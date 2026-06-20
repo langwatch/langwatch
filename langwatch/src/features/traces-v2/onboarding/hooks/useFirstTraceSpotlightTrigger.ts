@@ -9,15 +9,15 @@ interface UseFirstTraceSpotlightTriggerArgs {
 }
 
 /**
- * One-shot per-project effect: the moment `hasAnyTraces` flips to true
- * for a project we haven't auto-fired the spotlight tour on yet, start
- * spotlights so the user gets a contextual walk-through of their own
- * data the instant it lands.
+ * One-shot global (browser-level) effect: the moment `hasAnyTraces`
+ * flips to true in any project we haven't auto-fired the spotlight tour
+ * on yet, start spotlights so the user gets a contextual walk-through of
+ * their own data the instant it lands.
  *
- * Persisted in `firstTraceSpotlightFiredByProject` so refreshes don't
- * re-trigger, and a second project gets its own first-trace moment
- * (we'd add a cross-project / cross-user "has the user ever finished
- * one of these" signal here later when the backend lands one).
+ * Persisted in the global `firstTraceSpotlightFired` flag so refreshes
+ * don't re-trigger AND so seeing the tour once suppresses it across every
+ * project on this browser (no longer keyed by project). See
+ * specs/traces-v2/tour-visibility-and-persistence.feature
  *
  * Skipped silently when:
  *   - the project hasn't been resolved yet (projectId === null)
@@ -32,8 +32,8 @@ export function useFirstTraceSpotlightTrigger({
   projectId,
   hasAnyTraces,
 }: UseFirstTraceSpotlightTriggerArgs): void {
-  const firstTraceSpotlightFiredByProject = useOnboardingStore(
-    (s) => s.firstTraceSpotlightFiredByProject,
+  const firstTraceSpotlightFired = useOnboardingStore(
+    (s) => s.firstTraceSpotlightFired,
   );
   const markFired = useOnboardingStore((s) => s.markFirstTraceSpotlightFired);
   const spotlightsActive = useOnboardingStore((s) => s.spotlightsActive);
@@ -46,12 +46,12 @@ export function useFirstTraceSpotlightTrigger({
   useEffect(() => {
     if (!projectId) return;
     if (hasAnyTraces !== true) return;
-    if (firstTraceSpotlightFiredByProject[projectId]) return;
+    if (firstTraceSpotlightFired) return;
     if (spotlightsActive || tourActive) {
       // The user is already mid-tour or mid-journey — don't yank them
       // back to the first spotlight. Still mark fired so we don't
       // retry on the next render once they exit.
-      markFired(projectId);
+      markFired();
       return;
     }
     // Brief breath before the spotlight pops up so the user gets to
@@ -68,7 +68,7 @@ export function useFirstTraceSpotlightTrigger({
       // for the next visit.
       const state = useOnboardingStore.getState();
       if (state.spotlightsActive || state.tourActive) {
-        state.markFirstTraceSpotlightFired(projectId);
+        state.markFirstTraceSpotlightFired();
         return;
       }
       const first = TRACE_EXPLORER_SPOTLIGHTS[0];
@@ -76,13 +76,13 @@ export function useFirstTraceSpotlightTrigger({
       state.setCurrentSpotlightId(firstId);
       state.setSpotlightsActive(true);
       writeSpotlightFragment(firstId);
-      state.markFirstTraceSpotlightFired(projectId);
+      state.markFirstTraceSpotlightFired();
     }, ARRIVAL_BREATH_MS);
     return () => clearTimeout(timer);
   }, [
     projectId,
     hasAnyTraces,
-    firstTraceSpotlightFiredByProject,
+    firstTraceSpotlightFired,
     spotlightsActive,
     tourActive,
     markFired,

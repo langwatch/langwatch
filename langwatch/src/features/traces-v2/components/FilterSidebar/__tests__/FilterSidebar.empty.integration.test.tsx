@@ -17,7 +17,6 @@ import "@testing-library/jest-dom/vitest";
 let mockHasAnyTraces: boolean | undefined = false;
 let mockFacetsLoading = false;
 let mockDescriptors: unknown[] = [];
-let mockCategoricals: unknown[] = [];
 
 // ─── Dependency mocks ─────────────────────────────────────────────────────────
 
@@ -53,6 +52,18 @@ vi.mock("../../../stores/filterStore", () => ({
   useFilterStore: (selector: (s: unknown) => unknown) =>
     selector({
       ast: { type: "group", combinator: "and", filters: [] },
+      queryText: "",
+      clearAll: vi.fn(),
+    }),
+}));
+
+vi.mock("../../../stores/viewStore", () => ({
+  useViewStore: (selector: (s: unknown) => unknown) =>
+    selector({
+      activeLensId: "all-traces",
+      isDraft: () => false,
+      revertLens: vi.fn(),
+      allLenses: [{ id: "all-traces", name: "All" }],
     }),
 }));
 
@@ -86,7 +97,10 @@ vi.mock("../../../stores/facetVisibilityStore", () => ({
 vi.mock("~/server/app-layer/traces/query-language/queries", () => ({
   analyzeOrGroups: () => ({ groups: [], fieldToGroupIds: new Map() }),
   buildFacetStateLookup: () => new Map(),
-  getFacetValues: () => ({ include: new Set<string>(), exclude: new Set<string>() }),
+  getFacetValues: () => ({
+    include: new Set<string>(),
+    exclude: new Set<string>(),
+  }),
 }));
 
 // Stub the heavy sub-components so we only test the visibility decision
@@ -99,14 +113,11 @@ vi.mock("../SectionRenderer", () => ({
 }));
 
 vi.mock("../SortableSection", () => ({
-  SortableSection: ({ children }: { children: (p: unknown) => React.ReactNode }) => (
-    <div>{children({})}</div>
-  ),
-}));
-
-vi.mock("../OrConnectorOverlay", () => ({
-  OrConnectorOverlay: () => null,
-  ConnectorLaneWidth: 16,
+  SortableSection: ({
+    children,
+  }: {
+    children: (p: unknown) => React.ReactNode;
+  }) => <div>{children({})}</div>,
 }));
 
 vi.mock("../FilterSidebarSkeleton", () => ({
@@ -139,7 +150,7 @@ vi.mock("@dnd-kit/sortable", () => ({
 
 // ─── Module under test ────────────────────────────────────────────────────────
 
-import React from "react";
+import type React from "react";
 import { FilterSidebar } from "../FilterSidebar";
 
 // ─── Test lifecycle ───────────────────────────────────────────────────────────
@@ -153,7 +164,6 @@ beforeEach(() => {
   mockHasAnyTraces = false;
   mockFacetsLoading = false;
   mockDescriptors = [];
-  mockCategoricals = [];
 });
 
 function renderSidebar() {
@@ -222,6 +232,50 @@ describe("<FilterSidebar />", () => {
 
         // hasAnyTraces=true → sidebar should be visible even with 0 descriptors
         expect(container).not.toBeEmptyDOMElement();
+      });
+
+      it("falls back to the default minimal facet set (not a blank rail)", () => {
+        mockHasAnyTraces = true;
+        mockFacetsLoading = false;
+        mockDescriptors = [];
+
+        renderSidebar();
+
+        // The container always has the header bar, so a non-empty DOM is a
+        // weak signal. The load-bearing check is that real facet SECTIONS
+        // render — the synthetic FACET_DEFAULTS visible under comfortable
+        // density. Zero here = the blank-rail regression.
+        expect(
+          screen.getAllByTestId("section-renderer").length,
+        ).toBeGreaterThan(0);
+      });
+    });
+
+    describe("when discover returns descriptors that all partition away", () => {
+      it("falls back to the default minimal facet set (not a blank rail)", () => {
+        mockHasAnyTraces = true;
+        mockFacetsLoading = false;
+        // Discover responded with descriptors, but every categorical has
+        // zero buckets and every range a zero span — nothing usable
+        // survives partitioning. Before the fix this collapsed the rail to
+        // zero sections because synthesis only fired on an EMPTY descriptor
+        // list, not on a "non-empty but all-dropped" one.
+        mockDescriptors = [
+          {
+            kind: "categorical",
+            key: "status",
+            label: "Status",
+            topValues: [],
+          },
+          { kind: "categorical", key: "model", label: "Model", topValues: [] },
+          { kind: "range", key: "duration", label: "Duration", min: 0, max: 0 },
+        ];
+
+        renderSidebar();
+
+        expect(
+          screen.getAllByTestId("section-renderer").length,
+        ).toBeGreaterThan(0);
       });
     });
   });

@@ -109,6 +109,20 @@ export const STANDARD_COLUMNS: readonly StandardColumnConfig[] = [
     minWidth: 100,
   },
   {
+    id: "labels",
+    label: "Labels",
+    section: "standard",
+    visible: true,
+    minWidth: 140,
+  },
+  {
+    id: "prompt",
+    label: "Prompt",
+    section: "fields",
+    visible: false,
+    minWidth: 140,
+  },
+  {
     id: "evaluations",
     label: "Evals",
     section: "evaluations",
@@ -148,6 +162,10 @@ export const STANDARD_COLUMNS: readonly StandardColumnConfig[] = [
     label: "Conversation ID",
     section: "standard",
     visible: false,
+    // Pinned like Time: a conversation is the trace's identity in
+    // multi-turn views, so when the column is enabled it stays frozen at
+    // the left edge rather than scrolling away among the metrics.
+    pinned: "left",
     minWidth: 120,
   },
   {
@@ -177,5 +195,12 @@ export const STANDARD_COLUMNS: readonly StandardColumnConfig[] = [
     section: "standard",
     visible: false,
     minWidth: 60,
+  },
+  {
+    id: "size",
+    label: "Storage size",
+    section: "standard",
+    visible: false,
+    minWidth: 110,
   },
 ];

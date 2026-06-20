@@ -226,6 +226,17 @@ export function VizPlaceholder({
   fillParent = false,
   paneLayout,
 }: VizPlaceholderProps) {
+  // Span ids carrying a managed prompt. The trace summary already rolls
+  // up the selected + last-used prompt span ids, which is enough to flag
+  // prompt-bearing spans in the waterfall without loading full span
+  // params just for an icon.
+  const promptSpanIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (trace?.selectedPromptSpanId) ids.add(trace.selectedPromptSpanId);
+    if (trace?.lastUsedPromptSpanId) ids.add(trace.lastUsedPromptSpanId);
+    return ids;
+  }, [trace?.selectedPromptSpanId, trace?.lastUsedPromptSpanId]);
+
   // When the detail pane is hidden, surface a "Show details" affordance
   // in the viz tab row so the user can bring it back without having to
   // click a span. The detail pane also auto-reopens whenever a span is
@@ -631,6 +642,7 @@ export function VizPlaceholder({
               <WaterfallView
                 spans={spans}
                 selectedSpanId={selectedSpanId}
+                promptSpanIds={promptSpanIds}
                 onSelectSpan={onSelectSpan}
                 onClearSpan={onClearSpan}
                 onSwitchToSpanList={handleSwitchToSpanList}

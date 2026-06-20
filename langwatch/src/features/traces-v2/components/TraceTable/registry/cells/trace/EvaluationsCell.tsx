@@ -1,5 +1,8 @@
 import { Badge, Box, HStack, Text } from "@chakra-ui/react";
-import { useLayoutEffect, useRef, useState } from "react";
+import type React from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useFilterStore } from "~/features/traces-v2/stores/filterStore";
+import { useDrawer } from "~/hooks/useDrawer";
 import type {
   TraceEvalResult,
   TraceListItem,
@@ -11,6 +14,11 @@ import type { CellDef } from "../../types";
 const MAX_EVALS_WHEN_WRAPPING = 9;
 
 type Density = "compact" | "comfortable";
+
+type DecorateEval = (ev: TraceEvalResult) => {
+  onFilter?: () => void;
+  onViewDefinition?: () => void;
+};
 
 // Server returns evaluations ordered by UpdatedAt DESC, so the first
 // occurrence per evaluator is the latest run — keep that one and drop
@@ -27,12 +35,66 @@ function dedupeLatest(evals: TraceEvalResult[]): TraceEvalResult[] {
   return result;
 }
 
-function renderEvaluations(
-  row: TraceListItem,
-  density: Density,
-  isExpanded: boolean,
-  enabledAddonIds: string[],
-) {
+/**
+ * Resolve which definition drawer (if any) an evaluator id opens.
+ *
+ * Langevals built-in evaluator *types* carry a "/" (e.g.
+ * "ragas/faithfulness") and have no editable definition → null.
+ * Configured evaluators (`evaluator_*`) open the evaluator editor; other
+ * slash-free ids are legacy online monitors and open the
+ * online-evaluation drawer — mirroring the legacy EvaluationStatusItem.
+ */
+export function evalDefinitionTarget(
+  evaluatorId: string | null | undefined,
+):
+  | { drawer: "evaluatorEditor"; evaluatorId: string }
+  | { drawer: "onlineEvaluation"; monitorId: string }
+  | null {
+  if (!evaluatorId || evaluatorId.includes("/")) return null;
+  if (evaluatorId.startsWith("evaluator_")) {
+    return { drawer: "evaluatorEditor", evaluatorId };
+  }
+  return { drawer: "onlineEvaluation", monitorId: evaluatorId };
+}
+
+/**
+ * Builds the per-eval click handlers: filter-by-evaluator on chip click,
+ * and a "View definition" action (for evaluators that resolve to a
+ * definition drawer) that navigates exactly like EvaluationStatusItem.
+ */
+function useEvalChipDecorations(): DecorateEval {
+  const { openDrawer } = useDrawer();
+  return useCallback(
+    (ev: TraceEvalResult) => {
+      const evaluatorId = ev.evaluatorId?.trim();
+      const onFilter = evaluatorId
+        ? () => useFilterStore.getState().toggleFacet("evaluator", evaluatorId)
+        : undefined;
+      const target = evalDefinitionTarget(ev.evaluatorId);
+      const onViewDefinition = target
+        ? () => {
+            if (target.drawer === "evaluatorEditor") {
+              openDrawer("evaluatorEditor", {
+                evaluatorId: target.evaluatorId,
+              });
+            } else {
+              openDrawer("onlineEvaluation", { monitorId: target.monitorId });
+            }
+          }
+        : undefined;
+      return { onFilter, onViewDefinition };
+    },
+    [openDrawer],
+  );
+}
+
+const EvaluationsCellView: React.FC<{
+  row: TraceListItem;
+  density: Density;
+  isExpanded: boolean;
+  enabledAddonIds: string[];
+}> = ({ row, density, isExpanded, enabledAddonIds }) => {
+  const decorate = useEvalChipDecorations();
   const evals = dedupeLatest(row.evaluations);
   const textStyle = density === "compact" ? "xs" : "sm";
   if (evals.length === 0) {
@@ -60,29 +122,44 @@ function renderEvaluations(
     return (
       <HStack gap={gap} flexWrap="wrap">
         {visible.map((ev, i) => (
-          <EvalChip key={`${ev.evaluatorId}-${i}`} eval_={ev} />
+          <EvalChip
+            key={`${ev.evaluatorId}-${i}`}
+            eval_={ev}
+            {...decorate(ev)}
+          />
         ))}
         {overflow > 0 && <MoreEvalsPill count={overflow} />}
       </HStack>
     );
   }
-  return <CappedEvalChipsRow evals={evals} gap={gap} />;
-}
+  return <CappedEvalChipsRow evals={evals} gap={gap} decorate={decorate} />;
+};
 
 export const EvaluationsCell = {
   id: "evaluations",
   label: "Evals",
-  render: ({ row, isExpanded, enabledAddonIds }) =>
-    renderEvaluations(row, "compact", isExpanded, enabledAddonIds),
-  renderComfortable: ({ row, isExpanded, enabledAddonIds }) =>
-    renderEvaluations(row, "comfortable", isExpanded, enabledAddonIds),
+  render: ({ row, isExpanded, enabledAddonIds }) => (
+    <EvaluationsCellView
+      row={row}
+      density="compact"
+      isExpanded={isExpanded}
+      enabledAddonIds={enabledAddonIds}
+    />
+  ),
+  renderComfortable: ({ row, isExpanded, enabledAddonIds }) => (
+    <EvaluationsCellView
+      row={row}
+      density="comfortable"
+      isExpanded={isExpanded}
+      enabledAddonIds={enabledAddonIds}
+    />
+  ),
 } as const satisfies CellDef<TraceListItem>;
 
 function MoreEvalsPill({ count }: { count: number }) {
-  // Matches the model column's `ExtraModelsBadge` — same outline badge,
-  // bare `+N` text. The previous filled pill with the trailing "more"
-  // word read as a louder, separately-coloured surface that didn't
-  // sit beside the eval chips cleanly.
+  // Plain outline badge with bare `+N` text. The previous filled pill
+  // with the trailing "more" word read as a louder, separately-coloured
+  // surface that didn't sit beside the eval chips cleanly.
   return (
     <Badge size="xs" variant="outline" flexShrink={0}>
       +{count}
@@ -93,6 +170,7 @@ function MoreEvalsPill({ count }: { count: number }) {
 interface CappedEvalChipsRowProps {
   evals: TraceEvalResult[];
   gap: 1 | 1.5;
+  decorate: DecorateEval;
 }
 
 /**
@@ -104,7 +182,7 @@ interface CappedEvalChipsRowProps {
  * eventual capped row appear with the chips already in place instead
  * of pop-in.
  */
-function CappedEvalChipsRow({ evals, gap }: CappedEvalChipsRowProps) {
+function CappedEvalChipsRow({ evals, gap, decorate }: CappedEvalChipsRowProps) {
   const measureRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [visibleCount, setVisibleCount] = useState<number | null>(null);
@@ -141,8 +219,8 @@ function CappedEvalChipsRow({ evals, gap }: CappedEvalChipsRowProps) {
       // for the trailing pill plus a gap on its left.
       let used = 0;
       let count = 0;
-      for (let i = 0; i < chips.length; i++) {
-        const w = chips[i]!.offsetWidth;
+      for (const chip of chips) {
+        const w = chip.offsetWidth;
         const tentative = used + w + (count > 0 ? gapPx : 0);
         const reserve = pillWidth + gapPx;
         if (tentative + reserve > containerWidth) break;
@@ -161,8 +239,7 @@ function CappedEvalChipsRow({ evals, gap }: CappedEvalChipsRowProps) {
     return () => ro.disconnect();
   }, [evals, gapPx]);
 
-  const visible =
-    visibleCount === null ? evals : evals.slice(0, visibleCount);
+  const visible = visibleCount === null ? evals : evals.slice(0, visibleCount);
   const overflow = evals.length - visible.length;
 
   return (
@@ -177,7 +254,11 @@ function CappedEvalChipsRow({ evals, gap }: CappedEvalChipsRowProps) {
         css={{ left: "-9999px", top: 0, gap: `${gapPx}px` }}
       >
         {evals.map((ev, i) => (
-          <EvalChip key={`m-${ev.evaluatorId}-${i}`} eval_={ev} />
+          <EvalChip
+            key={`m-${ev.evaluatorId}-${i}`}
+            eval_={ev}
+            {...decorate(ev)}
+          />
         ))}
         <MoreEvalsPill count={Math.max(evals.length, 1)} />
       </Box>
@@ -194,7 +275,11 @@ function CappedEvalChipsRow({ evals, gap }: CappedEvalChipsRowProps) {
         visibility={visibleCount === null ? "hidden" : "visible"}
       >
         {visible.map((ev, i) => (
-          <EvalChip key={`${ev.evaluatorId}-${i}`} eval_={ev} />
+          <EvalChip
+            key={`${ev.evaluatorId}-${i}`}
+            eval_={ev}
+            {...decorate(ev)}
+          />
         ))}
         {overflow > 0 && <MoreEvalsPill count={overflow} />}
       </HStack>

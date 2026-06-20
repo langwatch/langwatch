@@ -2,14 +2,14 @@ import {
   Badge,
   Box,
   Button,
+  chakra,
   Flex,
   HStack,
   Input,
   SimpleGrid,
   Stack,
-  Text,
-  chakra,
   type StackProps,
+  Text,
 } from "@chakra-ui/react";
 import type React from "react";
 import { useMemo } from "react";
@@ -30,7 +30,7 @@ import {
 } from "../../lens/capabilities";
 import { isLensDraftValid } from "../../lens/schema";
 import { useLensDraftStore } from "../../stores/lensDraftStore";
-import { type GroupingMode } from "../../stores/viewStore";
+import type { GroupingMode } from "../../stores/viewStore";
 
 interface LensConfigDialogProps {
   /** Called with the validated draft after the user clicks "Create lens". */
@@ -207,10 +207,7 @@ const ColumnsField: React.FC = () => {
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 
   return (
-    <FieldShell
-      label="Columns"
-      hint={`${selected.length} selected`}
-    >
+    <FieldShell label="Columns" hint={`${selected.length} selected`}>
       <Stack gap={3}>
         {sections.map(([sectionLabel, columns]) => (
           <Stack key={sectionLabel} gap={1.5}>
@@ -230,17 +227,9 @@ const ColumnsField: React.FC = () => {
                   key={c.id}
                   size="sm"
                   checked={selectedSet.has(c.id)}
-                  disabled={c.pinned}
                   onCheckedChange={() => toggleColumn(c.id)}
                 >
-                  <HStack gap={1}>
-                    <Text fontSize="xs">{c.label}</Text>
-                    {c.pinned && (
-                      <Text fontSize="2xs" color="fg.subtle">
-                        (pinned)
-                      </Text>
-                    )}
-                  </HStack>
+                  <Text fontSize="xs">{c.label}</Text>
                 </Checkbox>
               ))}
             </SimpleGrid>
@@ -428,9 +417,8 @@ const BetaBanner: React.FC = () => (
       <LuInfo size={14} />
     </Box>
     <Text fontSize="xs" lineHeight="1.4">
-      Lenses are stored in your browser during this beta. They won't sync
-      across browsers or to teammates yet — server-backed lenses are landing
-      next.
+      Lenses are stored in your browser during this beta. They won't sync across
+      browsers or to teammates yet — server-backed lenses are landing next.
     </Text>
   </Flex>
 );

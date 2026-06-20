@@ -57,7 +57,7 @@ import {
 import { CostBreakdownTooltipContent } from "../../shared/CostBreakdownTooltip";
 import { TokenBreakdownTooltipContent } from "../../shared/TokenBreakdownTooltip";
 import { TooltipRow } from "../../shared/TooltipRow";
-import { ExtraModelsBadge } from "../../TraceTable/registry/cells/trace/ModelCell";
+import { ModelsTooltip } from "../../TraceTable/registry/cells/trace/ModelCell";
 import { Chip } from "../Chip";
 import { splitChipsForOverflow } from "../ChipBar";
 import { ExceptionsContent } from "../ExceptionsContent";
@@ -1190,17 +1190,27 @@ export const DrawerHeader = memo(function DrawerHeader({
         {reasoningTokens != null && reasoningTokens > 0 && (
           <MetricPill label="Reasoning" value={formatTokens(reasoningTokens)} />
         )}
-        {trace.models.length > 0 && (
-          <HStack gap={1}>
+        {trace.models.length > 0 &&
+          (trace.models.length > 1 ? (
+            // Folded +N (matches the table's model chip) — the count lives
+            // inside the pill value rather than as a separate badge; the
+            // full model list is one hover away via the tooltip.
+            <ModelsTooltip models={trace.models}>
+              <Box display="inline-flex">
+                <MetricPill
+                  label="Models"
+                  value={`${abbreviateModel(trace.models[0]!)}  +${
+                    trace.models.length - 1
+                  }`}
+                />
+              </Box>
+            </ModelsTooltip>
+          ) : (
             <MetricPill
-              label={trace.models.length > 1 ? "Models" : "Model"}
+              label="Model"
               value={abbreviateModel(trace.models[0]!)}
             />
-            {trace.models.length > 1 && (
-              <ExtraModelsBadge models={trace.models.slice(1)} size="sm" />
-            )}
-          </HStack>
-        )}
+          ))}
         {reasoningEffort && (
           <MetricPill label="Reasoning effort" value={reasoningEffort} />
         )}

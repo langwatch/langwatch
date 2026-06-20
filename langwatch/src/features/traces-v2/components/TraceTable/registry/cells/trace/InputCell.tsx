@@ -1,4 +1,5 @@
 import { Text } from "@chakra-ui/react";
+import { RedactedInline } from "~/components/ui/RedactedField";
 import type { TraceListItem } from "../../../../../types/trace";
 import { contentToText } from "../../../chatContent";
 import type { CellDef } from "../../types";
@@ -9,6 +10,12 @@ export const InputCell = {
   render: ({ row }) => {
     const text = contentToText(row.input);
     if (!text) {
+      // Redacted (server nulled the content) reads as a lock + "Redacted", not
+      // the em-dash used for genuinely-absent input — so the operator knows the
+      // content exists but is hidden by a privacy rule.
+      if (row.inputRedacted) {
+        return <RedactedInline visibleTo={row.inputVisibleTo} size="xs" />;
+      }
       return (
         <Text textStyle="sm" color="fg.subtle">
           —

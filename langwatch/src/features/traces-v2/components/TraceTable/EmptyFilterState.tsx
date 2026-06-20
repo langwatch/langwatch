@@ -55,9 +55,9 @@ function emptyContent({
 }): EmptyContent {
   if (activeLensId === "errors") {
     return {
-      title: "No errors in this range",
+      title: "No errors here — lucky you",
       description:
-        "Nothing failed in the selected window. Switch to All traces or widen the range to keep digging.",
+        "Not a single failure in this window. Either your stack is having a flawless day, or nothing's actually reporting errors yet — worth a glance at your integration to be sure it's wired up.",
     };
   }
   if (activeLensId === "conversations") {

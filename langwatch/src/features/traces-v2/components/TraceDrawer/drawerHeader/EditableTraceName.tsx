@@ -220,11 +220,19 @@ export function EditableTraceName({
           </IconButton>
         </Tooltip>
       </HStack>
+      {/* Counter + validation float beneath the input row (absolute, out of
+          flow) so they don't add height to this box — otherwise the header
+          row's `align="center"` re-centres the sibling status orb against
+          the taller box and the orb visibly drops while editing. See
+          specs/traces-v2/editable-trace-name-alignment.feature */}
       {localValidationMessage && (
         <Text
           id={errorId}
           textStyle="2xs"
           color="red.fg"
+          position="absolute"
+          top="100%"
+          left={0}
           marginTop={0.5}
           role="alert"
         >
@@ -232,7 +240,14 @@ export function EditableTraceName({
         </Text>
       )}
       {!localValidationMessage && trimmed.length > 0 && (
-        <Text textStyle="2xs" color="fg.subtle" marginTop={0.5}>
+        <Text
+          textStyle="2xs"
+          color="fg.subtle"
+          position="absolute"
+          top="100%"
+          left={0}
+          marginTop={0.5}
+        >
           {trimmed.length}/{TRACE_NAME_MAX_LENGTH}
         </Text>
       )}

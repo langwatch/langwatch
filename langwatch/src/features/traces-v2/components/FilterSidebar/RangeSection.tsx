@@ -46,14 +46,18 @@ interface RangeSectionProps {
   onShiftToggle?: (nextOpen: boolean) => void;
   /** Remove this section from the sidebar (per-user). */
   onHide?: () => void;
-  orGroupId?: string;
-  orPeers?: readonly string[];
   /**
    * True when this range section was synthesised as a placeholder before
    * traces arrive. When `min === max === 0`, renders a caption instead of
    * an unusable zero-span slider.
    */
   synthetic?: boolean;
+  /** Slider ↔ tick-list presentation toggle, shown for discrete-eligible
+   *  numeric facets. */
+  modeToggleProps?: {
+    mode: "range" | "discrete";
+    onToggle: () => void;
+  };
 }
 
 const RangeSectionInner: React.FC<RangeSectionProps> = ({
@@ -70,9 +74,8 @@ const RangeSectionInner: React.FC<RangeSectionProps> = ({
   dragHandleProps,
   onShiftToggle,
   onHide,
-  orGroupId,
-  orPeers,
   synthetic,
+  modeToggleProps,
 }) => {
   const lensOverride = useFacetLensStore((s) => s.lens.sectionOpen[field]);
   const setSectionOpen = useFacetLensStore((s) => s.setSectionOpen);
@@ -149,8 +152,7 @@ const RangeSectionInner: React.FC<RangeSectionProps> = ({
       onShiftToggle={onShiftToggle}
       onHide={onHide}
       hideLabel={`Hide ${title}`}
-      orGroupId={orGroupId}
-      orPeers={orPeers}
+      modeToggleProps={modeToggleProps}
       hasActive={isActive}
       activeIndicator={
         summary ? (

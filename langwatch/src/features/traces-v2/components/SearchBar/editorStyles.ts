@@ -14,7 +14,7 @@ export const editorStyles: SystemStyleObject = {
     // (whitespace-only newline that survives normalisation, or schema
     // expansion in future) pushes the rest of the page off-screen.
     maxHeight: "96px",
-    caretColor: "var(--chakra-colors-fg-DEFAULT)",
+    caretColor: "var(--chakra-colors-fg)",
   },
   "& .tiptap p": { margin: 0 },
   "& .tiptap p.is-editor-empty:first-of-type::before": {
@@ -51,47 +51,38 @@ export const editorStyles: SystemStyleObject = {
     // glued onto the value (`origin:agent×` instead of `origin:agent  ×`).
     paddingRight: "6px",
     marginLeft: "1px",
-    // Anchor for the optional label overlay below — without it the
-    // ::after pseudo-element positions against the editor itself.
-    position: "relative",
   },
-  // Label overlay: when a chip carries a human-readable `label`
-  // (populated from the facet response — evaluator name, topic name,
-  // etc.), paint that label on top of the ID in the chip body. On
-  // hover (or when the caret enters the chip), the overlay fades out
-  // and the underlying ID becomes visible. The user can therefore
-  // *read* the chip as "model: GPT-4o", but the document still holds
-  // `model:openai/gpt-4o-2024-08-06` so the query language is
-  // unchanged and round-trips ID-only. Width is dictated by the
-  // underlying text; the overlay just paints over it — if the label
-  // is shorter the right of the chip looks slightly padded, which is
-  // an acceptable tradeoff against not breaking selection / paste-back.
+  // Label collapse: when a chip carries a human-readable `label`, render the
+  // field-qualified label (`evaluator:Policy Check`) as in-flow ::after text
+  // and collapse the underlying id to zero width (font-size:0). The chip then
+  // hugs the *label*, not the longer id — no spare space reserved for the
+  // value tail. The id stays in the DOM (selection / copy / the query
+  // language all keep it) and returns to full size on hover, where the label
+  // hides and the chip grows in place to reveal the full id. The `evaluator:`
+  // prefix is part of both the label and the id, so it never moves — only the
+  // value tail differs.
+  "& .filter-token[data-filter-chip-label]": {
+    fontSize: "0px",
+  },
   "& .filter-token[data-filter-chip-label]::after": {
     content: "attr(data-filter-chip-label)",
-    position: "absolute",
-    inset: 0,
-    display: "flex",
-    alignItems: "center",
-    paddingLeft: "6px",
-    paddingRight: "6px",
     color: "blue.fg",
-    background: "inherit",
     fontFamily: "inherit",
-    fontSize: "inherit",
+    fontSize: "var(--chakra-font-sizes-xs)",
     lineHeight: "22px",
+    whiteSpace: "nowrap",
     pointerEvents: "none",
-    borderTopLeftRadius: "8px",
-    borderBottomLeftRadius: "8px",
-    opacity: 1,
-    transition: "opacity 100ms ease-out",
   },
-  // Reveal the underlying ID on hover. `:has(+ .filter-token-delete:hover)`
-  // covers the case where the hover happens over the X-button half of
-  // the pill, so the overlay drops there too — otherwise the user would
-  // see "label, label, X" and "label, ID, X" inconsistently.
+  // Reveal the underlying id on hover — also when the X-button half is
+  // hovered, so the whole pill reads consistently. Restore the id text to
+  // full size and drop the label so only the id shows; the chip grows to fit.
+  "& .filter-token[data-filter-chip-label]:hover, & .filter-token[data-filter-chip-label]:has(+ .filter-token-delete:hover)":
+    {
+      fontSize: "var(--chakra-font-sizes-xs)",
+    },
   "& .filter-token[data-filter-chip-label]:hover::after, & .filter-token[data-filter-chip-label]:has(+ .filter-token-delete:hover)::after":
     {
-      opacity: 0,
+      display: "none",
     },
   // Field name was unrecognised (typo, removed key) — still parses as a
   // tag but the rest of the platform won't filter on it. A warning tint

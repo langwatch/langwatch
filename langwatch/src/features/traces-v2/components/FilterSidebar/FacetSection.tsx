@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Input, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
@@ -12,6 +12,7 @@ import { FacetRow } from "./FacetRow";
 import { NoneFacetRow } from "./NoneFacetRow";
 import { SidebarSection } from "./SidebarSection";
 import type { FacetItem, FacetValueState } from "./types";
+import { countPresentValues } from "./utils";
 
 interface FacetSectionProps {
   title: string;
@@ -19,26 +20,28 @@ interface FacetSectionProps {
   field: string;
   items: FacetItem[];
   getValueState: (value: string) => FacetValueState;
-  onToggle: (
-    field: string,
-    value: string,
-    options?: { modifierKey?: boolean },
-  ) => void;
+  onToggle: (field: string, value: string) => void;
+  /** Force a value to excluded (`NOT field:value`) / back to neutral —
+   * drives each row's trailing exclude (`−`) affordance. */
+  onExclude: (field: string, value: string) => void;
   dragHandleProps?: React.HTMLAttributes<HTMLDivElement>;
   /** When set, renders a "(none)" row pinned at the bottom that toggles a `none:`/`has:` filter. */
   noneRow?: { active: boolean; onToggle: () => void };
   onShiftToggle?: (nextOpen: boolean) => void;
   /** Remove this section from the sidebar (per-user). */
   onHide?: () => void;
-  orGroupId?: string;
-  orPeers?: readonly string[];
-  orMemberValues?: ReadonlySet<string>;
   /**
    * True when this section was synthesised before traces arrive. When
    * `items.length === 0` and this is set, renders a "No values yet"
    * placeholder instead of an empty section.
    */
   synthetic?: boolean;
+  /** Slider ↔ tick-list presentation toggle, forwarded to the header for
+   *  numeric facets rendered in discrete mode. */
+  modeToggleProps?: {
+    mode: "range" | "discrete";
+    onToggle: () => void;
+  };
   /**
    * Optional per-row extras renderer. Invoked for any row whose value
    * is currently active (i.e. surfaced via `pinnedContent`). The
@@ -55,6 +58,12 @@ interface FacetSectionProps {
    * this row is currently expanded, and a callback to toggle the
    * expansion. Returns `null` to skip extras for that item.
    *
+   * Split into two slots: `trailing` renders inline at the row's right
+   * edge (the expand chevron) and `below` renders underneath the row
+   * (the expanded drilldown panel). Keeping the toggle inline — rather
+   * than as a full-width row beneath — is why the contract is an object
+   * rather than a single node.
+   *
    * FacetSection owns the `expandedInactiveRows` Set so the state is
    * automatically reset whenever the section unmounts or the sidebar
    * is closed — no external persistence needed.
@@ -63,7 +72,16 @@ interface FacetSectionProps {
     item: FacetItem,
     isExpanded: boolean,
     onToggleExpand: () => void,
-  ) => React.ReactNode;
+  ) => InactiveRowExtras | null;
+}
+
+interface InactiveRowExtras {
+  /** Inline accessory rendered at the row's trailing edge (e.g. an
+   *  expand chevron). Sits beside the row, not inside its button. */
+  trailing?: React.ReactNode;
+  /** Content rendered directly below the row (e.g. the expanded
+   *  drilldown panel). Only present while the row is expanded. */
+  below?: React.ReactNode;
 }
 
 const FacetSectionInner: React.FC<FacetSectionProps> = ({
@@ -73,16 +91,15 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
   items,
   getValueState,
   onToggle,
+  onExclude,
   dragHandleProps,
   noneRow,
   onShiftToggle,
   onHide,
-  orGroupId,
-  orPeers,
-  orMemberValues,
   renderActiveRowExtras,
   renderInactiveRowExtras,
   synthetic,
+  modeToggleProps,
 }) => {
   const [expandedInactiveRows, setExpandedInactiveRows] = useState<Set<string>>(
     () => new Set(),
@@ -103,9 +120,9 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
   const [showMore, setShowMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   // The typed-value filter is hidden by default; the SidebarSection
-  // header shows a sliders icon that reveals (and auto-focuses) the
-  // input. Audit feedback was that the always-on input took ~32px
-  // off every section's vertical real estate for an affordance most
+  // header shows a list-filter funnel icon that reveals (and auto-
+  // focuses) the input. Audit feedback was that the always-on input took
+  // ~32px off every section's vertical real estate for an affordance most
   // operators only reach for on long-tail values. We keep it
   // *available* (one click) but stop spending the space.
   const [searchOpen, setSearchOpen] = useState(false);
@@ -121,9 +138,12 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
   }, [searchOpen]);
 
   const handleToggle = useCallback(
-    (value: string, options?: { modifierKey?: boolean }) =>
-      onToggle(field, value, options),
+    (value: string) => onToggle(field, value),
     [onToggle, field],
+  );
+  const handleExclude = useCallback(
+    (value: string) => onExclude(field, value),
+    [onExclude, field],
   );
 
   const activeCount = useMemo(
@@ -133,24 +153,35 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
     [items, getValueState, noneRow?.active],
   );
 
+  // "Any of" hint: 2+ INCLUDED values of the same field combine with OR
+  // (a trace's field can equal only one value at a time). Surfacing this on
+  // the header tells the user the selection is a set of alternatives, not a
+  // narrowing AND — without making them read the query bar. Excluded values
+  // don't count: `NOT a AND NOT b` is a genuine AND, not an "any of".
+  const includedCount = useMemo(
+    () => items.filter((i) => getValueState(i.value) === "include").length,
+    [items, getValueState],
+  );
+  const showAnyOfHint = includedCount >= 2;
+
+  // Header value-count badge counts only values that actually have matching
+  // traces — see countPresentValues. The zero-count default rows stay visible
+  // in the list for one-click filtering; the badge just stops tallying them.
+  const presentValueCount = useMemo(() => countPresentValues(items), [items]);
+
   const filtered = useMemo(
     () => filterAndSortItems({ items, searchQuery }),
     [items, searchQuery],
   );
 
-  // Active rows = currently-filtered values + OR-group members. We
-  // pin them above the collapsible content so they stay visible even
-  // when the section is collapsed — the connector line keeps its
-  // anchors and the user can see / remove what's filtered without
+  // Active rows = currently-filtered values (same-field OR values are
+  // already active here via getValueState). We pin them above the
+  // collapsible content so they stay visible even when the section is
+  // collapsed — the user can see / remove what's filtered without
   // expanding the whole list.
   const activeItems = useMemo(
-    () =>
-      filtered.filter(
-        (item) =>
-          getValueState(item.value) !== "neutral" ||
-          orMemberValues?.has(item.value),
-      ),
-    [filtered, getValueState, orMemberValues],
+    () => filtered.filter((item) => getValueState(item.value) !== "neutral"),
+    [filtered, getValueState],
   );
   const activeValueSet = useMemo(
     () => new Set(activeItems.map((i) => i.value)),
@@ -178,193 +209,235 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
     [facetWindow.visible],
   );
 
+  // Freeze the row layout while the pointer is inside the section. A click
+  // toggles a value's state but must not yank it up to the pinned area or
+  // reshuffle the count-sorted list under the cursor (jarring). We snapshot
+  // the rendered partition (pinned actives + windowed rest) on pointer-enter
+  // and keep rendering it until the pointer leaves, at which point the live
+  // partition re-flows. Each row still reads its *live* state, so the clicked
+  // value lights up in place without moving.
+  const liveLayoutRef = useRef({ activeItems, facetWindow, maxCount });
+  liveLayoutRef.current = { activeItems, facetWindow, maxCount };
+  const [frozenLayout, setFrozenLayout] = useState<{
+    activeItems: FacetItem[];
+    facetWindow: FacetWindow;
+    maxCount: number;
+  } | null>(null);
+  const freezeLayout = useCallback(
+    () => setFrozenLayout((prev) => prev ?? { ...liveLayoutRef.current }),
+    [],
+  );
+  const thawLayout = useCallback(() => setFrozenLayout(null), []);
+  const layout = frozenLayout ?? { activeItems, facetWindow, maxCount };
+
   const smartDefaultOpen =
     items.length <= AUTO_EXPAND_THRESHOLD || activeCount > 0;
   const effectiveOpen = lensOverride ?? smartDefaultOpen;
 
   return (
-    <SidebarSection
-      title={title}
-      icon={icon}
-      open={effectiveOpen}
-      onOpenChange={(next) => setSectionOpen(field, next)}
-      dragHandleProps={dragHandleProps}
-      onShiftToggle={onShiftToggle}
-      onHide={onHide}
-      hideLabel={`Hide ${title}`}
-      orGroupId={orGroupId}
-      orPeers={orPeers}
-      searchToggleProps={
-        items.length > 0
-          ? {
-              open: searchOpen,
-              onToggle: () => setSearchOpen((prev) => !prev),
-            }
-          : undefined
-      }
-      valueCount={items.length}
-      hasActive={activeCount > 0}
-      pinnedContent={
-        activeItems.length > 0 ? (
-          <VStack gap={0.5} align="stretch">
-            {activeItems.map((item) => {
-              const extras = renderActiveRowExtras?.(item);
-              return (
-                <Box key={item.value}>
-                  <FacetRow
-                    item={item}
-                    state={getValueState(item.value)}
-                    maxCount={maxCount}
-                    onToggle={handleToggle}
-                    orGroupId={
-                      orMemberValues?.has(item.value) ? orGroupId : undefined
-                    }
-                    field={field}
-                  />
-                  {extras}
-                </Box>
-              );
-            })}
-          </VStack>
-        ) : undefined
-      }
-      activeIndicator={
-        activeCount > 0 ? (
-          <Badge
-            variant="solid"
-            size="xs"
-            colorPalette="blue"
-            borderRadius="full"
-            minW="4"
-            height="4"
-            paddingX={1}
-            display="inline-flex"
-            alignItems="center"
-            justifyContent="center"
-          >
-            {activeCount}
-          </Badge>
-        ) : undefined
-      }
-    >
-      <VStack gap={0.5} align="stretch">
-        {/* Placeholder row for sections that exist but have no values yet
+    <Box onMouseEnter={freezeLayout} onMouseLeave={thawLayout}>
+      <SidebarSection
+        title={title}
+        icon={icon}
+        open={effectiveOpen}
+        onOpenChange={(next) => setSectionOpen(field, next)}
+        dragHandleProps={dragHandleProps}
+        onShiftToggle={onShiftToggle}
+        onHide={onHide}
+        hideLabel={`Hide ${title}`}
+        searchToggleProps={
+          items.length > 0
+            ? {
+                open: searchOpen,
+                onToggle: () => setSearchOpen((prev) => !prev),
+              }
+            : undefined
+        }
+        modeToggleProps={modeToggleProps}
+        valueCount={presentValueCount}
+        hasActive={activeCount > 0}
+        pinnedContent={
+          layout.activeItems.length > 0 ? (
+            <VStack gap={0.5} align="stretch">
+              {layout.activeItems.map((item) => {
+                const extras = renderActiveRowExtras?.(item);
+                return (
+                  <Box key={item.value}>
+                    <FacetRow
+                      item={item}
+                      state={getValueState(item.value)}
+                      maxCount={layout.maxCount}
+                      onToggle={handleToggle}
+                      onExclude={handleExclude}
+                      field={field}
+                    />
+                    {extras}
+                  </Box>
+                );
+              })}
+            </VStack>
+          ) : undefined
+        }
+        activeIndicator={
+          // "Any of" hint — the only header indicator left. Shown when 2+
+          // values are INCLUDED, i.e. the same-field OR case, telling the
+          // user the selection is a set of alternatives (OR), not a
+          // narrowing AND, without making them read the query bar. The old
+          // numeric selection badge was removed: it floated mid-header,
+          // double-counted against the present-value count on the right,
+          // and was wrong for off-list custom values (it only tallied
+          // values present in `items`). The selection is already legible —
+          // chosen values stay pinned + visible above the list (even when
+          // collapsed) and the title goes bold via `hasActive`.
+          showAnyOfHint ? (
+            <Text
+              textStyle="2xs"
+              color="blue.fg"
+              fontWeight="500"
+              textTransform="none"
+              letterSpacing="normal"
+              flexShrink={0}
+              title="These values are combined with OR — traces matching any of them are shown"
+              data-testid="facet-any-of-hint"
+            >
+              any of
+            </Text>
+          ) : undefined
+        }
+      >
+        <VStack gap={0.5} align="stretch">
+          {/* Placeholder row for sections that exist but have no values yet
             (synthetic state — project has no traces, or discover is loading). */}
-        {items.length === 0 && synthetic && (
-          <Text
-            textStyle="2xs"
-            color="fg.subtle"
-            paddingX={1}
-            paddingY={1}
-          >
-            No values yet
-          </Text>
-        )}
-        {facetWindow.visible.map((item) => {
-          const inactiveExtras = renderInactiveRowExtras?.(
-            item,
-            expandedInactiveRows.has(item.value),
-            () => toggleInactiveExpand(item.value),
-          );
-          return (
-            <Box key={item.value}>
+          {items.length === 0 && synthetic && (
+            <Text textStyle="2xs" color="fg.subtle" paddingX={1} paddingY={1}>
+              No values yet
+            </Text>
+          )}
+          {layout.facetWindow.visible.map((item) => {
+            const inactiveExtras = renderInactiveRowExtras?.(
+              item,
+              expandedInactiveRows.has(item.value),
+              () => toggleInactiveExpand(item.value),
+            );
+            const row = (
               <FacetRow
                 item={item}
                 state={getValueState(item.value)}
                 maxCount={maxCount}
                 onToggle={handleToggle}
-                orGroupId={
-                  orMemberValues?.has(item.value) ? orGroupId : undefined
-                }
+                onExclude={handleExclude}
                 field={field}
               />
-              {inactiveExtras}
-            </Box>
-          );
-        })}
+            );
+            return (
+              <Box key={item.value}>
+                {inactiveExtras?.trailing ? (
+                  // Pair the row with its inline trailing accessory (the
+                  // expand chevron) so the toggle sits at the row's end
+                  // instead of as a full-width strip beneath it.
+                  <HStack gap={0.5} align="center">
+                    <Box flex={1} minWidth={0}>
+                      {row}
+                    </Box>
+                    {inactiveExtras.trailing}
+                  </HStack>
+                ) : (
+                  row
+                )}
+                {inactiveExtras?.below}
+              </Box>
+            );
+          })}
 
-        {noneRow && !searchQuery && (
-          <NoneFacetRow active={noneRow.active} onToggle={noneRow.onToggle} />
-        )}
+          {noneRow && !searchQuery && (
+            <NoneFacetRow active={noneRow.active} onToggle={noneRow.onToggle} />
+          )}
 
-        {isHighCardinality && !searchQuery && (
-          <ExpandToggle
-            showMore={showMore}
-            collapsedRemaining={facetWindow.collapsedRemaining}
-            beyondExpanded={facetWindow.beyondExpanded}
-            onShowMore={() => setShowMore(true)}
-            onShowLess={() => setShowMore(false)}
-          />
-        )}
+          {isHighCardinality && !searchQuery && (
+            <ExpandToggle
+              showMore={showMore}
+              collapsedRemaining={layout.facetWindow.collapsedRemaining}
+              beyondExpanded={layout.facetWindow.beyondExpanded}
+              onShowMore={() => setShowMore(true)}
+              onShowLess={() => setShowMore(false)}
+            />
+          )}
 
-        {/* Typed-value filter — revealed only when the user clicks the
-            sliders icon in the section header (searchToggleProps).
+          {/* Typed-value filter — revealed only when the user clicks the
+            list-filter funnel icon in the section header (searchToggleProps).
             Audit feedback was that the always-on input took ~32px off
             every section's vertical real estate for an affordance most
             operators only reach for on long-tail values. The toggle
             keeps it one click away; reopening auto-focuses the Input
             so the user can start typing immediately. */}
-        {items.length > 0 && searchOpen && (
-          // Inset paddingX so the Input's 2px focus ring has room to
-          // render — without it, the ring's left/right edges were
-          // clipped by the sidebar scroll container's
-          // `overflowX: "hidden"`. The 2px gutter on each side keeps
-          // the focused state legible without pulling the input far
-          // away from the rest of the section's content.
-          // paddingY mirrors paddingX so the focus ring has the same
-          // 2px gutter top and bottom. Without it the ring's bottom
-          // edge was clipped by the next sibling block (the
-          // facetWindow rows) once the input gained focus.
-          <VStack
-            gap={0.5}
-            align="stretch"
-            marginTop={1}
-            paddingX={0.5}
-            paddingY={0.5}
-          >
-            <Input
-              ref={searchInputRef}
-              size="xs"
-              placeholder="Search or press Enter to apply…"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key !== "Enter") return;
-                const typed = searchQuery.trim();
-                if (!typed) return;
-                // Prefer an exact match against a known FacetItem so
-                // facets where label !== value (friendly topic names,
-                // etc.) submit `value` rather than the typed `label`.
-                // Fall back to the raw typed value for rare values
-                // (a one-off `metadata.tenant`, a long error string
-                // copy-pasted from a log) that don't surface in the
-                // top-50 facet response. Toggle is symmetric: typing
-                // the same value again removes the filter.
-                const lowered = typed.toLowerCase();
-                const matched = items.find(
-                  (i) =>
-                    i.value.toLowerCase() === lowered ||
-                    i.label.toLowerCase() === lowered,
-                );
-                e.preventDefault();
-                handleToggle(matched?.value ?? typed);
-                setSearchQuery("");
-              }}
-              textStyle="xs"
-            />
-            {searchQuery.trim() && facetWindow.visible.length === 0 && (
-              <Text textStyle="2xs" color="fg.muted" paddingX={1}>
-                No match. Press <Kbd>Enter</Kbd> to filter by "
-                <Box as="span" fontWeight="600" color="fg">
-                  {searchQuery.trim()}
-                </Box>
-                " anyway.
-              </Text>
-            )}
-          </VStack>
-        )}
-      </VStack>
-    </SidebarSection>
+          {items.length > 0 && searchOpen && (
+            // The Input carries an inset focus ring (outlineOffset -2px) so
+            // the keyboard outline renders fully inside the element instead
+            // of being clipped at the edge by the sidebar scroll
+            // container's overflow (#18b). The small paddingX/paddingY
+            // gutter is kept purely for visual breathing room around the
+            // focused input.
+            <VStack
+              gap={0.5}
+              align="stretch"
+              marginTop={1}
+              paddingX={0.5}
+              paddingY={0.5}
+            >
+              <Input
+                ref={searchInputRef}
+                size="xs"
+                placeholder="Search or press Enter to apply…"
+                value={searchQuery}
+                // Inset focus ring so the keyboard outline renders fully —
+                // the sidebar scroll container's overflow clips an outset
+                // ring's edges (#18b). The paddingX/paddingY gutter on the
+                // wrapper above is kept as belt-and-braces.
+                _focusVisible={{
+                  outlineWidth: "2px",
+                  outlineStyle: "solid",
+                  outlineColor: "blue.focusRing",
+                  outlineOffset: "-2px",
+                }}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter") return;
+                  const typed = searchQuery.trim();
+                  if (!typed) return;
+                  // Prefer an exact match against a known FacetItem so
+                  // facets where label !== value (friendly topic names,
+                  // etc.) submit `value` rather than the typed `label`.
+                  // Fall back to the raw typed value for rare values
+                  // (a one-off `metadata.tenant`, a long error string
+                  // copy-pasted from a log) that don't surface in the
+                  // top-50 facet response. Toggle is symmetric: typing
+                  // the same value again removes the filter.
+                  const lowered = typed.toLowerCase();
+                  const matched = items.find(
+                    (i) =>
+                      i.value.toLowerCase() === lowered ||
+                      i.label.toLowerCase() === lowered,
+                  );
+                  e.preventDefault();
+                  handleToggle(matched?.value ?? typed);
+                  setSearchQuery("");
+                }}
+                textStyle="xs"
+              />
+              {searchQuery.trim() && facetWindow.visible.length === 0 && (
+                <Text textStyle="2xs" color="fg.muted" paddingX={1}>
+                  No match. Press <Kbd>Enter</Kbd> to filter by "
+                  <Box as="span" fontWeight="600" color="fg">
+                    {searchQuery.trim()}
+                  </Box>
+                  " anyway.
+                </Text>
+              )}
+            </VStack>
+          )}
+        </VStack>
+      </SidebarSection>
+    </Box>
   );
 };
 

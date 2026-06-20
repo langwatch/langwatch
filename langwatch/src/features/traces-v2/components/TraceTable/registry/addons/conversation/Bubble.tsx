@@ -1,7 +1,10 @@
 import { Box, Circle, Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { Lightbulb, MessageSquare } from "lucide-react";
 import type React from "react";
+import { useEffect, useState } from "react";
 import { Markdown } from "~/components/Markdown";
+import { useConversationExpand } from "../../../../TraceDrawer/conversationView/expandContext";
+import { MessageExpandToggle } from "../../../../TraceDrawer/conversationView/MessageExpandToggle";
 import { ReasoningBlock } from "../../../../TraceDrawer/transcript";
 
 export type BubbleSide = "left" | "right";
@@ -112,8 +115,25 @@ export const Bubble: React.FC<BubbleProps> = ({
 }) => {
   const palette = BUBBLE_TONES[tone];
   const compact = size === "compact";
-  const display = truncateMarkdown({ text, maxChars });
   const hasAnnotation = !!annotation && annotation.count > 0;
+
+  // In the conversation view (provider sets `isExpandable`), a truncated
+  // message offers a per-message Show more / Show less toggle instead of a
+  // bare "…". Elsewhere (the table's compact preview) `isExpandable` is false
+  // and the original ellipsis truncation is kept. See
+  // specs/traces-v2/conversation-message-expand.feature
+  const { isExpandable, shouldExpandAll } = useConversationExpand();
+  const [expanded, setExpanded] = useState(shouldExpandAll);
+  useEffect(() => setExpanded(shouldExpandAll), [shouldExpandAll]);
+  const isTruncated = maxChars > 0 && text.length > maxChars;
+  const canExpand = isExpandable && isTruncated;
+  const truncated = truncateMarkdown({ text, maxChars });
+  const display =
+    !isExpandable || !isTruncated
+      ? truncated
+      : expanded
+        ? text
+        : truncated.replace(/\n+…\s*$/, "");
 
   return (
     <Flex
@@ -221,6 +241,12 @@ export const Bubble: React.FC<BubbleProps> = ({
         >
           <Markdown>{display}</Markdown>
         </Box>
+        {canExpand && (
+          <MessageExpandToggle
+            expanded={expanded}
+            onToggle={() => setExpanded((v) => !v)}
+          />
+        )}
       </Box>
     </Flex>
   );

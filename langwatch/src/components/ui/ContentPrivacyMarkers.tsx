@@ -115,11 +115,11 @@ const PrivacyMarker: React.FC<MarkerCopy> = ({ icon, label, tooltip }) => {
         color="fg.muted"
         fontStyle="italic"
         fontSize="sm"
-        gap={1}
+        gap={1.5}
         cursor="default"
         display="inline-flex"
       >
-        <Icon as={icon} boxSize={3} />
+        <Icon as={icon} boxSize={3} flexShrink={0} />
         <Text>{label}</Text>
       </HStack>
     </Tooltip>
@@ -130,15 +130,23 @@ const PrivacyMarker: React.FC<MarkerCopy> = ({ icon, label, tooltip }) => {
  * Renders the privacy markers for the given categories (defaults to all four).
  * Categories with nothing to mark render nothing, so the block is invisible for
  * ordinary captured content.
+ *
+ * `framed` wraps the markers in a subtle bordered panel so a standalone block
+ * (e.g. the span I/O section's system-instructions / tool-calls markers, which
+ * have no inline content slot of their own) reads as an intentional, contained
+ * redaction state instead of cramped italic text butting against the rows
+ * below.
  */
 export const ContentPrivacyMarkers: React.FC<{
   privacy?: ContentPrivacy | null;
   categories?: readonly Category[];
   skipRestricted?: boolean;
+  framed?: boolean;
 }> = ({
   privacy,
   categories = ["input", "output", "system", "tools"],
   skipRestricted = false,
+  framed = false,
 }) => {
   if (!privacy) return null;
   const markers = categories
@@ -153,7 +161,21 @@ export const ContentPrivacyMarkers: React.FC<{
   if (markers.length === 0) return null;
 
   return (
-    <VStack align="start" gap={1}>
+    <VStack
+      align="start"
+      gap={1.5}
+      {...(framed
+        ? {
+            borderWidth: "1px",
+            borderColor: "border.muted",
+            borderRadius: "md",
+            bg: "bg.subtle",
+            paddingX: 3,
+            paddingY: 2,
+            width: "full",
+          }
+        : {})}
+    >
       {markers.map(({ category, copy }) => (
         <PrivacyMarker key={category} {...copy} />
       ))}

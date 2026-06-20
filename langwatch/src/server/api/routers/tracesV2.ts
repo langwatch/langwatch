@@ -863,10 +863,18 @@ export const tracesV2Router = createTRPCRouter({
         ),
       });
       const turns = page.items.map((t) => {
-        // Conversation turns only need the permission-nulled input/output, not
-        // the placeholder flags the drawer uses — strip those so the turn shape
-        // stays the bare conversation DTO the client expects.
-        const { input, output } = redactV2Content(
+        // Carry the permission-nulled input/output AND the redaction flags so a
+        // hidden turn renders the "Redacted" marker in the conversation strip /
+        // view instead of an empty "(no message)" placeholder that would read
+        // as a genuinely-absent turn.
+        const {
+          input,
+          output,
+          inputRedacted,
+          outputRedacted,
+          inputVisibleTo,
+          outputVisibleTo,
+        } = redactV2Content(
           {
             traceId: t.traceId,
             timestamp: t.timestamp,
@@ -886,6 +894,10 @@ export const tracesV2Router = createTRPCRouter({
           status: t.status,
           input,
           output,
+          inputRedacted,
+          outputRedacted,
+          inputVisibleTo,
+          outputVisibleTo,
         };
       });
       // Position/previous/next are derived client-side from the active

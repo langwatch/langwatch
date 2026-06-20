@@ -23,10 +23,25 @@ const traceListItemSchema = z.object({
   cacheCreationTokens: z.number().nullable().optional(),
   reasoningTokens: z.number().nullable().optional(),
   models: z.array(z.string()),
+  labels: z.array(z.string()).default([]),
+  promptId: z.string().nullable().optional(),
+  promptVersionNumber: z.number().nullable().optional(),
   status: z.enum(["ok", "error", "warning"]),
   spanCount: z.number().int().nonnegative().default(0),
+  // Stored payload size in bytes (MATERIALIZED `_size_bytes` on
+  // trace_summaries). Defaults to 0 for older cached responses pre-dating
+  // the field so consumers stay safe on a fresh deploy.
+  sizeBytes: z.number().int().nonnegative().default(0),
   input: z.string().nullable(),
   output: z.string().nullable(),
+  // Set when a restrict privacy rule hides the content from this viewer, so the
+  // table cell shows a "Redacted" marker instead of an em-dash that reads as
+  // "no content". `*VisibleTo` is the human audience label ("Admins" / "no one")
+  // or null for the generic copy. Absent/false on rows the viewer can fully see.
+  inputRedacted: z.boolean().nullish(),
+  outputRedacted: z.boolean().nullish(),
+  inputVisibleTo: z.string().nullish(),
+  outputVisibleTo: z.string().nullish(),
   error: z.string().nullable().optional(),
   conversationId: z.string().nullable().optional(),
   userId: z.string().nullable().optional(),
@@ -307,6 +322,14 @@ export const conversationTurnSchema = z.object({
   status: z.enum(["ok", "error", "warning"]),
   input: z.string().nullish(),
   output: z.string().nullish(),
+  // Set when a restrict privacy rule hides the turn's content from this viewer,
+  // so the conversation-context strip / conversation view render a "Redacted"
+  // marker instead of an empty/"(no message)" placeholder that reads as a
+  // genuinely-absent turn. `*VisibleTo` is the audience label or null.
+  inputRedacted: z.boolean().nullish(),
+  outputRedacted: z.boolean().nullish(),
+  inputVisibleTo: z.string().nullish(),
+  outputVisibleTo: z.string().nullish(),
 });
 
 export type ConversationTurn = z.infer<typeof conversationTurnSchema>;

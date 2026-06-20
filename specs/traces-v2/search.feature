@@ -416,6 +416,66 @@ Rule: Filter column collapse and expand
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# FACET FINDER — FILTER THE SIDEBAR'S FACETS BY NAME
+# ─────────────────────────────────────────────────────────────────────────────
+
+Rule: Facet finder
+  A search control in the sidebar header filters which facet SECTIONS are
+  shown, so the user can jump to a facet by name without scrolling. It filters
+  the already-visible facets in place — it does not change which facets are
+  enabled (that is Configure) and does not search facet values (that is the
+  per-facet value search).
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the sidebar shows the Model, Cost, Duration, and Status facets
+
+  Scenario: The finder is collapsed until invoked
+    Then a facet-finder search icon is shown in the sidebar header
+    And no finder input is shown
+
+  Scenario: Opening the finder focuses the input
+    When the user clicks the facet-finder icon
+    Then a "Find a facet…" input appears below the header
+    And it is focused for immediate typing
+
+  Scenario: Typing filters the facet sections by name
+    Given the facet finder is open
+    When the user types "cost"
+    Then only facet sections whose name matches "cost" remain
+    And the non-matching sections are hidden
+
+  Scenario: Matching is case-insensitive and also matches the field key
+    Given the facet finder is open
+    When the user types "PROMPT"
+    Then the "Prompt version" facet remains visible
+    # Matches the human label OR the raw field key, lower-cased.
+
+  Scenario: The finder shows how many facets match
+    Given the sidebar shows 12 facets
+    And the facet finder is open
+    When the user types a query that matches 3 of them
+    Then the finder shows a "3 of 12" count
+
+  Scenario: No match shows an inline hint, not a blank column
+    Given the facet finder is open
+    When the user types a query that matches no shown facet
+    Then an inline "No facets match" hint is shown
+
+  Scenario: Clearing the finder restores every facet
+    Given the user has filtered the facets with a query
+    When the user presses Escape or clicks the clear button
+    Then every previously visible facet is shown again
+    And the finder input closes
+
+  Scenario: The finder is a transient view filter, not a visibility change
+    Given the user filtered to a single facet with the finder
+    When the user clears the finder
+    Then the other facets reappear without opening Configure
+    And no facet's shown or hidden setting was changed
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # CATEGORICAL FACETS — THREE-STAGE CHECKBOXES
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -527,6 +587,8 @@ Rule: Categorical facet selection logic
 
 Rule: Range facets
   Double-handled sliders for Tokens, Cost, and Latency filtering.
+  # Numeric facets can also be shown as Discrete value pickers — see
+  # specs/traces-v2/numeric-facet-modes.feature (Range is this slider).
 
   Background:
     Given the user is authenticated with "traces:view" permission
@@ -646,10 +708,111 @@ Rule: Two-way sync from sidebar to search bar
     When the user checks "Error" and "Warning" under Status
     Then the search bar shows "(@status:error OR @status:warning)"
 
+  # A second value of the SAME field must OR, not AND — a trace's field
+  # can't equal two values at once, so AND-ing them matches nothing. This
+  # happens automatically on a plain click (no modifier key).
+  @unit
+  Scenario: A second same-field value OR-combines on a plain click
+    Given the search bar contains "@origin:sample"
+    When the user checks "Application" under Origin
+    Then the search bar shows "(@origin:sample OR @origin:application)"
+
+  # Operator precedence guard: liqe binds "A AND b OR c" as "(A AND b) OR c",
+  # so a same-field OR mixed into an AND query must stay parenthesised or it
+  # silently widens the whole query.
+  @unit
+  Scenario: A same-field OR alongside another facet stays parenthesised
+    Given the search bar contains "@model:gpt-4o AND @origin:sample"
+    When the user checks "Application" under Origin
+    Then the search bar shows "@model:gpt-4o AND (@origin:sample OR @origin:application)"
+
+  # A cross-FIELD pick still AND-combines (the narrowing default).
+  @unit
+  Scenario: A value in a different facet AND-combines
+    Given the search bar contains "@origin:sample"
+    When the user checks "Error" under Status
+    Then the search bar shows "@origin:sample AND @status:error"
+
+  # Removing a value from a same-field OR group unwraps cleanly: a
+  # two-value group collapses to a bare clause with no stray parens.
+  @unit
+  Scenario: Unchecking down to one value collapses the OR group to a bare clause
+    Given the search bar contains "(@origin:sample OR @origin:application)"
+    When the user unchecks "Application" under Origin
+    Then the search bar shows "@origin:sample"
+
   Scenario: Unchecking the last checkbox removes the clause
     Given the user has "Error" checked under Status
     When the user unchecks "Error"
     Then the "@status:error" clause is removed from the search bar
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# INCLUDE / EXCLUDE ROW AFFORDANCE
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Each facet value row carries an explicit two-zone affordance so users
+# don't have to learn the hidden "click again to exclude" cycle. The row
+# body includes the value; a trailing minus button (revealed on hover, but
+# always shown once a value is active) excludes it. This makes the NOT
+# action discoverable without a tooltip and removes the click-twice guess.
+Rule: Facet value rows expose include and exclude directly
+  A value can be included (row body) or excluded (trailing minus) in one
+  deliberate click each, rather than cycling through hidden states.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces
+
+  Scenario: Clicking a neutral value's row body includes it
+    Given "Error" under Status is neutral
+    When the user clicks the "Error" row body
+    Then the search bar shows "@status:error"
+
+  @integration
+  Scenario: Clicking the exclude affordance on a value excludes it
+    Given "Error" under Status is neutral
+    When the user clicks the exclude affordance on "Error"
+    Then the search bar shows "NOT @status:error"
+
+  @integration
+  Scenario: Clicking the exclude affordance on an included value flips it to excluded
+    Given "Error" under Status is included
+    When the user clicks the exclude affordance on "Error"
+    Then the search bar shows "NOT @status:error"
+
+  @integration
+  Scenario: Clicking the row body of an excluded value clears it back to neutral
+    Given "Error" under Status is excluded
+    When the user clicks the "Error" row body
+    Then the "@status:error" clause is removed from the search bar
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SAME-FIELD "ANY OF" HEADER HINT
+# ─────────────────────────────────────────────────────────────────────────────
+
+# When two or more values of the same field are included, they combine with
+# OR (a trace's field can only equal one value at a time). The section header
+# surfaces a quiet "any of" hint so it's obvious the included values are
+# alternatives, not a narrowing AND — without forcing the user to read the
+# query bar.
+Rule: Same-field multi-select shows an "any of" header hint
+  A section with 2+ included values labels them as alternatives.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces
+
+  @integration
+  Scenario: Two included values in one section show the any-of hint
+    Given "Error" and "Warning" under Status are both included
+    Then the Status section header shows an "any of" hint
+
+  @integration
+  Scenario: A single included value shows no any-of hint
+    Given only "Error" under Status is included
+    Then the Status section header shows no "any of" hint
 
   Scenario: Moving a slider updates the search bar
     When the user adjusts the Cost slider to 0.01..1.00
@@ -749,10 +912,17 @@ Rule: Two-way sync edge cases
     When the user fixes the syntax and presses Enter
     Then the sidebar syncs to the new valid state
 
-  Scenario: Cross-facet OR shows a warning badge
+  # Cross-field OR is built and edited entirely in the filter bar, where
+  # the query breakdown renders the full AND/OR/paren grouping. It is NOT
+  # created by clicking facet rows, and the sidebar shows no warning badge
+  # and no cross-section linking decoration (no OR pills, coloured rails,
+  # or connector lines). The sidebar still reflects same-field OR — active
+  # values are highlighted in their section.
+  Scenario: Cross-field OR is typed in the filter bar, not linked in the sidebar
     When the user types "@status:error OR @model:gpt-4o" and presses Enter
-    Then a warning badge appears on the search bar
-    And the badge reads "Query uses cross-facet OR — sidebar may not fully reflect the query."
+    Then the filter bar shows the OR grouping in its query breakdown
+    And the sidebar shows no warning badge
+    And the sidebar shows no cross-section OR linking decoration
 
   Scenario: Parenthesized OR within one facet maps to multi-select
     When the user types "@status:error AND (@model:gpt-4o OR @model:claude*)" and presses Enter
@@ -861,29 +1031,29 @@ Rule: Zero-count values after filtering
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# HIGH-CARDINALITY FACETS (10+ VALUES)
+# HIGH-CARDINALITY FACETS (5+ VALUES)
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: High-cardinality facets
-  Facets with 10 or more values show top 10 with expand and search capabilities.
+  Facets with 5 or more values show their top 5 values with expand and search capabilities.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And the project has 18 distinct model values
 
-  Scenario: Top 10 values shown by default sorted by count descending
-    Then the Model facet shows the top 10 values sorted by count descending
+  Scenario: Top 5 values shown by default sorted by count descending
+    Then the Model facet shows the top 5 values sorted by count descending
 
   Scenario: Show more expander reveals remaining values
-    Then a "Show 8 more" expander appears below the top 10 values
-    When the user clicks "Show 8 more"
-    Then the remaining 8 values are revealed sorted by count descending
+    Then a "Show 13 more" expander appears below the top 5 values
+    When the user clicks "Show 13 more"
+    Then the remaining 13 values are revealed sorted by count descending
     And the expander text changes to "Show less"
 
   Scenario: Collapse after expanding
     Given the user expanded the Model facet
     When the user clicks "Show less"
-    Then only the top 10 values are visible again
+    Then only the top 5 values are visible again
 
   Scenario: Search input appears for facets with 5+ values
     Given a facet has at least SEARCHABLE_VALUE_THRESHOLD (5) values
@@ -901,7 +1071,7 @@ Rule: High-cardinality facets
   Scenario: Expanded state resets on page reload
     Given the user expanded the Model facet
     When the user reloads the page
-    Then the Model facet shows only the top 10 values
+    Then the Model facet shows only the top 5 values
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -916,21 +1086,21 @@ Rule: Very high-cardinality facets
     And the project has 60 distinct service values
 
   Scenario: Show more expander is capped at 30 total
-    Then the Service facet shows the top 10 values
-    And a "Show 20 more" expander appears
-    When the user clicks "Show 20 more"
+    Then the Service facet shows the top 5 values
+    And a "Show 25 more" expander appears
+    When the user clicks "Show 25 more"
     Then 30 total values are visible
     And a message reads "And 30 more — use search to filter"
 
   Scenario: Facet search matches against all values
     When the user types "finance" in the Service facet search
     Then values matching "finance" from all 60 services are shown inline
-    And the top-10 list is temporarily replaced with search results
+    And the top-5 list is temporarily replaced with search results
 
-  Scenario: Clearing facet search returns to top-10 view
+  Scenario: Clearing facet search returns to top-5 view
     Given the user is searching in the Service facet
     When the user clears the search input
-    Then the top 10 values are displayed again
+    Then the top 5 values are displayed again
 
   Scenario: SpanName is a sidebar facet under Span
     Then a "Span Name" facet section appears in the Span group
@@ -1129,30 +1299,48 @@ Rule: AI query composer (Ask AI)
 # CHIP LABELS WITH HOVER-TO-ID
 # ─────────────────────────────────────────────────────────────────────────────
 # Filter chips render the human-readable name of the value (evaluator
-# name, topic name, etc.) on top of the underlying id. Hovering the chip
-# fades the label out so the operator can see (and copy) the id. The
-# query language is unchanged — the document still holds the id, search
-# matching is still id-only. Names exist for discovery and reading
-# comfort only.
+# name, topic name, etc.) on top of the underlying id — but the field
+# prefix is always part of the overlay, so the chip reads as
+# "evaluator:Policy Check", never a bare "Policy Check". Hovering the chip
+# fades the overlay so only the value tail swaps to the raw id; the
+# "evaluator:" prefix never moves. The query language is unchanged — the
+# document still holds the id, search matching is still id-only. Names
+# exist for discovery and reading comfort only.
 
-Rule: Chip labels overlay the id by default, reveal on hover
-  When a facet returns a `label` for a topValue, the chip paints that
-  label on top of the id and reveals the id on hover.
+Rule: Chip labels are field-qualified and reveal the id on hover
+  When a facet returns a `label` for a topValue, the chip paints
+  "field:label" on top of the id and reveals "field:id" on hover. The
+  field prefix shows in both states; only the value tail changes.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And the project has traces with an evaluator named "Policy Check"
 
-  Scenario: Evaluator chip reads as the evaluator name
+  Scenario: Evaluator chip keeps the field prefix and reads as the name
     Given the search bar contains "@evaluator:eval_abc123"
-    Then the chip's visible text reads "Policy Check"
+    Then the chip's visible text reads "evaluator:Policy Check"
     And the underlying document text is still "@evaluator:eval_abc123"
 
-  Scenario: Hovering the chip reveals the id
+  Scenario: At rest the chip hugs the label, reserving no id-width space
+    Given the search bar contains "@evaluator:eval_abc123" labeled "Policy Check"
+    Then the chip is only as wide as "evaluator:Policy Check"
+    And no empty space is reserved for the longer id before the remove button
+
+  Scenario: Hovering the chip expands it to reveal the id, prefix intact
     Given the search bar contains "@evaluator:eval_abc123"
     When the user hovers the chip
-    Then the label overlay fades out
-    And the chip reads "@evaluator:eval_abc123"
+    Then the chip grows in place to fit the full id
+    And the chip reads "evaluator:eval_abc123"
+
+  Scenario: The field prefix never disappears between rest and hover
+    Given the search bar contains "@evaluator:eval_abc123"
+    Then the "evaluator:" prefix is visible both at rest and on hover
+    And only the value swaps between "Policy Check" and "eval_abc123"
+
+  Scenario: The placeholder and live editor paint an identical chip
+    Given the search bar contains "@evaluator:eval_abc123" on cold load
+    When the user clicks into the bar and the live editor mounts
+    Then the chip keeps the same size and position — no reflow on hand-off
 
   Scenario: A label equal to the id renders without overlay
     Given the search bar contains "@status:error"

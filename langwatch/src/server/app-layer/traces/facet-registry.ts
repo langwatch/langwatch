@@ -8,6 +8,7 @@ import {
   SPAN_ATTRIBUTE_KEYS_FACET,
   SPAN_NAME_FACET,
   SPAN_STATUS_FACET,
+  TRACE_METADATA_FACET,
 } from "./facets";
 
 export type FacetTable = "trace_summaries" | "evaluation_runs" | "stored_spans";
@@ -51,6 +52,15 @@ export interface QueryBuilderCategoricalDef extends BaseFacetDef {
 export interface RangeFacetDef extends BaseFacetDef {
   kind: "range";
   expression: string;
+  /**
+   * When true, this integer facet can ALSO be presented as a "Discrete"
+   * tick-list (distinct values + counts), not just a min/max slider. Discover
+   * computes the distinct values for these facets; the sidebar falls back to
+   * the slider when the distinct count exceeds the discrete threshold. Only
+   * set on small, naturally-bounded integer columns (e.g. prompt version,
+   * span count) — each flag adds one GROUP BY query to discovery.
+   */
+  isDiscrete?: boolean;
 }
 
 export interface DynamicKeysDef extends BaseFacetDef {
@@ -243,6 +253,7 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "prompt",
     table: "trace_summaries",
     expression: "LastUsedPromptVersionNumber",
+    isDiscrete: true,
   },
 
   // trace_summaries: queryBuilder facets
@@ -322,10 +333,28 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "trace",
     table: "trace_summaries",
     expression: "SpanCount",
+    isDiscrete: true,
+  },
+  {
+    // Stored payload size of the trace in bytes — the materialised
+    // `_size_bytes` column (CH-native `byteSize(...)` over the heavy
+    // payload columns; see migration 00032). SELECT-only: it's a
+    // MATERIALIZED column so it never appears in INSERTs. High-cardinality,
+    // so it stays a min/max slider (no `isDiscrete`). Cells humanise the
+    // value (`1.4 MB`), so no unit lives in the label.
+    key: "size",
+    kind: "range",
+    label: "Storage size",
+    group: "trace",
+    table: "trace_summaries",
+    expression: "_size_bytes",
   },
 
   // metadata: dynamic keys
   METADATA_KEYS_FACET,
+  // trace_summaries: metadata-scoped dynamic keys (the `metadata.*` subset of
+  // METADATA_KEYS_FACET, surfaced as a first-class trace facet)
+  TRACE_METADATA_FACET,
 
   // evaluation_runs: cross-table
   EVALUATOR_FACET,
@@ -358,6 +387,19 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     group: "evaluation",
     table: "evaluation_runs",
     expression: "Score",
+  },
+  {
+    // Per-evaluator emitted label (e.g. "faithful" / "toxic"). The sidebar
+    // drilldown surfaces the top values inline under each evaluator; this
+    // registry entry also makes `evaluatorLabel:<value>` a first-class filter
+    // field, auto-deriving the cross-table `evaluation_runs.Label` subquery
+    // handler — the same wiring as `evaluatorVerdict` above.
+    key: "evaluatorLabel",
+    kind: "categorical",
+    label: "Evaluator label",
+    group: "evaluation",
+    table: "evaluation_runs",
+    expression: "Label",
   },
 
   // stored_spans: cross-table

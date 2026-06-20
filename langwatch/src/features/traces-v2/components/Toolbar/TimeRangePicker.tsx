@@ -26,7 +26,9 @@ import {
 
 const COPY_FEEDBACK_MS = 2000;
 
-export const TimeRangePicker: React.FC = () => {
+export const TimeRangePicker: React.FC<{ compact?: boolean }> = ({
+  compact = false,
+}) => {
   const timeRange = useFilterStore((s) => s.timeRange);
   const setTimeRange = useFilterStore((s) => s.setTimeRange);
   const [open, setOpen] = useState(false);
@@ -38,6 +40,8 @@ export const TimeRangePicker: React.FC = () => {
         : matchPreset(timeRange),
     [timeRange],
   );
+
+  const triggerLabel = formatTriggerLabel(timeRange);
 
   const applyPreset = (preset: TimeRangePreset) => {
     const { from, to } = preset.compute();
@@ -56,18 +60,28 @@ export const TimeRangePicker: React.FC = () => {
       onOpenChange={(e) => setOpen(e.open)}
       positioning={{ placement: "bottom-end" }}
     >
-      <Popover.Trigger asChild>
-        {/* Verbose label (`Last 30 days`) rather than the cryptic `30d`
-            so the most-impactful control on the page actually reads.
-            Size matches the rest of the toolbar (`xs`) — and so does
-            the horizontal padding: the earlier paddingX={3} override
-            made this trigger visibly wider-set than every sibling
-            button in the strip. */}
-        <Button size="xs" variant="outline" fontWeight="medium" gap={1.5}>
-          <Clock size={14} />
-          {formatTriggerLabel(timeRange)}
-        </Button>
-      </Popover.Trigger>
+      {/* Verbose label (`Last 30 days`) rather than the cryptic `30d` so the
+          most-impactful control on the page actually reads — until the toolbar
+          is squeezed, when it collapses to the clock icon (the full range
+          stays one hover away in the tooltip). Size + padding match the rest
+          of the toolbar's `xs` buttons. */}
+      <Tooltip
+        content={`Time range: ${triggerLabel}`}
+        positioning={{ placement: "bottom" }}
+      >
+        <Popover.Trigger asChild>
+          <Button
+            size="xs"
+            variant="outline"
+            fontWeight="medium"
+            gap={compact ? 0 : 1.5}
+            aria-label={`Time range: ${triggerLabel}`}
+          >
+            <Clock size={14} />
+            {!compact && triggerLabel}
+          </Button>
+        </Popover.Trigger>
+      </Tooltip>
       <Popover.Content width="auto" minWidth="420px">
         <Popover.Body padding={0}>
           <Flex>

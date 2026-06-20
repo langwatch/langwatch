@@ -43,7 +43,11 @@ export function statusBorderColor(status: SearchBarStatus): string {
 
 /** The bar's outer background colour for a given status. */
 export function statusBackgroundColor(status: SearchBarStatus): string {
-  if (status.kind === "error") return "red.subtle/30";
+  // Error uses the full red.subtle (not /30) so the input row matches the
+  // error banner that drops below it — together they read as one
+  // continuous, clearly-visible error surface with no brightness seam.
+  // Warning has no banner, so its lighter /30 tint stays.
+  if (status.kind === "error") return "red.subtle";
   if (status.kind === "warning") return "orange.subtle/30";
   return "bg.surface";
 }

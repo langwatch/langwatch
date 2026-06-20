@@ -28,6 +28,7 @@ import {
   useColumnEducationStore,
 } from "../../stores/columnEducationStore";
 import { ColumnResizeGrip } from "./ColumnResizeGrip";
+import { SELECT_COLUMN_ID } from "./registry/cells/SelectCells";
 import { Table as TableEl, Th, Thead, Tr } from "./TablePrimitives";
 
 type Color = NonNullable<SystemStyleObject["color"]>;
@@ -123,7 +124,7 @@ export function TraceTableShell<T>({
     onColumnReorder(next);
   };
 
-  return (
+  const tableElement = (
     <TableEl
       width="full"
       // Anchor the table's underlying surface so alpha-blended row tints
@@ -158,7 +159,7 @@ export function TraceTableShell<T>({
           // checkbox column read as a permanently-neutral strip on
           // erroring rows, hiding the status colour the rest of the
           // row was carrying.
-          "& tbody > tr > td:first-child": {
+          "& tbody > tr > td:first-of-type": {
             position: "sticky",
             left: 0,
             zIndex: 1,
@@ -172,7 +173,7 @@ export function TraceTableShell<T>({
           // sticky cell paints the SAME surface that's behind the
           // transparent row body. Still opaque, still covers any
           // horizontally-scrolled content underneath it.
-          "& tbody[data-row-variant='default'] > tr > td:first-child, & tbody:not([data-row-variant]) > tr > td:first-child":
+          "& tbody[data-row-variant='default'] > tr > td:first-of-type, & tbody:not([data-row-variant]) > tr > td:first-of-type":
             {
               backgroundColor: "var(--chakra-colors-bg-surface)",
             },
@@ -181,28 +182,28 @@ export function TraceTableShell<T>({
           // (see RegistryRow). Without this rule, only the row body
           // picked up the hover tint and the sticky cell kept its
           // resting bg — the row read as "half hovered".
-          "& tbody[data-row-variant='default']:hover > tr > td:first-child, & tbody:not([data-row-variant]):hover > tr > td:first-child":
+          "& tbody[data-row-variant='default']:hover > tr > td:first-of-type, & tbody:not([data-row-variant]):hover > tr > td:first-of-type":
             {
               backgroundColor: "var(--chakra-colors-gray-subtle)",
             },
-          "& tbody[data-row-variant='selected'] > tr > td:first-child": {
+          "& tbody[data-row-variant='selected'] > tr > td:first-of-type": {
             backgroundColor: "var(--chakra-colors-blue-subtle)",
           },
-          "& tbody[data-row-variant='error'] > tr > td:first-child": {
+          "& tbody[data-row-variant='error'] > tr > td:first-of-type": {
             // Match RegistryRow's `bg=red.fg/8` so the sticky cell reads
             // as part of the same red surface the rest of the row paints.
             backgroundColor:
               "color-mix(in srgb, var(--chakra-colors-red-fg) 8%, var(--chakra-colors-bg-surface))",
           },
-          "& tbody[data-row-variant='warning'] > tr > td:first-child": {
+          "& tbody[data-row-variant='warning'] > tr > td:first-of-type": {
             backgroundColor:
               "color-mix(in srgb, var(--chakra-colors-yellow-fg) 8%, var(--chakra-colors-bg-surface))",
           },
-          "& tbody[data-row-variant='error']:hover > tr > td:first-child": {
+          "& tbody[data-row-variant='error']:hover > tr > td:first-of-type": {
             backgroundColor:
               "color-mix(in srgb, var(--chakra-colors-red-fg) 14%, var(--chakra-colors-bg-surface))",
           },
-          "& tbody[data-row-variant='warning']:hover > tr > td:first-child": {
+          "& tbody[data-row-variant='warning']:hover > tr > td:first-of-type": {
             backgroundColor:
               "color-mix(in srgb, var(--chakra-colors-yellow-fg) 14%, var(--chakra-colors-bg-surface))",
           },
@@ -222,34 +223,24 @@ export function TraceTableShell<T>({
         bg={{ base: "bg.subtle", _dark: "bg.surface" }}
       >
         {reorderable ? (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={() => {
-              suppressSortClickRef.current = true;
-            }}
-            onDragEnd={handleDragEnd}
-            onDragCancel={releaseSortClickSuppression}
+          <SortableContext
+            items={sortableHeaderIds}
+            strategy={horizontalListSortingStrategy}
           >
-            <SortableContext
-              items={sortableHeaderIds}
-              strategy={horizontalListSortingStrategy}
-            >
-              {table.getHeaderGroups().map((headerGroup) => (
-                <Tr key={headerGroup.id} borderBottomWidth="0">
-                  {headerGroup.headers.map((header, i) => (
-                    <HeaderCell
-                      key={header.id}
-                      header={header}
-                      isStickyFirst={stickyFirstColumn && i === 0}
-                      reorderable={!pinnedColumnIds?.has(header.id)}
-                      suppressSortClickRef={suppressSortClickRef}
-                    />
-                  ))}
-                </Tr>
-              ))}
-            </SortableContext>
-          </DndContext>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <Tr key={headerGroup.id} borderBottomWidth="0">
+                {headerGroup.headers.map((header, i) => (
+                  <HeaderCell
+                    key={header.id}
+                    header={header}
+                    isStickyFirst={stickyFirstColumn && i === 0}
+                    reorderable={!pinnedColumnIds?.has(header.id)}
+                    suppressSortClickRef={suppressSortClickRef}
+                  />
+                ))}
+              </Tr>
+            ))}
+          </SortableContext>
         ) : (
           table.getHeaderGroups().map((headerGroup) => (
             <Tr key={headerGroup.id} borderBottomWidth="0">
@@ -266,6 +257,27 @@ export function TraceTableShell<T>({
       </Thead>
       {children}
     </TableEl>
+  );
+
+  // The DndContext wraps the whole table (not the <thead>) so its
+  // accessibility nodes (the visually-hidden describedby / announcer
+  // <div>s) render as siblings of <table> rather than as an invalid
+  // <div> child of <thead> — which tripped a hydration / DOM-nesting
+  // error. Header cells stay sortable: they're still inside this context.
+  return reorderable ? (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={() => {
+        suppressSortClickRef.current = true;
+      }}
+      onDragEnd={handleDragEnd}
+      onDragCancel={releaseSortClickSuppression}
+    >
+      {tableElement}
+    </DndContext>
+  ) : (
+    tableElement
   );
 }
 
@@ -382,7 +394,15 @@ function HeaderCell<T>({
   const wasResized =
     isFlex && declaredSize !== undefined && size !== declaredSize;
   const useFixedWidth = !isFlex || wasResized;
-  const align = meta?.align ?? "left";
+  // Every column *title* is left-aligned for a consistent header row —
+  // the previous mix (numeric columns right-aligned their headers via
+  // `meta.align`) read as ragged. Numeric cell *values* still
+  // right-align in the body; that alignment comes from the body cell
+  // renderers, not this header, so it's unaffected. The select-checkbox
+  // column is the one exception: its body checkbox is centred, so the
+  // header checkbox centres too (left-aligning it sat ~2px off the rows).
+  const align: "left" | "center" =
+    header.column.id === SELECT_COLUMN_ID ? "center" : "left";
   const canSort = header.column.getCanSort();
   const sortDirection = header.column.getIsSorted();
   const isActiveSort = sortDirection !== false;
@@ -491,7 +511,7 @@ function HeaderCell<T>({
 }
 
 interface SortableHeaderButtonProps {
-  align: "left" | "right";
+  align: "left" | "center" | "right";
   sortDirection: false | "asc" | "desc";
   onToggle: ((event: unknown) => void) | undefined;
   children: React.ReactNode;
@@ -536,7 +556,13 @@ function SortableHeaderButton({
       // and non-sortable headers line up to the same grid.
       paddingX={0}
       paddingY={0}
-      justifyContent={align === "right" ? "flex-end" : "flex-start"}
+      justifyContent={
+        align === "right"
+          ? "flex-end"
+          : align === "center"
+            ? "center"
+            : "flex-start"
+      }
       color="inherit"
       userSelect="none"
       fontSize="inherit"

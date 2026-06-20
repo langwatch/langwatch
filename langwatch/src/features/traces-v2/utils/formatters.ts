@@ -136,25 +136,6 @@ export function formatRelativeTimeAgo(timestamp: number): string {
   return `${Math.floor(diffMs / MS_PER_DAY)}d ago`;
 }
 
-/**
- * Compact absolute-time form for inline use in the TIME / SINCE cells
- * when the column is in "Sum" mode. Local time, drops the year for
- * recent traces. Examples: "Jun 4 18:32", "Jun 4 2025 18:32".
- */
-export function formatCompactAbsolute(timestamp: number): string {
-  const d = new Date(timestamp);
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const month = d.toLocaleString(undefined, { month: "short" });
-  const day = d.getDate();
-  const hh = pad(d.getHours());
-  const mm = pad(d.getMinutes());
-  if (d.getFullYear() === now.getFullYear()) {
-    return `${month} ${day} ${hh}:${mm}`;
-  }
-  return `${month} ${day} ${d.getFullYear()} ${hh}:${mm}`;
-}
-
 export function formatAbsoluteTime(timestamp: number): string {
   // Render in UTC and tag the suffix so engineers reading a trace can
   // line up timestamps against their server logs without doing the TZ
@@ -185,6 +166,28 @@ export function formatTokens(tokens: number): string {
   if (tokens === 0) return "—";
   if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}K`;
   return `${tokens}`;
+}
+
+/**
+ * Human-readable byte size using decimal (SI) units — bytes, kB, MB, GB, TB.
+ * Decimal, not binary (KiB), because the source is ClickHouse `byteSize(...)`
+ * which reports raw byte totals and SI units read more naturally to users
+ * ("1.4 MB"). Sub-kB renders as a plain integer ("512 B"); kB and up carry
+ * one decimal place. A zero / negative / non-finite size reads as the em-dash
+ * placeholder so an empty Size column matches the other numeric cells.
+ */
+const BYTE_UNITS = ["B", "kB", "MB", "GB", "TB"] as const;
+
+export function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "—";
+  if (bytes < 1_000) return `${Math.round(bytes)} B`;
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1_000 && unitIndex < BYTE_UNITS.length - 1) {
+    value /= 1_000;
+    unitIndex += 1;
+  }
+  return `${value.toFixed(1)} ${BYTE_UNITS[unitIndex]}`;
 }
 
 const MODEL_ABBREVIATIONS: ReadonlyArray<readonly [from: string, to: string]> =

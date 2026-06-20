@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { analyzeOrGroups } from "~/server/app-layer/traces/query-language/queries";
 import { useFilterStore } from "../filterStore";
 
 const TRANSLATION = {
@@ -30,9 +31,11 @@ describe("toggleFacet", () => {
   describe("given an existing query and combinator: OR", () => {
     describe("when called", () => {
       it("wraps both sides in parens and joins with OR", () => {
-        // OR has lower precedence than AND, so the toggle wraps to
-        // preserve user intent regardless of how the existing query
-        // was built.
+        // Store-level contract: `combinator: "OR"` opens a fresh
+        // top-level OR scope. OR has lower precedence than AND, so the
+        // toggle wraps both sides to preserve intent. (Cross-field OR is
+        // built by typing in the filter bar — no sidebar click produces
+        // this combinator any more — but the store mechanism stays.)
         useFilterStore.getState().applyQueryText("model:gpt-4o");
         useFilterStore
           .getState()
@@ -75,6 +78,124 @@ describe("toggleFacet", () => {
         });
         expect(useFilterStore.getState().queryText).toContain(
           "NOT status:error",
+        );
+      });
+    });
+  });
+
+  describe("given the field already has one bare value", () => {
+    describe("when a second value of the SAME field is added on a plain click", () => {
+      /** @scenario "A second same-field value OR-combines on a plain click" */
+      it("OR-combines the two values into a parenthesised group", () => {
+        // The bug fix: same-field multi-select must OR, not AND — a
+        // trace's origin can't be both `sample` and `application`.
+        useFilterStore.getState().applyQueryText("origin:sample");
+        useFilterStore.getState().toggleFacet("origin", "application");
+        expect(useFilterStore.getState().queryText).toBe(
+          "(origin:sample OR origin:application)",
+        );
+      });
+    });
+
+    describe("when the field's lone value sits beside a cross-field AND", () => {
+      /** @scenario "A same-field OR alongside another facet stays parenthesised" */
+      it("scopes the same-field OR under the AND with parens", () => {
+        // Precedence guard: `model:x AND origin:a OR origin:b` would bind
+        // as `(model:x AND origin:a) OR origin:b` — the parens keep the
+        // OR scoped to the origin field.
+        useFilterStore
+          .getState()
+          .applyQueryText("model:gpt-4o AND origin:sample");
+        useFilterStore.getState().toggleFacet("origin", "application");
+        expect(useFilterStore.getState().queryText).toBe(
+          "model:gpt-4o AND (origin:sample OR origin:application)",
+        );
+      });
+    });
+
+    describe("when a value in a DIFFERENT field is added", () => {
+      /** @scenario "A value in a different facet AND-combines" */
+      it("AND-combines — a different field narrows rather than ORs", () => {
+        useFilterStore.getState().applyQueryText("origin:sample");
+        useFilterStore.getState().toggleFacet("status", "error");
+        expect(useFilterStore.getState().queryText).toBe(
+          "origin:sample AND status:error",
+        );
+      });
+    });
+  });
+
+  describe("given a same-field OR group already exists", () => {
+    describe("when a third value is added with the group's orGroupLocation", () => {
+      it("extends the existing group rather than nesting a new one", () => {
+        // Mirror production: the location comes from `analyzeOrGroups`,
+        // which reports the INNER OR expression's span (inside the
+        // parens), so the splice lands before the closing `)`.
+        useFilterStore
+          .getState()
+          .applyQueryText("(origin:sample OR origin:application)");
+        const { ast } = useFilterStore.getState();
+        const group = analyzeOrGroups(ast).groups[0]!;
+        useFilterStore.getState().toggleFacet("origin", "api", {
+          orGroupLocation: { start: group.start, end: group.end },
+        });
+        expect(useFilterStore.getState().queryText).toBe(
+          "(origin:sample OR origin:application OR origin:api)",
+        );
+      });
+    });
+
+    describe("when a value is removed (2 → 1)", () => {
+      /** @scenario "Unchecking down to one value collapses the OR group to a bare clause" */
+      it("collapses the group back to a bare tag", () => {
+        useFilterStore
+          .getState()
+          .applyQueryText("(origin:sample OR origin:application)");
+        useFilterStore.getState().removeFacet("origin", "application");
+        expect(useFilterStore.getState().queryText).toBe("origin:sample");
+      });
+    });
+  });
+
+});
+
+describe("excludeFacet", () => {
+  describe("given a neutral value", () => {
+    describe("when excluded", () => {
+      it("adds a NOT clause", () => {
+        useFilterStore.getState().excludeFacet("status", "error");
+        expect(useFilterStore.getState().queryText).toBe("NOT status:error");
+      });
+    });
+  });
+
+  describe("given an already-included value", () => {
+    describe("when excluded", () => {
+      it("flips the include to a NOT clause", () => {
+        useFilterStore.getState().applyQueryText("status:error");
+        useFilterStore.getState().excludeFacet("status", "error");
+        expect(useFilterStore.getState().queryText).toBe("NOT status:error");
+      });
+    });
+  });
+
+  describe("given an already-excluded value", () => {
+    describe("when excluded again", () => {
+      it("toggles back to neutral", () => {
+        useFilterStore.getState().applyQueryText("NOT status:error");
+        useFilterStore.getState().excludeFacet("status", "error");
+        expect(useFilterStore.getState().queryText).toBe("");
+      });
+    });
+  });
+
+  describe("given another field is already filtered", () => {
+    describe("when a value is excluded", () => {
+      it("AND-combines the NOT clause", () => {
+        useFilterStore.getState().applyQueryText("model:gpt-4o");
+        useFilterStore.getState().excludeFacet("status", "error");
+        expect(useFilterStore.getState().queryText).toBe(
+          "model:gpt-4o AND NOT status:error",
         );
       });
     });

@@ -25,7 +25,9 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
  * intentionally reads as gated rather than hidden, so users discover
  * the affordance is coming.
  */
-export const AutomateButton: React.FC = () => {
+export const AutomateButton: React.FC<{ compact?: boolean }> = ({
+  compact = false,
+}) => {
   const { project, hasPermission } = useOrganizationTeamProject();
 
   if (!hasPermission("triggers:manage")) return null;
@@ -53,7 +55,7 @@ export const AutomateButton: React.FC = () => {
             <Icon boxSize={3.5}>
               <Zap />
             </Icon>
-            Automate
+            {!compact && "Automate"}
           </Button>
         </PopoverTrigger>
       </Tooltip>

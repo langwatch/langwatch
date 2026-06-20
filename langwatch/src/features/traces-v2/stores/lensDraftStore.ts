@@ -56,7 +56,9 @@ interface LensDraftState {
    * Validate the current draft. Returns the parsed `LensDraft` on success or
    * a list of human-readable error messages on failure. Pure — does not mutate.
    */
-  validate: () => { ok: true; draft: LensDraft } | { ok: false; errors: string[] };
+  validate: () =>
+    | { ok: true; draft: LensDraft }
+    | { ok: false; errors: string[] };
 }
 
 const EMPTY_DRAFT: LensDraft = {
@@ -82,7 +84,10 @@ function reconcileDraft(
   return {
     name: partial.name ?? "",
     grouping: partial.grouping,
-    columns: reconcileColumns(partial.columns ?? capability.defaultColumns, capability),
+    columns: reconcileColumns({
+      ids: partial.columns ?? capability.defaultColumns,
+      capability,
+    }),
     addons: reconcileAddons(partial.addons ?? [], capability),
     sort: reconcileSort(partial.sort ?? capability.defaultSort, capability),
     filterText: includeFilter ? liveFilterText : "",
@@ -144,10 +149,6 @@ export const useLensDraftStore = create<LensDraftState>((set, get) => ({
 
   toggleColumn: (columnId) =>
     set((s) => {
-      const capability = getCapability(s.draft.grouping);
-      const def = capability.columns.find((c) => c.id === columnId);
-      // Pinned columns can't be toggled off — silently ignore.
-      if (def?.pinned) return s;
       const has = s.draft.columns.includes(columnId);
       const columns = has
         ? s.draft.columns.filter((id) => id !== columnId)

@@ -18,6 +18,7 @@ import { formatCount } from "./utils";
 
 export const AttributeKeyRow = memo(function AttributeKeyRow({
   attrKey,
+  displayLabel,
   count,
   getValueState,
   noneActive,
@@ -25,14 +26,16 @@ export const AttributeKeyRow = memo(function AttributeKeyRow({
   onToggleNone,
 }: {
   attrKey: string;
+  /**
+   * Text shown for this key. Defaults to `attrKey`; the Metadata section
+   * passes the `metadata.`-stripped form. Display-only — `attrKey` still
+   * drives value loading, filtering, and active-state lookups.
+   */
+  displayLabel?: string;
   count: number;
   getValueState: (attrKey: string, value: string) => FacetValueState;
   noneActive: boolean;
-  onToggleValue: (
-    attrKey: string,
-    value: string,
-    options?: { modifierKey?: boolean },
-  ) => void;
+  onToggleValue: (attrKey: string, value: string) => void;
   onToggleNone: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -78,7 +81,7 @@ export const AttributeKeyRow = memo(function AttributeKeyRow({
               data-attr-label
               color={activeCount > 0 ? "fg" : "fg.muted"}
             >
-              {attrKey}
+              {displayLabel ?? attrKey}
             </Text>
             {activeCount > 0 && (
               <Badge
@@ -90,11 +93,7 @@ export const AttributeKeyRow = memo(function AttributeKeyRow({
                 {activeCount}
               </Badge>
             )}
-            <Text
-              textStyle="xs"
-              color="fg.subtle"
-              flexShrink={0}
-            >
+            <Text textStyle="xs" color="fg.subtle" flexShrink={0}>
               {formatCount(count)}
             </Text>
           </HStack>

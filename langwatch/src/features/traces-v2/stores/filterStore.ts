@@ -1,12 +1,19 @@
 import type { LiqeQuery } from "liqe";
 import { create } from "zustand";
+import type { AiActionError } from "~/server/app-layer/traces/ai-query";
 import {
+  removeEvaluatorScoreRangeInQuery,
+  setEvaluatorScoreRangeInQuery,
+  toggleEvaluatorSubFilterInQuery,
+} from "~/server/app-layer/traces/query-language/evaluatorGroup";
+import {
+  addSameFieldOrValue,
+  addToOrGroupAtLocation,
   removeFacetValueFromQuery,
   removeFieldFromQuery,
   removeImplicitTermFromQuery,
-  setRangeInQuery,
-  addToOrGroupAtLocation,
   setFacetValueAtLocation,
+  setRangeInQuery,
   swapOperatorAtLocation,
   toggleFacetInQuery,
 } from "~/server/app-layer/traces/query-language/mutations";
@@ -20,7 +27,6 @@ import {
   getFacetValueState,
   validateAst,
 } from "~/server/app-layer/traces/query-language/queries";
-import type { AiActionError } from "~/server/app-layer/traces/ai-query";
 
 export interface TimeRange {
   from: number;
@@ -95,12 +101,17 @@ interface FilterState {
 
   /**
    * Three-stage facet toggle: neutral → include → exclude → neutral.
-   * Pass `combinator: "OR"` (typically from a Shift/Ctrl-click in the
-   * sidebar) to glue the new clause via OR rather than the default AND.
-   * Pass `orGroupLocation` to splice the new value into an existing OR
-   * group rather than appending a fresh OR — so clicking a value in an
-   * OR-grouped facet extends the same group instead of opening a new
-   * cross-facet OR scope.
+   *
+   * Adding a value (neutral → include) follows faceted-search semantics:
+   *   - A SECOND value of the same field OR-combines with the existing one
+   *     automatically on a plain click — `origin:sample` becomes
+   *     `(origin:sample OR origin:application)` — because a field can't
+   *     equal two values at once, so AND-ing them matches nothing.
+   *   - A value in a DIFFERENT field AND-combines (the narrowing default).
+   *   - Pass `combinator: "OR"` (a cross-field Shift/Ctrl-click in the
+   *     sidebar) to force a fresh top-level OR scope across fields instead.
+   *   - Pass `orGroupLocation` to splice the new value into an existing OR
+   *     group (the third-and-beyond value of an already-OR-grouped facet).
    */
   toggleFacet: (
     field: string,
@@ -110,6 +121,36 @@ interface FilterState {
       orGroupLocation?: { start: number; end: number };
     },
   ) => void;
+  /**
+   * Force a facet value into the EXCLUDED (`NOT field:value`) state,
+   * regardless of its current state — drives the row's trailing exclude
+   * (`−`) affordance so "exclude" is one deliberate click rather than a
+   * double-click through the include→exclude cycle. Toggles back to
+   * neutral when the value is already excluded. Always AND-combines the
+   * negation (the facet UI never emits `NOT … OR …`).
+   */
+  excludeFacet: (field: string, value: string) => void;
+  /**
+   * Toggle a verdict / label sub-condition scoped to a single evaluator's
+   * parenthesised group — `(evaluator:X AND evaluatorVerdict:pass)` — so the
+   * sub-condition binds to that one evaluation rather than floating at the top
+   * level. Cycles neutral → include → exclude → neutral; the evaluator anchor
+   * is added automatically and removed when its last sub-condition clears.
+   */
+  toggleEvaluatorSubFilter: (args: {
+    evaluatorId: string;
+    field: string;
+    value: string;
+  }) => void;
+  /** Set the score range inside an evaluator's group (adds the anchor). */
+  setEvaluatorScoreRange: (args: {
+    evaluatorId: string;
+    from: string;
+    to: string;
+  }) => void;
+  /** Clear just the score range from an evaluator's group. */
+  removeEvaluatorScoreRange: (args: { evaluatorId: string }) => void;
+
   /** Swap the AND/OR keyword at a given liqe text location. Used by the
    * search-bar token cycle handler. */
   swapOperator: (start: number, end: number) => void;
@@ -283,12 +324,11 @@ export const useFilterStore = create<FilterState>((set, get) => ({
   toggleFacet: (field, value, options) =>
     set((s) => {
       const state = getFacetValueState(s.ast, field, value);
-      // OR-group splice path: when the field is currently part of an
-      // OR group AND we're adding a new value (not removing one), put
-      // it into the same group via `addToOrGroupAtLocation` instead of
-      // the generic toggleFacet which would AND-combine at the top.
-      // Removal still goes through removeFacetValueFromQuery which
-      // walks the whole AST.
+      // OR-group splice path: when the field is already part of an OR
+      // group (2+ values) AND we're adding a new value, splice it into
+      // the same group via `addToOrGroupAtLocation` instead of
+      // AND-combining at the top. Removal still goes through
+      // removeFacetValueFromQuery which walks the whole AST.
       if (state === "neutral" && options?.orGroupLocation) {
         return applyMutation(s, (q) =>
           addToOrGroupAtLocation({
@@ -298,6 +338,19 @@ export const useFilterStore = create<FilterState>((set, get) => ({
             fieldName: field,
             value,
           }),
+        );
+      }
+      // Same-field OR creation path: a plain click adding the SECOND
+      // value of a field has no group to splice into yet (a group needs
+      // 2+ members to exist). Folding it together with the existing bare
+      // value via OR — `origin:sample` → `(origin:sample OR
+      // origin:application)` — is the correct faceted-search default,
+      // since a field can't equal two values at once. Skipped when the
+      // caller forced `combinator: "OR"` (a cross-field Shift/Ctrl-click,
+      // which deliberately opens a new top-level OR scope instead).
+      if (state === "neutral" && options?.combinator !== "OR") {
+        return applyMutation(s, (q) =>
+          addSameFieldOrValue({ currentQuery: q, fieldName: field, value }),
         );
       }
       return applyMutation(s, (q) =>
@@ -310,6 +363,60 @@ export const useFilterStore = create<FilterState>((set, get) => ({
         }),
       );
     }),
+
+  excludeFacet: (field, value) =>
+    set((s) => {
+      const state = getFacetValueState(s.ast, field, value);
+      // Already excluded → second press on the `−` toggles it back off.
+      if (state === "exclude") {
+        return applyMutation(s, (q) =>
+          removeFacetValueFromQuery({ currentQuery: q, fieldName: field, value }),
+        );
+      }
+      // Force exclude from neutral OR include. `toggleFacetInQuery`'s
+      // `currentState: "include"` branch first strips any existing clause
+      // for this value, then appends `NOT field:value` — exactly the
+      // "make it excluded" result we want regardless of where it started.
+      return applyMutation(s, (q) =>
+        toggleFacetInQuery({
+          currentQuery: q,
+          fieldName: field,
+          value,
+          currentState: "include",
+        }),
+      );
+    }),
+
+  toggleEvaluatorSubFilter: ({ evaluatorId, field, value }) =>
+    set((s) =>
+      applyMutation(s, (q) =>
+        toggleEvaluatorSubFilterInQuery({
+          currentQuery: q,
+          evaluatorId,
+          field,
+          value,
+        }),
+      ),
+    ),
+
+  setEvaluatorScoreRange: ({ evaluatorId, from, to }) =>
+    set((s) =>
+      applyMutation(s, (q) =>
+        setEvaluatorScoreRangeInQuery({
+          currentQuery: q,
+          evaluatorId,
+          from,
+          to,
+        }),
+      ),
+    ),
+
+  removeEvaluatorScoreRange: ({ evaluatorId }) =>
+    set((s) =>
+      applyMutation(s, (q) =>
+        removeEvaluatorScoreRangeInQuery({ currentQuery: q, evaluatorId }),
+      ),
+    ),
 
   swapOperator: (start, end) =>
     set((s) =>

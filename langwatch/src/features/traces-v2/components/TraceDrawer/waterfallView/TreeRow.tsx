@@ -1,4 +1,5 @@
 import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
+import { BookText } from "lucide-react";
 import { memo, useCallback } from "react";
 import {
   LuChevronDown,
@@ -32,6 +33,7 @@ export const TreeRow = memo(function TreeRow({
   rootStart,
   rootDuration,
   isSelected,
+  isPrompt,
   isPinned,
   isCollapsed,
   hasChildren,
@@ -46,6 +48,8 @@ export const TreeRow = memo(function TreeRow({
   rootStart: number;
   rootDuration: number;
   isSelected: boolean;
+  /** Whether this span carries a managed prompt (shows a book icon). */
+  isPrompt: boolean;
   /** Whether this span is currently pinned in the SpanTabBar. */
   isPinned: boolean;
   isCollapsed: boolean;
@@ -377,6 +381,19 @@ export const TreeRow = memo(function TreeRow({
               >
                 {span.name}
               </Text>
+              {/* Book icon (the Prompts nav glyph) flags spans that used a
+                  managed prompt, so prompt-bearing spans are spottable in
+                  the tree without opening each one. */}
+              {isPrompt && (
+                <Icon
+                  boxSize="11px"
+                  color="purple.fg"
+                  flexShrink={0}
+                  aria-label="Uses a managed prompt"
+                >
+                  <BookText />
+                </Icon>
+              )}
               {/* Hidden-descendant count — a collapsed parent says how
                   much it's hiding, so plain collapse reads differently
                   from a GroupRow's "×N repeated" fold. */}

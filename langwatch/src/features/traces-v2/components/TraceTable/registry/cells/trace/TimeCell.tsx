@@ -1,19 +1,19 @@
 import { Box, HStack, Icon, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type React from "react";
-import { useTimeColumnModeStore } from "../../../../../stores/timeColumnModeStore";
+import { useTimeFormatStore } from "../../../../../stores/timeFormatStore";
 import type { TraceListItem } from "../../../../../types/trace";
-import { formatCompactAbsolute } from "../../../../../utils/formatters";
+import { formatISOTimestamp } from "../../../../../utils/formatters";
 import { useRelativeTime } from "../../../../../utils/useRelativeTime";
 import { MonoCell } from "../../../MonoCell";
 import type { CellDef } from "../../types";
 import { TimeHoverCard } from "./TimeHoverCard";
 
-// Compact TIME / SINCE / TIMESTAMP all share the same TimeHoverCard so
-// hovering any time cell surfaces the full breakdown (verbose relative,
-// local + tz, UTC, ISO). Previously this column used a flat Tooltip
-// that showed only the UTC string — the user couldn't see local time,
-// tz, or ISO without switching columns.
+// The pinned Time column renders either compact relative ("3m") or full
+// ISO 8601, per the user's `timeFormatStore` choice (switchable from the
+// column picker). Both share the same TimeHoverCard so hovering surfaces
+// the full breakdown (verbose relative, local + tz, UTC, ISO) regardless
+// of the chosen format.
 export const TimeCell = {
   id: "time",
   label: "Time",
@@ -23,9 +23,7 @@ export const TimeCell = {
         <PeekButton isExpanded={isExpanded} onClick={actions.onTogglePeek} />
       )}
       <TimeHoverCard timestamp={row.timestamp}>
-        <MonoCell color="fg.subtle" cursor="help">
-          <CompactRelative timestamp={row.timestamp} />
-        </MonoCell>
+        <TimeValue timestamp={row.timestamp} density="compact" />
       </TimeHoverCard>
     </HStack>
   ),
@@ -35,29 +33,51 @@ export const TimeCell = {
         <PeekButton isExpanded={isExpanded} onClick={actions.onTogglePeek} />
       )}
       <TimeHoverCard timestamp={row.timestamp}>
-        <Text textStyle="sm" color="fg.muted" cursor="help">
-          <CompactRelative timestamp={row.timestamp} />
-        </Text>
+        <TimeValue timestamp={row.timestamp} density="comfortable" />
       </TimeHoverCard>
     </HStack>
   ),
 } as const satisfies CellDef<TraceListItem>;
 
 /**
- * Reads the column's current display mode from `timeColumnModeStore`
- * and renders either:
- *   - `relative` → "4m", self-updating at the next label boundary
- *   - `absolute` → "Jun 4 18:32" (compact local form)
- *
- * Extracted as a component so the hook isolation is per-row; the
- * surrounding cell renderers stay pure functions.
+ * The pinned Time column's value. ISO always renders monospace (digit
+ * columns align across rows); relative uses the muted MonoCell in compact
+ * and a softer Text in comfortable, matching the prior look.
+ */
+const TimeValue: React.FC<{
+  timestamp: number;
+  density: "compact" | "comfortable";
+}> = ({ timestamp, density }) => {
+  const format = useTimeFormatStore((s) => s.format);
+  if (format === "iso") {
+    return (
+      <MonoCell color="fg.subtle" cursor="help">
+        {formatISOTimestamp(timestamp)}
+      </MonoCell>
+    );
+  }
+  if (density === "comfortable") {
+    return (
+      <Text textStyle="sm" color="fg.muted" cursor="help">
+        <CompactRelative timestamp={timestamp} />
+      </Text>
+    );
+  }
+  return (
+    <MonoCell color="fg.subtle" cursor="help">
+      <CompactRelative timestamp={timestamp} />
+    </MonoCell>
+  );
+};
+
+/**
+ * Compact relative time ("4m"), self-updating at the next label
+ * boundary. Extracted as a component so the hook isolation is per-row;
+ * the surrounding cell renderers stay pure functions.
  */
 const CompactRelative: React.FC<{ timestamp: number }> = ({ timestamp }) => {
-  const mode = useTimeColumnModeStore((s) => s.mode);
   const relative = useRelativeTime(timestamp);
-  return (
-    <>{mode === "absolute" ? formatCompactAbsolute(timestamp) : relative}</>
-  );
+  return <>{relative}</>;
 };
 
 const PeekButton: React.FC<{

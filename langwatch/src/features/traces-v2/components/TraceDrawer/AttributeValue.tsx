@@ -20,6 +20,7 @@ import {
   LuUser,
   LuWrench,
 } from "react-icons/lu";
+import { useColorMode } from "~/components/ui/color-mode";
 import { Popover } from "~/components/ui/popover";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
@@ -33,6 +34,7 @@ import {
   tryParseJson,
 } from "./attributeFormat";
 import { safePrettyJson } from "./JsonHighlight";
+import { ShikiCodeBlock } from "./markdownView";
 
 const EM_DASH = "—";
 const COPY_FEEDBACK_MS = 1200;
@@ -132,7 +134,7 @@ export function AttributeValue({ attrKey, value }: AttributeValueProps) {
       </Popover.Trigger>
       <Popover.Content maxWidth="560px" minWidth="360px">
         <Popover.Arrow />
-        <Popover.Body padding={0}>
+        <Popover.Body padding={0} overflow={"hidden"}>
           <VStack align="stretch" gap={0}>
             <HStack
               justify="space-between"
@@ -164,6 +166,7 @@ export function AttributeValue({ attrKey, value }: AttributeValueProps) {
               bg="bg.subtle"
               borderTopWidth="1px"
               borderTopColor="border.subtle"
+              borderBottomRadius={"md"}
               paddingX={3}
               paddingY={2}
               maxHeight="360px"
@@ -306,6 +309,7 @@ function FormatBody({
 }
 
 function JsonBody({ raw }: { raw: string }) {
+  const { colorMode } = useColorMode();
   // Wrap in try/catch so a prettifier crash on adversarial input
   // doesn't tear down the row.
   const formatted = useMemo(() => {
@@ -315,18 +319,16 @@ function JsonBody({ raw }: { raw: string }) {
       return raw;
     }
   }, [raw]);
+  // Shiki syntax highlighting (shared drawer adapter) instead of a flat
+  // mono block — the un-highlighted JSON read as a hard-to-scan grey wall.
+  // See specs/traces-v2/attribute-value-readability.feature
   return (
-    <Text
-      as="pre"
-      textStyle="xs"
-      fontFamily="mono"
-      color="fg"
-      whiteSpace="pre-wrap"
-      wordBreak="break-word"
-      margin={0}
-    >
-      {formatted}
-    </Text>
+    <ShikiCodeBlock
+      code={formatted}
+      language="json"
+      colorMode={colorMode}
+      flush
+    />
   );
 }
 
