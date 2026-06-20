@@ -438,15 +438,15 @@ describe.skipIf(!hasTestcontainers)(
      *   - the preview-based ComputedInput/ComputedOutput in trace_summaries.
      *
      * Returns the ids + the staged lean preview so callers can assert against it.
-     * `seedEventLog: false` skips the event_log insert to model AC5 (resolution
+     * `shouldSeedEventLog: false` skips the event_log insert to model AC5 (resolution
      * failure: the ref points at a row that does not exist).
      */
     async function seedOffloadedTrace({
       ioField,
-      seedEventLog = true,
+      shouldSeedEventLog = true,
     }: {
       ioField: IoField;
-      seedEventLog?: boolean;
+      shouldSeedEventLog?: boolean;
     }): Promise<{
       tenantId: string;
       traceId: string;
@@ -474,7 +474,7 @@ describe.skipIf(!hasTestcontainers)(
         ioField,
         ioValue: LARGE_VALUE,
       });
-      if (seedEventLog) {
+      if (shouldSeedEventLog) {
         await insertEventLogRow({
           client,
           tenantId,
@@ -671,7 +671,7 @@ describe.skipIf(!hasTestcontainers)(
             // event_log row — getFromEventLog finds nothing (BlobNotFoundError).
             const { tenantId, traceId, preview } = await seedOffloadedTrace({
               ioField,
-              seedEventLog: false,
+              shouldSeedEventLog: false,
             });
 
             const service = TraceService.create(

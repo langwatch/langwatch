@@ -148,7 +148,13 @@ const fakeProject = {
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-function makeRequest(traceId: string, query: Record<string, string> = {}) {
+function makeRequest({
+  traceId,
+  query = {},
+}: {
+  traceId: string;
+  query?: Record<string, string>;
+}) {
   const searchParams = new URLSearchParams(query).toString();
   const url = `http://localhost/api/trace/${traceId}${searchParams ? `?${searchParams}` : ""}`;
   return testApp.request(url, {
@@ -186,7 +192,7 @@ describe("legacy GET /api/trace/:id (singular)", () => {
     it("constructs TraceService with blob-resolution deps (mirrors the plural reference handler)", async () => {
       // PRE-FIX: FAILS — current code calls TraceService.create(prisma) with ONE arg,
       // not two. The fix must pass buildTraceBlobResolutionDeps() as the second arg.
-      await makeRequest("trace-abc", { format: "json" });
+      await makeRequest({ traceId: "trace-abc", query: { format: "json" } });
 
       expect(mockCreate).toHaveBeenCalledTimes(1);
       expect(mockCreate).toHaveBeenCalledWith(
@@ -201,7 +207,7 @@ describe("legacy GET /api/trace/:id (singular)", () => {
     it("calls getById with full:true so >64 KB offloaded IO resolves (#4888)", async () => {
       // PRE-FIX: FAILS — current code calls traceService.getById(project.id, traceId, protections)
       // with THREE args; it must pass { full: true } as the fourth arg.
-      await makeRequest("trace-abc", { format: "json" });
+      await makeRequest({ traceId: "trace-abc", query: { format: "json" } });
 
       expect(mockGetById).toHaveBeenCalledWith(
         "project-123",
@@ -213,7 +219,10 @@ describe("legacy GET /api/trace/:id (singular)", () => {
 
     it("returns 200 with the trace json", async () => {
       // Sanity: the handler still returns the trace. Passes pre- and post-fix.
-      const res = await makeRequest("trace-abc", { format: "json" });
+      const res = await makeRequest({
+        traceId: "trace-abc",
+        query: { format: "json" },
+      });
 
       expect(res.status).toBe(200);
       const body = await res.json();
