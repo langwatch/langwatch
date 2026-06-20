@@ -1206,7 +1206,7 @@ function parseTokenCount(raw: string | undefined): number | null {
  * strings (e.g. `'["prod","beta"]'`) parked on the trace summary. A
  * missing or malformed value reads as no labels rather than throwing.
  */
-function parseLabels(raw: string | undefined): string[] {
+export function parseLabels(raw: string | undefined): string[] {
   if (raw == null || raw === "") return [];
   try {
     const parsed: unknown = JSON.parse(raw);
