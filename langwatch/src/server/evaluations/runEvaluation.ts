@@ -1,5 +1,7 @@
 import { EvaluatorConfigError } from "~/server/app-layer/evaluations/errors";
 import { setupModelEnv } from "~/server/app-layer/evaluations/evaluation-execution.factories";
+import { codeEvaluatorIdFromCheckType } from "~/server/evaluators/codeEvaluator";
+import { runCodeEvaluator } from "~/server/evaluators/runCodeEvaluator";
 import { stagedLangevalsFetch } from "~/server/langevals/stagedFetch";
 import type { Trace } from "~/server/tracer/types";
 import type { Protections } from "~/server/traces/protections";
@@ -25,8 +27,6 @@ import {
   extractParentTraceForNlpgo,
   maxCausalityDepthOfSpans,
 } from "../app-layer/evaluations/evaluation-execution.service";
-import { codeEvaluatorIdFromCheckType } from "~/server/evaluators/codeEvaluator";
-import { runCodeEvaluator } from "~/server/evaluators/runCodeEvaluator";
 import { prisma } from "../db";
 import {
   evaluationDurationHistogram,

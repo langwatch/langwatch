@@ -1317,11 +1317,15 @@ describe("Span organizing and flattening tests", () => {
             value: [
               {
                 role: "system",
-                content: [{ type: "text", content: "You are a helpful assistant." }],
+                content: [
+                  { type: "text", content: "You are a helpful assistant." },
+                ],
               },
               {
                 role: "user",
-                parts: [{ type: "text", content: "[Sun 2026-02-08 20:58 UTC] hi" }],
+                parts: [
+                  { type: "text", content: "[Sun 2026-02-08 20:58 UTC] hi" },
+                ],
               },
             ],
           },
@@ -1363,9 +1367,7 @@ describe("Span organizing and flattening tests", () => {
               },
               {
                 role: "user",
-                content: [
-                  { type: "text", content: "What is the weather?" },
-                ],
+                content: [{ type: "text", content: "What is the weather?" }],
               },
             ],
           },
@@ -1374,9 +1376,7 @@ describe("Span organizing and flattening tests", () => {
             value: [
               {
                 role: "assistant",
-                content: [
-                  { type: "text", content: "It's sunny at 22C!" },
-                ],
+                content: [{ type: "text", content: "It's sunny at 22C!" }],
               },
             ],
           },
@@ -1401,14 +1401,23 @@ describe("Span organizing and flattening tests", () => {
           input: {
             type: "json",
             value: [
-              { role: "system", content: [{ type: "text", content: "Be helpful." }] },
-              { role: "user", parts: [{ type: "text", content: "hello there" }] },
+              {
+                role: "system",
+                content: [{ type: "text", content: "Be helpful." }],
+              },
+              {
+                role: "user",
+                parts: [{ type: "text", content: "hello there" }],
+              },
             ],
           },
           output: {
             type: "json",
             value: [
-              { role: "assistant", parts: [{ type: "text", content: "Hi! How can I help?" }] },
+              {
+                role: "assistant",
+                parts: [{ type: "text", content: "Hi! How can I help?" }],
+              },
             ],
           },
         },

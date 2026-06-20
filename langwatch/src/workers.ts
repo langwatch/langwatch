@@ -1,7 +1,7 @@
 import "dotenv/config";
+import { setEnvironment } from "@langwatch/ksuid";
 import http from "http";
 import { register } from "prom-client";
-import { setEnvironment } from "@langwatch/ksuid";
 import { verifyRedisReady } from "./server/redis";
 import { createLogger } from "./utils/logger/server";
 
