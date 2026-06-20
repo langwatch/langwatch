@@ -39,6 +39,12 @@ export const spanInsertDataSchema = z.object({
   droppedAttributesCount: z.number(),
   droppedEventsCount: z.number(),
   droppedLinksCount: z.number(),
+  // Per-span cost (USD), computed at projection time via the same
+  // SpanCostService the trace-summary fold uses. Null when the span has no
+  // costable usage. `nonBilledCost` is the bundled portion (flat plan); billed
+  // is `cost - nonBilledCost`. Mirrors `trace_summaries.TotalCost/NonBilledCost`.
+  cost: z.number().nullable(),
+  nonBilledCost: z.number().nullable(),
   retentionDays: z.number().optional().default(0),
 });
 

@@ -296,6 +296,8 @@ function makeNormalizedSpan({
     droppedAttributesCount: 0,
     droppedEventsCount: 0,
     droppedLinksCount: 0,
+    cost: null,
+    nonBilledCost: null,
   };
 }
 
