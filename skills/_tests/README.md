@@ -45,3 +45,28 @@ If you skip step 3, you're trusting the regex. The regex doesn't know about your
 - `Error: Command failed with exit code 1` inside `callAgent` — the sub `claude` process crashed or rate-limited. Re-run; if it persists, check `~/.claude/projects/` for the agent's transcript.
 - Test times out without a generated file — the SKILL didn't give Claude enough to act, or pointed it at a docs page that no longer exists. Read what Claude actually tried in its transcript.
 - Test passes the regex but the generated file is nonsense — the regex is too loose. Tighten it AND fix the SKILL guidance that led to the nonsense.
+
+## opencode adapter (`helpers/opencode-adapter.ts`)
+
+`createOpenCodeAgent` is a `@langwatch/scenario` `AgentAdapter` that drives **opencode** (sst/opencode) via `@opencode-ai/sdk`, the opencode analogue of the Claude Code adapter above.
+
+- **No separate server process.** The adapter auto-spawns `opencode serve` for you through the SDK on first use and tears it down when the run ends. There is nothing to start by hand.
+- **Stateful sessions.** It opens one opencode session per scenario `threadId` and reuses it across turns (sending only the latest user message each turn), unlike the Claude Code adapter which replays the full history every turn.
+
+### Prerequisites for the live test
+
+- The `opencode` binary must be on PATH.
+- A provider must be authenticated. The adapter does **not** inject keys — opencode resolves them from its own config. Run `opencode auth login`, or set the provider env var (e.g. `ANTHROPIC_API_KEY`) before running.
+
+### Usage
+
+```ts
+import { createOpenCodeAgent } from "./helpers/opencode-adapter";
+
+const agent = createOpenCodeAgent({
+  model: { providerID: "anthropic", modelID: "claude-haiku-4-5" },
+  workingDirectory: tempFolder, // optional
+});
+```
+
+The unit tests (`_tests/opencode-adapter.test.ts`) inject a fake client and run in CI — no binary or keys needed. The live scenario (`_tests/opencode-adapter.scenario.test.ts`) is skipped in CI and is also skipped locally whenever the `opencode` binary or `ANTHROPIC_API_KEY` is absent.
