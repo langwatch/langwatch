@@ -133,6 +133,11 @@ export const RETENTION_TABLE_CATEGORY_MAP = {
   trace_analytics: "traces",
   trace_analytics_rollup: "traces",
   evaluation_runs: "traces",
+  // ADR-034 Phase 6: eval analytics tables age with the same per-project
+  // retention policy as evaluation_runs (and trace_summaries — both currently
+  // categorised "traces" until eval split-out lands).
+  evaluation_analytics: "traces",
+  evaluation_analytics_rollup: "traces",
   dspy_steps: "traces",
   simulation_runs: "scenarios",
   suite_runs: "scenarios",

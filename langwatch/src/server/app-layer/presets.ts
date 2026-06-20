@@ -152,6 +152,10 @@ import { LogRecordStorageClickHouseRepository } from "./traces/repositories/log-
 import { NullLogRecordStorageRepository } from "./traces/repositories/log-record-storage.repository";
 import { MetricRecordStorageClickHouseRepository } from "./traces/repositories/metric-record-storage.clickhouse.repository";
 import { NullMetricRecordStorageRepository } from "./traces/repositories/metric-record-storage.repository";
+import { EvaluationAnalyticsClickHouseRepository } from "./evaluations/repositories/evaluation-analytics.clickhouse.repository";
+import { NullEvaluationAnalyticsRepository } from "./evaluations/repositories/evaluation-analytics.repository";
+import { EvaluationAnalyticsRollupClickHouseRepository } from "./evaluations/repositories/evaluation-analytics-rollup.clickhouse.repository";
+import { NullEvaluationAnalyticsRollupRepository } from "./evaluations/repositories/evaluation-analytics-rollup.repository";
 import { TraceAnalyticsClickHouseRepository } from "./traces/repositories/trace-analytics.clickhouse.repository";
 import { NullTraceAnalyticsRepository } from "./traces/repositories/trace-analytics.repository";
 import { TraceAnalyticsRollupClickHouseRepository } from "./traces/repositories/trace-analytics-rollup.clickhouse.repository";
@@ -563,6 +567,14 @@ export function initializeDefaultApp(options?: {
     traceAnalytics: clickhouseEnabled
       ? new TraceAnalyticsClickHouseRepository(resolveClickHouseClient)
       : new NullTraceAnalyticsRepository(),
+    evaluationAnalyticsRollup: clickhouseEnabled
+      ? new EvaluationAnalyticsRollupClickHouseRepository(
+          resolveClickHouseClient,
+        )
+      : new NullEvaluationAnalyticsRollupRepository(),
+    evaluationAnalytics: clickhouseEnabled
+      ? new EvaluationAnalyticsClickHouseRepository(resolveClickHouseClient)
+      : new NullEvaluationAnalyticsRepository(),
     experimentRunItemStorage: createExperimentRunItemAppendStore(
       clickhouseEnabled ? resolveClickHouseClient : null,
     ),
