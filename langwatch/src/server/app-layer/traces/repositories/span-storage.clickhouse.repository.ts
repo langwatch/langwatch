@@ -159,6 +159,36 @@ const SINGLE_TRACE_READ_SETTINGS = {
 } as const;
 
 /**
+ * Settings for the single-span fetch paths (`getSpanByIds`, `getSpanEvents`).
+ * Locks `query_plan_optimize_lazy_materialization=1` per-query so the LazilyRead
+ * optimiser stays engaged even if a future cluster/profile config flips it off.
+ *
+ * Investigation (dev CH 25.10.1.3832 against a fat span: 19 attrs / 127 events
+ * / ~88KB Events.Attributes):
+ *
+ *   getSpanByIds   Form A (ORDER BY UpdatedAt DESC LIMIT 1)
+ *     read_bytes = 14,933       (~15KB) - heavy columns deferred past LIMIT
+ *   getSpanByIds   Form B (scalar-subquery dedup, doc "Anti-Pattern 1" form)
+ *     read_bytes = 9,706,538    (~9.7MB)
+ *   getSpanByIds   Form A, LazilyRead disabled
+ *     read_bytes = 9,692,701    (~9.7MB) - matches Form B, hence the lock
+ *
+ *   getSpanEvents  Form A (inner ORDER BY DESC LIMIT 1, ARRAY JOIN outside)
+ *     read_bytes = 14,933       (~15KB) - LazilyRead survives through the subquery
+ *   getSpanEvents  Form B (scalar-subquery dedup inside the subquery)
+ *     read_bytes = 4,570,069    (~4.6MB)
+ *
+ * LazilyRead applies to LIMIT N where N <= query_plan_max_limit_for_lazy_materialization
+ * (default 10 on 25.10, raised to 10,000 on 25.12). LIMIT 1 is well inside the
+ * safe zone. Above the threshold, Form A degrades to full heavy-column reads.
+ * Minimum supported CH version for these methods: 25.4 (where LazilyRead landed).
+ */
+const SINGLE_SPAN_FETCH_SETTINGS = {
+  ...SINGLE_TRACE_READ_SETTINGS,
+  query_plan_optimize_lazy_materialization: "1",
+} as const;
+
+/**
  * Light projection used by readers that only need the span tree shape
  * (waterfall/flame, span list). Avoids reading heavy `SpanAttributes`,
  * `Events.*`, and `Links.*` columns. Map subscripts (`['key']`) read a
@@ -931,18 +961,15 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         async (window) => {
           const partition = partitionFragment(window);
           const client = await this.resolveClient(tenantId);
-          // Single-span fetch: WHERE pins (TenantId, TraceId, SpanId) - the
-          // primary key prefix - so we hit a tiny granule range. With at
-          // most a handful of versions per spanId, ORDER BY UpdatedAt DESC
-          // LIMIT 1 is cheaper than the IN-tuple dedup the multi-row paths
-          // need.
-          //
-          // On ClickHouse 25.10 this form picks up the `LazilyRead`
-          // optimiser step (verified via EXPLAIN on prod): heavy columns
-          // (SpanAttributes, Events.*, Links.*) are deferred past the
-          // LIMIT, so even unmerged versions don't materialise them. The
-          // doc's "Anti-Pattern 1" rule predates LazilyRead and no longer
-          // applies on this CH line.
+          // Single-span fetch. WHERE pins (TenantId, TraceId, SpanId) - the
+          // primary key prefix - so we hit a tiny granule range. ORDER BY
+          // UpdatedAt DESC LIMIT 1 deliberately picks up CH 25.10's
+          // LazilyRead optimiser: heavy columns (SpanAttributes, Events.*,
+          // Links.*) are deferred past the LIMIT, so unmerged versions
+          // don't materialise them. Investigation numbers + the per-query
+          // lock that keeps the optimiser engaged live in
+          // SINGLE_SPAN_FETCH_SETTINGS above. The doc's "Anti-Pattern 1"
+          // rule predates LazilyRead and isn't load-bearing on this shape.
           const result = await client.query({
             query: `
               SELECT ${FULL_SPAN_SELECT}
@@ -955,7 +982,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               LIMIT 1
             `,
             query_params: { tenantId, traceId, spanId, ...partition.params },
-            clickhouse_settings: SINGLE_TRACE_READ_SETTINGS,
+            clickhouse_settings: SINGLE_SPAN_FETCH_SETTINGS,
             format: "JSONEachRow",
           });
 
@@ -1291,11 +1318,14 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                 event_name AS event_type,
                 event_attrs AS attributes
               FROM (
-                -- Single-span fetch. Same rationale as getSpanByIds:
-                -- ORDER BY UpdatedAt DESC LIMIT 1 picks up LazilyRead on
-                -- CH 25.10 so the heavy Events.* arrays are deferred past
-                -- the LIMIT. Doc's "Anti-Pattern 1" rule predates that
-                -- optimiser and no longer applies here.
+                -- Single-span fetch. Same rationale and same investigation
+                -- as getSpanByIds (see SINGLE_SPAN_FETCH_SETTINGS comment).
+                -- LazilyRead survives through this subquery + ARRAY JOIN
+                -- composition: Events.Timestamp / Events.Name /
+                -- Events.Attributes are deferred past the inner LIMIT 1
+                -- and only the granule's key columns are read up front.
+                -- ARRAY JOIN unrolls the events from the single picked
+                -- row after the lazy read materialises it.
                 SELECT
                   TenantId, TraceId, SpanId,
                   "Events.Timestamp" AS Events_Timestamp,
@@ -1316,6 +1346,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               ORDER BY event_timestamp DESC
             `,
             query_params: { tenantId, traceId, spanId, ...partition.params },
+            clickhouse_settings: SINGLE_SPAN_FETCH_SETTINGS,
             format: "JSONEachRow",
           });
 
