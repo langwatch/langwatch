@@ -70,7 +70,9 @@ const evaluatorBreakdown: ClickHouseEvaluatorBreakdownRow[] = [
 
 describe("mapClickHouseRunToExperimentRun", () => {
   it("maps PascalCase fields to camelCase", () => {
-    const result = mapClickHouseRunToExperimentRun({ record: baseClickHouseRun });
+    const result = mapClickHouseRunToExperimentRun({
+      record: baseClickHouseRun,
+    });
 
     expect(result.experimentId).toBe("exp-1");
     expect(result.runId).toBe("run-1");
@@ -79,7 +81,9 @@ describe("mapClickHouseRunToExperimentRun", () => {
   });
 
   it("parses ClickHouse DateTime64 strings to UTC Unix milliseconds", () => {
-    const result = mapClickHouseRunToExperimentRun({ record: baseClickHouseRun });
+    const result = mapClickHouseRunToExperimentRun({
+      record: baseClickHouseRun,
+    });
 
     expect(result.timestamps.createdAt).toBe(
       Date.parse("2024-01-15T10:30:00.000Z"),
@@ -109,7 +113,9 @@ describe("mapClickHouseRunToExperimentRun", () => {
   });
 
   it("sets workflowVersion to null when not provided", () => {
-    const result = mapClickHouseRunToExperimentRun({ record: baseClickHouseRun });
+    const result = mapClickHouseRunToExperimentRun({
+      record: baseClickHouseRun,
+    });
     expect(result.workflowVersion).toBeNull();
   });
 
@@ -144,13 +150,13 @@ describe("mapClickHouseRunToExperimentRun", () => {
       evaluatorBreakdown,
     });
 
-    expect(
-      result.summary.evaluations["eval-2"]!.averagePassed,
-    ).toBeUndefined();
+    expect(result.summary.evaluations["eval-2"]!.averagePassed).toBeUndefined();
   });
 
   it("returns empty evaluations when no breakdown provided", () => {
-    const result = mapClickHouseRunToExperimentRun({ record: baseClickHouseRun });
+    const result = mapClickHouseRunToExperimentRun({
+      record: baseClickHouseRun,
+    });
     expect(result.summary.evaluations).toEqual({});
   });
 });

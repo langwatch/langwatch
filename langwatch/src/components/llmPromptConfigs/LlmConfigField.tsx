@@ -8,10 +8,10 @@ import {
 } from "~/components/llmPromptConfigs/LLMConfigPopover";
 import { AddModelProviderKey } from "~/optimization_studio/components/AddModelProviderKey";
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
-import { Popover } from "../ui/popover";
-import { NoModelsConfiguredCallout } from "../NoModelsConfiguredCallout";
-import { LLMModelDisplay } from "./LLMModelDisplay";
 import type { ModelOption } from "~/server/topicClustering/types";
+import { NoModelsConfiguredCallout } from "../NoModelsConfiguredCallout";
+import { Popover } from "../ui/popover";
+import { LLMModelDisplay } from "./LLMModelDisplay";
 
 type LLMConfigFieldProps = {
   llmConfig: LLMConfig;
