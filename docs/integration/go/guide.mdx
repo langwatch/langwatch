@@ -30,7 +30,7 @@ The SDK ships:
 
 - A **core tracing module** (`github.com/langwatch/langwatch/sdk-go`) with the exporter, the `Tracer`, the `LangWatchSpan` helpers and span filtering. It has **no provider dependencies at all**.
 - A set of **provider instrumentations**, each its own Go module, so importing one never pulls in the others' SDKs. OpenAI, Anthropic, Google Gemini / Vertex, Amazon Bedrock, Azure OpenAI, Ollama, the community `go-openai` client and Firebase Genkit are all supported natively.
-- A typed **REST API client** (`github.com/langwatch/langwatch/sdk-go/client`) for reading and writing LangWatch resources — prompts, datasets, traces, annotations, evaluations and more.
+- A typed **REST API client** (`github.com/langwatch/langwatch/sdk-go/client`) for reading and writing LangWatch resources: prompts, datasets, traces, annotations, evaluations and more.
 
 <LLMsTxtProtip />
 
@@ -88,7 +88,7 @@ Get started in just a few minutes by installing the SDK and instrumenting your a
 
   ```go
   func setupLangWatch(ctx context.Context) func(context.Context) {
-  	// Create the LangWatch exporter — reads LANGWATCH_API_KEY from the environment.
+  	// Create the LangWatch exporter (reads LANGWATCH_API_KEY from the environment).
   	exporter, err := langwatch.NewExporter(ctx)
   	if err != nil {
   		log.Fatalf("failed to create LangWatch exporter: %v", err)
@@ -115,7 +115,7 @@ Get started in just a few minutes by installing the SDK and instrumenting your a
 </Step>
 
 <Step title="Instrument Your OpenAI Client">
-  Add the LangWatch middleware to your OpenAI client. The middleware captures request **and** response content by default — there is nothing else to enable:
+  Add the LangWatch middleware to your OpenAI client. The middleware captures request **and** response content by default, with nothing else to enable:
 
   ```go
   client := openai.NewClient(
@@ -225,7 +225,7 @@ func setupLangWatch(ctx context.Context) func(context.Context) {
 	otel.SetTracerProvider(tp)
 
 	return func(ctx context.Context) {
-		// This flushes all pending traces — never skip this!
+		// This flushes all pending traces, never skip this!
 		if err := tp.Shutdown(ctx); err != nil {
 			log.Printf("Error shutting down tracer provider: %v", err)
 		}
@@ -384,7 +384,7 @@ span.SetMetrics(langwatch.SpanMetrics{
 ```
 
 <Tip>
-For the complete list of span helper methods — RAG contexts, multimodal/binary content, metadata, GenAI semconv setters, evaluations and events — see the [Span section](/integration/go/reference#span) in the reference.
+For the complete list of span helper methods (RAG contexts, multimodal/binary content, metadata, GenAI semconv setters, evaluations and events), see the [Span section](/integration/go/reference#span) in the reference.
 </Tip>
 
 ## Data Capture
@@ -414,7 +414,7 @@ For per-instrumentation data-capture options and how they compose with the expor
 
 ## The LangWatch API Client
 
-Separate from tracing, `github.com/langwatch/langwatch/sdk-go/client` is a typed REST client for the LangWatch API — prompts, datasets, traces, annotations, events, evaluations, triggers, monitors, scenarios and projects. It lives in its own module so the generated code stays out of the core graph:
+Separate from tracing, `github.com/langwatch/langwatch/sdk-go/client` is a typed REST client for the LangWatch API: prompts, datasets, traces, annotations, events, evaluations, triggers, monitors, scenarios and projects. It lives in its own module so the generated code stays out of the core graph:
 
 ```go
 import "github.com/langwatch/langwatch/sdk-go/client"
@@ -534,7 +534,7 @@ Since LangWatch is built on OpenTelemetry, it also supports any library or frame
 **Import errors:**
 - Run `go mod tidy` to ensure all dependencies are properly resolved
 - Verify you're using Go 1.25 or later
-- Remember the OpenAI client is now `github.com/openai/openai-go/v3` (and `/v3/option`)
+- Make sure the OpenAI client import path is `github.com/openai/openai-go/v3` (and `/v3/option`)
 
 **OpenTelemetry configuration errors:**
 - Check that the LangWatch endpoint URL is correct

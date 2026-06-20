@@ -76,7 +76,7 @@ func main() {
 The middleware automatically captures request/response content, every token type (input / output / cached / reasoning), and model information. Streaming responses are fully supported and automatically accumulated.
 
 <Note>
-The middleware captures input and output content **by default** (`langwatch.DataCaptureAll`). The previous opt-in `WithCaptureInput()` / `WithCaptureOutput()` options have been **removed**. To opt out, pass `otelopenai.WithDataCapture(langwatch.DataCaptureNone)` (or `DataCaptureInput` / `DataCaptureOutput` to capture only one side).
+The middleware captures input and output content **by default** (`langwatch.DataCaptureAll`). To opt out, pass `otelopenai.WithDataCapture(langwatch.DataCaptureNone)` (or `DataCaptureInput` / `DataCaptureOutput` to capture only one side).
 </Note>
 
 <Warning>

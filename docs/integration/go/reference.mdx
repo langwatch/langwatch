@@ -10,9 +10,9 @@ This reference provides detailed documentation for all public APIs in the LangWa
 
 The SDK is made of three kinds of module:
 
-- **Core tracing** — `github.com/langwatch/langwatch/sdk-go`: the exporter, the `Tracer`, the `LangWatchSpan` helpers, span filtering and data capture. No provider dependencies.
-- **Provider instrumentations** — `github.com/langwatch/langwatch/sdk-go/instrumentation/<provider>`: one module per provider, so importing one never pulls in the others' SDKs.
-- **REST client** — `github.com/langwatch/langwatch/sdk-go/client`: a typed client for the LangWatch API.
+- **Core tracing** (`github.com/langwatch/langwatch/sdk-go`): the exporter, the `Tracer`, the `LangWatchSpan` helpers, span filtering and data capture. No provider dependencies.
+- **Provider instrumentations** (`github.com/langwatch/langwatch/sdk-go/instrumentation/<provider>`): one module per provider, so importing one never pulls in the others' SDKs.
+- **REST client** (`github.com/langwatch/langwatch/sdk-go/client`): a typed client for the LangWatch API.
 
 <Tip>
 For a quick start guide with step-by-step instructions, see the [Go Integration Guide](/integration/go/guide). For practical examples of creating traces and spans, see the [Core Concepts section](/integration/go/guide#core-concepts) in the guide.
@@ -290,7 +290,7 @@ Handy when instrumenting manually. These map directly to OpenTelemetry GenAI sem
 </ParamField>
 
 <ParamField path="SetGenAIRequestParams(params GenAIRequestParams)" type="function">
-  Sets `gen_ai.request.*` — temperature, top_p, max_tokens, stop, reasoning_effort, …
+  Sets `gen_ai.request.*`: temperature, top_p, max_tokens, stop, reasoning_effort, and so on.
 </ParamField>
 
 <ParamField path="SetGenAIResponseFinishReasons(...string)" type="function">
@@ -362,7 +362,7 @@ Each provider instrumentation is a **separate Go module** so importing one never
 | `…/instrumentation/bedrock` | `aws-sdk-go-v2` bedrockruntime | smithy-go middleware | [Amazon Bedrock](/integration/go/integrations/amazon-bedrock) |
 | `…/instrumentation/azureopenai` | `openai-go/v3` (azure) | `option.Middleware` | [Azure OpenAI](/integration/go/integrations/azure-openai) |
 | `…/instrumentation/ollama` | `github.com/ollama/ollama/api` | `http.RoundTripper` | [Ollama](/integration/go/integrations/ollama) |
-| `…/instrumentation/gopenai` | `github.com/sashabaranov/go-openai` | `http.RoundTripper` | — |
+| `…/instrumentation/gopenai` | `github.com/sashabaranov/go-openai` | `http.RoundTripper` | (no dedicated guide) |
 | `…/instrumentation/genkit` | `github.com/firebase/genkit/go` | OTel-native | [Genkit](/integration/go/integrations/genkit) |
 
 ### OpenAI middleware
@@ -383,17 +383,13 @@ client := openai.NewClient(
 **Configuration Options (`...Option`):**
 
 <ParamField path="WithDataCapture(mode langwatch.DataCaptureMode)" type="function">
-  Controls whether request (input) and response (output) **content** is recorded at the source. **Defaults to `langwatch.DataCaptureAll`** — input and output are captured by default.
+  Controls whether request (input) and response (output) **content** is recorded at the source. **Defaults to `langwatch.DataCaptureAll`**, so input and output are captured by default.
 
   **Example:**
   ```go
   otelopenai.Middleware("my-app", otelopenai.WithDataCapture(langwatch.DataCaptureInput)) // input only
   otelopenai.Middleware("my-app", otelopenai.WithDataCapture(langwatch.DataCaptureNone))  // neither
   ```
-
-  <Note>
-  This replaces the previous opt-in `WithCaptureInput()` / `WithCaptureOutput()` options, which have been **removed**.
-  </Note>
 </ParamField>
 
 <ParamField path="WithGenAIProvider(provider attribute.KeyValue)" type="function">
@@ -409,7 +405,7 @@ client := openai.NewClient(
   ```
 
   <Note>
-  `gen_ai.system` was removed from the GenAI semantic conventions in favour of `gen_ai.provider.name`. `WithGenAISystem` remains only as a deprecated alias for `WithGenAIProvider`.
+  `gen_ai.provider.name` is the GenAI semantic-convention attribute for the provider. `WithGenAISystem` is a thin alias for this option.
   </Note>
 </ParamField>
 
@@ -453,7 +449,7 @@ The instrumentations add attributes to the client span, following the [OpenTelem
 - `gen_ai.openai.response.system_fingerprint`
 - `langwatch.output` (when output capture is enabled; for streaming this is the reconstructed textual content)
 
-Standard HTTP client attributes (`http.request.method`, `url.path`, `server.address`, `http.response.status_code`) are also included. Other providers map their native token kinds onto the same `gen_ai.usage.*` attributes — for example Anthropic and Bedrock add `gen_ai.usage.cache_creation.input_tokens` for cache-creation tokens. See each provider's guide for the exact list.
+Standard HTTP client attributes (`http.request.method`, `url.path`, `server.address`, `http.response.status_code`) are also included. Other providers map their native token kinds onto the same `gen_ai.usage.*` attributes; for example Anthropic and Bedrock add `gen_ai.usage.cache_creation.input_tokens` for cache-creation tokens. See each provider's guide for the exact list.
 
 ## Data Capture
 
@@ -479,7 +475,7 @@ exporter, _ := langwatch.NewExporter(ctx, langwatch.WithDataCaptureFunc(
 | `langwatch.DataCaptureAll` | Input and output content (default) |
 | `langwatch.DataCaptureInput` | Input content only |
 | `langwatch.DataCaptureOutput` | Output content only |
-| `langwatch.DataCaptureNone` | Neither — structure, models, usage and metadata only |
+| `langwatch.DataCaptureNone` | Neither (structure, models, usage and metadata only) |
 
 Each instrumentation also accepts `WithDataCapture(mode)` to gate content **at the source** for a single client. The two **compose**: the middleware gates content at the source, and the exporter strips content at export time. The exporter option is the recommended place for a uniform policy; the per-instrumentation option is handy when you only want to change behaviour for one client.
 
@@ -620,7 +616,7 @@ Reach resources through the service fields on `*client.Client`. Every method tak
 | `lw.Scenarios` | Simulation scenarios and runs |
 | `lw.Projects` | Organization projects (admin key) |
 
-**Prompts** — the flagship service:
+**Prompts**, the flagship service:
 
 ```go
 // Fetch the latest version, a pinned version, or a tagged version.
@@ -638,7 +634,7 @@ p, err := lw.Prompts.Create(ctx, client.CreatePromptParams{
 })
 ```
 
-**Feedback & evaluations by trace id** — capture the trace id from a span while tracing, then submit later. These reuse the same `langwatch.Event` / `langwatch.Evaluation` types as the live `span.RecordEvent` / `span.RecordEvaluation`, so a value can be recorded live or submitted later interchangeably:
+**Feedback & evaluations by trace id**: capture the trace id from a span while tracing, then submit later. These reuse the same `langwatch.Event` / `langwatch.Evaluation` types as the live `span.RecordEvent` / `span.RecordEvaluation`, so a value can be recorded live or submitted later interchangeably:
 
 ```go
 traceID := span.SpanContext().TraceID().String() // captured earlier

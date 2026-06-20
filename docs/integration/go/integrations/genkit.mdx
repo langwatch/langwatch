@@ -5,7 +5,7 @@ description: Export Firebase Genkit Go traces to LangWatch to observe flows, mod
 keywords: go, golang, genkit, firebase, instrumentation, langwatch, opentelemetry, native, flows
 ---
 
-[Firebase Genkit](https://github.com/firebase/genkit) for Go is **OpenTelemetry-native**: it already emits its own `gen_ai.*` spans for flows, models and tools onto the global OpenTelemetry tracer provider. The LangWatch Genkit package does **no body parsing** — it registers a LangWatch span processor on the tracer provider Genkit's spans flow through, so whatever Genkit records (model, token usage, prompt/completion and tool data) is exported to LangWatch.
+[Firebase Genkit](https://github.com/firebase/genkit) for Go is **OpenTelemetry-native**: it already emits its own `gen_ai.*` spans for flows, models and tools onto the global OpenTelemetry tracer provider. The LangWatch Genkit package does **no body parsing**; it registers a LangWatch span processor on the tracer provider Genkit's spans flow through, so whatever Genkit records (model, token usage, prompt/completion and tool data) is exported to LangWatch.
 
 ## Installation
 
@@ -46,7 +46,7 @@ func main() {
 		log.Fatalf("failed to register LangWatch: %v", err)
 	}
 
-	// Define and run flows as usual — their spans are now exported to LangWatch.
+	// Define and run flows as usual; their spans are exported to LangWatch.
 }
 ```
 
@@ -62,7 +62,7 @@ lwgenkit.RegisterLangWatch(g,
 ```
 
 <Note>
-LangWatch captures whatever `gen_ai.*` attributes Genkit records — there is no extra parsing in this package. If you build your own `sdktrace.TracerProvider`, use `lwgenkit.SpanProcessor(opts...)` to obtain the processor and register it yourself (Genkit reads the global tracer provider).
+LangWatch captures whatever `gen_ai.*` attributes Genkit records; there is no extra parsing in this package. If you build your own `sdktrace.TracerProvider`, use `lwgenkit.SpanProcessor(opts...)` to obtain the processor and register it yourself (Genkit reads the global tracer provider).
 </Note>
 
 ## Related

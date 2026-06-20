@@ -9607,7 +9607,7 @@ icon: golang
 keywords: go, golang, aws, amazon bedrock, bedrockruntime, instrumentation, langwatch, smithy, converse
 ---
 
-LangWatch provides native instrumentation for the AWS Bedrock Runtime client (`github.com/aws/aws-sdk-go-v2/service/bedrockruntime`). Unlike the HTTP-bytes instrumentations, Bedrock is traced via the AWS **smithy-go middleware stack**, reading the typed operation input/output structs directly — so there is no body buffering. It captures `Converse`, `ConverseStream` and (best-effort) `InvokeModel`, including cache read + write tokens and latency.
+LangWatch provides native instrumentation for the AWS Bedrock Runtime client (`github.com/aws/aws-sdk-go-v2/service/bedrockruntime`). Unlike the HTTP-bytes instrumentations, Bedrock is traced via the AWS **smithy-go middleware stack**, reading the typed operation input/output structs directly, so there is no body buffering. It captures `Converse`, `ConverseStream` and (best-effort) `InvokeModel`, including cache read + write tokens and latency.
 
 ## Installation
 
@@ -9693,7 +9693,7 @@ The middleware captures input and output content **by default** (`langwatch.Data
 </Note>
 
 <Warning>
-**Close streaming responses.** For `ConverseStream`, the span is finalised when the stream drains, `Close()` is called, or the operation context is cancelled — always `defer stream.Close()` (or pass a cancellable context), exactly as you would for any AWS event stream.
+**Close streaming responses.** For `ConverseStream`, the span is finalised when the stream drains, `Close()` is called, or the operation context is cancelled, so always `defer stream.Close()` (or pass a cancellable context), exactly as you would for any AWS event stream.
 </Warning>
 
 <Warning>
@@ -9718,7 +9718,7 @@ icon: golang
 keywords: go, golang, anthropic, claude, instrumentation, langwatch, messages api, native
 ---
 
-LangWatch provides **native** instrumentation for the official Anthropic Go SDK (`github.com/anthropics/anthropic-sdk-go`). It wires a middleware that records request and response attributes for the Messages API (`/v1/messages`) — both buffered and streamed — including the full token-usage breakdown (input, output, cache-read and cache-creation) and thinking content.
+LangWatch provides **native** instrumentation for the official Anthropic Go SDK (`github.com/anthropics/anthropic-sdk-go`). It wires a middleware that records request and response attributes for the Messages API (`/v1/messages`), both buffered and streamed, including the full token-usage breakdown (input, output, cache-read and cache-creation) and thinking content.
 
 ## Installation
 
@@ -9786,7 +9786,7 @@ func main() {
 }
 ```
 
-Streaming works identically — drive `client.Messages.NewStreaming(...)` and drain it; the span is recorded once the stream concludes.
+Streaming works identically: drive `client.Messages.NewStreaming(...)` and drain it; the span is recorded once the stream concludes.
 
 <Note>
 The middleware captures input and output content **by default** (`langwatch.DataCaptureAll`). Pass `otelanthropic.WithDataCapture(langwatch.DataCaptureNone)` to opt out. If your client points at an Anthropic-compatible gateway (e.g. AWS Bedrock or Google Vertex), set the provider with `otelanthropic.WithGenAIProvider(...)`.
@@ -9917,7 +9917,7 @@ description: Export Firebase Genkit Go traces to LangWatch to observe flows, mod
 keywords: go, golang, genkit, firebase, instrumentation, langwatch, opentelemetry, native, flows
 ---
 
-[Firebase Genkit](https://github.com/firebase/genkit) for Go is **OpenTelemetry-native**: it already emits its own `gen_ai.*` spans for flows, models and tools onto the global OpenTelemetry tracer provider. The LangWatch Genkit package does **no body parsing** — it registers a LangWatch span processor on the tracer provider Genkit's spans flow through, so whatever Genkit records (model, token usage, prompt/completion and tool data) is exported to LangWatch.
+[Firebase Genkit](https://github.com/firebase/genkit) for Go is **OpenTelemetry-native**: it already emits its own `gen_ai.*` spans for flows, models and tools onto the global OpenTelemetry tracer provider. The LangWatch Genkit package does **no body parsing**; it registers a LangWatch span processor on the tracer provider Genkit's spans flow through, so whatever Genkit records (model, token usage, prompt/completion and tool data) is exported to LangWatch.
 
 ## Installation
 
@@ -9958,7 +9958,7 @@ func main() {
 		log.Fatalf("failed to register LangWatch: %v", err)
 	}
 
-	// Define and run flows as usual — their spans are now exported to LangWatch.
+	// Define and run flows as usual; their spans are exported to LangWatch.
 }
 ```
 
@@ -9974,7 +9974,7 @@ lwgenkit.RegisterLangWatch(g,
 ```
 
 <Note>
-LangWatch captures whatever `gen_ai.*` attributes Genkit records — there is no extra parsing in this package. If you build your own `sdktrace.TracerProvider`, use `lwgenkit.SpanProcessor(opts...)` to obtain the processor and register it yourself (Genkit reads the global tracer provider).
+LangWatch captures whatever `gen_ai.*` attributes Genkit records; there is no extra parsing in this package. If you build your own `sdktrace.TracerProvider`, use `lwgenkit.SpanProcessor(opts...)` to obtain the processor and register it yourself (Genkit reads the global tracer provider).
 </Note>
 
 ## Related
@@ -9995,7 +9995,7 @@ icon: golang
 keywords: go, golang, google, gemini, vertex ai, genai, instrumentation, langwatch, native
 ---
 
-LangWatch provides **native** instrumentation for Google's unified Gen AI Go SDK (`google.golang.org/genai`), which covers both the **Gemini Developer API** and **Vertex AI** behind one client. It traces at the HTTP layer the `genai` client uses, recording request and response attributes — including all token kinds Gemini reports (prompt, candidates, cached content, and `thoughts` as reasoning tokens), with full streaming support.
+LangWatch provides **native** instrumentation for Google's unified Gen AI Go SDK (`google.golang.org/genai`), which covers both the **Gemini Developer API** and **Vertex AI** behind one client. It traces at the HTTP layer the `genai` client uses, recording request and response attributes, including all token kinds Gemini reports (prompt, candidates, cached content, and `thoughts` as reasoning tokens), with full streaming support.
 
 ## Installation
 
@@ -10275,7 +10275,7 @@ description: Instrument local Ollama models in Go to monitor performance, debug 
 keywords: go, golang, ollama, local llm, instrumentation, langwatch, native, ndjson streaming
 ---
 
-LangWatch provides **native** instrumentation for the official Ollama Go client (`github.com/ollama/ollama/api`), covering its native `/api/chat`, `/api/generate` and `/api/embed` endpoints. It captures the model parameters, token counts (`prompt_eval_count` / `eval_count`), server-side phase durations, and tool calls — with NDJSON streaming reconstruction.
+LangWatch provides **native** instrumentation for the official Ollama Go client (`github.com/ollama/ollama/api`), covering its native `/api/chat`, `/api/generate` and `/api/embed` endpoints. It captures the model parameters, token counts (`prompt_eval_count` / `eval_count`), server-side phase durations, and tool calls, with NDJSON streaming reconstruction.
 
 <Note>
 This page covers Ollama's **native** API. If you talk to Ollama through an OpenAI client instead (the `/v1/*` compatibility shim), use the [OpenAI](/integration/go/integrations/open-ai) instrumentation with `option.WithBaseURL("http://localhost:11434/v1")` and `otelopenai.WithGenAIProvider(semconv.GenAIProviderNameKey.String("ollama"))`.
@@ -10439,7 +10439,7 @@ func main() {
 The middleware automatically captures request/response content, every token type (input / output / cached / reasoning), and model information. Streaming responses are fully supported and automatically accumulated.
 
 <Note>
-The middleware captures input and output content **by default** (`langwatch.DataCaptureAll`). The previous opt-in `WithCaptureInput()` / `WithCaptureOutput()` options have been **removed**. To opt out, pass `otelopenai.WithDataCapture(langwatch.DataCaptureNone)` (or `DataCaptureInput` / `DataCaptureOutput` to capture only one side).
+The middleware captures input and output content **by default** (`langwatch.DataCaptureAll`). To opt out, pass `otelopenai.WithDataCapture(langwatch.DataCaptureNone)` (or `DataCaptureInput` / `DataCaptureOutput` to capture only one side).
 </Note>
 
 <Warning>

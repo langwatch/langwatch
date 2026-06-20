@@ -6,7 +6,7 @@ icon: golang
 keywords: go, golang, anthropic, claude, instrumentation, langwatch, messages api, native
 ---
 
-LangWatch provides **native** instrumentation for the official Anthropic Go SDK (`github.com/anthropics/anthropic-sdk-go`). It wires a middleware that records request and response attributes for the Messages API (`/v1/messages`) — both buffered and streamed — including the full token-usage breakdown (input, output, cache-read and cache-creation) and thinking content.
+LangWatch provides **native** instrumentation for the official Anthropic Go SDK (`github.com/anthropics/anthropic-sdk-go`). It wires a middleware that records request and response attributes for the Messages API (`/v1/messages`), both buffered and streamed, including the full token-usage breakdown (input, output, cache-read and cache-creation) and thinking content.
 
 ## Installation
 
@@ -74,7 +74,7 @@ func main() {
 }
 ```
 
-Streaming works identically — drive `client.Messages.NewStreaming(...)` and drain it; the span is recorded once the stream concludes.
+Streaming works identically: drive `client.Messages.NewStreaming(...)` and drain it; the span is recorded once the stream concludes.
 
 <Note>
 The middleware captures input and output content **by default** (`langwatch.DataCaptureAll`). Pass `otelanthropic.WithDataCapture(langwatch.DataCaptureNone)` to opt out. If your client points at an Anthropic-compatible gateway (e.g. AWS Bedrock or Google Vertex), set the provider with `otelanthropic.WithGenAIProvider(...)`.

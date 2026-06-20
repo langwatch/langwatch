@@ -5,7 +5,7 @@ description: Instrument local Ollama models in Go to monitor performance, debug 
 keywords: go, golang, ollama, local llm, instrumentation, langwatch, native, ndjson streaming
 ---
 
-LangWatch provides **native** instrumentation for the official Ollama Go client (`github.com/ollama/ollama/api`), covering its native `/api/chat`, `/api/generate` and `/api/embed` endpoints. It captures the model parameters, token counts (`prompt_eval_count` / `eval_count`), server-side phase durations, and tool calls — with NDJSON streaming reconstruction.
+LangWatch provides **native** instrumentation for the official Ollama Go client (`github.com/ollama/ollama/api`), covering its native `/api/chat`, `/api/generate` and `/api/embed` endpoints. It captures the model parameters, token counts (`prompt_eval_count` / `eval_count`), server-side phase durations, and tool calls, with NDJSON streaming reconstruction.
 
 <Note>
 This page covers Ollama's **native** API. If you talk to Ollama through an OpenAI client instead (the `/v1/*` compatibility shim), use the [OpenAI](/integration/go/integrations/open-ai) instrumentation with `option.WithBaseURL("http://localhost:11434/v1")` and `otelopenai.WithGenAIProvider(semconv.GenAIProviderNameKey.String("ollama"))`.

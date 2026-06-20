@@ -6,7 +6,7 @@ icon: golang
 keywords: go, golang, aws, amazon bedrock, bedrockruntime, instrumentation, langwatch, smithy, converse
 ---
 
-LangWatch provides native instrumentation for the AWS Bedrock Runtime client (`github.com/aws/aws-sdk-go-v2/service/bedrockruntime`). Unlike the HTTP-bytes instrumentations, Bedrock is traced via the AWS **smithy-go middleware stack**, reading the typed operation input/output structs directly — so there is no body buffering. It captures `Converse`, `ConverseStream` and (best-effort) `InvokeModel`, including cache read + write tokens and latency.
+LangWatch provides native instrumentation for the AWS Bedrock Runtime client (`github.com/aws/aws-sdk-go-v2/service/bedrockruntime`). Unlike the HTTP-bytes instrumentations, Bedrock is traced via the AWS **smithy-go middleware stack**, reading the typed operation input/output structs directly, so there is no body buffering. It captures `Converse`, `ConverseStream` and (best-effort) `InvokeModel`, including cache read + write tokens and latency.
 
 ## Installation
 
@@ -92,7 +92,7 @@ The middleware captures input and output content **by default** (`langwatch.Data
 </Note>
 
 <Warning>
-**Close streaming responses.** For `ConverseStream`, the span is finalised when the stream drains, `Close()` is called, or the operation context is cancelled — always `defer stream.Close()` (or pass a cancellable context), exactly as you would for any AWS event stream.
+**Close streaming responses.** For `ConverseStream`, the span is finalised when the stream drains, `Close()` is called, or the operation context is cancelled, so always `defer stream.Close()` (or pass a cancellable context), exactly as you would for any AWS event stream.
 </Warning>
 
 <Warning>
