@@ -70,7 +70,6 @@ interface VizPlaceholderProps {
   selectedSpanId: string | null;
   onSelectSpan: (spanId: string) => void;
   onClearSpan: () => void;
-  onSwitchToSpanList?: (nameFilter: string, typeFilter: string) => void;
   /**
    * When true, the viz fills its parent's full height — the internal
    * height state and the bottom resize handle are skipped because the
@@ -222,7 +221,6 @@ export function VizPlaceholder({
   selectedSpanId,
   onSelectSpan,
   onClearSpan,
-  onSwitchToSpanList,
   fillParent = false,
   paneLayout,
 }: VizPlaceholderProps) {
@@ -304,20 +302,6 @@ export function VizPlaceholder({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasData, fillParent]);
-
-  // `handleSwitchToSpanList` used to switch the viz tab to "spanlist"
-  // and forward filter state when the user expanded a waterfall group
-  // and asked to drill in. Span list was retired during the redesign —
-  // the no-op shim below keeps existing call sites (TreeRow / GroupRow)
-  // compiling without each having to feature-flag the prop. The user is
-  // already inside the waterfall, so the prop is a no-op rather than
-  // attempting some other reasonable fallback.
-  const handleSwitchToSpanList = useCallback(
-    (_nameFilter: string, _typeFilter: string) => {
-      // intentional no-op — see comment above
-    },
-    [],
-  );
 
   const handleVizTabChange = useCallback(
     (tab: VizTab) => {
@@ -645,7 +629,6 @@ export function VizPlaceholder({
                 promptSpanIds={promptSpanIds}
                 onSelectSpan={onSelectSpan}
                 onClearSpan={onClearSpan}
-                onSwitchToSpanList={handleSwitchToSpanList}
               />
             )}
             {/*

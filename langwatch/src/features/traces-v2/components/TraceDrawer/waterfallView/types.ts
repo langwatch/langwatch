@@ -21,7 +21,6 @@ export interface WaterfallViewProps {
   promptSpanIds?: ReadonlySet<string>;
   onSelectSpan: (spanId: string) => void;
   onClearSpan: () => void;
-  onSwitchToSpanList?: (nameFilter: string, typeFilter: string) => void;
 }
 
 export interface WaterfallTreeNode {

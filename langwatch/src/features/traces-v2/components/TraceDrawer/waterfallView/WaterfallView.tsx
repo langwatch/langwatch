@@ -42,7 +42,6 @@ export const WaterfallView = memo(function WaterfallView({
   promptSpanIds,
   onSelectSpan,
   onClearSpan,
-  onSwitchToSpanList,
 }: WaterfallViewProps) {
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -518,7 +517,6 @@ export const WaterfallView = memo(function WaterfallView({
                       groupKey={groupKey}
                       isExpanded={expandedGroups.has(groupKey)}
                       onToggle={handleToggleGroup}
-                      onSwitchToSpanList={onSwitchToSpanList}
                     />
                   </Box>
                 );
