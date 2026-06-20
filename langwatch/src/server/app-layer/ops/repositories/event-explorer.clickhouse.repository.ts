@@ -82,6 +82,7 @@ export class EventExplorerClickHouseRepository
   async searchAggregates(params: {
     query: string;
     tenantIds?: string[];
+    sinceMs?: number;
   }): Promise<AggregateSearchResult[]> {
     // Defensive guard: without at least one of (tenants, query string) the
     // query degrades to "ORDER BY EventTimestamp DESC LIMIT 50" against the
@@ -102,16 +103,21 @@ export class EventExplorerClickHouseRepository
       );
     }
 
-    // No silent time clamp here - DejaView is the internal ops admin tool, and
-    // operators searching for old aggregates during incident archaeology
-    // mustn't get empty results with no explanation. The hot/cold-tier bound
-    // is surfaced *in the DejaView UI* (uses the same env-var-derived value
-    // the TTL reconciler does) so the operator sees "older than N days lives
-    // in cold storage" up front, rather than the backend silently dropping
-    // rows. Tradeoff: a truly unbounded cross-tenant scan stays expensive,
-    // but the upfront guard above (must supply tenants or a query string)
-    // already prevents the worst shape.
+    // No silent time clamp in the repo. The caller (the ops router for the
+    // DejaView UI) supplies sinceMs explicitly - currently a 1-year bound
+    // surfaced under the search box as a banner so the operator sees the
+    // window up front. Other callers (e.g. integration tests, ad-hoc
+    // scripts) can pass `undefined` to scan the full event_log, paying the
+    // partition-fan-out cost knowingly. EventOccurredAt = 0 is the legacy
+    // sentinel; preserved alongside the bound so historical test data
+    // doesn't silently disappear.
     const queryParams: Record<string, unknown> = {};
+    let timeBoundFilter = "";
+    if (typeof params.sinceMs === "number" && params.sinceMs > 0) {
+      timeBoundFilter =
+        "AND (EventOccurredAt = 0 OR EventOccurredAt >= {sinceMs:UInt64})";
+      queryParams.sinceMs = params.sinceMs;
+    }
 
     let tenantFilter = "";
     if (hasTenants) {
@@ -136,6 +142,7 @@ export class EventExplorerClickHouseRepository
           max(EventTimestamp) AS lastEventTime
         FROM event_log
         WHERE 1=1
+          ${timeBoundFilter}
           ${tenantFilter}
           ${aggregateFilter}
         GROUP BY AggregateId, AggregateType, TenantId
@@ -167,29 +174,14 @@ export class EventExplorerClickHouseRepository
     aggregateId: string;
     tenantId: string;
     limit: number;
-    sinceMs?: number;
   }): Promise<RawEventRow[]> {
-    // Heavy column read (EventPayload, ZSTD(3)). Without an EventOccurredAt
-    // bound the read walks every weekly partition for the aggregate — the
-    // primary key seeks to (TenantId, AggregateType, AggregateId, …) per
-    // partition but pays cold-S3 metadata fetches for the inactive ones.
-    //
-    // Caller semantics:
-    //   * Routine event-listing (ops UI) — pass sinceMs (e.g. last 30 days)
-    //     to bound the scan to warm partitions only.
-    //   * Projection replay — explicitly omit sinceMs to read the full
-    //     event history of an aggregate (necessary for fold correctness).
-    const queryParams: Record<string, unknown> = {
-      tenantId: params.tenantId,
-      aggregateId: params.aggregateId,
-      limit: params.limit,
-    };
-    let timeFilter = "";
-    if (typeof params.sinceMs === "number" && params.sinceMs > 0) {
-      timeFilter = "AND EventOccurredAt >= {sinceMs:UInt64}";
-      queryParams.sinceMs = params.sinceMs;
-    }
-
+    // No `sinceMs` parameter: this is the detail-view query for a
+    // specific aggregate the operator has already picked from the
+    // (bounded) DejaView search. Once you're looking at one aggregate
+    // you want its full event history, including projection replays
+    // where the fold depends on every event. The partition fan-out is
+    // acceptable here because the aggregate-id seek is narrow per
+    // partition.
     const result = await this.client.query({
       query: `
         SELECT
@@ -200,11 +192,14 @@ export class EventExplorerClickHouseRepository
         FROM event_log
         WHERE TenantId = {tenantId:String}
           AND AggregateId = {aggregateId:String}
-          ${timeFilter}
         ORDER BY EventTimestamp ASC, EventId ASC
         LIMIT {limit:UInt32}
       `,
-      query_params: queryParams,
+      query_params: {
+        tenantId: params.tenantId,
+        aggregateId: params.aggregateId,
+        limit: params.limit,
+      },
       format: "JSONEachRow",
     });
 

@@ -99,15 +99,19 @@ export function DejaViewContent() {
     },
   );
 
-  // event_log moves to cold-tier S3 after this window (env-var-derived from
-  // CLICKHOUSE_COLD_STORAGE_EVENT_LOG_TTL_DAYS). Aggregates older than this
-  // are still searchable but the query gets quite some slower. Surfaced as
-  // an inline info note so the operator isn't confused by missing/slow
-  // results during incident archaeology.
-  const hotTierQuery = api.ops.getEventLogHotTierDays.useQuery(undefined, {
-    staleTime: 60 * 60 * 1000,
-  });
-  const hotTierDays = hotTierQuery.data?.days ?? null;
+  // DejaView search is bounded server-side to the last 365 days (the ops
+  // router supplies the sinceMs). Cold-tier storage kicks in earlier
+  // (env-var-derived from CLICKHOUSE_COLD_STORAGE_EVENT_LOG_TTL_DAYS) -
+  // aggregates inside the search window but past the hot tier still come
+  // back, they're just quite some slower. The banner under the search
+  // surfaces both numbers so the operator sees the bounds up front
+  // instead of guessing why an old aggregate didn't show up.
+  const searchWindowQuery = api.ops.getEventLogSearchWindow.useQuery(
+    undefined,
+    { staleTime: 60 * 60 * 1000 },
+  );
+  const searchLookbackDays = searchWindowQuery.data?.searchLookbackDays ?? null;
+  const hotTierDays = searchWindowQuery.data?.hotTierDays ?? null;
 
   const eventsQuery = api.ops.loadAggregateEvents.useQuery(
     {
@@ -240,7 +244,7 @@ export function DejaViewContent() {
         />
         <Box paddingX={6} paddingY={4} w="full">
           <VStack align="stretch" gap={4}>
-            {hotTierDays !== null && (
+            {searchLookbackDays !== null && (
               <Box
                 padding={3}
                 borderRadius="md"
@@ -253,12 +257,18 @@ export function DejaViewContent() {
                     <Info size={14} />
                   </Box>
                   <Text textStyle="xs" color="fg.muted">
-                    Aggregates older than {hotTierDays} days live in cold
-                    storage. They're still searchable, but the query gets quite
-                    some slower (this window is set by{" "}
-                    {hotTierQuery.data?.envVar ??
-                      "CLICKHOUSE_COLD_STORAGE_EVENT_LOG_TTL_DAYS"}
-                    ).
+                    Search is bounded to the last {searchLookbackDays} days.
+                    {hotTierDays !== null && (
+                      <>
+                        {" "}
+                        Aggregates older than {hotTierDays} days within that
+                        window live in cold storage and load quite some slower
+                        (set by{" "}
+                        {searchWindowQuery.data?.hotTierEnvVar ??
+                          "CLICKHOUSE_COLD_STORAGE_EVENT_LOG_TTL_DAYS"}
+                        ).
+                      </>
+                    )}
                   </Text>
                 </HStack>
               </Box>

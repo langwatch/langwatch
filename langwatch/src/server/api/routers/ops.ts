@@ -556,28 +556,34 @@ export const opsRouter = createTRPCRouter({
       z.object({
         query: z.string(),
         tenantId: z.string().optional(),
+        sinceMs: z.number().int().positive().optional(),
       }),
     )
     .query(async ({ input }) => {
       const ops = requireOps();
+      const DEFAULT_LOOKBACK_MS = 365 * 24 * 60 * 60 * 1000;
+      const sinceMs = input.sinceMs ?? Date.now() - DEFAULT_LOOKBACK_MS;
 
       return ops.eventExplorer.searchAggregates({
         query: input.query,
         tenantIds: input.tenantId ? [input.tenantId] : [],
+        sinceMs,
       });
     }),
 
-  // Surfaces the env-var-derived hot-tier window for `event_log` so the
-  // DejaView UI can warn operators that older aggregates live in cold
-  // storage. The backend search itself is unbounded on time (cold-tier
-  // hits are slow but allowed); this is the transparent signal that lets
-  // an operator know why a search might be incomplete.
-  getEventLogHotTierDays: protectedProcedure
+  // Exposes (a) the 1-year DejaView search default and (b) the env-var-
+  // derived hot-tier window for event_log so the DejaView UI can render
+  // the banner under the search box. Cold-tier reads still work but get
+  // quite some slower; the banner makes the bound visible up front.
+  getEventLogSearchWindow: protectedProcedure
     .use(opsViewPermission)
     .query(() => {
-      const config = TABLE_TTL_CONFIG.find((c) => c.table === "event_log");
-      if (!config) return null;
-      return { days: resolveHotDays(config), envVar: config.envVar };
+      const ttl = TABLE_TTL_CONFIG.find((c) => c.table === "event_log");
+      return {
+        searchLookbackDays: 365,
+        hotTierDays: ttl ? resolveHotDays(ttl) : null,
+        hotTierEnvVar: ttl?.envVar ?? null,
+      };
     }),
 
   loadAggregateEvents: protectedProcedure

@@ -79,30 +79,35 @@ describe("EventExplorerClickHouseRepository.searchAggregates", () => {
     });
   });
 
-  describe("given the upfront guard is satisfied (tenant or query string supplied)", () => {
+  describe("given the upfront guard is satisfied and the caller supplies sinceMs", () => {
     describe("when searchAggregates is called", () => {
-      it("does not silently clamp the lookback to N days - the cold-tier bound is surfaced in the DejaView ops UI instead", async () => {
-        // The repo used to clamp to "now - 90 days" via EventOccurredAt. That
-        // turned out to be the wrong layer: it silently dropped aggregates
-        // older than 90 days during incident archaeology where the operator
-        // already knew the tenant. DejaView is an internal ops tool, so the
-        // hot/cold-tier surface is handled in the UI (uses the env-var-derived
-        // CLICKHOUSE_COLD_STORAGE_EVENT_LOG_TTL_DAYS value); the backend stays
-        // unbounded on the time axis.
+      it("applies the EventOccurredAt time bound (preserving the EventOccurredAt = 0 legacy sentinel)", async () => {
+        // The ops router defaults sinceMs to `now - 365 days` for the
+        // DejaView UI, surfaced as a banner under the search box. The
+        // repo just honours whatever the caller supplies - no silent
+        // backend clamp. Zero-sentinel rows survive so historical test
+        // data doesn't silently disappear.
         const { repo, query } = repoCapturingQuery();
 
         await repo.searchAggregates({
           query: "abc",
           tenantIds: ["project_x"],
+          sinceMs: 1_700_000_000_000,
         });
 
         const { query: sql, query_params } = capturedQuery(query);
-        expect(sql).not.toContain("EventOccurredAt");
-        expect(query_params.sinceMs).toBeUndefined();
+        expect(sql).toMatch(
+          /EventOccurredAt\s*=\s*0\s+OR\s+EventOccurredAt\s*>=\s*\{sinceMs:UInt64\}/,
+        );
+        expect(query_params.sinceMs).toBe(1_700_000_000_000);
         expect(query_params.tenantIds).toEqual(["project_x"]);
       });
+    });
+  });
 
-      it("stays unbounded on time when only a cross-tenant query string is supplied (guard still requires the query string itself)", async () => {
+  describe("given the upfront guard is satisfied but no sinceMs is supplied", () => {
+    describe("when searchAggregates is called", () => {
+      it("stays unbounded on time so non-UI callers (integration tests, scripts) can scan full history knowingly", async () => {
         const { repo, query } = repoCapturingQuery();
 
         await repo.searchAggregates({ query: "abc" });
@@ -116,28 +121,9 @@ describe("EventExplorerClickHouseRepository.searchAggregates", () => {
 });
 
 describe("EventExplorerClickHouseRepository.findEventsByAggregate", () => {
-  describe("given the caller passes a sinceMs (routine ops listing)", () => {
+  describe("given an aggregate the operator has already selected", () => {
     describe("when findEventsByAggregate is called", () => {
-      it("includes the EventOccurredAt predicate in the SQL", async () => {
-        const { repo, query } = repoCapturingQuery();
-
-        await repo.findEventsByAggregate({
-          aggregateId: "agg-1",
-          tenantId: "project_test",
-          limit: 10,
-          sinceMs: 1_700_000_000_000,
-        });
-
-        const { query: sql, query_params } = capturedQuery(query);
-        expect(sql).toContain("EventOccurredAt >= {sinceMs:UInt64}");
-        expect(query_params.sinceMs).toBe(1_700_000_000_000);
-      });
-    });
-  });
-
-  describe("given the caller omits sinceMs (projection replay)", () => {
-    describe("when findEventsByAggregate is called", () => {
-      it("does not include the EventOccurredAt predicate so the full event history is reachable", async () => {
+      it("returns the full event history with no time bound (detail-view, full fold history needed for projection replay)", async () => {
         const { repo, query } = repoCapturingQuery();
 
         await repo.findEventsByAggregate({
@@ -147,8 +133,12 @@ describe("EventExplorerClickHouseRepository.findEventsByAggregate", () => {
         });
 
         const { query: sql, query_params } = capturedQuery(query);
-        expect(sql).not.toContain("EventOccurredAt >= {sinceMs:UInt64}");
-        expect(query_params.sinceMs).toBeUndefined();
+        expect(sql).not.toContain("EventOccurredAt");
+        expect(query_params).toEqual({
+          tenantId: "project_test",
+          aggregateId: "agg-1",
+          limit: 10,
+        });
       });
     });
   });
