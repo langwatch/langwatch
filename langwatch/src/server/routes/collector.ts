@@ -536,20 +536,32 @@ secured
           ),
         );
 
-        const failures = results.filter(
-          (r): r is PromiseRejectedResult => r.status === "rejected",
-        );
-        rejectedSpans = failures.length;
-        rejectionErrors = failures.map((f) =>
-          f.reason instanceof Error ? f.reason.message : String(f.reason),
-        );
-        if (failures.length > 0) {
+        // `ingestNormalizedSpan` catches its own errors and RESOLVES with
+        // `{ status: "failed", error }` (it never rejects), so inspect the
+        // resolved status — checking the allSettled "rejected" wrapper would
+        // count every failure as a success. An unexpected rejection is still
+        // treated as a failure defensively. "deduped" is a success, not an error.
+        const failureErrors = results
+          .map((r) => {
+            if (r.status === "rejected") {
+              return r.reason instanceof Error
+                ? r.reason.message
+                : String(r.reason);
+            }
+            return r.value.status === "failed"
+              ? (r.value.error ?? "span ingestion failed")
+              : null;
+          })
+          .filter((e): e is string => e !== null);
+        rejectedSpans = failureErrors.length;
+        rejectionErrors = failureErrors;
+        if (failureErrors.length > 0) {
           logger.error(
             {
               projectId: project.id,
               traceId,
-              failureCount: failures.length,
-              errors: failures.map((f) => f.reason),
+              failureCount: failureErrors.length,
+              errors: failureErrors,
             },
             "Error dispatching collector spans to event sourcing",
           );
