@@ -14,6 +14,10 @@ const logger = createLogger("langwatch:workers");
 
 logger.info("starting");
 
+// These worker/queue modules construct Redis-connecting `QueueWithFallback`
+// instances at module load, so they're imported dynamically — only after
+// `verifyRedisReady()` confirms the connection — to avoid connecting before
+// Redis is up. Keep them as `await import()` (not top-level) for that ordering.
 void verifyRedisReady().then(async () => {
   try {
     const { startIngestionPullerWorker } = await import(

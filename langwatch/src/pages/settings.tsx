@@ -117,7 +117,7 @@ function SettingsForm({
           toaster.create({
             title: "Failed to update organization",
             description:
-              "Please make sure you have filled out all fields related to either S3 or Elasticsearch",
+              "Please make sure you have filled out all fields related to S3",
             type: "error",
             meta: {
               closable: true,
