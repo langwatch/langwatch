@@ -464,6 +464,32 @@ export function extractReadableText(
   return raw;
 }
 
+/**
+ * Pull the first system/developer prompt out of a trace `input` payload, as
+ * clean prose. Used for the conversation-level system-prompt banner and the
+ * markdown export's `## System` chunk.
+ *
+ * Built on the same coercion + block-parsing path as `extractReadableText`,
+ * so it understands every chat shape (arrays, single objects, typed-value
+ * envelopes, double-stringified) and unwraps typed text blocks instead of
+ * dumping raw JSON. Multi-block content is joined with newlines (the natural
+ * separator for a prompt rendered in a banner / code fence). Matches the
+ * `system` role only (not `developer`) to preserve the behaviour of the
+ * callers it replaces. Returns "" when the payload isn't chat-shaped or
+ * carries no system prompt.
+ */
+export function extractSystemText(raw: string | null | undefined): string {
+  if (!raw) return "";
+  const chat = coerceToChatMessages(tryParseJSON(raw));
+  if (!chat) return "";
+  for (const msg of chat) {
+    if (msg.role !== "system") continue;
+    const text = joinTextBlocks(parseContentBlocks(msg.content));
+    if (text.trim()) return text;
+  }
+  return "";
+}
+
 export function getReasoning(
   message: ChatMessage,
   blocks: ContentBlock[],

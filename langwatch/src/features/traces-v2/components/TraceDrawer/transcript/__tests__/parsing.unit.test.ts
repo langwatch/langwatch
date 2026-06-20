@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { coerceToChatMessages } from "../parsing";
+import { coerceToChatMessages, extractSystemText } from "../parsing";
 
 describe("coerceToChatMessages", () => {
   describe("given an explicit chat_messages typed-value envelope", () => {
@@ -88,6 +88,69 @@ describe("coerceToChatMessages", () => {
       ];
 
       expect(coerceToChatMessages(data)).toEqual(data);
+    });
+  });
+});
+
+describe("extractSystemText", () => {
+  describe("given a chat array with a string system message", () => {
+    it("returns the first system message's content", () => {
+      const raw = JSON.stringify([
+        { role: "system", content: "You are a helpful assistant." },
+        { role: "user", content: "hi" },
+        { role: "system", content: "second system, ignored" },
+      ]);
+      expect(extractSystemText(raw)).toBe("You are a helpful assistant.");
+    });
+  });
+
+  describe("given a system message with typed text-block content", () => {
+    it("joins the text blocks and unwraps them from the block envelope", () => {
+      const raw = JSON.stringify([
+        {
+          role: "system",
+          content: [
+            { type: "text", text: "line one" },
+            { type: "text", text: "line two" },
+          ],
+        },
+      ]);
+      expect(extractSystemText(raw)).toBe("line one\nline two");
+    });
+  });
+
+  describe("given a chat_messages typed-value envelope", () => {
+    it("reaches inside the envelope for the system prompt", () => {
+      const raw = JSON.stringify({
+        type: "chat_messages",
+        value: [
+          { role: "system", content: "enveloped system" },
+          { role: "user", content: "hi" },
+        ],
+      });
+      expect(extractSystemText(raw)).toBe("enveloped system");
+    });
+  });
+
+  describe("given input with no system role", () => {
+    it("returns an empty string", () => {
+      const raw = JSON.stringify([
+        { role: "user", content: "hi" },
+        { role: "assistant", content: "hello" },
+      ]);
+      expect(extractSystemText(raw)).toBe("");
+    });
+  });
+
+  describe("given non-chat input", () => {
+    it("returns an empty string for plain prose", () => {
+      expect(extractSystemText("just some plain text")).toBe("");
+    });
+
+    it("returns an empty string for null / empty input", () => {
+      expect(extractSystemText(null)).toBe("");
+      expect(extractSystemText(undefined)).toBe("");
+      expect(extractSystemText("")).toBe("");
     });
   });
 });

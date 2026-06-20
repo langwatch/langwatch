@@ -3,7 +3,7 @@ import {
   formatDuration,
   formatRelativeTime,
 } from "../../../utils/formatters";
-import { contentToString } from "../../TraceTable/chatContent";
+import { extractSystemText } from "../transcript/parsing";
 import type { ParsedTurn } from "./types";
 
 export interface ConversationMarkdownChunk {
@@ -58,7 +58,7 @@ export function buildConversationMarkdownChunks(
   // System prompt gets its own chunk — long system prompts can dwarf the
   // conversation itself, and isolating them keeps the preamble cheap and
   // the prompt unmounted until scrolled to.
-  const systemPrompt = parseSystemPrompt(parsedTurns[0]?.turn.input);
+  const systemPrompt = extractSystemText(parsedTurns[0]?.turn.input);
   if (systemPrompt) {
     chunks.push({
       id: "system",
@@ -104,51 +104,6 @@ export function joinConversationMarkdown(
     .map((c) => c.markdown)
     .join("\n\n")
     .trimEnd();
-}
-
-/**
- * Extract the first system message from the chat-history input. Used to render
- * the conversation-level system prompt banner. Returns "" if not chat-shaped or
- * no system role present.
- */
-export function parseSystemPrompt(raw: string | null | undefined): string {
-  if (!raw) return "";
-  try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      const sys = parsed.find(
-        (m) => m && typeof m === "object" && m.role === "system",
-      );
-      if (sys) return contentToString(sys.content);
-    }
-  } catch {
-    // not JSON
-  }
-  return "";
-}
-
-/**
- * The `input` field on a trace is often the full chat history (system + earlier
- * turns + the latest user message). For chat rendering we want just the latest
- * user message — that's the new content this turn.
- */
-export function parseLastUserText(raw: string | null | undefined): string {
-  if (!raw) return "";
-  try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      const lastUser = [...parsed]
-        .reverse()
-        .find((m) => m && typeof m === "object" && m.role === "user");
-      if (lastUser) return contentToString(lastUser.content);
-    }
-    if (typeof parsed === "object" && parsed !== null) {
-      return JSON.stringify(parsed);
-    }
-  } catch {
-    // not JSON
-  }
-  return raw;
 }
 
 export function formatGap(secs: number): string {

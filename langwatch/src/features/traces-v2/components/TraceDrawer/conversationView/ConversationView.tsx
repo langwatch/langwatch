@@ -28,7 +28,11 @@ import { useTraceDrawerNavigation } from "../../../hooks/useTraceDrawerNavigatio
 import type { TraceListItem } from "../../../types/trace";
 import { RenderedMarkdown } from "../markdownView";
 import { SegmentedToggle } from "../SegmentedToggle";
-import { extractReadableText, extractReasoningText } from "../transcript";
+import {
+  extractReadableText,
+  extractReasoningText,
+  extractSystemText,
+} from "../transcript";
 import { AnnotationsView } from "./AnnotationsView";
 import { ChatTurnRow } from "./ChatTurnRow";
 import { ConversationExpandContext } from "./expandContext";
@@ -43,8 +47,6 @@ import {
   buildConversationMarkdownChunks,
   type ConversationMarkdownChunk,
   joinConversationMarkdown,
-  parseLastUserText,
-  parseSystemPrompt,
 } from "./utils";
 
 type AnnotationItem = RouterOutputs["annotation"]["getByTraceIds"][number];
@@ -121,10 +123,8 @@ export const ConversationView = memo(function ConversationView({
         turn: t,
         // Use the shared Transcript helper so we handle the same shapes
         // the I/O viewer does (chat arrays, single message objects,
-        // typed-block content arrays). parseLastUserText only handled
-        // chat arrays, missing single-message and bare-block envelopes.
-        userText:
-          extractReadableText(t.input, "user") || parseLastUserText(t.input),
+        // typed-block content arrays, and the raw-string fallback).
+        userText: extractReadableText(t.input, "user"),
         assistantText: extractReadableText(t.output, "assistant"),
         assistantReasoning: extractReasoningText(t.output),
         gapSecs,
@@ -427,7 +427,7 @@ const TurnsView: React.FC<{
   annotationsByTrace,
 }) => {
   const systemPrompt = useMemo(
-    () => parseSystemPrompt(systemPromptInput),
+    () => extractSystemText(systemPromptInput),
     [systemPromptInput],
   );
 
