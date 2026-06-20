@@ -21,11 +21,11 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
-import type { Protections } from "../../elasticsearch/protections";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../event-sourcing/__tests__/integration/testContainers";
+import type { Protections } from "../../traces/protections";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
 import { enrichTracesWithEvaluations } from "../enrich-evaluations";
 import {
@@ -340,7 +340,12 @@ describe("trace search projection (integration)", () => {
       /** @scenario "Projected event details are redacted when captured input is not visible" */
       it("redacts event detail values but keeps types and metrics", async () => {
         const rows = await projectedSearch({
-          select: ["trace_id", "events.type", "events.metrics", "events.details"],
+          select: [
+            "trace_id",
+            "events.type",
+            "events.metrics",
+            "events.details",
+          ],
           protections: {
             canSeeCosts: true,
             canSeeCapturedInput: false,

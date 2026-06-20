@@ -54,11 +54,12 @@ import { getApp } from "~/server/app-layer/app";
 import type { DspyStepData } from "~/server/app-layer/dspy-steps/types";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
+import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import type {
   DSPyLLMCall,
   DSPyStepRESTParams,
 } from "~/server/experiments/types";
-import { dSPyStepRESTParamsSchema } from "~/server/experiments/types.generated";
+import { dSPyStepRESTParamsSchema } from "~/server/experiments/types";
 import { filterFieldsEnum } from "~/server/filters/types";
 import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
@@ -76,12 +77,12 @@ import {
 } from "~/server/tracer/collector/cost";
 import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
 import type { TrackEventRESTParamsValidator } from "~/server/tracer/types";
-import { trackEventRESTParamsValidatorSchema } from "~/server/tracer/types.generated";
+import { trackEventRESTParamsValidatorSchema } from "~/server/tracer/types";
 import { runWorkflow as runWorkflowFn } from "~/server/workflows/runWorkflow";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import { createLogger } from "~/utils/logger/server";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
 import { validateInternalSecret } from "./_lib/internal-secret";
 
@@ -124,7 +125,7 @@ const secured = createServiceApp<{ Variables: UnifiedAuthVariables }>({
 const inRouteAuth = handlerManagedAuth(
   "project auth + permission ceiling enforced by in-route middleware",
 );
-const internalAuth = internalSecret(
+const _internalAuth = internalSecret(
   "internal shared secret validated in-handler via validateInternalSecret",
 );
 
@@ -299,7 +300,7 @@ secured
           },
           "invalid log_steps data received",
         );
-        captureException(error, { extra: { projectId: project.id } });
+        captureException(toError(error), { extra: { projectId: project.id } });
         const validationError = fromZodError(error as ZodError);
         return c.json({ error: validationError.message }, 400);
       }
@@ -342,7 +343,7 @@ secured
               },
               "failed to validate data for DSPy step",
             );
-            captureException(error, {
+            captureException(toError(error), {
               extra: { projectId: project.id, param },
             });
             const validationError = fromZodError(error);
@@ -357,7 +358,7 @@ secured
               },
               "internal server error processing DSPy step",
             );
-            captureException(error, {
+            captureException(toError(error), {
               extra: { projectId: project.id, param },
             });
             return c.json(
@@ -421,7 +422,7 @@ secured
           { error, body, projectId: project.id },
           "invalid init data received",
         );
-        captureException(error, { extra: { projectId: project.id } });
+        captureException(toError(error), { extra: { projectId: project.id } });
         const validationError = fromZodError(error as ZodError);
         return c.json({ error: validationError.message }, 400);
       }
@@ -598,7 +599,7 @@ secured
       const versionId = c.req.param("versionId");
 
       const contentType = c.req.header("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
+      if (!contentType?.includes("application/json")) {
         return c.json({ message: "Invalid body, expecting json" }, 400);
       }
 
@@ -679,7 +680,7 @@ secured
         { error, body: rawBody, projectId: project.id },
         "invalid event received",
       );
-      captureException(error);
+      captureException(toError(error));
       const validationError = fromZodError(error as ZodError);
       return c.json({ error: validationError.message }, 400);
     }
@@ -692,7 +693,7 @@ secured
           { error, body: rawBody, projectId: project.id },
           "invalid event received",
         );
-        captureException(error);
+        captureException(toError(error));
         const validationError = fromZodError(error as ZodError);
         return c.json({ error: validationError.message }, 400);
       }
@@ -772,7 +773,7 @@ secured
         },
         resource: { attributes: [] },
         instrumentationScope: { name: TRACK_EVENT_SPAN_NAME },
-        piiRedactionLevel: project.piiRedactionLevel,
+        piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
         occurredAt: Date.now(),
       });
     } catch (error) {
@@ -806,7 +807,7 @@ secured
           properties,
         });
       } catch (error) {
-        captureException(error);
+        captureException(toError(error));
       }
     }
 
@@ -912,7 +913,7 @@ async function handleWorkflowRun(
   versionId: string | undefined,
 ) {
   const contentType = c.req.header("content-type");
-  if (!contentType || !contentType.includes("application/json")) {
+  if (!contentType?.includes("application/json")) {
     return c.json({ message: "Invalid body, expecting json" }, 400);
   }
 

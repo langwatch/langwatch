@@ -3,6 +3,7 @@ import { bodyLimit } from "hono/body-limit";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { createLogger } from "../../utils/logger/server";
 import {
   captureException,
@@ -31,7 +32,7 @@ import {
   spanMetricsSchema,
   spanSchema,
   spanValidatorSchema,
-} from "../tracer/types.generated";
+} from "../tracer/types";
 import { CollectorSpanUtils } from "../traces/collectorSpan.utils";
 
 const logger = createLogger("langwatch.collector");
@@ -63,7 +64,7 @@ secured
       }
 
       const contentType = c.req.header("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
+      if (!contentType?.includes("application/json")) {
         logger.error("collector request body is not json");
 
         return c.json({ message: "Invalid body, expecting json" }, 400);
@@ -526,7 +527,7 @@ secured
               span: CollectorSpanUtils.convertSpanToOtlp(span),
               resource,
               instrumentationScope: { name: "langwatch.rest.collector" },
-              piiRedactionLevel: project.piiRedactionLevel,
+              piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
               occurredAt: Date.now(),
             }),
           ),
