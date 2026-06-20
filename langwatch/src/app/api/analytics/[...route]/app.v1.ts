@@ -3,7 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
-import { getAnalyticsService } from "~/server/analytics/analytics.service";
+import { getAnalyticsService } from "~/server/app-layer/analytics";
 import { timeseriesSeriesInput } from "~/server/analytics/registry";
 import { sharedFiltersInputSchema } from "~/server/analytics/types";
 import { type createProjectApp, requires } from "~/server/api/security";
