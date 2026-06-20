@@ -127,6 +127,8 @@ const FULL_SPAN_SELECT = `
   StatusMessage,
   ScopeName,
   ScopeVersion,
+  Cost,
+  NonBilledCost,
   arrayMap(x -> toUnixTimestamp64Milli(x), \`Events.Timestamp\`) AS Events_Timestamp,
   \`Events.Name\` AS Events_Name,
   \`Events.Attributes\` AS Events_Attributes,
@@ -345,6 +347,17 @@ export interface SpanSummaryQueryRow {
 function attrNumber(raw: string): number | null {
   if (!raw) return null;
   const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Coerces a `Nullable(Float64)` column read from ClickHouse to `number | null`.
+ * JSONEachRow usually returns numbers, but a string can arrive depending on
+ * output settings; null/undefined and non-finite values map to null.
+ */
+function nullableFloat(raw: number | string | null | undefined): number | null {
+  if (raw === null || raw === undefined || raw === "") return null;
+  const n = typeof raw === "string" ? Number(raw) : raw;
   return Number.isFinite(n) ? n : null;
 }
 
@@ -651,6 +664,8 @@ interface ClickHouseSpanRecord {
   DroppedAttributesCount: 0;
   DroppedEventsCount: 0;
   DroppedLinksCount: 0;
+  Cost: number | null;
+  NonBilledCost: number | null;
   CreatedAt: number;
   UpdatedAt: number;
   _retention_days: number;
@@ -675,6 +690,8 @@ interface FullSpanRow {
   StatusMessage: string | null;
   ScopeName: string | null;
   ScopeVersion: string | null;
+  Cost: number | null;
+  NonBilledCost: number | null;
   Events_Timestamp: number[];
   Events_Name: string[];
   Events_Attributes: Record<string, unknown>[];
@@ -727,6 +744,10 @@ function mapChRowToNormalized(row: FullSpanRow) {
     droppedAttributesCount: 0 as const,
     droppedEventsCount: 0 as const,
     droppedLinksCount: 0 as const,
+    // Nullable(Float64) round-trips as number | null over JSONEachRow, but a
+    // string can still arrive depending on settings — coerce defensively.
+    cost: nullableFloat(row.Cost),
+    nonBilledCost: nullableFloat(row.NonBilledCost),
   };
 }
 
@@ -1909,6 +1930,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       DroppedAttributesCount: 0,
       DroppedEventsCount: 0,
       DroppedLinksCount: 0,
+      Cost: span.cost,
+      NonBilledCost: span.nonBilledCost,
       CreatedAt: new Date(),
       UpdatedAt: new Date(),
       _retention_days: span.retentionDays ?? PLATFORM_DEFAULT_RETENTION_DAYS,

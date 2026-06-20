@@ -19,6 +19,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
+import type { SpanInsertData } from "../../types";
 import { SpanStorageClickHouseRepository } from "../span-storage.clickhouse.repository";
 
 const tenantId = `test-span-fetch-${nanoid()}`;
@@ -409,6 +410,120 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
         expect(storedSpansQueries).toHaveLength(1);
         expect(storedSpansQueries[0]!.query).toContain("StartTime >=");
       });
+    });
+  });
+});
+
+// Per-span cost columns (Cost / NonBilledCost) written through the repository's
+// own insert path (toClickHouseRecord) and read back (mapChRowToNormalized), so
+// both the write mapping and the read mapping of the new columns are exercised
+// against the production schema rather than raw-inserted rows.
+const costTenantId = `test-span-cost-${nanoid()}`;
+const costTraceId = `trace-${nanoid()}`;
+
+function makeSpanInsert(
+  spanId: string,
+  cost: number | null,
+  nonBilledCost: number | null,
+): SpanInsertData {
+  return {
+    id: `proj-${nanoid()}`,
+    tenantId: costTenantId,
+    traceId: costTraceId,
+    spanId,
+    parentSpanId: null,
+    parentTraceId: null,
+    parentIsRemote: null,
+    sampled: true,
+    startTimeUnixMs: base,
+    endTimeUnixMs: base + 50,
+    durationMs: 50,
+    name: "cost-span",
+    kind: 1,
+    resourceAttributes: {},
+    spanAttributes: {},
+    statusCode: 1,
+    statusMessage: null,
+    instrumentationScope: { name: "test", version: undefined },
+    events: [],
+    links: [],
+    droppedAttributesCount: 0,
+    droppedEventsCount: 0,
+    droppedLinksCount: 0,
+    cost,
+    nonBilledCost,
+    retentionDays: 0,
+  };
+}
+
+describe("SpanStorageClickHouseRepository per-span cost columns (integration)", () => {
+  let costRepo: SpanStorageClickHouseRepository;
+
+  beforeAll(async () => {
+    const containers = await startTestContainers();
+    costRepo = new SpanStorageClickHouseRepository(
+      async () => containers.clickHouseClient,
+    );
+
+    await costRepo.insertSpans([
+      makeSpanInsert("span-billed", 0.0123, null),
+      makeSpanInsert("span-bundled", 0.0456, 0.0456),
+      makeSpanInsert("span-nocost", null, null),
+    ]);
+  }, 120_000);
+
+  afterAll(async () => {
+    if (ch) {
+      await ch.exec({
+        query:
+          "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
+        query_params: { tenantId: costTenantId },
+      });
+    }
+  });
+
+  describe("when a billed span is stored", () => {
+    it("round-trips its Cost with no non-billed portion", async () => {
+      const spans = await costRepo.getNormalizedSpansByTraceId({
+        tenantId: costTenantId,
+        traceId: costTraceId,
+        occurredAtMs: base,
+      });
+
+      const billed = spans.find((s) => s.spanId === "span-billed");
+      expect(billed).toBeDefined();
+      expect(billed?.cost).toBeCloseTo(0.0123, 6);
+      expect(billed?.nonBilledCost).toBeNull();
+    });
+  });
+
+  describe("when a non-billable span is stored", () => {
+    it("round-trips Cost and NonBilledCost as the full bundled amount", async () => {
+      const spans = await costRepo.getNormalizedSpansByTraceId({
+        tenantId: costTenantId,
+        traceId: costTraceId,
+        occurredAtMs: base,
+      });
+
+      const bundled = spans.find((s) => s.spanId === "span-bundled");
+      expect(bundled).toBeDefined();
+      expect(bundled?.cost).toBeCloseTo(0.0456, 6);
+      expect(bundled?.nonBilledCost).toBeCloseTo(0.0456, 6);
+    });
+  });
+
+  describe("when a span without costable usage is stored", () => {
+    it("round-trips null Cost and NonBilledCost", async () => {
+      const spans = await costRepo.getNormalizedSpansByTraceId({
+        tenantId: costTenantId,
+        traceId: costTraceId,
+        occurredAtMs: base,
+      });
+
+      const noCost = spans.find((s) => s.spanId === "span-nocost");
+      expect(noCost).toBeDefined();
+      expect(noCost?.cost).toBeNull();
+      expect(noCost?.nonBilledCost).toBeNull();
     });
   });
 });
