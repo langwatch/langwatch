@@ -1,12 +1,7 @@
-import { FIELD_VALUES, SEARCH_FIELDS } from "./metadata";
-
 /**
- * Single source of truth for the trace query language. The same markdown is
- * rendered in the in-app docs drawer and fed to the LLM that powers AI mode,
- * so any change here propagates to both surfaces.
- *
- * Field metadata is appended at runtime (see `composeQuerySyntaxDoc`) so the
- * fields table can never drift from `SEARCH_FIELDS` / `FIELD_VALUES`.
+ * Static markdown describing the trace query language, fed to the LLM that
+ * powers AI mode. (The in-app docs drawer renders its own JSX from
+ * `SEARCH_FIELDS` / `FIELD_VALUES`, so it doesn't consume this string.)
  */
 export const QUERY_SYNTAX_DOC = `# Trace query syntax
 
@@ -91,41 +86,3 @@ trace side via \`attribute.foo:bar\`.
 - Attribute matching is exact equality only — wildcards (\`attribute.foo:*ar\`) and ranges (\`attribute.tokens:>10\`) aren't yet supported on the dynamic namespaces.
 `;
 
-/**
- * Render a markdown table summarising every queryable field, derived from
- * `SEARCH_FIELDS`. Categorical fields surface their static value enum from
- * `FIELD_VALUES` so users (and the LLM) see what they can type.
- */
-export function buildFieldsTable(): string {
-  const header = "| Field | Type | Examples |\n| --- | --- | --- |\n";
-  const rows = Object.entries(SEARCH_FIELDS).map(([name, meta]) => {
-    const examples = formatExamplesFor(name, meta.valueType);
-    return `| \`${name}\` | ${meta.valueType} | ${examples} |`;
-  });
-  return `${header}${rows.join("\n")}\n`;
-}
-
-function formatExamplesFor(field: string, valueType: string): string {
-  const enumValues = FIELD_VALUES[field];
-  if (enumValues && enumValues.length > 0) {
-    return enumValues
-      .slice(0, 5)
-      .map((v) => `\`${field}:${v}\``)
-      .join(" · ");
-  }
-  if (valueType === "range") {
-    return `\`${field}:>10\` · \`${field}:[10 TO 100]\``;
-  }
-  if (valueType === "existence") {
-    return `\`${field}:error\` · \`${field}:eval\``;
-  }
-  return `\`${field}:value\``;
-}
-
-/**
- * Compose the user-facing markdown: the static doc plus a runtime-rendered
- * fields table. Used by the docs drawer.
- */
-export function composeQuerySyntaxDoc(): string {
-  return `${QUERY_SYNTAX_DOC}\n## Fields\n\n${buildFieldsTable()}`;
-}

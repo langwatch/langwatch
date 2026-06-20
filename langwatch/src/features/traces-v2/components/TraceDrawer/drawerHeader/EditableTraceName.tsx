@@ -4,10 +4,7 @@ import { LuCheck, LuX } from "react-icons/lu";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import {
-  TRACE_NAME_MAX_LENGTH,
-  TRACE_NAME_MIN_LENGTH,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import { TRACE_NAME_MAX_LENGTH } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import { api } from "~/utils/api";
 
 interface EditableTraceNameProps {
@@ -254,8 +251,3 @@ export function EditableTraceName({
     </Box>
   );
 }
-
-export const TRACE_NAME_LIMITS = {
-  min: TRACE_NAME_MIN_LENGTH,
-  max: TRACE_NAME_MAX_LENGTH,
-} as const;

@@ -106,15 +106,6 @@ export function joinConversationMarkdown(
     .trimEnd();
 }
 
-export function buildConversationMarkdown(
-  conversationId: string,
-  parsedTurns: ParsedTurn[],
-): string {
-  return joinConversationMarkdown(
-    buildConversationMarkdownChunks(conversationId, parsedTurns),
-  );
-}
-
 /**
  * Extract the first system message from the chat-history input. Used to render
  * the conversation-level system prompt banner. Returns "" if not chat-shaped or
