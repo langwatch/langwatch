@@ -1,13 +1,11 @@
-import { DEFAULT_TRACE_DEBOUNCE_MS } from "~/automations/cadences";
 import { createLogger } from "~/utils/logger/server";
-import { captureException, toError } from "~/utils/posthogErrorCapture";
 import type { Event } from "../domain/types";
 import type {
   ReactorContext,
   ReactorDefinition,
 } from "../reactors/reactor.types";
+import { dispatchOutboxEnqueues } from "./dispatchOutboxEnqueues";
 import type { OutboxReactorDefinition } from "./outboxReactor.types";
-import { isSettle, type SettleStagePayload } from "./payload";
 import type { OutboxRuntime } from "./setup";
 
 const logger = createLogger("langwatch:event-sourcing:outbox-reactor-adapter");
@@ -17,7 +15,9 @@ const logger = createLogger("langwatch:event-sourcing:outbox-reactor-adapter");
  * with the GroupQueue-routed outbox runtime that this codebase actually
  * ships (ADR-030 r3). For every event the wrapped reactor's `decide()`
  * is invoked; each returned `OutboxEnqueueRequest` is forwarded to
- * `outbox.enqueueSettle(...)`.
+ * `outbox.enqueueSettle(...)` via the shared `dispatchOutboxEnqueues`
+ * helper — which is also used by the heartbeat scheduler so both
+ * sources hit the same code path.
  *
  * The request's `dedupKey` / `groupKey` / `maxAttempts` are descriptive
  * of the spec's row-leased architecture (see
@@ -73,69 +73,12 @@ export function adaptOutboxReactor<E extends Event, FoldState>(
       // INSERT + downstream cadence are not — skip the whole branch.
       if (context.isReplay) return;
       const requests = await definition.decide(event, context);
-      if (requests.length === 0) return;
-
-      for (const request of requests) {
-        // `OutboxPayload` is `Prisma.InputJsonValue` (recursive JSON);
-        // narrow it back into the structural object shape `isSettle`
-        // expects so the discriminator check works.
-        const payload = request.payload as Record<string, unknown>;
-        if (!isSettlePayload(payload)) {
-          // The current architecture only knows how to enqueue settle
-          // payloads. A reactor that emits any other shape is a config
-          // bug — surface it loudly so it doesn't silently drop a real
-          // notification.
-          const error = new Error(
-            `OutboxReactor "${definition.name}" emitted a non-settle payload (stage="${
-              (payload as { stage?: unknown }).stage ?? "<missing>"
-            }"); the GroupQueue-routed adapter only forwards settle payloads to enqueueSettle.`,
-          );
-          logger.error(
-            {
-              reactorName: definition.name,
-              dedupKey: request.dedupKey,
-            },
-            error.message,
-          );
-          captureException(error, {
-            extra: {
-              reactorName: definition.name,
-              dedupKey: request.dedupKey,
-            },
-          });
-          continue;
-        }
-
-        try {
-          await outbox.enqueueSettle(payload, {
-            ttlMs: request.enqueueOptions?.ttlMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
-          });
-        } catch (error) {
-          // Mirror the existing inline enqueue-failure behavior: log +
-          // capture, continue with the next request. A bad enqueue
-          // shouldn't poison the rest of the batch.
-          logger.error(
-            {
-              reactorName: definition.name,
-              dedupKey: request.dedupKey,
-              error: error instanceof Error ? error.message : String(error),
-            },
-            "OutboxReactor enqueueSettle failed",
-          );
-          captureException(toError(error), {
-            extra: {
-              reactorName: definition.name,
-              dedupKey: request.dedupKey,
-            },
-          });
-        }
-      }
+      await dispatchOutboxEnqueues({
+        requests,
+        outbox,
+        sourceName: definition.name,
+        logger,
+      });
     },
   };
-}
-
-function isSettlePayload(
-  payload: Record<string, unknown>,
-): payload is SettleStagePayload {
-  return isSettle(payload);
 }
