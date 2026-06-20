@@ -284,6 +284,17 @@ export const runEvaluationForTrace = async ({
       ? trace.metadata.thread_id
       : undefined;
 
+  // Parity with the legacy worker's getTraceById({ includeEvaluations: true }):
+  // getById → getTracesWithSpans does not enrich evaluations, but evaluator
+  // field mappings that read the `evaluations` source need them. Fetch and
+  // attach before building the mapped data so they aren't silently empty.
+  const evaluationsByTrace = await traceService.getEvaluationsMultiple(
+    projectId,
+    [traceId],
+    protections,
+  );
+  trace.evaluations = evaluationsByTrace[traceId] ?? [];
+
   const data = await buildDataForEvaluation(
     evaluatorType,
     trace,
