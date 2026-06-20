@@ -1,6 +1,5 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { CostReferenceType, CostType, type Project } from "@prisma/client";
-import { fetch as fetchHTTP2 } from "fetch-h2";
 import { nanoid } from "nanoid";
 import { env } from "../../env.mjs";
 import { OPENAI_EMBEDDING_DIMENSION } from "../../utils/constants";
@@ -17,7 +16,6 @@ import { prisma } from "../db";
 import { getProjectEmbeddingsModel } from "../embeddings";
 import { getPayloadSizeHistogram } from "../metrics";
 import { stagedLangevalsFetch } from "../langevals/stagedFetch";
-import { isNlpGoEnabled } from "../nlpgo/nlpgoFetch";
 import type {
   BatchClusteringParams,
   IncrementalClusteringParams,
@@ -49,7 +47,7 @@ export const clusterTopicsForProject = async (
   }
 
   const { totalTracesCount, recentTracesCount, assignedTracesCount } =
-    await fetchCountsFromClickHouse(clickhouse, projectId);
+    await fetchCountsFromClickHouse({ clickhouse, projectId });
 
   logger.info(
     {
@@ -188,29 +186,46 @@ type TraceSearchResult = {
   returnedCount: number;
 };
 
-async function fetchCountsFromClickHouse(
-  clickhouse: ClickHouseClient,
-  projectId: string,
-): Promise<TraceCounts> {
+export async function fetchCountsFromClickHouse({
+  clickhouse,
+  projectId,
+}: {
+  clickhouse: ClickHouseClient;
+  projectId: string;
+}): Promise<TraceCounts> {
   const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
   const twelveMonthsAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
 
+  // trace_summaries is a ReplacingMergeTree, so we count one row per trace
+  // (its latest version). Rather than the IN-tuple dedup pattern — which
+  // scans the 12-month window twice (once to build the latest-version key
+  // set, once for the outer aggregate) and materialises a key set sized to
+  // every trace — fold to the latest version in a single GROUP BY pass with
+  // argMax(expr, UpdatedAt). The conditional counts read the latest version's
+  // OccurredAt / assigned-state, identical to the previous shape, but with one
+  // scan and no IN-set build. Light columns only (no heavy payloads).
+  //
+  // The assigned check folds over `argMax(TopicId IS NOT NULL AND TopicId !=
+  // '', UpdatedAt)`, not `argMax(TopicId, UpdatedAt)`: TopicId is Nullable and
+  // argMax skips rows whose first argument is NULL, so a trace whose latest
+  // version cleared its topic (latest TopicId = NULL) would otherwise fold to
+  // an older non-null TopicId and be over-counted. The boolean expression is
+  // non-nullable, so the fold reads the true latest version.
   const result = await clickhouse.query({
     query: `
       SELECT
         toString(count(*)) AS total,
-        toString(countIf(OccurredAt >= fromUnixTimestamp64Milli({thirtyDaysAgo:UInt64}))) AS recent,
-        toString(countIf(TopicId IS NOT NULL AND TopicId != '')) AS assigned
-      FROM trace_summaries t
-      WHERE TenantId = {tenantId:String}
-        AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
-        AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
-          SELECT TenantId, TraceId, max(UpdatedAt)
-          FROM trace_summaries
-          WHERE TenantId = {tenantId:String}
-            AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
-          GROUP BY TenantId, TraceId
-        )
+        toString(countIf(latestOccurredAt >= fromUnixTimestamp64Milli({thirtyDaysAgo:UInt64}))) AS recent,
+        toString(countIf(latestAssigned)) AS assigned
+      FROM (
+        SELECT
+          argMax(OccurredAt, UpdatedAt) AS latestOccurredAt,
+          argMax(TopicId IS NOT NULL AND TopicId != '', UpdatedAt) AS latestAssigned
+        FROM trace_summaries
+        WHERE TenantId = {tenantId:String}
+          AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
+        GROUP BY TenantId, TraceId
+      )
     `,
     query_params: { tenantId: projectId, thirtyDaysAgo, twelveMonthsAgo },
     format: "JSONEachRow",
@@ -343,6 +358,15 @@ export async function fetchTracesFromClickHouse(
         : {}),
     },
     format: "JSONEachRow",
+    // The outer query reads ComputedInput (a potentially large payload) for the
+    // page of <=2000 traces. Even though rows stream (no outer sort/LIMIT), the
+    // dedup still resolves the latest version per trace, and peak memory scales
+    // with the number of read streams holding a ComputedInput block at once. For
+    // tenants with large inputs that peak crossed max_memory_usage_per_query
+    // (MEMORY_LIMIT_EXCEEDED). This is a background clustering batch, not a
+    // latency-critical path, so cap the read streams to keep peak memory well
+    // under the per-query limit; the returned rows are unchanged.
+    clickhouse_settings: { max_threads: 2 },
   });
 
   const rawRows = (await result.json()) as Array<{
@@ -695,33 +719,21 @@ export const storeResults = async (
 };
 
 /**
- * Resolve which service hosts topic clustering for the given project. When
- * `release_nlp_go_engine_enabled` is on, route to langevals (the new
- * workspace member at langevals/evaluators/topic_clustering — see
- * specs/nlp-go/_shared/contract.md §11). When off, the legacy langwatch_nlp
- * path is used unchanged.
- *
- * Returns `null` if neither endpoint is configured for the resolved engine —
- * caller should warn-and-skip in that case.
+ * Topic clustering runs on langevals (the workspace member at
+ * langevals/evaluators/topic_clustering — see contract.md §11). Returns
+ * the base URL, or `null` if LANGEVALS_ENDPOINT is unset, in which case
+ * the caller warns and skips.
  */
-const resolveTopicClusteringEndpoint = async (
-  projectId: string,
-): Promise<{ baseUrl: string; engine: "langevals" | "langwatch_nlp" } | null> => {
-  const goEnabled = await isNlpGoEnabled({ projectId });
-  if (goEnabled) {
-    if (!env.LANGEVALS_ENDPOINT) return null;
-    return { baseUrl: env.LANGEVALS_ENDPOINT, engine: "langevals" };
-  }
-  if (!env.TOPIC_CLUSTERING_SERVICE) return null;
-  return { baseUrl: env.TOPIC_CLUSTERING_SERVICE, engine: "langwatch_nlp" };
+const resolveTopicClusteringEndpoint = (): string | null => {
+  return env.LANGEVALS_ENDPOINT ?? null;
 };
 
 export const fetchTopicsBatchClustering = async (
   projectId: string,
   params: BatchClusteringParams,
 ): Promise<TopicClusteringResponse | undefined> => {
-  const endpoint = await resolveTopicClusteringEndpoint(projectId);
-  if (!endpoint) {
+  const baseUrl = resolveTopicClusteringEndpoint();
+  if (!baseUrl) {
     logger.warn(
       { projectId },
       "Topic clustering service URL not set, skipping topic clustering",
@@ -733,14 +745,13 @@ export const fetchTopicsBatchClustering = async (
   getPayloadSizeHistogram("topic_clustering_batch").observe(size);
 
   logger.info(
-    { sizeMb: size / 125000, projectId, engine: endpoint.engine },
+    { sizeMb: size / 125000, projectId, engine: "langevals" },
     "uploading traces data for project",
   );
 
   const response = await postToTopicClustering({
     projectId,
-    engine: endpoint.engine,
-    url: `${endpoint.baseUrl}/topics/batch_clustering`,
+    url: `${baseUrl}/topics/batch_clustering`,
     body: params,
     kind: "topic_clustering_batch",
   });
@@ -756,7 +767,7 @@ export const fetchTopicsBatchClustering = async (
       /* this is just a safe json parse fallback */
     }
     throw new Error(
-      `Failed to fetch topics batch clustering (${endpoint.engine}): ${response.statusText}\n\n${body}`,
+      `Failed to fetch topics batch clustering (langevals): ${response.statusText}\n\n${body}`,
     );
   }
 
@@ -769,8 +780,8 @@ export const fetchTopicsIncrementalClustering = async (
   projectId: string,
   params: IncrementalClusteringParams,
 ): Promise<TopicClusteringResponse | undefined> => {
-  const endpoint = await resolveTopicClusteringEndpoint(projectId);
-  if (!endpoint) {
+  const baseUrl = resolveTopicClusteringEndpoint();
+  if (!baseUrl) {
     logger.warn(
       { projectId },
       "Topic clustering service URL not set, skipping topic clustering",
@@ -782,14 +793,13 @@ export const fetchTopicsIncrementalClustering = async (
   getPayloadSizeHistogram("topic_clustering_incremental").observe(size);
 
   logger.info(
-    { sizeMb: size / 125000, projectId, engine: endpoint.engine },
+    { sizeMb: size / 125000, projectId, engine: "langevals" },
     "uploading traces data for project",
   );
 
   const response = await postToTopicClustering({
     projectId,
-    engine: endpoint.engine,
-    url: `${endpoint.baseUrl}/topics/incremental_clustering`,
+    url: `${baseUrl}/topics/incremental_clustering`,
     body: params,
     kind: "topic_clustering_incremental",
   });
@@ -806,7 +816,7 @@ export const fetchTopicsIncrementalClustering = async (
     }
 
     throw new Error(
-      `Failed to fetch topics incremental clustering (${endpoint.engine}): ${response.statusText}\n\n${body}`,
+      `Failed to fetch topics incremental clustering (langevals): ${response.statusText}\n\n${body}`,
     );
   }
 
@@ -816,28 +826,20 @@ export const fetchTopicsIncrementalClustering = async (
 };
 
 /**
- * The langwatch_nlp engine runs on a k8s pod behind an ingress that
- * historically accepts ~100 MB bodies — fetch-h2 (HTTP/2) is preserved
- * there to avoid regressing self-hosted operators with large batches.
- *
- * The langevals engine runs on AWS Lambda which hard-caps sync invokes
- * at 6 MB; we stage anything past LANGEVALS_STAGING_THRESHOLD_BYTES to
- * S3 and pass the presigned URL via X-Payload-S3-URL.
+ * langevals runs on AWS Lambda, which hard-caps sync invokes at 6 MB; we
+ * stage anything past LANGEVALS_STAGING_THRESHOLD_BYTES to S3 and pass
+ * the presigned URL via X-Payload-S3-URL.
  */
 const postToTopicClustering = async (opts: {
   projectId: string;
-  engine: "langevals" | "langwatch_nlp";
   url: string;
   body: BatchClusteringParams | IncrementalClusteringParams;
   kind: "topic_clustering_batch" | "topic_clustering_incremental";
 }) => {
-  if (opts.engine === "langevals") {
-    return stagedLangevalsFetch({
-      url: opts.url,
-      body: opts.body,
-      projectId: opts.projectId,
-      kind: opts.kind,
-    });
-  }
-  return fetchHTTP2(opts.url, { method: "POST", json: opts.body });
+  return stagedLangevalsFetch({
+    url: opts.url,
+    body: opts.body,
+    projectId: opts.projectId,
+    kind: opts.kind,
+  });
 };

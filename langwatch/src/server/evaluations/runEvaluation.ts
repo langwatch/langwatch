@@ -10,7 +10,12 @@ import {
   type BatchEvaluationResult,
   type EvaluatorTypes,
   type SingleEvaluationResult,
-} from "../../server/evaluations/evaluators.generated";
+} from "../../server/evaluations/evaluators";
+import { isNativeEvaluatorType } from "../../server/evaluations/evaluators.native";
+import {
+  augmentEvaluationResult,
+  executeNativeEvaluation,
+} from "../../server/evaluations/native/registry";
 import {
   AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
   isAzureEvaluatorType,
@@ -347,6 +352,25 @@ export const runEvaluation = async ({
     throw new Error(`Evaluator ${evaluatorType} not found`);
   }
 
+  const droppedCategories = trace?.privacy?.droppedCategories ?? [];
+
+  // Native (in-process) evaluators short-circuit the langevals HTTP call. They
+  // still run through the shared augmenter so a leak that ingestion redaction
+  // already scrubbed, or content that was dropped, is reflected in the result.
+  if (isNativeEvaluatorType(builtInEvaluatorType)) {
+    const nativeResult = await executeNativeEvaluation({
+      evaluatorType: builtInEvaluatorType,
+      data: data.data,
+    });
+    return augmentEvaluationResult({
+      evaluatorType: builtInEvaluatorType,
+      mappedData: data.data,
+      settings,
+      droppedCategories,
+      result: nativeResult,
+    });
+  }
+
   const evaluator = AVAILABLE_EVALUATORS[builtInEvaluatorType];
 
   let evaluatorEnv: Record<string, string>;
@@ -468,7 +492,13 @@ export const runEvaluation = async ({
 
   getEvaluationStatusCounter(builtInEvaluatorType, result.status).inc();
 
-  return result;
+  return augmentEvaluationResult({
+    evaluatorType: builtInEvaluatorType,
+    mappedData: data.data,
+    settings,
+    droppedCategories,
+    result,
+  });
 };
 
 const customEvaluation = async (
