@@ -87,20 +87,6 @@ describe("numericModeStore", () => {
     });
   });
 
-  describe("when a mode is reset", () => {
-    it("removes the override so the facet reverts to its default", () => {
-      const s = useNumericModeStore.getState();
-      s.setMode({ projectId: PROJECT, field: "spans", mode: "range" });
-      s.resetField({ projectId: PROJECT, field: "spans" });
-      expect(
-        selectNumericModesFor({
-          state: useNumericModeStore.getState(),
-          projectId: PROJECT,
-        }).spans,
-      ).toBeUndefined();
-    });
-  });
-
   describe("when stored data is malformed", () => {
     it("ignores non-mode values on hydrate", () => {
       localStorage.setItem(

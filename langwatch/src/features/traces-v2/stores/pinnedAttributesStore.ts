@@ -10,7 +10,6 @@ export interface PinnedAttribute {
 
 interface PinnedAttributesState {
   byProject: Record<string, PinnedAttribute[]>;
-  setForProject: (projectId: string, pins: PinnedAttribute[]) => void;
   togglePin: (projectId: string, pin: PinnedAttribute) => void;
   removePin: (
     projectId: string,
@@ -75,11 +74,6 @@ function samePin(
 export const usePinnedAttributesStore = create<PinnedAttributesState>(
   (set, get) => ({
     byProject: {},
-
-    setForProject: (projectId, pins) => {
-      writeToStorage(projectId, pins);
-      set((s) => ({ byProject: { ...s.byProject, [projectId]: pins } }));
-    },
 
     togglePin: (projectId, pin) => {
       const current = get().byProject[projectId] ?? readFromStorage(projectId);

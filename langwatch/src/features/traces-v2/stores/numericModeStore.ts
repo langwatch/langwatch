@@ -20,8 +20,6 @@ export interface NumericModeState {
     field: string;
     mode: NumericMode;
   }) => void;
-  /** Drop the override for `field` — reverts to the registry default. */
-  resetField: (params: { projectId: string; field: string }) => void;
 }
 
 const STORAGE_PREFIX = "langwatch:traces-v2:numeric-mode:v1:";
@@ -90,14 +88,6 @@ export const useNumericModeStore = create<NumericModeState>((set, get) => ({
   setMode: ({ projectId, field, mode }) => {
     const current = get().byProject[projectId] ?? readFromStorage(projectId);
     const next = { ...current, [field]: mode };
-    writeToStorage({ projectId, modes: next });
-    set((s) => ({ byProject: { ...s.byProject, [projectId]: next } }));
-  },
-
-  resetField: ({ projectId, field }) => {
-    const current = get().byProject[projectId] ?? readFromStorage(projectId);
-    const next = { ...current };
-    delete next[field];
     writeToStorage({ projectId, modes: next });
     set((s) => ({ byProject: { ...s.byProject, [projectId]: next } }));
   },
