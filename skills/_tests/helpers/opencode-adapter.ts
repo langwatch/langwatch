@@ -7,6 +7,7 @@ import {
   createOpencode,
   createOpencodeClient,
 } from "@opencode-ai/sdk";
+import { renderContent } from "./render-content";
 
 /**
  * A `{ providerID, modelID }` pair identifying the model opencode should drive,
@@ -48,57 +49,6 @@ export interface OpenCodeServerHandle {
   client: OpenCodeClientLike;
   close: () => void;
 }
-
-/**
- * Flatten message content into plain text.
- *
- * Lifted (near-verbatim) from the Claude Code adapter: Anthropic-format
- * messages can carry `content` as an array of blocks (text, tool_use,
- * tool_result, image, …). String-interpolating that array yields
- * `[object Object]`, so we render each block down to readable text instead.
- */
-export const renderContent = (content: unknown): string => {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) {
-    try {
-      return JSON.stringify(content);
-    } catch {
-      return String(content);
-    }
-  }
-  return content
-    .map((block: any) => {
-      if (block == null) return "";
-      if (typeof block === "string") return block;
-      switch (block.type) {
-        case "text":
-          return block.text ?? "";
-        case "tool_use": {
-          const input = block.input != null ? JSON.stringify(block.input) : "";
-          return `[tool_use ${block.name ?? "?"}(${input})]`;
-        }
-        case "tool_result": {
-          const inner =
-            typeof block.content === "string"
-              ? block.content
-              : Array.isArray(block.content)
-                ? renderContent(block.content)
-                : JSON.stringify(block.content ?? "");
-          return `[tool_result] ${inner}`;
-        }
-        case "image":
-          return "[image omitted]";
-        default:
-          try {
-            return JSON.stringify(block);
-          } catch {
-            return String(block);
-          }
-      }
-    })
-    .filter(Boolean)
-    .join("\n");
-};
 
 /**
  * Collapse opencode's response `parts` array into a single text string.

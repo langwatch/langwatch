@@ -3,9 +3,9 @@ import { AgentRole, type AgentInput } from "@langwatch/scenario";
 import {
   createOpenCodeAgent,
   partsToText,
-  renderContent,
   type OpenCodeServerHandle,
 } from "./helpers/opencode-adapter";
+import { renderContent } from "./helpers/render-content";
 
 /**
  * Builds a fake opencode server handle plus spies, so the adapter can be
@@ -19,11 +19,9 @@ function makeFakeServer(
   handle: OpenCodeServerHandle;
   created: string[];
   prompts: any[];
-  closed: { count: number };
 } {
   const created: string[] = [];
   const prompts: any[] = [];
-  const closed = { count: 0 };
   let counter = 0;
 
   const handle: OpenCodeServerHandle = {
@@ -34,30 +32,18 @@ function makeFakeServer(
           created.push(options?.body?.title ?? "");
           return { data: { id: `sess-${counter}` } };
         },
-        prompt:
-          promptImpl ??
-          (async (options) => {
-            prompts.push(options);
-            return { data: { parts: [{ type: "text", text: "reply" }] } };
-          }),
+        prompt: async (options) => {
+          prompts.push(options);
+          return promptImpl
+            ? promptImpl(options)
+            : { data: { parts: [{ type: "text", text: "reply" }] } };
+        },
       },
     },
-    close: () => {
-      closed.count += 1;
-    },
+    close: () => {},
   };
 
-  // When a custom promptImpl is supplied, still record into `prompts` so tests
-  // can assert on the recorded options.
-  if (promptImpl) {
-    const wrapped = handle.client.session.prompt;
-    handle.client.session.prompt = async (options) => {
-      prompts.push(options);
-      return wrapped(options);
-    };
-  }
-
-  return { handle, created, prompts, closed };
+  return { handle, created, prompts };
 }
 
 /**
@@ -265,15 +251,40 @@ describe("createOpenCodeAgent", () => {
 
         expect(prompts[0].body.model).toEqual(model);
       });
+
+      it("falls back to full history rendering when no user message exists anywhere (AC-3)", async () => {
+        const { handle, prompts } = makeFakeServer();
+        const agent = createOpenCodeAgent({
+          model: { providerID: "anthropic", modelID: "claude-haiku-4-5" },
+          startServer: async () => handle,
+        });
+
+        await agent.call(
+          makeInput({
+            threadId: "thread-1",
+            messages: [
+              { role: "system", content: "You are a helpful assistant." },
+              { role: "assistant", content: "How can I help?" },
+            ],
+            newMessages: [],
+          })
+        );
+
+        const promptText = prompts[0].body.parts[0].text;
+        expect(promptText).toContain("assistant: ");
+        expect(promptText).toContain("How can I help?");
+      });
     });
 
     describe("when the prompt resolves asynchronously", () => {
       it("waits for completion before returning the full text (AC-4)", async () => {
+        let settled = false;
         const { handle } = makeFakeServer(async () => {
           // Defer to a later microtask, then resolve with the full reply. If the
           // adapter returned before awaiting, the text would be missing.
           await Promise.resolve();
           await Promise.resolve();
+          settled = true;
           return {
             data: { parts: [{ type: "text", text: "fully generated answer" }] },
           };
@@ -290,6 +301,7 @@ describe("createOpenCodeAgent", () => {
           })
         );
 
+        expect(settled).toBe(true);
         expect(reply).toBe("fully generated answer");
       });
     });
