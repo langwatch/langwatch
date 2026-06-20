@@ -4,6 +4,14 @@
  * "Sent with ♥ from LangWatch · Edit automation" line — that footer sits in
  * the email chrome (`emailLayout.ts`) so every email keeps it consistently,
  * regardless of what a customer template prints.
+ *
+ * ADR-034 Phase 5: a SECOND default family targets custom-graph threshold
+ * ALERTS (`alertDefaults` below). The shape of an alert is "metric X
+ * crossed threshold Y" — not "this trace happened matching filters" —
+ * so the default subject + body + Slack mrkdwn all read in metric-
+ * crossed-threshold terms instead of trace terms. Selection happens
+ * via `pickTriggerDefaults({ hasCustomGraph })`; per-trigger custom
+ * Liquid still overrides whichever default it picks.
  */
 
 export const DEFAULT_EMAIL_SUBJECT_TEMPLATE =
@@ -58,6 +66,101 @@ export const DEFAULT_SLACK_TEMPLATE = `{% if trigger.alertType == 'INFO' %}ℹ�
  * before `| json` — see the Slack-mrkdwn-injection finding and the
  * DEFAULT_SLACK_TEMPLATE comment above.
  */
+/**
+ * ADR-034 Phase 5: alert-default templates for custom-graph threshold
+ * alerts. These render in metric-crossed-threshold language instead of
+ * the trace-iteration shape the trace defaults use. The dispatcher /
+ * test-fire path picks these via `pickTriggerDefaults({ hasCustomGraph:
+ * true })` whenever the trigger has a `customGraphId` set. The matched
+ * `m.trace.input` carries "Graph: <name>" and `m.trace.output` carries
+ * "Current value: <v> (threshold: <op> <thr>)" — the EXACT triggerData
+ * shape the cron and the new handler both produce, so the variables
+ * line up without an extra context contract.
+ */
+export const DEFAULT_ALERT_EMAIL_SUBJECT_TEMPLATE =
+  "[Alert] {{ trigger.name }}";
+
+export const DEFAULT_ALERT_EMAIL_BODY_TEMPLATE = `# [Alert] {{ trigger.name }}
+
+{% for m in matches %}**{{ m.trace.input }}**
+
+{{ m.trace.output }}
+
+[Open dashboard ↗]({{ m.trace.url }})
+{% endfor %}`;
+
+export const DEFAULT_ALERT_SLACK_TEMPLATE = `:rotating_light: *{{ trigger.name }}*{% if trigger.alertType %} _({{ trigger.alertType }})_{% endif %}
+{% for m in matches %}*{{ m.trace.input | mrkdwn_escape }}*
+{{ m.trace.output | mrkdwn_escape }}
+<{{ m.trace.url }}|Open dashboard>{% unless forloop.last %}
+{% endunless %}{% endfor %}`;
+
+export const DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE = `[
+  {
+    "type": "header",
+    "text": {
+      "type": "plain_text",
+      "text": {{ trigger.name | prepend: ":rotating_light: " | json }},
+      "emoji": true
+    }
+  },
+  {% if trigger.alertType %}
+  {
+    "type": "context",
+    "elements": [
+      { "type": "mrkdwn", "text": {{ trigger.alertType | prepend: "*Alert type:* " | json }} }
+    ]
+  },
+  {% endif %}
+  {% for m in matches %}
+  {
+    "type": "section",
+    "text": { "type": "mrkdwn", "text": {{ m.trace.input | mrkdwn_escape | prepend: "*" | append: "*" | json }} }
+  },
+  {
+    "type": "section",
+    "text": { "type": "mrkdwn", "text": {{ m.trace.output | mrkdwn_escape | json }} }
+  },
+  {%- capture _link -%}<{{ m.trace.url }}|Open dashboard>{%- endcapture -%}
+  {
+    "type": "context",
+    "elements": [
+      { "type": "mrkdwn", "text": {{ _link | json }} }
+    ]
+  },
+  {% endfor %}
+  {
+    "type": "divider"
+  },
+  {%- capture _footer_text -%}<{{ trigger.editUrl }}|Edit automation>{%- endcapture -%}
+  {
+    "type": "context",
+    "elements": [
+      { "type": "mrkdwn", "text": {{ _footer_text | json }} }
+    ]
+  }
+]`;
+
+/**
+ * The four default-template strings a renderer needs, picked together
+ * to keep email + slack defaults aligned. `pickTriggerDefaults`
+ * returns the trace-shape set or the alert-shape set based on whether
+ * the trigger is a custom-graph alert.
+ */
+export interface TriggerTemplateDefaults {
+  emailSubject: string;
+  emailBody: string;
+  slackString: string;
+  slackBlockKit: string;
+}
+
+export const ALERT_TRIGGER_DEFAULTS: TriggerTemplateDefaults = {
+  emailSubject: DEFAULT_ALERT_EMAIL_SUBJECT_TEMPLATE,
+  emailBody: DEFAULT_ALERT_EMAIL_BODY_TEMPLATE,
+  slackString: DEFAULT_ALERT_SLACK_TEMPLATE,
+  slackBlockKit: DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE,
+};
+
 export const DEFAULT_SLACK_BLOCK_KIT_TEMPLATE = `[
   {
     "type": "header",
@@ -114,3 +217,26 @@ export const DEFAULT_SLACK_BLOCK_KIT_TEMPLATE = `[
     ]
   }
 ]`;
+
+export const TRACE_TRIGGER_DEFAULTS: TriggerTemplateDefaults = {
+  emailSubject: DEFAULT_EMAIL_SUBJECT_TEMPLATE,
+  emailBody: DEFAULT_EMAIL_BODY_TEMPLATE,
+  slackString: DEFAULT_SLACK_TEMPLATE,
+  slackBlockKit: DEFAULT_SLACK_BLOCK_KIT_TEMPLATE,
+};
+
+/**
+ * ADR-034 Phase 5: pick the trace-shape or alert-shape default set.
+ * Selection by `hasCustomGraph` matches the cron's discriminator (a
+ * trigger with `customGraphId != null` IS the graph-alert path, full
+ * stop). A per-trigger custom Liquid template STILL overrides whichever
+ * default set this returns — the dispatcher checks `hasCustomEmail` /
+ * `hasCustomSlack` before reaching for any default.
+ */
+export function pickTriggerDefaults({
+  hasCustomGraph,
+}: {
+  hasCustomGraph: boolean;
+}): TriggerTemplateDefaults {
+  return hasCustomGraph ? ALERT_TRIGGER_DEFAULTS : TRACE_TRIGGER_DEFAULTS;
+}

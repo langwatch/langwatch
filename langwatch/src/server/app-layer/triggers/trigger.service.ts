@@ -12,6 +12,16 @@ export class TriggerService {
     "triggers:",
   );
 
+  /**
+   * Separate cache namespace for graph triggers so the trace-trigger
+   * cache (used hot by the outbox `handleSettle` path) stays untouched
+   * when the heartbeat / graph-eval reactor refreshes its own list.
+   */
+  private readonly graphCache = new TtlCache<TriggerSummary[]>(
+    TriggerService.TTL_MS,
+    "graph-triggers:",
+  );
+
   constructor(private readonly repo: TriggerRepository) {}
 
   async getActiveTraceTriggersForProject(
@@ -26,6 +36,27 @@ export class TriggerService {
     await this.cache.set(projectId, traceOnly);
 
     return traceOnly;
+  }
+
+  /**
+   * Active custom-graph triggers for a project (ADR-034 Phase 5).
+   * Counterpart to `getActiveTraceTriggersForProject`: filters the
+   * SAME `findActiveForProject` read down to rows with `customGraphId`,
+   * which is the cron's definition of a graph trigger
+   * (cron.ts:421 `triggers.filter((t) => t.customGraphId)`).
+   */
+  async getActiveGraphTriggersForProject(
+    projectId: string,
+  ): Promise<TriggerSummary[]> {
+    const cached = await this.graphCache.get(projectId);
+    if (cached) return cached;
+
+    const all = await this.repo.findActiveForProject(projectId);
+    const graphOnly = all.filter((t) => t.customGraphId != null);
+
+    await this.graphCache.set(projectId, graphOnly);
+
+    return graphOnly;
   }
 
   /**
@@ -62,5 +93,6 @@ export class TriggerService {
 
   async invalidate(projectId: string): Promise<void> {
     await this.cache.delete(projectId);
+    await this.graphCache.delete(projectId);
   }
 }

@@ -1,7 +1,12 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { createLogger } from "~/utils/logger/server";
 import type { QueueAuditAdapter } from "../queues/queue.types";
-import { isCadence, isSettle, type OutboxJob } from "./payload";
+import {
+  isCadence,
+  isGraphEval,
+  isSettle,
+  type OutboxJob,
+} from "./payload";
 
 const logger = createLogger("langwatch:outbox:pg-audit-adapter");
 
@@ -48,6 +53,14 @@ export class PgOutboxAuditAdapter implements QueueAuditAdapter<OutboxJob> {
     maxAttempts?: number;
   }): Promise<void> {
     const p = event.payload;
+    if (isGraphEval(p)) {
+      // ADR-034 Phase 5: graphEval payloads do not target a
+      // `ReactorOutbox` row — they own their own dedup via `TriggerSent`
+      // and have no `(trigger, trace)` identity to project here. Skip
+      // the audit write entirely; lifecycle observability for graph
+      // evaluations comes from the structured handler logs.
+      return;
+    }
     if (isSettle(p)) {
       // Settle is the first stage — INSERT (idempotent via the
       // (reactorName, auditDedupKey) unique constraint). A replayed
