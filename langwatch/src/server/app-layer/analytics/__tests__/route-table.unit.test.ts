@@ -172,7 +172,7 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
   });
 
   describe("given an evaluation metric", () => {
-    it("falls back to trace_summaries (eval reads need evaluation_runs join)", () => {
+    it("routes to evaluation_analytics_rollup (ADR-034 Phase 6 — eval fast-path)", () => {
       const table = pickAnalyticsTable({
         series: [
           series("evaluations.evaluation_score", "avg", {
@@ -180,7 +180,7 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
           }),
         ],
       });
-      expect(table).toBe("trace_summaries");
+      expect(table).toBe("evaluation_analytics_rollup");
     });
   });
 

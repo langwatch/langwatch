@@ -351,6 +351,8 @@ describe("ttlReconciler", () => {
         "trace_summaries",
         "trace_analytics",
         "trace_analytics_rollup",
+        "evaluation_analytics",
+        "evaluation_analytics_rollup",
       ]);
     });
 

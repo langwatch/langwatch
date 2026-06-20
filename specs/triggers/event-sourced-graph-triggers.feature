@@ -69,3 +69,45 @@ Feature: Event-sourced custom-graph threshold alerts
     When the alert fires
     Then the notification subject renders the operator's template
     And the alert-default template is not used
+
+  Rule: eval-metric graph triggers fire on the same event-sourced path
+
+    The Phase 6 extension wires eval-metric custom-graph triggers
+    (`evaluations.evaluation_score`, `evaluations.evaluation_pass_rate`,
+    `evaluations.evaluation_runs`) onto the same real-time path and the
+    same heartbeat, source-aware so the recency check queries
+    `evaluation_analytics` instead of `trace_analytics`. The
+    `release_es_graph_triggers_firing` flag is shared with the trace path —
+    operators do not toggle a second flag.
+
+    Scenario: flag off, eval-metric threshold breaches via cron
+      Given the project is on the legacy path
+      And a graph trigger watches an evaluation-score metric
+      When the score crosses its threshold
+      Then the cron processes the trigger
+      And one notification is sent for that incident
+      And the new event-sourced path does not enqueue any evaluation
+
+    Scenario: flag on, eval-metric threshold breaches in real time
+      Given the project is on the event-sourced path
+      And a graph trigger watches an evaluation-score metric
+      When new evaluations land that move the metric across the threshold
+      Then a notification is sent within a few seconds of the breach
+      And one `TriggerSent` row is recorded for the incident
+      And the cron skip is logged for the project's graph triggers
+
+    Scenario: flag on, eval-metric goes silent — no-data alert fires from heartbeat
+      Given the project is on the event-sourced path
+      And a graph trigger watches an eval-pass-rate metric configured to fire when it drops to zero
+      When the project sees no qualifying evaluations for the trigger's window
+      Then the heartbeat fires the alert within thirty seconds
+      And the heartbeat's recency check queries the evaluation analytics table, not the trace one
+      And the notification names the metric and the no-data condition
+
+    Scenario: flag on, mixed trace + eval triggers — one query per source per project per tick
+      Given the project is on the event-sourced path
+      And the project owns one trace-metric graph trigger and one eval-metric graph trigger
+      When the heartbeat ticks
+      Then it issues exactly one recency query against the trace analytics table
+      And exactly one recency query against the evaluation analytics table
+      And does not issue any cross-source query

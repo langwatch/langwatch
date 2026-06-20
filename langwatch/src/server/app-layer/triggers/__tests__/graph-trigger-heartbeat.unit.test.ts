@@ -145,6 +145,7 @@ describe("decideGraphTriggerHeartbeat", () => {
         prisma: prismaStub as unknown as GraphTriggerHeartbeatDeps["prisma"],
         resolveClickHouseClient: async () => chStub.client,
         featureFlagService: flags,
+        lookupTriggerSource: async () => "trace" as const,
       };
 
       const result = await decideGraphTriggerHeartbeat({
@@ -173,6 +174,7 @@ describe("decideGraphTriggerHeartbeat", () => {
         prisma: prismaStub as unknown as GraphTriggerHeartbeatDeps["prisma"],
         resolveClickHouseClient: async () => chStub.client,
         featureFlagService: makeFlagsAllOn(),
+        lookupTriggerSource: async () => "trace" as const,
       };
 
       const result = await decideGraphTriggerHeartbeat({
@@ -202,6 +204,7 @@ describe("decideGraphTriggerHeartbeat", () => {
         prisma: prismaStub as unknown as GraphTriggerHeartbeatDeps["prisma"],
         resolveClickHouseClient: async () => chStub.client,
         featureFlagService: makeFlagsAllOn(),
+        lookupTriggerSource: async () => "trace" as const,
       };
 
       const result = await decideGraphTriggerHeartbeat({
@@ -238,6 +241,7 @@ describe("decideGraphTriggerHeartbeat", () => {
         prisma: prismaStub as unknown as GraphTriggerHeartbeatDeps["prisma"],
         resolveClickHouseClient: async () => chStub.client,
         featureFlagService: makeFlagsAllOn(),
+        lookupTriggerSource: async () => "trace" as const,
       };
 
       const result = await decideGraphTriggerHeartbeat({
@@ -269,6 +273,7 @@ describe("decideGraphTriggerHeartbeat", () => {
         prisma: prismaStub as unknown as GraphTriggerHeartbeatDeps["prisma"],
         resolveClickHouseClient: async () => chStub.client,
         featureFlagService: makeFlagsAllOn(),
+        lookupTriggerSource: async () => "trace" as const,
       };
 
       const result = await decideGraphTriggerHeartbeat({
@@ -313,6 +318,7 @@ describe("decideGraphTriggerHeartbeat", () => {
         prisma: prismaStub as unknown as GraphTriggerHeartbeatDeps["prisma"],
         resolveClickHouseClient: async () => chStub.client,
         featureFlagService: makeFlagsAllOn(),
+        lookupTriggerSource: async () => "trace" as const,
       };
 
       const result = await decideGraphTriggerHeartbeat({

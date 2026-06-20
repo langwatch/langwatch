@@ -34,6 +34,8 @@ import type { BroadcastService } from "../app-layer/broadcast/broadcast.service"
 import { getAzureSafetyEnvFromProject } from "../app-layer/evaluations/azure-safety-env.server";
 import type { EvaluationCostRecorder } from "../app-layer/evaluations/evaluation-cost.recorder";
 import type { EvaluationExecutionService } from "../app-layer/evaluations/evaluation-execution.service";
+import type { EvaluationAnalyticsRepository } from "../app-layer/evaluations/repositories/evaluation-analytics.repository";
+import type { EvaluationAnalyticsRollupRepository } from "../app-layer/evaluations/repositories/evaluation-analytics-rollup.repository";
 import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
 import type { MonitorService } from "../app-layer/monitors/monitor.service";
 import type { OrganizationService } from "../app-layer/organizations/organization.service";
@@ -63,11 +65,14 @@ import {
 } from "./pipelines/billing-reporting/pipeline";
 import { ExecuteEvaluationCommand } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
 import { createEvaluationProcessingPipeline } from "./pipelines/evaluation-processing/pipeline";
+import { EvaluationAnalyticsStore } from "./pipelines/evaluation-processing/projections/evaluationAnalytics.store";
+import { EvaluationAnalyticsRollupAppendStore } from "./pipelines/evaluation-processing/projections/evaluationAnalyticsRollup.store";
 import { EvaluationRunStore } from "./pipelines/evaluation-processing/projections/evaluationRun.store";
 import { createEvaluationAlertTriggerReactor } from "./pipelines/evaluation-processing/reactors/evaluationAlertTrigger.reactor";
 import { createEvaluationAlertTriggerNotifyOutboxReactor } from "./pipelines/evaluation-processing/reactors/evaluationAlertTriggerNotifyOutbox.reactor";
 import type { EvaluationEsSyncReactorDeps } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
 import { createEvaluationEsSyncReactor } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
+import { createEvaluationGraphTriggerEvaluationOutboxReactor } from "./pipelines/evaluation-processing/reactors/graphTriggerEvaluation.outboxReactor";
 import { createExperimentRunProcessingPipeline } from "./pipelines/experiment-run-processing/pipeline";
 import type { ClickHouseExperimentRunResultRecord } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.mapProjection";
 import { createExperimentRunItemAppendStore } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
@@ -193,6 +198,10 @@ export interface PipelineRepositories {
   traceAnalyticsRollup: TraceAnalyticsRollupRepository;
   /** ADR-034 Phase 2: slim per-trace analytics repository (dual-tap, no read path yet). */
   traceAnalytics: TraceAnalyticsRepository;
+  /** ADR-034 Phase 6: per-evaluation rollup repository. */
+  evaluationAnalyticsRollup: EvaluationAnalyticsRollupRepository;
+  /** ADR-034 Phase 6: slim per-evaluation analytics repository. */
+  evaluationAnalytics: EvaluationAnalyticsRepository;
   experimentRunItemStorage: AppendStore<ClickHouseExperimentRunResultRecord>;
 }
 
@@ -336,15 +345,32 @@ export class PipelineRegistry {
         traceSummaryStore,
       });
 
+    // ADR-034 Phase 6: real-time graph-trigger reactor on the slim eval fold.
+    // Flag-gated per project via the same `release_es_graph_triggers_firing`
+    // flag the trace pipeline uses — disabled = empty decide; cron handles
+    // the project's graph triggers as today.
+    const graphTriggerEvaluationOutboxReactor =
+      createEvaluationGraphTriggerEvaluationOutboxReactor({
+        triggers: this.deps.triggers,
+      });
+
     return this.deps.eventSourcing.register(
       createEvaluationProcessingPipeline({
         evalRunStore: new EvaluationRunStore(
           this.deps.evaluations.runs.repository,
         ),
+        evaluationAnalyticsStore: new EvaluationAnalyticsStore(
+          this.deps.repositories.evaluationAnalytics,
+        ),
+        evaluationAnalyticsRollupAppendStore:
+          new EvaluationAnalyticsRollupAppendStore(
+            this.deps.repositories.evaluationAnalyticsRollup,
+          ),
         executeEvaluationCommand,
         esSyncReactor,
         evaluationAlertTriggerReactor,
         evaluationAlertTriggerNotifyOutboxReactor,
+        graphTriggerEvaluationOutboxReactor,
       }),
     );
   }

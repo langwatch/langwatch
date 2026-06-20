@@ -49,9 +49,21 @@ import {
   type TraceAnalyticsRollupReadRepository,
 } from "./repositories/trace-analytics-rollup.clickhouse.repository";
 import {
+  EvaluationAnalyticsClickHouseReadRepository,
+  type EvaluationAnalyticsReadRepository,
+} from "./repositories/evaluation-analytics.clickhouse.repository";
+import {
+  EvaluationAnalyticsRollupClickHouseReadRepository,
+  type EvaluationAnalyticsRollupReadRepository,
+} from "./repositories/evaluation-analytics-rollup.clickhouse.repository";
+import {
   ClickHouseLegacyTraceSummariesShim,
   type LegacyTraceSummariesShim,
 } from "./repositories/legacy-trace-summaries.shim";
+import {
+  ClickHouseLegacyEvaluationRunsShim,
+  type LegacyEvaluationRunsShim,
+} from "./repositories/legacy-evaluation-runs.shim";
 import { compareForTripwire } from "./tripwire/divergence-compare";
 
 const TIMESERIES_CACHE_TTL_MS = 30_000 as const;
@@ -65,6 +77,10 @@ export interface AnalyticsServiceDependencies {
   rollupRepository: TraceAnalyticsRollupReadRepository;
   slimRepository: TraceAnalyticsReadRepository;
   legacyShim: LegacyTraceSummariesShim;
+  /** ADR-034 Phase 6: eval analytics fast-path repositories. */
+  evalRollupRepository: EvaluationAnalyticsRollupReadRepository;
+  evalSlimRepository: EvaluationAnalyticsReadRepository;
+  evalLegacyShim: LegacyEvaluationRunsShim;
   /**
    * Backend used for the non-routed read paths (`getFeedbacks`,
    * `getTopUsedDocuments`). Those queries have no ADR-034 routing — they
@@ -112,15 +128,30 @@ export class AnalyticsService {
 
         const table = await this.resolveAnalyticsTable(input);
 
-        // OFF (legacy) or routed → trace_summaries: single call, no overhead.
+        // OFF (legacy) or routed → a legacy table: single call, no overhead.
         if (table === "trace_summaries") {
           const result =
             await this.deps.legacyShim.runTraceSummariesTimeseries(input);
           await this.timeseriesCache.set(cacheKey, result);
           return result;
         }
+        if (table === "evaluation_runs") {
+          const result =
+            await this.deps.evalLegacyShim.runEvaluationRunsTimeseries(input);
+          await this.timeseriesCache.set(cacheKey, result);
+          return result;
+        }
 
         const tripwireEnabled = await isTripwireEnabled(input.projectId);
+        const legacyForTripwire =
+          table === "evaluation_analytics_rollup" ||
+          table === "evaluation_analytics"
+            ? this.deps.evalLegacyShim.runEvaluationRunsTimeseries.bind(
+                this.deps.evalLegacyShim,
+              )
+            : this.deps.legacyShim.runTraceSummariesTimeseries.bind(
+                this.deps.legacyShim,
+              );
 
         if (!tripwireEnabled) {
           const result = await this.runRouted(table, input);
@@ -130,10 +161,12 @@ export class AnalyticsService {
 
         // Tripwire: run both queries in parallel; log on divergence; return
         // the routed result so the flag flip behaviour is observable
-        // end-to-end.
+        // end-to-end. The legacy comparator picks per-source so an
+        // eval-routed query is compared against `evaluation_runs`, not
+        // `trace_summaries`.
         const [routedResult, legacyResult] = await Promise.all([
           this.runRouted(table, input),
-          this.deps.legacyShim.runTraceSummariesTimeseries(input),
+          legacyForTripwire(input),
         ]);
         compareForTripwire({
           projectId: input.projectId,
@@ -226,7 +259,7 @@ export class AnalyticsService {
    * date math.
    */
   private async runRouted(
-    table: Exclude<AnalyticsTable, "trace_summaries">,
+    table: Exclude<AnalyticsTable, "trace_summaries" | "evaluation_runs">,
     input: TimeseriesInputType,
   ): Promise<TimeseriesResult> {
     const { previousPeriodStartDate, startDate, endDate } =
@@ -278,10 +311,29 @@ export class AnalyticsService {
         originalTimeScale: input.timeScale,
       });
     }
+    if (table === "evaluation_analytics_rollup") {
+      return this.deps.evalRollupRepository.runRollupTimeseries({
+        tenantId: input.projectId,
+        builderInput,
+        series: input.series,
+        groupBy: input.groupBy,
+        originalTimeScale: input.timeScale,
+      });
+    }
+    if (table === "evaluation_analytics") {
+      return this.deps.evalSlimRepository.runSlimTimeseries({
+        tenantId: input.projectId,
+        builderInput,
+        series: input.series,
+        groupBy: input.groupBy,
+        originalTimeScale: input.timeScale,
+      });
+    }
     // Exhaustiveness check — if AnalyticsTable ever gains a new variant,
     // the compiler catches it here instead of silently routing to the
-    // wrong path. "trace_summaries" is handled earlier via the shim
-    // branch in dispatchTimeseriesQuery, so it never reaches this method.
+    // wrong path. "trace_summaries" and "evaluation_runs" are handled
+    // earlier via the shim branches in getTimeseries, so they never reach
+    // this method.
     const _exhaustive: never = table;
     throw new Error(
       `Unhandled analytics table in routed dispatch: ${String(_exhaustive)}`,
@@ -324,6 +376,13 @@ export function createAnalyticsService(
     ),
     slimRepository: new TraceAnalyticsClickHouseReadRepository(resolveClient),
     legacyShim: new ClickHouseLegacyTraceSummariesShim(resolveClient),
+    evalRollupRepository: new EvaluationAnalyticsRollupClickHouseReadRepository(
+      resolveClient,
+    ),
+    evalSlimRepository: new EvaluationAnalyticsClickHouseReadRepository(
+      resolveClient,
+    ),
+    evalLegacyShim: new ClickHouseLegacyEvaluationRunsShim(resolveClient),
     legacyBackend: getClickHouseAnalyticsService(),
   });
 }
