@@ -146,7 +146,9 @@ describe("LogRecordStorageClickHouseRepository.getMarkedClaudeCodeLogsByTrace", 
       );
       expect(typeof query_params.fromMs).toBe("number");
       expect(typeof query_params.toMs).toBe("number");
-      expect(query_params.toMs).toBeGreaterThan(query_params.fromMs);
+      expect(query_params.toMs as number).toBeGreaterThan(
+        query_params.fromMs as number,
+      );
     });
   });
 });
