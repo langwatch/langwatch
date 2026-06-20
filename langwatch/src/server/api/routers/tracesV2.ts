@@ -28,21 +28,16 @@ import {
 } from "~/server/data-privacy/dropKeyCatalog";
 import type { CategoryVisibility } from "~/server/elasticsearch/protections";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
-import {
-  changeTraceNameInputSchema,
-  DEFAULT_PII_REDACTION_LEVEL,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import { changeTraceNameInputSchema } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
   TRACE_NAME_MAX_LENGTH,
   TRACE_NAME_MIN_LENGTH,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
-import type {
-  CustomMetadata,
-  ReservedTraceMetadata,
-  Span,
-  SpanInputOutput,
-} from "~/server/tracer/types";
-import { CollectorSpanUtils } from "~/server/traces/collectorSpan.utils";
+import type { Span, SpanInputOutput } from "~/server/tracer/types";
+import {
+  traceMetadataUpdateSchema,
+  updateTraceMetadata,
+} from "~/server/app-layer/traces/trace-metadata.service";
 import {
   findPromptReferenceInAncestors,
   flattenParamsToPromptAttributes,
@@ -1140,79 +1135,12 @@ export const tracesV2Router = createTRPCRouter({
       z.object({
         projectId: z.string(),
         traceId: z.string(),
-        metadata: z
-          .record(
-            z.union([
-              z.string().max(4096),
-              z.number(),
-              z.boolean(),
-              z.array(z.string()),
-              z.record(z.unknown()),
-            ]),
-          )
-          .refine((obj) => Object.keys(obj).length > 0, {
-            message: "metadata must contain at least one key",
-          })
-          .refine((obj) => JSON.stringify(obj).length <= 32768, {
-            message: "total metadata payload must not exceed 32KB",
-          }),
+        metadata: traceMetadataUpdateSchema,
       }),
     )
     .use(checkProjectPermission("traces:update"))
     .mutation(async ({ input }) => {
-      const RESERVED_METADATA_KEYS = new Set([
-        "user_id",
-        "customer_id",
-        "thread_id",
-        "labels",
-      ]);
-
-      const reserved: ReservedTraceMetadata = {};
-      const custom: CustomMetadata = {};
-      for (const [key, value] of Object.entries(input.metadata)) {
-        if (RESERVED_METADATA_KEYS.has(key)) {
-          (reserved as Record<string, unknown>)[key] = value;
-        } else {
-          custom[key] = value as CustomMetadata[string];
-        }
-      }
-
-      const resource = CollectorSpanUtils.buildResource({
-        reservedTraceMetadata: reserved,
-        customMetadata: custom,
-      });
-
-      const now = Date.now();
-      const nowNano = String(now * 1_000_000);
-      const spanId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
-
-      await getApp().traces.recordSpan({
-        tenantId: input.projectId,
-        span: {
-          traceId: input.traceId,
-          spanId,
-          traceState: null,
-          parentSpanId: null,
-          name: "langwatch.metadata_update",
-          kind: 1,
-          startTimeUnixNano: nowNano,
-          endTimeUnixNano: nowNano,
-          attributes: [
-            { key: "langwatch.span.type", value: { stringValue: "span" } },
-          ],
-          events: [],
-          links: [],
-          status: { code: 1 },
-          droppedAttributesCount: 0,
-          droppedEventsCount: 0,
-          droppedLinksCount: 0,
-        },
-        resource,
-        instrumentationScope: { name: "langwatch.api.metadata_update" },
-        piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
-        occurredAt: now,
-      });
-
+      await updateTraceMetadata(input);
       return { traceId: input.traceId };
     }),
 
