@@ -404,6 +404,29 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
                     onClick={() => selectPerspective(p.id)}
                     role="radio"
                     aria-checked={active}
+                    // Radiogroup keyboard pattern: only the active radio is
+                    // tabbable, and arrow keys move selection + focus.
+                    tabIndex={active ? 0 : -1}
+                    onKeyDown={(e) => {
+                      const idx = FACET_PERSPECTIVES.findIndex(
+                        (x) => x.id === p.id,
+                      );
+                      const len = FACET_PERSPECTIVES.length;
+                      let nextIdx: number | null = null;
+                      if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+                        nextIdx = (idx + 1) % len;
+                      } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+                        nextIdx = (idx - 1 + len) % len;
+                      }
+                      if (nextIdx === null) return;
+                      e.preventDefault();
+                      selectPerspective(FACET_PERSPECTIVES[nextIdx]!.id);
+                      const radios =
+                        e.currentTarget.parentElement?.querySelectorAll(
+                          '[role="radio"]',
+                        );
+                      (radios?.[nextIdx] as HTMLElement | undefined)?.focus();
+                    }}
                   >
                     <Icon
                       boxSize={3}

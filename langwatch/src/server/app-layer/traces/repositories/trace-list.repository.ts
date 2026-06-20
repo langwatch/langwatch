@@ -145,8 +145,8 @@ export interface TraceListRepository {
   }): Promise<{ min: number; max: number }>;
 
   /**
-   * Distinct integer values + counts for an integer range facet (one declared
-   * `integer: true` on its `RangeFacetDef`), ascending, capped at `limit`.
+   * Distinct integer values + counts for a discrete range facet (one declared
+   * `isDiscrete: true` on its `RangeFacetDef`), ascending, capped at `limit`.
    * `distinctCount` is exact regardless of the cap so the sidebar can fall back
    * to the slider once the distinct values exceed its threshold.
    */

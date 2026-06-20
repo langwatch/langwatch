@@ -468,7 +468,7 @@ function appendClause(
  * escaped so values like `He said "no"` round-trip cleanly. The empty
  * string quotes to `""` rather than emitting a bare `field:`.
  */
-function escapeValue(value: string): string {
+export function escapeValue(value: string): string {
   if (value === "" || !/^[A-Za-z0-9_.-]+$/.test(value)) {
     return `"${value.replace(/[\\"]/g, "\\$&")}"`;
   }

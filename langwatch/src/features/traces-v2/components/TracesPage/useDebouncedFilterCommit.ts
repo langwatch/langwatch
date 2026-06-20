@@ -15,8 +15,9 @@ const TIME_RANGE_DEBOUNCE_MS = 300;
 /**
  * Mirrors the visual filter state (queryText, timeRange) into the debounced
  * state that drives network requests, so typing doesn't refetch on every key.
- * Query text and time range are debounced independently so a slow-typed query
- * never gets a short timer just because the time range also changed.
+ * Query-text and time-range changes each schedule a commit on their own timer
+ * (query waits longer — see the constants above); whichever timer fires reads
+ * and commits the CURRENT query + time range together via `commitDebounced`.
  */
 export const useDebouncedFilterCommit = (): void => {
   const queryText = useFilterStore((s) => s.queryText);

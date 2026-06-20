@@ -23,6 +23,7 @@
  */
 
 import type { LiqeQuery, TagToken } from "liqe";
+import { escapeValue } from "./mutations";
 import { isEmptyAST, parse, serialize } from "./parse";
 import { filterAST, walkAST } from "./walk";
 
@@ -205,13 +206,6 @@ export function readEvaluatorGroup(
   }
 }
 
-function escapeValue(value: string): string {
-  if (value === "" || !/^[A-Za-z0-9_.-]+$/.test(value)) {
-    return `"${value.replace(/[\\"]/g, "\\$&")}"`;
-  }
-  return value;
-}
-
 function categoricalClause(sub: CategoricalSub): string {
   const tag = `${sub.field}:${escapeValue(sub.value)}`;
   return sub.negated ? `NOT ${tag}` : tag;
@@ -339,7 +333,15 @@ export function setEvaluatorScoreRangeInQuery({
   to: string;
 }): string {
   return mutateEvaluatorGroup(currentQuery, evaluatorId, (group) => {
-    group.score = { from: Number(from), to: Number(to) };
+    const fromNum = Number(from);
+    const toNum = Number(to);
+    // Guard non-numeric bounds — `Number("")`/`Number("x")` is NaN, and
+    // `evaluatorScore:[NaN TO NaN]` is a liqe SyntaxError. Mirror the read
+    // side, which only treats finite bounds as a real range.
+    group.score =
+      Number.isFinite(fromNum) && Number.isFinite(toNum)
+        ? { from: fromNum, to: toNum }
+        : null;
   });
 }
 

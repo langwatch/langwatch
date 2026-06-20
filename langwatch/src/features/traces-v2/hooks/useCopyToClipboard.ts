@@ -30,6 +30,7 @@ export function useCopyToClipboard(): {
 } {
   const [copied, setCopied] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
 
   const clearTimer = useCallback(() => {
     if (timerRef.current !== null) {
@@ -38,13 +39,22 @@ export function useCopyToClipboard(): {
     }
   }, []);
 
-  useEffect(() => clearTimer, [clearTimer]);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      clearTimer();
+    };
+  }, [clearTimer]);
 
   const copy = useCallback(
     (text: string) => {
       void navigator.clipboard
         .writeText(text)
         .then(() => {
+          // The write can resolve after the component unmounts; don't touch
+          // state then (avoids a React set-state-on-unmounted no-op warning).
+          if (!mountedRef.current) return;
           setCopied(true);
           clearTimer();
           timerRef.current = setTimeout(() => {
