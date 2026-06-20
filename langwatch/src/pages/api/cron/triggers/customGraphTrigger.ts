@@ -9,7 +9,7 @@ import type {
   SeriesInputType,
   TimeseriesInputType,
 } from "~/server/analytics/registry";
-import { getAnalyticsService } from "~/server/analytics/analytics.service";
+import { getAnalyticsService } from "~/server/app-layer/analytics";
 import type {
   TimeseriesBucket,
   TimeseriesResult,

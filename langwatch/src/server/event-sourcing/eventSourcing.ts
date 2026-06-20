@@ -14,7 +14,9 @@ import type { OutboxReactorDefinition } from "./outbox/outboxReactor.types";
 import { adaptOutboxReactor } from "./outbox/outboxReactorAdapter";
 import {
   cadenceGroupKey,
+  graphEvalGroupKey,
   isCadence,
+  isGraphEval,
   isSettle,
   type OutboxJob,
   settleGroupKey,
@@ -467,15 +469,16 @@ export class EventSourcing {
     const outbox = this._outbox;
     const isOutboxPayload = (
       payload: Record<string, unknown>,
-    ): payload is OutboxJob => isSettle(payload) || isCadence(payload);
+    ): payload is OutboxJob =>
+      isSettle(payload) || isCadence(payload) || isGraphEval(payload);
 
     const definition = {
       name: queueName,
       groupKey: (payload: Record<string, unknown>) => {
         if (isOutboxPayload(payload)) {
-          return isSettle(payload)
-            ? settleGroupKey(payload)
-            : cadenceGroupKey(payload);
+          if (isSettle(payload)) return settleGroupKey(payload);
+          if (isCadence(payload)) return cadenceGroupKey(payload);
+          return graphEvalGroupKey(payload);
         }
         const result = this.lookupEntry(payload);
         if (!result) return "__unknown__";
@@ -531,11 +534,12 @@ export class EventSourcing {
       },
       coalesceMaxBatch: (payload: Record<string, unknown>) => {
         if (isOutboxPayload(payload)) {
-          // Settle is per-(trigger, trace) so coalescing makes no sense
-          // — its dedup mode is already the collapsing primitive.
+          // Settle / graphEval are per-(trigger, ...) so coalescing makes
+          // no sense — their dedup mode is the collapsing primitive.
           // Cadence digest batches up to 100 same-window jobs into one
           // render+dispatch.
-          return isSettle(payload) ? 1 : 100;
+          if (isSettle(payload) || isGraphEval(payload)) return 1;
+          return 100;
         }
         const result = this.lookupEntry(payload);
         return result?.entry.coalesceMaxBatch ?? 1;

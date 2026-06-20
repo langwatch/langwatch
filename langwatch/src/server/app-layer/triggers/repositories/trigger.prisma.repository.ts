@@ -4,7 +4,12 @@ import {
   type NotificationCadence,
 } from "~/automations/cadences";
 import type { TriggerFilters } from "~/server/filters/types";
-import type { TriggerRepository, TriggerSummary } from "./trigger.repository";
+import type {
+  GraphTriggerSentRepository,
+  OpenGraphTriggerSent,
+  TriggerRepository,
+  TriggerSummary,
+} from "./trigger.repository";
 
 export class PrismaTriggerRepository implements TriggerRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -92,6 +97,94 @@ export class PrismaTriggerRepository implements TriggerRepository {
     await this.prisma.trigger.update({
       where: { id: triggerId, projectId },
       data: { lastRunAt: Date.now() },
+    });
+  }
+}
+
+/**
+ * Prisma-backed mirror of the cron's graph-alert TriggerSent dedup
+ * pattern (ADR-034 Phase 5). The cron's flow is the source of truth:
+ *
+ *  - findFirst(triggerId, projectId, customGraphId, resolvedAt: null,
+ *    orderBy createdAt desc) — `unresolvedTriggerSent`
+ *    (customGraphTrigger.ts:179-189)
+ *  - create({ triggerId, traceId: null, customGraphId, projectId,
+ *    resolvedAt: null }) — `addTriggersSent`
+ *    (utils.ts:39-48)
+ *  - update({ where: { id, projectId }, data: { resolvedAt: new Date() } })
+ *    (customGraphTrigger.ts:264-271)
+ *
+ * The event-sourced handler MUST mirror this byte-for-byte so the same
+ * "still firing?" semantics hold whether the cron fired the alert or
+ * the new path did, including operators flipping the flag mid-flight.
+ */
+export class PrismaGraphTriggerSentRepository
+  implements GraphTriggerSentRepository
+{
+  constructor(private readonly prisma: PrismaClient) {}
+
+  async findOpenForGraphAlert({
+    triggerId,
+    projectId,
+    customGraphId,
+  }: {
+    triggerId: string;
+    projectId: string;
+    customGraphId: string;
+  }): Promise<OpenGraphTriggerSent | null> {
+    const row = await this.prisma.triggerSent.findFirst({
+      where: { triggerId, projectId, customGraphId, resolvedAt: null },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, triggerId: true, projectId: true, customGraphId: true },
+    });
+    if (!row || row.customGraphId == null) return null;
+    return {
+      id: row.id,
+      triggerId: row.triggerId,
+      projectId: row.projectId,
+      customGraphId: row.customGraphId,
+    };
+  }
+
+  async createOpenForGraphAlert({
+    triggerId,
+    projectId,
+    customGraphId,
+  }: {
+    triggerId: string;
+    projectId: string;
+    customGraphId: string;
+  }): Promise<OpenGraphTriggerSent> {
+    const row = await this.prisma.triggerSent.create({
+      data: {
+        triggerId,
+        traceId: null,
+        customGraphId,
+        projectId,
+        resolvedAt: null,
+      },
+      select: { id: true, triggerId: true, projectId: true, customGraphId: true },
+    });
+    return {
+      id: row.id,
+      triggerId: row.triggerId,
+      projectId: row.projectId,
+      customGraphId: customGraphId,
+    };
+  }
+
+  async markResolvedById({
+    id,
+    projectId,
+    now,
+  }: {
+    id: string;
+    projectId: string;
+    now: Date;
+  }): Promise<void> {
+    await this.prisma.triggerSent.update({
+      where: { id, projectId },
+      data: { resolvedAt: now },
     });
   }
 }

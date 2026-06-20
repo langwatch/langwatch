@@ -48,7 +48,16 @@ import { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
 import { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
 import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
 import { EventSourcing } from "../event-sourcing";
+import { dispatchOutboxEnqueues } from "../event-sourcing/outbox/dispatchOutboxEnqueues";
+import {
+  OutboxHeartbeatScheduler,
+  outboxHeartbeatRegistry,
+} from "../event-sourcing/outbox/heartbeat";
 import { buildOutboxRuntime } from "../event-sourcing/outbox/setup";
+import {
+  defaultGraphTriggerHeartbeatDeps,
+  registerGraphTriggerHeartbeat,
+} from "./triggers/graph-trigger-heartbeat";
 import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
 import {
   type AppCommands,
@@ -143,6 +152,10 @@ import { LogRecordStorageClickHouseRepository } from "./traces/repositories/log-
 import { NullLogRecordStorageRepository } from "./traces/repositories/log-record-storage.repository";
 import { MetricRecordStorageClickHouseRepository } from "./traces/repositories/metric-record-storage.clickhouse.repository";
 import { NullMetricRecordStorageRepository } from "./traces/repositories/metric-record-storage.repository";
+import { TraceAnalyticsClickHouseRepository } from "./traces/repositories/trace-analytics.clickhouse.repository";
+import { NullTraceAnalyticsRepository } from "./traces/repositories/trace-analytics.repository";
+import { TraceAnalyticsRollupClickHouseRepository } from "./traces/repositories/trace-analytics-rollup.clickhouse.repository";
+import { NullTraceAnalyticsRollupRepository } from "./traces/repositories/trace-analytics-rollup.repository";
 import { SpanStorageClickHouseRepository } from "./traces/repositories/span-storage.clickhouse.repository";
 import { NullSpanStorageRepository } from "./traces/repositories/span-storage.repository";
 import { TraceListClickHouseRepository } from "./traces/repositories/trace-list.clickhouse.repository";
@@ -544,6 +557,12 @@ export function initializeDefaultApp(options?: {
     metricRecordStorage: clickhouseEnabled
       ? new MetricRecordStorageClickHouseRepository(resolveClickHouseClient)
       : new NullMetricRecordStorageRepository(),
+    traceAnalyticsRollup: clickhouseEnabled
+      ? new TraceAnalyticsRollupClickHouseRepository(resolveClickHouseClient)
+      : new NullTraceAnalyticsRollupRepository(),
+    traceAnalytics: clickhouseEnabled
+      ? new TraceAnalyticsClickHouseRepository(resolveClickHouseClient)
+      : new NullTraceAnalyticsRepository(),
     experimentRunItemStorage: createExperimentRunItemAppendStore(
       clickhouseEnabled ? resolveClickHouseClient : null,
     ),
@@ -590,6 +609,45 @@ export function initializeDefaultApp(options?: {
           traceSummaryRepository: repositories.traceSummaryFold,
         })
       : undefined;
+
+  // Heartbeat scheduler (ADR-034 Phase 4): worker-only periodic source of
+  // outbox enqueues for the cases the event-driven outbox path
+  // STRUCTURALLY cannot reach (no-data detection, resolve-when-traffic-stops).
+  // Registrations live in `outboxHeartbeatRegistry` (process-singleton);
+  // the scheduler routes every tick's `decide` result through the same
+  // `dispatchOutboxEnqueues` helper `adaptOutboxReactor` uses, so one
+  // dispatch path serves both event-sourced and tick-sourced enqueues.
+  // Constructed only when both a worker role AND an outbox runtime AND a
+  // Redis client are present — the lock is the leader-election primitive
+  // so a missing Redis means no scheduler.
+  const outboxHeartbeatScheduler =
+    config.processRole === "worker" && outbox && redis
+      ? new OutboxHeartbeatScheduler({
+          registry: outboxHeartbeatRegistry,
+          redis,
+          dispatchOutboxEnqueues: ({ requests, sourceName }) =>
+            dispatchOutboxEnqueues({
+              requests,
+              outbox,
+              sourceName,
+              logger: createLogger("langwatch:event-sourcing:outbox-heartbeat"),
+            }),
+          processRole: config.processRole,
+          logger: createLogger("langwatch:event-sourcing:outbox-heartbeat"),
+        })
+      : undefined;
+  // ADR-034 Phase 5: register the graph-trigger heartbeat BEFORE the
+  // scheduler starts. Registration is passive data (the registry is a
+  // process-singleton) so this is safe on every role; the scheduler
+  // itself is worker-only and ignores non-worker processes. We only
+  // register when an outbox runtime is present — without it there's no
+  // dispatch target.
+  if (outbox) {
+    registerGraphTriggerHeartbeat(
+      defaultGraphTriggerHeartbeatDeps({ triggers, prisma }),
+    );
+  }
+  outboxHeartbeatScheduler?.start();
 
   const registry = new PipelineRegistry({
     eventSourcing: es,
@@ -730,6 +788,14 @@ export function initializeDefaultApp(options?: {
   // The outbox runtime piggy-backs on the main event-sourcing queue
   // (ADR-030 revision 3), so there's nothing outbox-specific to close —
   // the event-sourcing queue's own close registration covers it.
+  if (outboxHeartbeatScheduler) {
+    gracefulCloseables.push({
+      name: "outbox-heartbeat-scheduler",
+      close: async () => {
+        await outboxHeartbeatScheduler.stop();
+      },
+    });
+  }
   gracefulCloseables.push({
     name: "prisma",
     close: () => prisma.$disconnect(),

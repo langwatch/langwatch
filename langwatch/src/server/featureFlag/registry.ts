@@ -147,6 +147,45 @@ export const FEATURE_FLAGS = [
     description:
       "Gates the personal keys, admin oversight, RoutingPolicy, and IngestionSource UI surfaces. Distinct from release_ui_ai_gateway_menu_enabled — the existing gateway product ships unblocked while governance keeps cooking.",
   },
+  // ADR-034 Phase 3 — routes analytics getTimeseries reads to the slim
+  // `trace_analytics` / rollup `trace_analytics_rollup` tables (Phases 1+2)
+  // when the query shape allows. OFF (default) = legacy trace_summaries reads
+  // unchanged. The router (`pickAnalyticsTable`) is the SINGLE place that
+  // chooses; this flag gates whether the router runs at all per project.
+  {
+    key: "release_event_sourced_analytics_read",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Routes analytics getTimeseries reads to the slim trace_analytics / rollup trace_analytics_rollup tables (ADR-034 Phases 1+2) when the query shape allows. Off = legacy trace_summaries reads unchanged.",
+  },
+  // ADR-034 Phase 3 tripwire — when ON, runs both the routed query AND the
+  // legacy `trace_summaries` query in parallel and logs a structured warning
+  // on divergence beyond a small numeric tolerance. Returns the routed result
+  // either way; thin wrapper, no read-path duplication beyond the comparison.
+  // Disabled by default; flipped on per-project during canary.
+  {
+    key: "release_event_sourced_analytics_read_tripwire",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Tripwire for ADR-034 Phase 3: when ON alongside release_event_sourced_analytics_read, runs the routed and legacy trace_summaries queries in parallel and logs divergence beyond a small tolerance. Returns the routed result either way.",
+  },
+  // ADR-034 Phase 5 — moves custom-graph threshold-alert firing off the K8s
+  // cron onto the event-sourced path (real-time outbox reactor on
+  // trace-processing + 30s heartbeat for no-data / firing-resolve absence
+  // cases). OFF (default) = cron handles the project's graph triggers as
+  // today. ON = cron skips that project's graph triggers; the
+  // event-sourced path takes over. The cron loop and the new path
+  // coexist per-project — graph triggers either fire from one OR the
+  // other for a given project, never both.
+  {
+    key: "release_es_graph_triggers_firing",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Moves custom-graph threshold-alert firing off the K8s cron onto the event-sourced path (ADR-034 Phase 5). On = cron skips this project's graph triggers; real-time outbox reactor + heartbeat fire them. Off = cron handles as today.",
+  },
 ] as const satisfies readonly FeatureFlagDefinition[];
 
 export const FEATURE_FLAG_FAMILIES = [
