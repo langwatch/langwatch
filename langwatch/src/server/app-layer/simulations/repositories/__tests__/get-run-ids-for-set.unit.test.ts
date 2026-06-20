@@ -1,15 +1,17 @@
-import { describe, it, expect, vi } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { describe, expect, it, vi } from "vitest";
 import {
-  SimulationClickHouseRepository,
   RUN_ID_CAP,
+  SimulationClickHouseRepository,
 } from "../simulation.clickhouse.repository";
 
 function makeRowsOfLength(n: number): { ScenarioRunId: string }[] {
   return Array.from({ length: n }, (_, i) => ({ ScenarioRunId: `run-${i}` }));
 }
 
-function makeMockClientReturning(rows: { ScenarioRunId: string }[]): ClickHouseClient {
+function makeMockClientReturning(
+  rows: { ScenarioRunId: string }[],
+): ClickHouseClient {
   const jsonFn = vi.fn().mockResolvedValue(rows);
   const queryFn = vi.fn().mockResolvedValue({ json: jsonFn });
   return { query: queryFn } as unknown as ClickHouseClient;
