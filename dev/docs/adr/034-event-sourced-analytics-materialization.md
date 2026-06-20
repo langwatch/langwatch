@@ -75,9 +75,9 @@ Averages derived at read (`CostSum / TraceUniq`, …).
 
 ## Keep / drop (from the prior attempt)
 
-**Keep, repointed:** the `.withSweep` + recurring-tick scheduler (ADR-033), `evaluateCustomGraphThreshold`, the trigger / notification / custom-graph services, the active-trigger read model.
+**Keep, repointed:** the recurring-tick scheduler (ADR-033 — promoted to a generic outbox heartbeat primitive), `evaluateCustomGraphThreshold`, the trigger / notification / custom-graph services, the active-trigger read model.
 **Drop:** the Postgres `CustomGraphTriggerRollupBucket` + migrations, the sketches, the sign-collapsing, the `graphRollupTrigger` reactors, the relevance gate, `graphSeriesValue`/`evaluationSeriesValue` (already removed by the reset to `6e496787e`).
 
 ## Related
 
-ADR-002/007 (event sourcing), **ADR-021 (lean fold cache — folds idempotent under replay)**, **ADR-022 (event log source of truth — at-least-once re-apply)**, **ADR-015 (projection replay — folds only; coordinated dedup)**, ADR-024 (cold-path tiered storage), ADR-033 (recurring-tick scheduler + `.withSweep`). ADR-018 (governance flat substrate) — considered, deliberately **not** shared.
+ADR-002/007 (event sourcing), **ADR-021 (lean fold cache — folds idempotent under replay)**, **ADR-022 (event log source of truth — at-least-once re-apply)**, **ADR-015 (projection replay — folds only; coordinated dedup)**, ADR-024 (cold-path tiered storage), **ADR-033 (outbox heartbeat primitive — the absence-detection consumer Phase 5 motivated)**. ADR-018 (governance flat substrate) — considered, deliberately **not** shared.

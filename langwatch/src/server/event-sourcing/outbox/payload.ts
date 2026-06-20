@@ -127,7 +127,34 @@ export interface CadenceStagePayload
   renderDiagnostics?: { missingVariables: string[] } | null;
 }
 
-export type OutboxJob = SettleStagePayload | CadenceStagePayload;
+/**
+ * Custom-graph threshold evaluation request (ADR-034 Phase 5).
+ *
+ * Single-stage outbox payload — graph evaluations do not have a settle
+ * → cadence shape because they have no `traceId` to debounce per-trace
+ * and no per-trigger digest to coalesce: each call drives the cron-
+ * mirror handler `evaluateGraphTrigger` which itself owns dedup via
+ * `TriggerSent`. The Debounce Mode TTL on the outer queue collapses
+ * repeated `(triggerId, projectId)` enqueues into a single fire — see
+ * `release_es_graph_triggers_firing` (ADR-034 Phase 5).
+ */
+export const GRAPH_TRIGGER_EVAL_REACTOR_NAME =
+  "graphTriggerEvaluation" as const;
+
+export interface GraphEvalStagePayload extends Record<string, unknown> {
+  stage: "graphEval";
+  projectId: string;
+  triggerId: string;
+  reactorName: typeof GRAPH_TRIGGER_EVAL_REACTOR_NAME;
+  /** What woke the evaluator up — for telemetry only. The handler
+   *  re-derives breach/no-breach from analytics regardless. */
+  reason: "real-time" | "heartbeat-absence" | "heartbeat-resolve";
+}
+
+export type OutboxJob =
+  | SettleStagePayload
+  | CadenceStagePayload
+  | GraphEvalStagePayload;
 
 // Widened to accept any unknown payload — these are the discriminators
 // the main event-sourcing queue uses to pick off outbox jobs from
@@ -143,6 +170,57 @@ export function isCadence(
   job: Record<string, unknown>,
 ): job is CadenceStagePayload {
   return (job as { stage?: unknown }).stage === "cadence";
+}
+
+export function isGraphEval(
+  job: Record<string, unknown>,
+): job is GraphEvalStagePayload {
+  return (job as { stage?: unknown }).stage === "graphEval";
+}
+
+/**
+ * Per-(trigger, project) dedup key for the graphEval stage. Identity
+ * for the GroupQueue Debounce Mode entry — repeat sends within the TTL
+ * collapse onto the existing pending job. The handler `evaluateGraphTrigger`
+ * is idempotent and owns its own `TriggerSent` dedup; the debounce
+ * here just bounds the rate at which we re-run the threshold check.
+ *
+ * Convention mirrors `settleDedupId` shape, with a `:graph:` discriminator
+ * + suffix indicating the source (`real-time` reactor vs `hb` heartbeat)
+ * so the two sources don't collapse together — locked by the Phase 5
+ * spec.
+ */
+export function graphEvalDedupId(params: {
+  projectId: string;
+  triggerId: string;
+  suffix?: string;
+}): string {
+  const tail = params.suffix ? `:${params.suffix}` : "";
+  return `${params.projectId}/${params.triggerId}:graph${tail}`;
+}
+
+/**
+ * Per-trigger group key for the graphEval stage. Per-trigger FIFO so a
+ * noisy trigger doesn't head-of-line-block other triggers' evaluation
+ * windows.
+ */
+export function graphEvalGroupKey(params: {
+  projectId: string;
+  triggerId: string;
+}): string {
+  return `${params.projectId}/${GRAPH_TRIGGER_EVAL_REACTOR_NAME}:${params.triggerId}`;
+}
+
+/**
+ * Per-(trigger, project) audit row identity for graphEval. Mirrors
+ * `auditDedupKey`'s shape but uses `:graph:` so it never collides with
+ * trace-based dispatches' rows.
+ */
+export function graphEvalAuditDedupKey(params: {
+  projectId: string;
+  triggerId: string;
+}): string {
+  return `${params.projectId}/${params.triggerId}:graph`;
 }
 
 /**
