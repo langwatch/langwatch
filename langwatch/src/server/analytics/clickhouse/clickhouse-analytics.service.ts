@@ -85,12 +85,25 @@ export class ClickHouseAnalyticsService {
   }
 
   /**
-   * Execute timeseries query
+   * Execute timeseries query against the legacy `trace_summaries` table.
+   *
+   * ADR-034 Phase 3 routing (slim / rollup destinations) is owned by the
+   * app-layer analytics service at `~/server/app-layer/analytics/` — this
+   * legacy backend only ever hits `trace_summaries`. The new service uses
+   * its own repositories for the routed paths and a thin shim back into
+   * this builder for the trace_summaries fallback.
    */
-  async getTimeseries(input: TimeseriesInputType): Promise<TimeseriesResult> {
+  async getTimeseries(
+    input: TimeseriesInputType,
+  ): Promise<TimeseriesResult> {
     return this.tracer.withActiveSpan(
       "ClickHouseAnalyticsService.getTimeseries",
-      { attributes: { "tenant.id": input.projectId } },
+      {
+        attributes: {
+          "tenant.id": input.projectId,
+          "analytics.table": "trace_summaries",
+        },
+      },
       async (span) => {
         const clickHouseClient = await this.resolveClient(input.projectId);
         if (!clickHouseClient) {

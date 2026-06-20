@@ -105,7 +105,11 @@ export type CHTable =
   | "evaluation_runs";
 
 /**
- * Field mapping configuration
+ * Field mapping configuration for the legacy `trace_summaries` SQL builder
+ * (`aggregation-builder.ts`). The ADR-034 routing metadata (`availableOn`)
+ * previously carried here has moved to
+ * `~/server/app-layer/analytics/routing/field-availability.ts` where the
+ * router + slim/rollup builders consume it directly.
  */
 export interface FieldMapping {
   /** The ClickHouse table containing this field */

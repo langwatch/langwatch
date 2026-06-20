@@ -521,6 +521,11 @@ function getGroupByExpression(
  * round trips and allows the database to optimize the scan across both date ranges.
  */
 export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
+  // ADR-034 Phase 3: routing to `trace_analytics_rollup` /
+  // `trace_analytics` lives in `~/server/app-layer/analytics` now — the
+  // service there decides which destination to use and calls the dedicated
+  // builders directly. This function only emits the legacy
+  // `trace_summaries` SQL (the safe fallback).
   const ts = tableAliases.trace_summaries;
   const timeZone = input.timeZone ?? "UTC";
 

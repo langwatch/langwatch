@@ -1,5 +1,5 @@
 import { timeseriesInput } from "../../../analytics/registry";
-import { getAnalyticsService } from "../../../analytics/analytics.service";
+import { getAnalyticsService } from "../../../app-layer/analytics";
 import { checkProjectPermission } from "../../rbac";
 import { protectedProcedure } from "../../trpc";
 
