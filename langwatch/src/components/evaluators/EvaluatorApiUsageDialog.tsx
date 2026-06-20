@@ -35,7 +35,7 @@ export type EvaluatorApiUsageDialogProps = {
 };
 
 type UsageMode = "experiment" | "online";
-type Language = "python" | "typescript" | "bash";
+type Language = "python" | "typescript" | "go" | "bash";
 
 /**
  * Dialog showing code examples for using an evaluator from the API.
@@ -159,6 +159,22 @@ export function EvaluatorApiUsageDialog({
     return allFields.map((field) => `"${field}": "your ${field}"`).join(",\n    ");
   };
 
+  // Build data fields for the Go raw-http body (a map literal entry per field).
+  const buildGoDataFields = (): string => {
+    const allFields = [
+      ...(evaluatorDef?.requiredFields ?? []),
+      ...(evaluatorDef?.optionalFields ?? []),
+    ];
+
+    if (allFields.length === 0) {
+      return `\t\t\t"input":  "input content",\n\t\t\t"output": "output content",`;
+    }
+
+    return allFields
+      .map((field) => `\t\t\t"${field}": "your ${field}",`)
+      .join("\n");
+  };
+
   // ============================================================================
   // Experiment Mode Code Snippets
   // ============================================================================
@@ -247,6 +263,56 @@ ${buildTypeScriptOnlineDataFields()}
   return result;
 }`;
 
+  // The Go tracing SDK does not model experiment loops or a "run evaluator by
+  // slug" helper, so Go calls the evaluator REST endpoint directly — the same
+  // request the curl tab sends — authenticated with `Authorization: Bearer`
+  // (never the legacy X-Auth-Token). The same call works for online checks and
+  // for scoring a single experiment row.
+  const goCode = `package main
+
+import (
+\t"bytes"
+\t"context"
+\t"encoding/json"
+\t"fmt"
+\t"io"
+\t"net/http"
+\t"os"
+)
+
+// Set LANGWATCH_API_KEY in your environment.
+
+func main() {
+\tctx := context.Background()
+
+\tbody, _ := json.Marshal(map[string]any{
+\t\t"name": "${evaluatorName}",
+\t\t"data": map[string]any{
+${buildGoDataFields()}
+\t\t},
+\t\t"settings": map[string]any{},
+\t})
+
+\treq, err := http.NewRequestWithContext(ctx, http.MethodPost,
+\t\t"${langwatchEndpoint()}/api/evaluations/evaluators/${evaluatorSlug}/evaluate",
+\t\tbytes.NewReader(body))
+\tif err != nil {
+\t\tpanic(err)
+\t}
+\treq.Header.Set("Authorization", "Bearer "+os.Getenv("LANGWATCH_API_KEY"))
+\treq.Header.Set("Content-Type", "application/json")
+
+\tresp, err := http.DefaultClient.Do(req)
+\tif err != nil {
+\t\tpanic(err)
+\t}
+\tdefer resp.Body.Close()
+
+\tout, _ := io.ReadAll(resp.Body)
+\tfmt.Println(string(out))
+\t// => { "status": "processed", "passed": true, "score": 1, "details": "..." }
+}`;
+
   const curlCode = `# Set your API key
 API_KEY="$LANGWATCH_API_KEY"
 
@@ -279,6 +345,8 @@ EOF
           return experimentPythonCode;
         case "typescript":
           return experimentTypeScriptCode;
+        case "go":
+          return goCode;
         case "bash":
           return curlCode;
         default:
@@ -290,6 +358,8 @@ EOF
           return onlinePythonCode;
         case "typescript":
           return onlineTypeScriptCode;
+        case "go":
+          return goCode;
         case "bash":
           return curlCode;
         default:
@@ -304,6 +374,8 @@ EOF
         return "python";
       case "typescript":
         return "typescript";
+      case "go":
+        return "go";
       case "bash":
         return "bash";
       default:
@@ -368,6 +440,7 @@ EOF
                 >
                   <option value="python">Python</option>
                   <option value="typescript">TypeScript</option>
+                  <option value="go">Go</option>
                   <option value="bash">cURL</option>
                 </NativeSelect.Field>
                 <NativeSelect.Indicator />
