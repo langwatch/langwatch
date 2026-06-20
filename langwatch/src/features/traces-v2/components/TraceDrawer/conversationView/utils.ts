@@ -67,7 +67,7 @@ export function buildConversationMarkdownChunks(
   }
 
   for (let i = 0; i < parsedTurns.length; i++) {
-    const { turn, userText } = parsedTurns[i]!;
+    const { turn, userText, assistantText } = parsedTurns[i]!;
     const turnNum = i + 1;
     const model = turn.models[0] ? abbreviateModel(turn.models[0]) : "—";
     chunks.push({
@@ -80,10 +80,15 @@ export function buildConversationMarkdownChunks(
         markdown: ["**User:**", "", userText].join("\n"),
       });
     }
-    if (turn.output) {
+    // Prefer the pre-extracted assistant prose (same as the bubble) — it
+    // strips Anthropic `{type:"thinking"|"tool_use"}` envelopes. Fall back
+    // to raw output only when there's no extractable text (e.g. a tool-only
+    // turn), rather than dumping JSON for the common text case.
+    const assistantMarkdown = assistantText || turn.output;
+    if (assistantMarkdown) {
       chunks.push({
         id: `turn-${turnNum}-assistant`,
-        markdown: ["**Assistant:**", "", turn.output].join("\n"),
+        markdown: ["**Assistant:**", "", assistantMarkdown].join("\n"),
       });
     } else if (turn.error) {
       chunks.push({

@@ -43,18 +43,56 @@ import {
  * following `AND` / `OR` / `NOT`, drop whitespace hugging the inside of
  * parens, and collapse adjacent whitespace.
  */
+/**
+ * Split a serialized query into alternating unquoted / quoted segments so
+ * normalisation only ever touches structure — never the inside of a `"…"` /
+ * `'…'` literal. Values can legitimately contain parens, brackets, boolean
+ * words, and runs of whitespace that must survive verbatim (e.g.
+ * `user:"name ( test )"`, which the structural passes below would otherwise
+ * rewrite to `user:"name (test)"`). The quote chars stay attached to their
+ * quoted segment; a backslash-escaped quote does not close the string.
+ */
+function splitOnQuotes(s: string): Array<{ text: string; quoted: boolean }> {
+  const segments: Array<{ text: string; quoted: boolean }> = [];
+  let buf = "";
+  let quoteChar = "";
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i]!;
+    if (quoteChar) {
+      buf += ch;
+      if (ch === quoteChar && s[i - 1] !== "\\") {
+        segments.push({ text: buf, quoted: true });
+        buf = "";
+        quoteChar = "";
+      }
+    } else if (ch === '"' || ch === "'") {
+      if (buf) segments.push({ text: buf, quoted: false });
+      buf = ch;
+      quoteChar = ch;
+    } else {
+      buf += ch;
+    }
+  }
+  if (buf) segments.push({ text: buf, quoted: quoteChar !== "" });
+  return segments;
+}
+
 function normalizeQueryString(s: string): string {
-  return (
-    s
-      .replace(/([\]\)])(?=(?:AND|OR|NOT)\b)/gi, "$1 ")
-      .replace(/\b(?:AND|OR|NOT)\b\s+/gi, (m) => m.replace(/\s+/g, " "))
-      // Collapse whitespace immediately inside parens — `( a` / `a )` are
-      // serializer artifacts from clause removal, never canonical output.
-      .replace(/\(\s+/g, "(")
-      .replace(/\s+\)/g, ")")
-      .replace(/[ \t]{2,}/g, " ")
-      .trim()
-  );
+  return splitOnQuotes(s)
+    .map((seg) =>
+      seg.quoted
+        ? seg.text
+        : seg.text
+            .replace(/([\]\)])(?=(?:AND|OR|NOT)\b)/gi, "$1 ")
+            .replace(/\b(?:AND|OR|NOT)\b\s+/gi, (m) => m.replace(/\s+/g, " "))
+            // Collapse whitespace immediately inside parens — `( a` / `a )`
+            // are serializer artifacts from clause removal, never canonical.
+            .replace(/\(\s+/g, "(")
+            .replace(/\s+\)/g, ")")
+            .replace(/[ \t]{2,}/g, " "),
+    )
+    .join("")
+    .trim();
 }
 
 export function serialize(ast: LiqeQuery): string {

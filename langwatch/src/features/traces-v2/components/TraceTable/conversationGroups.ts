@@ -111,9 +111,9 @@ const GROUP_SORT_ACCESSORS: Record<string, (g: ConversationGroup) => number> = {
   cost: (g) => g.totalCost,
   tokens: (g) => g.totalTokens,
   duration: (g) => g.totalDuration,
-  spans: (g) => g.totalSpans,
   turns: (g) => g.traces.length,
-  time: (g) => g.latestTimestamp,
+  started: (g) => g.earliestTimestamp,
+  lastTurn: (g) => g.latestTimestamp,
 };
 
 /**

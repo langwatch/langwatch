@@ -32,6 +32,7 @@ import { Kbd } from "~/components/ops/shared/Kbd";
 import { IsolatedErrorBoundary } from "~/components/ui/IsolatedErrorBoundary";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
+import { useDrawerStore } from "../../stores/drawerStore";
 import { useFilterStore } from "../../stores/filterStore";
 import { useUIStore } from "../../stores/uiStore";
 import { useViewStore } from "../../stores/viewStore";
@@ -244,6 +245,11 @@ export const FilterSidebar: React.FC = () => {
   // modifier is held, so they never hijack ⌘C / Ctrl+F / etc.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't fire sidebar shortcuts while the trace drawer is open — the
+      // sidebar stays mounted underneath it, so `x`/`r`/`c`/`f`/`e` would
+      // otherwise act behind the drawer (and `c`/`r` collide with the
+      // drawer's own shortcuts). Mirrors the page-level shortcut guards.
+      if (useDrawerStore.getState().isOpen) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const target = e.target;
       if (target instanceof HTMLElement) {

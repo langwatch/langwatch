@@ -409,6 +409,18 @@ function HeaderCell<T>({
 
   return (
     <Th
+      // Expose sort state to assistive tech (the visual chevron alone is
+      // invisible to screen readers). `none` only when the column is
+      // sortable but unsorted; omitted entirely for non-sortable columns.
+      aria-sort={
+        sortDirection === "asc"
+          ? "ascending"
+          : sortDirection === "desc"
+            ? "descending"
+            : canSort
+              ? "none"
+              : undefined
+      }
       ref={reorderable ? setNodeRef : undefined}
       // Apply ONLY the translation from the sortable transform —
       // `CSS.Translate.toString` skips the scaleX/scaleY that

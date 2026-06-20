@@ -245,6 +245,20 @@ describe("parse operator matrix", () => {
       expect(ast.expression.value).toBe("gpt-4 turbo");
     });
 
+    it("keeps parens + whitespace inside quoted values through serialize() (regression)", () => {
+      // The post-serialise normaliser collapses whitespace hugging parens
+      // (a clause-removal tidy-up); it must NOT reach inside quoted literals.
+      // Without quote-awareness `model:"( x )"` round-trips to `model:"(x)"`,
+      // silently rewriting the user's search value when an unrelated chip is
+      // removed (serialize runs on every clause-removal mutation).
+      expect(serialize(parse('model:"( x )"'))).toBe('model:"( x )"');
+      expect(serialize(parse('user:"name ( test )"'))).toBe(
+        'user:"name ( test )"',
+      );
+      // A literal boolean word + double spaces inside a quote survive too.
+      expect(serialize(parse('user:"a  b AND  c"'))).toBe('user:"a  b AND  c"');
+    });
+
     it("normalises single-quoted values to the same Literal value", () => {
       const single = parse("model:'gpt-4 turbo'") as {
         expression: { value: string };
