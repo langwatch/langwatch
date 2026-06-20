@@ -175,63 +175,6 @@ export class StoredObjectsRepository {
   }
 
   /**
-   * Returns the id of an existing stored_objects row whose sha256 matches,
-   * or null if no such row exists for this project.
-   *
-   * Used by storeFromBytes to implement content-addressed deduplication.
-   */
-  async findBySha256({
-    projectId,
-    sha256,
-  }: {
-    projectId: string;
-    sha256: string;
-  }): Promise<{ id: string } | null> {
-    return tracer.withActiveSpan(
-      "StoredObjectsRepository.findBySha256",
-      {
-        kind: SpanKind.CLIENT,
-        attributes: {
-          "db.system": "clickhouse",
-          "db.operation": "SELECT",
-          "tenant.id": projectId,
-          "stored_object.sha256": sha256,
-        },
-      },
-      async (span) => {
-        const client = await getClickHouseClientForProject(projectId);
-        if (!client) {
-          throw new Error(
-            "ClickHouse is not configured — cannot find stored object by sha256",
-          );
-        }
-
-        const result = await client.query({
-          query: `
-            SELECT id
-            FROM ${TABLE_NAME}
-            WHERE project_id = {projectId:String}
-              AND sha256 = {sha256:String}
-            LIMIT 1
-          `,
-          query_params: { projectId, sha256 },
-          format: "JSONEachRow",
-        });
-
-        const rows = await result.json<{ id: string }>();
-
-        span.setAttribute("result.found", rows.length > 0);
-
-        if (rows.length === 0) {
-          return null;
-        }
-
-        return { id: rows[0]!.id };
-      },
-    );
-  }
-
-  /**
    * Streams (id, storage_uri) pairs for every live row owned by the project.
    *
    * Used by `deleteOwnedBy` to enumerate the bytes that need to be
@@ -319,11 +262,7 @@ export class StoredObjectsRepository {
    * this method, otherwise the byte content orphans in S3/disk with no row
    * pointing at it.
    */
-  async deleteByProject({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<void> {
+  async deleteByProject({ projectId }: { projectId: string }): Promise<void> {
     return tracer.withActiveSpan(
       "StoredObjectsRepository.deleteByProject",
       {

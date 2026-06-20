@@ -1,8 +1,8 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type {
-  EventExplorerRepository,
   AggregateDiscoveryRow,
   AggregateSearchResult,
+  EventExplorerRepository,
   RawEventRow,
 } from "./event-explorer.repository";
 
@@ -86,8 +86,11 @@ export class EventExplorerClickHouseRepository
     const trimmedQuery = params.query.trim();
     const hasQueryString = trimmedQuery.length > 0;
     if (!hasTenants && !hasQueryString) {
+      // Rationale lives in the comment above (cross-tenant unbounded scan
+      // over the whole event_log) but the message reaches the ops UI - the
+      // user-facing text should tell them what to do, not name the method.
       throw new Error(
-        "EventExplorer.searchAggregates: provide either tenantIds or a non-empty query string — an unbounded scan over event_log is not allowed.",
+        "Enter a search query or pick at least one tenant before searching.",
       );
     }
 

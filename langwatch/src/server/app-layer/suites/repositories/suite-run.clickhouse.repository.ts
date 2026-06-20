@@ -52,7 +52,10 @@ export class SuiteRunClickHouseRepository implements SuiteRunReadRepository {
           )
         LIMIT 1
       `,
-      query_params: { projectId: params.projectId, batchRunId: params.batchRunId },
+      query_params: {
+        projectId: params.projectId,
+        batchRunId: params.batchRunId,
+      },
       format: "JSONEachRow",
     });
 

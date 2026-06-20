@@ -6,8 +6,8 @@
  */
 import { createHash } from "node:crypto";
 import type { Readable } from "node:stream";
-import { SpanKind } from "@opentelemetry/api";
 import { Instance, Ksuid } from "@langwatch/ksuid";
+import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import {
   getStoredObjectDedupHitCounter,
@@ -22,9 +22,9 @@ import {
   redactStorageUri,
   resolveProjectStorageDestination,
 } from "./project-storage-destination";
+import type { StorageRegistry } from "./storage-registry";
 import type { StoredObject } from "./stored-object";
 import type { StoredObjectsRepository } from "./stored-objects.repository";
-import type { StorageRegistry } from "./storage-registry";
 import { mintFileUri, mintS3Uri } from "./uri";
 
 const tracer = getLangWatchTracer("langwatch.stored-objects.service");
@@ -58,7 +58,10 @@ function deriveStoredObjectId({
  * and SHA-256 content hash. Injected into `StoredObjectsService` so tests can
  * supply a per-call stub without module-level mocking.
  */
-export type MintStorageUri = (args: { projectId: string; sha256: string }) => Promise<string>;
+export type MintStorageUri = (args: {
+  projectId: string;
+  sha256: string;
+}) => Promise<string>;
 
 /**
  * Returns the storage URI for a new object, delegating destination
@@ -387,8 +390,14 @@ export class StoredObjectsService {
           }
         }
         span.setAttribute("stored_objects.bytes_deleted", bytesDeleted);
-        span.setAttribute("stored_objects.byte_delete_failures", byteDeleteFailures);
-        span.setAttribute("stored_objects.rows_retained_for_retry", byteDeleteFailures);
+        span.setAttribute(
+          "stored_objects.byte_delete_failures",
+          byteDeleteFailures,
+        );
+        span.setAttribute(
+          "stored_objects.rows_retained_for_retry",
+          byteDeleteFailures,
+        );
 
         // Only remove the rows whose bytes were successfully deleted.
         // Failed rows stay behind so the next cascade can retry the
@@ -410,7 +419,6 @@ export class StoredObjectsService {
       },
     );
   }
-
 }
 
 // ============================================================================

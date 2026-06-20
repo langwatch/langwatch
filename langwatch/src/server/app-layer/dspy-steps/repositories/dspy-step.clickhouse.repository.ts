@@ -224,7 +224,6 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
   async getStepsByExperiment(
     tenantId: string,
     experimentId: string,
-    options?: { sinceMs?: number },
   ): Promise<DspyStepSummaryData[]> {
     try {
       const client = await this.resolveClient(tenantId);
@@ -233,16 +232,13 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
       // including cold-tier S3 ones. The primary key
       // `(TenantId, ExperimentId, RunId, StepIndex)` makes the per-partition
       // scan cheap but the partition fan-out itself is the dominant cost.
-      // Callers that know the experiment's start window should pass `sinceMs`
-      // to bound the scan; the default keeps behaviour unchanged for callers
-      // that need the full history (rare experiment archaeology).
-      const queryParams: Record<string, unknown> = { tenantId, experimentId };
-      let timeFilter = "";
-      if (typeof options?.sinceMs === "number" && options.sinceMs > 0) {
-        timeFilter =
-          "AND CreatedAt >= fromUnixTimestamp64Milli({sinceMs:Int64})";
-        queryParams.sinceMs = options.sinceMs;
-      }
+      //
+      // If/when a service-layer caller has access to the experiment's start
+      // time (e.g. derived from Prisma's experiment.createdAt), add an
+      // optional sinceMs and emit
+      //   AND CreatedAt >= fromUnixTimestamp64Milli({sinceMs:Int64})
+      // here to prune partitions. Avoiding the optional param until a real
+      // caller wires it through; otherwise it's API surface that nobody uses.
       const result = await client.query({
         query: `
           SELECT
@@ -261,12 +257,11 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND ExperimentId = {experimentId:String}
-            ${timeFilter}
           GROUP BY TenantId, ExperimentId, RunId, StepIndex
           ORDER BY CreatedAt ASC
           LIMIT 10000
         `,
-        query_params: queryParams,
+        query_params: { tenantId, experimentId },
         format: "JSONEachRow",
       });
 

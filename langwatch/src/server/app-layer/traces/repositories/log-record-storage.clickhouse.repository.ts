@@ -1,8 +1,8 @@
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import {
   CLAUDE_CODE_KIND_ATTR,
   CLAUDE_CODE_LOG_RETENTION_DAYS,
 } from "~/server/app-layer/traces/claude-code-log-to-span";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
 import type { NormalizedLogRecord } from "~/server/event-sourcing/pipelines/trace-processing/schemas/logRecords";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
@@ -23,7 +23,10 @@ export class LogRecordStorageClickHouseRepository
 {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
-  async insertLogRecord(record: NormalizedLogRecord, retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS): Promise<void> {
+  async insertLogRecord(
+    record: NormalizedLogRecord,
+    retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
+  ): Promise<void> {
     EventUtils.validateTenantId(
       { tenantId: record.tenantId },
       "LogRecordStorageClickHouseRepository.insertLogRecord",
@@ -131,7 +134,7 @@ export class LogRecordStorageClickHouseRepository
     // Moving it out makes the inner read lightweight key columns only; the
     // outer SELECT then applies the filter to one row per (TenantId, TraceId,
     // SpanId, ProjectionId), which is the right scale to read the map at.
-            const result = await client.query({
+    const result = await client.query({
       query: `
         SELECT
           TraceId,

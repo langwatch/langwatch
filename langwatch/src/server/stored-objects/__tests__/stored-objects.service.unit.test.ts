@@ -4,7 +4,7 @@
  * Unit tests for StoredObjectsService with mocked repository and registry.
  */
 import { Readable } from "node:stream";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks — must be declared before any imports that trigger module load
@@ -12,10 +12,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({
-    withActiveSpan: (
-      _name: string,
-      ...args: unknown[]
-    ) => {
+    withActiveSpan: (_name: string, ...args: unknown[]) => {
       // withActiveSpan(name, fn) or withActiveSpan(name, options, fn)
       const fn = args.length === 1 ? args[0] : args[1];
       const span: { setAttribute: ReturnType<typeof vi.fn> } = {
@@ -63,14 +60,17 @@ vi.mock("~/server/dataplane-s3", () => ({
 // Imports after mocks
 // ---------------------------------------------------------------------------
 
+import { env as mockedEnv } from "~/env.mjs";
+import * as dataplaneS3 from "~/server/dataplane-s3";
+import { ObjectNotFoundError } from "../errors";
+import type { StorageRegistry } from "../storage-registry";
 import type { StoredObject } from "../stored-object";
 import type { StoredObjectsRepository } from "../stored-objects.repository";
-import { StoredObjectsService, deriveStoredObjectId } from "../stored-objects.service";
 import type { MintStorageUri } from "../stored-objects.service";
-import type { StorageRegistry } from "../storage-registry";
-import { ObjectNotFoundError } from "../errors";
-import * as dataplaneS3 from "~/server/dataplane-s3";
-import { env as mockedEnv } from "~/env.mjs";
+import {
+  deriveStoredObjectId,
+  StoredObjectsService,
+} from "../stored-objects.service";
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -80,7 +80,6 @@ function makeRepository(): StoredObjectsRepository {
   return {
     insert: vi.fn().mockResolvedValue(undefined),
     findById: vi.fn().mockResolvedValue(null),
-    findBySha256: vi.fn().mockResolvedValue(null),
     findAllByProject: vi.fn().mockResolvedValue([]),
     deleteByProject: vi.fn().mockResolvedValue(undefined),
     deleteByIds: vi.fn().mockResolvedValue(undefined),
@@ -137,16 +136,15 @@ describe("storeFromBytes", () => {
   beforeEach(() => {
     repo = makeRepository();
     registry = makeRegistry();
-    mockMintStorageUri = vi.fn(async ({ projectId, sha256 }: { projectId: string; sha256: string }) =>
-      `file:///tmp/${projectId}/${sha256}`,
+    mockMintStorageUri = vi.fn(
+      async ({ projectId, sha256 }: { projectId: string; sha256: string }) =>
+        `file:///tmp/${projectId}/${sha256}`,
     ) as ReturnType<typeof vi.fn> & MintStorageUri;
     service = new StoredObjectsService(repo, registry, mockMintStorageUri);
   });
 
   describe("when the content is new for the project", () => {
     it("PUTs bytes to storage, INSERTs a stored_objects row, returns the new id with isDuplicate false", async () => {
-      vi.mocked(repo.findBySha256).mockResolvedValue(null);
-
       const result = await service.storeFromBytes(STORE_PARAMS);
 
       expect(registry.put).toHaveBeenCalledOnce();
@@ -185,15 +183,31 @@ describe("storeFromBytes", () => {
       expect(result.isDuplicate).toBe(true);
       expect(result.mediaType).toBe("text/plain");
     });
+
+    it("dedup probe goes through findById (by deterministic id), not by sha256 — a regression to the scan-all-partitions path would surface here", async () => {
+      // Lock the dedup-probe contract: the hot path computes id = derive(projectId, sha256)
+      // and looks up via findById. findById uses the (project_id, id) primary key seek;
+      // the old sha256 path scanned every weekly partition incl. cold S3.
+      vi.mocked(repo.findById).mockResolvedValue(null);
+
+      await service.storeFromBytes(STORE_PARAMS);
+
+      expect(repo.findById).toHaveBeenCalledOnce();
+      const call = vi.mocked(repo.findById).mock.calls[0]![0];
+      expect(call.projectId).toBe(PROJECT_ID);
+      expect(typeof call.id).toBe("string");
+      expect(call.id.length).toBeGreaterThan(0);
+    });
   });
 
   describe("when storage put fails", () => {
     it("throws and does not insert any stored_objects row", async () => {
       const storageError = new Error("S3 unavailable");
-      vi.mocked(repo.findBySha256).mockResolvedValue(null);
       vi.mocked(registry.put).mockRejectedValue(storageError);
 
-      await expect(service.storeFromBytes(STORE_PARAMS)).rejects.toThrow("S3 unavailable");
+      await expect(service.storeFromBytes(STORE_PARAMS)).rejects.toThrow(
+        "S3 unavailable",
+      );
       expect(repo.insert).not.toHaveBeenCalled();
     });
   });
@@ -202,7 +216,6 @@ describe("storeFromBytes", () => {
     /** @scenario "DB insert failure after a successful storage PUT triggers compensating storage delete" */
     it("issues a compensating storage delete and surfaces the original error to the caller", async () => {
       // Setup: storage PUT succeeds, repository INSERT throws.
-      vi.mocked(repo.findBySha256).mockResolvedValue(null);
       const chError = new Error("ClickHouse insert failed");
       vi.mocked(repo.insert).mockRejectedValueOnce(chError);
 
@@ -237,7 +250,6 @@ describe("storeFromBytes", () => {
       // back to the caller synchronously instead of being silently
       // dropped on the async_insert queue. The service must surface that
       // error untouched — no try/catch swallow, no degraded fallback.
-      vi.mocked(repo.findBySha256).mockResolvedValue(null);
       const chError = new Error("DB::NetException: connection refused");
       vi.mocked(repo.insert).mockRejectedValueOnce(chError);
 
@@ -250,12 +262,10 @@ describe("storeFromBytes", () => {
   describe("when called twice with identical input", () => {
     it("returns the same deterministic id", async () => {
       // First call: miss → store
-      vi.mocked(repo.findBySha256).mockResolvedValueOnce(null);
       const first = await service.storeFromBytes(STORE_PARAMS);
 
       // Second call: simulated hit (real world) — but we want to verify
       // determinism so we call storeFromBytes again with a miss too
-      vi.mocked(repo.findBySha256).mockResolvedValueOnce(null);
       const second = await service.storeFromBytes(STORE_PARAMS);
 
       expect(first.id).toBe(second.id);
@@ -270,8 +280,14 @@ describe("storeFromBytes", () => {
       // with the same inputs twice and verifying they produce the same result.
       const sha256 = "e2d0fe1585a63ec6009c8016ff8dda8b17719a637405a4e23c0536d6";
 
-      const idFromPod1 = deriveStoredObjectId({ projectId: PROJECT_ID, sha256 });
-      const idFromPod2 = deriveStoredObjectId({ projectId: PROJECT_ID, sha256 });
+      const idFromPod1 = deriveStoredObjectId({
+        projectId: PROJECT_ID,
+        sha256,
+      });
+      const idFromPod2 = deriveStoredObjectId({
+        projectId: PROJECT_ID,
+        sha256,
+      });
 
       expect(idFromPod1).toBe(idFromPod2);
       // Must look like a KSUID: resource_<29-char-base62>
@@ -300,7 +316,10 @@ describe("getById", () => {
       vi.mocked(repo.findById).mockResolvedValue(row);
       vi.mocked(registry.get).mockResolvedValue(stream);
 
-      const result = await service.getById({ projectId: PROJECT_ID, id: "obj-1" });
+      const result = await service.getById({
+        projectId: PROJECT_ID,
+        id: "obj-1",
+      });
 
       expect(result).not.toBeNull();
       expect(result).toMatchObject({ row });
@@ -316,7 +335,10 @@ describe("getById", () => {
         new ObjectNotFoundError("file:///var/lib/langwatch/objects/proj-1/abc"),
       );
 
-      const result = await service.getById({ projectId: PROJECT_ID, id: "obj-1" });
+      const result = await service.getById({
+        projectId: PROJECT_ID,
+        id: "obj-1",
+      });
 
       expect(result).not.toBeNull();
       expect(result).toMatchObject({ row, status: "missing" });
@@ -328,7 +350,10 @@ describe("getById", () => {
     it("returns null", async () => {
       vi.mocked(repo.findById).mockResolvedValue(null);
 
-      const result = await service.getById({ projectId: PROJECT_ID, id: "unknown-id" });
+      const result = await service.getById({
+        projectId: PROJECT_ID,
+        id: "unknown-id",
+      });
 
       expect(result).toBeNull();
     });
@@ -452,7 +477,10 @@ describe("headById", () => {
       vi.mocked(repo.findById).mockResolvedValue(row);
       vi.mocked(registry.exists).mockResolvedValue(true);
 
-      const result = await service.headById({ projectId: PROJECT_ID, id: "obj-1" });
+      const result = await service.headById({
+        projectId: PROJECT_ID,
+        id: "obj-1",
+      });
 
       expect(result).toEqual({ status: "available", mediaType: "audio/mp3" });
     });
@@ -464,7 +492,10 @@ describe("headById", () => {
       vi.mocked(repo.findById).mockResolvedValue(row);
       vi.mocked(registry.exists).mockResolvedValue(false);
 
-      const result = await service.headById({ projectId: PROJECT_ID, id: "obj-1" });
+      const result = await service.headById({
+        projectId: PROJECT_ID,
+        id: "obj-1",
+      });
 
       expect(result).toEqual({ status: "missing", mediaType: "audio/mp3" });
     });
@@ -474,7 +505,10 @@ describe("headById", () => {
     it("returns status not_found and does not probe storage", async () => {
       vi.mocked(repo.findById).mockResolvedValue(null);
 
-      const result = await service.headById({ projectId: PROJECT_ID, id: "unknown" });
+      const result = await service.headById({
+        projectId: PROJECT_ID,
+        id: "unknown",
+      });
 
       expect(result).toEqual({ status: "not_found" });
       expect(registry.exists).not.toHaveBeenCalled();
@@ -491,7 +525,6 @@ describe("mintStorageUri (BYOC bucket selection — observed through the inserte
     repo = makeRepository();
     registry = makeRegistry();
     service = new StoredObjectsService(repo, registry);
-    vi.mocked(repo.findBySha256).mockResolvedValue(null);
   });
 
   describe("when the project has a private dataplane bucket configured", () => {
@@ -555,7 +588,11 @@ describe("StoredObjectsService surface", () => {
   it("exposes storeFromBytes, getById, deleteOwnedBy", () => {
     const mintStub: MintStorageUri = async ({ projectId, sha256 }) =>
       `file:///tmp/${projectId}/${sha256}`;
-    const service = new StoredObjectsService(makeRepository(), makeRegistry(), mintStub);
+    const service = new StoredObjectsService(
+      makeRepository(),
+      makeRegistry(),
+      mintStub,
+    );
 
     expect(typeof service.storeFromBytes).toBe("function");
     expect(typeof service.getById).toBe("function");

@@ -7,19 +7,21 @@
  * @see specs/analytics/clickhouse-memory-safety.feature (Layer 2: @integration scenarios)
  */
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
 import {
-  getTestClickHouseClient,
   cleanupTestData,
+  getTestClickHouseClient,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
+import type {
+  FlattenAnalyticsMetricsEnum,
+  SeriesInputType,
+} from "../../registry";
+import type { AggregationTypes } from "../../types";
 import { buildTimeseriesQuery } from "../aggregation-builder";
 import { resetParamCounter } from "../filter-translator";
-import type { FlattenAnalyticsMetricsEnum } from "../../registry";
-import type { AggregationTypes } from "../../types";
-import type { SeriesInputType } from "../../registry";
 import { seedSpans } from "./test-utils/clickhouse-fixtures";
-import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
 
 const TENANT_ID = "memory-safety-test";
 
@@ -294,19 +296,16 @@ describe("memory-safety integration", () => {
     let wideDataSeeded = false;
     const WIDE_TENANT_ID = "memory-safety-wide-test";
 
-    beforeAll(
-      async () => {
-        await seedSpans(ch, {
-          tenantId: WIDE_TENANT_ID,
-          count: 10_000,
-          attributeKeys: 50,
-          attributeValueSize: 4096,
-          traceCount: 1000,
-        });
-        wideDataSeeded = true;
-      },
-      120_000,
-    );
+    beforeAll(async () => {
+      await seedSpans(ch, {
+        tenantId: WIDE_TENANT_ID,
+        count: 10_000,
+        attributeKeys: 50,
+        attributeValueSize: 4096,
+        traceCount: 1000,
+      });
+      wideDataSeeded = true;
+    }, 120_000);
 
     afterAll(async () => {
       if (wideDataSeeded) {
@@ -394,21 +393,18 @@ describe("memory-safety integration", () => {
   describe("when proving column pruning prevents OOM on wide SpanAttributes data", () => {
     const WIDE_COLUMN_TENANT_ID = "memory-safety-wide-column-test";
 
-    beforeAll(
-      async () => {
-        // Seed spans with 50 attribute keys × 4KB per value ≈ 200KB per span.
-        // This data set would cause OOM if analytics queries read SpanAttributes
-        // without key-level pruning on metrics that don't need it.
-        await seedSpans(ch, {
-          tenantId: WIDE_COLUMN_TENANT_ID,
-          count: 1_000,
-          attributeKeys: 50,
-          attributeValueSize: 4096,
-          traceCount: 100,
-        });
-      },
-      120_000,
-    );
+    beforeAll(async () => {
+      // Seed spans with 50 attribute keys × 4KB per value ≈ 200KB per span.
+      // This data set would cause OOM if analytics queries read SpanAttributes
+      // without key-level pruning on metrics that don't need it.
+      await seedSpans(ch, {
+        tenantId: WIDE_COLUMN_TENANT_ID,
+        count: 1_000,
+        attributeKeys: 50,
+        attributeValueSize: 4096,
+        traceCount: 100,
+      });
+    }, 120_000);
 
     afterAll(async () => {
       await cleanupTestData(WIDE_COLUMN_TENANT_ID);
@@ -461,8 +457,7 @@ describe("memory-safety integration", () => {
         });
         await result.json();
       } catch (error: unknown) {
-        const message =
-          error instanceof Error ? error.message : String(error);
+        const message = error instanceof Error ? error.message : String(error);
         if (message.includes("MEMORY_LIMIT_EXCEEDED")) {
           expect.fail(
             `total_cost query exceeded 50MB on wide-attribute data — ` +
@@ -481,7 +476,8 @@ describe("memory-safety integration", () => {
         timeScale: "full",
         series: [
           {
-            metric: "performance.tokens_per_second" as FlattenAnalyticsMetricsEnum,
+            metric:
+              "performance.tokens_per_second" as FlattenAnalyticsMetricsEnum,
             aggregation: "avg" as AggregationTypes,
           },
         ],
@@ -500,8 +496,7 @@ describe("memory-safety integration", () => {
         });
         await result.json();
       } catch (error: unknown) {
-        const message =
-          error instanceof Error ? error.message : String(error);
+        const message = error instanceof Error ? error.message : String(error);
         if (message.includes("MEMORY_LIMIT_EXCEEDED")) {
           expect.fail(
             `tokens_per_second query exceeded 50MB on wide-attribute data — ` +
@@ -521,7 +516,8 @@ describe("memory-safety integration", () => {
         timeScale: "full",
         series: [
           {
-            metric: "performance.tokens_per_second" as FlattenAnalyticsMetricsEnum,
+            metric:
+              "performance.tokens_per_second" as FlattenAnalyticsMetricsEnum,
             aggregation: "avg" as AggregationTypes,
           },
         ],
@@ -541,7 +537,8 @@ describe("memory-safety integration", () => {
         timeScale: "full",
         series: [
           {
-            metric: "performance.tokens_per_second" as FlattenAnalyticsMetricsEnum,
+            metric:
+              "performance.tokens_per_second" as FlattenAnalyticsMetricsEnum,
             aggregation: "p95" as AggregationTypes,
           },
         ],
@@ -549,10 +546,10 @@ describe("memory-safety integration", () => {
 
       expect(sql).not.toContain("SpanAttributes");
       expect(sql).toContain("TokensPerSecond");
-      // performance.* metrics use quantileTDigest (bounded memory). Test
-      // accepts either family so the assertion stays meaningful even if the
-      // opt-in surface changes.
-      expect(sql).toMatch(/quantile(Exact|TDigest)/);
+      // performance.* metrics route through perfAgg which hard-codes
+      // tdigest. Locking the family so a regression that drops the
+      // wrapper or the literal is caught here, not in prod under OOM.
+      expect(sql).toContain("quantileTDigest(");
     });
   });
 
@@ -635,7 +632,8 @@ describe("memory-safety integration", () => {
         timeScale: "full",
         series: [
           {
-            metric: "performance.tokens_per_second" as FlattenAnalyticsMetricsEnum,
+            metric:
+              "performance.tokens_per_second" as FlattenAnalyticsMetricsEnum,
             aggregation: "avg" as AggregationTypes,
           },
         ],

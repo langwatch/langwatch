@@ -27,7 +27,9 @@ const makeRecord = (
 
 const repoCapturingInsert = () => {
   const insert = vi.fn().mockResolvedValue(undefined);
-  const resolveClient = (async () => ({ insert })) as unknown as ConstructorParameters<
+  const resolveClient = (async () => ({
+    insert,
+  })) as unknown as ConstructorParameters<
     typeof LogRecordStorageClickHouseRepository
   >[0];
   const repo = new LogRecordStorageClickHouseRepository(resolveClient);
@@ -41,7 +43,9 @@ const repoCapturingQuery = () => {
   const query = vi
     .fn()
     .mockResolvedValue({ json: async () => [] as unknown[] });
-  const resolveClient = (async () => ({ query })) as unknown as ConstructorParameters<
+  const resolveClient = (async () => ({
+    query,
+  })) as unknown as ConstructorParameters<
     typeof LogRecordStorageClickHouseRepository
   >[0];
   const repo = new LogRecordStorageClickHouseRepository(resolveClient);
@@ -136,19 +140,30 @@ describe("LogRecordStorageClickHouseRepository.getMarkedClaudeCodeLogsByTrace", 
       // Replaces a previous "unbounded fallback" behaviour. CC logs older than
       // CLAUDE_CODE_LOG_RETENTION_DAYS have already been TTL'd away anyway, so
       // a 7×retention lookback is safe and bounds the partition scan.
+      // Locking the bound *shape* (toMs ≈ now, fromMs == toMs − 7×retention)
+      // so a future bug picking 0 or now-1h doesn't pass this test silently.
       const { repo, query } = repoCapturingQuery();
+      const before = Date.now();
 
       await repo.getMarkedClaudeCodeLogsByTrace("project_test", "trace-1");
 
+      const after = Date.now();
       const { query: sql, query_params } = capturedQuery(query);
       expect(sql.match(/TimeUnixMs >= fromUnixTimestamp64Milli/g)).toHaveLength(
         2,
       );
-      expect(typeof query_params.fromMs).toBe("number");
-      expect(typeof query_params.toMs).toBe("number");
-      expect(query_params.toMs as number).toBeGreaterThan(
-        query_params.fromMs as number,
-      );
+
+      const toMs = query_params.toMs as number;
+      const fromMs = query_params.fromMs as number;
+      expect(typeof fromMs).toBe("number");
+      expect(typeof toMs).toBe("number");
+      // toMs is captured at now() at the moment the repo built the query
+      expect(toMs).toBeGreaterThanOrEqual(before);
+      expect(toMs).toBeLessThanOrEqual(after);
+      // fromMs is exactly 7×CC_RETENTION earlier than toMs
+      const sevenCcRetentionMs =
+        CLAUDE_CODE_LOG_RETENTION_DAYS * 7 * 24 * 60 * 60 * 1000;
+      expect(toMs - fromMs).toBe(sevenCcRetentionMs);
     });
   });
 });
