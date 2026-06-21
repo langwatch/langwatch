@@ -73,8 +73,28 @@ export class LocalDatasetStorage implements DatasetStorage {
       const filePath = this.localPath(
         chunkKey(projectId, datasetId, chunk.index),
       );
-      await fs.mkdir(path.dirname(filePath), { recursive: true });
-      await fs.writeFile(filePath, chunk.jsonl, "utf-8");
+      try {
+        await fs.mkdir(path.dirname(filePath), { recursive: true });
+        await fs.writeFile(filePath, chunk.jsonl, "utf-8");
+      } catch (error: unknown) {
+        // Born-on-storage requires a writable backend. An unwritable local-FS
+        // root (e.g. the default `/var/lib/langwatch/objects` on an install
+        // that never provisioned it) would otherwise surface as a cryptic
+        // EACCES/EROFS 500 on every dataset write — turn it into an actionable
+        // error pointing at the two ways to fix it.
+        if (
+          errorHasProp(error, "code", "EACCES") ||
+          errorHasProp(error, "code", "EROFS") ||
+          errorHasProp(error, "code", "EPERM")
+        ) {
+          throw new Error(
+            `Dataset storage path "${this.root}" is not writable. ` +
+              "Configure object storage (set S3_BUCKET_NAME) or point " +
+              "LANGWATCH_LOCAL_STORAGE_PATH at a writable, persistent directory.",
+          );
+        }
+        throw error;
+      }
     }
     return chunks;
   }

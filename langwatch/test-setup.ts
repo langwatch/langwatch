@@ -1,8 +1,23 @@
+import os from "node:os";
+import path from "node:path";
 import "@testing-library/jest-dom/vitest";
 import dotenv from "dotenv";
 import { afterAll, vi } from "vitest";
 import { TEST_PUBLIC_KEY } from "./ee/licensing/__tests__/fixtures/testKeys";
+
 dotenv.config({ path: ".env" });
+
+// Born-on-storage (ADR-032): every dataset create writes chunk objects to the
+// resolved storage backend. Tests run without S3, so the resolver falls back to
+// the local FS — and its default root (`/var/lib/langwatch/objects`) isn't
+// writable in CI, which would 500 every dataset create. Point it at a writable
+// temp dir before `~/env.mjs` reads it (this file is a setupFile, so it runs
+// before the test module's import graph). An explicit path from `.env` (local
+// dev) is honored via `??=`.
+process.env.LANGWATCH_LOCAL_STORAGE_PATH ??= path.join(
+  os.tmpdir(),
+  "langwatch-test-storage",
+);
 
 // Any test that evaluates a PostHog-backed PRODUCT flag (e.g. resolveHome ->
 // featureFlagService.isEnabled) constructs the posthog-node client, whose
@@ -215,9 +230,17 @@ vi.mock("~/utils/compat/next-link", () => {
   return {
     default: React.forwardRef(function MockLink(
       { children, href, ...props }: any,
-      ref: any
+      ref: any,
     ) {
-      return React.createElement("a", { ref, href: typeof href === "string" ? href : href?.pathname ?? "/", ...props }, children);
+      return React.createElement(
+        "a",
+        {
+          ref,
+          href: typeof href === "string" ? href : (href?.pathname ?? "/"),
+          ...props,
+        },
+        children,
+      );
     }),
   };
 });
@@ -227,9 +250,17 @@ vi.mock("next/link", () => {
   return {
     default: React.forwardRef(function MockLink(
       { children, href, ...props }: any,
-      ref: any
+      ref: any,
     ) {
-      return React.createElement("a", { ref, href: typeof href === "string" ? href : href?.pathname ?? "/", ...props }, children);
+      return React.createElement(
+        "a",
+        {
+          ref,
+          href: typeof href === "string" ? href : (href?.pathname ?? "/"),
+          ...props,
+        },
+        children,
+      );
     }),
   };
 });
