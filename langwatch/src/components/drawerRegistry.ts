@@ -97,6 +97,9 @@ export const drawers = {
   editAutomationFilter: EditAutomationFilterDrawer,
   seriesFilters: SeriesFiltersDrawer,
   selectDataset: SelectDatasetDrawer,
+  // Deprecated (ADR-034 Phase 5.2): the active flow is `automation` drawer
+  // opened with `prefilledGraphId` / `prefilledSeriesName`. Kept registered
+  // as an unreachable fallback per the side-by-side rollout in ADR-034.
   customGraphAlert: AlertDrawer,
   dashboardName: DashboardNameDrawer,
   // Evaluations V3 drawers
