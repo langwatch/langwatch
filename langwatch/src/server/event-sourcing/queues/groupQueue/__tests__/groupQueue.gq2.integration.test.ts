@@ -132,12 +132,12 @@ describe.skipIf(!hasTestcontainers)("GroupQueueProcessor — GQ2 offload", () =>
     });
   });
 
-  // NOTE: multi-holder *sharing* (N distinct jobs → one blob) is not reachable
-  // through the queue's normal path while content addressing covers the whole
-  // body — distinct jobs (distinct stagedJobId, derived from payload.id) have
-  // distinct content, hence distinct blobs. That cross-job dedup arrives with
-  // the routing-exclusion (a separate change). The holder reclaim sequence
-  // itself is proven in blobHolders.integration.test.ts.
+  // The fan-out content-sharing invariant is proven at the encode level in
+  // jobEnvelope.unit.test.ts ("when two envelopes have identical user payloads
+  // but different queue machinery → ONE stored blob"). A queue-level end-to-end
+  // proof requires multi-reactor wiring (multiple reactor definitions over one
+  // event) — out of scope for this single-reactor harness. The holder reclaim
+  // sequence itself is proven in blobHolders.integration.test.ts.
   describe("given an offloaded job", () => {
     describe("when it is staged", () => {
       it("keys the blob by tenant namespace and content hash", async () => {
@@ -196,6 +196,73 @@ describe.skipIf(!hasTestcontainers)("GroupQueueProcessor — GQ2 offload", () =>
         });
         expect(received[0]!.value).toBe(big);
       }, 20000);
+    });
+  });
+
+  describe("given a payload carrying a __* key in the reserved namespace", () => {
+    describe("when sent", () => {
+      it("rejects loudly so silent dedup collisions can't happen", async () => {
+        const { queue } = createQueue({
+          processFn: async () => {},
+          consumerEnabled: false,
+        });
+        await queue.waitUntilReady();
+
+        await expect(
+          queue.send({
+            id: "j1",
+            groupId: TENANT_GROUP,
+            value: "ok",
+            // biome-ignore lint/suspicious/noExplicitAny: testing a runtime guard
+            __custom: "this would collide on the content hash",
+          } as any),
+        ).rejects.toThrow(/__custom.*reserved/);
+      });
+    });
+
+    describe("when the payload carries a caller-set routing field", () => {
+      it("passes through (__pipelineName / __jobType / __jobName are caller-controlled, not queue-internal)", async () => {
+        const { queue } = createQueue({
+          processFn: async () => {},
+          consumerEnabled: false,
+        });
+        await queue.waitUntilReady();
+
+        await expect(
+          queue.send({
+            id: "j1",
+            groupId: TENANT_GROUP,
+            value: "ok",
+            __pipelineName: "trace-processing",
+            __jobType: "fold",
+            __jobName: "recordSpan",
+            // biome-ignore lint/suspicious/noExplicitAny: routing fields aren't on TestPayload
+          } as any),
+        ).resolves.toBeUndefined();
+      });
+    });
+
+    describe("when sentBatch", () => {
+      it("rejects if any payload in the batch carries a __* key", async () => {
+        const { queue } = createQueue({
+          processFn: async () => {},
+          consumerEnabled: false,
+        });
+        await queue.waitUntilReady();
+
+        await expect(
+          queue.sendBatch([
+            { id: "ok", groupId: TENANT_GROUP, value: "ok" },
+            // biome-ignore lint/suspicious/noExplicitAny: testing a runtime guard
+            {
+              id: "bad",
+              groupId: TENANT_GROUP,
+              value: "bad",
+              __sneaky: "x",
+            } as any,
+          ]),
+        ).rejects.toThrow(/__sneaky.*reserved/);
+      });
     });
   });
 });

@@ -195,6 +195,40 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
         });
       });
     });
+
+    describe("when the re-encoded value carries a different __attempt (the queue retry path)", () => {
+      it("hashes identically — machinery doesn't perturb the content hash (routing-exclusion)", async () => {
+        // This is the queue-level retry-cheapness guarantee: the retry re-encode
+        // produces the SAME blob hash, so the atomic transfer is a same-set
+        // SADD+SREM (one Lua eval, blob untouched) rather than a cross-set
+        // reclaim. Without routing-exclusion, __attempt would perturb the body
+        // bytes and each retry would churn through a fresh blob.
+        const v1 = await lifecycle.encode({
+          jobData: { ...REDIS_TIER_PAYLOAD, __attempt: 1 },
+          groupId: TENANT_GROUP,
+        });
+        const v2 = await lifecycle.encode({
+          jobData: { ...REDIS_TIER_PAYLOAD, __attempt: 2 },
+          groupId: TENANT_GROUP,
+        });
+
+        expect(hashOf(v2)).toBe(hashOf(v1));
+        lifecycle.acquire(v1);
+        const key = holderKey(hashOf(v1));
+        await vi.waitFor(async () => expect(await redis.scard(key)).toBe(1));
+
+        lifecycle.transfer({
+          newValue: v2,
+          oldValue: v1,
+          groupId: TENANT_GROUP,
+        });
+
+        await vi.waitFor(async () => {
+          expect(await redis.scard(key)).toBe(1);
+          expect(await redis.exists(blobKey(hashOf(v1)))).toBe(1);
+        });
+      });
+    });
   });
 
   describe("given a dedup squash to different content", () => {

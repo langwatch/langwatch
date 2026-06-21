@@ -527,5 +527,78 @@ describe("jobEnvelope", () => {
         ).rejects.toThrow(/missing/);
       });
     });
+
+    describe("when two envelopes have identical user payloads but different queue machinery", () => {
+      it("collapses to ONE stored blob (machinery is lifted into the header, not the hashed body)", async () => {
+        const { tieredBlobs, redisBlobs } = makeTiered();
+        const payload = { evt: "x".repeat(8 * 1024) }; // > 4 KiB → offloads
+
+        // Same user payload, two distinct fan-out reactors over the same event.
+        const v1 = await encodeJobEnvelope({
+          jobData: {
+            ...payload,
+            __pipelineName: "experiment-run",
+            __jobType: "fold",
+            __jobName: "rollup-by-day",
+            __attempt: 1,
+            __stagedJobId: "j-1",
+          },
+          tieredBlobs,
+          projectId: PROJECT,
+        });
+        const v2 = await encodeJobEnvelope({
+          jobData: {
+            ...payload,
+            __pipelineName: "experiment-run",
+            __jobType: "map",
+            __jobName: "billing-projection",
+            __attempt: 3,
+            __stagedJobId: "j-2",
+          },
+          tieredBlobs,
+          projectId: PROJECT,
+        });
+
+        // The two envelopes are different (different headers / hold tokens)
+        // but the underlying blob is a single content-addressed entry.
+        expect(v1).not.toBe(v2);
+        expect(redisBlobs.store.size).toBe(1);
+
+        // Both decode back to the original jobData shape — machinery comes
+        // back from the header.
+        const d1 = await decodeJobEnvelope({ value: v1, tieredBlobs });
+        const d2 = await decodeJobEnvelope({ value: v2, tieredBlobs });
+        expect(d1.__jobName).toBe("rollup-by-day");
+        expect(d2.__jobName).toBe("billing-projection");
+        expect(d1.__attempt).toBe(1);
+        expect(d2.__attempt).toBe(3);
+        expect(d1.evt).toBe(payload.evt);
+        expect(d2.evt).toBe(payload.evt);
+      });
+    });
+
+    describe("when an inline-tier GQ2 envelope carries machinery", () => {
+      it("round-trips via header.m so downstream code sees the original jobData", async () => {
+        const { tieredBlobs } = makeTiered();
+        const jobData = {
+          evt: "small inline payload",
+          __pipelineName: "p",
+          __jobType: "t",
+          __jobName: "n",
+          __attempt: 2,
+        };
+        const encoded = await encodeJobEnvelope({
+          jobData,
+          tieredBlobs,
+          projectId: PROJECT,
+        });
+
+        const decoded = await decodeJobEnvelope({
+          value: encoded,
+          tieredBlobs,
+        });
+        expect(decoded).toEqual(jobData);
+      });
+    });
   });
 });
