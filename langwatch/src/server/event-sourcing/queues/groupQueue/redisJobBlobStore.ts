@@ -1,15 +1,8 @@
 import type { Cluster, Redis as IORedis } from "ioredis";
 
+import { BLOB_BACKSTOP_TTL_SECONDS } from "./blobConstants";
+import { redisBlobKeyPrefix } from "./blobKeys";
 import type { JobBlobStore } from "./jobEnvelope";
-
-/**
- * Safety-net TTL for offloaded bodies. Deletion is best-effort at job
- * completion/restage; this bounds how long an orphan (dedup-squashed job,
- * crash between stage and delete) lingers. Must comfortably exceed the
- * longest plausible staged residence — retry backoff chains and paused
- * pipelines hold jobs for hours, not days.
- */
-const BLOB_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 /**
  * Stores offloaded envelope bodies as raw gzip binary under standalone keys,
@@ -29,15 +22,28 @@ export class RedisJobBlobStore implements JobBlobStore {
     queueName: string;
   }) {
     this.redis = redis;
-    this.keyPrefix = `${queueName}:gq:blob:`;
+    this.keyPrefix = redisBlobKeyPrefix(queueName);
   }
 
   async put({ id, data }: { id: string; data: Buffer }): Promise<void> {
-    await this.redis.set(this.keyPrefix + id, data, "EX", BLOB_TTL_SECONDS);
+    await this.redis.set(
+      this.keyPrefix + id,
+      data,
+      "EX",
+      BLOB_BACKSTOP_TTL_SECONDS,
+    );
   }
 
+  /**
+   * Reads the blob and refreshes its TTL (GETEX), so a body still referenced by
+   * a long-dwelling job never expires under it. A missing key returns null.
+   */
   async get({ id }: { id: string }): Promise<Buffer | null> {
-    return await this.redis.getBuffer(this.keyPrefix + id);
+    return await this.redis.getexBuffer(
+      this.keyPrefix + id,
+      "EX",
+      BLOB_BACKSTOP_TTL_SECONDS,
+    );
   }
 
   async delete({ id }: { id: string }): Promise<void> {
