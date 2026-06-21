@@ -10,7 +10,7 @@
  *   mappings also opens the drawer.
  * - Clicking Save & Run with a non-workflow agent (code) proceeds normally.
  *
- * @see specs/scenarios/workflow-agent-mapping-gate.feature
+ * @see specs/features/scenarios/workflow-agent-mapping-layer.feature
  */
 import * as React from "react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -326,6 +326,52 @@ describe("<ScenarioFormDrawer /> mapping gate", () => {
             type: "warning",
           }),
         );
+      });
+    });
+
+    /** @scenario Mapping warning links back to the agent editor */
+    it("offers an 'Open agent editor' action that reopens the editor drawer independently of the auto-open", async () => {
+      const user = userEvent.setup();
+      renderWithTarget({ type: "workflow", id: "workflow-agent-1" });
+
+      await user.click(screen.getByTestId("save-and-run-button"));
+
+      await waitFor(() => {
+        expect(mockToasterCreate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: expect.objectContaining({ label: "Open agent editor" }),
+          }),
+        );
+      });
+
+      // Prove the action handler ALONE reopens the editor: clear the mock so
+      // the earlier auto-open call doesn't count, then invoke onClick. This is
+      // the fallback affordance — functional even if the auto-open raced/was
+      // dismissed.
+      const toastArg = mockToasterCreate.mock.calls.at(-1)?.[0] as {
+        action?: { label: string; onClick: () => void };
+      };
+      mocks.mockOpenDrawer.mockClear();
+      toastArg.action?.onClick();
+
+      expect(mocks.mockOpenDrawer).toHaveBeenCalledWith("agentWorkflowEditor", {
+        urlParams: { agentId: "workflow-agent-1" },
+      });
+    });
+
+    /** @scenario Mapping warning names the missing scenario input field */
+    it("names the missing scenario input fields (input / messages) in the toast description", async () => {
+      const user = userEvent.setup();
+      renderWithTarget({ type: "workflow", id: "workflow-agent-1" });
+
+      await user.click(screen.getByTestId("save-and-run-button"));
+
+      await waitFor(() => {
+        const toastArg = mockToasterCreate.mock.calls.at(-1)?.[0] as {
+          description?: string;
+        };
+        expect(toastArg.description).toMatch(/input/i);
+        expect(toastArg.description).toMatch(/messages/i);
       });
     });
   });
