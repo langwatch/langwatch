@@ -49,6 +49,7 @@ import type {
   ChildProcessJobData,
   ScenarioExecutionResult,
 } from "./execution/types";
+import { reconcileOrphanedRunsOnBoot } from "./orphaned-run-reconciliation.clickhouse";
 import { CHILD_PROCESS, SCENARIO_WORKER } from "./scenario.constants";
 import { ScenarioService } from "./scenario.service";
 import {
@@ -629,6 +630,19 @@ export async function startScenarioProcessor(
       thresholdMs: ORPHAN_QUEUED_THRESHOLD_MS,
     }).catch((err) => logger.warn({ err }, "orphan reconciler failed"));
   }
+
+  // The sweep above only takes QUEUED runs terminal — a run that a dead worker
+  // had already started (PENDING/IN_PROGRESS) is invisible to it and spins in
+  // the UI forever (#3195). This second sweep covers every non-terminal run
+  // whose last activity predates any window a live worker could still hold it.
+  // Fire-and-forget so a large/slow sweep never blocks worker startup; the
+  // finish path both sweeps share is idempotent, so overlapping on a QUEUED
+  // orphan (and co-booting pods) collapses to a single terminal event.
+  void reconcileOrphanedRunsOnBoot({
+    failureEmitter: deps.failureEmitter,
+  }).catch((err: unknown) =>
+    logger.error({ err }, "Orphaned-run reconciliation failed on boot"),
+  );
 
   return {
     close: async () => {
