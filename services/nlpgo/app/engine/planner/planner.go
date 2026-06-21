@@ -116,6 +116,18 @@ func (e *DuplicateNodeError) Error() string {
 	return fmt.Sprintf("planner: duplicate node id %q", e.NodeID)
 }
 
+// MissingEndNodeError signals a full-run workflow has no End node, so it
+// would complete without producing any result — the uninterpretable
+// "completed with empty output" symptom from issue #3198. Partial plans
+// are exempt: a "Run until here" plan (WithUntilNode) intentionally stops
+// before the End, and a single-component run (AllowMissingEnd) dispatches
+// one node where the End is irrelevant.
+type MissingEndNodeError struct{}
+
+func (e *MissingEndNodeError) Error() string {
+	return "planner: workflow has no End node; add an End node so the run produces a result"
+}
+
 // Option tunes how New constructs the Plan. Functional options keep the
 // common case (`planner.New(w)`) clean while allowing callers like
 // engine.Engine to opt into reachability scoping.
@@ -123,6 +135,7 @@ type Option func(*planOptions)
 
 type planOptions struct {
 	untilNodeID string
+	endOptional bool
 }
 
 // WithUntilNode restricts the plan to nodes on a path from the Entry to
@@ -134,6 +147,15 @@ func WithUntilNode(id string) Option {
 	return func(o *planOptions) { o.untilNodeID = id }
 }
 
+// AllowMissingEnd permits a workflow with no End node to plan. The engine
+// sets it for execute_component (single-node) runs, where only the target
+// node is dispatched and the End node is irrelevant. Full execute_flow
+// runs do NOT set it, so a missing End surfaces as MissingEndNodeError
+// (issue #3198).
+func AllowMissingEnd() Option {
+	return func(o *planOptions) { o.endOptional = true }
+}
+
 // New validates the workflow and returns its execution plan.
 //
 // Validation order:
@@ -141,11 +163,15 @@ func WithUntilNode(id string) Option {
 //  2. Unsupported node kinds
 //  3. Edge endpoints exist in the node table
 //  4. Cycle detection (DFS coloring)
-//  5. Reachability scoping: full BFS from Entry (and a backward DFS from
+//  5. Missing End node (full runs only): a workflow with no End node
+//     would finalize with an empty result, so reject it — issue #3198.
+//     Skipped for "Run until here" (untilNodeID) and execute_component
+//     (AllowMissingEnd) partial runs, which legitimately stop before End.
+//  6. Reachability scoping: full BFS from Entry (and a backward DFS from
 //     untilNodeID when provided) — disconnected nodes never enter the
 //     plan. Mirrors Python's `find_reachable_nodes` /
 //     `find_path_until_node` in studio/parser.py.
-//  6. Layered topological sort (Kahn's algorithm with stable ordering)
+//  7. Layered topological sort (Kahn's algorithm with stable ordering)
 //
 // Errors short-circuit at the first failure so the caller surfaces a
 // single root cause to the customer.
@@ -204,7 +230,26 @@ func New(w *dsl.Workflow, opts ...Option) (*Plan, error) {
 		return nil, &CycleError{Cycle: cycle}
 	}
 
-	// 5. Reachability scope. The Studio canvas tolerates nodes the
+	// 5. Missing End node. A full run with no End node finalizes with an
+	// empty result and a misleading success — issue #3198. Reject it here
+	// so the API surfaces a clear validation error instead. Exempt the
+	// partial-run shapes that legitimately stop before End: a "Run until
+	// here" plan (untilNodeID set) and a single-component run
+	// (AllowMissingEnd, set by the engine for execute_component).
+	if o.untilNodeID == "" && !o.endOptional {
+		hasEnd := false
+		for _, t := range nodeIDs {
+			if t == dsl.ComponentEnd {
+				hasEnd = true
+				break
+			}
+		}
+		if !hasEnd {
+			return nil, &MissingEndNodeError{}
+		}
+	}
+
+	// 6. Reachability scope. The Studio canvas tolerates nodes the
 	// author hasn't wired up yet — an orphan LLM node, a disconnected
 	// sub-chain. Python parity is to skip those: a full run includes
 	// only nodes reachable forward from Entry, and a "Run until here"
@@ -234,7 +279,7 @@ func New(w *dsl.Workflow, opts ...Option) (*Plan, error) {
 		allowed = path
 	}
 
-	// 6. Layered topo sort. We seed with the input ordering of Nodes
+	// 7. Layered topo sort. We seed with the input ordering of Nodes
 	// to keep results stable across runs; a stable order helps both
 	// debugging and integration-test diffs against Python output.
 	layers := layerize(w.Nodes, children, parents, allowed)

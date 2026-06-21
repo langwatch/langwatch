@@ -1063,7 +1063,21 @@ func planOptionsFor(req ExecuteRequest) []planner.Option {
 	if req.UntilNodeID != "" {
 		opts = append(opts, planner.WithUntilNode(req.UntilNodeID))
 	}
+	// execute_component dispatches a single node; the End node is
+	// irrelevant, so don't trip the planner's missing-End guard (#3198).
+	if req.NodeID != "" {
+		opts = append(opts, planner.AllowMissingEnd())
+	}
 	return opts
+}
+
+// requireEndNode reports whether a run is expected to terminate at an End
+// node — a full execute_flow, not a single-component run (NodeID) and not
+// a "run until here" partial plan (UntilNodeID). finalize uses it to turn
+// a missing End node into an explicit error instead of a silent empty
+// success (#3198), mirroring the planner's AC1 gate.
+func requireEndNode(req ExecuteRequest) bool {
+	return req.NodeID == "" && req.UntilNodeID == ""
 }
 
 // applyManualInputs primes runState with the inbound execute_component
