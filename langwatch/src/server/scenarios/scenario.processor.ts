@@ -17,6 +17,7 @@ import path from "path";
 import { createLogger } from "~/utils/logger/server";
 import { prisma } from "../db";
 import { connection } from "../redis";
+import { getSharedClickHouseClient } from "../clickhouse/clickhouseClient";
 import { subscribeToCancellations, type CancellationMessage } from "./cancellation-channel";
 import {
   type JobContextMetadata,
@@ -36,6 +37,12 @@ import {
 } from "../metrics";
 import { CHILD_PROCESS, SCENARIO_WORKER } from "./scenario.constants";
 import { ScenarioFailureHandler, type FailureEventParams } from "./scenario-failure-handler";
+import {
+  findQueuedRunCandidates,
+  LOOKBACK_MS,
+  ORPHAN_QUEUED_THRESHOLD_MS,
+  reconcileOrphanedQueuedRuns,
+} from "./scenario-orphan-reconciler";
 import { ScenarioService } from "./scenario.service";
 import { resolveChildProcessSpawn } from "./execution/child-process-spawn";
 import {
@@ -115,6 +122,52 @@ export async function handleFailedJobResult(
     name: scenario?.name,
     description: scenario?.situation,
   });
+}
+
+/**
+ * Emit a terminal failure for every run still in flight, then drain the pool.
+ *
+ * Called on processor shutdown — including the worker's max-runtime restart,
+ * which awaits `close()` before it rejects/restarts. Without this, in-flight
+ * runs (running children killed by drain, and buffered pending jobs silently
+ * dropped) would never get a terminal event and would orphan at QUEUED, with
+ * the suites page polling them forever.
+ *
+ * Each emission is isolated by a per-job try/catch so one failure can't block
+ * draining the rest (Promise.all is safe because no task rejects). Double-emitting for
+ * a running child whose own close handler also emits is safe — finishRun is
+ * idempotent.
+ */
+export async function drainInFlightRuns(
+  pool: ScenarioExecutionPool,
+  deps: ProcessorDependencies,
+): Promise<void> {
+  const inFlight = pool.inFlightJobs;
+  if (inFlight.length > 0) {
+    logger.info(
+      { count: inFlight.length },
+      "Draining: emitting terminal failure for in-flight scenario runs before shutdown",
+    );
+    await Promise.all(
+      inFlight.map(async (jobData) => {
+        try {
+          await handleFailedJobResult(
+            jobData,
+            "Worker restarting — scenario run terminated before completion",
+            deps,
+          );
+        } catch (err) {
+          logger.warn(
+            { err, scenarioRunId: jobData.scenarioRunId },
+            "Failed to emit terminal failure for in-flight run during drain",
+          );
+        }
+      }),
+    );
+  }
+
+  // Kills running children and clears the pending buffer.
+  pool.drain();
 }
 
 /**
@@ -491,9 +544,42 @@ export async function startScenarioProcessor(
     "Scenario processor started (event-driven)",
   );
 
+  // Belt-and-braces for hard kills (OOM/SIGKILL) where the graceful drain
+  // above never ran: reconcile runs left orphaned at QUEUED by a previous
+  // worker. Fire-and-forget — a slow or failing cross-tenant ClickHouse scan
+  // must never wedge worker startup. Uses the shared (non-tenant) client
+  // because the scan is intentionally cross-tenant.
+  const sharedClickHouseClient = getSharedClickHouseClient();
+  if (sharedClickHouseClient) {
+    void reconcileOrphanedQueuedRuns({
+      findCandidates: () =>
+        findQueuedRunCandidates({
+          client: sharedClickHouseClient,
+          lookbackMs: LOOKBACK_MS,
+          now: Date.now(),
+        }),
+      emitFailure: (candidate) =>
+        deps.failureEmitter.ensureFailureEventsEmitted({
+          projectId: candidate.projectId,
+          scenarioId: candidate.scenarioId,
+          setId: candidate.setId,
+          batchRunId: candidate.batchRunId,
+          scenarioRunId: candidate.scenarioRunId,
+          error:
+            "Reconciled: orphaned QUEUED run with no live worker (worker restart/crash)",
+        }),
+      now: Date.now(),
+      thresholdMs: ORPHAN_QUEUED_THRESHOLD_MS,
+    }).catch((err) => logger.warn({ err }, "orphan reconciler failed"));
+  }
+
   return {
     close: async () => {
-      pool.drain();
+      // Emit a terminal failure for every in-flight run, then drain. This is
+      // what makes the worker's max-runtime restart (which awaits close()
+      // before it rejects/restarts) safe: in-flight runs reach a terminal
+      // state instead of orphaning at QUEUED.
+      await drainInFlightRuns(pool, deps);
       await unsubscribe().catch((err: unknown) =>
         logger.warn({ err }, "Error closing cancellation subscriber"),
       );
