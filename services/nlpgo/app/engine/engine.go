@@ -214,18 +214,18 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*ExecuteResul
 			return nil, fmt.Errorf("engine: execute_component target node %q not in workflow", req.NodeID)
 		}
 		e.runLayer(ctx, req, plan, state, []string{req.NodeID})
-		return finalize(state, traceID, started, nil), nil
+		return finalize(state, traceID, started, nil, requireEndNode(req)), nil
 	}
 	for _, layer := range plan.Layers {
 		if err := ctx.Err(); err != nil {
-			return finalize(state, traceID, started, err), nil
+			return finalize(state, traceID, started, err, requireEndNode(req)), nil
 		}
 		e.runLayer(ctx, req, plan, state, layer)
 		if state.firstError != nil {
-			return finalize(state, traceID, started, nil), nil
+			return finalize(state, traceID, started, nil, requireEndNode(req)), nil
 		}
 	}
-	return finalize(state, traceID, started, nil), nil
+	return finalize(state, traceID, started, nil, requireEndNode(req)), nil
 }
 
 func (e *Engine) runLayer(ctx context.Context, req ExecuteRequest, plan *planner.Plan, state *runState, layer []string) {
@@ -1291,7 +1291,7 @@ func stripHandlePrefix(handle, prefix string) string {
 	return handle
 }
 
-func finalize(state *runState, traceID string, started time.Time, ctxErr error) *ExecuteResult {
+func finalize(state *runState, traceID string, started time.Time, ctxErr error, requireEnd bool) *ExecuteResult {
 	res := &ExecuteResult{
 		TraceID:    traceID,
 		Nodes:      state.states,
@@ -1306,6 +1306,16 @@ func finalize(state *runState, traceID string, started time.Time, ctxErr error) 
 	if state.firstError != nil {
 		res.Status = "error"
 		res.Error = state.firstError
+		return res
+	}
+	// A full run that never reached an End node finalizes with an empty
+	// result and a misleading success — issue #3198. Turn it into an
+	// explicit error instead, mirroring the planner's AC1 gate. Partial
+	// runs (execute_component, "run until here") legitimately have no End,
+	// so requireEnd is false for them and the happy path proceeds.
+	if requireEnd && state.endNodeID == "" {
+		res.Status = "error"
+		res.Error = &NodeError{Type: "missing_end_node", Message: "workflow has no End node; add an End node so the run produces a result"}
 		return res
 	}
 	res.Status = "success"

@@ -103,7 +103,7 @@ func (e *Engine) ExecuteStream(ctx context.Context, req ExecuteRequest, opts Exe
 		// node dispatch (running → success/error inside runLayerStream).
 		if req.NodeID != "" {
 			e.runLayerStream(ctx, req, plan, state, []string{req.NodeID}, traceID, out)
-			emit(ctx, out, doneEvent(traceID, state, started))
+			emit(ctx, out, doneEvent(traceID, state, started, requireEndNode(req)))
 			return
 		}
 		// execute_flow / execute_evaluation need workflow-level state
@@ -150,12 +150,12 @@ func (e *Engine) ExecuteStream(ctx context.Context, req ExecuteRequest, opts Exe
 			e.runLayerStream(ctx, req, plan, state, layer, traceID, out)
 			if state.firstError != nil {
 				emit(ctx, out, workflowErrorEvent(req, traceID, state.firstError.Message, isEval))
-				emit(ctx, out, doneEvent(traceID, state, started))
+				emit(ctx, out, doneEvent(traceID, state, started, requireEndNode(req)))
 				return
 			}
 		}
 		emit(ctx, out, workflowSuccessEvent(req, traceID, state, started, isEval))
-		emit(ctx, out, doneEvent(traceID, state, started))
+		emit(ctx, out, doneEvent(traceID, state, started, requireEndNode(req)))
 	}()
 	return out, nil
 }
@@ -380,7 +380,7 @@ func workflowSuccessEvent(req ExecuteRequest, traceID string, state *runState, s
 			},
 		}
 	}
-	res := finalize(state, traceID, started, nil)
+	res := finalize(state, traceID, started, nil, requireEndNode(req))
 	return StreamEvent{
 		Type:    "execution_state_change",
 		TraceID: traceID,
@@ -425,8 +425,8 @@ func workflowErrorEvent(req ExecuteRequest, traceID, message string, isEval bool
 	}
 }
 
-func doneEvent(traceID string, state *runState, started time.Time) StreamEvent {
-	res := finalize(state, traceID, started, nil)
+func doneEvent(traceID string, state *runState, started time.Time, requireEnd bool) StreamEvent {
+	res := finalize(state, traceID, started, nil, requireEnd)
 	if res.Status == "error" {
 		return StreamEvent{
 			Type:    "done",
