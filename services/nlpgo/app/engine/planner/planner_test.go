@@ -125,6 +125,68 @@ func TestPlan_RejectsDuplicateNodeID(t *testing.T) {
 	assert.Equal(t, "A", dup.NodeID)
 }
 
+func TestPlan_RejectsWorkflowWithNoEndNode(t *testing.T) {
+	// A full run of a workflow with an Entry but no End node must be
+	// rejected — issue #3198 (it otherwise finalizes as an empty success).
+	w := &dsl.Workflow{
+		Nodes: []dsl.Node{
+			{ID: "entry", Type: dsl.ComponentEntry},
+			{ID: "code", Type: dsl.ComponentCode},
+		},
+		Edges: []dsl.Edge{
+			{ID: "e1", Source: "entry", Target: "code"},
+		},
+	}
+	_, err := planner.New(w)
+	require.Error(t, err)
+	var missing *planner.MissingEndNodeError
+	require.ErrorAs(t, err, &missing, "expected MissingEndNodeError, got %T: %v", err, err)
+}
+
+func TestPlan_AcceptsWorkflowWithEndNode(t *testing.T) {
+	// The happy path: a workflow that has an End node still plans.
+	p, err := planner.New(linearWorkflow())
+	require.NoError(t, err)
+	assert.NotNil(t, p)
+}
+
+func TestPlan_WithUntilNode_NoEndNodeDoesNotTripGuard(t *testing.T) {
+	// A "Run until here" partial plan intentionally stops before the End,
+	// so a workflow with no End node must NOT trip the missing-End guard.
+	w := &dsl.Workflow{
+		Nodes: []dsl.Node{
+			{ID: "entry", Type: dsl.ComponentEntry},
+			{ID: "A", Type: dsl.ComponentCode},
+			{ID: "B", Type: dsl.ComponentCode},
+		},
+		Edges: []dsl.Edge{
+			{ID: "e1", Source: "entry", Target: "A"},
+			{ID: "e2", Source: "A", Target: "B"},
+		},
+	}
+	p, err := planner.New(w, planner.WithUntilNode("A"))
+	require.NoError(t, err, "until-node partial plan must not require an End node")
+	assert.NotNil(t, p)
+}
+
+func TestPlan_AllowMissingEnd_NoEndNodeDoesNotTripGuard(t *testing.T) {
+	// execute_component runs a single node; the engine sets AllowMissingEnd
+	// so a workflow with no End node still plans (the End is irrelevant to a
+	// one-node dispatch).
+	w := &dsl.Workflow{
+		Nodes: []dsl.Node{
+			{ID: "entry", Type: dsl.ComponentEntry},
+			{ID: "code", Type: dsl.ComponentCode},
+		},
+		Edges: []dsl.Edge{
+			{ID: "e1", Source: "entry", Target: "code"},
+		},
+	}
+	p, err := planner.New(w, planner.AllowMissingEnd())
+	require.NoError(t, err, "AllowMissingEnd must exempt the missing-End guard")
+	assert.NotNil(t, p)
+}
+
 func TestPlan_RejectsUnsupportedNodeKind(t *testing.T) {
 	// "future_kind" is a fictitious type not yet supported; covers the
 	// case where a workflow ships from the future of the DSL with a
@@ -235,19 +297,22 @@ func TestPlan_RetiredTakesPriorityOverUnsupported(t *testing.T) {
 }
 
 func TestPlan_StableLayerOrdering(t *testing.T) {
-	// Three independent nodes should appear in their input order, not
-	// in map-iteration order.
+	// Independent nodes should appear in their input order, not in
+	// map-iteration order. The End node is required by the missing-End
+	// guard (#3198); with no Entry node (allowed=nil → all included) it's
+	// a 4th independent node in layer 0.
 	w := &dsl.Workflow{
 		Nodes: []dsl.Node{
 			{ID: "alpha", Type: dsl.ComponentCode},
 			{ID: "beta", Type: dsl.ComponentCode},
 			{ID: "gamma", Type: dsl.ComponentCode},
+			{ID: "end", Type: dsl.ComponentEnd},
 		},
 	}
 	p, err := planner.New(w)
 	require.NoError(t, err)
 	require.Len(t, p.Layers, 1)
-	assert.Equal(t, []string{"alpha", "beta", "gamma"}, p.Layers[0])
+	assert.Equal(t, []string{"alpha", "beta", "gamma", "end"}, p.Layers[0])
 }
 
 // flattenLayers collapses Plan.Layers into a single set so tests can
