@@ -2,12 +2,14 @@ import {
   Box,
   Field,
   HStack,
+  Input,
   NativeSelect,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { AlertType } from "@prisma/client";
 import type { Monaco } from "@monaco-editor/react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FieldsFilters } from "~/components/filters/FieldsFilters";
 import { Switch } from "~/components/ui/switch";
 import type { FilterParam } from "~/hooks/useFilterParams";
@@ -17,6 +19,11 @@ import {
   type TriggerFilterValue,
   triggerFiltersPermissiveSchema,
 } from "~/server/filters/types";
+import {
+  GRAPH_ALERT_TIME_PERIODS,
+  type GraphAlertOperator,
+  type GraphAlertTimePeriod,
+} from "~/server/app-layer/triggers/graph-alert.builder";
 import { api } from "~/utils/api";
 import dynamic from "~/utils/compat/next-dynamic";
 import {
@@ -29,7 +36,13 @@ import {
   registerJsonSchema,
 } from "../../editors/monacoSchemas";
 import { useMonacoTheme } from "../../editors/useMonacoTheme";
-import type { ConditionSource } from "../../logic/draftReducer";
+import {
+  type ConditionSource,
+  type GraphAlertDraft,
+  INITIAL_GRAPH_ALERT_DRAFT,
+  OPERATOR_LABELS,
+  TIME_PERIOD_LABELS,
+} from "../../logic/draftReducer";
 import { SourceCard } from "../SourceCard";
 import { SecondaryDrawerShell } from "./SecondaryDrawerShell";
 
@@ -46,20 +59,64 @@ export interface FiltersDrawerResult {
   source: ConditionSource;
   filters: Partial<Record<FilterField, FilterParam>>;
   customGraphId: string | null;
+  graphAlert: GraphAlertDraft;
+  alertType: AlertType | null;
+}
+
+interface GraphSeriesOption {
+  key: string;
+  label: string;
+}
+
+/**
+ * Builds the series-key + label list a custom graph's JSON exposes for
+ * alert authoring. Matches the format the dispatcher reads ("`{index}/{key
+ * | metric}/{aggregation}`") so the saved `seriesName` lines up with what
+ * the chart data is keyed by at evaluation time.
+ *
+ * Defensive: a hand-edited / malformed `graph` JSON falls back to an empty
+ * list so the picker still renders without crashing — the user just sees
+ * "Pick a graph with a configured series" copy below.
+ */
+function deriveSeriesOptionsFromGraph(graph: unknown): GraphSeriesOption[] {
+  if (!graph || typeof graph !== "object") return [];
+  const candidate = (graph as { series?: unknown }).series;
+  if (!Array.isArray(candidate)) return [];
+  return candidate.map((entry, index): GraphSeriesOption => {
+    const s = (entry ?? {}) as Record<string, unknown>;
+    const keyPart =
+      typeof s.key === "string" && s.key.length > 0
+        ? s.key
+        : typeof s.metric === "string"
+          ? s.metric
+          : "value";
+    const aggregationPart =
+      typeof s.aggregation === "string" ? s.aggregation : "count";
+    const seriesKey = `${index}/${keyPart}/${aggregationPart}`;
+    const label =
+      (typeof s.name === "string" && s.name.length > 0 ? s.name : null) ??
+      `Series ${index + 1}: ${keyPart} (${aggregationPart})`;
+    return { key: seriesKey, label };
+  });
 }
 
 /**
  * Conditions secondary drawer. Lets the author pick the trigger source
  * (trace data vs custom graph), then either configure trace filters
  * (visual + JSON code mode with a registered JSON Schema) or pick a
- * custom graph from a dropdown.
+ * custom graph and define a threshold rule (series, operator, threshold,
+ * time window, severity).
  */
 export function FiltersSecondaryDrawer({
   open,
   source,
   filters,
   customGraphId,
+  graphAlert,
+  alertType,
   projectId,
+  prefilledGraphId,
+  prefilledSeriesName,
   onSave,
   onCancel,
 }: {
@@ -67,7 +124,15 @@ export function FiltersSecondaryDrawer({
   source: ConditionSource;
   filters: Partial<Record<FilterField, FilterParam>>;
   customGraphId: string | null;
+  graphAlert: GraphAlertDraft;
+  alertType: AlertType | null;
   projectId: string;
+  /** When set, the graph-id field is initialised to this value and locked
+   *  — the drawer was launched from a specific chart card (Phase 5.2). */
+  prefilledGraphId?: string;
+  /** Companion to `prefilledGraphId` — the series the chart card asked us
+   *  to monitor. Locked alongside the graph field. */
+  prefilledSeriesName?: string;
   onSave: (result: FiltersDrawerResult) => void;
   onCancel: () => void;
 }) {
@@ -75,6 +140,11 @@ export function FiltersSecondaryDrawer({
   const [local, setLocal] = useState(filters);
   const [localCustomGraphId, setLocalCustomGraphId] = useState<string | null>(
     customGraphId,
+  );
+  const [localGraphAlert, setLocalGraphAlert] =
+    useState<GraphAlertDraft>(graphAlert);
+  const [localAlertType, setLocalAlertType] = useState<AlertType>(
+    alertType ?? AlertType.WARNING,
   );
   const [codeMode, setCodeMode] = useState(false);
   const [code, setCode] = useState(JSON.stringify(filters, null, 2));
@@ -86,14 +156,31 @@ export function FiltersSecondaryDrawer({
       setLocalSource(source);
       setLocal(filters);
       setLocalCustomGraphId(customGraphId);
+      setLocalGraphAlert(graphAlert);
+      setLocalAlertType(alertType ?? AlertType.WARNING);
       setCode(JSON.stringify(filters, null, 2));
       setCodeError(null);
     }
-  }, [open, source, filters, customGraphId]);
+  }, [open, source, filters, customGraphId, graphAlert, alertType]);
 
   const graphs = api.graphs.getAll.useQuery(
     { projectId },
     { enabled: open && localSource === "customGraph" && !!projectId },
+  );
+
+  // Pull the selected graph's series shape so the series picker shows
+  // labels the author can reason about ("p95 latency" not "0/latency/p95").
+  const selectedGraphQuery = api.graphs.getById.useQuery(
+    { projectId, id: localCustomGraphId ?? "" },
+    {
+      enabled:
+        open && localSource === "customGraph" && !!localCustomGraphId && !!projectId,
+    },
+  );
+
+  const seriesOptions = useMemo<GraphSeriesOption[]>(
+    () => deriveSeriesOptionsFromGraph(selectedGraphQuery.data?.graph),
+    [selectedGraphQuery.data?.graph],
   );
 
   const onToggleCode = (toCode: boolean) => {
@@ -124,6 +211,8 @@ export function FiltersSecondaryDrawer({
         source: "customGraph",
         filters: {},
         customGraphId: localCustomGraphId,
+        graphAlert: localGraphAlert,
+        alertType: localAlertType,
       });
       return;
     }
@@ -140,6 +229,8 @@ export function FiltersSecondaryDrawer({
           source: "trace",
           filters: sanitized as Partial<Record<FilterField, FilterParam>>,
           customGraphId: null,
+          graphAlert: INITIAL_GRAPH_ALERT_DRAFT,
+          alertType: localAlertType,
         });
       } catch {
         setCodeError("Invalid JSON syntax");
@@ -152,12 +243,19 @@ export function FiltersSecondaryDrawer({
         source: "trace",
         filters: sanitized as Partial<Record<FilterField, FilterParam>>,
         customGraphId: null,
+        graphAlert: INITIAL_GRAPH_ALERT_DRAFT,
+        alertType: localAlertType,
       });
     }
   };
 
   const customGraphMissing =
     localSource === "customGraph" && !localCustomGraphId;
+  const seriesMissing =
+    localSource === "customGraph" &&
+    !!localCustomGraphId &&
+    !localGraphAlert.seriesName;
+  const isPrefilled = !!prefilledGraphId;
 
   return (
     <SecondaryDrawerShell
@@ -165,7 +263,7 @@ export function FiltersSecondaryDrawer({
       title="When"
       onClose={onCancel}
       onDone={apply}
-      doneDisabled={customGraphMissing}
+      doneDisabled={customGraphMissing || seriesMissing}
       headerRight={
         localSource === "trace" ? (
           <>
@@ -189,40 +287,167 @@ export function FiltersSecondaryDrawer({
             active={localSource === "trace"}
             title="Trace data"
             description="Match on incoming traces using filter fields."
-            onClick={() => setLocalSource("trace")}
+            onClick={() => !isPrefilled && setLocalSource("trace")}
           />
           <SourceCard
             active={localSource === "customGraph"}
             title="Custom graph"
-            description="Fire when a custom-graph alert threshold is crossed."
-            onClick={() => setLocalSource("customGraph")}
+            description="Fire when a custom graph metric crosses a threshold."
+            onClick={() => !isPrefilled && setLocalSource("customGraph")}
           />
         </HStack>
       </Box>
       {localSource === "customGraph" ? (
-        <VStack align="stretch" gap={2}>
+        <VStack align="stretch" gap={4}>
           <Field.Root invalid={customGraphMissing}>
             <Field.Label>Custom graph</Field.Label>
             <NativeSelect.Root>
               <NativeSelect.Field
                 value={localCustomGraphId ?? ""}
-                onChange={(e) => setLocalCustomGraphId(e.target.value || null)}
+                disabled={isPrefilled}
+                onChange={(e) => {
+                  const id = e.target.value || null;
+                  setLocalCustomGraphId(id);
+                  // Reset series selection when the graph changes — the
+                  // previous selection's key won't exist on the new one.
+                  setLocalGraphAlert((prev) => ({ ...prev, seriesName: "" }));
+                }}
               >
                 <option value="">Select a graph…</option>
                 {(graphs.data ?? []).map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.name ?? g.id}
-                    {g.trigger ? " — already automated" : ""}
+                    {g.trigger && g.id !== customGraphId
+                      ? " — already automated"
+                      : ""}
                   </option>
                 ))}
               </NativeSelect.Field>
               <NativeSelect.Indicator />
             </NativeSelect.Root>
             <Field.ErrorText>Pick a custom graph to continue.</Field.ErrorText>
+            {isPrefilled ? (
+              <Field.HelperText>
+                Set from the dashboard graph that opened this drawer.
+              </Field.HelperText>
+            ) : null}
           </Field.Root>
+
+          <Field.Root invalid={seriesMissing}>
+            <Field.Label>Series</Field.Label>
+            <NativeSelect.Root>
+              <NativeSelect.Field
+                value={localGraphAlert.seriesName}
+                disabled={
+                  isPrefilled ||
+                  !localCustomGraphId ||
+                  seriesOptions.length === 0
+                }
+                onChange={(e) =>
+                  setLocalGraphAlert((prev) => ({
+                    ...prev,
+                    seriesName: e.target.value,
+                  }))
+                }
+              >
+                <option value="">Select a series…</option>
+                {seriesOptions.map((s) => (
+                  <option key={s.key} value={s.key}>
+                    {s.label}
+                  </option>
+                ))}
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
+            <Field.ErrorText>Pick a series to monitor.</Field.ErrorText>
+          </Field.Root>
+
+          <HStack gap={3}>
+            <Field.Root flex="1">
+              <Field.Label>Operator</Field.Label>
+              <NativeSelect.Root>
+                <NativeSelect.Field
+                  value={localGraphAlert.operator}
+                  onChange={(e) =>
+                    setLocalGraphAlert((prev) => ({
+                      ...prev,
+                      operator: e.target.value as GraphAlertOperator,
+                    }))
+                  }
+                >
+                  <option value="gt">Greater than</option>
+                  <option value="lt">Less than</option>
+                  <option value="gte">Greater than or equal</option>
+                  <option value="lte">Less than or equal</option>
+                  <option value="eq">Equal to</option>
+                </NativeSelect.Field>
+                <NativeSelect.Indicator />
+              </NativeSelect.Root>
+            </Field.Root>
+            <Field.Root flex="1">
+              <Field.Label>Threshold</Field.Label>
+              <Input
+                type="number"
+                step="any"
+                value={Number.isFinite(localGraphAlert.threshold)
+                  ? localGraphAlert.threshold
+                  : 0}
+                onChange={(e) => {
+                  const next = Number(e.target.value);
+                  setLocalGraphAlert((prev) => ({
+                    ...prev,
+                    threshold: Number.isFinite(next) ? next : 0,
+                  }));
+                }}
+              />
+            </Field.Root>
+          </HStack>
+
+          <HStack gap={3}>
+            <Field.Root flex="1">
+              <Field.Label>Time window</Field.Label>
+              <NativeSelect.Root>
+                <NativeSelect.Field
+                  value={localGraphAlert.timePeriod}
+                  onChange={(e) =>
+                    setLocalGraphAlert((prev) => ({
+                      ...prev,
+                      timePeriod: Number(e.target.value) as GraphAlertTimePeriod,
+                    }))
+                  }
+                >
+                  {GRAPH_ALERT_TIME_PERIODS.map((minutes) => (
+                    <option key={minutes} value={minutes}>
+                      {TIME_PERIOD_LABELS[minutes]}
+                    </option>
+                  ))}
+                </NativeSelect.Field>
+                <NativeSelect.Indicator />
+              </NativeSelect.Root>
+            </Field.Root>
+            <Field.Root flex="1">
+              <Field.Label>Severity</Field.Label>
+              <NativeSelect.Root>
+                <NativeSelect.Field
+                  value={localAlertType}
+                  onChange={(e) =>
+                    setLocalAlertType(e.target.value as AlertType)
+                  }
+                >
+                  <option value={AlertType.INFO}>Info</option>
+                  <option value={AlertType.WARNING}>Warning</option>
+                  <option value={AlertType.CRITICAL}>Critical</option>
+                </NativeSelect.Field>
+                <NativeSelect.Indicator />
+              </NativeSelect.Root>
+            </Field.Root>
+          </HStack>
+
           <Text textStyle="xs" color="fg.muted">
-            The automation fires when this custom graph's alert threshold is
-            crossed. Configure thresholds from the analytics view.
+            Fires when {OPERATOR_LABELS[localGraphAlert.operator]}{" "}
+            {localGraphAlert.threshold} over{" "}
+            {TIME_PERIOD_LABELS[localGraphAlert.timePeriod]}. Pick the
+            notification channel below under Type.
           </Text>
         </VStack>
       ) : codeMode ? (

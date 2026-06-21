@@ -49,6 +49,7 @@ import { FiltersSecondaryDrawer } from "./components/secondaries/FiltersSecondar
 import {
   type AutomationDraft,
   actionParamsFromDraft,
+  extractGraphAlertFromTriggerRow,
   filtersAreSet,
   INITIAL_DRAFT,
   notifyChannel,
@@ -97,12 +98,20 @@ function saveDisabledReason(
 export function AutomationDrawer({
   automationId,
   source,
+  prefilledGraphId,
+  prefilledSeriesName,
 }: {
   automationId?: string;
   /** Marker query param set by the email "Edit automation" footer link so the
    *  drawer can surface a one-line landing banner. Any other value (or
    *  undefined) renders the drawer normally. */
   source?: string;
+  /** When set, the drawer opens in graph-alert mode with the graph + series
+   *  fields pre-filled and locked. Used by the dashboard "Add alert" entry
+   *  point (Phase 5.2). Phase 5.1 ships the seam; the dashboard does not
+   *  yet pass this. */
+  prefilledGraphId?: string;
+  prefilledSeriesName?: string;
 }) {
   const { project, organization, team } = useOrganizationTeamProject();
   const { closeDrawer } = useDrawer();
@@ -143,6 +152,28 @@ export function AutomationDrawer({
       dispatch({ type: "SET_FILTERS", value: filterParams.filters });
       prefilledFromTraces.current = true;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Pre-fill graph-alert mode from drawer params on a fresh create. Used
+  // by the dashboard "Add alert" entry (Phase 5.2). When set, the drawer
+  // opens with source = customGraph and the graph / series already
+  // selected and locked, so the author lands on the threshold rule.
+  const prefilledFromGraph = useRef(false);
+  useEffect(() => {
+    if (automationId) return;
+    if (prefilledFromGraph.current) return;
+    if (!prefilledGraphId) return;
+    dispatch({ type: "SET_SOURCE", value: "customGraph" });
+    dispatch({ type: "SET_CUSTOM_GRAPH_ID", value: prefilledGraphId });
+    if (prefilledSeriesName) {
+      const currentGraphAlert = useAutomationStore.getState().draft.graphAlert;
+      dispatch({
+        type: "SET_GRAPH_ALERT",
+        value: { ...currentGraphAlert, seriesName: prefilledSeriesName },
+      });
+    }
+    prefilledFromGraph.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -198,6 +229,11 @@ export function AutomationDrawer({
       alertType: row.alertType,
       source: row.customGraphId ? "customGraph" : "trace",
       customGraphId: row.customGraphId,
+      // Pull the threshold rule out of actionParams when this row is a
+      // graph alert so the threshold form pre-populates on edit.
+      graphAlert: row.customGraphId
+        ? extractGraphAlertFromTriggerRow(row.actionParams)
+        : INITIAL_DRAFT.graphAlert,
       filters: sanitized as Partial<Record<FilterField, FilterParam>>,
       // Defensive narrow: column is a free-form TEXT (see the repo parser).
       notificationCadence: (
@@ -430,6 +466,10 @@ export function AutomationDrawer({
         filters: draft.source === "customGraph" ? {} : draft.filters,
         customGraphId:
           draft.source === "customGraph" ? draft.customGraphId : null,
+        // The graph-alert threshold rule travels alongside the destination
+        // keys; the router merges them into the persisted `actionParams`.
+        graphAlert:
+          draft.source === "customGraph" ? draft.graphAlert : undefined,
         actionParams: actionParamsFromDraft(draft) as never,
         templates: templatesFromDraft(draft),
         notificationCadence: draft.notificationCadence,
@@ -576,13 +616,25 @@ export function AutomationDrawer({
         source={draft.source}
         filters={draft.filters}
         customGraphId={draft.customGraphId}
+        graphAlert={draft.graphAlert}
+        alertType={draft.alertType}
         projectId={projectId}
-        onSave={({ source, filters, customGraphId }) => {
+        prefilledGraphId={prefilledGraphId}
+        prefilledSeriesName={prefilledSeriesName}
+        onSave={({
+          source,
+          filters,
+          customGraphId,
+          graphAlert,
+          alertType,
+        }) => {
           dispatch({ type: "SET_SOURCE", value: source });
           if (source === "trace") {
             dispatch({ type: "SET_FILTERS", value: filters });
           } else {
             dispatch({ type: "SET_CUSTOM_GRAPH_ID", value: customGraphId });
+            dispatch({ type: "SET_GRAPH_ALERT", value: graphAlert });
+            dispatch({ type: "SET_ALERT_TYPE", value: alertType });
           }
           setSection(null);
         }}

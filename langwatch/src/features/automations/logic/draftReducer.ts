@@ -13,6 +13,10 @@ import {
 import { isNotifyEntry } from "~/automations/providers/types";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import type { FilterField } from "~/server/filters/types";
+import type {
+  GraphAlertOperator,
+  GraphAlertTimePeriod,
+} from "~/server/app-layer/triggers/graph-alert.builder";
 
 /**
  * Pure state machine for the staged automation drawer (ADR-028). Lives
@@ -28,6 +32,25 @@ import type { FilterField } from "~/server/filters/types";
 
 export type ConditionSource = "trace" | "customGraph";
 
+/** The threshold rule a custom-graph alert fires on. Mirrors the fields the
+ *  dashboard `AlertDrawer` collects and the dispatcher reads off the
+ *  Trigger row's `actionParams`. Lives at the draft root (not in a slice)
+ *  because both Email and Slack providers reuse the same rule and only
+ *  differ in their destination keys. */
+export interface GraphAlertDraft {
+  seriesName: string;
+  operator: GraphAlertOperator;
+  threshold: number;
+  timePeriod: GraphAlertTimePeriod;
+}
+
+export const INITIAL_GRAPH_ALERT_DRAFT: GraphAlertDraft = {
+  seriesName: "",
+  operator: "gt",
+  threshold: 0,
+  timePeriod: 60,
+};
+
 export interface AutomationDraft {
   /** The chosen action, or null while the user is still picking. */
   action: TriggerAction | null;
@@ -38,6 +61,11 @@ export interface AutomationDraft {
   source: ConditionSource;
   filters: Partial<Record<FilterField, FilterParam>>;
   customGraphId: string | null;
+  /** Threshold rule for graph alerts. Only meaningful when
+   *  `source === "customGraph"`; carried around the draft so type-switching
+   *  back and forth doesn't wipe the user's threshold while they're
+   *  experimenting. */
+  graphAlert: GraphAlertDraft;
   /** Per-trigger digest cadence (ADR-026). Ignored at storage and dispatch
    *  time for persist actions, so the draft value can sit dormant while the
    *  user is type-switching. */
@@ -63,6 +91,7 @@ export type DraftAction =
   | { type: "SET_SOURCE"; value: ConditionSource }
   | { type: "SET_CUSTOM_GRAPH_ID"; value: string | null }
   | { type: "SET_FILTERS"; value: Partial<Record<FilterField, FilterParam>> }
+  | { type: "SET_GRAPH_ALERT"; value: GraphAlertDraft }
   | { type: "SET_CADENCE"; value: NotificationCadence }
   | { type: "SET_TRACE_DEBOUNCE_MS"; value: number }
   | { type: "CONFIRM_CADENCE" }
@@ -91,6 +120,7 @@ export const INITIAL_DRAFT: AutomationDraft = {
   source: "trace",
   filters: {},
   customGraphId: null,
+  graphAlert: INITIAL_GRAPH_ALERT_DRAFT,
   // Matches the app-layer create-default for notify triggers (ADR-026).
   // Persist actions ignore this at the router boundary, so leaving it set
   // here while the user is picking an action is safe.
@@ -127,6 +157,8 @@ export function reducer(
       return { ...state, customGraphId: action.value };
     case "SET_FILTERS":
       return { ...state, filters: action.value };
+    case "SET_GRAPH_ALERT":
+      return { ...state, graphAlert: action.value };
     case "SET_CADENCE":
       return {
         ...state,
@@ -188,9 +220,17 @@ export function filtersAreSet(filters: AutomationDraft["filters"]): boolean {
 }
 
 export function conditionsAreSet(draft: AutomationDraft): boolean {
-  return draft.source === "customGraph"
-    ? draft.customGraphId !== null
-    : filtersAreSet(draft.filters);
+  if (draft.source === "customGraph") {
+    // A graph alert isn't a condition until the threshold rule is filled
+    // in. Without the rule there's nothing to fire on; without the series
+    // the dispatcher has no metric to evaluate.
+    return (
+      draft.customGraphId !== null &&
+      draft.graphAlert.seriesName.length > 0 &&
+      Number.isFinite(draft.graphAlert.threshold)
+    );
+  }
+  return filtersAreSet(draft.filters);
 }
 
 export function configIsComplete(draft: AutomationDraft): boolean {
@@ -201,14 +241,35 @@ export function configIsComplete(draft: AutomationDraft): boolean {
 
 export function summariseConditions(draft: AutomationDraft): string {
   if (draft.source === "customGraph") {
-    return draft.customGraphId
-      ? `Custom graph alert (${draft.customGraphId.slice(0, 12)}…)`
-      : "Custom graph (none selected)";
+    if (!draft.customGraphId) return "Pick a graph";
+    if (!draft.graphAlert.seriesName) return "Pick a series to monitor";
+    const op = OPERATOR_LABELS[draft.graphAlert.operator];
+    const window = TIME_PERIOD_LABELS[draft.graphAlert.timePeriod];
+    return `${draft.graphAlert.seriesName} ${op} ${draft.graphAlert.threshold} over ${window}`;
   }
   const keys = Object.keys(draft.filters);
   if (keys.length === 0) return "No conditions yet";
   return `${keys.length} condition${keys.length === 1 ? "" : "s"}: ${keys.slice(0, 3).join(", ")}${keys.length > 3 ? "…" : ""}`;
 }
+
+/** Operator labels matching the dashboard "Configure Alert" copy verbatim
+ *  so the experience is identical between the two creation paths. */
+export const OPERATOR_LABELS: Record<GraphAlertOperator, string> = {
+  gt: "greater than",
+  lt: "less than",
+  gte: "greater than or equal",
+  lte: "less than or equal",
+  eq: "equal to",
+};
+
+/** Time-period labels mirroring the dashboard "Time Period" select. */
+export const TIME_PERIOD_LABELS: Record<GraphAlertTimePeriod, string> = {
+  5: "5 minutes",
+  15: "15 minutes",
+  30: "30 minutes",
+  60: "1 hour",
+  1440: "1 day",
+};
 
 export function configurationSummary(draft: AutomationDraft): string {
   if (!draft.action) return "Choose a type first";
@@ -223,6 +284,45 @@ export function configurationSummary(draft: AutomationDraft): string {
 export function isNotifyAction(draft: AutomationDraft): boolean {
   if (!draft.action) return false;
   return isNotifyEntry(CLIENT_PROVIDERS[draft.action]);
+}
+
+/** Pull the graph-alert threshold rule out of a saved Trigger row's
+ *  `actionParams` JSON. Returns the seeded defaults when the row isn't a
+ *  graph alert or the JSON shape is unexpected (legacy / hand-edited rows).
+ *  The drawer relies on this on edit hydration so the threshold fields
+ *  pre-populate. */
+export function extractGraphAlertFromTriggerRow(
+  actionParams: unknown,
+): GraphAlertDraft {
+  if (!actionParams || typeof actionParams !== "object") {
+    return INITIAL_GRAPH_ALERT_DRAFT;
+  }
+  const raw = actionParams as Record<string, unknown>;
+  const operator =
+    raw.operator === "gt" ||
+    raw.operator === "lt" ||
+    raw.operator === "gte" ||
+    raw.operator === "lte" ||
+    raw.operator === "eq"
+      ? (raw.operator as GraphAlertOperator)
+      : INITIAL_GRAPH_ALERT_DRAFT.operator;
+  const timePeriod =
+    raw.timePeriod === 5 ||
+    raw.timePeriod === 15 ||
+    raw.timePeriod === 30 ||
+    raw.timePeriod === 60 ||
+    raw.timePeriod === 1440
+      ? (raw.timePeriod as GraphAlertTimePeriod)
+      : INITIAL_GRAPH_ALERT_DRAFT.timePeriod;
+  const threshold =
+    typeof raw.threshold === "number" && Number.isFinite(raw.threshold)
+      ? raw.threshold
+      : INITIAL_GRAPH_ALERT_DRAFT.threshold;
+  const seriesName =
+    typeof raw.seriesName === "string"
+      ? raw.seriesName
+      : INITIAL_GRAPH_ALERT_DRAFT.seriesName;
+  return { operator, timePeriod, threshold, seriesName };
 }
 
 /** One-line summary of the cadence + settle window, shown on the cadence
