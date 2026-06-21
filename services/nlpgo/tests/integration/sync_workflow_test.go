@@ -194,6 +194,55 @@ func postSync(t *testing.T, stack *stack, body string) *app.WorkflowResult {
 	return &out
 }
 
+// TestSync_WorkflowWithNoEndNodeReturnsClearError pins the issue #3198
+// fix at the API surface: a full-run workflow with no End node used to
+// return status:"success" with an empty result — the uninterpretable
+// "completed without success or error status". It must now surface as a
+// clear status:"error" naming the missing End node, so the caller (Studio
+// / the scenario agent) can show an actionable message. The engine reports
+// errors through the result body (HTTP 200), which postSync asserts, not
+// via HTTP status codes — consistent with every other engine error.
+func TestSync_WorkflowWithNoEndNodeReturnsClearError(t *testing.T) {
+	stack := setupStack(t)
+	defer stack.close()
+
+	// entry -> code, NO end node. Passes every other planner check
+	// (ids/kinds/edges/cycle) so the rejection is unambiguously the
+	// missing End node.
+	body := `{
+	  "trace_id": "test-missing-end",
+	  "origin": "workflow",
+	  "workflow": {
+	    "workflow_id":"wf","api_key":"k","spec_version":"1.3","name":"x","icon":"x","description":"x","version":"x",
+	    "template_adapter":"default",
+	    "nodes":[
+	      {"id":"entry","type":"entry","data":{
+	        "outputs":[{"identifier":"q","type":"str"}],
+	        "dataset":{"inline":{"records":{"q":["hello world"]}}},
+	        "entry_selection":0,
+	        "train_size":1.0,"test_size":0.0,"seed":1
+	      }},
+	      {"id":"code","type":"code","data":{
+	        "outputs":[{"identifier":"q","type":"str"}]
+	      }}
+	    ],
+	    "edges":[
+	      {"id":"e1","source":"entry","sourceHandle":"outputs.q","target":"code","targetHandle":"inputs.q","type":"default"}
+	    ],
+	    "state":{}
+	  }
+	}`
+
+	res := postSync(t, stack, body)
+
+	// Before the fix: status "success" with an empty result. Now: a clear error.
+	require.Equal(t, "error", res.Status,
+		"a workflow with no End node must surface as status:error, not a silent success (#3198)")
+	require.NotNil(t, res.Error)
+	assert.Contains(t, res.Error.Message, "End node",
+		"the error must name the missing End node so the caller can act on it")
+}
+
 // TestSync_DatasetEntrySelectionThroughHTTPServer exercises the very
 // thinnest happy path: an entry node with one row, an end node that
 // echoes it back. No external upstreams; just engine wiring.
