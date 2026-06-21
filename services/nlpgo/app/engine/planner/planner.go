@@ -116,16 +116,23 @@ func (e *DuplicateNodeError) Error() string {
 	return fmt.Sprintf("planner: duplicate node id %q", e.NodeID)
 }
 
+// MissingEndNodeMessage is the customer-facing explanation for a workflow
+// with no End node — shared by the planner's MissingEndNodeError and the
+// engine's defensive finalize guard so the two never drift (#3198).
+const MissingEndNodeMessage = "workflow has no End node; add an End node so the run produces a result"
+
 // MissingEndNodeError signals a full-run workflow has no End node, so it
 // would complete without producing any result — the uninterpretable
 // "completed with empty output" symptom from issue #3198. Partial plans
 // are exempt: a "Run until here" plan (WithUntilNode) intentionally stops
 // before the End, and a single-component run (AllowMissingEnd) dispatches
-// one node where the End is irrelevant.
+// one node where the End is irrelevant. It carries no fields because there
+// is no offending node id to attach — unlike other planner errors, the
+// problem is an absence rather than a specific node.
 type MissingEndNodeError struct{}
 
 func (e *MissingEndNodeError) Error() string {
-	return "planner: workflow has no End node; add an End node so the run produces a result"
+	return "planner: " + MissingEndNodeMessage
 }
 
 // Option tunes how New constructs the Plan. Functional options keep the

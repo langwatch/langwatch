@@ -1075,7 +1075,13 @@ func planOptionsFor(req ExecuteRequest) []planner.Option {
 // node — a full execute_flow, not a single-component run (NodeID) and not
 // a "run until here" partial plan (UntilNodeID). finalize uses it to turn
 // a missing End node into an explicit error instead of a silent empty
-// success (#3198), mirroring the planner's AC1 gate.
+// success (#3198), mirroring the planner's MissingEndNodeError gate (#3198).
+//
+// Invariant: this predicate must remain the boolean dual of planOptionsFor's
+// AllowMissingEnd/WithUntilNode conditions. If a new partial-run shape is
+// ever added, BOTH planOptionsFor (which sets AllowMissingEnd or WithUntilNode)
+// AND this function must be updated together — otherwise the planner guard and
+// the finalize guard will silently disagree about what constitutes a full run.
 func requireEndNode(req ExecuteRequest) bool {
 	return req.NodeID == "" && req.UntilNodeID == ""
 }
@@ -1310,12 +1316,13 @@ func finalize(state *runState, traceID string, started time.Time, ctxErr error, 
 	}
 	// A full run that never reached an End node finalizes with an empty
 	// result and a misleading success — issue #3198. Turn it into an
-	// explicit error instead, mirroring the planner's AC1 gate. Partial
-	// runs (execute_component, "run until here") legitimately have no End,
-	// so requireEnd is false for them and the happy path proceeds.
+	// explicit error instead, mirroring the planner's MissingEndNodeError
+	// gate (#3198). Partial runs (execute_component, "run until here")
+	// legitimately have no End, so requireEnd is false for them and the
+	// happy path proceeds.
 	if requireEnd && state.endNodeID == "" {
 		res.Status = "error"
-		res.Error = &NodeError{Type: "missing_end_node", Message: "workflow has no End node; add an End node so the run produces a result"}
+		res.Error = &NodeError{Type: "missing_end_node", Message: planner.MissingEndNodeMessage}
 		return res
 	}
 	res.Status = "success"
