@@ -83,6 +83,38 @@ const GROUP_QUEUE_CONFIG = {
 /** Default TTL for deduplication in milliseconds */
 const DEFAULT_DEDUPLICATION_TTL_MS = 200;
 
+/**
+ * The `__*` namespace is reserved for queue machinery. Routing fields
+ * (`__pipelineName`, `__jobType`, `__jobName`) ARE caller-set — event-sourcing
+ * pipelines pre-set them so dispatch + the ops dashboard can route — so those
+ * pass through. Everything else `__*` is queue-internal (`__context`,
+ * `__attempt`, `__groupId`, `__stagedJobId`, `__dispatchScore`), and any
+ * user-provided `__custom` would silently collide on the GQ2 content hash and
+ * clobber on decode (because the strip is allowlist-free; ADR-029). Reject at
+ * the public send-boundary so the contract is loud rather than silent.
+ */
+const CALLER_RESERVED_KEYS = new Set([
+  "__pipelineName",
+  "__jobType",
+  "__jobName",
+]);
+
+function assertNoReservedKeys(
+  payload: Record<string, unknown>,
+  queueName: string,
+  method: "send" | "sendBatch",
+): void {
+  for (const key of Object.keys(payload)) {
+    if (key.startsWith("__") && !CALLER_RESERVED_KEYS.has(key)) {
+      throw new QueueError(
+        queueName,
+        method,
+        `Payload key "${key}" is in the reserved __* namespace (queue machinery). User payloads must not start with "__" except __pipelineName / __jobType / __jobName.`,
+      );
+    }
+  }
+}
+
 /** Internal fields attached to job data that must be stripped before processing. */
 const INTERNAL_FIELDS = [
   "__context",
@@ -296,6 +328,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         "Cannot send to queue after shutdown has been requested",
       );
     }
+    assertNoReservedKeys(
+      payload as Record<string, unknown>,
+      this.queueName,
+      "send",
+    );
 
     const delay = options?.delay ?? this.delay;
     const dedup = options?.deduplication ?? this.deduplication;
@@ -407,6 +444,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
     if (payloads.length === 0) {
       return;
+    }
+    for (const payload of payloads) {
+      assertNoReservedKeys(
+        payload as Record<string, unknown>,
+        this.queueName,
+        "sendBatch",
+      );
     }
 
     const delay = options?.delay ?? this.delay;

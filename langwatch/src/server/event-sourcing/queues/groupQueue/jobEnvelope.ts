@@ -94,9 +94,67 @@ interface EnvelopeHeader {
   ref?: BlobRef;
   /** GQ2 per-stage hold token — the holder-set member for this staged occupancy. */
   h?: string;
+  /** Routing fields read by the Lua dispatcher and ops dashboard WITHOUT parsing the body. */
   p?: string;
   t?: string;
   n?: string;
+  /**
+   * GQ2: queue-machinery fields (every `__*` key in jobData) lifted out of the
+   * body so they don't perturb the content hash. Restored onto the parsed body
+   * on decode. The user payload is everything else; the body is hashed over
+   * the payload alone, so the same event fanned out to N reactors collapses to
+   * one stored blob (ADR-029). Allowlist-free: any future `__*` field is
+   * automatically treated as machinery.
+   */
+  m?: Record<string, unknown>;
+}
+
+/**
+ * GQ2: split jobData into (machinery, payload). Every `__*` key is queue
+ * machinery — the queue assigns these fields per-stage (`__stagedJobId`,
+ * `__attempt`, `__context`) or per-reactor (`__jobName`, `__jobType`,
+ * `__pipelineName`), and they perturb the body bytes if left in, defeating
+ * content-addressed dedup. The user payload is the rest.
+ */
+function splitMachineryFromBody(jobData: Record<string, unknown>): {
+  machinery: Record<string, unknown>;
+  payload: Record<string, unknown>;
+} {
+  const machinery: Record<string, unknown> = {};
+  const payload: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(jobData)) {
+    if (k.startsWith("__")) {
+      machinery[k] = v;
+    } else {
+      payload[k] = v;
+    }
+  }
+  return { machinery, payload };
+}
+
+/**
+ * GQ2 decode side of {@link splitMachineryFromBody}: re-merge the queue
+ * machinery back onto the parsed body. The routing trio
+ * (`__pipelineName/__jobType/__jobName`) lives in `header.p/t/n` only — the
+ * read-fast-path used by the Lua dispatcher and `readJobRoutingMeta` without
+ * touching the body. The rest of the machinery lives in `header.m`. Keeping
+ * the trio out of `m` saves ~50 wire bytes per envelope and removes a second
+ * source of truth that could drift.
+ */
+function mergeMachinery(
+  body: Record<string, unknown>,
+  header: EnvelopeHeader,
+): Record<string, unknown> {
+  const hasRouting =
+    typeof header.p === "string" ||
+    typeof header.t === "string" ||
+    typeof header.n === "string";
+  if (!header.m && !hasRouting) return body;
+  const merged: Record<string, unknown> = { ...body, ...(header.m ?? {}) };
+  if (typeof header.p === "string") merged.__pipelineName = header.p;
+  if (typeof header.t === "string") merged.__jobType = header.t;
+  if (typeof header.n === "string") merged.__jobName = header.n;
+  return merged;
 }
 
 function routingHeader(
@@ -188,13 +246,29 @@ export async function encodeJobEnvelope({
   // the composition root supplies a tiered store and the job's tenant.
   if (tieredBlobs && projectId) {
     const header = routingHeader(jobData, 2);
-    if (jsonBytes > INLINE_CEILING_BYTES) {
+    // Lift queue machinery into the header so it doesn't perturb the content
+    // hash. Without this, N reactors fanning out the same event produce N
+    // different hashes because each carries its own __jobName / __attempt
+    // (ADR-029). The body now contains only the user payload.
+    const { machinery, payload } = splitMachineryFromBody(jobData);
+    // The routing trio is already in header.p/t/n via routingHeader(); drop
+    // the duplicate copy from m so the wire format isn't ~50 bytes heavier
+    // per envelope and the two can't drift.
+    delete machinery.__pipelineName;
+    delete machinery.__jobType;
+    delete machinery.__jobName;
+    if (Object.keys(machinery).length > 0) {
+      header.m = machinery;
+    }
+    const payloadJson = JSON.stringify(payload);
+    const payloadBytes = Buffer.byteLength(payloadJson);
+    if (payloadBytes > INLINE_CEILING_BYTES) {
       const ref = await tieredBlobs.put({
         projectId,
-        data: await gzipAsync(json),
-        // Hash the RAW json, not the gzip output, so the dedup key is independent
-        // of gzip determinism (zlib version/level) — ADR-030 §1.
-        hashSource: Buffer.from(json, "utf8"),
+        data: await gzipAsync(payloadJson),
+        // Hash the RAW payload json, not the gzip output, so the dedup key is
+        // independent of gzip determinism (zlib version/level) — ADR-030 §1.
+        hashSource: Buffer.from(payloadJson, "utf8"),
       });
       header.e = ref.tier;
       header.ref = ref;
@@ -207,7 +281,7 @@ export async function encodeJobEnvelope({
     return finalize(
       ENVELOPE_PREFIX_V2,
       header,
-      await inlineBody(json, jsonBytes, header),
+      await inlineBody(payloadJson, payloadBytes, header),
     );
   }
 
@@ -258,9 +332,10 @@ export async function decodeJobEnvelope({
         "Job envelope tiered blob is missing (deleted or expired)",
       );
     }
-    return JSON.parse(
+    const parsed = JSON.parse(
       (await gunzipAsync(data, DECODE_GUNZIP_OPTS)).toString("utf8"),
     ) as Record<string, unknown>;
+    return mergeMachinery(parsed, header);
   }
 
   // GQ1: randomUUID offloaded blob.
@@ -290,7 +365,9 @@ export async function decodeJobEnvelope({
           await gunzipAsync(Buffer.from(body, "base64"), DECODE_GUNZIP_OPTS)
         ).toString("utf8")
       : body;
-  return JSON.parse(json) as Record<string, unknown>;
+  const parsed = JSON.parse(json) as Record<string, unknown>;
+  // GQ2 inline lifted machinery into header.m too; GQ1 (v=1) never did.
+  return header.v === 2 ? mergeMachinery(parsed, header) : parsed;
 }
 
 /**
