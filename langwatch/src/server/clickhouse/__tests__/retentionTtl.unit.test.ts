@@ -70,8 +70,8 @@ describe("hasRetentionTTL", () => {
 });
 
 describe("RETENTION_MANAGED_TABLES", () => {
-  it("includes all 15 retention-managed tables", () => {
-    expect(RETENTION_MANAGED_TABLES).toHaveLength(15);
+  it("includes all 21 retention-managed tables", () => {
+    expect(RETENTION_MANAGED_TABLES).toHaveLength(21);
     expect(RETENTION_MANAGED_TABLES).toContain("stored_spans");
     expect(RETENTION_MANAGED_TABLES).toContain("event_log");
     expect(RETENTION_MANAGED_TABLES).toContain("trace_summaries");
@@ -88,6 +88,13 @@ describe("RETENTION_MANAGED_TABLES", () => {
     expect(RETENTION_MANAGED_TABLES).toContain("experiment_runs");
     expect(RETENTION_MANAGED_TABLES).toContain("experiment_run_items");
     expect(RETENTION_MANAGED_TABLES).toContain("dspy_steps");
+    // ADR-034 Phase 7 — scenarios / experiments / suites mirrors.
+    expect(RETENTION_MANAGED_TABLES).toContain("simulation_analytics");
+    expect(RETENTION_MANAGED_TABLES).toContain("simulation_analytics_rollup");
+    expect(RETENTION_MANAGED_TABLES).toContain("experiment_analytics");
+    expect(RETENTION_MANAGED_TABLES).toContain("experiment_analytics_rollup");
+    expect(RETENTION_MANAGED_TABLES).toContain("suite_analytics");
+    expect(RETENTION_MANAGED_TABLES).toContain("suite_analytics_rollup");
   });
 
   it("does not include billable_events", () => {

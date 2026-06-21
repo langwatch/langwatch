@@ -9,6 +9,14 @@ import {
   ComputeExperimentRunMetricsCommand,
   CompleteExperimentRunCommand,
 } from "./commands";
+import {
+  ExperimentAnalyticsFoldProjection,
+  type ExperimentAnalyticsData,
+} from "./projections/experimentAnalytics.foldProjection";
+import {
+  ExperimentAnalyticsRollupMapProjection,
+  type ExperimentAnalyticsRollupRow,
+} from "./projections/experimentAnalyticsRollup.mapProjection";
 import { ExperimentRunResultStorageMapProjection, type ClickHouseExperimentRunResultRecord } from "./projections/experimentRunResultStorage.mapProjection";
 import { ExperimentRunStateFoldProjection, type ExperimentRunStateData } from "./projections/experimentRunState.foldProjection";
 import type { ExperimentRunProcessingEvent } from "./schemas/events";
@@ -16,6 +24,10 @@ import type { ExperimentRunProcessingEvent } from "./schemas/events";
 export interface ExperimentRunProcessingPipelineDeps {
   experimentRunStateFoldStore: FoldProjectionStore<ExperimentRunStateData>;
   experimentRunItemAppendStore: AppendStore<ClickHouseExperimentRunResultRecord>;
+  /** ADR-034 Phase 7: slim per-experiment-run fold writer. */
+  experimentAnalyticsStore: FoldProjectionStore<ExperimentAnalyticsData>;
+  /** ADR-034 Phase 7: per-experiment-run rollup writer. */
+  experimentAnalyticsRollupAppendStore: AppendStore<ExperimentAnalyticsRollupRow>;
   esSync?: ReactorDefinition<ExperimentRunProcessingEvent, ExperimentRunStateData>;
 }
 
@@ -47,9 +59,21 @@ export function createExperimentRunProcessingPipeline(deps: ExperimentRunProcess
     .withFoldProjection("experimentRunState", new ExperimentRunStateFoldProjection({
       store: deps.experimentRunStateFoldStore,
     }))
+    .withFoldProjection(
+      "experimentAnalytics",
+      new ExperimentAnalyticsFoldProjection({
+        store: deps.experimentAnalyticsStore,
+      }),
+    )
     .withMapProjection("experimentRunResultStorage", new ExperimentRunResultStorageMapProjection({
       store: deps.experimentRunItemAppendStore,
-    }));
+    }))
+    .withMapProjection(
+      "experimentAnalyticsRollup",
+      new ExperimentAnalyticsRollupMapProjection({
+        store: deps.experimentAnalyticsRollupAppendStore,
+      }),
+    );
 
   if (deps.esSync) {
     builder.withReactor("experimentRunState", "experimentRunEsSync", deps.esSync);
