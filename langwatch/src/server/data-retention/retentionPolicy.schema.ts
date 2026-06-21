@@ -140,9 +140,21 @@ export const RETENTION_TABLE_CATEGORY_MAP = {
   evaluation_analytics_rollup: "traces",
   dspy_steps: "traces",
   simulation_runs: "scenarios",
+  // ADR-034 Phase 7: simulation analytics tables age with the same per-project
+  // retention policy as simulation_runs.
+  simulation_analytics: "scenarios",
+  simulation_analytics_rollup: "scenarios",
   suite_runs: "scenarios",
+  // ADR-034 Phase 7: suite analytics tables age with the same per-project
+  // retention policy as suite_runs (categorised "scenarios").
+  suite_analytics: "scenarios",
+  suite_analytics_rollup: "scenarios",
   experiment_runs: "experiments",
   experiment_run_items: "experiments",
+  // ADR-034 Phase 7: experiment analytics tables age with the same per-project
+  // retention policy as experiment_runs.
+  experiment_analytics: "experiments",
+  experiment_analytics_rollup: "experiments",
 } as const satisfies Record<string, RetentionCategory>;
 
 export type RetentionManagedTable = keyof typeof RETENTION_TABLE_CATEGORY_MAP;
