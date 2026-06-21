@@ -20,6 +20,10 @@ import {
   ProjectNotFoundError,
 } from "~/server/app-layer/triggers/errors";
 import {
+  graphAlertActionParamsSchema,
+  type GraphAlertActionParams,
+} from "~/server/app-layer/triggers/graph-alert.builder";
+import {
   type DraftProject,
   validateTemplateDraft,
 } from "~/server/app-layer/triggers/trigger-template.service";
@@ -332,6 +336,21 @@ export const automationRouter = createTRPCRouter({
         return map;
       }, {});
 
+      // Load the names of any custom graphs the rows point at so the
+      // automations list can render "Graph: my-p95" for graph alerts
+      // without a second client-side fetch per row.
+      const customGraphIds = triggers
+        .map((t) => t.customGraphId)
+        .filter((id): id is string => typeof id === "string" && id.length > 0);
+      const customGraphs =
+        customGraphIds.length > 0
+          ? await ctx.prisma.customGraph.findMany({
+              where: { id: { in: customGraphIds }, projectId: input.projectId },
+              select: { id: true, name: true },
+            })
+          : [];
+      const customGraphsById = new Map(customGraphs.map((g) => [g.id, g]));
+
       const enhancedTriggers = triggers.map((trigger) => {
         let triggerFilters: Record<string, any> = {};
 
@@ -343,9 +362,14 @@ export const automationRouter = createTRPCRouter({
 
         const checks = checkIds.map((id) => checksMap[id]).filter(Boolean);
 
+        const customGraph = trigger.customGraphId
+          ? customGraphsById.get(trigger.customGraphId) ?? null
+          : null;
+
         return {
           ...trigger,
           checks,
+          customGraph,
         };
       });
 
@@ -492,6 +516,10 @@ export const automationRouter = createTRPCRouter({
         alertType: z.nativeEnum(AlertType).nullable().optional(),
         filters: triggerFiltersSchema,
         customGraphId: z.string().nullable().optional(),
+        /** Graph-threshold-alert rule. Present iff this is a graph alert
+         *  (`customGraphId` set); merged into `actionParams` before persist
+         *  so the dispatcher (cron + event-sourced) reads one shape. */
+        graphAlert: graphAlertActionParamsSchema.optional(),
         actionParams: actionParamsSchema,
         templates: templateDraftSchema,
         notificationCadence: notificationCadenceSchema.optional(),
@@ -500,8 +528,52 @@ export const automationRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("triggers:update"))
     .mutation(async ({ ctx, input }) => {
+      const isGraphAlert = !!input.customGraphId;
       try {
         validateTemplateDraft(input.templates);
+        if (isGraphAlert) {
+          // Graph alerts only support notify channels — there is no
+          // "ADD_TO_DATASET on a metric crossing a threshold" UX.
+          if (
+            input.action !== TriggerAction.SEND_EMAIL &&
+            input.action !== TriggerAction.SEND_SLACK_MESSAGE
+          ) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message:
+                "Graph alerts only support Email or Slack notifications.",
+            });
+          }
+          if (!input.graphAlert) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message:
+                "Graph alerts require a threshold rule (operator, threshold, time period, series).",
+            });
+          }
+          if (!input.alertType) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Graph alerts require an alert severity.",
+            });
+          }
+          // The graph must belong to the calling project — multitenancy
+          // gate. Without this a hostile client could attach a trigger to
+          // a graph from another tenant.
+          const graph = await ctx.prisma.customGraph.findUnique({
+            where: {
+              id: input.customGraphId ?? "",
+              projectId: input.projectId,
+            },
+            select: { id: true },
+          });
+          if (!graph) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Graph not found in this project.",
+            });
+          }
+        }
         // Per-action shape validation: the provider registry's per-action
         // Zod schema is the authoritative shape for actionParams. The router's
         // top-level `actionParamsSchema` accepts the union for the wire
@@ -545,20 +617,41 @@ export const automationRouter = createTRPCRouter({
       // provider slice doesn't carry it, so stamp the caller here — same as
       // the legacy create mutation — or an edit would silently strip it and
       // disable dispatch for the trigger.
-      const actionParams =
+      let actionParams: Record<string, unknown> =
         input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE
           ? {
               ...input.actionParams,
               createdByUserId:
                 input.actionParams.createdByUserId ?? ctx.session?.user.id,
             }
-          : input.actionParams;
+          : { ...input.actionParams };
+
+      // Graph alerts merge the threshold rule into actionParams so the
+      // persisted row matches what `buildGraphAlertTriggerData` writes
+      // through the dashboard path. The dispatcher only knows one shape.
+      if (isGraphAlert && input.graphAlert) {
+        const graphAlert: GraphAlertActionParams = input.graphAlert;
+        actionParams = {
+          ...actionParams,
+          threshold: graphAlert.threshold,
+          operator: graphAlert.operator,
+          timePeriod: graphAlert.timePeriod,
+          seriesName: graphAlert.seriesName,
+        };
+      }
 
       const data = {
-        name: input.name,
+        // Match the dashboard "Add Alert" path so the same trigger appears
+        // identically whether it was created on the chart card or in the
+        // automations drawer.
+        name: isGraphAlert
+          ? input.name.startsWith("Alert: ")
+            ? input.name
+            : `Alert: ${input.name}`
+          : input.name,
         action: input.action,
         alertType: input.alertType ?? null,
-        filters: JSON.stringify(input.filters),
+        filters: isGraphAlert ? JSON.stringify({}) : JSON.stringify(input.filters),
         customGraphId: input.customGraphId ?? null,
         actionParams,
         slackTemplateType: input.templates.slackTemplateType ?? null,

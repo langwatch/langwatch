@@ -7,11 +7,14 @@ import {
   conditionsAreSet,
   configIsComplete,
   configurationSummary,
+  extractGraphAlertFromTriggerRow,
   filtersAreSet,
   INITIAL_DRAFT,
+  INITIAL_GRAPH_ALERT_DRAFT,
   isNotifyAction,
   notifyChannel,
   reducer,
+  summariseConditions,
   templatesFromDraft,
 } from "../draftReducer";
 
@@ -131,15 +134,129 @@ describe("filtersAreSet", () => {
 
 describe("conditionsAreSet", () => {
   describe("when the source is customGraph", () => {
-    it("is true only when a graph id is set", () => {
+    it("is false without a graph id", () => {
       const a: AutomationDraft = {
         ...SAMPLE,
         source: "customGraph",
         filters: {},
+        customGraphId: null,
+        graphAlert: {
+          seriesName: "0/value/avg",
+          operator: "gt",
+          threshold: 0.5,
+          timePeriod: 60,
+        },
       };
-      expect(conditionsAreSet({ ...a, customGraphId: null })).toBe(false);
-      expect(conditionsAreSet({ ...a, customGraphId: "g_1" })).toBe(true);
+      expect(conditionsAreSet(a)).toBe(false);
     });
+
+    it("is false when the graph is picked but no series is chosen", () => {
+      const a: AutomationDraft = {
+        ...SAMPLE,
+        source: "customGraph",
+        filters: {},
+        customGraphId: "g_1",
+        graphAlert: {
+          ...INITIAL_GRAPH_ALERT_DRAFT,
+          seriesName: "",
+        },
+      };
+      expect(conditionsAreSet(a)).toBe(false);
+    });
+
+    it("is true once graph + series + finite threshold are set", () => {
+      const a: AutomationDraft = {
+        ...SAMPLE,
+        source: "customGraph",
+        filters: {},
+        customGraphId: "g_1",
+        graphAlert: {
+          seriesName: "0/value/avg",
+          operator: "gt",
+          threshold: 250,
+          timePeriod: 60,
+        },
+      };
+      expect(conditionsAreSet(a)).toBe(true);
+    });
+  });
+});
+
+describe("SET_GRAPH_ALERT", () => {
+  it("replaces the graph-alert draft slice", () => {
+    const next = reducer(SAMPLE, {
+      type: "SET_GRAPH_ALERT",
+      value: {
+        seriesName: "0/cost/sum",
+        operator: "gte",
+        threshold: 100,
+        timePeriod: 1440,
+      },
+    });
+    expect(next.graphAlert).toEqual({
+      seriesName: "0/cost/sum",
+      operator: "gte",
+      threshold: 100,
+      timePeriod: 1440,
+    });
+  });
+});
+
+describe("summariseConditions for graph alerts", () => {
+  it("describes the rule when fully filled in", () => {
+    const draft: AutomationDraft = {
+      ...SAMPLE,
+      source: "customGraph",
+      customGraphId: "g_1",
+      graphAlert: {
+        seriesName: "0/latency/p95",
+        operator: "gt",
+        threshold: 250,
+        timePeriod: 60,
+      },
+    };
+    expect(summariseConditions(draft)).toMatch(
+      /0\/latency\/p95.*greater than.*250.*over 1 hour/i,
+    );
+  });
+
+  it("prompts for a graph when none is picked", () => {
+    const draft: AutomationDraft = {
+      ...SAMPLE,
+      source: "customGraph",
+      customGraphId: null,
+    };
+    expect(summariseConditions(draft)).toMatch(/pick a graph/i);
+  });
+});
+
+describe("extractGraphAlertFromTriggerRow", () => {
+  it("hydrates the saved threshold rule", () => {
+    const result = extractGraphAlertFromTriggerRow({
+      threshold: 0.9,
+      operator: "lte",
+      timePeriod: 1440,
+      seriesName: "errors",
+    });
+    expect(result).toEqual({
+      threshold: 0.9,
+      operator: "lte",
+      timePeriod: 1440,
+      seriesName: "errors",
+    });
+  });
+
+  it("falls back to defaults for a malformed row", () => {
+    expect(extractGraphAlertFromTriggerRow(null)).toEqual(
+      INITIAL_GRAPH_ALERT_DRAFT,
+    );
+    expect(
+      extractGraphAlertFromTriggerRow({
+        operator: "between",
+        timePeriod: "ten",
+        threshold: "x",
+      }),
+    ).toEqual(INITIAL_GRAPH_ALERT_DRAFT);
   });
 });
 

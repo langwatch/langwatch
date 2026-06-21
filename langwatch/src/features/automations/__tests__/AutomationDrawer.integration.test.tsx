@@ -117,6 +117,9 @@ vi.mock("~/utils/api", () => ({
     },
     graphs: {
       getAll: { useQuery: () => ({ data: [], isLoading: false }) },
+      getById: {
+        useQuery: () => ({ data: null, isLoading: false }),
+      },
     },
     useContext: () => ({
       automation: { getTriggers: { invalidate: mockInvalidate } },
@@ -265,6 +268,57 @@ describe("AutomationDrawer", () => {
           expect(
             screen.getByText(/1 condition: metadata\.labels/i),
           ).toBeInTheDocument();
+        });
+      });
+    });
+  });
+
+  describe("given the drawer opens with a prefilled graph", () => {
+    describe("when the drawer mounts", () => {
+      it("initialises the draft into graph-alert mode with the graph + series locked in", async () => {
+        renderDrawer({
+          prefilledGraphId: "graph-1",
+          prefilledSeriesName: "0/latency/p95",
+        });
+
+        await waitFor(() => {
+          const draft = useAutomationStore.getState().draft;
+          expect(draft.source).toBe("customGraph");
+          expect(draft.customGraphId).toBe("graph-1");
+          expect(draft.graphAlert.seriesName).toBe("0/latency/p95");
+        });
+      });
+    });
+  });
+
+  describe("given an existing graph-alert row in edit mode", () => {
+    describe("when the saved row first resolves", () => {
+      it("hydrates the threshold rule from actionParams", async () => {
+        mockTriggerRow = savedRow({
+          customGraphId: "graph-7",
+          action: "SEND_SLACK_MESSAGE",
+          alertType: "CRITICAL",
+          filters: JSON.stringify({}),
+          actionParams: {
+            slackWebhook: "https://hooks.slack.com/services/abc",
+            threshold: 0.9,
+            operator: "lte",
+            timePeriod: 1440,
+            seriesName: "0/error_rate/avg",
+          },
+        });
+        renderDrawer({ automationId: "trigger-1" });
+
+        await waitFor(() => {
+          const draft = useAutomationStore.getState().draft;
+          expect(draft.source).toBe("customGraph");
+          expect(draft.customGraphId).toBe("graph-7");
+          expect(draft.graphAlert).toEqual({
+            threshold: 0.9,
+            operator: "lte",
+            timePeriod: 1440,
+            seriesName: "0/error_rate/avg",
+          });
         });
       });
     });
