@@ -49,6 +49,7 @@ import path from "node:path";
 import { nanoid } from "nanoid";
 import { createManyDatasetRecords } from "../../api/routers/datasetRecord.utils";
 import { DatasetService } from "../dataset.service";
+import * as datasetStorageModule from "../dataset-storage";
 import { getDatasetStorage } from "../dataset-storage";
 import { DirectUploadUnavailableError } from "../errors";
 import { LocalDatasetStorage } from "../local-dataset-storage";
@@ -127,6 +128,7 @@ describe("Feature: Large dataset storage — self-hosted without object storage"
      * write lands on the resolver-provided `file` root via the real
      * `LocalDatasetStorage`, and records never touch the PG record-write seam.
      */
+    /** @scenario A new dataset is created directly in object storage */
     it("creates an s3_jsonl dataset on local FS, never PG, even with no S3", async () => {
       const root = path.join(os.tmpdir(), `lw-ds-no-s3-${nanoid()}`);
       resolveProjectStorageDestination.mockResolvedValue({
@@ -235,6 +237,78 @@ describe("Feature: Large dataset storage — self-hosted without object storage"
       });
       expect(rows).toEqual([]);
 
+      await fs.rm(root, { recursive: true, force: true });
+    });
+  });
+
+  describe("DatasetService.upsertDataset() when the chunk write fails during create", () => {
+    /**
+     * Born-on-storage writes the chunk objects BEFORE inserting the row, so a
+     * chunk-write failure must throw and leave NO orphan row (the old
+     * record-insert transaction left an orphan that wedged name reuse). Mock the
+     * storage factory so the FIRST create's `writeChunks` rejects, then a real
+     * local-FS storage for the retry — proving the failed create wrote no row and
+     * the same name is immediately reusable.
+     */
+    /** @scenario A failed dataset create writes no orphan row */
+    /** @scenario Retrying a failed dataset create reuses the same name */
+    it("throws without creating a row, then a retry with the same name succeeds", async () => {
+      const root = path.join(os.tmpdir(), `lw-ds-atomic-${nanoid()}`);
+      resolveProjectStorageDestination.mockResolvedValue({
+        kind: "file" as const,
+        root,
+      });
+
+      // First create's storage write rejects; every later call falls through to
+      // the REAL local-FS factory (so the retry actually writes a chunk).
+      const realGetDatasetStorage = datasetStorageModule.getDatasetStorage;
+      const storageSpy = vi
+        .spyOn(datasetStorageModule, "getDatasetStorage")
+        .mockResolvedValueOnce({
+          writeChunks: vi
+            .fn()
+            .mockRejectedValue(new Error("storage write failed")),
+        } as never)
+        .mockImplementation((projectId: string) =>
+          realGetDatasetStorage(projectId),
+        );
+
+      const repository = {
+        findBySlug: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockImplementation((data: { id: string }) =>
+          Promise.resolve({
+            ...data,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+        ),
+      };
+      const service = makeService({ repository, prisma: {} });
+
+      // The chunk write fails → the whole create rejects.
+      await expect(
+        service.upsertDataset({
+          projectId: "p1",
+          name: "Atomic DS",
+          columnTypes: [{ name: "input", type: "string" }],
+          datasetRecords: [{ input: "would fail to write" }],
+        }),
+      ).rejects.toThrow("storage write failed");
+      // No orphan row: the row is inserted only AFTER the chunk write succeeds.
+      expect(repository.create).not.toHaveBeenCalled();
+
+      // The retry with the SAME name succeeds (real storage) — the "already
+      // exists" wedge is gone because the failed create wrote no row.
+      const followUp = await service.upsertDataset({
+        projectId: "p1",
+        name: "Atomic DS",
+        columnTypes: [{ name: "input", type: "string" }],
+        datasetRecords: [{ input: "now valid" }],
+      });
+      expect(followUp.slug).toBe("atomic-ds");
+      expect(repository.create).toHaveBeenCalledOnce();
+
+      storageSpy.mockRestore();
       await fs.rm(root, { recursive: true, force: true });
     });
   });

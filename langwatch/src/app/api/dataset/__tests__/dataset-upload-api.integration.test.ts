@@ -8,7 +8,6 @@ import {
   type PlanProvider,
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
-import { DatasetService } from "~/server/datasets/dataset.service";
 import type { DatasetColumns } from "~/server/datasets/types";
 import { prisma } from "~/server/db";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
@@ -829,53 +828,6 @@ describe("Feature: Dataset File Upload REST API", () => {
       });
       const entry = updated!.entry as Record<string, string>;
       expect(entry.input).toBe("newvalue");
-    });
-  });
-
-  describe("when the chunk write fails during create", () => {
-    /** @scenario A failed create writes no orphan dataset row */
-    /** @scenario Retrying after a failed create reuses the same name */
-    it("inserts the row only after chunks are written, so a storage failure leaves no orphan", async () => {
-      // Born-on-storage writes chunks BEFORE inserting the row, so a chunk-write
-      // failure must leave no row (and not wedge name reuse). Force the storage
-      // write to fail for the first create only.
-      const storageModule = await import("~/server/datasets/dataset-storage");
-      const spy = vi
-        .spyOn(storageModule, "getDatasetStorage")
-        .mockResolvedValueOnce({
-          writeChunks: vi
-            .fn()
-            .mockRejectedValue(new Error("storage write failed")),
-        } as never);
-
-      const service = DatasetService.create(prisma);
-
-      await expect(
-        service.upsertDataset({
-          projectId: testProjectId,
-          name: "Atomic Test",
-          columnTypes: [{ name: "input", type: "string" }],
-          datasetRecords: [{ input: "would fail to write" }],
-        }),
-      ).rejects.toThrow();
-
-      // No orphan row — the row is inserted only after the chunk write succeeds.
-      const orphan = await prisma.dataset.findFirst({
-        where: { slug: "atomic-test", projectId: testProjectId },
-      });
-      expect(orphan).toBeNull();
-
-      spy.mockRestore();
-
-      // The next attempt with the same name (real storage) succeeds — proving
-      // the "already exists" wedge is gone.
-      const followUp = await service.upsertDataset({
-        projectId: testProjectId,
-        name: "Atomic Test",
-        columnTypes: [{ name: "input", type: "string" }],
-        datasetRecords: [{ input: "now valid" }],
-      });
-      expect(followUp.slug).toBe("atomic-test");
     });
   });
 });

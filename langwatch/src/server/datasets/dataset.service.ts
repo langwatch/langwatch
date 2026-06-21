@@ -11,11 +11,12 @@ import {
   getFullDataset,
 } from "../api/routers/datasetRecord.utils";
 import { DatasetRepository } from "./dataset.repository";
-import { type ChunkOffset, chunkedMeta, chunkMetaOf } from "./dataset-chunking";
+import type { ChunkOffset } from "./dataset-chunking";
 import {
   appendS3JsonlRecords,
   deleteS3JsonlRecords,
   editS3JsonlRecord,
+  writeInitialS3JsonlChunks,
 } from "./dataset-mutations";
 import { enqueueDatasetNormalize } from "./dataset-normalize.queue";
 import { DatasetRecordRepository } from "./dataset-record.repository";
@@ -297,20 +298,20 @@ export class DatasetService {
     const datasetId = `dataset_${nanoid()}`;
 
     // Drop any caller-supplied id (s3_jsonl rows are addressed by their
-    // chunk-line id), scrub U+0000 (I-NULL), and wrap as `{ id, entry }`.
-    const lines = (datasetRecords ?? []).map((record) => {
+    // chunk-line id, minted by writeInitialS3JsonlChunks). The {id,entry} wrap +
+    // U+0000 scrub (I-NULL) lives in dataset-mutations alongside the append path.
+    const entries = (datasetRecords ?? []).map((record) => {
       const { id: _id, ...entry } = record;
-      return { id: `record_${nanoid()}`, entry: stripNullBytes(entry) };
+      return entry;
     });
 
-    const storage = await getDatasetStorage(projectId);
-    const written = await storage.writeChunks({
+    // Born-on-storage: write the chunk objects BEFORE the row exists, so a
+    // write failure throws and leaves no orphan row.
+    const meta = await writeInitialS3JsonlChunks({
       projectId,
       datasetId,
-      records: lines,
-      fromIndex: 0,
+      entries,
     });
-    const meta = chunkedMeta(written.map(chunkMetaOf));
 
     return await this.repository.create({
       id: datasetId,

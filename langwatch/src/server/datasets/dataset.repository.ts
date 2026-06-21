@@ -1,4 +1,9 @@
-import type { Dataset, DatasetRecord, Prisma, PrismaClient } from "@prisma/client";
+import type {
+  Dataset,
+  DatasetRecord,
+  Prisma,
+  PrismaClient,
+} from "@prisma/client";
 
 /**
  * Input types derived from Prisma for type safety
@@ -123,22 +128,6 @@ export class DatasetRepository {
   }
 
   /**
-   * Gets project with organization info for S3 configuration check.
-   */
-  async getProjectWithOrgS3Settings(input: { projectId: string }): Promise<{
-    canUseS3: boolean;
-  }> {
-    const project = await this.prisma.project.findUnique({
-      where: { id: input.projectId },
-      include: { team: { include: { organization: true } } },
-    });
-
-    return {
-      canUseS3: project?.team?.organization?.useCustomS3 ?? false,
-    };
-  }
-
-  /**
    * Finds all dataset slugs in a project (for name conflict checking).
    */
   async findAllSlugs(input: {
@@ -192,5 +181,4 @@ export class DatasetRepository {
 
     return { datasets, total };
   }
-
 }

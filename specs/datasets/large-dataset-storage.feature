@@ -37,6 +37,13 @@ Feature: Large dataset storage
     Then once ready the dataset reports 50 rows
     And the dataset reports its stored size
 
+  @unit
+  Scenario: A new dataset is created directly in object storage
+    When I create a new dataset
+    Then its rows are stored in object storage as chunks
+    And its rows are not stored in the Postgres records table
+    And the dataset is immediately ready to read
+
   @integration
   Scenario: A dataset still being prepared is not used as data
     Given a dataset that is still processing

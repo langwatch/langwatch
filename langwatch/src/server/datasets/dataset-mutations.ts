@@ -19,10 +19,17 @@
  */
 import type { Dataset, Prisma, PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { type ChunkOffset, toSingleJsonl } from "./dataset-chunking";
+import {
+  type ChunkedDatasetMeta,
+  type ChunkOffset,
+  chunkedMeta,
+  chunkMetaOf,
+  toSingleJsonl,
+} from "./dataset-chunking";
 import { withDatasetLock } from "./dataset-lock";
 import { type DatasetStorage, getDatasetStorage } from "./dataset-storage";
 import { DatasetNotReadyError, MissingChunkError } from "./errors";
+import { stripNullBytes } from "./sanitize";
 
 export type RecomputedDatasetCounts = {
   rowCount: number;
@@ -34,6 +41,24 @@ export type RecomputedDatasetCounts = {
 /** An s3_jsonl chunk line: the row entry tagged with a stable id so edit/delete
  * can target it. Mirrors the shape the normalize/append paths write. */
 type ChunkLine = { id: string; entry: unknown };
+
+/**
+ * Wrap raw row entries as `{ id, entry }` chunk lines: mint a stable per-row id
+ * (`record_<nanoid>`) the later edit/delete can target, and scrub U+0000 from
+ * the entry (I-NULL — Postgres-parity). `forcedIds` pins each new row's id
+ * (upsert semantics); otherwise a fresh id is minted per row. The single home
+ * for the batch `{id,entry}`+null-scrub wrap shared by the append and
+ * born-on-storage paths (the streaming normalize writer mints ids per row as it
+ * goes, so it stays separate).
+ */
+const toChunkLines = (
+  entries: unknown[],
+  { forcedIds }: { forcedIds?: string[] } = {},
+): ChunkLine[] =>
+  entries.map((entry, i) => ({
+    id: forcedIds?.[i] ?? `record_${nanoid()}`,
+    entry: stripNullBytes(entry),
+  }));
 
 const isChunkLine = (line: unknown): line is ChunkLine =>
   typeof line === "object" && line !== null && "id" in line && "entry" in line;
@@ -99,10 +124,7 @@ const appendLinesInTx = async ({
   storage: DatasetStorage;
   forcedIds?: string[];
 }): Promise<{ appended: number }> => {
-  const lines: ChunkLine[] = entries.map((entry, i) => ({
-    id: forcedIds?.[i] ?? `record_${nanoid()}`,
-    entry,
-  }));
+  const lines = toChunkLines(entries, { forcedIds });
 
   const fromIndex = current.chunkCount ?? 0;
   const oldRowCount = current.rowCount ?? 0;
@@ -135,6 +157,43 @@ const appendLinesInTx = async ({
   });
 
   return { appended: lines.length };
+};
+
+/**
+ * Born-on-storage (ADR-032 cutover step 1): write a brand-new dataset's records
+ * directly to chunk objects from index 0 and return the PG-authoritative
+ * `ChunkedDatasetMeta` (rowCount / sizeBytes / chunkCount / chunkOffsets) the
+ * caller stamps onto the `Dataset` row.
+ *
+ * No advisory lock and no transaction: the row does not exist yet (this runs
+ * BEFORE `repository.create`, not inside `withDatasetLock`), so there is nothing
+ * to serialize against. Writing the chunks first means a write failure throws
+ * and leaves no orphan row — the atomicity the create path relies on. Owns its
+ * own storage resolution (`getDatasetStorage`) when not passed, mirroring the
+ * sibling append/edit/delete mutations.
+ */
+export const writeInitialS3JsonlChunks = async ({
+  projectId,
+  datasetId,
+  entries,
+  storage,
+}: {
+  projectId: string;
+  datasetId: string;
+  entries: unknown[];
+  storage?: DatasetStorage;
+}): Promise<ChunkedDatasetMeta> => {
+  const datasetStorage = storage ?? (await getDatasetStorage(projectId));
+
+  const lines = toChunkLines(entries);
+  const written = await datasetStorage.writeChunks({
+    projectId,
+    datasetId,
+    records: lines,
+    fromIndex: 0,
+  });
+
+  return chunkedMeta(written.map(chunkMetaOf));
 };
 
 /**
