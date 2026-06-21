@@ -232,6 +232,29 @@ class Code:
 	assert.Equal(t, "right", res.Outputs["out"], "__call__ class must win over a forward-only helper class")
 }
 
+// TestCodeBlock_DedentsUniformlyIndentedCode pins issue #3013: a code-block
+// pasted into the Studio editor can inherit a uniform leading indent on every
+// line (Monaco auto-indent on paste). Before the runner dedented before
+// compile, that raised IndentationError at compile time and surfaced as an
+// opaque 500. The runner must normalize the indentation and execute normally.
+func TestCodeBlock_DedentsUniformlyIndentedCode(t *testing.T) {
+	requirePython(t)
+	// Every line carries two leading spaces — uniformly over-indented.
+	code := "  import dspy\n" +
+		"\n" +
+		"  class Code(dspy.Module):\n" +
+		"      def forward(self, a, b):\n" +
+		"          return {\"sum\": a + b}\n"
+	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
+		Code:            code,
+		Inputs:          map[string]any{"a": float64(4), "b": float64(5)},
+		DeclaredOutputs: []string{"sum"},
+	})
+	require.NoError(t, err)
+	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
+	assert.InDelta(t, 9.0, res.Outputs["sum"], 1e-9)
+}
+
 // TestCodeBlock_DspyPredictionReturnValue covers the second-most-common
 // return shape from the survey: customer code returning
 // `dspy.Prediction(**kwargs)` instead of a plain dict. The fake_dspy
