@@ -107,6 +107,7 @@ import type {
   PipelineFields,
   SharedFiltersInput,
 } from "../../../../server/analytics/types";
+import { deriveSeriesIdentifier } from "../../../../components/analytics/seriesIdentifier";
 import { filterOutEmptyFilters } from "../../../../server/analytics/utils";
 import type { FilterField } from "../../../../server/filters/types";
 import { api } from "../../../../utils/api";
@@ -387,6 +388,19 @@ function AnalyticsCustomGraphContent({
                     fontSize="16px"
                   />
                   <HStack gap={2}>
+                    {/*
+                     * ADR-034 Phase 8: both the bell-icon (edit) and the
+                     * "Add alert" (create) paths open the automations
+                     * drawer pre-filled with this graph + its first series,
+                     * mirroring the dashboard chart card flow from Phase
+                     * 5.2. The legacy `customGraphAlert` drawer is kept
+                     * registered as an unreachable fallback per the side-
+                     * by-side rollout in ADR-034. `deriveSeriesIdentifier`
+                     * emits the canonical "{index}/{key|metric}/
+                     * {aggregation}" form the automations secondary drawer
+                     * matches against (Series.name is a free-form label
+                     * and would not pre-select).
+                     */}
                     {form.watch("alert.enabled") ? (
                       <Tooltip
                         content="Alert configured"
@@ -396,9 +410,13 @@ function AnalyticsCustomGraphContent({
                           padding={1}
                           cursor="pointer"
                           onClick={() =>
-                            openDrawer("customGraphAlert", {
-                              form,
-                              graphId: customId,
+                            openDrawer("automation", {
+                              automationId: form.getValues("alert.triggerId"),
+                              prefilledGraphId: customId,
+                              prefilledSeriesName: deriveSeriesIdentifier(
+                                graph,
+                                0,
+                              ),
                             })
                           }
                         >
@@ -411,9 +429,12 @@ function AnalyticsCustomGraphContent({
                         colorPalette="gray"
                         size="sm"
                         onClick={() =>
-                          openDrawer("customGraphAlert", {
-                            form,
-                            graphId: customId,
+                          openDrawer("automation", {
+                            prefilledGraphId: customId,
+                            prefilledSeriesName: deriveSeriesIdentifier(
+                              graph,
+                              0,
+                            ),
                           })
                         }
                       >

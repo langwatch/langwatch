@@ -75,6 +75,7 @@ export function MainSectionList({
       <TypePicker
         value={draft.action}
         onChange={(value) => dispatch({ type: "SET_ACTION", value })}
+        source={draft.source}
       />
       <SectionRow
         title={configTitle}

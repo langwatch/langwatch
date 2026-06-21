@@ -4,39 +4,12 @@ import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import { BarChart2, Bell } from "lucide-react";
 import { useMemo } from "react";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
+import { deriveSeriesIdentifier } from "~/components/analytics/seriesIdentifier";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
 import type { FilterField } from "~/server/filters/types";
 import { GraphCardMenu, type SizeOption } from "./GraphCardMenu";
 import { GraphFilterIndicator } from "./GraphFilterIndicator";
-
-/**
- * Encodes a graph series into the canonical `"{index}/{key|metric}/{aggregation}"`
- * identifier the automations drawer + dispatcher both key off of. The
- * `name` field on `Series` is a human label ("p95 latency"), not what the
- * threshold rule stores, so we have to derive the identifier from the same
- * fields `FiltersSecondaryDrawer.deriveSeriesOptionsFromGraph` reads.
- */
-function deriveSeriesIdentifier(
-  graph: unknown,
-  index: number,
-): string | undefined {
-  if (!graph || typeof graph !== "object") return undefined;
-  const candidate = (graph as { series?: unknown }).series;
-  if (!Array.isArray(candidate)) return undefined;
-  const entry = candidate[index];
-  if (!entry || typeof entry !== "object") return undefined;
-  const s = entry as Record<string, unknown>;
-  const keyPart =
-    typeof s.key === "string" && s.key.length > 0
-      ? s.key
-      : typeof s.metric === "string"
-        ? s.metric
-        : "value";
-  const aggregationPart =
-    typeof s.aggregation === "string" ? s.aggregation : "count";
-  return `${index}/${keyPart}/${aggregationPart}`;
-}
 
 interface GraphCardHeaderProps {
   graphId: string;
