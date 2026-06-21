@@ -742,7 +742,6 @@ describe("aggregation-builder", () => {
         };
         const result = buildTimeseriesQuery(input);
 
-        // The new score-only WHEN: target evaluator + processed + Passed IS NULL → 'unknown'
         expect(result.sql).toMatch(
           /EvaluatorId = \{groupByKey:String\} AND \w+\.Status = 'processed' AND \w+\.Passed IS NULL THEN 'unknown'/,
         );

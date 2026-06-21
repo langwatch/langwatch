@@ -252,7 +252,6 @@ describe("score-only-evaluator-passed-groupby", () => {
           expect(passedRows.length).toBeGreaterThan(0);
           expect(failedRows.length).toBeGreaterThan(0);
 
-          // A pass/fail evaluator yields no 'unknown' group — isolation is explicit here, not just implicit
           expect(
             currentRows.filter((r) => r.group_key === "unknown"),
           ).toHaveLength(0);
