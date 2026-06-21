@@ -83,7 +83,7 @@ export function isOrphanedQueuedRun({
 
 /**
  * Find QUEUED-at-latest-version runs across ALL tenants within the lookback
- * window.
+ * window that are older than the orphan threshold.
  *
  * INTENTIONALLY cross-tenant: this is a startup ops reconciler (like the
  * storage-metering / TTL scans) and runs with the shared ClickHouse client, so
@@ -96,7 +96,10 @@ export function isOrphanedQueuedRun({
  * ReplacingMergeTree(UpdatedAt); ScenarioRunId is a globally-unique KSUID, so
  * grouping by (TenantId, ScenarioRunId) collapses every version of a run even
  * though the table's full dedup key also includes ScenarioSetId/BatchRunId.
- * Only groups whose latest Status is 'QUEUED' are returned. The scan is
+ * Only groups whose latest Status is 'QUEUED' AND whose LastEventAtMs is at or
+ * before the orphan cutoff are returned — newest candidates are excluded before
+ * the 10k cap so genuine old orphans are never starved. Results are ordered
+ * oldest-first so the most urgent orphans are processed first. The scan is
  * partition-pruned on StartedAt for the lookback window (StartedAt defaults to
  * the queue/insert time, so QUEUED orphans fall in their queue-week partition).
  * Selected columns are light, and per-group non-key values use argMax(col,
@@ -107,12 +110,15 @@ export async function findQueuedRunCandidates({
   client,
   lookbackMs,
   now,
+  orphanThresholdMs,
 }: {
   client: ClickHouseClient;
   lookbackMs: number;
   now: number;
+  orphanThresholdMs: number;
 }): Promise<OrphanCandidate[]> {
   const fromMs = now - lookbackMs;
+  const orphanCutoffMs = now - orphanThresholdMs;
 
   const result = await client.query({
     query: `
@@ -128,9 +134,11 @@ export async function findQueuedRunCandidates({
       WHERE StartedAt >= fromUnixTimestamp64Milli(toUInt64({fromMs:String}))
       GROUP BY TenantId, ScenarioRunId
       HAVING Status = '${ScenarioRunStatus.QUEUED}'
+        AND LastEventAtMs <= toUInt64({orphanCutoffMs:String})
+      ORDER BY LastEventAtMs ASC
       LIMIT 10000
     `,
-    query_params: { fromMs: String(fromMs) },
+    query_params: { fromMs: String(fromMs), orphanCutoffMs: String(orphanCutoffMs) },
     format: "JSONEachRow",
   });
 
