@@ -38,8 +38,8 @@ import { useUIStore } from "../../stores/uiStore";
 import { useViewStore } from "../../stores/viewStore";
 import { FacetManagerPopover } from "./FacetManagerPopover";
 import { FilterSidebarSkeleton } from "./FilterSidebarSkeleton";
-import { useFilterSidebarData } from "./hooks/useFilterSidebarData";
 import { HoverHighlightStyle } from "./HoverHighlightStyle";
+import { useFilterSidebarData } from "./hooks/useFilterSidebarData";
 import { SectionRenderer } from "./SectionRenderer";
 import { SortableSection } from "./SortableSection";
 import { getFacetIcon } from "./utils";
@@ -503,7 +503,9 @@ export const FilterSidebar: React.FC = () => {
             content={
               <HStack gap={1.5}>
                 <Text>
-                  {allExpanded ? "Collapse all sections" : "Expand all sections"}
+                  {allExpanded
+                    ? "Collapse all sections"
+                    : "Expand all sections"}
                 </Text>
                 <Kbd>E</Kbd>
               </HStack>

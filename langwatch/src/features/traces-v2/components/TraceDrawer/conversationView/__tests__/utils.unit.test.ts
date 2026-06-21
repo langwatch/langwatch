@@ -32,7 +32,8 @@ function makeTurn(opts: {
 
 const assistantChunkOf = (
   chunks: { id: string; markdown: string }[],
-): string | undefined => chunks.find((c) => c.id.endsWith("-assistant"))?.markdown;
+): string | undefined =>
+  chunks.find((c) => c.id.endsWith("-assistant"))?.markdown;
 
 describe("buildConversationMarkdownChunks", () => {
   describe("when an assistant turn carries typed-block output", () => {

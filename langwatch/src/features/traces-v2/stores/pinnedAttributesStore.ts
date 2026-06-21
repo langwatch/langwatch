@@ -119,7 +119,7 @@ export const usePinnedAttributesStore = create<PinnedAttributesState>(
 
 if (typeof window !== "undefined") {
   window.addEventListener("storage", (event) => {
-    if (!event.key || !event.key.startsWith(STORAGE_PREFIX)) return;
+    if (!event.key?.startsWith(STORAGE_PREFIX)) return;
     const projectId = event.key.slice(STORAGE_PREFIX.length);
     usePinnedAttributesStore.getState().hydrateFromStorage(projectId);
   });

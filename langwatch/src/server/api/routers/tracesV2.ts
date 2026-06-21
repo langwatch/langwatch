@@ -14,6 +14,10 @@ import { TraceNotFoundError } from "~/server/app-layer/traces/errors";
 import { translateFilterToClickHouse } from "~/server/app-layer/traces/filter-to-clickhouse";
 import { deriveUnmappedCostSuggestion } from "~/server/app-layer/traces/model-cost-span-preview.service";
 import type { SpanSummaryRow } from "~/server/app-layer/traces/repositories/span-storage.repository";
+import {
+  traceMetadataUpdateSchema,
+  updateTraceMetadata,
+} from "~/server/app-layer/traces/trace-metadata.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
   CONTENT_CATEGORIES,
@@ -34,10 +38,6 @@ import {
   TRACE_NAME_MIN_LENGTH,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import type { Span, SpanInputOutput } from "~/server/tracer/types";
-import {
-  traceMetadataUpdateSchema,
-  updateTraceMetadata,
-} from "~/server/app-layer/traces/trace-metadata.service";
 import {
   findPromptReferenceInAncestors,
   flattenParamsToPromptAttributes,

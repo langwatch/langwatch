@@ -17,6 +17,7 @@ import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDi
 import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
+import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { AnnotationPopover } from "./conversationView/AnnotationPopover";
 import { IOViewerBody } from "./IOViewerBody";
 import { safePrettyJson } from "./JsonHighlight";
@@ -38,7 +39,6 @@ import {
   useIOViewerState,
   type ViewFormat,
 } from "./useIOViewerState";
-import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 
 const TRUNCATE_AT = 100_000;
 // Require a meaningful tail before offering an expander — otherwise we

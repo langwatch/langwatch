@@ -102,7 +102,10 @@ export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
   // measures without an encoder, and doesn't collide with other
   // "bytes" readings elsewhere on the page.
   const charCount = useMemo(() => fullPayload.length, [fullPayload]);
-  const lineCount = useMemo(() => fullPayload.split("\n").length, [fullPayload]);
+  const lineCount = useMemo(
+    () => fullPayload.split("\n").length,
+    [fullPayload],
+  );
   const matchedLines = useMemo(
     () =>
       search
@@ -238,11 +241,7 @@ export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
               <Text textStyle="xs" color="fg.muted">
                 No lines match "{search}"
               </Text>
-              <Button
-                size="xs"
-                variant="ghost"
-                onClick={() => setSearch("")}
-              >
+              <Button size="xs" variant="ghost" onClick={() => setSearch("")}>
                 Clear search
               </Button>
             </VStack>

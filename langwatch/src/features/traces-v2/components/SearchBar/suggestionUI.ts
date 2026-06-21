@@ -1,9 +1,6 @@
 import type { SearchFieldGroup } from "~/server/app-layer/traces/query-language/metadata";
 import type { SuggestionState } from "./getSuggestionState";
-import {
-  getFieldSuggestions,
-  getValueSuggestions,
-} from "./suggestionItems";
+import { getFieldSuggestions, getValueSuggestions } from "./suggestionItems";
 
 /**
  * Single row in the dropdown. `value` is what lands in the editor;

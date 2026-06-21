@@ -61,7 +61,9 @@ function readFromStorage(projectId: string): {
     if (parsed.version !== 1) return fallback;
     return {
       explicitlyShown: Array.isArray(parsed.explicitlyShown)
-        ? parsed.explicitlyShown.filter((s): s is string => typeof s === "string")
+        ? parsed.explicitlyShown.filter(
+            (s): s is string => typeof s === "string",
+          )
         : [],
       explicitlyHidden: Array.isArray(parsed.explicitlyHidden)
         ? parsed.explicitlyHidden.filter(

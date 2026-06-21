@@ -23,6 +23,7 @@ import {
 import { useColorMode } from "~/components/ui/color-mode";
 import { Popover } from "~/components/ui/popover";
 import { Tooltip } from "~/components/ui/tooltip";
+import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import {
   type AttributeFormat,
   buildInlineDescriptor,
@@ -33,7 +34,6 @@ import {
   stringifyForCopy,
   tryParseJson,
 } from "./attributeFormat";
-import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { safePrettyJson } from "./JsonHighlight";
 import { ShikiCodeBlock } from "./markdownView";
 

@@ -67,7 +67,7 @@ export function useCopyToClipboard(): {
           // with no room for an error string, and the user can retry.
         });
     },
-    [clearTimer]
+    [clearTimer],
   );
 
   return { copied, copy };
