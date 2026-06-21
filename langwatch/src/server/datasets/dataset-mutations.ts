@@ -22,7 +22,7 @@ import { nanoid } from "nanoid";
 import { type ChunkOffset, toSingleJsonl } from "./dataset-chunking";
 import { withDatasetLock } from "./dataset-lock";
 import { type DatasetStorage, getDatasetStorage } from "./dataset-storage";
-import { DatasetNotReadyError } from "./errors";
+import { DatasetNotReadyError, MissingChunkError } from "./errors";
 
 export type RecomputedDatasetCounts = {
   rowCount: number;
@@ -353,13 +353,45 @@ export const deleteS3JsonlRecords = async ({
       sizeBytes,
     } = recomputeOffsets(perChunk);
 
+    // Compaction (cheap, trailing-only): a delete that empties the highest-index
+    // chunks leaves them as zero-row objects. Reap the contiguous TRAILING empty
+    // chunks so `chunkCount` and the S3 object set don't grow unbounded under
+    // delete/edit churn. Trailing-only is mandatory: chunk keys are positional
+    // (`chunk-NNNNN`) and `readChunks` assumes a contiguous `0..chunkCount` set,
+    // so a MIDDLE empty must stay in place — removing it would require
+    // re-indexing every chunk above it. `deleteChunksFrom` deletes the suffix
+    // and stops at the first gap, so it can't over-delete.
+    let keptChunkCount = perChunk.length;
+    while (keptChunkCount > 0 && perChunk[keptChunkCount - 1]!.rowCount === 0) {
+      keptChunkCount -= 1;
+    }
+    const trimmed = keptChunkCount < perChunk.length;
+    if (trimmed) {
+      await datasetStorage.deleteChunksFrom({
+        projectId,
+        datasetId: dataset.id,
+        fromIndex: keptChunkCount,
+      });
+    }
+
     await tx.dataset.update({
       where: { id: dataset.id, projectId },
       data: {
         rowCount,
         sizeBytes: BigInt(sizeBytes),
-        // chunkCount unchanged — empty chunks are kept (no compaction).
-        chunkOffsets: newOffsets as unknown as Prisma.InputJsonValue,
+        // The trailing empty offset entries (startRow === endRow, byteSize 0)
+        // contribute nothing to the totals, so slicing is exact.
+        ...(trimmed
+          ? {
+              chunkCount: keptChunkCount,
+              chunkOffsets: newOffsets.slice(
+                0,
+                keptChunkCount,
+              ) as unknown as Prisma.InputJsonValue,
+            }
+          : {
+              chunkOffsets: newOffsets as unknown as Prisma.InputJsonValue,
+            }),
       },
     });
 
@@ -376,10 +408,12 @@ export const deleteS3JsonlRecords = async ({
  * Runnable on a detected mismatch — the residual repair for the rare
  * PG-commit-after-S3-write failure on edit/delete, where the chunk is mutated
  * but the counters rolled back (Consequences → Negative: I-COUNT is eventually
- * consistent / repairable, not unconditionally atomic). `chunkCount` itself is
- * trusted as the chunk-set boundary (empty chunks are kept, never compacted), so
- * this re-derives addressing within the known chunk set rather than re-discovering
- * it via S3 LIST. Returns the recomputed counts that were persisted.
+ * consistent / repairable, not unconditionally atomic). It reads `0..chunkCount`
+ * but STOPS at the first missing chunk and re-derives `chunkCount` from the
+ * contiguous prefix actually present — so it also repairs a delete-trim residual
+ * (trailing objects reaped, but PG kept the old `chunkCount`). Writes are always
+ * contiguous, so the first gap is necessarily trailing; a non-missing-chunk error
+ * still propagates. Returns the recomputed counts that were persisted.
  */
 export const recomputeDatasetCounts = async ({
   prisma,
@@ -399,14 +433,22 @@ export const recomputeDatasetCounts = async ({
       where: { id: datasetId, projectId },
     });
 
-    const chunkCount = current.chunkCount ?? 0;
+    const declaredChunkCount = current.chunkCount ?? 0;
     const perChunk: Array<{ rowCount: number; byteSize: number }> = [];
-    for (let index = 0; index < chunkCount; index++) {
-      const rows = await datasetStorage.readChunk({
-        projectId,
-        datasetId,
-        index,
-      });
+    for (let index = 0; index < declaredChunkCount; index++) {
+      let rows: unknown[];
+      try {
+        rows = await datasetStorage.readChunk({ projectId, datasetId, index });
+      } catch (error) {
+        // A missing chunk at the tail is a recoverable delete-trim residual: the
+        // trailing objects were reaped but a PG-commit-after-S3-delete failure
+        // left `chunkCount` at the old value. Writes are always contiguous, so
+        // the first gap is necessarily trailing — stop and re-derive chunkCount
+        // from the contiguous prefix actually present (this IS the repair). A
+        // non-missing-chunk error still propagates.
+        if (error instanceof MissingChunkError) break;
+        throw error;
+      }
       // Measure bytes from the actual chunk rows so the recomputed totals reflect
       // S3 truth, not a possibly-drifted offset entry.
       perChunk.push({
@@ -415,6 +457,10 @@ export const recomputeDatasetCounts = async ({
       });
     }
 
+    // Re-derive the boundary from S3 truth (the present contiguous prefix) rather
+    // than trusting the stored `chunkCount` — that's what makes this repair able
+    // to fix a delete-trim residual.
+    const chunkCount = perChunk.length;
     const { offsets, rowCount, sizeBytes } = recomputeOffsets(perChunk);
 
     await tx.dataset.update({

@@ -36,6 +36,7 @@ import type { DatasetStorage, PresignedUpload } from "./dataset-storage";
 import {
   ChunkTooLargeError,
   DirectUploadUnavailableError,
+  MissingChunkError,
   StagedUploadNotFoundError,
 } from "./errors";
 
@@ -122,7 +123,7 @@ export class LocalDatasetStorage implements DatasetStorage {
         jsonl = await fs.readFile(this.localPath(key), "utf-8");
       } catch (error: unknown) {
         if (errorHasProp(error, "code", "ENOENT")) {
-          throw new Error(`Missing dataset chunk: ${key}`);
+          throw new MissingChunkError(key);
         }
         throw error;
       }
@@ -149,7 +150,7 @@ export class LocalDatasetStorage implements DatasetStorage {
       jsonl = await fs.readFile(this.localPath(key), "utf-8");
     } catch (error: unknown) {
       if (errorHasProp(error, "code", "ENOENT")) {
-        throw new Error(`Missing dataset chunk: ${key}`);
+        throw new MissingChunkError(key);
       }
       throw error;
     }

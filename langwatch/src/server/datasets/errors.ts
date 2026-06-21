@@ -193,3 +193,22 @@ export class DatasetTooLargeToExportError extends Error {
     this.maxBytes = maxBytes;
   }
 }
+
+/**
+ * A chunk that the PG-authoritative `chunkCount` claims must exist is missing
+ * from object storage. From a read's perspective this is corruption, not
+ * emptiness, so the read paths (`readChunks`/`readChunk`) throw it rather than
+ * silently truncate. The I-COUNT repair (`recomputeDatasetCounts`) catches it to
+ * tell a recoverable TRAILING gap (a delete-trim residual — PG kept the old
+ * `chunkCount` after the trailing objects were already reaped) from genuine
+ * mid-set corruption.
+ */
+export class MissingChunkError extends Error {
+  readonly key: string;
+
+  constructor(key: string) {
+    super(`Missing dataset chunk: ${key}`);
+    this.name = "MissingChunkError";
+    this.key = key;
+  }
+}
