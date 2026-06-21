@@ -77,7 +77,7 @@ Feature: Workflow agent input/output mapping layer
     Given a workflow agent selected as the scenario target
     And the agent has no scenario input mapping
     When the user clicks Save & Run
-    Then the warning offers an action that opens the AgentWorkflowEditorDrawer for that agent
+    Then the warning offers an action that opens the agent editor for that agent
     And the action still works if the automatic drawer open was dismissed
 
   @integration
