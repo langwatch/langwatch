@@ -344,16 +344,17 @@ describe("<ScenarioFormDrawer /> mapping gate", () => {
         );
       });
 
-      // Prove the action handler ALONE reopens the editor: clear the mock so
-      // the earlier auto-open call doesn't count, then invoke onClick. This is
-      // the fallback affordance — functional even if the auto-open raced/was
-      // dismissed.
       const toastArg = mockToasterCreate.mock.calls.at(-1)?.[0] as {
         action?: { label: string; onClick: () => void };
       };
+      // AC3: the auto-open fired first (existing behavior preserved)...
+      expect(mocks.mockOpenDrawer).toHaveBeenCalledWith("agentWorkflowEditor", {
+        urlParams: { agentId: "workflow-agent-1" },
+      });
+      // ...then clear it and prove the action handler ALONE reopens the editor —
+      // the fallback affordance, functional even if the auto-open was dismissed.
       mocks.mockOpenDrawer.mockClear();
       toastArg.action?.onClick();
-
       expect(mocks.mockOpenDrawer).toHaveBeenCalledWith("agentWorkflowEditor", {
         urlParams: { agentId: "workflow-agent-1" },
       });
@@ -366,13 +367,12 @@ describe("<ScenarioFormDrawer /> mapping gate", () => {
 
       await user.click(screen.getByTestId("save-and-run-button"));
 
-      await waitFor(() => {
-        const toastArg = mockToasterCreate.mock.calls.at(-1)?.[0] as {
-          description?: string;
-        };
-        expect(toastArg.description).toMatch(/input/i);
-        expect(toastArg.description).toMatch(/messages/i);
-      });
+      await waitFor(() => expect(mockToasterCreate).toHaveBeenCalled());
+      const toastArg = mockToasterCreate.mock.calls.at(-1)?.[0] as {
+        description?: string;
+      };
+      expect(toastArg.description).toMatch(/input/i);
+      expect(toastArg.description).toMatch(/messages/i);
     });
   });
 

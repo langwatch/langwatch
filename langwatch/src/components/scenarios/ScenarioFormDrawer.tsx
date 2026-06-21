@@ -291,6 +291,8 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
                 },
                 meta: { closable: true },
               });
+              // Auto-open the editor now; the toast action above is the manual
+              // fallback if this auto-open races, is dismissed, or fails.
               openAgentEditor();
               return;
             }
