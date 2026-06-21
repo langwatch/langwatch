@@ -353,6 +353,13 @@ describe("ttlReconciler", () => {
         "trace_analytics_rollup",
         "evaluation_analytics",
         "evaluation_analytics_rollup",
+        // ADR-034 Phase 7: scenarios / experiments / suites slim + rollup.
+        "simulation_analytics",
+        "simulation_analytics_rollup",
+        "experiment_analytics",
+        "experiment_analytics_rollup",
+        "suite_analytics",
+        "suite_analytics_rollup",
       ]);
     });
 

@@ -1,15 +1,28 @@
 import { definePipeline } from "../../";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
+import type { AppendStore } from "../../projections/mapProjection.types";
 import {
   StartSuiteRunCommand,
   RecordSuiteRunItemStartedCommand,
   CompleteSuiteRunItemCommand,
 } from "./commands";
+import {
+  SuiteAnalyticsFoldProjection,
+  type SuiteAnalyticsData,
+} from "./projections/suiteAnalytics.foldProjection";
+import {
+  SuiteAnalyticsRollupMapProjection,
+  type SuiteAnalyticsRollupRow,
+} from "./projections/suiteAnalyticsRollup.mapProjection";
 import { SuiteRunStateFoldProjection, type SuiteRunStateData } from "./projections/suiteRunState.foldProjection";
 import type { SuiteRunProcessingEvent } from "./schemas/events";
 
 export interface SuiteRunProcessingPipelineDeps {
   suiteRunStateFoldStore: FoldProjectionStore<SuiteRunStateData>;
+  /** ADR-034 Phase 7: slim per-suite-run fold writer. */
+  suiteAnalyticsStore: FoldProjectionStore<SuiteAnalyticsData>;
+  /** ADR-034 Phase 7: per-item rollup writer. */
+  suiteAnalyticsRollupAppendStore: AppendStore<SuiteAnalyticsRollupRow>;
 }
 
 /**
@@ -37,6 +50,16 @@ export function createSuiteRunProcessingPipeline(deps: SuiteRunProcessingPipelin
     .withFoldProjection("suiteRunState", new SuiteRunStateFoldProjection({
       store: deps.suiteRunStateFoldStore,
     }))
+    .withFoldProjection(
+      "suiteAnalytics",
+      new SuiteAnalyticsFoldProjection({ store: deps.suiteAnalyticsStore }),
+    )
+    .withMapProjection(
+      "suiteAnalyticsRollup",
+      new SuiteAnalyticsRollupMapProjection({
+        store: deps.suiteAnalyticsRollupAppendStore,
+      }),
+    )
     .withCommand("startSuiteRun", StartSuiteRunCommand)
     .withCommand("recordSuiteRunItemStarted", RecordSuiteRunItemStartedCommand)
     .withCommand("completeSuiteRunItem", CompleteSuiteRunItemCommand)
