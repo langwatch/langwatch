@@ -102,9 +102,12 @@ export class LogRecordStorageClickHouseRepository
     // re-fold. Two windows:
     //   * with a turn-time hint → ±2d around it (generous headroom for clock
     //     skew / long-running turns)
-    //   * without a hint → `now − 7×CC_RETENTION` ... `now`. Bounded because
-    //     CC logs older than CLAUDE_CODE_LOG_RETENTION_DAYS have already been
-    //     deleted by TTL anyway, so a wider scan can't return anything.
+    //   * without a hint → `now − 7×CC_RETENTION` ... `now + 2d`. The upper
+    //     bound mirrors the hint path's clock-skew headroom so a fast client
+    //     clock that writes a slightly-future TimeUnixMs (it's client-supplied)
+    //     doesn't silently drop the row. Lower bound is safe because CC logs
+    //     older than CLAUDE_CODE_LOG_RETENTION_DAYS have already been deleted
+    //     by TTL anyway.
     const partitionWindowMs = 2 * 24 * 60 * 60 * 1000;
     const ccRetentionMs = CLAUDE_CODE_LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000;
     const fallbackLookbackMs = ccRetentionMs * 7;
@@ -113,7 +116,9 @@ export class LogRecordStorageClickHouseRepository
     const fromMs = hasWindow
       ? occurredAtMs - partitionWindowMs
       : now - fallbackLookbackMs;
-    const toMs = hasWindow ? occurredAtMs + partitionWindowMs : now;
+    const toMs = hasWindow
+      ? occurredAtMs + partitionWindowMs
+      : now + partitionWindowMs;
     // Qualify the bound with the table name: the outer SELECT aliases
     // `toUnixTimestamp64Milli(TimeUnixMs) AS TimeUnixMs`, and ClickHouse would
     // otherwise resolve a bare `TimeUnixMs` in WHERE to that ms-integer alias

@@ -136,12 +136,13 @@ describe("LogRecordStorageClickHouseRepository.getMarkedClaudeCodeLogsByTrace", 
   });
 
   describe("when the caller does not provide a time", () => {
-    it("falls back to a CC-retention-bounded window so the scan can't walk every partition", async () => {
+    it("falls back to a CC-retention-bounded window that includes clock-skew headroom on the upper bound", async () => {
       // Replaces a previous "unbounded fallback" behaviour. CC logs older than
       // CLAUDE_CODE_LOG_RETENTION_DAYS have already been TTL'd away anyway, so
-      // a 7×retention lookback is safe and bounds the partition scan.
-      // Locking the bound *shape* (toMs ≈ now, fromMs == toMs − 7×retention)
-      // so a future bug picking 0 or now-1h doesn't pass this test silently.
+      // a 7×retention lookback is safe and bounds the partition scan. The
+      // upper bound mirrors the hint path's ±2d clock-skew headroom so a
+      // fast client clock that writes a slightly-future TimeUnixMs (it's
+      // client-supplied) doesn't silently drop the row.
       const { repo, query } = repoCapturingQuery();
       const before = Date.now();
 
@@ -157,13 +158,16 @@ describe("LogRecordStorageClickHouseRepository.getMarkedClaudeCodeLogsByTrace", 
       const fromMs = query_params.fromMs as number;
       expect(typeof fromMs).toBe("number");
       expect(typeof toMs).toBe("number");
-      // toMs is captured at now() at the moment the repo built the query
-      expect(toMs).toBeGreaterThanOrEqual(before);
-      expect(toMs).toBeLessThanOrEqual(after);
-      // fromMs is exactly 7×CC_RETENTION earlier than toMs
+      // toMs is now() + 2d (clock-skew headroom). Capture the now() at the
+      // moment the repo built the query (between `before` and `after`).
+      const partitionWindowMs = 2 * 24 * 60 * 60 * 1000;
+      expect(toMs).toBeGreaterThanOrEqual(before + partitionWindowMs);
+      expect(toMs).toBeLessThanOrEqual(after + partitionWindowMs);
+      // fromMs is exactly 7×CC_RETENTION earlier than (toMs − partitionWindowMs)
+      // (i.e. the gap between fromMs and toMs is 7×CC_RETENTION + the headroom)
       const sevenCcRetentionMs =
         CLAUDE_CODE_LOG_RETENTION_DAYS * 7 * 24 * 60 * 60 * 1000;
-      expect(toMs - fromMs).toBe(sevenCcRetentionMs);
+      expect(toMs - fromMs).toBe(sevenCcRetentionMs + partitionWindowMs);
     });
   });
 });
