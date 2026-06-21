@@ -1,6 +1,6 @@
 /**
  * Shared evaluation handler for custom-graph threshold alerts
- * (ADR-034 Phase 5).
+ * (ADR-034 Phase 5 + 8.1).
  *
  * Single canonical handler called by BOTH:
  *
@@ -11,23 +11,16 @@
  *     no-data / firing-resolve absence cases the event-driven path
  *     structurally cannot reach.
  *
- * Mirrors the cron's `processCustomGraphTrigger` exactly:
- *
- *   - Fetch trigger, custom graph, build TimeseriesInput, call
- *     `analyticsService.getTimeseries(...)` (which routes to slim /
- *     rollup / legacy via ADR-034 Phase 3 automatically).
- *   - Compute current value via the same aggregation rules
- *     (`sum/average/cardinality/...`).
- *   - Apply `evaluateCustomGraphThreshold` (the extracted pure
- *     function the cron also calls).
- *   - Apply `isNoDataPredicate` to recognise the "fire when zero" shape.
- *   - On breach: insert a `TriggerSent` row (cron's EXACT dedup pattern
- *     — `triggerId/projectId/customGraphId, resolvedAt:null`) and
- *     dispatch via existing `handleSendEmail` / `handleSendSlackMessage`
- *     (which now pick the alert-default template since `customGraphId`
- *     is set).
- *   - On no-longer-breach: resolve any open `TriggerSent` for the
- *     trigger.
+ * Mirrors the cron's `processCustomGraphTrigger` for the evaluation
+ * side (fetch trigger + graph, build TimeseriesInput, call
+ * `analyticsService.getTimeseries(...)`, compute current value via
+ * the same aggregation rules, apply `evaluateCustomGraphThreshold` /
+ * `isNoDataPredicate`, insert / resolve `TriggerSent` with the same
+ * dedup pattern). Phase 8.1 replaces the cron's hardcoded
+ * `handleSendEmail` / `handleSendSlackMessage` notify hop with the
+ * Liquid pipeline — `buildGraphAlertTemplateContext` +
+ * `dispatchGraphAlertAction` — so per-trigger custom templates and
+ * the alert-default Liquid templates both apply.
  *
  * Idempotent: a second call inside the debounce window sees the
  * already-open `TriggerSent` and skips the side-effect (only updates
@@ -38,7 +31,6 @@ import type {
   CustomGraph,
   Project,
   Trigger,
-  TriggerAction as TriggerActionEnum,
 } from "@prisma/client";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 import type {
@@ -50,11 +42,12 @@ import type {
   TimeseriesResult,
 } from "~/server/analytics/types";
 import { sumMetricAcrossGroups } from "~/pages/api/cron/triggers/customGraphTrigger";
+import type { ActionParams } from "~/pages/api/cron/triggers/types";
 import type {
-  ActionParams,
-  TriggerData,
-} from "~/pages/api/cron/triggers/types";
-import type { Trace } from "~/server/tracer/types";
+  GraphAlertDispatchInput,
+  GraphAlertDispatchResult,
+} from "~/server/event-sourcing/pipelines/shared/graphAlertActionDispatch";
+import { buildGraphAlertTemplateContext } from "~/shared/templating/templateContext";
 import {
   evaluateCustomGraphThreshold,
   isNoDataPredicate,
@@ -99,25 +92,14 @@ export type StoredGraphConfig = Pick<
 >;
 
 /**
- * Notification dispatcher contract. Implemented in the wiring layer by
- * the EXISTING `handleSendEmail` / `handleSendSlackMessage` from
- * `~/pages/api/cron/triggers/actions/` — the same handlers the cron uses.
- * Kept as injected hooks here so this service stays free of mailer /
- * Slack dependencies and easy to unit-test.
+ * Notification dispatcher hook (ADR-034 Phase 8.1). Implemented in the
+ * wiring layer by `dispatchGraphAlertAction` — which routes through the
+ * Liquid pipeline + per-trigger custom templates + alert defaults.
+ * Kept as an injected hook here so this service stays free of mailer /
+ * Slack / templating dependencies and trivially unit-testable.
  */
 export interface GraphTriggerNotifier {
-  sendEmail(params: {
-    trigger: Trigger;
-    projects: Project[];
-    triggerData: TriggerData[];
-    projectSlug: string;
-  }): Promise<void>;
-  sendSlack(params: {
-    trigger: Trigger;
-    projects: Project[];
-    triggerData: TriggerData[];
-    projectSlug: string;
-  }): Promise<void>;
+  dispatch(input: GraphAlertDispatchInput): Promise<GraphAlertDispatchResult>;
 }
 
 export interface GraphTriggerEvaluationDeps {
@@ -137,6 +119,10 @@ export interface GraphTriggerEvaluationDeps {
     projectId: string;
   }): Promise<void>;
   notifier: GraphTriggerNotifier;
+  /** Base host for building deep links inside rendered templates
+   *  (ADR-034 Phase 8.1). Injected, not read from env, so this service
+   *  stays pure and testable. */
+  baseHost: string;
   now(): Date;
 }
 
@@ -324,42 +310,38 @@ export async function evaluateGraphTrigger({
       });
     }
 
-    const triggerData: TriggerData[] = [
-      {
-        input: `Graph: ${customGraph.name}`,
-        output: `Current value: ${currentValue.toFixed(
-          2,
-        )} (threshold: ${operator} ${threshold})`,
-        graphId: customGraphId,
-        projectId,
-        fullTrace: {} as Trace,
+    // ADR-034 Phase 8.1: build the alert template context and dispatch
+    // through the Liquid pipeline. Per-trigger custom templates (the
+    // four Trigger columns) override the alert defaults inside the
+    // renderer; this layer only assembles the variable surface.
+    const metricLabel = series.name ?? seriesName;
+    const context = buildGraphAlertTemplateContext({
+      trigger: {
+        id: trigger.id,
+        name: trigger.name,
+        alertType: trigger.alertType,
       },
-    ];
+      graph: { id: customGraphId, name: customGraph.name },
+      metric: { label: metricLabel, seriesName },
+      condition: {
+        operator,
+        threshold,
+        timePeriodMinutes: timePeriod,
+      },
+      currentValue,
+      occurredAt: now,
+      reason,
+      project: { id: project.id, name: project.name, slug: project.slug },
+      baseHost: deps.baseHost,
+    });
 
-    const dispatchedTrigger: Trigger = {
-      ...trigger,
-      message:
-        trigger.message ??
-        `Graph "${customGraph.name}" alert: Value ${currentValue.toFixed(
-          2,
-        )} ${operator} ${threshold}`,
-    };
-
-    if (isSendEmail(trigger.action)) {
-      await deps.notifier.sendEmail({
-        trigger: dispatchedTrigger,
-        projects: [project],
-        triggerData,
-        projectSlug: project.slug,
-      });
-    } else if (isSendSlack(trigger.action)) {
-      await deps.notifier.sendSlack({
-        trigger: dispatchedTrigger,
-        projects: [project],
-        triggerData,
-        projectSlug: project.slug,
-      });
-    }
+    await deps.notifier.dispatch({
+      trigger,
+      project,
+      context,
+      recipients: params.members ?? [],
+      slackWebhook: params.slackWebhook ?? null,
+    });
 
     // Record the fire BEFORE updateLastRunAt — same order as the cron
     // (`addTriggersSent` then `updateAlert`).
@@ -443,14 +425,6 @@ function noteIfNoData(operator: string, threshold: number): string | undefined {
   return isNoDataPredicate({ operator, threshold })
     ? "no-data predicate"
     : undefined;
-}
-
-function isSendEmail(action: TriggerActionEnum): boolean {
-  return action === "SEND_EMAIL";
-}
-
-function isSendSlack(action: TriggerActionEnum): boolean {
-  return action === "SEND_SLACK_MESSAGE";
 }
 
 /**
