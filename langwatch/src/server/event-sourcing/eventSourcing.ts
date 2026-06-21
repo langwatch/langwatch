@@ -1,13 +1,15 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { SpanKind } from "@opentelemetry/api";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
 import type { ProcessRole } from "~/server/app-layer/config";
-import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import { makeQueueName } from "~/server/background/queues/makeQueueName";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import { createLogger } from "~/utils/logger/server";
+import { resolveProjectStorageDestination } from "../stored-objects/project-storage-destination";
+import { createStorageRegistry } from "../stored-objects/stored-objects-factory";
 import { DisabledPipeline } from "./disabledPipeline";
 import type { Event, Projection } from "./domain/types";
 import type {
@@ -22,16 +24,15 @@ import type {
 import { BILLING_REPORTING_PIPELINE_NAME } from "./pipelines/billing-reporting/pipeline";
 import { createBillingMeterDispatchReactor } from "./projections/global/billingMeterDispatch.reactor";
 import { orgBillableEventsMeterProjection } from "./projections/global/orgBillableEventsMeter.mapProjection";
-import type { ReactorDefinition } from "./reactors/reactor.types";
-import { RedisReplayMarkerChecker } from "./projections/replayMarkerCheck";
-import { ConfigurationError } from "./services/errorHandling";
-
 import { projectDailySdkUsageProjection } from "./projections/global/projectDailySdkUsage.foldProjection";
 import { ProjectionRegistry } from "./projections/projectionRegistry";
+import { RedisReplayMarkerChecker } from "./projections/replayMarkerCheck";
 import type { EventSourcedQueueProcessor } from "./queues";
 import { GroupQueueProcessor } from "./queues/groupQueue/groupQueue";
 import { EventSourcedQueueProcessorMemory } from "./queues/memory";
+import type { ReactorDefinition } from "./reactors/reactor.types";
 import { EventSourcingPipeline } from "./runtimePipeline";
+import { ConfigurationError } from "./services/errorHandling";
 import type { JobRegistryEntry } from "./services/queues/queueManager";
 import type { EventStore } from "./stores/eventStore.types";
 import { EventStoreClickHouse } from "./stores/eventStoreClickHouse";
@@ -157,7 +158,10 @@ export class EventSourcing {
       this.projectionRegistry.registerReactor(foldName, reactor);
     } catch (error) {
       // Only suppress "fold not registered" errors — let wiring bugs (duplicates, etc.) fail fast
-      if (error instanceof ConfigurationError && error.message.includes("fold not registered")) {
+      if (
+        error instanceof ConfigurationError &&
+        error.message.includes("fold not registered")
+      ) {
         logger.debug(
           { foldName, reactorName: reactor.name },
           "Skipping global fold reactor — fold not registered",
@@ -492,6 +496,8 @@ export class EventSourcing {
     if (effectiveRedis) {
       this._globalQueue = new GroupQueueProcessor(definition, effectiveRedis, {
         consumerEnabled: this._processRole === "worker",
+        objectStoreFor: (projectId) => createStorageRegistry({ projectId }),
+        resolveStorageDestination: resolveProjectStorageDestination,
       });
     } else {
       this._globalQueue = new EventSourcedQueueProcessorMemory(definition);
