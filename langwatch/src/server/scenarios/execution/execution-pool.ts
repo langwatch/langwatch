@@ -35,6 +35,14 @@ export type OnSkipCancelledFn = (jobData: ExecutionJobData) => void;
 
 export class ScenarioExecutionPool {
   private readonly _running = new Map<string, ChildProcess>();
+  /**
+   * In-flight job data keyed by scenarioRunId, tracked from the moment a job
+   * starts (before the child is registered) so the spawn window — where the
+   * child exists but isn't yet in `_running` — is still covered. Used by
+   * `inFlightJobs` so a draining worker can emit a terminal failure for every
+   * run it owns and none orphan at QUEUED.
+   */
+  private readonly _runningJobs = new Map<string, ExecutionJobData>();
   private readonly _pending: ExecutionJobData[] = [];
   private readonly _cancelled = new Set<string>();
   private readonly _concurrency: number;
@@ -71,6 +79,16 @@ export class ScenarioExecutionPool {
   }
 
   /**
+   * Job data for every run still in flight: those running (tracked from
+   * startJob, covering the pre-registration spawn window) plus those buffered
+   * pending. Drained on worker shutdown so each run reaches a terminal state
+   * instead of orphaning at QUEUED.
+   */
+  get inFlightJobs(): ExecutionJobData[] {
+    return [...this._runningJobs.values(), ...this._pending];
+  }
+
+  /**
    * Mark a scenario as cancelled. Called when the cancel subscription receives
    * a message and kills the child. The close handler checks this to distinguish
    * cancellation from crashes.
@@ -98,6 +116,7 @@ export class ScenarioExecutionPool {
    */
   deregisterChild(scenarioRunId: string): void {
     this._running.delete(scenarioRunId);
+    this._runningJobs.delete(scenarioRunId);
     this.dequeueNext();
   }
 
@@ -133,8 +152,14 @@ export class ScenarioExecutionPool {
   }
 
   private startJob(jobData: ExecutionJobData): void {
+    // Track in-flight job data immediately — before the child is registered —
+    // so a draining worker can emit a terminal failure even if shutdown lands
+    // in the spawn window (child exists but not yet in `_running`).
+    this._runningJobs.set(jobData.scenarioRunId, jobData);
+
     if (!this._spawnFn) {
       logger.error({ scenarioRunId: jobData.scenarioRunId }, "Spawn function not set on execution pool");
+      this._runningJobs.delete(jobData.scenarioRunId);
       return;
     }
 
@@ -151,6 +176,7 @@ export class ScenarioExecutionPool {
       );
       // Ensure we deregister even on unexpected errors
       this._running.delete(jobData.scenarioRunId);
+      this._runningJobs.delete(jobData.scenarioRunId);
       this.dequeueNext();
     });
   }

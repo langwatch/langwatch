@@ -230,6 +230,11 @@ export const start = async (
           topicClusteringWorker?.off("closing", closingListener);
           usageStatsWorker?.off("closing", closingListener);
           anomalyDetectionWorker?.off("closing", closingListener);
+          // scenarioProcessor.close() emits a terminal failure for every
+          // in-flight scenario run before we drain and restart, so those runs
+          // don't orphan at QUEUED (no live worker would ever finish them).
+          // It is awaited here (before the reject below) so the failures are
+          // persisted before the restart tears the process down.
           await Promise.all([
             collectorWorker?.close(),
             evaluationsWorker?.close(),
