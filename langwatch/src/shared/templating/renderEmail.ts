@@ -9,7 +9,10 @@ import {
 import { wrapEmailHtml } from "./emailLayout";
 import { markdownToEmailHtml } from "./markdown";
 import { renderWithFallback } from "./renderWithFallback";
-import type { TemplateContext } from "./templateContext";
+import type {
+  GraphAlertTemplateContext,
+  TemplateContext,
+} from "./templateContext";
 
 export const EMAIL_SUBJECT_MAX_LENGTH = 200;
 
@@ -34,28 +37,38 @@ function clipSubject(subject: string): string {
  * framework default per part. Body is Liquid → Markdown → sanitized HTML →
  * LangWatch frame. On a test fire, a non-suppressible banner is injected by the
  * backend (subject prefix + body callout) above the customer content.
+ *
+ * `defaults` (optional) overrides the framework subject/body templates the
+ * renderer falls back to. ADR-034 Phase 8.1 uses this to render
+ * `GraphAlertTemplateContext` against the alert-default templates without
+ * forking the engine; trace callers omit it and keep the trace defaults.
+ * Both `TemplateContext` and `GraphAlertTemplateContext` carry the
+ * `project.url` + `trigger.editUrl` the chrome footer needs, so the
+ * non-template chrome wrap works for either.
  */
 export async function renderTriggerEmail({
   subjectTemplate,
   bodyTemplate,
   context,
+  defaults,
   testFire = false,
 }: {
   subjectTemplate: string | null;
   bodyTemplate: string | null;
-  context: TemplateContext;
+  context: TemplateContext | GraphAlertTemplateContext;
+  defaults?: { emailSubject: string; emailBody: string };
   testFire?: boolean;
 }): Promise<RenderedEmail> {
   const ctx = context as unknown as Record<string, unknown>;
 
   const subjectRender = await renderWithFallback({
     template: subjectTemplate,
-    fallback: DEFAULT_EMAIL_SUBJECT_TEMPLATE,
+    fallback: defaults?.emailSubject ?? DEFAULT_EMAIL_SUBJECT_TEMPLATE,
     context: ctx,
   });
   const bodyRender = await renderWithFallback({
     template: bodyTemplate,
-    fallback: DEFAULT_EMAIL_BODY_TEMPLATE,
+    fallback: defaults?.emailBody ?? DEFAULT_EMAIL_BODY_TEMPLATE,
     context: ctx,
   });
 

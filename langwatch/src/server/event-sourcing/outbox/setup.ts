@@ -17,10 +17,11 @@ import {
 } from "~/server/app-layer/triggers/graph-trigger-evaluation.service";
 import { PrismaGraphTriggerSentRepository } from "~/server/app-layer/triggers/repositories/trigger.prisma.repository";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
-import { handleSendEmail } from "~/pages/api/cron/triggers/actions/sendEmail";
-import { handleSendSlackMessage } from "~/pages/api/cron/triggers/actions/sendSlackMessage";
 import { getAnalyticsService } from "~/server/app-layer/analytics";
+import { dispatchGraphAlertAction } from "~/server/event-sourcing/pipelines/shared/graphAlertActionDispatch";
+import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { TraceService } from "~/server/traces/trace.service";
+import { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
 import { TraceSummaryStore } from "../pipelines/trace-processing/projections/traceSummary.store";
 import type { FoldProjectionStore } from "../projections/foldProjection.types";
 import { RedisCachedFoldStore } from "../projections/redisCachedFoldStore";
@@ -163,13 +164,16 @@ export function buildOutboxRuntime({
     return promise;
   };
 
-  // ADR-034 Phase 5: shared evaluator deps for graphEval-stage payloads.
-  // Constructed lazily once (no per-tick allocation). Notifier reuses the
-  // EXISTING cron handlers byte-for-byte (`handleSendEmail` /
-  // `handleSendSlackMessage`) — the spec requires `sendTriggerEmail` /
-  // `sendSlackWebhook` to be UNCHANGED. The TriggerSent repo mirrors the
-  // cron's dedup pattern exactly (find/create/update with the same WHERE
-  // clauses for `customGraphId != null` graph alerts).
+  // ADR-034 Phase 5/8.1: shared evaluator deps for graphEval-stage
+  // payloads. Constructed lazily once (no per-tick allocation). The
+  // notifier dispatches via the Liquid pipeline (`dispatchGraphAlertAction`)
+  // so per-trigger custom templates and the alert-default Liquid
+  // templates both apply — the cron's `handleSendEmail` /
+  // `handleSendSlackMessage` are NOT used here (they stay around for
+  // un-flagged projects that still ride the cron). Sender signatures
+  // (`sendRenderedTriggerEmail` / `sendRenderedSlackMessage`) are
+  // unchanged. The TriggerSent repo mirrors the cron's dedup pattern
+  // exactly.
   const graphTriggerSentRepo = new PrismaGraphTriggerSentRepository(prisma);
   const graphTriggerEvalDeps: GraphTriggerEvaluationDeps = {
     loadTrigger: async ({ triggerId, projectId }) =>
@@ -185,21 +189,16 @@ export function buildOutboxRuntime({
     updateLastRunAt: async ({ triggerId, projectId }) =>
       triggers.updateLastRunAt(triggerId, projectId),
     notifier: {
-      sendEmail: async (params) =>
-        handleSendEmail({
-          trigger: params.trigger,
-          projects: params.projects,
-          triggerData: params.triggerData,
-          projectSlug: params.projectSlug,
-        }),
-      sendSlack: async (params) =>
-        handleSendSlackMessage({
-          trigger: params.trigger,
-          projects: params.projects,
-          triggerData: params.triggerData,
-          projectSlug: params.projectSlug,
+      dispatch: async (input) =>
+        dispatchGraphAlertAction({
+          deps: {
+            sendEmail: sendRenderedTriggerEmail,
+            sendSlack: sendRenderedSlackMessage,
+          },
+          input,
         }),
     },
+    baseHost: env.BASE_HOST ?? "",
     now: () => new Date(),
   };
 

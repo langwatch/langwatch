@@ -105,6 +105,184 @@ function matchUrl({
 }
 
 /**
+ * Template-variable contract for custom-graph THRESHOLD ALERTS (ADR-034
+ * Phase 8.1). Distinct from `TemplateContext` (the trace-iteration shape)
+ * because an alert reads as "metric X crossed threshold Y", not "these
+ * traces happened" — there is no `matches` array, just one metric value
+ * compared against a condition.
+ *
+ * Carried into both alert-default templates and any per-trigger custom
+ * Liquid templates (the four Trigger columns). Renders through the same
+ * `renderTriggerEmail` / `renderTriggerSlack` engine; only the variable
+ * surface differs.
+ */
+export interface GraphAlertTemplateContext {
+  trigger: GraphAlertTriggerVars;
+  graph: GraphAlertGraphVars;
+  metric: GraphAlertMetricVars;
+  condition: GraphAlertConditionVars;
+  /** The metric value the evaluator just read for the alert's window. */
+  currentValue: number;
+  /** ISO-8601 timestamp the evaluator considered to be "now". */
+  occurredAt: string;
+  /** Same enum the evaluator carries (`real-time` / `heartbeat-absence`
+   *  / `heartbeat-resolve`). Surfaced so a custom template can branch on
+   *  it if needed. */
+  reason: "real-time" | "heartbeat-absence" | "heartbeat-resolve";
+  project: GraphAlertProjectVars;
+}
+
+export interface GraphAlertTriggerVars {
+  id: string;
+  name: string;
+  /** `INFO` / `WARNING` / `CRITICAL`. Plain string (not the Prisma enum)
+   *  so this module stays Prisma-free for the test fixtures. */
+  alertType: "INFO" | "WARNING" | "CRITICAL" | null;
+  /** Deep link to the automation's edit page — same shape as the
+   *  trace-context `editUrl` so chrome-footer rendering is uniform. */
+  editUrl: string;
+}
+
+export interface GraphAlertGraphVars {
+  id: string;
+  name: string;
+  /** Deep link to the custom-graph dashboard page. */
+  url: string;
+}
+
+export interface GraphAlertMetricVars {
+  /** Human-readable label, e.g. "Trace count". Derived from the series'
+   *  display name when set; falls back to the series-name string the
+   *  trigger stored. */
+  label: string;
+  /** The internal series identifier the trigger references — same
+   *  `index/key/aggregation` string the evaluator parses. */
+  seriesName: string;
+}
+
+export interface GraphAlertConditionVars {
+  /** Raw operator the trigger stored (`gt`, `lt`, `gte`, `lte`, `eq`). */
+  operator: string;
+  /** Human-readable operator phrasing for subjects/bodies, e.g. "is
+   *  greater than". */
+  operatorLabel: string;
+  threshold: number;
+  /** Window the evaluator used, in minutes (mirror of `actionParams.timePeriod`). */
+  timePeriodMinutes: number;
+  /** Human-readable window label, e.g. "last 60 minutes". */
+  timePeriodLabel: string;
+}
+
+export interface GraphAlertProjectVars {
+  id: string;
+  name: string;
+  slug: string;
+  /** Project home URL — also used by the email-chrome footer. */
+  url: string;
+}
+
+function operatorLabel(operator: string): string {
+  switch (operator) {
+    case "gt":
+      return "is greater than";
+    case "gte":
+      return "is greater than or equal to";
+    case "lt":
+      return "is less than";
+    case "lte":
+      return "is less than or equal to";
+    case "eq":
+      return "is equal to";
+    default:
+      return operator;
+  }
+}
+
+function timePeriodLabel(minutes: number): string {
+  if (minutes === 1) return "last 1 minute";
+  if (minutes < 60) return `last ${minutes} minutes`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  if (remainder === 0) {
+    return hours === 1 ? "last 1 hour" : `last ${hours} hours`;
+  }
+  return `last ${minutes} minutes`;
+}
+
+/**
+ * Pure builder for the alert template context (ADR-034 Phase 8.1).
+ * `baseHost` is injected (not read from env) so the renderer stays pure
+ * and testable. The graph URL points at the canonical custom-graph page
+ * — same path `matchUrl` produces for graph-shaped trace matches, kept
+ * in sync here so chrome / template URLs agree.
+ */
+export function buildGraphAlertTemplateContext({
+  trigger,
+  graph,
+  metric,
+  condition,
+  currentValue,
+  occurredAt,
+  reason,
+  project,
+  baseHost,
+}: {
+  trigger: { id: string; name: string; alertType: "INFO" | "WARNING" | "CRITICAL" | null };
+  graph: { id: string; name: string };
+  metric: { label: string; seriesName: string };
+  condition: {
+    operator: string;
+    threshold: number;
+    timePeriodMinutes: number;
+  };
+  currentValue: number;
+  occurredAt: Date;
+  reason: GraphAlertTemplateContext["reason"];
+  project: { id: string; name: string; slug: string };
+  baseHost: string;
+}): GraphAlertTemplateContext {
+  const projectUrl = `${baseHost}/${project.slug}`;
+  const graphUrl = matchUrl({
+    baseHost,
+    projectSlug: project.slug,
+    graphId: graph.id,
+  });
+  return {
+    trigger: {
+      id: trigger.id,
+      name: trigger.name,
+      alertType: trigger.alertType,
+      editUrl: `${projectUrl}/automations?drawer.open=automation&drawer.automationId=${trigger.id}&drawer.source=email-link`,
+    },
+    graph: {
+      id: graph.id,
+      name: graph.name,
+      url: graphUrl,
+    },
+    metric: {
+      label: metric.label,
+      seriesName: metric.seriesName,
+    },
+    condition: {
+      operator: condition.operator,
+      operatorLabel: operatorLabel(condition.operator),
+      threshold: condition.threshold,
+      timePeriodMinutes: condition.timePeriodMinutes,
+      timePeriodLabel: timePeriodLabel(condition.timePeriodMinutes),
+    },
+    currentValue,
+    occurredAt: occurredAt.toISOString(),
+    reason,
+    project: {
+      id: project.id,
+      name: project.name,
+      slug: project.slug,
+      url: projectUrl,
+    },
+  };
+}
+
+/**
  * Maps dispatch-layer match data into the template variable contract.
  * `baseHost` is injected (not read from env here) so the renderer stays pure
  * and testable.
