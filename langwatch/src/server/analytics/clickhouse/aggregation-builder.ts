@@ -332,7 +332,7 @@ const groupByExpressions: Partial<
       ? `CASE
         WHEN ${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String} AND ${tableAliases.evaluation_runs}.Status = 'processed' AND ${tableAliases.evaluation_runs}.Passed IS NOT NULL AND ${tableAliases.evaluation_runs}.Passed = 1 THEN 'passed'
         WHEN ${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String} AND ${tableAliases.evaluation_runs}.Status = 'processed' AND ${tableAliases.evaluation_runs}.Passed IS NOT NULL AND ${tableAliases.evaluation_runs}.Passed = 0 THEN 'failed'
-        WHEN ${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String} AND ${tableAliases.evaluation_runs}.Status = 'processed' THEN 'unknown'
+        WHEN ${tableAliases.evaluation_runs}.EvaluatorId = {groupByKey:String} AND ${tableAliases.evaluation_runs}.Status = 'processed' AND ${tableAliases.evaluation_runs}.Passed IS NULL THEN 'unknown'
         ELSE NULL
       END`
       : `CASE

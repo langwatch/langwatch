@@ -742,8 +742,10 @@ describe("aggregation-builder", () => {
         };
         const result = buildTimeseriesQuery(input);
 
-        // The new score-only WHEN: processed rows for THIS evaluator with Passed IS NULL → 'unknown'
-        expect(result.sql).toMatch(/Status = 'processed'\s+THEN 'unknown'/);
+        // The new score-only WHEN: target evaluator + processed + Passed IS NULL → 'unknown'
+        expect(result.sql).toMatch(
+          /EvaluatorId = \{groupByKey:String\} AND \w+\.Status = 'processed' AND \w+\.Passed IS NULL THEN 'unknown'/,
+        );
         // Foreign-evaluator isolation sentinel is preserved — other evaluators still hit ELSE NULL
         expect(result.sql).toContain("ELSE NULL");
       });
