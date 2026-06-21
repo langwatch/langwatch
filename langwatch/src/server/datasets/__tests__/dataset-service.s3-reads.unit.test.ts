@@ -350,7 +350,7 @@ describe("DatasetService", () => {
 
   describe("copyDataset()", () => {
     describe("when the source is s3_jsonl and ready", () => {
-      it("reads source rows from chunks (not the empty PG table) into the new dataset", async () => {
+      it("reads source rows from chunks (not the empty PG table) into the new s3_jsonl dataset", async () => {
         const create = vi
           .fn()
           .mockResolvedValue({ id: "dataset_new", slug: "ds-copy" });
@@ -358,21 +358,33 @@ describe("DatasetService", () => {
           findOne: vi.fn().mockResolvedValue({ ...baseS3Dataset }),
           findAllSlugs: vi.fn().mockResolvedValue([]),
           findBySlug: vi.fn().mockResolvedValue(null),
-          getProjectWithOrgS3Settings: vi
-            .fn()
-            .mockResolvedValue({ canUseS3: false }),
           create,
         };
         const recordRepository = { findDatasetRecords: vi.fn() };
-        // $transaction passthrough so createNewDataset runs.
         const service = makeService({ repository, recordRepository });
-        (service as unknown as { prisma: unknown }).prisma = {
-          $transaction: async (fn: (tx: unknown) => unknown) => fn({}),
-        };
-        mockReadChunks([
+
+        // The same fake storage serves both the SOURCE read (readChunks) and the
+        // born-on-storage WRITE of the target (writeChunks).
+        const readChunks = vi.fn().mockResolvedValue([
           { id: "r1", entry: { a: 1 } },
           { id: "r2", entry: { a: 2 } },
         ]);
+        const writeChunks = vi.fn(({ records }: { records: unknown[] }) =>
+          Promise.resolve([
+            {
+              index: 0,
+              jsonl: "",
+              rowCount: records.length,
+              byteSize: 1,
+              startRow: 0,
+              endRow: records.length,
+            },
+          ]),
+        );
+        vi.mocked(getDatasetStorage).mockResolvedValue({
+          readChunks,
+          writeChunks,
+        } as never);
 
         await service.copyDataset({
           sourceDatasetId: "dataset_1",
@@ -382,14 +394,22 @@ describe("DatasetService", () => {
 
         // The PG record reader must NOT be used for an s3_jsonl source.
         expect(recordRepository.findDatasetRecords).not.toHaveBeenCalled();
-        // The copied entries come from the chunk lines' `entry` (unwrapped),
-        // each with a fresh id — proving the read came from S3, not empty PG.
+        // Born-on-storage: the target is created s3_jsonl and the copied rows are
+        // written to chunk objects (NOT the PG record-write seam).
         expect(create).toHaveBeenCalled();
-        const copiedEntries = vi.mocked(createManyDatasetRecords).mock
-          .calls[0]![0].datasetRecords;
-        expect(copiedEntries).toHaveLength(2);
-        expect(copiedEntries[0]).toMatchObject({ a: 1 });
-        expect(copiedEntries[1]).toMatchObject({ a: 2 });
+        expect(create.mock.calls[0]![0]).toMatchObject({
+          contentLayout: "s3_jsonl",
+          status: "ready",
+        });
+        expect(createManyDatasetRecords).not.toHaveBeenCalled();
+        // The written chunk lines carry the source entries (unwrapped from S3),
+        // proving the read came from chunks, not the empty PG table.
+        const written = writeChunks.mock.calls[0]![0].records as Array<{
+          entry: unknown;
+        }>;
+        expect(written).toHaveLength(2);
+        expect(written[0]!.entry).toMatchObject({ a: 1 });
+        expect(written[1]!.entry).toMatchObject({ a: 2 });
       });
     });
 

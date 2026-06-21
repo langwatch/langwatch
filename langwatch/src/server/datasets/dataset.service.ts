@@ -11,7 +11,7 @@ import {
   getFullDataset,
 } from "../api/routers/datasetRecord.utils";
 import { DatasetRepository } from "./dataset.repository";
-import type { ChunkOffset } from "./dataset-chunking";
+import { type ChunkOffset, chunkedMeta, chunkMetaOf } from "./dataset-chunking";
 import {
   appendS3JsonlRecords,
   deleteS3JsonlRecords,
@@ -256,13 +256,22 @@ export class DatasetService {
   }
 
   /**
-   * Creates a new dataset with generated slug and optional records.
+   * Creates a new dataset with a generated slug and optional records.
    *
-   * Atomicity: dataset row creation and record insertion are wrapped in a
-   * single Prisma transaction. If record insertion fails (e.g. Postgres
-   * rejects a record with a U+0000 null byte before sanitisation reached it),
-   * the dataset row is rolled back so the user is not left with an orphaned
-   * empty dataset that blocks retries with a "name already exists" error.
+   * Born-on-storage (ADR-032 cutover step 1): every new dataset is created
+   * directly in the chunked-JSONL layout — S3 when configured, else the local
+   * filesystem (`resolveProjectStorageDestination` always returns a backend) —
+   * so `contentLayout='postgres'` is never created for new data and the backfill
+   * drains to zero. Records are wrapped `{ id, entry }` (the same shape the
+   * append/normalize paths write) and flushed to chunk objects from index 0,
+   * then the row is created with PG-authoritative counters and `status='ready'`
+   * (the write is synchronous, so there is no async-normalize `processing`
+   * window).
+   *
+   * Atomicity: chunks are written BEFORE the row exists, so a chunk-write
+   * failure throws and leaves no orphan row (the "name already exists" trap the
+   * old record-insert transaction guarded against). No advisory lock is taken —
+   * the row doesn't exist yet, so there is nothing to serialize against.
    *
    * @throws {DatasetConflictError} if slug already exists
    */
@@ -285,33 +294,36 @@ export class DatasetService {
       throw new DatasetConflictError();
     }
 
-    const { canUseS3 } = await this.repository.getProjectWithOrgS3Settings({
-      projectId,
+    const datasetId = `dataset_${nanoid()}`;
+
+    // Drop any caller-supplied id (s3_jsonl rows are addressed by their
+    // chunk-line id), scrub U+0000 (I-NULL), and wrap as `{ id, entry }`.
+    const lines = (datasetRecords ?? []).map((record) => {
+      const { id: _id, ...entry } = record;
+      return { id: `record_${nanoid()}`, entry: stripNullBytes(entry) };
     });
 
-    return await this.prisma.$transaction(async (tx) => {
-      const dataset = await this.repository.create(
-        {
-          id: `dataset_${nanoid()}`,
-          slug,
-          name,
-          projectId,
-          columnTypes,
-          useS3: canUseS3,
-        },
-        { tx },
-      );
+    const storage = await getDatasetStorage(projectId);
+    const written = await storage.writeChunks({
+      projectId,
+      datasetId,
+      records: lines,
+      fromIndex: 0,
+    });
+    const meta = chunkedMeta(written.map(chunkMetaOf));
 
-      if (datasetRecords) {
-        await createManyDatasetRecords({
-          datasetId: dataset.id,
-          projectId,
-          datasetRecords,
-          tx,
-        });
-      }
-
-      return dataset;
+    return await this.repository.create({
+      id: datasetId,
+      slug,
+      name,
+      projectId,
+      columnTypes,
+      contentLayout: "s3_jsonl",
+      status: "ready",
+      rowCount: meta.rowCount,
+      sizeBytes: BigInt(meta.sizeBytes),
+      chunkCount: meta.chunkCount,
+      chunkOffsets: meta.chunkOffsets as unknown as Prisma.InputJsonValue,
     });
   }
 
