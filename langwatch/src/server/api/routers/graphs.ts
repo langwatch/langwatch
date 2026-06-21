@@ -2,6 +2,7 @@ import { AlertType, type Prisma, TriggerAction } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { buildGraphAlertTriggerData } from "~/server/app-layer/triggers/graph-alert.builder";
 import { type FilterField, filterFieldsEnum } from "../../filters/types";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import { checkProjectPermission } from "../rbac";
@@ -64,8 +65,12 @@ const alertSchemaRefinement = (
 // Reusable alert schema with conditional validation
 const alertSchema = alertSchemaBase.superRefine(alertSchemaRefinement);
 
-// Helper function to build trigger data for graph alerts
-const buildGraphAlertTriggerData = (
+// Reuses the shared builder from `app-layer/triggers` so the dashboard
+// path and the automation-drawer path write the EXACT same Trigger row
+// shape. Narrows the upstream `operator`/`timePeriod` shape (which the
+// legacy schema accepts more permissively than the builder) to the
+// builder's enum at the call boundary.
+const buildAlertTriggerForGraph = (
   id: string,
   name: string,
   projectId: string,
@@ -77,24 +82,28 @@ const buildGraphAlertTriggerData = (
   },
   alertType: AlertType,
   customGraphId: string,
-) => {
-  return {
+) =>
+  buildGraphAlertTriggerData({
     id,
-    name: `Alert: ${name}`,
+    name,
     projectId,
     action,
-    actionParams: {
-      ...actionParams,
-      threshold: actionParams.threshold,
-      operator: actionParams.operator,
-      timePeriod: actionParams.timePeriod,
-    },
-    filters: {},
     alertType,
-    active: true,
     customGraphId,
-  };
-};
+    actionParams: {
+      threshold: actionParams.threshold,
+      operator: actionParams.operator as
+        | "gt"
+        | "lt"
+        | "gte"
+        | "lte"
+        | "eq",
+      timePeriod: actionParams.timePeriod as 5 | 15 | 30 | 60 | 1440,
+      seriesName: actionParams.seriesName ?? "",
+      members: actionParams.members,
+      slackWebhook: actionParams.slackWebhook,
+    },
+  });
 
 export const graphsRouter = createTRPCRouter({
   create: protectedProcedure
@@ -146,7 +155,7 @@ export const graphsRouter = createTRPCRouter({
       // Create trigger if alert is enabled
       if (input.alert?.enabled && input.alert.action && input.alert.type) {
         const triggerName = input.alertName ?? input.name;
-        const triggerData = buildGraphAlertTriggerData(
+        const triggerData = buildAlertTriggerForGraph(
           nanoid(),
           triggerName,
           input.projectId,
@@ -354,7 +363,7 @@ export const graphsRouter = createTRPCRouter({
           });
         } else {
           // Create new trigger
-          const triggerData = buildGraphAlertTriggerData(
+          const triggerData = buildAlertTriggerForGraph(
             nanoid(),
             triggerName,
             input.projectId,

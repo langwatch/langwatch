@@ -1,4 +1,5 @@
 import {
+  Badge,
   Box,
   Button,
   Container,
@@ -10,12 +11,28 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Monitor, TriggerAction } from "@prisma/client";
-import { Bell, Edit2, Filter, MoreVertical, Plus, Trash } from "react-feather";
+import {
+  Bell,
+  Edit2,
+  Filter,
+  MoreVertical,
+  Plus,
+  Trash,
+  TrendingUp,
+} from "react-feather";
 import { CLIENT_PROVIDERS } from "~/automations/providers/client";
 import { FilterDisplay } from "~/components/automations/FilterDisplay";
 import { HoverableBigText } from "~/components/HoverableBigText";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
+import {
+  OPERATOR_LABELS,
+  TIME_PERIOD_LABELS,
+} from "~/features/automations/logic/draftReducer";
 import { useDrawer } from "~/hooks/useDrawer";
+import type {
+  GraphAlertOperator,
+  GraphAlertTimePeriod,
+} from "~/server/app-layer/triggers/graph-alert.builder";
 import { ProjectSelector } from "../../components/DashboardLayout";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Link } from "../../components/ui/link";
@@ -122,6 +139,11 @@ function Automations() {
     slackWebhook?: string;
     members?: string[];
     datasetId?: string;
+    // Graph-alert keys — present on rows where `customGraphId` is set.
+    seriesName?: string;
+    operator?: GraphAlertOperator;
+    threshold?: number;
+    timePeriod?: GraphAlertTimePeriod;
   }
 
   const actionItems = (action: TriggerAction, actionParams: ActionParams) => {
@@ -259,9 +281,10 @@ function Automations() {
                 <Table.Header>
                   <Table.Row>
                     <Table.ColumnHeader>Name</Table.ColumnHeader>
+                    <Table.ColumnHeader>Type</Table.ColumnHeader>
                     <Table.ColumnHeader>Action</Table.ColumnHeader>
                     <Table.ColumnHeader>Destination</Table.ColumnHeader>
-                    <Table.ColumnHeader>Filters</Table.ColumnHeader>
+                    <Table.ColumnHeader>Conditions</Table.ColumnHeader>
                     <Table.ColumnHeader whiteSpace="nowrap">
                       Last Triggered At
                     </Table.ColumnHeader>
@@ -272,10 +295,13 @@ function Automations() {
                 <Table.Body>
                   {triggers.isLoading ? (
                     <Table.Row>
-                      <Table.Cell colSpan={7}>Loading...</Table.Cell>
+                      <Table.Cell colSpan={8}>Loading...</Table.Cell>
                     </Table.Row>
                   ) : (
                     triggers.data?.map((trigger) => {
+                      const isGraphAlert = !!trigger.customGraphId;
+                      const actionParams =
+                        trigger.actionParams as ActionParams;
                       return (
                         <Table.Row
                           key={trigger.id}
@@ -283,31 +309,45 @@ function Automations() {
                         >
                           <Table.Cell>{trigger.name}</Table.Cell>
                           <Table.Cell>
+                            {isGraphAlert ? (
+                              <Badge colorPalette="purple" gap={1}>
+                                <TrendingUp size={12} />
+                                Graph alert
+                              </Badge>
+                            ) : (
+                              <Badge colorPalette="gray">Trace</Badge>
+                            )}
+                          </Table.Cell>
+                          <Table.Cell>
                             {triggerActionName(trigger.action)}
                           </Table.Cell>
                           <Table.Cell>
-                            {actionItems(
-                              trigger.action,
-                              trigger.actionParams as ActionParams,
-                            )}
+                            {actionItems(trigger.action, actionParams)}
                           </Table.Cell>
 
                           <Table.Cell maxWidth="500px">
-                            <VStack gap={2}>
-                              {applyChecks(
-                                trigger.checks?.filter(
-                                  (check): check is Monitor => !!check,
-                                ) ?? [],
-                              )}
+                            {isGraphAlert ? (
+                              <GraphAlertConditions
+                                graphName={trigger.customGraph?.name ?? null}
+                                actionParams={actionParams}
+                              />
+                            ) : (
+                              <VStack gap={2}>
+                                {applyChecks(
+                                  trigger.checks?.filter(
+                                    (check): check is Monitor => !!check,
+                                  ) ?? [],
+                                )}
 
-                              {trigger.filters &&
-                              typeof trigger.filters === "string" ? (
-                                <FilterDisplay
-                                  filters={trigger.filters}
-                                  hasBorder={true}
-                                />
-                              ) : null}
-                            </VStack>
+                                {trigger.filters &&
+                                typeof trigger.filters === "string" ? (
+                                  <FilterDisplay
+                                    filters={trigger.filters}
+                                    hasBorder={true}
+                                  />
+                                ) : null}
+                              </VStack>
+                            )}
                           </Table.Cell>
                           <Table.Cell whiteSpace="nowrap">
                             {formatTimeAgo(trigger.lastRunAt)}
@@ -396,6 +436,52 @@ function Automations() {
         )}
       </Container>
     </SettingsLayout>
+  );
+}
+
+interface GraphAlertConditionsProps {
+  graphName: string | null;
+  actionParams: {
+    seriesName?: string;
+    operator?: GraphAlertOperator;
+    threshold?: number;
+    timePeriod?: GraphAlertTimePeriod;
+  };
+}
+
+/**
+ * Compact rendering of a graph-threshold alert row's conditions cell:
+ * shows the graph it watches plus the threshold rule that fires it.
+ * Mirrors the dashboard "Configure Alert" copy verbatim (`greater than`,
+ * `over 5 minutes`) so the experience reads the same across both
+ * creation paths.
+ */
+function GraphAlertConditions({
+  graphName,
+  actionParams,
+}: GraphAlertConditionsProps) {
+  const operator = actionParams.operator
+    ? OPERATOR_LABELS[actionParams.operator]
+    : null;
+  const window = actionParams.timePeriod
+    ? TIME_PERIOD_LABELS[actionParams.timePeriod]
+    : null;
+  return (
+    <VStack align="start" gap={1}>
+      <Text fontSize="sm" fontWeight="500">
+        Graph: {graphName ?? "(missing)"}
+      </Text>
+      {actionParams.seriesName ? (
+        <Text fontSize="sm" color="fg.muted">
+          {actionParams.seriesName}
+          {operator ? ` ${operator}` : ""}
+          {actionParams.threshold !== undefined
+            ? ` ${actionParams.threshold}`
+            : ""}
+          {window ? ` over ${window}` : ""}
+        </Text>
+      ) : null}
+    </VStack>
   );
 }
 

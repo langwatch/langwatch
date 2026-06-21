@@ -8,12 +8,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { globalForApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
 
-const { mockEnforceLicenseLimit, mockTriggerUpdate, mockTriggersInvalidate } =
-  vi.hoisted(() => ({
-    mockEnforceLicenseLimit: vi.fn().mockResolvedValue(undefined),
-    mockTriggerUpdate: vi.fn(),
-    mockTriggersInvalidate: vi.fn().mockResolvedValue(undefined),
-  }));
+const {
+  mockEnforceLicenseLimit,
+  mockTriggerUpdate,
+  mockTriggerCreate,
+  mockCustomGraphFindUnique,
+  mockTriggersInvalidate,
+} = vi.hoisted(() => ({
+  mockEnforceLicenseLimit: vi.fn().mockResolvedValue(undefined),
+  mockTriggerUpdate: vi.fn(),
+  mockTriggerCreate: vi.fn(),
+  mockCustomGraphFindUnique: vi.fn(),
+  mockTriggersInvalidate: vi.fn().mockResolvedValue(undefined),
+}));
 
 vi.mock("~/server/license-enforcement", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/server/license-enforcement")>();
@@ -54,6 +61,10 @@ function createTestCaller() {
     prisma: {
       trigger: {
         update: mockTriggerUpdate,
+        create: mockTriggerCreate,
+      },
+      customGraph: {
+        findUnique: mockCustomGraphFindUnique,
       },
     },
     permissionChecked: false,
@@ -116,6 +127,134 @@ describe("automationRouter", () => {
         ).rejects.toMatchObject({ code: "BAD_REQUEST" });
 
         expect(mockEnforceLicenseLimit).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("upsert with graph-alert variant", () => {
+    const baseGraphAlertInput = {
+      projectId: "proj_123",
+      name: "p95 latency",
+      action: TriggerAction.SEND_SLACK_MESSAGE,
+      alertType: "WARNING" as const,
+      filters: {},
+      customGraphId: "graph_1",
+      graphAlert: {
+        seriesName: "0/latency/p95",
+        operator: "gt" as const,
+        threshold: 250,
+        timePeriod: 60 as const,
+      },
+      actionParams: {
+        slackWebhook: "https://hooks.slack.com/services/abc",
+      },
+      templates: {
+        slackTemplate: null,
+        slackTemplateType: null,
+        emailSubjectTemplate: null,
+        emailBodyTemplate: null,
+      },
+    };
+
+    describe("when the customGraphId belongs to the project", () => {
+      describe("on create (no triggerId)", () => {
+        it("merges the threshold rule into actionParams and persists the graph-alert row", async () => {
+          mockCustomGraphFindUnique.mockResolvedValueOnce({ id: "graph_1" });
+          mockTriggerCreate.mockResolvedValueOnce({ id: "trigger_new" });
+
+          await caller.upsert(baseGraphAlertInput as any);
+
+          expect(mockCustomGraphFindUnique).toHaveBeenCalledWith({
+            where: { id: "graph_1", projectId: "proj_123" },
+            select: { id: true },
+          });
+          expect(mockTriggerCreate).toHaveBeenCalledTimes(1);
+          const createArgs = mockTriggerCreate.mock.calls[0]![0];
+          expect(createArgs.data.customGraphId).toBe("graph_1");
+          expect(createArgs.data.action).toBe(TriggerAction.SEND_SLACK_MESSAGE);
+          expect(createArgs.data.alertType).toBe("WARNING");
+          // Filters are forced to {} on graph alerts — the conditions live on
+          // the graph itself, not on the trigger.
+          expect(createArgs.data.filters).toBe(JSON.stringify({}));
+          // Threshold rule is merged into actionParams so the dispatcher
+          // sees ONE shape regardless of which creation path was used.
+          expect(createArgs.data.actionParams).toMatchObject({
+            slackWebhook: "https://hooks.slack.com/services/abc",
+            threshold: 250,
+            operator: "gt",
+            timePeriod: 60,
+            seriesName: "0/latency/p95",
+          });
+          // Name is prefixed to match the dashboard "Add Alert" path so the
+          // same trigger appears identically through both creators.
+          expect(createArgs.data.name).toBe("Alert: p95 latency");
+        });
+      });
+    });
+
+    describe("when the customGraphId does not belong to the project", () => {
+      it("rejects with NOT_FOUND before persisting", async () => {
+        mockCustomGraphFindUnique.mockResolvedValueOnce(null);
+
+        await expect(
+          caller.upsert(baseGraphAlertInput as any),
+        ).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+        expect(mockTriggerCreate).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the action is not a notify channel", () => {
+      it("rejects ADD_TO_DATASET on a graph alert", async () => {
+        await expect(
+          caller.upsert({
+            ...baseGraphAlertInput,
+            action: TriggerAction.ADD_TO_DATASET,
+            actionParams: { datasetId: "dataset_1" },
+          } as any),
+        ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+
+        expect(mockCustomGraphFindUnique).not.toHaveBeenCalled();
+        expect(mockTriggerCreate).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the graphAlert rule is missing", () => {
+      it("rejects the upsert", async () => {
+        await expect(
+          caller.upsert({
+            ...baseGraphAlertInput,
+            graphAlert: undefined,
+          } as any),
+        ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      });
+    });
+
+    describe("when the operator is invalid", () => {
+      it("rejects on schema validation", async () => {
+        await expect(
+          caller.upsert({
+            ...baseGraphAlertInput,
+            graphAlert: {
+              ...baseGraphAlertInput.graphAlert,
+              operator: "between",
+            },
+          } as any),
+        ).rejects.toBeDefined();
+      });
+    });
+
+    describe("when timePeriod is outside the allowed set", () => {
+      it("rejects on schema validation", async () => {
+        await expect(
+          caller.upsert({
+            ...baseGraphAlertInput,
+            graphAlert: {
+              ...baseGraphAlertInput.graphAlert,
+              timePeriod: 7,
+            },
+          } as any),
+        ).rejects.toBeDefined();
       });
     });
   });
