@@ -2,8 +2,8 @@ import { performance } from "node:perf_hooks";
 import {
   context as otelContext,
   SpanKind,
-  trace,
   TraceFlags,
+  trace,
 } from "@opentelemetry/api";
 import fastq from "fastq";
 import { Cluster, Redis as IORedis } from "ioredis";
@@ -11,18 +11,18 @@ import { getLangWatchTracer } from "langwatch";
 import type { SemConvAttributes } from "langwatch/observability";
 import { createLogger } from "../../../../utils/logger/server";
 import {
+  createContextFromJobData,
   getJobContextMetadata,
   type JobContextMetadata,
-  createContextFromJobData,
   runWithContext,
 } from "../../../context/asyncContext";
-import { connection } from "../../../redis";
+import { featureFlagService } from "../../../featureFlag";
 import {
-  decodeJobEnvelope,
-  encodeJobEnvelope,
-  readEnvelopeBlobId,
-} from "./jobEnvelope";
-import { RedisJobBlobStore } from "./redisJobBlobStore";
+  TenantRateTracker,
+  tenantIdFromGroupId,
+} from "../../../observability/tenantRateTracker";
+import { connection } from "../../../redis";
+import type { ProjectStorageDestination } from "../../../stored-objects/project-storage-destination";
 import type {
   DeduplicationConfig,
   EventSourcedQueueDefinition,
@@ -30,26 +30,27 @@ import type {
   QueueSendOptions,
 } from "../../queues";
 import {
-  categorizeError,
   ConfigurationError,
+  categorizeError,
   ErrorCategory,
   QueueError,
 } from "../../services/errorHandling";
-import { JOB_RETRY_CONFIG, getBackoffMs } from "../shared";
+import { getBackoffMs, JOB_RETRY_CONFIG } from "../shared";
 import { GroupQueueDispatcher } from "./dispatcher";
+import { EnvelopeBlobLifecycle } from "./envelopeBlobLifecycle";
 import {
   gqGroupsBlockedTotal,
+  gqJobDelayMilliseconds,
+  gqJobDurationMilliseconds,
   gqJobsCompletedTotal,
   gqJobsDedupedTotal,
-  gqJobsExhaustedTotal,
-  gqJobsRetriedTotal,
-  gqJobsNonRetryableTotal,
-  gqJobsStagedTotal,
   gqJobsDelayedTotal,
-  gqJobDelayMilliseconds,
+  gqJobsExhaustedTotal,
+  gqJobsNonRetryableTotal,
+  gqJobsRetriedTotal,
+  gqJobsStagedTotal,
   gqRetryAttempt,
   gqRetryBackoffMilliseconds,
-  gqJobDurationMilliseconds,
 } from "./metrics";
 import { GroupQueueMetricsCollector } from "./metricsCollector";
 import {
@@ -57,11 +58,7 @@ import {
   type DrainedJob,
   GroupStagingScripts,
 } from "./scripts";
-import {
-  TenantRateTracker,
-  tenantIdFromGroupId,
-} from "../../../observability/tenantRateTracker";
-import { featureFlagService } from "../../../featureFlag";
+import { type ObjectStore, TransientBlobStoreError } from "./tieredBlobStore";
 
 /**
  * Configuration for the group queue.
@@ -129,7 +126,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   private readonly redisConnection: IORedis | Cluster;
   private readonly blockingConnection: IORedis | Cluster;
   private readonly scripts: GroupStagingScripts;
-  private readonly blobs: RedisJobBlobStore;
+  private readonly blobLifecycle: EnvelopeBlobLifecycle;
   private readonly rateTracker!: TenantRateTracker;
   private readonly globalConcurrency: number;
   private readonly consumerEnabled: boolean;
@@ -143,7 +140,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   constructor(
     definition: EventSourcedQueueDefinition<Payload>,
     redisConnection?: IORedis | Cluster,
-    options?: { consumerEnabled?: boolean },
+    options?: {
+      consumerEnabled?: boolean;
+      objectStoreFor?: (projectId: string) => ObjectStore;
+      resolveStorageDestination?: (
+        projectId: string,
+      ) => Promise<ProjectStorageDestination>;
+    },
   ) {
     const {
       name,
@@ -206,11 +209,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       this.queueName,
     );
 
-    // Offloaded envelope bodies (ADR-026): large payloads live under
-    // standalone blob keys so their bulk never transits the Lua scripts.
-    this.blobs = new RedisJobBlobStore({
+    // The GQ2 content-addressed blob lifecycle — tiered store, holder-set
+    // refcount, and the encode/decode/acquire/release seams (ADR-029/030).
+    this.blobLifecycle = new EnvelopeBlobLifecycle({
       redis: this.redisConnection,
       queueName: this.queueName,
+      objectStoreFor: options?.objectStoreFor,
+      resolveStorageDestination: options?.resolveStorageDestination,
     });
 
     // Advertise this queue in the registry set so the ops dashboard enumerates
@@ -328,26 +333,36 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       span.setAttributes({ ...customAttributes });
     }
 
+    const jobDataJson = await this.blobLifecycle.encode({
+      jobData: payloadWithContext,
+      groupId,
+    });
+
     const { isNew, orphanedValue } = await this.scripts.stage({
       stagedJobId,
       groupId,
       dispatchAfterMs,
       dedupId,
       dedupTtlMs,
-      jobDataJson: await encodeJobEnvelope({
-        jobData: payloadWithContext,
-        blobs: this.blobs,
-      }),
+      jobDataJson,
       shouldExtend,
       shouldReplace,
     });
 
-    // A dedup squash displaced a staged payload; reclaim its offloaded blob so
-    // it does not leak until the 7-day TTL (the 2026-06-11 capacity incident).
-    // Fire-and-forget (matches the worker reclaim paths); a no-op for inline
-    // payloads (readEnvelopeBlobId yields null) and new stages (orphanedValue "").
+    // Acquire this occupancy's hold BEFORE releasing any payload a dedup squash
+    // displaced, so a squash re-staging identical content never drops the shared
+    // blob to zero holders. Both are no-ops for inline/legacy values.
     if (orphanedValue) {
-      this.deleteEnvelopeBlobs([orphanedValue]);
+      // Atomic hold transfer: a dedup squash moves the hold from the displaced
+      // value to the new one in one eval, so a partial failure can't reclaim a
+      // live blob (ADR-030 §4).
+      this.blobLifecycle.transfer({
+        newValue: jobDataJson,
+        oldValue: orphanedValue,
+        groupId,
+      });
+    } else {
+      this.blobLifecycle.acquire(jobDataJson);
     }
 
     if (isNew) {
@@ -429,9 +444,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           dispatchAfterMs,
           dedupId,
           dedupTtlMs,
-          jobDataJson: await encodeJobEnvelope({
+          jobDataJson: await this.blobLifecycle.encode({
             jobData: payloadWithContext,
-            blobs: this.blobs,
+            groupId,
           }),
           shouldExtend,
           shouldReplace,
@@ -442,11 +457,23 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     const { newStagedCount, orphanedValues } =
       await this.scripts.stageBatch(jobsToStage);
 
-    // Reclaim blobs displaced by any in-batch dedup squashes (see send()).
-    const orphans = orphanedValues.filter((value) => value.length > 0);
-    if (orphans.length > 0) {
-      this.deleteEnvelopeBlobs(orphans);
-    }
+    // Atomically transfer the hold from any in-batch dedup-squashed value to the
+    // job that displaced it (orphanedValues is index-aligned with jobsToStage);
+    // otherwise just acquire. Matches send()'s atomic path, so a partial failure
+    // can't reclaim a live blob the way a separate acquire+release pair can
+    // (ADR-030 §4).
+    jobsToStage.forEach((job, i) => {
+      const orphan = orphanedValues[i];
+      if (orphan && orphan.length > 0) {
+        this.blobLifecycle.transfer({
+          newValue: job.jobDataJson,
+          oldValue: orphan,
+          groupId: job.groupId,
+        });
+      } else {
+        this.blobLifecycle.acquire(job.jobDataJson);
+      }
+    });
 
     const dedupedCount = payloads.length - newStagedCount;
     if (newStagedCount > 0) {
@@ -501,18 +528,34 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     // Parse the stored job data
     let jobData: Record<string, unknown>;
     try {
-      jobData = await decodeJobEnvelope({
+      jobData = await this.blobLifecycle.decode({
         value: jobDataJson,
-        blobs: this.blobs,
+        groupId,
       });
-    } catch {
+    } catch (err) {
+      if (err instanceof TransientBlobStoreError) {
+        // The body is temporarily unreachable, not gone — retry, don't drop.
+        await this.handleTransientDecode({
+          groupId,
+          stagedJobId,
+          jobDataJson,
+          err,
+        });
+        return;
+      }
       this.logger.error(
-        { queueName: this.queueName, stagedJobId, groupId },
+        {
+          queueName: this.queueName,
+          projectId: tenantIdFromGroupId(groupId),
+          stagedJobId,
+          groupId,
+        },
         "Failed to parse staged job data",
       );
-      // Complete the group slot so it's not stuck
+      // Missing blob or unparseable value: complete the slot so it's not stuck;
+      // recover via event replay.
       await this.scripts.complete({ groupId, stagedJobId });
-      this.deleteEnvelopeBlobs([jobDataJson]);
+      this.blobLifecycle.release({ values: [jobDataJson], groupId });
       return;
     }
 
@@ -659,10 +702,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
               // removed from staging during the drain, so completing the
               // dispatched job is enough to free the group.
               await this.scripts.complete({ groupId, stagedJobId, jobName });
-              this.deleteEnvelopeBlobs([
-                jobDataJson,
-                ...drainedSiblings.map((sibling) => sibling.jobDataJson),
-              ]);
+              this.blobLifecycle.release({
+                values: [
+                  jobDataJson,
+                  ...drainedSiblings.map((sibling) => sibling.jobDataJson),
+                ],
+                groupId,
+              });
               gqJobsCompletedTotal.inc(routingLabels);
 
               this.logger.debug(
@@ -695,13 +741,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 gqRetryAttempt.observe(routingLabels, attempt);
                 gqRetryBackoffMilliseconds.observe(routingLabels, backoffMs);
                 const newStagedJobId = `${stagedJobId}/r/${attempt}`;
-                const retryJobData = await encodeJobEnvelope({
+                const retryJobData = await this.blobLifecycle.encode({
                   jobData: {
                     ...(payload as Record<string, unknown>),
                     __context: contextMetadata,
                     __attempt: attempt + 1,
                   },
-                  blobs: this.blobs,
+                  groupId,
                 });
 
                 await this.scripts.retryRestage({
@@ -712,11 +758,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   jobDataJson: retryJobData,
                   backoffMs,
                 });
-                // The re-stage wrote a fresh envelope (and blob, if large);
-                // the dispatched value's blob is now unreferenced. Drained
-                // siblings were re-staged with their ORIGINAL values, so
-                // their blobs stay.
-                this.deleteEnvelopeBlobs([jobDataJson]);
+                // Atomically transfer the hold from the dispatched value to the
+                // re-staged one. For GQ2 the retry re-encodes to the SAME content
+                // hash, so it's SADD+SREM on one holder set (the blob stays
+                // referenced); for a mixed/GQ1 value it falls back to ordered
+                // acquire+release. Drained siblings keep their ORIGINAL values.
+                this.blobLifecycle.transfer({
+                  newValue: retryJobData,
+                  oldValue: jobDataJson,
+                  groupId,
+                });
 
                 this.logger.warn(
                   {
@@ -758,7 +809,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                   contextMetadata,
                   routingLabels,
                 });
-                this.deleteEnvelopeBlobs([jobDataJson]);
+                this.blobLifecycle.release({ values: [jobDataJson], groupId });
               }
             }
           },
@@ -793,24 +844,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         )
         .ltrim(`${this.queueName}:gq:stats:latencies-ms`, 0, 199)
         .exec()
-        .catch(() => {});
-    }
-  }
-
-  /**
-   * Best-effort reclamation of offloaded bodies whose staged values are retired
-   * (drained, completed, retried, or displaced by a dedup squash). Inline and
-   * legacy values yield no blob id and are skipped. Fire-and-forget: the blob
-   * TTL is the correctness backstop, so a failed delete only means the blob
-   * lingers until expiry. Producer (send/sendBatch) and worker paths alike call
-   * this without awaiting, to keep the hot path off the extra round-trip.
-   */
-  private deleteEnvelopeBlobs(values: string[]): void {
-    for (const value of values) {
-      const blobId = readEnvelopeBlobId(value);
-      if (blobId) {
-        void this.blobs.delete({ id: blobId }).catch(() => {});
-      }
+        .catch(() => undefined);
     }
   }
 
@@ -839,9 +873,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     groupId: string;
   }): Promise<Payload | null> {
     try {
-      const jobData = await decodeJobEnvelope({
+      const jobData = await this.blobLifecycle.decode({
         value: sibling.jobDataJson,
-        blobs: this.blobs,
+        groupId,
       });
       return this.stripInternalFields(jobData);
     } catch {
@@ -877,6 +911,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           dedupTtlMs: 0,
           jobDataJson: sibling.jobDataJson,
         });
+        // Re-acquire the sibling's hold (idempotent: it kept its hold through
+        // the drain, and its value — hence token — is unchanged).
+        this.blobLifecycle.acquire(sibling.jobDataJson);
       } catch (err) {
         this.logger.error(
           {
@@ -953,12 +990,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
     // Re-stage with a new ID
     const newStagedJobId = `${stagedJobId}/r/${Date.now()}`;
-    const jobDataJson = await encodeJobEnvelope({
+    const jobDataJson = await this.blobLifecycle.encode({
       jobData: {
         ...(payload as Record<string, unknown>),
         __context: contextMetadata,
       },
-      blobs: this.blobs,
+      groupId,
     });
 
     // Atomically: block the group, re-stage the job, update ready score, store error
@@ -970,6 +1007,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       errorMessage: lastError?.message,
       errorStack: lastError?.stack,
     });
+
+    // Acquire the re-staged value's hold; the caller releases the dispatched
+    // one after this returns (acquire-before-release keeps a GQ2 blob alive).
+    this.blobLifecycle.acquire(jobDataJson);
 
     gqGroupsBlockedTotal.inc(routingLabels);
     gqJobsExhaustedTotal.inc(routingLabels);
@@ -983,6 +1024,66 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         error: lastError?.message,
       },
       "Group blocked after exhausted retries, job re-staged",
+    );
+  }
+
+  /**
+   * A transient blob-store failure (network/5xx) means the body is temporarily
+   * unreachable — not gone. Re-stage the SAME envelope with backoff so the job
+   * retries instead of dropping to replay; the value is still valid and its hold
+   * token is unchanged, so there is no re-encode and no holder churn (releasing
+   * here would risk reclaiming the blob the re-stage still needs). Bounded by the
+   * `/r/` retry suffixes already in the stagedJobId, so a misclassified permanent
+   * failure still terminates at the fail-safe (ADR-030 §2).
+   */
+  private async handleTransientDecode({
+    groupId,
+    stagedJobId,
+    jobDataJson,
+    err,
+  }: {
+    groupId: string;
+    stagedJobId: string;
+    jobDataJson: string;
+    err: TransientBlobStoreError;
+  }): Promise<void> {
+    const attempt = (stagedJobId.match(/\/r\//g)?.length ?? 0) + 1;
+    if (attempt >= JOB_RETRY_CONFIG.maxAttempts) {
+      this.logger.error(
+        {
+          queueName: this.queueName,
+          projectId: tenantIdFromGroupId(groupId),
+          groupId,
+          stagedJobId,
+          attempt,
+          error: err.message,
+        },
+        "Blob store unreachable after retries; completing slot to recover via replay",
+      );
+      await this.scripts.complete({ groupId, stagedJobId });
+      this.blobLifecycle.release({ values: [jobDataJson], groupId });
+      return;
+    }
+    const backoffMs = getBackoffMs(attempt);
+    await this.scripts.retryRestage({
+      groupId,
+      stagedJobId,
+      newStagedJobId: `${stagedJobId}/r/${attempt}`,
+      dispatchAfterMs: Date.now() + backoffMs,
+      jobDataJson,
+      backoffMs,
+    });
+    this.logger.warn(
+      {
+        queueName: this.queueName,
+        projectId: tenantIdFromGroupId(groupId),
+        groupId,
+        stagedJobId,
+        attempt,
+        backoffMs,
+        error: err.message,
+      },
+      "Blob temporarily unreachable, re-staged with backoff",
     );
   }
 
@@ -1066,7 +1167,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     // Wake the BRPOP so the dispatcher exits immediately
     await this.redisConnection
       .lpush(this.scripts.getSignalKey(), "1")
-      .catch(() => {});
+      .catch(() => undefined);
     this.logger.debug(
       { queueName: this.queueName },
       "Closing group queue processor",
