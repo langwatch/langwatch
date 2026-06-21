@@ -48,8 +48,8 @@ Runtime constraints:
 The graph-trigger heartbeat (ADR-034 Phase 5) is the first consumer:
 - 30s cadence.
 - Two `decide`-time predicates: active triggers with the no-data operator/threshold combination, and active triggers with an unresolved `TriggerSent` row.
-- Pre-filter against the slim `trace_analytics` table — if the project has any qualifying event newer than a candidate's window, the real-time outbox reactor is already firing for that trigger; skip.
-- Surviving candidates enqueue `graphEval`-stage payloads. The shared handler `evaluateGraphTrigger` picks up — same handler the real-time reactor's payloads land at.
+- **Source-aware pre-filter** (Phase 6 extension): per candidate trigger, look up the metric's source (`trace` | `evaluation`) via `field-availability`. Group candidates per `(project, source)` and issue ONE batched recency query per source per project per tick — `trace_analytics` for trace-source candidates, `evaluation_analytics` for eval-source candidates. If the project has any qualifying event newer than a candidate's window, the real-time outbox reactor is already firing for that trigger; skip.
+- Surviving candidates enqueue `graphEval`-stage payloads. The shared handler `evaluateGraphTrigger` picks up — same handler the real-time reactor's payloads land at, regardless of source pipeline.
 
 ## Consequences
 
