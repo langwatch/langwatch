@@ -18,7 +18,10 @@ export const ColumnsDropdown: React.FC<{ compact?: boolean }> = ({
 }) => {
   return (
     <Popover.Root positioning={{ placement: "bottom-end" }}>
-      <Tooltip content="Show or hide columns" positioning={{ placement: "bottom" }}>
+      <Tooltip
+        content="Show or hide columns"
+        positioning={{ placement: "bottom" }}
+      >
         <Popover.Trigger asChild>
           <Button
             size="xs"

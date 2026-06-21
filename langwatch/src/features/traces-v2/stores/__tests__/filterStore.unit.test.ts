@@ -156,7 +156,6 @@ describe("toggleFacet", () => {
       });
     });
   });
-
 });
 
 describe("excludeFacet", () => {

@@ -370,7 +370,11 @@ export const useFilterStore = create<FilterState>((set, get) => ({
       // Already excluded → second press on the `−` toggles it back off.
       if (state === "exclude") {
         return applyMutation(s, (q) =>
-          removeFacetValueFromQuery({ currentQuery: q, fieldName: field, value }),
+          removeFacetValueFromQuery({
+            currentQuery: q,
+            fieldName: field,
+            value,
+          }),
         );
       }
       // Force exclude from neutral OR include. `toggleFacetInQuery`'s

@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SEARCH_FIELDS } from "~/server/app-layer/traces/query-language/metadata";
-import {
-  getFieldSuggestions,
-  getValueSuggestions,
-} from "../suggestionItems";
+import { getFieldSuggestions, getValueSuggestions } from "../suggestionItems";
 
 describe("getFieldSuggestions", () => {
   describe("given a blank query", () => {

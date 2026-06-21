@@ -19,8 +19,8 @@ import { useUIStore } from "../../stores/uiStore";
 import {
   FACET_GROUPS,
   type FacetGroupDef,
-  getFacetGroupId,
   GROUP_ICONS,
+  getFacetGroupId,
 } from "../FilterSidebar/constants";
 import { getFacetIcon } from "../FilterSidebar/utils";
 import type { SuggestionState } from "./getSuggestionState";

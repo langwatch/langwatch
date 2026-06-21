@@ -1,6 +1,5 @@
 import { Box, Button, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { ArrowUpRight, Zap } from "lucide-react";
-import NextLink from "~/utils/compat/next-link";
 import {
   PopoverArrow,
   PopoverBody,
@@ -10,6 +9,7 @@ import {
 } from "~/components/ui/popover";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import NextLink from "~/utils/compat/next-link";
 
 /**
  * Filtered traces → automation entry point.
@@ -32,9 +32,7 @@ export const AutomateButton: React.FC<{ compact?: boolean }> = ({
 
   if (!hasPermission("triggers:manage")) return null;
 
-  const legacyHref = project?.slug
-    ? `/${project.slug}/messages`
-    : "/messages";
+  const legacyHref = project?.slug ? `/${project.slug}/messages` : "/messages";
 
   return (
     <PopoverRoot positioning={{ placement: "bottom-end" }}>
@@ -80,17 +78,13 @@ export const AutomateButton: React.FC<{ compact?: boolean }> = ({
               </Text>
             </HStack>
             <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
-              In the old view you could turn a filter into an automation —
-              Slack pings, dataset capture, annotation queues. We&rsquo;re
-              rebuilding that on the new event-driven trigger system, and
-              it&rsquo;s not wired up here yet. For now, create automations
-              from the original trace view and they&rsquo;ll keep running
-              against your data.
+              In the old view you could turn a filter into an automation — Slack
+              pings, dataset capture, annotation queues. We&rsquo;re rebuilding
+              that on the new event-driven trigger system, and it&rsquo;s not
+              wired up here yet. For now, create automations from the original
+              trace view and they&rsquo;ll keep running against your data.
             </Text>
-            <NextLink
-              href={legacyHref}
-              style={{ display: "block" }}
-            >
+            <NextLink href={legacyHref} style={{ display: "block" }}>
               <Button size="xs" width="full" variant="outline">
                 <Icon boxSize={3.5}>
                   <ArrowUpRight />
