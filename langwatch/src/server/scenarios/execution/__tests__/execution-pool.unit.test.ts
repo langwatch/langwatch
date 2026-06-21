@@ -3,11 +3,11 @@
  * @see specs/scenarios/event-driven-execution-prep.feature
  */
 
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { EventEmitter } from "events";
 import type { ChildProcess } from "child_process";
-import { ScenarioExecutionPool } from "../execution-pool";
+import { EventEmitter } from "events";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExecutionJobData } from "../execution-pool";
+import { ScenarioExecutionPool } from "../execution-pool";
 
 function makeJob(id: string): ExecutionJobData {
   return {
@@ -94,7 +94,9 @@ describe("ScenarioExecutionPool", () => {
       pool.submit(makeJob("run-1"));
 
       expect(onSkip).toHaveBeenCalledTimes(1);
-      expect(onSkip).toHaveBeenCalledWith(expect.objectContaining({ scenarioRunId: "run-1" }));
+      expect(onSkip).toHaveBeenCalledWith(
+        expect.objectContaining({ scenarioRunId: "run-1" }),
+      );
     });
   });
 
@@ -129,7 +131,9 @@ describe("ScenarioExecutionPool", () => {
       await new Promise((r) => setTimeout(r, 10));
 
       expect(onSkip).toHaveBeenCalledTimes(1);
-      expect(onSkip).toHaveBeenCalledWith(expect.objectContaining({ scenarioRunId: "run-3" }));
+      expect(onSkip).toHaveBeenCalledWith(
+        expect.objectContaining({ scenarioRunId: "run-3" }),
+      );
     });
   });
 

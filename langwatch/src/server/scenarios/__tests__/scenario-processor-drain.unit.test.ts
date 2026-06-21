@@ -10,10 +10,10 @@
  * @see specs/scenarios/queued-run-orphan-recovery.feature "In-flight runs are failed when the worker restarts"
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChildProcess } from "child_process";
-import { ScenarioExecutionPool } from "../execution/execution-pool";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExecutionJobData } from "../execution/execution-pool";
+import { ScenarioExecutionPool } from "../execution/execution-pool";
 import type { ProcessorDependencies } from "../scenario.processor";
 import { drainInFlightRuns } from "../scenario.processor";
 
@@ -43,10 +43,9 @@ describe("drainInFlightRuns", () => {
     // `_running`, which only fills via registerChild). The child is never
     // deregistered, so jobs stay in-flight until drain.
     pool.setSpawnFunction(async (jobData) => {
-      pool.registerChild(
-        jobData.scenarioRunId,
-        { kill: () => true } as unknown as ChildProcess,
-      );
+      pool.registerChild(jobData.scenarioRunId, {
+        kill: () => true,
+      } as unknown as ChildProcess);
     });
 
     mockGetById = vi
@@ -74,6 +73,7 @@ describe("drainInFlightRuns", () => {
         await drainInFlightRuns(pool, deps);
 
         expect(mockEnsureFailureEventsEmitted).toHaveBeenCalledTimes(2);
+        expect(mockGetById).toHaveBeenCalledTimes(2);
         const emittedRunIds = mockEnsureFailureEventsEmitted.mock.calls.map(
           (call) => (call[0] as { scenarioRunId: string }).scenarioRunId,
         );

@@ -160,7 +160,7 @@ export async function findQueuedRunCandidates({
  * (per isOrphanedQueuedRun), and emit a terminal failure for each.
  *
  * Each emission is isolated in a try/catch so one bad run does not abort the
- * sweep; a run whose emission rejects is counted as skipped.
+ * sweep; a run whose emission rejects is counted as errored (distinct from skipped non-orphans).
  */
 export async function reconcileOrphanedQueuedRuns({
   findCandidates,
@@ -172,7 +172,7 @@ export async function reconcileOrphanedQueuedRuns({
   emitFailure: (candidate: OrphanCandidate) => Promise<void>;
   now: number;
   thresholdMs: number;
-}): Promise<{ failed: number; skipped: number }> {
+}): Promise<{ failed: number; skipped: number; errored: number }> {
   const candidates = await findCandidates();
   const orphans = candidates.filter((c) =>
     isOrphanedQueuedRun({
@@ -184,27 +184,31 @@ export async function reconcileOrphanedQueuedRuns({
   );
 
   let failed = 0;
-  // Non-orphan candidates are skipped by definition; rejected emissions add to
-  // this count below.
+  // Non-orphan candidates are skipped by definition.
   let skipped = candidates.length - orphans.length;
+  let errored = 0;
 
   for (const orphan of orphans) {
     try {
       await emitFailure(orphan);
       failed++;
     } catch (err) {
-      skipped++;
+      errored++;
       logger.warn(
-        { err, scenarioRunId: orphan.scenarioRunId, projectId: orphan.projectId },
+        {
+          err,
+          scenarioRunId: orphan.scenarioRunId,
+          projectId: orphan.projectId,
+        },
         "Failed to reconcile orphaned queued run",
       );
     }
   }
 
   logger.info(
-    { failed, skipped, candidates: candidates.length },
+    { failed, skipped, errored, candidates: candidates.length },
     "Orphaned queued run reconciliation complete",
   );
 
-  return { failed, skipped };
+  return { failed, skipped, errored };
 }

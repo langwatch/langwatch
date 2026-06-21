@@ -12,43 +12,55 @@
  * @see specs/scenarios/event-driven-execution-prep.feature
  */
 
-import { spawn, type ChildProcess } from "child_process";
+import { type ChildProcess, spawn } from "child_process";
 import path from "path";
 import { createLogger } from "~/utils/logger/server";
-import { prisma } from "../db";
-import { connection } from "../redis";
 import { getSharedClickHouseClient } from "../clickhouse/clickhouseClient";
-import { subscribeToCancellations, type CancellationMessage } from "./cancellation-channel";
 import {
-  type JobContextMetadata,
   createContextFromJobData,
-  runWithContext,
   getJobContextMetadata,
+  type JobContextMetadata,
+  runWithContext,
 } from "../context/asyncContext";
-import {
-  createDataPrefetcherDependencies,
-  prefetchScenarioData,
-} from "./execution/data-prefetcher";
-import type { ChildProcessJobData, ScenarioExecutionResult } from "./execution/types";
-import type { ExecutionJobData, ScenarioExecutionPool } from "./execution/execution-pool";
+import { prisma } from "../db";
 import {
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
 } from "../metrics";
+import { connection } from "../redis";
+import {
+  type CancellationMessage,
+  subscribeToCancellations,
+} from "./cancellation-channel";
+import {
+  encodeScenarioLogContext,
+  SCENARIO_LOG_CONTEXT_ENV,
+} from "./execution/child-logger";
+import { resolveChildProcessSpawn } from "./execution/child-process-spawn";
+import {
+  createDataPrefetcherDependencies,
+  prefetchScenarioData,
+} from "./execution/data-prefetcher";
+import type {
+  ExecutionJobData,
+  ScenarioExecutionPool,
+} from "./execution/execution-pool";
+import type {
+  ChildProcessJobData,
+  ScenarioExecutionResult,
+} from "./execution/types";
 import { CHILD_PROCESS, SCENARIO_WORKER } from "./scenario.constants";
-import { ScenarioFailureHandler, type FailureEventParams } from "./scenario-failure-handler";
+import { ScenarioService } from "./scenario.service";
+import {
+  type FailureEventParams,
+  ScenarioFailureHandler,
+} from "./scenario-failure-handler";
 import {
   findQueuedRunCandidates,
   LOOKBACK_MS,
   ORPHAN_QUEUED_THRESHOLD_MS,
   reconcileOrphanedQueuedRuns,
 } from "./scenario-orphan-reconciler";
-import { ScenarioService } from "./scenario.service";
-import { resolveChildProcessSpawn } from "./execution/child-process-spawn";
-import {
-  encodeScenarioLogContext,
-  SCENARIO_LOG_CONTEXT_ENV,
-} from "./execution/child-logger";
 
 // ============================================================================
 // Dependency Interfaces (Dependency Inversion Principle)
@@ -134,7 +146,7 @@ export async function handleFailedJobResult(
  * the suites page polling them forever.
  *
  * Each emission is isolated by a per-job try/catch so one failure can't block
- * draining the rest (Promise.all is safe because no task rejects). Double-emitting for
+ * draining the rest. Double-emitting for
  * a running child whose own close handler also emits is safe — finishRun is
  * idempotent.
  */
@@ -218,7 +230,9 @@ function createScenarioLogger(jobData: ExecutionJobData) {
 export function buildOtelResourceAttributes(labels: string[]): string {
   const parts = ["langwatch.origin.source=platform"];
   if (labels.length) {
-    const escapedLabels = labels.map((l) => l.replace(/\\/g, "\\\\").replace(/[,=]/g, "\\$&"));
+    const escapedLabels = labels.map((l) =>
+      l.replace(/\\/g, "\\\\").replace(/[,=]/g, "\\$&"),
+    );
     parts.push(`scenario.labels=${escapedLabels.join(",")}`);
   }
   return parts.join(",");
@@ -242,7 +256,8 @@ export function buildChildProcessEnv(
     NODE_ENV: process.env.NODE_ENV,
     NODE_OPTIONS: process.env.NODE_OPTIONS,
     SKIP_ENV_VALIDATION: "1",
-    COREPACK_ENABLE_DOWNLOAD_PROMPT: process.env.COREPACK_ENABLE_DOWNLOAD_PROMPT,
+    COREPACK_ENABLE_DOWNLOAD_PROMPT:
+      process.env.COREPACK_ENABLE_DOWNLOAD_PROMPT,
     ...scenarioVars,
   };
 
@@ -289,7 +304,11 @@ export async function executeScenarioRun(
     // Check if cancellation was requested while we were prefetching
     if (pool.wasCancelled(jobData.scenarioRunId)) {
       jobLogger.info("Scenario cancelled during prefetch");
-      await handleCancelledJobResult(jobData, "Cancelled before execution started", deps);
+      await handleCancelledJobResult(
+        jobData,
+        "Cancelled before execution started",
+        deps,
+      );
       return;
     }
 
@@ -336,7 +355,12 @@ export async function executeScenarioRun(
     } else {
       getJobProcessingCounter("scenario", "failed").inc();
       jobLogger.warn(
-        { success: false, error: result.error, totalDurationMs, childDurationMs },
+        {
+          success: false,
+          error: result.error,
+          totalDurationMs,
+          childDurationMs,
+        },
         "Scenario job completed with failure",
       );
       await handleFailedJobResult(jobData, result.error, deps);
@@ -372,7 +396,9 @@ async function spawnScenarioChildProcess(
       childLogger[level](extra ?? {}, message);
     };
 
-    const otelResourceAttrs = buildOtelResourceAttributes(childProcessData.scenario.labels);
+    const otelResourceAttrs = buildOtelResourceAttributes(
+      childProcessData.scenario.labels,
+    );
     const logContext = encodeScenarioLogContext({
       scenarioRunId: jobData.scenarioRunId,
       batchRunId,
@@ -400,7 +426,10 @@ async function spawnScenarioChildProcess(
       stdio: ["pipe", "pipe", "pipe"],
       cwd: packageRoot,
     });
-    log("info", "Child process spawned", { pid: child.pid, spawnMs: Date.now() - spawnStart });
+    log("info", "Child process spawned", {
+      pid: child.pid,
+      spawnMs: Date.now() - spawnStart,
+    });
 
     // Register in the pool so cancel broadcasts can find this child
     pool.registerChild(jobData.scenarioRunId, child);
@@ -416,7 +445,9 @@ async function spawnScenarioChildProcess(
     };
 
     const timeout = setTimeout(() => {
-      log("error", "Child process timed out", { timeoutMs: CHILD_PROCESS.TIMEOUT_MS });
+      log("error", "Child process timed out", {
+        timeoutMs: CHILD_PROCESS.TIMEOUT_MS,
+      });
       cleanup();
       resolve({
         success: false,
@@ -448,12 +479,19 @@ async function spawnScenarioChildProcess(
       // Check if this was killed by the cancel subscription
       if (pool.wasCancelled(jobData.scenarioRunId)) {
         log("info", "Job cancelled via cancel broadcast");
-        resolve({ success: false, error: "Job was cancelled", cancelled: true });
+        resolve({
+          success: false,
+          error: "Job was cancelled",
+          cancelled: true,
+        });
         return;
       }
 
       if (code !== 0) {
-        log("error", `Child process exited with code ${code}`, { exitCode: code, stderr });
+        log("error", `Child process exited with code ${code}`, {
+          exitCode: code,
+          stderr,
+        });
         resolve({
           success: false,
           error: `Child process exited with code ${code}: ${stderr}`,
@@ -486,7 +524,9 @@ async function spawnScenarioChildProcess(
         child.stdin.write(JSON.stringify(childProcessData));
         child.stdin.end();
       } catch (err) {
-        log("warn", "Child stdin write failed", { error: (err as Error).message });
+        log("warn", "Child stdin write failed", {
+          error: (err as Error).message,
+        });
       }
     }
   });
@@ -518,8 +558,15 @@ export async function startScenarioProcessor(
   // Wire the callback for when the pool skips a cancelled job —
   // dispatch finished(CANCELLED) so the run reaches terminal state
   pool.setOnSkipCancelled((jobData) => {
-    logger.info({ scenarioRunId: jobData.scenarioRunId }, "Dispatching finished(CANCELLED) for skipped cancelled job");
-    void handleCancelledJobResult(jobData, "Cancelled before execution started", deps);
+    logger.info(
+      { scenarioRunId: jobData.scenarioRunId },
+      "Dispatching finished(CANCELLED) for skipped cancelled job",
+    );
+    void handleCancelledJobResult(
+      jobData,
+      "Cancelled before execution started",
+      deps,
+    );
   });
 
   // Subscribe to cancellation signals from the event-sourcing reactor
@@ -551,12 +598,13 @@ export async function startScenarioProcessor(
   // because the scan is intentionally cross-tenant.
   const sharedClickHouseClient = getSharedClickHouseClient();
   if (sharedClickHouseClient) {
+    const reconcilerNow = Date.now();
     void reconcileOrphanedQueuedRuns({
       findCandidates: () =>
         findQueuedRunCandidates({
           client: sharedClickHouseClient,
           lookbackMs: LOOKBACK_MS,
-          now: Date.now(),
+          now: reconcilerNow,
         }),
       emitFailure: (candidate) =>
         deps.failureEmitter.ensureFailureEventsEmitted({
@@ -568,7 +616,7 @@ export async function startScenarioProcessor(
           error:
             "Reconciled: orphaned QUEUED run with no live worker (worker restart/crash)",
         }),
-      now: Date.now(),
+      now: reconcilerNow,
       thresholdMs: ORPHAN_QUEUED_THRESHOLD_MS,
     }).catch((err) => logger.warn({ err }, "orphan reconciler failed"));
   }

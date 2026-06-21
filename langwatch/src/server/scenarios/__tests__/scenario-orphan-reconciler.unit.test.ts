@@ -10,11 +10,12 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   isOrphanedQueuedRun,
-  reconcileOrphanedQueuedRuns,
+  ORPHAN_QUEUED_THRESHOLD_MS,
   type OrphanCandidate,
+  reconcileOrphanedQueuedRuns,
 } from "../scenario-orphan-reconciler";
 
-const THRESHOLD_MS = 30 * 60 * 1000; // 30 min
+const THRESHOLD_MS = ORPHAN_QUEUED_THRESHOLD_MS;
 const NOW = 1_700_000_000_000;
 
 function makeCandidate(overrides: Partial<OrphanCandidate>): OrphanCandidate {
@@ -46,7 +47,7 @@ describe("isOrphanedQueuedRun", () => {
     });
 
     describe("when the last event is exactly at the threshold", () => {
-      it("flags it as orphaned", () => {
+      it("flags it as orphaned at the exact threshold boundary", () => {
         expect(
           isOrphanedQueuedRun({
             status: "QUEUED",
@@ -120,7 +121,7 @@ describe("reconcileOrphanedQueuedRuns", () => {
 
         expect(emitFailure).toHaveBeenCalledTimes(1);
         expect(emitFailure).toHaveBeenCalledWith(oldQueued);
-        expect(result).toEqual({ failed: 1, skipped: 2 });
+        expect(result).toEqual({ failed: 1, skipped: 2, errored: 0 });
       });
     });
   });
@@ -145,8 +146,8 @@ describe("reconcileOrphanedQueuedRuns", () => {
         expect(emitFailure).toHaveBeenCalledTimes(2);
         expect(emitFailure).toHaveBeenCalledWith(orphanA);
         expect(emitFailure).toHaveBeenCalledWith(orphanB);
-        // One emission succeeded, the rejecting one is counted as skipped.
-        expect(result).toEqual({ failed: 1, skipped: 1 });
+        // One emission succeeded, the rejecting one is counted as errored.
+        expect(result).toEqual({ failed: 1, skipped: 0, errored: 1 });
       });
     });
   });
@@ -164,7 +165,7 @@ describe("reconcileOrphanedQueuedRuns", () => {
         });
 
         expect(emitFailure).not.toHaveBeenCalled();
-        expect(result).toEqual({ failed: 0, skipped: 0 });
+        expect(result).toEqual({ failed: 0, skipped: 0, errored: 0 });
       });
     });
   });
