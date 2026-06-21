@@ -163,11 +163,19 @@ export async function drainInFlightRuns(
     await Promise.all(
       inFlight.map(async (jobData) => {
         try {
-          await handleFailedJobResult(
-            jobData,
-            "Worker restarting — scenario run terminated before completion",
-            deps,
-          );
+          if (pool.wasCancelled(jobData.scenarioRunId)) {
+            await handleCancelledJobResult(
+              jobData,
+              "Cancelled before execution started",
+              deps,
+            );
+          } else {
+            await handleFailedJobResult(
+              jobData,
+              "Worker restarting — scenario run terminated before completion",
+              deps,
+            );
+          }
         } catch (err) {
           logger.warn(
             { err, scenarioRunId: jobData.scenarioRunId },
@@ -605,6 +613,7 @@ export async function startScenarioProcessor(
           client: sharedClickHouseClient,
           lookbackMs: LOOKBACK_MS,
           now: reconcilerNow,
+          orphanThresholdMs: ORPHAN_QUEUED_THRESHOLD_MS,
         }),
       emitFailure: (candidate) =>
         deps.failureEmitter.ensureFailureEventsEmitted({

@@ -114,6 +114,26 @@ describe("drainInFlightRuns", () => {
     });
   });
 
+  describe("given a cancelled in-flight run", () => {
+    describe("when the processor drains", () => {
+      it("emits a cancellation event, not an error failure", async () => {
+        const job = makeJob("cancelled-run");
+        pool.submit(job);
+        pool.markCancelled(job.scenarioRunId);
+
+        await drainInFlightRuns(pool, deps);
+
+        expect(mockEnsureFailureEventsEmitted).toHaveBeenCalledTimes(1);
+        expect(mockEnsureFailureEventsEmitted).toHaveBeenCalledWith(
+          expect.objectContaining({
+            scenarioRunId: job.scenarioRunId,
+            cancelled: true,
+          }),
+        );
+      });
+    });
+  });
+
   describe("given no in-flight runs", () => {
     describe("when the processor drains", () => {
       it("emits nothing", async () => {
