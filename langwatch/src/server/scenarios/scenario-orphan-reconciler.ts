@@ -138,7 +138,10 @@ export async function findQueuedRunCandidates({
       ORDER BY LastEventAtMs ASC
       LIMIT 10000
     `,
-    query_params: { fromMs: String(fromMs), orphanCutoffMs: String(orphanCutoffMs) },
+    query_params: {
+      fromMs: String(fromMs),
+      orphanCutoffMs: String(orphanCutoffMs),
+    },
     format: "JSONEachRow",
   });
 
