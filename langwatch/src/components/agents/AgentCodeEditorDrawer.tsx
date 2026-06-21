@@ -18,7 +18,12 @@ import {
   OutputsSection,
   type OutputType,
 } from "~/components/outputs/OutputsSection";
+import {
+  isScenarioMappingValid,
+  ScenarioInputMappingSection,
+} from "~/components/suites/ScenarioInputMappingSection";
 import { Drawer } from "~/components/ui/drawer";
+import { toaster } from "~/components/ui/toaster";
 import {
   type AvailableSource,
   type FieldMapping,
@@ -33,20 +38,19 @@ import {
 } from "~/hooks/useDrawer";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { toaster } from "~/components/ui/toaster";
 import { CodeEditorModal } from "~/optimization_studio/components/code/CodeEditorModal";
 import type {
   CodeComponentConfig,
   Field as DSLField,
 } from "~/optimization_studio/types/dsl";
+import { dedentPythonCode } from "~/optimization_studio/utils/dedentPythonCode";
 import type {
   AgentComponentConfig,
   TypedAgent,
 } from "~/server/agents/agent.repository";
+import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
 import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
-import { ScenarioInputMappingSection, isScenarioMappingValid } from "~/components/suites/ScenarioInputMappingSection";
-import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
 
 const DEFAULT_CODE = `class Code:
     def __call__(self, input: str):
@@ -253,8 +257,19 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
   const handleSave = useCallback(() => {
     if (!project?.id || !isValid) return;
 
+    // Normalize indentation before saving so an accidental uniform indent
+    // (Monaco auto-indent on paste) can't persist and crash the runner's
+    // compile() downstream (issue #3013). The server save route enforces the
+    // same normalization for non-UI callers.
+    const normalizedCode = dedentPythonCode(code);
     // Build DSL-compatible config with current inputs/outputs/scenarioMappings/scenarioOutputField
-    const config = buildCodeConfig(code, inputs, outputs, scenarioMappings, scenarioOutputField);
+    const config = buildCodeConfig(
+      normalizedCode,
+      inputs,
+      outputs,
+      scenarioMappings,
+      scenarioOutputField,
+    );
 
     if (agentId) {
       // Editing existing agent - no limit check needed
