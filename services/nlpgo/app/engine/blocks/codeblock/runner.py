@@ -84,6 +84,7 @@ import io
 import json
 import os
 import sys
+import textwrap
 import time
 import traceback
 from contextlib import redirect_stdout, redirect_stderr
@@ -139,7 +140,14 @@ def main() -> int:
             # raises NameError on both engines).
             if secrets:
                 module_globals["secrets"] = SimpleNamespace(**secrets)
-            exec(compile(code, "<code-block>", "exec"), module_globals)
+            # Normalize indentation before compiling. A code-block pasted into the
+            # Studio editor can inherit a uniform leading indent on every line
+            # (Monaco auto-indent on paste); that makes top-level statements
+            # illegally indented and crashes compile() with IndentationError
+            # (issue #3013). textwrap.dedent strips the common leading whitespace,
+            # restoring the canonical flush form. Already-flush code is unchanged.
+            normalized_code = textwrap.dedent(code)
+            exec(compile(normalized_code, "<code-block>", "exec"), module_globals)
             result = _invoke_user_entrypoint(module_globals, inputs)
             result = _coerce_result(result)
             # Validate declared outputs are present (these are wired to
