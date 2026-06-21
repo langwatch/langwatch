@@ -8,7 +8,6 @@
 
 import crypto from "node:crypto";
 import { getApp } from "../../app-layer/app";
-import { prisma } from "../../db";
 import { DEFAULT_PII_REDACTION_LEVEL } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
 import type { CustomMetadata, Span } from "../../tracer/types";
 import { CollectorSpanUtils } from "../../traces/collectorSpan.utils";
