@@ -8,15 +8,9 @@
  * hooks). Binds specs/datasets/dataset-upload-dropzone.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 // Mutable result the mocked `dataset.getById.useQuery` returns, so each test
@@ -51,7 +45,8 @@ vi.mock("../services/directUpload", async (importActual) => {
     await importActual<typeof import("../services/directUpload")>();
   return {
     ...actual,
-    retryDatasetNormalize: (...args: unknown[]) => retryDatasetNormalize(...args),
+    retryDatasetNormalize: (...args: unknown[]) =>
+      retryDatasetNormalize(...args),
   };
 });
 
@@ -95,9 +90,7 @@ describe("the upload dropzone", () => {
   describe("when no file has been chosen", () => {
     /** @scenario The empty dropzone invites a file */
     it("invites a file with the prompt and supported types", () => {
-      wrap(
-        <CSVReaderComponent parse={false} onUploadAccepted={vi.fn()} />,
-      );
+      wrap(<CSVReaderComponent parse={false} onUploadAccepted={vi.fn()} />);
 
       expect(screen.getByText(/drag and drop file/i)).toBeInTheDocument();
       expect(screen.getByText(/click to browse/i)).toBeInTheDocument();
@@ -271,7 +264,11 @@ describe("DatasetUploadProcessing", () => {
 
   describe("when the dataset is still processing", () => {
     it("shows the preparing state and does not call onReady", () => {
-      getByIdResult.data = { id: "dataset_1", name: "ds", status: "processing" };
+      getByIdResult.data = {
+        id: "dataset_1",
+        name: "ds",
+        status: "processing",
+      };
       getByIdResult.isFetched = true;
       const onReady = vi.fn();
       renderProcessing({ onReady });
@@ -358,10 +355,10 @@ describe("DatasetUploadProcessing", () => {
       const onReady = vi.fn();
       renderProcessing({ onReady });
 
+      expect(screen.getByText(/no longer available/i)).toBeInTheDocument();
       expect(
-        screen.getByText(/no longer available/i),
-      ).toBeInTheDocument();
-      expect(screen.queryByText(/preparing your dataset/i)).not.toBeInTheDocument();
+        screen.queryByText(/preparing your dataset/i),
+      ).not.toBeInTheDocument();
       expect(onReady).not.toHaveBeenCalled();
     });
   });
