@@ -315,6 +315,61 @@ describe("Feature: Large dataset storage — self-hosted without object storage"
     });
   });
 
+  describe("DatasetService.upsertDataset() create with caller-supplied record ids", () => {
+    /**
+     * Born-on-storage create honors a pinned row id (the contract the old
+     * createManyDatasetRecords path provided and the append path still does), so
+     * a caller that sets an id for later edit/delete or idempotency keeps it. A
+     * row with no id gets a fresh `record_<nanoid>`. Read back from the real
+     * local-FS chunk to prove the id actually landed.
+     */
+    it("honors a pinned id and mints a fresh one only where absent", async () => {
+      const root = path.join(os.tmpdir(), `lw-ds-ids-${nanoid()}`);
+      resolveProjectStorageDestination.mockResolvedValue({
+        kind: "file" as const,
+        root,
+      });
+      const repository = {
+        findBySlug: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockImplementation((data: { id: string }) =>
+          Promise.resolve({
+            ...data,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+        ),
+      };
+
+      const dataset = await makeService({
+        repository,
+        prisma: {},
+      }).upsertDataset({
+        projectId: "p1",
+        name: "Pinned DS",
+        columnTypes: [{ name: "input", type: "string" }],
+        datasetRecords: [
+          { id: "record_pinned", input: "hello" },
+          { input: "world" },
+        ],
+      });
+
+      const storage = await getDatasetStorage("p1");
+      const rows = (await storage.readChunks({
+        projectId: "p1",
+        datasetId: dataset.id,
+        chunkCount: 1,
+      })) as Array<{ id: string; entry: unknown }>;
+
+      expect(rows[0]!.id).toBe("record_pinned");
+      expect(rows[0]!.entry).toEqual({ input: "hello" });
+      // The id-less row got a minted id, not the pinned one.
+      expect(rows[1]!.id).toMatch(/^record_/);
+      expect(rows[1]!.id).not.toBe("record_pinned");
+
+      await fs.rm(root, { recursive: true, force: true });
+    });
+  });
+
   describe("DatasetService.upsertDataset() when the chunk write fails during create", () => {
     /**
      * Born-on-storage writes the chunk objects BEFORE inserting the row, so a

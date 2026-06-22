@@ -114,6 +114,41 @@ describe("dataset-mutations (s3_jsonl)", () => {
       });
     });
 
+    describe("when caller-supplied row ids are passed", () => {
+      it("honors a pinned id and mints a fresh one only where absent (parity with append)", async () => {
+        const storage = makeStorage({
+          writeChunks: vi.fn().mockResolvedValue([
+            {
+              index: 0,
+              rowCount: 3,
+              byteSize: 60,
+              startRow: 0,
+              endRow: 3,
+              jsonl: "",
+            },
+          ]),
+        });
+
+        await writeInitialS3JsonlChunks({
+          projectId: "p1",
+          datasetId: "dataset_1",
+          entries: [{ a: 1 }, { a: 2 }, { a: 3 }],
+          forcedIds: ["record_pinned", undefined, "record_third"],
+          storage: storage as never,
+        });
+
+        const records = storage.writeChunks.mock.calls[0]![0].records as Array<{
+          id: string;
+        }>;
+        expect(records[0]!.id).toBe("record_pinned");
+        expect(records[2]!.id).toBe("record_third");
+        // The gap mints a fresh id, never reusing a neighbor's.
+        expect(records[1]!.id).toMatch(/^record_/);
+        expect(records[1]!.id).not.toBe("record_pinned");
+        expect(records[1]!.id).not.toBe("record_third");
+      });
+    });
+
     describe("when the chunk write fails partway through a multi-chunk create", () => {
       it("reaps the orphaned 0..k prefix and rethrows the original error", async () => {
         const storage = makeStorage({

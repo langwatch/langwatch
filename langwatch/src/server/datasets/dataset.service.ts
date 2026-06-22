@@ -305,13 +305,23 @@ export class DatasetService {
 
     const datasetId = `dataset_${nanoid()}`;
 
-    // Drop any caller-supplied id (s3_jsonl rows are addressed by their
-    // chunk-line id, minted by writeInitialS3JsonlChunks). The {id,entry} wrap +
-    // U+0000 scrub (I-NULL) lives in dataset-mutations alongside the append path.
-    const entries = (datasetRecords ?? []).map((record) => {
+    // Split each record into its entry (id stripped) and its caller-supplied id,
+    // index-aligned. We HONOR a pinned id (SDK/MCP/REST may set one for a later
+    // edit/delete or for idempotency) and mint a fresh `record_<nanoid>` only
+    // where absent — the same contract the append path already provides via
+    // `forcedIds`. The `{id,entry}` wrap + U+0000 scrub (I-NULL) lives in
+    // dataset-mutations alongside the append path.
+    const records = datasetRecords ?? [];
+    const entries = records.map((record) => {
       const { id: _id, ...entry } = record;
       return entry;
     });
+    const forcedIds = records.map((record) => record.id);
+
+    // Resolve storage once and thread it through the write AND the failure reap,
+    // so the reap can never target a different backend than the write if the
+    // project's storage config flips mid-call.
+    const storage = await getDatasetStorage(projectId);
 
     // Born-on-storage: write the chunk objects BEFORE the row exists, so a
     // write failure throws and leaves no orphan row. A PARTIAL write (chunk 0
@@ -321,6 +331,8 @@ export class DatasetService {
       projectId,
       datasetId,
       entries,
+      forcedIds,
+      storage,
     });
 
     try {
@@ -341,10 +353,14 @@ export class DatasetService {
       // The chunks were written before this row. If the insert fails (a slug
       // race → `@@unique([projectId, slug])` violation, or a DB outage) the
       // objects are orphaned — customer content in storage with no row to govern
-      // its retention/deletion. Best-effort reap them, then surface the failure.
-      await deleteAllS3JsonlChunks({ projectId, datasetId }).catch(() => {
-        // best-effort: a failed reap must not mask the original insert error
-      });
+      // its retention/deletion. `datasetId` is a fresh nanoid scoped to THIS
+      // attempt, so the reap only ever targets this losing attempt's chunks,
+      // never a concurrent winner's. Best-effort, then surface the failure.
+      await deleteAllS3JsonlChunks({ projectId, datasetId, storage }).catch(
+        () => {
+          // best-effort: a failed reap must not mask the original insert error
+        },
+      );
       throw error;
     }
   }

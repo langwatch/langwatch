@@ -45,15 +45,16 @@ type ChunkLine = { id: string; entry: unknown };
 /**
  * Wrap raw row entries as `{ id, entry }` chunk lines: mint a stable per-row id
  * (`record_<nanoid>`) the later edit/delete can target, and scrub U+0000 from
- * the entry (I-NULL — Postgres-parity). `forcedIds` pins each new row's id
- * (upsert semantics); otherwise a fresh id is minted per row. The single home
- * for the batch `{id,entry}`+null-scrub wrap shared by the append and
- * born-on-storage paths (the streaming normalize writer mints ids per row as it
- * goes, so it stays separate).
+ * the entry (I-NULL — Postgres-parity). `forcedIds` pins each new row's id —
+ * per-row and optional: a defined entry honors the caller's id, an `undefined`
+ * one (or a short/absent array) mints a fresh id. The single home for the batch
+ * `{id,entry}`+null-scrub wrap shared by the append and born-on-storage paths
+ * (the streaming normalize writer mints ids per row as it goes, so it stays
+ * separate).
  */
 const toChunkLines = (
   entries: unknown[],
-  { forcedIds }: { forcedIds?: string[] } = {},
+  { forcedIds }: { forcedIds?: (string | undefined)[] } = {},
 ): ChunkLine[] =>
   entries.map((entry, i) => ({
     id: forcedIds?.[i] ?? `record_${nanoid()}`,
@@ -178,21 +179,26 @@ const appendLinesInTx = async ({
  * govern retention/deletion). On any write failure we best-effort reap the whole
  * `0..k` prefix (`deleteChunksFrom(fromIndex: 0)`) before rethrowing, so the
  * function never leaks objects regardless of which caller invokes it.
+ *
+ * `forcedIds` honors caller-supplied per-row ids (parity with the append path);
+ * a fresh `record_<nanoid>` is minted wherever an id is absent.
  */
 export const writeInitialS3JsonlChunks = async ({
   projectId,
   datasetId,
   entries,
+  forcedIds,
   storage,
 }: {
   projectId: string;
   datasetId: string;
   entries: unknown[];
+  forcedIds?: (string | undefined)[];
   storage?: DatasetStorage;
 }): Promise<ChunkedDatasetMeta> => {
   const datasetStorage = storage ?? (await getDatasetStorage(projectId));
 
-  const lines = toChunkLines(entries);
+  const lines = toChunkLines(entries, { forcedIds });
   let written: Awaited<ReturnType<DatasetStorage["writeChunks"]>>;
   try {
     written = await datasetStorage.writeChunks({
