@@ -15,16 +15,20 @@ import { type ComponentProps, type FC, lazy } from "react";
 
 import type { TraceV2DrawerShellProps } from "../features/traces-v2/components/TraceDrawer";
 
-const lazyDefault = <
-  K extends string,
-  T extends { [P in K]: React.FC<any> },
->({
+const lazyDefault = <K extends string, T extends { [P in K]: React.FC<any> }>({
   factory,
   key,
 }: {
   factory: () => Promise<T>;
   key: K;
-}) => lazy(() => factory().then((m) => ({ default: m[key] })));
+}) => {
+  const Component = lazy(() => factory().then((m) => ({ default: m[key] })));
+  // Preserve the original export's name on the lazy wrapper so React DevTools
+  // and regression tests (e.g. scenariosIndexNoDoubleDrawer) can still
+  // identify the underlying drawer.
+  Object.defineProperty(Component, "name", { value: key });
+  return Component;
+};
 
 const AddAnnotationQueueDrawer = lazyDefault({
   factory: () => import("./AddAnnotationQueueDrawer"),
