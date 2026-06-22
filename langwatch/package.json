@@ -280,7 +280,7 @@
     "@types/nprogress": "^0.2.3",
     "@types/numeral": "^2.0.5",
     "@types/papaparse": "^5.5.2",
-    "@types/qs": "^6.15.0",
+    "@types/qs": "^6.15.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@types/semver": "^7.7.1",
