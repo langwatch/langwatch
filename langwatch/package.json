@@ -298,7 +298,7 @@
     "jest-mock-extended": "^4.0.1",
     "jsdom": "^28.1.0",
     "node-mocks-http": "^1.17.2",
-    "playwright": "1.59.1",
+    "playwright": "1.60.0",
     "raw-loader": "^4.0.2",
     "sass": "^1.99.0",
     "selfsigned": "^3.0.1",
