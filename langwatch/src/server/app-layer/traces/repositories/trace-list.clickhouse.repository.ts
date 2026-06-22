@@ -14,6 +14,14 @@ import type {
 
 const TABLE_NAME = "trace_summaries" as const;
 
+/**
+ * Buffer subtracted from `since` when bounding the new-trace-count subquery
+ * scan on `stored_spans`. Spans start around their trace's OccurredAt and
+ * partitions are weekly, so +/- 2 days guarantees a matching span near the
+ * boundary is never pruned. Matches the `withPartitionHint` margin.
+ */
+const SINCE_WINDOW_BUFFER_MS = 2 * 24 * 60 * 60 * 1000;
+
 interface ClickHouseSummaryRow extends TraceSummaryFieldsBase {
   // The list mapper only reads a fixed set of keys out of `Attributes`.
   // Projecting them individually lets ClickHouse skip reading the full
@@ -381,9 +389,22 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       "TraceListClickHouseRepository.findCount",
     );
 
+    // This is the live "new traces since `since`" poll. The outer count only
+    // wants traces with OccurredAt > since, but `filterWhere` can carry a
+    // span-level filter whose bounded subquery scans `stored_spans` over the
+    // whole [from, to] window. Raise the window's lower bound to `since` (less
+    // a small buffer) so that subquery prunes to the recent partitions instead
+    // of re-scanning the entire range on every poll. A trace with
+    // OccurredAt > since has its matching span StartTime >= OccurredAt > since,
+    // so the count is unchanged; the buffer covers any OccurredAt-vs-StartTime
+    // skew and matches the +/- 2 day margin used elsewhere for span pruning.
+    const effectiveFrom = Math.max(
+      params.timeRange.from,
+      params.since - SINCE_WINDOW_BUFFER_MS,
+    );
     const { sql: whereClause, params: queryParams } = buildWhereClause(
       params.tenantId,
-      params.timeRange,
+      { ...params.timeRange, from: effectiveFrom },
       params.filterWhere,
     );
 
@@ -974,7 +995,8 @@ function buildListAttributes(
   // the "Cache read" / "Cache write" / reasoning rows (the raw per-span
   // gen_ai.usage.cache_* values never reach the trace attribute map).
   if (row.AttrCacheReadTokens) {
-    attributes["langwatch.reserved.cache_read_tokens"] = row.AttrCacheReadTokens;
+    attributes["langwatch.reserved.cache_read_tokens"] =
+      row.AttrCacheReadTokens;
   }
   if (row.AttrCacheCreationTokens) {
     attributes["langwatch.reserved.cache_creation_tokens"] =
