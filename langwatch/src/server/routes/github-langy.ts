@@ -19,7 +19,11 @@
  */
 import { randomBytes } from "crypto";
 import { env } from "~/env.mjs";
-import { createServiceApp, publicEndpoint } from "~/server/api/security";
+import {
+  createServiceApp,
+  handlerManagedAuth,
+  publicEndpoint,
+} from "~/server/api/security";
 import { auditLog } from "~/server/auditLog";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
@@ -57,9 +61,23 @@ const logger = createLogger("langwatch:api:github-langy");
 
 const GITHUB_AUTHORIZE_URL = "https://github.com/login/oauth/authorize";
 
-const PUBLIC_REASON =
+// /callback is genuinely public: GitHub's OAuth redirect_uri spec forbids
+// pre-auth on this endpoint — we only get a session via the signed state and
+// a re-check of the session cookie inside the handler.
+const CALLBACK_PUBLIC_REASON =
   "GitHub App OAuth redirect URI — protocol-mandated public endpoint; " +
   "all sensitive state is signed and bound to the session that started the flow.";
+
+// /connect is session-gated: it requires a logged-in user and an org-membership
+// check before signing state and redirecting to github.com. The session check
+// runs in-handler (we need the session BEFORE the redirect so we can bind the
+// state to it), so we declare handlerManagedAuth to record that fact in the
+// route-auth registry rather than mis-classifying it as publicEndpoint.
+const CONNECT_HANDLER_AUTH_REASON =
+  "Connect-start endpoint: requires a valid application session " +
+  "(checked in-handler via getServerAuthSession) plus an org-membership " +
+  "check before any redirect to GitHub. State token is HMAC-signed and " +
+  "bound to that session id.";
 
 const secured = createServiceApp({ basePath: "/api" });
 
@@ -134,7 +152,7 @@ function withGithubError(returnTo: string, message: string): string {
 }
 
 secured
-  .access(publicEndpoint(PUBLIC_REASON))
+  .access(handlerManagedAuth(CONNECT_HANDLER_AUTH_REASON))
   .get("/github-langy/connect", async (c) => {
     if (!appConfigured()) {
       return c.json(
@@ -222,7 +240,7 @@ secured
   });
 
 secured
-  .access(publicEndpoint(PUBLIC_REASON))
+  .access(publicEndpoint(CALLBACK_PUBLIC_REASON))
   .get("/github-langy/callback", async (c) => {
     const code = c.req.query("code");
     const state = verifyState(c.req.query("state") ?? null);

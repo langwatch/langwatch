@@ -94,4 +94,24 @@ describe("API router endpoint authorization guarantee", () => {
       expect(offenders.map((o) => `${o.method} ${o.path}`)).toEqual([]);
     });
   });
+
+  // Regression: pull request #4913 originally classified /github-langy/connect
+  // as publicEndpoint together with the protocol-mandated /callback. Connect is
+  // session-gated (it requires a logged-in user before signing state) — keeping
+  // both under one policy made the registry lie about what is actually open to
+  // the internet. Pin the policies separately so a future edit can't quietly
+  // re-merge them.
+  describe("when the GitHub OAuth endpoints are registered", () => {
+    it("treats /github-langy/connect as handler-managed (session-gated) and /github-langy/callback as public", () => {
+      const byPath = new Map(
+        allRegisteredRoutes().map((r) => [`${r.method} ${r.path}`, r.policy]),
+      );
+      const connect = byPath.get("GET /api/github-langy/connect");
+      const callback = byPath.get("GET /api/github-langy/callback");
+      expect(connect, "/connect must be registered").toBeDefined();
+      expect(callback, "/callback must be registered").toBeDefined();
+      expect(connect?.kind).toBe("handlerManaged");
+      expect(callback?.kind).toBe("public");
+    });
+  });
 });
