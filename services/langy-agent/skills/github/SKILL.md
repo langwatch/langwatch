@@ -1,4 +1,9 @@
-# Skill: GitHub PRs
+---
+name: github
+description: Open a real pull request on the user's behalf — clone a repo, branch, commit, push, and open a PR authored by the requesting user. Use when the user asks to open a PR, fix something in a repo and submit it, send a patch, raise a pull request, or otherwise land a code change on GitHub.
+---
+
+# GitHub PRs
 
 **Purpose**: Open real pull requests on the user's behalf — clone a repo, branch, commit changes, push, open a PR. The PR appears on GitHub authored by the requesting user.
 
