@@ -59,7 +59,7 @@
     "licenses": "pnpx license-checker --summary && pnpx license-checker --json > licenses.json && echo \"Full licenses report saved to licenses.json\""
   },
   "dependencies": {
-    "@ag-ui/core": "~0.0.53",
+    "@ag-ui/core": "~0.0.57",
     "@ai-sdk/amazon-bedrock": "^4.0.100",
     "@ai-sdk/azure": "^3.0.59",
     "@ai-sdk/google": "^3.0.67",
