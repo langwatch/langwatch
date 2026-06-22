@@ -256,8 +256,8 @@ secured.access(requires("datasets:manage")).post(
     const service = c.get("datasetService");
 
     const body = await c.req.parseBody();
-    const file = body["file"];
-    const name = body["name"];
+    const file = body.file;
+    const name = body.name;
 
     if (!name || typeof name !== "string" || name.trim() === "") {
       throw new UnprocessableEntityError("name field is required");
@@ -453,7 +453,10 @@ secured.access(directUploadSessionAuth).put(
       // (set LANGWATCH_LOCAL_STORAGE_PATH / configure S3) instead of a generic
       // 500 the browser would mistake for "no object storage" and fall back on.
       if (error instanceof Error && error.name === "StorageNotWritableError") {
-        return c.json({ error: "StorageNotWritable", message: error.message }, 500);
+        return c.json(
+          { error: "StorageNotWritable", message: error.message },
+          500,
+        );
       }
       throw error;
     }
@@ -600,7 +603,7 @@ secured.access(requires("datasets:manage")).post(
     const service = c.get("datasetService");
 
     const body = await c.req.parseBody();
-    const file = body["file"];
+    const file = body.file;
 
     if (!file || !(file instanceof File)) {
       throw new UnprocessableEntityError("file field is required");
