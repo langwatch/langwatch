@@ -360,7 +360,7 @@ function agentStreamResponse(replyText: string): Response {
   });
 }
 
-async function postChat(prompt: string) {
+async function postChat(prompt: string, modelOverride?: string) {
   const { app } = await import("../langy");
   return app.request("http://localhost/api/langy/chat", {
     method: "POST",
@@ -369,6 +369,7 @@ async function postChat(prompt: string) {
       projectId: "p1",
       conversationId: null,
       messages: [{ role: "user", parts: [{ type: "text", text: prompt }] }],
+      ...(modelOverride ? { modelOverride } : {}),
     }),
   });
 }
@@ -622,6 +623,63 @@ describe("Feature: Langy chat opens PRs as the requesting user", () => {
           // permits whose turn opened zero PRs.
           expect(releaseLangyGithubPrPermit).not.toHaveBeenCalled();
         });
+      });
+    });
+
+    // Regression: PR #4913 second-review pass found the route reserved a
+    // permit BEFORE modelOverride validation and the agent fetch, then only
+    // released it inside the stream executor's happy path. Every pre-stream
+    // error (invalid model → 400, transport failure / non-OK → 502, stream
+    // abort) consumed a permit without opening a PR. Pin the fixed behaviour
+    // here so a future edit can't re-introduce the leak.
+    describe("when a pre-stream error happens after the permit was reserved", () => {
+      /** @scenario "Permit must be released on every non-PR exit" */
+      it("releases the permit when the agent fetch transport fails", async () => {
+        fetchMock = vi.fn(async () => {
+          throw new Error("ECONNREFUSED");
+        });
+        vi.stubGlobal("fetch", fetchMock);
+
+        const res = await postChat("Open a PR on acme/service-x");
+        expect(res.status).toBe(502);
+
+        expect(reserveLangyGithubPrPermit).toHaveBeenCalledTimes(1);
+        expect(releaseLangyGithubPrPermit).toHaveBeenCalledTimes(1);
+      });
+
+      /** @scenario "Permit must be released on every non-PR exit" */
+      it("releases the permit when the agent answers with a non-OK status", async () => {
+        fetchMock = vi.fn(
+          async () =>
+            new Response("upstream blew up", {
+              status: 502,
+              headers: { "Content-Type": "text/plain" },
+            }),
+        );
+        vi.stubGlobal("fetch", fetchMock);
+
+        const res = await postChat("Open a PR on acme/service-x");
+        expect(res.status).toBe(502);
+
+        expect(reserveLangyGithubPrPermit).toHaveBeenCalledTimes(1);
+        expect(releaseLangyGithubPrPermit).toHaveBeenCalledTimes(1);
+      });
+
+      /** @scenario "Invalid modelOverride must NOT burn a permit" */
+      it("never reserves a permit when modelOverride fails the allowlist check (400)", async () => {
+        // Tight allowlist that explicitly excludes the requested model.
+        getModelsAllowed.mockResolvedValue(["openai/gpt-5-mini"]);
+
+        const res = await postChat(
+          "Open a PR on acme/service-x",
+          "anthropic/claude-not-allowed",
+        );
+        expect(res.status).toBe(400);
+
+        // The whole point: validation runs BEFORE reservation, so the daily
+        // counter is untouched by a request the route was going to 400 anyway.
+        expect(reserveLangyGithubPrPermit).not.toHaveBeenCalled();
+        expect(releaseLangyGithubPrPermit).not.toHaveBeenCalled();
       });
     });
   });
