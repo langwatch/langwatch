@@ -30,6 +30,31 @@ type Credentials struct {
 	GithubLogin        string `json:"githubLogin,omitempty"`
 }
 
+// CredentialSignature is a stable fingerprint of the credential capabilities
+// the worker was spawned with. We can't reuse a worker whose capability set
+// has changed since spawn (model swap, GH token added/removed) — see the
+// `kill on capability change` review finding. Reusing would mean:
+//   - A worker that got a GH_TOKEN at spawn keeps it across later turns
+//     where the control plane denied the daily PR cap (token's still in
+//     the subprocess env; the model can still call `gh pr create`).
+//   - A user switching the model picker mid-conversation appears to
+//     succeed but execution stays on the originally-spawned model
+//     because setupWorkerHome only ran once.
+//
+// The signature is compared on every reuse; mismatch → kill + respawn.
+type CredentialSignature struct {
+	Model        string
+	HasGithubAuth bool
+}
+
+// signatureOf derives the comparable signature from a credentials payload.
+func signatureOf(creds Credentials) CredentialSignature {
+	return CredentialSignature{
+		Model:         creds.Model,
+		HasGithubAuth: creds.GithubToken != "",
+	}
+}
+
 // Worker is the manager's bookkeeping for one OpenCode subprocess.
 type Worker struct {
 	conversationID    string
@@ -38,8 +63,19 @@ type Worker struct {
 	cmd               *exec.Cmd
 	uid               uint32
 
-	mu       sync.Mutex
+	// credSig is set at spawn and compared on each reuse. A mismatch means
+	// the caller's capability set differs from this worker's — we must
+	// recreate the worker rather than continue with stale env.
+	credSig CredentialSignature
+
+	mu sync.Mutex
+	// lastSeen drives the idle reaper.
 	lastSeen time.Time
+	// inFlight serialises turns on the same conversation. Two simultaneous
+	// /chat requests for one conversationID would otherwise both subscribe
+	// to the same /event stream and each terminate on the other's terminal
+	// event, splicing replies. tryClaim/release wrap it.
+	inFlight bool
 }
 
 // touch updates the worker's idle timer. Called whenever a turn arrives.
@@ -54,6 +90,26 @@ func (w *Worker) idleSince() time.Duration {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return time.Since(w.lastSeen)
+}
+
+// tryClaim is true if the worker was idle and now belongs to the caller —
+// the caller MUST call release() when its turn is done (success or error).
+// False means another turn is already running; the handler converts that
+// into 409.
+func (w *Worker) tryClaim() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.inFlight {
+		return false
+	}
+	w.inFlight = true
+	return true
+}
+
+func (w *Worker) release() {
+	w.mu.Lock()
+	w.inFlight = false
+	w.mu.Unlock()
 }
 
 // sensitiveEnvPattern matches env names that must never reach a worker. The

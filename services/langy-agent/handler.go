@@ -138,6 +138,19 @@ func handleChat(w http.ResponseWriter, r *http.Request, mgr *Manager, cfg Config
 		flush()
 		return
 	}
+
+	// Per-conversation in-flight guard. The worker's OpenCode session is
+	// single-stream — two concurrent turns subscribing to /event from the
+	// same worker would each receive the other's deltas and could terminate
+	// on the other's terminal event, splicing replies. Return 409 on
+	// overlap; the control plane shows a "still answering — wait" notice.
+	if !worker.tryClaim() {
+		writeJSON(w, http.StatusConflict, map[string]string{
+			"error": "conversation-busy",
+		})
+		return
+	}
+	defer worker.release()
 	worker.touch()
 
 	w.WriteHeader(http.StatusOK)
