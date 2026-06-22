@@ -307,11 +307,121 @@ export const appendS3JsonlRecords = async ({
 };
 
 /**
- * Locate a row by id across the chunks (in order) and replace its `entry` in
- * place, rewriting only that one chunk and patching its offset/byteSize
- * (rowCount unchanged). If the id is not found in any chunk it is treated as a
- * new row → appended (upsert-of-new). Returns whether an existing row was
- * updated.
+ * Pre-lock locate scan (NO advisory lock held) for the scan-before-lock
+ * optimization. Reads chunks in order — OFF the lock — to find which chunk
+ * currently holds each of `ids`, stopping as soon as every id is located. The
+ * edit/delete paths use this to shrink the lock-held work from O(chunkCount) S3
+ * reads to O(affected chunks): the expensive locate runs here, off the lock, and
+ * only the affected chunks are re-read + rewritten under the lock.
+ *
+ * The result is a HINT, never authoritative. A concurrent mutation between this
+ * scan and lock acquisition can move or remove a row, so the caller re-validates
+ * under the lock and bails to a full in-lock scan on any discrepancy — this scan
+ * never decides correctness on its own. Returns `null` (→ caller takes the
+ * proven full in-lock scan) when a chunk can't be cleanly read off the lock
+ * (e.g. racing a concurrent rewrite), rather than acting on a partial locate.
+ */
+const locateIdsBeforeLock = async ({
+  storage,
+  projectId,
+  datasetId,
+  ids,
+  chunkCount,
+}: {
+  storage: DatasetStorage;
+  projectId: string;
+  datasetId: string;
+  ids: Set<string>;
+  chunkCount: number;
+}): Promise<{ affectedIndices: number[]; locatedIds: Set<string> } | null> => {
+  const affected = new Set<number>();
+  const locatedIds = new Set<string>();
+  const remaining = new Set(ids);
+  for (let index = 0; index < chunkCount && remaining.size > 0; index++) {
+    let rows: unknown[];
+    try {
+      rows = await storage.readChunk({ projectId, datasetId, index });
+    } catch {
+      // Couldn't read this chunk off the lock (e.g. racing a rewrite). Abandon
+      // the hint so the caller uses the proven full in-lock scan instead of
+      // acting on a partial locate.
+      return null;
+    }
+    for (const line of rows) {
+      if (isChunkLine(line) && remaining.has(line.id)) {
+        affected.add(index);
+        locatedIds.add(line.id);
+        remaining.delete(line.id);
+      }
+    }
+  }
+  return { affectedIndices: [...affected].sort((a, b) => a - b), locatedIds };
+};
+
+/**
+ * Write the recomputed counters for a delete under the lock: a full offset
+ * recompute from the final per-chunk `(rowCount, byteSize)` plus the trailing-
+ * empty LOGICAL compaction (drop trailing 0-row chunks from `chunkCount` + the
+ * offset index; objects are left as benign orphans — see `deleteS3JsonlRecords`).
+ * Shared by the fast (affected-only) and full-scan delete paths so the
+ * compaction/offset math lives in exactly one place.
+ */
+const commitDeleteCounts = async ({
+  repository,
+  tx,
+  datasetId,
+  projectId,
+  perChunk,
+}: {
+  repository: DatasetRepository;
+  tx: Prisma.TransactionClient;
+  datasetId: string;
+  projectId: string;
+  perChunk: Array<{ rowCount: number; byteSize: number }>;
+}): Promise<void> => {
+  const { offsets, rowCount, sizeBytes } = recomputeOffsets(perChunk);
+  let keptChunkCount = perChunk.length;
+  while (keptChunkCount > 0 && perChunk[keptChunkCount - 1]!.rowCount === 0) {
+    keptChunkCount -= 1;
+  }
+  const trimmed = keptChunkCount < perChunk.length;
+  await repository.update(
+    {
+      id: datasetId,
+      projectId,
+      data: {
+        rowCount,
+        sizeBytes: BigInt(sizeBytes),
+        // The trailing empty offset entries (startRow === endRow, byteSize 0)
+        // contribute nothing to the totals, so slicing is exact.
+        ...(trimmed
+          ? {
+              chunkCount: keptChunkCount,
+              chunkOffsets: offsets.slice(
+                0,
+                keptChunkCount,
+              ) as unknown as Prisma.InputJsonValue,
+            }
+          : {
+              chunkOffsets: offsets as unknown as Prisma.InputJsonValue,
+            }),
+      },
+    },
+    { tx },
+  );
+};
+
+/**
+ * Locate a row by id and replace its `entry` in place, rewriting only that one
+ * chunk and patching its offset/byteSize (rowCount unchanged). If the id is not
+ * found in any chunk it is treated as a new row → appended (upsert-of-new).
+ * Returns whether an existing row was updated.
+ *
+ * scan-before-lock: the O(chunkCount) locate runs OFF the advisory lock
+ * (`locateIdsBeforeLock`); under the lock the fast path re-reads only the one
+ * hinted chunk. If the row isn't there under the lock (a concurrent mutation
+ * moved/removed it since the scan) the fast path falls through to the proven
+ * full in-lock scan, so correctness never depends on the hint.
  */
 export const editS3JsonlRecord = async ({
   prisma,
@@ -331,6 +441,20 @@ export const editS3JsonlRecord = async ({
   const datasetStorage = storage ?? (await getDatasetStorage(projectId));
   const repository = new DatasetRepository(prisma);
 
+  // OFF the lock: locate the row's chunk so only that chunk is re-read under it.
+  // Skipped unless the dataset looks ready — never do storage I/O ahead of the
+  // readiness gate (the under-lock `assertReady` stays authoritative).
+  const hint =
+    dataset.status === "ready"
+      ? await locateIdsBeforeLock({
+          storage: datasetStorage,
+          projectId,
+          datasetId: dataset.id,
+          ids: new Set([recordId]),
+          chunkCount: dataset.chunkCount ?? 0,
+        })
+      : null;
+
   return withDatasetLock({ prisma, datasetId: dataset.id }, async (tx) => {
     const current = await repository.findOneOrThrow(
       { id: dataset.id, projectId },
@@ -339,31 +463,16 @@ export const editS3JsonlRecord = async ({
     assertReady(current);
 
     const chunkCount = current.chunkCount ?? 0;
-    // Bounded in-order scan: read one chunk at a time until the id is found.
-    // Edits are rare (Decision 3 — the editor path, not a hot loop), so the
-    // per-chunk read cost is acceptable; a future reads-at-scale epic can index
-    // id→chunk if needed.
-    // m3: the advisory-lock + PG-connection hold time scales with `chunkCount`
-    // (this id-scan does O(chunkCount) S3 reads inside the lock) — acceptable
-    // because edits are rare; a hot path would need an id→chunk index instead.
-    // The transaction timeout is widened (see `withDatasetLock`) so this scan
-    // can't P2028 on a multi-chunk dataset.
-    // TODO(scan-before-lock): the O(chunkCount) locate-scan could run BEFORE
-    // entering the lock, then re-read only the target chunk under the lock
-    // before rewriting — shrinking lock-hold to the rewrite + counter-write.
-    // Deferred: it risks the serialization guarantee if done carelessly (the
-    // target chunk may move between scan and lock), so it needs its own rung.
-    for (let index = 0; index < chunkCount; index++) {
-      const rows = await datasetStorage.readChunk({
-        projectId,
-        datasetId: dataset.id,
-        index,
-      });
-      const rowIndex = rows.findIndex(
-        (line) => isChunkLine(line) && line.id === recordId,
-      );
-      if (rowIndex === -1) continue;
+    const offsets = readOffsets(current);
 
+    // Replace the row's entry at (index, rowIndex) in place and patch only that
+    // chunk's byteSize — rows don't move on edit, so startRow/endRow are
+    // unchanged. Shared by the fast and full-scan branches.
+    const rewriteRowAt = async (
+      index: number,
+      rows: unknown[],
+      rowIndex: number,
+    ): Promise<void> => {
       const updatedRows = rows.slice();
       updatedRows[rowIndex] = { id: recordId, entry } satisfies ChunkLine;
       const offset = await datasetStorage.rewriteChunk({
@@ -372,10 +481,6 @@ export const editS3JsonlRecord = async ({
         index,
         records: updatedRows,
       });
-
-      // Rows didn't move → every chunk's startRow/endRow is unchanged; patch
-      // only the affected chunk's byteSize and shift sizeBytes by the delta.
-      const offsets = readOffsets(current);
       const oldByteSize = offsets[index]?.byteSize ?? 0;
       const patched = offsets.map((o) =>
         o.index === index ? { ...o, byteSize: offset.byteSize } : o,
@@ -392,6 +497,42 @@ export const editS3JsonlRecord = async ({
         },
         { tx },
       );
+    };
+
+    // Fast path — the pre-scan located the row and the offset index covers every
+    // chunk: re-read only that one chunk under the lock.
+    if (hint?.locatedIds.has(recordId) && offsets.length === chunkCount) {
+      const index = hint.affectedIndices[0]!;
+      if (index < chunkCount) {
+        const rows = await datasetStorage.readChunk({
+          projectId,
+          datasetId: dataset.id,
+          index,
+        });
+        const rowIndex = rows.findIndex(
+          (line) => isChunkLine(line) && line.id === recordId,
+        );
+        if (rowIndex !== -1) {
+          await rewriteRowAt(index, rows, rowIndex);
+          return { updated: true };
+        }
+        // Row moved/removed since the scan → fall through to the full scan.
+      }
+    }
+
+    // Full in-lock scan (the proven path): read chunks in order until the id is
+    // found; rewrite in place, or append as a new row when it exists nowhere.
+    for (let index = 0; index < chunkCount; index++) {
+      const rows = await datasetStorage.readChunk({
+        projectId,
+        datasetId: dataset.id,
+        index,
+      });
+      const rowIndex = rows.findIndex(
+        (line) => isChunkLine(line) && line.id === recordId,
+      );
+      if (rowIndex === -1) continue;
+      await rewriteRowAt(index, rows, rowIndex);
       return { updated: true };
     }
 
@@ -418,6 +559,18 @@ export const editS3JsonlRecord = async ({
  * empty is LEFT in place as an empty chunk (no compaction): `chunkCount` stays
  * authoritative and `readChunks` tolerates an empty chunk (parses to []), so
  * this is the simplest correct approach for the rung. Returns rows removed.
+ *
+ * scan-before-lock: the O(chunkCount) locate runs OFF the advisory lock
+ * (`locateIdsBeforeLock`); under the lock the fast path re-reads ONLY the
+ * affected chunks and takes every unaffected chunk's `(rowCount, byteSize)` from
+ * the authoritative offset index (no read), shrinking lock-held S3 reads from
+ * O(chunkCount) to O(affected). The fast path only commits when the pre-scan
+ * located every target id and the offset index covers every chunk, and it bails
+ * to the proven full in-lock scan if any located id isn't where the hint said
+ * (a concurrent move/delete since the scan) — so correctness never depends on
+ * the hint. (Trusting the offset index for unaffected chunks means a delete no
+ * longer incidentally self-heals counter drift on those chunks;
+ * `recomputeDatasetCounts` remains the explicit I-COUNT repair.)
  */
 export const deleteS3JsonlRecords = async ({
   prisma,
@@ -436,6 +589,21 @@ export const deleteS3JsonlRecords = async ({
   const repository = new DatasetRepository(prisma);
   const removeSet = new Set(recordIds);
 
+  // OFF the lock: locate the target ids' chunks so only the affected chunks are
+  // re-read under the lock (not all chunkCount). Skipped for a not-ready dataset
+  // — never do storage I/O ahead of the readiness gate (the under-lock
+  // `assertReady` stays authoritative).
+  const hint =
+    removeSet.size > 0 && dataset.status === "ready"
+      ? await locateIdsBeforeLock({
+          storage: datasetStorage,
+          projectId,
+          datasetId: dataset.id,
+          ids: removeSet,
+          chunkCount: dataset.chunkCount ?? 0,
+        })
+      : null;
+
   return withDatasetLock({ prisma, datasetId: dataset.id }, async (tx) => {
     const current = await repository.findOneOrThrow(
       { id: dataset.id, projectId },
@@ -444,17 +612,86 @@ export const deleteS3JsonlRecords = async ({
     assertReady(current);
 
     const chunkCount = current.chunkCount ?? 0;
+    if (removeSet.size === 0) {
+      return { deleted: 0 };
+    }
+    const offsets = readOffsets(current);
+
+    // Fast path — only when the pre-scan located EVERY target id and the offset
+    // index covers every chunk: re-read just the affected chunks, take unaffected
+    // chunk sizes from the authoritative offset index. Bails (returns null) if
+    // any located id isn't where the hint said.
+    if (
+      hint &&
+      hint.locatedIds.size === removeSet.size &&
+      offsets.length === chunkCount
+    ) {
+      const fast = await (async (): Promise<{ deleted: number } | null> => {
+        const removedIds = new Set<string>();
+        const newRowCount = new Map<number, number>();
+        const newByteSize = new Map<number, number>();
+        let deleted = 0;
+        for (const index of hint.affectedIndices) {
+          if (index >= chunkCount) continue; // chunk trimmed away since the scan
+          const rows = await datasetStorage.readChunk({
+            projectId,
+            datasetId: dataset.id,
+            index,
+          });
+          const kept = rows.filter(
+            (line) => !(isChunkLine(line) && removeSet.has(line.id)),
+          );
+          if (kept.length === rows.length) continue; // none of ours here now
+          for (const line of rows) {
+            if (isChunkLine(line) && removeSet.has(line.id)) {
+              removedIds.add(line.id);
+            }
+          }
+          deleted += rows.length - kept.length;
+          const offset = await datasetStorage.rewriteChunk({
+            projectId,
+            datasetId: dataset.id,
+            index,
+            records: kept,
+          });
+          newRowCount.set(index, kept.length);
+          newByteSize.set(index, offset.byteSize);
+        }
+        // Re-validate the hint: every located id must have been removed here. If
+        // not, a concurrent mutation moved/removed it since the scan — bail to
+        // the proven full scan rather than risk a missed delete.
+        for (const id of hint.locatedIds) {
+          if (!removedIds.has(id)) return null;
+        }
+        if (deleted === 0) {
+          return { deleted: 0 };
+        }
+        // Per-chunk (rowCount, byteSize) for ALL chunks: affected from the
+        // re-read above, the rest from the authoritative offset index (no read).
+        const perChunk = [...offsets]
+          .sort((a, b) => a.index - b.index)
+          .map((o) => ({
+            rowCount: newRowCount.get(o.index) ?? o.endRow - o.startRow,
+            byteSize: newByteSize.get(o.index) ?? o.byteSize,
+          }));
+        await commitDeleteCounts({
+          repository,
+          tx,
+          datasetId: dataset.id,
+          projectId,
+          perChunk,
+        });
+        return { deleted };
+      })();
+      if (fast) return fast;
+    }
+
+    // Full in-lock scan (the proven path): read every chunk, drop target rows,
+    // recompute. Used on a legacy/no-offset dataset, or when the fast path
+    // bailed on a hint discrepancy. Measures unaffected chunks from their actual
+    // bytes, so this path also self-heals any pre-existing counter drift.
     const perChunk: Array<{ rowCount: number; byteSize: number }> = [];
     let deleted = 0;
-
-    // m3: the advisory-lock + PG-connection hold time scales with `chunkCount` —
-    // this scan reads every chunk inside the lock (O(chunkCount) S3 reads).
-    // Acceptable because deletes are rare; a hot path would need an id→chunk index.
-    // The transaction timeout is widened (see `withDatasetLock`) so this scan
-    // can't P2028 on a multi-chunk dataset.
-    // TODO(scan-before-lock): the locate-scan could run BEFORE the lock and only
-    // the affected-chunk rewrites + counter-write run under it — deferred for the
-    // same serialization-safety reason noted on `editS3JsonlRecord`.
     for (let index = 0; index < chunkCount; index++) {
       const rows = await datasetStorage.readChunk({
         projectId,
@@ -465,7 +702,6 @@ export const deleteS3JsonlRecords = async ({
         (line) => !(isChunkLine(line) && removeSet.has(line.id)),
       );
       const removedHere = rows.length - kept.length;
-
       if (removedHere > 0) {
         deleted += removedHere;
         const offset = await datasetStorage.rewriteChunk({
@@ -476,8 +712,6 @@ export const deleteS3JsonlRecords = async ({
         });
         perChunk.push({ rowCount: kept.length, byteSize: offset.byteSize });
       } else {
-        // Untouched on disk; measure its bytes from the in-memory rows so the
-        // recomputed totals don't depend on a possibly-stale offset entry.
         perChunk.push({
           rowCount: rows.length,
           byteSize: toSingleJsonl(rows).byteSize,
@@ -488,57 +722,13 @@ export const deleteS3JsonlRecords = async ({
     if (deleted === 0) {
       return { deleted: 0 };
     }
-
-    const {
-      offsets: newOffsets,
-      rowCount,
-      sizeBytes,
-    } = recomputeOffsets(perChunk);
-
-    // Compaction (cheap, trailing-only, LOGICAL): a delete that empties the
-    // highest-index chunks lets us drop them from `chunkCount` + the offset index
-    // so reads stop iterating empty chunks and `chunkCount` doesn't grow unbounded
-    // under churn. We deliberately do NOT delete the chunk objects here: an S3
-    // delete inside this transaction would land before the lowered `chunkCount`
-    // commits, and reads are lock-free — a reader could see the old count and then
-    // hit the now-missing object (a hard `MissingChunkError`). Instead the
-    // trailing objects are left as benign 0-byte orphans: readers ignore them
-    // (they iterate `0..chunkCount`), the next append overwrites them by key
-    // (`writeChunks(fromIndex=chunkCount)`), and physical reap is the deferred
-    // compaction's job. Trailing-only regardless: a MIDDLE empty must stay in
-    // place (chunk keys are positional; removing it would re-index every chunk
-    // above it).
-    let keptChunkCount = perChunk.length;
-    while (keptChunkCount > 0 && perChunk[keptChunkCount - 1]!.rowCount === 0) {
-      keptChunkCount -= 1;
-    }
-    const trimmed = keptChunkCount < perChunk.length;
-
-    await repository.update(
-      {
-        id: dataset.id,
-        projectId,
-        data: {
-          rowCount,
-          sizeBytes: BigInt(sizeBytes),
-          // The trailing empty offset entries (startRow === endRow, byteSize 0)
-          // contribute nothing to the totals, so slicing is exact.
-          ...(trimmed
-            ? {
-                chunkCount: keptChunkCount,
-                chunkOffsets: newOffsets.slice(
-                  0,
-                  keptChunkCount,
-                ) as unknown as Prisma.InputJsonValue,
-              }
-            : {
-                chunkOffsets: newOffsets as unknown as Prisma.InputJsonValue,
-              }),
-        },
-      },
-      { tx },
-    );
-
+    await commitDeleteCounts({
+      repository,
+      tx,
+      datasetId: dataset.id,
+      projectId,
+      perChunk,
+    });
     return { deleted };
   });
 };
