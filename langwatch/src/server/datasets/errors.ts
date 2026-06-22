@@ -198,10 +198,12 @@ export class DatasetTooLargeToExportError extends Error {
  * A chunk that the PG-authoritative `chunkCount` claims must exist is missing
  * from object storage. From a read's perspective this is corruption, not
  * emptiness, so the read paths (`readChunks`/`readChunk`) throw it rather than
- * silently truncate. The I-COUNT repair (`recomputeDatasetCounts`) catches it to
- * tell a recoverable TRAILING gap (a delete-trim residual — PG kept the old
- * `chunkCount` after the trailing objects were already reaped) from genuine
- * mid-set corruption.
+ * silently truncate. The I-COUNT repair (`recomputeDatasetCounts`) does NOT
+ * swallow it either: trailing-chunk compaction is logical-only (it lowers
+ * `chunkCount` without deleting any object), so nothing reaps a chunk mid-flight
+ * and any gap is genuine corruption. The repair propagates it (loud) rather than
+ * re-derive a smaller `chunkCount`, which would mask a lost middle chunk whose
+ * successors still survive.
  */
 export class MissingChunkError extends Error {
   readonly key: string;

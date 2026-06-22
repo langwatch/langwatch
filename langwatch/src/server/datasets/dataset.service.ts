@@ -307,7 +307,9 @@ export class DatasetService {
     });
 
     // Born-on-storage: write the chunk objects BEFORE the row exists, so a
-    // write failure throws and leaves no orphan row.
+    // write failure throws and leaves no orphan row. A PARTIAL write (chunk 0
+    // lands, chunk 1 throws) self-reaps inside writeInitialS3JsonlChunks, so we
+    // only have to guard the row insert here.
     const meta = await writeInitialS3JsonlChunks({
       projectId,
       datasetId,

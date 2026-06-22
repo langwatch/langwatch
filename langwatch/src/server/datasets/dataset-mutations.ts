@@ -171,6 +171,13 @@ const appendLinesInTx = async ({
  * and leaves no orphan row — the atomicity the create path relies on. Owns its
  * own storage resolution (`getDatasetStorage`) when not passed, mirroring the
  * sibling append/edit/delete mutations.
+ *
+ * Self-cleaning on a partial write: both storage backends write chunks
+ * sequentially, so a multi-chunk write can persist chunk 0 and then fail on
+ * chunk 1 — leaving rowless orphan objects (customer content with no row to
+ * govern retention/deletion). On any write failure we best-effort reap the whole
+ * `0..k` prefix (`deleteChunksFrom(fromIndex: 0)`) before rethrowing, so the
+ * function never leaks objects regardless of which caller invokes it.
  */
 export const writeInitialS3JsonlChunks = async ({
   projectId,
@@ -186,12 +193,28 @@ export const writeInitialS3JsonlChunks = async ({
   const datasetStorage = storage ?? (await getDatasetStorage(projectId));
 
   const lines = toChunkLines(entries);
-  const written = await datasetStorage.writeChunks({
-    projectId,
-    datasetId,
-    records: lines,
-    fromIndex: 0,
-  });
+  let written: Awaited<ReturnType<DatasetStorage["writeChunks"]>>;
+  try {
+    written = await datasetStorage.writeChunks({
+      projectId,
+      datasetId,
+      records: lines,
+      fromIndex: 0,
+    });
+  } catch (error) {
+    // A partial write leaves a contiguous `0..k` orphan prefix; reap it.
+    // Best-effort: a failed reap must not mask the original write error.
+    try {
+      await datasetStorage.deleteChunksFrom({
+        projectId,
+        datasetId,
+        fromIndex: 0,
+      });
+    } catch {
+      // swallow — surface the write failure below
+    }
+    throw error;
+  }
 
   return chunkedMeta(written.map(chunkMetaOf));
 };

@@ -6,6 +6,7 @@ import {
   deleteS3JsonlRecords,
   editS3JsonlRecord,
   recomputeDatasetCounts,
+  writeInitialS3JsonlChunks,
 } from "../dataset-mutations";
 import { MissingChunkError } from "../errors";
 
@@ -74,6 +75,94 @@ const makeStorage = (
 beforeEach(() => vi.clearAllMocks());
 
 describe("dataset-mutations (s3_jsonl)", () => {
+  describe("writeInitialS3JsonlChunks()", () => {
+    describe("when the chunk write succeeds", () => {
+      it("returns PG-authoritative meta and never reaps", async () => {
+        const storage = makeStorage({
+          writeChunks: vi.fn().mockResolvedValue([
+            {
+              index: 0,
+              rowCount: 2,
+              byteSize: 40,
+              startRow: 0,
+              endRow: 2,
+              jsonl: "",
+            },
+          ]),
+        });
+
+        const meta = await writeInitialS3JsonlChunks({
+          projectId: "p1",
+          datasetId: "dataset_1",
+          entries: [{ a: 1 }, { a: 2 }],
+          storage: storage as never,
+        });
+
+        expect(storage.writeChunks).toHaveBeenCalledOnce();
+        // Wrote from index 0 (a brand-new dataset), {id,entry}-wrapped rows.
+        const writeArg = storage.writeChunks.mock.calls[0]![0];
+        expect(writeArg.fromIndex).toBe(0);
+        expect(writeArg.records).toHaveLength(2);
+        expect(writeArg.records[0]).toMatchObject({ entry: { a: 1 } });
+        expect(meta).toEqual({
+          rowCount: 2,
+          sizeBytes: 40,
+          chunkCount: 1,
+          chunkOffsets: [{ index: 0, startRow: 0, endRow: 2, byteSize: 40 }],
+        });
+        expect(storage.deleteChunksFrom).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the chunk write fails partway through a multi-chunk create", () => {
+      it("reaps the orphaned 0..k prefix and rethrows the original error", async () => {
+        const storage = makeStorage({
+          writeChunks: vi
+            .fn()
+            .mockRejectedValue(new Error("storage write failed mid-batch")),
+        });
+
+        await expect(
+          writeInitialS3JsonlChunks({
+            projectId: "p1",
+            datasetId: "dataset_1",
+            entries: [{ a: 1 }, { a: 2 }],
+            storage: storage as never,
+          }),
+        ).rejects.toThrow("storage write failed mid-batch");
+
+        // The partial write is reaped from index 0 — no rowless orphan left.
+        expect(storage.deleteChunksFrom).toHaveBeenCalledWith({
+          projectId: "p1",
+          datasetId: "dataset_1",
+          fromIndex: 0,
+        });
+      });
+
+      it("surfaces the write error even when the reap itself fails", async () => {
+        const storage = makeStorage({
+          writeChunks: vi
+            .fn()
+            .mockRejectedValue(new Error("storage write failed mid-batch")),
+          deleteChunksFrom: vi
+            .fn()
+            .mockRejectedValue(new Error("reap also failed")),
+        });
+
+        // Best-effort cleanup must not mask the original write failure.
+        await expect(
+          writeInitialS3JsonlChunks({
+            projectId: "p1",
+            datasetId: "dataset_1",
+            entries: [{ a: 1 }],
+            storage: storage as never,
+          }),
+        ).rejects.toThrow("storage write failed mid-batch");
+        expect(storage.deleteChunksFrom).toHaveBeenCalledOnce();
+      });
+    });
+  });
+
   describe("appendS3JsonlRecords()", () => {
     describe("when appending rows to a ready dataset with one existing chunk", () => {
       it("writes a new chunk from chunkCount with {id,entry}-wrapped rows and advances the counters", async () => {

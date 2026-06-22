@@ -361,6 +361,75 @@ describe("Feature: Large dataset storage — self-hosted without object storage"
     });
   });
 
+  describe("DatasetService.upsertDataset() when the chunk write fails mid-batch", () => {
+    /**
+     * Born-on-storage writes chunks sequentially. A failure mid-batch (chunk 0
+     * lands, chunk 1 throws) would leave the already-written object as a rowless
+     * orphan — the same harm the insert-failure reap guards against.
+     * `writeInitialS3JsonlChunks` self-reaps the `0..k` prefix on a write
+     * failure, so a failed create leaves nothing behind. End-to-end proof on a
+     * real local-FS backend. (Symmetry with "row insert fails after chunks are
+     * written".)
+     */
+    it("reaps the partially-written chunk objects when the write fails mid-batch", async () => {
+      const root = path.join(os.tmpdir(), `lw-ds-partial-${nanoid()}`);
+      resolveProjectStorageDestination.mockResolvedValue({
+        kind: "file" as const,
+        root,
+      });
+
+      // Capture the REAL local-FS backend before spying, then wrap it: write
+      // only the FIRST chunk for real and throw as if the next chunk failed.
+      // Deletes delegate to the real backend so the reap actually runs on disk.
+      const realStorage = await datasetStorageModule.getDatasetStorage("p1");
+      let writtenDatasetId: string | undefined;
+      const partialWriteStorage = {
+        writeChunks: vi.fn().mockImplementation(async (args: any) => {
+          writtenDatasetId = args.datasetId;
+          await realStorage.writeChunks({
+            ...args,
+            records: args.records.slice(0, 1),
+          });
+          throw new Error("storage write failed mid-batch");
+        }),
+        deleteChunksFrom: (args: any) => realStorage.deleteChunksFrom(args),
+      };
+      const storageSpy = vi
+        .spyOn(datasetStorageModule, "getDatasetStorage")
+        .mockResolvedValue(partialWriteStorage as never);
+
+      const repository = {
+        findBySlug: vi.fn().mockResolvedValue(null),
+        create: vi.fn(),
+      };
+
+      await expect(
+        makeService({ repository, prisma: {} }).upsertDataset({
+          projectId: "p1",
+          name: "Partial DS",
+          columnTypes: [{ name: "input", type: "string" }],
+          datasetRecords: [{ input: "a" }, { input: "b" }],
+        }),
+      ).rejects.toThrow("storage write failed mid-batch");
+
+      // The row was never inserted — the write threw first.
+      expect(repository.create).not.toHaveBeenCalled();
+      // The chunk that DID land was reaped: reading it back hits the deleted
+      // chunk-0. Without the reap this read would succeed (rowless orphan).
+      expect(partialWriteStorage.writeChunks).toHaveBeenCalledOnce();
+      await expect(
+        realStorage.readChunks({
+          projectId: "p1",
+          datasetId: writtenDatasetId!,
+          chunkCount: 1,
+        }),
+      ).rejects.toThrow(/Missing dataset chunk/);
+
+      storageSpy.mockRestore();
+      await fs.rm(root, { recursive: true, force: true });
+    });
+  });
+
   describe("DatasetService.listRecords() for a postgres dataset on a no-S3 instance", () => {
     it("paginates from Postgres and never resolves object storage", async () => {
       const repository = {
