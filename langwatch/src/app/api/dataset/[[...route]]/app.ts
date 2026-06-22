@@ -449,6 +449,12 @@ secured.access(directUploadSessionAuth).put(
       if (error instanceof Error && error.name === "UploadTooLargeError") {
         throw new BadRequestError(error.message);
       }
+      // Local-FS root not writable — surface the actionable config message
+      // (set LANGWATCH_LOCAL_STORAGE_PATH / configure S3) instead of a generic
+      // 500 the browser would mistake for "no object storage" and fall back on.
+      if (error instanceof Error && error.name === "StorageNotWritableError") {
+        return c.json({ error: "StorageNotWritable", message: error.message }, 500);
+      }
       throw error;
     }
   },

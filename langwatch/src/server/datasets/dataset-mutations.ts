@@ -123,7 +123,7 @@ const appendLinesInTx = async ({
   projectId: string;
   entries: unknown[];
   storage: DatasetStorage;
-  forcedIds?: string[];
+  forcedIds?: (string | undefined)[];
 }): Promise<{ appended: number }> => {
   const lines = toChunkLines(entries, { forcedIds });
 
@@ -251,18 +251,25 @@ export const deleteAllS3JsonlChunks = async ({
  * wrapped `{ id, entry }` so a later edit/delete can target it. Re-reads the
  * dataset inside the lock: the counters are authoritative and another serialized
  * mutation may have advanced them since the caller loaded the row.
+ *
+ * `forcedIds` honors caller-supplied per-row ids (index-aligned, optional) so a
+ * batch-create that mints + RETURNS ids persists those exact ids — otherwise the
+ * returned ids wouldn't exist in storage and a follow-up edit/delete by id would
+ * miss. A fresh `record_<nanoid>` is minted wherever an id is absent.
  */
 export const appendS3JsonlRecords = async ({
   prisma,
   dataset,
   projectId,
   entries,
+  forcedIds,
   storage,
 }: {
   prisma: PrismaClient;
   dataset: Dataset;
   projectId: string;
   entries: unknown[];
+  forcedIds?: (string | undefined)[];
   storage?: DatasetStorage;
 }): Promise<{ appended: number }> => {
   const datasetStorage = storage ?? (await getDatasetStorage(projectId));
@@ -277,6 +284,7 @@ export const appendS3JsonlRecords = async ({
       current,
       projectId,
       entries,
+      forcedIds,
       storage: datasetStorage,
     });
   });

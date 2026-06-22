@@ -502,6 +502,35 @@ describe("LocalDatasetStorage", () => {
       );
     });
 
+    // Regression: batch-create mints + RETURNS ids, then appends. Without
+    // forcedIds the append minted its own ids and the returned ones existed
+    // nowhere → a follow-up edit/delete by the returned id would miss.
+    it("persists caller-supplied ids so returned ids match what's on disk", async () => {
+      const projectId = "p1";
+      const datasetId = "mut-append-ids";
+      const { row, prisma } = await seed(projectId, datasetId, []);
+
+      await appendS3JsonlRecords({
+        prisma: prisma as never,
+        dataset: row as never,
+        projectId,
+        entries: [{ a: 1 }, { a: 2 }],
+        forcedIds: ["rec_returned_1", undefined],
+        storage,
+      });
+
+      const rows = await readAll(
+        projectId,
+        datasetId,
+        row.chunkCount as number,
+      );
+      // The pinned id is on disk verbatim; the id-less row got a minted one.
+      expect(rows[0]!.id).toBe("rec_returned_1");
+      expect(rows[0]!.entry).toEqual({ a: 1 });
+      expect(rows[1]!.id).toMatch(/^record_/);
+      expect(rows[1]!.id).not.toBe("rec_returned_1");
+    });
+
     /** @scenario "Editing or deleting a row updates only that row" */
     it("edits one row and deletes another, leaving the rest unaffected", async () => {
       const projectId = "p1";

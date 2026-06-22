@@ -187,6 +187,47 @@ describe("directUpload service", () => {
         ).rejects.toBeInstanceOf(PresignedUploadFailedError);
       });
     });
+
+    describe("when a same-origin (local-FS) PUT fails", () => {
+      it("surfaces the server's actionable message and does NOT signal a fallback", async () => {
+        // The local streaming route reports a real, fixable reason (unwritable
+        // LANGWATCH_LOCAL_STORAGE_PATH). It must reach the user verbatim — NOT a
+        // PresignedUploadFailedError, which would make the modal fall back to the
+        // in-browser parse and show the misleading "requires object storage" cap.
+        mockFetch().mockResolvedValue({
+          ok: false,
+          status: 500,
+          json: () =>
+            Promise.resolve({
+              error: "StorageNotWritable",
+              message:
+                'Dataset storage path "/var/lib/langwatch/objects" is not writable. Configure object storage (set S3_BUCKET_NAME) or point LANGWATCH_LOCAL_STORAGE_PATH at a writable, persistent directory.',
+            }),
+        });
+        const file = new File(["x"], "data.csv");
+
+        const err = await putFileToPresignedUrl(
+          "/api/dataset/direct-upload/staging/up_1?projectId=p1",
+          file,
+        ).catch((e: unknown) => e);
+
+        expect(err).not.toBeInstanceOf(PresignedUploadFailedError);
+        expect((err as Error).message).toMatch(/LANGWATCH_LOCAL_STORAGE_PATH/);
+      });
+
+      it("surfaces a fetch rejection directly rather than as a CORS fallback", async () => {
+        mockFetch().mockRejectedValue(new TypeError("network down"));
+        const file = new File(["x"], "data.csv");
+
+        const err = await putFileToPresignedUrl(
+          "/api/dataset/direct-upload/staging/up_1?projectId=p1",
+          file,
+        ).catch((e: unknown) => e);
+
+        expect(err).not.toBeInstanceOf(PresignedUploadFailedError);
+        expect((err as Error).message).toMatch(/network down/);
+      });
+    });
   });
 
   describe("abortPendingUpload()", () => {

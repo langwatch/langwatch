@@ -834,11 +834,16 @@ export class DatasetService {
     // lock (Decision 9). The shared column validation/fill above is reused; only
     // the persistence target differs.
     if (dataset.contentLayout === "s3_jsonl") {
+      // Persist the SAME ids we mint and return below — `forcedIds` pins each
+      // chunk-line id to `record.id`, so a follow-up edit/delete by the returned
+      // id actually targets the stored row (without this, append minted its own
+      // ids and the returned ones existed nowhere).
       await appendS3JsonlRecords({
         prisma: this.prisma,
         dataset,
         projectId: params.projectId,
         entries: records.map((r) => r.entry),
+        forcedIds: records.map((r) => r.id),
       });
       const createdAt = new Date();
       return records.map((record) => ({

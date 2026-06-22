@@ -133,10 +133,16 @@ export async function putFileToPresignedUrl(
       credentials: sameOrigin ? "include" : "omit",
     });
   } catch (error) {
-    // A cross-origin PUT to a bucket with no CORS rule (or any network failure)
-    // rejects `fetch` with an opaque `TypeError` — there is no status to read.
-    // Wrap it so the modal can recognize it and fall back to the backend path
-    // instead of dead-ending on a generic error.
+    // Same-origin (local-FS streaming route): a fetch rejection is a genuine
+    // server/network failure, NOT a CORS-fallback signal — surface it directly
+    // (falling back to in-browser parse can't help; the local route IS the
+    // upload mechanism). Cross-origin (S3): an opaque TypeError means a missing
+    // bucket CORS rule (no status to read) — wrap it so the modal falls back.
+    if (sameOrigin) {
+      throw error instanceof Error
+        ? error
+        : new Error("Failed to upload the file");
+    }
     throw new PresignedUploadFailedError(
       "Failed to upload the file to object storage (network or CORS error)",
       error,
@@ -144,6 +150,22 @@ export async function putFileToPresignedUrl(
   }
 
   if (!response.ok) {
+    // Same-origin failure is the local route reporting a real, actionable reason
+    // (unwritable LANGWATCH_LOCAL_STORAGE_PATH, size cap, no pending row). Surface
+    // that message rather than fall back to the in-browser parse — which would
+    // show the misleading "requires object storage" cap error for a deployment
+    // that HAS storage, just misconfigured.
+    if (sameOrigin) {
+      const body = (await response.json().catch(() => ({}))) as {
+        message?: string;
+        error?: string;
+      };
+      throw new Error(
+        body.message ??
+          body.error ??
+          `Upload failed (status ${response.status})`,
+      );
+    }
     throw new PresignedUploadFailedError(
       `Failed to upload the file to object storage (status ${response.status})`,
     );

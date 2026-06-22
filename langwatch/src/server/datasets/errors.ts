@@ -214,3 +214,18 @@ export class MissingChunkError extends Error {
     this.key = key;
   }
 }
+
+/**
+ * The local-FS storage root is not writable (EACCES/EROFS/EPERM) — born-on-
+ * storage made a writable backend mandatory, so this is a deployment-config
+ * error, not a transient failure. Typed (vs a bare `Error`) so the upload route
+ * can surface its actionable message to the client (configure S3 / set
+ * `LANGWATCH_LOCAL_STORAGE_PATH`) instead of letting it collapse into a generic
+ * 500 that the browser then mistakes for "no object storage".
+ */
+export class StorageNotWritableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StorageNotWritableError";
+  }
+}

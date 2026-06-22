@@ -251,6 +251,43 @@ describe("dataset-mutations (s3_jsonl)", () => {
       });
     });
 
+    describe("when caller-supplied row ids are passed", () => {
+      it("persists the forced ids (so returned ids match storage) and mints where absent", async () => {
+        const row = makeDataset({
+          rowCount: 0,
+          sizeBytes: 0n,
+          chunkCount: 0,
+          chunkOffsets: [] as unknown as Dataset["chunkOffsets"],
+        });
+        const { prisma } = makePrisma(row);
+        const storage = makeStorage({
+          writeChunks: vi
+            .fn()
+            .mockResolvedValue([
+              { index: 0, rowCount: 2, byteSize: 40, startRow: 0, endRow: 2 },
+            ]),
+        });
+
+        await appendS3JsonlRecords({
+          prisma: prisma as never,
+          dataset: row,
+          projectId: "p1",
+          entries: [{ a: 1 }, { a: 2 }],
+          forcedIds: ["rec_ksuid_1", undefined],
+          storage: storage as never,
+        });
+
+        const writeArgs = storage.writeChunks.mock.calls[0]![0];
+        // The pinned id is persisted verbatim; the id-less row gets a minted one.
+        expect(writeArgs.records[0]).toEqual({
+          id: "rec_ksuid_1",
+          entry: { a: 1 },
+        });
+        expect(writeArgs.records[1].id).toMatch(/^record_/);
+        expect(writeArgs.records[1].id).not.toBe("rec_ksuid_1");
+      });
+    });
+
     describe("when the dataset is not ready", () => {
       it("throws DatasetNotReadyError and never writes a chunk", async () => {
         const row = makeDataset({ status: "processing" });
