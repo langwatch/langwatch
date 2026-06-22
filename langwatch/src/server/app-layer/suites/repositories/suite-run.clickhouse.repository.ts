@@ -52,7 +52,10 @@ export class SuiteRunClickHouseRepository implements SuiteRunReadRepository {
           )
         LIMIT 1
       `,
-      query_params: { projectId: params.projectId, batchRunId: params.batchRunId },
+      query_params: {
+        projectId: params.projectId,
+        batchRunId: params.batchRunId,
+      },
       format: "JSONEachRow",
     });
 
@@ -70,20 +73,46 @@ export class SuiteRunClickHouseRepository implements SuiteRunReadRepository {
   }): Promise<SuiteRunStateData[]> {
     const limit = Math.min(params.limit ?? 50, 100);
     const client = await this.getClient(params.projectId);
+    // The previous version had no dedup, so the LIMIT 50 page could fill
+    // with multiple unmerged versions of the same BatchRunId — the user
+    // would see e.g. 5 unique suite runs duplicated 10× each, not 50
+    // distinct rows. IN-tuple dedup over (TenantId, ScenarioSetId,
+    // BatchRunId, UpdatedAt) collapses to one row per BatchRunId.
+    //
+    // Note: no `StartedAt` partition predicate. Batch history is a
+    // displayed-once-per-page-load surface, not a hot path, and bounding
+    // it would hide batches older than the bound. Accept the cross-
+    // partition scan; revisit if it shows up in slow-query metrics.
+    // The outer query projects `toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt`,
+    // which shadows the raw DateTime64 UpdatedAt column with a UInt64 alias.
+    // Without the `t.` qualifier, the IN-tuple's `UpdatedAt` resolves to the
+    // alias and the type comparison breaks (same rule the sibling
+    // getSuiteRunState query documents at the top of this file).
     const result = await client.query({
       query: `
         SELECT
-          SuiteRunId, BatchRunId, ScenarioSetId, SuiteId,
-          Status, Total, StartedCount, CompletedCount, FailedCount,
-          Progress, PassRateBps, PassedCount, GradedCount,
-          toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
-          toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
-          toUnixTimestamp64Milli(StartedAt) AS StartedAt,
-          toUnixTimestamp64Milli(FinishedAt) AS FinishedAt
-        FROM suite_runs
-        WHERE TenantId = {projectId:String}
-          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
-        ORDER BY CreatedAt DESC
+          t.SuiteRunId AS SuiteRunId, t.BatchRunId AS BatchRunId,
+          t.ScenarioSetId AS ScenarioSetId, t.SuiteId AS SuiteId,
+          t.Status AS Status, t.Total AS Total,
+          t.StartedCount AS StartedCount, t.CompletedCount AS CompletedCount,
+          t.FailedCount AS FailedCount, t.Progress AS Progress,
+          t.PassRateBps AS PassRateBps, t.PassedCount AS PassedCount,
+          t.GradedCount AS GradedCount,
+          toUnixTimestamp64Milli(t.CreatedAt) AS CreatedAt,
+          toUnixTimestamp64Milli(t.UpdatedAt) AS UpdatedAt,
+          toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
+          toUnixTimestamp64Milli(t.FinishedAt) AS FinishedAt
+        FROM suite_runs AS t
+        WHERE t.TenantId = {projectId:String}
+          AND t.ScenarioSetId IN ({scenarioSetIds:Array(String)})
+          AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.UpdatedAt) IN (
+            SELECT TenantId, ScenarioSetId, BatchRunId, max(UpdatedAt)
+            FROM suite_runs
+            WHERE TenantId = {projectId:String}
+              AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
+            GROUP BY TenantId, ScenarioSetId, BatchRunId
+          )
+        ORDER BY t.CreatedAt DESC
         LIMIT {limit:UInt32}
       `,
       query_params: {

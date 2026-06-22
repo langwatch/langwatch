@@ -35,25 +35,25 @@ describe("metric-translator", () => {
   describe("buildMetricAlias", () => {
     it("builds basic alias with index, metric, and aggregation", () => {
       expect(buildMetricAlias(0, "performance.total_cost", "sum")).toBe(
-        "0__performance_total_cost__sum"
+        "0__performance_total_cost__sum",
       );
     });
 
     it("includes key in alias when provided", () => {
       expect(
-        buildMetricAlias(1, "evaluations.evaluation_score", "avg", "eval-123")
+        buildMetricAlias(1, "evaluations.evaluation_score", "avg", "eval-123"),
       ).toBe("1__evaluations_evaluation_score__avg__eval_123");
     });
 
     it("includes both key and subkey in alias", () => {
       expect(
-        buildMetricAlias(2, "events.event_score", "avg", "thumbs_up", "vote")
+        buildMetricAlias(2, "events.event_score", "avg", "thumbs_up", "vote"),
       ).toBe("2__events_event_score__avg__thumbs_up__vote");
     });
 
     it("sanitizes special characters in key and subkey", () => {
       expect(buildMetricAlias(0, "test", "avg", "key-with-dashes")).toBe(
-        "0__test__avg__key_with_dashes"
+        "0__test__avg__key_with_dashes",
       );
     });
   });
@@ -72,7 +72,7 @@ describe("metric-translator", () => {
         // Uses uniqIf to filter out empty user_ids to match ES behavior
         expect(result.selectExpression).toContain("uniqIf(");
         expect(result.selectExpression).toContain(
-          "Attributes['langwatch.user_id']"
+          "Attributes['langwatch.user_id']",
         );
         expect(result.requiredJoins).toHaveLength(0);
       });
@@ -82,7 +82,7 @@ describe("metric-translator", () => {
         // Uses uniqIf to filter out empty thread_ids to match ES behavior
         expect(result.selectExpression).toContain("uniqIf(");
         expect(result.selectExpression).toContain(
-          "Attributes['gen_ai.conversation.id']"
+          "Attributes['gen_ai.conversation.id']",
         );
       });
 
@@ -92,7 +92,11 @@ describe("metric-translator", () => {
         // incorrectly required, causing fan-out that inflated trace-level SUM metrics
         // (TotalCost, TotalTokens) when combined in the same query.
         it("does not require stored_spans JOIN for cardinality aggregation", () => {
-          const result = translateMetric("metadata.span_type", "cardinality", 0);
+          const result = translateMetric(
+            "metadata.span_type",
+            "cardinality",
+            0,
+          );
           expect(result.selectExpression).toContain("uniq(");
           expect(result.selectExpression).toContain("ts.TraceId");
           expect(result.requiredJoins).not.toContain("stored_spans");
@@ -123,12 +127,14 @@ describe("metric-translator", () => {
         const result = translateMetric("performance.cost_billed", "sum", 0);
         expect(result.selectExpression).toContain("sum(");
         // billed = grand total minus the folded non-billed amount.
-        expect(result.selectExpression).toContain("coalesce(ts.TotalCost, 0) -");
+        expect(result.selectExpression).toContain(
+          "coalesce(ts.TotalCost, 0) -",
+        );
         // the non-billed amount prefers the folded column ...
         expect(result.selectExpression).toContain("ts.NonBilledCost");
         // ... falling back to the legacy boolean for pre-column rows.
         expect(result.selectExpression).toContain(
-          "Attributes['langwatch.cost.non_billable'] = 'true'"
+          "Attributes['langwatch.cost.non_billable'] = 'true'",
         );
       });
 
@@ -139,13 +145,16 @@ describe("metric-translator", () => {
         expect(result.selectExpression).toContain("coalesce(ts.NonBilledCost,");
         // ... then the legacy all-or-nothing boolean, then 0.
         expect(result.selectExpression).toContain(
-          "Attributes['langwatch.cost.non_billable'] = 'true', ts.TotalCost, 0"
+          "Attributes['langwatch.cost.non_billable'] = 'true', ts.TotalCost, 0",
         );
       });
 
-      it("translates performance.first_token with p95", () => {
+      it("translates performance.first_token with p95 using quantileTDigest", () => {
         const result = translateMetric("performance.first_token", "p95", 0);
-        expect(result.selectExpression).toContain("quantileExact(0.95)");
+        // performance.* metrics opt into quantileTDigest for percentile
+        // aggregations - ±5% tail error is fine on latency dashboards, and the
+        // memory profile is bounded, not O(N).
+        expect(result.selectExpression).toContain("quantileTDigest(0.95)");
         expect(result.selectExpression).toContain("TimeToFirstTokenMs");
       });
 
@@ -153,24 +162,26 @@ describe("metric-translator", () => {
         const result = translateMetric(
           "performance.tokens_per_second",
           "avg",
-          0
+          0,
         );
         // Uses pre-aggregated TokensPerSecond from trace_summaries to avoid
         // reading SpanAttributes (Map column with large LLM text), which causes OOM.
         expect(result.selectExpression).toContain("TokensPerSecond");
         expect(result.selectExpression).not.toContain("stored_spans");
         expect(result.selectExpression).not.toContain("SpanAttributes");
-        expect(result.selectExpression).not.toContain("gen_ai.usage.output_tokens");
+        expect(result.selectExpression).not.toContain(
+          "gen_ai.usage.output_tokens",
+        );
         expect(result.requiredJoins).not.toContain("stored_spans");
       });
 
-      it("translates performance.tokens_per_second with percentile aggregation", () => {
+      it("translates performance.tokens_per_second with percentile aggregation using quantileTDigest", () => {
         const result = translateMetric(
           "performance.tokens_per_second",
           "p95",
-          0
+          0,
         );
-        expect(result.selectExpression).toContain("quantileExact(0.95)");
+        expect(result.selectExpression).toContain("quantileTDigest(0.95)");
         expect(result.selectExpression).toContain("TokensPerSecond");
         expect(result.requiredJoins).not.toContain("stored_spans");
       });
@@ -182,7 +193,11 @@ describe("metric-translator", () => {
       });
 
       it("translates performance.cache_read_tokens from the reserved attribute key", () => {
-        const result = translateMetric("performance.cache_read_tokens", "sum", 0);
+        const result = translateMetric(
+          "performance.cache_read_tokens",
+          "sum",
+          0,
+        );
         expect(result.selectExpression).toContain(
           "Attributes['langwatch.reserved.cache_read_tokens']",
         );
@@ -222,7 +237,7 @@ describe("metric-translator", () => {
         const result = translateMetric(
           "evaluations.evaluation_score",
           "avg",
-          0
+          0,
         );
         expect(result.selectExpression).toContain("es.Score");
         expect(result.selectExpression).toContain("Status = 'processed'");
@@ -234,15 +249,15 @@ describe("metric-translator", () => {
           "evaluations.evaluation_score",
           "avg",
           0,
-          "eval-123"
+          "eval-123",
         );
         // Should use parameterized query for evaluator ID (SQL injection prevention)
         expect(result.selectExpression).toMatch(
-          /es\.EvaluatorId = \{m_evaluatorId_[a-f0-9]+:String\}/
+          /es\.EvaluatorId = \{m_evaluatorId_[a-f0-9]+:String\}/,
         );
         // Params should contain the evaluator ID value
         const paramKey = Object.keys(result.params).find((k) =>
-          k.startsWith("m_evaluatorId_")
+          k.startsWith("m_evaluatorId_"),
         );
         expect(paramKey).toBeDefined();
         expect(result.params[paramKey!]).toBe("eval-123");
@@ -252,7 +267,7 @@ describe("metric-translator", () => {
         const result = translateMetric(
           "evaluations.evaluation_pass_rate",
           "avg",
-          0
+          0,
         );
         expect(result.selectExpression).toContain("es.Passed");
         expect(result.requiredJoins).toContain("evaluation_runs");
@@ -262,7 +277,7 @@ describe("metric-translator", () => {
         const result = translateMetric(
           "evaluations.evaluation_runs",
           "cardinality",
-          0
+          0,
         );
         expect(result.selectExpression).toContain("uniqIf");
         expect(result.selectExpression).toContain("EvaluationId");
@@ -280,16 +295,16 @@ describe("metric-translator", () => {
           "events.event_type",
           "cardinality",
           0,
-          "thumbs_up_down"
+          "thumbs_up_down",
         );
         expect(result.selectExpression).toContain("countIf");
         // Should use parameterized query for event type (SQL injection prevention)
         expect(result.selectExpression).toMatch(
-          /\{m_eventType_[a-f0-9]+:String\}/
+          /\{m_eventType_[a-f0-9]+:String\}/,
         );
         // Params should contain the event type value
         const paramKey = Object.keys(result.params).find((k) =>
-          k.startsWith("m_eventType_")
+          k.startsWith("m_eventType_"),
         );
         expect(paramKey).toBeDefined();
         expect(result.params[paramKey!]).toBe("thumbs_up_down");
@@ -302,14 +317,14 @@ describe("metric-translator", () => {
           const result = translateMetric(
             "sentiment.thumbs_up_down",
             "cardinality",
-            0
+            0,
           );
           expect(result.selectExpression).toContain("countIf");
           expect(result.selectExpression).toMatch(
-            /\{m_sentimentEventType_[a-f0-9]+:String\}/
+            /\{m_sentimentEventType_[a-f0-9]+:String\}/,
           );
           const eventTypeParam = Object.keys(result.params).find((k) =>
-            k.startsWith("m_sentimentEventType_")
+            k.startsWith("m_sentimentEventType_"),
           );
           expect(eventTypeParam).toBeDefined();
           expect(result.params[eventTypeParam!]).toBe("thumbs_up_down");
@@ -331,10 +346,10 @@ describe("metric-translator", () => {
 
         it("filters to thumbs_up_down events using parameterized query", () => {
           expect(result.selectExpression).toMatch(
-            /\{m_sentimentEventType_[a-f0-9]+:String\}/
+            /\{m_sentimentEventType_[a-f0-9]+:String\}/,
           );
           const eventTypeParam = Object.keys(result.params).find((k) =>
-            k.startsWith("m_sentimentEventType_")
+            k.startsWith("m_sentimentEventType_"),
           );
           expect(eventTypeParam).toBeDefined();
           expect(result.params[eventTypeParam!]).toBe("thumbs_up_down");
@@ -342,7 +357,7 @@ describe("metric-translator", () => {
 
         it("extracts event.metrics.vote using parameterized query", () => {
           const voteKeyParam = Object.keys(result.params).find((k) =>
-            k.startsWith("m_sentimentVoteKey_")
+            k.startsWith("m_sentimentVoteKey_"),
           );
           expect(voteKeyParam).toBeDefined();
           expect(result.params[voteKeyParam!]).toBe("event.metrics.vote");
@@ -355,11 +370,7 @@ describe("metric-translator", () => {
 
       describe("when aggregation is avg", () => {
         it("extracts vote values and applies avgArray", () => {
-          const result = translateMetric(
-            "sentiment.thumbs_up_down",
-            "avg",
-            0
-          );
+          const result = translateMetric("sentiment.thumbs_up_down", "avg", 0);
           expect(result.selectExpression).toContain("avgArray");
           expect(result.selectExpression).toContain("x != 0");
           expect(result.requiredJoins).toContain("stored_spans");
@@ -368,11 +379,7 @@ describe("metric-translator", () => {
 
       describe("when aggregation is min", () => {
         it("extracts vote values and applies minArray", () => {
-          const result = translateMetric(
-            "sentiment.thumbs_up_down",
-            "min",
-            0
-          );
+          const result = translateMetric("sentiment.thumbs_up_down", "min", 0);
           expect(result.selectExpression).toContain("minArray");
           expect(result.selectExpression).toContain("x != 0");
           expect(result.requiredJoins).toContain("stored_spans");
@@ -381,11 +388,7 @@ describe("metric-translator", () => {
 
       describe("when aggregation is max", () => {
         it("extracts vote values and applies maxArray", () => {
-          const result = translateMetric(
-            "sentiment.thumbs_up_down",
-            "max",
-            0
-          );
+          const result = translateMetric("sentiment.thumbs_up_down", "max", 0);
           expect(result.selectExpression).toContain("maxArray");
           expect(result.selectExpression).toContain("x != 0");
           expect(result.requiredJoins).toContain("stored_spans");
@@ -394,11 +397,7 @@ describe("metric-translator", () => {
 
       describe("when aggregation is a percentile", () => {
         it("extracts vote values and applies quantileExactArray", () => {
-          const result = translateMetric(
-            "sentiment.thumbs_up_down",
-            "p95",
-            0
-          );
+          const result = translateMetric("sentiment.thumbs_up_down", "p95", 0);
           expect(result.selectExpression).toContain("quantileExactArray(0.95)");
           expect(result.selectExpression).toContain("x != 0");
           expect(result.requiredJoins).toContain("stored_spans");
@@ -411,7 +410,7 @@ describe("metric-translator", () => {
         const result = translateMetric(
           "threads.average_duration_per_thread",
           "avg",
-          0
+          0,
         );
         expect(result.requiresSubquery).toBe(true);
         expect(result.subquery).toBeDefined();
@@ -426,23 +425,36 @@ describe("metric-translator", () => {
         expect(result.selectExpression).toContain("uniq(");
       });
 
-      it("uses quantileExact for percentile aggregations", () => {
+      it("uses quantileTDigest for performance.* percentile aggregations", () => {
         const result = translateMetric("performance.completion_time", "p99", 0);
-        expect(result.selectExpression).toContain("quantileExact(0.99)");
+        expect(result.selectExpression).toContain("quantileTDigest(0.99)");
+      });
+
+      it("keeps quantileExact for evaluation score percentiles", () => {
+        // Evaluation scores stay on quantileExact - their distributions are
+        // narrow enough that ±5% can flip threshold-based dashboard outcomes.
+        const result = translateMetric(
+          "evaluations.evaluation_score",
+          "p99",
+          0,
+          "eval-1",
+        );
+        expect(result.selectExpression).toContain("quantileExactIf(0.99)");
+        expect(result.selectExpression).not.toContain("quantileTDigest");
       });
 
       it("uses correct aggregation for min/max", () => {
         const minResult = translateMetric(
           "performance.completion_time",
           "min",
-          0
+          0,
         );
         expect(minResult.selectExpression).toContain("min(");
 
         const maxResult = translateMetric(
           "performance.completion_time",
           "max",
-          1
+          1,
         );
         expect(maxResult.selectExpression).toContain("max(");
       });
@@ -456,11 +468,11 @@ describe("metric-translator", () => {
         "sum",
         "user_id",
         "avg",
-        0
+        0,
       );
       expect(result.requiresSubquery).toBe(true);
       expect(result.subquery?.innerSelect).toContain(
-        "Attributes['langwatch.user_id']"
+        "Attributes['langwatch.user_id']",
       );
       expect(result.subquery?.innerGroupBy).toBe("pipeline_key");
       expect(result.subquery?.outerAggregation).toContain("avg(inner_value)");
@@ -472,11 +484,11 @@ describe("metric-translator", () => {
         "avg",
         "thread_id",
         "sum",
-        0
+        0,
       );
       expect(result.requiresSubquery).toBe(true);
       expect(result.subquery?.innerSelect).toContain(
-        "Attributes['gen_ai.conversation.id']"
+        "Attributes['gen_ai.conversation.id']",
       );
       expect(result.subquery?.outerAggregation).toContain("sum(inner_value)");
     });
@@ -487,7 +499,7 @@ describe("metric-translator", () => {
         "sum",
         "trace_id",
         "max",
-        0
+        0,
       );
       expect(result.subquery?.innerSelect).toContain("TraceId");
       expect(result.subquery?.outerAggregation).toContain("max(inner_value)");
@@ -500,7 +512,7 @@ describe("metric-translator", () => {
         "user_id",
         "avg",
         0,
-        "eval-123"
+        "eval-123",
       );
       expect(result.requiredJoins).toContain("evaluation_runs");
     });
@@ -515,14 +527,16 @@ describe("metric-translator", () => {
         "avg",
         "user_id",
         "avg",
-        0
+        0,
       );
 
       // Returns a subquery with nested structure
       expect(result.requiresSubquery).toBe(true);
       expect(result.subquery).toBeDefined();
       expect(result.subquery?.nestedSubquery).toBeDefined();
-      expect(result.subquery?.nestedSubquery?.select).toContain("thread_duration");
+      expect(result.subquery?.nestedSubquery?.select).toContain(
+        "thread_duration",
+      );
       expect(result.subquery?.innerSelect).toContain("avg(thread_duration)");
       expect(result.selectExpression).toContain("avg(user_avg_duration)");
     });

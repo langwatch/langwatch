@@ -2,10 +2,10 @@
  * @vitest-environment node
  *
  * Unit tests for StoredObjectsRepository — verifies that queries are
- * project-scoped and that insert/findById/findBySha256 delegate to the
- * ClickHouse client with the expected shape.
+ * project-scoped and that insert/findById delegate to the ClickHouse
+ * client with the expected shape.
  */
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
@@ -29,12 +29,11 @@ vi.mock("~/server/clickhouse/clickhouseClient", () => ({
 
 vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({
-    withActiveSpan: (
-      _name: string,
-      ...args: unknown[]
-    ) => {
+    withActiveSpan: (_name: string, ...args: unknown[]) => {
       const fn = args.length === 1 ? args[0] : args[1];
-      const span: { setAttribute: ReturnType<typeof vi.fn> } = { setAttribute: vi.fn() };
+      const span: { setAttribute: ReturnType<typeof vi.fn> } = {
+        setAttribute: vi.fn(),
+      };
       return (fn as (s: typeof span) => Promise<unknown>)(span);
     },
   }),
@@ -124,12 +123,18 @@ describe("StoredObjectsRepository", () => {
         };
         mockQueryResult.json.mockResolvedValue([rawRow]);
 
-        const result = await repo.findById({ projectId: "proj-1", id: "test-id" });
+        const result = await repo.findById({
+          projectId: "proj-1",
+          id: "test-id",
+        });
 
         expect(mockQuery).toHaveBeenCalledOnce();
         const call = mockQuery.mock.calls[0]![0];
         // Query must be project-scoped
-        expect(call.query_params).toMatchObject({ projectId: "proj-1", id: "test-id" });
+        expect(call.query_params).toMatchObject({
+          projectId: "proj-1",
+          id: "test-id",
+        });
         expect(call.query).toContain("project_id");
 
         expect(result).not.toBeNull();
@@ -143,35 +148,10 @@ describe("StoredObjectsRepository", () => {
       it("returns null", async () => {
         mockQueryResult.json.mockResolvedValue([]);
 
-        const result = await repo.findById({ projectId: "proj-1", id: "missing-id" });
-
-        expect(result).toBeNull();
-      });
-    });
-  });
-
-  describe("findBySha256", () => {
-    describe("when a row with the given sha256 exists", () => {
-      it("returns the id", async () => {
-        mockQueryResult.json.mockResolvedValue([{ id: "found-id" }]);
-
-        const result = await repo.findBySha256({ projectId: "proj-1", sha256: "abc123" });
-
-        expect(mockQuery).toHaveBeenCalledOnce();
-        const call = mockQuery.mock.calls[0]![0];
-        // Query must be project-scoped
-        expect(call.query_params).toMatchObject({ projectId: "proj-1", sha256: "abc123" });
-        expect(call.query).toContain("project_id");
-
-        expect(result).toEqual({ id: "found-id" });
-      });
-    });
-
-    describe("when no row matches", () => {
-      it("returns null", async () => {
-        mockQueryResult.json.mockResolvedValue([]);
-
-        const result = await repo.findBySha256({ projectId: "proj-1", sha256: "unknown" });
+        const result = await repo.findById({
+          projectId: "proj-1",
+          id: "missing-id",
+        });
 
         expect(result).toBeNull();
       });

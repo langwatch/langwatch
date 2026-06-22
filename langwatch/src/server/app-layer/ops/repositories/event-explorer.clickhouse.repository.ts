@@ -1,8 +1,8 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type {
-  EventExplorerRepository,
   AggregateDiscoveryRow,
   AggregateSearchResult,
+  EventExplorerRepository,
   RawEventRow,
 } from "./event-explorer.repository";
 
@@ -34,6 +34,21 @@ export class EventExplorerClickHouseRepository
       queryParams.tenantIds = params.tenantIds;
     }
 
+    // event_log partitions on `toYearWeek(toDateTime64(EventOccurredAt / 1000, 3))`,
+    // NOT on EventTimestamp. The previous version filtered on EventTimestamp,
+    // which is the ReplacingMergeTree version column (ingest-time) — that
+    // predicate does not prune partitions, so every weekly partition was
+    // scanned including cold S3 ones. EventOccurredAt is what the partition
+    // key is derived from and is also closer to the caller's intent
+    // ("aggregates active since this real-world time").
+    //
+    // `EventOccurredAt = 0` is the historical sentinel for events that pre-date
+    // the column (added after the table was already in production). Those rows
+    // still live in the epoch-week partition and are real aggregates the bulk
+    // replay wizard must be able to surface; a naïve `>= sinceMs` filter would
+    // silently drop them. Including `OR EventOccurredAt = 0` keeps partition
+    // pruning (epoch-week + last-N-weeks instead of every partition) while
+    // preserving the legacy rows.
     const result = await this.client.query({
       query: `
         SELECT
@@ -42,7 +57,7 @@ export class EventExplorerClickHouseRepository
           count(DISTINCT AggregateId) AS aggregateCount
         FROM event_log
         WHERE AggregateType IN ({aggregateTypes:Array(String)})
-          AND EventTimestamp >= {sinceMs:UInt64}
+          AND (EventOccurredAt = 0 OR EventOccurredAt >= {sinceMs:UInt64})
           ${tenantClause}
         GROUP BY AggregateType, TenantId
         ORDER BY AggregateType, TenantId
@@ -67,20 +82,54 @@ export class EventExplorerClickHouseRepository
   async searchAggregates(params: {
     query: string;
     tenantIds?: string[];
+    sinceMs?: number;
   }): Promise<AggregateSearchResult[]> {
+    // Defensive guard: without at least one of (tenants, query string) the
+    // query degrades to "ORDER BY EventTimestamp DESC LIMIT 50" against the
+    // entire event_log table — every weekly partition incl. cold S3, every
+    // tenant, just to surface 50 rows. The doc rule "TenantId is always
+    // required" applies, but this is an ops/admin tool so we allow the
+    // cross-tenant case when a non-empty query string at least bounds it.
+    const hasTenants =
+      params.tenantIds !== undefined && params.tenantIds.length > 0;
+    const trimmedQuery = params.query.trim();
+    const hasQueryString = trimmedQuery.length > 0;
+    if (!hasTenants && !hasQueryString) {
+      // Rationale lives in the comment above (cross-tenant unbounded scan
+      // over the whole event_log) but the message reaches the ops UI - the
+      // user-facing text should tell them what to do, not name the method.
+      throw new Error(
+        "Enter a search query or pick at least one tenant before searching.",
+      );
+    }
+
+    // No silent time clamp in the repo. The caller (the ops router for the
+    // DejaView UI) supplies sinceMs explicitly - currently a 1-year bound
+    // surfaced under the search box as a banner so the operator sees the
+    // window up front. Other callers (e.g. integration tests, ad-hoc
+    // scripts) can pass `undefined` to scan the full event_log, paying the
+    // partition-fan-out cost knowingly. EventOccurredAt = 0 is the legacy
+    // sentinel; preserved alongside the bound so historical test data
+    // doesn't silently disappear.
     const queryParams: Record<string, unknown> = {};
+    let timeBoundFilter = "";
+    if (typeof params.sinceMs === "number" && params.sinceMs > 0) {
+      timeBoundFilter =
+        "AND (EventOccurredAt = 0 OR EventOccurredAt >= {sinceMs:UInt64})";
+      queryParams.sinceMs = params.sinceMs;
+    }
 
     let tenantFilter = "";
-    if (params.tenantIds !== undefined && params.tenantIds.length > 0) {
+    if (hasTenants) {
       tenantFilter = "AND TenantId IN ({tenantIds:Array(String)})";
       queryParams.tenantIds = params.tenantIds;
     }
 
     let aggregateFilter = "";
-    if (params.query.trim().length > 0) {
+    if (hasQueryString) {
       aggregateFilter =
         "AND (AggregateId LIKE {queryPattern:String} OR TenantId LIKE {queryPattern:String})";
-      queryParams.queryPattern = `%${params.query.trim()}%`;
+      queryParams.queryPattern = `%${trimmedQuery}%`;
     }
 
     const result = await this.client.query({
@@ -92,7 +141,8 @@ export class EventExplorerClickHouseRepository
           count() AS eventCount,
           max(EventTimestamp) AS lastEventTime
         FROM event_log
-        WHERE 1 = 1
+        WHERE 1=1
+          ${timeBoundFilter}
           ${tenantFilter}
           ${aggregateFilter}
         GROUP BY AggregateId, AggregateType, TenantId
@@ -125,6 +175,13 @@ export class EventExplorerClickHouseRepository
     tenantId: string;
     limit: number;
   }): Promise<RawEventRow[]> {
+    // No `sinceMs` parameter: this is the detail-view query for a
+    // specific aggregate the operator has already picked from the
+    // (bounded) DejaView search. Once you're looking at one aggregate
+    // you want its full event history, including projection replays
+    // where the fold depends on every event. The partition fan-out is
+    // acceptable here because the aggregate-id seek is narrow per
+    // partition.
     const result = await this.client.query({
       query: `
         SELECT

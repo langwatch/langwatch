@@ -86,6 +86,39 @@ export const percentileToPercent: Record<PercentileAggregationTypes, number> = {
 };
 
 /**
+ * Per-metric opt-in for which percentile aggregate to compile to.
+ *
+ * - `"exact"` → quantileExact / quantileExactArray / quantileExactIf. Exact
+ *   sort-based percentile. Memory grows O(N) with the input row count, which
+ *   has been the top driver of OOM on heavy analytics dashboards.
+ * - `"tdigest"` → quantileTDigest / quantileTDigestArray / quantileTDigestIf.
+ *   t-digest sketch, ±5% error at distribution tails, bounded memory per
+ *   aggregator state. The accuracy gap is invisible on latency / cost /
+ *   token-count dashboards. Default for `performance.*` metrics.
+ *
+ * Existing call sites omit the parameter and stay on `"exact"`, matching the
+ * pre-existing behaviour. The cost / latency translators pass `"tdigest"` to
+ * opt in. Evaluation score / pass-rate metrics deliberately stay on `"exact"`
+ * because their distributions are narrow enough that a ±5% tail miss can flip
+ * dashboard outcomes (e.g. a p95 score crossing a threshold).
+ */
+export type PercentileMode = "exact" | "tdigest";
+
+function percentileFunctionName(
+  mode: PercentileMode,
+  shape: "scalar" | "array" | "conditional",
+): string {
+  switch (shape) {
+    case "scalar":
+      return mode === "tdigest" ? "quantileTDigest" : "quantileExact";
+    case "array":
+      return mode === "tdigest" ? "quantileTDigestArray" : "quantileExactArray";
+    case "conditional":
+      return mode === "tdigest" ? "quantileTDigestIf" : "quantileExactIf";
+  }
+}
+
+/**
  * Check if aggregation type is a percentile
  */
 export function isPercentileAggregation(
@@ -118,6 +151,7 @@ function translateSimpleAggregation(
   columnExpr: string,
   aggregation: AggregationTypes,
   alias: string,
+  percentileMode: PercentileMode = "exact",
 ): string {
   switch (aggregation) {
     case "avg":
@@ -137,9 +171,8 @@ function translateSimpleAggregation(
     default:
       if (isPercentileAggregation(aggregation)) {
         const percentile = percentileToPercent[aggregation];
-        // Use quantileExact for accurate percentiles (matching ES behavior)
-        // quantileTDigest is faster but has ±5% error at distribution extremes
-        return `quantileExact(${percentile})(${columnExpr}) AS ${alias}`;
+        const fn = percentileFunctionName(percentileMode, "scalar");
+        return `${fn}(${percentile})(${columnExpr}) AS ${alias}`;
       }
       return `count(${columnExpr}) AS ${alias}`;
   }
@@ -154,6 +187,7 @@ function translateArrayAggregation(
   arrayExpr: string,
   aggregation: AggregationTypes,
   alias: string,
+  percentileMode: PercentileMode = "exact",
 ): string {
   switch (aggregation) {
     case "avg":
@@ -174,8 +208,8 @@ function translateArrayAggregation(
     default:
       if (isPercentileAggregation(aggregation)) {
         const percentile = percentileToPercent[aggregation];
-        // Use quantilesExactArray for percentiles on arrays
-        return `quantileExactArray(${percentile})(${arrayExpr}) AS ${alias}`;
+        const fn = percentileFunctionName(percentileMode, "array");
+        return `${fn}(${percentile})(${arrayExpr}) AS ${alias}`;
       }
       // Default to counting array elements
       return `sum(length(${arrayExpr})) AS ${alias}`;
@@ -223,7 +257,12 @@ export function translateMetric(
   }
 
   if (metric.startsWith("performance.")) {
-    return translatePerformanceMetric(metric, aggregation, alias, requiredJoins);
+    return translatePerformanceMetric(
+      metric,
+      aggregation,
+      alias,
+      requiredJoins,
+    );
   }
 
   if (metric.startsWith("evaluations.")) {
@@ -379,6 +418,14 @@ function translateMetadataMetric(
 
 /**
  * Translate performance metrics
+ *
+ * All performance.* and spans.metrics.* percentile aggregations route through
+ * `perfAgg` below, which hard-codes `percentileMode: "tdigest"`. The wrapper
+ * exists so adding a new performance.* case doesn't require remembering to
+ * thread the literal at every call site - forgetting silently regresses to
+ * `quantileExact` (the helper's default) and the O(N) memory bug only surfaces
+ * under heavy analytics load. If you ever want a per-call override, drop back
+ * to the raw `translateSimpleAggregation(col, aggregation, alias, mode)` form.
  */
 function translatePerformanceMetric(
   metric: string,
@@ -388,15 +435,13 @@ function translatePerformanceMetric(
 ): MetricTranslation {
   const ts = tableAliases.trace_summaries;
   const ss = tableAliases.stored_spans;
+  const perfAgg = (col: string): string =>
+    translateSimpleAggregation(col, aggregation, alias, "tdigest");
 
   switch (metric) {
     case "performance.completion_time":
       return {
-        selectExpression: translateSimpleAggregation(
-          `${ts}.TotalDurationMs`,
-          aggregation,
-          alias,
-        ),
+        selectExpression: perfAgg(`${ts}.TotalDurationMs`),
         alias,
         requiredJoins,
         params: {},
@@ -404,11 +449,7 @@ function translatePerformanceMetric(
 
     case "performance.first_token":
       return {
-        selectExpression: translateSimpleAggregation(
-          `${ts}.TimeToFirstTokenMs`,
-          aggregation,
-          alias,
-        ),
+        selectExpression: perfAgg(`${ts}.TimeToFirstTokenMs`),
         alias,
         requiredJoins,
         params: {},
@@ -416,11 +457,7 @@ function translatePerformanceMetric(
 
     case "performance.total_cost":
       return {
-        selectExpression: translateSimpleAggregation(
-          `${ts}.TotalCost`,
-          aggregation,
-          alias,
-        ),
+        selectExpression: perfAgg(`${ts}.TotalCost`),
         alias,
         requiredJoins,
         params: {},
@@ -432,10 +469,8 @@ function translatePerformanceMetric(
     // legacy all-or-nothing langwatch.cost.non_billable boolean.
     case "performance.cost_billed":
       return {
-        selectExpression: translateSimpleAggregation(
+        selectExpression: perfAgg(
           `(coalesce(${ts}.TotalCost, 0) - ${nonBilledCostExpression(ts)})`,
-          aggregation,
-          alias,
         ),
         alias,
         requiredJoins,
@@ -446,11 +481,7 @@ function translatePerformanceMetric(
     // bundled-subscription usage). The grand total is performance.total_cost.
     case "performance.cost_non_billed":
       return {
-        selectExpression: translateSimpleAggregation(
-          nonBilledCostExpression(ts),
-          aggregation,
-          alias,
-        ),
+        selectExpression: perfAgg(nonBilledCostExpression(ts)),
         alias,
         requiredJoins,
         params: {},
@@ -458,11 +489,7 @@ function translatePerformanceMetric(
 
     case "performance.prompt_tokens":
       return {
-        selectExpression: translateSimpleAggregation(
-          `${ts}.TotalPromptTokenCount`,
-          aggregation,
-          alias,
-        ),
+        selectExpression: perfAgg(`${ts}.TotalPromptTokenCount`),
         alias,
         requiredJoins,
         params: {},
@@ -470,11 +497,7 @@ function translatePerformanceMetric(
 
     case "performance.completion_tokens":
       return {
-        selectExpression: translateSimpleAggregation(
-          `${ts}.TotalCompletionTokenCount`,
-          aggregation,
-          alias,
-        ),
+        selectExpression: perfAgg(`${ts}.TotalCompletionTokenCount`),
         alias,
         requiredJoins,
         params: {},
@@ -483,10 +506,8 @@ function translatePerformanceMetric(
     case "performance.total_tokens":
       // Sum of prompt + completion tokens (the "new content" delta, excludes cache)
       return {
-        selectExpression: translateSimpleAggregation(
+        selectExpression: perfAgg(
           `(coalesce(${ts}.TotalPromptTokenCount, 0) + coalesce(${ts}.TotalCompletionTokenCount, 0))`,
-          aggregation,
-          alias,
         ),
         alias,
         requiredJoins,
@@ -499,10 +520,8 @@ function translatePerformanceMetric(
     // values are stored as strings; toUInt64OrZero handles missing/empty → 0.
     case "performance.cache_read_tokens":
       return {
-        selectExpression: translateSimpleAggregation(
+        selectExpression: perfAgg(
           `toUInt64OrZero(${ts}.Attributes['langwatch.reserved.cache_read_tokens'])`,
-          aggregation,
-          alias,
         ),
         alias,
         requiredJoins,
@@ -511,10 +530,8 @@ function translatePerformanceMetric(
 
     case "performance.cache_write_tokens":
       return {
-        selectExpression: translateSimpleAggregation(
+        selectExpression: perfAgg(
           `toUInt64OrZero(${ts}.Attributes['langwatch.reserved.cache_creation_tokens'])`,
-          aggregation,
-          alias,
         ),
         alias,
         requiredJoins,
@@ -523,10 +540,8 @@ function translatePerformanceMetric(
 
     case "performance.reasoning_tokens":
       return {
-        selectExpression: translateSimpleAggregation(
+        selectExpression: perfAgg(
           `toUInt64OrZero(${ts}.Attributes['langwatch.reserved.reasoning_tokens'])`,
-          aggregation,
-          alias,
         ),
         alias,
         requiredJoins,
@@ -537,10 +552,8 @@ function translatePerformanceMetric(
     // cache write. Reasoning is a subset of completion, so it is NOT added again.
     case "performance.total_processed_tokens":
       return {
-        selectExpression: translateSimpleAggregation(
+        selectExpression: perfAgg(
           `(coalesce(${ts}.TotalPromptTokenCount, 0) + coalesce(${ts}.TotalCompletionTokenCount, 0) + toUInt64OrZero(${ts}.Attributes['langwatch.reserved.cache_read_tokens']) + toUInt64OrZero(${ts}.Attributes['langwatch.reserved.cache_creation_tokens']))`,
-          aggregation,
-          alias,
         ),
         alias,
         requiredJoins,
@@ -552,11 +565,7 @@ function translatePerformanceMetric(
       // Avoids joining stored_spans and reading SpanAttributes (a Map column
       // that includes large LLM prompt/completion text), which caused OOM.
       return {
-        selectExpression: translateSimpleAggregation(
-          `${ts}.TokensPerSecond`,
-          aggregation,
-          alias,
-        ),
+        selectExpression: perfAgg(`${ts}.TokensPerSecond`),
         alias,
         requiredJoins,
         params: {},
@@ -567,10 +576,8 @@ function translatePerformanceMetric(
       // Uses canonical OTel name: gen_ai.usage.input_tokens
       requiredJoins.push("stored_spans");
       return {
-        selectExpression: translateSimpleAggregation(
+        selectExpression: perfAgg(
           `toFloat64OrNull(${ss}.SpanAttributes['gen_ai.usage.input_tokens'])`,
-          aggregation,
-          alias,
         ),
         alias,
         requiredJoins,
@@ -582,10 +589,8 @@ function translatePerformanceMetric(
       // Uses canonical OTel name: gen_ai.usage.output_tokens
       requiredJoins.push("stored_spans");
       return {
-        selectExpression: translateSimpleAggregation(
+        selectExpression: perfAgg(
           `toFloat64OrNull(${ss}.SpanAttributes['gen_ai.usage.output_tokens'])`,
-          aggregation,
-          alias,
         ),
         alias,
         requiredJoins,
@@ -747,7 +752,11 @@ function translateEventMetric(
       }
 
       // Apply aggregation to the extracted scores array
-      const aggExpr = translateArrayAggregation(scoreExtraction, aggregation, alias);
+      const aggExpr = translateArrayAggregation(
+        scoreExtraction,
+        aggregation,
+        alias,
+      );
       return {
         selectExpression: aggExpr,
         alias,
@@ -908,13 +917,7 @@ export function translatePipelineAggregation(
   subkey?: string,
 ): MetricTranslation {
   const ts = tableAliases.trace_summaries;
-  const alias = buildMetricAlias(
-    index,
-    metric,
-    aggregation,
-    key,
-    subkey,
-  );
+  const alias = buildMetricAlias(index, metric, aggregation, key, subkey);
 
   // Get the pipeline field expression
   // ES terms aggregation excludes null/missing values, so we just use the column directly
@@ -945,7 +948,10 @@ export function translatePipelineAggregation(
   // 1. Group by (user_id, thread_id), compute thread duration
   // 2. Group by user_id, compute avg thread duration per user
   // 3. Compute avg across users
-  if (metric === "threads.average_duration_per_thread" && innerMetric.requiresSubquery) {
+  if (
+    metric === "threads.average_duration_per_thread" &&
+    innerMetric.requiresSubquery
+  ) {
     const threadIdCol = `${ts}.Attributes['gen_ai.conversation.id']`;
     // pipelineAggregation is typed as PipelineAggregationTypes (sum/avg/min/max)
     // which matches CH function names directly

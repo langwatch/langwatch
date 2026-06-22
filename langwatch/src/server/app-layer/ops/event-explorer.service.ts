@@ -1,12 +1,12 @@
-import type {
-  EventExplorerRepository,
-  AggregateSearchResult,
-} from "./repositories/event-explorer.repository";
 import {
-  getProjectionMetadata,
   getDejaViewProjections,
+  getProjectionMetadata,
 } from "~/server/event-sourcing/pipelineRegistry";
 import { createLogger } from "~/utils/logger/server";
+import type {
+  AggregateSearchResult,
+  EventExplorerRepository,
+} from "./repositories/event-explorer.repository";
 
 const logger = createLogger("langwatch:ops:event-explorer");
 
@@ -36,9 +36,7 @@ export class EventExplorerService {
       return { projections: [] };
     }
 
-    const aggregateTypes = [
-      ...new Set(selected.map((p) => p.aggregateType)),
-    ];
+    const aggregateTypes = [...new Set(selected.map((p) => p.aggregateType))];
     const sinceMs = new Date(params.since).getTime();
 
     const rows = await this.repo.findAggregates({
@@ -89,10 +87,12 @@ export class EventExplorerService {
   async searchAggregates(params: {
     query: string;
     tenantIds: string[];
+    sinceMs?: number;
   }): Promise<AggregateSearchResult[]> {
     return this.repo.searchAggregates({
       query: params.query,
       tenantIds: params.tenantIds.length > 0 ? params.tenantIds : undefined,
+      sinceMs: params.sinceMs,
     });
   }
 
@@ -202,7 +202,11 @@ export class EventExplorerService {
           appliedCount++;
         } catch (err) {
           logger.warn(
-            { error: err, eventId: row.eventId, projectionName: params.projectionName },
+            {
+              error: err,
+              eventId: row.eventId,
+              projectionName: params.projectionName,
+            },
             "Skipping event that failed to apply during projection state computation",
           );
         }
