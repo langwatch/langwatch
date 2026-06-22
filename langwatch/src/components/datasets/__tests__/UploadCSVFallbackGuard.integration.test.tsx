@@ -261,4 +261,59 @@ describe("UploadCSVForm 409-fallback size guard", () => {
       expect(textSpy).not.toHaveBeenCalled();
     });
   });
+
+  describe("when a same-origin local-FS PUT fails (e.g. storage not writable)", () => {
+    it("surfaces the error, reaps the pending row, and does NOT fall back to parsing", async () => {
+      // Local-FS upload: requestDirectUpload mints a SAME-ORIGIN staging URL + an
+      // `uploading` row; the streaming PUT then fails with a real server error (a
+      // plain Error, not PresignedUploadFailedError). The modal must surface it,
+      // reap the pending row (else the slug is locked on retry), and NOT fall
+      // back to the in-browser parse — the local route IS the upload mechanism.
+      requestDirectUpload.mockResolvedValue({
+        datasetId: "dataset_pending",
+        slug: "s",
+        uploadUrl: "/api/dataset/direct-upload/staging/up_1?projectId=proj_1",
+        stagingKey: "staging/proj_1/up_1",
+      });
+      putFileToPresignedUrl.mockRejectedValue(
+        new Error(
+          'Dataset storage path "/var/lib/langwatch/objects" is not writable. Point LANGWATCH_LOCAL_STORAGE_PATH at a writable directory.',
+        ),
+      );
+      abortPendingUpload.mockResolvedValue(undefined);
+      const user = userEvent.setup();
+
+      renderForm();
+
+      // A SMALL file: if it WRONGLY fell back, the parser would run — so asserting
+      // it never parses proves there was no fallback.
+      const smallFile = new File(["a,b\n1,2\n"], "small.csv", {
+        type: "text/csv",
+      });
+      const textSpy = vi
+        .spyOn(smallFile, "text")
+        .mockResolvedValue("a,b\n1,2\n");
+
+      const input = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement;
+      await user.upload(input, smallFile);
+      await user.click(screen.getByRole("button", { name: /upload/i }));
+
+      // The actionable server error is surfaced verbatim...
+      await waitFor(() => {
+        expect(screen.getByTestId("upload-error")).toHaveTextContent(
+          /LANGWATCH_LOCAL_STORAGE_PATH/,
+        );
+      });
+      // ...the orphaned `uploading` row is reaped (slug free for retry)...
+      expect(abortPendingUpload).toHaveBeenCalledWith({
+        projectId: "proj_1",
+        datasetId: "dataset_pending",
+      });
+      // ...and there was NO fallback parse, and no finalize after the failed PUT.
+      expect(textSpy).not.toHaveBeenCalled();
+      expect(finalizeDirectUpload).not.toHaveBeenCalled();
+    });
+  });
 });
