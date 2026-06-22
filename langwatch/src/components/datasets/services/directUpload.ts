@@ -123,6 +123,7 @@ export async function requestDirectUpload({
 export async function putFileToPresignedUrl(
   uploadUrl: string,
   file: File,
+  signal?: AbortSignal,
 ): Promise<void> {
   const sameOrigin = uploadUrl.startsWith("/");
   let response: Response;
@@ -131,8 +132,14 @@ export async function putFileToPresignedUrl(
       method: "PUT",
       body: file,
       credentials: sameOrigin ? "include" : "omit",
+      signal,
     });
   } catch (error) {
+    // A user-initiated cancel aborts the fetch: propagate the AbortError as-is
+    // so the caller treats it as a cancel, not a CORS/network fallback signal.
+    if (error instanceof Error && error.name === "AbortError") {
+      throw error;
+    }
     // Same-origin (local-FS streaming route): a fetch rejection is a genuine
     // server/network failure, NOT a CORS-fallback signal — surface it directly
     // (falling back to in-browser parse can't help; the local route IS the

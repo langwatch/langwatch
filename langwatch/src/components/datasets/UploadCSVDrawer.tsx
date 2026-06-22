@@ -10,12 +10,14 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
+import { keyframes } from "@emotion/react";
+import { useEffect, useRef, useState } from "react";
 import {
   CheckCircle,
   CloudUpload,
   FileText,
   Trash2,
+  X,
   XCircle,
 } from "lucide-react";
 import {
@@ -377,6 +379,10 @@ export function UploadCSVForm({
   // the file's row (sizeError + overRowLimitForFallback below).
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [sizeError, setSizeError] = useState<string | null>(null);
+  // Abort handle for the in-flight PUT + the pending dataset it minted, so a
+  // user-initiated cancel can stop the stream and reap the orphaned row.
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const pendingDatasetIdRef = useRef<string | null>(null);
 
   const getValidName = async (proposedName: string): Promise<string> => {
     if (!projectId) return proposedName;
@@ -431,7 +437,11 @@ export function UploadCSVForm({
     setIsUploading(true);
     setUploadError(null);
     // Track the pending dataset so a presigned-PUT failure can clean up the
-    // orphaned `uploading` row before falling back.
+    // orphaned `uploading` row before falling back. The refs mirror these so a
+    // user-initiated cancel can abort the stream and reap the same row.
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    pendingDatasetIdRef.current = null;
     let pendingDatasetId: string | undefined;
     try {
       const name =
@@ -442,9 +452,12 @@ export function UploadCSVForm({
         filename: rawFile.name,
       });
       pendingDatasetId = datasetId;
-      await putFileToPresignedUrl(uploadUrl, rawFile);
+      pendingDatasetIdRef.current = datasetId;
+      await putFileToPresignedUrl(uploadUrl, rawFile, controller.signal);
       await finalizeDirectUpload({ projectId, datasetId });
 
+      abortControllerRef.current = null;
+      pendingDatasetIdRef.current = null;
       if (onDirectUploadComplete) {
         // Hand off to the drawer host, which polls status and shows the
         // processing → ready/failed flow in place (no navigation).
@@ -460,6 +473,11 @@ export function UploadCSVForm({
         void router.push(`/${project.slug}/datasets/${datasetId}`);
       }
     } catch (error) {
+      // A user-initiated cancel aborts the PUT: handleCancelUpload already reset
+      // state and reaped the pending row, so there is nothing more to do here.
+      if (error instanceof Error && error.name === "AbortError") {
+        return;
+      }
       // Any failure AFTER requestDirectUpload minted the `uploading` row leaves
       // it behind and locks the slug — whether we fall back (a fresh dataset is
       // created) or surface the error (the upload is abandoned). Reap it either
@@ -501,6 +519,26 @@ export function UploadCSVForm({
       );
       setIsUploading(false);
     }
+  };
+
+  /**
+   * Cancel an in-flight direct upload: abort the streaming PUT and reap the
+   * pending `uploading` row so its slug isn't locked on retry. The file stays
+   * selected so the user can re-upload or remove it.
+   */
+  const handleCancelUpload = () => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    const pendingId = pendingDatasetIdRef.current;
+    pendingDatasetIdRef.current = null;
+    if (pendingId && projectId) {
+      void abortPendingUpload({ projectId, datasetId: pendingId }).catch(
+        (error) => {
+          logger.error({ error }, "Failed to clean up cancelled upload");
+        },
+      );
+    }
+    setIsUploading(false);
   };
 
   /**
@@ -575,6 +613,7 @@ export function UploadCSVForm({
         parse={!enableDirectUpload}
         uploadStatus={isUploading && enableDirectUpload ? "uploading" : undefined}
         fileError={fileError}
+        onCancel={handleCancelUpload}
         onUploadAccepted={handleUploadAccepted}
         onRawFile={(file) => {
           setRawFile(file);
@@ -605,6 +644,7 @@ export function UploadCSVForm({
         <Button
           colorPalette="blue"
           loading={isUploading}
+          loadingText="Uploading"
           disabled={!!disabled || isUploading || !canUpload}
           onClick={() => void handleUpload()}
         >
@@ -622,6 +662,7 @@ export function CSVReaderComponent({
   parse = true,
   uploadStatus,
   fileError,
+  onCancel,
   children,
 }: {
   onUploadAccepted: (results: {
@@ -647,6 +688,8 @@ export function CSVReaderComponent({
   uploadStatus?: "uploading";
   /** File-level validation/upload message; renders the file row in an error state. */
   fileError?: string;
+  /** Cancels an in-flight upload (no-parse path). Shows the X cancel control. */
+  onCancel?: () => void;
   children?: (hasAcceptedFile: boolean) => React.ReactNode;
 }) {
   if (!parse) {
@@ -656,6 +699,7 @@ export function CSVReaderComponent({
         onUploadRemoved={onUploadRemoved}
         uploadStatus={uploadStatus}
         fileError={fileError}
+        onCancel={onCancel}
       >
         {children}
       </RawFileDropzone>
@@ -902,7 +946,7 @@ const DROPZONE_DOTTED_STYLE: React.CSSProperties = {
 };
 
 /** Shared Chakra props for the dashed dropzone surface; highlights when active
- *  (dragging a file over it) and on hover. */
+ *  (dragging a file over it) and on hover, and softly grows the cloud icon. */
 const dropzoneSurfaceProps = (active: boolean) => ({
   borderRadius: "xl",
   borderWidth: "2px",
@@ -914,8 +958,37 @@ const dropzoneSurfaceProps = (active: boolean) => ({
   cursor: "pointer",
   width: "full",
   transition: "border-color 0.15s ease, background-color 0.15s ease",
-  _hover: { borderColor: "blue.300", bg: "blue.500/5" },
+  // Grow the icon while dragging a file over the zone; the icon's own
+  // transition animates the grow/shrink smoothly.
+  "& .lw-dropzone-icon": active ? { transform: "scale(1.12)" } : {},
+  _hover: {
+    borderColor: "blue.300",
+    bg: "blue.500/5",
+    "& .lw-dropzone-icon": { transform: "scale(1.12)" },
+  },
 });
+
+// PostHog's rainbow-scroll text sheen (same recipe as ShikiCommandBox): a
+// gradient clipped to the text whose background-position scrolls to animate.
+// Applied to the file name while it uploads — one continuous "loading" tell.
+const lwRainbowScroll = keyframes`
+  0% { background-position-x: 0%; }
+  100% { background-position-x: 200%; }
+`;
+
+const LW_RAINBOW_GRADIENT =
+  "linear-gradient(90deg, #0143cb 0%, #2b6ff4 24%, #d23401 47%, #ff651f 66%, #fba000 83%, #0143cb 100%)";
+
+const RAINBOW_TEXT_CSS = {
+  color: "transparent",
+  backgroundImage: LW_RAINBOW_GRADIENT,
+  backgroundClip: "text",
+  WebkitBackgroundClip: "text",
+  WebkitTextFillColor: "transparent",
+  backgroundSize: "200% 100%",
+  animation: `${lwRainbowScroll} 3s linear infinite`,
+  "@media (prefers-reduced-motion: reduce)": { animation: "none" },
+} as const;
 
 /**
  * Empty-state contents of the dropzone: an upload illustration, the primary
@@ -924,7 +997,12 @@ const dropzoneSurfaceProps = (active: boolean) => ({
 function DropzonePrompt() {
   return (
     <VStack gap={2}>
-      <Box color="blue.400">
+      <Box
+        className="lw-dropzone-icon"
+        color="blue.400"
+        transition="transform 0.2s ease"
+        transformOrigin="center"
+      >
         <CloudUpload size={36} strokeWidth={1.5} />
       </Box>
       <Text fontSize="md" color="fg">
@@ -982,6 +1060,7 @@ function DatasetFileRow({
   action?: React.ReactNode;
 }) {
   const isError = status === "error";
+  const isUploading = status === "uploading";
   const meta = message ?? metaLabel;
   return (
     <HStack
@@ -995,7 +1074,13 @@ function DatasetFileRow({
     >
       <DatasetFileStatusIcon status={status} />
       <VStack align="start" gap={0} flex={1} minWidth={0}>
-        <Text fontWeight="medium" truncate maxWidth="full">
+        <Text
+          fontWeight="medium"
+          truncate
+          maxWidth="full"
+          // The name sweeps a rainbow gradient while uploading — the "loading" tell.
+          css={isUploading ? RAINBOW_TEXT_CSS : undefined}
+        >
           {name}
         </Text>
         {(sizeLabel ?? meta) && (
@@ -1023,7 +1108,6 @@ function RemoveFileButton({ onRemove }: { onRemove: () => void }) {
   return (
     <Box
       as="button"
-      type="button"
       color="fg.muted"
       display="flex"
       _hover={{ color: "red.500" }}
@@ -1036,6 +1120,26 @@ function RemoveFileButton({ onRemove }: { onRemove: () => void }) {
       }}
     >
       <Trash2 size={18} />
+    </Box>
+  );
+}
+
+/** X control shown in place of the trash while an upload is in flight. */
+function CancelUploadButton({ onCancel }: { onCancel: () => void }) {
+  return (
+    <Box
+      as="button"
+      color="fg.muted"
+      display="flex"
+      _hover={{ color: "red.500" }}
+      aria-label="Cancel upload"
+      onClick={(event: React.MouseEvent) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onCancel();
+      }}
+    >
+      <X size={18} />
     </Box>
   );
 }
@@ -1063,13 +1167,24 @@ function CSVReaderBox({
   }, [acceptedFile, setAcceptedFile]);
 
   return (
-    <VStack width="full" gap={3} align="stretch">
+    <VStack width="full" gap={0} align="stretch">
+      {/* Single-file flow: the drag-and-drop container collapses once a file is
+          chosen and expands back when it's removed. */}
       <Box
-        {...getRootProps()}
-        {...dropzoneSurfaceProps(zoneHover)}
-        style={DROPZONE_DOTTED_STYLE}
+        display="grid"
+        gridTemplateRows={acceptedFile ? "0fr" : "1fr"}
+        opacity={acceptedFile ? 0 : 1}
+        transition="grid-template-rows 0.35s ease, opacity 0.3s ease"
       >
-        <DropzonePrompt />
+        <Box overflow="hidden">
+          <Box
+            {...getRootProps()}
+            {...dropzoneSurfaceProps(zoneHover)}
+            style={DROPZONE_DOTTED_STYLE}
+          >
+            <DropzonePrompt />
+          </Box>
+        </Box>
       </Box>
       {acceptedFile && (
         <DatasetFileRow
@@ -1080,7 +1195,6 @@ function CSVReaderBox({
           action={
             <Box
               as="button"
-              type="button"
               color="fg.muted"
               display="flex"
               _hover={{ color: "red.500" }}
@@ -1110,6 +1224,7 @@ function RawFileDropzone({
   onUploadRemoved,
   uploadStatus,
   fileError,
+  onCancel,
   children,
 }: {
   onRawFile?: (file: File | null) => void;
@@ -1118,6 +1233,8 @@ function RawFileDropzone({
   uploadStatus?: "uploading";
   /** File-level validation/upload message; turns the row red. */
   fileError?: string;
+  /** Cancels the in-flight upload; shows the X cancel control while uploading. */
+  onCancel?: () => void;
   children?: (hasAcceptedFile: boolean) => React.ReactNode;
 }) {
   const [zoneHover, setZoneHover] = useState(false);
@@ -1141,42 +1258,50 @@ function RawFileDropzone({
       : "selected";
 
   return (
-    <VStack width="full" gap={3} align="stretch">
-      {/* While the file streams, the dropzone is replaced by its status row so
-          the user can't swap files mid-upload (single-file flow). */}
-      {!isUploading && (
-        <Box
-          as="label"
-          {...dropzoneSurfaceProps(zoneHover)}
-          style={DROPZONE_DOTTED_STYLE}
-          display="block"
-          onDragOver={(event) => {
-            event.preventDefault();
-            setZoneHover(true);
-          }}
-          onDragLeave={(event) => {
-            event.preventDefault();
-            setZoneHover(false);
-          }}
-          onDrop={(event) => {
-            event.preventDefault();
-            setZoneHover(false);
-            const file = event.dataTransfer?.files?.[0] ?? null;
-            if (file) setFile(file);
-          }}
-        >
-          <input
-            type="file"
-            accept=".csv,.json,.jsonl"
-            style={{ display: "none" }}
-            onChange={(event) => {
-              const file = event.target.files?.[0] ?? null;
+    <VStack width="full" gap={0} align="stretch">
+      {/* Single-file flow: the drag-and-drop container smoothly collapses once a
+          file is chosen and expands back when it's removed or cancelled. The
+          grid 1fr→0fr trick animates the height without measuring it. */}
+      <Box
+        display="grid"
+        gridTemplateRows={acceptedFile ? "0fr" : "1fr"}
+        opacity={acceptedFile ? 0 : 1}
+        transition="grid-template-rows 0.35s ease, opacity 0.3s ease"
+      >
+        <Box overflow="hidden">
+          <Box
+            as="label"
+            {...dropzoneSurfaceProps(zoneHover)}
+            style={DROPZONE_DOTTED_STYLE}
+            display="block"
+            onDragOver={(event) => {
+              event.preventDefault();
+              setZoneHover(true);
+            }}
+            onDragLeave={(event) => {
+              event.preventDefault();
+              setZoneHover(false);
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              setZoneHover(false);
+              const file = event.dataTransfer?.files?.[0] ?? null;
               if (file) setFile(file);
             }}
-          />
-          <DropzonePrompt />
+          >
+            <input
+              type="file"
+              accept=".csv,.json,.jsonl"
+              style={{ display: "none" }}
+              onChange={(event) => {
+                const file = event.target.files?.[0] ?? null;
+                if (file) setFile(file);
+              }}
+            />
+            <DropzonePrompt />
+          </Box>
         </Box>
-      )}
+      </Box>
       {acceptedFile && (
         <DatasetFileRow
           name={acceptedFile.name}
@@ -1185,7 +1310,18 @@ function RawFileDropzone({
           status={rowStatus}
           message={fileError}
           action={
-            isUploading ? undefined : (
+            isUploading ? (
+              onCancel ? (
+                <CancelUploadButton
+                  onCancel={() => {
+                    // Cancel aborts the upload AND clears the file, so the
+                    // drag-and-drop container expands back in.
+                    onCancel();
+                    setFile(null);
+                  }}
+                />
+              ) : undefined
+            ) : (
               <RemoveFileButton onRemove={() => setFile(null)} />
             )
           }
