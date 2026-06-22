@@ -63,8 +63,6 @@ export type ExecutionRequest = {
   dataset_id?: string;
   /** Constant inputs applied to every row, overriding entry fields. */
   parameters?: Record<string, string | number | boolean>;
-  /** Subset of dataset row indices to evaluate. */
-  row_indices?: number[];
 };
 
 export const executionRequestSchema = z
@@ -130,8 +128,9 @@ export const executionRequestSchema = z
     parameters: z
       .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
       .optional(),
-    /** Subset of dataset row indices to evaluate. */
-    row_indices: z.array(z.number().int().nonnegative()).optional(),
+    // Row subsetting on /execute is expressed through `scope` ({ type: "rows" });
+    // a separate row_indices here would be redundant and is intentionally absent.
+    // The CI run path (/:slug/run) carries its own row_indices in runInputsBodySchema.
   })
   .refine((req) => !(req.data && req.dataset_id), {
     message: "Pass either inline data or a dataset_id, not both",
