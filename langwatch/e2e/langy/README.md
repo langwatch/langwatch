@@ -20,7 +20,7 @@ Langy runs inside an OpenCode pod in Minikube and uses the **MCP server** (`lang
 ## Run
 
 ```bash
-cd langwatch/src/tests/langy
+cd langwatch/e2e/langy
 LANGY_AGENT_URL=http://172.22.160.1:8081 \
 OPENAI_API_KEY=<your-virtual-key> \
 OPENAI_BASE_URL=http://localhost:5563/v1 \
