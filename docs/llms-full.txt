@@ -9965,6 +9965,8 @@ func main() {
 `RegisterLangWatch` reads `LANGWATCH_API_KEY` (and `LANGWATCH_ENDPOINT`) from the environment by default. To forward exporter options (API key, endpoint, data capture, filters), pass `WithExporterOptions`:
 
 ```go
+import langwatch "github.com/langwatch/langwatch/sdk-go"
+
 lwgenkit.RegisterLangWatch(g,
 	lwgenkit.WithExporterOptions(
 		langwatch.WithAPIKey("sk-lw-..."),

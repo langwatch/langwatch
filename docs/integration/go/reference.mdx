@@ -661,7 +661,7 @@ if client.IsConflict(err)     { /* 409 */ }
 
 ### Pagination & iterators
 
-The API uses offset (`page` / `limit`) and cursor pagination. The single-page `List` / `Search` / `ListRuns` methods return the page plus its metadata for manual paging. For large result sets, each heavy service exposes a Go 1.23 range-over-func iterator (`iter.Seq2[T, error]`) that fetches one page at a time, so memory stays flat:
+The API uses offset (`page` / `limit`) and cursor pagination. The single-page `List` / `Search` / `ListRuns` methods return the page plus its metadata for manual paging. For large result sets, each heavy service exposes a range-over-func iterator (`iter.Seq2[T, error]`) that fetches one page at a time, so memory stays flat:
 
 ```go
 for rec, err := range lw.Datasets.AllRecords(ctx, "golden-examples", client.ListDatasetsParams{}) {

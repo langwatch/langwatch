@@ -323,7 +323,7 @@ ${
         : `map[string]any{}`;
 
     const settingsEntry = storeSettingsOnCode
-      ? `\n\t\t"settings": ${JSON.stringify(settings ?? {})},`
+      ? `\n\t\t"settings": json.RawMessage(\`${JSON.stringify(settings ?? {})}\`),`
       : "";
     const asGuardrailEntry = isGuardrail ? `\n\t\t"as_guardrail": true,` : "";
 

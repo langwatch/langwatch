@@ -171,7 +171,15 @@ export function EvaluatorApiUsageDialog({
     }
 
     return allFields
-      .map((field) => `\t\t\t"${field}": "your ${field}",`)
+      .map((field) => {
+        if (field === "contexts" || field === "expected_contexts") {
+          return `\t\t\t"${field}": []string{"context 1", "context 2"},`;
+        }
+        if (field === "conversation") {
+          return `\t\t\t"${field}": []map[string]any{{"input": "hi", "output": "hello"}},`;
+        }
+        return `\t\t\t"${field}": "your ${field}",`;
+      })
       .join("\n");
   };
 

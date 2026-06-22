@@ -124,36 +124,48 @@ curl -X POST "${baseUrl}/api/workflows/${workflowId}/evaluate" \\
  * — never the legacy X-Auth-Token header. The "parameters" example mirrors the
  * entry point's own fields exactly as the curl snippet does.
  */
-export function evaluateGoSnippet({
-  workflowId,
-  baseUrl,
-  entryFields,
+function buildGoDatasetComment({
   datasetColumns,
   datasetName,
 }: {
-  workflowId: string;
-  baseUrl: string;
-  entryFields: WorkflowField[];
   datasetColumns: string[];
   datasetName?: string;
+}): string {
+  const hasDataset = !!datasetName || datasetColumns.length > 0;
+  if (!hasDataset) {
+    return `\t// Evaluates the latest committed version. With no dataset attached, the\n\t// parameters below form the single evaluated row.`;
+  }
+  if (datasetName) {
+    return `\t// Evaluates the latest committed version against this workflow's\n\t// attached dataset ("${datasetName}").`;
+  }
+  return `\t// Evaluates the latest committed version against this workflow's\n\t// attached dataset.`;
+}
+
+function buildGoBodyJson({
+  entryFields,
+  datasetColumns,
+}: {
+  entryFields: WorkflowField[];
+  datasetColumns: string[];
 }): string {
   const mapped = buildEvaluateParameters({ entryFields, datasetColumns });
   const parameters =
     Object.keys(mapped).length > 0 ? mapped : PLACEHOLDER_PARAMETERS;
-
   // Indent the JSON body to sit inside the Go raw string literal.
-  const bodyJson = JSON.stringify({ parameters }, null, 2).replace(
-    /\n/g,
-    "\n\t\t",
-  );
+  return JSON.stringify({ parameters }, null, 2).replace(/\n/g, "\n\t\t");
+}
 
-  const hasDataset = !!datasetName || datasetColumns.length > 0;
-  const datasetLine = !hasDataset
-    ? `\t// Evaluates the latest committed version. With no dataset attached, the\n\t// parameters below form the single evaluated row.`
-    : datasetName
-      ? `\t// Evaluates the latest committed version against this workflow's\n\t// attached dataset ("${datasetName}").`
-      : `\t// Evaluates the latest committed version against this workflow's\n\t// attached dataset.`;
-
+function renderGoEvaluateSnippet({
+  workflowId,
+  baseUrl,
+  bodyJson,
+  datasetLine,
+}: {
+  workflowId: string;
+  baseUrl: string;
+  bodyJson: string;
+  datasetLine: string;
+}): string {
   return `package main
 
 import (
@@ -196,4 +208,25 @@ ${datasetLine}
 \tout, _ := io.ReadAll(resp.Body)
 \tfmt.Println(string(out)) // => { "run_id": "run_...", "workflow_version_id": "..." }
 }`;
+}
+
+export function evaluateGoSnippet({
+  workflowId,
+  baseUrl,
+  entryFields,
+  datasetColumns,
+  datasetName,
+}: {
+  workflowId: string;
+  baseUrl: string;
+  entryFields: WorkflowField[];
+  datasetColumns: string[];
+  datasetName?: string;
+}): string {
+  return renderGoEvaluateSnippet({
+    workflowId,
+    baseUrl,
+    bodyJson: buildGoBodyJson({ entryFields, datasetColumns }),
+    datasetLine: buildGoDatasetComment({ datasetColumns, datasetName }),
+  });
 }
