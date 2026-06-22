@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  Heading,
   HStack,
   Spacer,
   Text,
@@ -21,7 +22,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { createLogger } from "~/utils/logger";
-import { Dialog } from "../../components/ui/dialog";
+import { Drawer } from "../ui/drawer";
 import type {
   DatasetColumns,
   DatasetRecordEntry,
@@ -43,9 +44,9 @@ import {
 import { getSafeColumnName } from "./utils/reservedColumns";
 export const MAX_ROWS_LIMIT = 10_000;
 
-const logger = createLogger("UploadCSVModal");
+const logger = createLogger("UploadCSVDrawer");
 
-export function UploadCSVModal({
+export function UploadCSVDrawer({
   isOpen: isOpen_,
   onClose: onClose_,
   onSuccess,
@@ -90,17 +91,17 @@ export function UploadCSVModal({
 
   return (
     <>
-      <Dialog.Root
+      <Drawer.Root
         open={localIsOpen}
         onOpenChange={({ open }) => !open && onClose()}
-        closeOnInteractOutside={false}
+        size="xl"
       >
-        <Dialog.Content bg="bg">
-          <Dialog.Header>
-            <Dialog.Title>Upload CSV</Dialog.Title>
-            <Dialog.CloseTrigger />
-          </Dialog.Header>
-          <Dialog.Body>
+        <Drawer.Content bg="bg">
+          <Drawer.CloseTrigger />
+          <Drawer.Header>
+            <Heading>Upload CSV</Heading>
+          </Drawer.Header>
+          <Drawer.Body>
             <UploadCSVForm
               setUploadedDataset={setUploadedDataset}
               uploadedDataset={uploadedDataset}
@@ -109,9 +110,9 @@ export function UploadCSVModal({
               enableDirectUpload={enableDirectUpload}
               onClose={onClose}
             />
-          </Dialog.Body>
-        </Dialog.Content>
-      </Dialog.Root>
+          </Drawer.Body>
+        </Drawer.Content>
+      </Drawer.Root>
       <AddOrEditDatasetDrawer
         datasetToSave={uploadedDataset}
         open={addDatasetDrawer.open}

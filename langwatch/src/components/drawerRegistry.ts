@@ -26,7 +26,7 @@ import {
 import { AlertDrawer } from "./analytics/AlertDrawer";
 import { DashboardNameDrawer } from "./analytics/DashboardNameDrawer";
 import { SelectDatasetDrawer } from "./datasets/SelectDatasetDrawer";
-import { UploadCSVModal } from "./datasets/UploadCSVModal";
+import { UploadCSVDrawer } from "./datasets/UploadCSVDrawer";
 import { FeatureFlagsDrawer } from "./drawers/FeatureFlagsDrawer";
 import { SdkRadarDrawer } from "./drawers/SdkRadarDrawer";
 import { EditAutomationFilterDrawer } from "./EditAutomationFilterDrawer";
@@ -92,7 +92,7 @@ export const drawers = {
   addAnnotationQueue: AddAnnotationQueueDrawer,
   addDatasetRecord: AddDatasetRecordDrawerV2,
   llmModelCost: LLMModelCostDrawer,
-  uploadCSV: UploadCSVModal,
+  uploadCSV: UploadCSVDrawer,
   addOrEditDataset: AddOrEditDatasetDrawer,
   editAutomationFilter: EditAutomationFilterDrawer,
   seriesFilters: SeriesFiltersDrawer,

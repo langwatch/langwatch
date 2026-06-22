@@ -19,7 +19,7 @@ import {
 } from "../../server/datasets/types";
 import { api } from "../../utils/api";
 import { tryToConvertRowsToAppropriateType } from "../AddOrEditDatasetDrawer";
-import { CSVReaderComponent } from "./UploadCSVModal";
+import { CSVReaderComponent } from "./UploadCSVDrawer";
 
 export function AddRowsFromCSVModal({
   isOpen,

@@ -39,7 +39,7 @@ vi.mock("react-papaparse", async (importActual) => {
   };
 });
 
-import { CSVReaderComponent } from "../UploadCSVModal";
+import { CSVReaderComponent } from "../UploadCSVDrawer";
 
 function renderReader(props: {
   parse?: boolean;

@@ -32,7 +32,7 @@ import { useRouter } from "~/utils/compat/next-router";
 import { AddOrEditDatasetDrawer } from "../../components/AddOrEditDatasetDrawer";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { CopyDatasetDialog } from "../../components/datasets/CopyDatasetDialog";
-import { UploadCSVModal } from "../../components/datasets/UploadCSVModal";
+import { UploadCSVDrawer } from "../../components/datasets/UploadCSVDrawer";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
@@ -365,7 +365,7 @@ function DatasetsPage() {
           addEditDatasetDrawer.onClose();
         }}
       />
-      <UploadCSVModal
+      <UploadCSVDrawer
         isOpen={uploadCSVModal.open}
         onClose={uploadCSVModal.onClose}
         onSuccess={() => {

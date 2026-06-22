@@ -66,7 +66,7 @@ import {
   DirectUploadUnavailableError,
   PresignedUploadFailedError,
 } from "../services/directUpload";
-import { UploadCSVForm } from "../UploadCSVModal";
+import { UploadCSVForm } from "../UploadCSVDrawer";
 
 const renderForm = () =>
   render(
