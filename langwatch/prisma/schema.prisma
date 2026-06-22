@@ -2817,7 +2817,6 @@ model LangyMessage {
     projectId      String
     role           String
     parts          Json
-    tokenCount     Int?
     createdAt      DateTime @default(now())
 
     conversation   LangyConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)

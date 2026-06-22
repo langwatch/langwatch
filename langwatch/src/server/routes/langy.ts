@@ -27,7 +27,6 @@ import {
   Resources,
 } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
-import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
 import { auditLog } from "~/server/auditLog";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
@@ -58,8 +57,6 @@ import { createLogger } from "~/utils/logger/server";
 import type { NextRequestShim } from "./types";
 
 const logger = createLogger("langwatch:api:langy");
-
-const LANGY_FALLBACK_MODEL = "openai/gpt-5-mini";
 
 // The Langy worker carries a service API key with WRITE on every resource
 // listed here (see LANGY_PERMISSION_SELECTIONS in services/langy/langyApiKey.ts).
@@ -118,23 +115,24 @@ const chatRequestSchema = z.object({
     .max(200)
     .optional(),
 });
+// Token counts live on the gateway-emitted OTel trace (see the per-worker
+// OPENCODE_OTLP_* env in services/langy-agent — the OpenCode OTel plugin
+// exports gen_ai.usage.{prompt,completion}_tokens for every LLM call). The
+// LangyMessage row is the text+role+parts of a chat turn; consumers that need
+// usage figures should fold the trace by langwatch.thread.id=conversationId,
+// not double-count with an in-process tokenizer here. Discussed on PR #4913.
 async function persistMessage(opts: {
   conversationId: string;
   projectId: string;
   role: "user" | "assistant";
   parts: unknown;
-  model: string;
 }) {
-  const text = extractTextFromParts(opts.parts);
-  const tokenizer = new TiktokenClient();
-  const tokenCount = (await tokenizer.countTokens(opts.model, text)) ?? null;
   const messageService = LangyMessageService.create(prisma);
   await messageService.append({
     conversationId: opts.conversationId,
     projectId: opts.projectId,
     role: opts.role,
     parts: opts.parts ?? [],
-    tokenCount,
   });
   if (opts.role === "assistant") {
     const conversationService = LangyConversationService.create(prisma);
@@ -312,7 +310,6 @@ langyRoute().post("/langy/chat", async (c) => {
       projectId,
       role: "user",
       parts: lastUserMessage.parts,
-      model: LANGY_FALLBACK_MODEL,
     });
   }
 
@@ -521,7 +518,6 @@ langyRoute().post("/langy/chat", async (c) => {
           projectId,
           role: "assistant",
           parts: [{ type: "text", text: persistedText, role: "assistant" }],
-          model: LANGY_FALLBACK_MODEL,
         });
       } catch (error) {
         logger.error({ error }, "failed to persist langy assistant message");

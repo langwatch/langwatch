@@ -22,13 +22,15 @@ CREATE INDEX "LangyConversation_projectId_isShared_updatedAt_idx" ON "LangyConve
 CREATE INDEX "LangyConversation_deletedAt_idx" ON "LangyConversation"("deletedAt");
 
 -- LangyMessage
+-- No tokenCount column: usage is on the gateway-emitted OTel trace
+-- (gen_ai.usage.{prompt,completion}_tokens, grouped by langwatch.thread.id).
+-- Consumers that need it fold by traceId rather than re-counting client-side.
 CREATE TABLE "LangyMessage" (
     "id" TEXT NOT NULL,
     "conversationId" TEXT NOT NULL,
     "projectId" TEXT NOT NULL,
     "role" TEXT NOT NULL,
     "parts" JSONB NOT NULL,
-    "tokenCount" INTEGER,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "LangyMessage_pkey" PRIMARY KEY ("id")
