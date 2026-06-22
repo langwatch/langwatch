@@ -7,6 +7,7 @@ import {
   handlerManagedAuth,
   requires,
 } from "~/server/api/security";
+import { createLogger } from "~/utils/logger/server";
 import { createManyDatasetRecords } from "../../../../server/api/routers/datasetRecord.utils";
 import { UploadValidationError } from "../../../../server/datasets/dataset.service";
 import type { DatasetNotReadyError } from "../../../../server/datasets/errors";
@@ -38,6 +39,8 @@ import { datasetOutputSchema } from "./schemas";
 import { buildStandardSuccessResponse } from "./utils";
 
 patchZodOpenapi();
+
+const logger = createLogger("langwatch:api:dataset");
 
 // -- Validation schemas for new endpoints --
 
@@ -343,14 +346,24 @@ secured.access(directUploadSessionAuth).post(
     // `resourceLimitMiddleware`) because the org is only known after in-handler
     // auth resolves the project.
     const organizationId = await resolveOrganizationId(auth.teamId);
-    if (organizationId) {
-      const overLimit = await enforceResourceLimitOrRespond({
-        c,
-        organizationId,
-        limitType: "datasets",
-      });
-      if (overLimit) return overLimit;
+    if (!organizationId) {
+      // Fail CLOSED, matching `resourceLimitMiddleware`: never skip the limit
+      // check just because the org couldn't be resolved. `Team.organizationId`
+      // is non-null, so this is a should-never-happen guard — but the inline
+      // path must not be more permissive than the shared middleware (which 500s
+      // here), or a create could slip past the dataset limit.
+      logger.error(
+        { projectId: auth.projectId, teamId: auth.teamId },
+        "Could not resolve organization for dataset resource limit check",
+      );
+      throw new InternalServerError("Could not resolve organization");
     }
+    const overLimit = await enforceResourceLimitOrRespond({
+      c,
+      organizationId,
+      limitType: "datasets",
+    });
+    if (overLimit) return overLimit;
 
     const name = body.name;
     if (!name || typeof name !== "string" || name.trim() === "") {
