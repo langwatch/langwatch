@@ -588,6 +588,8 @@ export const deleteS3JsonlRecords = async ({
   const datasetStorage = storage ?? (await getDatasetStorage(projectId));
   const repository = new DatasetRepository(prisma);
   const removeSet = new Set(recordIds);
+  const isTarget = (line: unknown): boolean =>
+    isChunkLine(line) && removeSet.has(line.id);
 
   // OFF the lock: locate the target ids' chunks so only the affected chunks are
   // re-read under the lock (not all chunkCount). Skipped for a not-ready dataset
@@ -638,9 +640,7 @@ export const deleteS3JsonlRecords = async ({
             datasetId: dataset.id,
             index,
           });
-          const kept = rows.filter(
-            (line) => !(isChunkLine(line) && removeSet.has(line.id)),
-          );
+          const kept = rows.filter((line) => !isTarget(line));
           if (kept.length === rows.length) continue; // none of ours here now
           for (const line of rows) {
             if (isChunkLine(line) && removeSet.has(line.id)) {
@@ -671,6 +671,8 @@ export const deleteS3JsonlRecords = async ({
         const perChunk = [...offsets]
           .sort((a, b) => a.index - b.index)
           .map((o) => ({
+            // Affected chunks from the re-read above; unaffected from the offset
+            // index (rowCount = endRow - startRow, byteSize as stored).
             rowCount: newRowCount.get(o.index) ?? o.endRow - o.startRow,
             byteSize: newByteSize.get(o.index) ?? o.byteSize,
           }));
