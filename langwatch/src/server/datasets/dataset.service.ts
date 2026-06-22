@@ -1,3 +1,4 @@
+import type { Readable } from "node:stream";
 import { generate } from "@langwatch/ksuid";
 import type { DatasetRecord, Prisma, PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
@@ -27,6 +28,7 @@ import {
   DatasetNotFoundError,
   DatasetNotReadyError,
   DatasetNotRetryableError,
+  DirectUploadUnavailableError,
   InvalidColumnError,
   MalformedColumnTypesError,
   StagedUploadNotFoundError,
@@ -34,7 +36,11 @@ import {
   UploadTooLargeError,
 } from "./errors";
 import { ExperimentRepository } from "./experiment.repository";
-import { exceedsUploadCap } from "./presigned-upload";
+import {
+  exceedsUploadCap,
+  stagingUploadKey,
+  UPLOAD_MAX_BYTES,
+} from "./presigned-upload";
 import { stripNullBytes } from "./sanitize";
 import type {
   DatasetColumns,
@@ -1145,6 +1151,37 @@ export class DatasetService {
       uploadUrl: upload.url,
       stagingKey: upload.key,
     };
+  }
+
+  /**
+   * Server-side deposit for the local-FS direct upload: stream the raw file the
+   * browser PUT to the same-origin staging route into the storage backend's
+   * staging slot. Only backends that route uploads THROUGH the app (local FS)
+   * implement `putStaged`; on S3 the browser PUTs to the bucket directly, so a
+   * call here means the route was hit on a backend that doesn't deposit through
+   * the app — surface `DirectUploadUnavailableError` (mapped to 409). The size
+   * cap (`UPLOAD_MAX_BYTES`) is enforced mid-stream so a client can't fill the
+   * disk before finalize's HEAD would reject it.
+   *
+   * @throws {DirectUploadUnavailableError} if the backend deposits direct (S3)
+   * @throws {UploadTooLargeError} if the stream exceeds the size cap
+   */
+  async writeStagedUpload(params: {
+    projectId: string;
+    uploadId: string;
+    body: Readable;
+  }): Promise<void> {
+    const { projectId, uploadId, body } = params;
+    const storage = await getDatasetStorage(projectId);
+    if (!storage.putStaged) {
+      throw new DirectUploadUnavailableError();
+    }
+    await storage.putStaged({
+      projectId,
+      key: stagingUploadKey(projectId, uploadId),
+      body,
+      maxBytes: UPLOAD_MAX_BYTES,
+    });
   }
 
   /**

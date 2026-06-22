@@ -106,28 +106,31 @@ export async function requestDirectUpload({
 }
 
 /**
- * PUT the raw file to the presigned storage URL.
+ * PUT the raw file to the upload URL. Two URL shapes, two credential modes:
  *
- * No credentials: the URL is cross-origin (S3-compatible storage) and a
- * presigned request must not carry our session cookie.
+ *  - Absolute (cross-origin S3): NO credentials — a presigned request must not
+ *    carry our session cookie — and NO Content-Type: `createPresignedUpload`
+ *    signs the `PutObjectCommand` WITHOUT a `ContentType`, so the signature
+ *    doesn't cover a `Content-Type` header; setting one adds an unsigned header
+ *    some S3 impls fold into the canonical request, breaking the signature.
+ *  - Relative `/...` (same-origin): the no-S3 local-FS path — the file streams
+ *    through our own API to local-FS staging, so we DO send the session cookie
+ *    (`credentials: "include"`); the route is session-authed and there is no
+ *    signature to keep intact.
  *
- * No Content-Type: `createPresignedUpload` in `s3-dataset-storage.ts` signs a
- * `PutObjectCommand` WITHOUT a `ContentType`, so the signature does not cover a
- * `Content-Type` header. Setting one here would add an unsigned header that
- * some S3 implementations fold into the canonical request, breaking the
- * signature. We deliberately let the browser send the file body with no
- * explicit Content-Type to keep the signed request intact.
+ * A leading "/" is the discriminator: relative ⇒ same-origin local route.
  */
 export async function putFileToPresignedUrl(
   uploadUrl: string,
   file: File,
 ): Promise<void> {
+  const sameOrigin = uploadUrl.startsWith("/");
   let response: Response;
   try {
     response = await fetch(uploadUrl, {
       method: "PUT",
       body: file,
-      credentials: "omit",
+      credentials: sameOrigin ? "include" : "omit",
     });
   } catch (error) {
     // A cross-origin PUT to a bucket with no CORS rule (or any network failure)

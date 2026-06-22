@@ -62,4 +62,26 @@ describe("LocalDatasetStorage", () => {
       });
     });
   });
+
+  describe("createPresignedUpload()", () => {
+    // Local FS has no browser-reachable bucket, so instead of throwing (the old
+    // behavior that forced the in-browser-parse fallback + 25 MB cap) it mints a
+    // SAME-ORIGIN upload URL the browser streams to (ADR-032 v14). Pure — no FS.
+    describe("on a local-FS backend", () => {
+      it("returns a same-origin staging URL and the tenant-scoped staging key", async () => {
+        const presign = await new LocalDatasetStorage(
+          ROOT,
+        ).createPresignedUpload({ projectId: "p1" });
+
+        // Relative URL → the modal's PUT helper reads "/" as same-origin and
+        // sends the session cookie (vs an absolute S3 URL → no credentials).
+        expect(presign.url).toBe(
+          `/api/dataset/direct-upload/staging/${presign.uploadId}?projectId=p1`,
+        );
+        // The key matches what finalize/normalize expect: staging/{project}/{id}.
+        expect(presign.key).toBe(`staging/p1/${presign.uploadId}`);
+        expect(presign.uploadId).toBeTruthy();
+      });
+    });
+  });
 });

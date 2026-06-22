@@ -46,13 +46,24 @@ vi.mock("../dataset-normalize.queue", () => ({
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { Readable } from "node:stream";
 import { nanoid } from "nanoid";
 import { createManyDatasetRecords } from "../../api/routers/datasetRecord.utils";
 import { DatasetService } from "../dataset.service";
 import * as datasetStorageModule from "../dataset-storage";
 import { getDatasetStorage } from "../dataset-storage";
-import { DirectUploadUnavailableError } from "../errors";
+import { DirectUploadUnavailableError, UploadTooLargeError } from "../errors";
 import { LocalDatasetStorage } from "../local-dataset-storage";
+
+/** A non-object-mode Readable emitting the given byte chunks, then EOF — an
+ * unambiguous byte stream for the streaming-upload tests (avoids Readable.from's
+ * object-mode-by-default ambiguity when piping into a byte writable). */
+const byteStream = (...chunks: string[]): Readable => {
+  const r = new Readable({ read() {} });
+  for (const c of chunks) r.push(Buffer.from(c, "utf8"));
+  r.push(null);
+  return r;
+};
 
 /** A no-S3 (single-replica self-host) storage destination. */
 const NO_S3_DESTINATION = {
@@ -87,36 +98,84 @@ describe("Feature: Large dataset storage — self-hosted without object storage"
       expect(resolveProjectStorageDestination).toHaveBeenCalledWith("p1");
     });
 
-    describe("when a heavy direct (browser→S3) upload is requested", () => {
-      it("throws DirectUploadUnavailableError so the caller falls back to /upload", async () => {
+    describe("when a heavy direct upload is requested", () => {
+      it("mints a same-origin staging URL instead of throwing (local-FS streaming upload)", async () => {
         const storage = await getDatasetStorage("p1");
 
-        await expect(
-          storage.createPresignedUpload({ projectId: "p1" }),
-        ).rejects.toBeInstanceOf(DirectUploadUnavailableError);
+        const presign = await storage.createPresignedUpload({
+          projectId: "p1",
+        });
+
+        // Relative (same-origin) URL → the browser streams the file THROUGH the
+        // app to local-FS staging; no S3 required. The key is the same
+        // tenant-scoped, server-owned key finalize/normalize already understand.
+        expect(presign.url).toMatch(
+          /^\/api\/dataset\/direct-upload\/staging\//,
+        );
+        expect(presign.url).toContain("projectId=p1");
+        expect(presign.key).toBe(`staging/p1/${presign.uploadId}`);
       });
     });
   });
 
-  describe("DatasetService.createPendingUpload() on a no-S3 instance", () => {
+  describe("DatasetService direct upload on a no-S3 instance", () => {
+    /**
+     * Born-on-storage made backend storage mandatory; the local-FS direct-upload
+     * transport (ADR-032 v14) makes the heavy-file UPLOAD work without S3 too.
+     * `createPendingUpload` no longer throws — it mints a same-origin staging
+     * URL and an `uploading` row; the browser PUTs the raw file to that route,
+     * which streams it to local-FS staging (no in-browser parse, no 25 MB cap).
+     * Real `LocalDatasetStorage` on a tmp root proves the bytes actually land.
+     */
     /** @scenario "Datasets work on a minimal self-hosted install" */
-    it("propagates DirectUploadUnavailableError without creating an orphan row", async () => {
+    /** @scenario A large file uploads on a self-hosted install with no object storage */
+    it("accepts a heavy upload via the same-origin staging route and lands it in storage", async () => {
+      const root = path.join(os.tmpdir(), `lw-ds-localup-${nanoid()}`);
+      resolveProjectStorageDestination.mockResolvedValue({
+        kind: "file" as const,
+        root,
+      });
       const repository = {
         findBySlug: vi.fn().mockResolvedValue(null),
-        create: vi.fn(),
+        create: vi.fn().mockImplementation((data: { id: string }) =>
+          Promise.resolve({
+            ...data,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+        ),
       };
+      const service = makeService({ repository, prisma: {} });
 
-      await expect(
-        makeService({ repository }).createPendingUpload({
-          projectId: "p1",
-          name: "DS",
-          filename: "data.jsonl",
-        }),
-      ).rejects.toBeInstanceOf(DirectUploadUnavailableError);
-      // No row is created when the presign is unavailable — the client retries
-      // via the backend /upload path, which creates an s3_jsonl dataset on the
-      // local filesystem instead (born-on-storage).
-      expect(repository.create).not.toHaveBeenCalled();
+      // 1. No-S3 no longer dead-ends: a same-origin staging URL + `uploading` row.
+      const pending = await service.createPendingUpload({
+        projectId: "p1",
+        name: "Big DS",
+        filename: "big.csv",
+      });
+      expect(pending.uploadUrl).toMatch(
+        /^\/api\/dataset\/direct-upload\/staging\//,
+      );
+      expect(repository.create).toHaveBeenCalledOnce();
+      const uploadId = pending.stagingKey.split("/").pop()!;
+
+      // 2. The browser PUTs the raw file; the route streams it via the service.
+      await service.writeStagedUpload({
+        projectId: "p1",
+        uploadId,
+        body: byteStream("question,answer\n", "q1,a1\n", "q2,a2\n"),
+      });
+
+      // 3. The staged object actually landed at the bound key — finalize's HEAD
+      // (headStagedObjectSize) reads a real, non-empty size.
+      const storage = await getDatasetStorage("p1");
+      const size = await storage.headStagedObjectSize({
+        projectId: "p1",
+        key: pending.stagingKey,
+      });
+      expect(size).toBeGreaterThan(0);
+
+      await fs.rm(root, { recursive: true, force: true });
     });
   });
 
@@ -426,6 +485,75 @@ describe("Feature: Large dataset storage — self-hosted without object storage"
       ).rejects.toThrow(/Missing dataset chunk/);
 
       storageSpy.mockRestore();
+      await fs.rm(root, { recursive: true, force: true });
+    });
+  });
+
+  describe("DatasetService.writeStagedUpload() when the backend deposits direct (S3)", () => {
+    it("rejects with DirectUploadUnavailableError — the app route isn't S3's upload mechanism", async () => {
+      // An S3-style storage has no `putStaged` (its presigned PUT lands bytes in
+      // the bucket directly), so the staging route must refuse rather than no-op.
+      const storageSpy = vi
+        .spyOn(datasetStorageModule, "getDatasetStorage")
+        .mockResolvedValue({} as never);
+
+      await expect(
+        makeService({ prisma: {} }).writeStagedUpload({
+          projectId: "p1",
+          uploadId: "up_1",
+          body: byteStream("x"),
+        }),
+      ).rejects.toBeInstanceOf(DirectUploadUnavailableError);
+
+      storageSpy.mockRestore();
+    });
+  });
+
+  describe("LocalDatasetStorage.putStaged() — no-S3 streaming deposit", () => {
+    it("aborts mid-stream past maxBytes and leaves no partial object (disk-fill guard)", async () => {
+      const root = path.join(os.tmpdir(), `lw-ds-putcap-${nanoid()}`);
+      const storage = new LocalDatasetStorage(root);
+      const key = `staging/p1/${nanoid()}`;
+
+      // 50 bytes streamed, cap 25 → abort once the running total crosses it.
+      await expect(
+        storage.putStaged({
+          projectId: "p1",
+          key,
+          body: byteStream(
+            "0123456789",
+            "0123456789",
+            "0123456789",
+            "0123456789",
+            "0123456789",
+          ),
+          maxBytes: 25,
+        }),
+      ).rejects.toBeInstanceOf(UploadTooLargeError);
+
+      // The partial object was reaped — a rejected upload leaves nothing behind.
+      await expect(
+        storage.headStagedObjectSize({ projectId: "p1", key }),
+      ).rejects.toThrow();
+
+      await fs.rm(root, { recursive: true, force: true });
+    });
+
+    it("streams a within-cap body to disk and reads its size back", async () => {
+      const root = path.join(os.tmpdir(), `lw-ds-putok-${nanoid()}`);
+      const storage = new LocalDatasetStorage(root);
+      const key = `staging/p1/${nanoid()}`;
+
+      await storage.putStaged({
+        projectId: "p1",
+        key,
+        body: byteStream("question,answer\n", "q1,a1\n"),
+        maxBytes: 1024,
+      });
+
+      const size = await storage.headStagedObjectSize({ projectId: "p1", key });
+      expect(size).toBe(Buffer.byteLength("question,answer\nq1,a1\n"));
+
       await fs.rm(root, { recursive: true, force: true });
     });
   });

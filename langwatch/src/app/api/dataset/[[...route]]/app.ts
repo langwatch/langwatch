@@ -1,3 +1,4 @@
+import { Readable } from "node:stream";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
@@ -388,6 +389,60 @@ secured.access(directUploadSessionAuth).post(
           },
           409,
         );
+      }
+      throw error;
+    }
+  },
+);
+
+// ── Direct upload: stream the file into staging (no browser-reachable S3) ──
+// On S3 the browser PUTs the file to the bucket directly; only local FS routes
+// the bytes through the app, via the same-origin URL minted by
+// createPresignedUpload. Registered before the `/:datasetId` routes so "staging"
+// isn't matched as a datasetId. Session-cookie (or API-key) authed in-handler.
+secured.access(directUploadSessionAuth).put(
+  "/direct-upload/staging/:uploadId",
+  datasetServiceMiddleware,
+  describeRoute({
+    description:
+      "Stream a heavy upload into staging when there is no browser-reachable S3",
+  }),
+  async (c) => {
+    const { uploadId } = c.req.param();
+    const projectId = c.req.query("projectId");
+    if (!projectId || projectId.trim() === "") {
+      throw new UnprocessableEntityError("projectId query param is required");
+    }
+    const auth = await authorizeDirectUpload(c, projectId.trim());
+    if (!auth.ok) {
+      return c.json({ error: auth.error }, auth.status);
+    }
+    const body = c.req.raw.body;
+    if (!body) {
+      throw new UnprocessableEntityError("request body is required");
+    }
+    const service = c.get("datasetService");
+    try {
+      await service.writeStagedUpload({
+        projectId: auth.projectId,
+        uploadId,
+        // Web ReadableStream → Node Readable; streamed to disk, never buffered.
+        body: Readable.fromWeb(body as Parameters<typeof Readable.fromWeb>[0]),
+      });
+      return c.json({ ok: true }, 200);
+    } catch (error) {
+      // The backend deposits direct (S3) — the app route isn't its mechanism.
+      if (
+        error instanceof Error &&
+        error.name === "DirectUploadUnavailableError"
+      ) {
+        return c.json(
+          { error: "DirectUploadUnavailable", message: error.message },
+          409,
+        );
+      }
+      if (error instanceof Error && error.name === "UploadTooLargeError") {
+        throw new BadRequestError(error.message);
       }
       throw error;
     }

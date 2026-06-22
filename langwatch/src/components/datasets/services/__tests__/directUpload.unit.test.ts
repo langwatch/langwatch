@@ -135,6 +135,28 @@ describe("directUpload service", () => {
         // one, so adding it here would break the signature.
         expect(init.headers).toBeUndefined();
       });
+
+      it("sends the session cookie for a same-origin (relative) local-FS upload URL", async () => {
+        // No-S3 deploys mint a relative `/api/...` staging URL; the file streams
+        // through our own session-authed API, so the cookie must ride along
+        // (ADR-032 v14). The leading "/" is the discriminator.
+        mockFetch().mockResolvedValue({ ok: true });
+        const file = new File(["a,b\n1,2\n"], "data.csv", { type: "text/csv" });
+
+        await putFileToPresignedUrl(
+          "/api/dataset/direct-upload/staging/up_1?projectId=p1",
+          file,
+        );
+
+        const [url, init] = mockFetch().mock.calls[0]!;
+        expect(url).toBe(
+          "/api/dataset/direct-upload/staging/up_1?projectId=p1",
+        );
+        expect(init.method).toBe("PUT");
+        expect(init.body).toBe(file);
+        // Session cookie included on the same-origin route (vs omit for S3).
+        expect(init.credentials).toBe("include");
+      });
     });
 
     describe("when the storage PUT returns a non-ok status", () => {

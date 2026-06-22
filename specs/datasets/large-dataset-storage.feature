@@ -126,6 +126,14 @@ Feature: Large dataset storage
     Then it works
     And the application still starts normally
 
+  @unit
+  Scenario: A large file uploads on a self-hosted install with no object storage
+    Given a self-hosted install without object storage (local filesystem only)
+    When I upload a CSV larger than the in-browser limit
+    Then the upload is accepted without a "requires object storage" error
+    And the file is streamed to storage rather than parsed in the browser
+    And the dataset becomes ready once it finishes preparing
+
   # ============================================================================
   # Editing
   # ============================================================================

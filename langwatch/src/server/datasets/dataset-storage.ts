@@ -103,6 +103,22 @@ export interface DatasetStorage {
     projectId: string;
   }): Promise<PresignedUpload>;
 
+  /**
+   * Deposit a staged upload from a byte stream, server-side. Present ONLY on
+   * backends whose direct upload routes the file THROUGH the app (local FS): the
+   * same-origin `/direct-upload/staging/:uploadId` route calls this. S3 omits it
+   * — its presigned PUT lands bytes in the bucket directly, so they never transit
+   * the app. Streamed, never buffered (multi-GB safe); `maxBytes` aborts a stream
+   * that exceeds the cap (and deletes the partial object) so an authed client
+   * can't fill the disk before the finalize HEAD would reject it.
+   */
+  putStaged?(params: {
+    projectId: string;
+    key: string;
+    body: Readable;
+    maxBytes?: number;
+  }): Promise<void>;
+
   /** HEAD a staged upload to read its size — finalize size-cap enforcement. */
   headStagedObjectSize(params: {
     projectId: string;
