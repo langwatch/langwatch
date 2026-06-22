@@ -46,7 +46,7 @@
     "@eslint/js": "^10.0.1",
     "@langwatch/scenario": "^0.4.6",
     "@types/debug": "^4.1.12",
-    "@types/eslint__js": "^8.42.3",
+    "@types/eslint__js": "^9.14.0",
     "@types/express": "^5.0.6",
     "@types/node": "^25.6.0",
     "@types/yargs": "^17.0.33",
