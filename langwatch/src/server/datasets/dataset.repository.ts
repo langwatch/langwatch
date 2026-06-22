@@ -128,6 +128,27 @@ export class DatasetRepository {
   }
 
   /**
+   * Finds the pending (`status='uploading'`, non-archived) dataset that owns a
+   * given staging key. The direct-upload staging route uses this to refuse a
+   * stream into a `staging/` slot no upload row claims — otherwise an authed
+   * project user could spray orphan objects there (local FS has no staging-TTL
+   * reaper). `stagingKey` is server-minted and bound to the row at presign time.
+   */
+  async findPendingUploadByStagingKey(input: {
+    projectId: string;
+    stagingKey: string;
+  }): Promise<Dataset | null> {
+    return await this.prisma.dataset.findFirst({
+      where: {
+        projectId: input.projectId,
+        stagingKey: input.stagingKey,
+        status: "uploading",
+        archivedAt: null,
+      },
+    });
+  }
+
+  /**
    * Finds all dataset slugs in a project (for name conflict checking).
    */
   async findAllSlugs(input: {

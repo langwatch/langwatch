@@ -52,7 +52,11 @@ import { createManyDatasetRecords } from "../../api/routers/datasetRecord.utils"
 import { DatasetService } from "../dataset.service";
 import * as datasetStorageModule from "../dataset-storage";
 import { getDatasetStorage } from "../dataset-storage";
-import { DirectUploadUnavailableError, UploadTooLargeError } from "../errors";
+import {
+  DirectUploadUnavailableError,
+  UploadNotPendingError,
+  UploadTooLargeError,
+} from "../errors";
 import { LocalDatasetStorage } from "../local-dataset-storage";
 
 /** A non-object-mode Readable emitting the given byte chunks, then EOF — an
@@ -135,15 +139,26 @@ describe("Feature: Large dataset storage — self-hosted without object storage"
         kind: "file" as const,
         root,
       });
+      let createdRow: Record<string, unknown> | undefined;
       const repository = {
         findBySlug: vi.fn().mockResolvedValue(null),
-        create: vi.fn().mockImplementation((data: { id: string }) =>
-          Promise.resolve({
+        create: vi.fn().mockImplementation((data: { id: string }) => {
+          createdRow = {
             ...data,
             createdAt: new Date(),
             updatedAt: new Date(),
-          }),
-        ),
+          };
+          return Promise.resolve(createdRow);
+        }),
+        // The staging write is gated on the owning `uploading` row that
+        // createPendingUpload just inserted (matched by its bound stagingKey).
+        findPendingUploadByStagingKey: vi
+          .fn()
+          .mockImplementation(({ stagingKey }: { stagingKey: string }) =>
+            Promise.resolve(
+              createdRow?.stagingKey === stagingKey ? createdRow : null,
+            ),
+          ),
       };
       const service = makeService({ repository, prisma: {} });
 
@@ -504,6 +519,38 @@ describe("Feature: Large dataset storage — self-hosted without object storage"
           body: byteStream("x"),
         }),
       ).rejects.toBeInstanceOf(DirectUploadUnavailableError);
+
+      storageSpy.mockRestore();
+    });
+  });
+
+  describe("DatasetService.writeStagedUpload() when no pending upload owns the key", () => {
+    it("refuses the orphan write (UploadNotPendingError) before touching the disk", async () => {
+      // A fabricated/replayed uploadId has no `uploading` row bound to its
+      // staging key; stream it anyway and an authed user fills local disk with
+      // orphans no lifecycle reaps. The gate refuses before putStaged runs.
+      const putStaged = vi.fn();
+      const storageSpy = vi
+        .spyOn(datasetStorageModule, "getDatasetStorage")
+        .mockResolvedValue({ putStaged } as never);
+      const repository = {
+        findPendingUploadByStagingKey: vi.fn().mockResolvedValue(null),
+      };
+
+      await expect(
+        makeService({ repository, prisma: {} }).writeStagedUpload({
+          projectId: "p1",
+          uploadId: "up_orphan",
+          body: byteStream("x"),
+        }),
+      ).rejects.toBeInstanceOf(UploadNotPendingError);
+
+      // Never reached the disk write.
+      expect(putStaged).not.toHaveBeenCalled();
+      expect(repository.findPendingUploadByStagingKey).toHaveBeenCalledWith({
+        projectId: "p1",
+        stagingKey: "staging/p1/up_orphan",
+      });
 
       storageSpy.mockRestore();
     });

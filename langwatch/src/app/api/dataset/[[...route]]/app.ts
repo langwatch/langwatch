@@ -441,6 +441,11 @@ secured.access(directUploadSessionAuth).put(
           409,
         );
       }
+      // No pending upload row owns this staging key (fabricated / replayed
+      // uploadId, or already finalized) — refuse the orphan write.
+      if (error instanceof Error && error.name === "UploadNotPendingError") {
+        return c.json({ error: "Conflict", message: error.message }, 409);
+      }
       if (error instanceof Error && error.name === "UploadTooLargeError") {
         throw new BadRequestError(error.message);
       }

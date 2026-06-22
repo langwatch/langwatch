@@ -18,6 +18,7 @@ import { useMemo, useState } from "react";
 import { Database, Search } from "react-feather";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { datasetDisplayRecordCount } from "~/server/datasets/record-count";
 import type { DatasetColumns } from "~/server/datasets/types";
 import { api } from "~/utils/api";
 
@@ -72,11 +73,7 @@ export function DatasetPickerList({
               key={dataset.id}
               name={dataset.name}
               columnCount={(dataset.columnTypes as DatasetColumns).length}
-              entryCount={
-                dataset.useS3
-                  ? (dataset.s3RecordCount ?? 0)
-                  : dataset._count.datasetRecords
-              }
+              entryCount={datasetDisplayRecordCount(dataset)}
               updatedAt={dataset.updatedAt}
               onClick={() =>
                 onSelect({

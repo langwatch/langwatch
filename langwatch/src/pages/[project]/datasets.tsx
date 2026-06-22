@@ -39,6 +39,7 @@ import { toaster } from "../../components/ui/toaster";
 import { useLiteMemberGuard } from "../../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { AppRouter } from "../../server/api/root";
+import { datasetDisplayRecordCount } from "../../server/datasets/record-count";
 import type { DatasetColumns } from "../../server/datasets/types";
 import { api } from "../../utils/api";
 import { isHandledByGlobalHandler } from "../../utils/trpcError";
@@ -277,9 +278,7 @@ function DatasetsPage() {
                       </HStack>
                     </Table.Cell>
                     <Table.Cell>
-                      {dataset.useS3
-                        ? (dataset.s3RecordCount ?? 0)
-                        : (dataset._count.datasetRecords ?? 0)}
+                      {datasetDisplayRecordCount(dataset)}
                     </Table.Cell>
                     <Table.Cell>
                       {new Date(

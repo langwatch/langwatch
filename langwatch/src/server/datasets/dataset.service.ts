@@ -41,6 +41,7 @@ import {
   stagingUploadKey,
   UPLOAD_MAX_BYTES,
 } from "./presigned-upload";
+import { datasetDisplayRecordCount } from "./record-count";
 import { stripNullBytes } from "./sanitize";
 import type {
   DatasetColumns,
@@ -540,7 +541,9 @@ export class DatasetService {
         columnTypes: d.columnTypes,
         createdAt: d.createdAt,
         updatedAt: d.updatedAt,
-        recordCount: d._count.datasetRecords,
+        // s3_jsonl rows live in chunks, not the DatasetRecord table — count via
+        // the layout-aware helper so new datasets don't report 0.
+        recordCount: datasetDisplayRecordCount(d),
       })),
       pagination: {
         page,
@@ -1163,7 +1166,15 @@ export class DatasetService {
    * cap (`UPLOAD_MAX_BYTES`) is enforced mid-stream so a client can't fill the
    * disk before finalize's HEAD would reject it.
    *
+   * Gated on an owning pending-upload row: we only stream into a `staging/` slot
+   * that a `status='uploading'` dataset created via `createPendingUpload` claims
+   * (the key is server-minted and bound to the row at presign). Without this an
+   * authed project user could stream arbitrary 5 GB orphans into
+   * `staging/{projectId}/…` that no lifecycle (abort/finalize) ever reaps — local
+   * FS has no staging-TTL sweep — growing the disk unbounded.
+   *
    * @throws {DirectUploadUnavailableError} if the backend deposits direct (S3)
+   * @throws {UploadNotPendingError} if no pending upload row owns the staging key
    * @throws {UploadTooLargeError} if the stream exceeds the size cap
    */
   async writeStagedUpload(params: {
@@ -1176,9 +1187,17 @@ export class DatasetService {
     if (!storage.putStaged) {
       throw new DirectUploadUnavailableError();
     }
+    const stagingKey = stagingUploadKey(projectId, uploadId);
+    const pending = await this.repository.findPendingUploadByStagingKey({
+      projectId,
+      stagingKey,
+    });
+    if (!pending) {
+      throw new UploadNotPendingError();
+    }
     await storage.putStaged({
       projectId,
-      key: stagingUploadKey(projectId, uploadId),
+      key: stagingKey,
       body,
       maxBytes: UPLOAD_MAX_BYTES,
     });

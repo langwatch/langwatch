@@ -21,6 +21,7 @@ import { ChunkTooLargeError } from "../errors";
 // `.integration.test.ts` runs in CI under testcontainers; locally without
 // Docker the integration runner won't start — that's expected.
 import { LocalDatasetStorage } from "../local-dataset-storage";
+import { UPLOAD_MAX_BYTES } from "../presigned-upload";
 
 // Constructed in beforeEach once the temp root exists — the impl takes its root
 // as a constructor arg (threaded from the resolver in production), no env read.
@@ -161,11 +162,50 @@ describe("LocalDatasetStorage", () => {
   });
 
   describe("createPresignedUpload()", () => {
-    describe("when there is no browser-reachable storage", () => {
-      it("signals the caller to fall back to the backend upload path", async () => {
-        await expect(
-          storage.createPresignedUpload({ projectId: "p1" }),
-        ).rejects.toThrow(/Direct upload is unavailable/);
+    describe("on a local-FS backend (no browser-reachable bucket)", () => {
+      it("mints a same-origin staging URL + tenant-scoped key (local streaming upload)", async () => {
+        // ADR-032 v14: instead of throwing (the old behavior that forced the
+        // in-browser-parse fallback + 25 MB cap), local FS mints a same-origin
+        // URL the browser streams to, into the same staging key S3 would use.
+        const presign = await storage.createPresignedUpload({
+          projectId: "p1",
+        });
+
+        expect(presign.url).toBe(
+          `/api/dataset/direct-upload/staging/${presign.uploadId}?projectId=p1`,
+        );
+        expect(presign.key).toBe(`staging/p1/${presign.uploadId}`);
+      });
+    });
+  });
+
+  describe("putStaged() + streamStaged()", () => {
+    describe("given a body streamed into staging", () => {
+      it("round-trips the bytes back through the staging key", async () => {
+        const { uploadId, key } = await storage.createPresignedUpload({
+          projectId: "p1",
+        });
+        const payload = "question,answer\nq1,a1\nq2,a2\n";
+        const source = new Readable({ read() {} });
+        source.push(Buffer.from(payload, "utf8"));
+        source.push(null);
+
+        await storage.putStaged({
+          projectId: "p1",
+          key,
+          body: source,
+          maxBytes: UPLOAD_MAX_BYTES,
+        });
+
+        expect(
+          await storage.headStagedObjectSize({ projectId: "p1", key }),
+        ).toBe(Buffer.byteLength(payload));
+        const back = await storage.streamStaged({ projectId: "p1", key });
+        const chunks: Buffer[] = [];
+        for await (const c of back) chunks.push(c as Buffer);
+        expect(Buffer.concat(chunks).toString("utf8")).toBe(payload);
+        // The key the route would reconstruct from uploadId matches.
+        expect(key).toBe(`staging/p1/${uploadId}`);
       });
     });
   });
