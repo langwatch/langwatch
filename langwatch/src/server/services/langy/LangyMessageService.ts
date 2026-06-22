@@ -7,7 +7,6 @@ export type CreateMessageInput = {
   projectId: string;
   role: MessageRole;
   parts: unknown;
-  tokenCount?: number | null;
 };
 
 /**
@@ -56,7 +55,6 @@ export class LangyMessageRepository {
         projectId: input.projectId,
         role: input.role,
         parts: input.parts as never,
-        tokenCount: input.tokenCount ?? null,
       },
     });
   }
