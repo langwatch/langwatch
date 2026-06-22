@@ -101,7 +101,7 @@
     "@opentelemetry/core": "2.7.1",
     "@opentelemetry/exporter-logs-otlp-proto": "^0.217.0",
     "@opentelemetry/exporter-trace-otlp-grpc": "0.217.0",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.217.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.219.0",
     "@opentelemetry/exporter-trace-otlp-proto": "^0.217.0",
     "@opentelemetry/otlp-transformer": "0.55.0",
     "@opentelemetry/otlp-transformer-next": "npm:@opentelemetry/otlp-transformer@0.217.0",
