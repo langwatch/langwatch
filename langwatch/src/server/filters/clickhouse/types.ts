@@ -67,7 +67,21 @@ export type FilterConditionBuilder = (
   paramId: string,
   key?: string,
   subkey?: string,
+  options?: FilterConditionOptions,
 ) => FilterConditionResult;
+
+/**
+ * Cross-cutting options threaded to every condition builder.
+ */
+export type FilterConditionOptions = {
+  /**
+   * Pre-built SQL fragment bounding `sp.StartTime` to the dashboard time window,
+   * injected into `stored_spans` EXISTS subqueries so they prune partitions
+   * instead of cold-scanning every weekly partition (including S3-tiered ones).
+   * Empty string when no time window is available.
+   */
+  spanTimeBound?: string;
+};
 
 /**
  * Result of generating filter conditions from filter parameters.

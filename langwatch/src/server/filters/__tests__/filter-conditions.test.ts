@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { FilterParam } from "~/hooks/useFilterParams";
-import type { FilterField } from "../types";
 import {
   clickHouseFilterConditions,
   generateClickHouseFilterConditions,
 } from "../clickhouse/filter-conditions";
+import type { FilterField } from "../types";
 
 describe("clickHouseFilterConditions", () => {
   describe("topics.topics", () => {
@@ -85,7 +85,7 @@ describe("clickHouseFilterConditions", () => {
       const builder = clickHouseFilterConditions["metadata.user_id"];
       const result = builder!(["user1"], "f0");
       expect(result.sql).toBe(
-        "ts.Attributes['langwatch.user_id'] IN ({f0_values:Array(String)})"
+        "ts.Attributes['langwatch.user_id'] IN ({f0_values:Array(String)})",
       );
     });
 
@@ -93,7 +93,7 @@ describe("clickHouseFilterConditions", () => {
       const builder = clickHouseFilterConditions["metadata.thread_id"];
       const result = builder!(["thread1"], "f0");
       expect(result.sql).toBe(
-        "ts.Attributes['gen_ai.conversation.id'] IN ({f0_values:Array(String)})"
+        "ts.Attributes['gen_ai.conversation.id'] IN ({f0_values:Array(String)})",
       );
     });
 
@@ -101,7 +101,7 @@ describe("clickHouseFilterConditions", () => {
       const builder = clickHouseFilterConditions["metadata.customer_id"];
       const result = builder!(["cust1"], "f0");
       expect(result.sql).toBe(
-        "ts.Attributes['langwatch.customer_id'] IN ({f0_values:Array(String)})"
+        "ts.Attributes['langwatch.customer_id'] IN ({f0_values:Array(String)})",
       );
     });
   });
@@ -125,14 +125,23 @@ describe("clickHouseFilterConditions", () => {
       const builder = clickHouseFilterConditions["metadata.key"];
       const result = builder!(["canary", "environment"], "f0");
       expect(result.sql).toContain(" OR ");
-      expect(result.params).toHaveProperty("f0_k0_canonical", "metadata.canary");
-      expect(result.params).toHaveProperty("f0_k1_canonical", "metadata.environment");
+      expect(result.params).toHaveProperty(
+        "f0_k0_canonical",
+        "metadata.canary",
+      );
+      expect(result.params).toHaveProperty(
+        "f0_k1_canonical",
+        "metadata.environment",
+      );
     });
 
     it("converts dot-encoded keys back to dots", () => {
       const builder = clickHouseFilterConditions["metadata.key"];
       const result = builder!(["nested·key"], "f0");
-      expect(result.params).toHaveProperty("f0_k0_canonical", "metadata.nested.key");
+      expect(result.params).toHaveProperty(
+        "f0_k0_canonical",
+        "metadata.nested.key",
+      );
       expect(result.params).toHaveProperty("f0_k0_bare", "nested.key");
     });
 
@@ -168,7 +177,10 @@ describe("clickHouseFilterConditions", () => {
     it("converts dot-encoded keys back to dots", () => {
       const builder = clickHouseFilterConditions["metadata.value"];
       const result = builder!(["val"], "f0", "nested·key");
-      expect(result.params).toHaveProperty("f0_canonical", "metadata.nested.key");
+      expect(result.params).toHaveProperty(
+        "f0_canonical",
+        "metadata.nested.key",
+      );
       expect(result.params).toHaveProperty("f0_bare", "nested.key");
     });
   });
@@ -183,21 +195,43 @@ describe("clickHouseFilterConditions", () => {
       expect(result.sql).toContain("sp.SpanAttributes['langwatch.span.type']");
       expect(result.params).toEqual({ f0_values: ["llm", "tool"] });
     });
+
+    it("does not bound StartTime when no spanTimeBound option is given", () => {
+      const builder = clickHouseFilterConditions["spans.type"];
+      const result = builder!(["llm"], "f0");
+      expect(result.sql).not.toContain("sp.StartTime");
+    });
+
+    it("injects the spanTimeBound fragment when provided", () => {
+      const builder = clickHouseFilterConditions["spans.type"];
+      const bound =
+        " AND sp.StartTime >= fromUnixTimestamp64Milli({spanWindowStart:UInt64}) AND sp.StartTime <= fromUnixTimestamp64Milli({spanWindowEnd:UInt64})";
+      const result = builder!(["llm"], "f0", undefined, undefined, {
+        spanTimeBound: bound,
+      });
+      expect(result.sql).toContain("sp.StartTime >=");
+      expect(result.sql).toContain("spanWindowStart");
+      expect(result.sql).toContain("spanWindowEnd");
+    });
   });
 
   describe("evaluations.evaluator_id.has_passed", () => {
     it("generates EXISTS subquery filtering on Passed IS NOT NULL", () => {
-      const builder = clickHouseFilterConditions["evaluations.evaluator_id.has_passed"];
+      const builder =
+        clickHouseFilterConditions["evaluations.evaluator_id.has_passed"];
       expect(builder).not.toBeNull();
       const result = builder!(["eval-1", "eval-2"], "f0");
       expect(result.sql).toContain("EXISTS (");
-      expect(result.sql).toContain("es.EvaluatorId IN ({f0_values:Array(String)})");
+      expect(result.sql).toContain(
+        "es.EvaluatorId IN ({f0_values:Array(String)})",
+      );
       expect(result.sql).toContain("es.Passed IS NOT NULL");
       expect(result.params).toEqual({ f0_values: ["eval-1", "eval-2"] });
     });
 
     it("uses assumeNotNull for Nullable TraceId correlation (#3000)", () => {
-      const builder = clickHouseFilterConditions["evaluations.evaluator_id.has_passed"];
+      const builder =
+        clickHouseFilterConditions["evaluations.evaluator_id.has_passed"];
       const result = builder!(["eval-1"], "f0");
       expect(result.sql).toContain("es.TraceId IS NOT NULL");
       expect(result.sql).toContain("assumeNotNull(es.TraceId) = ts.TraceId");
@@ -207,17 +241,21 @@ describe("clickHouseFilterConditions", () => {
 
   describe("evaluations.evaluator_id.has_score", () => {
     it("generates EXISTS subquery filtering on Score IS NOT NULL", () => {
-      const builder = clickHouseFilterConditions["evaluations.evaluator_id.has_score"];
+      const builder =
+        clickHouseFilterConditions["evaluations.evaluator_id.has_score"];
       expect(builder).not.toBeNull();
       const result = builder!(["eval-1"], "f0");
       expect(result.sql).toContain("EXISTS (");
-      expect(result.sql).toContain("es.EvaluatorId IN ({f0_values:Array(String)})");
+      expect(result.sql).toContain(
+        "es.EvaluatorId IN ({f0_values:Array(String)})",
+      );
       expect(result.sql).toContain("es.Score IS NOT NULL");
       expect(result.params).toEqual({ f0_values: ["eval-1"] });
     });
 
     it("uses assumeNotNull for Nullable TraceId correlation (#3000)", () => {
-      const builder = clickHouseFilterConditions["evaluations.evaluator_id.has_score"];
+      const builder =
+        clickHouseFilterConditions["evaluations.evaluator_id.has_score"];
       const result = builder!(["eval-1"], "f0");
       expect(result.sql).toContain("es.TraceId IS NOT NULL");
       expect(result.sql).toContain("assumeNotNull(es.TraceId) = ts.TraceId");
@@ -227,11 +265,14 @@ describe("clickHouseFilterConditions", () => {
 
   describe("evaluations.evaluator_id.has_label", () => {
     it("generates EXISTS subquery filtering on Label IS NOT NULL and excludes succeeded/failed", () => {
-      const builder = clickHouseFilterConditions["evaluations.evaluator_id.has_label"];
+      const builder =
+        clickHouseFilterConditions["evaluations.evaluator_id.has_label"];
       expect(builder).not.toBeNull();
       const result = builder!(["eval-1"], "f0");
       expect(result.sql).toContain("EXISTS (");
-      expect(result.sql).toContain("es.EvaluatorId IN ({f0_values:Array(String)})");
+      expect(result.sql).toContain(
+        "es.EvaluatorId IN ({f0_values:Array(String)})",
+      );
       expect(result.sql).toContain("es.Label IS NOT NULL");
       expect(result.sql).toContain("es.Label != ''");
       expect(result.sql).toContain("es.Label NOT IN ('succeeded', 'failed')");
@@ -239,7 +280,8 @@ describe("clickHouseFilterConditions", () => {
     });
 
     it("uses assumeNotNull for Nullable TraceId correlation (#3000)", () => {
-      const builder = clickHouseFilterConditions["evaluations.evaluator_id.has_label"];
+      const builder =
+        clickHouseFilterConditions["evaluations.evaluator_id.has_label"];
       const result = builder!(["eval-1"], "f0");
       expect(result.sql).toContain("es.TraceId IS NOT NULL");
       expect(result.sql).toContain("assumeNotNull(es.TraceId) = ts.TraceId");
@@ -249,7 +291,8 @@ describe("clickHouseFilterConditions", () => {
 
   describe("evaluations.evaluator_id.guardrails_only", () => {
     it("uses assumeNotNull for Nullable TraceId correlation (#3000)", () => {
-      const builder = clickHouseFilterConditions["evaluations.evaluator_id.guardrails_only"];
+      const builder =
+        clickHouseFilterConditions["evaluations.evaluator_id.guardrails_only"];
       const result = builder!(["eval-1"], "f0");
       expect(result.sql).toContain("es.TraceId IS NOT NULL");
       expect(result.sql).toContain("assumeNotNull(es.TraceId) = ts.TraceId");
@@ -445,7 +488,10 @@ describe("generateClickHouseFilterConditions", () => {
 
       expect(result.conditions.length).toBe(1);
       expect(result.params).toHaveProperty("f0_key", "purchase");
-      expect(result.params).toHaveProperty("f0_attrkey", "event.metrics.amount");
+      expect(result.params).toHaveProperty(
+        "f0_attrkey",
+        "event.metrics.amount",
+      );
       expect(result.params).toHaveProperty("f0_min");
       expect(result.params).toHaveProperty("f0_max");
     });
@@ -482,6 +528,68 @@ describe("generateClickHouseFilterConditions", () => {
       expect(result.conditions.length).toBe(1);
       // Single condition should not have extra OR wrapping
       expect(result.conditions[0]).not.toContain(" OR ");
+    });
+  });
+
+  describe("stored_spans partition pruning via time window", () => {
+    const DAY = 24 * 60 * 60 * 1000;
+
+    it("bounds the span EXISTS subquery to the buffered window", () => {
+      const filters: Partial<Record<FilterField, FilterParam>> = {
+        "spans.type": ["llm"],
+      };
+      const startDate = 10 * DAY;
+      const endDate = 20 * DAY;
+      const result = generateClickHouseFilterConditions(filters, {
+        startDate,
+        endDate,
+      });
+
+      expect(result.conditions[0]).toContain("sp.StartTime >=");
+      expect(result.conditions[0]).toContain("sp.StartTime <=");
+      // +/- 2 day buffer around the dashboard window.
+      expect(result.params).toHaveProperty(
+        "spanWindowStart",
+        startDate - 2 * DAY,
+      );
+      expect(result.params).toHaveProperty("spanWindowEnd", endDate + 2 * DAY);
+    });
+
+    it("clamps the lower bound at zero", () => {
+      const result = generateClickHouseFilterConditions(
+        { "spans.type": ["llm"] },
+        { startDate: 0, endDate: 5 * DAY },
+      );
+      expect(result.params).toHaveProperty("spanWindowStart", 0);
+    });
+
+    it("also bounds event.* filters that probe stored_spans", () => {
+      const result = generateClickHouseFilterConditions(
+        { "events.event_type": ["thumbs_up"] },
+        { startDate: 10 * DAY, endDate: 20 * DAY },
+      );
+      expect(result.conditions[0]).toContain("stored_spans sp");
+      expect(result.conditions[0]).toContain("sp.StartTime >=");
+    });
+
+    it("leaves queries unbounded when no window is passed (backwards compat)", () => {
+      const result = generateClickHouseFilterConditions({
+        "spans.type": ["llm"],
+      });
+      expect(result.conditions[0]).not.toContain("sp.StartTime");
+      expect(result.params).not.toHaveProperty("spanWindowStart");
+    });
+
+    it("does not inject StartTime SQL when the filter set has no span probe", () => {
+      const result = generateClickHouseFilterConditions(
+        { "topics.topics": ["t1"] },
+        { startDate: 10 * DAY, endDate: 20 * DAY },
+      );
+      // The span-window params are still emitted when a window is passed (they
+      // are harmless and unreferenced here), but no filter probes stored_spans,
+      // so no StartTime predicate is injected.
+      expect(result.conditions[0]).not.toContain("sp.StartTime");
+      expect(result.params).toHaveProperty("spanWindowStart");
     });
   });
 });
