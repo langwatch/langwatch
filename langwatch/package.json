@@ -114,7 +114,7 @@
     "@opentelemetry/sdk-trace-web": "2.7.1",
     "@opentelemetry/semantic-conventions": "^1.40.0",
     "@paper-design/shaders-react": "^0.0.76",
-    "@prisma/client": "5.7.1",
+    "@prisma/client": "7.8.0",
     "@react-email/button": "^0.2.1",
     "@react-email/components": "^0.0.42",
     "@react-email/container": "^0.0.16",
