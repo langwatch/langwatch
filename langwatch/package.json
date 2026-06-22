@@ -305,7 +305,7 @@
     "simple-statistics": "^7.8.9",
     "string-replace-loader": "^3.3.0",
     "testcontainers": "^11.14.0",
-    "turbo": "^2.9.14",
+    "turbo": "^2.9.18",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
     "vitest": "^4.1.4",
