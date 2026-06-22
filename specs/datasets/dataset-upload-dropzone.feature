@@ -44,13 +44,13 @@ Feature: Dataset upload dropzone states
     And the row explains the file is too large
     And the upload is not started
 
-  @integration
+  @unit
   Scenario: An uploading file shows progress and can be cancelled
-    When I upload a CSV
+    When the file is uploading
     Then its row shows it is uploading
     And the row offers to cancel
 
-  @integration
+  @unit
   Scenario: A finished upload shows a ready row without leaving the drawer
     When my uploaded dataset finishes preparing
     Then its row shows it is ready

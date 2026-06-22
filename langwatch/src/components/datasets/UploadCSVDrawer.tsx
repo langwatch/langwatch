@@ -11,7 +11,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
-import { useEffect, useRef, useState } from "react";
 import {
   CheckCircle,
   CloudUpload,
@@ -20,6 +19,7 @@ import {
   X,
   XCircle,
 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import {
   formatFileSize,
   jsonToCSV as papaparseJsonToCSV,
@@ -33,7 +33,6 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { createLogger } from "~/utils/logger";
-import { Drawer } from "../ui/drawer";
 import type {
   DatasetColumns,
   DatasetRecordEntry,
@@ -43,6 +42,7 @@ import {
   type AddDatasetDrawerProps,
   AddOrEditDatasetDrawer,
 } from "../AddOrEditDatasetDrawer";
+import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import {
   abortPendingUpload,
@@ -144,9 +144,7 @@ export function UploadCSVDrawer({
                   const datasetId = processingDatasetId;
                   handleClose();
                   if (project) {
-                    void router.push(
-                      `/${project.slug}/datasets/${datasetId}`,
-                    );
+                    void router.push(`/${project.slug}/datasets/${datasetId}`);
                   }
                 }}
               />
@@ -180,6 +178,15 @@ export function UploadCSVDrawer({
   );
 }
 
+/** True once a dataset has at least one column — the signal that normalize has
+ *  actually run (distinguishes a real "ready" from the schema-default one). */
+function datasetHasColumns(dataset: { columnTypes?: unknown }): boolean {
+  const cols = dataset.columnTypes;
+  return (
+    !!cols && typeof cols === "object" && Object.keys(cols as object).length > 0
+  );
+}
+
 /**
  * In-drawer view for the async tail of a direct upload (ADR-032 D4): after the
  * raw file is finalized, the dataset normalizes server-side. This polls its
@@ -188,7 +195,7 @@ export function UploadCSVDrawer({
  * the drawer. On ready it notifies the host (to refresh the list); navigating
  * to the dataset is an explicit user action, never automatic.
  */
-function DatasetUploadProcessing({
+export function DatasetUploadProcessing({
   projectId,
   datasetId,
   onReady,
@@ -208,31 +215,35 @@ function DatasetUploadProcessing({
     { projectId, datasetId },
     {
       enabled: !!projectId && !!datasetId,
-      // Poll only while preparing; the functional form lets the query stop
-      // itself once the status settles (same contract as the dataset page).
-      refetchInterval: (data) =>
-        data?.status === "processing" || data?.status === "uploading"
-          ? 3000
-          : false,
+      // Poll while preparing. `Dataset.status` schema-defaults to "ready", so a
+      // row whose normalize hasn't run can momentarily read "ready" with no
+      // columns — keep polling in that case too, and stop only once it has
+      // columns, failed, or the row is gone (findFirst → null).
+      refetchInterval: (data) => {
+        if (!data) return false;
+        if (data.status === "processing" || data.status === "uploading") {
+          return 3000;
+        }
+        if (data.status === "ready" && !datasetHasColumns(data)) return 3000;
+        return false;
+      },
     },
   );
 
-  const status = datasetQuery.data?.status;
-  const isReady = status === "ready";
-  const isFailed = status === "failed";
-  // A freshly finalized direct upload always reports a real status
-  // (uploading → processing → ready), so anything that is not yet ready or
-  // failed — including the first in-flight fetch — is still "preparing".
-  const isProcessing = !isReady && !isFailed;
+  const data = datasetQuery.data;
+  // `getById` (findFirst, archivedAt: null) returns null for a missing/archived
+  // dataset — a terminal state, NOT "still preparing" (else the spinner hangs
+  // forever, since refetchInterval also stops on null).
+  const datasetGone = datasetQuery.isFetched && data == null;
+  const isFailed = data?.status === "failed";
+  // Trust "ready" only once normalize has populated columns, so the schema
+  // default can't be mistaken for a finished upload.
+  const isReady = data?.status === "ready" && datasetHasColumns(data);
+  const isProcessing = !datasetGone && !isFailed && !isReady;
 
-  const readyDataset = datasetQuery.data;
   useEffect(() => {
-    if (isReady && readyDataset) {
-      onReady({
-        id: readyDataset.id,
-        name: readyDataset.name,
-        columnTypes: readyDataset.columnTypes,
-      });
+    if (isReady && data) {
+      onReady({ id: data.id, name: data.name, columnTypes: data.columnTypes });
     }
     // Fire once on the transition to ready; onReady just refreshes the list.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -258,18 +269,15 @@ function DatasetUploadProcessing({
     }
   };
 
-  const rowStatus: DatasetFileStatus = isFailed
-    ? "error"
-    : isReady
-      ? "ready"
-      : "uploading";
+  const rowStatus: DatasetFileStatus =
+    isFailed || datasetGone ? "error" : isReady ? "ready" : "uploading";
 
   // Same row treatment as the dropzone, so the upload → prepare → ready flow
   // reads as one continuous file row rather than swapping to a banner.
   return (
     <VStack width="full" align="stretch" gap={4}>
       <DatasetFileRow
-        name={datasetQuery.data?.name ?? "Your dataset"}
+        name={data?.name ?? "Your dataset"}
         status={rowStatus}
         metaLabel={
           isReady
@@ -279,10 +287,12 @@ function DatasetUploadProcessing({
               : undefined
         }
         message={
-          isFailed
-            ? (datasetQuery.data?.statusError ??
-              "Something went wrong while processing your file. You can retry.")
-            : undefined
+          datasetGone
+            ? "This dataset is no longer available."
+            : isFailed
+              ? (data?.statusError ??
+                "Something went wrong while processing your file. You can retry.")
+              : undefined
         }
         action={
           isFailed ? (
@@ -454,10 +464,13 @@ export function UploadCSVForm({
       pendingDatasetId = datasetId;
       pendingDatasetIdRef.current = datasetId;
       await putFileToPresignedUrl(uploadUrl, rawFile, controller.signal);
-      await finalizeDirectUpload({ projectId, datasetId });
-
+      // The PUT succeeded — we're now committed to finalizing, so a cancel must
+      // NOT reap the row. Clear the abort/reap handles BEFORE finalize (not
+      // after) to close the cancel-after-finalize double-reap race.
       abortControllerRef.current = null;
       pendingDatasetIdRef.current = null;
+      await finalizeDirectUpload({ projectId, datasetId });
+
       if (onDirectUploadComplete) {
         // Hand off to the drawer host, which polls status and shows the
         // processing → ready/failed flow in place (no navigation).
@@ -512,6 +525,9 @@ export function UploadCSVForm({
       // A same-origin local-FS failure (e.g. StorageNotWritable) is a real,
       // actionable server error — surface it verbatim, no fallback parse.
       logger.error({ error }, "Direct dataset upload failed");
+      // System error → top alert; clear any file-level error so the two never
+      // render the shared `upload-error` testid at once.
+      setSizeError(null);
       setUploadError(
         error instanceof Error
           ? error.message
@@ -553,6 +569,8 @@ export function UploadCSVForm({
    */
   const runFallbackParseAndDrawer = async (file: File) => {
     if (file.size > MAX_FILE_SIZE_BYTES) {
+      // File-level error → inline row; clear any system error for exclusivity.
+      setUploadError(null);
       setSizeError(
         "This file is too large to upload on this deployment. Large uploads require object storage.",
       );
@@ -567,6 +585,7 @@ export function UploadCSVForm({
       uploadCSVData();
     } catch (error) {
       logger.error({ error }, "Fallback parse of dataset file failed");
+      setSizeError(null);
       setUploadError(
         error instanceof Error
           ? error.message
@@ -611,7 +630,9 @@ export function UploadCSVForm({
         // Direct path: capture only the raw File (no parse). Fallback/picker
         // path: parse immediately for synchronous columns/records.
         parse={!enableDirectUpload}
-        uploadStatus={isUploading && enableDirectUpload ? "uploading" : undefined}
+        uploadStatus={
+          isUploading && enableDirectUpload ? "uploading" : undefined
+        }
         fileError={fileError}
         onCancel={handleCancelUpload}
         onUploadAccepted={handleUploadAccepted}
@@ -1274,6 +1295,8 @@ function RawFileDropzone({
             {...dropzoneSurfaceProps(zoneHover)}
             style={DROPZONE_DOTTED_STYLE}
             display="block"
+            // Observable drag-active state (the highlight itself is CSS-only).
+            data-active={zoneHover ? "true" : "false"}
             onDragOver={(event) => {
               event.preventDefault();
               setZoneHover(true);
