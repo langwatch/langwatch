@@ -246,7 +246,7 @@
     "tsx": "^4.21.0",
     "undici": "^7.25.0",
     "use-debounce": "^10.1.1",
-    "usehooks-ts": "^2.16.0",
+    "usehooks-ts": "^3.1.1",
     "ws": "^8.20.1",
     "zod": "^3.25.76",
     "zod-openapi": "^4.2.4",
