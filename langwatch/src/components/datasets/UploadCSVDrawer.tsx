@@ -1,9 +1,11 @@
 import {
+  Alert,
   Box,
   Button,
   Heading,
   HStack,
   Spacer,
+  Spinner,
   Text,
   useDisclosure,
   VStack,
@@ -40,6 +42,7 @@ import {
   PresignedUploadFailedError,
   putFileToPresignedUrl,
   requestDirectUpload,
+  retryDatasetNormalize,
 } from "./services/directUpload";
 import { getSafeColumnName } from "./utils/reservedColumns";
 export const MAX_ROWS_LIMIT = 10_000;
@@ -66,6 +69,8 @@ export function UploadCSVDrawer({
   enableDirectUpload?: boolean;
 }) {
   const { closeDrawer } = useDrawer();
+  const { project } = useOrganizationTeamProject();
+  const router = useRouter();
   const onClose = onClose_ ?? closeDrawer;
   const isOpen = isOpen_ ?? true;
 
@@ -74,16 +79,29 @@ export function UploadCSVDrawer({
   const [uploadedDataset, setUploadedDataset] = useState<
     InMemoryDataset | undefined
   >(undefined);
+  // Direct-upload (ADR-032 D4) processing stays IN this drawer: once the raw
+  // file is streamed + finalized, the dataset normalizes server-side. We hold
+  // its id and poll its status here instead of navigating to the dataset page,
+  // so the whole async flow is observable without leaving the drawer.
+  const [processingDatasetId, setProcessingDatasetId] = useState<string | null>(
+    null,
+  );
 
   const uploadCSVData = () => {
     setLocalIsOpen(false);
     addDatasetDrawer.onOpen();
   };
 
+  const handleClose = () => {
+    setProcessingDatasetId(null);
+    onClose();
+  };
+
   useEffect(() => {
     setLocalIsOpen(isOpen);
     if (!isOpen) {
       setUploadedDataset(undefined);
+      setProcessingDatasetId(null);
       addDatasetDrawer.onClose();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -93,7 +111,7 @@ export function UploadCSVDrawer({
     <>
       <Drawer.Root
         open={localIsOpen}
-        onOpenChange={({ open }) => !open && onClose()}
+        onOpenChange={({ open }) => !open && handleClose()}
         size="xl"
       >
         <Drawer.Content bg="bg">
@@ -102,14 +120,38 @@ export function UploadCSVDrawer({
             <Heading>Upload CSV</Heading>
           </Drawer.Header>
           <Drawer.Body>
-            <UploadCSVForm
-              setUploadedDataset={setUploadedDataset}
-              uploadedDataset={uploadedDataset}
-              uploadCSVData={uploadCSVData}
-              onCreateFromScratch={onCreateFromScratch}
-              enableDirectUpload={enableDirectUpload}
-              onClose={onClose}
-            />
+            {processingDatasetId && project ? (
+              <DatasetUploadProcessing
+                projectId={project.id}
+                datasetId={processingDatasetId}
+                onReady={(dataset) => {
+                  onSuccess({
+                    datasetId: dataset.id,
+                    name: dataset.name,
+                    columnTypes: (dataset.columnTypes ?? {}) as DatasetColumns,
+                  });
+                }}
+                onViewDataset={() => {
+                  const datasetId = processingDatasetId;
+                  handleClose();
+                  if (project) {
+                    void router.push(
+                      `/${project.slug}/datasets/${datasetId}`,
+                    );
+                  }
+                }}
+              />
+            ) : (
+              <UploadCSVForm
+                setUploadedDataset={setUploadedDataset}
+                uploadedDataset={uploadedDataset}
+                uploadCSVData={uploadCSVData}
+                onCreateFromScratch={onCreateFromScratch}
+                enableDirectUpload={enableDirectUpload}
+                onClose={onClose}
+                onDirectUploadComplete={setProcessingDatasetId}
+              />
+            )}
           </Drawer.Body>
         </Drawer.Content>
       </Drawer.Root>
@@ -126,6 +168,139 @@ export function UploadCSVDrawer({
         }}
       />
     </>
+  );
+}
+
+/**
+ * In-drawer view for the async tail of a direct upload (ADR-032 D4): after the
+ * raw file is finalized, the dataset normalizes server-side. This polls its
+ * status (mirroring the dataset page's processing banner, so the UX is
+ * identical) and surfaces processing / ready / failed states without leaving
+ * the drawer. On ready it notifies the host (to refresh the list); navigating
+ * to the dataset is an explicit user action, never automatic.
+ */
+function DatasetUploadProcessing({
+  projectId,
+  datasetId,
+  onReady,
+  onViewDataset,
+}: {
+  projectId: string;
+  datasetId: string;
+  onReady: (dataset: {
+    id: string;
+    name: string;
+    columnTypes: unknown;
+  }) => void;
+  onViewDataset: () => void;
+}) {
+  const [isRetrying, setIsRetrying] = useState(false);
+  const datasetQuery = api.dataset.getById.useQuery(
+    { projectId, datasetId },
+    {
+      enabled: !!projectId && !!datasetId,
+      // Poll only while preparing; the functional form lets the query stop
+      // itself once the status settles (same contract as the dataset page).
+      refetchInterval: (data) =>
+        data?.status === "processing" || data?.status === "uploading"
+          ? 3000
+          : false,
+    },
+  );
+
+  const status = datasetQuery.data?.status;
+  const isReady = status === "ready";
+  const isFailed = status === "failed";
+  // A freshly finalized direct upload always reports a real status
+  // (uploading → processing → ready), so anything that is not yet ready or
+  // failed — including the first in-flight fetch — is still "preparing".
+  const isProcessing = !isReady && !isFailed;
+
+  const readyDataset = datasetQuery.data;
+  useEffect(() => {
+    if (isReady && readyDataset) {
+      onReady({
+        id: readyDataset.id,
+        name: readyDataset.name,
+        columnTypes: readyDataset.columnTypes,
+      });
+    }
+    // Fire once on the transition to ready; onReady just refreshes the list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isReady]);
+
+  const handleRetry = async () => {
+    setIsRetrying(true);
+    try {
+      await retryDatasetNormalize({ projectId, datasetId });
+      await datasetQuery.refetch();
+    } catch (error) {
+      toaster.create({
+        title: "Could not retry",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Please try again in a moment.",
+        type: "error",
+        meta: { closable: true },
+      });
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
+  return (
+    <VStack width="full" align="stretch" gap={4}>
+      {isFailed && (
+        <Alert.Root status="error">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>We could not prepare your dataset</Alert.Title>
+            <Alert.Description>
+              {datasetQuery.data?.statusError ??
+                "Something went wrong while processing your file. You can retry."}
+            </Alert.Description>
+          </Alert.Content>
+          <Button
+            size="sm"
+            colorPalette="red"
+            variant="outline"
+            loading={isRetrying}
+            onClick={() => void handleRetry()}
+          >
+            Retry
+          </Button>
+        </Alert.Root>
+      )}
+      {isProcessing && (
+        <Alert.Root status="info">
+          <Alert.Indicator>
+            <Spinner size="sm" />
+          </Alert.Indicator>
+          <Alert.Content>
+            <Alert.Title>
+              Preparing your dataset, this can take a few minutes
+            </Alert.Title>
+          </Alert.Content>
+        </Alert.Root>
+      )}
+      {isReady && (
+        <Alert.Root status="success">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>Your dataset is ready</Alert.Title>
+          </Alert.Content>
+        </Alert.Root>
+      )}
+      <HStack width="full">
+        <Spacer />
+        {isReady && (
+          <Button colorPalette="blue" onClick={onViewDataset}>
+            View dataset
+          </Button>
+        )}
+      </HStack>
+    </VStack>
   );
 }
 
@@ -169,16 +344,22 @@ export function UploadCSVForm({
   disabled,
   enableDirectUpload = false,
   onClose,
+  onDirectUploadComplete,
 }: {
   setUploadedDataset: (dataset: InMemoryDataset | undefined) => void;
   uploadedDataset: InMemoryDataset | undefined;
   onCreateFromScratch?: () => void;
   uploadCSVData: () => void;
   disabled?: boolean;
-  /** When true, "Upload" streams the raw file to storage and navigates to the
-   *  dataset page; falls back to the parse-and-drawer flow if storage is off. */
+  /** When true, "Upload" streams the raw file to storage; the host then shows
+   *  processing in the drawer. Falls back to the parse-and-drawer flow if
+   *  storage is off. */
   enableDirectUpload?: boolean;
   onClose?: () => void;
+  /** Called with the new dataset id once a direct upload is finalized, so the
+   *  host (UploadCSVDrawer) takes over and shows processing IN the drawer.
+   *  When omitted, the direct path navigates to the dataset page instead. */
+  onDirectUploadComplete?: (datasetId: string) => void;
 }) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
@@ -260,13 +441,20 @@ export function UploadCSVForm({
       await putFileToPresignedUrl(uploadUrl, rawFile);
       await finalizeDirectUpload({ projectId, datasetId });
 
-      toaster.create({
-        title: "Preparing your dataset",
-        type: "success",
-        meta: { closable: true },
-      });
-      onClose?.();
-      void router.push(`/${project.slug}/datasets/${datasetId}`);
+      if (onDirectUploadComplete) {
+        // Hand off to the drawer host, which polls status and shows the
+        // processing → ready/failed flow in place (no navigation).
+        setIsUploading(false);
+        onDirectUploadComplete(datasetId);
+      } else {
+        toaster.create({
+          title: "Preparing your dataset",
+          type: "success",
+          meta: { closable: true },
+        });
+        onClose?.();
+        void router.push(`/${project.slug}/datasets/${datasetId}`);
+      }
     } catch (error) {
       // Any failure AFTER requestDirectUpload minted the `uploading` row leaves
       // it behind and locks the slug — whether we fall back (a fresh dataset is
@@ -361,6 +549,17 @@ export function UploadCSVForm({
 
   return (
     <VStack width="full" align="start" gap={4}>
+      {(uploadError || overRowLimitForFallback) && (
+        <Alert.Root status="error" width="full">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Description data-testid="upload-error">
+              {uploadError ??
+                `Sorry, the max number of rows accepted for datasets is currently ${MAX_ROWS_LIMIT} rows. Please reduce the number of rows or contact support.`}
+            </Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
+      )}
       <CSVReaderComponent
         // Direct path: capture only the raw File (no parse). Fallback/picker
         // path: parse immediately for synchronous columns/records.
@@ -377,19 +576,6 @@ export function UploadCSVForm({
         }}
       />
       <HStack width="full" align="end">
-        {overRowLimitForFallback && (
-          <Text color="red.500" paddingTop={4}>
-            Sorry, the max number of rows accepted for datasets is currently{" "}
-            {MAX_ROWS_LIMIT} rows. Please reduce the number of rows or contact
-            support.
-          </Text>
-        )}
-        {uploadError && (
-          <Text color="red.500" paddingTop={4} data-testid="upload-error">
-            {uploadError}
-          </Text>
-        )}
-
         {onCreateFromScratch && (
           <Button
             variant="plain"
