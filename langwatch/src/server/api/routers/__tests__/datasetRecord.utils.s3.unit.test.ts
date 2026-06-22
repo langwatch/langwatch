@@ -417,34 +417,111 @@ describe("getFullDataset()", () => {
 
 describe("readDatasetHeadS3Jsonl()", () => {
   describe("when the dataset is ready", () => {
-    it("reads only the first chunk, returns up to 5 adapted rows, and the PG row count", async () => {
-      const readChunks = vi.fn().mockResolvedValue([
-        { id: "r1", entry: { a: 1 } },
-        { id: "r2", entry: { a: 2 } },
-      ]);
-      getDatasetStorage.mockResolvedValue({ readChunks });
+    it("reads the first non-empty chunk and returns up to 5 adapted rows with the PG count", async () => {
+      const { readChunks, readChunk } = mockReadChunk({
+        0: [
+          { id: "r1", entry: { a: 1 } },
+          { id: "r2", entry: { a: 2 } },
+        ],
+      });
 
       const result = await readDatasetHeadS3Jsonl({
-        dataset: { ...baseDataset, rowCount: 42, chunkCount: 3 } as never,
+        dataset: {
+          ...baseDataset,
+          rowCount: 2,
+          chunkCount: 1,
+          chunkOffsets: [{ index: 0, startRow: 0, endRow: 2, byteSize: 10 }],
+        } as never,
         projectId: "p1",
       });
 
-      // Head reads at most one chunk.
-      expect(readChunks).toHaveBeenCalledWith({
+      // Reads the single non-empty chunk; never the whole-dataset readChunks.
+      expect(readChunk).toHaveBeenCalledTimes(1);
+      expect(readChunk).toHaveBeenCalledWith({
         projectId: "p1",
         datasetId: "dataset_1",
-        chunkCount: 1,
+        index: 0,
       });
-      expect(result.total).toBe(42); // PG-authoritative rowCount
+      expect(readChunks).not.toHaveBeenCalled();
+      expect(result.total).toBe(2); // PG-authoritative rowCount
       expect(result.records.map((r) => r.id)).toEqual(["r1", "r2"]);
       expect(result.records[0]?.entry).toEqual({ a: 1 });
     });
   });
 
+  describe("when a delete emptied the leading chunk but later chunks still have rows", () => {
+    it("skips the empty chunk via the offset index and previews the first non-empty chunk", async () => {
+      // chunk 0 emptied in place by a delete (compaction is trailing-only, so a
+      // leading empty chunk stays); the surviving rows now live in chunk 1.
+      const { readChunk } = mockReadChunk({
+        0: [],
+        1: [
+          { id: "r3", entry: { a: 3 } },
+          { id: "r4", entry: { a: 4 } },
+        ],
+      });
+
+      const result = await readDatasetHeadS3Jsonl({
+        dataset: {
+          ...baseDataset,
+          rowCount: 2,
+          chunkCount: 2,
+          chunkOffsets: [
+            { index: 0, startRow: 0, endRow: 0, byteSize: 0 },
+            { index: 1, startRow: 0, endRow: 2, byteSize: 50 },
+          ],
+        } as never,
+        projectId: "p1",
+      });
+
+      // The empty leading chunk is skipped WITHOUT a read; only chunk 1 read.
+      expect(readChunk).toHaveBeenCalledTimes(1);
+      expect(readChunk).toHaveBeenCalledWith({
+        projectId: "p1",
+        datasetId: "dataset_1",
+        index: 1,
+      });
+      // The bug: an empty preview against a positive total. Now non-empty.
+      expect(result.records.map((r) => r.id)).toEqual(["r3", "r4"]);
+      expect(result.total).toBe(2);
+    });
+  });
+
+  describe("when the offset index is missing (legacy rows)", () => {
+    it("scans chunks in order, skipping empties, until the preview is filled", async () => {
+      const { readChunk } = mockReadChunk({
+        0: [],
+        1: [{ id: "r5", entry: { a: 5 } }],
+      });
+
+      const result = await readDatasetHeadS3Jsonl({
+        dataset: {
+          ...baseDataset,
+          rowCount: 1,
+          chunkCount: 2,
+          chunkOffsets: null,
+        } as never,
+        projectId: "p1",
+      });
+
+      expect(readChunk).toHaveBeenNthCalledWith(1, {
+        projectId: "p1",
+        datasetId: "dataset_1",
+        index: 0,
+      });
+      expect(readChunk).toHaveBeenNthCalledWith(2, {
+        projectId: "p1",
+        datasetId: "dataset_1",
+        index: 1,
+      });
+      expect(result.records.map((r) => r.id)).toEqual(["r5"]);
+      expect(result.total).toBe(1);
+    });
+  });
+
   describe("when the dataset is not ready", () => {
     it("throws DatasetNotReadyError without reading chunks", async () => {
-      const readChunks = vi.fn();
-      getDatasetStorage.mockResolvedValue({ readChunks });
+      const { readChunk } = mockReadChunk({});
 
       await expect(
         readDatasetHeadS3Jsonl({
@@ -455,7 +532,7 @@ describe("readDatasetHeadS3Jsonl()", () => {
         name: "DatasetNotReadyError",
         status: "failed",
       });
-      expect(readChunks).not.toHaveBeenCalled();
+      expect(readChunk).not.toHaveBeenCalled();
     });
   });
 });

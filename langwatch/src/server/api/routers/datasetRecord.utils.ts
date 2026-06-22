@@ -330,10 +330,17 @@ const selectS3JsonlRecordViaOffsets = async ({
 
 /**
  * Read the head (first up-to-5 rows) of an s3_jsonl dataset for the preview,
- * gated on `status='ready'` (ADR-032 Decision 6 / I-READY). Reads only the
- * first chunk — never the whole dataset — and reports the PG-authoritative
+ * gated on `status='ready'` (ADR-032 Decision 6 / I-READY). Reads the first
+ * NON-EMPTY chunk(s) — never the whole dataset — and reports the PG-authoritative
  * count. Extracted from the `getHead` tRPC procedure so the s3_jsonl read path
  * is unit-testable at its boundaries (prisma already resolved the row).
+ *
+ * Reads the first non-empty chunk(s), not literally chunk 0: a delete that
+ * empties all of chunk 0 while later chunks keep rows leaves chunk 0 empty in
+ * place (compaction is trailing-only, ADR-032 D3 / `deleteS3JsonlRecords`), so
+ * reading only chunk 0 would render an empty preview against a positive total.
+ * The `chunkOffsets` index marks each chunk's row range (`endRow > startRow` ⇒
+ * non-empty), so empty leading/middle chunks are skipped without being read.
  *
  * @throws {DatasetNotReadyError} if the dataset is not `ready`.
  */
@@ -352,16 +359,51 @@ export const readDatasetHeadS3Jsonl = async ({
   }
 
   const storage = await getDatasetStorage(projectId);
-  // Read just the first chunk for the preview — never the whole dataset.
-  const rows = await storage.readChunks({
-    projectId,
-    datasetId: dataset.id,
-    chunkCount: Math.min(1, dataset.chunkCount ?? 0),
-  });
+  const HEAD_LIMIT = 5;
+  const chunkCount = dataset.chunkCount ?? 0;
+  const offsets = readOffsets(dataset);
+
+  const records: DatasetRecord[] = [];
+  const pushRows = (rows: unknown[]): void => {
+    for (const line of rows) {
+      if (records.length >= HEAD_LIMIT) return;
+      records.push(adaptS3JsonlRecord(line, dataset));
+    }
+  };
+
+  if (offsets.length > 0) {
+    // Offset index present: read only the chunks it marks non-empty, in order,
+    // until the preview is full — empty leading/middle chunks are skipped
+    // without a read.
+    for (const offset of offsets) {
+      if (records.length >= HEAD_LIMIT) break;
+      if (offset.endRow <= offset.startRow) continue;
+      pushRows(
+        await storage.readChunk({
+          projectId,
+          datasetId: dataset.id,
+          index: offset.index,
+        }),
+      );
+    }
+  } else {
+    // Legacy/never-written offsets: scan chunks in order, skipping empties,
+    // until the preview is full. Still bounded — stops at the first chunk(s)
+    // that fill it, never reads the whole dataset.
+    for (
+      let index = 0;
+      index < chunkCount && records.length < HEAD_LIMIT;
+      index++
+    ) {
+      pushRows(
+        await storage.readChunk({ projectId, datasetId: dataset.id, index }),
+      );
+    }
+  }
 
   return {
-    records: rows.slice(0, 5).map((line) => adaptS3JsonlRecord(line, dataset)),
-    total: dataset.rowCount ?? rows.length,
+    records,
+    total: dataset.rowCount ?? records.length,
   };
 };
 
