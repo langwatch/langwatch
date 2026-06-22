@@ -8,7 +8,13 @@
  * hooks). Binds specs/datasets/dataset-upload-dropzone.feature.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -20,6 +26,10 @@ const getByIdResult: {
   isFetched: boolean;
 } = { data: undefined, isFetched: false };
 const retryDatasetNormalize = vi.fn();
+const requestDirectUpload = vi.fn();
+const putFileToPresignedUrl = vi.fn();
+const finalizeDirectUpload = vi.fn();
+const abortPendingUpload = vi.fn();
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -47,6 +57,11 @@ vi.mock("../services/directUpload", async (importActual) => {
     ...actual,
     retryDatasetNormalize: (...args: unknown[]) =>
       retryDatasetNormalize(...args),
+    requestDirectUpload: (...args: unknown[]) => requestDirectUpload(...args),
+    putFileToPresignedUrl: (...args: unknown[]) =>
+      putFileToPresignedUrl(...args),
+    finalizeDirectUpload: (...args: unknown[]) => finalizeDirectUpload(...args),
+    abortPendingUpload: (...args: unknown[]) => abortPendingUpload(...args),
   };
 });
 
@@ -71,7 +86,12 @@ vi.mock("../ui/toaster", () => ({
 import {
   CSVReaderComponent,
   DatasetUploadProcessing,
+  UploadCSVForm,
 } from "../UploadCSVDrawer";
+
+/** Error shaped like an aborted fetch. */
+const abortError = () =>
+  Object.assign(new Error("aborted"), { name: "AbortError" });
 
 const wrap = (ui: React.ReactElement) =>
   render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
@@ -360,6 +380,78 @@ describe("DatasetUploadProcessing", () => {
         screen.queryByText(/preparing your dataset/i),
       ).not.toBeInTheDocument();
       expect(onReady).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("UploadCSVForm cancel", () => {
+  describe("when cancel lands before requestDirectUpload resolves", () => {
+    it("reaps the just-minted dataset row instead of stranding it", async () => {
+      const user = userEvent.setup();
+      // requestDirectUpload is held open so we can cancel mid-flight, then
+      // resolve it AFTER the cancel — the server has minted the row by then.
+      let resolveRequest!: (value: {
+        datasetId: string;
+        uploadUrl: string;
+        slug: string;
+        stagingKey: string;
+      }) => void;
+      requestDirectUpload.mockReturnValue(
+        new Promise((resolve) => {
+          resolveRequest = resolve;
+        }),
+      );
+      // The PUT fails immediately because the cancel already aborted the signal.
+      putFileToPresignedUrl.mockImplementation(
+        (_url: string, _file: File, signal?: AbortSignal) => {
+          if (signal?.aborted) return Promise.reject(abortError());
+          return Promise.resolve();
+        },
+      );
+      abortPendingUpload.mockResolvedValue(undefined);
+
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <UploadCSVForm
+            setUploadedDataset={vi.fn()}
+            uploadedDataset={undefined}
+            uploadCSVData={vi.fn()}
+            enableDirectUpload={true}
+            onDirectUploadComplete={vi.fn()}
+          />
+        </ChakraProvider>,
+      );
+
+      await user.upload(
+        fileInput(),
+        new File(["x"], "racey.csv", { type: "text/csv" }),
+      );
+      await user.click(screen.getByRole("button", { name: /^upload$/i }));
+
+      // Mid-flight: the cancel control is shown; click it before the presign
+      // resolves (so handleCancelUpload sees no id yet → reaps nothing).
+      await user.click(
+        await screen.findByRole("button", { name: /cancel upload/i }),
+      );
+      expect(abortPendingUpload).not.toHaveBeenCalled();
+
+      // Now the presign resolves: the row exists, the aborted PUT throws, and
+      // the catch must reap the now-known id.
+      resolveRequest({
+        datasetId: "dataset_racey",
+        uploadUrl: "https://s3.example/put",
+        slug: "s",
+        stagingKey: "staging/proj/u",
+      });
+
+      await waitFor(() => {
+        expect(abortPendingUpload).toHaveBeenCalledWith({
+          projectId: "proj_1",
+          datasetId: "dataset_racey",
+        });
+      });
+      // Reaped exactly once.
+      expect(abortPendingUpload).toHaveBeenCalledTimes(1);
     });
   });
 });

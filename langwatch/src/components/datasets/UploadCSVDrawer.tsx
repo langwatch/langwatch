@@ -486,9 +486,27 @@ export function UploadCSVForm({
         void router.push(`/${project.slug}/datasets/${datasetId}`);
       }
     } catch (error) {
-      // A user-initiated cancel aborts the PUT: handleCancelUpload already reset
-      // state and reaped the pending row, so there is nothing more to do here.
+      // A user-initiated cancel aborts the PUT. handleCancelUpload reaped the
+      // pending row IF it knew the id at cancel time — but a cancel that landed
+      // while requestDirectUpload() was still in flight ran BEFORE the id
+      // existed, so the row (minted just after) is still pending. The ref holds
+      // that id exactly when it hasn't been reaped yet, so reap-and-clear here.
+      // (Cancel during the PUT already reaped and nulled the ref, so this is a
+      // no-op then — no double reap.)
       if (error instanceof Error && error.name === "AbortError") {
+        const strandedId = pendingDatasetIdRef.current;
+        pendingDatasetIdRef.current = null;
+        if (strandedId && projectId) {
+          void abortPendingUpload({
+            projectId,
+            datasetId: strandedId,
+          }).catch((cleanupError) => {
+            logger.error(
+              { error: cleanupError },
+              "Failed to clean up cancelled upload",
+            );
+          });
+        }
         return;
       }
       // Any failure AFTER requestDirectUpload minted the `uploading` row leaves
