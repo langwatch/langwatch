@@ -101,7 +101,9 @@ describe("CSVReaderComponent", () => {
       );
       onRawFile.mockClear();
 
-      await userEvent.click(screen.getByText("×"));
+      await userEvent.click(
+        screen.getByRole("button", { name: /remove file/i }),
+      );
 
       expect(onRawFile).toHaveBeenCalledWith(null);
       expect(onUploadRemoved).toHaveBeenCalledTimes(1);

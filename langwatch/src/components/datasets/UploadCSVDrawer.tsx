@@ -12,6 +12,13 @@ import {
 } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import {
+  CheckCircle,
+  CloudUpload,
+  FileText,
+  Trash2,
+  XCircle,
+} from "lucide-react";
+import {
   formatFileSize,
   jsonToCSV as papaparseJsonToCSV,
   readString as papaparseReadString,
@@ -249,57 +256,50 @@ function DatasetUploadProcessing({
     }
   };
 
+  const rowStatus: DatasetFileStatus = isFailed
+    ? "error"
+    : isReady
+      ? "ready"
+      : "uploading";
+
+  // Same row treatment as the dropzone, so the upload → prepare → ready flow
+  // reads as one continuous file row rather than swapping to a banner.
   return (
     <VStack width="full" align="stretch" gap={4}>
-      {isFailed && (
-        <Alert.Root status="error">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>We could not prepare your dataset</Alert.Title>
-            <Alert.Description>
-              {datasetQuery.data?.statusError ??
-                "Something went wrong while processing your file. You can retry."}
-            </Alert.Description>
-          </Alert.Content>
-          <Button
-            size="sm"
-            colorPalette="red"
-            variant="outline"
-            loading={isRetrying}
-            onClick={() => void handleRetry()}
-          >
-            Retry
-          </Button>
-        </Alert.Root>
-      )}
-      {isProcessing && (
-        <Alert.Root status="info">
-          <Alert.Indicator>
-            <Spinner size="sm" />
-          </Alert.Indicator>
-          <Alert.Content>
-            <Alert.Title>
-              Preparing your dataset, this can take a few minutes
-            </Alert.Title>
-          </Alert.Content>
-        </Alert.Root>
-      )}
-      {isReady && (
-        <Alert.Root status="success">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>Your dataset is ready</Alert.Title>
-          </Alert.Content>
-        </Alert.Root>
-      )}
-      <HStack width="full">
-        <Spacer />
-        {isReady && (
-          <Button colorPalette="blue" onClick={onViewDataset}>
-            View dataset
-          </Button>
-        )}
-      </HStack>
+      <DatasetFileRow
+        name={datasetQuery.data?.name ?? "Your dataset"}
+        status={rowStatus}
+        metaLabel={
+          isReady
+            ? "Ready"
+            : isProcessing
+              ? "Preparing your dataset, this can take a few minutes"
+              : undefined
+        }
+        message={
+          isFailed
+            ? (datasetQuery.data?.statusError ??
+              "Something went wrong while processing your file. You can retry.")
+            : undefined
+        }
+        action={
+          isFailed ? (
+            <Button
+              size="sm"
+              colorPalette="red"
+              variant="outline"
+              loading={isRetrying}
+              onClick={() => void handleRetry()}
+            >
+              Retry
+            </Button>
+          ) : isReady ? (
+            <Button size="sm" colorPalette="blue" onClick={onViewDataset}>
+              View dataset
+            </Button>
+          ) : undefined
+        }
+      />
     </VStack>
   );
 }
@@ -372,7 +372,11 @@ export function UploadCSVForm({
   // used by the fallback (no-storage) flow.
   const [rawFile, setRawFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  // System/drawer-level failure (storage not writable, upload failed) → top
+  // alert. File-level validation (too large / over the row limit) → inline on
+  // the file's row (sizeError + overRowLimitForFallback below).
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [sizeError, setSizeError] = useState<string | null>(null);
 
   const getValidName = async (proposedName: string): Promise<string> => {
     if (!projectId) return proposedName;
@@ -511,7 +515,7 @@ export function UploadCSVForm({
    */
   const runFallbackParseAndDrawer = async (file: File) => {
     if (file.size > MAX_FILE_SIZE_BYTES) {
-      setUploadError(
+      setSizeError(
         "This file is too large to upload on this deployment. Large uploads require object storage.",
       );
       setIsUploading(false);
@@ -547,15 +551,20 @@ export function UploadCSVForm({
       uploadedDataset.datasetRecords.length > 0 &&
       !overRowLimitForFallback;
 
+  // File-level validation, shown inline on the file's row: too-large (fallback)
+  // or over the in-browser row limit.
+  const fileError = overRowLimitForFallback
+    ? `Sorry, the max number of rows accepted for datasets is currently ${MAX_ROWS_LIMIT} rows. Please reduce the number of rows or contact support.`
+    : (sizeError ?? undefined);
+
   return (
     <VStack width="full" align="start" gap={4}>
-      {(uploadError || overRowLimitForFallback) && (
+      {uploadError && (
         <Alert.Root status="error" width="full">
           <Alert.Indicator />
           <Alert.Content>
             <Alert.Description data-testid="upload-error">
-              {uploadError ??
-                `Sorry, the max number of rows accepted for datasets is currently ${MAX_ROWS_LIMIT} rows. Please reduce the number of rows or contact support.`}
+              {uploadError}
             </Alert.Description>
           </Alert.Content>
         </Alert.Root>
@@ -564,15 +573,19 @@ export function UploadCSVForm({
         // Direct path: capture only the raw File (no parse). Fallback/picker
         // path: parse immediately for synchronous columns/records.
         parse={!enableDirectUpload}
+        uploadStatus={isUploading && enableDirectUpload ? "uploading" : undefined}
+        fileError={fileError}
         onUploadAccepted={handleUploadAccepted}
         onRawFile={(file) => {
           setRawFile(file);
           setUploadError(null);
+          setSizeError(null);
         }}
         onUploadRemoved={() => {
           setUploadedDataset(undefined);
           setRawFile(null);
           setUploadError(null);
+          setSizeError(null);
         }}
       />
       <HStack width="full" align="end">
@@ -607,6 +620,8 @@ export function CSVReaderComponent({
   onUploadRemoved,
   onRawFile,
   parse = true,
+  uploadStatus,
+  fileError,
   children,
 }: {
   onUploadAccepted: (results: {
@@ -628,11 +643,20 @@ export function CSVReaderComponent({
    * rely on for synchronous columns/records.
    */
   parse?: boolean;
+  /** "uploading" while the no-parse raw file streams to storage. */
+  uploadStatus?: "uploading";
+  /** File-level validation/upload message; renders the file row in an error state. */
+  fileError?: string;
   children?: (hasAcceptedFile: boolean) => React.ReactNode;
 }) {
   if (!parse) {
     return (
-      <RawFileDropzone onRawFile={onRawFile} onUploadRemoved={onUploadRemoved}>
+      <RawFileDropzone
+        onRawFile={onRawFile}
+        onUploadRemoved={onUploadRemoved}
+        uploadStatus={uploadStatus}
+        fileError={fileError}
+      >
         {children}
       </RawFileDropzone>
     );
@@ -642,6 +666,7 @@ export function CSVReaderComponent({
     <ParsingCSVReader
       onUploadAccepted={onUploadAccepted}
       onUploadRemoved={onUploadRemoved}
+      fileError={fileError}
     >
       {children}
     </ParsingCSVReader>
@@ -658,6 +683,7 @@ export function CSVReaderComponent({
 function ParsingCSVReader({
   onUploadAccepted,
   onUploadRemoved,
+  fileError,
   children,
 }: {
   onUploadAccepted: (results: {
@@ -665,6 +691,7 @@ function ParsingCSVReader({
     acceptedFile: File;
   }) => void | Promise<void>;
   onUploadRemoved?: () => void;
+  fileError?: string;
   children?: (hasAcceptedFile: boolean) => React.ReactNode;
 }) {
   const { CSVReader } = useCSVReader();
@@ -729,7 +756,6 @@ function ParsingCSVReader({
         acceptedFile,
         ProgressBar,
         getRemoveFileProps,
-        Remove,
       }: {
         getRootProps: () => Record<string, unknown>;
         acceptedFile: File | null;
@@ -743,9 +769,9 @@ function ParsingCSVReader({
               acceptedFile={acceptedFile}
               setAcceptedFile={setAcceptedFile}
               zoneHover={zoneHover}
+              fileError={fileError}
               getRootProps={getRootProps}
               getRemoveFileProps={getRemoveFileProps}
-              Remove={Remove}
               ProgressBar={ProgressBar}
             />
             {children ? children(acceptedFile !== null) : null}{" "}
@@ -862,21 +888,174 @@ function jsonToCSV(jsonContents: object[]): string {
   });
 }
 
+type DatasetFileStatus = "selected" | "uploading" | "ready" | "error";
+
+const DROPZONE_SUPPORTED_HELP = "Supported files: CSV, JSON, or JSONL";
+
+// Dotted-grid surface for the empty dropzone. Raw CSS (not a Chakra token) so
+// it composes over the theme-aware background color; `border` follows the
+// active color mode.
+const DROPZONE_DOTTED_STYLE: React.CSSProperties = {
+  backgroundImage:
+    "radial-gradient(var(--chakra-colors-border) 1px, transparent 1px)",
+  backgroundSize: "16px 16px",
+};
+
+/** Shared Chakra props for the dashed dropzone surface; highlights when active
+ *  (dragging a file over it) and on hover. */
+const dropzoneSurfaceProps = (active: boolean) => ({
+  borderRadius: "xl",
+  borderWidth: "2px",
+  borderStyle: "dashed" as const,
+  borderColor: active ? "blue.400" : "border",
+  bg: active ? "blue.500/10" : "transparent",
+  padding: 10,
+  textAlign: "center" as const,
+  cursor: "pointer",
+  width: "full",
+  transition: "border-color 0.15s ease, background-color 0.15s ease",
+  _hover: { borderColor: "blue.300", bg: "blue.500/5" },
+});
+
+/**
+ * Empty-state contents of the dropzone: an upload illustration, the primary
+ * prompt (with "click to browse" reading as a link), and the supported types.
+ */
+function DropzonePrompt() {
+  return (
+    <VStack gap={2}>
+      <Box color="blue.400">
+        <CloudUpload size={36} strokeWidth={1.5} />
+      </Box>
+      <Text fontSize="md" color="fg">
+        Drag and drop file, or{" "}
+        <Text as="span" color="blue.500" fontWeight="medium">
+          click to browse
+        </Text>
+      </Text>
+      <Text fontSize="xs" color="fg.muted">
+        {DROPZONE_SUPPORTED_HELP}
+      </Text>
+    </VStack>
+  );
+}
+
+function DatasetFileStatusIcon({ status }: { status: DatasetFileStatus }) {
+  if (status === "uploading") return <Spinner size="sm" color="blue.500" />;
+  if (status === "ready")
+    return (
+      <Box color="green.500" display="flex">
+        <CheckCircle size={20} />
+      </Box>
+    );
+  if (status === "error")
+    return (
+      <Box color="red.500" display="flex">
+        <XCircle size={20} />
+      </Box>
+    );
+  return (
+    <Box color="fg.muted" display="flex">
+      <FileText size={20} />
+    </Box>
+  );
+}
+
+/**
+ * A file presented as a status row (Image #5): status icon, file name, a
+ * "size · meta" sub-line, and a trailing action slot (remove, cancel, …). The
+ * error state turns the row red and shows the message in place of the meta.
+ */
+function DatasetFileRow({
+  name,
+  sizeLabel,
+  metaLabel,
+  status,
+  message,
+  action,
+}: {
+  name: string;
+  sizeLabel?: string;
+  metaLabel?: string;
+  status: DatasetFileStatus;
+  message?: string;
+  action?: React.ReactNode;
+}) {
+  const isError = status === "error";
+  const meta = message ?? metaLabel;
+  return (
+    <HStack
+      width="full"
+      gap={3}
+      padding={3}
+      borderWidth="1px"
+      borderRadius="lg"
+      borderColor={isError ? "red.400" : "border"}
+      bg="bg"
+    >
+      <DatasetFileStatusIcon status={status} />
+      <VStack align="start" gap={0} flex={1} minWidth={0}>
+        <Text fontWeight="medium" truncate maxWidth="full">
+          {name}
+        </Text>
+        {(sizeLabel ?? meta) && (
+          <HStack gap={2} fontSize="xs" color="fg.muted">
+            {sizeLabel && <Text>{sizeLabel}</Text>}
+            {sizeLabel && meta && <Text color="border">|</Text>}
+            {meta && (
+              <Text
+                color={isError ? "red.500" : "fg.muted"}
+                data-testid={isError ? "upload-error" : undefined}
+              >
+                {meta}
+              </Text>
+            )}
+          </HStack>
+        )}
+      </VStack>
+      {action}
+    </HStack>
+  );
+}
+
+/** Trash-style remove control for a file row. */
+function RemoveFileButton({ onRemove }: { onRemove: () => void }) {
+  return (
+    <Box
+      as="button"
+      type="button"
+      color="fg.muted"
+      display="flex"
+      _hover={{ color: "red.500" }}
+      aria-label="Remove file"
+      onClick={(event: React.MouseEvent) => {
+        // Prevent a wrapping label from re-opening the file picker on remove.
+        event.preventDefault();
+        event.stopPropagation();
+        onRemove();
+      }}
+    >
+      <Trash2 size={18} />
+    </Box>
+  );
+}
+
 function CSVReaderBox({
   acceptedFile,
   setAcceptedFile,
   zoneHover,
+  fileError,
   getRootProps,
   getRemoveFileProps,
-  Remove,
   ProgressBar,
 }: {
   acceptedFile: File | null;
   setAcceptedFile: (file: File | null) => void;
   zoneHover: boolean;
+  /** File-level validation message (e.g. over the row limit); turns the row red. */
+  fileError?: string;
   getRootProps: () => Record<string, unknown>;
   getRemoveFileProps: () => Record<string, unknown>;
-  Remove: React.ComponentType;
   ProgressBar: React.ComponentType;
 }) {
   useEffect(() => {
@@ -884,45 +1063,37 @@ function CSVReaderBox({
   }, [acceptedFile, setAcceptedFile]);
 
   return (
-    <Box
-      {...getRootProps()}
-      borderRadius={"lg"}
-      borderWidth={2}
-      borderColor={zoneHover ? "border.emphasized" : "border"}
-      borderStyle="dashed"
-      padding={10}
-      textAlign="center"
-      cursor="pointer"
-      width="full"
-    >
-      {acceptedFile ? (
-        <>
-          <Box
-            bg="bg.muted"
-            padding={4}
-            borderRadius={"lg"}
-            position="relative"
-          >
-            <VStack>
-              <Text>{formatFileSize(acceptedFile.size)}</Text>
-              <Text>{acceptedFile.name}</Text>
-            </VStack>
-            <ProgressBar />
-
+    <VStack width="full" gap={3} align="stretch">
+      <Box
+        {...getRootProps()}
+        {...dropzoneSurfaceProps(zoneHover)}
+        style={DROPZONE_DOTTED_STYLE}
+      >
+        <DropzonePrompt />
+      </Box>
+      {acceptedFile && (
+        <DatasetFileRow
+          name={acceptedFile.name}
+          sizeLabel={formatFileSize(acceptedFile.size)}
+          status={fileError ? "error" : "selected"}
+          message={fileError}
+          action={
             <Box
-              position="absolute"
-              right={-1}
-              top={-1}
+              as="button"
+              type="button"
+              color="fg.muted"
+              display="flex"
+              _hover={{ color: "red.500" }}
+              aria-label="Remove file"
               {...getRemoveFileProps()}
             >
-              <Remove />
+              <Trash2 size={18} />
             </Box>
-          </Box>
-        </>
-      ) : (
-        <Text>Drop CSV or JSONL file or click here to upload</Text>
+          }
+        />
       )}
-    </Box>
+      <ProgressBar />
+    </VStack>
   );
 }
 
@@ -937,10 +1108,16 @@ function CSVReaderBox({
 function RawFileDropzone({
   onRawFile,
   onUploadRemoved,
+  uploadStatus,
+  fileError,
   children,
 }: {
   onRawFile?: (file: File | null) => void;
   onUploadRemoved?: () => void;
+  /** Set to "uploading" while the raw file streams to storage. */
+  uploadStatus?: "uploading";
+  /** File-level validation/upload message; turns the row red. */
+  fileError?: string;
   children?: (hasAcceptedFile: boolean) => React.ReactNode;
 }) {
   const [zoneHover, setZoneHover] = useState(false);
@@ -956,75 +1133,65 @@ function RawFileDropzone({
     }
   };
 
+  const isUploading = uploadStatus === "uploading";
+  const rowStatus: DatasetFileStatus = fileError
+    ? "error"
+    : isUploading
+      ? "uploading"
+      : "selected";
+
   return (
-    <>
-      <Box
-        as="label"
-        borderRadius={"lg"}
-        borderWidth={2}
-        borderColor={zoneHover ? "border.emphasized" : "border"}
-        borderStyle="dashed"
-        padding={10}
-        textAlign="center"
-        cursor="pointer"
-        width="full"
-        display="block"
-        onDragOver={(event) => {
-          event.preventDefault();
-          setZoneHover(true);
-        }}
-        onDragLeave={(event) => {
-          event.preventDefault();
-          setZoneHover(false);
-        }}
-        onDrop={(event) => {
-          event.preventDefault();
-          setZoneHover(false);
-          const file = event.dataTransfer?.files?.[0] ?? null;
-          if (file) setFile(file);
-        }}
-      >
-        <input
-          type="file"
-          accept=".csv,.json,.jsonl"
-          style={{ display: "none" }}
-          onChange={(event) => {
-            const file = event.target.files?.[0] ?? null;
+    <VStack width="full" gap={3} align="stretch">
+      {/* While the file streams, the dropzone is replaced by its status row so
+          the user can't swap files mid-upload (single-file flow). */}
+      {!isUploading && (
+        <Box
+          as="label"
+          {...dropzoneSurfaceProps(zoneHover)}
+          style={DROPZONE_DOTTED_STYLE}
+          display="block"
+          onDragOver={(event) => {
+            event.preventDefault();
+            setZoneHover(true);
+          }}
+          onDragLeave={(event) => {
+            event.preventDefault();
+            setZoneHover(false);
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            setZoneHover(false);
+            const file = event.dataTransfer?.files?.[0] ?? null;
             if (file) setFile(file);
           }}
+        >
+          <input
+            type="file"
+            accept=".csv,.json,.jsonl"
+            style={{ display: "none" }}
+            onChange={(event) => {
+              const file = event.target.files?.[0] ?? null;
+              if (file) setFile(file);
+            }}
+          />
+          <DropzonePrompt />
+        </Box>
+      )}
+      {acceptedFile && (
+        <DatasetFileRow
+          name={acceptedFile.name}
+          sizeLabel={formatFileSize(acceptedFile.size)}
+          metaLabel={new Date(acceptedFile.lastModified).toLocaleDateString()}
+          status={rowStatus}
+          message={fileError}
+          action={
+            isUploading ? undefined : (
+              <RemoveFileButton onRemove={() => setFile(null)} />
+            )
+          }
         />
-        {acceptedFile ? (
-          <Box
-            bg="bg.muted"
-            padding={4}
-            borderRadius={"lg"}
-            position="relative"
-          >
-            <VStack>
-              <Text>{formatFileSize(acceptedFile.size)}</Text>
-              <Text>{acceptedFile.name}</Text>
-            </VStack>
-            <Box
-              position="absolute"
-              right={-1}
-              top={-1}
-              onClick={(event) => {
-                // Prevent the label from re-opening the file picker on remove.
-                event.preventDefault();
-                event.stopPropagation();
-                setFile(null);
-              }}
-            >
-              <Text fontSize="lg" lineHeight="1" cursor="pointer">
-                ×
-              </Text>
-            </Box>
-          </Box>
-        ) : (
-          <Text>Drop CSV or JSONL file or click here to upload</Text>
-        )}
-      </Box>
+      )}
       {children ? children(acceptedFile !== null) : null}
-    </>
+    </VStack>
   );
 }
