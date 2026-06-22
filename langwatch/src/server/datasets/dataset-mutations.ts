@@ -19,10 +19,17 @@
  */
 import type { Dataset, Prisma, PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { type ChunkOffset, toSingleJsonl } from "./dataset-chunking";
+import {
+  type ChunkedDatasetMeta,
+  type ChunkOffset,
+  chunkedMeta,
+  chunkMetaOf,
+  toSingleJsonl,
+} from "./dataset-chunking";
 import { withDatasetLock } from "./dataset-lock";
 import { type DatasetStorage, getDatasetStorage } from "./dataset-storage";
 import { DatasetNotReadyError } from "./errors";
+import { stripNullBytes } from "./sanitize";
 
 export type RecomputedDatasetCounts = {
   rowCount: number;
@@ -34,6 +41,25 @@ export type RecomputedDatasetCounts = {
 /** An s3_jsonl chunk line: the row entry tagged with a stable id so edit/delete
  * can target it. Mirrors the shape the normalize/append paths write. */
 type ChunkLine = { id: string; entry: unknown };
+
+/**
+ * Wrap raw row entries as `{ id, entry }` chunk lines: mint a stable per-row id
+ * (`record_<nanoid>`) the later edit/delete can target, and scrub U+0000 from
+ * the entry (I-NULL — Postgres-parity). `forcedIds` pins each new row's id —
+ * per-row and optional: a defined entry honors the caller's id, an `undefined`
+ * one (or a short/absent array) mints a fresh id. The single home for the batch
+ * `{id,entry}`+null-scrub wrap shared by the append and born-on-storage paths
+ * (the streaming normalize writer mints ids per row as it goes, so it stays
+ * separate).
+ */
+const toChunkLines = (
+  entries: unknown[],
+  { forcedIds }: { forcedIds?: (string | undefined)[] } = {},
+): ChunkLine[] =>
+  entries.map((entry, i) => ({
+    id: forcedIds?.[i] ?? `record_${nanoid()}`,
+    entry: stripNullBytes(entry),
+  }));
 
 const isChunkLine = (line: unknown): line is ChunkLine =>
   typeof line === "object" && line !== null && "id" in line && "entry" in line;
@@ -97,12 +123,9 @@ const appendLinesInTx = async ({
   projectId: string;
   entries: unknown[];
   storage: DatasetStorage;
-  forcedIds?: string[];
+  forcedIds?: (string | undefined)[];
 }): Promise<{ appended: number }> => {
-  const lines: ChunkLine[] = entries.map((entry, i) => ({
-    id: forcedIds?.[i] ?? `record_${nanoid()}`,
-    entry,
-  }));
+  const lines = toChunkLines(entries, { forcedIds });
 
   const fromIndex = current.chunkCount ?? 0;
   const oldRowCount = current.rowCount ?? 0;
@@ -138,22 +161,115 @@ const appendLinesInTx = async ({
 };
 
 /**
+ * Born-on-storage (ADR-032 cutover step 1): write a brand-new dataset's records
+ * directly to chunk objects from index 0 and return the PG-authoritative
+ * `ChunkedDatasetMeta` (rowCount / sizeBytes / chunkCount / chunkOffsets) the
+ * caller stamps onto the `Dataset` row.
+ *
+ * No advisory lock and no transaction: the row does not exist yet (this runs
+ * BEFORE `repository.create`, not inside `withDatasetLock`), so there is nothing
+ * to serialize against. Writing the chunks first means a write failure throws
+ * and leaves no orphan row — the atomicity the create path relies on. Owns its
+ * own storage resolution (`getDatasetStorage`) when not passed, mirroring the
+ * sibling append/edit/delete mutations.
+ *
+ * Self-cleaning on a partial write: both storage backends write chunks
+ * sequentially, so a multi-chunk write can persist chunk 0 and then fail on
+ * chunk 1 — leaving rowless orphan objects (customer content with no row to
+ * govern retention/deletion). On any write failure we best-effort reap the whole
+ * `0..k` prefix (`deleteChunksFrom(fromIndex: 0)`) before rethrowing, so the
+ * function never leaks objects regardless of which caller invokes it.
+ *
+ * `forcedIds` honors caller-supplied per-row ids (parity with the append path);
+ * a fresh `record_<nanoid>` is minted wherever an id is absent.
+ */
+export const writeInitialS3JsonlChunks = async ({
+  projectId,
+  datasetId,
+  entries,
+  forcedIds,
+  storage,
+}: {
+  projectId: string;
+  datasetId: string;
+  entries: unknown[];
+  forcedIds?: (string | undefined)[];
+  storage?: DatasetStorage;
+}): Promise<ChunkedDatasetMeta> => {
+  const datasetStorage = storage ?? (await getDatasetStorage(projectId));
+
+  const lines = toChunkLines(entries, { forcedIds });
+  let written: Awaited<ReturnType<DatasetStorage["writeChunks"]>>;
+  try {
+    written = await datasetStorage.writeChunks({
+      projectId,
+      datasetId,
+      records: lines,
+      fromIndex: 0,
+    });
+  } catch (error) {
+    // A partial write leaves a contiguous `0..k` orphan prefix; reap it.
+    // Best-effort: a failed reap must not mask the original write error.
+    try {
+      await datasetStorage.deleteChunksFrom({
+        projectId,
+        datasetId,
+        fromIndex: 0,
+      });
+    } catch {
+      // swallow — surface the write failure below
+    }
+    throw error;
+  }
+
+  return chunkedMeta(written.map(chunkMetaOf));
+};
+
+/**
+ * Best-effort delete of ALL chunk objects of a dataset (from index 0). The
+ * born-on-storage create (`writeInitialS3JsonlChunks`) writes chunks BEFORE
+ * inserting the row; if the row insert then fails (slug race → unique violation,
+ * DB outage) this reaps the orphaned objects so customer content isn't left in
+ * storage with no row to govern its retention/deletion. No lock, no counters —
+ * there is no row to serialize against or update.
+ */
+export const deleteAllS3JsonlChunks = async ({
+  projectId,
+  datasetId,
+  storage,
+}: {
+  projectId: string;
+  datasetId: string;
+  storage?: DatasetStorage;
+}): Promise<void> => {
+  const datasetStorage = storage ?? (await getDatasetStorage(projectId));
+  await datasetStorage.deleteChunksFrom({ projectId, datasetId, fromIndex: 0 });
+};
+
+/**
  * Append rows to an s3_jsonl dataset under the advisory lock. Each row is
  * wrapped `{ id, entry }` so a later edit/delete can target it. Re-reads the
  * dataset inside the lock: the counters are authoritative and another serialized
  * mutation may have advanced them since the caller loaded the row.
+ *
+ * `forcedIds` honors caller-supplied per-row ids (index-aligned, optional) so a
+ * batch-create that mints + RETURNS ids persists those exact ids — otherwise the
+ * returned ids wouldn't exist in storage and a follow-up edit/delete by id would
+ * miss. A fresh `record_<nanoid>` is minted wherever an id is absent.
  */
 export const appendS3JsonlRecords = async ({
   prisma,
   dataset,
   projectId,
   entries,
+  forcedIds,
   storage,
 }: {
   prisma: PrismaClient;
   dataset: Dataset;
   projectId: string;
   entries: unknown[];
+  forcedIds?: (string | undefined)[];
   storage?: DatasetStorage;
 }): Promise<{ appended: number }> => {
   const datasetStorage = storage ?? (await getDatasetStorage(projectId));
@@ -168,6 +284,7 @@ export const appendS3JsonlRecords = async ({
       current,
       projectId,
       entries,
+      forcedIds,
       storage: datasetStorage,
     });
   });
@@ -353,13 +470,43 @@ export const deleteS3JsonlRecords = async ({
       sizeBytes,
     } = recomputeOffsets(perChunk);
 
+    // Compaction (cheap, trailing-only, LOGICAL): a delete that empties the
+    // highest-index chunks lets us drop them from `chunkCount` + the offset index
+    // so reads stop iterating empty chunks and `chunkCount` doesn't grow unbounded
+    // under churn. We deliberately do NOT delete the chunk objects here: an S3
+    // delete inside this transaction would land before the lowered `chunkCount`
+    // commits, and reads are lock-free — a reader could see the old count and then
+    // hit the now-missing object (a hard `MissingChunkError`). Instead the
+    // trailing objects are left as benign 0-byte orphans: readers ignore them
+    // (they iterate `0..chunkCount`), the next append overwrites them by key
+    // (`writeChunks(fromIndex=chunkCount)`), and physical reap is the deferred
+    // compaction's job. Trailing-only regardless: a MIDDLE empty must stay in
+    // place (chunk keys are positional; removing it would re-index every chunk
+    // above it).
+    let keptChunkCount = perChunk.length;
+    while (keptChunkCount > 0 && perChunk[keptChunkCount - 1]!.rowCount === 0) {
+      keptChunkCount -= 1;
+    }
+    const trimmed = keptChunkCount < perChunk.length;
+
     await tx.dataset.update({
       where: { id: dataset.id, projectId },
       data: {
         rowCount,
         sizeBytes: BigInt(sizeBytes),
-        // chunkCount unchanged — empty chunks are kept (no compaction).
-        chunkOffsets: newOffsets as unknown as Prisma.InputJsonValue,
+        // The trailing empty offset entries (startRow === endRow, byteSize 0)
+        // contribute nothing to the totals, so slicing is exact.
+        ...(trimmed
+          ? {
+              chunkCount: keptChunkCount,
+              chunkOffsets: newOffsets.slice(
+                0,
+                keptChunkCount,
+              ) as unknown as Prisma.InputJsonValue,
+            }
+          : {
+              chunkOffsets: newOffsets as unknown as Prisma.InputJsonValue,
+            }),
       },
     });
 
@@ -376,10 +523,12 @@ export const deleteS3JsonlRecords = async ({
  * Runnable on a detected mismatch — the residual repair for the rare
  * PG-commit-after-S3-write failure on edit/delete, where the chunk is mutated
  * but the counters rolled back (Consequences → Negative: I-COUNT is eventually
- * consistent / repairable, not unconditionally atomic). `chunkCount` itself is
- * trusted as the chunk-set boundary (empty chunks are kept, never compacted), so
- * this re-derives addressing within the known chunk set rather than re-discovering
- * it via S3 LIST. Returns the recomputed counts that were persisted.
+ * consistent / repairable, not unconditionally atomic). `chunkCount` is trusted
+ * as the chunk-set boundary: every chunk in `0..chunkCount` MUST exist — a
+ * missing one is corruption, not emptiness, so `readChunk` throws
+ * `MissingChunkError` and we propagate it rather than silently dropping the tail
+ * (which would re-derive a smaller `chunkCount` and mask data loss when a middle
+ * chunk is gone but later chunks survive). Returns the recomputed counts.
  */
 export const recomputeDatasetCounts = async ({
   prisma,
@@ -402,6 +551,8 @@ export const recomputeDatasetCounts = async ({
     const chunkCount = current.chunkCount ?? 0;
     const perChunk: Array<{ rowCount: number; byteSize: number }> = [];
     for (let index = 0; index < chunkCount; index++) {
+      // `readChunk` throws `MissingChunkError` if a chunk the count claims is
+      // gone — corruption, not emptiness. Propagate it (loud) rather than mask it.
       const rows = await datasetStorage.readChunk({
         projectId,
         datasetId,

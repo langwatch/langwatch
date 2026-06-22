@@ -267,37 +267,39 @@ export function UploadCSVForm({
       onClose?.();
       void router.push(`/${project.slug}/datasets/${datasetId}`);
     } catch (error) {
-      // Both "no browser-reachable storage" (backend never minted a presign) and
-      // "presigned PUT failed" (CORS/network/non-ok) mean: fall back to the
-      // backend upload path. The fallback is size-guarded, so a small file +
-      // missing CORS still works, and a large file + missing CORS shows the
-      // clear "large uploads require object storage" error. Either way, no dead
-      // end.
+      // Any failure AFTER requestDirectUpload minted the `uploading` row leaves
+      // it behind and locks the slug — whether we fall back (a fresh dataset is
+      // created) or surface the error (the upload is abandoned). Reap it either
+      // way so a retry isn't blocked. `DirectUploadUnavailableError` throws
+      // BEFORE the row exists (pendingDatasetId undefined → no-op), and a
+      // same-origin local-FS PUT failure (StorageNotWritable, a plain Error)
+      // hits the surface-error branch below — which previously stranded the row.
+      if (pendingDatasetId) {
+        try {
+          await abortPendingUpload({ projectId, datasetId: pendingDatasetId });
+        } catch (cleanupError) {
+          logger.error(
+            { error: cleanupError },
+            "Failed to clean up pending upload",
+          );
+        }
+      }
+      // "No browser-reachable storage" and "presigned PUT failed"
+      // (CORS/network/non-ok) mean: fall back to the backend upload path. The
+      // fallback is size-guarded, so a small file + missing CORS still works, and
+      // a large file + missing CORS shows the clear "large uploads require object
+      // storage" error. Either way, no dead end.
       if (
         error instanceof DirectUploadUnavailableError ||
         error instanceof PresignedUploadFailedError
       ) {
-        // A presigned-PUT failure already created the `uploading` row; reap it so
-        // a CORS-failed attempt doesn't leave a stuck dataset behind (the
-        // fallback creates a fresh one). Best-effort — never block the fallback.
-        if (error instanceof PresignedUploadFailedError && pendingDatasetId) {
-          try {
-            await abortPendingUpload({
-              projectId,
-              datasetId: pendingDatasetId,
-            });
-          } catch (cleanupError) {
-            logger.error(
-              { error: cleanupError },
-              "Failed to clean up pending upload after presigned PUT failure",
-            );
-          }
-        }
         // Parse the already-captured file NOW (the first and only in-browser
         // parse on this path) and hand off to the existing parse-and-drawer flow.
         await runFallbackParseAndDrawer(rawFile);
         return;
       }
+      // A same-origin local-FS failure (e.g. StorageNotWritable) is a real,
+      // actionable server error — surface it verbatim, no fallback parse.
       logger.error({ error }, "Direct dataset upload failed");
       setUploadError(
         error instanceof Error

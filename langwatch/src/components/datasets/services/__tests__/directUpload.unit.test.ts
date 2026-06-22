@@ -135,6 +135,28 @@ describe("directUpload service", () => {
         // one, so adding it here would break the signature.
         expect(init.headers).toBeUndefined();
       });
+
+      it("sends the session cookie for a same-origin (relative) local-FS upload URL", async () => {
+        // No-S3 deploys mint a relative `/api/...` staging URL; the file streams
+        // through our own session-authed API, so the cookie must ride along
+        // (ADR-032 v14). The leading "/" is the discriminator.
+        mockFetch().mockResolvedValue({ ok: true });
+        const file = new File(["a,b\n1,2\n"], "data.csv", { type: "text/csv" });
+
+        await putFileToPresignedUrl(
+          "/api/dataset/direct-upload/staging/up_1?projectId=p1",
+          file,
+        );
+
+        const [url, init] = mockFetch().mock.calls[0]!;
+        expect(url).toBe(
+          "/api/dataset/direct-upload/staging/up_1?projectId=p1",
+        );
+        expect(init.method).toBe("PUT");
+        expect(init.body).toBe(file);
+        // Session cookie included on the same-origin route (vs omit for S3).
+        expect(init.credentials).toBe("include");
+      });
     });
 
     describe("when the storage PUT returns a non-ok status", () => {
@@ -163,6 +185,47 @@ describe("directUpload service", () => {
         await expect(
           putFileToPresignedUrl("https://s3.example/put", file),
         ).rejects.toBeInstanceOf(PresignedUploadFailedError);
+      });
+    });
+
+    describe("when a same-origin (local-FS) PUT fails", () => {
+      it("surfaces the server's actionable message and does NOT signal a fallback", async () => {
+        // The local streaming route reports a real, fixable reason (unwritable
+        // LANGWATCH_LOCAL_STORAGE_PATH). It must reach the user verbatim — NOT a
+        // PresignedUploadFailedError, which would make the modal fall back to the
+        // in-browser parse and show the misleading "requires object storage" cap.
+        mockFetch().mockResolvedValue({
+          ok: false,
+          status: 500,
+          json: () =>
+            Promise.resolve({
+              error: "StorageNotWritable",
+              message:
+                'Dataset storage path "/var/lib/langwatch/objects" is not writable. Configure object storage (set S3_BUCKET_NAME) or point LANGWATCH_LOCAL_STORAGE_PATH at a writable, persistent directory.',
+            }),
+        });
+        const file = new File(["x"], "data.csv");
+
+        const err = await putFileToPresignedUrl(
+          "/api/dataset/direct-upload/staging/up_1?projectId=p1",
+          file,
+        ).catch((e: unknown) => e);
+
+        expect(err).not.toBeInstanceOf(PresignedUploadFailedError);
+        expect((err as Error).message).toMatch(/LANGWATCH_LOCAL_STORAGE_PATH/);
+      });
+
+      it("surfaces a fetch rejection directly rather than as a CORS fallback", async () => {
+        mockFetch().mockRejectedValue(new TypeError("network down"));
+        const file = new File(["x"], "data.csv");
+
+        const err = await putFileToPresignedUrl(
+          "/api/dataset/direct-upload/staging/up_1?projectId=p1",
+          file,
+        ).catch((e: unknown) => e);
+
+        expect(err).not.toBeInstanceOf(PresignedUploadFailedError);
+        expect((err as Error).message).toMatch(/network down/);
       });
     });
   });

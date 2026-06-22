@@ -1,4 +1,9 @@
-import type { Dataset, DatasetRecord, Prisma, PrismaClient } from "@prisma/client";
+import type {
+  Dataset,
+  DatasetRecord,
+  Prisma,
+  PrismaClient,
+} from "@prisma/client";
 
 /**
  * Input types derived from Prisma for type safety
@@ -123,19 +128,24 @@ export class DatasetRepository {
   }
 
   /**
-   * Gets project with organization info for S3 configuration check.
+   * Finds the pending (`status='uploading'`, non-archived) dataset that owns a
+   * given staging key. The direct-upload staging route uses this to refuse a
+   * stream into a `staging/` slot no upload row claims — otherwise an authed
+   * project user could spray orphan objects there (local FS has no staging-TTL
+   * reaper). `stagingKey` is server-minted and bound to the row at presign time.
    */
-  async getProjectWithOrgS3Settings(input: { projectId: string }): Promise<{
-    canUseS3: boolean;
-  }> {
-    const project = await this.prisma.project.findUnique({
-      where: { id: input.projectId },
-      include: { team: { include: { organization: true } } },
+  async findPendingUploadByStagingKey(input: {
+    projectId: string;
+    stagingKey: string;
+  }): Promise<Dataset | null> {
+    return await this.prisma.dataset.findFirst({
+      where: {
+        projectId: input.projectId,
+        stagingKey: input.stagingKey,
+        status: "uploading",
+        archivedAt: null,
+      },
     });
-
-    return {
-      canUseS3: project?.team?.organization?.useCustomS3 ?? false,
-    };
   }
 
   /**
@@ -192,5 +202,4 @@ export class DatasetRepository {
 
     return { datasets, total };
   }
-
 }

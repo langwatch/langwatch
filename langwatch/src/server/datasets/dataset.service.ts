@@ -1,3 +1,4 @@
+import type { Readable } from "node:stream";
 import { generate } from "@langwatch/ksuid";
 import type { DatasetRecord, Prisma, PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
@@ -14,8 +15,10 @@ import { DatasetRepository } from "./dataset.repository";
 import type { ChunkOffset } from "./dataset-chunking";
 import {
   appendS3JsonlRecords,
+  deleteAllS3JsonlChunks,
   deleteS3JsonlRecords,
   editS3JsonlRecord,
+  writeInitialS3JsonlChunks,
 } from "./dataset-mutations";
 import { enqueueDatasetNormalize } from "./dataset-normalize.queue";
 import { DatasetRecordRepository } from "./dataset-record.repository";
@@ -25,6 +28,7 @@ import {
   DatasetNotFoundError,
   DatasetNotReadyError,
   DatasetNotRetryableError,
+  DirectUploadUnavailableError,
   InvalidColumnError,
   MalformedColumnTypesError,
   StagedUploadNotFoundError,
@@ -32,7 +36,12 @@ import {
   UploadTooLargeError,
 } from "./errors";
 import { ExperimentRepository } from "./experiment.repository";
-import { exceedsUploadCap } from "./presigned-upload";
+import {
+  exceedsUploadCap,
+  stagingUploadKey,
+  UPLOAD_MAX_BYTES,
+} from "./presigned-upload";
+import { datasetDisplayRecordCount } from "./record-count";
 import { stripNullBytes } from "./sanitize";
 import type {
   DatasetColumns,
@@ -256,13 +265,22 @@ export class DatasetService {
   }
 
   /**
-   * Creates a new dataset with generated slug and optional records.
+   * Creates a new dataset with a generated slug and optional records.
    *
-   * Atomicity: dataset row creation and record insertion are wrapped in a
-   * single Prisma transaction. If record insertion fails (e.g. Postgres
-   * rejects a record with a U+0000 null byte before sanitisation reached it),
-   * the dataset row is rolled back so the user is not left with an orphaned
-   * empty dataset that blocks retries with a "name already exists" error.
+   * Born-on-storage (ADR-032 cutover step 1): every new dataset is created
+   * directly in the chunked-JSONL layout — S3 when configured, else the local
+   * filesystem (`resolveProjectStorageDestination` always returns a backend) —
+   * so `contentLayout='postgres'` is never created for new data and the backfill
+   * drains to zero. Records are wrapped `{ id, entry }` (the same shape the
+   * append/normalize paths write) and flushed to chunk objects from index 0,
+   * then the row is created with PG-authoritative counters and `status='ready'`
+   * (the write is synchronous, so there is no async-normalize `processing`
+   * window).
+   *
+   * Atomicity: chunks are written BEFORE the row exists, so a chunk-write
+   * failure throws and leaves no orphan row (the "name already exists" trap the
+   * old record-insert transaction guarded against). No advisory lock is taken —
+   * the row doesn't exist yet, so there is nothing to serialize against.
    *
    * @throws {DatasetConflictError} if slug already exists
    */
@@ -285,34 +303,66 @@ export class DatasetService {
       throw new DatasetConflictError();
     }
 
-    const { canUseS3 } = await this.repository.getProjectWithOrgS3Settings({
+    const datasetId = `dataset_${nanoid()}`;
+
+    // Split each record into its entry (id stripped) and its caller-supplied id,
+    // index-aligned. We HONOR a pinned id (SDK/MCP/REST may set one for a later
+    // edit/delete or for idempotency) and mint a fresh `record_<nanoid>` only
+    // where absent — the same contract the append path already provides via
+    // `forcedIds`. The `{id,entry}` wrap + U+0000 scrub (I-NULL) lives in
+    // dataset-mutations alongside the append path.
+    const records = datasetRecords ?? [];
+    const entries = records.map((record) => {
+      const { id: _id, ...entry } = record;
+      return entry;
+    });
+    const forcedIds = records.map((record) => record.id);
+
+    // Resolve storage once and thread it through the write AND the failure reap,
+    // so the reap can never target a different backend than the write if the
+    // project's storage config flips mid-call.
+    const storage = await getDatasetStorage(projectId);
+
+    // Born-on-storage: write the chunk objects BEFORE the row exists, so a
+    // write failure throws and leaves no orphan row. A PARTIAL write (chunk 0
+    // lands, chunk 1 throws) self-reaps inside writeInitialS3JsonlChunks, so we
+    // only have to guard the row insert here.
+    const meta = await writeInitialS3JsonlChunks({
       projectId,
+      datasetId,
+      entries,
+      forcedIds,
+      storage,
     });
 
-    return await this.prisma.$transaction(async (tx) => {
-      const dataset = await this.repository.create(
-        {
-          id: `dataset_${nanoid()}`,
-          slug,
-          name,
-          projectId,
-          columnTypes,
-          useS3: canUseS3,
+    try {
+      return await this.repository.create({
+        id: datasetId,
+        slug,
+        name,
+        projectId,
+        columnTypes,
+        contentLayout: "s3_jsonl",
+        status: "ready",
+        rowCount: meta.rowCount,
+        sizeBytes: BigInt(meta.sizeBytes),
+        chunkCount: meta.chunkCount,
+        chunkOffsets: meta.chunkOffsets as unknown as Prisma.InputJsonValue,
+      });
+    } catch (error) {
+      // The chunks were written before this row. If the insert fails (a slug
+      // race → `@@unique([projectId, slug])` violation, or a DB outage) the
+      // objects are orphaned — customer content in storage with no row to govern
+      // its retention/deletion. `datasetId` is a fresh nanoid scoped to THIS
+      // attempt, so the reap only ever targets this losing attempt's chunks,
+      // never a concurrent winner's. Best-effort, then surface the failure.
+      await deleteAllS3JsonlChunks({ projectId, datasetId, storage }).catch(
+        () => {
+          // best-effort: a failed reap must not mask the original insert error
         },
-        { tx },
       );
-
-      if (datasetRecords) {
-        await createManyDatasetRecords({
-          datasetId: dataset.id,
-          projectId,
-          datasetRecords,
-          tx,
-        });
-      }
-
-      return dataset;
-    });
+      throw error;
+    }
   }
 
   /**
@@ -507,7 +557,9 @@ export class DatasetService {
         columnTypes: d.columnTypes,
         createdAt: d.createdAt,
         updatedAt: d.updatedAt,
-        recordCount: d._count.datasetRecords,
+        // s3_jsonl rows live in chunks, not the DatasetRecord table — count via
+        // the layout-aware helper so new datasets don't report 0.
+        recordCount: datasetDisplayRecordCount(d),
       })),
       pagination: {
         page,
@@ -782,11 +834,16 @@ export class DatasetService {
     // lock (Decision 9). The shared column validation/fill above is reused; only
     // the persistence target differs.
     if (dataset.contentLayout === "s3_jsonl") {
+      // Persist the SAME ids we mint and return below — `forcedIds` pins each
+      // chunk-line id to `record.id`, so a follow-up edit/delete by the returned
+      // id actually targets the stored row (without this, append minted its own
+      // ids and the returned ones existed nowhere).
       await appendS3JsonlRecords({
         prisma: this.prisma,
         dataset,
         projectId: params.projectId,
         entries: records.map((r) => r.entry),
+        forcedIds: records.map((r) => r.id),
       });
       const createdAt = new Date();
       return records.map((record) => ({
@@ -1118,6 +1175,53 @@ export class DatasetService {
       uploadUrl: upload.url,
       stagingKey: upload.key,
     };
+  }
+
+  /**
+   * Server-side deposit for the local-FS direct upload: stream the raw file the
+   * browser PUT to the same-origin staging route into the storage backend's
+   * staging slot. Only backends that route uploads THROUGH the app (local FS)
+   * implement `putStaged`; on S3 the browser PUTs to the bucket directly, so a
+   * call here means the route was hit on a backend that doesn't deposit through
+   * the app — surface `DirectUploadUnavailableError` (mapped to 409). The size
+   * cap (`UPLOAD_MAX_BYTES`) is enforced mid-stream so a client can't fill the
+   * disk before finalize's HEAD would reject it.
+   *
+   * Gated on an owning pending-upload row: we only stream into a `staging/` slot
+   * that a `status='uploading'` dataset created via `createPendingUpload` claims
+   * (the key is server-minted and bound to the row at presign). Without this an
+   * authed project user could stream arbitrary 5 GB orphans into
+   * `staging/{projectId}/…` that no lifecycle (abort/finalize) ever reaps — local
+   * FS has no staging-TTL sweep — growing the disk unbounded.
+   *
+   * @throws {DirectUploadUnavailableError} if the backend deposits direct (S3)
+   * @throws {UploadNotPendingError} if no pending upload row owns the staging key
+   * @throws {UploadTooLargeError} if the stream exceeds the size cap
+   */
+  async writeStagedUpload(params: {
+    projectId: string;
+    uploadId: string;
+    body: Readable;
+  }): Promise<void> {
+    const { projectId, uploadId, body } = params;
+    const storage = await getDatasetStorage(projectId);
+    if (!storage.putStaged) {
+      throw new DirectUploadUnavailableError();
+    }
+    const stagingKey = stagingUploadKey(projectId, uploadId);
+    const pending = await this.repository.findPendingUploadByStagingKey({
+      projectId,
+      stagingKey,
+    });
+    if (!pending) {
+      throw new UploadNotPendingError();
+    }
+    await storage.putStaged({
+      projectId,
+      key: stagingKey,
+      body,
+      maxBytes: UPLOAD_MAX_BYTES,
+    });
   }
 
   /**

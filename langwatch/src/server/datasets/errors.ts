@@ -193,3 +193,39 @@ export class DatasetTooLargeToExportError extends Error {
     this.maxBytes = maxBytes;
   }
 }
+
+/**
+ * A chunk that the PG-authoritative `chunkCount` claims must exist is missing
+ * from object storage. From a read's perspective this is corruption, not
+ * emptiness, so the read paths (`readChunks`/`readChunk`) throw it rather than
+ * silently truncate. The I-COUNT repair (`recomputeDatasetCounts`) does NOT
+ * swallow it either: trailing-chunk compaction is logical-only (it lowers
+ * `chunkCount` without deleting any object), so nothing reaps a chunk mid-flight
+ * and any gap is genuine corruption. The repair propagates it (loud) rather than
+ * re-derive a smaller `chunkCount`, which would mask a lost middle chunk whose
+ * successors still survive.
+ */
+export class MissingChunkError extends Error {
+  readonly key: string;
+
+  constructor(key: string) {
+    super(`Missing dataset chunk: ${key}`);
+    this.name = "MissingChunkError";
+    this.key = key;
+  }
+}
+
+/**
+ * The local-FS storage root is not writable (EACCES/EROFS/EPERM) — born-on-
+ * storage made a writable backend mandatory, so this is a deployment-config
+ * error, not a transient failure. Typed (vs a bare `Error`) so the upload route
+ * can surface its actionable message to the client (configure S3 / set
+ * `LANGWATCH_LOCAL_STORAGE_PATH`) instead of letting it collapse into a generic
+ * 500 that the browser then mistakes for "no object storage".
+ */
+export class StorageNotWritableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StorageNotWritableError";
+  }
+}

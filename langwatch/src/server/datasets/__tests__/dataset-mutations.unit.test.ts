@@ -6,7 +6,9 @@ import {
   deleteS3JsonlRecords,
   editS3JsonlRecord,
   recomputeDatasetCounts,
+  writeInitialS3JsonlChunks,
 } from "../dataset-mutations";
+import { MissingChunkError } from "../errors";
 
 /**
  * Unit tests for the s3_jsonl write-mutations (ADR-032 rung 6b). Boundary mocks:
@@ -60,17 +62,142 @@ const makeStorage = (
     writeChunks: ReturnType<typeof vi.fn>;
     readChunk: ReturnType<typeof vi.fn>;
     rewriteChunk: ReturnType<typeof vi.fn>;
+    deleteChunksFrom: ReturnType<typeof vi.fn>;
   }> = {},
 ) => ({
   writeChunks: vi.fn(),
   readChunk: vi.fn(),
   rewriteChunk: vi.fn(),
+  deleteChunksFrom: vi.fn().mockResolvedValue(undefined),
   ...overrides,
 });
 
 beforeEach(() => vi.clearAllMocks());
 
 describe("dataset-mutations (s3_jsonl)", () => {
+  describe("writeInitialS3JsonlChunks()", () => {
+    describe("when the chunk write succeeds", () => {
+      it("returns PG-authoritative meta and never reaps", async () => {
+        const storage = makeStorage({
+          writeChunks: vi.fn().mockResolvedValue([
+            {
+              index: 0,
+              rowCount: 2,
+              byteSize: 40,
+              startRow: 0,
+              endRow: 2,
+              jsonl: "",
+            },
+          ]),
+        });
+
+        const meta = await writeInitialS3JsonlChunks({
+          projectId: "p1",
+          datasetId: "dataset_1",
+          entries: [{ a: 1 }, { a: 2 }],
+          storage: storage as never,
+        });
+
+        expect(storage.writeChunks).toHaveBeenCalledOnce();
+        // Wrote from index 0 (a brand-new dataset), {id,entry}-wrapped rows.
+        const writeArg = storage.writeChunks.mock.calls[0]![0];
+        expect(writeArg.fromIndex).toBe(0);
+        expect(writeArg.records).toHaveLength(2);
+        expect(writeArg.records[0]).toMatchObject({ entry: { a: 1 } });
+        expect(meta).toEqual({
+          rowCount: 2,
+          sizeBytes: 40,
+          chunkCount: 1,
+          chunkOffsets: [{ index: 0, startRow: 0, endRow: 2, byteSize: 40 }],
+        });
+        expect(storage.deleteChunksFrom).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when caller-supplied row ids are passed", () => {
+      it("honors a pinned id and mints a fresh one only where absent (parity with append)", async () => {
+        const storage = makeStorage({
+          writeChunks: vi.fn().mockResolvedValue([
+            {
+              index: 0,
+              rowCount: 3,
+              byteSize: 60,
+              startRow: 0,
+              endRow: 3,
+              jsonl: "",
+            },
+          ]),
+        });
+
+        await writeInitialS3JsonlChunks({
+          projectId: "p1",
+          datasetId: "dataset_1",
+          entries: [{ a: 1 }, { a: 2 }, { a: 3 }],
+          forcedIds: ["record_pinned", undefined, "record_third"],
+          storage: storage as never,
+        });
+
+        const records = storage.writeChunks.mock.calls[0]![0].records as Array<{
+          id: string;
+        }>;
+        expect(records[0]!.id).toBe("record_pinned");
+        expect(records[2]!.id).toBe("record_third");
+        // The gap mints a fresh id, never reusing a neighbor's.
+        expect(records[1]!.id).toMatch(/^record_/);
+        expect(records[1]!.id).not.toBe("record_pinned");
+        expect(records[1]!.id).not.toBe("record_third");
+      });
+    });
+
+    describe("when the chunk write fails partway through a multi-chunk create", () => {
+      it("reaps the orphaned 0..k prefix and rethrows the original error", async () => {
+        const storage = makeStorage({
+          writeChunks: vi
+            .fn()
+            .mockRejectedValue(new Error("storage write failed mid-batch")),
+        });
+
+        await expect(
+          writeInitialS3JsonlChunks({
+            projectId: "p1",
+            datasetId: "dataset_1",
+            entries: [{ a: 1 }, { a: 2 }],
+            storage: storage as never,
+          }),
+        ).rejects.toThrow("storage write failed mid-batch");
+
+        // The partial write is reaped from index 0 — no rowless orphan left.
+        expect(storage.deleteChunksFrom).toHaveBeenCalledWith({
+          projectId: "p1",
+          datasetId: "dataset_1",
+          fromIndex: 0,
+        });
+      });
+
+      it("surfaces the write error even when the reap itself fails", async () => {
+        const storage = makeStorage({
+          writeChunks: vi
+            .fn()
+            .mockRejectedValue(new Error("storage write failed mid-batch")),
+          deleteChunksFrom: vi
+            .fn()
+            .mockRejectedValue(new Error("reap also failed")),
+        });
+
+        // Best-effort cleanup must not mask the original write failure.
+        await expect(
+          writeInitialS3JsonlChunks({
+            projectId: "p1",
+            datasetId: "dataset_1",
+            entries: [{ a: 1 }],
+            storage: storage as never,
+          }),
+        ).rejects.toThrow("storage write failed mid-batch");
+        expect(storage.deleteChunksFrom).toHaveBeenCalledOnce();
+      });
+    });
+  });
+
   describe("appendS3JsonlRecords()", () => {
     describe("when appending rows to a ready dataset with one existing chunk", () => {
       it("writes a new chunk from chunkCount with {id,entry}-wrapped rows and advances the counters", async () => {
@@ -121,6 +248,43 @@ describe("dataset-mutations (s3_jsonl)", () => {
             { index: 1, startRow: 10, endRow: 12, byteSize: 40 },
           ],
         });
+      });
+    });
+
+    describe("when caller-supplied row ids are passed", () => {
+      it("persists the forced ids (so returned ids match storage) and mints where absent", async () => {
+        const row = makeDataset({
+          rowCount: 0,
+          sizeBytes: 0n,
+          chunkCount: 0,
+          chunkOffsets: [] as unknown as Dataset["chunkOffsets"],
+        });
+        const { prisma } = makePrisma(row);
+        const storage = makeStorage({
+          writeChunks: vi
+            .fn()
+            .mockResolvedValue([
+              { index: 0, rowCount: 2, byteSize: 40, startRow: 0, endRow: 2 },
+            ]),
+        });
+
+        await appendS3JsonlRecords({
+          prisma: prisma as never,
+          dataset: row,
+          projectId: "p1",
+          entries: [{ a: 1 }, { a: 2 }],
+          forcedIds: ["rec_ksuid_1", undefined],
+          storage: storage as never,
+        });
+
+        const writeArgs = storage.writeChunks.mock.calls[0]![0];
+        // The pinned id is persisted verbatim; the id-less row gets a minted one.
+        expect(writeArgs.records[0]).toEqual({
+          id: "rec_ksuid_1",
+          entry: { a: 1 },
+        });
+        expect(writeArgs.records[1].id).toMatch(/^record_/);
+        expect(writeArgs.records[1].id).not.toBe("rec_ksuid_1");
       });
     });
 
@@ -355,8 +519,8 @@ describe("dataset-mutations (s3_jsonl)", () => {
       });
     });
 
-    describe("when every row in a chunk is deleted", () => {
-      it("leaves the chunk in place as empty (startRow===endRow) with chunkCount unchanged", async () => {
+    describe("when every row in a NON-TRAILING chunk is deleted", () => {
+      it("leaves the middle chunk in place as empty (startRow===endRow), chunkCount unchanged, no trim", async () => {
         const row = makeDataset({
           rowCount: 4,
           sizeBytes: 200n,
@@ -403,14 +567,105 @@ describe("dataset-mutations (s3_jsonl)", () => {
         });
         const data = update.mock.calls[0]![0].data;
         expect(data.rowCount).toBe(2);
-        // Empty chunk kept (no compaction): chunkCount stays 2.
+        // A MIDDLE empty chunk is kept (trailing-only compaction can't remove it
+        // without re-indexing the chunks above): chunkCount stays 2, no trim.
         expect(data.chunkCount).toBeUndefined();
+        expect(storage.deleteChunksFrom).not.toHaveBeenCalled();
         // The emptied chunk has startRow===endRow (zero rows); chunk 1 shifts to
         // [0, 2). Untouched chunk byteSize pinned (56 = toSingleJsonl([r3,r4])).
         expect(data.chunkOffsets).toEqual([
           { index: 0, startRow: 0, endRow: 0, byteSize: 0 },
           { index: 1, startRow: 0, endRow: 2, byteSize: 56 },
         ]);
+      });
+    });
+
+    describe("when every row in the TRAILING chunk is deleted", () => {
+      it("lowers chunkCount + trims offsets but leaves the object (logical trim, no in-tx delete)", async () => {
+        const row = makeDataset({
+          rowCount: 4,
+          sizeBytes: 200n,
+          chunkCount: 2,
+          chunkOffsets: [
+            { index: 0, startRow: 0, endRow: 2, byteSize: 100 },
+            { index: 1, startRow: 2, endRow: 4, byteSize: 100 },
+          ] as unknown as Dataset["chunkOffsets"],
+        });
+        const { prisma, update } = makePrisma(row);
+        const readChunk = vi
+          .fn()
+          .mockResolvedValueOnce([
+            { id: "r1", entry: { a: 1 } },
+            { id: "r2", entry: { a: 2 } },
+          ])
+          .mockResolvedValueOnce([
+            { id: "r3", entry: { a: 3 } },
+            { id: "r4", entry: { a: 4 } },
+          ]);
+        // chunk 1 (the last) emptied → rewritten with zero rows.
+        const rewriteChunk = vi
+          .fn()
+          .mockResolvedValue({ index: 1, startRow: 0, endRow: 0, byteSize: 0 });
+        const storage = makeStorage({ readChunk, rewriteChunk });
+
+        const result = await deleteS3JsonlRecords({
+          prisma: prisma as never,
+          dataset: row,
+          projectId: "p1",
+          recordIds: ["r3", "r4"],
+          storage: storage as never,
+        });
+
+        expect(result).toEqual({ deleted: 2 });
+        // No object delete inside the locked tx — that would land before the
+        // lowered chunkCount commits and race a lock-free reader. The trailing
+        // empty object is left as a benign orphan.
+        expect(storage.deleteChunksFrom).not.toHaveBeenCalled();
+        const data = update.mock.calls[0]![0].data;
+        expect(data.rowCount).toBe(2);
+        // chunkCount logically decremented; the trailing empty offset is dropped.
+        expect(data.chunkCount).toBe(1);
+        expect(data.chunkOffsets).toEqual([
+          { index: 0, startRow: 0, endRow: 2, byteSize: 56 },
+        ]);
+      });
+    });
+
+    describe("when every row in the only chunk is deleted (whole dataset emptied)", () => {
+      it("lowers chunkCount to 0 with empty offsets, no object delete", async () => {
+        const row = makeDataset({
+          rowCount: 2,
+          sizeBytes: 100n,
+          chunkCount: 1,
+          chunkOffsets: [
+            { index: 0, startRow: 0, endRow: 2, byteSize: 100 },
+          ] as unknown as Dataset["chunkOffsets"],
+        });
+        const { prisma, update } = makePrisma(row);
+        const readChunk = vi.fn().mockResolvedValueOnce([
+          { id: "r1", entry: { a: 1 } },
+          { id: "r2", entry: { a: 2 } },
+        ]);
+        const rewriteChunk = vi
+          .fn()
+          .mockResolvedValue({ index: 0, startRow: 0, endRow: 0, byteSize: 0 });
+        const storage = makeStorage({ readChunk, rewriteChunk });
+
+        const result = await deleteS3JsonlRecords({
+          prisma: prisma as never,
+          dataset: row,
+          projectId: "p1",
+          recordIds: ["r1", "r2"],
+          storage: storage as never,
+        });
+
+        expect(result).toEqual({ deleted: 2 });
+        // Logical trim only — the emptied object is left as a benign orphan.
+        expect(storage.deleteChunksFrom).not.toHaveBeenCalled();
+        const data = update.mock.calls[0]![0].data;
+        expect(data.rowCount).toBe(0);
+        expect(data.chunkCount).toBe(0);
+        expect(data.chunkOffsets).toEqual([]);
       });
     });
 
@@ -536,6 +791,62 @@ describe("dataset-mutations (s3_jsonl)", () => {
           chunkCount: 2,
           chunkOffsets: expected.chunkOffsets,
         });
+      });
+    });
+
+    describe("when a chunk in the set is missing (corruption, not emptiness)", () => {
+      it("throws MissingChunkError and never masks a surviving later chunk", async () => {
+        // PG claims 3 chunks; chunk 1 is gone but chunk 2 still holds rows. The
+        // repair must NOT stop at the gap and silently drop chunk 2 (that would
+        // re-derive chunkCount=1 and mask data loss) — it stays loud.
+        const row = makeDataset({
+          rowCount: 6,
+          sizeBytes: 300n,
+          chunkCount: 3,
+          chunkOffsets: [] as unknown as Dataset["chunkOffsets"],
+        });
+        const { prisma, update } = makePrisma(row);
+        const readChunk = vi
+          .fn()
+          .mockResolvedValueOnce([
+            { id: "r1", entry: { a: 1 } },
+            { id: "r2", entry: { a: 2 } },
+          ])
+          .mockRejectedValueOnce(
+            new MissingChunkError("datasets/p1/dataset_1/chunk-00001.jsonl"),
+          )
+          .mockResolvedValueOnce([{ id: "r5", entry: { a: 5 } }]);
+        const storage = makeStorage({ readChunk });
+
+        await expect(
+          recomputeDatasetCounts({
+            prisma: prisma as never,
+            datasetId: "dataset_1",
+            projectId: "p1",
+            storage: storage as never,
+          }),
+        ).rejects.toBeInstanceOf(MissingChunkError);
+        // No masking write — the counters are not silently lowered.
+        expect(update).not.toHaveBeenCalled();
+      });
+
+      it("propagates a non-missing-chunk read error", async () => {
+        const row = makeDataset({ chunkCount: 2 });
+        const { prisma } = makePrisma(row);
+        const readChunk = vi
+          .fn()
+          .mockResolvedValueOnce([{ id: "r1", entry: { a: 1 } }])
+          .mockRejectedValueOnce(new Error("S3 connection reset"));
+        const storage = makeStorage({ readChunk });
+
+        await expect(
+          recomputeDatasetCounts({
+            prisma: prisma as never,
+            datasetId: "dataset_1",
+            projectId: "p1",
+            storage: storage as never,
+          }),
+        ).rejects.toThrow("S3 connection reset");
       });
     });
   });

@@ -46,16 +46,6 @@ describe("DatasetRepository", () => {
     it.todo("uses transaction client when provided");
   });
 
-  describe("getProjectWithOrgS3Settings", () => {
-    describe("when org has custom S3", () => {
-      it.todo("returns canUseS3 true");
-    });
-
-    describe("when org has no custom S3", () => {
-      it.todo("returns canUseS3 false");
-    });
-  });
-
   describe("findAllSlugs", () => {
     it.todo("returns all slugs for project");
   });

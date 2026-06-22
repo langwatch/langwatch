@@ -5,12 +5,11 @@ import { projectFactory } from "~/factories/project.factory";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
-  PlanProviderService,
   type PlanProvider,
+  PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
-import { prisma } from "~/server/db";
-import { DatasetService } from "~/server/datasets/dataset.service";
 import type { DatasetColumns } from "~/server/datasets/types";
+import { prisma } from "~/server/db";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 
@@ -141,6 +140,20 @@ describe("Feature: Dataset File Upload REST API", () => {
       headers: { "X-Auth-Token": apiKey ?? testApiKey },
       body: formData,
     });
+  }
+
+  // Helper: read a dataset's records via the API. Born-on-storage datasets keep
+  // rows in chunk objects (not the PG `datasetRecord` table), so assertions on
+  // created records must go through the layout-aware read endpoint.
+  async function getRecords(slugOrId: string, apiKey?: string) {
+    const res = await app.request(
+      `/api/dataset/${slugOrId}/records?limit=1000`,
+      { method: "GET", headers: { "X-Auth-Token": apiKey ?? testApiKey } },
+    );
+    const body = (await res.json()) as {
+      data: Array<{ id: string; entry: Record<string, unknown> }>;
+    };
+    return body.data;
   }
 
   // ── Upload to Existing Dataset ─────────────────────────────────
@@ -534,13 +547,9 @@ describe("Feature: Dataset File Upload REST API", () => {
         expect(columnNames).toContain("input");
         expect(columnNames).toContain("selected_");
 
-        // Verify records use renamed column names
-        const records = await prisma.datasetRecord.findMany({
-          where: {
-            datasetId: body.id,
-            projectId: testProjectId,
-          },
-        });
+        // Verify records use renamed column names (read via the API — the
+        // s3_jsonl dataset stores rows in chunk objects, not the PG table).
+        const records = await getRecords(body.id);
         const entry = records[0]!.entry as Record<string, unknown>;
         expect(entry).toHaveProperty("id_");
         expect(entry).toHaveProperty("selected_");
@@ -676,8 +685,7 @@ describe("Feature: Dataset File Upload REST API", () => {
       it("strips the null byte and persists all records", async () => {
         const NUL = String.fromCharCode(0);
         const jsonl =
-          `{"input": "before${NUL}after"}\n` +
-          `{"input": "clean"}\n`;
+          `{"input": "before${NUL}after"}\n` + `{"input": "clean"}\n`;
         const form = buildFormData({
           file: { content: jsonl, filename: "data.jsonl" },
           name: "Nulls JSONL",
@@ -691,10 +699,8 @@ describe("Feature: Dataset File Upload REST API", () => {
         });
         expect(dataset).not.toBeNull();
 
-        const records = await prisma.datasetRecord.findMany({
-          where: { datasetId: dataset!.id, projectId: testProjectId },
-          orderBy: { id: "asc" },
-        });
+        // Read via the API (s3_jsonl rows live in chunks, not the PG table).
+        const records = await getRecords("nulls-jsonl");
         expect(records).toHaveLength(2);
 
         const entries = records.map((r) => r.entry as Record<string, string>);
@@ -822,69 +828,6 @@ describe("Feature: Dataset File Upload REST API", () => {
       });
       const entry = updated!.entry as Record<string, string>;
       expect(entry.input).toBe("newvalue");
-    });
-  });
-
-  describe("when record insertion fails after the dataset row is created", () => {
-    /** @scenario Create + upload rolls back the dataset row when record insertion fails */
-    /** @scenario Retrying after a failed create + upload reuses the same name */
-    it("rolls back the dataset row so retries with the same name succeed", async () => {
-      // We supply a record id guaranteed to collide with a pre-existing
-      // record, so datasetRecord.createMany inside the transaction throws
-      // a Postgres unique-constraint error after the dataset row has
-      // already been INSERTed within the same transaction. The fix wraps
-      // both writes in $transaction so the dataset row rolls back.
-
-      // Pre-create a sibling dataset + a record whose id we will collide on.
-      const sibling = await prisma.dataset.create({
-        data: {
-          id: `dataset_${nanoid()}`,
-          name: "Sibling",
-          slug: `sibling-${nanoid()}`,
-          projectId: testProjectId,
-          columnTypes: [{ name: "input", type: "string" }],
-        },
-      });
-      const collidingId = `record-collide-${nanoid()}`;
-      await prisma.datasetRecord.create({
-        data: {
-          id: collidingId,
-          datasetId: sibling.id,
-          projectId: testProjectId,
-          entry: { input: "existing" } as any,
-        },
-      });
-
-      const service = DatasetService.create(prisma);
-
-      await expect(
-        service.upsertDataset({
-          projectId: testProjectId,
-          name: "Atomic Test",
-          columnTypes: [{ name: "input", type: "string" }],
-          datasetRecords: [
-            { id: collidingId, input: "would crash on insert" },
-          ],
-        }),
-      ).rejects.toThrow();
-
-      // The dataset row for "Atomic Test" must NOT exist — the failure
-      // inside the transaction should have rolled it back.
-      const orphan = await prisma.dataset.findFirst({
-        where: { slug: "atomic-test", projectId: testProjectId },
-      });
-      expect(orphan).toBeNull();
-
-      // And the next attempt with the same name (after the user fixes
-      // their data) must succeed — proving the customer's "already exists"
-      // wedge is gone.
-      const followUp = await service.upsertDataset({
-        projectId: testProjectId,
-        name: "Atomic Test",
-        columnTypes: [{ name: "input", type: "string" }],
-        datasetRecords: [{ input: "now valid" }],
-      });
-      expect(followUp.slug).toBe("atomic-test");
     });
   });
 });

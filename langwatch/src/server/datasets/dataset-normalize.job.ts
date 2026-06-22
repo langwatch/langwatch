@@ -237,6 +237,28 @@ const buildRenameMap = (headers: string[]): Map<string, string> => {
 };
 
 /**
+ * Make column names unique by suffixing repeats `_1`, `_2`, … — the same scheme
+ * papaparse's `header:true` dedup uses, but applied ONCE to the header row.
+ *
+ * The CSV path parses with `header:false` and maps rows to objects by index
+ * (below) precisely to AVOID papaparse's header machinery: under our
+ * pause/resume backpressure it re-runs its duplicate-name dedup against the
+ * CURRENT data row on every resume, so any row holding two equal cells (an input
+ * that equals its expected output, or two empty cells) had its second value
+ * silently corrupted with a `_1` suffix — and logged a warning per row. Deduping
+ * the header ourselves keeps the legitimate "two columns named the same" rename
+ * without ever touching row values.
+ */
+const dedupeHeaders = (headers: string[]): string[] => {
+  const seen = new Map<string, number>();
+  return headers.map((header) => {
+    const count = seen.get(header) ?? 0;
+    seen.set(header, count + 1);
+    return count === 0 ? header : `${header}_${count}`;
+  });
+};
+
+/**
  * Rewrite a record's keys through the rename map so the stored JSONL row keys
  * match `columnTypes` (m4). Streaming — one record at a time, never buffers the
  * file. A no-op when nothing was renamed.
@@ -295,6 +317,13 @@ const parseInto = async (params: {
   }
 
   if (format === "csv") {
+    // CSV is parsed with `header:false` (rows as arrays) and mapped to objects
+    // by index here — NOT papaparse's `header:true`. Under our pause/resume
+    // backpressure, papaparse re-runs its duplicate-header dedup against the
+    // current data row on every resume, suffixing the second of any two equal
+    // cells with `_1` (corrupting e.g. input==expected rows, or two blank cells)
+    // and warning once per row. We dedup the real header row ONCE instead.
+    let csvHeaders: string[] | null = null;
     await new Promise<void>((resolve, reject) => {
       // papaparse accepts a Node Readable and emits rows via `step`, so the
       // whole CSV is never materialized in memory. Serialize the backpressured
@@ -302,28 +331,39 @@ const parseInto = async (params: {
       let chain: Promise<void> = Promise.resolve();
       // papaparse's Node build accepts a Readable as a streaming source, but
       // its types only model browser File/string inputs — cast at this one seam.
-      Papa.parse<Record<string, unknown>>(stream as unknown as Papa.LocalFile, {
-        header: true,
+      Papa.parse<string[]>(stream as unknown as Papa.LocalFile, {
+        header: false,
         skipEmptyLines: true,
         // Bound papaparse's read buffer so it pulls the stream in fixed-size
         // chunks rather than draining it as fast as the chunk writer allows.
         chunkSize: MAX_CSV_ROW_BYTES,
         step: (row, parser) => {
+          const values = row.data;
+          // The first row is the header: dedupe repeats + reserved-rename once.
+          if (csvHeaders === null) {
+            const raw = values.map((value) =>
+              value == null ? "" : String(value),
+            );
+            csvHeaders = renameReservedColumns(dedupeHeaders(raw));
+            headers = csvHeaders;
+            return;
+          }
+          const record: Record<string, unknown> = {};
+          csvHeaders.forEach((header, i) => {
+            record[header] = values[i];
+          });
           // I-MEM: reject a single row whose serialized fields cross
           // MAX_CSV_ROW_BYTES (a malformed CSV with no row delimiter or one
           // giant field), the CSV counterpart to the JSONL line cap — fail the
           // dataset rather than risk an OOM accumulating an unbounded row.
-          if (csvRowBytes(row.data) > MAX_CSV_ROW_BYTES) {
+          if (csvRowBytes(record) > MAX_CSV_ROW_BYTES) {
             parser.abort();
             reject(new Error("CSV row exceeds max size — malformed file"));
             return;
           }
-          if (headers.length === 0 && row.meta.fields) {
-            captureHeaders(row.meta.fields);
-          }
           parser.pause();
           chain = chain
-            .then(() => writer.push(applyRename(row.data, renameMap)))
+            .then(() => writer.push(record))
             .then(() => parser.resume())
             .catch((error: unknown) => {
               parser.abort();

@@ -34,6 +34,25 @@ export const stagingUploadKey = (
   return `staging/${projectId}/${uploadId}`;
 };
 
+/**
+ * Same-origin upload target for backends that deposit the staged object THROUGH
+ * the app rather than via a cross-origin presigned PUT (local FS — no
+ * browser-reachable bucket). The browser PUTs the raw file here and the route
+ * streams it to staging. Relative on purpose: the modal's PUT helper reads the
+ * leading "/" as "same-origin → send the session cookie" (vs an absolute S3 URL
+ * → no credentials). Shared by `LocalDatasetStorage.createPresignedUpload` (mints
+ * it) and the `/direct-upload/staging/:uploadId` route (serves it).
+ */
+export const localStagingUploadPath = (
+  projectId: string,
+  uploadId: string,
+): string => {
+  assertNoTraversal(projectId, uploadId);
+  return `/api/dataset/direct-upload/staging/${uploadId}?projectId=${encodeURIComponent(
+    projectId,
+  )}`;
+};
+
 /** True when a staged object exceeds the hard cap (checked at finalize). */
 export const exceedsUploadCap = (
   sizeBytes: number,

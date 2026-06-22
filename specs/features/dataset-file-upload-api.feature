@@ -275,25 +275,24 @@ Feature: Dataset File Upload REST API
     And the stored entry's "input" value is "newvalue"
 
   # ── Atomic dataset creation ───────────────────────────────────
-  # If record insertion fails after the parent dataset row is created,
-  # the dataset row must be rolled back. Otherwise the user gets a
-  # half-baked empty dataset and a misleading "name already exists"
-  # error on retry.
+  # A new dataset's rows are written to object storage before the
+  # dataset itself exists. If storage is unavailable, the create fails
+  # cleanly and leaves nothing behind — no half-baked empty dataset and
+  # no misleading "name already exists" error on retry.
 
-  @integration
-  Scenario: Create + upload rolls back the dataset row when record insertion fails
-    Given the database is configured to reject the records insert (e.g. simulated transient error)
-    When I POST /api/dataset/upload with name "Atomic Test" and a valid CSV file
-    Then the request fails with 5xx
-    And no dataset row with slug "atomic-test" exists in the database
+  @regression @unit
+  Scenario: A failed dataset create writes no orphan row
+    Given object storage is unavailable
+    When I create a dataset
+    Then the create fails
+    And no dataset is left behind
 
-  @integration
-  Scenario: Retrying after a failed create + upload reuses the same name
-    Given a previous POST /api/dataset/upload with name "Retry Me" failed during record insertion
-    And the dataset row was rolled back
-    When I POST /api/dataset/upload with name "Retry Me" and a valid CSV file
-    Then the request succeeds with 201
-    And the dataset is created with all records
+  @regression @unit
+  Scenario: Retrying a failed dataset create reuses the same name
+    Given a previous create with name "Retry Me" failed and left nothing behind
+    And object storage is now available again
+    When I create a dataset with name "Retry Me"
+    Then the create succeeds
 
   # ── Authentication ─────────────────────────────────────────────
 

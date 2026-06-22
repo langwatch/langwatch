@@ -39,7 +39,11 @@ import {
   toSingleJsonl,
 } from "./dataset-chunking";
 import type { DatasetStorage, PresignedUpload } from "./dataset-storage";
-import { ChunkTooLargeError, StagedUploadNotFoundError } from "./errors";
+import {
+  ChunkTooLargeError,
+  MissingChunkError,
+  StagedUploadNotFoundError,
+} from "./errors";
 import { stagingUploadKey, UPLOAD_TTL_SECONDS } from "./presigned-upload";
 
 type ResolvedS3Client = { s3Client: S3Client; s3Bucket: string };
@@ -149,7 +153,7 @@ export class S3DatasetStorage implements DatasetStorage {
         jsonl = (await Body?.transformToString()) ?? "";
       } catch (error: unknown) {
         if (errorHasProp(error, "name", "NoSuchKey")) {
-          throw new Error(`Missing dataset chunk: ${key}`);
+          throw new MissingChunkError(key);
         }
         throw error;
       }
@@ -180,7 +184,7 @@ export class S3DatasetStorage implements DatasetStorage {
       jsonl = (await Body?.transformToString()) ?? "";
     } catch (error: unknown) {
       if (errorHasProp(error, "name", "NoSuchKey")) {
-        throw new Error(`Missing dataset chunk: ${key}`);
+        throw new MissingChunkError(key);
       }
       throw error;
     }

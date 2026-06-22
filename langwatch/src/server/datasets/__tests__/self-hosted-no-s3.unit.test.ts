@@ -43,11 +43,31 @@ vi.mock("../dataset-normalize.queue", () => ({
   enqueueDatasetNormalize: vi.fn().mockResolvedValue(undefined),
 }));
 
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { Readable } from "node:stream";
+import { nanoid } from "nanoid";
 import { createManyDatasetRecords } from "../../api/routers/datasetRecord.utils";
 import { DatasetService } from "../dataset.service";
+import * as datasetStorageModule from "../dataset-storage";
 import { getDatasetStorage } from "../dataset-storage";
-import { DirectUploadUnavailableError } from "../errors";
+import {
+  DirectUploadUnavailableError,
+  UploadNotPendingError,
+  UploadTooLargeError,
+} from "../errors";
 import { LocalDatasetStorage } from "../local-dataset-storage";
+
+/** A non-object-mode Readable emitting the given byte chunks, then EOF — an
+ * unambiguous byte stream for the streaming-upload tests (avoids Readable.from's
+ * object-mode-by-default ambiguity when piping into a byte writable). */
+const byteStream = (...chunks: string[]): Readable => {
+  const r = new Readable({ read() {} });
+  for (const c of chunks) r.push(Buffer.from(c, "utf8"));
+  r.push(null);
+  return r;
+};
 
 /** A no-S3 (single-replica self-host) storage destination. */
 const NO_S3_DESTINATION = {
@@ -82,74 +102,136 @@ describe("Feature: Large dataset storage — self-hosted without object storage"
       expect(resolveProjectStorageDestination).toHaveBeenCalledWith("p1");
     });
 
-    describe("when a heavy direct (browser→S3) upload is requested", () => {
-      it("throws DirectUploadUnavailableError so the caller falls back to /upload", async () => {
+    describe("when a heavy direct upload is requested", () => {
+      it("mints a same-origin staging URL instead of throwing (local-FS streaming upload)", async () => {
         const storage = await getDatasetStorage("p1");
 
-        await expect(
-          storage.createPresignedUpload({ projectId: "p1" }),
-        ).rejects.toBeInstanceOf(DirectUploadUnavailableError);
+        const presign = await storage.createPresignedUpload({
+          projectId: "p1",
+        });
+
+        // Relative (same-origin) URL → the browser streams the file THROUGH the
+        // app to local-FS staging; no S3 required. The key is the same
+        // tenant-scoped, server-owned key finalize/normalize already understand.
+        expect(presign.url).toMatch(
+          /^\/api\/dataset\/direct-upload\/staging\//,
+        );
+        expect(presign.url).toContain("projectId=p1");
+        expect(presign.key).toBe(`staging/p1/${presign.uploadId}`);
       });
     });
   });
 
-  describe("DatasetService.createPendingUpload() on a no-S3 instance", () => {
+  describe("DatasetService direct upload on a no-S3 instance", () => {
+    /**
+     * Born-on-storage made backend storage mandatory; the local-FS direct-upload
+     * transport (ADR-032 v14) makes the heavy-file UPLOAD work without S3 too.
+     * `createPendingUpload` no longer throws — it mints a same-origin staging
+     * URL and an `uploading` row; the browser PUTs the raw file to that route,
+     * which streams it to local-FS staging (no in-browser parse, no 25 MB cap).
+     * Real `LocalDatasetStorage` on a tmp root proves the bytes actually land.
+     */
     /** @scenario "Datasets work on a minimal self-hosted install" */
-    it("propagates DirectUploadUnavailableError without creating an orphan row", async () => {
+    /** @scenario A large file uploads on a self-hosted install with no object storage */
+    it("accepts a heavy upload via the same-origin staging route and lands it in storage", async () => {
+      const root = path.join(os.tmpdir(), `lw-ds-localup-${nanoid()}`);
+      resolveProjectStorageDestination.mockResolvedValue({
+        kind: "file" as const,
+        root,
+      });
+      let createdRow: Record<string, unknown> | undefined;
       const repository = {
         findBySlug: vi.fn().mockResolvedValue(null),
-        create: vi.fn(),
-      };
-
-      await expect(
-        makeService({ repository }).createPendingUpload({
-          projectId: "p1",
-          name: "DS",
-          filename: "data.jsonl",
+        create: vi.fn().mockImplementation((data: { id: string }) => {
+          createdRow = {
+            ...data,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+          return Promise.resolve(createdRow);
         }),
-      ).rejects.toBeInstanceOf(DirectUploadUnavailableError);
-      // No row is created when the presign is unavailable — the client retries
-      // via the backend /upload path, which creates a postgres dataset instead.
-      expect(repository.create).not.toHaveBeenCalled();
+        // The staging write is gated on the owning `uploading` row that
+        // createPendingUpload just inserted (matched by its bound stagingKey).
+        findPendingUploadByStagingKey: vi
+          .fn()
+          .mockImplementation(({ stagingKey }: { stagingKey: string }) =>
+            Promise.resolve(
+              createdRow?.stagingKey === stagingKey ? createdRow : null,
+            ),
+          ),
+      };
+      const service = makeService({ repository, prisma: {} });
+
+      // 1. No-S3 no longer dead-ends: a same-origin staging URL + `uploading` row.
+      const pending = await service.createPendingUpload({
+        projectId: "p1",
+        name: "Big DS",
+        filename: "big.csv",
+      });
+      expect(pending.uploadUrl).toMatch(
+        /^\/api\/dataset\/direct-upload\/staging\//,
+      );
+      expect(repository.create).toHaveBeenCalledOnce();
+      const uploadId = pending.stagingKey.split("/").pop()!;
+
+      // 2. The browser PUTs the raw file; the route streams it via the service.
+      await service.writeStagedUpload({
+        projectId: "p1",
+        uploadId,
+        body: byteStream("question,answer\n", "q1,a1\n", "q2,a2\n"),
+      });
+
+      // 3. The staged object actually landed at the bound key — finalize's HEAD
+      // (headStagedObjectSize) reads a real, non-empty size.
+      const storage = await getDatasetStorage("p1");
+      const size = await storage.headStagedObjectSize({
+        projectId: "p1",
+        key: pending.stagingKey,
+      });
+      expect(size).toBeGreaterThan(0);
+
+      await fs.rm(root, { recursive: true, force: true });
     });
   });
 
   describe("DatasetService.createDatasetFromUpload() on a no-S3 instance", () => {
     /**
-     * The backend upload fallback (≤25MB) must always produce a Postgres-layout
-     * dataset — never `s3_jsonl` — when storage isn't S3-backed. This is the
-     * fallback the /upload route uses after a direct-upload 409.
+     * Born-on-storage (ADR-032 cutover step 1): the backend upload fallback
+     * (≤25MB) now creates an `s3_jsonl` dataset on the LOCAL filesystem even with
+     * no S3 configured — `postgres` is never created for new data. The chunk
+     * write lands on the resolver-provided `file` root via the real
+     * `LocalDatasetStorage`, and records never touch the PG record-write seam.
      */
-    it("creates a postgres-layout dataset and writes rows to PG, never S3", async () => {
-      let createdLayout: string | undefined;
+    /** @scenario A new dataset is created directly in object storage */
+    it("creates an s3_jsonl dataset on local FS, never PG, even with no S3", async () => {
+      const root = path.join(os.tmpdir(), `lw-ds-no-s3-${nanoid()}`);
+      resolveProjectStorageDestination.mockResolvedValue({
+        kind: "file" as const,
+        root,
+      });
+
+      let created: {
+        id?: string;
+        contentLayout?: string;
+        status?: string;
+        rowCount?: number;
+        chunkCount?: number;
+      } = {};
       const repository = {
         findBySlug: vi.fn().mockResolvedValue(null),
-        getProjectWithOrgS3Settings: vi
-          .fn()
-          .mockResolvedValue({ canUseS3: false }),
-        create: vi
-          .fn()
-          .mockImplementation((data: { contentLayout?: string }) => {
-            createdLayout = data.contentLayout;
-            return Promise.resolve({
-              id: "dataset_pg",
-              name: "DS",
-              slug: "ds",
-              columnTypes: [{ name: "input", type: "string" }],
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            });
-          }),
-      };
-      // createNewDataset runs inside a $transaction(fn) — run fn with the repo's
-      // own client (the repository methods are mocked, so the tx client is unused).
-      const prisma = {
-        $transaction: async (fn: (tx: unknown) => unknown) => fn({}),
+        create: vi.fn().mockImplementation((data: typeof created) => {
+          created = data;
+          return Promise.resolve({
+            ...data,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+        }),
       };
 
       const result = await makeService({
         repository,
-        prisma,
+        prisma: {},
       }).createDatasetFromUpload({
         projectId: "p1",
         name: "DS",
@@ -158,14 +240,423 @@ describe("Feature: Large dataset storage — self-hosted without object storage"
         fileSize: 12,
       });
 
-      expect(result.id).toBe("dataset_pg");
-      // Default Prisma `contentLayout` is "postgres"; createNewDataset never sets
-      // it to s3_jsonl, so `create` is called WITHOUT an s3_jsonl layout.
-      expect(createdLayout).not.toBe("s3_jsonl");
-      // Rows go to PG via the record-write seam.
-      expect(createManyDatasetRecords).toHaveBeenCalledOnce();
-      // The S3 client / dataset storage is never resolved for the PG write path.
-      expect(resolveProjectStorageDestination).not.toHaveBeenCalled();
+      // Born s3_jsonl + ready, with PG-authoritative counters from the chunk write.
+      expect(created.contentLayout).toBe("s3_jsonl");
+      expect(created.status).toBe("ready");
+      expect(created.rowCount).toBe(1);
+      expect(created.chunkCount).toBe(1);
+      // Records go to chunk objects, NOT the PG record-write seam.
+      expect(createManyDatasetRecords).not.toHaveBeenCalled();
+      // The chunk actually landed on the local filesystem under the resolved root.
+      const storage = await getDatasetStorage("p1");
+      const rows = await storage.readChunks({
+        projectId: "p1",
+        datasetId: result.id,
+        chunkCount: 1,
+      });
+      expect(rows).toHaveLength(1);
+      expect((rows[0] as { entry: unknown }).entry).toEqual({ input: "hello" });
+
+      await fs.rm(root, { recursive: true, force: true });
+    });
+  });
+
+  describe("DatasetService.upsertDataset() empty create on a no-S3 instance", () => {
+    it("borns an empty s3_jsonl dataset (0 chunks, ready) and reads back empty", async () => {
+      const root = path.join(os.tmpdir(), `lw-ds-empty-${nanoid()}`);
+      resolveProjectStorageDestination.mockResolvedValue({
+        kind: "file" as const,
+        root,
+      });
+      let created: {
+        id?: string;
+        contentLayout?: string;
+        status?: string;
+        rowCount?: number;
+        chunkCount?: number;
+      } = {};
+      const repository = {
+        findBySlug: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockImplementation((data: typeof created) => {
+          created = data;
+          return Promise.resolve({
+            ...data,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          });
+        }),
+      };
+
+      const dataset = await makeService({
+        repository,
+        prisma: {},
+      }).upsertDataset({
+        projectId: "p1",
+        name: "Empty DS",
+        columnTypes: [{ name: "input", type: "string" }],
+      });
+
+      // Born s3_jsonl + ready with zero chunks — no records to write.
+      expect(created.contentLayout).toBe("s3_jsonl");
+      expect(created.status).toBe("ready");
+      expect(created.rowCount).toBe(0);
+      expect(created.chunkCount).toBe(0);
+      expect(createManyDatasetRecords).not.toHaveBeenCalled();
+      // A 0-chunk dataset reads back empty without throwing.
+      const storage = await getDatasetStorage("p1");
+      const rows = await storage.readChunks({
+        projectId: "p1",
+        datasetId: dataset.id,
+        chunkCount: 0,
+      });
+      expect(rows).toEqual([]);
+
+      await fs.rm(root, { recursive: true, force: true });
+    });
+  });
+
+  describe("DatasetService.upsertDataset() create with caller-supplied record ids", () => {
+    /**
+     * Born-on-storage create honors a pinned row id (the contract the old
+     * createManyDatasetRecords path provided and the append path still does), so
+     * a caller that sets an id for later edit/delete or idempotency keeps it. A
+     * row with no id gets a fresh `record_<nanoid>`. Read back from the real
+     * local-FS chunk to prove the id actually landed.
+     */
+    it("honors a pinned id and mints a fresh one only where absent", async () => {
+      const root = path.join(os.tmpdir(), `lw-ds-ids-${nanoid()}`);
+      resolveProjectStorageDestination.mockResolvedValue({
+        kind: "file" as const,
+        root,
+      });
+      const repository = {
+        findBySlug: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockImplementation((data: { id: string }) =>
+          Promise.resolve({
+            ...data,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+        ),
+      };
+
+      const dataset = await makeService({
+        repository,
+        prisma: {},
+      }).upsertDataset({
+        projectId: "p1",
+        name: "Pinned DS",
+        columnTypes: [{ name: "input", type: "string" }],
+        datasetRecords: [
+          { id: "record_pinned", input: "hello" },
+          { input: "world" },
+        ],
+      });
+
+      const storage = await getDatasetStorage("p1");
+      const rows = (await storage.readChunks({
+        projectId: "p1",
+        datasetId: dataset.id,
+        chunkCount: 1,
+      })) as Array<{ id: string; entry: unknown }>;
+
+      expect(rows[0]!.id).toBe("record_pinned");
+      expect(rows[0]!.entry).toEqual({ input: "hello" });
+      // The id-less row got a minted id, not the pinned one.
+      expect(rows[1]!.id).toMatch(/^record_/);
+      expect(rows[1]!.id).not.toBe("record_pinned");
+
+      await fs.rm(root, { recursive: true, force: true });
+    });
+  });
+
+  describe("DatasetService.upsertDataset() when the chunk write fails during create", () => {
+    /**
+     * Born-on-storage writes the chunk objects BEFORE inserting the row, so a
+     * chunk-write failure must throw and leave NO orphan row (the old
+     * record-insert transaction left an orphan that wedged name reuse). Mock the
+     * storage factory so the FIRST create's `writeChunks` rejects, then a real
+     * local-FS storage for the retry — proving the failed create wrote no row and
+     * the same name is immediately reusable.
+     */
+    /** @scenario A failed dataset create writes no orphan row */
+    /** @scenario Retrying a failed dataset create reuses the same name */
+    it("throws without creating a row, then a retry with the same name succeeds", async () => {
+      const root = path.join(os.tmpdir(), `lw-ds-atomic-${nanoid()}`);
+      resolveProjectStorageDestination.mockResolvedValue({
+        kind: "file" as const,
+        root,
+      });
+
+      // First create's storage write rejects; every later call falls through to
+      // the REAL local-FS factory (so the retry actually writes a chunk).
+      const realGetDatasetStorage = datasetStorageModule.getDatasetStorage;
+      const storageSpy = vi
+        .spyOn(datasetStorageModule, "getDatasetStorage")
+        .mockResolvedValueOnce({
+          writeChunks: vi
+            .fn()
+            .mockRejectedValue(new Error("storage write failed")),
+        } as never)
+        .mockImplementation((projectId: string) =>
+          realGetDatasetStorage(projectId),
+        );
+
+      const repository = {
+        findBySlug: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockImplementation((data: { id: string }) =>
+          Promise.resolve({
+            ...data,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }),
+        ),
+      };
+      const service = makeService({ repository, prisma: {} });
+
+      // The chunk write fails → the whole create rejects.
+      await expect(
+        service.upsertDataset({
+          projectId: "p1",
+          name: "Atomic DS",
+          columnTypes: [{ name: "input", type: "string" }],
+          datasetRecords: [{ input: "would fail to write" }],
+        }),
+      ).rejects.toThrow("storage write failed");
+      // No orphan row: the row is inserted only AFTER the chunk write succeeds.
+      expect(repository.create).not.toHaveBeenCalled();
+
+      // The retry with the SAME name succeeds (real storage) — the "already
+      // exists" wedge is gone because the failed create wrote no row.
+      const followUp = await service.upsertDataset({
+        projectId: "p1",
+        name: "Atomic DS",
+        columnTypes: [{ name: "input", type: "string" }],
+        datasetRecords: [{ input: "now valid" }],
+      });
+      expect(followUp.slug).toBe("atomic-ds");
+      expect(repository.create).toHaveBeenCalledOnce();
+
+      storageSpy.mockRestore();
+      await fs.rm(root, { recursive: true, force: true });
+    });
+  });
+
+  describe("DatasetService.upsertDataset() when the row insert fails after chunks are written", () => {
+    /**
+     * Born-on-storage writes chunks BEFORE the row. If the row insert then fails
+     * (slug race → `@@unique` violation, DB outage), the just-written objects
+     * would be orphaned customer content with no row to govern retention — the
+     * create best-effort reaps them before surfacing the error.
+     */
+    it("reaps the orphaned chunk objects when the row insert fails", async () => {
+      const root = path.join(os.tmpdir(), `lw-ds-f2-${nanoid()}`);
+      resolveProjectStorageDestination.mockResolvedValue({
+        kind: "file" as const,
+        root,
+      });
+
+      let datasetId: string | undefined;
+      const repository = {
+        findBySlug: vi.fn().mockResolvedValue(null),
+        // Slug check passed, but the insert hits the unique constraint (a race).
+        create: vi.fn().mockImplementation((data: { id: string }) => {
+          datasetId = data.id;
+          return Promise.reject(new Error("unique constraint violation"));
+        }),
+      };
+
+      await expect(
+        makeService({ repository, prisma: {} }).upsertDataset({
+          projectId: "p1",
+          name: "Race DS",
+          columnTypes: [{ name: "input", type: "string" }],
+          datasetRecords: [{ input: "hello" }],
+        }),
+      ).rejects.toThrow("unique constraint violation");
+
+      // The chunk written before the failed insert was reaped — no orphan content
+      // left in storage. readChunks now hits the deleted chunk-0.
+      const storage = await getDatasetStorage("p1");
+      await expect(
+        storage.readChunks({
+          projectId: "p1",
+          datasetId: datasetId!,
+          chunkCount: 1,
+        }),
+      ).rejects.toThrow(/Missing dataset chunk/);
+
+      await fs.rm(root, { recursive: true, force: true });
+    });
+  });
+
+  describe("DatasetService.upsertDataset() when the chunk write fails mid-batch", () => {
+    /**
+     * Born-on-storage writes chunks sequentially. A failure mid-batch (chunk 0
+     * lands, chunk 1 throws) would leave the already-written object as a rowless
+     * orphan — the same harm the insert-failure reap guards against.
+     * `writeInitialS3JsonlChunks` self-reaps the `0..k` prefix on a write
+     * failure, so a failed create leaves nothing behind. End-to-end proof on a
+     * real local-FS backend. (Symmetry with "row insert fails after chunks are
+     * written".)
+     */
+    it("reaps the partially-written chunk objects when the write fails mid-batch", async () => {
+      const root = path.join(os.tmpdir(), `lw-ds-partial-${nanoid()}`);
+      resolveProjectStorageDestination.mockResolvedValue({
+        kind: "file" as const,
+        root,
+      });
+
+      // Capture the REAL local-FS backend before spying, then wrap it: write
+      // only the FIRST chunk for real and throw as if the next chunk failed.
+      // Deletes delegate to the real backend so the reap actually runs on disk.
+      const realStorage = await datasetStorageModule.getDatasetStorage("p1");
+      let writtenDatasetId: string | undefined;
+      const partialWriteStorage = {
+        writeChunks: vi.fn().mockImplementation(async (args: any) => {
+          writtenDatasetId = args.datasetId;
+          await realStorage.writeChunks({
+            ...args,
+            records: args.records.slice(0, 1),
+          });
+          throw new Error("storage write failed mid-batch");
+        }),
+        deleteChunksFrom: (args: any) => realStorage.deleteChunksFrom(args),
+      };
+      const storageSpy = vi
+        .spyOn(datasetStorageModule, "getDatasetStorage")
+        .mockResolvedValue(partialWriteStorage as never);
+
+      const repository = {
+        findBySlug: vi.fn().mockResolvedValue(null),
+        create: vi.fn(),
+      };
+
+      await expect(
+        makeService({ repository, prisma: {} }).upsertDataset({
+          projectId: "p1",
+          name: "Partial DS",
+          columnTypes: [{ name: "input", type: "string" }],
+          datasetRecords: [{ input: "a" }, { input: "b" }],
+        }),
+      ).rejects.toThrow("storage write failed mid-batch");
+
+      // The row was never inserted — the write threw first.
+      expect(repository.create).not.toHaveBeenCalled();
+      // The chunk that DID land was reaped: reading it back hits the deleted
+      // chunk-0. Without the reap this read would succeed (rowless orphan).
+      expect(partialWriteStorage.writeChunks).toHaveBeenCalledOnce();
+      await expect(
+        realStorage.readChunks({
+          projectId: "p1",
+          datasetId: writtenDatasetId!,
+          chunkCount: 1,
+        }),
+      ).rejects.toThrow(/Missing dataset chunk/);
+
+      storageSpy.mockRestore();
+      await fs.rm(root, { recursive: true, force: true });
+    });
+  });
+
+  describe("DatasetService.writeStagedUpload() when the backend deposits direct (S3)", () => {
+    it("rejects with DirectUploadUnavailableError — the app route isn't S3's upload mechanism", async () => {
+      // An S3-style storage has no `putStaged` (its presigned PUT lands bytes in
+      // the bucket directly), so the staging route must refuse rather than no-op.
+      const storageSpy = vi
+        .spyOn(datasetStorageModule, "getDatasetStorage")
+        .mockResolvedValue({} as never);
+
+      await expect(
+        makeService({ prisma: {} }).writeStagedUpload({
+          projectId: "p1",
+          uploadId: "up_1",
+          body: byteStream("x"),
+        }),
+      ).rejects.toBeInstanceOf(DirectUploadUnavailableError);
+
+      storageSpy.mockRestore();
+    });
+  });
+
+  describe("DatasetService.writeStagedUpload() when no pending upload owns the key", () => {
+    it("refuses the orphan write (UploadNotPendingError) before touching the disk", async () => {
+      // A fabricated/replayed uploadId has no `uploading` row bound to its
+      // staging key; stream it anyway and an authed user fills local disk with
+      // orphans no lifecycle reaps. The gate refuses before putStaged runs.
+      const putStaged = vi.fn();
+      const storageSpy = vi
+        .spyOn(datasetStorageModule, "getDatasetStorage")
+        .mockResolvedValue({ putStaged } as never);
+      const repository = {
+        findPendingUploadByStagingKey: vi.fn().mockResolvedValue(null),
+      };
+
+      await expect(
+        makeService({ repository, prisma: {} }).writeStagedUpload({
+          projectId: "p1",
+          uploadId: "up_orphan",
+          body: byteStream("x"),
+        }),
+      ).rejects.toBeInstanceOf(UploadNotPendingError);
+
+      // Never reached the disk write.
+      expect(putStaged).not.toHaveBeenCalled();
+      expect(repository.findPendingUploadByStagingKey).toHaveBeenCalledWith({
+        projectId: "p1",
+        stagingKey: "staging/p1/up_orphan",
+      });
+
+      storageSpy.mockRestore();
+    });
+  });
+
+  describe("LocalDatasetStorage.putStaged() — no-S3 streaming deposit", () => {
+    it("aborts mid-stream past maxBytes and leaves no partial object (disk-fill guard)", async () => {
+      const root = path.join(os.tmpdir(), `lw-ds-putcap-${nanoid()}`);
+      const storage = new LocalDatasetStorage(root);
+      const key = `staging/p1/${nanoid()}`;
+
+      // 50 bytes streamed, cap 25 → abort once the running total crosses it.
+      await expect(
+        storage.putStaged({
+          projectId: "p1",
+          key,
+          body: byteStream(
+            "0123456789",
+            "0123456789",
+            "0123456789",
+            "0123456789",
+            "0123456789",
+          ),
+          maxBytes: 25,
+        }),
+      ).rejects.toBeInstanceOf(UploadTooLargeError);
+
+      // The partial object was reaped — a rejected upload leaves nothing behind.
+      await expect(
+        storage.headStagedObjectSize({ projectId: "p1", key }),
+      ).rejects.toThrow();
+
+      await fs.rm(root, { recursive: true, force: true });
+    });
+
+    it("streams a within-cap body to disk and reads its size back", async () => {
+      const root = path.join(os.tmpdir(), `lw-ds-putok-${nanoid()}`);
+      const storage = new LocalDatasetStorage(root);
+      const key = `staging/p1/${nanoid()}`;
+
+      await storage.putStaged({
+        projectId: "p1",
+        key,
+        body: byteStream("question,answer\n", "q1,a1\n"),
+        maxBytes: 1024,
+      });
+
+      const size = await storage.headStagedObjectSize({ projectId: "p1", key });
+      expect(size).toBe(Buffer.byteLength("question,answer\nq1,a1\n"));
+
+      await fs.rm(root, { recursive: true, force: true });
     });
   });
 
