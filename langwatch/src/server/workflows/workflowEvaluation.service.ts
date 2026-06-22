@@ -7,7 +7,6 @@ import {
   type TargetConfig,
 } from "~/experiments-v3/types";
 import { extractPersistedState } from "~/experiments-v3/types/persistence";
-import { entryInlineWithDefaults } from "~/optimization_studio/server/entryInputDefaults";
 import type {
   Entry,
   Field,
@@ -273,69 +272,6 @@ export class WorkflowEvaluationService {
       runUrl,
       workflowVersionId: version.id,
       version: version.version,
-    };
-  }
-}
-
-/**
- * Binds caller-provided parameters as constant entry inputs: each key
- * becomes an entry field (if not already one) and a constant column on
- * the materialized dataset, so every evaluated row carries the value.
- * With no dataset attached, the parameters themselves form a single
- * synthetic row - evaluate-with-flags needs no placeholder dataset.
- */
-export function injectEntryParameters(
-  workflow: WorkflowDSL,
-  parameters: WorkflowEvaluationParameters,
-): void {
-  const entryNode = workflow.nodes.find((n) => n.type === "entry");
-  if (!entryNode) return;
-  const entry = entryNode.data as Entry;
-
-  const outputs: Field[] = [...(entry.outputs ?? [])];
-  for (const key of Object.keys(parameters)) {
-    if (!outputs.some((o) => o.identifier === key)) {
-      outputs.push({ identifier: key, type: "str" });
-    }
-  }
-  entry.outputs = outputs;
-
-  const inline = entry.dataset?.inline;
-  if (inline) {
-    const rowCount = Math.max(
-      1,
-      ...Object.values(inline.records).map((column) => column.length),
-    );
-    for (const [key, value] of Object.entries(parameters)) {
-      inline.records[key] = Array<unknown>(rowCount).fill(value);
-      if (!inline.columnTypes.some((c) => c.name === key)) {
-        inline.columnTypes.push({ name: key, type: "string" });
-      }
-    }
-  } else {
-    entry.dataset = {
-      name: "API parameters",
-      inline: {
-        records: Object.fromEntries(
-          Object.entries(parameters).map(([key, value]) => [key, [value]]),
-        ),
-        columnTypes: Object.keys(parameters).map((key) => ({
-          name: key,
-          type: "string" as const,
-        })),
-      },
-    };
-  }
-
-  // Backfill any entry field with a default value that the caller did not
-  // provide as a parameter, so the run gets the default instead of nothing.
-  if (entry.dataset?.inline) {
-    entry.dataset = {
-      ...entry.dataset,
-      inline: entryInlineWithDefaults(
-        entry.dataset.inline,
-        entry.outputs ?? [],
-      ),
     };
   }
 }

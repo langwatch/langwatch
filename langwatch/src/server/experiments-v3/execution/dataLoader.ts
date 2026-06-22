@@ -228,6 +228,14 @@ export const applyParametersToRows = ({
 /**
  * Normalizes inline row-first data (from the run API or an SDK) into the loaded
  * dataset shape. Columns are derived from the union of keys across rows.
+ *
+ * Unlike the saved/attached-dataset paths, inline values are NOT run through
+ * parseJsonColumns: row-first data arrives as native JSON (a caller posting a
+ * chat-messages or rag-contexts column sends an actual array/object, not a
+ * stringified one) and carries no declared column types to mark which strings
+ * to parse. So every column is typed "string" and values pass through as-is;
+ * structured fields are already structured. A caller that hand-sends
+ * stringified JSON is responsible for sending it parsed instead.
  */
 const rowsFromInlineData = (
   data: Array<Record<string, unknown>>,

@@ -449,7 +449,7 @@ describe("Workflows REST API", () => {
       });
 
       /** @scenario "Caller-supplied parameters are accepted" */
-      it("accepts parameters and starts a run", async () => {
+      it("binds an undeclared parameter as a target input and dataset mapping", async () => {
         await createVersion("1", entryDsl());
 
         const res = await postEvaluate(
@@ -458,6 +458,31 @@ describe("Workflows REST API", () => {
         );
 
         await expectRunResponse(res);
+
+        // The entry only declares `question`. A parameter the workflow does not
+        // declare still has to reach the nodes: it rides as a dataset column
+        // (applyParametersToRows), so the target must gain a matching input and
+        // mapping or buildTargetInputs would never read that column. Asserting
+        // the persisted target proves the wiring, not just that the call 200s.
+        const experiment = await prisma.experiment.findFirst({
+          where: {
+            projectId: testProjectId,
+            workflowId: workflow.id,
+            type: "EVALUATIONS_V3",
+          },
+        });
+        const state = experiment!.workbenchState as {
+          targets: Array<{
+            inputs: Array<{ identifier: string }>;
+            mappings: Record<string, Record<string, unknown>>;
+          }>;
+        };
+        const target = state.targets[0]!;
+        const inputIdentifiers = target.inputs.map((i) => i.identifier);
+        expect(inputIdentifiers).toContain("feature_flag");
+        expect(inputIdentifiers).toContain("question");
+        const datasetMapping = Object.values(target.mappings)[0]!;
+        expect(Object.keys(datasetMapping)).toContain("feature_flag");
       });
 
       /** @scenario "Inline data can be evaluated instead of the attached dataset" */
