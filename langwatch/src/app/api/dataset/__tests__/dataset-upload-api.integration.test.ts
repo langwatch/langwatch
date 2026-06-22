@@ -145,9 +145,11 @@ describe("Feature: Dataset File Upload REST API", () => {
   // Helper: read a dataset's records via the API. Born-on-storage datasets keep
   // rows in chunk objects (not the PG `datasetRecord` table), so assertions on
   // created records must go through the layout-aware read endpoint.
-  async function getRecords(slugOrId: string, apiKey?: string) {
+  // `limit` caps the rows fetched (default 1000). A test that creates more than
+  // this MUST pass a higher limit or its assertions will silently truncate.
+  async function getRecords(slugOrId: string, apiKey?: string, limit = 1000) {
     const res = await app.request(
-      `/api/dataset/${slugOrId}/records?limit=1000`,
+      `/api/dataset/${slugOrId}/records?limit=${limit}`,
       { method: "GET", headers: { "X-Auth-Token": apiKey ?? testApiKey } },
     );
     const body = (await res.json()) as {
