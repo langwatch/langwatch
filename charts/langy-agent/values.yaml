@@ -24,7 +24,7 @@ resources:
     cpu: "2"
     memory: 4Gi
 
-# server.js (the manager) tunables. Surfaced via the ConfigMap.
+# Manager tunables (read by services/langy-agent/config.go). Surfaced via the ConfigMap.
 manager:
   port: 8080
   maxWorkers: 20
@@ -45,7 +45,7 @@ secrets:
   existingSecretName: langwatch-langy-agent-auth
   internalSecretKey: LANGY_INTERNAL_SECRET
 
-# /health (server.js) backs both probes.
+# /health (manager HTTP) backs both probes.
 probes:
   readiness:
     periodSeconds: 10

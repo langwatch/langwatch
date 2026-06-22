@@ -20,7 +20,7 @@ spec:
           imagePullPolicy: Never
           ports:
             - containerPort: 8080
-          # NO user credentials at pod level. The manager (server.js) injects
+          # NO user credentials at pod level. The manager (services/langy-agent) injects
           # per-session credentials when it spawns each worker subprocess, so
           # there's no shared key to fall back to or leak across sessions.
           # The ONE env var here is the service-to-service auth secret —

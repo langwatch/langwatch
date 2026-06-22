@@ -1,6 +1,6 @@
 # langwatch-langy-agent helm chart
 
-Deploys the **Langy agent pod** — the OpenCode "manager" (`server.js`) that
+Deploys the **Langy agent pod** — the OpenCode "manager" (Go, `services/langy-agent/`) that
 backs the in-product Langy assistant. The manager spawns one isolated
 OpenCode subprocess per conversation and injects that request's credentials
 into the subprocess env at spawn time, so sessions never share credentials.

@@ -4,7 +4,7 @@ metadata:
   name: {{ include "langy-agent.fullname" . }}
   labels: {{- include "langy-agent.labels" . | nindent 4 }}
 data:
-  # Non-secret tunables read by server.js (the manager). The service-to-
+  # Non-secret tunables read by the manager (services/langy-agent). The service-to-
   # service auth secret (LANGY_INTERNAL_SECRET) is NOT here — it comes from
   # the existing Secret, injected directly in the Deployment env.
   PORT: {{ .Values.manager.port | quote }}
