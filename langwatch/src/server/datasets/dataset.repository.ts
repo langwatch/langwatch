@@ -51,6 +51,33 @@ export class DatasetRepository {
   }
 
   /**
+   * Finds a single dataset by id within a project, throwing if absent.
+   *
+   * The s3_jsonl write-mutations re-read the row inside the per-dataset advisory
+   * lock, where its existence is already guaranteed by the lock — a miss there is
+   * an invariant violation, not a not-found to branch on. This is the throwing
+   * counterpart to {@link findOne} so those paths surface it loudly (Prisma's
+   * `NotFoundError`) instead of null-checking a "can't happen".
+   */
+  async findOneOrThrow(
+    input: {
+      id: string;
+      projectId: string;
+    },
+    options?: {
+      tx?: Prisma.TransactionClient;
+    },
+  ): Promise<Dataset> {
+    const client = options?.tx ?? this.prisma;
+    return await client.dataset.findFirstOrThrow({
+      where: {
+        id: input.id,
+        projectId: input.projectId,
+      },
+    });
+  }
+
+  /**
    * Finds dataset by slug within a project.
    */
   async findBySlug(
@@ -89,12 +116,15 @@ export class DatasetRepository {
   }
 
   /**
-   * Updates an existing dataset.
+   * Updates an existing dataset and returns the updated row.
    *
-   * Validates that the dataset belongs to the specified project before updating.
-   * This guard prevents cross-project updates at the data layer.
+   * The `where` pins BOTH id and projectId, so a cross-project update simply
+   * doesn't match any row and Prisma throws `P2025` (NotFoundError) — the tenancy
+   * guard IS the where clause. Prisma's `update` already returns the updated row,
+   * so we return it directly (no redundant re-read — these run under the dataset
+   * advisory lock where every extra round-trip lengthens lock hold).
    *
-   * @throws {Error} if dataset not found or doesn't belong to project
+   * @throws {Prisma.PrismaClientKnownRequestError} P2025 if no row matches id+project
    */
   async update(
     input: UpdateDatasetInput,
@@ -104,26 +134,12 @@ export class DatasetRepository {
   ): Promise<Dataset> {
     const client = options?.tx ?? this.prisma;
 
-    const result = await client.dataset.update({
+    return await client.dataset.update({
       where: {
         id: input.id,
         projectId: input.projectId,
       },
       data: input.data,
-    });
-
-    if (!result) {
-      throw new Error(
-        `Dataset ${input.id} not found in project ${input.projectId}`,
-      );
-    }
-
-    // Return the updated dataset
-    return await client.dataset.findFirstOrThrow({
-      where: {
-        id: input.id,
-        projectId: input.projectId,
-      },
     });
   }
 

@@ -74,6 +74,15 @@ export const MAX_JSONL_LINE_BYTES = 8 * 1024 * 1024;
  */
 export const MAX_CSV_ROW_BYTES = 8 * 1024 * 1024;
 
+/**
+ * papaparse read-buffer size — how many bytes it pulls from the source stream
+ * before emitting rows, so it reads in fixed-size I/O chunks rather than draining
+ * the stream as fast as the chunk writer allows (backpressure). Distinct concern
+ * from `MAX_CSV_ROW_BYTES` (the per-row payload cap) even though both currently
+ * sit at 8 MB — tune one without implying the other.
+ */
+export const CSV_IO_CHUNK_BYTES = 8 * 1024 * 1024;
+
 /** Payload for the `datasetNormalize` GroupQueue job. */
 export type DatasetNormalizePayload = {
   /** Stable job id (datasetId) — used for staged-job debuggability + dedup. */
@@ -251,10 +260,21 @@ const buildRenameMap = (headers: string[]): Map<string, string> => {
  */
 const dedupeHeaders = (headers: string[]): string[] => {
   const seen = new Map<string, number>();
+  // Track the names actually emitted, not just the raw inputs: a suffixed
+  // candidate (`col_1`) can still collide with a column literally named `col_1`,
+  // so keep bumping the counter until the candidate is unique. Without this,
+  // `["col","col","col_1"]` would emit `["col","col_1","col_1"]` and the by-index
+  // record map below would silently overwrite one column's values with another's.
+  const emitted = new Set<string>();
   return headers.map((header) => {
-    const count = seen.get(header) ?? 0;
+    let count = seen.get(header) ?? 0;
+    let candidate = count === 0 ? header : `${header}_${count}`;
+    while (emitted.has(candidate)) {
+      candidate = `${header}_${++count}`;
+    }
     seen.set(header, count + 1);
-    return count === 0 ? header : `${header}_${count}`;
+    emitted.add(candidate);
+    return candidate;
   });
 };
 
@@ -336,7 +356,7 @@ const parseInto = async (params: {
         skipEmptyLines: true,
         // Bound papaparse's read buffer so it pulls the stream in fixed-size
         // chunks rather than draining it as fast as the chunk writer allows.
-        chunkSize: MAX_CSV_ROW_BYTES,
+        chunkSize: CSV_IO_CHUNK_BYTES,
         step: (row, parser) => {
           const values = row.data;
           // The first row is the header: dedupe repeats + reserved-rename once.

@@ -37,6 +37,16 @@ type Enqueue = (payload: DatasetNormalizePayload) => Promise<void>;
 let registeredEnqueue: Enqueue | null = null;
 
 /**
+ * Latches the first inline-normalize warning per process. Without a queue sender
+ * the warn condition is true for EVERY upload (S3-yes/Redis-no deploy, or the
+ * narrow registry-init window on a rolling deploy), so a per-call warn would burst
+ * identical WARN lines into production observability. Warn once per process
+ * instead — a persistent misconfiguration belongs in a metric/healthcheck, not a
+ * per-upload log line.
+ */
+let hasWarnedNoQueue = false;
+
+/**
  * Wire the real GroupQueue sender. Called once by the pipeline registry at app
  * init; idempotent-safe to overwrite (registry runs once per process).
  */
@@ -66,11 +76,13 @@ export const enqueueDatasetNormalize = async (params: {
   prisma: PrismaClient;
   payload: DatasetNormalizePayload;
 }): Promise<void> => {
-  if (!registeredEnqueue && env.NODE_ENV === "production") {
+  if (!registeredEnqueue && env.NODE_ENV === "production" && !hasWarnedNoQueue) {
     // No queue sender registered in production means event sourcing / the worker
     // isn't wired — normalize runs INLINE in the request thread. Fine for a
     // single small pod, but on an S3-yes / Redis-no multi-pod deploy this blocks
-    // the request and won't scale. Surface it so the misconfiguration is visible.
+    // the request and won't scale. Surface it ONCE per process (not per upload)
+    // so the misconfiguration is visible without bursting the logs.
+    hasWarnedNoQueue = true;
     logger.warn(
       {
         datasetId: params.payload.datasetId,
