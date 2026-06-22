@@ -6,50 +6,206 @@
  * - `DrawerType`: Union type of all drawer names
  * - `DrawerProps<T>`: Props type for a specific drawer
  * - `DrawerCallbacks<T>`: Callback props (functions) for a specific drawer
+ *
+ * All drawers are lazy-loaded so their transitive dependencies (monaco-editor,
+ * shiki, react-admin, OTel SDK, etc.) stay out of the initial bundle.
+ * `CurrentDrawer` already wraps rendering in <Suspense>, so this just works.
  */
 import { type ComponentProps, type FC, lazy } from "react";
 
-import { AddAnnotationQueueDrawer } from "./AddAnnotationQueueDrawer";
-import { AutomationDrawer } from "./AddAutomationDrawer";
-import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
-import { AddOrEditAnnotationScoreDrawer } from "./AddOrEditAnnotationScoreDrawer";
-import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
-import { AgentHistoryDrawer } from "./agents/AgentHistoryDrawer";
-import { AgentListDrawer } from "./agents/AgentListDrawer";
-import { AgentTypeSelectorDrawer } from "./agents/AgentTypeSelectorDrawer";
-import { AgentWorkflowEditorDrawer } from "./agents/AgentWorkflowEditorDrawer";
-import {
-  AgentCodeEditorDrawerFromUrl,
-  AgentHttpEditorDrawerFromUrl,
-  WorkflowSelectorDrawerFromUrl,
-} from "./agents/drawerFromUrl";
-import { AlertDrawer } from "./analytics/AlertDrawer";
-import { DashboardNameDrawer } from "./analytics/DashboardNameDrawer";
-import { SelectDatasetDrawer } from "./datasets/SelectDatasetDrawer";
-import { UploadCSVModal } from "./datasets/UploadCSVModal";
-import { FeatureFlagsDrawer } from "./drawers/FeatureFlagsDrawer";
-import { SdkRadarDrawer } from "./drawers/SdkRadarDrawer";
-import { EditAutomationFilterDrawer } from "./EditAutomationFilterDrawer";
-import { EditModelProviderDrawer } from "./EditModelProviderDrawer";
-import { GuardrailsDrawer } from "./evaluations/GuardrailsDrawer";
-// Online Evaluations (Monitors) drawers
-import { OnlineEvaluationDrawer } from "./evaluations/OnlineEvaluationDrawer";
-import { CodeEvaluatorEditorDrawer } from "./evaluators/CodeEvaluatorEditorDrawer";
-import { EvaluatorCategorySelectorDrawer } from "./evaluators/EvaluatorCategorySelectorDrawer";
-import { EvaluatorEditorDrawer } from "./evaluators/EvaluatorEditorDrawer";
-import { EvaluatorHistoryDrawer } from "./evaluators/EvaluatorHistoryDrawer";
-import { EvaluatorListDrawer } from "./evaluators/EvaluatorListDrawer";
-import { EvaluatorTypeSelectorDrawer } from "./evaluators/EvaluatorTypeSelectorDrawer";
-import { WorkflowSelectorForEvaluatorDrawer } from "./evaluators/WorkflowSelectorForEvaluatorDrawer";
-import { DataPrivacyRuleDrawer } from "./settings/DataPrivacyRuleDrawer";
+import type { TraceV2DrawerShellProps } from "../features/traces-v2/components/TraceDrawer";
 
-// Lazy-loaded: FoundryDrawer transitively imports the OTel SDK which has
-// side effects that break React if evaluated eagerly at app startup.
-const FoundryDrawer = lazy(() =>
-  import("./ops/foundry/FoundryDrawer").then((m) => ({
-    default: m.FoundryDrawer,
-  })),
-);
+const lazyDefault = <K extends string, T extends { [P in K]: React.FC<any> }>({
+  factory,
+  key,
+}: {
+  factory: () => Promise<T>;
+  key: K;
+}) => {
+  const Component = lazy(() => factory().then((m) => ({ default: m[key] })));
+  // Preserve the original export's name on the lazy wrapper so React DevTools
+  // and regression tests (e.g. scenariosIndexNoDoubleDrawer) can still
+  // identify the underlying drawer.
+  Object.defineProperty(Component, "name", { value: key });
+  return Component;
+};
+
+const AddAnnotationQueueDrawer = lazyDefault({
+  factory: () => import("./AddAnnotationQueueDrawer"),
+  key: "AddAnnotationQueueDrawer",
+});
+const AddDatasetRecordDrawerV2 = lazyDefault({
+  factory: () => import("./AddDatasetRecordDrawer"),
+  key: "AddDatasetRecordDrawerV2",
+});
+const AddOrEditAnnotationScoreDrawer = lazyDefault({
+  factory: () => import("./AddOrEditAnnotationScoreDrawer"),
+  key: "AddOrEditAnnotationScoreDrawer",
+});
+const AddOrEditDatasetDrawer = lazyDefault({
+  factory: () => import("./AddOrEditDatasetDrawer"),
+  key: "AddOrEditDatasetDrawer",
+});
+const AutomationDrawer = lazyDefault({
+  factory: () => import("./AddAutomationDrawer"),
+  key: "AutomationDrawer",
+});
+const AgentHistoryDrawer = lazyDefault({
+  factory: () => import("./agents/AgentHistoryDrawer"),
+  key: "AgentHistoryDrawer",
+});
+const AgentListDrawer = lazyDefault({
+  factory: () => import("./agents/AgentListDrawer"),
+  key: "AgentListDrawer",
+});
+const AgentTypeSelectorDrawer = lazyDefault({
+  factory: () => import("./agents/AgentTypeSelectorDrawer"),
+  key: "AgentTypeSelectorDrawer",
+});
+const AgentWorkflowEditorDrawer = lazyDefault({
+  factory: () => import("./agents/AgentWorkflowEditorDrawer"),
+  key: "AgentWorkflowEditorDrawer",
+});
+const AgentCodeEditorDrawerFromUrl = lazyDefault({
+  factory: () => import("./agents/drawerFromUrl"),
+  key: "AgentCodeEditorDrawerFromUrl",
+});
+const AgentHttpEditorDrawerFromUrl = lazyDefault({
+  factory: () => import("./agents/drawerFromUrl"),
+  key: "AgentHttpEditorDrawerFromUrl",
+});
+const WorkflowSelectorDrawerFromUrl = lazyDefault({
+  factory: () => import("./agents/drawerFromUrl"),
+  key: "WorkflowSelectorDrawerFromUrl",
+});
+const AlertDrawer = lazyDefault({
+  factory: () => import("./analytics/AlertDrawer"),
+  key: "AlertDrawer",
+});
+const DashboardNameDrawer = lazyDefault({
+  factory: () => import("./analytics/DashboardNameDrawer"),
+  key: "DashboardNameDrawer",
+});
+const SelectDatasetDrawer = lazyDefault({
+  factory: () => import("./datasets/SelectDatasetDrawer"),
+  key: "SelectDatasetDrawer",
+});
+const UploadCSVModal = lazyDefault({
+  factory: () => import("./datasets/UploadCSVModal"),
+  key: "UploadCSVModal",
+});
+const FeatureFlagsDrawer = lazyDefault({
+  factory: () => import("./drawers/FeatureFlagsDrawer"),
+  key: "FeatureFlagsDrawer",
+});
+const SdkRadarDrawer = lazyDefault({
+  factory: () => import("./drawers/SdkRadarDrawer"),
+  key: "SdkRadarDrawer",
+});
+const EditAutomationFilterDrawer = lazyDefault({
+  factory: () => import("./EditAutomationFilterDrawer"),
+  key: "EditAutomationFilterDrawer",
+});
+const EditModelProviderDrawer = lazyDefault({
+  factory: () => import("./EditModelProviderDrawer"),
+  key: "EditModelProviderDrawer",
+});
+const GuardrailsDrawer = lazyDefault({
+  factory: () => import("./evaluations/GuardrailsDrawer"),
+  key: "GuardrailsDrawer",
+});
+const OnlineEvaluationDrawer = lazyDefault({
+  factory: () => import("./evaluations/OnlineEvaluationDrawer"),
+  key: "OnlineEvaluationDrawer",
+});
+const CodeEvaluatorEditorDrawer = lazyDefault({
+  factory: () => import("./evaluators/CodeEvaluatorEditorDrawer"),
+  key: "CodeEvaluatorEditorDrawer",
+});
+const EvaluatorCategorySelectorDrawer = lazyDefault({
+  factory: () => import("./evaluators/EvaluatorCategorySelectorDrawer"),
+  key: "EvaluatorCategorySelectorDrawer",
+});
+const EvaluatorEditorDrawer = lazyDefault({
+  factory: () => import("./evaluators/EvaluatorEditorDrawer"),
+  key: "EvaluatorEditorDrawer",
+});
+const EvaluatorHistoryDrawer = lazyDefault({
+  factory: () => import("./evaluators/EvaluatorHistoryDrawer"),
+  key: "EvaluatorHistoryDrawer",
+});
+const EvaluatorListDrawer = lazyDefault({
+  factory: () => import("./evaluators/EvaluatorListDrawer"),
+  key: "EvaluatorListDrawer",
+});
+const EvaluatorTypeSelectorDrawer = lazyDefault({
+  factory: () => import("./evaluators/EvaluatorTypeSelectorDrawer"),
+  key: "EvaluatorTypeSelectorDrawer",
+});
+const WorkflowSelectorForEvaluatorDrawer = lazyDefault({
+  factory: () => import("./evaluators/WorkflowSelectorForEvaluatorDrawer"),
+  key: "WorkflowSelectorForEvaluatorDrawer",
+});
+const FoundryDrawer = lazyDefault({
+  factory: () => import("./ops/foundry/FoundryDrawer"),
+  key: "FoundryDrawer",
+});
+const CreateProjectDrawer = lazyDefault({
+  factory: () => import("./projects/CreateProjectDrawer"),
+  key: "CreateProjectDrawer",
+});
+const EditProjectDrawer = lazyDefault({
+  factory: () => import("./projects/EditProjectDrawer"),
+  key: "EditProjectDrawer",
+});
+const PromptEditorDrawer = lazyDefault({
+  factory: () => import("./prompts/PromptEditorDrawer"),
+  key: "PromptEditorDrawer",
+});
+const PromptListDrawer = lazyDefault({
+  factory: () => import("./prompts/PromptListDrawer"),
+  key: "PromptListDrawer",
+});
+const ScenarioFormDrawerFromUrl = lazyDefault({
+  factory: () => import("./scenarios/ScenarioFormDrawer"),
+  key: "ScenarioFormDrawerFromUrl",
+});
+const SeriesFiltersDrawer = lazyDefault({
+  factory: () => import("./SeriesFilterDrawer"),
+  key: "SeriesFiltersDrawer",
+});
+const CreateTeamDrawer = lazyDefault({
+  factory: () => import("./settings/CreateTeamDrawer"),
+  key: "CreateTeamDrawer",
+});
+const DataPrivacyRuleDrawer = lazyDefault({
+  factory: () => import("./settings/DataPrivacyRuleDrawer"),
+  key: "DataPrivacyRuleDrawer",
+});
+const DefaultModelOverrideDrawer = lazyDefault({
+  factory: () => import("./settings/DefaultModelOverrideDrawer"),
+  key: "DefaultModelOverrideDrawer",
+});
+const LLMModelCostDrawer = lazyDefault({
+  factory: () => import("./settings/LLMModelCostDrawer"),
+  key: "LLMModelCostDrawer",
+});
+const ScenarioRunDetailDrawer = lazyDefault({
+  factory: () => import("./simulations/ScenarioRunDetailDrawer"),
+  key: "ScenarioRunDetailDrawer",
+});
+const SuiteFormDrawer = lazyDefault({
+  factory: () => import("./suites/SuiteFormDrawer"),
+  key: "SuiteFormDrawer",
+});
+const TargetTypeSelectorDrawer = lazyDefault({
+  factory: () => import("./targets/TargetTypeSelectorDrawer"),
+  key: "TargetTypeSelectorDrawer",
+});
+const TraceDetailsDrawer = lazyDefault({
+  factory: () => import("./TraceDetailsDrawer"),
+  key: "TraceDetailsDrawer",
+});
 
 // Traces V2 drawers — the real shell is mounted from `TracesPage` based
 // on the drawer store (so a click → drawer-open is synchronous, no
@@ -60,24 +216,7 @@ const FoundryDrawer = lazy(() =>
 // The prop shape mirrors `TraceV2DrawerShellProps` exactly so
 // `openDrawer("traceV2Details", { traceId, t, ... })` still typechecks
 // at every call site.
-import type { TraceV2DrawerShellProps } from "../features/traces-v2/components/TraceDrawer";
-import { CreateProjectDrawer } from "./projects/CreateProjectDrawer";
-import { EditProjectDrawer } from "./projects/EditProjectDrawer";
-import { PromptEditorDrawer } from "./prompts/PromptEditorDrawer";
-import { PromptListDrawer } from "./prompts/PromptListDrawer";
-import { SeriesFiltersDrawer } from "./SeriesFilterDrawer";
-import { ScenarioFormDrawerFromUrl } from "./scenarios/ScenarioFormDrawer";
-import { CreateTeamDrawer } from "./settings/CreateTeamDrawer";
-import { DefaultModelOverrideDrawer } from "./settings/DefaultModelOverrideDrawer";
-import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
-import { ScenarioRunDetailDrawer } from "./simulations/ScenarioRunDetailDrawer";
-import { SuiteFormDrawer } from "./suites/SuiteFormDrawer";
-import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
-
 const TraceV2DrawerNoop: FC<TraceV2DrawerShellProps> = () => null;
-
-// Evaluations V3 drawers
-import { TargetTypeSelectorDrawer } from "./targets/TargetTypeSelectorDrawer";
 
 /**
  * Map of drawer names to their React components.
