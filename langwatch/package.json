@@ -88,7 +88,7 @@
     "@google-cloud/dlp": "^6.6.1",
     "@hono/node-server": "^2.0.0",
     "@hono/zod-validator": "^0.4.3",
-    "@hookform/resolvers": "^5.2.2",
+    "@hookform/resolvers": "^5.4.0",
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/mcp-server": "workspace:*",
     "@langwatch/scenario": "file:vendor/langwatch-scenario-0.4.10.tgz",
