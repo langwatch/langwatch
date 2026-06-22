@@ -25,6 +25,7 @@
  */
 import type { Dataset, Prisma, PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
+import { DatasetRepository } from "./dataset.repository";
 import {
   type ChunkedDatasetMeta,
   type ChunkOffset,
@@ -33,7 +34,6 @@ import {
   toSingleJsonl,
 } from "./dataset-chunking";
 import { withDatasetLock } from "./dataset-lock";
-import { DatasetRepository } from "./dataset.repository";
 import { type DatasetStorage, getDatasetStorage } from "./dataset-storage";
 import { DatasetNotReadyError } from "./errors";
 import { stripNullBytes } from "./sanitize";

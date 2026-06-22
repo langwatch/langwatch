@@ -76,7 +76,11 @@ export const enqueueDatasetNormalize = async (params: {
   prisma: PrismaClient;
   payload: DatasetNormalizePayload;
 }): Promise<void> => {
-  if (!registeredEnqueue && env.NODE_ENV === "production" && !hasWarnedNoQueue) {
+  if (
+    !registeredEnqueue &&
+    env.NODE_ENV === "production" &&
+    !hasWarnedNoQueue
+  ) {
     // No queue sender registered in production means event sourcing / the worker
     // isn't wired — normalize runs INLINE in the request thread. Fine for a
     // single small pod, but on an S3-yes / Redis-no multi-pod deploy this blocks
