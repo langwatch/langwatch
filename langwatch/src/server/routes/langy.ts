@@ -347,38 +347,6 @@ langyRoute().post("/langy/chat", async (c) => {
     throw error;
   }
 
-  // Per-user daily PR cap, enforced by atomic permit reservation BEFORE we
-  // hand the worker a GitHub token. If we're over cap, we strip the token
-  // from `credentials` below so the worker physically cannot `gh pr create`
-  // (no GH_TOKEN env in the subprocess) — the system note is a courtesy
-  // explanation, not the authorisation boundary. If the turn ends without
-  // opening any PR (read-only chat), the permit is released post-stream so
-  // a permit isn't burned by a question.
-  const permit = await reserveLangyGithubPrPermit({ userId: session.user.id });
-  const capReachedNote = !permit.allowed
-    ? [
-        "",
-        "USER PR CAP REACHED — the user has already opened the per-day maximum",
-        "of",
-        String(LANGY_GITHUB_PRS_PER_DAY),
-        "GitHub pull requests via Langy today.",
-        "If the user asks you to open a PR, refuse politely, say the daily cap",
-        "is reached, and that it resets at",
-        new Date(permit.resetAt).toISOString(),
-        "UTC.",
-        "Do not call any tool that opens a PR.",
-      ].join(" ")
-    : "";
-  // Revoke GitHub capability when the cap is reached: deleting these fields
-  // means spawnWorker omits GH_TOKEN + GITHUB_LOGIN from the subprocess env
-  // (services/langy-agent/server.js conditionally spreads them based on
-  // truthiness), so the worker cannot reach github.com with an authenticated
-  // token even if it ignores the system note.
-  if (!permit.allowed) {
-    delete (credentials as { githubToken?: string }).githubToken;
-    delete (credentials as { githubLogin?: string }).githubLogin;
-  }
-
   // Defense in depth: when a `modelOverride` rides in, enforce the project's
   // Langy VK allowlist HERE — don't trust the picker UI to gate it. If the VK
   // has no allowlist (modelsAllowed=null), the gateway is still the final
@@ -386,6 +354,10 @@ langyRoute().post("/langy/chat", async (c) => {
   // allowed. The org is taken from `credentials` (the resolver already
   // returned it) so we don't refetch the project — no risk of a TOCTOU race
   // silently skipping the check between calls.
+  //
+  // Order matters: this runs BEFORE the PR-permit reservation so an invalid
+  // modelOverride doesn't burn a daily PR slot. The earlier ordering leaked
+  // a permit on every 400 here.
   if (modelOverride) {
     const modelsAllowed = await credentialService.getModelsAllowed({
       projectId,
@@ -408,29 +380,93 @@ langyRoute().post("/langy/chat", async (c) => {
     }
   }
 
-  const agentResponse = await fetch(`${agentUrl}/chat`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${internalSecret}`,
-    },
-    body: JSON.stringify({
-      conversationId: conversation.id,
-      prompt: userText,
-      system: capReachedNote
-        ? `${langyOverride}\n\n${capReachedNote}`
-        : langyOverride,
-      credentials,
-      // Forwarded for the agent to thread through to the gateway as the
-      // `model` parameter when its support lands. Today the agent ignores
-      // unrecognized fields, so this is effectively a wire-up that doesn't
-      // change behavior — but the user's picker choice rides through.
-      ...(modelOverride ? { modelOverride } : {}),
-    }),
-    signal: AbortSignal.timeout(120_000),
-  });
+  // Per-user daily PR cap, enforced by atomic permit reservation BEFORE we
+  // hand the worker a GitHub token. If we're over cap, we strip the token
+  // from `credentials` below so the worker physically cannot `gh pr create`
+  // (no GH_TOKEN env in the subprocess) — the system note is a courtesy
+  // explanation, not the authorisation boundary.
+  //
+  // Permit lifecycle: once reserved, the slot is owned by THIS request and
+  // MUST be released on every exit path that didn't open a PR (read-only
+  // chat, agent fetch failure, stream error, client disconnect). A
+  // `permitReleased` latch + a `releasePermitIfUnused()` helper centralises
+  // the release so a future edit can't introduce a fresh leak. The earlier
+  // shape only released inside the stream executor's happy path — every
+  // pre-stream error (502, throw, disconnect) leaked one permit per turn.
+  const permit = await reserveLangyGithubPrPermit({ userId: session.user.id });
+  let permitReleased = false;
+  const releasePermitIfUnused = async () => {
+    if (!permit.allowed || permitReleased) return;
+    permitReleased = true;
+    try {
+      await releaseLangyGithubPrPermit({ userId: session.user.id });
+    } catch (error) {
+      // Releasing a permit can fail (Redis blip); the daily counter would
+      // then be off by one until reset. Logged, not fatal — the same fail-
+      // open posture the reserve side uses.
+      logger.warn({ error }, "failed to release langy github PR permit");
+    }
+  };
+  const capReachedNote = !permit.allowed
+    ? [
+        "",
+        "USER PR CAP REACHED — the user has already opened the per-day maximum",
+        "of",
+        String(LANGY_GITHUB_PRS_PER_DAY),
+        "GitHub pull requests via Langy today.",
+        "If the user asks you to open a PR, refuse politely, say the daily cap",
+        "is reached, and that it resets at",
+        new Date(permit.resetAt).toISOString(),
+        "UTC.",
+        "Do not call any tool that opens a PR.",
+      ].join(" ")
+    : "";
+  // Revoke GitHub capability when the cap is reached: deleting these fields
+  // means the agent omits GH_TOKEN + GITHUB_LOGIN from the worker subprocess
+  // env (services/langy-agent/worker.go::spawnOpenCode conditionally appends
+  // them based on truthiness), so the worker cannot reach github.com with
+  // an authenticated token even if it ignores the system note.
+  if (!permit.allowed) {
+    delete (credentials as { githubToken?: string }).githubToken;
+    delete (credentials as { githubLogin?: string }).githubLogin;
+  }
+
+  let agentResponse: Response;
+  try {
+    agentResponse = await fetch(`${agentUrl}/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${internalSecret}`,
+      },
+      body: JSON.stringify({
+        conversationId: conversation.id,
+        prompt: userText,
+        system: capReachedNote
+          ? `${langyOverride}\n\n${capReachedNote}`
+          : langyOverride,
+        credentials,
+        // Forwarded for the agent to thread through to the gateway as the
+        // `model` parameter when its support lands. Today the agent ignores
+        // unrecognized fields, so this is effectively a wire-up that doesn't
+        // change behavior — but the user's picker choice rides through.
+        ...(modelOverride ? { modelOverride } : {}),
+      }),
+      signal: AbortSignal.timeout(120_000),
+    });
+  } catch (error) {
+    // Transport failure (DNS, connection refused, timeout from
+    // AbortSignal.timeout). The agent never accepted the work, so the
+    // permit must be released before we surface the 502.
+    await releasePermitIfUnused();
+    logger.error({ error }, "opencode agent request transport failure");
+    return c.json({ error: "Agent request failed" }, { status: 502 });
+  }
 
   if (!agentResponse.ok) {
+    // The agent answered, but with a non-2xx — same shape: no PR was
+    // opened so the permit must come back.
+    await releasePermitIfUnused();
     logger.error(
       { status: agentResponse.status },
       "opencode agent request failed",
@@ -443,7 +479,8 @@ langyRoute().post("/langy/chat", async (c) => {
 
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
-      writer.write({ type: "text-start", id: textId });
+      try {
+        writer.write({ type: "text-start", id: textId });
 
       const reader = agentResponse.body!.getReader();
       const decoder = new TextDecoder();
@@ -532,12 +569,15 @@ langyRoute().post("/langy/chat", async (c) => {
       // Counting is owned by the pre-turn `reserveLangyGithubPrPermit` (one
       // permit per turn, atomic). If the turn opened MORE than one PR, the
       // permit covers the first; further PRs are still audited but won't
-      // double-bump the daily counter. If the turn opened ZERO PRs, we
-      // release the permit so a question doesn't burn a permit.
+      // double-bump the daily counter. If the turn opened ZERO PRs, the
+      // permit is released by the executor's finally below so a question
+      // doesn't burn a permit.
       try {
         const links = extractOpenedPrLinks(fullText);
-        if (links.length === 0 && permit.allowed) {
-          await releaseLangyGithubPrPermit({ userId: session.user.id });
+        if (links.length > 0) {
+          // PR was actually opened — the permit is consumed, latch it
+          // closed so the cleanup finally doesn't reverse the consumption.
+          permitReleased = true;
         }
         for (const link of links) {
           await auditLog({
@@ -555,8 +595,21 @@ langyRoute().post("/langy/chat", async (c) => {
       } catch (error) {
         logger.error({ error }, "failed to record langy github PR usage");
       }
+      } finally {
+        // Single release point for the executor's normal end AND any throw
+        // inside it. If a PR was opened, the earlier block latched
+        // `permitReleased = true` so this is a no-op; otherwise the slot
+        // is returned to the daily counter so a read-only chat doesn't
+        // burn a permit.
+        await releasePermitIfUnused();
+      }
     },
     onError: (error) => {
+      // Stream-level errors (writer.write throws, AbortController fires
+      // before the executor finally runs, etc.) land here. Release the
+      // permit on this path too — releasePermitIfUnused is idempotent so
+      // a duplicate call from the finally above is harmless.
+      void releasePermitIfUnused();
       logger.error({ error }, "error in opencode agent stream");
       return "An error occurred while processing your request.";
     },
