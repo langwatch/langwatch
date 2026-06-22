@@ -580,13 +580,16 @@ describe("generateClickHouseFilterConditions", () => {
       expect(result.params).not.toHaveProperty("spanWindowStart");
     });
 
-    it("does not add span-window params when the filter set has no span probe", () => {
+    it("does not inject StartTime SQL when the filter set has no span probe", () => {
       const result = generateClickHouseFilterConditions(
         { "topics.topics": ["t1"] },
         { startDate: 10 * DAY, endDate: 20 * DAY },
       );
-      // The params are emitted (harmless, unreferenced) but no StartTime SQL.
+      // The span-window params are still emitted when a window is passed (they
+      // are harmless and unreferenced here), but no filter probes stored_spans,
+      // so no StartTime predicate is injected.
       expect(result.conditions[0]).not.toContain("sp.StartTime");
+      expect(result.params).toHaveProperty("spanWindowStart");
     });
   });
 });
