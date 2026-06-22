@@ -1,5 +1,5 @@
-# Langy agent pod image — the OpenCode "manager" (server.js) plus the
-# LangWatch CLI + MCP server the per-session workers shell out to.
+# Langy agent pod image — the OpenCode "manager" plus the LangWatch CLI +
+# MCP server the per-session workers shell out to.
 #
 # Built by the `langy-agent` matrix entry in
 # .github/workflows/publish-docker-app.yml on `langwatch@*` releases, and
@@ -8,6 +8,54 @@
 #
 # Build context is the repo root (context: .), so the COPYs below reach
 # into services/langy-agent/.
+#
+# Two-stage build: stage one compiles the Go manager binary from the
+# repo's mono-binary (services/langy-agent/ is the package, dispatched via
+# cmd/service). Stage two is the runtime image with all the tooling the
+# workers shell out to (opencode, gh, langwatch CLI/MCP, OTel plugin).
+
+# -----------------------------------------------------------------------------
+# Stage 1: build the Go manager binary.
+# -----------------------------------------------------------------------------
+# Pin the Go toolchain to the version recorded in go.mod (`go 1.26.2`) so
+# CI and local builds produce byte-identical binaries. Bump in lockstep.
+FROM golang:1.26.2-bookworm AS builder
+
+WORKDIR /src
+
+# Cache go module downloads in a layer that only invalidates when go.mod/
+# go.sum changes — the rest of the source tree is a churnier input.
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go mod download
+
+# Bring in everything the mono-binary needs to compile. We only ship the
+# `service langy-agent` codepath out the other side, but cmd/service
+# imports all three services so we need their packages present at build
+# time. The aigateway + nlpgo subtrees are tree-shaken by the linker —
+# only references reachable from `langy-agent` survive.
+COPY cmd ./cmd
+COPY pkg ./pkg
+COPY services ./services
+
+# CGO disabled so the produced binary is statically linked and runs on
+# any glibc the Ubuntu base ships with no surprise dynamic-link issues.
+# -trimpath drops the host build path from binary metadata for cleaner
+# diffs across reproducible builds.
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+ARG SERVICE_VERSION=dev
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+        go build -trimpath \
+        -ldflags "-s -w -X main.Version=${SERVICE_VERSION}" \
+        -o /out/langy-agent ./cmd/service
+
+# -----------------------------------------------------------------------------
+# Stage 2: runtime image.
+# -----------------------------------------------------------------------------
 FROM ubuntu:24.04
 
 # Pin the CLI + MCP versions the agent was validated against. Bump these
@@ -17,7 +65,8 @@ ARG LANGWATCH_MCP_VERSION=0.10.1
 # opencode has no native OpenTelemetry export, so the per-session worker loads
 # this opencode plugin to emit session/llm/tool spans over OTLP into the user's
 # LangWatch project. Pinned; opencode auto-loads it by name from the per-worker
-# config (server.js). See specs/assistant/langy-otel-tracing.feature.
+# config (manager writes one per worker at spawn). See
+# specs/assistant/langy-otel-tracing.feature.
 ARG OPENCODE_OTEL_PLUGIN_VERSION=1.0.0
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -42,12 +91,15 @@ RUN curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_CLI_VERSION}/
     && rm -rf /var/lib/apt/lists/* \
     && gh --version
 
+# Node is still required at runtime: opencode is a Node application and
+# the langwatch CLI / MCP server ship as npm packages. The manager itself
+# is now a Go binary (see stage 1) — there is no `server.js` anymore.
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # Install opencode as root (its installer drops files in $HOME), then copy the
-# binary to /usr/local/bin so the non-root agent user can execute it without
+# binary to /usr/local/bin so the non-root worker UIDs can execute it without
 # needing access to /root.
 RUN curl -fsSL https://opencode.ai/install | bash && \
     find /root -name opencode -type f 2>/dev/null | head -1 | xargs -I{} cp {} /usr/local/bin/opencode && \
@@ -62,30 +114,34 @@ RUN npm install -g "langwatch@${LANGWATCH_CLI_VERSION}" \
     "@langwatch/mcp-server@${LANGWATCH_MCP_VERSION}" \
     "@devtheops/opencode-plugin-otel@${OPENCODE_OTEL_PLUGIN_VERSION}"
 
-# Surface the pinned plugin version to the manager (server.js) so each
-# per-worker opencode config requests the exact same version opencode loads.
+# Surface the pinned plugin version to the manager so each per-worker
+# opencode config requests the exact same version opencode loads.
 ENV OPENCODE_OTEL_PLUGIN_VERSION=${OPENCODE_OTEL_PLUGIN_VERSION}
 
+# Drop the Go binary in place. The entrypoint dispatches the mono-binary
+# at `service langy-agent` so /langy-agent is the runtime command name.
+COPY --from=builder /out/langy-agent /usr/local/bin/langy-agent
+
 COPY services/langy-agent/entrypoint.sh /entrypoint.sh
-COPY services/langy-agent/server.js /server.js
 RUN chmod +x /entrypoint.sh
 
 # Static templates the entrypoint seeds into /workspace at pod startup.
 # They live under /opt (not /workspace) because /workspace is an emptyDir
 # volume in k8s, which would shadow any image content placed there.
 # AGENTS.md keeps the literal ${LANGWATCH_ENDPOINT} placeholder — the
-# manager (server.js) substitutes it per-worker at spawn time.
+# manager substitutes it per-worker at spawn time.
 COPY services/langy-agent/skills/ /opt/langy-templates/skills/
 COPY services/langy-agent/AGENTS.md.template /opt/langy-templates/AGENTS.md
 
 # The manager process runs as root so it can chown per-session directories
-# to per-worker UIDs and `child_process.spawn({uid, gid})` into them; see
-# the SecurityContext block in charts/langy-agent/values.yaml for the cap
-# set that keeps the blast radius small. Workers spawned by the manager
-# enter unique UIDs (2000+hash(conversationId) % 60000) — no static user
-# records are needed because `setuid(N)` doesn't require `/etc/passwd` to
-# resolve N. Keep `/workspace` root-owned at image build time; the
-# manager re-chowns per-session subdirs as workers spawn.
+# to per-worker UIDs and exec into them with syscall.Credential. See the
+# SecurityContext block in charts/langy-agent/values.yaml for the cap set
+# that keeps the blast radius small (CAP_SETUID, CAP_SETGID, CAP_CHOWN,
+# CAP_DAC_OVERRIDE). Workers spawned by the manager enter unique UIDs
+# (2000+hash(conversationId)%60000) — no static user records needed
+# because setuid(N) doesn't require /etc/passwd to resolve N. Keep
+# /workspace root-owned at image build time; the manager re-chowns
+# per-session subdirs as workers spawn.
 RUN userdel -r ubuntu 2>/dev/null || true && \
     mkdir -p /workspace && \
     chown root:root /workspace && \
@@ -95,4 +151,4 @@ ENV HOME=/root
 WORKDIR /workspace
 EXPOSE 8080
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["node", "/server.js"]
+CMD ["/usr/local/bin/langy-agent", "langy-agent"]
