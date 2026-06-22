@@ -104,10 +104,26 @@ spec:
             {{- end }}
             - name: tmp-dir
               mountPath: /tmp
+            {{- if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
+            # Stored-objects local-FS mount. When migrating to local FS (no S3),
+            # the backfill writes the migrated dataset chunks here, so the Job
+            # MUST mount the SAME PVC the app reads from — otherwise the chunks
+            # land on the Job's ephemeral FS and the flipped `s3_jsonl` rows point
+            # at content that doesn't exist (broken reads / data loss). Renders
+            # only when local-FS is the active backend; shares the app's RWO PVC →
+            # single-node topology (use app.dataplane S3 otherwise).
+            - name: stored-objects-data
+              mountPath: {{ .Values.app.storedObjects.localFilesystem.path }}
+            {{- end }}
       volumes:
         {{- with .Values.datasetS3Migration.extraVolumes }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
         - name: tmp-dir
           emptyDir: {}
+        {{- if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
+        - name: stored-objects-data
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-stored-objects
+        {{- end }}
 {{- end }}

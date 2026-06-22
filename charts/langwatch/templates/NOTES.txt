@@ -105,11 +105,15 @@ backend for you:
   • Default (no S3): a local-filesystem PVC is provisioned
     ({{ .Values.app.storedObjects.localFilesystem.path }},
     {{ .Values.app.storedObjects.localFilesystem.size | default "10Gi" }})
-    and the app is pointed at it (LANGWATCH_LOCAL_STORAGE_PATH) — so a
-    fresh install works without S3. This is SINGLE-REPLICA ONLY: the chart
-    refuses to render with replicaCount > 1 (pods can't share a
-    ReadWriteOnce volume). Fine for a hobby / single-pod install; bytes
-    survive pod restarts.
+    and mounted into the app, the worker (which runs dataset
+    normalization), and the dataset-migration Job — they all read and write
+    the SAME chunks (LANGWATCH_LOCAL_STORAGE_PATH), so a fresh install works
+    without S3. Because these separate pods share one ReadWriteOnce volume,
+    every dataset pod must run on a SINGLE NODE: the chart refuses
+    replicaCount > 1, and on a multi-node cluster the worker / migration Job
+    can fail to schedule against the app's volume. Fine for a hobby /
+    single-node install; bytes survive pod restarts. For anything bigger,
+    enable app.dataplane (S3).
 
   • Production / multi-pod: enable app.dataplane (S3 / MinIO / Azure).
     Then configure these on the bucket and deployment, or uploads and
