@@ -321,16 +321,21 @@ describe("dataset-mutations (s3_jsonl)", () => {
           ] as unknown as Dataset["chunkOffsets"],
         });
         const { prisma, update, executeRaw } = makePrisma(row);
-        const readChunk = vi
-          .fn()
-          .mockResolvedValueOnce([
+        // Index-based so the OFF-lock locate scan and the under-lock re-read
+        // (scan-before-lock) both resolve the right chunk regardless of call order.
+        const chunks: Record<number, unknown[]> = {
+          0: [
             { id: "r1", entry: { a: 1 } },
             { id: "r2", entry: { a: 2 } },
-          ])
-          .mockResolvedValueOnce([
+          ],
+          1: [
             { id: "r3", entry: { a: 3 } },
             { id: "r4", entry: { a: 4 } },
-          ]);
+          ],
+        };
+        const readChunk = vi.fn(({ index }: { index: number }) =>
+          Promise.resolve(chunks[index] ?? []),
+        );
         const rewriteChunk = vi.fn().mockResolvedValue({
           index: 1,
           startRow: 0,
@@ -350,8 +355,9 @@ describe("dataset-mutations (s3_jsonl)", () => {
 
         expect(result).toEqual({ updated: true });
         expect(executeRaw).toHaveBeenCalledOnce();
-        // Scanned chunk 0 then chunk 1; rewrote ONLY chunk 1 with r3 replaced.
-        expect(readChunk).toHaveBeenCalledTimes(2);
+        // scan-before-lock: OFF-lock locate reads chunk 0 then 1; under the lock
+        // only the hinted chunk 1 is re-read (3 reads total), then rewritten.
+        expect(readChunk).toHaveBeenCalledTimes(3);
         expect(rewriteChunk).toHaveBeenCalledOnce();
         expect(rewriteChunk.mock.calls[0]![0]).toMatchObject({
           index: 1,
@@ -454,6 +460,69 @@ describe("dataset-mutations (s3_jsonl)", () => {
         expect(update).not.toHaveBeenCalled();
       });
     });
+
+    describe("when the row moved between the pre-scan and the lock (hint bail)", () => {
+      it("bails to the full in-lock scan and rewrites the row in its new chunk", async () => {
+        const row = makeDataset({
+          rowCount: 2,
+          sizeBytes: 100n,
+          chunkCount: 2,
+          chunkOffsets: [
+            { index: 0, startRow: 0, endRow: 1, byteSize: 50 },
+            { index: 1, startRow: 1, endRow: 2, byteSize: 50 },
+          ] as unknown as Dataset["chunkOffsets"],
+        });
+        const { prisma, findFirstOrThrow } = makePrisma(row);
+        // The advisory lock is taken (and findOneOrThrow runs) AFTER the off-lock
+        // locate, so flip the storage view there to model a concurrent mutation
+        // that moved rE from chunk 0 to chunk 1 between the scan and the lock.
+        let locked = false;
+        findFirstOrThrow.mockImplementation(() => {
+          locked = true;
+          return Promise.resolve(row);
+        });
+        const before: Record<number, unknown[]> = {
+          0: [{ id: "rE", entry: { a: 1 } }],
+          1: [{ id: "rZ", entry: { a: 9 } }],
+        };
+        const after: Record<number, unknown[]> = {
+          0: [],
+          1: [
+            { id: "rZ", entry: { a: 9 } },
+            { id: "rE", entry: { a: 1 } },
+          ],
+        };
+        const readChunk = vi.fn(({ index }: { index: number }) =>
+          Promise.resolve((locked ? after : before)[index] ?? []),
+        );
+        const rewriteChunk = vi.fn().mockResolvedValue({
+          index: 1,
+          startRow: 0,
+          endRow: 2,
+          byteSize: 70,
+        });
+        const storage = makeStorage({ readChunk, rewriteChunk });
+
+        const result = await editS3JsonlRecord({
+          prisma: prisma as never,
+          dataset: row,
+          projectId: "p1",
+          recordId: "rE",
+          entry: { a: 99 },
+          storage: storage as never,
+        });
+
+        // Fast path's hinted chunk 0 no longer holds rE; the full scan finds it
+        // in chunk 1 and rewrites it there — no missed/lost edit.
+        expect(result).toEqual({ updated: true });
+        expect(rewriteChunk).toHaveBeenCalledOnce();
+        expect(rewriteChunk.mock.calls[0]![0].index).toBe(1);
+        expect(rewriteChunk.mock.calls[0]![0].records).toContainEqual({
+          id: "rE",
+          entry: { a: 99 },
+        });
+      });
+    });
   });
 
   describe("deleteS3JsonlRecords()", () => {
@@ -465,20 +534,25 @@ describe("dataset-mutations (s3_jsonl)", () => {
           chunkCount: 2,
           chunkOffsets: [
             { index: 0, startRow: 0, endRow: 2, byteSize: 100 },
-            { index: 1, startRow: 2, endRow: 4, byteSize: 100 },
+            // Authoritative byteSize for the unaffected chunk: the fast path
+            // takes it from here (no read), so it appears verbatim in the result.
+            { index: 1, startRow: 2, endRow: 4, byteSize: 56 },
           ] as unknown as Dataset["chunkOffsets"],
         });
         const { prisma, update, executeRaw } = makePrisma(row);
-        const readChunk = vi
-          .fn()
-          .mockResolvedValueOnce([
+        const chunks: Record<number, unknown[]> = {
+          0: [
             { id: "r1", entry: { a: 1 } },
             { id: "r2", entry: { a: 2 } },
-          ])
-          .mockResolvedValueOnce([
+          ],
+          1: [
             { id: "r3", entry: { a: 3 } },
             { id: "r4", entry: { a: 4 } },
-          ]);
+          ],
+        };
+        const readChunk = vi.fn(({ index }: { index: number }) =>
+          Promise.resolve(chunks[index] ?? []),
+        );
         // chunk 0 rewritten without r1 → one row, 55 bytes.
         const rewriteChunk = vi.fn().mockResolvedValue({
           index: 0,
@@ -509,9 +583,8 @@ describe("dataset-mutations (s3_jsonl)", () => {
         expect(data.rowCount).toBe(3);
         expect(data.chunkCount).toBeUndefined();
         // Chunk 0 now holds 1 row → chunk 1's startRow/endRow shift down by 1.
-        // m1: pin the untouched chunk's concrete recomputed byteSize (56 =
-        // toSingleJsonl([r3,r4])) so any count-drift on the untouched chunk
-        // would fail the test, not pass under expect.any(Number).
+        // The unaffected chunk 1 keeps its authoritative offset byteSize (56) —
+        // the fast path doesn't re-read it.
         expect(data.chunkOffsets).toEqual([
           { index: 0, startRow: 0, endRow: 1, byteSize: 55 },
           { index: 1, startRow: 1, endRow: 3, byteSize: 56 },
@@ -527,20 +600,23 @@ describe("dataset-mutations (s3_jsonl)", () => {
           chunkCount: 2,
           chunkOffsets: [
             { index: 0, startRow: 0, endRow: 2, byteSize: 100 },
-            { index: 1, startRow: 2, endRow: 4, byteSize: 100 },
+            { index: 1, startRow: 2, endRow: 4, byteSize: 56 },
           ] as unknown as Dataset["chunkOffsets"],
         });
         const { prisma, update } = makePrisma(row);
-        const readChunk = vi
-          .fn()
-          .mockResolvedValueOnce([
+        const chunks: Record<number, unknown[]> = {
+          0: [
             { id: "r1", entry: { a: 1 } },
             { id: "r2", entry: { a: 2 } },
-          ])
-          .mockResolvedValueOnce([
+          ],
+          1: [
             { id: "r3", entry: { a: 3 } },
             { id: "r4", entry: { a: 4 } },
-          ]);
+          ],
+        };
+        const readChunk = vi.fn(({ index }: { index: number }) =>
+          Promise.resolve(chunks[index] ?? []),
+        );
         // chunk 0 emptied → rewritten with zero rows, 0 bytes.
         const rewriteChunk = vi.fn().mockResolvedValue({
           index: 0,
@@ -572,7 +648,7 @@ describe("dataset-mutations (s3_jsonl)", () => {
         expect(data.chunkCount).toBeUndefined();
         expect(storage.deleteChunksFrom).not.toHaveBeenCalled();
         // The emptied chunk has startRow===endRow (zero rows); chunk 1 shifts to
-        // [0, 2). Untouched chunk byteSize pinned (56 = toSingleJsonl([r3,r4])).
+        // [0, 2) and keeps its authoritative offset byteSize (56, unaffected).
         expect(data.chunkOffsets).toEqual([
           { index: 0, startRow: 0, endRow: 0, byteSize: 0 },
           { index: 1, startRow: 0, endRow: 2, byteSize: 56 },
@@ -587,21 +663,24 @@ describe("dataset-mutations (s3_jsonl)", () => {
           sizeBytes: 200n,
           chunkCount: 2,
           chunkOffsets: [
-            { index: 0, startRow: 0, endRow: 2, byteSize: 100 },
+            { index: 0, startRow: 0, endRow: 2, byteSize: 56 },
             { index: 1, startRow: 2, endRow: 4, byteSize: 100 },
           ] as unknown as Dataset["chunkOffsets"],
         });
         const { prisma, update } = makePrisma(row);
-        const readChunk = vi
-          .fn()
-          .mockResolvedValueOnce([
+        const chunks: Record<number, unknown[]> = {
+          0: [
             { id: "r1", entry: { a: 1 } },
             { id: "r2", entry: { a: 2 } },
-          ])
-          .mockResolvedValueOnce([
+          ],
+          1: [
             { id: "r3", entry: { a: 3 } },
             { id: "r4", entry: { a: 4 } },
-          ]);
+          ],
+        };
+        const readChunk = vi.fn(({ index }: { index: number }) =>
+          Promise.resolve(chunks[index] ?? []),
+        );
         // chunk 1 (the last) emptied → rewritten with zero rows.
         const rewriteChunk = vi
           .fn()
@@ -624,6 +703,7 @@ describe("dataset-mutations (s3_jsonl)", () => {
         const data = update.mock.calls[0]![0].data;
         expect(data.rowCount).toBe(2);
         // chunkCount logically decremented; the trailing empty offset is dropped.
+        // Unaffected chunk 0 keeps its authoritative offset byteSize (56).
         expect(data.chunkCount).toBe(1);
         expect(data.chunkOffsets).toEqual([
           { index: 0, startRow: 0, endRow: 2, byteSize: 56 },
@@ -642,10 +722,16 @@ describe("dataset-mutations (s3_jsonl)", () => {
           ] as unknown as Dataset["chunkOffsets"],
         });
         const { prisma, update } = makePrisma(row);
-        const readChunk = vi.fn().mockResolvedValueOnce([
-          { id: "r1", entry: { a: 1 } },
-          { id: "r2", entry: { a: 2 } },
-        ]);
+        const readChunk = vi.fn(({ index }: { index: number }) =>
+          Promise.resolve(
+            index === 0
+              ? [
+                  { id: "r1", entry: { a: 1 } },
+                  { id: "r2", entry: { a: 2 } },
+                ]
+              : [],
+          ),
+        );
         const rewriteChunk = vi
           .fn()
           .mockResolvedValue({ index: 0, startRow: 0, endRow: 0, byteSize: 0 });
@@ -731,6 +817,172 @@ describe("dataset-mutations (s3_jsonl)", () => {
           }),
         ).rejects.toThrow("S3 PutObject failed");
         expect(update).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the target rows are in an early chunk (scan-before-lock)", () => {
+      it("reads only the affected chunk and never reads the later chunks", async () => {
+        const row = makeDataset({
+          rowCount: 6,
+          sizeBytes: 300n,
+          chunkCount: 3,
+          chunkOffsets: [
+            { index: 0, startRow: 0, endRow: 2, byteSize: 100 },
+            { index: 1, startRow: 2, endRow: 4, byteSize: 56 },
+            { index: 2, startRow: 4, endRow: 6, byteSize: 56 },
+          ] as unknown as Dataset["chunkOffsets"],
+        });
+        const { prisma, update } = makePrisma(row);
+        const chunks: Record<number, unknown[]> = {
+          0: [
+            { id: "r1", entry: { a: 1 } },
+            { id: "r2", entry: { a: 2 } },
+          ],
+          1: [
+            { id: "r3", entry: { a: 3 } },
+            { id: "r4", entry: { a: 4 } },
+          ],
+          2: [
+            { id: "r5", entry: { a: 5 } },
+            { id: "r6", entry: { a: 6 } },
+          ],
+        };
+        const readChunk = vi.fn(({ index }: { index: number }) =>
+          Promise.resolve(chunks[index] ?? []),
+        );
+        const rewriteChunk = vi.fn().mockResolvedValue({
+          index: 0,
+          startRow: 0,
+          endRow: 1,
+          byteSize: 55,
+        });
+        const storage = makeStorage({ readChunk, rewriteChunk });
+
+        const result = await deleteS3JsonlRecords({
+          prisma: prisma as never,
+          dataset: row,
+          projectId: "p1",
+          recordIds: ["r1"],
+          storage: storage as never,
+        });
+
+        expect(result).toEqual({ deleted: 1 });
+        // The locate stops at chunk 0 and only chunk 0 is ever read — chunks 1
+        // and 2 are never touched (the O(chunkCount) in-lock scan is gone). Their
+        // (rowCount, byteSize) come from the authoritative offset index.
+        expect(readChunk.mock.calls.every((c) => c[0].index === 0)).toBe(true);
+        expect(rewriteChunk).toHaveBeenCalledOnce();
+        expect(rewriteChunk.mock.calls[0]![0].index).toBe(0);
+        const data = update.mock.calls[0]![0].data;
+        expect(data.rowCount).toBe(5);
+        expect(data.chunkOffsets).toEqual([
+          { index: 0, startRow: 0, endRow: 1, byteSize: 55 },
+          { index: 1, startRow: 1, endRow: 3, byteSize: 56 },
+          { index: 2, startRow: 3, endRow: 5, byteSize: 56 },
+        ]);
+      });
+    });
+
+    describe("when a target row moved between the pre-scan and the lock (hint bail)", () => {
+      it("bails to the full in-lock scan and still deletes it from its new chunk", async () => {
+        const row = makeDataset({
+          rowCount: 2,
+          sizeBytes: 100n,
+          chunkCount: 2,
+          chunkOffsets: [
+            { index: 0, startRow: 0, endRow: 1, byteSize: 50 },
+            { index: 1, startRow: 1, endRow: 2, byteSize: 50 },
+          ] as unknown as Dataset["chunkOffsets"],
+        });
+        const { prisma, findFirstOrThrow } = makePrisma(row);
+        // The advisory lock (and findOneOrThrow) runs AFTER the off-lock locate,
+        // so flip the storage view there to model a concurrent mutation that
+        // moved r2 from chunk 0 to chunk 1 between the scan and the lock.
+        let locked = false;
+        findFirstOrThrow.mockImplementation(() => {
+          locked = true;
+          return Promise.resolve(row);
+        });
+        const before: Record<number, unknown[]> = {
+          0: [{ id: "r2", entry: { a: 2 } }],
+          1: [{ id: "rZ", entry: { a: 9 } }],
+        };
+        const after: Record<number, unknown[]> = {
+          0: [],
+          1: [
+            { id: "rZ", entry: { a: 9 } },
+            { id: "r2", entry: { a: 2 } },
+          ],
+        };
+        const readChunk = vi.fn(({ index }: { index: number }) =>
+          Promise.resolve((locked ? after : before)[index] ?? []),
+        );
+        const rewriteChunk = vi.fn().mockResolvedValue({
+          index: 1,
+          startRow: 0,
+          endRow: 1,
+          byteSize: 40,
+        });
+        const storage = makeStorage({ readChunk, rewriteChunk });
+
+        const result = await deleteS3JsonlRecords({
+          prisma: prisma as never,
+          dataset: row,
+          projectId: "p1",
+          recordIds: ["r2"],
+          storage: storage as never,
+        });
+
+        // Pre-scan located r2 in chunk 0; under the lock chunk 0 is empty (r2
+        // moved), so the fast path bails and the full scan deletes r2 from chunk
+        // 1 — no silently-missed delete.
+        expect(result).toEqual({ deleted: 1 });
+        expect(rewriteChunk).toHaveBeenCalledOnce();
+        expect(rewriteChunk.mock.calls[0]![0].index).toBe(1);
+      });
+    });
+
+    describe("when the dataset has no offset index (legacy rows)", () => {
+      it("uses the full in-lock scan (no fast path) and deletes correctly", async () => {
+        const row = makeDataset({
+          rowCount: 2,
+          sizeBytes: 100n,
+          chunkCount: 1,
+          chunkOffsets: null as unknown as Dataset["chunkOffsets"],
+        });
+        const { prisma, update } = makePrisma(row);
+        const readChunk = vi.fn(({ index }: { index: number }) =>
+          Promise.resolve(
+            index === 0
+              ? [
+                  { id: "r1", entry: { a: 1 } },
+                  { id: "r2", entry: { a: 2 } },
+                ]
+              : [],
+          ),
+        );
+        const rewriteChunk = vi.fn().mockResolvedValue({
+          index: 0,
+          startRow: 0,
+          endRow: 1,
+          byteSize: 50,
+        });
+        const storage = makeStorage({ readChunk, rewriteChunk });
+
+        const result = await deleteS3JsonlRecords({
+          prisma: prisma as never,
+          dataset: row,
+          projectId: "p1",
+          recordIds: ["r1"],
+          storage: storage as never,
+        });
+
+        expect(result).toEqual({ deleted: 1 });
+        expect(rewriteChunk.mock.calls[0]![0]).toMatchObject({
+          index: 0,
+          records: [{ id: "r2", entry: { a: 2 } }],
+        });
+        expect(update.mock.calls[0]![0].data.rowCount).toBe(1);
       });
     });
   });
