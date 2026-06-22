@@ -125,41 +125,38 @@ graph TB
 
 ## Queue System
 
-### GroupQueue (for folds)
+Every projection — fold, map, reactor — dispatches through the in-house **GroupQueue**: per-aggregate FIFO + cross-aggregate parallelism on Redis primitives + Lua. Not BullMQ. The framework wires one GroupQueue per pipeline at the composition root.
 
-Fold projections require **per-aggregate FIFO ordering** -- event N must be fully processed before event N+1. The `GroupQueue` achieves this using BullMQ's `group` parameter combined with custom Lua staging scripts.
+The summary:
 
-Each aggregate gets its own virtual queue. A worker picks up the next job for each group, processes it, and only then allows the next job in that group to proceed. This serializes processing within an aggregate while allowing different aggregates to be processed in parallel across workers.
+- **GroupQueue (for folds)** — fold projections need per-aggregate FIFO. The `groupKey` is the aggregate id; events for the same aggregate process in order, different aggregates parallelise.
+- **GroupQueue (for maps + reactors)** — same queue infrastructure, different group keys. No per-aggregate ordering; just dedup + retries + tiered storage.
+- **Memory Queue (for testing / no Redis)** — when Redis is unavailable (local dev, fast unit tests), the framework drops to an in-process queue ([`queues/memory.ts`](./queues/memory.ts)) that processes jobs asynchronously with simple concurrency control. Not a tier of GroupQueue — entirely separate code path with no Lua, no Redis, no tiered storage.
 
-See: [`queues/groupQueue/groupQueue.ts`](./queues/groupQueue/groupQueue.ts)
+GroupQueue has its own deep-dive docs:
 
-### Global Queue (unified)
+- **[`queues/groupQueue/ARCHITECTURE.md`](./queues/groupQueue/ARCHITECTURE.md)** — staging Lua, dispatcher loop, the tiered envelope (inline → Redis blob → S3), holder-set reference counting, retries, dedup, pause/resume, tenant isolation, failure handling.
+- **[`queues/groupQueue/README.md`](./queues/groupQueue/README.md)** — when to use it, configuration knobs, process roles, caveats, testing, observability.
 
-All projections (folds, maps, and reactors) are dispatched through a single global `GroupQueue`. Map projections and reactors share the same queue infrastructure; they simply use different group keys and do not rely on per-aggregate ordering.
-
-### Memory Queue (for testing / no Redis)
-
-When Redis is unavailable, both queue types fall back to an in-memory implementation that processes jobs synchronously.
-
-See: [`queues/memory.ts`](./queues/memory.ts)
+The tiered storage in one line: a payload's serialized size picks where it lives at encode time — inline JSON (≤ 1 KiB) → inline gzip (1–4 KiB) → standalone Redis key (4–256 KiB) → object store / S3 (> 256 KiB, ≤ 50 MiB). Identical bytes collapse to one stored blob via content addressing, refcounted by a per-blob Redis SET.
 
 ## Process Roles
 
 The system supports two process roles, configured via the `processRole` option:
 
-- **`web`**: Dispatches commands and enqueues events. Does **not** start BullMQ workers. The web process can create events and dispatch commands but never processes queue jobs.
-- **`worker`**: Starts all BullMQ workers (fold, map, reactor, command queues). Processes events from queues.
+- **`web`**: Dispatches commands and stages events. The dispatcher loop and local processor are NOT started, so the web process can create events and stage queue jobs but never processes them.
+- **`worker`**: Stages AND dispatches — runs the BRPOP signal loop, the local concurrency processor, and the metrics collector for every registered queue.
 
-This separation allows horizontal scaling -- multiple web instances dispatch work while dedicated worker instances process it.
+This separation allows horizontal scaling — multiple web instances stage work while dedicated worker instances process it. The flag wires to GroupQueue's `consumerEnabled` option at construction time.
 
 ## No Checkpoints Needed
 
 Unlike traditional event sourcing systems that use checkpoint stores to track processing progress, this system does not need them:
 
-- **GroupQueue provides ordering**: BullMQ's group mechanism ensures per-aggregate FIFO without a sequence number tracker.
-- **Fold state is the implicit checkpoint**: The last persisted fold state tells the system where it is. If processing fails, the event is retried via BullMQ's retry mechanism and the fold re-applies from current state.
-- **Map projections are stateless**: Each event is independently appended -- no position tracking needed.
-- **Reactors are idempotent**: They fire after fold success. If they fail, BullMQ retries them. Deduplication is handled via `makeJobId`.
+- **GroupQueue provides ordering**: per-aggregate FIFO is enforced inside the staging Lua — events for the same aggregate are dispatched in stage-order without a sequence-number tracker.
+- **Fold state is the implicit checkpoint**: the last persisted fold state tells the system where it is. If processing fails, the queue retries the event with backoff (in front of the same group, preserving FIFO) and the fold re-applies from current state.
+- **Map projections are stateless**: each event is independently appended — no position tracking needed.
+- **Reactors are idempotent**: they fire after fold success. If they fail, the queue retries them. Downstream deduplication is handled via `makeJobId`.
 
 ## Global Projection Registry
 
@@ -177,9 +174,11 @@ All operations are scoped to `tenantId`. Events, projections, and stores enforce
 
 ## Failure Handling
 
-- **Fold failures**: BullMQ retries the job. On retry, the fold loads current state and re-applies the event. If state was already stored, the fold is effectively idempotent.
-- **Map failures**: BullMQ retries the job. Append stores should be idempotent or tolerate duplicates.
-- **Reactor failures**: BullMQ retries the reactor independently. The fold state is already persisted, so the reactor can safely retry.
+- **Fold failures**: GroupQueue retries the job with exponential backoff in front of the same group (FIFO is preserved). On retry, the fold loads current state and re-applies the event. If state was already stored, the fold is effectively idempotent.
+- **Map failures**: GroupQueue retries the job. Append stores should be idempotent or tolerate duplicates.
+- **Reactor failures**: GroupQueue retries the reactor independently. The fold state is already persisted, so the reactor can safely retry.
+- **Transient blob-store failures** (offloaded body temporarily unreachable — network blip, 5xx): GroupQueue re-stages the SAME envelope without re-encoding, so the body stays referenced through the retry. Distinguished from "missing" so a transient store outage can't mass-drop every in-flight offloaded job.
+- **Genuinely missing offloaded body** (TTL backstop kicked in, or manual purge): decode returns null, the slot is completed, the work recovers via event replay. The append-only event log is the durable source of truth.
 
 ## Key Implementation Files
 
@@ -195,7 +194,8 @@ All operations are scoped to `tenantId`. Events, projections, and stores enforce
 | Map executor | [`projections/mapProjectionExecutor.ts`](./projections/mapProjectionExecutor.ts) |
 | Projection router | [`projections/projectionRouter.ts`](./projections/projectionRouter.ts) |
 | Reactor types | [`reactors/reactor.types.ts`](./reactors/reactor.types.ts) |
-| GroupQueue | [`queues/groupQueue/groupQueue.ts`](./queues/groupQueue/groupQueue.ts) |
+| GroupQueue (deep dive) | [`queues/groupQueue/ARCHITECTURE.md`](./queues/groupQueue/ARCHITECTURE.md) + [`queues/groupQueue/README.md`](./queues/groupQueue/README.md) |
+| GroupQueue (main class) | [`queues/groupQueue/groupQueue.ts`](./queues/groupQueue/groupQueue.ts) |
 | Event store (interface) | [`stores/eventStore.types.ts`](./stores/eventStore.types.ts) |
 | Event store (ClickHouse) | [`stores/eventStoreClickHouse.ts`](./stores/eventStoreClickHouse.ts) |
 | Event store (Memory) | [`stores/eventStoreMemory.ts`](./stores/eventStoreMemory.ts) |
