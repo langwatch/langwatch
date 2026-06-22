@@ -201,7 +201,7 @@
     "ohm-js": "^17.5.0",
     "openai": "^5.23.2",
     "papaparse": "^5.5.3",
-    "path-to-regexp": "^6.3.0",
+    "path-to-regexp": "^8.4.2",
     "pino": "^10.3.1",
     "pino-opentelemetry-transport": "^2.0.0",
     "pino-pretty": "^13.1.3",
