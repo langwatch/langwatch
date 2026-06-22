@@ -313,6 +313,54 @@ describe("Feature: Large dataset storage — self-hosted without object storage"
     });
   });
 
+  describe("DatasetService.upsertDataset() when the row insert fails after chunks are written", () => {
+    /**
+     * Born-on-storage writes chunks BEFORE the row. If the row insert then fails
+     * (slug race → `@@unique` violation, DB outage), the just-written objects
+     * would be orphaned customer content with no row to govern retention — the
+     * create best-effort reaps them before surfacing the error.
+     */
+    it("reaps the orphaned chunk objects when the row insert fails", async () => {
+      const root = path.join(os.tmpdir(), `lw-ds-f2-${nanoid()}`);
+      resolveProjectStorageDestination.mockResolvedValue({
+        kind: "file" as const,
+        root,
+      });
+
+      let datasetId: string | undefined;
+      const repository = {
+        findBySlug: vi.fn().mockResolvedValue(null),
+        // Slug check passed, but the insert hits the unique constraint (a race).
+        create: vi.fn().mockImplementation((data: { id: string }) => {
+          datasetId = data.id;
+          return Promise.reject(new Error("unique constraint violation"));
+        }),
+      };
+
+      await expect(
+        makeService({ repository, prisma: {} }).upsertDataset({
+          projectId: "p1",
+          name: "Race DS",
+          columnTypes: [{ name: "input", type: "string" }],
+          datasetRecords: [{ input: "hello" }],
+        }),
+      ).rejects.toThrow("unique constraint violation");
+
+      // The chunk written before the failed insert was reaped — no orphan content
+      // left in storage. readChunks now hits the deleted chunk-0.
+      const storage = await getDatasetStorage("p1");
+      await expect(
+        storage.readChunks({
+          projectId: "p1",
+          datasetId: datasetId!,
+          chunkCount: 1,
+        }),
+      ).rejects.toThrow(/Missing dataset chunk/);
+
+      await fs.rm(root, { recursive: true, force: true });
+    });
+  });
+
   describe("DatasetService.listRecords() for a postgres dataset on a no-S3 instance", () => {
     it("paginates from Postgres and never resolves object storage", async () => {
       const repository = {

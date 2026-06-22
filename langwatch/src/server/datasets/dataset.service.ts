@@ -14,6 +14,7 @@ import { DatasetRepository } from "./dataset.repository";
 import type { ChunkOffset } from "./dataset-chunking";
 import {
   appendS3JsonlRecords,
+  deleteAllS3JsonlChunks,
   deleteS3JsonlRecords,
   editS3JsonlRecord,
   writeInitialS3JsonlChunks,
@@ -313,19 +314,30 @@ export class DatasetService {
       entries,
     });
 
-    return await this.repository.create({
-      id: datasetId,
-      slug,
-      name,
-      projectId,
-      columnTypes,
-      contentLayout: "s3_jsonl",
-      status: "ready",
-      rowCount: meta.rowCount,
-      sizeBytes: BigInt(meta.sizeBytes),
-      chunkCount: meta.chunkCount,
-      chunkOffsets: meta.chunkOffsets as unknown as Prisma.InputJsonValue,
-    });
+    try {
+      return await this.repository.create({
+        id: datasetId,
+        slug,
+        name,
+        projectId,
+        columnTypes,
+        contentLayout: "s3_jsonl",
+        status: "ready",
+        rowCount: meta.rowCount,
+        sizeBytes: BigInt(meta.sizeBytes),
+        chunkCount: meta.chunkCount,
+        chunkOffsets: meta.chunkOffsets as unknown as Prisma.InputJsonValue,
+      });
+    } catch (error) {
+      // The chunks were written before this row. If the insert fails (a slug
+      // race → `@@unique([projectId, slug])` violation, or a DB outage) the
+      // objects are orphaned — customer content in storage with no row to govern
+      // its retention/deletion. Best-effort reap them, then surface the failure.
+      await deleteAllS3JsonlChunks({ projectId, datasetId }).catch(() => {
+        // best-effort: a failed reap must not mask the original insert error
+      });
+      throw error;
+    }
   }
 
   /**
