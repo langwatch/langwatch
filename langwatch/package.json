@@ -191,7 +191,7 @@
     "micro": "^10.0.1",
     "monaco-editor": "^0.52.2",
     "monacopilot": "^1.2.12",
-    "motion": "^12.38.0",
+    "motion": "^12.40.0",
     "mustache": "^4.2.0",
     "nanoid": "^5.1.11",
     "next-themes": "^0.4.6",
