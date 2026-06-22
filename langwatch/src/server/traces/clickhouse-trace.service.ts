@@ -729,12 +729,18 @@ export class ClickHouseTraceService {
             this.logger.debug("No scrollId provided in request");
           }
 
-          // Generate filter conditions from input.filters
+          // Generate filter conditions from input.filters. Pass the dashboard
+          // time window so span/event filters bound their stored_spans EXISTS
+          // subqueries to the same window the outer trace_summaries query uses,
+          // pruning partitions instead of cold-scanning the S3-tiered tail.
           const {
             conditions: filterConditions,
             params: filterParams,
             hasUnsupportedFilters,
-          } = generateClickHouseFilterConditions(input.filters ?? {});
+          } = generateClickHouseFilterConditions(input.filters ?? {}, {
+            startDate: input.startDate,
+            endDate: input.endDate,
+          });
 
           if (hasUnsupportedFilters) {
             throw new Error(
