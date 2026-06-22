@@ -128,7 +128,7 @@ uuid
 langwatch/pr-screenshots/
 
 # Per-scenario LLM conversation transcripts (langy.scenario.test.ts)
-langwatch/src/tests/langy/scenario-logs/
+langwatch/e2e/langy/scenario-logs/
 
 # Agent scratch + dogfood evidence (never track)
 **/.claude/dogfood-evidence/
