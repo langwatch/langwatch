@@ -301,7 +301,7 @@
     "playwright": "1.59.1",
     "raw-loader": "^4.0.2",
     "sass": "^1.99.0",
-    "selfsigned": "^3.0.1",
+    "selfsigned": "^5.5.0",
     "simple-statistics": "^7.8.9",
     "string-replace-loader": "^3.3.0",
     "testcontainers": "^11.14.0",
