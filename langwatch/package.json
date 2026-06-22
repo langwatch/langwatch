@@ -251,7 +251,7 @@
     "zod": "^3.25.76",
     "zod-openapi": "^4.2.4",
     "zod-to-json-schema": "^3.25.2",
-    "zod-validation-error": "^3.5.4",
+    "zod-validation-error": "^5.0.0",
     "zundo": "^2.3.0",
     "zustand": "^4.5.7"
   },
