@@ -6,13 +6,14 @@
  * Verifies that edit/delete menu items are gated behind
  * the `datasets:manage` permission for lite members.
  */
-import { cleanup, render, screen } from "@testing-library/react";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockIsLiteMemberRef, mockDatasetsList, mockDeleteMutate } =
-  vi.hoisted(() => {
+const { mockIsLiteMemberRef, mockDatasetsList, mockDeleteMutate } = vi.hoisted(
+  () => {
     return {
       mockIsLiteMemberRef: {
         current: false,
@@ -35,7 +36,8 @@ const { mockIsLiteMemberRef, mockDatasetsList, mockDeleteMutate } =
       },
       mockDeleteMutate: vi.fn(),
     };
-  });
+  },
+);
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
@@ -122,14 +124,12 @@ vi.mock("~/utils/trpcError", () => ({
   isHandledByGlobalHandler: vi.fn(() => false),
 }));
 
-vi.mock("~/components/datasets/UploadCSVModal", () => ({
-  UploadCSVModal: () => <div data-testid="upload-csv-modal" />,
+vi.mock("~/components/datasets/UploadCSVDrawer", () => ({
+  UploadCSVDrawer: () => <div data-testid="upload-csv-modal" />,
 }));
 
 vi.mock("~/components/AddOrEditDatasetDrawer", () => ({
-  AddOrEditDatasetDrawer: () => (
-    <div data-testid="add-edit-dataset-drawer" />
-  ),
+  AddOrEditDatasetDrawer: () => <div data-testid="add-edit-dataset-drawer" />,
 }));
 
 vi.mock("~/components/datasets/CopyDatasetDialog", () => ({
@@ -154,21 +154,15 @@ vi.mock("~/components/ui/layouts/PageLayout", () => ({
     Container: ({ children }: { children?: ReactNode }) => (
       <div>{children}</div>
     ),
-    Content: ({ children }: { children?: ReactNode }) => (
-      <div>{children}</div>
-    ),
+    Content: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   },
 }));
 
 vi.mock("~/components/ui/menu", () => ({
   Menu: {
     Root: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-    Trigger: ({ children }: { children?: ReactNode }) => (
-      <div>{children}</div>
-    ),
-    Content: ({ children }: { children?: ReactNode }) => (
-      <div>{children}</div>
-    ),
+    Trigger: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+    Content: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
     Item: ({
       children,
       ...props
@@ -196,9 +190,7 @@ vi.mock("~/components/ui/link", () => ({
 }));
 
 // Lazy import to ensure mocks are set up first
-const { default: DatasetsPage } = await import(
-  "~/pages/[project]/datasets"
-);
+const { default: DatasetsPage } = await import("~/pages/[project]/datasets");
 
 function renderPage() {
   return render(

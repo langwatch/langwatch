@@ -39,7 +39,7 @@ vi.mock("react-papaparse", async (importActual) => {
   };
 });
 
-import { CSVReaderComponent } from "../UploadCSVModal";
+import { CSVReaderComponent } from "../UploadCSVDrawer";
 
 function renderReader(props: {
   parse?: boolean;
@@ -101,7 +101,9 @@ describe("CSVReaderComponent", () => {
       );
       onRawFile.mockClear();
 
-      await userEvent.click(screen.getByText("×"));
+      await userEvent.click(
+        screen.getByRole("button", { name: /remove file/i }),
+      );
 
       expect(onRawFile).toHaveBeenCalledWith(null);
       expect(onUploadRemoved).toHaveBeenCalledTimes(1);

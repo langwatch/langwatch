@@ -34,7 +34,7 @@ import {
   DatasetEditorTable,
   type InMemoryDataset,
 } from "~/components/datasets/editor/DatasetEditorTable";
-import { UploadCSVModal } from "~/components/datasets/UploadCSVModal";
+import { UploadCSVDrawer } from "~/components/datasets/UploadCSVDrawer";
 import { useDrawer } from "~/hooks/useDrawer";
 import type { DatasetColumns } from "~/server/datasets/types";
 import { Dialog } from "../../components/ui/dialog";
@@ -268,7 +268,7 @@ export function DatasetModal({
         )}
       </Dialog.Content>
       {uploadCSVModal.open && (
-        <UploadCSVModal
+        <UploadCSVDrawer
           isOpen={uploadCSVModal.open}
           onClose={uploadCSVModal.onClose}
           // The workflow picker needs the dataset's columns synchronously to
