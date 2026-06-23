@@ -1,6 +1,11 @@
 import type { Readable } from "node:stream";
 import { generate } from "@langwatch/ksuid";
-import type { DatasetRecord, Prisma, PrismaClient } from "@prisma/client";
+import type {
+  Dataset,
+  DatasetRecord,
+  Prisma,
+  PrismaClient,
+} from "@prisma/client";
 import { nanoid } from "nanoid";
 import { tryToMapPreviousColumnsToNewColumns } from "~/optimization_studio/utils/datasetUtils";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -8,6 +13,7 @@ import { createLogger } from "~/utils/logger/server";
 import { slugify } from "~/utils/slugify";
 import {
   adaptS3JsonlRecord,
+  assertDatasetReadableInHeap,
   createManyDatasetRecords,
   getFullDataset,
 } from "../api/routers/datasetRecord.utils";
@@ -24,6 +30,8 @@ import { enqueueDatasetNormalize } from "./dataset-normalize.queue";
 import { DatasetRecordRepository } from "./dataset-record.repository";
 import { getDatasetStorage } from "./dataset-storage";
 import {
+  ColumnTypeChangeNotSupportedError,
+  DatasetChunkCountMissingError,
   DatasetConflictError,
   DatasetNotFoundError,
   DatasetNotReadyError,
@@ -38,6 +46,7 @@ import {
 import { ExperimentRepository } from "./experiment.repository";
 import {
   exceedsUploadCap,
+  STALE_PENDING_UPLOAD_TTL_SECONDS,
   stagingUploadKey,
   UPLOAD_MAX_BYTES,
 } from "./presigned-upload";
@@ -206,6 +215,21 @@ export class DatasetService {
         throw new DatasetNotFoundError();
       }
 
+      // Defense in depth for the UI's ready-gate: editing a dataset that is still
+      // `uploading`/`processing` (or `failed`) races the normalize job and edits
+      // content that isn't settled. Refuse unless ready (a null status = legacy =
+      // ready). The datasets-page menu hides Edit for non-ready rows; this stops a
+      // direct/stale call too.
+      if (
+        existingDataset.status != null &&
+        existingDataset.status !== "ready"
+      ) {
+        throw new DatasetNotReadyError({
+          status: existingDataset.status,
+          statusError: existingDataset.statusError,
+        });
+      }
+
       const slug = this.generateSlug(name);
 
       // Check for slug collision with other datasets (excluding current one)
@@ -233,9 +257,7 @@ export class DatasetService {
         // nothing, leaving stored chunk keys out of sync with columnTypes.
         // Refuse rather than corrupt. (Deferred: s3_jsonl column migration.)
         if (existingDataset.contentLayout === "s3_jsonl") {
-          throw new Error(
-            "Changing column types is not yet supported for large (S3) datasets",
-          );
+          throw new ColumnTypeChangeNotSupportedError();
         }
         await this.migrateDatasetRecordColumns(
           {
@@ -657,10 +679,24 @@ export class DatasetService {
           });
         }
       } else {
+        // No chunkOffsets (legacy/partial migration): the only way to honour the
+        // page window is to read every chunk, then slice — an UNBOUNDED read per
+        // page. Guard on sizeBytes so a large offset-less dataset can't OOM the
+        // pod on a normal list call (offsets-present datasets take the bounded
+        // branch above).
+        assertDatasetReadableInHeap(dataset);
+        // I-COUNT: same guard as getFullDataset — a `ready` s3_jsonl dataset MUST
+        // have a non-null chunkCount. `chunkCount ?? 0` would loop zero times and
+        // serve an EMPTY page against a positive rowCount (silent data loss); the
+        // offsets branch above never reaches here, so this only fires on genuine
+        // drift. Throw loudly so it surfaces (and recomputeDatasetCounts repairs).
+        if (dataset.chunkCount == null) {
+          throw new DatasetChunkCountMissingError(dataset.id);
+        }
         const rows = await storage.readChunks({
           projectId: params.projectId,
           datasetId: dataset.id,
-          chunkCount: dataset.chunkCount ?? 0,
+          chunkCount: dataset.chunkCount,
         });
         const records = rows.map((line) => adaptS3JsonlRecord(line, dataset));
         pageRecords.push(...records.slice(windowStart, windowEnd));
@@ -727,6 +763,7 @@ export class DatasetService {
         projectId: params.projectId,
         recordId: params.recordId,
         entry: sanitisedEntry,
+        repository: this.repository,
       });
       const record = {
         id: params.recordId,
@@ -844,6 +881,7 @@ export class DatasetService {
         projectId: params.projectId,
         entries: records.map((r) => r.entry),
         forcedIds: records.map((r) => r.id),
+        repository: this.repository,
       });
       const createdAt = new Date();
       return records.map((record) => ({
@@ -891,6 +929,7 @@ export class DatasetService {
         dataset,
         projectId: params.projectId,
         recordIds: params.recordIds,
+        repository: this.repository,
       });
       return { count: deleted };
     }
@@ -957,8 +996,9 @@ export class DatasetService {
     // Fetch source records. ADR-032: an s3_jsonl source has its content in chunk
     // objects, not the PG DatasetRecord table (I-PG), so reading PG would copy
     // an empty dataset. Gate on ready (I-READY) and read the chunks instead.
-    // NOTE: reads all chunks in memory; large-dataset copy is bounded by the
-    // reads-at-scale fast-follow, same as every other read in this rung.
+    // NOTE: reads all chunks in memory until the streaming-copy fast-follow —
+    // so guard on sizeBytes (same ceiling as export) to reject a too-large copy
+    // rather than OOM the pod.
     let sourceRecordEntries: Array<Record<string, unknown>>;
     if (sourceDataset.contentLayout === "s3_jsonl") {
       if (sourceDataset.status !== "ready") {
@@ -967,11 +1007,19 @@ export class DatasetService {
           statusError: sourceDataset.statusError,
         });
       }
+      assertDatasetReadableInHeap(sourceDataset);
+      // I-COUNT: a ready s3_jsonl source MUST have a non-null chunkCount; `?? 0`
+      // would read zero chunks and silently copy an EMPTY dataset against a
+      // positive rowCount. Mirror getFullDataset/listRecords — throw, don't
+      // truncate (no offsets branch here, so chunkCount always governs the read).
+      if (sourceDataset.chunkCount == null) {
+        throw new DatasetChunkCountMissingError(sourceDatasetId);
+      }
       const storage = await getDatasetStorage(sourceProjectId);
       const rows = await storage.readChunks({
         projectId: sourceProjectId,
         datasetId: sourceDatasetId,
-        chunkCount: sourceDataset.chunkCount ?? 0,
+        chunkCount: sourceDataset.chunkCount,
       });
       // Reuse the shared {id, entry} → DatasetRecord adapter (the same unwrap the
       // read paths use) and take just the entry; the copy mints fresh ids below.
@@ -1113,15 +1161,6 @@ export class DatasetService {
   }
 
   /**
-   * Creates a new dataset from an uploaded file.
-   *
-   * Parses the file, infers columns (all as "string"), renames reserved columns,
-   * creates the dataset and records.
-   *
-   * @throws {DatasetConflictError} if slug conflicts
-   * @throws {UploadValidationError} if file too large, too many rows, etc.
-   */
-  /**
    * R3: start a direct browser→S3 upload for a NEW dataset. Checks the name
    * conflict FIRST (C2 — a conflict must never mint a presigned URL), then
    * mints the presigned target (fails fast with `DirectUploadUnavailableError`
@@ -1129,6 +1168,9 @@ export class DatasetService {
    * then creates the `Dataset` in `uploading` with the minted staging key
    * bound to the row (C1). Content lands in S3 once the normalize job runs
    * (rung 4); `columnTypes` is unknown until then.
+   *
+   * Opportunistically reaps this project's abandoned prior uploads first (no
+   * scheduler — the poll-triggered cleanup; see `reapStalePendingUploads`).
    */
   async createPendingUpload(params: {
     projectId: string;
@@ -1138,9 +1180,13 @@ export class DatasetService {
     datasetId: string;
     slug: string;
     uploadUrl: string;
-    stagingKey: string;
   }> {
     const { projectId, name, filename } = params;
+
+    // Bound the accumulation of abandoned `uploading` rows + staging objects:
+    // sweep this project's stale pending uploads as new ones start. Best-effort
+    // (never blocks this upload).
+    await this.reapStalePendingUploads(projectId);
 
     const slug = this.generateSlug(name);
     // C2: reject a name conflict before minting a presigned URL so a duplicate
@@ -1173,7 +1219,6 @@ export class DatasetService {
       datasetId: dataset.id,
       slug: dataset.slug,
       uploadUrl: upload.url,
-      stagingKey: upload.key,
     };
   }
 
@@ -1253,14 +1298,28 @@ export class DatasetService {
       throw new UploadNotPendingError();
     }
 
-    // Best-effort delete of the staged object — non-fatal (the staging lifecycle
-    // rule reaps it otherwise; a failed delete must not block the cleanup).
+    await this.reapPendingUpload(dataset);
+
+    return { datasetId, aborted: true };
+  }
+
+  /**
+   * Reap one pending (`uploading`, non-archived) upload row: best-effort delete
+   * its staged object, then archive the row (rename the slug + set `archivedAt`)
+   * so it stops pinning its slug/quota. The staged-object delete is non-fatal —
+   * the S3 staging lifecycle rule (IaC) reaps it otherwise; a failed delete must
+   * never block the archive. Shared by the explicit abort (`abortPendingUpload`)
+   * and the poll-triggered sweep (`reapStalePendingUploads`). The caller owns the
+   * `status='uploading'` guard.
+   */
+  private async reapPendingUpload(dataset: Dataset): Promise<void> {
+    const { id: datasetId, projectId } = dataset;
     if (dataset.stagingKey) {
       try {
         const storage = await getDatasetStorage(projectId);
         await storage.deleteStaged({ projectId, key: dataset.stagingKey });
       } catch {
-        // ignore
+        // ignore — best-effort; the lifecycle rule is the durable backstop
       }
     }
 
@@ -1273,8 +1332,39 @@ export class DatasetService {
         archivedAt: new Date(),
       },
     });
+  }
 
-    return { datasetId, aborted: true };
+  /**
+   * Poll-triggered cleanup of abandoned pending uploads: archive every
+   * `status='uploading'` row in the project older than
+   * `STALE_PENDING_UPLOAD_TTL_SECONDS` and best-effort delete its staging
+   * object. Runs opportunistically when a new upload starts (NOT a scheduler —
+   * this epic deliberately adds no cron; see the normalize-recovery decision),
+   * so accumulation is bounded for any project that keeps uploading. Wholly
+   * best-effort: any failure is swallowed so it can never block the upload that
+   * triggered it. The conservative TTL guarantees a still-in-flight upload is
+   * never reaped. The durable backstop for a project that never uploads again is
+   * the S3 `staging/` lifecycle rule (IaC).
+   */
+  private async reapStalePendingUploads(projectId: string): Promise<void> {
+    try {
+      const olderThan = new Date(
+        Date.now() - STALE_PENDING_UPLOAD_TTL_SECONDS * 1000,
+      );
+      const stale = await this.repository.findStalePendingUploads({
+        projectId,
+        olderThan,
+      });
+      for (const dataset of stale) {
+        try {
+          await this.reapPendingUpload(dataset);
+        } catch {
+          // one bad row must not abort the rest of the sweep
+        }
+      }
+    } catch {
+      // sweep is opportunistic — never let it block the triggering upload
+    }
   }
 
   /**

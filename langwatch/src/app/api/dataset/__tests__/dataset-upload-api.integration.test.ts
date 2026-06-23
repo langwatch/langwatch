@@ -673,6 +673,39 @@ describe("Feature: Dataset File Upload REST API", () => {
         expect(res.status).toBe(401);
       });
     });
+
+    describe("when an API key targets a DIFFERENT project (cross-tenant IDOR)", () => {
+      /** @scenario Direct-upload rejects a foreign-project API key against an owned project */
+      it("returns 401 from POST /direct-upload on apiKey/project mismatch", async () => {
+        // A second project under the same team; its API key must NOT authorize a
+        // direct upload that targets the first project. This is the route-level
+        // proof of the cross-tenant guard (the unit test covers the decision
+        // function; this exercises the full handlerManagedAuth chain).
+        const foreignProject = await prisma.project.create({
+          data: {
+            ...projectFactory.build({ slug: nanoid() }),
+            teamId: testTeam.id,
+            personalFeatures: {},
+          },
+        });
+        try {
+          const form = new FormData();
+          form.set("projectId", testProjectId); // project A (owned)
+          form.set("name", "Cross tenant");
+          form.set("filename", "data.csv");
+
+          const res = await app.request("/api/dataset/direct-upload", {
+            method: "POST",
+            headers: { "X-Auth-Token": foreignProject.apiKey }, // project B's key
+            body: form,
+          });
+
+          expect(res.status).toBe(401);
+        } finally {
+          await prisma.project.delete({ where: { id: foreignProject.id } });
+        }
+      });
+    });
   });
 
   // ── Postgres null-byte safety + atomicity ──────────────────────

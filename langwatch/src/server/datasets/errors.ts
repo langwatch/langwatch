@@ -10,6 +10,22 @@ export class DatasetNotFoundError extends Error {
   }
 }
 
+/**
+ * A column-type change was requested on an s3_jsonl dataset, where rewriting
+ * every chunk's keys is a later rung (Decision 6 defers s3_jsonl column
+ * migration). It's a user-actionable precondition, not a server fault — typed so
+ * the router maps it to a 4xx with the message intact instead of letting a plain
+ * `Error` collapse into a generic 500.
+ */
+export class ColumnTypeChangeNotSupportedError extends Error {
+  constructor(
+    message = "Changing column types is not yet supported for large (S3) datasets",
+  ) {
+    super(message);
+    this.name = "ColumnTypeChangeNotSupportedError";
+  }
+}
+
 export class DatasetConflictError extends Error {
   constructor(message = "A dataset with this name already exists") {
     super(message);
@@ -212,6 +228,28 @@ export class MissingChunkError extends Error {
     super(`Missing dataset chunk: ${key}`);
     this.name = "MissingChunkError";
     this.key = key;
+  }
+}
+
+/**
+ * An s3_jsonl dataset is `ready` but its PG-authoritative `chunkCount` is null —
+ * an I-COUNT integrity violation (a transiently-failed `UPDATE` after migrate /
+ * normalize, never a valid resting state). Read paths must NOT coerce it via
+ * `chunkCount ?? 0`, which would loop zero times and serve an EMPTY dataset
+ * against a positive `rowCount` — silent, undiagnosable data loss for the UI,
+ * SDK, and experiments. Throwing surfaces the drift loudly so it can be repaired
+ * (`recomputeDatasetCounts`) rather than masked. Maps to a 500 (server-side data
+ * bug, not user-actionable).
+ */
+export class DatasetChunkCountMissingError extends Error {
+  readonly datasetId: string;
+
+  constructor(datasetId: string) {
+    super(
+      `Dataset ${datasetId} has s3_jsonl layout but a null chunkCount (I-COUNT drift)`,
+    );
+    this.name = "DatasetChunkCountMissingError";
+    this.datasetId = datasetId;
   }
 }
 

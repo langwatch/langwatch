@@ -147,8 +147,8 @@ export class DatasetRepository {
    * Finds the pending (`status='uploading'`, non-archived) dataset that owns a
    * given staging key. The direct-upload staging route uses this to refuse a
    * stream into a `staging/` slot no upload row claims — otherwise an authed
-   * project user could spray orphan objects there (local FS has no staging-TTL
-   * reaper). `stagingKey` is server-minted and bound to the row at presign time.
+   * project user could spray orphan objects there. `stagingKey` is server-minted
+   * and bound to the row at presign time.
    */
   async findPendingUploadByStagingKey(input: {
     projectId: string;
@@ -160,6 +160,28 @@ export class DatasetRepository {
         stagingKey: input.stagingKey,
         status: "uploading",
         archivedAt: null,
+      },
+    });
+  }
+
+  /**
+   * Finds abandoned pending uploads in a project: `status='uploading'`,
+   * non-archived rows created before `olderThan`. Drives the poll-triggered
+   * reap (see `DatasetService.reapStalePendingUploads`) that bounds the
+   * accumulation of stuck `uploading` rows + their staging objects without a
+   * scheduler. The `olderThan` cutoff is conservative (well beyond the presign
+   * TTL) so a still-in-flight upload is never matched.
+   */
+  async findStalePendingUploads(input: {
+    projectId: string;
+    olderThan: Date;
+  }): Promise<Dataset[]> {
+    return await this.prisma.dataset.findMany({
+      where: {
+        projectId: input.projectId,
+        status: "uploading",
+        archivedAt: null,
+        createdAt: { lt: input.olderThan },
       },
     });
   }

@@ -31,7 +31,6 @@ describe("directUpload service", () => {
           datasetId: "dataset_1",
           slug: "my-dataset",
           uploadUrl: "https://s3.example/staging/abc",
-          stagingKey: "staging/proj/abc",
         };
         mockFetch().mockResolvedValue({
           ok: true,
@@ -245,6 +244,20 @@ describe("directUpload service", () => {
           "/api/dataset/direct-upload/dataset_1?projectId=proj_1",
         );
         expect(init.method).toBe("DELETE");
+      });
+    });
+
+    describe("when the cleanup DELETE returns a non-ok status", () => {
+      it("throws so the caller logs the failure instead of swallowing it", async () => {
+        // A 5xx (DB timeout, pod restart) leaves the `uploading` row pinned in PG
+        // — pinning its slug and counting against project quota. The reject makes
+        // that observable at the caller's existing catch/log; it must NOT resolve
+        // silently.
+        mockFetch().mockResolvedValue({ ok: false, status: 500 });
+
+        await expect(
+          abortPendingUpload({ projectId: "proj_1", datasetId: "dataset_1" }),
+        ).rejects.toThrow(/status 500/);
       });
     });
   });

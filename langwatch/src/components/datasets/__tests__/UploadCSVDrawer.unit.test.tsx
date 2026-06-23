@@ -417,7 +417,6 @@ describe("UploadCSVForm cancel", () => {
         datasetId: string;
         uploadUrl: string;
         slug: string;
-        stagingKey: string;
       }) => void;
       requestDirectUpload.mockReturnValue(
         new Promise((resolve) => {
@@ -464,7 +463,6 @@ describe("UploadCSVForm cancel", () => {
         datasetId: "dataset_racey",
         uploadUrl: "https://s3.example/put",
         slug: "s",
-        stagingKey: "staging/proj/u",
       });
 
       await waitFor(() => {

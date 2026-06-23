@@ -59,6 +59,30 @@ export class LocalDatasetStorage implements DatasetStorage {
   }
 
   /**
+   * Write a chunk file atomically: write a unique temp sibling, then `rename`
+   * it into place. A bare `fs.writeFile` truncates-then-writes, so a reader —
+   * `readChunks`/`readChunk` take NO advisory lock (only writers do) — can
+   * observe a half-written chunk and crash in `JSON.parse`. POSIX `rename` is
+   * atomic on the same filesystem, so a concurrent read sees either the old
+   * object or the fully-written new one, never a torn one. This brings the
+   * local backend to parity with S3 (PutObject is already atomic). The temp
+   * sibling shares the chunk's directory so the rename stays intra-filesystem;
+   * a failed write removes it so a crash never leaves `.tmp-*` litter.
+   */
+  private async atomicWriteFile(filePath: string, data: string): Promise<void> {
+    const tmpPath = `${filePath}.tmp-${nanoid()}`;
+    try {
+      await fs.writeFile(tmpPath, data, "utf-8");
+      await fs.rename(tmpPath, filePath);
+    } catch (error: unknown) {
+      await fs.rm(tmpPath, { force: true }).catch(() => {
+        // best-effort cleanup — surface the original write/rename error
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Turn a raw FS permission failure (EACCES/EROFS/EPERM) into an actionable
    * error pointing at the two ways to fix it; rethrow anything else. Born-on-
    * storage made a writable backend mandatory, so an unwritable root (e.g. the
@@ -104,7 +128,7 @@ export class LocalDatasetStorage implements DatasetStorage {
       );
       try {
         await fs.mkdir(path.dirname(filePath), { recursive: true });
-        await fs.writeFile(filePath, chunk.jsonl, "utf-8");
+        await this.atomicWriteFile(filePath, chunk.jsonl);
       } catch (error: unknown) {
         this.rethrowWritable(error);
       }
@@ -211,7 +235,7 @@ export class LocalDatasetStorage implements DatasetStorage {
     }
     const filePath = this.localPath(chunkKey(projectId, datasetId, index));
     await fs.mkdir(path.dirname(filePath), { recursive: true });
-    await fs.writeFile(filePath, jsonl, "utf-8");
+    await this.atomicWriteFile(filePath, jsonl);
     // startRow/endRow are chunk-LOCAL here; the caller recomputes global offsets.
     return { index, startRow: 0, endRow: records.length, byteSize };
   }

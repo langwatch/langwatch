@@ -46,9 +46,17 @@ export function DatasetPickerList({
 
   const filteredDatasets = useMemo(() => {
     if (!datasetsQuery.data) return [];
+    // Only `ready` datasets are usable: selecting a processing/uploading/failed
+    // one hands its id to the workbench/workflow node, which then throws
+    // DatasetNotReadyError on the first read. Hide non-ready rows from the picker
+    // so they can't be chosen. Legacy rows default status="ready"; a null status
+    // (born-before-status) is treated as ready too, matching the read gate.
+    const ready = datasetsQuery.data.filter(
+      (dataset) => dataset.status === "ready" || dataset.status == null,
+    );
     const query = searchQuery.toLowerCase().trim();
-    if (!query) return datasetsQuery.data;
-    return datasetsQuery.data.filter((dataset) =>
+    if (!query) return ready;
+    return ready.filter((dataset) =>
       dataset.name.toLowerCase().includes(query),
     );
   }, [datasetsQuery.data, searchQuery]);

@@ -31,7 +31,14 @@ export default function Dataset() {
   );
 
   const status = datasetQuery.data?.status;
-  const isReady = status === "ready" || status == null;
+  // Gate on `isSuccess`: before the query resolves `status` is `undefined`, and
+  // `undefined == null` is `true` — which would mount the editor and fire
+  // `getAll` against a still-`processing` dataset (server rejects with
+  // PRECONDITION_FAILED → retry-toast cascade) before the status is known. Once
+  // the query settles, a genuinely-null status (legacy born-before-status rows)
+  // still reads as ready.
+  const isReady =
+    datasetQuery.isSuccess && (status === "ready" || status == null);
 
   const runExperiment = () => {
     void router.push({

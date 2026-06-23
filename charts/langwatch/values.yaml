@@ -297,8 +297,8 @@ app:
       # AWS S3 configuration for dataset storage
       ## @extra app.dataplane.providers.awsS3 AWS S3 provider configuration.
       ## @param app.dataplane.providers.awsS3.endpoint.value [string] Custom S3 endpoint.
-      ## @param app.dataplane.providers.awsS3.accessKeyId.value [string] S3 access key ID.
-      ## @param app.dataplane.providers.awsS3.secretAccessKey.value [string] S3 secret access key.
+      ## @param app.dataplane.providers.awsS3.accessKeyId.value [string] S3 access key ID (not recommended in production — use accessKeyId.secretKeyRef).
+      ## @param app.dataplane.providers.awsS3.secretAccessKey.value [string] S3 secret access key (not recommended in production — use secretAccessKey.secretKeyRef).
       ## @param app.dataplane.providers.awsS3.keySalt.value [string] Optional key salt.
       awsS3:
         endpoint:
@@ -746,8 +746,13 @@ datasetS3Migration:
   skip: false
   ## @param datasetS3Migration.backoffLimit [default: 3] Job backoffLimit — retries on transient failure (the task is idempotent).
   backoffLimit: 3
-  ## @param datasetS3Migration.activeDeadlineSeconds [object] Hard runtime limit for the hook Job (unset = no limit).
-  activeDeadlineSeconds: ~
+  ## @param datasetS3Migration.activeDeadlineSeconds [default: 21600] Hard runtime limit (s) for the hook Job — a backstop so a hung migration can't run forever. The task is idempotent/resumable, so a re-run resumes; raise for very large installs or set null to disable.
+  activeDeadlineSeconds: 21600
+  # ServiceAccount for the migration Job. Leave empty to use the namespace
+  # default (matching the app/workers). On EKS+IRSA, set this to the same
+  # IAM-role-annotated ServiceAccount the app/workers use so the Job can reach S3.
+  ## @param datasetS3Migration.serviceAccountName [string, default: ""] ServiceAccount for the Job (set to the app/workers IRSA SA on EKS).
+  serviceAccountName: ""
   ## @param datasetS3Migration.ttlSecondsAfterFinished [default: 600] Clean up the finished Job after this many seconds.
   ttlSecondsAfterFinished: 600
   ## @extra datasetS3Migration.resources Resource requests and limits for the migration Job.

@@ -18,6 +18,7 @@ vi.mock("../../api/routers/datasetRecord.utils", async (importOriginal) => {
 import { createManyDatasetRecords } from "../../api/routers/datasetRecord.utils";
 import { DatasetService } from "../dataset.service";
 import { getDatasetStorage } from "../dataset-storage";
+import { DatasetChunkCountMissingError } from "../errors";
 
 const makeService = (overrides: {
   repository?: Record<string, unknown>;
@@ -122,6 +123,32 @@ describe("DatasetService", () => {
         expect(result.pagination.total).toBe(2);
         // The PG paginator must NOT be touched for s3_jsonl.
         expect(recordRepository.listPaginated).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a ready s3_jsonl dataset has a null chunkCount and no offsets (I-COUNT drift)", () => {
+      it("throws DatasetChunkCountMissingError instead of serving an empty page against a positive rowCount", async () => {
+        const repository = {
+          findBySlugOrId: vi.fn().mockResolvedValue({
+            ...baseS3Dataset,
+            chunkCount: null,
+            rowCount: 5,
+          }),
+        };
+        // Storage is stubbed but the guard must fire BEFORE any chunk read — a
+        // `chunkCount ?? 0` would otherwise loop zero times and return [] (empty
+        // page) while total=5: silent data loss.
+        const readChunks = mockReadChunks([]);
+
+        await expect(
+          makeService({ repository }).listRecords({
+            slugOrId: "ds",
+            projectId: "p1",
+            page: 1,
+            limit: 10,
+          }),
+        ).rejects.toBeInstanceOf(DatasetChunkCountMissingError);
+        expect(readChunks).not.toHaveBeenCalled();
       });
     });
 
@@ -297,6 +324,8 @@ describe("DatasetService", () => {
       it("throws DatasetNotReadyError instead of editing the chunk", async () => {
         const repository = {
           findBySlugOrId: vi.fn().mockResolvedValue({ ...notReadyRow }),
+          // The injected repo's locked re-read that the mutation asserts ready on.
+          findOneOrThrow: vi.fn().mockResolvedValue({ ...notReadyRow }),
         };
         vi.mocked(getDatasetStorage).mockResolvedValue({
           readChunk: vi.fn(),
@@ -325,6 +354,8 @@ describe("DatasetService", () => {
       it("throws DatasetNotReadyError instead of rewriting chunks", async () => {
         const repository = {
           findBySlugOrId: vi.fn().mockResolvedValue({ ...notReadyRow }),
+          // The injected repo's locked re-read that the mutation asserts ready on.
+          findOneOrThrow: vi.fn().mockResolvedValue({ ...notReadyRow }),
         };
         vi.mocked(getDatasetStorage).mockResolvedValue({
           readChunk: vi.fn(),
@@ -344,6 +375,58 @@ describe("DatasetService", () => {
           name: "DatasetNotReadyError",
           status: "processing",
         });
+      });
+    });
+
+    describe("upsertDataset() editing an existing dataset", () => {
+      it("refuses to edit a not-ready dataset, before any slug lookup or mutation", async () => {
+        const repository = {
+          findOne: vi.fn().mockResolvedValue({ ...notReadyRow }),
+          findBySlug: vi.fn(),
+        };
+        const prisma = {
+          $transaction: async (fn: (tx: unknown) => unknown) => fn({}),
+        };
+
+        await expect(
+          makeService({ repository, prisma }).upsertDataset({
+            projectId: "p1",
+            datasetId: "dataset_1",
+            name: "DS",
+            columnTypes: [{ name: "a", type: "string" }],
+          }),
+        ).rejects.toMatchObject({
+          name: "DatasetNotReadyError",
+          status: "processing",
+        });
+        // The ready-gate fires before the slug-conflict lookup / write.
+        expect(repository.findBySlug).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("upsertDataset() changing column types on a ready s3_jsonl dataset", () => {
+    it("refuses with a typed ColumnTypeChangeNotSupportedError (a 4xx, not a 500)", async () => {
+      // s3_jsonl column migration is a deferred rung; the edit must surface a
+      // typed, user-actionable error the router maps to a 4xx — not a plain
+      // Error that collapses into a generic 500.
+      const repository = {
+        findOne: vi.fn().mockResolvedValue({ ...baseS3Dataset }), // ready, cols [a]
+        findBySlug: vi.fn().mockResolvedValue(null),
+      };
+      const prisma = {
+        $transaction: async (fn: (tx: unknown) => unknown) => fn({}),
+      };
+
+      await expect(
+        makeService({ repository, prisma }).upsertDataset({
+          projectId: "p1",
+          datasetId: "dataset_1",
+          name: "DS",
+          columnTypes: [{ name: "b", type: "string" }], // changed columns
+        }),
+      ).rejects.toMatchObject({
+        name: "ColumnTypeChangeNotSupportedError",
       });
     });
   });
@@ -428,6 +511,32 @@ describe("DatasetService", () => {
             targetProjectId: "p2",
           }),
         ).rejects.toMatchObject({ name: "DatasetNotReadyError" });
+      });
+    });
+
+    describe("when the source is ready s3_jsonl but has a null chunkCount (I-COUNT drift)", () => {
+      it("throws DatasetChunkCountMissingError instead of creating an empty copy", async () => {
+        const create = vi.fn();
+        const repository = {
+          findOne: vi.fn().mockResolvedValue({
+            ...baseS3Dataset,
+            chunkCount: null,
+            rowCount: 5,
+          }),
+          findAllSlugs: vi.fn().mockResolvedValue([]),
+          findBySlug: vi.fn().mockResolvedValue(null),
+          create,
+        };
+
+        await expect(
+          makeService({ repository }).copyDataset({
+            sourceDatasetId: "dataset_1",
+            sourceProjectId: "p1",
+            targetProjectId: "p2",
+          }),
+        ).rejects.toBeInstanceOf(DatasetChunkCountMissingError);
+        // No empty copy is created against the positive rowCount.
+        expect(create).not.toHaveBeenCalled();
       });
     });
   });

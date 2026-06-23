@@ -22,6 +22,23 @@ export const UPLOAD_MAX_BYTES = 5 * 1024 * 1024 * 1024;
 export const UPLOAD_TTL_SECONDS = 15 * 60;
 
 /**
+ * Age past which a `status='uploading'` row is treated as abandoned and reaped
+ * (its staging object deleted, the row archived). Deliberately FAR above the
+ * presign TTL: a row that lingers this long means the browser PUT either never
+ * happened or completed-but-never-finalized, never a still-in-flight upload (a
+ * legit upload starts within the 15-min presign window and finalizes promptly).
+ * The conservative margin guarantees the lazy sweep never reaps a live upload.
+ *
+ * The reaper is *poll-triggered* (runs opportunistically when the next upload
+ * starts — see `reapStalePendingUploads`), not a scheduler: this epic
+ * deliberately adds no new cron/BullMQ-repeat (see the normalize-recovery
+ * decision). The durable backstop for objects whose row never gets reaped (an
+ * inactive project) is an S3 bucket lifecycle rule on the `staging/` prefix
+ * (IaC) — the same place the upload-bucket CORS rule lives.
+ */
+export const STALE_PENDING_UPLOAD_TTL_SECONDS = 24 * 60 * 60;
+
+/**
  * Server-owned, tenant-scoped staging key the client cannot widen — the
  * presign is bound to exactly this key, so a client can only write this one
  * object under its own project prefix.

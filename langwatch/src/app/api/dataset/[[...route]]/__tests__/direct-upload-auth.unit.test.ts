@@ -115,6 +115,55 @@ describe("authorizeDirectUpload", () => {
         expect(projectFindUnique).not.toHaveBeenCalled();
       });
     });
+
+    describe("when the request is forged cross-site (CSRF)", () => {
+      it("rejects with 403 on Sec-Fetch-Site: cross-site, before any permission check", async () => {
+        hasProjectPermission.mockResolvedValue(true); // would pass if reached
+
+        const result = await authorizeDirectUpload(
+          makeContext({ "sec-fetch-site": "cross-site" }),
+          PROJECT_ID,
+        );
+
+        expect(result).toMatchObject({ ok: false, status: 403 });
+        // The CSRF gate fires before the permission check and team resolve.
+        expect(hasProjectPermission).not.toHaveBeenCalled();
+        expect(projectFindUnique).not.toHaveBeenCalled();
+      });
+
+      it("rejects when the Origin host differs from the Host (older browser, no Sec-Fetch-Site)", async () => {
+        hasProjectPermission.mockResolvedValue(true);
+
+        const result = await authorizeDirectUpload(
+          makeContext({
+            origin: "https://evil.example",
+            host: "app.langwatch.ai",
+          }),
+          PROJECT_ID,
+        );
+
+        expect(result).toMatchObject({ ok: false, status: 403 });
+        expect(hasProjectPermission).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the request is same-origin", () => {
+      it("proceeds to the permission check on Sec-Fetch-Site: same-origin", async () => {
+        hasProjectPermission.mockResolvedValue(true);
+
+        const result = await authorizeDirectUpload(
+          makeContext({ "sec-fetch-site": "same-origin" }),
+          PROJECT_ID,
+        );
+
+        expect(result).toEqual({
+          ok: true,
+          projectId: PROJECT_ID,
+          teamId: TEAM_ID,
+        });
+        expect(hasProjectPermission).toHaveBeenCalled();
+      });
+    });
   });
 
   describe("given no session", () => {

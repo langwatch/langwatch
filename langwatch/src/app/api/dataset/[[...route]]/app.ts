@@ -8,7 +8,6 @@ import {
   requires,
 } from "~/server/api/security";
 import { createLogger } from "~/utils/logger/server";
-import { createManyDatasetRecords } from "../../../../server/api/routers/datasetRecord.utils";
 import { UploadValidationError } from "../../../../server/datasets/dataset.service";
 import type { DatasetNotReadyError } from "../../../../server/datasets/errors";
 import type { DatasetColumns } from "../../../../server/datasets/types";
@@ -735,51 +734,33 @@ secured.access(requires("datasets:manage")).post(
     const { entries } = c.req.valid("json");
     const service = c.get("datasetService");
 
-    let dataset;
+    // Route through the service (parity with `/:slugOrId/records`) instead of
+    // reaching into the tRPC-layer `createManyDatasetRecords` util: the service
+    // owns the dataset lookup, column validation, id generation, and the
+    // s3_jsonl-vs-PG write routing. This handler only translates the result and
+    // typed errors to the legacy `{ success }` HTTP shape.
     try {
-      dataset = await service.getBySlugOrId({
+      await service.batchCreateRecords({
         slugOrId: slug,
         projectId: project.id,
+        entries,
       });
+      return c.json({ success: true });
     } catch (error) {
-      return mapDatasetNotFoundError(error);
-    }
-
-    const columns = Object.fromEntries(
-      (dataset.columnTypes as DatasetColumns).map((column) => [
-        column.name,
-        column.type,
-      ]),
-    );
-    for (const entry of entries) {
-      for (const [key] of Object.entries(entry)) {
-        if (!columns[key]) {
-          throw new BadRequestError(
-            `Column \`${key}\` is not present in the \`${dataset.name}\` dataset`,
-          );
-        }
+      if (error instanceof Error && error.name === "InvalidColumnError") {
+        throw new BadRequestError(error.message);
       }
-    }
-
-    const now = Date.now();
-
-    try {
-      await createManyDatasetRecords({
-        datasetId: dataset.id,
-        projectId: project.id,
-        datasetRecords: entries.map((entry, index) => ({
-          id: `${now}-${index}`,
-          ...entry,
-        })),
-      });
-    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.name === "MalformedColumnTypesError"
+      ) {
+        throw new InternalServerError(error.message);
+      }
       // M1: an s3_jsonl dataset still preparing rejects the append (I-READY).
       const notReady = mapDatasetNotReadyError(error, c);
       if (notReady) return notReady;
       return mapDatasetNotFoundError(error);
     }
-
-    return c.json({ success: true });
   },
 );
 

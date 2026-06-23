@@ -25,6 +25,7 @@
  */
 import type { Dataset, Prisma, PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
+import { createLogger } from "~/utils/logger/server";
 import { DatasetRepository } from "./dataset.repository";
 import {
   type ChunkedDatasetMeta,
@@ -37,6 +38,8 @@ import { withDatasetLock } from "./dataset-lock";
 import { type DatasetStorage, getDatasetStorage } from "./dataset-storage";
 import { DatasetNotReadyError } from "./errors";
 import { stripNullBytes } from "./sanitize";
+
+const logger = createLogger("langwatch:datasets:mutations");
 
 export type RecomputedDatasetCounts = {
   rowCount: number;
@@ -277,6 +280,7 @@ export const appendS3JsonlRecords = async ({
   entries,
   forcedIds,
   storage,
+  repository: providedRepository,
 }: {
   prisma: PrismaClient;
   dataset: Dataset;
@@ -284,9 +288,10 @@ export const appendS3JsonlRecords = async ({
   entries: unknown[];
   forcedIds?: (string | undefined)[];
   storage?: DatasetStorage;
+  repository?: DatasetRepository;
 }): Promise<{ appended: number }> => {
   const datasetStorage = storage ?? (await getDatasetStorage(projectId));
-  const repository = new DatasetRepository(prisma);
+  const repository = providedRepository ?? new DatasetRepository(prisma);
 
   return withDatasetLock({ prisma, datasetId: dataset.id }, async (tx) => {
     const current = await repository.findOneOrThrow(
@@ -345,6 +350,10 @@ const locateIdsBeforeLock = async ({
       // Couldn't read this chunk off the lock (e.g. racing a rewrite). Abandon
       // the hint so the caller uses the proven full in-lock scan instead of
       // acting on a partial locate.
+      logger.warn(
+        { projectId, datasetId, index },
+        "off-lock chunk read failed during id locate; abandoning fast-path hint, falling back to full in-lock scan",
+      );
       return null;
     }
     for (const line of rows) {
@@ -430,6 +439,7 @@ export const editS3JsonlRecord = async ({
   recordId,
   entry,
   storage,
+  repository: providedRepository,
 }: {
   prisma: PrismaClient;
   dataset: Dataset;
@@ -437,9 +447,10 @@ export const editS3JsonlRecord = async ({
   recordId: string;
   entry: unknown;
   storage?: DatasetStorage;
+  repository?: DatasetRepository;
 }): Promise<{ updated: boolean }> => {
   const datasetStorage = storage ?? (await getDatasetStorage(projectId));
-  const repository = new DatasetRepository(prisma);
+  const repository = providedRepository ?? new DatasetRepository(prisma);
 
   // OFF the lock: locate the row's chunk so only that chunk is re-read under it.
   // Skipped unless the dataset looks ready — never do storage I/O ahead of the
@@ -517,6 +528,10 @@ export const editS3JsonlRecord = async ({
           return { updated: true };
         }
         // Row moved/removed since the scan → fall through to the full scan.
+        logger.warn(
+          { projectId, datasetId: dataset.id, recordId, index },
+          "edit fast-path drift: located row not in hinted chunk; falling back to full in-lock scan",
+        );
       }
     }
 
@@ -578,15 +593,17 @@ export const deleteS3JsonlRecords = async ({
   projectId,
   recordIds,
   storage,
+  repository: providedRepository,
 }: {
   prisma: PrismaClient;
   dataset: Dataset;
   projectId: string;
   recordIds: string[];
   storage?: DatasetStorage;
+  repository?: DatasetRepository;
 }): Promise<{ deleted: number }> => {
   const datasetStorage = storage ?? (await getDatasetStorage(projectId));
-  const repository = new DatasetRepository(prisma);
+  const repository = providedRepository ?? new DatasetRepository(prisma);
   const removeSet = new Set(recordIds);
   const isTarget = (line: unknown): boolean =>
     isChunkLine(line) && removeSet.has(line.id);
@@ -661,7 +678,13 @@ export const deleteS3JsonlRecords = async ({
         // not, a concurrent mutation moved/removed it since the scan — bail to
         // the proven full scan rather than risk a missed delete.
         for (const id of hint.locatedIds) {
-          if (!removedIds.has(id)) return null;
+          if (!removedIds.has(id)) {
+            logger.warn(
+              { projectId, datasetId: dataset.id, recordId: id },
+              "delete fast-path drift: located id not removed (concurrent mutation); falling back to full in-lock scan",
+            );
+            return null;
+          }
         }
         if (deleted === 0) {
           return { deleted: 0 };
@@ -756,14 +779,16 @@ export const recomputeDatasetCounts = async ({
   datasetId,
   projectId,
   storage,
+  repository: providedRepository,
 }: {
   prisma: PrismaClient;
   datasetId: string;
   projectId: string;
   storage?: DatasetStorage;
+  repository?: DatasetRepository;
 }): Promise<RecomputedDatasetCounts> => {
   const datasetStorage = storage ?? (await getDatasetStorage(projectId));
-  const repository = new DatasetRepository(prisma);
+  const repository = providedRepository ?? new DatasetRepository(prisma);
 
   return withDatasetLock({ prisma, datasetId }, async (tx) => {
     const current = await repository.findOneOrThrow(

@@ -130,11 +130,60 @@ export const migrateDatasetToS3 = async (
 
   const storage = await deps.getStorage(projectId);
 
+  // Pre-check OUTSIDE the lock: skip an already-migrated dataset before doing any
+  // S3 work. The authoritative re-check runs inside the lock below — this one
+  // just avoids wasted writes on the common already-done case.
+  const preCheck = await deps.prisma.dataset.findFirst({
+    where: { id: dataset.id, projectId },
+  });
+  if (!preCheck || preCheck.contentLayout !== "postgres") {
+    logger.info(
+      { datasetId: dataset.id, projectId },
+      "Skipping dataset — already migrated (not on postgres layout)",
+    );
+    return "already-migrated";
+  }
+
+  // Read the PG rows and write the S3 chunks OUTSIDE the advisory lock — only the
+  // atomic counter+`contentLayout` flip needs serialization, so we never hold the
+  // lock (and burn its 120s transaction budget) across S3 network I/O. Safe
+  // because the write is idempotent by deterministic key: a concurrent/re-run
+  // write overwrites the same keys with identical content (a postgres-layout
+  // dataset's corpus is frozen during migration) and a crash here is re-runnable.
+  // This is the ordering the file header documents. [Records are capped at the
+  // legacy 25MB/10k limits → fits in memory; PRESERVE ids so the chunk lines
+  // carry the same record ids the editor targets.]
+  const records = await deps.recordRepository.findDatasetRecords({
+    datasetId: dataset.id,
+    projectId,
+  });
+  const lines = records.map((row) => ({ id: row.id, entry: row.entry }));
+
+  const written = await storage.writeChunks({
+    projectId,
+    datasetId: dataset.id,
+    records: lines,
+    fromIndex: 0,
+  });
+
+  // Defensive orphan-chunk cleanup (I-IDEM): drop any tail chunks a crashed prior
+  // run wrote beyond what THIS run writes, so a shorter re-run never leaves
+  // dangling `chunk-{n}` objects. Harmless today (frozen corpus → same count) and
+  // cheap (stops at the first contiguous gap).
+  await storage.deleteChunksFrom({
+    projectId,
+    datasetId: dataset.id,
+    fromIndex: written.length,
+  });
+  const meta = chunkedMeta(written);
+
+  // Flip onto s3_jsonl UNDER the lock — a short, PG-only critical section: re-read
+  // to win the race against a concurrent run (our idempotent S3 writes make a
+  // redundant write harmless), then commit the counter update + `contentLayout`
+  // flip atomically. `status` is left untouched (existing datasets are `ready`).
   return withDatasetLock(
     { prisma: deps.prisma, datasetId: dataset.id },
     async (tx) => {
-      // Re-read inside the lock: another pod/run may have migrated this dataset
-      // since we listed it. Idempotent/resumable — only `postgres` is migrated.
       const current = await tx.dataset.findFirst({
         where: { id: dataset.id, projectId },
       });
@@ -146,44 +195,6 @@ export const migrateDatasetToS3 = async (
         return "already-migrated";
       }
 
-      // Read the PG rows (small — capped at the legacy 25MB/10k limits, so the
-      // whole dataset fits in memory; no streaming needed). PRESERVE ids so the
-      // s3_jsonl chunk lines carry the same record ids the editor targets.
-      const records = await deps.recordRepository.findDatasetRecords(
-        { datasetId: dataset.id, projectId },
-        { tx },
-      );
-      const lines = records.map((row) => ({ id: row.id, entry: row.entry }));
-
-      // Write S3 chunks BEFORE the PG flip. Deterministic keys from index 0 →
-      // a re-run overwrites the same keys idempotently rather than appending.
-      const written = await storage.writeChunks({
-        projectId,
-        datasetId: dataset.id,
-        records: lines,
-        fromIndex: 0,
-      });
-
-      // Defensive orphan-chunk cleanup (I-IDEM). A crashed prior run could have
-      // written MORE chunks than this run does (e.g. if it failed mid-write, or
-      // a future change makes the corpus shrinkable) — those tail chunks would
-      // be orphaned, since `writeChunks` overwrites by key but never deletes
-      // beyond what it writes. Drop everything from `written.length` upward so a
-      // shorter re-run can never leave dangling `chunk-{n}` objects. Harmless
-      // today (the PG corpus is frozen → re-runs write the same count), but it
-      // future-proofs the flow and is cheap (stops at the first contiguous gap).
-      // Called unconditionally: simpler than gating on "could there be priors"
-      // and the no-op cost (one HEAD that 404s) is negligible.
-      await storage.deleteChunksFrom({
-        projectId,
-        datasetId: dataset.id,
-        fromIndex: written.length,
-      });
-      const meta = chunkedMeta(written);
-
-      // Flip the dataset onto the s3_jsonl layout in the SAME locked
-      // transaction — counter update + contentLayout flip commit atomically.
-      // `status` is left untouched (existing datasets are `ready`).
       await tx.dataset.update({
         where: { id: dataset.id, projectId },
         data: {
