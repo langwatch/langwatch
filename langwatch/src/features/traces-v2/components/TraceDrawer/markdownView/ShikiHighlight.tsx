@@ -22,9 +22,14 @@ function useResolvedShikiLang(language: string): string {
       return;
     }
     let cancelled = false;
-    void ensureShikiLangLoaded(canonical).then(() => {
-      if (!cancelled) bump((x) => x + 1);
-    });
+    // Swallow grammar-load failures (network, bad lang id) — the
+    // render falls back to "text" via `isShikiLangReady` so the UI
+    // stays safe; the unhandled rejection just spams the console.
+    void ensureShikiLangLoaded(canonical)
+      .then(() => {
+        if (!cancelled) bump((x) => x + 1);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };

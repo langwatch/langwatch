@@ -74,10 +74,20 @@ export function buildConversationMarkdownChunks(
       id: `turn-${turnNum}-header`,
       markdown: `## Turn ${turnNum} — ${formatRelativeTime(turn.timestamp)} · ${model} · ${formatDuration(turn.durationMs)}`,
     });
+    // Redaction is enforced server-side (content is nulled before it
+    // reaches the client when the project's redaction policy fires). The
+    // bubble view shows `[Redacted]` in place of the text; the markdown
+    // export must do the same — silently dropping the turn would make
+    // pasted transcripts look like the turn never happened.
     if (userText) {
       chunks.push({
         id: `turn-${turnNum}-user`,
         markdown: ["**User:**", "", userText].join("\n"),
+      });
+    } else if (turn.inputRedacted) {
+      chunks.push({
+        id: `turn-${turnNum}-user`,
+        markdown: ["**User:**", "", "_[Redacted]_"].join("\n"),
       });
     }
     // Prefer the pre-extracted assistant prose (same as the bubble) — it
@@ -89,6 +99,11 @@ export function buildConversationMarkdownChunks(
       chunks.push({
         id: `turn-${turnNum}-assistant`,
         markdown: ["**Assistant:**", "", assistantMarkdown].join("\n"),
+      });
+    } else if (turn.outputRedacted) {
+      chunks.push({
+        id: `turn-${turnNum}-assistant`,
+        markdown: ["**Assistant:**", "", "_[Redacted]_"].join("\n"),
       });
     } else if (turn.error) {
       chunks.push({

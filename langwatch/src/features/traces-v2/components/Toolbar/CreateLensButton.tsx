@@ -6,7 +6,7 @@ import { useViewStore } from "../../stores/viewStore";
 import { LensNamePopover } from "./LensNamePopover";
 
 const BETA_TOOLTIP =
-  "Lenses are saved in your browser during this beta. They don't sync across browsers or teammates yet.";
+  "Save the current columns, sort, and filter as a lens. Lenses sync to your account; team-shared lenses are coming.";
 
 /**
  * Lens creation entry point — single path: type a name, snapshot the
@@ -41,7 +41,7 @@ export const CreateLensButton: React.FC = () => {
           placement="bottom-start"
           footer={
             <Text fontSize="2xs" color="fg.subtle" lineHeight="1.4">
-              Saved locally during beta. Won't sync across browsers yet.
+              Lenses sync to your account. Sharing with teammates is coming.
             </Text>
           }
         >

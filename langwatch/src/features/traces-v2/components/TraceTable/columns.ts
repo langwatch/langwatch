@@ -279,8 +279,8 @@ const traceColumnDefs = {
 
 /**
  * Union of every id present in `traceColumnDefs`. Used to constrain the
- * STANDARD_COLUMNS list and the cell registry — adding an id to one place
- * but not the others becomes a compile error instead of a silent blank cell.
+ * cell registry — adding an id to one place but not the other becomes a
+ * compile error instead of a silent blank cell.
  */
 export type TraceColumnId = keyof typeof traceColumnDefs;
 

@@ -20,15 +20,6 @@ export interface SortConfig {
   direction: "asc" | "desc";
 }
 
-export interface ColumnConfig {
-  id: string;
-  label: string;
-  section: "standard" | "fields" | "evaluations" | "events";
-  visible: boolean;
-  pinned?: "left";
-  minWidth: number;
-}
-
 export interface LensConfig {
   id: string;
   name: string;
