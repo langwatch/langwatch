@@ -1,6 +1,11 @@
 import type { Readable } from "node:stream";
 import { generate } from "@langwatch/ksuid";
-import type { DatasetRecord, Prisma, PrismaClient } from "@prisma/client";
+import type {
+  Dataset,
+  DatasetRecord,
+  Prisma,
+  PrismaClient,
+} from "@prisma/client";
 import { nanoid } from "nanoid";
 import { tryToMapPreviousColumnsToNewColumns } from "~/optimization_studio/utils/datasetUtils";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -40,6 +45,7 @@ import {
 import { ExperimentRepository } from "./experiment.repository";
 import {
   exceedsUploadCap,
+  STALE_PENDING_UPLOAD_TTL_SECONDS,
   stagingUploadKey,
   UPLOAD_MAX_BYTES,
 } from "./presigned-upload";
@@ -1139,15 +1145,6 @@ export class DatasetService {
   }
 
   /**
-   * Creates a new dataset from an uploaded file.
-   *
-   * Parses the file, infers columns (all as "string"), renames reserved columns,
-   * creates the dataset and records.
-   *
-   * @throws {DatasetConflictError} if slug conflicts
-   * @throws {UploadValidationError} if file too large, too many rows, etc.
-   */
-  /**
    * R3: start a direct browser→S3 upload for a NEW dataset. Checks the name
    * conflict FIRST (C2 — a conflict must never mint a presigned URL), then
    * mints the presigned target (fails fast with `DirectUploadUnavailableError`
@@ -1155,6 +1152,9 @@ export class DatasetService {
    * then creates the `Dataset` in `uploading` with the minted staging key
    * bound to the row (C1). Content lands in S3 once the normalize job runs
    * (rung 4); `columnTypes` is unknown until then.
+   *
+   * Opportunistically reaps this project's abandoned prior uploads first (no
+   * scheduler — the poll-triggered cleanup; see `reapStalePendingUploads`).
    */
   async createPendingUpload(params: {
     projectId: string;
@@ -1164,9 +1164,13 @@ export class DatasetService {
     datasetId: string;
     slug: string;
     uploadUrl: string;
-    stagingKey: string;
   }> {
     const { projectId, name, filename } = params;
+
+    // Bound the accumulation of abandoned `uploading` rows + staging objects:
+    // sweep this project's stale pending uploads as new ones start. Best-effort
+    // (never blocks this upload).
+    await this.reapStalePendingUploads(projectId);
 
     const slug = this.generateSlug(name);
     // C2: reject a name conflict before minting a presigned URL so a duplicate
@@ -1199,7 +1203,6 @@ export class DatasetService {
       datasetId: dataset.id,
       slug: dataset.slug,
       uploadUrl: upload.url,
-      stagingKey: upload.key,
     };
   }
 
@@ -1279,14 +1282,28 @@ export class DatasetService {
       throw new UploadNotPendingError();
     }
 
-    // Best-effort delete of the staged object — non-fatal (the staging lifecycle
-    // rule reaps it otherwise; a failed delete must not block the cleanup).
+    await this.reapPendingUpload(dataset);
+
+    return { datasetId, aborted: true };
+  }
+
+  /**
+   * Reap one pending (`uploading`, non-archived) upload row: best-effort delete
+   * its staged object, then archive the row (rename the slug + set `archivedAt`)
+   * so it stops pinning its slug/quota. The staged-object delete is non-fatal —
+   * the S3 staging lifecycle rule (IaC) reaps it otherwise; a failed delete must
+   * never block the archive. Shared by the explicit abort (`abortPendingUpload`)
+   * and the poll-triggered sweep (`reapStalePendingUploads`). The caller owns the
+   * `status='uploading'` guard.
+   */
+  private async reapPendingUpload(dataset: Dataset): Promise<void> {
+    const { id: datasetId, projectId } = dataset;
     if (dataset.stagingKey) {
       try {
         const storage = await getDatasetStorage(projectId);
         await storage.deleteStaged({ projectId, key: dataset.stagingKey });
       } catch {
-        // ignore
+        // ignore — best-effort; the lifecycle rule is the durable backstop
       }
     }
 
@@ -1299,8 +1316,39 @@ export class DatasetService {
         archivedAt: new Date(),
       },
     });
+  }
 
-    return { datasetId, aborted: true };
+  /**
+   * Poll-triggered cleanup of abandoned pending uploads: archive every
+   * `status='uploading'` row in the project older than
+   * `STALE_PENDING_UPLOAD_TTL_SECONDS` and best-effort delete its staging
+   * object. Runs opportunistically when a new upload starts (NOT a scheduler —
+   * this epic deliberately adds no cron; see the normalize-recovery decision),
+   * so accumulation is bounded for any project that keeps uploading. Wholly
+   * best-effort: any failure is swallowed so it can never block the upload that
+   * triggered it. The conservative TTL guarantees a still-in-flight upload is
+   * never reaped. The durable backstop for a project that never uploads again is
+   * the S3 `staging/` lifecycle rule (IaC).
+   */
+  private async reapStalePendingUploads(projectId: string): Promise<void> {
+    try {
+      const olderThan = new Date(
+        Date.now() - STALE_PENDING_UPLOAD_TTL_SECONDS * 1000,
+      );
+      const stale = await this.repository.findStalePendingUploads({
+        projectId,
+        olderThan,
+      });
+      for (const dataset of stale) {
+        try {
+          await this.reapPendingUpload(dataset);
+        } catch {
+          // one bad row must not abort the rest of the sweep
+        }
+      }
+    } catch {
+      // sweep is opportunistic — never let it block the triggering upload
+    }
   }
 
   /**

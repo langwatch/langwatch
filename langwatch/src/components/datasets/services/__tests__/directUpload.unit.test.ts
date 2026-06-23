@@ -31,7 +31,6 @@ describe("directUpload service", () => {
           datasetId: "dataset_1",
           slug: "my-dataset",
           uploadUrl: "https://s3.example/staging/abc",
-          stagingKey: "staging/proj/abc",
         };
         mockFetch().mockResolvedValue({
           ok: true,

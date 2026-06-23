@@ -64,7 +64,6 @@ export type DirectUploadHandle = {
   datasetId: string;
   slug: string;
   uploadUrl: string;
-  stagingKey: string;
 };
 
 /**

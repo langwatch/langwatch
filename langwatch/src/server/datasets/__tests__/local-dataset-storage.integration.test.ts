@@ -58,6 +58,70 @@ describe("LocalDatasetStorage", () => {
       });
     });
 
+    describe("given atomic chunk writes (temp + rename)", () => {
+      it("leaves no .tmp residue after writeChunks and rewriteChunk", async () => {
+        await storage.writeChunks({
+          projectId: "p1",
+          datasetId: "d-atomic",
+          records: [{ a: 1 }, { a: 2 }],
+        });
+        await storage.rewriteChunk({
+          projectId: "p1",
+          datasetId: "d-atomic",
+          index: 0,
+          records: [{ a: 9 }],
+        });
+
+        const chunkDir = path.dirname(
+          path.join(storageDir, chunkKey("p1", "d-atomic", 0)),
+        );
+        const entries = await fs.readdir(chunkDir);
+        expect(entries.filter((f) => f.includes(".tmp-"))).toEqual([]);
+        expect(
+          entries.some((f) => f.startsWith("chunk-") && f.endsWith(".jsonl")),
+        ).toBe(true);
+      });
+
+      it("never exposes a torn chunk to a concurrent reader during repeated rewrites", async () => {
+        // A bare fs.writeFile truncates-then-writes; a read landing mid-write
+        // observes a partial file and crashes in JSON.parse. temp+rename makes
+        // every read see either the old or the fully-written new object. Hammer
+        // one chunk with rewrites while continuously reading it: each read must
+        // return exactly one complete row, never throw.
+        await storage.writeChunks({
+          projectId: "p1",
+          datasetId: "d-race",
+          records: [{ a: "x".repeat(1000) }],
+        });
+
+        let reads = 0;
+        const readLoop = (async () => {
+          for (let i = 0; i < 200; i++) {
+            const rows = await storage.readChunk({
+              projectId: "p1",
+              datasetId: "d-race",
+              index: 0,
+            });
+            expect(rows).toHaveLength(1);
+            reads++;
+          }
+        })();
+        const writeLoop = (async () => {
+          for (let i = 0; i < 200; i++) {
+            await storage.rewriteChunk({
+              projectId: "p1",
+              datasetId: "d-race",
+              index: 0,
+              records: [{ a: "y".repeat(1000 + i) }],
+            });
+          }
+        })();
+
+        await Promise.all([readLoop, writeLoop]);
+        expect(reads).toBe(200);
+      });
+    });
+
     describe("when appending rows to an existing dataset", () => {
       it("preserves the original rows and appends the new ones in order", async () => {
         const first = await storage.writeChunks({

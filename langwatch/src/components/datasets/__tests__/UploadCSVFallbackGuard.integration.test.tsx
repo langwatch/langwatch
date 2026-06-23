@@ -178,7 +178,6 @@ describe("UploadCSVForm 409-fallback size guard", () => {
         datasetId: "dataset_pending",
         slug: "s",
         uploadUrl: "https://s3.example/put",
-        stagingKey: "staging/proj/u",
       });
       putFileToPresignedUrl.mockRejectedValue(new PresignedUploadFailedError());
       abortPendingUpload.mockResolvedValue(undefined);
@@ -230,7 +229,6 @@ describe("UploadCSVForm 409-fallback size guard", () => {
         datasetId: "dataset_pending",
         slug: "s",
         uploadUrl: "https://s3.example/put",
-        stagingKey: "staging/proj/u",
       });
       putFileToPresignedUrl.mockRejectedValue(new PresignedUploadFailedError());
       abortPendingUpload.mockResolvedValue(undefined);
@@ -334,7 +332,6 @@ describe("UploadCSVForm 409-fallback size guard", () => {
         datasetId: "dataset_pending",
         slug: "s",
         uploadUrl: "/api/dataset/direct-upload/staging/up_1?projectId=proj_1",
-        stagingKey: "staging/proj_1/up_1",
       });
       putFileToPresignedUrl.mockRejectedValue(
         new Error(

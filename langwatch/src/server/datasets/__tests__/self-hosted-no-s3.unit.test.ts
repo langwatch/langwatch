@@ -172,7 +172,10 @@ describe("Feature: Large dataset storage — self-hosted without object storage"
         /^\/api\/dataset\/direct-upload\/staging\//,
       );
       expect(repository.create).toHaveBeenCalledOnce();
-      const uploadId = pending.stagingKey.split("/").pop()!;
+      // The staging key is bound to the row (C1), NOT leaked in the response —
+      // read it off the created row the way finalize does.
+      const stagingKey = createdRow!.stagingKey as string;
+      const uploadId = stagingKey.split("/").pop()!;
 
       // 2. The browser PUTs the raw file; the route streams it via the service.
       await service.writeStagedUpload({
@@ -186,7 +189,7 @@ describe("Feature: Large dataset storage — self-hosted without object storage"
       const storage = await getDatasetStorage("p1");
       const size = await storage.headStagedObjectSize({
         projectId: "p1",
-        key: pending.stagingKey,
+        key: stagingKey,
       });
       expect(size).toBeGreaterThan(0);
 
