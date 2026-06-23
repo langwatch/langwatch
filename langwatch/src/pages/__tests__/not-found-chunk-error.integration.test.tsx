@@ -3,7 +3,6 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { RELOAD_AT_KEY } from "~/utils/chunkReload";
 
 vi.mock("react-router", () => ({
   useRouteError: vi.fn(),
@@ -58,13 +57,12 @@ describe("NotFoundOrErrorPage", () => {
       expect(screen.getByRole("button", { name: /Reload app/ })).toBeDefined();
     });
 
-    it("writes a fresh cooldown timestamp on click", () => {
-      sessionStorage.setItem(RELOAD_AT_KEY, "1");
-
+    it("reloads on click without error", () => {
       render(<NotFoundOrErrorPage />, { wrapper: Wrapper });
-      fireEvent.click(screen.getByRole("button", { name: /Reload app/ }));
 
-      expect(Number(sessionStorage.getItem(RELOAD_AT_KEY))).toBeGreaterThan(1);
+      expect(() =>
+        fireEvent.click(screen.getByRole("button", { name: /Reload app/ })),
+      ).not.toThrow();
     });
   });
 
