@@ -190,8 +190,8 @@ importers:
         specifier: ^4.1.0
         version: 4.1.8(@opentelemetry/api@1.9.0)(@types/node@24.5.2)(@vitest/coverage-v8@4.1.8)(msw@2.12.10(@types/node@24.5.2)(typescript@5.9.3))(vite@7.3.5(@types/node@24.5.2)(yaml@2.8.1))
       vitest-mock-extended:
-        specifier: ^3.1.0
-        version: 3.1.1(typescript@5.9.3)(vitest@4.1.8)
+        specifier: ^4.0.0
+        version: 4.0.0(typescript@5.9.3)(vitest@4.1.8)
       yaml:
         specifier: ^2.8.1
         version: 2.8.1
@@ -2504,8 +2504,8 @@ packages:
     peerDependencies:
       typescript: '>=4.8.4'
 
-  ts-essentials@10.2.0:
-    resolution: {integrity: sha512-z9FlLywg0XEV46Ws1FwYN4NZDMr9qAe38lTTtgVBqzhhyEgwrnCUkFe4MEqnvar1kY1kFEnlkp56bxn2g0V+UA==}
+  ts-essentials@10.2.1:
+    resolution: {integrity: sha512-+Id1fRkuir+CsgK2x04/icS2b4V1hQmq7ObzIrDjhN0ozfRYivnP7aaKMVJfLApQm0trjR39A6NIMVchiB9Erw==}
     peerDependencies:
       typescript: '>=4.5.0'
     peerDependenciesMeta:
@@ -2619,11 +2619,11 @@ packages:
       yaml:
         optional: true
 
-  vitest-mock-extended@3.1.1:
-    resolution: {integrity: sha512-IQBKkEYB5BW4eJ+8JHZRzrLkKIJu5zkLJsU6u8vB+skSXbES+Di86nrUIbXwEQivDXcR4APMZFSvt398+iqKYA==}
+  vitest-mock-extended@4.0.0:
+    resolution: {integrity: sha512-m2FmH8JYfxzZoLsHuhXRY+Pv++a3zd91HYpSz81tpRLEHbtFkEL2QcWvJowucWuNTirzQURKfWbJJSXbYqkTsA==}
     peerDependencies:
       typescript: 3.x || 4.x || 5.x || 6.x
-      vitest: '>=3.0.0'
+      vitest: '>=4.0.0'
 
   vitest@4.1.8:
     resolution: {integrity: sha512-flY6ScbCIt9HThs+C5HS7jvGOB560DJtk/Z15IQROTA6zEy49Nh8T/dofWTQL+n3vswqn87sbJNiuqw1SDp5Ig==}
@@ -4905,7 +4905,7 @@ snapshots:
     dependencies:
       typescript: 5.9.3
 
-  ts-essentials@10.2.0(typescript@5.9.3):
+  ts-essentials@10.2.1(typescript@5.9.3):
     optionalDependencies:
       typescript: 5.9.3
 
@@ -4991,9 +4991,9 @@ snapshots:
       fsevents: 2.3.3
       yaml: 2.8.1
 
-  vitest-mock-extended@3.1.1(typescript@5.9.3)(vitest@4.1.8):
+  vitest-mock-extended@4.0.0(typescript@5.9.3)(vitest@4.1.8):
     dependencies:
-      ts-essentials: 10.2.0(typescript@5.9.3)
+      ts-essentials: 10.2.1(typescript@5.9.3)
       typescript: 5.9.3
       vitest: 4.1.8(@opentelemetry/api@1.9.0)(@types/node@24.5.2)(@vitest/coverage-v8@4.1.8)(msw@2.12.10(@types/node@24.5.2)(typescript@5.9.3))(vite@7.3.5(@types/node@24.5.2)(yaml@2.8.1))
 
