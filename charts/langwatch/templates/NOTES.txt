@@ -95,7 +95,47 @@ docs/ai-gateway/self-hosting/helm.
 {{- end }}
 
 ──────────────────────────────────────────────────────────────────────
-6. Required Secrets — check before upgrading
+6. Dataset object storage
+──────────────────────────────────────────────────────────────────────
+Datasets store their content as chunked JSONL in object storage, and a
+WRITABLE backend is REQUIRED: every dataset create writes to it, with no
+database fallback (ADR-032 "born-on-storage"). The chart configures a
+backend for you:
+
+  • Default (no S3): a local-filesystem PVC is provisioned
+    ({{ .Values.app.storedObjects.localFilesystem.path }},
+    {{ .Values.app.storedObjects.localFilesystem.size | default "10Gi" }})
+    and mounted into the app, the worker (which runs dataset
+    normalization), and the dataset-migration Job — they all read and write
+    the SAME chunks (LANGWATCH_LOCAL_STORAGE_PATH), so a fresh install works
+    without S3. Because these separate pods share one ReadWriteOnce volume,
+    every dataset pod must run on a SINGLE NODE: the chart refuses
+    replicaCount > 1, and on a multi-node cluster the worker / migration Job
+    can fail to schedule against the app's volume. Fine for a hobby /
+    single-node install; bytes survive pod restarts. For anything bigger,
+    enable app.dataplane (S3).
+
+  • Production / multi-pod: enable app.dataplane (S3 / MinIO / Azure).
+    Then configure these on the bucket and deployment, or uploads and
+    large datasets will not work:
+
+      • Bucket CORS: allow PUT from the app origin. The browser uploads
+        files straight to the bucket via a presigned PUT, so a missing
+        CORS rule fails the direct upload (small files fall back to a
+        backend upload; large files cannot).
+
+      • Lifecycle TTL on the staging/ prefix: expire un-finalized uploads
+        (e.g. 1-7 days) so abandoned uploads are reaped automatically.
+
+      • Worker + Redis (event sourcing): dataset normalization runs
+        off-request on the worker via the Redis-backed queue. Without a
+        worker and Redis, normalization falls back to running in the
+        request — fine for a single small pod, but a multi-pod S3
+        deployment must run the worker so uploads are processed
+        off-request.
+
+──────────────────────────────────────────────────────────────────────
+7. Required Secrets — check before upgrading
 ──────────────────────────────────────────────────────────────────────
 Each chart bump may introduce new required keys on the umbrella's app
 Secret. When upgrading, verify these are present in the Secret the app
