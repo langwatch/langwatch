@@ -29,7 +29,9 @@ function useResolvedShikiLang(language: string): string {
       .then(() => {
         if (!cancelled) bump((x) => x + 1);
       })
-      .catch(() => {});
+      .catch(() => {
+        // Intentionally swallowed — see comment above.
+      });
     return () => {
       cancelled = true;
     };

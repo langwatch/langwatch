@@ -21,7 +21,7 @@ const trace = (overrides: Partial<TraceListItem> = {}): TraceListItem => ({
   totalTokens: 0,
   models: [],
   labels: [],
-  status: "completed",
+  status: "ok",
   spanCount: 1,
   sizeBytes: 0,
   input: null,

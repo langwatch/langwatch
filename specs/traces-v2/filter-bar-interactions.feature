@@ -143,3 +143,23 @@ Rule: Facet rows hold their position while the pointer is in the section
     Given a value was toggled active while the pointer was inside the section
     When the pointer leaves the section
     Then the active value moves up to the pinned area
+
+  # The per-section value-search input lives inside the same hover-Box that
+  # triggers the freeze, so naive freeze-on-hover would keep showing the
+  # pre-search snapshot while the live list narrows. Search bypasses the
+  # freeze; reorder-on-click (the freeze's actual purpose) is untouched.
+
+  @integration
+  Scenario: Value search narrows the list live even while the layout would otherwise be frozen
+    Given the pointer has entered the facet section
+    And the user opens the section's value-search input
+    When the user types a substring that matches a subset of the values
+    Then only the matching rows are shown
+
+  @integration
+  Scenario: Empty-state hint and rendered rows agree when no values match
+    Given the pointer has entered the facet section
+    And the user opens the section's value-search input
+    When the user types a substring that matches no values
+    Then no value rows are rendered
+    And the "No match" hint is shown alone

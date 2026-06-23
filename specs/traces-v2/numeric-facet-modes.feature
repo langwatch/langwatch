@@ -128,3 +128,42 @@ Rule: A facet's mode is remembered per project, with a registry default
     Given the facet manager is open
     Then each numeric facet offers a Range/Discrete choice
     And changing it there matches the inline header toggle
+
+Rule: Mode toggle button reflects and flips the current mode
+  The header toggle is a single button: its aria-label and glyph describe
+  the mode it would switch INTO, so the user reads it as "show me the other
+  presentation." Pressing it calls onToggle with no argument; the consumer
+  computes the new mode and persists it.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And a discrete-eligible numeric facet is shown
+
+  @integration
+  Scenario: Mode toggle shows the slider glyph when discrete is active
+    Given the facet is in Discrete mode
+    Then the header toggle is labelled to switch to the range slider
+    And the toggle reports aria-pressed=true
+
+  @integration
+  Scenario: Clicking the discrete-mode toggle requests range
+    Given the facet is in Discrete mode
+    When the user clicks the mode toggle
+    Then onToggle is called so the consumer flips the mode
+
+  @integration
+  Scenario: Mode toggle shows the value-list glyph when range is active
+    Given the facet is in Range mode
+    Then the header toggle is labelled to switch to the value list
+    And the toggle reports aria-pressed=false
+
+  @integration
+  Scenario: Clicking the range-mode toggle requests discrete
+    Given the facet is in Range mode
+    When the user clicks the mode toggle
+    Then onToggle is called so the consumer flips the mode
+
+  @integration
+  Scenario: Non-eligible facets render no mode toggle at all
+    Given a categorical or wide-range numeric facet that does not qualify for Discrete
+    Then no mode toggle is rendered in its header
