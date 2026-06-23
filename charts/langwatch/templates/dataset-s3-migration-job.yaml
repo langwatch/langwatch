@@ -52,6 +52,12 @@ spec:
         app.kubernetes.io/component: dataset-s3-migration
     spec:
       restartPolicy: Never
+      {{/* On EKS+IRSA the Job must run as the same IAM-role-annotated
+           ServiceAccount as the app/workers to reach S3; default ("") falls
+           through to the namespace default SA (consistent with app/workers). */}}
+      {{- with .Values.datasetS3Migration.serviceAccountName }}
+      serviceAccountName: {{ . }}
+      {{- end }}
 
       {{/* Inherit chart-wide pod security + scheduling defaults so strict
            clusters don't reject the hook and node taints / dedicated pools
