@@ -513,6 +513,19 @@ export const createDatasetNormalizeHandler = (deps: DatasetNormalizeDeps) => {
         // ignore
       }
     } catch (error: unknown) {
+      // A failed dataset owns no valid chunks. parseInto flushes chunk objects
+      // to S3 as it streams, so a mid-stream failure (e.g. a JSONL parse error
+      // at row N of M) leaves chunk-0..k orphaned — and chunk keys, unlike
+      // staging keys, carry no lifecycle TTL to reap them, so a
+      // permanently-failed dataset would leak them forever. Best-effort delete
+      // every flushed chunk. Swallow any secondary error so it never masks the
+      // original failure cause (the staging object is preserved below for a
+      // manual retry, which re-writes chunks from index 0).
+      try {
+        await storage.deleteChunksFrom({ projectId, datasetId, fromIndex: 0 });
+      } catch {
+        // non-fatal: a failed reap is preferable to masking the real error.
+      }
       // Mark failed and rethrow so the queue records the failure; the staging
       // object is intentionally NOT deleted so a manual retry can re-run.
       const statusError =

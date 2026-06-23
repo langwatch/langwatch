@@ -304,6 +304,52 @@ describe("createDatasetNormalizeHandler()", () => {
       expect(update.data.statusError).toBeTruthy();
       expect(deleteStaged).not.toHaveBeenCalled();
     });
+
+    // @regression — a parse error AFTER chunks have already flushed to S3 must
+    // reap those chunks. parseInto flushes chunk objects mid-stream, so a
+    // failure at a later row leaves chunk-0..k orphaned; chunk keys have no
+    // lifecycle TTL, so a permanently-failed dataset would leak them forever.
+    describe("when chunks were already flushed before the parse error", () => {
+      it("reaps every flushed chunk (deleteChunksFrom 0), keeps staging, and rethrows", async () => {
+        // Three ~6 MB valid rows accumulate past CHUNK_MAX_BYTES (16 MB),
+        // forcing a real mid-stream flush (writeChunks → chunk objects in S3),
+        // then a malformed line throws — the orphan scenario, made concrete.
+        const big = (c: string) => `{"v":"${c.repeat(6 * 1024 * 1024)}"}\n`;
+        const { storage, writeChunks, deleteStaged, deleteChunksFrom } =
+          makeStorage({
+            streamStaged: vi
+              .fn()
+              .mockResolvedValue(
+                Readable.from([
+                  big("a"),
+                  big("b"),
+                  big("c"),
+                  "{not valid json\n",
+                ]),
+              ),
+          });
+        const repo = makeRepo({ id: "d1", status: "processing" });
+
+        const handler = createDatasetNormalizeHandler({
+          repository: repo as any,
+          getStorage: async () => storage as any,
+        });
+
+        await expect(handler(basePayload)).rejects.toThrow();
+        // Chunks really were flushed (orphan risk is real, not hypothetical).
+        expect(writeChunks).toHaveBeenCalled();
+        // …and the catch reaps them all.
+        expect(deleteChunksFrom).toHaveBeenCalledWith({
+          projectId: "p1",
+          datasetId: "d1",
+          fromIndex: 0,
+        });
+        const update = repo.update.mock.calls[0]![0];
+        expect(update.data.status).toBe("failed");
+        // Staging preserved for a manual retry; not deleted on failure.
+        expect(deleteStaged).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("when the dataset is not in processing", () => {
@@ -463,6 +509,7 @@ describe("createDatasetNormalizeHandler()", () => {
   // leaves orphan chunk objects; the handler must delete them from the new
   // chunk count upward so the chunk set matches the PG counters (I-IDEM).
   describe("when a prior run left more chunks than this run writes", () => {
+    /** @scenario "Retrying preparation does not duplicate rows" */
     it("deletes orphan chunks from the final count and stops at the first gap", async () => {
       const { storage, deleteChunksFrom } = makeStorage({
         // This run writes exactly 2 chunks (tiny per-chunk cap splits the rows).

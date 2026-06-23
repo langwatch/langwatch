@@ -58,7 +58,7 @@ Feature: Large dataset storage
     Then the dataset reports 15 rows
     And the original 10 rows are unchanged
 
-  @integration @unimplemented
+  @integration
   Scenario: Dataset access is isolated to its own project
     When I upload a dataset to my project
     Then I can read it from my project
@@ -69,7 +69,7 @@ Feature: Large dataset storage
   # Recovery
   # ============================================================================
 
-  @integration @unimplemented
+  @unit
   Scenario: An interrupted preparation loses nothing and can be retried
     Given a dataset whose preparation was interrupted before it finished
     Then nothing I uploaded is lost
@@ -77,7 +77,7 @@ Feature: Large dataset storage
     When I retry the preparation
     Then the dataset becomes ready with the correct rows
 
-  @integration @unimplemented
+  @unit
   Scenario: Retrying preparation does not duplicate rows
     Given a dataset whose preparation was interrupted after some rows were prepared
     When I retry the preparation

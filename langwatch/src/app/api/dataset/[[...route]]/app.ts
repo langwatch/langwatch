@@ -109,6 +109,11 @@ function validationHook(
 /**
  * Maps DatasetNotFoundError from the service layer to the HTTP NotFoundError.
  * The service throws domain errors; the route handler translates them to HTTP errors.
+ *
+ * NOTE: the direct-upload routes instead let domain errors propagate to
+ * `handleDatasetError` (the `DOMAIN_ERROR_HTTP` table). These older
+ * slug/record routes still map inline. Both reach 404 for a missing dataset;
+ * if you change a status/code, update both sites until they're unified.
  */
 function mapDatasetNotFoundError(error: unknown): never {
   if (error instanceof Error && error.name === "DatasetNotFoundError") {
@@ -375,35 +380,15 @@ secured.access(directUploadSessionAuth).post(
       throw new UnprocessableEntityError("filename field is required");
     }
 
-    try {
-      const result = await service.createPendingUpload({
-        projectId: auth.projectId,
-        name: name.trim(),
-        filename: filename.trim(),
-      });
-      return c.json(result, 201);
-    } catch (error) {
-      // Self-hosted without browser-reachable S3 → client falls back to /upload.
-      if (
-        error instanceof Error &&
-        error.name === "DirectUploadUnavailableError"
-      ) {
-        return c.json(
-          { error: "DirectUploadUnavailable", message: error.message },
-          409,
-        );
-      }
-      if (error instanceof Error && error.name === "DatasetConflictError") {
-        return c.json(
-          {
-            error: "Conflict",
-            message: "A dataset with this slug already exists",
-          },
-          409,
-        );
-      }
-      throw error;
-    }
+    // Domain errors map centrally in `handleDatasetError` (see DOMAIN_ERROR_HTTP).
+    // Note: DirectUploadUnavailableError (→ 409) is the client's signal to fall
+    // back to the backend /upload path.
+    const result = await service.createPendingUpload({
+      projectId: auth.projectId,
+      name: name.trim(),
+      filename: filename.trim(),
+    });
+    return c.json(result, 201);
   },
 );
 
@@ -434,44 +419,19 @@ secured.access(directUploadSessionAuth).put(
       throw new UnprocessableEntityError("request body is required");
     }
     const service = c.get("datasetService");
-    try {
-      await service.writeStagedUpload({
-        projectId: auth.projectId,
-        uploadId,
-        // Web ReadableStream → Node Readable; streamed to disk, never buffered.
-        body: Readable.fromWeb(body as Parameters<typeof Readable.fromWeb>[0]),
-      });
-      return c.json({ ok: true }, 200);
-    } catch (error) {
-      // The backend deposits direct (S3) — the app route isn't its mechanism.
-      if (
-        error instanceof Error &&
-        error.name === "DirectUploadUnavailableError"
-      ) {
-        return c.json(
-          { error: "DirectUploadUnavailable", message: error.message },
-          409,
-        );
-      }
-      // No pending upload row owns this staging key (fabricated / replayed
-      // uploadId, or already finalized) — refuse the orphan write.
-      if (error instanceof Error && error.name === "UploadNotPendingError") {
-        return c.json({ error: "Conflict", message: error.message }, 409);
-      }
-      if (error instanceof Error && error.name === "UploadTooLargeError") {
-        throw new BadRequestError(error.message);
-      }
-      // Local-FS root not writable — surface the actionable config message
-      // (set LANGWATCH_LOCAL_STORAGE_PATH / configure S3) instead of a generic
-      // 500 the browser would mistake for "no object storage" and fall back on.
-      if (error instanceof Error && error.name === "StorageNotWritableError") {
-        return c.json(
-          { error: "StorageNotWritable", message: error.message },
-          500,
-        );
-      }
-      throw error;
-    }
+    // Domain errors map centrally in `handleDatasetError` (see DOMAIN_ERROR_HTTP).
+    // Notes on the non-obvious ones: UploadNotPendingError (→ 409) means no
+    // pending row owns this staging key (fabricated/replayed uploadId or already
+    // finalized — an orphan write); StorageNotWritableError (→ 500, not the
+    // 409 fallback) means the local-FS root isn't writable, so the browser must
+    // NOT mistake it for "no object storage" and fall back.
+    await service.writeStagedUpload({
+      projectId: auth.projectId,
+      uploadId,
+      // Web ReadableStream → Node Readable; streamed to disk, never buffered.
+      body: Readable.fromWeb(body as Parameters<typeof Readable.fromWeb>[0]),
+    });
+    return c.json({ ok: true }, 200);
   },
 );
 
@@ -496,31 +456,13 @@ secured.access(directUploadSessionAuth).post(
     const service = c.get("datasetService");
 
     // The staging key is the server-minted one bound to the row (C1); the
-    // client no longer supplies it.
-    try {
-      const result = await service.finalizeUpload({
-        projectId: auth.projectId,
-        datasetId,
-      });
-      return c.json(result, 200);
-    } catch (error) {
-      if (error instanceof Error && error.name === "UploadTooLargeError") {
-        throw new BadRequestError(error.message);
-      }
-      if (error instanceof Error && error.name === "UploadNotPendingError") {
-        return c.json({ error: "Conflict", message: error.message }, 409);
-      }
-      if (
-        error instanceof Error &&
-        error.name === "StagedUploadNotFoundError"
-      ) {
-        return c.json({ error: "UploadNotFound", message: error.message }, 422);
-      }
-      if (error instanceof Error && error.name === "DatasetNotFoundError") {
-        return c.json({ error: "NotFound", message: error.message }, 404);
-      }
-      throw error;
-    }
+    // client no longer supplies it. Domain errors map centrally in
+    // `handleDatasetError` (see DOMAIN_ERROR_HTTP).
+    const result = await service.finalizeUpload({
+      projectId: auth.projectId,
+      datasetId,
+    });
+    return c.json(result, 200);
   },
 );
 
@@ -544,21 +486,12 @@ secured.access(directUploadSessionAuth).post(
     }
     const service = c.get("datasetService");
 
-    try {
-      const result = await service.retryNormalize({
-        projectId: auth.projectId,
-        datasetId,
-      });
-      return c.json(result, 200);
-    } catch (error) {
-      if (error instanceof Error && error.name === "DatasetNotFoundError") {
-        return c.json({ error: "NotFound", message: error.message }, 404);
-      }
-      if (error instanceof Error && error.name === "DatasetNotRetryableError") {
-        return c.json({ error: "Conflict", message: error.message }, 409);
-      }
-      throw error;
-    }
+    // Domain errors map centrally in `handleDatasetError` (see DOMAIN_ERROR_HTTP).
+    const result = await service.retryNormalize({
+      projectId: auth.projectId,
+      datasetId,
+    });
+    return c.json(result, 200);
   },
 );
 
@@ -584,21 +517,12 @@ secured.access(directUploadSessionAuth).delete(
     }
     const service = c.get("datasetService");
 
-    try {
-      const result = await service.abortPendingUpload({
-        projectId: auth.projectId,
-        datasetId,
-      });
-      return c.json(result, 200);
-    } catch (error) {
-      if (error instanceof Error && error.name === "DatasetNotFoundError") {
-        return c.json({ error: "NotFound", message: error.message }, 404);
-      }
-      if (error instanceof Error && error.name === "UploadNotPendingError") {
-        return c.json({ error: "Conflict", message: error.message }, 409);
-      }
-      throw error;
-    }
+    // Domain errors map centrally in `handleDatasetError` (see DOMAIN_ERROR_HTTP).
+    const result = await service.abortPendingUpload({
+      projectId: auth.projectId,
+      datasetId,
+    });
+    return c.json(result, 200);
   },
 );
 

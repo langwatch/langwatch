@@ -676,6 +676,7 @@ describe("Feature: Dataset File Upload REST API", () => {
 
     describe("when an API key targets a DIFFERENT project (cross-tenant IDOR)", () => {
       /** @scenario Direct-upload rejects a foreign-project API key against an owned project */
+      /** @scenario "Dataset access is isolated to its own project" */
       it("returns 401 from POST /direct-upload on apiKey/project mismatch", async () => {
         // A second project under the same team; its API key must NOT authorize a
         // direct upload that targets the first project. This is the route-level

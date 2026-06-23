@@ -325,6 +325,7 @@ describe("DatasetService", () => {
             id: "d1",
             status: "uploading",
             stagingKey: "staging/p1/k",
+            uploadFilename: "data.jsonl",
           }),
           update: vi.fn().mockResolvedValue({}),
         };
@@ -339,11 +340,42 @@ describe("DatasetService", () => {
           projectId: "p1",
           key: "staging/p1/k",
         });
+        // @regression — over-cap finalize must null the stagingKey alongside the
+        // failed flip. The staged object was just deleted; leaving the key set
+        // makes retryNormalize re-drive a deleted object and fail with the
+        // misleading "Uploaded object not found" instead of the over-cap cause.
         expect(repo.update).toHaveBeenCalledWith(
           expect.objectContaining({
-            data: expect.objectContaining({ status: "failed" }),
+            data: expect.objectContaining({
+              status: "failed",
+              stagingKey: null,
+            }),
           }),
         );
+      });
+
+      describe("and the over-cap dataset is then retried", () => {
+        it("is not retryable — the staged source was deleted (no re-drive of a missing object)", async () => {
+          // The over-cap finalize nulled stagingKey, so retryNormalize has no
+          // source to re-read and refuses rather than enqueuing a doomed job.
+          const repo = {
+            findOne: vi.fn().mockResolvedValue({
+              id: "d1",
+              status: "failed",
+              statusError: "Uploaded file is too large",
+              stagingKey: null,
+            }),
+            update: vi.fn().mockResolvedValue({}),
+          };
+
+          await expect(
+            makeService(repo).retryNormalize({
+              projectId: "p1",
+              datasetId: "d1",
+            }),
+          ).rejects.toMatchObject({ name: "DatasetNotRetryableError" });
+          expect(repo.update).not.toHaveBeenCalled();
+        });
       });
     });
 
@@ -359,6 +391,7 @@ describe("DatasetService", () => {
             id: "d1",
             status: "uploading",
             stagingKey: "staging/p1/k",
+            uploadFilename: "data.jsonl",
           }),
           update: vi.fn().mockResolvedValue({}),
         };
@@ -423,6 +456,30 @@ describe("DatasetService", () => {
       });
     });
 
+    describe("when the dataset has a staging key but no filename", () => {
+      it("fails loudly instead of guessing a .jsonl format", async () => {
+        // M1 co-sets filename with the staging key; a present key with no
+        // filename is a corrupt row. The old `?? `${id}.jsonl`` fallback would
+        // silently parse a CSV as JSONL — fail instead.
+        const repo = {
+          findOne: vi.fn().mockResolvedValue({
+            id: "d1",
+            status: "uploading",
+            stagingKey: "staging/p1/k",
+            uploadFilename: null,
+          }),
+        };
+
+        await expect(
+          makeService(repo).finalizeUpload({
+            projectId: "p1",
+            datasetId: "d1",
+          }),
+        ).rejects.toThrow(/missing its filename/i);
+        expect(enqueueDatasetNormalize).not.toHaveBeenCalled();
+      });
+    });
+
     describe("when the dataset is archived", () => {
       it("throws DatasetNotFoundError", async () => {
         const repo = {
@@ -458,6 +515,7 @@ describe("DatasetService", () => {
 
   describe("retryNormalize()", () => {
     describe("when retrying a failed dataset (I-RECOVER)", () => {
+      /** @scenario "An interrupted preparation loses nothing and can be retried" */
       it("flips the dataset back to processing and re-enqueues normalize", async () => {
         const repo = {
           findOne: vi.fn().mockResolvedValue({
@@ -534,6 +592,29 @@ describe("DatasetService", () => {
           }),
         ).rejects.toBeInstanceOf(DatasetNotRetryableError);
         expect(enqueueDatasetNormalize).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the dataset has a staging key but no filename", () => {
+      it("throws DatasetNotRetryableError instead of re-driving with a .jsonl guess", async () => {
+        const repo = {
+          findOne: vi.fn().mockResolvedValue({
+            id: "d1",
+            status: "failed",
+            stagingKey: "staging/p1/k",
+            uploadFilename: null,
+          }),
+          update: vi.fn(),
+        };
+
+        await expect(
+          makeService(repo).retryNormalize({
+            projectId: "p1",
+            datasetId: "d1",
+          }),
+        ).rejects.toThrow(/missing its filename/i);
+        expect(enqueueDatasetNormalize).not.toHaveBeenCalled();
+        expect(repo.update).not.toHaveBeenCalled();
       });
     });
 

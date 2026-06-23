@@ -1402,6 +1402,16 @@ export class DatasetService {
     if (!stagingKey) {
       throw new UploadNotPendingError("Dataset has no pending staged upload");
     }
+    // M1: the filename is required at presign and co-set with the staging key,
+    // so a present key with no filename is a corrupt row. Fail loudly rather
+    // than falling back to a `.jsonl` guess — a silent mis-detection would parse
+    // a CSV as JSONL and corrupt every row.
+    const filename = dataset.uploadFilename;
+    if (!filename) {
+      throw new UploadNotPendingError(
+        "Dataset upload is missing its filename — cannot detect file format",
+      );
+    }
 
     const storage = await getDatasetStorage(projectId);
 
@@ -1432,10 +1442,20 @@ export class DatasetService {
       } catch {
         // non-fatal: the staging lifecycle rule reaps it eventually.
       }
+      // Null the stagingKey in the same update: the staged object was just
+      // deleted, so the row no longer has a source to re-read. Leaving the key
+      // set would make retryNormalize accept this `failed` dataset and re-drive
+      // a deleted object, failing with the misleading "Uploaded object not
+      // found" instead of the real over-cap cause. An over-cap upload is not
+      // retryable — the user must upload a smaller file.
       await this.repository.update({
         id: datasetId,
         projectId,
-        data: { status: "failed", statusError: "Uploaded file is too large" },
+        data: {
+          status: "failed",
+          statusError: "Uploaded file is too large",
+          stagingKey: null,
+        },
       });
       throw new UploadTooLargeError();
     }
@@ -1467,7 +1487,7 @@ export class DatasetService {
         projectId,
         datasetId,
         stagingKey,
-        filename: dataset.uploadFilename ?? `${datasetId}.jsonl`,
+        filename,
       },
     }).catch((error: unknown) => {
       logger.error({ error, datasetId }, "failed to enqueue normalize");
@@ -1510,6 +1530,15 @@ export class DatasetService {
         "Dataset has no staged upload to retry",
       );
     }
+    // M1: filename is co-set with the staging key; a present key with no
+    // filename is a corrupt row. Fail loudly rather than re-driving with a
+    // `.jsonl` guess that would mis-parse a CSV (see finalizeUpload).
+    const filename = dataset.uploadFilename;
+    if (!filename) {
+      throw new DatasetNotRetryableError(
+        "Dataset upload is missing its filename — cannot detect file format",
+      );
+    }
 
     await this.repository.update({
       id: datasetId,
@@ -1527,7 +1556,7 @@ export class DatasetService {
         projectId,
         datasetId,
         stagingKey,
-        filename: dataset.uploadFilename ?? `${datasetId}.jsonl`,
+        filename,
       },
     }).catch((error: unknown) => {
       logger.error({ error, datasetId }, "failed to enqueue normalize retry");
