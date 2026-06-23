@@ -102,8 +102,8 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-vi.mock("~/components/datasets/UploadCSVModal", () => ({
-  UploadCSVModal: ({ isOpen }: { isOpen: boolean }) =>
+vi.mock("~/components/datasets/UploadCSVDrawer", () => ({
+  UploadCSVDrawer: ({ isOpen }: { isOpen: boolean }) =>
     isOpen ? <div data-testid="upload-csv-modal" /> : null,
 }));
 

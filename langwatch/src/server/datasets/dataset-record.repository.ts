@@ -11,6 +11,14 @@ export class DatasetRecordRepository {
 
   /**
    * Finds all dataset records for a specific dataset.
+   *
+   * Ordered by `[createdAt asc, id asc]` to match every other PG read path
+   * ({@link listPaginated}, the paginated/random reads in
+   * `datasetRecord.utils.ts`). A stable, canonical order is required so the
+   * PG→S3 backfill (which reads through here) writes chunks in the same row
+   * order users saw pre-migration — preserving first/last/random/number
+   * `entrySelection` parity — and so crash-resume re-runs produce identical
+   * chunks. `id` is the tiebreaker for rows sharing a `createdAt`.
    */
   async findDatasetRecords(
     input: {
@@ -27,6 +35,7 @@ export class DatasetRecordRepository {
         datasetId: input.datasetId,
         projectId: input.projectId,
       },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     });
   }
 

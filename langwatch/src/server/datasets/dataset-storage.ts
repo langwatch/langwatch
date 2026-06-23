@@ -21,7 +21,7 @@
  */
 import type { Readable } from "node:stream";
 import { resolveProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
-import type { DatasetChunk } from "./dataset-chunking";
+import type { ChunkOffset, DatasetChunk } from "./dataset-chunking";
 import { LocalDatasetStorage } from "./local-dataset-storage";
 import { S3DatasetStorage } from "./s3-dataset-storage";
 
@@ -61,6 +61,39 @@ export interface DatasetStorage {
   }): Promise<unknown[]>;
 
   /**
+   * Read a single chunk object's rows (ADR-032 Decision 3 — edit/delete locate
+   * and rewrite only the affected chunk, so they read just that chunk rather
+   * than the whole dataset). Throws on a missing chunk, consistent with
+   * `readChunks` (a chunk `chunkCount` claims exists but is missing is
+   * corruption, not emptiness — never silently truncate).
+   */
+  readChunk(params: {
+    projectId: string;
+    datasetId: string;
+    index: number;
+  }): Promise<unknown[]>;
+
+  /**
+   * Overwrite `chunk-{index}.jsonl` with exactly these records as a single
+   * object (ADR-032 Decision 3 — edit/delete rewrite one chunk in place under
+   * the advisory lock). Returns the new offset/byteSize for that index so the
+   * caller can patch the PG-authoritative `chunkOffsets` entry (I-COUNT). The
+   * same null-byte scrub (I-NULL) and key guard the append path uses apply.
+   *
+   * NOTE: an edit CAN grow a chunk past `CHUNK_MAX_BYTES` — replacing a small
+   * row with a large value enlarges the chunk (only delete strictly shrinks).
+   * Implementations REJECT a rewrite whose serialized size exceeds the cap
+   * (`ChunkTooLargeError`) rather than writing an oversized object; splitting /
+   * rebalancing the chunk on rewrite is the fuller fix, deferred to a later rung.
+   */
+  rewriteChunk(params: {
+    projectId: string;
+    datasetId: string;
+    index: number;
+    records: unknown[];
+  }): Promise<ChunkOffset>;
+
+  /**
    * Mint a presigned upload for a heavy browser→storage direct upload. The
    * key is server-generated and tenant-scoped. Backends without a
    * browser-reachable presign (local FS) throw `DirectUploadUnavailableError`
@@ -69,6 +102,22 @@ export interface DatasetStorage {
   createPresignedUpload(params: {
     projectId: string;
   }): Promise<PresignedUpload>;
+
+  /**
+   * Deposit a staged upload from a byte stream, server-side. Present ONLY on
+   * backends whose direct upload routes the file THROUGH the app (local FS): the
+   * same-origin `/direct-upload/staging/:uploadId` route calls this. S3 omits it
+   * — its presigned PUT lands bytes in the bucket directly, so they never transit
+   * the app. Streamed, never buffered (multi-GB safe); `maxBytes` aborts a stream
+   * that exceeds the cap (and deletes the partial object) so an authed client
+   * can't fill the disk before the finalize HEAD would reject it.
+   */
+  putStaged?(params: {
+    projectId: string;
+    key: string;
+    body: Readable;
+    maxBytes?: number;
+  }): Promise<void>;
 
   /** HEAD a staged upload to read its size — finalize size-cap enforcement. */
   headStagedObjectSize(params: {
@@ -112,7 +161,11 @@ export const getDatasetStorage = async (
   projectId: string,
 ): Promise<DatasetStorage> => {
   const destination = await resolveProjectStorageDestination(projectId);
+  // The Local impl needs the resolver-provided `root` (the single source of
+  // truth for the local FS path, honoring LANGWATCH_LOCAL_STORAGE_PATH + the
+  // canonical default); the S3 impl resolves its own bucket/credentials per
+  // project and needs nothing here.
   return destination.kind === "s3"
     ? new S3DatasetStorage()
-    : new LocalDatasetStorage();
+    : new LocalDatasetStorage(destination.root);
 };

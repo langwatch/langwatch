@@ -42,6 +42,30 @@ export type ChunkOffset = {
   byteSize: number;
 };
 
+/**
+ * Lightweight per-chunk metadata — everything `chunkedMeta` needs to build the
+ * PG-authoritative addressing WITHOUT the chunk's `jsonl` payload (I-MEM). The
+ * streaming normalize writer maps each freshly-written `DatasetChunk` to this
+ * immediately and drops the payload, so a multi-GB upload never accumulates the
+ * serialized file in heap by the time `finalize()` runs.
+ */
+export type ChunkMeta = {
+  index: number;
+  rowCount: number;
+  byteSize: number;
+  startRow: number;
+  endRow: number;
+};
+
+/** Project a heavy `DatasetChunk` down to its `ChunkMeta` (drops `jsonl`). */
+export const chunkMetaOf = (chunk: DatasetChunk): ChunkMeta => ({
+  index: chunk.index,
+  rowCount: chunk.rowCount,
+  byteSize: chunk.byteSize,
+  startRow: chunk.startRow,
+  endRow: chunk.endRow,
+});
+
 export type ChunkedDatasetMeta = {
   rowCount: number;
   sizeBytes: number;
@@ -100,8 +124,29 @@ export const toJsonlChunks = (
   return chunks;
 };
 
-/** Aggregate per-dataset metadata from a chunk list (PG-authoritative). */
-export const chunkedMeta = (chunks: DatasetChunk[]): ChunkedDatasetMeta => ({
+/**
+ * Serialize exactly these records into ONE JSONL blob (no byte-cap roll-over),
+ * scrubbing null bytes per row (I-NULL) like `toJsonlChunks`. The single-chunk
+ * rewrite path (`rewriteChunk`) uses this so an edit/delete writes the affected
+ * chunk back as one object with the same on-disk shape the append path produces.
+ * Returns the blob and its UTF-8 byte size for the PG `chunkOffsets` patch.
+ */
+export const toSingleJsonl = (
+  records: unknown[],
+): { jsonl: string; byteSize: number } => {
+  const jsonl =
+    records.map((record) => JSON.stringify(stripNullBytes(record))).join("\n") +
+    (records.length > 0 ? "\n" : "");
+  return { jsonl, byteSize: Buffer.byteLength(jsonl, "utf8") };
+};
+
+/**
+ * Aggregate per-dataset metadata from a chunk list (PG-authoritative). Accepts
+ * the lightweight `ChunkMeta` (a `DatasetChunk` is structurally assignable), so
+ * the streaming writer can build the final meta from metadata alone — never
+ * holding the `jsonl` payloads (I-MEM).
+ */
+export const chunkedMeta = (chunks: ChunkMeta[]): ChunkedDatasetMeta => ({
   rowCount: chunks.reduce((n, c) => n + c.rowCount, 0),
   sizeBytes: chunks.reduce((n, c) => n + c.byteSize, 0),
   chunkCount: chunks.length,

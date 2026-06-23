@@ -28,12 +28,15 @@
 
 import readline from "node:readline";
 import type { Readable } from "node:stream";
+import { nanoid } from "nanoid";
 import Papa from "papaparse";
 import type { DatasetRepository } from "./dataset.repository";
 import {
   CHUNK_MAX_BYTES,
+  type ChunkedDatasetMeta,
+  type ChunkMeta,
   chunkedMeta,
-  type DatasetChunk,
+  chunkMetaOf,
 } from "./dataset-chunking";
 import type { DatasetStorage } from "./dataset-storage";
 import { UPLOAD_MAX_BYTES } from "./presigned-upload";
@@ -60,6 +63,25 @@ export const LARGE_JSON_MAX_BYTES = 100 * 1024 * 1024;
  * rather than risking an OOM.
  */
 export const MAX_JSONL_LINE_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Max bytes for a single CSV row (I-MEM), the CSV counterpart to
+ * `MAX_JSONL_LINE_BYTES`. papaparse buffers until it can emit a complete row, so
+ * a malformed CSV with no row delimiter (or one giant field) would make it
+ * accumulate the whole file in memory before the first `step`. We track the
+ * parser cursor delta between rows and `abort()` once a single row crosses this
+ * cap, failing the dataset rather than risking an OOM.
+ */
+export const MAX_CSV_ROW_BYTES = 8 * 1024 * 1024;
+
+/**
+ * papaparse read-buffer size — how many bytes it pulls from the source stream
+ * before emitting rows, so it reads in fixed-size I/O chunks rather than draining
+ * the stream as fast as the chunk writer allows (backpressure). Distinct concern
+ * from `MAX_CSV_ROW_BYTES` (the per-row payload cap) even though both currently
+ * sit at 8 MB — tune one without implying the other.
+ */
+export const CSV_IO_CHUNK_BYTES = 8 * 1024 * 1024;
 
 /** Payload for the `datasetNormalize` GroupQueue job. */
 export type DatasetNormalizePayload = {
@@ -100,12 +122,25 @@ export class LargeJsonUnsupportedError extends Error {
  * soon as their serialized size reaches `CHUNK_MAX_BYTES`, keeping memory
  * bounded regardless of the source file size. Each flush calls `writeChunks`
  * with the running `fromIndex`, so chunk keys stay contiguous across flushes.
+ *
+ * Each JSONL line is wrapped as `{ id, entry }` (mirroring the logical
+ * `DatasetRecord` shape) so every row carries a stable id a later edit/delete
+ * rung can target — the read adapter maps `{id, entry}` back to a
+ * `DatasetRecord`-shaped object. The id is assigned per-record here in the
+ * streaming writer so this stays streaming (never builds an in-memory array of
+ * the whole file).
  */
 class StreamingChunkWriter {
   private buffer: unknown[] = [];
   private bufferBytes = 0;
   private nextIndex = 0;
-  private readonly chunks: DatasetChunk[] = [];
+  /**
+   * I-MEM: accumulate only lightweight per-chunk metadata (no `jsonl` payload).
+   * Each flush maps its written `DatasetChunk[]` to `ChunkMeta[]` and drops the
+   * serialized bodies, so a multi-GB upload never holds the whole normalized
+   * file in heap by the time `finalize()` runs.
+   */
+  private readonly chunkMetas: ChunkMeta[] = [];
 
   constructor(
     private readonly deps: {
@@ -115,7 +150,10 @@ class StreamingChunkWriter {
     },
   ) {}
 
-  async push(record: unknown): Promise<void> {
+  async push(entry: unknown): Promise<void> {
+    // Wrap the raw row as { id, entry } — the stable per-row id later
+    // edit/delete targets. nanoid() per record keeps this streaming.
+    const record = { id: `record_${nanoid()}`, entry };
     // Track an approximate serialized size to decide when to roll over. The
     // authoritative byteSize is recomputed inside toJsonlChunks on flush.
     this.bufferBytes += Buffer.byteLength(JSON.stringify(record), "utf8") + 1;
@@ -133,16 +171,21 @@ class StreamingChunkWriter {
       records: this.buffer,
       fromIndex: this.nextIndex,
     });
-    this.chunks.push(...written);
+    // I-MEM: keep only the metadata; the `jsonl` payloads are released here so
+    // they can be garbage-collected immediately after the write returns.
+    this.chunkMetas.push(...written.map(chunkMetaOf));
     this.nextIndex += written.length;
     this.buffer = [];
     this.bufferBytes = 0;
   }
 
-  /** Flush the remainder and return every chunk written, in order. */
-  async finalize(): Promise<DatasetChunk[]> {
+  /**
+   * Flush the remainder and return the aggregated `ChunkedDatasetMeta`, computed
+   * from the accumulated per-chunk metadata alone (never the `jsonl` payloads).
+   */
+  async finalize(): Promise<ChunkedDatasetMeta> {
     await this.flush();
-    return this.chunks;
+    return chunkedMeta(this.chunkMetas);
   }
 }
 
@@ -156,6 +199,25 @@ const NULL_BYTE_GLOBAL = /\u0000/g;
  */
 const scrubNullBytes = (text: string): string =>
   text.includes(NULL_BYTE) ? text.replace(NULL_BYTE_GLOBAL, "") : text;
+
+/**
+ * Approximate the serialized byte size of one parsed CSV row from its field
+ * values (I-MEM guard). papaparse buffers until it can emit a complete row, so a
+ * malformed row (no delimiter / one giant field) shows up here as an oversized
+ * `row.data` — summing the field byte-lengths bounds it without re-reading the
+ * raw input. Cheap: one `Buffer.byteLength` per field on the rare large row.
+ */
+const csvRowBytes = (data: Record<string, unknown>): number => {
+  let bytes = 0;
+  for (const value of Object.values(data)) {
+    if (typeof value === "string") {
+      bytes += Buffer.byteLength(value, "utf8");
+    } else if (value != null) {
+      bytes += Buffer.byteLength(String(value), "utf8");
+    }
+  }
+  return bytes;
+};
 
 /** Read a whole stream into a single string (only the guarded small-json path). */
 const streamToString = async (stream: Readable): Promise<string> => {
@@ -181,6 +243,39 @@ const buildRenameMap = (headers: string[]): Map<string, string> => {
     if (original !== renamed[i]) map.set(original, renamed[i]!);
   });
   return map;
+};
+
+/**
+ * Make column names unique by suffixing repeats `_1`, `_2`, … — the same scheme
+ * papaparse's `header:true` dedup uses, but applied ONCE to the header row.
+ *
+ * The CSV path parses with `header:false` and maps rows to objects by index
+ * (below) precisely to AVOID papaparse's header machinery: under our
+ * pause/resume backpressure it re-runs its duplicate-name dedup against the
+ * CURRENT data row on every resume, so any row holding two equal cells (an input
+ * that equals its expected output, or two empty cells) had its second value
+ * silently corrupted with a `_1` suffix — and logged a warning per row. Deduping
+ * the header ourselves keeps the legitimate "two columns named the same" rename
+ * without ever touching row values.
+ */
+const dedupeHeaders = (headers: string[]): string[] => {
+  const seen = new Map<string, number>();
+  // Track the names actually emitted, not just the raw inputs: a suffixed
+  // candidate (`col_1`) can still collide with a column literally named `col_1`,
+  // so keep bumping the counter until the candidate is unique. Without this,
+  // `["col","col","col_1"]` would emit `["col","col_1","col_1"]` and the by-index
+  // record map below would silently overwrite one column's values with another's.
+  const emitted = new Set<string>();
+  return headers.map((header) => {
+    let count = seen.get(header) ?? 0;
+    let candidate = count === 0 ? header : `${header}_${count}`;
+    while (emitted.has(candidate)) {
+      candidate = `${header}_${++count}`;
+    }
+    seen.set(header, count + 1);
+    emitted.add(candidate);
+    return candidate;
+  });
 };
 
 /**
@@ -242,6 +337,13 @@ const parseInto = async (params: {
   }
 
   if (format === "csv") {
+    // CSV is parsed with `header:false` (rows as arrays) and mapped to objects
+    // by index here — NOT papaparse's `header:true`. Under our pause/resume
+    // backpressure, papaparse re-runs its duplicate-header dedup against the
+    // current data row on every resume, suffixing the second of any two equal
+    // cells with `_1` (corrupting e.g. input==expected rows, or two blank cells)
+    // and warning once per row. We dedup the real header row ONCE instead.
+    let csvHeaders: string[] | null = null;
     await new Promise<void>((resolve, reject) => {
       // papaparse accepts a Node Readable and emits rows via `step`, so the
       // whole CSV is never materialized in memory. Serialize the backpressured
@@ -249,16 +351,39 @@ const parseInto = async (params: {
       let chain: Promise<void> = Promise.resolve();
       // papaparse's Node build accepts a Readable as a streaming source, but
       // its types only model browser File/string inputs — cast at this one seam.
-      Papa.parse<Record<string, unknown>>(stream as unknown as Papa.LocalFile, {
-        header: true,
+      Papa.parse<string[]>(stream as unknown as Papa.LocalFile, {
+        header: false,
         skipEmptyLines: true,
+        // Bound papaparse's read buffer so it pulls the stream in fixed-size
+        // chunks rather than draining it as fast as the chunk writer allows.
+        chunkSize: CSV_IO_CHUNK_BYTES,
         step: (row, parser) => {
-          if (headers.length === 0 && row.meta.fields) {
-            captureHeaders(row.meta.fields);
+          const values = row.data;
+          // The first row is the header: dedupe repeats + reserved-rename once.
+          if (csvHeaders === null) {
+            const raw = values.map((value) =>
+              value == null ? "" : String(value),
+            );
+            csvHeaders = renameReservedColumns(dedupeHeaders(raw));
+            headers = csvHeaders;
+            return;
+          }
+          const record: Record<string, unknown> = {};
+          csvHeaders.forEach((header, i) => {
+            record[header] = values[i];
+          });
+          // I-MEM: reject a single row whose serialized fields cross
+          // MAX_CSV_ROW_BYTES (a malformed CSV with no row delimiter or one
+          // giant field), the CSV counterpart to the JSONL line cap — fail the
+          // dataset rather than risk an OOM accumulating an unbounded row.
+          if (csvRowBytes(record) > MAX_CSV_ROW_BYTES) {
+            parser.abort();
+            reject(new Error("CSV row exceeds max size — malformed file"));
+            return;
           }
           parser.pause();
           chain = chain
-            .then(() => writer.push(applyRename(row.data, renameMap)))
+            .then(() => writer.push(record))
             .then(() => parser.resume())
             .catch((error: unknown) => {
               parser.abort();
@@ -345,8 +470,10 @@ export const createDatasetNormalizeHandler = (deps: DatasetNormalizeDeps) => {
         writer,
         sizeBytes,
       });
-      const chunks = await writer.finalize();
-      const meta = chunkedMeta(chunks);
+      // I-MEM: finalize returns the aggregated meta built from per-chunk
+      // metadata only — the chunk `jsonl` payloads were released at each flush,
+      // so the whole normalized file is never accumulated in heap.
+      const meta = await writer.finalize();
       const columnTypes = deriveColumnTypes(headers);
 
       // m5: an empty upload is a failure, not a 0-chunk `ready` dataset — this

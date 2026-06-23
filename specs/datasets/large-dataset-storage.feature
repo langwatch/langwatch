@@ -37,14 +37,21 @@ Feature: Large dataset storage
     Then once ready the dataset reports 50 rows
     And the dataset reports its stored size
 
-  @integration @unimplemented
+  @unit
+  Scenario: A new dataset is created directly in object storage
+    When I create a new dataset
+    Then its rows are stored in object storage as chunks
+    And its rows are not stored in the Postgres records table
+    And the dataset is immediately ready to read
+
+  @integration
   Scenario: A dataset still being prepared is not used as data
     Given a dataset that is still processing
     When an experiment, the SDK, or the UI reads that dataset
     Then it is treated as not ready
     And no partial or half-prepared rows are ever served
 
-  @integration @unimplemented
+  @integration
   Scenario: Appending rows adds new data and preserves existing rows
     Given a ready dataset with 10 rows
     When I append 5 more rows
@@ -90,13 +97,13 @@ Feature: Large dataset storage
   # Migration of existing datasets
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: An existing dataset stays usable after the storage migration
     Given a dataset created before the storage migration
     When the migration runs
     Then reading the dataset returns the same rows as before
 
-  @integration @unimplemented
+  @integration
   Scenario: The storage migration is safe to run more than once
     Given a dataset that has already been migrated
     When the migration runs again
@@ -112,18 +119,26 @@ Feature: Large dataset storage
   # Self-hosted
   # ============================================================================
 
-  @integration @unimplemented
+  @unit
   Scenario: Datasets work on a minimal self-hosted install
     Given a self-hosted install without extra storage set up
     When I create and read a dataset
     Then it works
     And the application still starts normally
 
+  @unit
+  Scenario: A large file uploads on a self-hosted install with no object storage
+    Given a self-hosted install without object storage (local filesystem only)
+    When I upload a CSV larger than the in-browser limit
+    Then the upload is accepted without a "requires object storage" error
+    And the file is streamed to storage rather than parsed in the browser
+    And the dataset becomes ready once it finishes preparing
+
   # ============================================================================
   # Editing
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Editing or deleting a row updates only that row
     Given a ready dataset with several rows
     When I edit one row and delete another

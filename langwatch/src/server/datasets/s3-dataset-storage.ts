@@ -29,14 +29,21 @@ import { createS3Client } from "../storage";
 import {
   assertKeyWithinProject,
   assertNoTraversal,
+  CHUNK_MAX_BYTES,
+  type ChunkOffset,
   chunkKey,
   type DatasetChunk,
   errorHasProp,
   parseJsonl,
   toJsonlChunks,
+  toSingleJsonl,
 } from "./dataset-chunking";
 import type { DatasetStorage, PresignedUpload } from "./dataset-storage";
-import { StagedUploadNotFoundError } from "./errors";
+import {
+  ChunkTooLargeError,
+  MissingChunkError,
+  StagedUploadNotFoundError,
+} from "./errors";
 import { stagingUploadKey, UPLOAD_TTL_SECONDS } from "./presigned-upload";
 
 type ResolvedS3Client = { s3Client: S3Client; s3Bucket: string };
@@ -146,7 +153,7 @@ export class S3DatasetStorage implements DatasetStorage {
         jsonl = (await Body?.transformToString()) ?? "";
       } catch (error: unknown) {
         if (errorHasProp(error, "name", "NoSuchKey")) {
-          throw new Error(`Missing dataset chunk: ${key}`);
+          throw new MissingChunkError(key);
         }
         throw error;
       }
@@ -155,6 +162,66 @@ export class S3DatasetStorage implements DatasetStorage {
       rows.push(...parseJsonl(jsonl));
     }
     return rows;
+  }
+
+  async readChunk({
+    projectId,
+    datasetId,
+    index,
+  }: {
+    projectId: string;
+    datasetId: string;
+    index: number;
+  }): Promise<unknown[]> {
+    assertNoTraversal(projectId, datasetId);
+    const { s3Client, s3Bucket } = await this.client(projectId);
+    const key = chunkKey(projectId, datasetId, index);
+    let jsonl: string;
+    try {
+      const { Body } = await s3Client.send(
+        new GetObjectCommand({ Bucket: s3Bucket, Key: key }),
+      );
+      jsonl = (await Body?.transformToString()) ?? "";
+    } catch (error: unknown) {
+      if (errorHasProp(error, "name", "NoSuchKey")) {
+        throw new MissingChunkError(key);
+      }
+      throw error;
+    }
+    return parseJsonl(jsonl);
+  }
+
+  async rewriteChunk({
+    projectId,
+    datasetId,
+    index,
+    records,
+  }: {
+    projectId: string;
+    datasetId: string;
+    index: number;
+    records: unknown[];
+  }): Promise<ChunkOffset> {
+    assertNoTraversal(projectId, datasetId);
+    const { jsonl, byteSize } = toSingleJsonl(records);
+    // Decision 2: an edit can replace a small row with a large value, so a
+    // rewrite CAN grow a chunk past the cap. Reject rather than write an
+    // oversized object (splitting on rewrite is out of scope for this rung).
+    if (byteSize > CHUNK_MAX_BYTES) {
+      throw new ChunkTooLargeError({ byteSize, maxBytes: CHUNK_MAX_BYTES });
+    }
+    const { s3Client, s3Bucket } = await this.client(projectId);
+    await s3Client.send(
+      new PutObjectCommand({
+        Bucket: s3Bucket,
+        Key: chunkKey(projectId, datasetId, index),
+        Body: jsonl,
+        ContentType: "application/x-ndjson",
+      }),
+    );
+    // startRow/endRow are chunk-LOCAL here (0..rowCount); the caller recomputes
+    // global offsets from prior chunks under the advisory lock (I-COUNT).
+    return { index, startRow: 0, endRow: records.length, byteSize };
   }
 
   async createPresignedUpload({

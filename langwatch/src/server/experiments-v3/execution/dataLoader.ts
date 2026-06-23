@@ -135,6 +135,9 @@ export const loadDataset = async (
     );
     rows = parseJsonColumns(rows, jsonColumns);
   } else if (dataset.type === "saved" && dataset.datasetId) {
+    // ADR-032 I-READY: a non-ready (uploading/processing/failed) s3_jsonl
+    // dataset throws DatasetNotReadyError here — it must NOT be silently treated
+    // as empty. The throw propagates as a clear run error; do not swallow it.
     const fullDataset = await getFullDataset({
       datasetId: dataset.datasetId,
       projectId,

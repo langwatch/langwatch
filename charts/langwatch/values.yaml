@@ -297,8 +297,8 @@ app:
       # AWS S3 configuration for dataset storage
       ## @extra app.dataplane.providers.awsS3 AWS S3 provider configuration.
       ## @param app.dataplane.providers.awsS3.endpoint.value [string] Custom S3 endpoint.
-      ## @param app.dataplane.providers.awsS3.accessKeyId.value [string] S3 access key ID.
-      ## @param app.dataplane.providers.awsS3.secretAccessKey.value [string] S3 secret access key.
+      ## @param app.dataplane.providers.awsS3.accessKeyId.value [string] S3 access key ID (not recommended in production — use accessKeyId.secretKeyRef).
+      ## @param app.dataplane.providers.awsS3.secretAccessKey.value [string] S3 secret access key (not recommended in production — use secretAccessKey.secretKeyRef).
       ## @param app.dataplane.providers.awsS3.keySalt.value [string] Optional key salt.
       awsS3:
         endpoint:
@@ -708,6 +708,78 @@ workers:
   ## @param workers.extraInitContainers [array] Additional init containers.
   extraInitContainers: []
   ## @param workers.extraVolumeMounts [array] Additional volume mounts for workers container.
+  extraVolumeMounts: []
+
+# =============================================================================
+# Dataset PG→S3 backfill migration (ADR-032 Decision 7, rung 5)
+# =============================================================================
+# A post-install,post-upgrade hook Job that runs the
+# `backfillDatasetContentToS3` task — flipping existing datasets whose content
+# still lives in Postgres onto the chunked-JSONL S3 layout. It runs OFF the boot
+# path (after the deploy completes), is idempotent, advisory-locked and
+# self-skipping (no-op when no postgres-layout datasets remain or storage isn't
+# S3-configured), so it is safe to fire on every `helm upgrade`. Image + env
+# mirror the workers Deployment (same app image, same shared env). See
+# templates/dataset-s3-migration-job.yaml.
+#
+# RELEASE-FAILURE SEMANTICS: this is a post-install,post-upgrade hook, so a
+# CATASTROPHIC, top-level task failure (DB unreachable, storage hard-down — NOT
+# a per-dataset error, which is caught and logged so the run continues) fails
+# the Helm release. This is deliberate: the task throws on such failures so the
+# problem stays visible rather than being silently swallowed. Recovery is
+# low-risk because the run is IDEMPOTENT and SELF-RESUMING — already-migrated
+# datasets are skipped under the advisory lock and a half-written dataset is
+# re-driven (overwrite-by-key + atomic flip), so simply re-running the upgrade
+# after fixing the underlying outage completes the migration. To unblock a
+# deploy WITHOUT waiting on the migration, set `datasetS3Migration.skip: true`
+# (below): the hook Job is not rendered and the release proceeds; datasets stay
+# on the `postgres` layout (and keep reading from PG) until a later upgrade with
+# `skip: false` migrates them.
+## @section Dataset S3 migration
+datasetS3Migration:
+  ## @param datasetS3Migration.enabled [default: true] Render the post-install/post-upgrade migration hook Job.
+  enabled: true
+  # Operator opt-out for the migration (ADR-032 SKIP_DATASET_S3_MIGRATE). When
+  # true the hook Job is not rendered at all; the task additionally self-skips
+  # at runtime if it ever runs with this env set.
+  ## @param datasetS3Migration.skip [default: false] Disable the dataset PG→S3 backfill migration entirely.
+  skip: false
+  ## @param datasetS3Migration.backoffLimit [default: 3] Job backoffLimit — retries on transient failure (the task is idempotent).
+  backoffLimit: 3
+  ## @param datasetS3Migration.activeDeadlineSeconds [default: 21600] Hard runtime limit (s) for the hook Job — a backstop so a hung migration can't run forever. The task is idempotent/resumable, so a re-run resumes; raise for very large installs or set null to disable.
+  activeDeadlineSeconds: 21600
+  # ServiceAccount for the migration Job. Leave empty to use the namespace
+  # default (matching the app/workers). On EKS+IRSA, set this to the same
+  # IAM-role-annotated ServiceAccount the app/workers use so the Job can reach S3.
+  ## @param datasetS3Migration.serviceAccountName [string, default: ""] ServiceAccount for the Job (set to the app/workers IRSA SA on EKS).
+  serviceAccountName: ""
+  ## @param datasetS3Migration.ttlSecondsAfterFinished [default: 600] Clean up the finished Job after this many seconds.
+  ttlSecondsAfterFinished: 600
+  ## @extra datasetS3Migration.resources Resource requests and limits for the migration Job.
+  ## @param datasetS3Migration.resources.requests.cpu [string, default: 100m] Requested CPU.
+  ## @param datasetS3Migration.resources.requests.memory [string, default: 512Mi] Requested memory.
+  ## @param datasetS3Migration.resources.limits.cpu [string, default: 1000m] CPU limit.
+  ## @param datasetS3Migration.resources.limits.memory [string, default: 2Gi] Memory limit.
+  resources:
+    requests: { cpu: 100m, memory: 512Mi }
+    limits: { cpu: 1000m, memory: 2Gi }
+  # Per-hook overrides; empty defaults fall through to global.* via the
+  # coalesce chain in the template (same convention as workers / preflight).
+  ## @param datasetS3Migration.podSecurityContext [object] Pod security context override.
+  podSecurityContext: {}
+  ## @param datasetS3Migration.containerSecurityContext [object] Container security context override.
+  containerSecurityContext: {}
+  ## @param datasetS3Migration.nodeSelector [object] Node selector override.
+  nodeSelector: {}
+  ## @param datasetS3Migration.tolerations [array] Tolerations override.
+  tolerations: []
+  ## @param datasetS3Migration.affinity [object] Affinity override.
+  affinity: {}
+  ## @param datasetS3Migration.extraEnvs [array] Additional environment variables for the migration Job.
+  extraEnvs: []
+  ## @param datasetS3Migration.extraVolumes [array] Additional pod volumes.
+  extraVolumes: []
+  ## @param datasetS3Migration.extraVolumeMounts [array] Additional volume mounts.
   extraVolumeMounts: []
 
 # =============================================================================

@@ -119,6 +119,55 @@ describe("createDatasetNormalizeHandler()", () => {
     });
   });
 
+  describe("when a streamed CSV has two columns sharing a value", () => {
+    // @regression — under pause/resume backpressure, header:true made papaparse
+    // re-run its duplicate-header dedup against each DATA row, suffixing the
+    // second of two equal cells with `_1` (answer == expected_answer, or two
+    // blank cells) and warning per row. Deliver the CSV in many small pieces so
+    // the parser actually streams — a single-string Readable doesn't trigger it.
+    it("never corrupts the second equal cell with a _1 suffix", async () => {
+      const rowCount = 200;
+      const csv =
+        "question,answer,expected_answer\n" +
+        Array.from(
+          { length: rowCount },
+          (_, i) => `"q${i}","Plants oxygen ${i}","Plants oxygen ${i}"`,
+        ).join("\n") +
+        "\n";
+      const pieces = csv.match(/[\s\S]{1,64}/g)!;
+
+      const { storage, writeChunks } = makeStorage({
+        streamStaged: vi.fn().mockResolvedValue(Readable.from(pieces)),
+      });
+      const repo = makeRepo({ id: "d1", status: "processing" });
+      const handler = createDatasetNormalizeHandler({
+        repository: repo as any,
+        getStorage: async () => storage as any,
+      });
+
+      await handler({ ...basePayload, filename: "data.csv" });
+
+      const update = repo.update.mock.calls[0]![0];
+      expect(update.data.status).toBe("ready");
+      expect(update.data.rowCount).toBe(rowCount);
+      expect(update.data.columnTypes).toEqual([
+        { name: "question", type: "string" },
+        { name: "answer", type: "string" },
+        { name: "expected_answer", type: "string" },
+      ]);
+
+      const entries = writeChunks.mock.calls
+        .flatMap((call: any) => call[0].records)
+        .map((record: any) => record.entry as Record<string, string>);
+      expect(entries).toHaveLength(rowCount);
+      // Every row's expected_answer is its answer verbatim — never `..._1`.
+      for (const entry of entries) {
+        expect(entry.expected_answer).toBe(entry.answer);
+        expect(entry.expected_answer).not.toMatch(/_1$/);
+      }
+    });
+  });
+
   describe("when a ready dataset reports its row count and size", () => {
     it("records the true rowCount and a positive sizeBytes once ready", async () => {
       const rows = Array.from({ length: 50 }, (_, i) => `{"a":"${i}"}`).join(
@@ -176,6 +225,62 @@ describe("createDatasetNormalizeHandler()", () => {
       expect(update.data.rowCount).toBe(3);
       expect(update.data.chunkCount).toBeGreaterThan(1);
       expect(splittingWriteChunks).toHaveBeenCalled();
+    });
+  });
+
+  // @regression P1#1 — the streaming writer must accumulate ONLY lightweight
+  // per-chunk metadata after each flush, never the chunk `jsonl` payloads
+  // (I-MEM). A 2–5 GB upload would otherwise hoard the whole normalized file in
+  // heap by finalize. Heap proxy: the meta the handler persists carries chunk
+  // offsets (metadata) and NO `jsonl` field anywhere, and the counts still match.
+  describe("when the input spans many chunks (memory contract)", () => {
+    it("persists chunk metadata only — no jsonl payloads retained — with matching counts", async () => {
+      const rows = Array.from(
+        { length: 6 },
+        (_, i) => `{"v":"${String(i).repeat(40)}"}`,
+      ).join("\n");
+      // Tiny per-flush cap so the single flush splits into several chunk objects.
+      const { storage } = makeStorage({
+        streamStaged: vi.fn().mockResolvedValue(Readable.from([rows + "\n"])),
+        writeChunks: vi.fn(async ({ records, fromIndex = 0 }: any) =>
+          toJsonlChunks(records, { maxBytes: 10 }).map((c) => ({
+            ...c,
+            index: c.index + fromIndex,
+          })),
+        ),
+      });
+      const repo = makeRepo({ id: "d1", status: "processing" });
+
+      const handler = createDatasetNormalizeHandler({
+        repository: repo as any,
+        getStorage: async () => storage as any,
+      });
+      await handler(basePayload);
+
+      const update = repo.update.mock.calls[0]![0];
+      // Counts still correct.
+      expect(update.data.rowCount).toBe(6);
+      expect(update.data.chunkCount).toBeGreaterThan(1);
+      // Metadata persisted; NO `jsonl` payload anywhere in what the handler kept.
+      const offsets = update.data.chunkOffsets as Array<
+        Record<string, unknown>
+      >;
+      expect(offsets).toHaveLength(update.data.chunkCount);
+      for (const offset of offsets) {
+        expect(offset).not.toHaveProperty("jsonl");
+        expect(offset).toMatchObject({
+          index: expect.any(Number),
+          startRow: expect.any(Number),
+          endRow: expect.any(Number),
+          byteSize: expect.any(Number),
+        });
+      }
+      // The whole persisted payload must not carry any serialized chunk body
+      // (BigInt-safe stringify since `sizeBytes` is a bigint).
+      const serialized = JSON.stringify(update.data, (_key, value) =>
+        typeof value === "bigint" ? value.toString() : value,
+      );
+      expect(serialized).not.toContain("jsonl");
     });
   });
 
@@ -255,6 +360,34 @@ describe("createDatasetNormalizeHandler()", () => {
     });
   });
 
+  describe("when a CSV row exceeds the max row size (malformed / no delimiter)", () => {
+    it("aborts and fails the dataset instead of buffering the whole file (I-MEM)", async () => {
+      // A header + a single data row whose field is larger than MAX_CSV_ROW_BYTES
+      // (8 MB). papaparse would buffer the whole thing without the cursor guard;
+      // the guard aborts and the handler fails the dataset.
+      const giantField = "x".repeat(9 * 1024 * 1024);
+      const { storage, deleteStaged } = makeStorage({
+        streamStaged: vi
+          .fn()
+          .mockResolvedValue(Readable.from([`a,b\n1,${giantField}\n`])),
+      });
+      const repo = makeRepo({ id: "d1", status: "processing" });
+
+      const handler = createDatasetNormalizeHandler({
+        repository: repo as any,
+        getStorage: async () => storage as any,
+      });
+
+      await expect(
+        handler({ ...basePayload, filename: "malformed.csv" }),
+      ).rejects.toThrow(/CSV row exceeds max size/i);
+      const update = repo.update.mock.calls[0]![0];
+      expect(update.data.status).toBe("failed");
+      // Staging preserved for a manual retry; not deleted on failure.
+      expect(deleteStaged).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when a record carries a reserved column name", () => {
     it("renames the key in stored rows and columnTypes (id → id_)", async () => {
       const { storage, writeChunks } = makeStorage({
@@ -270,9 +403,16 @@ describe("createDatasetNormalizeHandler()", () => {
       });
       await handler(basePayload);
 
-      // The stored row's keys are rewritten so they match columnTypes.
-      const pushed = writeChunks.mock.calls[0]![0].records;
-      expect(pushed).toEqual([{ id_: "x", b: "y" }]);
+      // The stored row's keys are rewritten so they match columnTypes. Each
+      // line is wrapped as { id, entry } so a later edit/delete can target the
+      // row by id.
+      const pushed = writeChunks.mock.calls[0]![0].records as Array<{
+        id: string;
+        entry: Record<string, unknown>;
+      }>;
+      expect(pushed).toHaveLength(1);
+      expect(pushed[0]!.id).toMatch(/^record_/);
+      expect(pushed[0]!.entry).toEqual({ id_: "x", b: "y" });
       const update = repo.update.mock.calls[0]![0];
       expect(update.data.columnTypes).toEqual([
         { name: "id_", type: "string" },

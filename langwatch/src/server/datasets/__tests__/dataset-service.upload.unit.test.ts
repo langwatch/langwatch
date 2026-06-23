@@ -45,11 +45,13 @@ describe("DatasetService", () => {
           filename: "data.jsonl",
         });
 
+        // The raw staging key is NOT leaked in the response — the client only
+        // needs datasetId + uploadUrl; finalize reads the key from the row (C1).
         expect(result).toMatchObject({
           datasetId: "dataset_x",
           uploadUrl: "https://example/put",
-          stagingKey: "staging/p1/u1",
         });
+        expect(result).not.toHaveProperty("stagingKey");
         expect(repo.create).toHaveBeenCalledWith(
           expect.objectContaining({
             status: "uploading",
@@ -105,6 +107,162 @@ describe("DatasetService", () => {
           }),
         ).rejects.toThrow(/Direct upload is unavailable/);
         expect(repo.create).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when abandoned pending uploads linger (poll-triggered reap)", () => {
+      it("archives stale uploading rows and deletes their staging objects before minting", async () => {
+        const deleteStaged = vi.fn().mockResolvedValue(undefined);
+        vi.mocked(getDatasetStorage).mockResolvedValue({
+          deleteStaged,
+          createPresignedUpload: vi.fn().mockResolvedValue({
+            uploadId: "u2",
+            key: "staging/p1/u2",
+            url: "https://example/put",
+          }),
+        } as any);
+        const stale = {
+          id: "dataset_stale",
+          name: "Old Upload",
+          projectId: "p1",
+          status: "uploading",
+          stagingKey: "staging/p1/old",
+          archivedAt: null,
+        };
+        const repo = {
+          findStalePendingUploads: vi.fn().mockResolvedValue([stale]),
+          findBySlug: vi.fn().mockResolvedValue(null),
+          create: vi.fn().mockResolvedValue({ id: "dataset_new", slug: "ds" }),
+          update: vi.fn().mockResolvedValue({}),
+        };
+
+        await makeService(repo).createPendingUpload({
+          projectId: "p1",
+          name: "DS",
+          filename: "data.jsonl",
+        });
+
+        // the abandoned row's staging object is deleted and the row archived...
+        expect(deleteStaged).toHaveBeenCalledWith({
+          projectId: "p1",
+          key: "staging/p1/old",
+        });
+        expect(repo.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            id: "dataset_stale",
+            projectId: "p1",
+            data: expect.objectContaining({ archivedAt: expect.any(Date) }),
+          }),
+        );
+        // ...and the new upload still proceeds
+        expect(repo.create).toHaveBeenCalled();
+      });
+
+      it("never blocks the upload when the sweep itself fails", async () => {
+        vi.mocked(getDatasetStorage).mockResolvedValue({
+          createPresignedUpload: vi.fn().mockResolvedValue({
+            uploadId: "u3",
+            key: "staging/p1/u3",
+            url: "https://example/put",
+          }),
+        } as any);
+        const repo = {
+          findStalePendingUploads: vi
+            .fn()
+            .mockRejectedValue(new Error("db down")),
+          findBySlug: vi.fn().mockResolvedValue(null),
+          create: vi.fn().mockResolvedValue({ id: "dataset_new", slug: "ds" }),
+        };
+
+        const result = await makeService(repo).createPendingUpload({
+          projectId: "p1",
+          name: "DS",
+          filename: "data.jsonl",
+        });
+
+        expect(result).toMatchObject({ datasetId: "dataset_new" });
+        expect(repo.create).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("abortPendingUpload()", () => {
+    describe("when aborting a still-pending upload", () => {
+      it("deletes the staged object and archives the uploading row", async () => {
+        const deleteStaged = vi.fn().mockResolvedValue(undefined);
+        vi.mocked(getDatasetStorage).mockResolvedValue({ deleteStaged } as any);
+        const repo = {
+          findOne: vi.fn().mockResolvedValue({
+            id: "dataset_x",
+            projectId: "p1",
+            name: "DS",
+            status: "uploading",
+            stagingKey: "staging/p1/u1",
+            archivedAt: null,
+          }),
+          update: vi.fn().mockResolvedValue({}),
+        };
+
+        const result = await makeService(repo).abortPendingUpload({
+          projectId: "p1",
+          datasetId: "dataset_x",
+        });
+
+        expect(result).toEqual({ datasetId: "dataset_x", aborted: true });
+        expect(deleteStaged).toHaveBeenCalledWith({
+          projectId: "p1",
+          key: "staging/p1/u1",
+        });
+        // Archived (soft-deleted), not hard-deleted.
+        expect(repo.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            id: "dataset_x",
+            projectId: "p1",
+            data: expect.objectContaining({ archivedAt: expect.any(Date) }),
+          }),
+        );
+      });
+    });
+
+    describe("when the dataset is no longer in uploading", () => {
+      it("rejects with UploadNotPendingError (never reaps real content)", async () => {
+        vi.mocked(getDatasetStorage).mockResolvedValue({
+          deleteStaged: vi.fn(),
+        } as any);
+        const repo = {
+          findOne: vi.fn().mockResolvedValue({
+            id: "dataset_x",
+            name: "DS",
+            status: "ready",
+            archivedAt: null,
+          }),
+          update: vi.fn(),
+        };
+
+        await expect(
+          makeService(repo).abortPendingUpload({
+            projectId: "p1",
+            datasetId: "dataset_x",
+          }),
+        ).rejects.toThrow(/not pending/i);
+        expect(repo.update).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the dataset does not exist", () => {
+      it("rejects with DatasetNotFoundError", async () => {
+        const repo = {
+          findOne: vi.fn().mockResolvedValue(null),
+          update: vi.fn(),
+        };
+
+        await expect(
+          makeService(repo).abortPendingUpload({
+            projectId: "p1",
+            datasetId: "missing",
+          }),
+        ).rejects.toThrow();
+        expect(repo.update).not.toHaveBeenCalled();
       });
     });
   });
