@@ -22,8 +22,8 @@ import execute, {
 /**
  * Unit tests for the PG→S3 backfill migration (ADR-032 rung 5). Boundary mocks:
  * the `DatasetStorage` chunk writer is a fake passed via `getStorage`, the
- * record repository's `findDatasetRecords` is stubbed, the storage destination
- * resolver is stubbed, and Prisma is stubbed at the `$transaction` /
+ * record repository's `findDatasetRecordsPage` is stubbed, the storage
+ * destination resolver is stubbed, and Prisma is stubbed at the `$transaction` /
  * advisory-lock (`$executeRaw`) seam. The chunk math + flip logic under test stay
  * real.
  */
@@ -89,10 +89,22 @@ const makeStorage = (
   deleteChunksFrom,
 });
 
+/**
+ * A `findDatasetRecordsPage` stub that yields one page of `records` on the first
+ * call and an empty page thereafter — the keyset loop reads until it gets an
+ * empty page, so a plain `mockResolvedValue([...])` (same non-empty page every
+ * call) would spin forever. For multi-page cases, chain `mockResolvedValueOnce`
+ * per page + a trailing `[]` directly instead of using this helper.
+ */
+const pagedRecords = (records: DatasetRecord[]) =>
+  vi.fn().mockResolvedValueOnce(records).mockResolvedValue([]);
+
 const makeDeps = (overrides: Partial<BackfillDeps> = {}): BackfillDeps =>
   ({
     prisma: {} as never,
-    recordRepository: { findDatasetRecords: vi.fn() } as never,
+    recordRepository: {
+      findDatasetRecordsPage: vi.fn().mockResolvedValue([]),
+    } as never,
     resolveStorage: vi.fn().mockResolvedValue({ kind: "s3", bucket: "b" }),
     getStorage: vi.fn(),
     ...overrides,
@@ -110,12 +122,10 @@ describe("backfillDatasetContentToS3", () => {
       it("writes its rows to S3 as chunks (ids preserved) and flips the dataset to s3_jsonl with correct counts", async () => {
         const row = makeDataset({ contentLayout: "postgres" });
         const { prisma, update, executeRaw } = makePrisma(row);
-        const findDatasetRecords = vi
-          .fn()
-          .mockResolvedValue([
-            makeRecord("rec_a", { q: "1" }),
-            makeRecord("rec_b", { q: "2" }),
-          ]);
+        const findDatasetRecordsPage = pagedRecords([
+          makeRecord("rec_a", { q: "1" }),
+          makeRecord("rec_b", { q: "2" }),
+        ]);
         const writeChunks = vi.fn().mockResolvedValue([
           {
             index: 0,
@@ -127,7 +137,7 @@ describe("backfillDatasetContentToS3", () => {
         ]);
         const deps = makeDeps({
           prisma: prisma as never,
-          recordRepository: { findDatasetRecords } as never,
+          recordRepository: { findDatasetRecordsPage } as never,
           getStorage: vi.fn().mockResolvedValue(makeStorage(writeChunks)),
         });
 
@@ -167,9 +177,9 @@ describe("backfillDatasetContentToS3", () => {
       it("deletes orphan chunks from the written count upward (defensive, I-IDEM)", async () => {
         const row = makeDataset({ contentLayout: "postgres" });
         const { prisma } = makePrisma(row);
-        const findDatasetRecords = vi
-          .fn()
-          .mockResolvedValue([makeRecord("rec_a", { q: "1" })]);
+        const findDatasetRecordsPage = pagedRecords([
+          makeRecord("rec_a", { q: "1" }),
+        ]);
         const writeChunks = vi.fn().mockResolvedValue([
           { index: 0, rowCount: 1, byteSize: 20, startRow: 0, endRow: 1 },
           { index: 1, rowCount: 1, byteSize: 20, startRow: 1, endRow: 2 },
@@ -177,7 +187,7 @@ describe("backfillDatasetContentToS3", () => {
         const deleteChunksFrom = vi.fn().mockResolvedValue(undefined);
         const deps = makeDeps({
           prisma: prisma as never,
-          recordRepository: { findDatasetRecords } as never,
+          recordRepository: { findDatasetRecordsPage } as never,
           getStorage: vi
             .fn()
             .mockResolvedValue(makeStorage(writeChunks, deleteChunksFrom)),
@@ -197,24 +207,22 @@ describe("backfillDatasetContentToS3", () => {
        * @scenario An existing dataset stays usable after the storage migration
        *
        * "The same rows as before" includes row ORDER. The deterministic
-       * `createdAt asc, id asc` order is enforced at the `findDatasetRecords`
+       * `createdAt asc, id asc` order is enforced at the `findDatasetRecordsPage`
        * repository read (asserted in dataset-record.repository.unit.test.ts);
        * this guards the migration SIDE of the contract: it must write rows in
        * exactly the order the repo returns them — never re-sorting or
        * reshuffling — so chunk/row order matches the PG read paths and is stable
        * across crash-resume re-runs.
        */
-      it("writes rows to S3 in the exact order findDatasetRecords returns them (no reshuffle)", async () => {
+      it("writes rows to S3 in the exact order findDatasetRecordsPage returns them (no reshuffle)", async () => {
         const row = makeDataset({ contentLayout: "postgres" });
         const { prisma } = makePrisma(row);
         // Repo returns rows already in canonical createdAt/id order.
-        const findDatasetRecords = vi
-          .fn()
-          .mockResolvedValue([
-            makeRecord("rec_a", { n: 1 }),
-            makeRecord("rec_b", { n: 2 }),
-            makeRecord("rec_c", { n: 3 }),
-          ]);
+        const findDatasetRecordsPage = pagedRecords([
+          makeRecord("rec_a", { n: 1 }),
+          makeRecord("rec_b", { n: 2 }),
+          makeRecord("rec_c", { n: 3 }),
+        ]);
         const writeChunks = vi
           .fn()
           .mockResolvedValue([
@@ -222,7 +230,7 @@ describe("backfillDatasetContentToS3", () => {
           ]);
         const deps = makeDeps({
           prisma: prisma as never,
-          recordRepository: { findDatasetRecords } as never,
+          recordRepository: { findDatasetRecordsPage } as never,
           getStorage: vi.fn().mockResolvedValue(makeStorage(writeChunks)),
         });
 
@@ -237,13 +245,81 @@ describe("backfillDatasetContentToS3", () => {
         ]);
       });
 
+      /**
+       * @scenario A huge dataset migrates without loading every row into memory
+       *
+       * The OOM guard (prod has a 708 MB / 57k-row and a 1.6M-row dataset). The
+       * migration must keyset-paginate `DatasetRecord` and stream each page into
+       * the chunk writer — never a single `findDatasetRecords`-style slurp. This
+       * asserts: it reads page-by-page until an empty page, advances the cursor
+       * by the previous page's last id, and preserves every row's id across pages.
+       */
+      it("streams records page-by-page (cursor advances; ids preserved across pages)", async () => {
+        const row = makeDataset({ contentLayout: "postgres" });
+        const { prisma } = makePrisma(row);
+        // Two non-empty pages, then empty → loop terminates. Distinct ids per
+        // page so we can assert the cursor seek and cross-page id preservation.
+        const findDatasetRecordsPage = vi
+          .fn()
+          .mockResolvedValueOnce([
+            makeRecord("rec_a", { n: 1 }),
+            makeRecord("rec_b", { n: 2 }),
+          ])
+          .mockResolvedValueOnce([
+            makeRecord("rec_c", { n: 3 }),
+            makeRecord("rec_d", { n: 4 }),
+          ])
+          .mockResolvedValueOnce([]);
+        const writeChunks = vi
+          .fn()
+          .mockResolvedValue([
+            { index: 0, rowCount: 4, byteSize: 80, startRow: 0, endRow: 4 },
+          ]);
+        const deps = makeDeps({
+          prisma: prisma as never,
+          recordRepository: { findDatasetRecordsPage } as never,
+          getStorage: vi.fn().mockResolvedValue(makeStorage(writeChunks)),
+        });
+
+        const outcome = await migrateDatasetToS3(
+          { dataset: row, projectId: "p1" },
+          deps,
+        );
+
+        expect(outcome).toBe("migrated");
+        // Read three times: page 1 (no cursor), page 2 (cursor = page 1's last
+        // id), page 3 (cursor = page 2's last id) → empty, stop.
+        expect(findDatasetRecordsPage).toHaveBeenCalledTimes(3);
+        expect(findDatasetRecordsPage.mock.calls[0]![0]).toMatchObject({
+          datasetId: "dataset_1",
+          projectId: "p1",
+          cursorId: undefined,
+        });
+        expect(findDatasetRecordsPage.mock.calls[1]![0]).toMatchObject({
+          cursorId: "rec_b",
+        });
+        expect(findDatasetRecordsPage.mock.calls[2]![0]).toMatchObject({
+          cursorId: "rec_d",
+        });
+        // All four rows reached the writer, in order, ids preserved.
+        const allWritten = writeChunks.mock.calls.flatMap(
+          (call) => call[0].records,
+        );
+        expect(allWritten).toEqual([
+          { id: "rec_a", entry: { n: 1 } },
+          { id: "rec_b", entry: { n: 2 } },
+          { id: "rec_c", entry: { n: 3 } },
+          { id: "rec_d", entry: { n: 4 } },
+        ]);
+      });
+
       it("does not delete the PG DatasetRecord rows (non-destructive, I-MIG)", async () => {
         const row = makeDataset({ contentLayout: "postgres" });
         const { prisma } = makePrisma(row);
         const deleteMany = vi.fn();
-        const findDatasetRecords = vi
-          .fn()
-          .mockResolvedValue([makeRecord("rec_a", { q: "1" })]);
+        const findDatasetRecordsPage = pagedRecords([
+          makeRecord("rec_a", { q: "1" }),
+        ]);
         const writeChunks = vi
           .fn()
           .mockResolvedValue([
@@ -251,7 +327,7 @@ describe("backfillDatasetContentToS3", () => {
           ]);
         const deps = makeDeps({
           prisma: prisma as never,
-          recordRepository: { findDatasetRecords, deleteMany } as never,
+          recordRepository: { findDatasetRecordsPage, deleteMany } as never,
           getStorage: vi.fn().mockResolvedValue(makeStorage(writeChunks)),
         });
 
@@ -268,10 +344,10 @@ describe("backfillDatasetContentToS3", () => {
         const row = makeDataset({ contentLayout: "s3_jsonl" });
         const { prisma, update } = makePrisma(row);
         const writeChunks = vi.fn();
-        const findDatasetRecords = vi.fn();
+        const findDatasetRecordsPage = vi.fn();
         const deps = makeDeps({
           prisma: prisma as never,
-          recordRepository: { findDatasetRecords } as never,
+          recordRepository: { findDatasetRecordsPage } as never,
           getStorage: vi.fn().mockResolvedValue(makeStorage(writeChunks)),
         });
 
@@ -285,7 +361,42 @@ describe("backfillDatasetContentToS3", () => {
 
         expect(outcome).toBe("already-migrated");
         expect(writeChunks).not.toHaveBeenCalled();
-        expect(findDatasetRecords).not.toHaveBeenCalled();
+        expect(findDatasetRecordsPage).not.toHaveBeenCalled();
+        expect(update).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the dataset uses the legacy useS3 single-blob layout", () => {
+      /**
+       * @scenario A legacy useS3 dataset is not destroyed by the migration
+       *
+       * useS3 datasets keep their rows in ONE S3 blob, with zero DatasetRecord
+       * rows. Migrating one would read zero rows and flip it to an EMPTY
+       * s3_jsonl dataset — silent data loss (incl. a real PII dataset
+       * in prod). The backfill must skip them and leave them on the still-live
+       * legacy read path.
+       */
+      it("skips it without reading records or writing chunks (no empty-flip data loss)", async () => {
+        // contentLayout is still `postgres` (born-on-storage default) but the
+        // legacy blob flag is set — the guard must catch it.
+        const row = makeDataset({ contentLayout: "postgres", useS3: true });
+        const { prisma, update } = makePrisma(row);
+        const writeChunks = vi.fn();
+        const findDatasetRecordsPage = vi.fn();
+        const deps = makeDeps({
+          prisma: prisma as never,
+          recordRepository: { findDatasetRecordsPage } as never,
+          getStorage: vi.fn().mockResolvedValue(makeStorage(writeChunks)),
+        });
+
+        const outcome = await migrateDatasetToS3(
+          { dataset: row, projectId: "p1" },
+          deps,
+        );
+
+        expect(outcome).toBe("already-migrated");
+        expect(findDatasetRecordsPage).not.toHaveBeenCalled();
+        expect(writeChunks).not.toHaveBeenCalled();
         expect(update).not.toHaveBeenCalled();
       });
     });
@@ -294,9 +405,9 @@ describe("backfillDatasetContentToS3", () => {
       it("migrates the dataset to the local backend (S3 preferred, local fallback)", async () => {
         const row = makeDataset({ contentLayout: "postgres" });
         const { prisma, executeRaw } = makePrisma(row);
-        const findDatasetRecords = vi
-          .fn()
-          .mockResolvedValue([makeRecord("rec_a", { q: "1" })]);
+        const findDatasetRecordsPage = pagedRecords([
+          makeRecord("rec_a", { q: "1" }),
+        ]);
         const writeChunks = vi
           .fn()
           .mockResolvedValue([
@@ -304,7 +415,7 @@ describe("backfillDatasetContentToS3", () => {
           ]);
         const deps = makeDeps({
           prisma: prisma as never,
-          recordRepository: { findDatasetRecords } as never,
+          recordRepository: { findDatasetRecordsPage } as never,
           resolveStorage: vi
             .fn()
             .mockResolvedValue({ kind: "file", root: "/x" }),
@@ -445,9 +556,14 @@ describe("backfillDatasetContentToS3", () => {
         const deps = makeDeps({
           prisma: prisma as never,
           recordRepository: {
-            findDatasetRecords: vi
+            // Per-dataset: one record page then empty. `mockResolvedValue([])`
+            // tail covers BOTH datasets' loops (each reads page → empty).
+            findDatasetRecordsPage: vi
               .fn()
-              .mockResolvedValue([makeRecord("r", { a: 1 })]),
+              .mockResolvedValueOnce([makeRecord("r", { a: 1 })])
+              .mockResolvedValueOnce([])
+              .mockResolvedValueOnce([makeRecord("r", { a: 1 })])
+              .mockResolvedValue([]),
           } as never,
           resolveStorage: vi
             .fn()
@@ -464,6 +580,15 @@ describe("backfillDatasetContentToS3", () => {
           alreadyMigrated: 0,
           failed: 0,
         });
+        // The scan excludes legacy useS3 blob datasets (they'd flip to empty).
+        expect(datasetFindMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              contentLayout: "postgres",
+              useS3: false,
+            }),
+          }),
+        );
         // d2's id reference keeps the linter happy that both fixtures are used.
         expect(d2.id).toBe("d2");
       });
@@ -500,9 +625,7 @@ describe("backfillDatasetContentToS3", () => {
         const deps = makeDeps({
           prisma: prisma as never,
           recordRepository: {
-            findDatasetRecords: vi
-              .fn()
-              .mockResolvedValue([makeRecord("r", { a: 1 })]),
+            findDatasetRecordsPage: pagedRecords([makeRecord("r", { a: 1 })]),
           } as never,
           resolveStorage: vi
             .fn()

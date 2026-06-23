@@ -59,4 +59,54 @@ describe("DatasetRecordRepository", () => {
       });
     });
   });
+
+  describe("findDatasetRecordsPage()", () => {
+    describe("when reading the first page (no cursor)", () => {
+      /** @scenario The backfill streams a huge dataset without an OOM */
+      it("reads `take` rows in canonical order with no cursor/skip", async () => {
+        const findMany = vi.fn().mockResolvedValue([]);
+        const prisma = {
+          datasetRecord: { findMany },
+        } as unknown as PrismaClient;
+        const repo = new DatasetRecordRepository(prisma);
+
+        await repo.findDatasetRecordsPage({
+          datasetId: "ds_1",
+          projectId: "p1",
+          take: 1000,
+        });
+
+        expect(findMany).toHaveBeenCalledWith({
+          where: { datasetId: "ds_1", projectId: "p1" },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          take: 1000,
+        });
+      });
+    });
+
+    describe("when reading a subsequent page (cursor given)", () => {
+      it("keyset-seeks past the cursor row (cursor + skip:1), same order", async () => {
+        const findMany = vi.fn().mockResolvedValue([]);
+        const prisma = {
+          datasetRecord: { findMany },
+        } as unknown as PrismaClient;
+        const repo = new DatasetRecordRepository(prisma);
+
+        await repo.findDatasetRecordsPage({
+          datasetId: "ds_1",
+          projectId: "p1",
+          take: 1000,
+          cursorId: "rec_last",
+        });
+
+        expect(findMany).toHaveBeenCalledWith({
+          where: { datasetId: "ds_1", projectId: "p1" },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          take: 1000,
+          cursor: { id: "rec_last" },
+          skip: 1,
+        });
+      });
+    });
+  });
 });

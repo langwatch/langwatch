@@ -36,7 +36,7 @@
  * follow-up, not this rung).
  */
 import { type Dataset, Prisma, type PrismaClient } from "@prisma/client";
-import { chunkedMeta } from "../server/datasets/dataset-chunking";
+import { StreamingChunkWriter } from "../server/datasets/dataset-chunk-writer";
 import { withDatasetLock } from "../server/datasets/dataset-lock";
 import { DatasetRecordRepository } from "../server/datasets/dataset-record.repository";
 import {
@@ -51,6 +51,13 @@ const logger = createLogger("langwatch:tasks:backfillDatasetContentToS3");
 
 /** How many `postgres` datasets to fetch per page when iterating. */
 const PAGE_SIZE = 50;
+
+/**
+ * How many `DatasetRecord` rows to pull per page when streaming ONE dataset into
+ * chunks. Bounds peak memory to ~one page + one in-flight chunk, independent of
+ * dataset size — the OOM guard for the multi-GB / million-row outliers in prod.
+ */
+const MIGRATE_PAGE_SIZE = 1000;
 
 /**
  * True when a Prisma error means a column this task queries (`contentLayout` /
@@ -143,6 +150,20 @@ export const migrateDatasetToS3 = async (
     );
     return "already-migrated";
   }
+  // Defense-in-depth (the dataset query already filters `useS3: false`): a legacy
+  // single-blob `useS3` dataset stores its rows in ONE S3 object, NOT as
+  // `DatasetRecord` rows — reading through `findDatasetRecordsPage` would yield
+  // ZERO rows and flip it to an EMPTY `s3_jsonl` dataset, silently destroying the
+  // blob's content. The legacy `useS3` read path is still live (see
+  // `datasetRecord.ts`), so leave these on it untouched (schema migration:
+  // "`useS3` left untouched"). A finite, closed legacy set — no new ones are minted.
+  if (preCheck.useS3) {
+    logger.info(
+      { datasetId: dataset.id, projectId },
+      "Skipping dataset — legacy useS3 single-blob layout (left on the legacy path, not flipped to empty s3_jsonl)",
+    );
+    return "already-migrated";
+  }
 
   // Read the PG rows and write the S3 chunks OUTSIDE the advisory lock — only the
   // atomic counter+`contentLayout` flip needs serialization, so we never hold the
@@ -150,21 +171,35 @@ export const migrateDatasetToS3 = async (
   // because the write is idempotent by deterministic key: a concurrent/re-run
   // write overwrites the same keys with identical content (a postgres-layout
   // dataset's corpus is frozen during migration) and a crash here is re-runnable.
-  // This is the ordering the file header documents. [Records are capped at the
-  // legacy 25MB/10k limits → fits in memory; PRESERVE ids so the chunk lines
-  // carry the same record ids the editor targets.]
-  const records = await deps.recordRepository.findDatasetRecords({
-    datasetId: dataset.id,
+  //
+  // STREAM, don't slurp (I-MEM): keyset-paginate the records and feed them to the
+  // StreamingChunkWriter, which rolls a chunk at CHUNK_MAX_BYTES — so peak memory
+  // is one page + one chunk, NOT the whole dataset. Prod has multi-GB / million-
+  // row datasets (a 708 MB / 57k-row and a 1.6M-row one) that would OOM the Job
+  // if read whole; the legacy 25MB/10k upload cap does NOT bound pre-existing or
+  // API-created data. The page order matches `findDatasetRecords` so re-runs
+  // produce identical chunks (crash-resume), and each row's id is PRESERVED so
+  // the chunk lines carry the same record ids the editor targets (I-MIG).
+  const writer = new StreamingChunkWriter({
+    storage,
     projectId,
-  });
-  const lines = records.map((row) => ({ id: row.id, entry: row.entry }));
-
-  const written = await storage.writeChunks({
-    projectId,
     datasetId: dataset.id,
-    records: lines,
-    fromIndex: 0,
   });
+  let cursorId: string | undefined;
+  for (;;) {
+    const page = await deps.recordRepository.findDatasetRecordsPage({
+      datasetId: dataset.id,
+      projectId,
+      take: MIGRATE_PAGE_SIZE,
+      cursorId,
+    });
+    if (page.length === 0) break;
+    for (const row of page) {
+      await writer.push(row.entry, { id: row.id });
+    }
+    cursorId = page[page.length - 1]!.id;
+  }
+  const meta = await writer.finalize();
 
   // Defensive orphan-chunk cleanup (I-IDEM): drop any tail chunks a crashed prior
   // run wrote beyond what THIS run writes, so a shorter re-run never leaves
@@ -173,9 +208,8 @@ export const migrateDatasetToS3 = async (
   await storage.deleteChunksFrom({
     projectId,
     datasetId: dataset.id,
-    fromIndex: written.length,
+    fromIndex: meta.chunkCount,
   });
-  const meta = chunkedMeta(written);
 
   // Flip onto s3_jsonl UNDER the lock — a short, PG-only critical section: re-read
   // to win the race against a concurrent run (our idempotent S3 writes make a
@@ -264,6 +298,12 @@ export const migrateAllPostgresDatasets = async (
         where: {
           projectId: project.id,
           contentLayout: "postgres",
+          // Exclude legacy single-blob `useS3` datasets: their rows live in one
+          // S3 object, not as `DatasetRecord` rows, so the backfill would read
+          // zero and flip them to an EMPTY s3_jsonl dataset (data loss). They
+          // stay on the still-live legacy read path. See the guard in
+          // `migrateDatasetToS3` for the per-dataset rationale.
+          useS3: false,
           ...(cursor ? { id: { gt: cursor } } : {}),
         },
         select: {

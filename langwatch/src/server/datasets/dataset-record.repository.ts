@@ -40,6 +40,32 @@ export class DatasetRecordRepository {
   }
 
   /**
+   * Keyset-paginated read of a dataset's records, in the SAME canonical order as
+   * {@link findDatasetRecords} (`[createdAt asc, id asc]`). Used by the PG→S3
+   * backfill to stream a dataset into chunks WITHOUT loading every row into
+   * memory — prod has multi-GB / million-row datasets that would OOM the
+   * migration Job if slurped whole. Pass the previous page's last id as
+   * `cursorId` to fetch the next page; `id` is the stable unique cursor and
+   * `skip: 1` excludes the cursor row itself.
+   */
+  async findDatasetRecordsPage(input: {
+    datasetId: string;
+    projectId: string;
+    take: number;
+    cursorId?: string;
+  }): Promise<DatasetRecord[]> {
+    return await this.prisma.datasetRecord.findMany({
+      where: {
+        datasetId: input.datasetId,
+        projectId: input.projectId,
+      },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      take: input.take,
+      ...(input.cursorId ? { cursor: { id: input.cursorId }, skip: 1 } : {}),
+    });
+  }
+
+  /**
    * Updates multiple dataset records atomically within a transaction.
    *
    * All records must belong to the same project (enforced by single projectId parameter).
