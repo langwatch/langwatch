@@ -14,10 +14,7 @@ import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolut
 import { slugify } from "~/utils/slugify";
 import { createLogger } from "../../../utils/logger/server";
 import type { Protections } from "../../traces/protections";
-import {
-  checkPermissionOrPubliclyShared,
-  checkProjectPermission,
-} from "../rbac";
+import { checkPermissionOrPubliclyShared, checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { getUserProtectionsForProject } from "../utils";
 

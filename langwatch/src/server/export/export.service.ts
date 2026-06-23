@@ -9,11 +9,11 @@
  */
 
 import type { PrismaClient } from "@prisma/client";
+import type { Protections } from "~/server/traces/protections";
 import type { Evaluation, Trace } from "~/server/tracer/types";
 import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
-import type { Protections } from "~/server/traces/protections";
-import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import type { TraceService } from "~/server/traces/trace.service";
+import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { createLogger } from "~/utils/logger/server";
 import {
   serializeTracesToFullCsv,
