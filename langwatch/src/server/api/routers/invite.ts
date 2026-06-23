@@ -1,35 +1,31 @@
-import {
-  OrganizationUserRole,
-  TeamUserRole,
-} from "@prisma/client";
-import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
+import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
+import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-
+import { fireTeamMemberInvitedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
+import { fireInviteAcceptedNurturingCalls } from "~/../ee/billing/nurturing/hooks/inviteAcceptance";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import { trackServerEvent } from "~/server/posthog";
-import { fireTeamMemberInvitedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
-import { fireInviteAcceptedNurturingCalls } from "~/../ee/billing/nurturing/hooks/inviteAcceptance";
-import {
-  InviteService,
-  ORGANIZATION_TO_TEAM_ROLE_MAP,
-} from "../../invites/invite.service";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
   DuplicateInviteError,
   INVITE_ALREADY_ACCEPTED_MESSAGE,
+  INVITE_NOT_READY_MESSAGE,
   InviteNotFoundError,
   OrganizationNotFoundError,
 } from "../../invites/errors";
 import {
-  assertEnterprisePlan,
-  isCustomRole,
-  ENTERPRISE_FEATURE_ERRORS,
-} from "../enterprise";
+  InviteService,
+  ORGANIZATION_TO_TEAM_ROLE_MAP,
+} from "../../invites/invite.service";
 import { LimitExceededError } from "../../license-enforcement/errors";
-import { captureException } from "~/utils/posthogErrorCapture";
-import { skipPermissionCheck } from "../rbac";
-import { checkOrganizationPermission } from "../rbac";
+import {
+  assertEnterprisePlan,
+  ENTERPRISE_FEATURE_ERRORS,
+  isCustomRole,
+} from "../enterprise";
+import { checkOrganizationPermission, skipPermissionCheck } from "../rbac";
 import { teamRoleInputSchema } from "./schemas/teamRole";
 
 export const inviteRouter = createTRPCRouter({
@@ -175,6 +171,7 @@ export const inviteRouter = createTRPCRouter({
                 where: {
                   id: { in: customRoleIds },
                   organizationId: input.organizationId,
+                  kind: "custom",
                 },
                 select: { id: true },
               });
@@ -443,13 +440,11 @@ export const inviteRouter = createTRPCRouter({
                       ? ("CUSTOM" as TeamUserRole)
                       : (t.role as TeamUserRole),
                     customRoleId:
-                      hasCustom && t.customRoleId
-                        ? t.customRoleId
-                        : undefined,
+                      hasCustom && t.customRoleId ? t.customRoleId : undefined,
                   };
                 });
 
-              // Validate custom role IDs belong to this organization
+              // Validate custom role IDs belong to this organization and are user-assignable
               const customRoleIds = teamAssignments
                 .map((t) => t.customRoleId)
                 .filter((id): id is string => !!id);
@@ -458,6 +453,7 @@ export const inviteRouter = createTRPCRouter({
                   where: {
                     id: { in: customRoleIds },
                     organizationId: input.organizationId,
+                    kind: "custom",
                   },
                   select: { id: true },
                 });
@@ -647,26 +643,35 @@ export const inviteRouter = createTRPCRouter({
         });
       }
 
-      if (!session || !session.user || !session.user.email) {
+      if (!session?.user?.email) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message: "You must be signed in to accept the invite",
         });
       }
 
+      if (invite.status === "ACCEPTED") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: INVITE_ALREADY_ACCEPTED_MESSAGE,
+        });
+      }
+
       if (invite.status !== "PENDING") {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message:
-            invite.status === "ACCEPTED"
-              ? INVITE_ALREADY_ACCEPTED_MESSAGE
-              : "Invite is not ready to be accepted",
+          message: INVITE_NOT_READY_MESSAGE,
         });
       }
 
       // Case-insensitive email comparison: BetterAuth lowercases emails
-      // during signup/signin so `session.user.email` is always lowercase,
-      // but `invite.email` preserves the admin's original casing.
+      // during signup/signin (see `findUserByEmail` in
+      // node_modules/better-auth/dist/db/internal-adapter.mjs) so
+      // `session.user.email` is always lowercase, but `invite.email`
+      // preserves the admin's original casing. A strict `!==` would
+      // reject an "Alice@Acme.com" invite for an "alice@acme.com" user.
+      // The old NextAuth flow worked accidentally because it didn't
+      // lowercase emails either — this is now a real mismatch post-migration.
       if (
         session.user.email.toLowerCase() !== invite.email.trim().toLowerCase()
       ) {
@@ -676,109 +681,42 @@ export const inviteRouter = createTRPCRouter({
         });
       }
 
-      await prisma.$transaction(async (prisma) => {
-        // Create org membership; skip if it already exists
-        await prisma.organizationUser.createMany({
-          data: [
-            {
-              userId: session.user.id,
-              organizationId: invite.organizationId,
-              role: invite.role,
-            },
-          ],
-          skipDuplicates: true,
-        });
-
-        // Use teamAssignments if available (new format), otherwise fall back to legacy teamIds
-        let teamMembershipData: Array<{
-          userId: string;
-          teamId: string;
-          role: TeamUserRole;
-          customRoleId?: string;
-        }> = [];
-
-        if (invite.teamAssignments && Array.isArray(invite.teamAssignments)) {
-          // New format: use per-team roles from teamAssignments
-          const assignments = invite.teamAssignments as Array<{
-            teamId: string;
-            role: TeamUserRole;
-            customRoleId?: string;
-          }>;
-          teamMembershipData = assignments.map((assignment) => ({
-            userId: session.user.id,
-            teamId: assignment.teamId,
-            role: assignment.role,
-            customRoleId: assignment.customRoleId,
-          }));
-        } else {
-          // Legacy format: use organization role mapping
-          const dedupedTeamIds = Array.from(
-            new Set(
-              invite.teamIds
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean),
-            ),
-          );
-
-          teamMembershipData = dedupedTeamIds.map((teamId) => ({
-            userId: session.user.id,
-            teamId,
-            role: ORGANIZATION_TO_TEAM_ROLE_MAP[invite.role],
-          }));
-        }
-
-        if (teamMembershipData.length > 0) {
-          // Handle custom roles separately since createMany doesn't support assignedRoleId
-          const builtInRoles = teamMembershipData.filter(
-            (data) => data.role !== TeamUserRole.CUSTOM,
-          );
-          const customRoles = teamMembershipData.filter(
-            (data): data is typeof data & { customRoleId: string } =>
-              data.role === TeamUserRole.CUSTOM && !!data.customRoleId,
-          );
-
-          // Create team memberships with built-in roles
-          if (builtInRoles.length > 0) {
-            await prisma.teamUser.createMany({
-              data: builtInRoles.map(
-                ({ customRoleId: _customRoleId, ...data }) => data,
-              ),
-              skipDuplicates: true,
-            });
-          }
-
-          // Create team memberships with custom roles (requires individual creates for assignedRoleId)
-          for (const customRole of customRoles) {
-            try {
-              await prisma.teamUser.create({
-                data: {
-                  userId: customRole.userId,
-                  teamId: customRole.teamId,
-                  role: TeamUserRole.CUSTOM,
-                  assignedRoleId: customRole.customRoleId,
-                },
-              });
-            } catch (error: unknown) {
-              // Ignore unique constraint violations (concurrent inserts)
-              if (
-                error instanceof PrismaClientKnownRequestError &&
-                error.code === "P2002"
-              ) {
-                // Swallow the error - record already exists
-                continue;
-              }
-              // Rethrow other errors
-              throw error;
-            }
-          }
-        }
-
-        await prisma.organizationInvite.update({
-          where: { id: invite.id, organizationId: invite.organizationId },
-          data: { status: "ACCEPTED" },
+      await prisma.$transaction(async (tx) => {
+        const txInviteService = InviteService.create(tx);
+        await txInviteService.applyInvite({
+          userId: session.user.id,
+          invite,
         });
       });
+
+      // Provision the user's Personal Workspace (Team.isPersonal +
+      // Project.isPersonal) for this org. Idempotent — safe if a prior
+      // invite already triggered it. Runs outside the invite tx so an
+      // unexpected failure here doesn't roll the membership back; the
+      // next login will retry via the lazy backfill in
+      // `user.personalContext`.
+      try {
+        const personalWorkspaceService = new PersonalWorkspaceService(prisma);
+        await personalWorkspaceService.ensure({
+          userId: session.user.id,
+          organizationId: invite.organizationId,
+          displayName: session.user.name,
+          displayEmail: session.user.email,
+        });
+      } catch (err) {
+        // Non-fatal — capture and continue. Lazy backfill will recover
+        // on the user's next session resolution. PostHog signal lets
+        // operators catch systemic provisioning regressions (bad
+        // migration, schema drift, Prisma constraint violation) before
+        // users start complaining about missing personal workspaces.
+        captureException(toError(err), {
+          extra: {
+            origin: "governance.acceptInvite",
+            userId: session.user.id,
+            organizationId: invite.organizationId,
+          },
+        });
+      }
 
       void getApp()
         .notifications.sendSlackSignupEvent({
@@ -799,6 +737,10 @@ export const inviteRouter = createTRPCRouter({
       const inviteService = InviteService.create(prisma);
       const projectSlug = await inviteService.findLandingProjectSlug(invite);
 
-      return { success: true, invite, project: projectSlug ? { slug: projectSlug } : null };
+      return {
+        success: true,
+        invite,
+        project: projectSlug ? { slug: projectSlug } : null,
+      };
     }),
 });
