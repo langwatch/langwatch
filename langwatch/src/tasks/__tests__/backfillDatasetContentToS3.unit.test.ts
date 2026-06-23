@@ -71,6 +71,9 @@ const makePrisma = (row: Dataset | null) => {
     dataset: { findFirst, update },
   };
   const prisma = {
+    // Top-level findFirst for the OUTSIDE-lock pre-check; the in-lock re-read
+    // uses the tx's findFirst (same spy, same row).
+    dataset: { findFirst },
     $transaction: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
   };
   return { prisma, tx, update, findFirst, executeRaw };
@@ -415,7 +418,14 @@ describe("backfillDatasetContentToS3", () => {
         const lockExecuteRaw = vi.fn().mockResolvedValue([]);
         const prisma = {
           project: { findMany: projectFindMany },
-          dataset: { findMany: datasetFindMany },
+          dataset: {
+            findMany: datasetFindMany,
+            // Top-level findFirst for each dataset's OUTSIDE-lock pre-check
+            // (both d1/d2 are postgres → both proceed to migrate).
+            findFirst: vi
+              .fn()
+              .mockResolvedValue(makeDataset({ contentLayout: "postgres" })),
+          },
           $transaction: vi.fn(async (fn: (t: unknown) => unknown) =>
             fn({
               $executeRaw: lockExecuteRaw,
@@ -474,17 +484,33 @@ describe("backfillDatasetContentToS3", () => {
           .mockResolvedValueOnce([]);
         const prisma = {
           project: { findMany: vi.fn().mockResolvedValue([{ id: "p1" }]) },
-          dataset: { findMany },
-          $transaction: vi.fn(async () => {
-            throw new Error("S3 write failed");
-          }),
+          dataset: {
+            findMany,
+            findFirst: vi
+              .fn()
+              .mockResolvedValue(makeDataset({ contentLayout: "postgres" })),
+          },
+          $transaction: vi.fn(async (fn: (t: unknown) => unknown) =>
+            fn({
+              $executeRaw: vi.fn().mockResolvedValue([]),
+              dataset: { findFirst: vi.fn(), update: vi.fn() },
+            }),
+          ),
         };
         const deps = makeDeps({
           prisma: prisma as never,
+          recordRepository: {
+            findDatasetRecords: vi
+              .fn()
+              .mockResolvedValue([makeRecord("r", { a: 1 })]),
+          } as never,
           resolveStorage: vi
             .fn()
             .mockResolvedValue({ kind: "s3", bucket: "b" }),
-          getStorage: vi.fn().mockResolvedValue(makeStorage(vi.fn())),
+          // The S3 write (now OUTSIDE the lock) fails for this dataset.
+          getStorage: vi.fn().mockResolvedValue(
+            makeStorage(vi.fn().mockRejectedValue(new Error("S3 write failed"))),
+          ),
         });
 
         const summary = await migrateAllPostgresDatasets(deps);
