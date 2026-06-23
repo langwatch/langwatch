@@ -245,15 +245,14 @@ describe("backfillDatasetContentToS3", () => {
         ]);
       });
 
-      /**
-       * @scenario A huge dataset migrates without loading every row into memory
-       *
-       * The OOM guard (prod has a 708 MB / 57k-row and a 1.6M-row dataset). The
-       * migration must keyset-paginate `DatasetRecord` and stream each page into
-       * the chunk writer — never a single `findDatasetRecords`-style slurp. This
-       * asserts: it reads page-by-page until an empty page, advances the cursor
-       * by the previous page's last id, and preserves every row's id across pages.
+      /*
+       * The OOM guard for multi-GB / million-row datasets. The migration must
+       * keyset-paginate `DatasetRecord` and stream each page into the chunk
+       * writer — never a single `findDatasetRecords`-style slurp. This asserts:
+       * it reads page-by-page until an empty page, advances the cursor by the
+       * previous page's last id, and preserves every row's id across pages.
        */
+      /** @scenario A very large dataset migrates without loading every row at once */
       it("streams records page-by-page (cursor advances; ids preserved across pages)", async () => {
         const row = makeDataset({ contentLayout: "postgres" });
         const { prisma } = makePrisma(row);
@@ -367,15 +366,13 @@ describe("backfillDatasetContentToS3", () => {
     });
 
     describe("when the dataset uses the legacy useS3 single-blob layout", () => {
-      /**
-       * @scenario A legacy useS3 dataset is not destroyed by the migration
-       *
+      /*
        * useS3 datasets keep their rows in ONE S3 blob, with zero DatasetRecord
        * rows. Migrating one would read zero rows and flip it to an EMPTY
-       * s3_jsonl dataset — silent data loss (incl. a real PII dataset
-       * in prod). The backfill must skip them and leave them on the still-live
-       * legacy read path.
+       * s3_jsonl dataset — silent data loss. The backfill must skip them and
+       * leave them on the still-live legacy read path.
        */
+      /** @scenario A legacy single-blob dataset is left readable, not emptied */
       it("skips it without reading records or writing chunks (no empty-flip data loss)", async () => {
         // contentLayout is still `postgres` (born-on-storage default) but the
         // legacy blob flag is set — the guard must catch it.

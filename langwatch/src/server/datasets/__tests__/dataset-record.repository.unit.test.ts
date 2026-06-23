@@ -62,7 +62,7 @@ describe("DatasetRecordRepository", () => {
 
   describe("findDatasetRecordsPage()", () => {
     describe("when reading the first page (no cursor)", () => {
-      /** @scenario The backfill streams a huge dataset without an OOM */
+      /** @scenario A very large dataset migrates without loading every row at once */
       it("reads `take` rows in canonical order with no cursor/skip", async () => {
         const findMany = vi.fn().mockResolvedValue([]);
         const prisma = {

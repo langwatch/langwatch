@@ -115,6 +115,21 @@ Feature: Large dataset storage
     When I read a dataset
     Then it still returns its rows
 
+  @unit
+  Scenario: A very large dataset migrates without loading every row at once
+    Given a dataset with more rows than fit comfortably in memory
+    When the migration runs
+    Then its rows are migrated by streaming them in pages
+    And memory use stays bounded regardless of how large the dataset is
+    And every row keeps the same identity after the migration
+
+  @unit
+  Scenario: A legacy single-blob dataset is left readable, not emptied
+    Given a dataset stored in the older single-file format
+    When the migration runs
+    Then that dataset is skipped and left on the legacy format
+    And it stays fully readable rather than being turned into an empty dataset
+
   # ============================================================================
   # Self-hosted
   # ============================================================================
