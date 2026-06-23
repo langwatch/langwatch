@@ -14,7 +14,10 @@ import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolut
 import { slugify } from "~/utils/slugify";
 import { createLogger } from "../../../utils/logger/server";
 import type { Protections } from "../../elasticsearch/protections";
-import { checkPermissionOrPubliclyShared, checkProjectPermission } from "../rbac";
+import {
+  checkPermissionOrPubliclyShared,
+  checkProjectPermission,
+} from "../rbac";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { getUserProtectionsForProject } from "../utils";
 
@@ -275,7 +278,11 @@ export const annotationRouter = createTRPCRouter({
         });
       } catch (error) {
         logger.error(
-          { error, traceId: deletedAnnotation.traceId, projectId: input.projectId },
+          {
+            error,
+            traceId: deletedAnnotation.traceId,
+            projectId: input.projectId,
+          },
           "Failed to sync annotation removal to ClickHouse",
         );
       }

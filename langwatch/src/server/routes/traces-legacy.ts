@@ -92,8 +92,7 @@ secured.access(handlerManagedAuth(AUTH_REASON)).get("/trace/:id", async (c) => {
     const traceId = c.req.param("id");
     const formatParam = c.req.query("format");
     const llmMode =
-      c.req.query("llmMode") === "true" ||
-      c.req.query("llmMode") === "1";
+      c.req.query("llmMode") === "true" || c.req.query("llmMode") === "1";
     const format = formatParam ?? (llmMode ? "digest" : "json");
 
     c.header("Deprecation", "true");
@@ -156,44 +155,48 @@ secured.access(handlerManagedAuth(AUTH_REASON)).get("/trace/:id", async (c) => {
 });
 
 // ---------- POST /api/trace/:id/share ----------
-secured.access(handlerManagedAuth(AUTH_REASON)).post("/trace/:id/share", async (c) => {
-  const auth = await authenticateRequest(c, "traces:share");
-  if ("error" in auth) {
-    return c.json({ message: auth.error }, auth.status);
-  }
-  const { project, markUsed } = auth;
+secured
+  .access(handlerManagedAuth(AUTH_REASON))
+  .post("/trace/:id/share", async (c) => {
+    const auth = await authenticateRequest(c, "traces:share");
+    if ("error" in auth) {
+      return c.json({ message: auth.error }, auth.status);
+    }
+    const { project, markUsed } = auth;
 
-  const traceId = c.req.param("id");
+    const traceId = c.req.param("id");
 
-  const share = await getApp().share.createShare({
-    projectId: project.id,
-    resourceType: "TRACE",
-    resourceId: traceId,
+    const share = await getApp().share.createShare({
+      projectId: project.id,
+      resourceType: "TRACE",
+      resourceId: traceId,
+    });
+
+    markUsed();
+    return c.json({ status: "success", path: `/share/${share.id}` });
   });
-
-  markUsed();
-  return c.json({ status: "success", path: `/share/${share.id}` });
-});
 
 // ---------- POST /api/trace/:id/unshare ----------
-secured.access(handlerManagedAuth(AUTH_REASON)).post("/trace/:id/unshare", async (c) => {
-  const auth = await authenticateRequest(c, "traces:share");
-  if ("error" in auth) {
-    return c.json({ message: auth.error }, auth.status);
-  }
-  const { project, markUsed } = auth;
+secured
+  .access(handlerManagedAuth(AUTH_REASON))
+  .post("/trace/:id/unshare", async (c) => {
+    const auth = await authenticateRequest(c, "traces:share");
+    if ("error" in auth) {
+      return c.json({ message: auth.error }, auth.status);
+    }
+    const { project, markUsed } = auth;
 
-  const traceId = c.req.param("id");
+    const traceId = c.req.param("id");
 
-  await getApp().share.unshare({
-    projectId: project.id,
-    resourceType: "TRACE",
-    resourceId: traceId,
+    await getApp().share.unshare({
+      projectId: project.id,
+      resourceType: "TRACE",
+      resourceId: traceId,
+    });
+
+    markUsed();
+    return c.json({ status: "success" });
   });
-
-  markUsed();
-  return c.json({ status: "success" });
-});
 
 // ---------- POST /api/trace/search ----------
 const paramsSchema = getAllForProjectInput
@@ -220,123 +223,127 @@ const paramsSchema = getAllForProjectInput
     llmMode: z.boolean().optional().default(false),
   });
 
-secured.access(handlerManagedAuth(AUTH_REASON)).post("/trace/search", async (c) => {
-  const auth = await authenticateRequest(c, "traces:view");
-  if ("error" in auth) {
-    return c.json({ message: auth.error }, auth.status);
-  }
-  const { project, markUsed } = auth;
+secured
+  .access(handlerManagedAuth(AUTH_REASON))
+  .post("/trace/search", async (c) => {
+    const auth = await authenticateRequest(c, "traces:view");
+    if ("error" in auth) {
+      return c.json({ message: auth.error }, auth.status);
+    }
+    const { project, markUsed } = auth;
 
-  let body: Record<string, any>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ error: "Invalid body" }, 400);
-  }
+    let body: Record<string, any>;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "Invalid body" }, 400);
+    }
 
-  let params: z.infer<typeof paramsSchema>;
-  try {
-    params = paramsSchema.strict().parse(body);
-  } catch (error) {
-    const validationError = fromZodError(error as ZodError);
-    return c.json({ error: validationError.message }, 400);
-  }
+    let params: z.infer<typeof paramsSchema>;
+    try {
+      params = paramsSchema.strict().parse(body);
+    } catch (error) {
+      const validationError = fromZodError(error as ZodError);
+      return c.json({ error: validationError.message }, 400);
+    }
 
-  const format = params.format ?? (params.llmMode ? "digest" : "json");
+    const format = params.format ?? (params.llmMode ? "digest" : "json");
 
-  c.header("Deprecation", "true");
-  c.header("Link", `</api/traces/search>; rel="successor-version"`);
+    c.header("Deprecation", "true");
+    c.header("Link", `</api/traces/search>; rel="successor-version"`);
 
-  const pageSize = Math.min(params.pageSize ?? 1000, 1000);
-  const protections = await getProtectionsForProject(prisma, {
-    projectId: project.id,
-  });
-  const traceService = TraceService.create(prisma);
-  const results = await traceService.getAllTracesForProject(
-    {
-      ...params,
+    const pageSize = Math.min(params.pageSize ?? 1000, 1000);
+    const protections = await getProtectionsForProject(prisma, {
       projectId: project.id,
-      startDate:
-        typeof params.startDate === "string"
-          ? Date.parse(params.startDate)
-          : params.startDate,
-      endDate:
-        typeof params.endDate === "string"
-          ? Date.parse(params.endDate)
-          : params.endDate,
-      pageSize,
-    },
-    protections,
-    {
-      downloadMode: true,
-      scrollId: params.scrollId ?? undefined,
-    },
-  );
+    });
+    const traceService = TraceService.create(prisma);
+    const results = await traceService.getAllTracesForProject(
+      {
+        ...params,
+        projectId: project.id,
+        startDate:
+          typeof params.startDate === "string"
+            ? Date.parse(params.startDate)
+            : params.startDate,
+        endDate:
+          typeof params.endDate === "string"
+            ? Date.parse(params.endDate)
+            : params.endDate,
+        pageSize,
+      },
+      protections,
+      {
+        downloadMode: true,
+        scrollId: params.scrollId ?? undefined,
+      },
+    );
 
-  const rawTraces = results.groups.flat() as Trace[];
-  const enrichedTraces = enrichTracesWithEvaluations({
-    traces: rawTraces,
-    traceChecks: results.traceChecks,
+    const rawTraces = results.groups.flat() as Trace[];
+    const enrichedTraces = enrichTracesWithEvaluations({
+      traces: rawTraces,
+      traceChecks: results.traceChecks,
+    });
+
+    let traces: unknown[];
+    if (format === "digest") {
+      traces = enrichedTraces.map((trace) => ({
+        trace_id: trace.trace_id,
+        formatted_trace: formatTraceSummaryDigest(trace),
+        input: trace.input,
+        output: trace.output,
+        timestamps: trace.timestamps,
+        metadata: trace.metadata,
+        error: trace.error,
+        evaluations: trace.evaluations,
+      }));
+    } else if (params.llmMode) {
+      traces = enrichedTraces.map((trace) => ({
+        ...toLLMModeTrace(trace as Trace & { spans: Span[] }),
+        spans: [],
+        evaluations: trace.evaluations,
+      }));
+    } else {
+      traces = enrichedTraces;
+    }
+
+    markUsed();
+    return c.json({
+      traces,
+      pagination: {
+        totalHits: results.totalHits,
+        scrollId: results.scrollId,
+      },
+    });
   });
-
-  let traces: unknown[];
-  if (format === "digest") {
-    traces = enrichedTraces.map((trace) => ({
-      trace_id: trace.trace_id,
-      formatted_trace: formatTraceSummaryDigest(trace),
-      input: trace.input,
-      output: trace.output,
-      timestamps: trace.timestamps,
-      metadata: trace.metadata,
-      error: trace.error,
-      evaluations: trace.evaluations,
-    }));
-  } else if (params.llmMode) {
-    traces = enrichedTraces.map((trace) => ({
-      ...toLLMModeTrace(trace as Trace & { spans: Span[] }),
-      spans: [],
-      evaluations: trace.evaluations,
-    }));
-  } else {
-    traces = enrichedTraces;
-  }
-
-  markUsed();
-  return c.json({
-    traces,
-    pagination: {
-      totalHits: results.totalHits,
-      scrollId: results.scrollId,
-    },
-  });
-});
 
 // ---------- GET /api/thread/:id ----------
-secured.access(handlerManagedAuth(AUTH_REASON)).get("/thread/:id", async (c) => {
-  const auth = await authenticateRequest(c, "traces:view");
-  if ("error" in auth) {
-    return c.json({ message: auth.error }, auth.status);
-  }
-  const { project, markUsed } = auth;
+secured
+  .access(handlerManagedAuth(AUTH_REASON))
+  .get("/thread/:id", async (c) => {
+    const auth = await authenticateRequest(c, "traces:view");
+    if ("error" in auth) {
+      return c.json({ message: auth.error }, auth.status);
+    }
+    const { project, markUsed } = auth;
 
-  const threadId = c.req.param("id");
-  const protections = await getProtectionsForProject(prisma, {
-    projectId: project.id,
+    const threadId = c.req.param("id");
+    const protections = await getProtectionsForProject(prisma, {
+      projectId: project.id,
+    });
+    // Thread-detail read consumes conversation content — resolve full IO (#4991).
+    const traceService = TraceService.create(
+      prisma,
+      buildTraceBlobResolutionDeps(),
+    );
+    const traces = await traceService.getTracesByThreadId(
+      project.id,
+      threadId,
+      protections,
+      { full: true },
+    );
+
+    markUsed();
+    return c.json({ traces });
   });
-  // Thread-detail read consumes conversation content — resolve full IO (#4991).
-  const traceService = TraceService.create(
-    prisma,
-    buildTraceBlobResolutionDeps(),
-  );
-  const traces = await traceService.getTracesByThreadId(
-    project.id,
-    threadId,
-    protections,
-    { full: true },
-  );
-
-  markUsed();
-  return c.json({ traces });
-});
 
 export const app = secured.hono;

@@ -58,8 +58,7 @@ export class ExportService {
     const { TraceService: TraceServiceImpl } = await import(
       "~/server/traces/trace.service"
     );
-    const resolvedPrisma =
-      prisma ?? (await import("~/server/db")).prisma;
+    const resolvedPrisma = prisma ?? (await import("~/server/db")).prisma;
     // Export is a content-consuming read: wire blob-resolution deps so a full
     // export reads the whole IO value, not the 64 KB preview (#4991 AC1).
     const traceService = TraceServiceImpl.create(
@@ -118,7 +117,11 @@ export class ExportService {
     protections: Protections;
   }): AsyncGenerator<{ chunk: string; progress: ExportProgress }> {
     logger.info(
-      { projectId: request.projectId, mode: request.mode, format: request.format },
+      {
+        projectId: request.projectId,
+        mode: request.mode,
+        format: request.format,
+      },
       "Starting trace export",
     );
 
@@ -268,7 +271,12 @@ function serializeBatch({
 }): string {
   switch (request.format) {
     case "csv":
-      return serializeCsvBatch({ traces, request, evaluatorNames, includeHeader });
+      return serializeCsvBatch({
+        traces,
+        request,
+        evaluatorNames,
+        includeHeader,
+      });
     case "json":
       return serializeJsonBatch({ traces, request });
     default: {
@@ -314,13 +322,16 @@ function serializeJsonBatch({
 }): string {
   switch (request.mode) {
     case "summary":
-      return traces
-        .map((trace) => serializeTraceToSummaryJson({ trace }))
-        .join("\n") + "\n";
+      return (
+        traces
+          .map((trace) => serializeTraceToSummaryJson({ trace }))
+          .join("\n") + "\n"
+      );
     case "full":
-      return traces
-        .map((trace) => serializeTraceToFullJson({ trace }))
-        .join("\n") + "\n";
+      return (
+        traces.map((trace) => serializeTraceToFullJson({ trace })).join("\n") +
+        "\n"
+      );
     default: {
       const _exhaustive: never = request.mode;
       throw new Error(`Unsupported mode: ${_exhaustive}`);
