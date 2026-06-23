@@ -31,14 +31,20 @@ export default function Dataset() {
   );
 
   const status = datasetQuery.data?.status;
-  // Gate on `isSuccess`: before the query resolves `status` is `undefined`, and
-  // `undefined == null` is `true` — which would mount the editor and fire
-  // `getAll` against a still-`processing` dataset (server rejects with
-  // PRECONDITION_FAILED → retry-toast cascade) before the status is known. Once
-  // the query settles, a genuinely-null status (legacy born-before-status rows)
-  // still reads as ready.
+  // `getById` returns null for an archived/deleted dataset (findFirst, no
+  // throw): surface that explicitly rather than treating the absent row as
+  // "ready" via the legacy-null branch below.
+  const datasetGone = datasetQuery.isSuccess && datasetQuery.data == null;
+  // Gate on `isSuccess` AND a present row: before the query resolves `status`
+  // is `undefined`, and `undefined == null` is `true` — which would mount the
+  // editor and fire `getAll` against a still-`processing` (or missing) dataset
+  // (server rejects with PRECONDITION_FAILED → retry-toast cascade) before the
+  // status is known. Once the query settles on a real row, a genuinely-null
+  // status (legacy born-before-status rows) still reads as ready.
   const isReady =
-    datasetQuery.isSuccess && (status === "ready" || status == null);
+    datasetQuery.isSuccess &&
+    datasetQuery.data != null &&
+    (status === "ready" || status == null);
 
   const runExperiment = () => {
     void router.push({
@@ -104,6 +110,11 @@ export default function Dataset() {
             </Button>
           </Alert.Root>
         )}
+        {datasetGone && (
+          <Text color="fg.muted">
+            This dataset is no longer available.
+          </Text>
+        )}
         {isReady ? (
           <DatasetEditorTable
             datasetId={datasetId}
@@ -123,7 +134,8 @@ export default function Dataset() {
             }
           />
         ) : (
-          status !== "failed" && (
+          status !== "failed" &&
+          !datasetGone && (
             <Text color="fg.muted">
               Your dataset will appear here once it is ready.
             </Text>

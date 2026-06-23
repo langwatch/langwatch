@@ -36,6 +36,15 @@ export class StreamingChunkWriter {
   private bufferBytes = 0;
   private nextIndex = 0;
   /**
+   * Running global row offset of the next chunk. `toJsonlChunks` (pure) emits
+   * `startRow`/`endRow` relative to each `writeChunks` batch — restarting at 0
+   * per flush — so the writer rebases them by this base to keep `chunkOffsets`
+   * globally contiguous across flushes. Without it, every flush's chunks would
+   * report `startRow: 0`, corrupting the paginated-read row addressing for any
+   * dataset larger than one chunk (normalize + backfill producers).
+   */
+  private nextStartRow = 0;
+  /**
    * I-MEM: accumulate only lightweight per-chunk metadata (no `jsonl` payload).
    * Each flush maps its written `DatasetChunk[]` to `ChunkMeta[]` and drops the
    * serialized bodies, so a multi-GB source never holds the whole normalized
@@ -79,7 +88,18 @@ export class StreamingChunkWriter {
     });
     // I-MEM: keep only the metadata; the `jsonl` payloads are released here so
     // they can be garbage-collected immediately after the write returns.
-    this.chunkMetas.push(...written.map(chunkMetaOf));
+    // Rebase the per-batch row offsets (which restart at 0 each `writeChunks`
+    // call) onto the running global base so `chunkOffsets` stays contiguous
+    // across flushes — the paginated read locates pages by `startRow`.
+    const base = this.nextStartRow;
+    this.chunkMetas.push(
+      ...written.map((chunk) => ({
+        ...chunkMetaOf(chunk),
+        startRow: chunk.startRow + base,
+        endRow: chunk.endRow + base,
+      })),
+    );
+    this.nextStartRow = base + (written.at(-1)?.endRow ?? 0);
     this.nextIndex += written.length;
     this.buffer = [];
     this.bufferBytes = 0;

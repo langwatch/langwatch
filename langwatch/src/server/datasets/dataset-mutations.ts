@@ -664,6 +664,13 @@ export const deleteS3JsonlRecords = async ({
         const removedIds = new Set<string>();
         const newRowCount = new Map<number, number>();
         const newByteSize = new Map<number, number>();
+        // Buffer the rewrites; do NOT issue any S3 PUT until the hint is
+        // re-validated. Otherwise a partial rewrite-then-bail would leave a
+        // chunk mutated while control falls through to the full in-lock scan,
+        // which then re-reads the already-mutated chunk and under-reports
+        // `deleted` (and redundantly re-PUTs it). On bail we must leave S3
+        // untouched so the full scan owns every write and the count.
+        const pendingRewrites: Array<{ index: number; kept: unknown[] }> = [];
         let deleted = 0;
         for (const index of hint.affectedIndices) {
           if (index >= chunkCount) continue; // chunk trimmed away since the scan
@@ -680,18 +687,12 @@ export const deleteS3JsonlRecords = async ({
             }
           }
           deleted += rows.length - kept.length;
-          const offset = await datasetStorage.rewriteChunk({
-            projectId,
-            datasetId: dataset.id,
-            index,
-            records: kept,
-          });
-          newRowCount.set(index, kept.length);
-          newByteSize.set(index, offset.byteSize);
+          pendingRewrites.push({ index, kept });
         }
         // Re-validate the hint: every located id must have been removed here. If
         // not, a concurrent mutation moved/removed it since the scan — bail to
-        // the proven full scan rather than risk a missed delete.
+        // the proven full scan rather than risk a missed delete. No S3 write has
+        // happened yet, so the full scan starts from the unmodified chunks.
         for (const id of hint.locatedIds) {
           if (!removedIds.has(id)) {
             logger.warn(
@@ -703,6 +704,17 @@ export const deleteS3JsonlRecords = async ({
         }
         if (deleted === 0) {
           return { deleted: 0 };
+        }
+        // Hint validated — now commit the buffered rewrites to S3.
+        for (const { index, kept } of pendingRewrites) {
+          const offset = await datasetStorage.rewriteChunk({
+            projectId,
+            datasetId: dataset.id,
+            index,
+            records: kept,
+          });
+          newRowCount.set(index, kept.length);
+          newByteSize.set(index, offset.byteSize);
         }
         // Per-chunk (rowCount, byteSize) for ALL chunks: affected from the
         // re-read above, the rest from the authoritative offset index (no read).

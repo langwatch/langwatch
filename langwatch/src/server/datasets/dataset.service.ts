@@ -1047,9 +1047,9 @@ export class DatasetService {
       sourceDataset.name,
     );
 
-    // Create new dataset. The copy target is created on the PG layout (the
-    // createNewDataset default); routing the copy *target* onto s3_jsonl is a
-    // write-mutation concern for a later rung — this rung only fixes reads.
+    // Create the copy target via createNewDataset, which is born-on-storage
+    // (contentLayout='s3_jsonl', v13): the copied rows are written straight to
+    // chunk objects, never to the PG records table.
     const newDataset = await this.createNewDataset({
       projectId: targetProjectId,
       name: newName,
