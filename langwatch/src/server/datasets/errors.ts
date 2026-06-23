@@ -216,6 +216,28 @@ export class MissingChunkError extends Error {
 }
 
 /**
+ * An s3_jsonl dataset is `ready` but its PG-authoritative `chunkCount` is null —
+ * an I-COUNT integrity violation (a transiently-failed `UPDATE` after migrate /
+ * normalize, never a valid resting state). Read paths must NOT coerce it via
+ * `chunkCount ?? 0`, which would loop zero times and serve an EMPTY dataset
+ * against a positive `rowCount` — silent, undiagnosable data loss for the UI,
+ * SDK, and experiments. Throwing surfaces the drift loudly so it can be repaired
+ * (`recomputeDatasetCounts`) rather than masked. Maps to a 500 (server-side data
+ * bug, not user-actionable).
+ */
+export class DatasetChunkCountMissingError extends Error {
+  readonly datasetId: string;
+
+  constructor(datasetId: string) {
+    super(
+      `Dataset ${datasetId} has s3_jsonl layout but a null chunkCount (I-COUNT drift)`,
+    );
+    this.name = "DatasetChunkCountMissingError";
+    this.datasetId = datasetId;
+  }
+}
+
+/**
  * The local-FS storage root is not writable (EACCES/EROFS/EPERM) — born-on-
  * storage made a writable backend mandatory, so this is a deployment-config
  * error, not a transient failure. Typed (vs a bare `Error`) so the upload route

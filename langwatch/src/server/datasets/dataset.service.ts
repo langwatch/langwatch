@@ -8,6 +8,7 @@ import { createLogger } from "~/utils/logger/server";
 import { slugify } from "~/utils/slugify";
 import {
   adaptS3JsonlRecord,
+  assertDatasetReadableInHeap,
   createManyDatasetRecords,
   getFullDataset,
 } from "../api/routers/datasetRecord.utils";
@@ -657,6 +658,12 @@ export class DatasetService {
           });
         }
       } else {
+        // No chunkOffsets (legacy/partial migration): the only way to honour the
+        // page window is to read every chunk, then slice — an UNBOUNDED read per
+        // page. Guard on sizeBytes so a large offset-less dataset can't OOM the
+        // pod on a normal list call (offsets-present datasets take the bounded
+        // branch above).
+        assertDatasetReadableInHeap(dataset);
         const rows = await storage.readChunks({
           projectId: params.projectId,
           datasetId: dataset.id,
@@ -957,8 +964,9 @@ export class DatasetService {
     // Fetch source records. ADR-032: an s3_jsonl source has its content in chunk
     // objects, not the PG DatasetRecord table (I-PG), so reading PG would copy
     // an empty dataset. Gate on ready (I-READY) and read the chunks instead.
-    // NOTE: reads all chunks in memory; large-dataset copy is bounded by the
-    // reads-at-scale fast-follow, same as every other read in this rung.
+    // NOTE: reads all chunks in memory until the streaming-copy fast-follow —
+    // so guard on sizeBytes (same ceiling as export) to reject a too-large copy
+    // rather than OOM the pod.
     let sourceRecordEntries: Array<Record<string, unknown>>;
     if (sourceDataset.contentLayout === "s3_jsonl") {
       if (sourceDataset.status !== "ready") {
@@ -967,6 +975,7 @@ export class DatasetService {
           statusError: sourceDataset.statusError,
         });
       }
+      assertDatasetReadableInHeap(sourceDataset);
       const storage = await getDatasetStorage(sourceProjectId);
       const rows = await storage.readChunks({
         projectId: sourceProjectId,

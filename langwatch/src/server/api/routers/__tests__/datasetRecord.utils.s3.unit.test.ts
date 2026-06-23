@@ -400,6 +400,49 @@ describe("getFullDataset()", () => {
     });
   });
 
+  describe("when an s3_jsonl dataset is ready but its chunkCount is null", () => {
+    it("throws DatasetChunkCountMissingError rather than serving an empty dataset", async () => {
+      // I-COUNT drift: `chunkCount ?? 0` would loop zero times and return [] with
+      // a positive count — silent data loss. The guard surfaces it loudly.
+      findFirst.mockResolvedValue({
+        ...baseDataset,
+        rowCount: 2,
+        chunkCount: null,
+      });
+      const readChunks = mockReadChunks([]);
+
+      await expect(
+        getFullDataset({ datasetId: "dataset_1", projectId: "p1" }),
+      ).rejects.toMatchObject({ name: "DatasetChunkCountMissingError" });
+      expect(readChunks).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a single-row selection falls back to a full read but the dataset exceeds the heap ceiling", () => {
+    it("throws DatasetTooLargeToExportError instead of reading the whole corpus", async () => {
+      // No offsets → the single-row select can't short-circuit and would read
+      // every chunk; guard on sizeBytes so a large legacy dataset can't OOM.
+      findFirst.mockResolvedValue({
+        ...baseDataset,
+        rowCount: 2,
+        chunkCount: 1,
+        chunkOffsets: null,
+        sizeBytes: BigInt(200 * 1024 * 1024), // 200 MB > 100 MB ceiling
+      });
+      const { readChunks, readChunk } = mockReadChunk({});
+
+      await expect(
+        getFullDataset({
+          datasetId: "dataset_1",
+          projectId: "p1",
+          entrySelection: "first",
+        }),
+      ).rejects.toMatchObject({ name: "DatasetTooLargeToExportError" });
+      expect(readChunk).not.toHaveBeenCalled();
+      expect(readChunks).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the dataset row does not exist", () => {
     it("returns null", async () => {
       findFirst.mockResolvedValue(null);

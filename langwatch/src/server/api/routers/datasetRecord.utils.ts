@@ -9,6 +9,7 @@ import {
   getDatasetStorage,
 } from "../../datasets/dataset-storage";
 import {
+  DatasetChunkCountMissingError,
   DatasetNotReadyError,
   DatasetTooLargeToExportError,
 } from "../../datasets/errors";
@@ -32,6 +33,27 @@ const storageService = new StorageService();
  * guard that keeps the pod alive in the meantime.
  */
 export const DATASET_FULL_EXPORT_MAX_BYTES = 100 * 1024 * 1024;
+
+/**
+ * Guard an UNBOUNDED full-corpus read (`readChunks` over every chunk) against
+ * OOM. The bounded readers cap at a byte budget, but three paths materialise the
+ * whole dataset at once — the legacy no-offsets fallbacks (single-row select and
+ * paginated list) and `copyDataset`. Reject a dataset too large to hold in heap
+ * with the same typed error the export path uses, rather than OOMing the pod.
+ * (Upload caps don't bound this: a dataset grows past 25 MB via repeated
+ * appends, so `sizeBytes` is the only real ceiling.)
+ */
+export const assertDatasetReadableInHeap = (dataset: {
+  sizeBytes: bigint | null;
+}): void => {
+  const sizeBytes = Number(dataset.sizeBytes ?? 0n);
+  if (sizeBytes > DATASET_FULL_EXPORT_MAX_BYTES) {
+    throw new DatasetTooLargeToExportError({
+      sizeBytes,
+      maxBytes: DATASET_FULL_EXPORT_MAX_BYTES,
+    });
+  }
+};
 
 const createDatasetRecords = ({
   entries,
@@ -449,6 +471,14 @@ export const getFullDataset = async ({
       });
     }
 
+    // I-COUNT: a `ready` s3_jsonl dataset MUST have a non-null chunkCount.
+    // `chunkCount ?? 0` below would otherwise loop zero times and serve an EMPTY
+    // dataset against a positive rowCount — silent, undiagnosable data loss.
+    // Throw loudly so the drift surfaces (and `recomputeDatasetCounts` repairs).
+    if (dataset.chunkCount == null) {
+      throw new DatasetChunkCountMissingError(datasetId);
+    }
+
     const storage = await getDatasetStorage(projectId);
 
     const count = dataset.rowCount ?? 0;
@@ -473,12 +503,14 @@ export const getFullDataset = async ({
       }
       // `record === null`: no short-circuit possible (missing/legacy offsets).
       // This rare defensive path reads the whole dataset to honour
-      // last/random/N correctly, then selects the single row. Bounded by the
-      // same in-memory read the rung accepts for legacy data without offsets.
+      // last/random/N correctly, then selects the single row — an UNBOUNDED read
+      // even for a single-row selection, so guard it on `sizeBytes` (the export
+      // path below guards the same way) rather than OOM on a large legacy dataset.
+      assertDatasetReadableInHeap(dataset);
       const rows = await storage.readChunks({
         projectId,
         datasetId,
-        chunkCount: dataset.chunkCount ?? 0,
+        chunkCount: dataset.chunkCount,
       });
       const allRecords = rows.map((line) => adaptS3JsonlRecord(line, dataset));
       const selected = selectRecords(allRecords, entrySelection);
@@ -500,13 +532,7 @@ export const getFullDataset = async ({
     // multi-GB download with a clear, typed error instead of OOMing the pod.
     // (True streaming export is the reads-at-scale fast-follow epic.)
     if (limitMb === null) {
-      const sizeBytes = Number(dataset.sizeBytes ?? 0n);
-      if (sizeBytes > DATASET_FULL_EXPORT_MAX_BYTES) {
-        throw new DatasetTooLargeToExportError({
-          sizeBytes,
-          maxBytes: DATASET_FULL_EXPORT_MAX_BYTES,
-        });
-      }
+      assertDatasetReadableInHeap(dataset);
     }
 
     // "all": read chunks ONE AT A TIME (I-MEM), accumulating rows until the
