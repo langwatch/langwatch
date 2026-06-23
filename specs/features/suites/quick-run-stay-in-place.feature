@@ -86,6 +86,19 @@ Feature: Sidebar Quick Run keeps the user in place
     Then the router push API is not called toward /<projectSlug>/simulations/run-plans/<slug>
     And the run plan summaries query invalidation is still triggered
 
+  # --- AC8: the success toast offers an explicit, opt-in "View run" action ---
+  # Founder (Rogério) compromise: staying in place is kept, but the
+  # run-scheduled success toast carries a button so the user can jump to the
+  # run plan's detail page on demand instead of being auto-navigated.
+
+  @integration
+  Scenario: The run-scheduled success toast offers a View run action that navigates to the run plan detail page
+    Given the user is on the All Runs page at /<projectSlug>/simulations
+    When the user clicks the inline Run button on a run plan row in the sidebar
+    And the run is scheduled with no archived scenarios or targets skipped
+    Then a success toast is shown with a "View run" action
+    And clicking the "View run" action navigates to the run plan detail page at /<projectSlug>/simulations/run-plans/<slug>
+
   # --- AC Coverage Map ---
   # AC 1: "stays on All Runs after sidebar quick-run"
   #   -> Scenario: Quick run from the All Runs page keeps the user on All Runs
@@ -101,3 +114,5 @@ Feature: Sidebar Quick Run keeps the user in place
   #   -> Scenario: Save and Run from the suite editor drawer still navigates to the suite detail page
   # AC 7: "automated test covers the no-navigation regression"
   #   -> Scenario: useRunSuite onRunScheduled does not call the router push API
+  # AC 8: "success toast carries an opt-in View run action that navigates to the detail page"
+  #   -> Scenario: The run-scheduled success toast offers a View run action that navigates to the run plan detail page
