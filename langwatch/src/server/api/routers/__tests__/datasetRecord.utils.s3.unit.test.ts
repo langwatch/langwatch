@@ -562,6 +562,26 @@ describe("readDatasetHeadS3Jsonl()", () => {
     });
   });
 
+  describe("when the offset index is missing and chunkCount is null (I-COUNT drift)", () => {
+    it("throws DatasetChunkCountMissingError instead of an empty preview against a positive total", async () => {
+      const { readChunk } = mockReadChunk({});
+
+      await expect(
+        readDatasetHeadS3Jsonl({
+          dataset: {
+            ...baseDataset,
+            rowCount: 5,
+            chunkCount: null,
+            chunkOffsets: null,
+          } as never,
+          projectId: "p1",
+        }),
+      ).rejects.toMatchObject({ name: "DatasetChunkCountMissingError" });
+      // The guard fires before the scan loop — no chunk is read.
+      expect(readChunk).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the dataset is not ready", () => {
     it("throws DatasetNotReadyError without reading chunks", async () => {
       const { readChunk } = mockReadChunk({});

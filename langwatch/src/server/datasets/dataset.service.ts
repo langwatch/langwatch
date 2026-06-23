@@ -1008,11 +1008,18 @@ export class DatasetService {
         });
       }
       assertDatasetReadableInHeap(sourceDataset);
+      // I-COUNT: a ready s3_jsonl source MUST have a non-null chunkCount; `?? 0`
+      // would read zero chunks and silently copy an EMPTY dataset against a
+      // positive rowCount. Mirror getFullDataset/listRecords — throw, don't
+      // truncate (no offsets branch here, so chunkCount always governs the read).
+      if (sourceDataset.chunkCount == null) {
+        throw new DatasetChunkCountMissingError(sourceDatasetId);
+      }
       const storage = await getDatasetStorage(sourceProjectId);
       const rows = await storage.readChunks({
         projectId: sourceProjectId,
         datasetId: sourceDatasetId,
-        chunkCount: sourceDataset.chunkCount ?? 0,
+        chunkCount: sourceDataset.chunkCount,
       });
       // Reuse the shared {id, entry} → DatasetRecord adapter (the same unwrap the
       // read paths use) and take just the entry; the copy mints fresh ids below.

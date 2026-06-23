@@ -417,6 +417,14 @@ export const readDatasetHeadS3Jsonl = async ({
       );
     }
   } else {
+    // I-COUNT: with no offsets the scan is driven by chunkCount; a null
+    // chunkCount (`?? 0`) would scan zero chunks and return an EMPTY preview
+    // against a positive total — masking the very drift this guards elsewhere
+    // (getFullDataset/listRecords). Throw rather than render an empty head. The
+    // offsets branch above never reaches here, so this only fires on real drift.
+    if (dataset.chunkCount == null) {
+      throw new DatasetChunkCountMissingError(dataset.id);
+    }
     // Legacy/never-written offsets: scan chunks in order, skipping empties,
     // until the preview is full. Still bounded — stops at the first chunk(s)
     // that fill it, never reads the whole dataset.

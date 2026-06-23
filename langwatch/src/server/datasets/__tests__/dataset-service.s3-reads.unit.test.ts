@@ -513,5 +513,31 @@ describe("DatasetService", () => {
         ).rejects.toMatchObject({ name: "DatasetNotReadyError" });
       });
     });
+
+    describe("when the source is ready s3_jsonl but has a null chunkCount (I-COUNT drift)", () => {
+      it("throws DatasetChunkCountMissingError instead of creating an empty copy", async () => {
+        const create = vi.fn();
+        const repository = {
+          findOne: vi.fn().mockResolvedValue({
+            ...baseS3Dataset,
+            chunkCount: null,
+            rowCount: 5,
+          }),
+          findAllSlugs: vi.fn().mockResolvedValue([]),
+          findBySlug: vi.fn().mockResolvedValue(null),
+          create,
+        };
+
+        await expect(
+          makeService({ repository }).copyDataset({
+            sourceDatasetId: "dataset_1",
+            sourceProjectId: "p1",
+            targetProjectId: "p2",
+          }),
+        ).rejects.toBeInstanceOf(DatasetChunkCountMissingError);
+        // No empty copy is created against the positive rowCount.
+        expect(create).not.toHaveBeenCalled();
+      });
+    });
   });
 });
