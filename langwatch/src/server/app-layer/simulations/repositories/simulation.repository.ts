@@ -165,7 +165,10 @@ export class NullSimulationRepository implements SimulationRepository {
     };
   }
 
-  async findAllRunIdsForSet(): Promise<{ runIds: string[]; reachedCap: boolean }> {
+  async findAllRunIdsForSet(): Promise<{
+    runIds: string[];
+    reachedCap: boolean;
+  }> {
     return { runIds: [], reachedCap: false };
   }
 
