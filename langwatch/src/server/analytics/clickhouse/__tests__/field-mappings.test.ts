@@ -200,6 +200,29 @@ describe("field-mappings", () => {
       expect(join).toContain("ts.TenantId = es.TenantId");
       expect(join).toContain("ts.TraceId = es.TraceId");
     });
+
+    it("leaves the stored_spans JOIN unbounded on StartTime when no filter is passed", () => {
+      const join = buildJoinClause("stored_spans");
+      // StartTime is a selected column, but there must be no StartTime predicate:
+      // the WHERE ends right after the tenant filter.
+      expect(join).not.toContain("StartTime >=");
+      expect(join).not.toContain("StartTime <");
+      expect(join).toContain("WHERE TenantId = {tenantId:String}) ss");
+    });
+
+    it("injects the span time filter into the stored_spans JOIN when provided", () => {
+      const filter =
+        "AND StartTime >= {startDate:DateTime64(3)} - INTERVAL 2 DAY AND StartTime < {endDate:DateTime64(3)} + INTERVAL 2 DAY";
+      const join = buildJoinClause("stored_spans", undefined, filter);
+      // The bound lands inside the subquery WHERE, before the closing paren/alias.
+      expect(join).toContain(`TenantId = {tenantId:String} ${filter})`);
+    });
+
+    it("ignores the span time filter for evaluation_runs", () => {
+      const filter = "AND StartTime >= {startDate:DateTime64(3)}";
+      const join = buildJoinClause("evaluation_runs", undefined, filter);
+      expect(join).not.toContain("StartTime");
+    });
   });
 
   describe("qualifiedColumn", () => {
