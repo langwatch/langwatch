@@ -11,28 +11,28 @@
 import type { Context } from "hono";
 import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
-import { getProtectionsForProject } from "~/server/api/utils";
-import { getApp } from "~/server/app-layer/app";
-import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
-import { prisma } from "~/server/db";
-import { generateAsciiTree } from "~/server/traces/trace-formatting";
-import {
-  toLLMModeTrace,
-  formatTraceSummaryDigest,
-} from "~/server/traces/trace-formatting";
-import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
-import { TraceService } from "~/server/traces/trace.service";
-import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
-import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
-import type { Span, Trace } from "~/server/tracer/types";
 import type { Permission } from "~/server/api/rbac";
+import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { getProtectionsForProject } from "~/server/api/utils";
 import {
+  apiKeyCeilingDenialResponse,
   enforceApiKeyCeiling,
   extractCredentials,
-  apiKeyCeilingDenialResponse,
 } from "~/server/api-key/auth-middleware";
 import { TokenResolver } from "~/server/api-key/token-resolver";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { getApp } from "~/server/app-layer/app";
+import { prisma } from "~/server/db";
+import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
+import type { Span, Trace } from "~/server/tracer/types";
+import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
+import { TraceService } from "~/server/traces/trace.service";
+import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
+import {
+  formatTraceSummaryDigest,
+  generateAsciiTree,
+  toLLMModeTrace,
+} from "~/server/traces/trace-formatting";
 
 const tokenResolver = TokenResolver.create(prisma);
 
