@@ -37,7 +37,10 @@ import type {
   DatasetColumns,
   DatasetRecordEntry,
 } from "../../server/datasets/types";
-import { MAX_FILE_SIZE_BYTES } from "../../server/datasets/upload-utils";
+import {
+  MAX_FILE_SIZE_BYTES,
+  MAX_ROWS_LIMIT,
+} from "../../server/datasets/upload-utils";
 import {
   type AddDatasetDrawerProps,
   AddOrEditDatasetDrawer,
@@ -54,7 +57,6 @@ import {
   retryDatasetNormalize,
 } from "./services/directUpload";
 import { getSafeColumnName } from "./utils/reservedColumns";
-export const MAX_ROWS_LIMIT = 10_000;
 
 const logger = createLogger("UploadCSVDrawer");
 
@@ -178,15 +180,6 @@ export function UploadCSVDrawer({
   );
 }
 
-/** True once a dataset has at least one column — the signal that normalize has
- *  actually run (distinguishes a real "ready" from the schema-default one). */
-function datasetHasColumns(dataset: { columnTypes?: unknown }): boolean {
-  const cols = dataset.columnTypes;
-  return (
-    !!cols && typeof cols === "object" && Object.keys(cols as object).length > 0
-  );
-}
-
 /**
  * In-drawer view for the async tail of a direct upload (ADR-032 D4): after the
  * raw file is finalized, the dataset normalizes server-side. This polls its
@@ -215,18 +208,15 @@ export function DatasetUploadProcessing({
     { projectId, datasetId },
     {
       enabled: !!projectId && !!datasetId,
-      // Poll while preparing. `Dataset.status` schema-defaults to "ready", so a
-      // row whose normalize hasn't run can momentarily read "ready" with no
-      // columns — keep polling in that case too, and stop only once it has
-      // columns, failed, or the row is gone (findFirst → null).
-      refetchInterval: (data) => {
-        if (!data) return false;
-        if (data.status === "processing" || data.status === "uploading") {
-          return 3000;
-        }
-        if (data.status === "ready" && !datasetHasColumns(data)) return 3000;
-        return false;
-      },
+      // Poll only while preparing, then stop — same contract as the dataset
+      // page. `finalizeUpload` always flips the row to "processing" before
+      // normalize runs, so "ready" is only ever reached once normalize has
+      // finished; we don't second-guess it (a degenerate columnless dataset is
+      // still terminally ready, not an endless spinner).
+      refetchInterval: (data) =>
+        data?.status === "processing" || data?.status === "uploading"
+          ? 3000
+          : false,
     },
   );
 
@@ -236,9 +226,7 @@ export function DatasetUploadProcessing({
   // forever, since refetchInterval also stops on null).
   const datasetGone = datasetQuery.isFetched && data == null;
   const isFailed = data?.status === "failed";
-  // Trust "ready" only once normalize has populated columns, so the schema
-  // default can't be mistaken for a finished upload.
-  const isReady = data?.status === "ready" && datasetHasColumns(data);
+  const isReady = data?.status === "ready";
   const isProcessing = !datasetGone && !isFailed && !isReady;
 
   useEffect(() => {
@@ -394,6 +382,15 @@ export function UploadCSVForm({
   const abortControllerRef = useRef<AbortController | null>(null);
   const pendingDatasetIdRef = useRef<string | null>(null);
 
+  // Closing the drawer mid-upload unmounts this form — abort the in-flight PUT
+  // so it doesn't silently finalize a dataset behind the user's back. The refs
+  // are nulled the instant the PUT succeeds (before finalize), so this aborts
+  // only a genuinely in-flight stream; the AbortError catch then reaps the
+  // pending row. No-op (ref null) on a normal close or the processing handoff.
+  useEffect(() => {
+    return () => abortControllerRef.current?.abort();
+  }, []);
+
   const getValidName = async (proposedName: string): Promise<string> => {
     if (!projectId) return proposedName;
     const validName = await trpcUtils.dataset.findNextName.fetch({
@@ -482,6 +479,7 @@ export function UploadCSVForm({
           type: "success",
           meta: { closable: true },
         });
+        setIsUploading(false);
         onClose?.();
         void router.push(`/${project.slug}/datasets/${datasetId}`);
       }
@@ -557,8 +555,9 @@ export function UploadCSVForm({
 
   /**
    * Cancel an in-flight direct upload: abort the streaming PUT and reap the
-   * pending `uploading` row so its slug isn't locked on retry. The file stays
-   * selected so the user can re-upload or remove it.
+   * pending `uploading` row so its slug isn't locked on retry. The dropzone's
+   * cancel control additionally clears the selected file (re-expanding the drop
+   * zone) — see `RawFileDropzone`'s cancel handler — so the user starts fresh.
    */
   const handleCancelUpload = () => {
     abortControllerRef.current?.abort();

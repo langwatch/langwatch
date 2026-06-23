@@ -353,8 +353,8 @@ describe("DatasetUploadProcessing", () => {
     });
   });
 
-  describe("when the dataset reports ready but has no columns yet", () => {
-    it("keeps showing preparing (does not trust the schema-default ready)", () => {
+  describe("when a degenerate dataset is ready with no columns", () => {
+    it("treats ready as terminal (no endless spinner) — finalize guarantees processing first", () => {
       getByIdResult.data = {
         id: "dataset_1",
         name: "ds",
@@ -365,8 +365,11 @@ describe("DatasetUploadProcessing", () => {
       const onReady = vi.fn();
       renderProcessing({ onReady });
 
-      expect(screen.getByText(/preparing your dataset/i)).toBeInTheDocument();
-      expect(onReady).not.toHaveBeenCalled();
+      // Not stuck on a spinner; "ready" is honored once the server says so.
+      expect(
+        screen.queryByText(/preparing your dataset/i),
+      ).not.toBeInTheDocument();
+      expect(onReady).toHaveBeenCalledTimes(1);
     });
   });
 
