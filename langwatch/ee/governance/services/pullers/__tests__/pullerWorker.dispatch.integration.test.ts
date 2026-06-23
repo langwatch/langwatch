@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { ClickHouseClient } from "@clickhouse/client";
 /**
  * @vitest-environment node
  *
@@ -22,17 +23,14 @@
  * Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
  */
 import http from "http";
-import type { AddressInfo } from "net";
-
-import { type ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
+import type { AddressInfo } from "net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
 import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
-
-import { runIngestionPullerJob } from "../pullerWorker";
 import { ensureHiddenGovernanceProject } from "../../governanceProject.service";
+import { runIngestionPullForSource } from "../pullerWorker";
 
 const ns = `puller-e2e-${nanoid(8)}`;
 
@@ -171,23 +169,16 @@ afterAll(async () => {
   await prisma.project
     .deleteMany({ where: { team: { organizationId } } })
     .catch(() => {});
-  await prisma.team
-    .deleteMany({ where: { organizationId } })
-    .catch(() => {});
+  await prisma.team.deleteMany({ where: { organizationId } }).catch(() => {});
   await prisma.organization
     .deleteMany({ where: { id: organizationId } })
     .catch(() => {});
 });
 
 describe("PullerAdapter framework — end-to-end with real CH + real fetch", () => {
+  /** @scenario "A due pull runs the existing pull body and writes OCSF events" */
   it("fetches a paginated audit-log feed and lands one OCSF row per event", async () => {
-    await runIngestionPullerJob({
-      id: `job-${ns}`,
-      data: {
-        ingestionSourceId,
-        scheduledAt: Date.now(),
-      },
-    } as any);
+    await runIngestionPullForSource({ ingestionSourceId });
 
     const govProject = await ensureHiddenGovernanceProject(
       prisma,

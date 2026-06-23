@@ -13,7 +13,7 @@ Feature: Microsoft Copilot Studio reference puller (built on HttpPollingPullerAd
     Given alice is an org ADMIN
     When alice clicks "Add ingestion source" → "Microsoft Copilot Studio" → enters her tenant credentials → Save
     Then a new IngestionSource row lands with `sourceType = "copilot_studio"` + `pullConfig = <auto-populated reference config>` + `pullSchedule = "*/15 * * * *"` (15 min default)
-    And the BullMQ worker picks up the first scheduled run within ~15 min
+    And the event-sourcing scheduler picks up the first scheduled run within ~15 min
 
   Scenario: Reference config is locked + auditable
     Given the copilot_studio reference puller exists at `langwatch/ee/governance/services/pullers/copilotStudio.puller.ts`

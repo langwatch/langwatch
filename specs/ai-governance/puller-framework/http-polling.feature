@@ -46,7 +46,7 @@ Feature: HttpPollingPullerAdapter (universal HTTP-polling adapter)
     Then the adapter POSTs/GETs the configured URL with substituted Authorization header
     And maps event1 + event2 via the configured JSON-paths
     And returns `{ events: [normalized1, normalized2], cursor: null, errorCount: 0 }`
-    And the BullMQ job marks the IngestionSource as fully drained
+    And the puller job marks the IngestionSource as fully drained
 
   Scenario: Multi-page pull respects cursor
     Given the upstream returns `{ events: […20 events…], next_cursor: "abc123" }` on first call
@@ -79,4 +79,4 @@ Feature: HttpPollingPullerAdapter (universal HTTP-polling adapter)
   Scenario: Cursor extraction handles missing field
     Given the upstream returns `{ events: [...], next_cursor: undefined }` (field absent)
     Then the adapter treats this as "drained" — returns cursor: null
-    And the BullMQ job schedules the next pull per the cron schedule, not immediately
+    And the puller job schedules the next pull per the cron schedule, not immediately
