@@ -224,11 +224,17 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const traceService = TraceService.create(ctx.prisma);
+      // Thread-detail read consumes conversation content — resolve full IO
+      // (#4991), not the 64 KB preview.
+      const traceService = TraceService.create(
+        ctx.prisma,
+        buildTraceBlobResolutionDeps(),
+      );
       const tracesGrouped = await traceService.getTracesByThreadId(
         projectId,
         threadId,
         protections,
+        { full: true },
       );
 
       if (!ctx.publiclyShared) {
@@ -311,11 +317,16 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const traceService = TraceService.create(ctx.prisma);
+      // Thread reads consume conversation content — resolve full IO (#4991).
+      const traceService = TraceService.create(
+        ctx.prisma,
+        buildTraceBlobResolutionDeps(),
+      );
       return traceService.getTracesWithSpansByThreadIds(
         projectId,
         threadIds,
         protections,
+        { full: true },
       );
     }),
 
@@ -333,7 +344,13 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const traceService = TraceService.create(ctx.prisma);
+      // Dataset builder persists trace content — resolve full IO (#4991) so
+      // truncated rows never corrupt the dataset. The ID-only list read above
+      // stays on the preview (it reads no content).
+      const traceService = TraceService.create(
+        ctx.prisma,
+        buildTraceBlobResolutionDeps(),
+      );
       const { groups } = await traceService.getAllTracesForProject(
         {
           ...input,
@@ -356,6 +373,7 @@ export const tracesRouter = createTRPCRouter({
         traceIds,
         protections,
         { from: input.startDate, to: input.endDate },
+        { full: true },
       );
     }),
 
@@ -395,7 +413,12 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const traceService = TraceService.create(ctx.prisma);
+      // Sample builder feeds dataset/evaluator content — resolve full IO
+      // (#4991). The ID-only list read stays on the preview.
+      const traceService = TraceService.create(
+        ctx.prisma,
+        buildTraceBlobResolutionDeps(),
+      );
       const { groups } = await traceService.getAllTracesForProject(
         {
           ...input,
@@ -421,6 +444,7 @@ export const tracesRouter = createTRPCRouter({
         traceIds,
         protections,
         { from: input.startDate, to: input.endDate },
+        { full: true },
       );
 
       const passedPreconditions = traceWithSpans.filter((trace) => {
@@ -472,7 +496,14 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const traceService = TraceService.create(ctx.prisma);
+      // Download consumes trace content — resolve full IO when spans are
+      // included so exported rows carry the whole value, not the 64 KB preview
+      // (#4991 AC1). resolveBlobs is gated on includeSpans (resolution runs
+      // during span enrichment).
+      const traceService = TraceService.create(
+        ctx.prisma,
+        buildTraceBlobResolutionDeps(),
+      );
       return traceService.getAllTracesForProject(
         {
           ...input,
@@ -483,6 +514,7 @@ export const tracesRouter = createTRPCRouter({
         {
           downloadMode: true,
           includeSpans: input.includeSpans,
+          resolveBlobs: input.includeSpans,
           scrollId: input.scrollId,
         },
       );
