@@ -1,4 +1,9 @@
-import type { Dataset, DatasetRecord, Prisma, PrismaClient } from "@prisma/client";
+import type {
+  Dataset,
+  DatasetRecord,
+  Prisma,
+  PrismaClient,
+} from "@prisma/client";
 
 /**
  * Input types derived from Prisma for type safety
@@ -46,6 +51,33 @@ export class DatasetRepository {
   }
 
   /**
+   * Finds a single dataset by id within a project, throwing if absent.
+   *
+   * The s3_jsonl write-mutations re-read the row inside the per-dataset advisory
+   * lock, where its existence is already guaranteed by the lock — a miss there is
+   * an invariant violation, not a not-found to branch on. This is the throwing
+   * counterpart to {@link findOne} so those paths surface it loudly (Prisma's
+   * `NotFoundError`) instead of null-checking a "can't happen".
+   */
+  async findOneOrThrow(
+    input: {
+      id: string;
+      projectId: string;
+    },
+    options?: {
+      tx?: Prisma.TransactionClient;
+    },
+  ): Promise<Dataset> {
+    const client = options?.tx ?? this.prisma;
+    return await client.dataset.findFirstOrThrow({
+      where: {
+        id: input.id,
+        projectId: input.projectId,
+      },
+    });
+  }
+
+  /**
    * Finds dataset by slug within a project.
    */
   async findBySlug(
@@ -84,12 +116,15 @@ export class DatasetRepository {
   }
 
   /**
-   * Updates an existing dataset.
+   * Updates an existing dataset and returns the updated row.
    *
-   * Validates that the dataset belongs to the specified project before updating.
-   * This guard prevents cross-project updates at the data layer.
+   * The `where` pins BOTH id and projectId, so a cross-project update simply
+   * doesn't match any row and Prisma throws `P2025` (NotFoundError) — the tenancy
+   * guard IS the where clause. Prisma's `update` already returns the updated row,
+   * so we return it directly (no redundant re-read — these run under the dataset
+   * advisory lock where every extra round-trip lengthens lock hold).
    *
-   * @throws {Error} if dataset not found or doesn't belong to project
+   * @throws {Prisma.PrismaClientKnownRequestError} P2025 if no row matches id+project
    */
   async update(
     input: UpdateDatasetInput,
@@ -99,43 +134,157 @@ export class DatasetRepository {
   ): Promise<Dataset> {
     const client = options?.tx ?? this.prisma;
 
-    const result = await client.dataset.update({
+    return await client.dataset.update({
       where: {
         id: input.id,
         projectId: input.projectId,
       },
       data: input.data,
     });
+  }
 
-    if (!result) {
-      throw new Error(
-        `Dataset ${input.id} not found in project ${input.projectId}`,
-      );
-    }
-
-    // Return the updated dataset
-    return await client.dataset.findFirstOrThrow({
+  /**
+   * Conditionally flip a dataset to `failed` ONLY while it is still
+   * `processing`. The normalize enqueue catch uses this: when the enqueue
+   * rejects synchronously no job is in flight, so the row's `processing` is a
+   * lie — flip it to `failed` so the UI exposes retry. Guarded on
+   * `status='processing'` (an `updateMany`, not `update`) so it never clobbers
+   * the more specific error the inline handler already set on ITS own failure
+   * path (the handler flips to `failed` + rethrows, so by the time this runs the
+   * row is already `failed` and this matches no row). Returns the rows flipped
+   * (0 = the handler — or a concurrent finalize — already moved it).
+   */
+  async failIfProcessing(input: {
+    id: string;
+    projectId: string;
+    statusError: string;
+  }): Promise<number> {
+    const { count } = await this.prisma.dataset.updateMany({
       where: {
         id: input.id,
         projectId: input.projectId,
+        status: "processing",
+      },
+      data: { status: "failed", statusError: input.statusError },
+    });
+    return count;
+  }
+
+  /**
+   * Atomically claim a pending upload for normalization: flip `uploading` →
+   * `processing` ONLY if the row is still `uploading` (and non-archived). The
+   * `updateMany` WHERE-clause is the concurrency guard — two finalize calls
+   * racing (double-click / client retry) can't both win, so only one enqueues a
+   * normalize. A read-then-`update` would let both pass the `status==='uploading'`
+   * read and both transition + enqueue, racing two handlers onto the same chunk
+   * keys in inline mode. Returns the rows claimed (1 = won, 0 = a concurrent
+   * finalize already moved it).
+   */
+  async claimForProcessing(input: {
+    id: string;
+    projectId: string;
+  }): Promise<number> {
+    const { count } = await this.prisma.dataset.updateMany({
+      where: {
+        id: input.id,
+        projectId: input.projectId,
+        status: "uploading",
+        archivedAt: null,
+      },
+      data: { status: "processing" },
+    });
+    return count;
+  }
+
+  /**
+   * Records a normalize re-drive on a wedged `processing` row by bumping
+   * `updatedAt` (Prisma's `@updatedAt` fires on any update; the no-op
+   * `statusError: null` write is just the trigger — a processing row already has
+   * a null error). Guarded on `status='processing'` (an `updateMany`) so it can
+   * never resurrect a row that raced to `ready`/`failed` between selection and
+   * re-drive. This stops `findStaleProcessing` from re-selecting the same row on
+   * every subsequent upload within the TTL. Returns the rows touched.
+   */
+  async markProcessingRedriven(input: {
+    id: string;
+    projectId: string;
+  }): Promise<number> {
+    const { count } = await this.prisma.dataset.updateMany({
+      where: {
+        id: input.id,
+        projectId: input.projectId,
+        status: "processing",
+      },
+      data: { statusError: null },
+    });
+    return count;
+  }
+
+  /**
+   * Finds datasets wedged mid-normalize: `status='processing'`, non-archived
+   * rows with a bound staging key whose `updatedAt` (the moment they flipped to
+   * `processing`) predates `olderThan`. Drives the poll-triggered re-drive (see
+   * `DatasetService.reapStaleProcessing`) that recovers the *lost-after-send*
+   * normalize window without a scheduler. Keyed on `updatedAt`, not `createdAt`:
+   * a retried row re-enters `processing` long after it was created, so the clock
+   * must start when normalization (re)started.
+   */
+  async findStaleProcessing(input: {
+    projectId: string;
+    olderThan: Date;
+  }): Promise<Dataset[]> {
+    return await this.prisma.dataset.findMany({
+      where: {
+        projectId: input.projectId,
+        status: "processing",
+        archivedAt: null,
+        stagingKey: { not: null },
+        updatedAt: { lt: input.olderThan },
       },
     });
   }
 
   /**
-   * Gets project with organization info for S3 configuration check.
+   * Finds the pending (`status='uploading'`, non-archived) dataset that owns a
+   * given staging key. The direct-upload staging route uses this to refuse a
+   * stream into a `staging/` slot no upload row claims — otherwise an authed
+   * project user could spray orphan objects there. `stagingKey` is server-minted
+   * and bound to the row at presign time.
    */
-  async getProjectWithOrgS3Settings(input: { projectId: string }): Promise<{
-    canUseS3: boolean;
-  }> {
-    const project = await this.prisma.project.findUnique({
-      where: { id: input.projectId },
-      include: { team: { include: { organization: true } } },
+  async findPendingUploadByStagingKey(input: {
+    projectId: string;
+    stagingKey: string;
+  }): Promise<Dataset | null> {
+    return await this.prisma.dataset.findFirst({
+      where: {
+        projectId: input.projectId,
+        stagingKey: input.stagingKey,
+        status: "uploading",
+        archivedAt: null,
+      },
     });
+  }
 
-    return {
-      canUseS3: project?.team?.organization?.useCustomS3 ?? false,
-    };
+  /**
+   * Finds abandoned pending uploads in a project: `status='uploading'`,
+   * non-archived rows created before `olderThan`. Drives the poll-triggered
+   * reap (see `DatasetService.reapStalePendingUploads`) that bounds the
+   * accumulation of stuck `uploading` rows + their staging objects without a
+   * scheduler. The `olderThan` cutoff is conservative (well beyond the presign
+   * TTL) so a still-in-flight upload is never matched.
+   */
+  async findStalePendingUploads(input: {
+    projectId: string;
+    olderThan: Date;
+  }): Promise<Dataset[]> {
+    return await this.prisma.dataset.findMany({
+      where: {
+        projectId: input.projectId,
+        status: "uploading",
+        archivedAt: null,
+        createdAt: { lt: input.olderThan },
+      },
+    });
   }
 
   /**
@@ -192,5 +341,4 @@ export class DatasetRepository {
 
     return { datasets, total };
   }
-
 }

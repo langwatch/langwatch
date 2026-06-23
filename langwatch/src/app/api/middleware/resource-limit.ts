@@ -1,13 +1,72 @@
-import type { MiddlewareHandler } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
+import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
 import { buildResourceLimitMessage } from "~/server/license-enforcement/limit-message";
-import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import type { LimitType } from "~/server/license-enforcement/types";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:api:middleware:resource-limit");
+
+/**
+ * Enforce a resource limit for an organization, returning a 403 JSON response
+ * when over the cap (and `undefined` otherwise so the caller proceeds). Shared
+ * by `resourceLimitMiddleware` and routes that resolve the org in-handler (the
+ * direct-upload routes, which authenticate in-handler so the middleware can't
+ * read `c.get("project")` yet).
+ */
+export async function enforceResourceLimitOrRespond({
+  c,
+  organizationId,
+  limitType,
+}: {
+  c: Context;
+  organizationId: string;
+  limitType: LimitType;
+}): Promise<Response | undefined> {
+  try {
+    const enforcement = createLicenseEnforcementService(prisma);
+    await enforcement.enforceLimit(organizationId, limitType);
+  } catch (error) {
+    if (error instanceof LimitExceededError) {
+      let message = error.message;
+      try {
+        message = await buildResourceLimitMessage({
+          organizationId,
+          limitType,
+          max: error.max,
+        });
+      } catch (messageError) {
+        logger.warn(
+          { error: messageError, organizationId, limitType },
+          "Failed to build resource limit message",
+        );
+      }
+
+      // Fire-and-forget notification
+      fireNotification(organizationId).catch((notifyError) => {
+        logger.error(
+          { error: notifyError, organizationId },
+          "Plan limit notification failed",
+        );
+      });
+
+      return c.json(
+        {
+          error: error.kind,
+          message,
+          limitType: error.limitType,
+          current: error.current,
+          max: error.max,
+        },
+        403,
+      );
+    }
+    throw error;
+  }
+  return undefined;
+}
 
 /**
  * Creates a Hono middleware that enforces resource limits for create operations.
@@ -46,46 +105,12 @@ export function resourceLimitMiddleware(
       );
     }
 
-    try {
-      const enforcement = createLicenseEnforcementService(prisma);
-      await enforcement.enforceLimit(organizationId, limitType);
-    } catch (error) {
-      if (error instanceof LimitExceededError) {
-        let message = error.message;
-        try {
-          message = await buildResourceLimitMessage({
-            organizationId,
-            limitType,
-            max: error.max,
-          });
-        } catch (messageError) {
-          logger.warn(
-            { error: messageError, organizationId, limitType },
-            "Failed to build resource limit message",
-          );
-        }
-
-        // Fire-and-forget notification
-        fireNotification(organizationId).catch((notifyError) => {
-          logger.error(
-            { error: notifyError, organizationId },
-            "Plan limit notification failed",
-          );
-        });
-
-        return c.json(
-          {
-            error: error.kind,
-            message,
-            limitType: error.limitType,
-            current: error.current,
-            max: error.max,
-          },
-          403,
-        );
-      }
-      throw error;
-    }
+    const overLimit = await enforceResourceLimitOrRespond({
+      c,
+      organizationId,
+      limitType,
+    });
+    if (overLimit) return overLimit;
 
     await next();
   };
@@ -95,7 +120,7 @@ export function resourceLimitMiddleware(
  * Resolves the organizationId from a teamId.
  * Returns null if the team or organization is not found.
  */
-async function resolveOrganizationId(
+export async function resolveOrganizationId(
   teamId: string,
 ): Promise<string | null> {
   const team = await prisma.team.findUnique({

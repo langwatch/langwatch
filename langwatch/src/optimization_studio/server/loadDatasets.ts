@@ -87,6 +87,9 @@ export const loadDatasets = async (
         throw new Error("Dataset ID is required");
       }
 
+      // ADR-032 I-READY: a non-ready (uploading/processing/failed) s3_jsonl
+      // dataset throws DatasetNotReadyError here — it must NOT be silently
+      // treated as empty. The throw propagates as a clear run error.
       const dataset = await getFullDataset({
         datasetId: node.data.dataset.id,
         projectId,

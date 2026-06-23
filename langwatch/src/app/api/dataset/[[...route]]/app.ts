@@ -1,13 +1,23 @@
+import { Readable } from "node:stream";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
-import { createProjectApp, requires } from "~/server/api/security";
-import { createManyDatasetRecords } from "../../../../server/api/routers/datasetRecord.utils";
+import {
+  createProjectApp,
+  handlerManagedAuth,
+  requires,
+} from "~/server/api/security";
+import { createLogger } from "~/utils/logger/server";
 import { UploadValidationError } from "../../../../server/datasets/dataset.service";
+import type { DatasetNotReadyError } from "../../../../server/datasets/errors";
 import type { DatasetColumns } from "../../../../server/datasets/types";
 import { datasetColumnTypeSchema } from "../../../../server/datasets/types";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
-import { resourceLimitMiddleware } from "../../middleware";
+import {
+  enforceResourceLimitOrRespond,
+  resolveOrganizationId,
+  resourceLimitMiddleware,
+} from "../../middleware";
 import {
   type DatasetServiceMiddlewareVariables,
   datasetServiceMiddleware,
@@ -22,11 +32,14 @@ import {
 import { platformUrl } from "../../shared/platform-url";
 import { errorSchema } from "../../shared/schemas";
 import { MAX_LIMIT_MB } from "./constants";
+import { authorizeDirectUpload } from "./direct-upload-auth";
 import { handleDatasetError } from "./error-handler";
 import { datasetOutputSchema } from "./schemas";
 import { buildStandardSuccessResponse } from "./utils";
 
 patchZodOpenapi();
+
+const logger = createLogger("langwatch:api:dataset");
 
 // -- Validation schemas for new endpoints --
 
@@ -96,6 +109,11 @@ function validationHook(
 /**
  * Maps DatasetNotFoundError from the service layer to the HTTP NotFoundError.
  * The service throws domain errors; the route handler translates them to HTTP errors.
+ *
+ * NOTE: the direct-upload routes instead let domain errors propagate to
+ * `handleDatasetError` (the `DOMAIN_ERROR_HTTP` table). These older
+ * slug/record routes still map inline. Both reach 404 for a missing dataset;
+ * if you change a status/code, update both sites until they're unified.
  */
 function mapDatasetNotFoundError(error: unknown): never {
   if (error instanceof Error && error.name === "DatasetNotFoundError") {
@@ -104,12 +122,44 @@ function mapDatasetNotFoundError(error: unknown): never {
   throw error;
 }
 
+/**
+ * ADR-032 Decision 6 / I-READY: a still-preparing (or failed) dataset is not
+ * served as data. Map `DatasetNotReadyError` to 425 Too Early with the
+ * lifecycle `status` in the body so the caller knows whether to poll
+ * (`processing`) or stop (`failed`). Returns `undefined` when the error isn't a
+ * not-ready error, so the caller falls through to its existing mapping.
+ */
+function mapDatasetNotReadyError(
+  error: unknown,
+  c: { json: (body: unknown, status: 425) => Response },
+): Response | undefined {
+  if (error instanceof Error && error.name === "DatasetNotReadyError") {
+    const notReady = error as DatasetNotReadyError;
+    return c.json(
+      {
+        error: "DatasetNotReady",
+        status: notReady.status,
+        message: notReady.message,
+      },
+      425,
+    );
+  }
+  return undefined;
+}
+
 const secured = createProjectApp<DatasetServiceMiddlewareVariables>({
   basePath: "/api/dataset",
 });
 
 // Preserve the dataset-specific error mapping (domain errors → HTTP codes).
 secured.hono.onError(handleDatasetError);
+
+// The browser→S3 direct-upload routes authenticate the in-app upload UI by
+// NextAuth session cookie (or API key), resolved in-handler — the rest of the
+// surface is API-key-only `requires(...)`, which would 401 a cookie request.
+const directUploadSessionAuth = handlerManagedAuth(
+  "upload UI authenticated in-handler via authorizeDirectUpload (session cookie or API key)",
+);
 
 // datasetServiceMiddleware runs AFTER the access chain (which authenticates and
 // sets `project`), so it is applied per-route rather than app-wide.
@@ -213,8 +263,8 @@ secured.access(requires("datasets:manage")).post(
     const service = c.get("datasetService");
 
     const body = await c.req.parseBody();
-    const file = body["file"];
-    const name = body["name"];
+    const file = body.file;
+    const name = body.name;
 
     if (!name || typeof name !== "string" || name.trim() === "") {
       throw new UnprocessableEntityError("name field is required");
@@ -267,6 +317,215 @@ secured.access(requires("datasets:manage")).post(
   },
 );
 
+// ── Direct (browser→S3) upload: request a presigned PUT ─────────
+// Registered before /:slugOrId so "direct-upload" isn't matched as a slug.
+// Session-cookie (or API-key) authenticated in-handler — see directUploadSessionAuth.
+secured.access(directUploadSessionAuth).post(
+  "/direct-upload",
+  datasetServiceMiddleware,
+  describeRoute({
+    description:
+      "Start a direct browser→S3 dataset upload (returns a presigned PUT)",
+  }),
+  async (c) => {
+    const service = c.get("datasetService");
+
+    const body = await c.req.parseBody();
+    const projectId = body.projectId;
+    if (
+      !projectId ||
+      typeof projectId !== "string" ||
+      projectId.trim() === ""
+    ) {
+      throw new UnprocessableEntityError("projectId field is required");
+    }
+    // Auth is in-handler (session cookie or API key) since there's no
+    // `authMiddleware` to set `c.get("project")` for this route.
+    const auth = await authorizeDirectUpload(c, projectId.trim());
+    if (!auth.ok) {
+      return c.json({ error: auth.error }, auth.status);
+    }
+
+    // Resource-limit enforcement runs inline here (not via
+    // `resourceLimitMiddleware`) because the org is only known after in-handler
+    // auth resolves the project.
+    const organizationId = await resolveOrganizationId(auth.teamId);
+    if (!organizationId) {
+      // Fail CLOSED, matching `resourceLimitMiddleware`: never skip the limit
+      // check just because the org couldn't be resolved. `Team.organizationId`
+      // is non-null, so this is a should-never-happen guard — but the inline
+      // path must not be more permissive than the shared middleware (which 500s
+      // here), or a create could slip past the dataset limit.
+      logger.error(
+        { projectId: auth.projectId, teamId: auth.teamId },
+        "Could not resolve organization for dataset resource limit check",
+      );
+      throw new InternalServerError("Could not resolve organization");
+    }
+    const overLimit = await enforceResourceLimitOrRespond({
+      c,
+      organizationId,
+      limitType: "datasets",
+    });
+    if (overLimit) return overLimit;
+
+    const name = body.name;
+    if (!name || typeof name !== "string" || name.trim() === "") {
+      throw new UnprocessableEntityError("name field is required");
+    }
+    // M1: required — the staged object carries no original filename, so the
+    // normalize job depends on this to detect the file format.
+    const filename = body.filename;
+    if (!filename || typeof filename !== "string" || filename.trim() === "") {
+      throw new UnprocessableEntityError("filename field is required");
+    }
+
+    // Domain errors map centrally in `handleDatasetError` (see DOMAIN_ERROR_HTTP).
+    // Note: DirectUploadUnavailableError (→ 409) is the client's signal to fall
+    // back to the backend /upload path.
+    const result = await service.createPendingUpload({
+      projectId: auth.projectId,
+      name: name.trim(),
+      filename: filename.trim(),
+    });
+    return c.json(result, 201);
+  },
+);
+
+// ── Direct upload: stream the file into staging (no browser-reachable S3) ──
+// On S3 the browser PUTs the file to the bucket directly; only local FS routes
+// the bytes through the app, via the same-origin URL minted by
+// createPresignedUpload. Registered before the `/:datasetId` routes so "staging"
+// isn't matched as a datasetId. Session-cookie (or API-key) authed in-handler.
+secured.access(directUploadSessionAuth).put(
+  "/direct-upload/staging/:uploadId",
+  datasetServiceMiddleware,
+  describeRoute({
+    description:
+      "Stream a heavy upload into staging when there is no browser-reachable S3",
+  }),
+  async (c) => {
+    const { uploadId } = c.req.param();
+    const projectId = c.req.query("projectId");
+    if (!projectId || projectId.trim() === "") {
+      throw new UnprocessableEntityError("projectId query param is required");
+    }
+    const auth = await authorizeDirectUpload(c, projectId.trim());
+    if (!auth.ok) {
+      return c.json({ error: auth.error }, auth.status);
+    }
+    const body = c.req.raw.body;
+    if (!body) {
+      throw new UnprocessableEntityError("request body is required");
+    }
+    const service = c.get("datasetService");
+    // Domain errors map centrally in `handleDatasetError` (see DOMAIN_ERROR_HTTP).
+    // Notes on the non-obvious ones: UploadNotPendingError (→ 409) means no
+    // pending row owns this staging key (fabricated/replayed uploadId or already
+    // finalized — an orphan write); StorageNotWritableError (→ 500, not the
+    // 409 fallback) means the local-FS root isn't writable, so the browser must
+    // NOT mistake it for "no object storage" and fall back.
+    await service.writeStagedUpload({
+      projectId: auth.projectId,
+      uploadId,
+      // Web ReadableStream → Node Readable; streamed to disk, never buffered.
+      body: Readable.fromWeb(body as Parameters<typeof Readable.fromWeb>[0]),
+    });
+    return c.json({ ok: true }, 200);
+  },
+);
+
+// ── Direct upload: finalize after the browser has PUT the file ───
+// Session-cookie (or API-key) authenticated in-handler — see directUploadSessionAuth.
+secured.access(directUploadSessionAuth).post(
+  "/direct-upload/:datasetId/finalize",
+  datasetServiceMiddleware,
+  describeRoute({
+    description: "Finalize a direct upload: size-check and start processing",
+  }),
+  async (c) => {
+    const { datasetId } = c.req.param();
+    const projectId = c.req.query("projectId");
+    if (!projectId || projectId.trim() === "") {
+      throw new UnprocessableEntityError("projectId query param is required");
+    }
+    const auth = await authorizeDirectUpload(c, projectId.trim());
+    if (!auth.ok) {
+      return c.json({ error: auth.error }, auth.status);
+    }
+    const service = c.get("datasetService");
+
+    // The staging key is the server-minted one bound to the row (C1); the
+    // client no longer supplies it. Domain errors map centrally in
+    // `handleDatasetError` (see DOMAIN_ERROR_HTTP).
+    const result = await service.finalizeUpload({
+      projectId: auth.projectId,
+      datasetId,
+    });
+    return c.json(result, 200);
+  },
+);
+
+// ── Direct upload: manually retry a failed/stuck normalize (I-RECOVER) ──
+// Session-cookie (or API-key) authenticated in-handler — see directUploadSessionAuth.
+secured.access(directUploadSessionAuth).post(
+  "/direct-upload/:datasetId/retry",
+  datasetServiceMiddleware,
+  describeRoute({
+    description: "Retry normalization of a failed or stuck dataset",
+  }),
+  async (c) => {
+    const { datasetId } = c.req.param();
+    const projectId = c.req.query("projectId");
+    if (!projectId || projectId.trim() === "") {
+      throw new UnprocessableEntityError("projectId query param is required");
+    }
+    const auth = await authorizeDirectUpload(c, projectId.trim());
+    if (!auth.ok) {
+      return c.json({ error: auth.error }, auth.status);
+    }
+    const service = c.get("datasetService");
+
+    // Domain errors map centrally in `handleDatasetError` (see DOMAIN_ERROR_HTTP).
+    const result = await service.retryNormalize({
+      projectId: auth.projectId,
+      datasetId,
+    });
+    return c.json(result, 200);
+  },
+);
+
+// ── Direct upload: abort a still-pending upload (CORS/network PUT failure) ──
+// Session-cookie (or API-key) authenticated in-handler — see directUploadSessionAuth.
+// Cleans up the orphaned `uploading` row so a failed presigned PUT isn't a dead
+// end before the browser falls back to the backend upload path.
+secured.access(directUploadSessionAuth).delete(
+  "/direct-upload/:datasetId",
+  datasetServiceMiddleware,
+  describeRoute({
+    description: "Abort a still-pending direct upload and clean up its row",
+  }),
+  async (c) => {
+    const { datasetId } = c.req.param();
+    const projectId = c.req.query("projectId");
+    if (!projectId || projectId.trim() === "") {
+      throw new UnprocessableEntityError("projectId query param is required");
+    }
+    const auth = await authorizeDirectUpload(c, projectId.trim());
+    if (!auth.ok) {
+      return c.json({ error: auth.error }, auth.status);
+    }
+    const service = c.get("datasetService");
+
+    // Domain errors map centrally in `handleDatasetError` (see DOMAIN_ERROR_HTTP).
+    const result = await service.abortPendingUpload({
+      projectId: auth.projectId,
+      datasetId,
+    });
+    return c.json(result, 200);
+  },
+);
+
 // ── Upload File to Existing Dataset ─────────────────────────────
 secured.access(requires("datasets:manage")).post(
   "/:slugOrId/upload",
@@ -280,7 +539,7 @@ secured.access(requires("datasets:manage")).post(
     const service = c.get("datasetService");
 
     const body = await c.req.parseBody();
-    const file = body["file"];
+    const file = body.file;
 
     if (!file || !(file instanceof File)) {
       throw new UnprocessableEntityError("file field is required");
@@ -399,44 +658,33 @@ secured.access(requires("datasets:manage")).post(
     const { entries } = c.req.valid("json");
     const service = c.get("datasetService");
 
-    let dataset;
+    // Route through the service (parity with `/:slugOrId/records`) instead of
+    // reaching into the tRPC-layer `createManyDatasetRecords` util: the service
+    // owns the dataset lookup, column validation, id generation, and the
+    // s3_jsonl-vs-PG write routing. This handler only translates the result and
+    // typed errors to the legacy `{ success }` HTTP shape.
     try {
-      dataset = await service.getBySlugOrId({
+      await service.batchCreateRecords({
         slugOrId: slug,
         projectId: project.id,
+        entries,
       });
+      return c.json({ success: true });
     } catch (error) {
+      if (error instanceof Error && error.name === "InvalidColumnError") {
+        throw new BadRequestError(error.message);
+      }
+      if (
+        error instanceof Error &&
+        error.name === "MalformedColumnTypesError"
+      ) {
+        throw new InternalServerError(error.message);
+      }
+      // M1: an s3_jsonl dataset still preparing rejects the append (I-READY).
+      const notReady = mapDatasetNotReadyError(error, c);
+      if (notReady) return notReady;
       return mapDatasetNotFoundError(error);
     }
-
-    const columns = Object.fromEntries(
-      (dataset.columnTypes as DatasetColumns).map((column) => [
-        column.name,
-        column.type,
-      ]),
-    );
-    for (const entry of entries) {
-      for (const [key] of Object.entries(entry)) {
-        if (!columns[key]) {
-          throw new BadRequestError(
-            `Column \`${key}\` is not present in the \`${dataset.name}\` dataset`,
-          );
-        }
-      }
-    }
-
-    const now = Date.now();
-
-    await createManyDatasetRecords({
-      datasetId: dataset.id,
-      projectId: project.id,
-      datasetRecords: entries.map((entry, index) => ({
-        id: `${now}-${index}`,
-        ...entry,
-      })),
-    });
-
-    return c.json({ success: true });
   },
 );
 
@@ -474,6 +722,8 @@ secured.access(requires("datasets:view")).get(
         limitMb: MAX_LIMIT_MB,
       });
     } catch (error) {
+      const notReady = mapDatasetNotReadyError(error, c);
+      if (notReady) return notReady;
       return mapDatasetNotFoundError(error);
     }
 
@@ -609,6 +859,8 @@ secured.access(requires("datasets:view")).get(
       });
       return c.json(result);
     } catch (error) {
+      const notReady = mapDatasetNotReadyError(error, c);
+      if (notReady) return notReady;
       return mapDatasetNotFoundError(error);
     }
   },
@@ -638,6 +890,9 @@ secured.access(requires("datasets:manage")).patch(
 
       return c.json(record, created ? 201 : 200);
     } catch (error) {
+      // M1: a still-preparing s3_jsonl dataset rejects the upsert (I-READY) → 425.
+      const notReady = mapDatasetNotReadyError(error, c);
+      if (notReady) return notReady;
       return mapDatasetNotFoundError(error);
     }
   },
@@ -665,6 +920,9 @@ secured.access(requires("datasets:manage")).delete(
         recordIds,
       });
     } catch (error) {
+      // M1: a still-preparing s3_jsonl dataset rejects the delete (I-READY) → 425.
+      const notReady = mapDatasetNotReadyError(error, c);
+      if (notReady) return notReady;
       return mapDatasetNotFoundError(error);
     }
 

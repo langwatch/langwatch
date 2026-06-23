@@ -1,59 +1,4 @@
-import type { PrismaClient } from "@prisma/client";
-import type { Redis, Cluster } from "ioredis";
-import { createLogger } from "~/utils/logger/server";
-import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
-import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
-import type { BillingCheckpointService } from "../app-layer/billing/billingCheckpoint.service";
-import type { EvaluationCostRecorder } from "../app-layer/evaluations/evaluation-cost.recorder";
-import type { OrganizationService } from "../app-layer/organizations/organization.service";
-
-import type { TraceSummaryData } from "../app-layer/traces/types";
-import type { RetentionPolicyResolver } from "../data-retention/retentionPolicyResolver";
-import { getClickHouseClientForProject } from "../clickhouse/clickhouseClient";
-import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
-import type { FoldProjectionStore } from "./projections/foldProjection.types";
-import type { EvaluationExecutionService } from "../app-layer/evaluations/evaluation-execution.service";
-import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
-import type { MonitorService } from "../app-layer/monitors/monitor.service";
-import type { ProjectService } from "../app-layer/projects/project.service";
-import type { TriggerService } from "../app-layer/triggers/trigger.service";
-import type { LogRecordStorageRepository } from "../app-layer/traces/repositories/log-record-storage.repository";
-import type { MetricRecordStorageRepository } from "../app-layer/traces/repositories/metric-record-storage.repository";
-import type { TraceSummaryRepository } from "../app-layer/traces/repositories/trace-summary.repository";
-import type { SpanStorageService } from "../app-layer/traces/span-storage.service";
-import { TraceReadDerivationService } from "../app-layer/traces/trace-read-derivation.service";
-import type { DerivedTraceEvent } from "./pipelines/trace-processing/projections/services/trace-events.derivation";
-import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";
-
-import { createEvaluationProcessingPipeline } from "./pipelines/evaluation-processing/pipeline";
-import { createExperimentRunProcessingPipeline } from "./pipelines/experiment-run-processing/pipeline";
-import { createExperimentRunEsSyncReactor } from "./pipelines/experiment-run-processing/reactors/experimentRunEsSync.reactor";
-import { createSimulationProcessingPipeline } from "./pipelines/simulation-processing/pipeline";
-import type { SimulationRunStateData } from "./pipelines/simulation-processing/projections/simulationRunState.foldProjection";
-import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
-import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
-import { createCancellationBroadcastReactor } from "./pipelines/simulation-processing/reactors/cancellationBroadcast.reactor";
-import { createScenarioExecutionReactor } from "./pipelines/simulation-processing/reactors/scenarioExecution.reactor";
-import type { ScenarioExecutionReactorHandle } from "./pipelines/simulation-processing/reactors/scenarioExecution.reactor";
-import { createSuiteRunSyncReactor } from "./pipelines/simulation-processing/reactors/suiteRunSync.reactor";
-import { createTraceMetricsSyncReactor } from "./pipelines/simulation-processing/reactors/traceMetricsSync.reactor";
-import {
-  ComputeRunMetricsCommand,
-  COMPUTE_METRICS_RETRY_DELAY_MS,
-} from "./pipelines/simulation-processing/commands/computeRunMetrics.command";
-import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
-import type { SimulationRunStateRepository } from "./pipelines/simulation-processing/repositories/simulationRunState.repository";
-import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
-import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
-import { RedisCachedFoldStore } from "./projections/redisCachedFoldStore";
-import { RepositoryFoldStore } from "./projections/repositoryFoldStore";
-import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/schemas/constants";
-import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
-import type { TriggerActionDispatchDeps } from "./pipelines/shared/triggerActionDispatch";
-import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
-import type { RecordSpanCommandData } from "./pipelines/trace-processing/schemas/commands";
-import { createSimulationMetricsSyncReactor } from "./pipelines/trace-processing/reactors/simulationMetricsSync.reactor";
-import { createExperimentMetricsSyncReactor } from "./pipelines/trace-processing/reactors/experimentMetricsSync.reactor";
+import { createAlertTriggerReactor } from "@ee/governance/reactors/alertTrigger.reactor";
 import {
   createGatewayBudgetSyncReactor,
   type GatewayBudgetSyncReactorDeps,
@@ -66,10 +11,43 @@ import {
   createGovernanceOcsfEventsSyncReactor,
   type GovernanceOcsfEventsSyncReactorDeps,
 } from "@ee/governance/reactors/governanceOcsfEventsSync.reactor";
-import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
-
+import type { PrismaClient } from "@prisma/client";
+import type { Cluster, Redis } from "ioredis";
+import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
+import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
+import { getProtectionsForProject } from "~/server/api/utils";
+import { DatasetRepository } from "~/server/datasets/dataset.repository";
+import {
+  createDatasetNormalizeHandler,
+  type DatasetNormalizePayload,
+} from "~/server/datasets/dataset-normalize.job";
+import { registerDatasetNormalizeEnqueue } from "~/server/datasets/dataset-normalize.queue";
+import { getDatasetStorage } from "~/server/datasets/dataset-storage";
+import { TraceService } from "~/server/traces/trace.service";
+import { createLogger } from "~/utils/logger/server";
+import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
+import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
+import type { BillingCheckpointService } from "../app-layer/billing/billingCheckpoint.service";
+import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
+import { getAzureSafetyEnvFromProject } from "../app-layer/evaluations/azure-safety-env.server";
+import type { EvaluationCostRecorder } from "../app-layer/evaluations/evaluation-cost.recorder";
+import type { EvaluationExecutionService } from "../app-layer/evaluations/evaluation-execution.service";
+import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
+import type { MonitorService } from "../app-layer/monitors/monitor.service";
+import type { OrganizationService } from "../app-layer/organizations/organization.service";
+import type { ProjectService } from "../app-layer/projects/project.service";
+import type { LogRecordStorageRepository } from "../app-layer/traces/repositories/log-record-storage.repository";
+import type { MetricRecordStorageRepository } from "../app-layer/traces/repositories/metric-record-storage.repository";
+import type { TraceSummaryRepository } from "../app-layer/traces/repositories/trace-summary.repository";
+import type { SpanStorageService } from "../app-layer/traces/span-storage.service";
+import { TraceReadDerivationService } from "../app-layer/traces/trace-read-derivation.service";
+import type { TraceSummaryService } from "../app-layer/traces/trace-summary.service";
+import type { TraceSummaryData } from "../app-layer/traces/types";
+import type { TriggerService } from "../app-layer/triggers/trigger.service";
+import { getClickHouseClientForProject } from "../clickhouse/clickhouseClient";
+import type { RetentionPolicyResolver } from "../data-retention/retentionPolicyResolver";
 import { createElasticsearchBatchEvaluationRepository } from "../experiments-v3/repositories/elasticsearchBatchEvaluation.repository";
-import { Deferred, type CommandDispatcher } from "./deferred";
+import { type CommandDispatcher, Deferred } from "./deferred";
 import type { EventSourcing } from "./eventSourcing";
 import { mapCommands } from "./mapCommands";
 import { ReportUsageForMonthCommand } from "./pipelines/billing-reporting/commands/reportUsageForMonth.command";
@@ -77,41 +55,69 @@ import {
   BILLING_REPORTING_PIPELINE_NAME,
   createBillingReportingPipeline,
 } from "./pipelines/billing-reporting/pipeline";
-import { getAzureSafetyEnvFromProject } from "../app-layer/evaluations/azure-safety-env.server";
 import { ExecuteEvaluationCommand } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
+import { createEvaluationProcessingPipeline } from "./pipelines/evaluation-processing/pipeline";
 import { EvaluationRunStore } from "./pipelines/evaluation-processing/projections/evaluationRun.store";
-import type { EvaluationEsSyncReactorDeps } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
 import { createEvaluationAlertTriggerReactor } from "./pipelines/evaluation-processing/reactors/evaluationAlertTrigger.reactor";
+import type { EvaluationEsSyncReactorDeps } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
 import { createEvaluationEsSyncReactor } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
+import { createExperimentRunProcessingPipeline } from "./pipelines/experiment-run-processing/pipeline";
+import type { ClickHouseExperimentRunResultRecord } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.mapProjection";
 import { createExperimentRunItemAppendStore } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
-import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-processing/projections/experimentRunState.store";
 import type { ExperimentRunStateData } from "./pipelines/experiment-run-processing/projections/experimentRunState.foldProjection";
+import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-processing/projections/experimentRunState.store";
+import { createExperimentRunEsSyncReactor } from "./pipelines/experiment-run-processing/reactors/experimentRunEsSync.reactor";
 import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
+import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
+import type { TriggerActionDispatchDeps } from "./pipelines/shared/triggerActionDispatch";
+import {
+  COMPUTE_METRICS_RETRY_DELAY_MS,
+  ComputeRunMetricsCommand,
+} from "./pipelines/simulation-processing/commands/computeRunMetrics.command";
+import { createSimulationProcessingPipeline } from "./pipelines/simulation-processing/pipeline";
+import type { SimulationRunStateData } from "./pipelines/simulation-processing/projections/simulationRunState.foldProjection";
+import { createCancellationBroadcastReactor } from "./pipelines/simulation-processing/reactors/cancellationBroadcast.reactor";
+import type { ScenarioExecutionReactorHandle } from "./pipelines/simulation-processing/reactors/scenarioExecution.reactor";
+import { createScenarioExecutionReactor } from "./pipelines/simulation-processing/reactors/scenarioExecution.reactor";
+import { createSnapshotUpdateBroadcastReactor } from "./pipelines/simulation-processing/reactors/snapshotUpdateBroadcast";
+import { createSuiteRunSyncReactor } from "./pipelines/simulation-processing/reactors/suiteRunSync.reactor";
+import { createTraceMetricsSyncReactor } from "./pipelines/simulation-processing/reactors/traceMetricsSync.reactor";
+import type { SimulationRunStateRepository } from "./pipelines/simulation-processing/repositories/simulationRunState.repository";
+import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
+import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
+import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
+import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
+import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
+import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/schemas/constants";
+import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
 import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/logRecordStorage.store";
 import { MetricRecordAppendStore } from "./pipelines/trace-processing/projections/metricRecordStorage.store";
+import type { DerivedTraceEvent } from "./pipelines/trace-processing/projections/services/trace-events.derivation";
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
+import { createClaudeCodeSpanSyncReactor } from "./pipelines/trace-processing/reactors/claudeCodeSpanSync.reactor";
 import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
-import { createProjectMetadataReactor } from "./pipelines/trace-processing/reactors/projectMetadata.reactor";
-import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
-import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
-import { getProtectionsForProject } from "~/server/api/utils";
-import { TraceService } from "~/server/traces/trace.service";
-import { createAlertTriggerReactor } from "@ee/governance/reactors/alertTrigger.reactor";
 import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
+import { createExperimentMetricsSyncReactor } from "./pipelines/trace-processing/reactors/experimentMetricsSync.reactor";
 import {
-  createOriginGateReactor,
   createDeferredOriginHandler,
-  makeDeferredJobId,
+  createOriginGateReactor,
   DEFERRED_CHECK_DELAY_MS,
   type DeferredOriginPayload,
+  makeDeferredJobId,
 } from "./pipelines/trace-processing/reactors/originGate.reactor";
+import { createProjectMetadataReactor } from "./pipelines/trace-processing/reactors/projectMetadata.reactor";
+import { createSimulationMetricsSyncReactor } from "./pipelines/trace-processing/reactors/simulationMetricsSync.reactor";
 import { createSpanStorageBroadcastReactor } from "./pipelines/trace-processing/reactors/spanStorageBroadcast.reactor";
-import { createClaudeCodeSpanSyncReactor } from "./pipelines/trace-processing/reactors/claudeCodeSpanSync.reactor";
 import { createTraceUpdateBroadcastReactor } from "./pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
+import type {
+  RecordSpanCommandData,
+  ResolveOriginCommandData,
+} from "./pipelines/trace-processing/schemas/commands";
+import type { FoldProjectionStore } from "./projections/foldProjection.types";
 import type { AppendStore } from "./projections/mapProjection.types";
-import type { ClickHouseExperimentRunResultRecord } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.mapProjection";
-import type { ResolveOriginCommandData } from "./pipelines/trace-processing/schemas/commands";
+import { RedisCachedFoldStore } from "./projections/redisCachedFoldStore";
+import { RepositoryFoldStore } from "./projections/repositoryFoldStore";
 
 const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
 
@@ -119,7 +125,13 @@ const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
  * Creates an in-memory setTimeout-based fallback for deferred job processing.
  * Used when the event-sourcing queue is unavailable (e.g. no Redis).
  */
-function createInMemoryDeferredFallback<P>({ makeId, delayMs, process, logContext, errorMessage }: {
+function createInMemoryDeferredFallback<P>({
+  makeId,
+  delayMs,
+  process,
+  logContext,
+  errorMessage,
+}: {
   makeId?: (payload: P) => string;
   delayMs: number;
   process: (payload: P) => Promise<void>;
@@ -276,11 +288,22 @@ export class PipelineRegistry {
     );
 
     const evalPipeline = this.registerEvaluationPipeline({ traceSummaryStore });
-    const { pipeline: tracePipeline, simComputeRunMetrics, wireExperimentDeps } = this.registerTracePipeline({ evalPipeline, traceSummaryStore });
+    const {
+      pipeline: tracePipeline,
+      simComputeRunMetrics,
+      wireExperimentDeps,
+    } = this.registerTracePipeline({ evalPipeline, traceSummaryStore });
     const suiteRunPipeline = this.registerSuiteRunPipeline();
-    const { pipeline: simulationPipeline, scenarioExecutionHandle } = this.registerSimulationPipeline({ suiteRunPipeline, traceSummaryStore, simComputeRunMetrics });
+    const { pipeline: simulationPipeline, scenarioExecutionHandle } =
+      this.registerSimulationPipeline({
+        suiteRunPipeline,
+        traceSummaryStore,
+        simComputeRunMetrics,
+      });
 
-    const experimentRunPipeline = this.registerExperimentRunPipeline({ wireExperimentDeps });
+    const experimentRunPipeline = this.registerExperimentRunPipeline({
+      wireExperimentDeps,
+    });
     const billingPipeline = this.registerBillingReportingPipeline();
 
     logger.info("All pipelines registered");
@@ -297,7 +320,9 @@ export class PipelineRegistry {
     };
   }
 
-  private registerEvaluationPipeline({ traceSummaryStore }: {
+  private registerEvaluationPipeline({
+    traceSummaryStore,
+  }: {
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   }) {
     const executeEvaluationCommand = new ExecuteEvaluationCommand({
@@ -331,19 +356,30 @@ export class PipelineRegistry {
     );
   }
 
-  private registerTracePipeline({ evalPipeline, traceSummaryStore }: {
+  private registerTracePipeline({
+    evalPipeline,
+    traceSummaryStore,
+  }: {
     evalPipeline: ReturnType<PipelineRegistry["registerEvaluationPipeline"]>;
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   }) {
     const evalCommands = mapCommands(evalPipeline.commands);
 
     // Deferred dispatchers — resolved after pipeline registration.
-    const resolveOrigin = new Deferred<CommandDispatcher<ResolveOriginCommandData>>("resolveOrigin");
-    const scheduleDeferred = new Deferred<(payload: DeferredOriginPayload) => Promise<void>>("scheduleDeferred");
-    const simComputeRunMetrics = new Deferred<CommandDispatcher<ComputeRunMetricsCommandData>>("simComputeRunMetrics");
+    const resolveOrigin = new Deferred<
+      CommandDispatcher<ResolveOriginCommandData>
+    >("resolveOrigin");
+    const scheduleDeferred = new Deferred<
+      (payload: DeferredOriginPayload) => Promise<void>
+    >("scheduleDeferred");
+    const simComputeRunMetrics = new Deferred<
+      CommandDispatcher<ComputeRunMetricsCommandData>
+    >("simComputeRunMetrics");
     // recordSpan is a command of the trace pipeline itself, so the claude
     // span-sync reactor that dispatches it is wired after registration.
-    const recordSpanDispatch = new Deferred<CommandDispatcher<RecordSpanCommandData>>("recordSpan");
+    const recordSpanDispatch = new Deferred<
+      CommandDispatcher<RecordSpanCommandData>
+    >("recordSpan");
 
     const originGateReactor = createOriginGateReactor({
       scheduleDeferred: scheduleDeferred.fn,
@@ -394,20 +430,28 @@ export class PipelineRegistry {
     // Late-bound reference for experiment metrics sync reactor.
     // The experiment pipeline is registered after the trace pipeline,
     // so computeExperimentRunMetrics is wired after experiment pipeline registration.
-    let expComputeRunMetrics: ((data: ComputeExperimentRunMetricsCommandData) => Promise<void>) | null = null;
-    let expLookupExperimentId: ((tenantId: string, runId: string) => Promise<string | null>) | null = null;
+    let expComputeRunMetrics:
+      | ((data: ComputeExperimentRunMetricsCommandData) => Promise<void>)
+      | null = null;
+    let expLookupExperimentId:
+      | ((tenantId: string, runId: string) => Promise<string | null>)
+      | null = null;
 
     const experimentMetricsSyncReactor = createExperimentMetricsSyncReactor({
       computeExperimentRunMetrics: async (data) => {
         if (!expComputeRunMetrics) {
-          logger.warn("experiment computeExperimentRunMetrics not yet initialized, skipping");
+          logger.warn(
+            "experiment computeExperimentRunMetrics not yet initialized, skipping",
+          );
           return;
         }
         return expComputeRunMetrics(data);
       },
       lookupExperimentId: async (tenantId, runId) => {
         if (!expLookupExperimentId) {
-          logger.warn("experiment lookupExperimentId not yet initialized, skipping");
+          logger.warn(
+            "experiment lookupExperimentId not yet initialized, skipping",
+          );
           return null;
         }
         return expLookupExperimentId(tenantId, runId);
@@ -423,14 +467,20 @@ export class PipelineRegistry {
       : undefined;
 
     const governanceOcsfEventsSyncReactor = this.deps.governanceOcsfEventsSync
-      ? createGovernanceOcsfEventsSyncReactor(this.deps.governanceOcsfEventsSync)
+      ? createGovernanceOcsfEventsSyncReactor(
+          this.deps.governanceOcsfEventsSync,
+        )
       : undefined;
 
     const tracePipeline = this.deps.eventSourcing.register(
       createTraceProcessingPipeline({
         spanAppendStore: new SpanAppendStore(this.deps.traces.spans.repository),
-        logRecordAppendStore: new LogRecordAppendStore(this.deps.repositories.logRecordStorage),
-        metricRecordAppendStore: new MetricRecordAppendStore(this.deps.repositories.metricRecordStorage),
+        logRecordAppendStore: new LogRecordAppendStore(
+          this.deps.repositories.logRecordStorage,
+        ),
+        metricRecordAppendStore: new MetricRecordAppendStore(
+          this.deps.repositories.metricRecordStorage,
+        ),
         traceSummaryStore,
         originGateReactor,
         evaluationTriggerReactor,
@@ -459,22 +509,23 @@ export class PipelineRegistry {
     // Wire the deferred origin resolution queue (BullMQ-backed, survives process restart).
     // After 5 min, dispatches resolveOrigin command → OriginResolvedEvent → fold → reactor.
     const deferredOriginHandler = createDeferredOriginHandler(resolveOrigin.fn);
-    const deferredOriginQueue = tracePipeline.service.registerJob<DeferredOriginPayload>({
-      name: "deferredOriginResolution",
-      process: deferredOriginHandler,
-      delay: DEFERRED_CHECK_DELAY_MS,
-      deduplication: {
-        makeId: makeDeferredJobId,
-        ttlMs: DEFERRED_CHECK_DELAY_MS + 60_000, // 6 min — covers the 5-min delay + buffer
-        extend: false,  // Don't reset the 5-min timer on new spans
-        replace: false,  // Don't update payload (same trace, same data)
-      },
-      groupKeyFn: (p) => p.traceId,  // Per-trace parallelism (framework prepends tenantId)
-      spanAttributes: (payload) => ({
-        "deferred.tenant_id": payload.tenantId,
-        "deferred.trace_id": payload.traceId,
-      }),
-    });
+    const deferredOriginQueue =
+      tracePipeline.service.registerJob<DeferredOriginPayload>({
+        name: "deferredOriginResolution",
+        process: deferredOriginHandler,
+        delay: DEFERRED_CHECK_DELAY_MS,
+        deduplication: {
+          makeId: makeDeferredJobId,
+          ttlMs: DEFERRED_CHECK_DELAY_MS + 60_000, // 6 min — covers the 5-min delay + buffer
+          extend: false, // Don't reset the 5-min timer on new spans
+          replace: false, // Don't update payload (same trace, same data)
+        },
+        groupKeyFn: (p) => p.traceId, // Per-trace parallelism (framework prepends tenantId)
+        spanAttributes: (payload) => ({
+          "deferred.tenant_id": payload.tenantId,
+          "deferred.trace_id": payload.traceId,
+        }),
+      });
 
     if (deferredOriginQueue) {
       scheduleDeferred.resolve((payload) => deferredOriginQueue.send(payload));
@@ -491,6 +542,34 @@ export class PipelineRegistry {
       );
     }
 
+    // ADR-032 D5: register the standalone `datasetNormalize` GroupQueue job
+    // (pure Postgres + S3, no fold/reactor). Per-group concurrency is inherent
+    // and the group key is the datasetId (framework prepends tenantId=projectId)
+    // → exactly one normalize in flight per dataset. The enqueue side is wired
+    // into the dataset domain via `registerDatasetNormalizeEnqueue`; when the
+    // global queue is unavailable the dataset module inline-runs the handler.
+    const datasetNormalizeHandler = createDatasetNormalizeHandler({
+      repository: new DatasetRepository(this.deps.prisma),
+      getStorage: getDatasetStorage,
+    });
+    const datasetNormalizeQueue =
+      tracePipeline.service.registerJob<DatasetNormalizePayload>({
+        name: "datasetNormalize",
+        process: datasetNormalizeHandler,
+        // The per-dataset group key already serializes to concurrency-1, so no
+        // deduplication block is needed; the 200ms debounce default is
+        // surprising and could swallow a fast retry (m1).
+        groupKeyFn: (p) => p.datasetId,
+      });
+
+    if (datasetNormalizeQueue) {
+      registerDatasetNormalizeEnqueue((payload) =>
+        datasetNormalizeQueue.send(payload),
+      );
+    }
+    // No else: when the global queue is absent the dataset module falls back to
+    // running the handler inline at enqueue time (dev/test without a worker).
+
     return {
       pipeline: tracePipeline,
       traceSummaryStore,
@@ -502,8 +581,13 @@ export class PipelineRegistry {
        * Called after the experiment pipeline is registered.
        */
       wireExperimentDeps: (deps: {
-        computeExperimentRunMetrics: (data: ComputeExperimentRunMetricsCommandData) => Promise<void>;
-        lookupExperimentId: (tenantId: string, runId: string) => Promise<string | null>;
+        computeExperimentRunMetrics: (
+          data: ComputeExperimentRunMetricsCommandData,
+        ) => Promise<void>;
+        lookupExperimentId: (
+          tenantId: string,
+          runId: string,
+        ) => Promise<string | null>;
       }) => {
         expComputeRunMetrics = deps.computeExperimentRunMetrics;
         expLookupExperimentId = deps.lookupExperimentId;
@@ -525,10 +609,16 @@ export class PipelineRegistry {
     );
   }
 
-  private registerSimulationPipeline({ suiteRunPipeline, traceSummaryStore, simComputeRunMetrics }: {
+  private registerSimulationPipeline({
+    suiteRunPipeline,
+    traceSummaryStore,
+    simComputeRunMetrics,
+  }: {
     suiteRunPipeline: ReturnType<PipelineRegistry["registerSuiteRunPipeline"]>;
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
-    simComputeRunMetrics: Deferred<CommandDispatcher<ComputeRunMetricsCommandData>>;
+    simComputeRunMetrics: Deferred<
+      CommandDispatcher<ComputeRunMetricsCommandData>
+    >;
   }) {
     const simulationRunStore = this.cached<SimulationRunStateData>(
       new RepositoryFoldStore<SimulationRunStateData>(
@@ -557,8 +647,12 @@ export class PipelineRegistry {
     });
 
     // Deferred dispatchers — resolved after pipeline registration.
-    const selfComputeRunMetrics = new Deferred<CommandDispatcher<ComputeRunMetricsCommandData>>("selfComputeRunMetrics");
-    const scheduleRetry = new Deferred<(payload: ComputeRunMetricsCommandData) => Promise<void>>("scheduleRetry");
+    const selfComputeRunMetrics = new Deferred<
+      CommandDispatcher<ComputeRunMetricsCommandData>
+    >("selfComputeRunMetrics");
+    const scheduleRetry = new Deferred<
+      (payload: ComputeRunMetricsCommandData) => Promise<void>
+    >("scheduleRetry");
 
     const traceReadDerivation = new TraceReadDerivationService(
       this.deps.traces.spans,
@@ -597,24 +691,25 @@ export class PipelineRegistry {
     const retryJobId = (payload: ComputeRunMetricsCommandData) =>
       `compute-metrics-retry:${payload.tenantId}:${payload.scenarioRunId}:${payload.traceId}`;
 
-    const retryQueue = simulationPipeline.service.registerJob<ComputeRunMetricsCommandData>({
-      name: "deferredComputeRunMetrics",
-      process: async (payload) => {
-        await simCommands.computeRunMetrics(payload);
-      },
-      delay: COMPUTE_METRICS_RETRY_DELAY_MS,
-      deduplication: {
-        makeId: retryJobId,
-        extend: false,
-        replace: true,
-      },
-      spanAttributes: (payload) => ({
-        "deferred.tenant_id": payload.tenantId,
-        "deferred.scenario_run_id": payload.scenarioRunId,
-        "deferred.trace_id": payload.traceId,
-        "deferred.retry_count": payload.retryCount,
-      }),
-    });
+    const retryQueue =
+      simulationPipeline.service.registerJob<ComputeRunMetricsCommandData>({
+        name: "deferredComputeRunMetrics",
+        process: async (payload) => {
+          await simCommands.computeRunMetrics(payload);
+        },
+        delay: COMPUTE_METRICS_RETRY_DELAY_MS,
+        deduplication: {
+          makeId: retryJobId,
+          extend: false,
+          replace: true,
+        },
+        spanAttributes: (payload) => ({
+          "deferred.tenant_id": payload.tenantId,
+          "deferred.scenario_run_id": payload.scenarioRunId,
+          "deferred.trace_id": payload.traceId,
+          "deferred.retry_count": payload.retryCount,
+        }),
+      });
 
     if (retryQueue) {
       scheduleRetry.resolve((payload) => retryQueue.send(payload));
@@ -624,7 +719,11 @@ export class PipelineRegistry {
         createInMemoryDeferredFallback({
           delayMs: COMPUTE_METRICS_RETRY_DELAY_MS,
           process: (payload) => simCommands.computeRunMetrics(payload),
-          logContext: (p) => ({ tenantId: p.tenantId, scenarioRunId: p.scenarioRunId, traceId: p.traceId }),
+          logContext: (p) => ({
+            tenantId: p.tenantId,
+            scenarioRunId: p.scenarioRunId,
+            traceId: p.traceId,
+          }),
           errorMessage: "Deferred compute metrics retry failed",
         }),
       );
@@ -654,18 +753,25 @@ export class PipelineRegistry {
     );
   }
 
-  private registerExperimentRunPipeline({ wireExperimentDeps }: {
-    wireExperimentDeps: ReturnType<PipelineRegistry["registerTracePipeline"]>["wireExperimentDeps"];
+  private registerExperimentRunPipeline({
+    wireExperimentDeps,
+  }: {
+    wireExperimentDeps: ReturnType<
+      PipelineRegistry["registerTracePipeline"]
+    >["wireExperimentDeps"];
   }) {
     const experimentRunStore = this.cached<ExperimentRunStateData>(
-      createExperimentRunStateFoldStore(this.deps.repositories.experimentRunState),
+      createExperimentRunStateFoldStore(
+        this.deps.repositories.experimentRunState,
+      ),
       "experiment_runs",
     );
 
     const experimentRunPipeline = this.deps.eventSourcing.register(
       createExperimentRunProcessingPipeline({
         experimentRunStateFoldStore: experimentRunStore,
-        experimentRunItemAppendStore: this.deps.repositories.experimentRunItemStorage,
+        experimentRunItemAppendStore:
+          this.deps.repositories.experimentRunItemStorage,
         esSync: createExperimentRunEsSyncReactor({
           project: this.deps.projects,
           repository: createElasticsearchBatchEvaluationRepository(),
@@ -677,7 +783,10 @@ export class PipelineRegistry {
     const expCommands = mapCommands(experimentRunPipeline.commands);
 
     // Create the experimentId lookup function using the experiment run ClickHouse repository
-    const lookupExperimentId = async (tenantId: string, runId: string): Promise<string | null> => {
+    const lookupExperimentId = async (
+      tenantId: string,
+      runId: string,
+    ): Promise<string | null> => {
       try {
         const client = await getClickHouseClientForProject(tenantId);
         if (!client) return null;
@@ -721,8 +830,8 @@ export type AppCommands = ReturnType<PipelineRegistry["registerAll"]>;
 // Introspection — derived from the live EventSourcing runtime
 // ============================================================================
 
-import type { StaticPipelineDefinition } from "./pipeline/staticBuilder.types";
 import { getApp } from "../app-layer/app";
+import type { StaticPipelineDefinition } from "./pipeline/staticBuilder.types";
 
 export interface ProjectionMetadata {
   projectionName: string;
@@ -746,7 +855,9 @@ export interface DejaViewProjection {
   apply: (state: unknown, event: { type: string }) => unknown;
 }
 
-function getDefinitions(): ReadonlyArray<StaticPipelineDefinition<any, any, any>> {
+function getDefinitions(): ReadonlyArray<
+  StaticPipelineDefinition<any, any, any>
+> {
   return getApp().eventSourcing?.definitions ?? [];
 }
 
@@ -766,12 +877,14 @@ export function getProjectionMetadata(): ProjectionMetadata[] {
 export function getReactorMetadata(): ReactorMetadata[] {
   return getDefinitions().flatMap((def) => {
     const { name: pipelineName, aggregateType } = def.metadata;
-    return Array.from(def.foldReactors.values()).map(({ projectionName, definition }) => ({
-      reactorName: definition.name,
-      pipelineName,
-      aggregateType,
-      afterProjection: projectionName,
-    }));
+    return Array.from(def.foldReactors.values()).map(
+      ({ projectionName, definition }) => ({
+        reactorName: definition.name,
+        pipelineName,
+        aggregateType,
+        afterProjection: projectionName,
+      }),
+    );
   });
 }
 

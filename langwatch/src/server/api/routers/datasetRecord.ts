@@ -1,7 +1,17 @@
-import type { PrismaClient } from "@prisma/client";
+import type { Dataset, PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
+import {
+  deleteS3JsonlRecords,
+  editS3JsonlRecord,
+} from "../../datasets/dataset-mutations";
+import {
+  ChunkTooLargeError,
+  DatasetNotReadyError,
+  DatasetTooLargeToExportError,
+  DuplicateRecordIdError,
+} from "../../datasets/errors";
 import { stripNullBytes } from "../../datasets/sanitize";
 import { newDatasetEntriesSchema } from "../../datasets/types";
 import { prisma } from "../../db";
@@ -11,11 +21,58 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   createManyDatasetRecords,
   getFullDataset,
+  readDatasetHeadS3Jsonl,
 } from "./datasetRecord.utils";
 
 export { createManyDatasetRecords, getFullDataset };
 
 const storageService = new StorageService();
+
+/**
+ * m5: surface a not-ready s3_jsonl write (I-READY) as a 4xx `PRECONDITION_FAILED`
+ * tRPC error rather than letting the plain `DatasetNotReadyError` fall through as
+ * INTERNAL_SERVER_ERROR. Mirrors the REST layer's 425 mapping — a write to a
+ * still-preparing dataset is a client-precondition failure, not a server fault.
+ * Re-throws anything else unchanged.
+ */
+const rethrowDatasetNotReadyAsTRPC = (error: unknown): never => {
+  if (error instanceof DatasetNotReadyError) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: error.message,
+      cause: error,
+    });
+  }
+  // A full export that would exceed the safe in-heap ceiling is a client-side
+  // precondition failure (the dataset must be exported via the streaming path
+  // once it ships), not a server fault — surface a clean 4xx, not a 500.
+  if (error instanceof DatasetTooLargeToExportError) {
+    throw new TRPCError({
+      code: "PAYLOAD_TOO_LARGE",
+      message: error.message,
+      cause: error,
+    });
+  }
+  // An edit that would grow a chunk past the cap is a client-side bad request
+  // (the new value is too large), not a server fault — clean 4xx, not a 500.
+  if (error instanceof ChunkTooLargeError) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: error.message,
+      cause: error,
+    });
+  }
+  // A duplicate caller-supplied row id in the same write is a client conflict
+  // (I-PG row-id uniqueness), not a server fault — clean 4xx, not a 500.
+  if (error instanceof DuplicateRecordIdError) {
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: error.message,
+      cause: error,
+    });
+  }
+  throw error;
+};
 
 export const datasetRecordRouter = createTRPCRouter({
   create: protectedProcedure
@@ -44,11 +101,17 @@ export const datasetRecordRouter = createTRPCRouter({
         });
       }
 
-      return createManyDatasetRecords({
-        datasetId: input.datasetId,
-        projectId: input.projectId,
-        datasetRecords: input.entries,
-      });
+      try {
+        return await createManyDatasetRecords({
+          datasetId: input.datasetId,
+          projectId: input.projectId,
+          datasetRecords: input.entries,
+          // Reuse the existence-check lookup above instead of re-querying.
+          dataset,
+        });
+      } catch (error) {
+        return rethrowDatasetNotReadyAsTRPC(error);
+      }
     }),
   update: protectedProcedure
     .input(
@@ -76,76 +139,61 @@ export const datasetRecordRouter = createTRPCRouter({
         });
       }
 
-      return updateDatasetRecord({
-        recordId,
-        updatedRecord,
-        datasetId: input.datasetId,
-        projectId: input.projectId,
-        useS3: dataset.useS3,
-        prisma,
-      });
+      try {
+        return await updateDatasetRecord({
+          recordId,
+          updatedRecord,
+          datasetId: input.datasetId,
+          projectId: input.projectId,
+          dataset,
+          prisma,
+        });
+      } catch (error) {
+        return rethrowDatasetNotReadyAsTRPC(error);
+      }
     }),
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string(), datasetId: z.string() }))
     .use(checkProjectPermission("datasets:view"))
     .query(async ({ input }) => {
-      return getFullDataset({
-        datasetId: input.datasetId,
-        projectId: input.projectId,
-      });
+      try {
+        return await getFullDataset({
+          datasetId: input.datasetId,
+          projectId: input.projectId,
+        });
+      } catch (error) {
+        // Defense: a not-ready read surfaces as PRECONDITION_FAILED instead of
+        // INTERNAL_SERVER_ERROR (the UI already gates, but downstream consumers
+        // rely on a clean 4xx — see useGetDatasetData / useSavedDatasetLoader).
+        return rethrowDatasetNotReadyAsTRPC(error);
+      }
     }),
   download: protectedProcedure
     .input(z.object({ projectId: z.string(), datasetId: z.string() }))
     .use(checkProjectPermission("datasets:view"))
     .mutation(async ({ input }) => {
-      return getFullDataset({
-        datasetId: input.datasetId,
-        projectId: input.projectId,
-        limitMb: null,
-      });
+      try {
+        return await getFullDataset({
+          datasetId: input.datasetId,
+          projectId: input.projectId,
+          limitMb: null,
+        });
+      } catch (error) {
+        // Defense: a not-ready download surfaces as PRECONDITION_FAILED instead
+        // of INTERNAL_SERVER_ERROR, matching getAll/getHead and the REST 425.
+        return rethrowDatasetNotReadyAsTRPC(error);
+      }
     }),
   getHead: protectedProcedure
     .input(z.object({ projectId: z.string(), datasetId: z.string() }))
     .use(checkProjectPermission("datasets:view"))
     .query(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
-
-      const dataset = await prisma.dataset.findFirst({
-        where: { id: input.datasetId, projectId: input.projectId },
-      });
-
-      if (!dataset) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Dataset not found",
-        });
-      }
-
-      if (dataset.useS3) {
-        const { records, count } = await storageService.getObject(
-          input.projectId,
-          dataset.id,
-        );
-        const total = count;
-        (dataset as any).datasetRecords = records.slice(0, 5);
-
-        return { dataset, total };
-      } else {
-        const dataset = await prisma.dataset.findFirst({
-          where: { id: input.datasetId, projectId: input.projectId },
-          include: {
-            datasetRecords: {
-              orderBy: { createdAt: "asc" },
-              take: 5,
-            },
-          },
-        });
-
-        const total = await prisma.datasetRecord.count({
-          where: { datasetId: input.datasetId, projectId: input.projectId },
-        });
-
-        return { dataset, total };
+      try {
+        return await getDatasetHead({ input, ctx });
+      } catch (error) {
+        // Defense: surface a not-ready read as PRECONDITION_FAILED (4xx) rather
+        // than INTERNAL_SERVER_ERROR, matching the REST 425 mapping.
+        return rethrowDatasetNotReadyAsTRPC(error);
       }
     }),
   deleteMany: protectedProcedure
@@ -174,30 +222,115 @@ export const datasetRecordRouter = createTRPCRouter({
         });
       }
 
-      return deleteManyDatasetRecords({
-        recordIds: input.recordIds,
-        datasetId: input.datasetId,
-        projectId: input.projectId,
-        useS3: dataset.useS3,
-        prisma,
-      });
+      try {
+        return await deleteManyDatasetRecords({
+          recordIds: input.recordIds,
+          datasetId: input.datasetId,
+          projectId: input.projectId,
+          dataset,
+          prisma,
+        });
+      } catch (error) {
+        return rethrowDatasetNotReadyAsTRPC(error);
+      }
     }),
 });
+
+const getDatasetHead = async ({
+  input,
+  ctx,
+}: {
+  input: { projectId: string; datasetId: string };
+  ctx: { prisma: PrismaClient };
+}) => {
+  const prisma = ctx.prisma;
+
+  const dataset = await prisma.dataset.findFirst({
+    where: { id: input.datasetId, projectId: input.projectId },
+  });
+
+  if (!dataset) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Dataset not found",
+    });
+  }
+
+  // ADR-032 Decision 6 / I-READY: s3_jsonl reads the first chunk only for
+  // the head preview, gated on `status='ready'`. Routed independently of the
+  // dead single-blob `useS3` path.
+  if (dataset.contentLayout === "s3_jsonl") {
+    const { records, total } = await readDatasetHeadS3Jsonl({
+      dataset,
+      projectId: input.projectId,
+    });
+    (dataset as any).datasetRecords = records;
+
+    return { dataset, total };
+  }
+
+  if (dataset.useS3) {
+    const { records, count } = await storageService.getObject(
+      input.projectId,
+      dataset.id,
+    );
+    const total = count;
+    (dataset as any).datasetRecords = records.slice(0, 5);
+
+    return { dataset, total };
+  } else {
+    const datasetWithRecords = await prisma.dataset.findFirst({
+      where: { id: input.datasetId, projectId: input.projectId },
+      include: {
+        datasetRecords: {
+          orderBy: { createdAt: "asc" },
+          take: 5,
+        },
+      },
+    });
+
+    const total = await prisma.datasetRecord.count({
+      where: { datasetId: input.datasetId, projectId: input.projectId },
+    });
+
+    return { dataset: datasetWithRecords, total };
+  }
+};
 
 const deleteManyDatasetRecords = async ({
   recordIds,
   datasetId,
   projectId,
-  useS3,
+  dataset,
   prisma,
 }: {
   recordIds: string[];
   datasetId: string;
   projectId: string;
-  useS3: boolean;
+  dataset: Dataset;
   prisma: PrismaClient;
 }) => {
-  if (useS3) {
+  // ADR-032 rung 6b: s3_jsonl rows live in chunk objects (I-PG); a delete
+  // rewrites the affected chunk(s) without the removed rows and recomputes the
+  // offset index, under the per-dataset advisory lock (Decision 9). Replaces the
+  // dead single-blob `useS3` path below for the new layout.
+  if (dataset.contentLayout === "s3_jsonl") {
+    const { deleted } = await deleteS3JsonlRecords({
+      prisma,
+      dataset,
+      projectId,
+      recordIds,
+    });
+    if (deleted === 0) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "No matching records found to delete",
+      });
+    }
+    return { deletedCount: deleted };
+  }
+
+  if (dataset.useS3) {
     // Get existing records
     let records: any[] = [];
     try {
@@ -213,9 +346,7 @@ const deleteManyDatasetRecords = async ({
           message: "No records found to delete",
         });
       }
-      captureException(
-        toError(error),
-      );
+      captureException(toError(error));
       throw error;
     }
 
@@ -267,14 +398,14 @@ const updateDatasetRecord = async ({
   updatedRecord,
   datasetId,
   projectId,
-  useS3,
+  dataset,
   prisma,
 }: {
   recordId: string;
   updatedRecord: any;
   datasetId: string;
   projectId: string;
-  useS3: boolean;
+  dataset: Dataset;
   prisma: PrismaClient;
 }) => {
   // Strip Postgres-incompatible U+0000 null bytes from any user-supplied
@@ -283,7 +414,22 @@ const updateDatasetRecord = async ({
   // of storage backend.
   const sanitisedRecord = stripNullBytes(updatedRecord);
 
-  if (useS3) {
+  // ADR-032 rung 6b: an s3_jsonl edit locates the row by id, rewrites only its
+  // chunk in place (or appends if the id is new), under the per-dataset advisory
+  // lock (Decision 9). Replaces the dead single-blob `useS3` path below for the
+  // new layout.
+  if (dataset.contentLayout === "s3_jsonl") {
+    await editS3JsonlRecord({
+      prisma,
+      dataset,
+      projectId,
+      recordId,
+      entry: sanitisedRecord,
+    });
+    return { success: true };
+  }
+
+  if (dataset.useS3) {
     const { records } = await storageService.getObject(projectId, datasetId);
 
     const recordIndex = records.findIndex(
@@ -348,4 +494,3 @@ const updateDatasetRecord = async ({
 
   return { success: true };
 };
-
