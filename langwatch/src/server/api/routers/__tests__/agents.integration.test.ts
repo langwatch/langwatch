@@ -125,33 +125,37 @@ describe("Agents Endpoints", () => {
       ).toBe(true);
     });
 
-    it("normalizes uniformly-indented code on create (issue #3013)", async () => {
-      const indentedCodeConfig = {
-        name: "Indented Processor",
-        parameters: [
-          {
-            identifier: "code",
+    describe("given uniformly-indented code (Monaco auto-indent on paste)", () => {
+      describe("when creating a code agent", () => {
+        it("normalizes the code to flush so compile() won't raise (issue #3013)", async () => {
+          const indentedCodeConfig = {
+            name: "Indented Processor",
+            parameters: [
+              {
+                identifier: "code",
+                type: "code",
+                value:
+                  '  class Code:\n      def __call__(self, input):\n          return {"output": input.upper()}\n',
+              },
+            ],
+            inputs: [{ identifier: "input", type: "str" }],
+            outputs: [{ identifier: "output", type: "str" }],
+          };
+          const result = await caller.agents.create({
+            projectId,
+            name: "Indented Processor",
             type: "code",
-            value:
-              '  class Code:\n      def __call__(self, input):\n          return {"output": input.upper()}\n',
-          },
-        ],
-        inputs: [{ identifier: "input", type: "str" }],
-        outputs: [{ identifier: "output", type: "str" }],
-      };
-      const result = await caller.agents.create({
-        projectId,
-        name: "Indented Processor",
-        type: "code",
-        config: indentedCodeConfig,
+            config: indentedCodeConfig,
+          });
+          const config = result.config as typeof indentedCodeConfig;
+          const codeParam = config.parameters.find(
+            (p) => p.identifier === "code" && p.type === "code",
+          );
+          // dedented: top-level `class` now starts at column 0 (no IndentationError downstream)
+          expect(codeParam?.value.startsWith("class Code:")).toBe(true);
+          expect(codeParam?.value).not.toMatch(/^\s+class/);
+        });
       });
-      const config = result.config as typeof indentedCodeConfig;
-      const codeParam = config.parameters.find(
-        (p) => p.identifier === "code" && p.type === "code",
-      );
-      // dedented: top-level `class` now starts at column 0 (no IndentationError downstream)
-      expect(codeParam?.value.startsWith("class Code:")).toBe(true);
-      expect(codeParam?.value).not.toMatch(/^\s+class/);
     });
 
     it("creates a workflow agent with workflowId", async () => {
@@ -307,51 +311,55 @@ describe("Agents Endpoints", () => {
       expect(config.method).toBe("PUT");
     });
 
-    it("normalizes uniformly-indented code on update (issue #3013)", async () => {
-      const flushCodeConfig = {
-        name: "Flush Code Agent",
-        parameters: [
-          {
-            identifier: "code",
+    describe("given an existing code agent", () => {
+      describe("when updating with uniformly-indented code", () => {
+        it("dedents the code to flush (issue #3013)", async () => {
+          const flushCodeConfig = {
+            name: "Flush Code Agent",
+            parameters: [
+              {
+                identifier: "code",
+                type: "code",
+                value:
+                  'class Code:\n    def __call__(self, input):\n        return {"output": input}\n',
+              },
+            ],
+            inputs: [{ identifier: "input", type: "str" }],
+            outputs: [{ identifier: "output", type: "str" }],
+          };
+          const created = await caller.agents.create({
+            projectId,
+            name: "Flush Code Agent",
             type: "code",
-            value:
-              'class Code:\n    def __call__(self, input):\n        return {"output": input}\n',
-          },
-        ],
-        inputs: [{ identifier: "input", type: "str" }],
-        outputs: [{ identifier: "output", type: "str" }],
-      };
-      const created = await caller.agents.create({
-        projectId,
-        name: "Flush Code Agent",
-        type: "code",
-        config: flushCodeConfig,
-      });
+            config: flushCodeConfig,
+          });
 
-      const indentedUpdateConfig = {
-        ...flushCodeConfig,
-        parameters: [
-          {
-            identifier: "code",
-            type: "code",
-            value:
-              '  class Code:\n      def __call__(self, input):\n          return {"output": input.upper()}\n',
-          },
-        ],
-      };
-      const updated = await caller.agents.update({
-        id: created.id,
-        projectId,
-        config: indentedUpdateConfig,
-      });
+          const indentedUpdateConfig = {
+            ...flushCodeConfig,
+            parameters: [
+              {
+                identifier: "code",
+                type: "code",
+                value:
+                  '  class Code:\n      def __call__(self, input):\n          return {"output": input.upper()}\n',
+              },
+            ],
+          };
+          const updated = await caller.agents.update({
+            id: created.id,
+            projectId,
+            config: indentedUpdateConfig,
+          });
 
-      const config = updated.config as typeof flushCodeConfig;
-      const codeParam = config.parameters.find(
-        (p) => p.identifier === "code" && p.type === "code",
-      );
-      // dedented: top-level `class` now starts at column 0 (no IndentationError downstream)
-      expect(codeParam?.value.startsWith("class Code:")).toBe(true);
-      expect(codeParam?.value).not.toMatch(/^\s+class/);
+          const config = updated.config as typeof flushCodeConfig;
+          const codeParam = config.parameters.find(
+            (p) => p.identifier === "code" && p.type === "code",
+          );
+          // dedented: top-level `class` now starts at column 0 (no IndentationError downstream)
+          expect(codeParam?.value.startsWith("class Code:")).toBe(true);
+          expect(codeParam?.value).not.toMatch(/^\s+class/);
+        });
+      });
     });
   });
 

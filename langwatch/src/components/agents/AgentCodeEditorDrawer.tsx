@@ -92,13 +92,19 @@ const getOutputsFromConfig = (config: AgentComponentConfig): DSLField[] => {
 /**
  * Build DSL-compatible config for code agent
  */
-const buildCodeConfig = (
-  code: string,
-  inputs: DSLField[],
-  outputs: DSLField[],
-  scenarioMappings: Record<string, FieldMapping>,
-  scenarioOutputField: string | undefined,
-): CodeComponentConfig => ({
+const buildCodeConfig = ({
+  code,
+  inputs,
+  outputs,
+  scenarioMappings,
+  scenarioOutputField,
+}: {
+  code: string;
+  inputs: DSLField[];
+  outputs: DSLField[];
+  scenarioMappings: Record<string, FieldMapping>;
+  scenarioOutputField: string | undefined;
+}): CodeComponentConfig => ({
   name: "Code",
   description: "Python code block",
   parameters: [
@@ -263,13 +269,13 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
     // same normalization for non-UI callers.
     const normalizedCode = dedentPythonCode(code);
     // Build DSL-compatible config with current inputs/outputs/scenarioMappings/scenarioOutputField
-    const config = buildCodeConfig(
-      normalizedCode,
+    const config = buildCodeConfig({
+      code: normalizedCode,
       inputs,
       outputs,
       scenarioMappings,
       scenarioOutputField,
-    );
+    });
 
     if (agentId) {
       // Editing existing agent - no limit check needed
