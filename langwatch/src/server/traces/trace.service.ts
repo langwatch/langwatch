@@ -496,10 +496,11 @@ export class TraceService {
    * @param threadIds - Array of thread IDs
    * @param protections - Field redaction protections
    * @param opts.full - When true AND blob-resolution deps are present, resolves
-   *   offloaded eventref pointers so thread IO reads back full. Used by the
-   *   eval path (which needs full values for thread-mapped evaluators) — the
-   *   eval-path TraceService carries deps. Customer thread views pass nothing
-   *   and carry no deps, so they stay on the ≤64 KB preview (#4888 / ADR-022).
+   *   offloaded eventref pointers so thread IO reads back full (#4991). Opted
+   *   into per call: the eval path (thread-mapped evaluators) and the
+   *   content-consuming thread tRPC both pass `{ full: true }` with deps. A
+   *   caller that omits it — or a deps-free TraceService — stays on the ≤64 KB
+   *   preview and issues zero event_log reads (#4888 / ADR-022).
    * @returns Array of traces
    */
   async getTracesWithSpansByThreadIds(
