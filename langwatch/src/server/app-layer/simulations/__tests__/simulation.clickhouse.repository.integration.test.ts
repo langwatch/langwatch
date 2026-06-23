@@ -691,7 +691,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
     });
   });
 
-  describe("getRunIdsForSet()", () => {
+  describe("findAllRunIdsForSet()", () => {
     describe("when runs exist in two scenario sets", () => {
       it("returns only run ids matching the scenarioSetId", async () => {
         const setA = `set-a-${nanoid()}`;
@@ -716,7 +716,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
           );
         }
 
-        const result = await repo.getRunIdsForSet({
+        const result = await repo.findAllRunIdsForSet({
           projectId: tenantId,
           scenarioSetId: setA,
         });
@@ -776,7 +776,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
           );
         }
 
-        const result = await repo.getRunIdsForSet({
+        const result = await repo.findAllRunIdsForSet({
           projectId: isolatedTenantId,
           scenarioSetId: "default",
         });
@@ -797,7 +797,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
       it("returns empty result with reachedCap false", async () => {
         const ghostSet = `ghost-set-${nanoid()}`;
 
-        const result = await repo.getRunIdsForSet({
+        const result = await repo.findAllRunIdsForSet({
           projectId: tenantId,
           scenarioSetId: ghostSet,
         });
@@ -835,7 +835,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
           );
         }
 
-        const result = await repo.getRunIdsForSet({
+        const result = await repo.findAllRunIdsForSet({
           projectId: tenantId,
           scenarioSetId: setId,
         });
@@ -892,7 +892,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
           }),
         );
 
-        const result = await repo.getRunIdsForSet({
+        const result = await repo.findAllRunIdsForSet({
           projectId: tenantId,
           scenarioSetId: setId,
         });
@@ -927,7 +927,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
           );
         }
 
-        const result = await repo.getRunIdsForSet({
+        const result = await repo.findAllRunIdsForSet({
           projectId: tenantId,
           scenarioSetId: sharedSetName,
         });

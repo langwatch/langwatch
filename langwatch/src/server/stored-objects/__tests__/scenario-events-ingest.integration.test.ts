@@ -503,7 +503,6 @@ describe("DELETE /api/scenario-events (scoped archive)", () => {
           scenarioSetId: "set-a",
         }),
       );
-      // Only the two runs the set-scoped lookup returned are archived.
       expect(mockDeleteRun).toHaveBeenCalledTimes(2);
       const archivedIds = mockDeleteRun.mock.calls.map(
         (args) => (args[0] as { scenarioRunId: string }).scenarioRunId,

@@ -123,7 +123,7 @@ export class SimulationRunService {
     projectId: string;
     scenarioSetId: string;
   }): Promise<{ runIds: string[]; reachedCap: boolean }> {
-    return this.repository.getRunIdsForSet(params);
+    return this.repository.findAllRunIdsForSet(params);
   }
 
   /**

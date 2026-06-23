@@ -56,7 +56,7 @@ describe("archiveScenarioSetRuns()", () => {
   });
 
   describe("when one deleteRun rejects", () => {
-    /** @scenario "A failed deleteRun is collected, not short-circuited" */
+    /** @scenario "One run failing to archive does not stop the others" */
     it("does not short-circuit; returns archived=N-1, failed=1", async () => {
       const runIds = ["run-1", "run-2", "run-3"];
       mockGetRunIdsForSet.mockResolvedValue({ runIds, reachedCap: false });

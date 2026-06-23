@@ -18,7 +18,7 @@ function makeMockClientReturning(
 }
 
 describe("SimulationClickHouseRepository", () => {
-  describe("getRunIdsForSet()", () => {
+  describe("findAllRunIdsForSet()", () => {
     describe("when N matching ids returns exactly RUN_ID_CAP", () => {
       /** @scenario "Reaching the 10k cap reports hasMore true" */
       it("sets reachedCap to true and returns RUN_ID_CAP runIds", async () => {
@@ -27,7 +27,7 @@ describe("SimulationClickHouseRepository", () => {
         const resolver = vi.fn().mockResolvedValue(mockClient);
         const repo = new SimulationClickHouseRepository(resolver);
 
-        const result = await repo.getRunIdsForSet({
+        const result = await repo.findAllRunIdsForSet({
           projectId: "project-1",
           scenarioSetId: "set-a",
         });
@@ -44,7 +44,7 @@ describe("SimulationClickHouseRepository", () => {
         const resolver = vi.fn().mockResolvedValue(mockClient);
         const repo = new SimulationClickHouseRepository(resolver);
 
-        const result = await repo.getRunIdsForSet({
+        const result = await repo.findAllRunIdsForSet({
           projectId: "project-1",
           scenarioSetId: "set-a",
         });

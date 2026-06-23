@@ -923,7 +923,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     }));
   }
 
-  async getRunIdsForSet({
+  async findAllRunIdsForSet({
     projectId,
     scenarioSetId,
   }: {

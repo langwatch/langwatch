@@ -96,7 +96,7 @@ export interface SimulationRepository {
    * with one unqualified request. Results are capped; `reachedCap` signals that
    * the cap was hit and more matching runs may exist beyond what was returned.
    */
-  getRunIdsForSet(params: {
+  findAllRunIdsForSet(params: {
     projectId: string;
     scenarioSetId: string;
   }): Promise<{ runIds: string[]; reachedCap: boolean }>;
@@ -165,7 +165,7 @@ export class NullSimulationRepository implements SimulationRepository {
     };
   }
 
-  async getRunIdsForSet(): Promise<{ runIds: string[]; reachedCap: boolean }> {
+  async findAllRunIdsForSet(): Promise<{ runIds: string[]; reachedCap: boolean }> {
     return { runIds: [], reachedCap: false };
   }
 
