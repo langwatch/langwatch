@@ -99,16 +99,27 @@ const makeStorage = (
 const pagedRecords = (records: DatasetRecord[]) =>
   vi.fn().mockResolvedValueOnce(records).mockResolvedValue([]);
 
-const makeDeps = (overrides: Partial<BackfillDeps> = {}): BackfillDeps =>
-  ({
+const makeDeps = (overrides: Partial<BackfillDeps> = {}): BackfillDeps => {
+  const { recordRepository: recordOverride, ...rest } = overrides;
+  return {
     prisma: {} as never,
+    // Merge the recordRepository so the concurrent-write guard's
+    // `countAndMaxUpdatedAt` is always present even when a test overrides the
+    // repo with just `findDatasetRecordsPage`. The default returns a constant,
+    // so baseline === recheck (no concurrent write) and the flip proceeds —
+    // tests that exercise the guard override this with differing values.
     recordRepository: {
       findDatasetRecordsPage: vi.fn().mockResolvedValue([]),
+      countAndMaxUpdatedAt: vi
+        .fn()
+        .mockResolvedValue({ count: 0, maxUpdatedAt: null }),
+      ...(recordOverride ?? {}),
     } as never,
     resolveStorage: vi.fn().mockResolvedValue({ kind: "s3", bucket: "b" }),
     getStorage: vi.fn(),
-    ...overrides,
-  }) as BackfillDeps;
+    ...rest,
+  } as BackfillDeps;
+};
 
 beforeEach(() => vi.clearAllMocks());
 afterEach(() => {
@@ -201,6 +212,95 @@ describe("backfillDatasetContentToS3", () => {
           datasetId: "dataset_1",
           fromIndex: 2,
         });
+      });
+
+      /**
+       * @scenario Migration never silently drops a concurrent write
+       *
+       * Concurrent-write guard (I-MIG): the migration snapshots the record
+       * count + maxUpdatedAt before reading, then re-reads under the lock before
+       * the flip. If a record was inserted/deleted (count) or edited in place
+       * (maxUpdatedAt) during the snapshot→flip window, the chunks are stale —
+       * so it must NOT flip. The dataset stays on `postgres` (still readable)
+       * and re-migrates next pass. Off-peak one-off mitigation, not a proof.
+       */
+      it("skips the flip when the record count changes during migration (insert/delete)", async () => {
+        const row = makeDataset({ contentLayout: "postgres" });
+        const { prisma, update } = makePrisma(row);
+        const findDatasetRecordsPage = pagedRecords([
+          makeRecord("rec_a", { q: "1" }),
+          makeRecord("rec_b", { q: "2" }),
+        ]);
+        const writeChunks = vi
+          .fn()
+          .mockResolvedValue([
+            { index: 0, rowCount: 2, byteSize: 42, startRow: 0, endRow: 2 },
+          ]);
+        const at = new Date("2026-06-23T00:00:00Z");
+        // Baseline (pre-read) sees 2 rows; the under-lock re-read sees 3 — a row
+        // was inserted mid-migration.
+        const countAndMaxUpdatedAt = vi
+          .fn()
+          .mockResolvedValueOnce({ count: 2, maxUpdatedAt: at })
+          .mockResolvedValueOnce({ count: 3, maxUpdatedAt: at });
+        const deps = makeDeps({
+          prisma: prisma as never,
+          recordRepository: {
+            findDatasetRecordsPage,
+            countAndMaxUpdatedAt,
+          } as never,
+          getStorage: vi.fn().mockResolvedValue(makeStorage(writeChunks)),
+        });
+
+        const outcome = await migrateDatasetToS3(
+          { dataset: row, projectId: "p1" },
+          deps,
+        );
+
+        expect(outcome).toBe("skipped-concurrent-write");
+        // Crucially: the dataset is NOT flipped (no stale snapshot committed).
+        expect(update).not.toHaveBeenCalled();
+      });
+
+      it("skips the flip when a row is edited in place during migration (same count, newer updatedAt)", async () => {
+        const row = makeDataset({ contentLayout: "postgres" });
+        const { prisma, update } = makePrisma(row);
+        const findDatasetRecordsPage = pagedRecords([
+          makeRecord("rec_a", { q: "1" }),
+        ]);
+        const writeChunks = vi
+          .fn()
+          .mockResolvedValue([
+            { index: 0, rowCount: 1, byteSize: 20, startRow: 0, endRow: 1 },
+          ]);
+        // Same count both reads, but the latest updatedAt advanced → an in-place
+        // edit landed; count alone would miss it, maxUpdatedAt catches it.
+        const countAndMaxUpdatedAt = vi
+          .fn()
+          .mockResolvedValueOnce({
+            count: 1,
+            maxUpdatedAt: new Date("2026-06-23T00:00:00Z"),
+          })
+          .mockResolvedValueOnce({
+            count: 1,
+            maxUpdatedAt: new Date("2026-06-23T00:05:00Z"),
+          });
+        const deps = makeDeps({
+          prisma: prisma as never,
+          recordRepository: {
+            findDatasetRecordsPage,
+            countAndMaxUpdatedAt,
+          } as never,
+          getStorage: vi.fn().mockResolvedValue(makeStorage(writeChunks)),
+        });
+
+        const outcome = await migrateDatasetToS3(
+          { dataset: row, projectId: "p1" },
+          deps,
+        );
+
+        expect(outcome).toBe("skipped-concurrent-write");
+        expect(update).not.toHaveBeenCalled();
       });
 
       /**
@@ -575,6 +675,7 @@ describe("backfillDatasetContentToS3", () => {
           migrated: 2,
           wouldMigrate: 0,
           alreadyMigrated: 0,
+          skippedConcurrentWrite: 0,
           failed: 0,
         });
         // The scan excludes legacy useS3 blob datasets (they'd flip to empty).

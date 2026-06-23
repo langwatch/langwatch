@@ -55,16 +55,44 @@ export const registerDatasetNormalizeEnqueue = (fn: Enqueue): void => {
 };
 
 /**
- * The inline fallback handler, built from `prisma` + the storage accessor. Used
- * when no queue sender is registered (event sourcing disabled / no worker), so
- * dev and test still produce a `ready` dataset.
+ * Per-dataset serialization for the INLINE path (ADR-032, concurrent-normalize
+ * guard). The handler's `status==='processing'` check is a read-then-check, not
+ * a compare-and-set — two normalizes for the same dataset that interleave both
+ * read `processing` and both proceed, racing chunk writes and the failure-path
+ * `deleteChunksFrom(0)` (one attempt can wipe another's chunks → data loss).
+ *
+ * In QUEUE mode the GroupQueue's per-dataset concurrency=1 already serializes
+ * this. The race only exists INLINE — and inline runs only when no queue sender
+ * is registered, which means no Redis, which means a SINGLE process (the chart
+ * forces `replicaCount>1` onto the queue path). So a process-local mutex keyed
+ * by datasetId is sufficient and correct: it can't span pods, but inline never
+ * spans pods. The losing caller awaits the winner, then the handler's status
+ * guard makes it a clean no-op. The map entry is cleared on settle so it can't
+ * leak across uploads.
  */
+const inlineNormalizeChains = new Map<string, Promise<void>>();
+
 const runInline = (prisma: PrismaClient): Enqueue => {
   const handler = createDatasetNormalizeHandler({
     repository: new DatasetRepository(prisma),
     getStorage: getDatasetStorage,
   });
-  return (payload) => handler(payload);
+  return (payload) => {
+    const key = `${payload.projectId}:${payload.datasetId}`;
+    const prior = inlineNormalizeChains.get(key) ?? Promise.resolve();
+    // Chain after any in-flight normalize for the same dataset; swallow the
+    // prior's rejection so one failure doesn't cascade onto the next caller.
+    const next = prior.catch(() => undefined).then(() => handler(payload));
+    inlineNormalizeChains.set(key, next);
+    // Clear the entry once settled — but only if it's still the tail of the
+    // chain (a later caller may have already chained onto `next`).
+    void next.finally(() => {
+      if (inlineNormalizeChains.get(key) === next) {
+        inlineNormalizeChains.delete(key);
+      }
+    });
+    return next;
+  };
 };
 
 /**

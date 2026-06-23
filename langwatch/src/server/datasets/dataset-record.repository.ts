@@ -66,6 +66,41 @@ export class DatasetRecordRepository {
   }
 
   /**
+   * Row count + latest `updatedAt` for a dataset's records, in ONE query.
+   *
+   * ADR-032: the PG→S3 backfill's concurrent-write guard. The migration reads
+   * the records OUTSIDE the advisory lock (a snapshot), writes chunks, then
+   * flips `contentLayout` UNDER the lock. A record insert/edit/delete in that
+   * window would land in PG but never in the chunks → silently lost once reads
+   * switch to S3. Comparing `(count, maxUpdatedAt)` from a baseline taken at
+   * snapshot time against a re-read taken under the lock just before the flip
+   * detects such a write (count catches insert/delete; `maxUpdatedAt` catches a
+   * same-count content edit) so the flip can be skipped and re-tried next pass.
+   *
+   * Honest scope: this is a one-off-off-peak MITIGATION, not a hard guarantee —
+   * the PG mutation paths don't take the advisory lock, so a write committing in
+   * the narrow re-read→commit window is still missed. Off-peak the window is
+   * effectively empty; a hard guarantee would require the writers on the lock.
+   * Optionally pass `tx` so the re-read runs inside the flip transaction.
+   */
+  async countAndMaxUpdatedAt(
+    input: { datasetId: string; projectId: string },
+    options?: { tx?: Prisma.TransactionClient },
+  ): Promise<{ count: number; maxUpdatedAt: Date | null }> {
+    const client = options?.tx ?? this.prisma;
+    const where = { datasetId: input.datasetId, projectId: input.projectId };
+    const result = await client.datasetRecord.aggregate({
+      where,
+      _count: { _all: true },
+      _max: { updatedAt: true },
+    });
+    return {
+      count: result._count._all,
+      maxUpdatedAt: result._max.updatedAt ?? null,
+    };
+  }
+
+  /**
    * Updates multiple dataset records atomically within a transaction.
    *
    * All records must belong to the same project (enforced by single projectId parameter).

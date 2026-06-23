@@ -76,7 +76,11 @@ const isMissingColumnError = (error: unknown): boolean =>
   error.code === "P2022";
 
 /** Outcome of attempting to migrate one dataset (for structured counts). */
-export type MigrateOutcome = "migrated" | "already-migrated" | "would-migrate";
+export type MigrateOutcome =
+  | "migrated"
+  | "already-migrated"
+  | "would-migrate"
+  | "skipped-concurrent-write";
 
 /**
  * Boundaries the per-dataset migrate logic depends on. Injected so the core can
@@ -180,6 +184,19 @@ export const migrateDatasetToS3 = async (
   // API-created data. The page order matches `findDatasetRecords` so re-runs
   // produce identical chunks (crash-resume), and each row's id is PRESERVED so
   // the chunk lines carry the same record ids the editor targets (I-MIG).
+  // Concurrent-write guard baseline (I-MIG): snapshot the record count + latest
+  // updatedAt BEFORE streaming the rows. We re-read both under the lock just
+  // before the flip; any change means a write landed during the snapshot→flip
+  // window (count → insert/delete; maxUpdatedAt → same-count content edit), so
+  // we skip the flip rather than freeze a stale snapshot into chunks. Honest
+  // scope: a one-off off-peak MITIGATION, not a proof — the PG write paths don't
+  // take this lock, so a write in the narrow re-read→commit window is still
+  // missed. Off-peak that window is effectively empty.
+  const baseline = await deps.recordRepository.countAndMaxUpdatedAt({
+    datasetId: dataset.id,
+    projectId,
+  });
+
   const writer = new StreamingChunkWriter({
     storage,
     projectId,
@@ -229,6 +246,32 @@ export const migrateDatasetToS3 = async (
         return "already-migrated";
       }
 
+      // Concurrent-write guard (I-MIG): re-read count + maxUpdatedAt inside the
+      // flip transaction and compare to the pre-read baseline. A mismatch means
+      // a record was inserted/deleted/edited during the snapshot→flip window —
+      // the chunks we wrote are stale, so DO NOT flip. The dataset stays on
+      // `postgres` (fully readable from PG, non-destructive) and the next run
+      // re-migrates it from a fresh snapshot. Never flips a stale snapshot live.
+      const recheck = await deps.recordRepository.countAndMaxUpdatedAt(
+        { datasetId: dataset.id, projectId },
+        { tx },
+      );
+      if (
+        recheck.count !== baseline.count ||
+        recheck.maxUpdatedAt?.getTime() !== baseline.maxUpdatedAt?.getTime()
+      ) {
+        logger.warn(
+          {
+            datasetId: dataset.id,
+            projectId,
+            baselineCount: baseline.count,
+            recheckCount: recheck.count,
+          },
+          "Skipping flip — records changed during migration (concurrent write); will re-migrate on the next run",
+        );
+        return "skipped-concurrent-write";
+      }
+
       await tx.dataset.update({
         where: { id: dataset.id, projectId },
         data: {
@@ -264,6 +307,12 @@ export type BackfillSummary = {
   /** Dry-run only: datasets that WOULD be migrated (nothing was written). */
   wouldMigrate: number;
   alreadyMigrated: number;
+  /**
+   * Datasets whose flip was skipped because records changed mid-migration
+   * (concurrent-write guard). Non-zero ⟹ re-run the backfill to drain them —
+   * they are still on `postgres` and fully readable, nothing was lost.
+   */
+  skippedConcurrentWrite: number;
   failed: number;
 };
 
@@ -281,6 +330,7 @@ export const migrateAllPostgresDatasets = async (
     migrated: 0,
     wouldMigrate: 0,
     alreadyMigrated: 0,
+    skippedConcurrentWrite: 0,
     failed: 0,
   };
 
@@ -326,6 +376,8 @@ export const migrateAllPostgresDatasets = async (
           );
           if (outcome === "migrated") summary.migrated += 1;
           else if (outcome === "would-migrate") summary.wouldMigrate += 1;
+          else if (outcome === "skipped-concurrent-write")
+            summary.skippedConcurrentWrite += 1;
           else summary.alreadyMigrated += 1;
         } catch (error) {
           summary.failed += 1;
