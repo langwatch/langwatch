@@ -508,9 +508,13 @@ describe("backfillDatasetContentToS3", () => {
             .fn()
             .mockResolvedValue({ kind: "s3", bucket: "b" }),
           // The S3 write (now OUTSIDE the lock) fails for this dataset.
-          getStorage: vi.fn().mockResolvedValue(
-            makeStorage(vi.fn().mockRejectedValue(new Error("S3 write failed"))),
-          ),
+          getStorage: vi
+            .fn()
+            .mockResolvedValue(
+              makeStorage(
+                vi.fn().mockRejectedValue(new Error("S3 write failed")),
+              ),
+            ),
         });
 
         const summary = await migrateAllPostgresDatasets(deps);
