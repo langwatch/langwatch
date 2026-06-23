@@ -378,6 +378,32 @@ describe("DatasetService", () => {
     });
   });
 
+  describe("upsertDataset() changing column types on a ready s3_jsonl dataset", () => {
+    it("refuses with a typed ColumnTypeChangeNotSupportedError (a 4xx, not a 500)", async () => {
+      // s3_jsonl column migration is a deferred rung; the edit must surface a
+      // typed, user-actionable error the router maps to a 4xx — not a plain
+      // Error that collapses into a generic 500.
+      const repository = {
+        findOne: vi.fn().mockResolvedValue({ ...baseS3Dataset }), // ready, cols [a]
+        findBySlug: vi.fn().mockResolvedValue(null),
+      };
+      const prisma = {
+        $transaction: async (fn: (tx: unknown) => unknown) => fn({}),
+      };
+
+      await expect(
+        makeService({ repository, prisma }).upsertDataset({
+          projectId: "p1",
+          datasetId: "dataset_1",
+          name: "DS",
+          columnTypes: [{ name: "b", type: "string" }], // changed columns
+        }),
+      ).rejects.toMatchObject({
+        name: "ColumnTypeChangeNotSupportedError",
+      });
+    });
+  });
+
   describe("copyDataset()", () => {
     describe("when the source is s3_jsonl and ready", () => {
       it("reads source rows from chunks (not the empty PG table) into the new s3_jsonl dataset", async () => {

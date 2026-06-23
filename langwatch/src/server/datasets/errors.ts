@@ -10,6 +10,22 @@ export class DatasetNotFoundError extends Error {
   }
 }
 
+/**
+ * A column-type change was requested on an s3_jsonl dataset, where rewriting
+ * every chunk's keys is a later rung (Decision 6 defers s3_jsonl column
+ * migration). It's a user-actionable precondition, not a server fault — typed so
+ * the router maps it to a 4xx with the message intact instead of letting a plain
+ * `Error` collapse into a generic 500.
+ */
+export class ColumnTypeChangeNotSupportedError extends Error {
+  constructor(
+    message = "Changing column types is not yet supported for large (S3) datasets",
+  ) {
+    super(message);
+    this.name = "ColumnTypeChangeNotSupportedError";
+  }
+}
+
 export class DatasetConflictError extends Error {
   constructor(message = "A dataset with this name already exists") {
     super(message);

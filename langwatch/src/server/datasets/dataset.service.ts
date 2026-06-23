@@ -25,6 +25,7 @@ import { enqueueDatasetNormalize } from "./dataset-normalize.queue";
 import { DatasetRecordRepository } from "./dataset-record.repository";
 import { getDatasetStorage } from "./dataset-storage";
 import {
+  ColumnTypeChangeNotSupportedError,
   DatasetConflictError,
   DatasetNotFoundError,
   DatasetNotReadyError,
@@ -249,9 +250,7 @@ export class DatasetService {
         // nothing, leaving stored chunk keys out of sync with columnTypes.
         // Refuse rather than corrupt. (Deferred: s3_jsonl column migration.)
         if (existingDataset.contentLayout === "s3_jsonl") {
-          throw new Error(
-            "Changing column types is not yet supported for large (S3) datasets",
-          );
+          throw new ColumnTypeChangeNotSupportedError();
         }
         await this.migrateDatasetRecordColumns(
           {
