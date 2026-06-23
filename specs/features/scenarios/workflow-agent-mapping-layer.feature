@@ -3,7 +3,7 @@ Feature: Workflow agent input/output mapping layer
   I want workflow agents to have their inputs and outputs mapped to the scenario contract
   So that scenario runs against workflow agents succeed without manual wiring guesswork
 
-  # Parity status: 9 of 13 scenarios bound to existing tests.
+  # Parity status: 11 of 15 scenarios bound to existing tests.
   # The remaining 4 @unimplemented scenarios describe shipped behavior
   # that does not yet have an integration test (#3458):
   #   - "Scenario runs successfully after user configures mappings via drawer"
@@ -71,6 +71,21 @@ Feature: Workflow agent input/output mapping layer
     And the agent has scenarioMappings but none wire a source to scenario "input" or "messages"
     When the user clicks Save & Run
     Then the AgentWorkflowEditorDrawer opens instead of starting the run
+
+  @integration
+  Scenario: Mapping warning links back to the agent editor
+    Given a workflow agent selected as the scenario target
+    And the agent has no scenario input mapping
+    When the user clicks Save & Run
+    Then the warning offers an action that opens the agent editor for that agent
+    And the action still works if the automatic drawer open was dismissed
+
+  @integration
+  Scenario: Mapping warning names the missing scenario input field
+    Given a workflow agent selected as the scenario target
+    And the agent has no scenario input mapping
+    When the user clicks Save & Run
+    Then the warning names the scenario input fields to map (input or messages)
 
   @e2e @unimplemented
   Scenario: Scenario runs successfully after user configures mappings via drawer
@@ -149,6 +164,8 @@ Feature: Workflow agent input/output mapping layer
 # AC 1: "Auto-compute mappings on workflow save" → Scenario: Auto-compute does not block the workflow save on failure
 # AC 2: "Mapping drawer gate at Save & Run" → Scenario: Opens mapping drawer when running a scenario with an unmapped workflow agent
 # AC 2: "Mapping drawer gate at Save & Run" → Scenario: Opens mapping drawer when workflow agent has no input-field mapping
+# AC 2: "Mapping drawer gate at Save & Run" → Scenario: Mapping warning links back to the agent editor
+# AC 2: "Mapping drawer gate at Save & Run" → Scenario: Mapping warning names the missing scenario input field
 # AC 2: "Mapping drawer gate at Save & Run" → Scenario: Scenario runs successfully after user configures mappings via drawer
 # AC 3: "Pre-run validation for multi-input workflows" → Scenario: Returns actionable error for multi-input workflow agent without mappings
 # AC 3: "Pre-run validation for multi-input workflows" → Scenario: Allows single-input workflow agent to run without explicit mappings
