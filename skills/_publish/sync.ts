@@ -10,7 +10,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { inlineMdx } from "../_lib/mdx-inline.js";
-import { FEATURE_SKILLS } from "../_lib/feature-skills.js";
+import { listPublishedSkills } from "../_lib/feature-skills.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -45,21 +45,13 @@ export function sync(targetDir: string): void {
   console.log(`Syncing skills to ${targetDir}...`);
   cleanTarget(targetDir);
 
-  for (const skill of FEATURE_SKILLS) {
-    const src = path.join(skillsRoot, skill, "SKILL.mdx");
-    if (!fs.existsSync(src)) continue;
-    writeSkill(targetDir, skill, src);
-    console.log(`  ✓ ${skill}`);
-  }
-
-  const recipesDir = path.join(skillsRoot, "recipes");
-  if (fs.existsSync(recipesDir)) {
-    for (const name of fs.readdirSync(recipesDir)) {
-      const src = path.join(recipesDir, name, "SKILL.mdx");
-      if (!fs.existsSync(src)) continue;
-      writeSkill(targetDir, path.join("recipes", name), src);
-      console.log(`  ✓ recipes/${name}`);
-    }
+  // Same selection Langy's native generator uses (skills/_compiler/native.ts),
+  // so the published set and the in-product set can never drift. Recipes nest
+  // under recipes/<slug> in the published repo.
+  for (const skill of listPublishedSkills(skillsRoot)) {
+    const target = skill.isRecipe ? path.join("recipes", skill.slug) : skill.slug;
+    writeSkill(targetDir, target, skill.src);
+    console.log(`  ✓ ${target}`);
   }
 
   fs.copyFileSync(

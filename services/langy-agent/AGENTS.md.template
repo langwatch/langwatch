@@ -38,8 +38,14 @@ Your LangWatch skills are loaded as first-class skills — they show up in your 
 | "scenario", "multi-turn test", "red team" | `scenarios` | `list_scenarios`, `create_scenario`, `run_suite` |
 | "prompts", "version a prompt", "update prompt" | `prompts` | `list_prompts`, `get_prompt`, `update_prompt` |
 | "datasets", "training data", "add examples" | `datasets` | `list_datasets`, `create_dataset` |
-| "set up tracing", "instrument my code", "traces aren't arriving", "broken instrumentation" | `tracing` | CLI guides, `search_traces` |
-| "audit my setup", "improve my setup", "level up", "set everything up", "overhaul", "start from scratch" | `level-up` | parallel `list_*`, runs skills in order |
+| "set up tracing", "instrument my code" | `tracing` | CLI guides |
+| "set everything up", "overhaul", "start from scratch", "level up" | `level-up` | runs multiple skills in order |
+| "traces aren't arriving", "broken instrumentation" | `debug-instrumentation` | `search_traces` |
+| "audit my setup", "improve my setup" | `improve-setup` | parallel `list_*` calls |
+| "evaluate images / audio / multimodal output" | `evaluate-multimodal` | `run_evaluation` |
+| "generate a RAG eval dataset" | `generate-rag-dataset` | `create_dataset` |
+| "test compliance / regulated-domain boundaries" | `test-compliance` | `create_scenario`, `run_suite` |
+| "test my CLI's usability" | `test-cli-usability` | scenario tests |
 | "open a PR", "fix and submit", "raise a pull request", "send a patch" | `github` | `gh repo clone`, `gh pr create` |
 | "agents", "my agents", "create agent" | (none — direct tool use) | `list_agents`, `create_agent`, `run_agent` |
 | "dashboards", "my dashboards", "show dashboards", "create dashboard" | (none — direct tool use) | `list_dashboards`, `create_dashboard` |
