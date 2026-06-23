@@ -111,9 +111,7 @@ export default function Dataset() {
           </Alert.Root>
         )}
         {datasetGone && (
-          <Text color="fg.muted">
-            This dataset is no longer available.
-          </Text>
+          <Text color="fg.muted">This dataset is no longer available.</Text>
         )}
         {isReady ? (
           <DatasetEditorTable

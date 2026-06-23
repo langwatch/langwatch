@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { StreamingChunkWriter } from "../dataset-chunk-writer";
-import {
-  type DatasetChunk,
-  toJsonlChunks,
-} from "../dataset-chunking";
+import { type DatasetChunk, toJsonlChunks } from "../dataset-chunking";
 import type { DatasetStorage } from "../dataset-storage";
 
 /**
@@ -67,9 +64,7 @@ describe("StreamingChunkWriter", () => {
           meta.chunkOffsets[i - 1]!.endRow,
         );
       }
-      expect(
-        meta.chunkOffsets[meta.chunkOffsets.length - 1]!.endRow,
-      ).toBe(6);
+      expect(meta.chunkOffsets[meta.chunkOffsets.length - 1]!.endRow).toBe(6);
       // Keys stay ordered and contiguous from 0 across flushes.
       expect(writes.map((w) => w.index)).toEqual(writes.map((_, i) => i));
     });
