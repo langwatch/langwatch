@@ -183,8 +183,14 @@ export async function putFileToPresignedUrl(
  * Best-effort cleanup of the just-created pending (`uploading`) dataset after a
  * presigned-PUT failure, so a CORS-failed attempt doesn't leave a stuck
  * `uploading` row behind. Authenticated by the same session cookie the other
- * direct-upload routes use; failures are swallowed (the fallback path creates a
- * fresh dataset regardless).
+ * direct-upload routes use.
+ *
+ * A non-2xx DELETE (DB timeout, pod restart) THROWS rather than resolving
+ * silently: every caller already wraps this in a `.catch`/try-catch that logs,
+ * so the failure becomes observable (an orphaned `uploading` row pins its slug
+ * and counts against project quota until reaped). Callers still proceed with the
+ * fallback regardless — the reject is for visibility, not control flow. A
+ * server-side TTL sweep of stale `uploading` rows is the durable backstop.
  */
 export async function abortPendingUpload({
   projectId,
@@ -193,10 +199,15 @@ export async function abortPendingUpload({
   projectId: string;
   datasetId: string;
 }): Promise<void> {
-  await fetch(
+  const response = await fetch(
     `/api/dataset/direct-upload/${datasetId}?projectId=${encodeURIComponent(projectId)}`,
     { method: "DELETE" },
   );
+  if (!response.ok) {
+    throw new Error(
+      `abortPendingUpload: DELETE failed (status ${response.status}) — dataset ${datasetId} may remain in 'uploading'`,
+    );
+  }
 }
 
 /**

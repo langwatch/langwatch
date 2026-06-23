@@ -247,6 +247,20 @@ describe("directUpload service", () => {
         expect(init.method).toBe("DELETE");
       });
     });
+
+    describe("when the cleanup DELETE returns a non-ok status", () => {
+      it("throws so the caller logs the failure instead of swallowing it", async () => {
+        // A 5xx (DB timeout, pod restart) leaves the `uploading` row pinned in PG
+        // — pinning its slug and counting against project quota. The reject makes
+        // that observable at the caller's existing catch/log; it must NOT resolve
+        // silently.
+        mockFetch().mockResolvedValue({ ok: false, status: 500 });
+
+        await expect(
+          abortPendingUpload({ projectId: "proj_1", datasetId: "dataset_1" }),
+        ).rejects.toThrow(/status 500/);
+      });
+    });
   });
 
   describe("finalizeDirectUpload()", () => {
