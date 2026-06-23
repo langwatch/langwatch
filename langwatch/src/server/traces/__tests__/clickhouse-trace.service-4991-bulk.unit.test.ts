@@ -278,7 +278,9 @@ describe("ClickHouseTraceService.getAllTracesForProject — #4991 AC5 list prote
           { includeSpans: true },
         );
 
-        expect(result!.groups.flat()[0]!.output?.value).not.toBe(FULL_OUTPUT);
+        // Falsifiable: assert the exact preview, not merely "not the full value"
+        // (a broken mapper returning "" / null would slip past not.toBe).
+        expect(result!.groups.flat()[0]!.output?.value).toBe(PREVIEW_OUTPUT);
       });
     });
   });
@@ -321,7 +323,8 @@ describe("ClickHouseTraceService.getTracesByThreadId — #4991 AC2 thread detail
         );
 
         expect(getFromEventLog).not.toHaveBeenCalled();
-        expect(traces![0]!.output?.value).not.toBe(FULL_OUTPUT);
+        // Falsifiable: exact preview, not merely "not the full value".
+        expect(traces![0]!.output?.value).toBe(PREVIEW_OUTPUT);
       });
     });
   });

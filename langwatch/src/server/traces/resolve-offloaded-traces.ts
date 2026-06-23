@@ -79,8 +79,8 @@ export interface ResolvedTraceSpans {
  * @param normalizedSpans - The raw NormalizedSpan array for a single trace.
  * @param blobStore - BlobStore providing getFromEventLog.
  * @param ioExtractionService - Recomputes trace-level IO from the resolved spans.
- * @param eventId - The event_log EventId for the event that produced these spans.
- *   Derived from span context. When not provided, eventref resolution is skipped.
+ *   Each span's eventId is read from its own embedded eventref pointer (not a
+ *   caller-supplied arg); spans without eventrefs are returned unchanged.
  * @param aggregateType - Aggregate type for event_log lookup (default: "trace").
  * @param logger - Logger for missing-ref warnings.
  */
