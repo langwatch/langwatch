@@ -13,7 +13,7 @@
  * first call — which must NOT fire for an oversize file.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -259,6 +259,67 @@ describe("UploadCSVForm 409-fallback size guard", () => {
       });
       // The size-guard fires before any in-browser parse of the oversize file.
       expect(textSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the user cancels while the presign request is still in flight", () => {
+    it("does NOT fall back or surface an error if the presign later rejects", async () => {
+      // The cancel control aborts the AbortController, but requestDirectUpload is
+      // not wired to it — so a no-storage install's DirectUploadUnavailableError
+      // can still reject AFTER the cancel. The catch must recognise the cancel
+      // (signal.aborted) and bail, NOT run the fallback parse / open the drawer.
+      let rejectPresign!: (reason: unknown) => void;
+      requestDirectUpload.mockReturnValue(
+        new Promise((_resolve, reject) => {
+          rejectPresign = reject;
+        }),
+      );
+      const uploadCSVData = vi.fn();
+      const user = userEvent.setup();
+
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <UploadCSVForm
+            setUploadedDataset={vi.fn()}
+            uploadedDataset={undefined}
+            uploadCSVData={uploadCSVData}
+            enableDirectUpload={true}
+          />
+        </ChakraProvider>,
+      );
+
+      const smallFile = new File(["a,b\n1,2\n"], "small.csv", {
+        type: "text/csv",
+      });
+      // If the cancelled upload WRONGLY fell back, the parser would read the file.
+      const textSpy = vi
+        .spyOn(smallFile, "text")
+        .mockResolvedValue("a,b\n1,2\n");
+
+      const input = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement;
+      await user.upload(input, smallFile);
+      await user.click(screen.getByRole("button", { name: /upload/i }));
+
+      // Presign is in flight → the row shows a Cancel control. Cancel now.
+      await waitFor(() => expect(requestDirectUpload).toHaveBeenCalledTimes(1));
+      await user.click(
+        await screen.findByRole("button", { name: /cancel upload/i }),
+      );
+
+      // The presign now rejects the way a no-storage install would — post-cancel.
+      await act(async () => {
+        rejectPresign(new DirectUploadUnavailableError());
+        // Flush the rejection through handleUpload's catch.
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      // The cancel wins: no fallback parse, no drawer hand-off, no error banner.
+      expect(textSpy).not.toHaveBeenCalled();
+      expect(uploadCSVData).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("upload-error")).not.toBeInTheDocument();
     });
   });
 

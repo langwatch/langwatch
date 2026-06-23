@@ -484,14 +484,24 @@ export function UploadCSVForm({
         void router.push(`/${project.slug}/datasets/${datasetId}`);
       }
     } catch (error) {
-      // A user-initiated cancel aborts the PUT. handleCancelUpload reaped the
-      // pending row IF it knew the id at cancel time — but a cancel that landed
-      // while requestDirectUpload() was still in flight ran BEFORE the id
-      // existed, so the row (minted just after) is still pending. The ref holds
-      // that id exactly when it hasn't been reaped yet, so reap-and-clear here.
-      // (Cancel during the PUT already reaped and nulled the ref, so this is a
-      // no-op then — no double reap.)
-      if (error instanceof Error && error.name === "AbortError") {
+      // A user-initiated cancel aborts the PUT (AbortError) OR lands while
+      // requestDirectUpload() is still pending. The presign call is deliberately
+      // NOT wired to the abort signal (aborting its fetch could strand a row the
+      // server minted but whose id we never received), so it runs to completion
+      // and may resolve OR reject — e.g. DirectUploadUnavailableError on a
+      // no-storage install — AFTER the cancel. In that window we must NOT run the
+      // fallback parse or surface an error for an upload the user already
+      // cancelled. `controller.signal.aborted` is the precise "cancelled while
+      // this attempt was live" flag (handleCancelUpload only aborts a controller
+      // still held by the ref; once the PUT succeeds the ref is nulled, so a
+      // later cancel can't set it), so treat it like AbortError: reap any row the
+      // presign minted (the ref holds that id exactly when it hasn't been reaped
+      // yet; a cancel during the PUT already reaped and nulled it → no double
+      // reap) and bail before any fallback/error handling.
+      if (
+        (error instanceof Error && error.name === "AbortError") ||
+        controller.signal.aborted
+      ) {
         const strandedId = pendingDatasetIdRef.current;
         pendingDatasetIdRef.current = null;
         if (strandedId && projectId) {
