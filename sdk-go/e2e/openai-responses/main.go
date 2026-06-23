@@ -8,10 +8,10 @@ import (
 	langwatch "github.com/langwatch/langwatch/sdk-go"
 	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
 
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
-	"github.com/openai/openai-go/packages/param"
-	"github.com/openai/openai-go/responses"
+	"github.com/openai/openai-go/v3"
+	oaioption "github.com/openai/openai-go/v3/option"
+	"github.com/openai/openai-go/v3/packages/param"
+	"github.com/openai/openai-go/v3/responses"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -53,11 +53,8 @@ func main() {
 	// Create instrumented OpenAI client
 	client := openai.NewClient(
 		oaioption.WithAPIKey(openaiAPIKey),
-		oaioption.WithMiddleware(otelopenai.Middleware("responses-openai-client",
-			// Optional: Capture request/response content (be mindful of sensitive data)
-			otelopenai.WithCaptureInput(),
-			otelopenai.WithCaptureOutput(),
-		)),
+		// Responses API input/output (incl. streamed output) is captured by default.
+		oaioption.WithMiddleware(otelopenai.Middleware("responses-openai-client")),
 	)
 
 	// Get LangWatch tracer

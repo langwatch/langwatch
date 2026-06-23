@@ -2,19 +2,20 @@ package openai
 
 import (
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/propagation"
 	oteltrace "go.opentelemetry.io/otel/trace"
+
+	langwatch "github.com/langwatch/langwatch/sdk-go"
 )
 
 // config is used to configure the middleware.
 type config struct {
-	tracerProvider                oteltrace.TracerProvider
-	propagators                   propagation.TextMapPropagator
-	traceIDResponseHeaderKey      string
-	traceSampledResponseHeaderKey string
-	recordInput                   bool
-	recordOutput                  bool
-	genAISystem                   attribute.KeyValue
+	tracerProvider oteltrace.TracerProvider
+	// dataCapture gates whether the middleware records input and/or output
+	// content at the source. It defaults to langwatch.DataCaptureAll.
+	dataCapture langwatch.DataCaptureMode
+	// genAIProvider is recorded as gen_ai.provider.name — the current GenAI
+	// semantic convention that supersedes the removed gen_ai.system.
+	genAIProvider attribute.KeyValue
 }
 
 // Option specifies instrumentation configuration options.
@@ -36,38 +37,39 @@ func WithTracerProvider(provider oteltrace.TracerProvider) Option {
 	})
 }
 
-// WithPropagators specifies propagators to use for extracting
-// information from the HTTP requests. If none are specified, global
-// ones will be used.
-func WithPropagators(propagators propagation.TextMapPropagator) Option {
+// WithDataCapture controls whether the middleware records request (input) and
+// response (output) content on the span. The mode gates recording at the
+// source: input content is only recorded when mode.CaptureInput() is true, and
+// output content only when mode.CaptureOutput() is true. Span structure,
+// metrics, models, usage and identity are always recorded.
+//
+// The default, when this option is not passed, is langwatch.DataCaptureAll —
+// the middleware captures both input and output. This is a deliberate breaking
+// change from the previous opt-in WithCaptureInput()/WithCaptureOutput().
+//
+// For cross-cutting control across every instrumentation, prefer the exporter
+// option langwatch.WithDataCapture(...): the two compose — the middleware gates
+// at the source and the exporter strips content at export time.
+func WithDataCapture(mode langwatch.DataCaptureMode) Option {
 	return optionFunc(func(c *config) {
-		c.propagators = propagators
+		c.dataCapture = mode
 	})
 }
 
-// WithCaptureInput enables recording the full request body content
-// under the `langwatch.input.value` attribute.
-// Be cautious with sensitive data.
-func WithCaptureInput() Option {
+// WithGenAIProvider sets the gen_ai.provider.name attribute on the span. By
+// default it is set to "openai". Pass a value from the OTel GenAI semconv
+// (e.g. semconv.GenAIProviderNameOpenAI) or a custom provider key/value.
+func WithGenAIProvider(provider attribute.KeyValue) Option {
 	return optionFunc(func(c *config) {
-		c.recordInput = true
+		c.genAIProvider = provider
 	})
 }
 
-// WithCaptureOutput enables recording the full response body content
-// (or accumulated stream content, if middleware could parse it)
-// under the `langwatch.output.value` attribute.
-// Be cautious with sensitive data.
-func WithCaptureOutput() Option {
-	return optionFunc(func(c *config) {
-		c.recordOutput = true
-	})
-}
-
-// WithGenAISystem sets the gen_ai.system attribute on the span. By
-// default, it is set to "openai".
+// WithGenAISystem sets the GenAI provider on the span.
+//
+// Deprecated: gen_ai.system was removed from the GenAI semantic conventions in
+// favour of gen_ai.provider.name. Use WithGenAIProvider; this alias forwards to
+// it for backwards compatibility.
 func WithGenAISystem(system attribute.KeyValue) Option {
-	return optionFunc(func(c *config) {
-		c.genAISystem = system
-	})
+	return WithGenAIProvider(system)
 }

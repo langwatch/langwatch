@@ -10,8 +10,8 @@ import (
 	langwatch "github.com/langwatch/langwatch/sdk-go"
 	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
 
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
+	"github.com/openai/openai-go/v3"
+	oaioption "github.com/openai/openai-go/v3/option"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -96,7 +96,7 @@ func askQuestion(ctx context.Context, client openai.Client, threadID string, his
 
 	log.Printf("trace_id: %v\n", span.SpanContext().TraceID())
 
-	span.RecordInputString(question)
+	span.SetInputText(question)
 
 	newHistory := append(history, openai.UserMessage(question))
 	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
@@ -108,7 +108,7 @@ func askQuestion(ctx context.Context, client openai.Client, threadID string, his
 	}
 
 	responseMessage := response.Choices[0].Message
-	span.RecordOutputString(responseMessage.Content)
+	span.SetOutputText(responseMessage.Content)
 
 	return responseMessage.Content, append(newHistory, openai.AssistantMessage(responseMessage.Content)), err
 }

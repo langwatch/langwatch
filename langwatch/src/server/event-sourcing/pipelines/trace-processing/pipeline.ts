@@ -1,17 +1,21 @@
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { definePipeline } from "../../";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
-import { AddAnnotationCommand, BulkSyncAnnotationsCommand, RemoveAnnotationCommand } from "./commands/annotationCommands";
+import {
+  AddAnnotationCommand,
+  BulkSyncAnnotationsCommand,
+  RemoveAnnotationCommand,
+} from "./commands/annotationCommands";
 import { AssignTopicCommand } from "./commands/assignTopicCommand";
 import { ChangeTraceNameCommand } from "./commands/changeTraceNameCommand";
 import { RecordLogCommand } from "./commands/recordLogCommand";
 import { RecordMetricCommand } from "./commands/recordMetricCommand";
 import {
-  RecordSpanCommand,
   RECORD_SPAN_DEDUPLICATION,
+  RecordSpanCommand,
 } from "./commands/recordSpanCommand";
 import { ResolveOriginCommand } from "./commands/resolveOriginCommand";
 import { LogRecordStorageMapProjection } from "./projections/logRecordStorage.mapProjection";
@@ -29,26 +33,66 @@ export interface TraceProcessingPipelineDeps {
   metricRecordAppendStore: AppendStore<NormalizedMetricRecord>;
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   originGateReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
-  evaluationTriggerReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
-  customEvaluationSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
-  traceUpdateBroadcastReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
-  projectMetadataReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
-  simulationMetricsSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
-  experimentMetricsSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
-  alertTriggerReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  evaluationTriggerReactor: ReactorDefinition<
+    TraceProcessingEvent,
+    TraceSummaryData
+  >;
+  customEvaluationSyncReactor: ReactorDefinition<
+    TraceProcessingEvent,
+    TraceSummaryData
+  >;
+  trackedEventSyncReactor: ReactorDefinition<
+    TraceProcessingEvent,
+    TraceSummaryData
+  >;
+  traceUpdateBroadcastReactor: ReactorDefinition<
+    TraceProcessingEvent,
+    TraceSummaryData
+  >;
+  projectMetadataReactor: ReactorDefinition<
+    TraceProcessingEvent,
+    TraceSummaryData
+  >;
+  simulationMetricsSyncReactor: ReactorDefinition<
+    TraceProcessingEvent,
+    TraceSummaryData
+  >;
+  experimentMetricsSyncReactor: ReactorDefinition<
+    TraceProcessingEvent,
+    TraceSummaryData
+  >;
+  alertTriggerReactor: ReactorDefinition<
+    TraceProcessingEvent,
+    TraceSummaryData
+  >;
   spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
   claudeCodeSpanSyncReactor: ReactorDefinition<TraceProcessingEvent>;
-  customerIoTraceSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
-  gatewayBudgetSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  customerIoTraceSyncReactor?: ReactorDefinition<
+    TraceProcessingEvent,
+    TraceSummaryData
+  >;
+  gatewayBudgetSyncReactor?: ReactorDefinition<
+    TraceProcessingEvent,
+    TraceSummaryData
+  >;
   /**
    * ADR-022: BlobStore injected so RecordSpanCommand can reconstitute oversized
    * commands (fetch from S3 spool) and best-effort delete the spool after
    * event_log INSERT succeeds. Optional — without it, the spool path is disabled.
    */
   blobStore?: BlobStore;
-  governanceKpisSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
-  retentionOrphanSweepReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
-  governanceOcsfEventsSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  governanceKpisSyncReactor?: ReactorDefinition<
+    TraceProcessingEvent,
+    TraceSummaryData
+  >;
+  retentionOrphanSweepReactor?: ReactorDefinition<
+    TraceProcessingEvent,
+    TraceSummaryData
+  >;
+  governanceOcsfEventsSyncReactor?: ReactorDefinition<
+    TraceProcessingEvent,
+    TraceSummaryData
+  >;
 }
 
 /**
@@ -58,32 +102,79 @@ export interface TraceProcessingPipelineDeps {
  * It aggregates span events into trace summary metrics (fold projection) and writes
  * individual spans to the stored_spans table (map projection).
  */
-export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps) {
+export function createTraceProcessingPipeline(
+  deps: TraceProcessingPipelineDeps,
+) {
   let builder = definePipeline<TraceProcessingEvent>()
     .withName("trace_processing")
     .withAggregateType("trace")
-    .withFoldProjection("traceSummary", new TraceSummaryFoldProjection({
-      store: deps.traceSummaryStore,
-    }))
-    .withMapProjection("spanStorage", new SpanStorageMapProjection({
-      store: deps.spanAppendStore,
-    }))
-    .withMapProjection("logRecordStorage", new LogRecordStorageMapProjection({
-      store: deps.logRecordAppendStore,
-    }))
-    .withMapProjection("metricRecordStorage", new MetricRecordStorageMapProjection({
-      store: deps.metricRecordAppendStore,
-    }))
+    .withFoldProjection(
+      "traceSummary",
+      new TraceSummaryFoldProjection({
+        store: deps.traceSummaryStore,
+      }),
+    )
+    .withMapProjection(
+      "spanStorage",
+      new SpanStorageMapProjection({
+        store: deps.spanAppendStore,
+      }),
+    )
+    .withMapProjection(
+      "logRecordStorage",
+      new LogRecordStorageMapProjection({
+        store: deps.logRecordAppendStore,
+      }),
+    )
+    .withMapProjection(
+      "metricRecordStorage",
+      new MetricRecordStorageMapProjection({
+        store: deps.metricRecordAppendStore,
+      }),
+    )
     .withReactor("traceSummary", "originGate", deps.originGateReactor)
-    .withReactor("traceSummary", "evaluationTrigger", deps.evaluationTriggerReactor)
-    .withReactor("traceSummary", "customEvaluationSync", deps.customEvaluationSyncReactor)
-    .withReactor("traceSummary", "traceUpdateBroadcast", deps.traceUpdateBroadcastReactor)
+    .withReactor(
+      "traceSummary",
+      "evaluationTrigger",
+      deps.evaluationTriggerReactor,
+    )
+    .withReactor(
+      "traceSummary",
+      "customEvaluationSync",
+      deps.customEvaluationSyncReactor,
+    )
+    .withReactor(
+      "traceSummary",
+      "trackedEventSync",
+      deps.trackedEventSyncReactor,
+    )
+    .withReactor(
+      "traceSummary",
+      "traceUpdateBroadcast",
+      deps.traceUpdateBroadcastReactor,
+    )
     .withReactor("traceSummary", "projectMetadata", deps.projectMetadataReactor)
-    .withReactor("traceSummary", "simulationMetricsSync", deps.simulationMetricsSyncReactor)
-    .withReactor("traceSummary", "experimentMetricsSync", deps.experimentMetricsSyncReactor)
+    .withReactor(
+      "traceSummary",
+      "simulationMetricsSync",
+      deps.simulationMetricsSyncReactor,
+    )
+    .withReactor(
+      "traceSummary",
+      "experimentMetricsSync",
+      deps.experimentMetricsSyncReactor,
+    )
     .withReactor("traceSummary", "alertTrigger", deps.alertTriggerReactor)
-    .withReactor("spanStorage", "spanStorageBroadcast", deps.spanStorageBroadcastReactor)
-    .withReactor("logRecordStorage", "claudeCodeSpanSync", deps.claudeCodeSpanSyncReactor);
+    .withReactor(
+      "spanStorage",
+      "spanStorageBroadcast",
+      deps.spanStorageBroadcastReactor,
+    )
+    .withReactor(
+      "logRecordStorage",
+      "claudeCodeSpanSync",
+      deps.claudeCodeSpanSyncReactor,
+    );
 
   if (deps.customerIoTraceSyncReactor) {
     builder = builder.withReactor(

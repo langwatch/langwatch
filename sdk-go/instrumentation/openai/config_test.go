@@ -6,10 +6,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
-	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
+
+	langwatch "github.com/langwatch/langwatch/sdk-go"
 )
 
 func TestOptions(t *testing.T) {
@@ -23,8 +24,6 @@ func TestOptions(t *testing.T) {
 		_ = exporter.Shutdown(context.Background())
 	}()
 
-	propagators := propagation.NewCompositeTextMapPropagator()
-
 	tests := []struct {
 		name         string
 		opts         []Option
@@ -35,9 +34,6 @@ func TestOptions(t *testing.T) {
 			opts: []Option{},
 			expectedConf: config{
 				tracerProvider: nil,
-				propagators:    nil,
-				recordInput:    false,
-				recordOutput:   false,
 			},
 		},
 		{
@@ -48,55 +44,53 @@ func TestOptions(t *testing.T) {
 			},
 		},
 		{
-			name: "With Propagators",
-			opts: []Option{WithPropagators(propagators)},
+			name: "With DataCapture None",
+			opts: []Option{WithDataCapture(langwatch.DataCaptureNone)},
 			expectedConf: config{
-				propagators: propagators,
+				dataCapture: langwatch.DataCaptureNone,
 			},
 		},
 		{
-			name: "With Input Content",
-			opts: []Option{WithCaptureInput()},
+			name: "With DataCapture Input only",
+			opts: []Option{WithDataCapture(langwatch.DataCaptureInput)},
 			expectedConf: config{
-				recordInput: true,
+				dataCapture: langwatch.DataCaptureInput,
 			},
 		},
 		{
-			name: "With Output Content",
-			opts: []Option{WithCaptureOutput()},
+			name: "With GenAIProvider Groq",
+			opts: []Option{WithGenAIProvider(semconv.GenAIProviderNameGroq)},
 			expectedConf: config{
-				recordOutput: true,
+				genAIProvider: semconv.GenAIProviderNameGroq,
 			},
 		},
 		{
-			name: "With GenAISystem Groq",
-			opts: []Option{WithGenAISystem(semconv.GenAISystemGroq)},
+			name: "With GenAIProvider Custom",
+			opts: []Option{WithGenAIProvider(semconv.GenAIProviderNameKey.String("custom"))},
 			expectedConf: config{
-				genAISystem: semconv.GenAISystemGroq,
+				genAIProvider: semconv.GenAIProviderNameKey.String("custom"),
 			},
 		},
 		{
-			name: "With GenAISystem Custom",
-			opts: []Option{WithGenAISystem(semconv.GenAISystemKey.String("custom"))},
+			// Exercises the deprecated WithGenAISystem alias, which forwards to
+			// WithGenAIProvider, to keep the backwards-compatible path covered.
+			name: "With GenAISystem deprecated alias",
+			opts: []Option{WithGenAISystem(semconv.GenAIProviderNameGroq)},
 			expectedConf: config{
-				genAISystem: semconv.GenAISystemKey.String("custom"),
+				genAIProvider: semconv.GenAIProviderNameGroq,
 			},
 		},
 		{
 			name: "With All Options",
 			opts: []Option{
 				WithTracerProvider(traceProvider),
-				WithPropagators(propagators),
-				WithCaptureInput(),
-				WithCaptureOutput(),
-				WithGenAISystem(semconv.GenAISystemGroq),
+				WithDataCapture(langwatch.DataCaptureAll),
+				WithGenAIProvider(semconv.GenAIProviderNameGroq),
 			},
 			expectedConf: config{
 				tracerProvider: traceProvider,
-				propagators:    propagators,
-				recordInput:    true,
-				recordOutput:   true,
-				genAISystem:    semconv.GenAISystemGroq,
+				dataCapture:    langwatch.DataCaptureAll,
+				genAIProvider:  semconv.GenAIProviderNameGroq,
 			},
 		},
 	}
@@ -109,9 +103,8 @@ func TestOptions(t *testing.T) {
 			}
 
 			require.Equal(t, tt.expectedConf.tracerProvider, cfg.tracerProvider)
-			require.Equal(t, tt.expectedConf.propagators, cfg.propagators)
-			assert.Equal(t, tt.expectedConf.recordInput, cfg.recordInput)
-			assert.Equal(t, tt.expectedConf.recordOutput, cfg.recordOutput)
+			assert.Equal(t, tt.expectedConf.dataCapture, cfg.dataCapture)
+			assert.Equal(t, tt.expectedConf.genAIProvider, cfg.genAIProvider)
 		})
 	}
 }

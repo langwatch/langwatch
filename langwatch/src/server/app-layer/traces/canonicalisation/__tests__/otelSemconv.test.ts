@@ -115,6 +115,127 @@ describe("OTel GenAI Semantic Conventions v1.38.0", () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────
+  // Inference Span — v1.41 reasoning / streaming attributes (Go SDK)
+  // ─────────────────────────────────────────────────────────────────────────
+  describe("inference span with v1.41 reasoning and streaming attributes", () => {
+    describe("when the span carries gen_ai.usage.reasoning.output_tokens", () => {
+      it("canonicalises it to gen_ai.usage.reasoning_tokens", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.usage.reasoning.output_tokens": 64,
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(result.attributes["gen_ai.usage.reasoning_tokens"]).toBe(64);
+      });
+    });
+
+    describe("when the span carries the legacy gen_ai.usage.reasoning_tokens", () => {
+      it("keeps reading it as a fallback", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.usage.reasoning_tokens": 32,
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(result.attributes["gen_ai.usage.reasoning_tokens"]).toBe(32);
+      });
+    });
+
+    describe("when both reasoning token attributes are present", () => {
+      it("lets the current convention win", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.usage.reasoning.output_tokens": 64,
+            "gen_ai.usage.reasoning_tokens": 32,
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(result.attributes["gen_ai.usage.reasoning_tokens"]).toBe(64);
+      });
+    });
+
+    describe("when the span carries gen_ai.response.time_to_first_chunk in seconds", () => {
+      it("canonicalises it to gen_ai.server.time_to_first_token in milliseconds", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.response.time_to_first_chunk": 0.65,
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(
+          result.attributes["gen_ai.server.time_to_first_token"],
+        ).toBeCloseTo(650, 5);
+      });
+    });
+
+    describe("when an existing time_to_first_token is already present", () => {
+      it("does not overwrite it with the chunk-derived value", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.server.time_to_first_token": 500,
+            "gen_ai.response.time_to_first_chunk": 0.8,
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(result.attributes["gen_ai.server.time_to_first_token"]).toBe(
+          500,
+        );
+      });
+    });
+
+    describe("when the span carries gen_ai.request.stream", () => {
+      it("records the boolean stream flag", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.request.stream": true,
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(result.attributes["gen_ai.request.stream"]).toBe(true);
+      });
+
+      it("coerces a stringified stream flag to a boolean", () => {
+        const result = service.canonicalize(
+          {
+            "gen_ai.operation.name": "chat",
+            "gen_ai.request.model": "gpt-4",
+            "gen_ai.request.stream": "true",
+          },
+          [],
+          clientSpan,
+        );
+
+        expect(result.attributes["gen_ai.request.stream"]).toBe(true);
+      });
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
   // Inference Span — Input messages (parts-based format, v1.38.0)
   // ─────────────────────────────────────────────────────────────────────────
   describe("inference span with parts-based input messages", () => {

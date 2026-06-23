@@ -8,8 +8,8 @@ import (
 	langwatch "github.com/langwatch/langwatch/sdk-go"
 	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
 
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
+	"github.com/openai/openai-go/v3"
+	oaioption "github.com/openai/openai-go/v3/option"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
@@ -33,11 +33,7 @@ func main() {
 	// Create instrumented OpenAI client
 	client := openai.NewClient(
 		oaioption.WithAPIKey(openaiAPIKey),
-		oaioption.WithMiddleware(otelopenai.Middleware("filtered-spans-openai-client",
-			// Optional: Capture request/response content (be mindful of sensitive data)
-			otelopenai.WithCaptureInput(),
-			otelopenai.WithCaptureOutput(),
-		)),
+		oaioption.WithMiddleware(otelopenai.Middleware("filtered-spans-openai-client")),
 	)
 
 	// Setup some tracers that we don't want to see in LangWatch
