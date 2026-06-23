@@ -107,7 +107,7 @@
     "@opentelemetry/semantic-conventions": "^1.36.0",
     "@types/prompts": "^2.4.9",
     "chalk": "^4.1.2",
-    "commander": "^12.0.0",
+    "commander": "^15.0.0",
     "dotenv": "^17.3.1",
     "js-yaml": "^4.1.0",
     "liquidjs": "^10.27.0",
