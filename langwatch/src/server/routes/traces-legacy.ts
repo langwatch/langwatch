@@ -22,6 +22,7 @@ import {
 } from "~/server/traces/trace-formatting";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import { TraceService } from "~/server/traces/trace.service";
+import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
 import type { Span, Trace } from "~/server/tracer/types";
 import type { Permission } from "~/server/api/rbac";
@@ -104,12 +105,13 @@ secured.access(handlerManagedAuth(AUTH_REASON)).get("/trace/:id", async (c) => {
     const protections = await getProtectionsForProject(prisma, {
       projectId: project.id,
     });
-    const traceService = TraceService.create(prisma);
-    const trace = await traceService.getById(
-      project.id,
-      traceId,
-      protections,
+    const traceService = TraceService.create(
+      prisma,
+      buildTraceBlobResolutionDeps(),
     );
+    const trace = await traceService.getById(project.id, traceId, protections, {
+      full: true,
+    });
     if (!trace) {
       return c.json({ message: "Trace not found." }, 404);
     }
