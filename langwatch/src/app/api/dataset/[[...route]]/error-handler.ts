@@ -22,6 +22,13 @@ const DOMAIN_ERROR_HTTP: Record<
   DatasetConflictError: { status: 409, code: "Conflict" },
   UploadNotPendingError: { status: 409, code: "Conflict" },
   DatasetNotRetryableError: { status: 409, code: "Conflict" },
+  // Reading/appending a still-preparing dataset (I-READY): 425 Too Early,
+  // matching the tRPC layer's PRECONDITION_FAILED and the explicit
+  // `mapDatasetNotReadyError` the read routes use. This is the global safety
+  // net so a route that lets the error propagate (e.g. POST /:slugOrId/upload
+  // racing an in-flight normalize) returns 425, not a 500 that pages on-call
+  // for a normal user-induced race.
+  DatasetNotReadyError: { status: 425, code: "DatasetNotReady" },
   DirectUploadUnavailableError: {
     status: 409,
     code: "DirectUploadUnavailable",

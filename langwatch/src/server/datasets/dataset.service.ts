@@ -1192,9 +1192,13 @@ export class DatasetService {
     // the name-conflict check below (else a same-name retry would spuriously
     // 409). The processing re-drive has no such coupling — it only re-enqueues
     // OTHER wedged rows — so fire it off the hot path (it swallows its own
-    // errors, so `void` can't throw).
+    // errors, so `void` can't throw today — the inline `.catch` is
+    // belt-and-suspenders so a future throw added ABOVE its internal try/catch
+    // (e.g. param validation) can't become an unhandled rejection.
     await this.reapStalePendingUploads(projectId);
-    void this.reapStaleProcessing(projectId);
+    void this.reapStaleProcessing(projectId).catch((err) => {
+      logger.warn({ projectId, err }, "reapStaleProcessing failed (non-fatal)");
+    });
 
     const slug = this.generateSlug(name);
     // C2: reject a name conflict before minting a presigned URL so a duplicate
