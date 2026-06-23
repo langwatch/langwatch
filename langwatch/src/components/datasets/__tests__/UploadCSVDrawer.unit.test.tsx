@@ -157,6 +157,26 @@ describe("the upload dropzone", () => {
         screen.getByRole("button", { name: /remove file/i }),
       ).toBeInTheDocument();
     });
+
+    it("resets the native input value so the same file can be re-picked after a remove", async () => {
+      const user = userEvent.setup();
+      wrap(
+        <CSVReaderComponent
+          parse={false}
+          onUploadAccepted={vi.fn()}
+          onRawFile={vi.fn()}
+        />,
+      );
+
+      await user.upload(
+        fileInput(),
+        new File(["x"], "repick.csv", { type: "text/csv" }),
+      );
+
+      // The captured file lives in React state; the input is cleared so the OS
+      // dialog re-firing `change` for the same file isn't suppressed.
+      expect(fileInput().value).toBe("");
+    });
   });
 
   describe("when the chosen file is removed", () => {

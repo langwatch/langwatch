@@ -1337,6 +1337,10 @@ function RawFileDropzone({
               onChange={(event) => {
                 const file = event.target.files?.[0] ?? null;
                 if (file) setFile(file);
+                // Reset the native value so re-picking the SAME file after a
+                // remove still fires `change` (otherwise the unchanged value
+                // suppresses it and Upload stays disabled).
+                event.target.value = "";
               }}
             />
             <DropzonePrompt />
