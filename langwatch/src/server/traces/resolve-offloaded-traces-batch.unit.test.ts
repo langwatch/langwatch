@@ -12,7 +12,7 @@
  *
  * BDD structure: given/when nested describes, action-based it() names.
  */
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // TraceIOExtractionService wraps its methods in getLangWatchTracer spans.
 vi.mock("langwatch", () => ({
@@ -21,7 +21,7 @@ vi.mock("langwatch", () => ({
       _name: string,
       _opts: unknown,
       fn: (span: { setAttributes: () => void }) => unknown,
-    ) => fn({ setAttributes: () => {} }),
+    ) => fn({ setAttributes: () => undefined }),
   }),
 }));
 
@@ -30,9 +30,9 @@ import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service"
 import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import {
+  type NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
-  type NormalizedSpan,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import {
   EVENT_LOG_RESOLVE_CONCURRENCY,
@@ -362,9 +362,7 @@ describe("resolveOffloadedTracesBatch() — AC7 graceful degradation", () => {
           logger,
         });
 
-        const keys = Object.keys(
-          results[0]!.resolvedSpans[0]!.spanAttributes,
-        );
+        const keys = Object.keys(results[0]!.resolvedSpans[0]!.spanAttributes);
         expect(keys.every((k) => !k.startsWith(EVENTREF_ATTR_PREFIX))).toBe(
           true,
         );

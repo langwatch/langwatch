@@ -27,11 +27,11 @@ import {
 } from "~/server/app-layer/traces/blob-store.service";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import {
-  hasEventRefs,
-  parseSpanEventRefs,
-} from "./offloaded-eventref-parsing";
-import type { ResolvedTraceSpans, WarnLogger } from "./resolve-offloaded-traces";
+import { hasEventRefs, parseSpanEventRefs } from "./offloaded-eventref-parsing";
+import type {
+  ResolvedTraceSpans,
+  WarnLogger,
+} from "./resolve-offloaded-traces";
 
 /**
  * Maximum number of concurrent `event_log` reads in flight at once across an
@@ -60,12 +60,14 @@ interface SpanPlan {
 }
 
 /** Internal: outcome of a single event_log fetch. */
-type FetchResult =
-  | { ok: true; value: string }
-  | { ok: false; error: unknown };
+type FetchResult = { ok: true; value: string } | { ok: false; error: unknown };
 
 /** Builds the dedup key for a fetch task. NUL separator can't collide with ids. */
-function fetchKeyOf(aggregateId: string, eventId: string, field: string): string {
+function fetchKeyOf(
+  aggregateId: string,
+  eventId: string,
+  field: string,
+): string {
   return `${aggregateId}\u0000${eventId}\u0000${field}`;
 }
 

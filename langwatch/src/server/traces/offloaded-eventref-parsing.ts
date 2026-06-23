@@ -29,10 +29,9 @@ export interface ParsedSpanEventRefs {
 
 /** True when the attribute map carries at least one eventref pointer. */
 export function hasEventRefs(attributes: Record<string, string>): boolean {
-  for (const key in attributes) {
-    if (key.startsWith(EVENTREF_ATTR_PREFIX)) return true;
-  }
-  return false;
+  return Object.keys(attributes).some((key) =>
+    key.startsWith(EVENTREF_ATTR_PREFIX),
+  );
 }
 
 /**

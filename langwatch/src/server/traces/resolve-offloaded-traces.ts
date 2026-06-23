@@ -32,10 +32,7 @@ import type {
   TraceIOExtractionService,
 } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import {
-  hasEventRefs,
-  parseSpanEventRefs,
-} from "./offloaded-eventref-parsing";
+import { hasEventRefs, parseSpanEventRefs } from "./offloaded-eventref-parsing";
 
 /** Minimal logger interface required by this module (subset of PinoLogger). */
 export type WarnLogger = Pick<PinoLogger, "warn" | "error">;

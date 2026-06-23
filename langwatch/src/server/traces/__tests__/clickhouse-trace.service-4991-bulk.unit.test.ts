@@ -23,7 +23,10 @@ import { ClickHouseTraceService } from "../clickhouse-trace.service";
 import { resolveOffloadedTraces } from "../resolve-offloaded-traces";
 import { resolveOffloadedTracesBatch } from "../resolve-offloaded-traces-batch";
 import type { GetAllTracesForProjectInput } from "../types";
-import { makeSpanRowWithEventRef, makeSummaryRow } from "./fixtures/ch-row-fixtures";
+import {
+  makeSpanRowWithEventRef,
+  makeSummaryRow,
+} from "./fixtures/ch-row-fixtures";
 
 // ---------------------------------------------------------------------------
 // Hoisted mock — only the raw CH SQL boundary
@@ -53,9 +56,9 @@ vi.mock("langwatch", () => ({
     withActiveSpan: (_name: string, ...args: unknown[]) => {
       const fn = args.length === 1 ? args[0] : args[1];
       const fakeSpan = {
-        setAttribute: () => {},
-        setAttributes: () => {},
-        addEvent: () => {},
+        setAttribute: () => undefined,
+        setAttributes: () => undefined,
+        addEvent: () => undefined,
       };
       return (fn as (s: typeof fakeSpan) => Promise<unknown>)(fakeSpan);
     },
