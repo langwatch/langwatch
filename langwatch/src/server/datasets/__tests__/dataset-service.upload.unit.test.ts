@@ -240,9 +240,7 @@ describe("DatasetService", () => {
         } as any);
         const repo = {
           findStalePendingUploads: vi.fn().mockResolvedValue([]),
-          findStaleProcessing: vi
-            .fn()
-            .mockRejectedValue(new Error("db down")),
+          findStaleProcessing: vi.fn().mockRejectedValue(new Error("db down")),
           findBySlug: vi.fn().mockResolvedValue(null),
           create: vi.fn().mockResolvedValue({ id: "dataset_new", slug: "ds" }),
         };
