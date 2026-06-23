@@ -298,35 +298,47 @@ function DatasetsPage() {
                           </Button>
                         </Menu.Trigger>
                         <Menu.Content>
-                          <Menu.Item
-                            value="copy"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setCopyDataset({
-                                datasetId: dataset.id,
-                                datasetName: dataset.name,
-                              });
-                            }}
-                          >
-                            <Copy size={16} /> Replicate to another project
-                          </Menu.Item>
+                          {/* Replicate and Edit operate on dataset CONTENT, which
+                              only exists once `ready` — copyDataset / column edits
+                              throw DatasetNotReadyError on a processing/failed row.
+                              Gate them on ready (a null status = legacy = ready).
+                              Delete stays available so a stuck/failed dataset can
+                              always be cleaned up. */}
+                          {(dataset.status === "ready" ||
+                            dataset.status == null) && (
+                            <Menu.Item
+                              value="copy"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setCopyDataset({
+                                  datasetId: dataset.id,
+                                  datasetName: dataset.name,
+                                });
+                              }}
+                            >
+                              <Copy size={16} /> Replicate to another project
+                            </Menu.Item>
+                          )}
                           {!isLiteMember && (
                             <>
-                              <Menu.Item
-                                value="edit"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setEditDataset({
-                                    datasetId: dataset.id,
-                                    name: dataset.name,
-                                    columnTypes:
-                                      dataset.columnTypes as DatasetColumns,
-                                  });
-                                  addEditDatasetDrawer.onOpen();
-                                }}
-                              >
-                                <Edit size={16} /> Edit dataset
-                              </Menu.Item>
+                              {(dataset.status === "ready" ||
+                                dataset.status == null) && (
+                                <Menu.Item
+                                  value="edit"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setEditDataset({
+                                      datasetId: dataset.id,
+                                      name: dataset.name,
+                                      columnTypes:
+                                        dataset.columnTypes as DatasetColumns,
+                                    });
+                                    addEditDatasetDrawer.onOpen();
+                                  }}
+                                >
+                                  <Edit size={16} /> Edit dataset
+                                </Menu.Item>
+                              )}
                               <Menu.Item
                                 value="delete"
                                 color="red.600"

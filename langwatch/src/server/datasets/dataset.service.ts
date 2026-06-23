@@ -207,6 +207,21 @@ export class DatasetService {
         throw new DatasetNotFoundError();
       }
 
+      // Defense in depth for the UI's ready-gate: editing a dataset that is still
+      // `uploading`/`processing` (or `failed`) races the normalize job and edits
+      // content that isn't settled. Refuse unless ready (a null status = legacy =
+      // ready). The datasets-page menu hides Edit for non-ready rows; this stops a
+      // direct/stale call too.
+      if (
+        existingDataset.status != null &&
+        existingDataset.status !== "ready"
+      ) {
+        throw new DatasetNotReadyError({
+          status: existingDataset.status,
+          statusError: existingDataset.statusError,
+        });
+      }
+
       const slug = this.generateSlug(name);
 
       // Check for slug collision with other datasets (excluding current one)

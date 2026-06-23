@@ -346,6 +346,32 @@ describe("DatasetService", () => {
         });
       });
     });
+
+    describe("upsertDataset() editing an existing dataset", () => {
+      it("refuses to edit a not-ready dataset, before any slug lookup or mutation", async () => {
+        const repository = {
+          findOne: vi.fn().mockResolvedValue({ ...notReadyRow }),
+          findBySlug: vi.fn(),
+        };
+        const prisma = {
+          $transaction: async (fn: (tx: unknown) => unknown) => fn({}),
+        };
+
+        await expect(
+          makeService({ repository, prisma }).upsertDataset({
+            projectId: "p1",
+            datasetId: "dataset_1",
+            name: "DS",
+            columnTypes: [{ name: "a", type: "string" }],
+          }),
+        ).rejects.toMatchObject({
+          name: "DatasetNotReadyError",
+          status: "processing",
+        });
+        // The ready-gate fires before the slug-conflict lookup / write.
+        expect(repository.findBySlug).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe("copyDataset()", () => {
