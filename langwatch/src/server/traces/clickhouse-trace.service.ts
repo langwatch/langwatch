@@ -61,6 +61,19 @@ export type ResolveTraceSpansFn = (
 ) => Promise<ResolvedTraceSpans>;
 
 /**
+ * Callback injected from TraceService that resolves offloaded blob refs for a
+ * WHOLE result set of traces in one bounded pass (#4991 bulk read paths). When
+ * present, the bulk read methods (getTracesWithSpans, enrichTracesWithSpans on
+ * the download path) use it so a large export/thread streams its event_log
+ * reads instead of fanning out an unbounded N×M burst. Falls back to the
+ * per-trace {@link ResolveTraceSpansFn} when absent.
+ */
+export type ResolveTraceSpansBatchFn = (
+  projectId: string,
+  spansPerTrace: NormalizedSpan[][],
+) => Promise<ResolvedTraceSpans[]>;
+
+/**
  * Cursor structure for keyset pagination.
  * Encoded as base64 JSON in the scrollId.
  */
@@ -222,11 +235,21 @@ export class ClickHouseTraceService {
    */
   private readonly resolveTraceSpans: ResolveTraceSpansFn | undefined;
 
+  /**
+   * Optional bulk resolver for whole result sets (#4991). Preferred over
+   * {@link resolveTraceSpans} on the bulk read paths so a large export/thread
+   * resolves its blobs in one bounded-concurrency pass. When absent, the bulk
+   * paths fall back to the per-trace resolver.
+   */
+  private readonly resolveTraceSpansBatch: ResolveTraceSpansBatchFn | undefined;
+
   constructor(
     private readonly prisma: PrismaClient,
     resolveTraceSpans?: ResolveTraceSpansFn,
+    resolveTraceSpansBatch?: ResolveTraceSpansBatchFn,
   ) {
     this.resolveTraceSpans = resolveTraceSpans;
+    this.resolveTraceSpansBatch = resolveTraceSpansBatch;
   }
 
   /**
@@ -246,8 +269,13 @@ export class ClickHouseTraceService {
   static create(
     prisma: PrismaClient = defaultPrisma,
     resolveTraceSpans?: ResolveTraceSpansFn,
+    resolveTraceSpansBatch?: ResolveTraceSpansBatchFn,
   ): ClickHouseTraceService {
-    return new ClickHouseTraceService(prisma, resolveTraceSpans);
+    return new ClickHouseTraceService(
+      prisma,
+      resolveTraceSpans,
+      resolveTraceSpansBatch,
+    );
   }
 
   /**
@@ -305,18 +333,15 @@ export class ClickHouseTraceService {
             occurredAt,
           );
 
-          // Map to legacy Trace format and apply protections
-          const traces: Trace[] = [];
-          for (const [_traceId, { summary, spans }] of tracesWithSpans) {
-            const trace = await this.resolveAndMerge({
-              projectId,
-              summary,
-              spans,
-              protections,
-              resolveBlobs: opts?.resolveBlobs,
-            });
-            traces.push(trace);
-          }
+          // Map to legacy Trace format and apply protections. Blob resolution
+          // (when opted in) runs as a single bounded pass over the whole set so
+          // a large multi-trace read streams its event_log reads (#4991 AC6).
+          const traces = await this.resolveAndMergeMany({
+            projectId,
+            entries: [...tracesWithSpans.values()],
+            protections,
+            resolveBlobs: opts?.resolveBlobs,
+          });
 
           this.logger.debug(
             { projectId, traceCount: traces.length },
@@ -428,12 +453,16 @@ export class ClickHouseTraceService {
    * @param projectId - The project ID
    * @param threadId - The thread ID to search for
    * @param protections - Field redaction protections
+   * @param opts.resolveBlobs - Forwarded to the per-trace fetch so the
+   *   thread-detail read resolves full IO (#4991). Customer thread views that
+   *   construct without a blob resolver get a no-op. Defaults to false.
    * @returns Array of Trace objects, or null if ClickHouse is not enabled
    */
   async getTracesByThreadId(
     projectId: string,
     threadId: string,
     protections: Protections,
+    opts?: { resolveBlobs?: boolean },
   ): Promise<Trace[] | null> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getTracesByThreadId",
@@ -477,11 +506,15 @@ export class ClickHouseTraceService {
             return [];
           }
 
-          // Fetch full traces with spans
+          // Fetch full traces with spans. Forward resolveBlobs so the
+          // thread-detail read can resolve full IO (#4991); customer thread
+          // views with no resolver wired stay on the preview.
           const traces = await this.getTracesWithSpans(
             projectId,
             traceIds,
             protections,
+            undefined,
+            { resolveBlobs: opts?.resolveBlobs },
           );
           if (!traces) return null;
 
@@ -767,12 +800,16 @@ export class ClickHouseTraceService {
               dateField,
             });
 
-          // When includeSpans is requested, fetch and attach actual spans
+          // When includeSpans is requested, fetch and attach actual spans.
+          // resolveBlobs is opt-in (download/export — #4991 AC1) so the
+          // list/search grid stays on the preview with zero event_log reads
+          // (#4888 AC2 / ADR-022 — AC5).
           if (options.includeSpans && traces.length > 0) {
             traces = await this.enrichTracesWithSpans(
               traces,
               input.projectId,
               protections,
+              options.resolveBlobs === true,
             );
           }
 
@@ -2261,39 +2298,105 @@ export class ClickHouseTraceService {
    *
    * @internal
    */
-  private async resolveAndMerge({
+  private async resolveAndMergeMany({
     projectId,
-    summary,
-    spans,
+    entries,
     protections,
     resolveBlobs,
   }: {
     projectId: string;
-    summary: TraceSummaryData;
-    spans: NormalizedSpan[];
+    entries: Array<{ summary: TraceSummaryData; spans: NormalizedSpan[] }>;
     protections: Protections;
     /**
-     * Per-call gate (#4888): resolve offloaded eventref pointers from event_log
-     * ONLY when true. The resolver is constructed on the instance, but the read
-     * path opts in per call so list/search/collapsed reads keep the preview and
-     * issue zero event_log SELECTs (ADR-022). Defaults to false.
+     * Per-call gate (#4888/#4991): resolve offloaded eventref pointers from
+     * event_log ONLY when true. The resolver is constructed on the instance,
+     * but the read path opts in per call so list/search/collapsed reads keep
+     * the preview and issue zero event_log SELECTs (ADR-022). Defaults to false.
      */
     resolveBlobs?: boolean;
-  }): Promise<Trace> {
-    let resolvedSpans = spans;
-    let recomputedInput: ExtractedIO | null = null;
-    let recomputedOutput: ExtractedIO | null = null;
+  }): Promise<Trace[]> {
+    const resolutions = await this.resolveSpansBatch({
+      projectId,
+      spansPerTrace: entries.map((e) => e.spans),
+      resolveBlobs,
+    });
 
-    if (resolveBlobs === true && this.resolveTraceSpans) {
-      const resolution = await this.resolveTraceSpans(projectId, spans);
-      resolvedSpans = resolution.resolvedSpans;
-      if (resolution.anyResolved) {
-        recomputedInput = resolution.recomputedInput;
-        recomputedOutput = resolution.recomputedOutput;
-      }
+    return entries.map((entry, i) =>
+      this.mergeResolvedTrace({
+        projectId,
+        summary: entry.summary,
+        resolution: resolutions[i]!,
+        protections,
+      }),
+    );
+  }
+
+  /**
+   * Resolve offloaded blob refs for a set of traces' spans, in one pass.
+   *
+   * Prefers the bulk {@link resolveTraceSpansBatch} (single bounded-concurrency
+   * sweep over event_log — #4991 AC6); falls back to the per-trace resolver
+   * when only that is wired (e.g. a CH service constructed with just the
+   * single-trace callback). When `resolveBlobs` is not true, returns
+   * passthrough resolutions (preview preserved, zero event_log reads — AC5).
+   *
+   * @internal
+   */
+  private async resolveSpansBatch({
+    projectId,
+    spansPerTrace,
+    resolveBlobs,
+  }: {
+    projectId: string;
+    spansPerTrace: NormalizedSpan[][];
+    resolveBlobs?: boolean;
+  }): Promise<ResolvedTraceSpans[]> {
+    if (resolveBlobs === true && this.resolveTraceSpansBatch) {
+      return this.resolveTraceSpansBatch(projectId, spansPerTrace);
     }
 
-    const mappedSpans = mapNormalizedSpansToSpans(resolvedSpans);
+    if (resolveBlobs === true && this.resolveTraceSpans) {
+      const resolutions: ResolvedTraceSpans[] = [];
+      for (const spans of spansPerTrace) {
+        resolutions.push(await this.resolveTraceSpans(projectId, spans));
+      }
+      return resolutions;
+    }
+
+    // No resolution opted in (or no resolver wired): keep the preview.
+    return spansPerTrace.map((spans) => ({
+      resolvedSpans: spans,
+      recomputedInput: null,
+      recomputedOutput: null,
+      anyResolved: false,
+    }));
+  }
+
+  /**
+   * Map one trace's resolved spans to the legacy Trace, patch recomputed I/O
+   * (when blobs were resolved), and apply field-redaction protections.
+   *
+   * @internal
+   */
+  private mergeResolvedTrace({
+    projectId,
+    summary,
+    resolution,
+    protections,
+  }: {
+    projectId: string;
+    summary: TraceSummaryData;
+    resolution: ResolvedTraceSpans;
+    protections: Protections;
+  }): Trace {
+    const recomputedInput: ExtractedIO | null = resolution.anyResolved
+      ? resolution.recomputedInput
+      : null;
+    const recomputedOutput: ExtractedIO | null = resolution.anyResolved
+      ? resolution.recomputedOutput
+      : null;
+
+    const mappedSpans = mapNormalizedSpansToSpans(resolution.resolvedSpans);
     let trace = mapTraceSummaryToTrace(summary, mappedSpans, projectId);
 
     // When blobs were resolved, patch trace.input / trace.output with
@@ -2326,6 +2429,7 @@ export class ClickHouseTraceService {
     traces: Trace[],
     projectId: string,
     protections: Protections,
+    resolveBlobs = false,
   ): Promise<Trace[]> {
     const traceIds = traces.map((t) => t.trace_id);
     // The traces already carry their own timestamps, so derive the partition
@@ -2344,25 +2448,39 @@ export class ClickHouseTraceService {
       occurredAt,
     );
 
-    return Promise.all(
-      traces.map(async (trace) => {
-        const data = tracesWithSpans.get(trace.trace_id);
-        if (!data || data.spans.length === 0) {
-          return trace;
-        }
+    // Collect the traces that actually have spans, resolve+merge them as one
+    // bounded batch (#4991 AC6), then splice the results back in order. Traces
+    // whose spans are not found pass through unchanged.
+    //
+    // resolveBlobs is gated by the CALLER: the list/search grid leaves it false
+    // so it keeps the ≤64 KB preview and issues zero event_log SELECTs (#4888
+    // AC2 / ADR-022). Only the download/export path opts in (#4991 AC1).
+    const enrichable = traces
+      .map((trace, index) => ({ index, data: tracesWithSpans.get(trace.trace_id) }))
+      .filter(
+        (
+          e,
+        ): e is {
+          index: number;
+          data: { summary: TraceSummaryData; spans: NormalizedSpan[] };
+        } => !!e.data && e.data.spans.length > 0,
+      );
 
-        // List/search path (getAllTracesForProject): NEVER resolve blobs, even
-        // on a deps-carrying instance — keep the ≤64 KB preview and issue zero
-        // event_log SELECTs (#4888 AC2 / ADR-022 binding constraint).
-        return this.resolveAndMerge({
-          projectId,
-          summary: data.summary,
-          spans: data.spans,
-          protections,
-          resolveBlobs: false,
-        });
-      }),
-    );
+    const merged = await this.resolveAndMergeMany({
+      projectId,
+      entries: enrichable.map((e) => ({
+        summary: e.data.summary,
+        spans: e.data.spans,
+      })),
+      protections,
+      resolveBlobs,
+    });
+
+    const result = [...traces];
+    enrichable.forEach((e, i) => {
+      result[e.index] = merged[i]!;
+    });
+    return result;
   }
 
   /**
