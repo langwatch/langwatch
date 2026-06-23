@@ -27,12 +27,15 @@ import {
   BlobFieldNotFoundError,
   BlobNotFoundError,
 } from "~/server/app-layer/traces/blob-store.service";
-import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
 import type {
   ExtractedIO,
   TraceIOExtractionService,
 } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import {
+  hasEventRefs,
+  parseSpanEventRefs,
+} from "./offloaded-eventref-parsing";
 
 /** Minimal logger interface required by this module (subset of PinoLogger). */
 export type WarnLogger = Pick<PinoLogger, "warn" | "error">;
@@ -59,14 +62,6 @@ export interface ResolvedTraceSpans {
    * stored in trace_summaries should remain in effect.
    */
   anyResolved: boolean;
-}
-
-/** True when the attribute map carries at least one eventref pointer. */
-function hasEventRefs(attributes: Record<string, string>): boolean {
-  for (const key in attributes) {
-    if (key.startsWith(EVENTREF_ATTR_PREFIX)) return true;
-  }
-  return false;
 }
 
 /**
@@ -131,50 +126,23 @@ export async function resolveOffloadedTraces({
         return { span, resolvedCount: 0 };
       }
 
-      // Separate eventref keys from regular attributes
-      const cleanedAttrs: Record<string, string> = {};
-      const eventrefEntries: Array<{
-        attrKey: string;
-        field: string;
-        eventId: string;
-      }> = [];
+      // Separate eventref keys from regular attributes (shared decoder).
+      const { cleanedAttrs, eventrefEntries, missingEventIdKeys } =
+        parseSpanEventRefs(attrs);
 
-      for (const [key, value] of Object.entries(attrs)) {
-        if (key.startsWith(EVENTREF_ATTR_PREFIX)) {
-          const attrKey = key.slice(EVENTREF_ATTR_PREFIX.length);
-          try {
-            const ref = JSON.parse(value) as {
-              field?: string;
-              eventId?: string;
-            };
-            if (typeof ref.eventId !== "string" || ref.eventId.length === 0) {
-              // Eventref missing the embedded eventId — can't resolve. Strip
-              // the key so we don't leak the reserved namespace to the UI,
-              // but keep the preview that's already in cleanedAttrs (added
-              // by `else` branch below when the span attr was the IO key
-              // itself, not the reserved one).
-              logger.warn(
-                {
-                  projectId,
-                  spanId: span.spanId,
-                  traceId: span.traceId,
-                  attrKey,
-                },
-                "eventref missing eventId — keeping preview value",
-              );
-              continue;
-            }
-            eventrefEntries.push({
-              attrKey,
-              field: ref.field ?? attrKey,
-              eventId: ref.eventId,
-            });
-          } catch {
-            // Malformed eventref JSON — skip; preview in cleanedAttrs is still shown.
-          }
-        } else {
-          cleanedAttrs[key] = value;
-        }
+      // Eventref missing the embedded eventId — can't resolve. The reserved
+      // key is already stripped (kept out of cleanedAttrs) so the UI never
+      // sees the namespace; the preview under the plain IO key stays in place.
+      for (const attrKey of missingEventIdKeys) {
+        logger.warn(
+          {
+            projectId,
+            spanId: span.spanId,
+            traceId: span.traceId,
+            attrKey,
+          },
+          "eventref missing eventId — keeping preview value",
+        );
       }
 
       if (eventrefEntries.length === 0) {
