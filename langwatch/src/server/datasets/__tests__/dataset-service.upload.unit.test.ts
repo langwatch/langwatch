@@ -186,7 +186,7 @@ describe("DatasetService", () => {
     });
 
     describe("when a prior upload is wedged mid-processing (lost normalize job)", () => {
-      it("re-drives normalize for the stale processing row before minting", async () => {
+      it("re-drives normalize for the stale processing row (off the hot path)", async () => {
         vi.mocked(getDatasetStorage).mockResolvedValue({
           createPresignedUpload: vi.fn().mockResolvedValue({
             uploadId: "u4",
@@ -204,6 +204,7 @@ describe("DatasetService", () => {
         const repo = {
           findStalePendingUploads: vi.fn().mockResolvedValue([]),
           findStaleProcessing: vi.fn().mockResolvedValue([wedged]),
+          markProcessingRedriven: vi.fn().mockResolvedValue(1),
           findBySlug: vi.fn().mockResolvedValue(null),
           create: vi.fn().mockResolvedValue({ id: "dataset_new", slug: "ds" }),
         };
@@ -214,16 +215,27 @@ describe("DatasetService", () => {
           filename: "data.jsonl",
         });
 
-        // the wedged row's normalize is re-enqueued from its bound source...
-        expect(enqueueDatasetNormalize).toHaveBeenCalledWith(
-          expect.objectContaining({
-            payload: expect.objectContaining({
-              datasetId: "dataset_wedged",
-              projectId: "p1",
-              tenantId: "p1",
-              stagingKey: "staging/p1/wedged",
-              filename: "old.csv",
+        // the processing re-drive is fire-and-forget (not on the upload's hot
+        // path), so the new upload returns first; the wedged row's normalize is
+        // re-enqueued from its bound source on the detached sweep...
+        await vi.waitFor(() =>
+          expect(enqueueDatasetNormalize).toHaveBeenCalledWith(
+            expect.objectContaining({
+              payload: expect.objectContaining({
+                datasetId: "dataset_wedged",
+                projectId: "p1",
+                tenantId: "p1",
+                stagingKey: "staging/p1/wedged",
+                filename: "old.csv",
+              }),
             }),
+          ),
+        );
+        // ...updatedAt is bumped so the next sweep won't re-select it within TTL
+        await vi.waitFor(() =>
+          expect(repo.markProcessingRedriven).toHaveBeenCalledWith({
+            id: "dataset_wedged",
+            projectId: "p1",
           }),
         );
         // ...and the new upload still proceeds

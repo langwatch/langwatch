@@ -171,6 +171,30 @@ export class DatasetRepository {
   }
 
   /**
+   * Records a normalize re-drive on a wedged `processing` row by bumping
+   * `updatedAt` (Prisma's `@updatedAt` fires on any update; the no-op
+   * `statusError: null` write is just the trigger — a processing row already has
+   * a null error). Guarded on `status='processing'` (an `updateMany`) so it can
+   * never resurrect a row that raced to `ready`/`failed` between selection and
+   * re-drive. This stops `findStaleProcessing` from re-selecting the same row on
+   * every subsequent upload within the TTL. Returns the rows touched.
+   */
+  async markProcessingRedriven(input: {
+    id: string;
+    projectId: string;
+  }): Promise<number> {
+    const { count } = await this.prisma.dataset.updateMany({
+      where: {
+        id: input.id,
+        projectId: input.projectId,
+        status: "processing",
+      },
+      data: { statusError: null },
+    });
+    return count;
+  }
+
+  /**
    * Finds datasets wedged mid-normalize: `status='processing'`, non-archived
    * rows with a bound staging key whose `updatedAt` (the moment they flipped to
    * `processing`) predates `olderThan`. Drives the poll-triggered re-drive (see

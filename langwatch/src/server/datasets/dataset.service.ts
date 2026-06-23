@@ -1186,10 +1186,15 @@ export class DatasetService {
     const { projectId, name, filename } = params;
 
     // Bound the accumulation of abandoned `uploading` rows + staging objects and
-    // recover any normalize wedged at `processing` (lost-after-send): sweep both
-    // as new uploads start. Best-effort (never blocks this upload).
+    // recover any normalize wedged at `processing` (lost-after-send) as new
+    // uploads start. Best-effort. The pending sweep is *awaited on purpose*: it
+    // archives same-named abandoned `uploading` rows, freeing their slug BEFORE
+    // the name-conflict check below (else a same-name retry would spuriously
+    // 409). The processing re-drive has no such coupling — it only re-enqueues
+    // OTHER wedged rows — so fire it off the hot path (it swallows its own
+    // errors, so `void` can't throw).
     await this.reapStalePendingUploads(projectId);
-    await this.reapStaleProcessing(projectId);
+    void this.reapStaleProcessing(projectId);
 
     const slug = this.generateSlug(name);
     // C2: reject a name conflict before minting a presigned URL so a duplicate
@@ -1371,19 +1376,24 @@ export class DatasetService {
   }
 
   /**
-   * Poll-triggered backstop for the *lost-after-send* normalize window: a row
-   * wedged at `processing` whose normalize job vanished WITHOUT flipping it
-   * (worker died / pod killed / Redis lost the job after a successful `.send()`).
-   * The synchronous enqueue-rejection case self-heals in `enqueueNormalize`'s
-   * catch; this is the only mechanism that can detect the case no catch sees.
-   *
-   * Re-drives normalize for every `processing` row older than
-   * `STALE_PROCESSING_TTL_SECONDS` — the staged source + filename are intact and
+   * Poll-triggered re-drive of a normalize wedged at `processing`: a row whose
+   * job vanished WITHOUT flipping it (worker died / pod killed / Redis lost the
+   * job after a successful `.send()`) — the *lost-after-send* window no enqueue
+   * catch can see. Re-drives normalize for every `processing` row older than
+   * `STALE_PROCESSING_TTL_SECONDS`; the staged source + filename are intact and
    * normalize is idempotent (the I-IDEM handler guard + concurrency-1 group make
    * a re-drive of a still-running job a queued no-op, so a false positive is
-   * harmless). Like `reapStalePendingUploads`: poll-triggered (this epic adds no
-   * cron), wholly best-effort, never blocks the triggering upload. WARN-logged
-   * so a vanished job is visible in observability, not silently masked.
+   * harmless). `markProcessingRedriven` then bumps `updatedAt` so the row isn't
+   * re-selected until the TTL re-elapses (otherwise every upload within the
+   * window re-enqueues the same rows).
+   *
+   * SCOPE (no overclaim): this is *same-project, poll-triggered* recovery, NOT a
+   * durable backstop — it only fires on this project's next `createPendingUpload`
+   * (no cron, by epic decision). A project that uploads once, loses the job, and
+   * never returns stays wedged; its only recovery is then the `retryNormalize`
+   * API. Unlike a stale *pending* upload (whose S3 `staging/` lifecycle rule is
+   * an object-level net), a wedged *processing* row has no durable backstop.
+   * WARN-logged so a vanished job is visible, not silently masked.
    */
   private async reapStaleProcessing(projectId: string): Promise<void> {
     try {
@@ -1395,21 +1405,33 @@ export class DatasetService {
         olderThan,
       });
       for (const dataset of stale) {
-        // findStaleProcessing already filters stagingKey != null; a present key
-        // with no filename is a corrupt row (M1 co-sets them) — skip rather than
-        // re-drive with a format-detection guess.
-        if (!dataset.stagingKey || !dataset.uploadFilename) continue;
-        logger.warn(
-          { datasetId: dataset.id, projectId },
-          "re-driving normalize for a dataset wedged in processing (lost job)",
-        );
-        this.enqueueNormalize({
-          projectId,
-          datasetId: dataset.id,
-          stagingKey: dataset.stagingKey,
-          filename: dataset.uploadFilename,
-          logContext: "failed to re-enqueue normalize for a wedged dataset",
-        });
+        try {
+          // findStaleProcessing already filters stagingKey != null; a present
+          // key with no filename is a corrupt row (M1 co-sets them) — skip
+          // rather than re-drive with a format-detection guess.
+          if (!dataset.stagingKey || !dataset.uploadFilename) continue;
+          logger.warn(
+            { datasetId: dataset.id, projectId },
+            "re-driving normalize for a dataset wedged in processing (lost job)",
+          );
+          this.enqueueNormalize({
+            projectId,
+            datasetId: dataset.id,
+            stagingKey: dataset.stagingKey,
+            filename: dataset.uploadFilename,
+            logContext: "failed to re-enqueue normalize for a wedged dataset",
+          });
+          // After the re-drive (not before — a bump failure must not prevent the
+          // re-enqueue), stamp updatedAt so the next sweep within the TTL skips
+          // this row. Guarded on still-processing so it can't resurrect a row
+          // that just raced to ready/failed.
+          await this.repository.markProcessingRedriven({
+            id: dataset.id,
+            projectId,
+          });
+        } catch {
+          // one bad row must not abort the rest of the sweep
+        }
       }
     } catch {
       // opportunistic — never let it block the triggering upload
