@@ -34,6 +34,18 @@ const capturedOnRunScheduled = vi.hoisted(
 );
 
 /**
+ * Capture the onViewRun callback passed by SimulationsPage to useRunSuite.
+ * Pins AC8 page-wiring: invoking it must navigate to the run plan detail page
+ * (the opt-in counterpart to the no-auto-nav invariant).
+ */
+const capturedOnViewRun = vi.hoisted(
+  () =>
+    ({
+      current: null,
+    }) as { current: ((suiteId: string) => void) | null },
+);
+
+/**
  * Capture the flow callbacks registered by SimulationsPage via setFlowCallbacks("suiteEditor", …)
  * so AC6 tests can directly invoke onRunRequested and assert navigation fires.
  */
@@ -76,8 +88,10 @@ vi.mock("~/utils/compat/next-router", () => ({
 vi.mock("~/components/suites/useRunSuite", () => ({
   useRunSuite: (opts: {
     onRunScheduled?: (suiteId: string, batchRunId: string) => void;
+    onViewRun?: (suiteId: string) => void;
   }) => {
     capturedOnRunScheduled.current = opts.onRunScheduled ?? null;
+    capturedOnViewRun.current = opts.onViewRun ?? null;
     return {
       requestRun: vi.fn(),
       confirmRun: vi.fn(),
@@ -236,6 +250,7 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
     cleanup();
     vi.clearAllMocks();
     capturedOnRunScheduled.current = null;
+    capturedOnViewRun.current = null;
     capturedFlowCallbacks.current = null;
     routerQueryPath.current = undefined;
   });
@@ -354,6 +369,40 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
         expect(routeArg).toMatchObject({
           query: expect.objectContaining({
             path: expect.arrayContaining(["run-plans", "newly-saved-slug"]),
+          }),
+        });
+      });
+    });
+  });
+
+  /**
+   * AC8 — opt-in "View run" navigation.
+   *
+   * The page must wire useRunSuite's onViewRun option to navigation so the
+   * success toast's "View run" action lands the user on the run plan detail
+   * page. This is the explicit, user-initiated counterpart to the no-auto-nav
+   * invariant above: navigation only happens when onViewRun is invoked.
+   */
+  describe("given a suite with id 'suite_target' and slug 'target-suite-slug'", () => {
+    describe("when the View run toast action fires for a scheduled run", () => {
+      /** @scenario The run-scheduled success toast offers a View run action that navigates to the run plan detail page */
+      it("calls router push toward the run plan detail page", async () => {
+        routerQueryPath.current = undefined; // Start on All Runs
+
+        await renderSimulationsPage();
+
+        expect(capturedOnViewRun.current).not.toBeNull();
+
+        // Simulate the user clicking "View run" on the success toast for the
+        // suite that was just scheduled.
+        capturedOnViewRun.current!("suite_target");
+
+        expect(mockRouterPush).toHaveBeenCalled();
+        const pushCall = mockRouterPush.mock.calls[0]!;
+        const [routeArg] = pushCall;
+        expect(routeArg).toMatchObject({
+          query: expect.objectContaining({
+            path: expect.arrayContaining(["run-plans", "target-suite-slug"]),
           }),
         });
       });

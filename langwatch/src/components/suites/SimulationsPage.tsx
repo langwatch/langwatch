@@ -230,6 +230,12 @@ export default function SimulationsPage() {
     onRunScheduled: () => {
       void utils.suites.getSummaries.invalidate();
     },
+    // Quick Run stays in place (issue #3363); the success toast's "View run"
+    // action is the opt-in path to the run plan detail page.
+    onViewRun: (suiteId) => {
+      const suite = suites?.find((s) => s.id === suiteId);
+      if (suite) navigateToSuite(suite.slug);
+    },
   });
 
   // Handlers

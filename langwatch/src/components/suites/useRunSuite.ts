@@ -18,6 +18,13 @@ import { toaster } from "../ui/toaster";
 
 interface UseRunSuiteOptions {
   onRunScheduled?: (suiteId: string, batchRunId: string) => void;
+  /**
+   * Invoked when the user clicks the "View run" action on the run-scheduled
+   * success toast. The consumer decides where to navigate (e.g. the run plan
+   * detail page). When omitted, the success toast carries no action — the hook
+   * never navigates on its own.
+   */
+  onViewRun?: (suiteId: string) => void;
 }
 
 export function useRunSuite(options: UseRunSuiteOptions = {}) {
@@ -71,6 +78,12 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
           title: `Run plan scheduled (${result.jobCount} jobs)`,
           type: "success",
           meta: { closable: true },
+          action: optionsRef.current.onViewRun
+            ? {
+                label: "View run",
+                onClick: () => optionsRef.current.onViewRun?.(variables.id),
+              }
+            : undefined,
         });
       }
 
