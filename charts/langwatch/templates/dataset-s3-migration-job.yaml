@@ -1,0 +1,135 @@
+{{/*
+  ADR-032 Decision 7 (rung 5): the PG→S3 dataset backfill, as a Helm
+  post-install,post-upgrade hook Job.
+
+  Runs the `backfillDatasetContentToS3` task (`pnpm run task ...`) which flips
+  existing datasets whose content still lives in Postgres onto the chunked-JSONL
+  S3 layout. Three properties make this safe to fire on every upgrade:
+
+    - OFF THE BOOT PATH: it's a hook Job that runs AFTER the deploy completes —
+      never on the `set -e` app boot — so a migration hiccup can't block pods
+      from starting, and the flip is rollout-gated (no old-image pod is present
+      when a dataset flips).
+    - IDEMPOTENT + SELF-SKIPPING: the task self-skips when no `postgres`-layout
+      datasets remain or when storage isn't S3-configured, and re-runs are no-ops
+      (already-`s3_jsonl` datasets are skipped under the per-dataset advisory
+      lock). So running it on every `helm upgrade` is harmless.
+    - OPT-OUT: `SKIP_DATASET_S3_MIGRATE` (wired from
+      `.Values.datasetS3Migration.skip`) lets an operator disable it entirely.
+
+  Hook semantics mirror the preflight-secrets hook: `hook-weight` runs it after
+  the app/workers roll (a higher weight than preflight's negative weights), and
+  `hook-delete-policy: before-hook-creation` deletes a prior run's Job before
+  re-creating it so reruns are clean. Image + env mirror the workers Deployment
+  (same app image, same `langwatch.sharedEnv` — DATABASE_URL, S3 config, etc.).
+*/}}
+{{- if and .Values.datasetS3Migration.enabled (not .Values.datasetS3Migration.skip) }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-dataset-s3-migration
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-dataset-s3-migration
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: dataset-s3-migration
+    {{- include "langwatch.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "5"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: {{ .Values.datasetS3Migration.backoffLimit | default 3 }}
+  {{- with .Values.datasetS3Migration.activeDeadlineSeconds }}
+  activeDeadlineSeconds: {{ . }}
+  {{- end }}
+  ttlSecondsAfterFinished: {{ .Values.datasetS3Migration.ttlSecondsAfterFinished | default 600 }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Release.Name }}-dataset-s3-migration
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: dataset-s3-migration
+    spec:
+      restartPolicy: Never
+      {{/* On EKS+IRSA the Job must run as the same IAM-role-annotated
+           ServiceAccount as the app/workers to reach S3; default ("") falls
+           through to the namespace default SA (consistent with app/workers). */}}
+      {{- with .Values.datasetS3Migration.serviceAccountName }}
+      serviceAccountName: {{ . }}
+      {{- end }}
+
+      {{/* Inherit chart-wide pod security + scheduling defaults so strict
+           clusters don't reject the hook and node taints / dedicated pools
+           still apply — the same coalesce pattern the workers / app / preflight
+           templates use. */}}
+      {{- with (coalesce .Values.datasetS3Migration.podSecurityContext .Values.global.podSecurityContext) }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (coalesce .Values.datasetS3Migration.nodeSelector .Values.global.scheduling.nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (coalesce .Values.datasetS3Migration.tolerations .Values.global.scheduling.tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (coalesce .Values.datasetS3Migration.affinity .Values.global.scheduling.affinity) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      containers:
+        - name: {{ .Release.Name }}-dataset-s3-migration
+          {{- with (coalesce .Values.datasetS3Migration.containerSecurityContext .Values.global.containerSecurityContext) }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
+          imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
+          workingDir: /app/langwatch
+          command: ['pnpm']
+          args: ['run', 'task', 'backfillDatasetContentToS3']
+          env:
+            {{- include "langwatch.sharedEnv" . | nindent 12 }}
+
+            {{/* No SKIP_DATASET_S3_MIGRATE env here: the outer guard above
+                 (`and .enabled (not .skip)`) already excludes skip=true, so this
+                 Job only renders when the migration is meant to run. Setting
+                 skip=true omits the Job entirely rather than running it with the
+                 opt-out flag. */}}
+            {{- with .Values.datasetS3Migration.extraEnvs }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.datasetS3Migration.resources | nindent 12 }}
+          volumeMounts:
+            {{- with .Values.datasetS3Migration.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            - name: tmp-dir
+              mountPath: /tmp
+            {{- if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
+            # Stored-objects local-FS mount. When migrating to local FS (no S3),
+            # the backfill writes the migrated dataset chunks here, so the Job
+            # MUST mount the SAME PVC the app reads from — otherwise the chunks
+            # land on the Job's ephemeral FS and the flipped `s3_jsonl` rows point
+            # at content that doesn't exist (broken reads / data loss). Renders
+            # only when local-FS is the active backend; shares the app's RWO PVC →
+            # single-node topology (use app.dataplane S3 otherwise).
+            - name: stored-objects-data
+              mountPath: {{ .Values.app.storedObjects.localFilesystem.path }}
+            {{- end }}
+      volumes:
+        {{- with .Values.datasetS3Migration.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        - name: tmp-dir
+          emptyDir: {}
+        {{- if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
+        - name: stored-objects-data
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-stored-objects
+        {{- end }}
+{{- end }}
