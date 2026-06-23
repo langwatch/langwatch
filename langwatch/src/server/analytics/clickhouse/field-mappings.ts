@@ -496,11 +496,15 @@ export function getTableAlias(table: CHTable): string {
  *   ones). The caller passes the fragment matching its date regime; the referenced
  *   params are bound by the outer query. Ignored for non-`stored_spans` tables.
  */
-export function buildJoinClause(
-  table: CHTable,
-  requiredColumns?: ReadonlySet<string>,
-  spanTimeFilter?: string,
-): string {
+export function buildJoinClause({
+  table,
+  requiredColumns,
+  spanTimeFilter,
+}: {
+  table: CHTable;
+  requiredColumns?: ReadonlySet<string>;
+  spanTimeFilter?: string;
+}): string {
   const alias = tableAliases[table];
   const baseAlias = tableAliases.trace_summaries;
 

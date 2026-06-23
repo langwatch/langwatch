@@ -180,11 +180,11 @@ describe("field-mappings", () => {
 
   describe("buildJoinClause", () => {
     it("returns empty string for trace_summaries", () => {
-      expect(buildJoinClause("trace_summaries")).toBe("");
+      expect(buildJoinClause({ table: "trace_summaries" })).toBe("");
     });
 
     it("builds correct JOIN for stored_spans with column pruning", () => {
-      const join = buildJoinClause("stored_spans");
+      const join = buildJoinClause({ table: "stored_spans" });
       expect(join).toContain("FROM stored_spans");
       expect(join).toContain("TenantId = {tenantId:String}");
       expect(join).toContain("ts.TenantId = ss.TenantId");
@@ -194,7 +194,7 @@ describe("field-mappings", () => {
     });
 
     it("builds correct JOIN for evaluation_runs", () => {
-      const join = buildJoinClause("evaluation_runs");
+      const join = buildJoinClause({ table: "evaluation_runs" });
       expect(join).toContain("FROM evaluation_runs");
       expect(join).toContain("GROUP BY TenantId, EvaluationId");
       expect(join).toContain("ts.TenantId = es.TenantId");
@@ -202,7 +202,7 @@ describe("field-mappings", () => {
     });
 
     it("leaves the stored_spans JOIN unbounded on StartTime when no filter is passed", () => {
-      const join = buildJoinClause("stored_spans");
+      const join = buildJoinClause({ table: "stored_spans" });
       // StartTime is a selected column, but there must be no StartTime predicate:
       // the WHERE ends right after the tenant filter.
       expect(join).not.toContain("StartTime >=");
@@ -213,14 +213,20 @@ describe("field-mappings", () => {
     it("injects the span time filter into the stored_spans JOIN when provided", () => {
       const filter =
         "AND StartTime >= {startDate:DateTime64(3)} - INTERVAL 2 DAY AND StartTime < {endDate:DateTime64(3)} + INTERVAL 2 DAY";
-      const join = buildJoinClause("stored_spans", undefined, filter);
+      const join = buildJoinClause({
+        table: "stored_spans",
+        spanTimeFilter: filter,
+      });
       // The bound lands inside the subquery WHERE, before the closing paren/alias.
       expect(join).toContain(`TenantId = {tenantId:String} ${filter})`);
     });
 
     it("ignores the span time filter for evaluation_runs", () => {
       const filter = "AND StartTime >= {startDate:DateTime64(3)}";
-      const join = buildJoinClause("evaluation_runs", undefined, filter);
+      const join = buildJoinClause({
+        table: "evaluation_runs",
+        spanTimeFilter: filter,
+      });
       expect(join).not.toContain("StartTime");
     });
   });

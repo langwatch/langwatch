@@ -609,11 +609,11 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
       const requiredColumns = resolveRequiredColumns(table, allExpressions);
       // Both-periods regime: bound the stored_spans JOIN to the same StartTime
       // envelope as the outer OccurredAt filter so it prunes partitions.
-      return buildJoinClause(
+      return buildJoinClause({
         table,
         requiredColumns,
-        SPAN_TIME_FILTER_BOTH_PERIODS,
-      );
+        spanTimeFilter: SPAN_TIME_FILTER_BOTH_PERIODS,
+      });
     })
     .join("\n");
 
@@ -1946,11 +1946,11 @@ function buildDateBucketedPipelineQuery({
       .map((table) => {
         const requiredColumns = resolveRequiredColumns(table, allSimpleExprs);
         // Both-periods regime: bound the stored_spans JOIN to the date envelope.
-        return buildJoinClause(
+        return buildJoinClause({
           table,
           requiredColumns,
-          SPAN_TIME_FILTER_BOTH_PERIODS,
-        );
+          spanTimeFilter: SPAN_TIME_FILTER_BOTH_PERIODS,
+        });
       })
       .join("\n");
 
@@ -2362,11 +2362,11 @@ export function buildDataForFilterQuery(
     .map((table) => {
       const requiredColumns = resolveRequiredColumns(table, filterExpressions);
       // Start/end regime: bound the stored_spans JOIN to the date envelope.
-      return buildJoinClause(
+      return buildJoinClause({
         table,
         requiredColumns,
-        SPAN_TIME_FILTER_START_END,
-      );
+        spanTimeFilter: SPAN_TIME_FILTER_START_END,
+      });
     })
     .join("\n");
 
@@ -2458,11 +2458,11 @@ export function buildDataForFilterQuery(
       break;
 
     case "spans.model":
-      joins = buildJoinClause(
-        "stored_spans",
-        new Set(["SpanAttributes"]),
-        SPAN_TIME_FILTER_START_END,
-      );
+      joins = buildJoinClause({
+        table: "stored_spans",
+        requiredColumns: new Set(["SpanAttributes"]),
+        spanTimeFilter: SPAN_TIME_FILTER_START_END,
+      });
       sql = `
         SELECT
           ${ss}.SpanAttributes['gen_ai.request.model'] AS field,
@@ -2484,11 +2484,11 @@ export function buildDataForFilterQuery(
       break;
 
     case "spans.type":
-      joins = buildJoinClause(
-        "stored_spans",
-        new Set(["SpanAttributes"]),
-        SPAN_TIME_FILTER_START_END,
-      );
+      joins = buildJoinClause({
+        table: "stored_spans",
+        requiredColumns: new Set(["SpanAttributes"]),
+        spanTimeFilter: SPAN_TIME_FILTER_START_END,
+      });
       sql = `
         SELECT
           ${ss}.SpanAttributes['langwatch.span.type'] AS field,
@@ -2511,7 +2511,7 @@ export function buildDataForFilterQuery(
 
     case "evaluations.evaluator_id":
     case "evaluations.evaluator_id.guardrails_only":
-      joins = buildJoinClause("evaluation_runs");
+      joins = buildJoinClause({ table: "evaluation_runs" });
       sql = `
         SELECT
           ${es}.EvaluatorId AS field,
