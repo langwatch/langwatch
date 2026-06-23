@@ -297,6 +297,8 @@ describe("DatasetService", () => {
       it("throws DatasetNotReadyError instead of editing the chunk", async () => {
         const repository = {
           findBySlugOrId: vi.fn().mockResolvedValue({ ...notReadyRow }),
+          // The injected repo's locked re-read that the mutation asserts ready on.
+          findOneOrThrow: vi.fn().mockResolvedValue({ ...notReadyRow }),
         };
         vi.mocked(getDatasetStorage).mockResolvedValue({
           readChunk: vi.fn(),
@@ -325,6 +327,8 @@ describe("DatasetService", () => {
       it("throws DatasetNotReadyError instead of rewriting chunks", async () => {
         const repository = {
           findBySlugOrId: vi.fn().mockResolvedValue({ ...notReadyRow }),
+          // The injected repo's locked re-read that the mutation asserts ready on.
+          findOneOrThrow: vi.fn().mockResolvedValue({ ...notReadyRow }),
         };
         vi.mocked(getDatasetStorage).mockResolvedValue({
           readChunk: vi.fn(),

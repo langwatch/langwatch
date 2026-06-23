@@ -277,6 +277,7 @@ export const appendS3JsonlRecords = async ({
   entries,
   forcedIds,
   storage,
+  repository: providedRepository,
 }: {
   prisma: PrismaClient;
   dataset: Dataset;
@@ -284,9 +285,10 @@ export const appendS3JsonlRecords = async ({
   entries: unknown[];
   forcedIds?: (string | undefined)[];
   storage?: DatasetStorage;
+  repository?: DatasetRepository;
 }): Promise<{ appended: number }> => {
   const datasetStorage = storage ?? (await getDatasetStorage(projectId));
-  const repository = new DatasetRepository(prisma);
+  const repository = providedRepository ?? new DatasetRepository(prisma);
 
   return withDatasetLock({ prisma, datasetId: dataset.id }, async (tx) => {
     const current = await repository.findOneOrThrow(
@@ -430,6 +432,7 @@ export const editS3JsonlRecord = async ({
   recordId,
   entry,
   storage,
+  repository: providedRepository,
 }: {
   prisma: PrismaClient;
   dataset: Dataset;
@@ -437,9 +440,10 @@ export const editS3JsonlRecord = async ({
   recordId: string;
   entry: unknown;
   storage?: DatasetStorage;
+  repository?: DatasetRepository;
 }): Promise<{ updated: boolean }> => {
   const datasetStorage = storage ?? (await getDatasetStorage(projectId));
-  const repository = new DatasetRepository(prisma);
+  const repository = providedRepository ?? new DatasetRepository(prisma);
 
   // OFF the lock: locate the row's chunk so only that chunk is re-read under it.
   // Skipped unless the dataset looks ready — never do storage I/O ahead of the
@@ -578,15 +582,17 @@ export const deleteS3JsonlRecords = async ({
   projectId,
   recordIds,
   storage,
+  repository: providedRepository,
 }: {
   prisma: PrismaClient;
   dataset: Dataset;
   projectId: string;
   recordIds: string[];
   storage?: DatasetStorage;
+  repository?: DatasetRepository;
 }): Promise<{ deleted: number }> => {
   const datasetStorage = storage ?? (await getDatasetStorage(projectId));
-  const repository = new DatasetRepository(prisma);
+  const repository = providedRepository ?? new DatasetRepository(prisma);
   const removeSet = new Set(recordIds);
   const isTarget = (line: unknown): boolean =>
     isChunkLine(line) && removeSet.has(line.id);
@@ -756,14 +762,16 @@ export const recomputeDatasetCounts = async ({
   datasetId,
   projectId,
   storage,
+  repository: providedRepository,
 }: {
   prisma: PrismaClient;
   datasetId: string;
   projectId: string;
   storage?: DatasetStorage;
+  repository?: DatasetRepository;
 }): Promise<RecomputedDatasetCounts> => {
   const datasetStorage = storage ?? (await getDatasetStorage(projectId));
-  const repository = new DatasetRepository(prisma);
+  const repository = providedRepository ?? new DatasetRepository(prisma);
 
   return withDatasetLock({ prisma, datasetId }, async (tx) => {
     const current = await repository.findOneOrThrow(

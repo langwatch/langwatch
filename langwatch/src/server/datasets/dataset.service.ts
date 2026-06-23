@@ -749,6 +749,7 @@ export class DatasetService {
         projectId: params.projectId,
         recordId: params.recordId,
         entry: sanitisedEntry,
+        repository: this.repository,
       });
       const record = {
         id: params.recordId,
@@ -866,6 +867,7 @@ export class DatasetService {
         projectId: params.projectId,
         entries: records.map((r) => r.entry),
         forcedIds: records.map((r) => r.id),
+        repository: this.repository,
       });
       const createdAt = new Date();
       return records.map((record) => ({
@@ -913,6 +915,7 @@ export class DatasetService {
         dataset,
         projectId: params.projectId,
         recordIds: params.recordIds,
+        repository: this.repository,
       });
       return { count: deleted };
     }
