@@ -2456,7 +2456,10 @@ export class ClickHouseTraceService {
     // so it keeps the ≤64 KB preview and issues zero event_log SELECTs (#4888
     // AC2 / ADR-022). Only the download/export path opts in (#4991 AC1).
     const enrichable = traces
-      .map((trace, index) => ({ index, data: tracesWithSpans.get(trace.trace_id) }))
+      .map((trace, index) => ({
+        index,
+        data: tracesWithSpans.get(trace.trace_id),
+      }))
       .filter(
         (
           e,
