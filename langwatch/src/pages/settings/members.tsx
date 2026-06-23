@@ -122,13 +122,12 @@ function MembersList({
     onClose: onInviteLinkClose,
   } = useDisclosure();
 
-  const pendingInvites =
-    api.invite.getOrganizationPendingInvites.useQuery(
-      {
-        organizationId: organization?.id ?? "",
-      },
-      { enabled: !!organization },
-    );
+  const pendingInvites = api.invite.getOrganizationPendingInvites.useQuery(
+    {
+      organizationId: organization?.id ?? "",
+    },
+    { enabled: !!organization },
+  );
   const deleteMemberMutation = api.organization.deleteMember.useMutation();
 
   const [selectedInvites, setSelectedInvites] = useState<
