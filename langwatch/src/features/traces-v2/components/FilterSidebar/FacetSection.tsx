@@ -228,7 +228,17 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
     [],
   );
   const thawLayout = useCallback(() => setFrozenLayout(null), []);
-  const layout = frozenLayout ?? { activeItems, facetWindow, maxCount };
+  // Bypass freeze whenever a typed-search is active: the value-search input
+  // lives inside the same hover-Box, so by the time the user types the
+  // layout is already frozen — `searchQuery → filtered → facetWindow`
+  // narrows live, but a frozen `layout.facetWindow.visible` would keep
+  // showing the pre-search snapshot. We re-flow on every keystroke so the
+  // list narrows as the user types. Reorder-on-click (the reason the
+  // freeze exists) doesn't intersect search, since clicking a row blurs
+  // the input and dismounts the search affordance.
+  const layout = searchQuery
+    ? { activeItems, facetWindow, maxCount }
+    : (frozenLayout ?? { activeItems, facetWindow, maxCount });
 
   const smartDefaultOpen =
     items.length <= AUTO_EXPAND_THRESHOLD || activeCount > 0;
@@ -323,7 +333,7 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
               <FacetRow
                 item={item}
                 state={getValueState(item.value)}
-                maxCount={maxCount}
+                maxCount={layout.maxCount}
                 onToggle={handleToggle}
                 onExclude={handleExclude}
                 field={field}
@@ -424,7 +434,7 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
                 }}
                 textStyle="xs"
               />
-              {searchQuery.trim() && facetWindow.visible.length === 0 && (
+              {searchQuery.trim() && layout.facetWindow.visible.length === 0 && (
                 <Text textStyle="2xs" color="fg.muted" paddingX={1}>
                   No match. Press <Kbd>Enter</Kbd> to filter by "
                   <Box as="span" fontWeight="600" color="fg">

@@ -98,4 +98,52 @@ describe("<FacetSection /> row ordering", () => {
       expect(valueOrder(container)[0]).toBe("b");
     });
   });
+
+  // The search input lives inside the same hover-Box that triggers the
+  // freeze, so naive freeze-on-hover would mask the typed-search narrow:
+  // searchQuery → filtered → facetWindow would update live, but rendered
+  // rows would still come from the frozen pre-search snapshot. The list
+  // must narrow as the user types, even though the pointer is inside the
+  // section (i.e. layout is otherwise frozen).
+  describe("when search is active while the pointer is inside the section", () => {
+    /** @scenario "Value search narrows the list live even while the layout would otherwise be frozen" */
+    it("bypasses freeze and narrows rows as the user types", () => {
+      const { container, getByLabelText } = render(tree(new Set()));
+      const section = container.firstElementChild as HTMLElement;
+      expect(valueOrder(container)).toEqual(["a", "b", "c"]);
+
+      // Pointer is in the section (would normally freeze). Open search and type.
+      enterSection(section);
+      const searchToggle = getByLabelText("Search ORIGIN values");
+      fireEvent.click(searchToggle);
+      const input = container.querySelector(
+        'input[placeholder^="Search"]',
+      ) as HTMLInputElement;
+      expect(input).toBeTruthy();
+      fireEvent.change(input, { target: { value: "bra" } });
+
+      // Only "Bravo" matches — the frozen snapshot should NOT win here.
+      expect(valueOrder(container)).toEqual(["b"]);
+    });
+
+    /** @scenario "Empty-state hint and rendered rows agree when no values match" */
+    it("renders empty-state alone when no rows match — not list+empty together", () => {
+      const { container, getByLabelText, queryByText } = render(
+        tree(new Set()),
+      );
+      const section = container.firstElementChild as HTMLElement;
+
+      enterSection(section);
+      fireEvent.click(getByLabelText("Search ORIGIN values"));
+      const input = container.querySelector(
+        'input[placeholder^="Search"]',
+      ) as HTMLInputElement;
+      fireEvent.change(input, { target: { value: "zzz-no-match" } });
+
+      // No rows AND empty-state hint visible — they used to be inconsistent
+      // (rows read frozen layout, hint read live count).
+      expect(valueOrder(container)).toEqual([]);
+      expect(queryByText(/No match/)).not.toBeNull();
+    });
+  });
 });
