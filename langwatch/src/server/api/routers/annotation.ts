@@ -5,17 +5,16 @@ import {
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
-import type { Session } from "~/server/auth";
 import { z } from "zod";
 import { AnnotationService } from "~/server/annotations/annotation.service";
+import { getApp } from "~/server/app-layer/app";
+import type { Session } from "~/server/auth";
 import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { slugify } from "~/utils/slugify";
-import { getApp } from "~/server/app-layer/app";
 import { createLogger } from "../../../utils/logger/server";
 import type { Protections } from "../../elasticsearch/protections";
-import { checkPermissionOrPubliclyShared } from "../rbac";
-import { checkProjectPermission } from "../rbac";
+import { checkPermissionOrPubliclyShared, checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { getUserProtectionsForProject } from "../utils";
 
