@@ -37,6 +37,7 @@ describe("archiveScenarioSetRuns()", () => {
   });
 
   describe("when getRunIdsForSet returns N runs", () => {
+    /** @scenario "Archiving one set leaves runs in other sets untouched" */
     it("dispatches deleteRun for each and returns archived=N, failed=0, scenarioSetId, hasMore=false", async () => {
       const runIds = ["run-1", "run-2", "run-3"];
       mockGetRunIdsForSet.mockResolvedValue({ runIds, reachedCap: false });
@@ -77,6 +78,7 @@ describe("archiveScenarioSetRuns()", () => {
   });
 
   describe("when reachedCap is true", () => {
+    /** @scenario "Reaching the 10k cap reports hasMore true" */
     it("returns hasMore: true", async () => {
       mockGetRunIdsForSet.mockResolvedValue({
         runIds: ["run-1"],

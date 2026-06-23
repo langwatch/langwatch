@@ -20,6 +20,7 @@ function makeMockClientReturning(
 describe("SimulationClickHouseRepository", () => {
   describe("getRunIdsForSet()", () => {
     describe("when N matching ids returns exactly RUN_ID_CAP", () => {
+      /** @scenario "Reaching the 10k cap reports hasMore true" */
       it("sets reachedCap to true and returns RUN_ID_CAP runIds", async () => {
         const rows = makeRowsOfLength(RUN_ID_CAP);
         const mockClient = makeMockClientReturning(rows);
