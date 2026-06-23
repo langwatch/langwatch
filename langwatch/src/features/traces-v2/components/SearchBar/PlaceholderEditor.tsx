@@ -6,7 +6,11 @@ import {
   swapOperatorAtLocation,
 } from "~/server/app-layer/traces/query-language/mutations";
 import { useFacetValueLabelResolver } from "../../hooks/useFacetValueLabels";
-import { buildDecorationPlan, type TokenRef } from "./filterHighlight";
+import {
+  buildDecorationPlan,
+  chipOverlayLabel,
+  type TokenRef,
+} from "./filterHighlight";
 
 const PLACEHOLDER_TEXT = "Search filters, free text, or Ask AI…";
 
@@ -90,32 +94,6 @@ function buildSegments(text: string): DecoratedSegment[] {
   return out;
 }
 
-/**
- * Swap a chip's raw value for its display label within the segment's
- * literal text. Anchored after the first ':' so the search only runs
- * over the value portion (a value that's a substring of the field name
- * — e.g. field `topics`, value `topic` — can't hit the wrong span).
- * Uses the replacer-function form of `replace` so `$&`/`$'` sequences
- * in tenant-controlled labels are inserted verbatim, not interpreted.
- * Exported for unit testing.
- */
-export function replaceChipValue({
-  segText,
-  value,
-  label,
-}: {
-  segText: string;
-  value: string;
-  label: string;
-}): string {
-  const colon = segText.indexOf(":");
-  if (colon === -1) return segText.replace(value, () => label);
-  return (
-    segText.slice(0, colon + 1) +
-    segText.slice(colon + 1).replace(value, () => label)
-  );
-}
-
 export interface TokenClickPayload {
   /** Bounding rect of the clicked chip — used to anchor a popover. */
   rect: DOMRect;
@@ -169,9 +147,9 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
   const isEmpty = queryText.length === 0;
   const segments = useMemo(() => buildSegments(queryText), [queryText]);
   // Chips store the raw id (unique) but display the resolved facet label
-  // (readable) — same source the sidebar uses. The id stays one hover
-  // away via `title`, and clicking into the bar mounts the live editor,
-  // which shows the underlying query text verbatim.
+  // (readable) — same source the sidebar uses. The label is painted by the
+  // shared CSS overlay (see editorStyles), field prefix intact, and the raw
+  // id slides back into view on hover — identical to the live editor.
   const resolveLabel = useFacetValueLabelResolver();
 
   return (
@@ -277,20 +255,18 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
                 field: tok.field,
                 value: tok.value!,
               });
-              // Swap the id for its display name in the rendered chip
-              // only — token coords, data-attrs, and the query text all
-              // keep the unique id. The replace is anchored after the
-              // first ':' so a value that happens to be a substring of
-              // the field name can't be swapped in the wrong place, and
-              // the replacer-function form keeps `$&`-style patterns in
-              // tenant-controlled labels from being interpreted.
-              const display = richLabel
-                ? replaceChipValue({
-                    segText: seg.text,
-                    value: tok.value!,
-                    label: richLabel,
-                  })
-                : seg.text;
+              // Render the raw `field:value` text and let the shared CSS
+              // overlay (editorStyles `.filter-token[data-filter-chip-label]`)
+              // paint the field-qualified label on top — exactly what the
+              // live editor does. Both renderers now produce an identical
+              // chip, so the hand-off when the placeholder swaps for the
+              // real editor is a no-op (no width lurch). Token coords,
+              // data-attrs, and the query text all keep the unique id.
+              const overlayLabel = chipOverlayLabel({
+                field: tok.field,
+                value: tok.value!,
+                label: richLabel,
+              });
               return (
                 <span
                   key={i}
@@ -299,6 +275,7 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
                   data-filter-chip-end={tok.end}
                   data-filter-chip-field={tok.field}
                   data-filter-chip-value={tok.value}
+                  data-filter-chip-label={overlayLabel}
                   style={{ cursor: "pointer" }}
                   title={
                     richLabel
@@ -319,7 +296,7 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
                     });
                   }}
                 >
-                  {display}
+                  {seg.text}
                 </span>
               );
             }

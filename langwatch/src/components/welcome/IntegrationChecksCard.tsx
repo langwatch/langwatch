@@ -7,7 +7,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import NextLink from "~/utils/compat/next-link";
 import type React from "react";
 import {
   LuBell,
@@ -19,6 +18,7 @@ import {
   LuWeight,
   LuWorkflow,
 } from "react-icons/lu";
+import NextLink from "~/utils/compat/next-link";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { trackEventOnce } from "../../utils/tracking";
 import { useIntegrationChecks } from "../IntegrationChecks";
@@ -37,10 +37,10 @@ const checks: IntegrationCheck[] = [
   {
     key: "firstMessage",
     label: "Sync your first message",
-    href: (slug: string) => `/${slug}/messages`,
+    href: (slug: string) => `/${slug}/traces`,
     event: "integration_checks_first_message",
     icon: LuMessageCircle,
-    tooltip: "View messages observed by the LangWatch platform",
+    tooltip: "View traces observed by the LangWatch platform",
   },
   {
     key: "workflows",

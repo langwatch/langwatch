@@ -26,6 +26,7 @@ export interface ClaudeCodeSpanSyncReactorDeps {
   getMarkedClaudeCodeLogs: (
     tenantId: string,
     traceId: string,
+    occurredAtMs?: number,
   ) => Promise<StoredLogRecordRow[]>;
   recordSpan: CommandDispatcher<RecordSpanCommandData>;
 }
@@ -74,7 +75,13 @@ export function createClaudeCodeSpanSyncReactor(
       const traceId = String(event.aggregateId);
 
       try {
-        const rows = await deps.getMarkedClaudeCodeLogs(tenantId, traceId);
+        // The triggering log event's occurredAt bounds the stored_log_records
+        // scan to the turn's partitions instead of cold-scanning S3.
+        const rows = await deps.getMarkedClaudeCodeLogs(
+          tenantId,
+          traceId,
+          event.occurredAt,
+        );
         if (rows.length === 0) return;
 
         const records = rows.map(rowToRecord);

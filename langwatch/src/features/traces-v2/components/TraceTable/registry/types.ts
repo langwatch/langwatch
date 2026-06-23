@@ -75,7 +75,6 @@ export interface AddonDef<TRow> {
 }
 
 export interface Registry<TRow> {
-  rowKind: RowKind;
   cells: Record<string, CellDef<TRow>>;
   addons: Record<string, AddonDef<TRow>>;
 }

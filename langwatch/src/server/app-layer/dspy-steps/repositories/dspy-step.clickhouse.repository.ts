@@ -227,6 +227,18 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
   ): Promise<DspyStepSummaryData[]> {
     try {
       const client = await this.resolveClient(tenantId);
+      // The table partitions on `toYearWeek(CreatedAt)`. Without a CreatedAt
+      // bound the GROUP BY walks every weekly partition for the experiment,
+      // including cold-tier S3 ones. The primary key
+      // `(TenantId, ExperimentId, RunId, StepIndex)` makes the per-partition
+      // scan cheap but the partition fan-out itself is the dominant cost.
+      //
+      // If/when a service-layer caller has access to the experiment's start
+      // time (e.g. derived from Prisma's experiment.createdAt), add an
+      // optional sinceMs and emit
+      //   AND CreatedAt >= fromUnixTimestamp64Milli({sinceMs:Int64})
+      // here to prune partitions. Avoiding the optional param until a real
+      // caller wires it through; otherwise it's API surface that nobody uses.
       const result = await client.query({
         query: `
           SELECT

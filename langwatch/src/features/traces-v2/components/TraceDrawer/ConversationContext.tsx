@@ -16,6 +16,7 @@ import {
   LuFlag,
   LuMessageCircle,
 } from "react-icons/lu";
+import { RedactedInline } from "~/components/ui/RedactedField";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
   type ConversationTurn,
@@ -66,6 +67,15 @@ interface ConversationRow {
   userText: string | null;
   /** Pre-extracted assistant response text, or null when there isn't one. */
   assistantText: string | null;
+  /**
+   * Per-side redaction: true when a privacy rule hid the content (server nulled
+   * it), so the line renders the shared "Redacted" marker instead of the
+   * "(no message)" placeholder that reads as a genuinely-absent turn.
+   */
+  userRedacted: boolean;
+  assistantRedacted: boolean;
+  userVisibleTo: string | null;
+  assistantVisibleTo: string | null;
   /** "previous" / "current" / "next" relative to the visible trace */
   position: "previous" | "current" | "next";
   status: ConversationTurn["status"];
@@ -160,6 +170,10 @@ function buildRows({
     userText: null,
     assistantText:
       boundary === "start" ? "Start of conversation" : "End of conversation",
+    userRedacted: false,
+    assistantRedacted: false,
+    userVisibleTo: null,
+    assistantVisibleTo: null,
     position: pos,
     status: "ok",
     isPlaceholder: true,
@@ -175,6 +189,10 @@ function buildRows({
     traceId: turn.traceId,
     userText: extractReadableSnippet(turn.input, "user") || null,
     assistantText: extractReadableSnippet(turn.output, "assistant") || null,
+    userRedacted: !!turn.inputRedacted,
+    assistantRedacted: !!turn.outputRedacted,
+    userVisibleTo: turn.inputVisibleTo ?? null,
+    assistantVisibleTo: turn.outputVisibleTo ?? null,
     position,
     status: turn.status,
   });
@@ -402,6 +420,13 @@ function ContextBody({
   traceId: string;
   onSelect: (id: string) => void;
 }) {
+  // Turns folded out of the previous/current/next window: anything before
+  // the "previous" row (position − 2) or after the "next" row
+  // (total − position − 1). Zero at a boundary, where the
+  // "Start/End of conversation" placeholder row covers it instead. See
+  // specs/traces-v2/conversation-context-turn-counts.feature
+  const turnsAbove = Math.max(0, ctx.position - 2);
+  const turnsBelow = Math.max(0, ctx.total - ctx.position - 1);
   return (
     <>
       {ctx.isLoading && rows.length === 0 ? (
@@ -475,14 +500,38 @@ function ContextBody({
               transition={SLIDE_TRANSITION}
             >
               <VStack align="stretch" gap={0}>
+                {turnsAbove > 0 && (
+                  <Text
+                    textStyle="2xs"
+                    color="fg.subtle"
+                    textAlign="center"
+                    paddingY={1}
+                    borderBottomWidth="1px"
+                    borderColor={{ base: "gray.200", _dark: "border.muted" }}
+                  >
+                    {turnsAbove} {turnsAbove === 1 ? "turn" : "turns"} above
+                  </Text>
+                )}
                 {rows.map((row, i) => (
                   <ConversationRow
                     key={row.key}
                     row={row}
-                    isLast={i === rows.length - 1}
+                    isLast={i === rows.length - 1 && turnsBelow === 0}
                     onSelect={onSelect}
                   />
                 ))}
+                {turnsBelow > 0 && (
+                  <Text
+                    textStyle="2xs"
+                    color="fg.subtle"
+                    textAlign="center"
+                    paddingY={1}
+                    borderTopWidth="1px"
+                    borderColor={{ base: "gray.200", _dark: "border.muted" }}
+                  >
+                    {turnsBelow} {turnsBelow === 1 ? "turn" : "turns"} below
+                  </Text>
+                )}
               </VStack>
             </motion.div>
           </AnimatePresence>
@@ -620,6 +669,8 @@ const ConversationRow = memo(function ConversationRow({
             emphasised={false}
             placeholder="(no user message)"
             kind="user"
+            redacted={row.userRedacted}
+            visibleTo={row.userVisibleTo}
           />
           <TurnLine
             icon={assistantVisuals.Icon}
@@ -630,6 +681,8 @@ const ConversationRow = memo(function ConversationRow({
             emphasised={isCurrent}
             placeholder="(no assistant response)"
             kind="assistant"
+            redacted={row.assistantRedacted}
+            visibleTo={row.assistantVisibleTo}
           />
         </VStack>
       </Flex>
@@ -664,7 +717,23 @@ const TurnLine: React.FC<{
   emphasised: boolean;
   placeholder: string;
   kind: "user" | "assistant";
-}> = ({ icon, iconColor, text, emphasised, placeholder, kind }) => {
+  /**
+   * True when a privacy rule hid this side's content. Renders the shared
+   * "Redacted" marker in place of the snippet / "(no message)" placeholder, so
+   * a hidden turn never reads as a genuinely-empty one.
+   */
+  redacted?: boolean;
+  visibleTo?: string | null;
+}> = ({
+  icon,
+  iconColor,
+  text,
+  emphasised,
+  placeholder,
+  kind,
+  redacted = false,
+  visibleTo = null,
+}) => {
   const isAssistant = kind === "assistant";
   return (
     <HStack
@@ -704,30 +773,39 @@ const TurnLine: React.FC<{
         // (18-14)/2 = 2px of nudge.
         marginTop="2px"
       />
-      <Text
-        textStyle="xs"
-        color={
-          text
-            ? isAssistant
-              ? "fg.muted"
-              : emphasised
-                ? "fg"
-                : "fg.muted"
-            : "fg.subtle"
-        }
-        fontStyle={text ? "normal" : "italic"}
-        fontWeight={emphasised && text && !isAssistant ? "medium" : "normal"}
-        flex={1}
-        minWidth={0}
-        // Real line breaks instead of the previous "↵" inline glyph —
-        // the snippet is short enough that letting it wrap to a couple
-        // of extra lines reads better than collapsing multiple lines
-        // into a single one with arrow runes.
-        whiteSpace="pre-wrap"
-        wordBreak="break-word"
-      >
-        {text ?? placeholder}
-      </Text>
+      {redacted && !text ? (
+        // Content hidden by a privacy rule — the shared lock + "Redacted"
+        // marker, not the "(no message)" placeholder, so a hidden line is never
+        // mistaken for a genuinely-empty one.
+        <Box flex={1} minWidth={0}>
+          <RedactedInline visibleTo={visibleTo} size="xs" />
+        </Box>
+      ) : (
+        <Text
+          textStyle="xs"
+          color={
+            text
+              ? isAssistant
+                ? "fg.muted"
+                : emphasised
+                  ? "fg"
+                  : "fg.muted"
+              : "fg.subtle"
+          }
+          fontStyle={text ? "normal" : "italic"}
+          fontWeight={emphasised && text && !isAssistant ? "medium" : "normal"}
+          flex={1}
+          minWidth={0}
+          // Real line breaks instead of the previous "↵" inline glyph —
+          // the snippet is short enough that letting it wrap to a couple
+          // of extra lines reads better than collapsing multiple lines
+          // into a single one with arrow runes.
+          whiteSpace="pre-wrap"
+          wordBreak="break-word"
+        >
+          {text ?? placeholder}
+        </Text>
+      )}
     </HStack>
   );
 };

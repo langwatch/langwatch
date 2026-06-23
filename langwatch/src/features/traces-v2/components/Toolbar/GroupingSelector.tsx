@@ -1,6 +1,7 @@
 import { Box, Button, Text } from "@chakra-ui/react";
 import { ChevronDown, Layers } from "lucide-react";
 import type React from "react";
+import { Tooltip } from "~/components/ui/tooltip";
 import {
   MenuContent,
   MenuRadioItem,
@@ -19,24 +20,35 @@ const GROUPING_OPTIONS: Record<GroupingMode, string> = {
   "by-model": "By Model",
 };
 
-export const GroupingSelector: React.FC = () => {
+export const GroupingSelector: React.FC<{ compact?: boolean }> = ({
+  compact = false,
+}) => {
   const grouping = useViewStore((s) => s.grouping);
   const setGrouping = useViewStore((s) => s.setGrouping);
 
   return (
     <MenuRoot>
-      <MenuTrigger asChild>
-        <Button
-          size="xs"
-          variant={grouping === "flat" ? "outline" : "subtle"}
-          aria-label={`Group rows. Currently ${GROUPING_OPTIONS[grouping]}.`}
-          gap={1}
-          paddingX={2}
-        >
-          <Layers size={14} />
-          <ChevronDown size={12} />
-        </Button>
-      </MenuTrigger>
+      <Tooltip
+        content={
+          grouping === "flat"
+            ? "Group rows"
+            : `Grouped: ${GROUPING_OPTIONS[grouping]}`
+        }
+        positioning={{ placement: "bottom" }}
+      >
+        <MenuTrigger asChild>
+          <Button
+            size="xs"
+            variant={grouping === "flat" ? "outline" : "subtle"}
+            aria-label={`Group rows. Currently ${GROUPING_OPTIONS[grouping]}.`}
+            gap={1}
+            paddingX={2}
+          >
+            <Layers size={14} />
+            {!compact && <ChevronDown size={12} />}
+          </Button>
+        </MenuTrigger>
+      </Tooltip>
       <MenuContent minWidth="160px" textStyle="xs" paddingY={1}>
         <Box
           paddingX={3}

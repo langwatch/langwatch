@@ -1,4 +1,12 @@
-import { Box, Button, HStack, Input, Stack, Tabs, Text } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  HStack,
+  Input,
+  Stack,
+  Tabs,
+  Text,
+} from "@chakra-ui/react";
 import type React from "react";
 import { useState } from "react";
 import {
@@ -178,7 +186,14 @@ const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({
           >
             <PopoverTrigger asChild>
               <Box
-                as="button"
+                // A span, not a button: this dot lives inside the lens
+                // Tabs.Trigger, which is itself a <button>, and a <button>
+                // nested in a <button> is invalid HTML (hydration error).
+                // role/tabIndex/onKeyDown restore the button keyboard
+                // semantics on the span.
+                as="span"
+                role="button"
+                tabIndex={0}
                 // Bumped 6px → 8px + ring. Original was easy to miss
                 // (especially against busy backgrounds), and missing it
                 // meant a stale draft filter loaded from localStorage
@@ -189,7 +204,12 @@ const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({
                 height="8px"
                 borderRadius="full"
                 backgroundColor="orange.solid"
-                boxShadow="0 0 0 2px var(--chakra-colors-orange-subtle)"
+                // Layered halo: a crisp `.subtle` inner ring plus a softer
+                // `.muted` outer glow so the unsaved-draft dot draws the eye
+                // amid the lens strip without the hard single-ring outline
+                // reading as a focus state. Both layers use orange semantic
+                // tokens (the lens / draft hue) — no raw colour (T17).
+                boxShadow="0 0 0 2px var(--chakra-colors-orange-subtle), 0 0 5px 1px var(--chakra-colors-orange-muted)"
                 display="inline-block"
                 flexShrink={0}
                 cursor="pointer"
@@ -198,46 +218,53 @@ const DraftDot: React.FC<{ lensId: string; lensName: string }> = ({
                   e.stopPropagation();
                   setPopoverOpen((v) => !v);
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setPopoverOpen((v) => !v);
+                  }
+                }}
               />
             </PopoverTrigger>
-        <PopoverContent width="280px">
-          <PopoverBody>
-            <Stack gap={3}>
-              <Text textStyle="sm" color="fg.muted" lineHeight="1.4">
-                You've changed columns, filters or sort on{" "}
-                <Text as="span" color="fg" fontWeight="semibold">
-                  {lensName}
-                </Text>
-                . These edits live in your browser only. Save them as a
-                new lens to keep them, or discard to snap back.
-              </Text>
-              <HStack gap={2} justify="flex-end">
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    revertLens(lensId);
-                    setPopoverOpen(false);
-                  }}
-                >
-                  Discard changes
-                </Button>
-                <Button
-                  size="xs"
-                  colorPalette="orange"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setPopoverOpen(false);
-                    setSaveDialogOpen(true);
-                  }}
-                >
-                  Save as new lens
-                </Button>
-              </HStack>
-            </Stack>
-          </PopoverBody>
-        </PopoverContent>
+            <PopoverContent width="280px">
+              <PopoverBody>
+                <Stack gap={3}>
+                  <Text textStyle="sm" color="fg.muted" lineHeight="1.4">
+                    You've changed columns, filters or sort on{" "}
+                    <Text as="span" color="fg" fontWeight="semibold">
+                      {lensName}
+                    </Text>
+                    . These edits live in your browser only. Save them as a new
+                    lens to keep them, or discard to snap back.
+                  </Text>
+                  <HStack gap={2} justify="flex-end">
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        revertLens(lensId);
+                        setPopoverOpen(false);
+                      }}
+                    >
+                      Discard changes
+                    </Button>
+                    <Button
+                      size="xs"
+                      colorPalette="orange"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPopoverOpen(false);
+                        setSaveDialogOpen(true);
+                      }}
+                    >
+                      Save as new lens
+                    </Button>
+                  </HStack>
+                </Stack>
+              </PopoverBody>
+            </PopoverContent>
           </PopoverRoot>
         </Box>
       </Tooltip>
@@ -354,9 +381,7 @@ const BuiltInLensMenuItems: React.FC<{
       <MenuSeparator />
       <MenuItem
         value="delete"
-        onClick={() =>
-          !isUndeletable && canDelete && deleteLens(lensId)
-        }
+        onClick={() => !isUndeletable && canDelete && deleteLens(lensId)}
         disabled={isUndeletable || !canDelete}
         color="fg.error"
       >

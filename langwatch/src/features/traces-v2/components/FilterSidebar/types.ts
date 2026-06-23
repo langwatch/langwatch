@@ -14,7 +14,14 @@ export interface FacetItemAggregates {
   scoreMin: number | null;
   scoreMax: number | null;
   hasScore: boolean;
+  /** Count of distinct non-null score values — drives whether the score
+   *  slider is worth showing (see EvaluatorDrilldown's meaningful-score gate). */
+  distinctScores: number;
   hasLabel: boolean;
+  /** Top distinct emitted-label values + counts (capped server-side). The
+   *  drilldown renders these as clickable rows that filter on `evaluatorLabel`.
+   *  Absent / empty when the evaluator emits no labels. */
+  labelValues?: { value: string; count: number }[];
 }
 
 export interface FacetItem {
@@ -93,6 +100,17 @@ export interface RangeSectionData extends SectionBase {
   min: number;
   max: number;
   /**
+   * Present only for `discrete`-flagged integer facets (e.g. prompt version,
+   * span count): the distinct values + counts that back the "Discrete"
+   * tick-list, plus the true distinct count. The sidebar offers Discrete only
+   * when `distinctCount` is within `DISCRETE_MODE_MAX_VALUES`; otherwise the
+   * facet stays a slider.
+   */
+  discrete?: {
+    values: { value: number; count: number }[];
+    distinctCount: number;
+  };
+  /**
    * True when this descriptor was synthesised from RANGE_DEFAULTS before
    * discover responded. The range section renders a placeholder caption
    * instead of an interactive slider so the user knows the filter will
@@ -114,6 +132,20 @@ export interface AttributesSectionData extends SectionBase {
   filterPrefix: "attribute" | "span.attribute" | "event.attribute";
   /** The discovered attribute keys for this section (with counts). */
   keys: AttributeKey[];
+  /**
+   * Cosmetic prefix stripped from each key's DISPLAYED label only (e.g.
+   * `metadata.` → "environment" instead of "metadata.environment"). The full
+   * key is still used to build the filter, so it resolves to the same
+   * underlying trace-attribute predicate. Absent on the trace/span/event
+   * attribute sections, which display keys verbatim.
+   */
+  displayStripPrefix?: string;
+  /**
+   * When set, the section renders even with zero discovered keys and its empty
+   * state links here (how to start emitting these attributes). Used by the
+   * always-visible Metadata facet so it teaches rather than disappearing.
+   */
+  emptyDocsHref?: string;
 }
 
 export type Section =

@@ -61,3 +61,29 @@ export const METADATA_KEYS_FACET: DynamicKeysDef = {
   table: "trace_summaries",
   queryBuilder: buildMetadataKeysFacetQuery,
 };
+
+/**
+ * Metadata-scoped sibling of {@link buildMetadataKeysFacetQuery}: forces the
+ * `metadata.` namespace onto the prefix so discovery surfaces ONLY
+ * `metadata.<name>` keys (e.g. `metadata.environment`), never bare trace
+ * attributes like `langwatch.origin` / `service.name`. Any user sub-search is
+ * still honoured by appending it after the namespace (`metadata.<search>`), so
+ * the facet's "Filter keys…" box keeps working on the stripped portion.
+ */
+export function buildTraceMetadataKeysFacetQuery(
+  ctx: FacetQueryContext,
+): FacetQuery {
+  return buildMetadataKeysFacetQuery({
+    ...ctx,
+    prefix: `metadata.${ctx.prefix ?? ""}`,
+  });
+}
+
+export const TRACE_METADATA_FACET: DynamicKeysDef = {
+  key: "metadata",
+  kind: "dynamic_keys",
+  label: "Metadata",
+  group: "trace",
+  table: "trace_summaries",
+  queryBuilder: buildTraceMetadataKeysFacetQuery,
+};

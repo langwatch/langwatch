@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  chakra,
   HStack,
   Icon,
   IconButton,
@@ -14,6 +15,8 @@ import {
   BadgeCheck,
   BarChart3,
   Bot,
+  Circle,
+  CircleDot,
   Compass,
   Cpu,
   Database,
@@ -34,11 +37,26 @@ import {
   Zap,
 } from "lucide-react";
 import type React from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Kbd } from "~/components/ops/shared/Kbd";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Popover } from "~/components/ui/popover";
 import { Tooltip } from "~/components/ui/tooltip";
-import { FACET_GROUPS, getFacetGroupId } from "./constants";
+import { useFacetLensStore } from "../../stores/facetLensStore";
+import type { NumericMode } from "../../stores/numericModeStore";
+import { useUIStore } from "../../stores/uiStore";
+import {
+  FACET_PERSPECTIVES,
+  getFacetGroupId,
+  orderedGroupDefsForPerspective,
+} from "./constants";
+
+// Default expanded sidebar width (mirrors SIDEBAR_WIDTH_EXPANDED in
+// TracesPage). Below this + a little slack the "shown / total" count chip
+// in the Configure trigger is dropped so it can't crowd the expand-all
+// toggle off the header — at narrow widths the trigger reads just
+// "Configure" and the exact tally lives one click inside the picker.
+const CONFIGURE_COUNT_MIN_WIDTH = 260;
 
 /** Lucide icon per facet group, rendered next to the group label so
  *  the picker telegraphs each cluster's "type" at a glance. Falls back
@@ -46,14 +64,17 @@ import { FACET_GROUPS, getFacetGroupId } from "./constants";
  *  hand-picked icon. Keys mirror the Round-3 AI-observability taxonomy
  *  in `constants.FACET_GROUPS`. */
 const GROUP_ICON: Record<string, typeof Activity> = {
-  origin: Compass,
-  model: Sparkles,
-  cost: DollarSign,
+  traces: Compass,
   errors: AlertCircle,
-  quality: BadgeCheck,
-  events: Activity,
+  spans: Layers,
   subjects: Users,
+  model: Sparkles,
+  prompts: MessageSquareText,
+  quality: BadgeCheck,
   topics: Tag,
+  cost: DollarSign,
+  latency: Timer,
+  volume: Hash,
   custom: Database,
 };
 
@@ -87,6 +108,7 @@ const KEY_ICON: Record<string, typeof Filter> = {
   evaluatorStatus: AlertCircle,
   evaluatorVerdict: BadgeCheck,
   evaluatorScore: BarChart3,
+  evaluatorLabel: Tag,
   duration: Timer,
   cost: DollarSign,
   tokens: Hash,
@@ -115,6 +137,11 @@ interface FacetManagerPopoverProps {
   onHide: (key: string) => void;
   /** Drop all overrides — sidebar returns to density default. */
   onResetAll: () => void;
+  /** Effective presentation mode per discrete-eligible numeric facet. A
+   *  missing key means the facet is slider-only (no mode control shown). */
+  numericModeByKey: Map<string, NumericMode>;
+  /** Switch a numeric facet between its slider and tick-list presentation. */
+  setNumericMode: (args: { field: string; mode: NumericMode }) => void;
   /**
    * Optional controlled-open prop. When set, the popover ignores its
    * internal `open` state and mirrors the caller's value (and reports
@@ -131,6 +158,15 @@ interface FacetManagerPopoverProps {
    * old floating bottom-right button.
    */
   triggerLabel?: string;
+  /**
+   * Explicit override for whether the "shown / total" count chip renders
+   * on the labelled trigger. When omitted, falls back to the internal
+   * sidebar-width heuristic. The sidebar passes a value that also weighs
+   * the other header buttons competing for the same row, so the chip
+   * yields only when the header is genuinely tight — not at a fixed wide
+   * width that left a dead band where the count vanished too early.
+   */
+  showCount?: boolean;
 }
 
 /**
@@ -162,9 +198,12 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
   onShow,
   onHide,
   onResetAll,
+  numericModeByKey,
+  setNumericMode,
   open: controlledOpen,
   onOpenChange,
   triggerLabel,
+  showCount: showCountOverride,
 }) => {
   // Controlled-or-uncontrolled hybrid: when the caller passes `open`
   // we treat it as the source of truth (so the floating Configure CTA
@@ -178,6 +217,28 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
     onOpenChange?.(next);
   };
   const [query, setQuery] = useState("");
+  // Focus the facet filter as soon as the popover opens so the user can type
+  // immediately. Deferred a tick so the popover content has mounted and the
+  // open animation has settled before moving focus.
+  const filterInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const t = setTimeout(() => filterInputRef.current?.focus(), 50);
+    return () => clearTimeout(t);
+  }, [open]);
+
+  // Perspective switcher: reads/writes the facet lens store directly so the
+  // sidebar (which already consumes the lens order) reorders in lock-step,
+  // without threading props through FilterSidebar.
+  const activePerspectiveId = useFacetLensStore((s) => s.activePerspectiveId);
+  const selectPerspective = useFacetLensStore((s) => s.selectPerspective);
+
+  // Group defs in the active perspective's order — drives the section
+  // headers below (the sidebar itself follows via the stamped lens order).
+  const orderedGroups = useMemo(
+    () => orderedGroupDefsForPerspective(activePerspectiveId),
+    [activePerspectiveId],
+  );
 
   const normalisedQuery = query.trim().toLowerCase();
 
@@ -203,6 +264,16 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
     () => orderedKeysAll.filter(isVisible).length,
     [orderedKeysAll, isVisible],
   );
+
+  // Drop the count chip when the header lacks room so the trigger collapses
+  // to just "Configure" and never pushes the expand-all toggle off the edge.
+  // The sidebar passes an explicit `showCount` that weighs the other header
+  // buttons; only the icon-only path (no override) falls back to the raw
+  // width heuristic. `sidebarWidth` null means the auto default width.
+  const sidebarWidth = useUIStore((s) => s.sidebarWidth);
+  const showCount =
+    showCountOverride ??
+    (sidebarWidth !== null && sidebarWidth >= CONFIGURE_COUNT_MIN_WIDTH);
 
   const totalMatching = useMemo(
     () => Object.values(byGroup).reduce((acc, ks) => acc + ks.length, 0),
@@ -239,13 +310,30 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
             color="fg.subtle"
             gap={1}
             paddingX={1.5}
-            aria-label="Manage which facets appear in the sidebar"
+            aria-label={`Manage which facets appear in the sidebar (${visibleCount} of ${orderedKeysAll.length} shown)`}
             _hover={{ color: "fg", bg: "bg.muted" }}
           >
             <Settings2 size={12} />
             <Text textStyle="2xs" fontWeight="600">
               {triggerLabel}
             </Text>
+            {orderedKeysAll.length > 0 && showCount && (
+              // Subtle "shown / available" hint so the user can tell at a
+              // glance how many facets are hidden behind the picker without
+              // opening it. Hidden when the sidebar is narrow (see showCount).
+              <Box
+                as="span"
+                bg="bg.muted"
+                color="fg.subtle"
+                borderRadius="sm"
+                paddingX={1}
+                fontVariantNumeric="tabular-nums"
+              >
+                <Text as="span" textStyle="2xs" fontWeight="600">
+                  {visibleCount}/{orderedKeysAll.length}
+                </Text>
+              </Box>
+            )}
           </Button>
         ) : (
           <IconButton
@@ -275,6 +363,88 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
                 {visibleCount} of {orderedKeysAll.length}
               </Text>
             </HStack>
+            <VStack
+              align="stretch"
+              gap={0}
+              paddingX={2}
+              paddingTop={2}
+              paddingBottom={1}
+              borderBottomWidth="1px"
+              borderColor="border.subtle"
+              role="radiogroup"
+              aria-label="Perspective"
+            >
+              <Text
+                textStyle="2xs"
+                fontWeight="700"
+                color="fg.subtle"
+                textTransform="uppercase"
+                letterSpacing="0.1em"
+                paddingX={1}
+                paddingBottom={1}
+              >
+                Perspective
+              </Text>
+              {FACET_PERSPECTIVES.map((p) => {
+                const active = p.id === activePerspectiveId;
+                const RadioIcon = active ? CircleDot : Circle;
+                return (
+                  <chakra.button
+                    key={p.id}
+                    type="button"
+                    display="flex"
+                    alignItems="center"
+                    gap={2}
+                    paddingX={2}
+                    paddingY={1}
+                    borderRadius="sm"
+                    cursor="pointer"
+                    bg={active ? "bg.muted" : undefined}
+                    _hover={{ bg: "bg.muted" }}
+                    onClick={() => selectPerspective(p.id)}
+                    role="radio"
+                    aria-checked={active}
+                    // Radiogroup keyboard pattern: only the active radio is
+                    // tabbable, and arrow keys move selection + focus.
+                    tabIndex={active ? 0 : -1}
+                    onKeyDown={(e) => {
+                      const idx = FACET_PERSPECTIVES.findIndex(
+                        (x) => x.id === p.id,
+                      );
+                      const len = FACET_PERSPECTIVES.length;
+                      let nextIdx: number | null = null;
+                      if (e.key === "ArrowDown" || e.key === "ArrowRight") {
+                        nextIdx = (idx + 1) % len;
+                      } else if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+                        nextIdx = (idx - 1 + len) % len;
+                      }
+                      if (nextIdx === null) return;
+                      e.preventDefault();
+                      selectPerspective(FACET_PERSPECTIVES[nextIdx]!.id);
+                      const radios =
+                        e.currentTarget.parentElement?.querySelectorAll(
+                          '[role="radio"]',
+                        );
+                      (radios?.[nextIdx] as HTMLElement | undefined)?.focus();
+                    }}
+                  >
+                    <Icon
+                      boxSize={3}
+                      color={active ? "blue.solid" : "fg.subtle"}
+                    >
+                      <RadioIcon />
+                    </Icon>
+                    <Text
+                      textStyle="xs"
+                      color="fg"
+                      fontWeight={active ? "600" : "500"}
+                    >
+                      {p.label}
+                    </Text>
+                  </chakra.button>
+                );
+              })}
+            </VStack>
             <Box paddingX={2} paddingY={2}>
               <HStack
                 gap={1.5}
@@ -289,6 +459,7 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
               >
                 <Search size={12} />
                 <Input
+                  ref={filterInputRef}
                   size="xs"
                   variant="flushed"
                   placeholder="Filter facets…"
@@ -328,7 +499,7 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
                   </Text>
                 </Box>
               ) : (
-                FACET_GROUPS.map((group) => {
+                orderedGroups.map((group) => {
                   const keys = byGroup[group.id] ?? [];
                   if (keys.length === 0) return null;
                   const GroupIcon = GROUP_ICON[group.id] ?? Filter;
@@ -368,26 +539,75 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
                               checked ? onHide(key) : onShow(key)
                             }
                           >
-                            <Checkbox
-                              size="sm"
-                              checked={checked}
-                              onCheckedChange={() =>
-                                checked ? onHide(key) : onShow(key)
-                              }
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <HStack gap={1.5}>
-                                <Icon
-                                  boxSize={3}
-                                  color={checked ? "fg.muted" : "fg.subtle"}
+                            <HStack justify="space-between" gap={2}>
+                              <Checkbox
+                                size="sm"
+                                checked={checked}
+                                onCheckedChange={() =>
+                                  checked ? onHide(key) : onShow(key)
+                                }
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <HStack gap={1.5}>
+                                  <Icon
+                                    boxSize={3}
+                                    color={checked ? "fg.muted" : "fg.subtle"}
+                                  >
+                                    <KeyIcon />
+                                  </Icon>
+                                  <Text textStyle="xs" color="fg">
+                                    {label}
+                                  </Text>
+                                </HStack>
+                              </Checkbox>
+                              {/* Numeric facets that support both presentations
+                                  get an inline Range/Discrete picker — the
+                                  same choice as the in-header toggle. */}
+                              {numericModeByKey.has(key) && (
+                                <HStack
+                                  gap={0}
+                                  flexShrink={0}
+                                  borderWidth="1px"
+                                  borderColor="border.subtle"
+                                  borderRadius="sm"
+                                  overflow="hidden"
+                                  onClick={(e) => e.stopPropagation()}
                                 >
-                                  <KeyIcon />
-                                </Icon>
-                                <Text textStyle="xs" color="fg">
-                                  {label}
-                                </Text>
-                              </HStack>
-                            </Checkbox>
+                                  {(["range", "discrete"] as const).map((m) => {
+                                    const active =
+                                      numericModeByKey.get(key) === m;
+                                    return (
+                                      <chakra.button
+                                        key={m}
+                                        type="button"
+                                        aria-pressed={active}
+                                        paddingX={1.5}
+                                        paddingY={0.5}
+                                        color={active ? "fg" : "fg.subtle"}
+                                        bg={active ? "bg.muted" : "transparent"}
+                                        cursor="pointer"
+                                        _hover={{ color: "fg", bg: "bg.muted" }}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setNumericMode({
+                                            field: key,
+                                            mode: m,
+                                          });
+                                        }}
+                                      >
+                                        <Text
+                                          as="span"
+                                          textStyle="2xs"
+                                          fontWeight={active ? "600" : "500"}
+                                        >
+                                          {m === "range" ? "Range" : "Discrete"}
+                                        </Text>
+                                      </chakra.button>
+                                    );
+                                  })}
+                                </HStack>
+                              )}
+                            </HStack>
                           </Box>
                         );
                       })}
@@ -421,25 +641,27 @@ export const FacetManagerPopover: React.FC<FacetManagerPopoverProps> = ({
     </Popover.Root>
   );
 
-  // When the caller asked for the labelled text button we drop the
-  // tooltip — the label itself ("Configure") is the affordance, and
-  // wrapping it in a hover-revealed tooltip felt redundant. The
-  // icon-only path still gets the tooltip, since the Settings2 glyph
-  // on its own benefits from spelling out the action.
-  if (triggerLabel) return popover;
+  // Both trigger variants get the same styled tooltip as their sidebar-header
+  // siblings — text + Kbd shortcut, bottom-placed — so the header reads as one
+  // consistent set of controls. The labelled "Configure" trigger previously
+  // relied on a bare native `title`, which looked and behaved differently from
+  // the IconButton tooltips beside it (the inconsistency users flagged).
+  //
+  // Tooltip wraps a Box that *contains* the Popover — not the Popover.Trigger
+  // directly. Both `Tooltip` and `Popover.Trigger` use `asChild` ref
+  // forwarding, and when they stack on the same node they fight over the slot,
+  // leaving the popover with no measurable anchor (it lands at the viewport's
+  // top-left). Splitting the chains via a host Box gives each component its own
+  // ref target. Same pattern as CreateLensButton.
   return (
-    // Tooltip wraps a Box that *contains* the Popover — not the
-    // Popover.Trigger directly. Both `Tooltip` and `Popover.Trigger`
-    // use `asChild` ref forwarding under the hood, and when they
-    // stack on the same node they fight over the slot, leaving the
-    // popover with no measurable anchor (it lands at the viewport's
-    // top-left). Splitting the chains via a host Box gives each
-    // component its own ref target — Tooltip anchors to the Box,
-    // Popover anchors to the IconButton. Same pattern as
-    // CreateLensButton.
     <Tooltip
       positioning={{ placement: "bottom" }}
-      content="Choose which facets appear in the sidebar"
+      content={
+        <HStack gap={1.5}>
+          <Text>Configure which facets appear</Text>
+          <Kbd>C</Kbd>
+        </HStack>
+      }
       openDelay={300}
     >
       <Box display="inline-flex">{popover}</Box>

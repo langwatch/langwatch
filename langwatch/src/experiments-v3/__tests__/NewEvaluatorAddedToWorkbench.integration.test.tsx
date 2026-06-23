@@ -393,3 +393,163 @@ describe("New Evaluator Added to Workbench", () => {
     });
   });
 });
+
+// ============================================================================
+// Auto-open the evaluator mapping drawer when required fields stay unmapped
+// ============================================================================
+
+describe("Adding an evaluator with unmapped required fields", () => {
+  // A prompt target whose single output is "output".
+  const promptTarget = {
+    id: "target-1",
+    type: "prompt" as const,
+    inputs: [{ identifier: "input", type: "str" as const }],
+    outputs: [{ identifier: "output", type: "str" as const }],
+    mappings: {},
+  };
+
+  const makeColumn = (name: string) => ({
+    id: name,
+    name,
+    type: "string" as const,
+  });
+  const makeDataset = (columnNames: string[]) => ({
+    id: "test-data",
+    name: "Test Data",
+    type: "inline" as const,
+    columns: columnNames.map(makeColumn),
+    inline: {
+      columns: columnNames.map(makeColumn),
+      // One row so the table renders a target cell (the add-evaluator button
+      // lives inside the per-row cell).
+      records: Object.fromEntries(
+        columnNames.map((name) => [name, ["sample"]]),
+      ),
+    },
+  });
+
+  // An existing library evaluator selected from the picker (the onSelect path).
+  const makeSelectedEvaluator = (
+    fields: Array<{ identifier: string; type: string }>,
+  ) =>
+    ({
+      id: "library-evaluator-1",
+      name: "My Custom Evaluator",
+      type: "evaluator",
+      projectId: "test-project",
+      config: { evaluatorType: "langevals/exact_match" },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      fields,
+    }) as never;
+
+  const seedWorkbench = (columnNames: string[]) => {
+    useEvaluationsV3Store.getState().reset();
+    useEvaluationsV3Store.setState({
+      targets: [promptTarget],
+      datasets: [makeDataset(columnNames)],
+      activeDatasetId: "test-data",
+      evaluators: [],
+    });
+  };
+
+  const addEvaluatorViaPicker = async (
+    user: ReturnType<typeof userEvent.setup>,
+    fields: Array<{ identifier: string; type: string }>,
+  ) => {
+    const buttons = screen.getAllByTestId("add-evaluator-button-target-1");
+    await user.click(buttons[0]!);
+
+    const onSelect = flowCallbacksStore.evaluatorList?.onSelect as
+      | ((evaluator: unknown) => void)
+      | undefined;
+    await act(async () => {
+      onSelect?.(makeSelectedEvaluator(fields));
+    });
+  };
+
+  beforeEach(() => {
+    currentDrawer = null;
+    drawerProps = {};
+    Object.keys(flowCallbacksStore).forEach(
+      (key) => delete flowCallbacksStore[key],
+    );
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  /** @scenario Adding an evaluator with unmapped required fields opens its mapping drawer */
+  it("opens the evaluator mapping drawer when a required field cannot be auto-mapped", async () => {
+    const user = userEvent.setup();
+    // The evaluator needs "ground_truth", which is an expected-answer field the
+    // dataset does not carry (and is never sourced from the target output), so
+    // it cannot be auto-mapped.
+    seedWorkbench(["input"]);
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
+    await waitFor(() => {
+      expect(
+        screen.getAllByTestId("add-evaluator-button-target-1").length,
+      ).toBeGreaterThan(0);
+    });
+
+    await addEvaluatorViaPicker(user, [
+      { identifier: "ground_truth", type: "str" },
+    ]);
+
+    // The evaluator was added, and instead of silently closing the picker the
+    // mapping drawer opened onto the unmapped fields.
+    expect(useEvaluationsV3Store.getState().evaluators.length).toBe(1);
+    expect(currentDrawer).toBe("evaluatorEditor");
+    expect(drawerProps.evaluatorId).toBe("library-evaluator-1");
+  });
+
+  /** @scenario Adding an evaluator whose required fields all auto-map closes the picker */
+  it("closes the picker when every required field auto-maps", async () => {
+    const user = userEvent.setup();
+    // Dataset carries "expected_output", so both required fields auto-map
+    // (output -> target output, expected_output -> dataset column).
+    seedWorkbench(["input", "expected_output"]);
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
+    await waitFor(() => {
+      expect(
+        screen.getAllByTestId("add-evaluator-button-target-1").length,
+      ).toBeGreaterThan(0);
+    });
+
+    await addEvaluatorViaPicker(user, [
+      { identifier: "output", type: "str" },
+      { identifier: "expected_output", type: "str" },
+    ]);
+
+    expect(useEvaluationsV3Store.getState().evaluators.length).toBe(1);
+    expect(currentDrawer).toBeNull();
+  });
+
+  /** @scenario The evaluator mapping selector offers target outputs before dataset columns */
+  it("lists the target outputs before the dataset columns in the opened drawer", async () => {
+    const user = userEvent.setup();
+    seedWorkbench(["input"]);
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
+    await waitFor(() => {
+      expect(
+        screen.getAllByTestId("add-evaluator-button-target-1").length,
+      ).toBeGreaterThan(0);
+    });
+
+    await addEvaluatorViaPicker(user, [
+      { identifier: "ground_truth", type: "str" },
+    ]);
+
+    expect(currentDrawer).toBe("evaluatorEditor");
+    const mappingsConfig = drawerProps.mappingsConfig as {
+      availableSources: Array<{ id: string; type: string }>;
+    };
+    // Target signature source comes first, dataset second.
+    expect(mappingsConfig.availableSources[0]?.type).toBe("signature");
+    expect(mappingsConfig.availableSources[0]?.id).toBe("target-1");
+    expect(mappingsConfig.availableSources[1]?.type).toBe("dataset");
+  });
+});

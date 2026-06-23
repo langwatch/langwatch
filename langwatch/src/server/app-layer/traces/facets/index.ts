@@ -10,11 +10,20 @@ import { EVALUATOR_FACET } from "./evaluator";
 import { EVENT_ATTRIBUTE_KEYS_FACET } from "./event-attribute-keys";
 import { EVENT_FACET } from "./events";
 import { LABEL_FACET } from "./label";
-import { METADATA_KEYS_FACET } from "./metadata-keys";
+import { METADATA_KEYS_FACET, TRACE_METADATA_FACET } from "./metadata-keys";
 import { SPAN_ATTRIBUTE_KEYS_FACET } from "./span-attribute-keys";
 import { SPAN_NAME_FACET } from "./span-name";
 import { SPAN_STATUS_FACET } from "./span-status";
 
+export { buildEvaluatorFacetQuery } from "./evaluator";
+export { buildEventAttributeKeysFacetQuery } from "./event-attribute-keys";
+export { buildEventsFacetQuery } from "./events";
+export { buildLabelFacetQuery } from "./label";
+export {
+  buildMetadataKeysFacetQuery,
+  buildTraceMetadataKeysFacetQuery,
+} from "./metadata-keys";
+export { buildSpanAttributeKeysFacetQuery } from "./span-attribute-keys";
 export {
   EVALUATOR_FACET,
   EVENT_ATTRIBUTE_KEYS_FACET,
@@ -24,10 +33,5 @@ export {
   SPAN_ATTRIBUTE_KEYS_FACET,
   SPAN_NAME_FACET,
   SPAN_STATUS_FACET,
+  TRACE_METADATA_FACET,
 };
-export { buildEvaluatorFacetQuery } from "./evaluator";
-export { buildEventAttributeKeysFacetQuery } from "./event-attribute-keys";
-export { buildEventsFacetQuery } from "./events";
-export { buildLabelFacetQuery } from "./label";
-export { buildMetadataKeysFacetQuery } from "./metadata-keys";
-export { buildSpanAttributeKeysFacetQuery } from "./span-attribute-keys";

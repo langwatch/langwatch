@@ -184,7 +184,7 @@ export class TraceService {
    * Static factory method for creating TraceService with default dependencies.
    *
    * @param prisma - PrismaClient instance
-   * @param blobResolutionDeps - Optional blob-offload resolution deps (#4215)
+   * @param blobResolutionDeps - Optional blob-offload resolution deps (#4888)
    * @returns TraceService instance
    */
   static create(
@@ -200,12 +200,17 @@ export class TraceService {
    * @param projectId - The project ID
    * @param traceId - The trace ID to fetch
    * @param protections - Field redaction protections
+   * @param opts.full - When true AND blob-resolution deps are present, resolves
+   *   offloaded eventref pointers from event_log so over-threshold IO values
+   *   read back full (#4888). Default (undefined/false) returns the ≤64 KB
+   *   preview — identical to pre-#4888 behavior.
    * @returns The trace if found, undefined otherwise
    */
   async getById(
     projectId: string,
     traceId: string,
     protections: Protections,
+    opts?: { full?: boolean },
   ): Promise<Trace | undefined> {
     return this.tracer.withActiveSpan(
       "TraceService.getById",
@@ -217,6 +222,8 @@ export class TraceService {
           projectId,
           [traceId],
           protections,
+          undefined,
+          { resolveBlobs: opts?.full },
         );
         if (traces === null) {
           throw new Error(
@@ -267,6 +274,8 @@ export class TraceService {
             projectId,
             [candidates[0]!],
             protections,
+            undefined,
+            { resolveBlobs: opts?.full },
           );
           return resolved?.[0];
         }
@@ -282,12 +291,20 @@ export class TraceService {
    * @param projectId - The project ID
    * @param traceIds - Array of trace IDs to fetch
    * @param protections - Field redaction protections
+   * @param occurredAt - Optional approximate trace time range (epoch ms). When
+   *   supplied, the trace_summaries read prunes to the matching weekly
+   *   partitions instead of scanning every partition (incl. cold S3).
+   * @param opts.full - When true AND blob-resolution deps are present, resolves
+   *   offloaded eventref pointers from event_log so over-threshold IO values
+   *   read back full (#4888). Default (undefined/false) returns previews.
    * @returns Array of Trace objects with spans
    */
   async getTracesWithSpans(
     projectId: string,
     traceIds: string[],
     protections: Protections,
+    occurredAt?: { from: number; to: number },
+    opts?: { full?: boolean },
   ): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
       "TraceService.getTracesWithSpans",
@@ -301,6 +318,8 @@ export class TraceService {
           projectId,
           traceIds,
           protections,
+          occurredAt,
+          { resolveBlobs: opts?.full },
         );
         if (traces === null) {
           throw new Error(
@@ -450,12 +469,18 @@ export class TraceService {
    * @param projectId - The project ID
    * @param threadIds - Array of thread IDs
    * @param protections - Field redaction protections
+   * @param opts.full - When true AND blob-resolution deps are present, resolves
+   *   offloaded eventref pointers so thread IO reads back full. Used by the
+   *   eval path (which needs full values for thread-mapped evaluators) — the
+   *   eval-path TraceService carries deps. Customer thread views pass nothing
+   *   and carry no deps, so they stay on the ≤64 KB preview (#4888 / ADR-022).
    * @returns Array of traces
    */
   async getTracesWithSpansByThreadIds(
     projectId: string,
     threadIds: string[],
     protections: Protections,
+    opts?: { full?: boolean },
   ): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
       "TraceService.getTracesWithSpansByThreadIds",
@@ -473,6 +498,7 @@ export class TraceService {
             projectId,
             threadIds,
             protections,
+            { resolveBlobs: opts?.full },
           );
         if (traces === null) {
           throw new Error(

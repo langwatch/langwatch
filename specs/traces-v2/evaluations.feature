@@ -379,48 +379,143 @@ Rule: Feedback is displayed as events
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# TABLE INTEGRATION: INDIVIDUAL EVAL COLUMNS
+# TABLE INTEGRATION: PER-EVALUATOR EVAL COLUMNS
 # ─────────────────────────────────────────────────────────────────────────────
+# See dev/docs/adr/029-trace-table-per-evaluator-columns.md for the architecture
+# (dynamic `eval:<field>:<evaluatorKey>` column ids, makeEvalCellDef factory).
 
-Rule: Individual eval columns in trace table
-  Per-evaluator column defs are dynamically derived (`makeEvalCellDef`) from
-  the unique evaluators observed across the visible rows.
+Rule: Adding a per-evaluator eval column
+  Users add a dedicated column for one evaluator's result via the Columns
+  dropdown. Each column targets one evaluator AND one field of its result
+  (Score, Verdict, or Label), so a single evaluator can back several columns.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And the trace table is visible
 
-  Scenario: Eval columns are dynamically derived from visible rows
-    When the trace table loads
-    Then a `eval:<evaluatorId>` column definition is registered for each unique evaluator across visible rows
+  Scenario: The Evaluations section offers an add-an-eval-column control
+    When the user opens the column picker (from the toolbar Columns button or the trailing "+" column)
+    Then the Evaluations section lists the "Evals" summary column
+    And it offers an "Add eval column" control with an evaluator picker and a field selector
 
-  Scenario: Individual eval column renders score with status colour dot
-    Given a trace has a "Faithfulness" eval with a numeric score of 8.2
+  Scenario: The evaluator picker lists evaluators seen in the active time range
+    Given evaluators "Faithfulness" and "Toxicity" have runs in the active time range
+    When the user opens the evaluator picker
+    Then both "Faithfulness" and "Toxicity" are offered as options
+
+  Scenario: The evaluator picker accepts a free-text evaluator key
+    Given the user opens the evaluator picker
+    When the user types an evaluator key that is not in the offered list
+    Then the typed key can be committed as the column's evaluator
+
+  Scenario: The field selector defaults to Score
+    When the user opens the field selector for a new eval column
+    Then "Score" is the default field
+    And "Verdict" and "Label" are also selectable
+
+  Scenario: Adding an eval column appends it and enters draft state
+    Given the user picked evaluator "Faithfulness" and field "Score"
+    When the user adds the column
+    Then an "eval:score:<faithfulness evaluatorId>" column is appended to `columnOrder`
+    And the active lens enters draft state
+
+  Scenario: One evaluator can back multiple columns on different fields
+    Given the user added a "Score" column for "Faithfulness"
+    When the user adds a "Verdict" column for "Faithfulness"
+    Then both columns coexist with distinct ids "eval:score:…" and "eval:verdict:…"
+
+  Scenario: The column header names the evaluator and the field
+    Given an eval column targets "Faithfulness" on field "Score"
+    Then the column header reads "Faithfulness · Score"
+
+  Scenario: An already-added evaluator offers an inline Remove in the picker
+    Given an eval column for "Faithfulness" on field "Score" is already shown
+    When the user opens the "Add eval column" control with field "Score" selected
+    Then the "Faithfulness" suggestion shows an inline "Remove" control instead of adding
+    And clicking it removes that eval column
+
+
+Rule: Rendering a per-evaluator eval column
+  Each cell shows the chosen field of the evaluator's LATEST run on that trace,
+  or an em-dash when the trace has no usable value.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the trace table is visible
+
+  Scenario: Score field renders the score with a status colour dot
+    Given an eval column targets "Faithfulness" on field "Score"
+    And a trace has a "Faithfulness" run with score 8.2
     Then the cell shows a colour dot tinted by `evalChipColor` and the formatted score "8.2"
 
-  Scenario: Individual eval column renders Pass / Fail when score is unavailable
-    Given a trace has a "Prompt Injection" eval with passed=false and no numeric score
+  Scenario: Verdict field renders Pass or Fail
+    Given an eval column targets "Prompt Injection" on field "Verdict"
+    And a trace has a "Prompt Injection" run with passed=false
     Then the cell shows a red dot and the text "Fail"
 
-  Scenario: Individual eval column shows a dash when the row has no run
-    Given a trace has no run of the column's evaluator
+  Scenario: Label field renders the categorical label
+    Given an eval column targets "Sentiment" on field "Label"
+    And a trace has a "Sentiment" run with label "Positive"
+    Then the cell renders "Positive"
+
+  Scenario: Latest run wins when an evaluator ran multiple times
+    Given an eval column targets "Faithfulness" on field "Score"
+    And a trace has 3 "Faithfulness" runs with the most recent scoring 9.1
+    Then the cell shows 9.1
+
+  Scenario: Cell shows an em-dash when the trace has no run of the evaluator
+    Given an eval column targets "Faithfulness"
+    And a trace has no "Faithfulness" run
     Then the cell renders an em-dash placeholder
 
+  Scenario: Cell shows an em-dash when the chosen field has no value
+    Given an eval column targets "Faithfulness" on field "Score"
+    And a trace has a "Faithfulness" run that was skipped with no score
+    Then the cell renders an em-dash placeholder
+
+
+Rule: Per-evaluator eval columns persist like any column
+  Eval columns live in the lens column list and survive reload; they are never
+  auto-hidden when their evaluator is absent from the data.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+
+  Scenario: Eval column survives a reload
+    Given the user added an eval column for "Faithfulness" on field "Score"
+    When the page reloads
+    Then the "Faithfulness · Score" column is still present
+
+  Scenario: An eval column whose evaluator left the time range is kept, not dropped
+    Given a saved lens has an "eval:score:…" column
+    And that evaluator has no runs in the active time range
+    When the trace table renders
+    Then the column remains visible
+    And every row shows an em-dash
+    # `reconcileColumns` preserves `eval:*` ids even though they are absent
+    # from the static capability column list.
+
+  Scenario: A free-text evaluator with no matching runs renders an all-dash column
+    Given the user added an eval column for a typed evaluator key with no runs in range
+    When the trace table renders
+    Then the column header renders normally
+    And every row shows an em-dash
+
   @planned
-  Scenario: Sorting by an individual eval column
-    # Not yet implemented as of 2026-05-01 — the dynamic eval column has no
-    # sort plumbing; column headers don't expose sort.
-    Given the "Faithfulness" column is enabled
-    When the user sorts by "Faithfulness" ascending
+  Scenario: Sorting by a per-evaluator eval column
+    # Deferred — the eval column accessor exposes the field value, but no
+    # server-side sort keyed on a specific evaluator is wired yet.
+    Given a "Faithfulness · Score" column is enabled
+    When the user sorts by it ascending
     Then the traces are ordered by lowest faithfulness score first
 
   @planned
-  Scenario: Eval shown as individual column is excluded from summary badges
-    # Not yet implemented as of 2026-05-01 — `EvaluationsCell` renders all
-    # latest evaluators regardless of which individual columns are enabled.
-    Given the "Faithfulness" column is enabled
-    And the evals summary column is also enabled
-    Then the evals summary column does not include a "Faithfulness" badge
+  Scenario: Evaluator shown as a column is excluded from the Evals summary badges
+    # Not yet implemented — `EvaluationsCell` renders all latest evaluators
+    # regardless of which per-evaluator columns are enabled.
+    Given a "Faithfulness · Score" column is enabled
+    And the Evals summary column is also enabled
+    Then the Evals summary column does not include a "Faithfulness" badge
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -79,10 +79,10 @@ Feature: Onboarding Progress UI
 
   # Navigation - Clicking steps
   @unimplemented
-  Scenario: Clicking syncFirstMessage step navigates to messages page
+  Scenario: Clicking syncFirstMessage step navigates to the traces explorer
     Given the current step is "syncFirstMessage"
     When I click the action for "Sync first message"
-    Then I should be navigated to the messages page
+    Then I should be navigated to the traces explorer page at "/<project>/traces"
 
   @unimplemented
   Scenario: Clicking createWorkflow step navigates to workflows page

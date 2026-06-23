@@ -223,7 +223,7 @@ Rule: Conversation grouping (by-conversation)
     And the user views the "Conversations" lens or selects "By Conversation" grouping
 
   Scenario: Conversation rows reflect the conversation columns capability
-    Then the available columns are Conversation (pinned), Turns, Started, Last Turn, Duration, Cost, Tokens, Model, Service, Status
+    Then the available columns are Conversation, Turns, Started, Last Turn, Duration, Cost, Tokens, Model, Service, Status
 
   Scenario: Conversation row shows turn count
     Then the Turns column shows the number of traces (turns) in the conversation

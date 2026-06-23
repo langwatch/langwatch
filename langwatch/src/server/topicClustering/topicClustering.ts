@@ -47,7 +47,7 @@ export const clusterTopicsForProject = async (
   }
 
   const { totalTracesCount, recentTracesCount, assignedTracesCount } =
-    await fetchCountsFromClickHouse(clickhouse, projectId);
+    await fetchCountsFromClickHouse({ clickhouse, projectId });
 
   logger.info(
     {
@@ -186,29 +186,46 @@ type TraceSearchResult = {
   returnedCount: number;
 };
 
-async function fetchCountsFromClickHouse(
-  clickhouse: ClickHouseClient,
-  projectId: string,
-): Promise<TraceCounts> {
+export async function fetchCountsFromClickHouse({
+  clickhouse,
+  projectId,
+}: {
+  clickhouse: ClickHouseClient;
+  projectId: string;
+}): Promise<TraceCounts> {
   const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
   const twelveMonthsAgo = Date.now() - 365 * 24 * 60 * 60 * 1000;
 
+  // trace_summaries is a ReplacingMergeTree, so we count one row per trace
+  // (its latest version). Rather than the IN-tuple dedup pattern — which
+  // scans the 12-month window twice (once to build the latest-version key
+  // set, once for the outer aggregate) and materialises a key set sized to
+  // every trace — fold to the latest version in a single GROUP BY pass with
+  // argMax(expr, UpdatedAt). The conditional counts read the latest version's
+  // OccurredAt / assigned-state, identical to the previous shape, but with one
+  // scan and no IN-set build. Light columns only (no heavy payloads).
+  //
+  // The assigned check folds over `argMax(TopicId IS NOT NULL AND TopicId !=
+  // '', UpdatedAt)`, not `argMax(TopicId, UpdatedAt)`: TopicId is Nullable and
+  // argMax skips rows whose first argument is NULL, so a trace whose latest
+  // version cleared its topic (latest TopicId = NULL) would otherwise fold to
+  // an older non-null TopicId and be over-counted. The boolean expression is
+  // non-nullable, so the fold reads the true latest version.
   const result = await clickhouse.query({
     query: `
       SELECT
         toString(count(*)) AS total,
-        toString(countIf(OccurredAt >= fromUnixTimestamp64Milli({thirtyDaysAgo:UInt64}))) AS recent,
-        toString(countIf(TopicId IS NOT NULL AND TopicId != '')) AS assigned
-      FROM trace_summaries t
-      WHERE TenantId = {tenantId:String}
-        AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
-        AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
-          SELECT TenantId, TraceId, max(UpdatedAt)
-          FROM trace_summaries
-          WHERE TenantId = {tenantId:String}
-            AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
-          GROUP BY TenantId, TraceId
-        )
+        toString(countIf(latestOccurredAt >= fromUnixTimestamp64Milli({thirtyDaysAgo:UInt64}))) AS recent,
+        toString(countIf(latestAssigned)) AS assigned
+      FROM (
+        SELECT
+          argMax(OccurredAt, UpdatedAt) AS latestOccurredAt,
+          argMax(TopicId IS NOT NULL AND TopicId != '', UpdatedAt) AS latestAssigned
+        FROM trace_summaries
+        WHERE TenantId = {tenantId:String}
+          AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
+        GROUP BY TenantId, TraceId
+      )
     `,
     query_params: { tenantId: projectId, thirtyDaysAgo, twelveMonthsAgo },
     format: "JSONEachRow",
@@ -341,6 +358,15 @@ export async function fetchTracesFromClickHouse(
         : {}),
     },
     format: "JSONEachRow",
+    // The outer query reads ComputedInput (a potentially large payload) for the
+    // page of <=2000 traces. Even though rows stream (no outer sort/LIMIT), the
+    // dedup still resolves the latest version per trace, and peak memory scales
+    // with the number of read streams holding a ComputedInput block at once. For
+    // tenants with large inputs that peak crossed max_memory_usage_per_query
+    // (MEMORY_LIMIT_EXCEEDED). This is a background clustering batch, not a
+    // latency-critical path, so cap the read streams to keep peak memory well
+    // under the per-query limit; the returned rows are unchanged.
+    clickhouse_settings: { max_threads: 2 },
   });
 
   const rawRows = (await result.json()) as Array<{

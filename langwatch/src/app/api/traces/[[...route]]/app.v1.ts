@@ -5,15 +5,13 @@ import { z } from "zod";
 import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
 import { requires, type SecuredApp } from "~/server/api/security";
 import { getProtectionsForProject } from "~/server/api/utils";
-import { getApp } from "~/server/app-layer/app";
+import {
+  traceMetadataUpdateSchema,
+  updateTraceMetadata,
+} from "~/server/app-layer/traces/trace-metadata.service";
 import { prisma } from "~/server/db";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
-import type {
-  CustomMetadata,
-  ReservedTraceMetadata,
-  Trace,
-} from "~/server/tracer/types";
-import { CollectorSpanUtils } from "~/server/traces/collectorSpan.utils";
+import type { Trace } from "~/server/tracer/types";
 import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
 import {
   type CompiledProjection,
@@ -26,6 +24,7 @@ import {
   AmbiguousTraceIdPrefixError,
   TraceService,
 } from "~/server/traces/trace.service";
+import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import {
   formatTraceSummaryDigest,
   generateAsciiTree,
@@ -303,7 +302,7 @@ export function registerTracesRoutes(
           name: "format",
           in: "query",
           description:
-            "Output format: 'digest' (default, AI-readable) or 'json' (full raw data)",
+            "Output format: 'digest' (AI-readable) or 'json' (full raw data, default)",
           required: false,
           schema: { type: "string", enum: ["digest", "json"] },
         },
@@ -363,11 +362,16 @@ export function registerTracesRoutes(
       const protections = await getProtectionsForProject(prisma, {
         projectId: project.id,
       });
-      const traceService = TraceService.create(prisma);
+      const traceService = TraceService.create(
+        prisma,
+        buildTraceBlobResolutionDeps(),
+      );
 
       let trace;
       try {
-        trace = await traceService.getById(project.id, traceId, protections);
+        trace = await traceService.getById(project.id, traceId, protections, {
+          full: true,
+        });
       } catch (err) {
         if (err instanceof AmbiguousTraceIdPrefixError) {
           return c.json(
@@ -427,48 +431,6 @@ export function registerTracesRoutes(
   );
 
   // PATCH /:traceId/metadata - Update trace metadata via synthetic span
-  const metadataValueSchema = z.union([
-    z.string().max(4096),
-    z.number(),
-    z.boolean(),
-    z.array(z.string()),
-    z.record(z.unknown()),
-  ]);
-
-  const metadataInputSchema = z
-    .record(metadataValueSchema)
-    .refine((obj) => Object.keys(obj).length > 0, {
-      message: "metadata must contain at least one key",
-    })
-    .refine((obj) => JSON.stringify(obj).length <= 32768, {
-      message: "total metadata payload must not exceed 32KB",
-    });
-
-  const RESERVED_METADATA_KEYS = new Set([
-    "user_id",
-    "customer_id",
-    "thread_id",
-    "labels",
-  ]);
-
-  function splitMetadata(metadata: Record<string, unknown>): {
-    reserved: ReservedTraceMetadata;
-    custom: CustomMetadata;
-  } {
-    const reserved: ReservedTraceMetadata = {};
-    const custom: CustomMetadata = {};
-
-    for (const [key, value] of Object.entries(metadata)) {
-      if (RESERVED_METADATA_KEYS.has(key)) {
-        (reserved as Record<string, unknown>)[key] = value;
-      } else {
-        custom[key] = value as CustomMetadata[string];
-      }
-    }
-
-    return { reserved, custom };
-  }
-
   secured.access(requires("traces:update")).patch(
     "/:traceId/metadata",
     describeRoute({
@@ -491,7 +453,7 @@ export function registerTracesRoutes(
     zValidator(
       "json",
       z.object({
-        metadata: metadataInputSchema,
+        metadata: traceMetadataUpdateSchema,
       }),
     ),
     async (c) => {
@@ -499,44 +461,10 @@ export function registerTracesRoutes(
       const traceId = c.req.param("traceId");
       const body = c.req.valid("json");
 
-      const { reserved, custom } = splitMetadata(body.metadata);
-      const resource = CollectorSpanUtils.buildResource({
-        reservedTraceMetadata: reserved,
-        customMetadata: custom,
-      });
-
-      const now = Date.now();
-      const nowNano = String(now * 1_000_000);
-      const spanId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
-
-      await getApp().traces.recordSpan({
-        tenantId: project.id,
-        span: {
-          traceId,
-          spanId,
-          traceState: null,
-          parentSpanId: null,
-          name: "langwatch.metadata_update",
-          kind: 1,
-          startTimeUnixNano: nowNano,
-          endTimeUnixNano: nowNano,
-          attributes: [
-            {
-              key: "langwatch.span.type",
-              value: { stringValue: "span" },
-            },
-          ],
-          events: [],
-          links: [],
-          status: { code: 1 },
-          droppedAttributesCount: 0,
-          droppedEventsCount: 0,
-          droppedLinksCount: 0,
-        },
-        resource,
-        instrumentationScope: { name: "langwatch.api.metadata_update" },
-        piiRedactionLevel: project.piiRedactionLevel,
-        occurredAt: now,
+      await updateTraceMetadata({
+        projectId: project.id,
+        traceId,
+        metadata: body.metadata,
       });
 
       return c.json({ traceId });

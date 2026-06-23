@@ -42,6 +42,8 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
+      # Workers do not call the Kubernetes API, so don't mount the SA token.
+      automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
       {{- with (coalesce .Values.workers.podSecurityContext .Values.global.podSecurityContext)}}
       securityContext:
         {{- toYaml . | nindent 8 }}

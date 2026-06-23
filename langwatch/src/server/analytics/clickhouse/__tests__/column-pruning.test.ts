@@ -7,15 +7,10 @@
  * @see specs/analytics/clickhouse-column-pruning.feature
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import { resetParamCounter } from "../filter-translator";
-import {
-  buildTimeseriesQuery,
-} from "../aggregation-builder";
 import type { FlattenAnalyticsMetricsEnum } from "../../registry";
-import {
-  fieldMappings,
-  TRACE_IDENTITY_COLUMNS,
-} from "../field-mappings";
+import { buildTimeseriesQuery } from "../aggregation-builder";
+import { fieldMappings, TRACE_IDENTITY_COLUMNS } from "../field-mappings";
+import { resetParamCounter } from "../filter-translator";
 
 describe("column-pruning", () => {
   beforeEach(() => {
@@ -138,6 +133,71 @@ describe("column-pruning", () => {
     });
   });
 
+  describe("metric query unused-column pruning", () => {
+    describe("when a summary query references only a subset of trace columns", () => {
+      // Mirrors the metadata-cardinality + cost summary shape that exceeded the
+      // per-query memory limit in prod: it reads only TraceId, two Attributes
+      // map keys and TotalCost, so the wide unused columns must not be scanned.
+      const summary = () =>
+        buildTimeseriesQuery({
+          ...baseInput,
+          timeScale: "full" as const,
+          series: [
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+            {
+              metric: "metadata.user_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+            {
+              metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum,
+              aggregation: "sum" as const,
+            },
+          ],
+        });
+
+      it("keeps the columns the query reads", () => {
+        const { sql } = summary();
+        expect(sql).toContain("TotalCost");
+        expect(sql).toContain("Attributes");
+      });
+
+      it("drops wide and unused columns the query never references", () => {
+        const { sql } = summary();
+        for (const column of [
+          "NonBilledCost",
+          "Models",
+          "ErrorMessage",
+          "AnnotationIds",
+          "TokensPerSecond",
+          "TimeToFirstTokenMs",
+        ]) {
+          expect(sql, `expected ${column} to be pruned`).not.toContain(column);
+        }
+      });
+    });
+
+    describe("when a query needs no metadata grouping or filtering", () => {
+      /** @scenario A pure numeric metric does not read the wide Attributes map */
+      it("does not read the Attributes map", () => {
+        const { sql } = buildTimeseriesQuery({
+          ...baseInput,
+          series: [
+            {
+              metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum,
+              aggregation: "sum" as const,
+            },
+          ],
+        });
+
+        expect(sql).toContain("TotalCost");
+        expect(sql).not.toContain("Attributes");
+      });
+    });
+  });
+
   describe("evaluation runs subquery column pruning", () => {
     describe("when referencing an evaluation metric", () => {
       /** @scenario Evaluation runs subquery selects only needed evaluation columns */
@@ -154,9 +214,7 @@ describe("column-pruning", () => {
         });
 
         // The evaluation_runs subquery should use explicit columns
-        expect(result.sql).not.toMatch(
-          /SELECT\s+\*\s+FROM\s+evaluation_runs/,
-        );
+        expect(result.sql).not.toMatch(/SELECT\s+\*\s+FROM\s+evaluation_runs/);
       });
 
       it("selects columns needed for JOIN key and referenced metric", () => {
@@ -237,8 +295,8 @@ describe("column-pruning", () => {
     });
 
     describe("when requesting performance.tokens_per_second", () => {
-      /** @scenario Tokens per second metric resolves duration from stored spans */
-      it("includes DurationMs in the stored_spans subquery", () => {
+      /** @scenario Tokens per second metric reads the pre-aggregated trace column */
+      it("reads the pre-aggregated TokensPerSecond column", () => {
         const result = buildTimeseriesQuery({
           ...baseInput,
           series: [
@@ -250,7 +308,9 @@ describe("column-pruning", () => {
           ],
         });
 
-        expect(result.sql).toContain("DurationMs");
+        // The metric resolves from the pre-aggregated ts.TokensPerSecond column
+        // (metric-translator), so that column must survive the dedup pruning.
+        expect(result.sql).toContain("TokensPerSecond");
       });
     });
   });
@@ -262,8 +322,7 @@ describe("column-pruning", () => {
           ...baseInput,
           series: [
             {
-              metric:
-                "sentiment.thumbs_up_down" as FlattenAnalyticsMetricsEnum,
+              metric: "sentiment.thumbs_up_down" as FlattenAnalyticsMetricsEnum,
               aggregation: "sum" as const,
             },
           ],
@@ -278,8 +337,7 @@ describe("column-pruning", () => {
           ...baseInput,
           series: [
             {
-              metric:
-                "sentiment.thumbs_up_down" as FlattenAnalyticsMetricsEnum,
+              metric: "sentiment.thumbs_up_down" as FlattenAnalyticsMetricsEnum,
               aggregation: "sum" as const,
             },
           ],
@@ -369,9 +427,7 @@ describe("column-pruning", () => {
         expect(result.sql).toContain("period");
         expect(result.sql).toContain("group_key");
         // Should not have SELECT *
-        expect(result.sql).not.toMatch(
-          /SELECT\s+\*\s+FROM\s+trace_summaries/,
-        );
+        expect(result.sql).not.toMatch(/SELECT\s+\*\s+FROM\s+trace_summaries/);
       });
     });
   });

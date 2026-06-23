@@ -1,15 +1,6 @@
-import {
-  Box,
-  HoverCard,
-  HStack,
-  Portal,
-  SegmentGroup,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, HoverCard, HStack, Portal, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { useState } from "react";
-import { useTimeColumnModeStore } from "../../../../../stores/timeColumnModeStore";
 import {
   formatAbsoluteTime,
   formatDayOfWeek,
@@ -28,7 +19,10 @@ import { useVerboseRelativeTime } from "../../../../../utils/useRelativeTime";
  *   - Verbose relative ("3 days ago") — dominant headline
  *   - Local / UTC / ISO as a tidy horizontal label→value grid
  *   - Day of week + IANA zone footer (supporting metadata)
- *   - In-card toggle for relative vs absolute column display mode
+ *
+ * Read-only — the columns themselves (Time / Since / Timestamp) are the
+ * format choice; the card surfaces every form at once, it doesn't switch
+ * anything.
  *
  * Modelled on `TracePreviewHoverCard` so it inherits the same open/close
  * delay + portal/positioner contract. Children render as the trigger;
@@ -71,13 +65,12 @@ export const TimeHoverCard: React.FC<TimeHoverCardProps> = ({
             background="bg.panel"
             boxShadow="lg"
             overflow="hidden"
-            // Trap clicks/mousedown inside the popover so toggling the
-            // time-column mode (or selecting timestamp text to copy)
-            // doesn't bubble up to the row's click handler and open the
-            // trace drawer. The hover card sits over the cell which is
-            // inside a clickable `<tr>` — without these stop-prop
-            // handlers any interaction inside the card pops the drawer
-            // open the moment the user lets go.
+            // Trap clicks/mousedown inside the popover so selecting
+            // timestamp text to copy doesn't bubble up to the row's click
+            // handler and open the trace drawer. The hover card sits over
+            // the cell which is inside a clickable `<tr>` — without these
+            // stop-prop handlers any interaction inside the card pops the
+            // drawer open the moment the user lets go.
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
@@ -94,7 +87,6 @@ export const TimeHoverCard: React.FC<TimeHoverCardProps> = ({
  *   1. Relative time — the dominant headline (why the user opened this)
  *   2. Local / UTC / ISO label→value grid (reference, secondary)
  *   3. Day-of-week + zone footer (quiet supporting metadata)
- *   4. Column display-mode toggle (utility, visually settled)
  *
  * The verbose-relative header re-renders precisely at the next minute /
  * hour / day boundary via `useVerboseRelativeTime` — no 1Hz polling.
@@ -106,9 +98,6 @@ const TimeHoverCardBody: React.FC<{ timestamp: number }> = ({ timestamp }) => {
   const utc = formatAbsoluteTime(timestamp);
   const iso = formatISOTimestamp(timestamp);
   const dayOfWeek = formatDayOfWeek(timestamp);
-
-  const mode = useTimeColumnModeStore((s) => s.mode);
-  const setMode = useTimeColumnModeStore((s) => s.setMode);
 
   return (
     <VStack align="stretch" gap={0}>
@@ -166,53 +155,6 @@ const TimeHoverCardBody: React.FC<{ timestamp: number }> = ({ timestamp }) => {
           {viewerZone}
         </Text>
       </HStack>
-
-      {/* ── 4. Column display-mode toggle ─────────────────────────── */}
-      {/* Surfacing the switch right under the timestamps saves a trip to
-          Columns settings. Persisted to localStorage so the choice
-          survives reloads. The subtle bg strip visually "grounds" the
-          toggle so it reads as a permanent control, not an afterthought. */}
-      <Box
-        paddingX={3}
-        paddingY={2.5}
-        borderTopWidth="1px"
-        borderColor="border.subtle"
-      >
-        <SegmentGroup.Root
-          size="xs"
-          value={mode}
-          onValueChange={(e) =>
-            setMode(e.value === "absolute" ? "absolute" : "relative")
-          }
-          background="bg.subtle"
-          borderRadius="md"
-          padding="2px"
-          width="full"
-          css={{
-            "& [data-part='item']": {
-              borderRadius: "sm",
-              paddingY: "1",
-              paddingX: "2",
-              flex: 1,
-              justifyContent: "center",
-            },
-            "& [data-part='item-text']": {
-              fontSize: "2xs",
-            },
-            "& [data-part='indicator']": {
-              borderRadius: "sm",
-            },
-          }}
-        >
-          <SegmentGroup.Indicator />
-          <SegmentGroup.Items
-            items={[
-              { value: "relative", label: "Relative (4m ago)" },
-              { value: "absolute", label: "Absolute (Jun 4)" },
-            ]}
-          />
-        </SegmentGroup.Root>
-      </Box>
     </VStack>
   );
 };

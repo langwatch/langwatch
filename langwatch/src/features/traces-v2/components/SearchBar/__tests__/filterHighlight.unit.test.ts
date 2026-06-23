@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildDecorationPlan, buildDecorationSlots } from "../filterHighlight";
+import {
+  buildDecorationPlan,
+  buildDecorationSlots,
+  chipOverlayLabel,
+} from "../filterHighlight";
 
 describe("buildDecorationSlots", () => {
   describe("given an empty string", () => {
@@ -208,8 +212,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       expect(plan.slots).toContainEqual({
         from: 12,
         to: 15,
-        className:
-          "filter-keyword filter-keyword-and filter-keyword-clickable",
+        className: "filter-keyword filter-keyword-and filter-keyword-clickable",
         opLoc: { start: 12, end: 15 },
       });
 
@@ -254,8 +257,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       expect(plan.slots).toContainEqual({
         from: 12,
         to: 14,
-        className:
-          "filter-keyword filter-keyword-or filter-keyword-clickable",
+        className: "filter-keyword filter-keyword-or filter-keyword-clickable",
         opLoc: { start: 12, end: 14 },
       });
     });
@@ -344,18 +346,15 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       ["greater-or-equal", "duration:>=1000"],
       ["less-than", "cost:<5"],
       ["less-or-equal", "cost:<=5"],
-    ])(
-      "`%s` (%s) survives the regex fallback path",
-      (_label, comparison) => {
-        // Force the fallback by appending a trailing `AND` (parse-fail).
-        const plan = buildDecorationPlan(`${comparison} AND`);
-        const tokenSlots = plan.slots.filter((s) =>
-          s.className.includes("filter-token"),
-        );
-        expect(tokenSlots).toHaveLength(1);
-        expect(tokenSlots[0]?.to).toBe(comparison.length);
-      },
-    );
+    ])("`%s` (%s) survives the regex fallback path", (_label, comparison) => {
+      // Force the fallback by appending a trailing `AND` (parse-fail).
+      const plan = buildDecorationPlan(`${comparison} AND`);
+      const tokenSlots = plan.slots.filter((s) =>
+        s.className.includes("filter-token"),
+      );
+      expect(tokenSlots).toHaveLength(1);
+      expect(tokenSlots[0]?.to).toBe(comparison.length);
+    });
   });
 
   describe("operator matrix — range form (KNOWN BUG)", () => {
@@ -819,6 +818,40 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       expect(
         plan.slots.some((s) => s.className.includes("filter-keyword-and")),
       ).toBe(false);
+    });
+  });
+});
+
+describe("chipOverlayLabel", () => {
+  describe("when a label differs from the value", () => {
+    it("returns the field-qualified label so the prefix stays put", () => {
+      expect(
+        chipOverlayLabel({
+          field: "evaluator",
+          value: "customeval_ragas_context_precision",
+          label: "ragas_context_precision",
+        }),
+      ).toBe("evaluator:ragas_context_precision");
+    });
+  });
+
+  describe("when the label equals the raw value", () => {
+    it("returns undefined so no overlay paints — nothing to humanise", () => {
+      expect(
+        chipOverlayLabel({ field: "status", value: "error", label: "error" }),
+      ).toBeUndefined();
+    });
+  });
+
+  describe("when no resolved label is provided", () => {
+    it("returns undefined so the chip renders the raw id verbatim", () => {
+      expect(
+        chipOverlayLabel({
+          field: "model",
+          value: "gpt-5-mini",
+          label: undefined,
+        }),
+      ).toBeUndefined();
     });
   });
 });

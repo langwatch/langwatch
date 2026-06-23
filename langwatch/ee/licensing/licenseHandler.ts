@@ -83,7 +83,10 @@ export class LicenseHandler {
     }
 
     // Validate the stored license
-    const result = validateLicense(organization.license, this.publicKey);
+    const result = validateLicense({
+      licenseKey: organization.license,
+      publicKey: this.publicKey,
+    });
 
     if (result.valid) {
       return result.planInfo;
@@ -105,7 +108,7 @@ export class LicenseHandler {
     licenseKey: string
   ): Promise<StoreLicenseResult> {
     // Validate the license before storing
-    const result = validateLicense(licenseKey, this.publicKey);
+    const result = validateLicense({ licenseKey, publicKey: this.publicKey });
 
     if (!result.valid) {
       return {
@@ -210,7 +213,10 @@ export class LicenseHandler {
       return { hasLicense: false, valid: false };
     }
 
-    const validationResult = validateLicense(organization.license, this.publicKey);
+    const validationResult = validateLicense({
+      licenseKey: organization.license,
+      publicKey: this.publicKey,
+    });
 
     // For valid licenses, use data from validationResult (avoids second parse)
     if (validationResult.valid) {

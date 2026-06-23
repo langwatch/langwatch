@@ -11,8 +11,8 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { ScenarioMessageRenderer } from "../ScenarioMessageRenderer";
 import type { ScenarioMessageSnapshotEvent } from "~/server/scenarios/scenario-event.types";
+import { ScenarioMessageRenderer } from "../ScenarioMessageRenderer";
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -26,7 +26,9 @@ vi.mock("~/utils/api", () => ({
 
 vi.mock("../../copilot-kit/TraceMessage", () => ({
   TraceMessage: ({ traceId }: { traceId: string }) => (
-    <button data-testid="trace-message" data-trace-id={traceId}>View Trace</button>
+    <button data-testid="trace-message" data-trace-id={traceId}>
+      View Trace
+    </button>
   ),
 }));
 
@@ -271,6 +273,211 @@ describe("<ScenarioMessageRenderer/>", () => {
       expect(traceIds).toContain("trace_text");
       expect(traceIds).toContain("trace_tool_call");
       expect(traceIds).toContain("trace_tool_result");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // #4138 — post-extraction `input_audio` URL shape.
+  //
+  // After server-side stored-objects extraction, an `input_audio` part is
+  // rewritten from inline `{data, format}` to `{url: "/api/files/<id>",
+  // mimeType}` (content-extractor.ts). These pin that the renderer plays the
+  // url-shape turn through MediaPart's native <audio> in BOTH the grid and
+  // drawer variants, and degrades gracefully for an unrenderable shape.
+  // -------------------------------------------------------------------------
+  describe("when an assistant audio message arrives in the post-extraction url shape (#4138)", () => {
+    const urlShapeMessage = {
+      id: "msg_audio_url_shape",
+      role: "assistant",
+      content: [
+        {
+          type: "input_audio",
+          input_audio: { url: "/api/files/test-id", mimeType: "audio/mpeg" },
+        },
+      ],
+    } as unknown as ScenarioMessageSnapshotEvent["messages"][number];
+
+    it("renders a media-part-audio element whose src is the file url (drawer variant)", () => {
+      renderWith([urlShapeMessage]);
+
+      const audio = screen.getByTestId("media-part-audio") as HTMLAudioElement;
+      expect(audio).toBeInTheDocument();
+      expect(audio.tagName.toLowerCase()).toBe("audio");
+      expect(audio).toHaveAttribute("src", "/api/files/test-id");
+      expect(audio).toHaveAttribute("controls");
+      // The raw part shape must never leak into the bubble as text.
+      expect(screen.queryByText(/input_audio/)).toBeNull();
+    });
+
+    it("renders a media-part-audio element whose src is the file url (grid variant)", () => {
+      renderWithGrid([urlShapeMessage]);
+
+      const audio = screen.getByTestId("media-part-audio") as HTMLAudioElement;
+      expect(audio).toBeInTheDocument();
+      expect(audio).toHaveAttribute("src", "/api/files/test-id");
+      expect(audio).toHaveAttribute("controls");
+    });
+  });
+
+  describe("when a media part has an unsupported mimeType (#4138 graceful fallback)", () => {
+    /**
+     * A media part whose mimeType is not an `audio/`/`image/`/`video/` type
+     * resolves to the binary category in MediaPart, which renders a
+     * download-link fallback (media-part-binary) rather than a broken <audio>
+     * element. This guards the unhappy shape — a graceful fallback node, never
+     * a broken/empty media element — for a file the renderer cannot play
+     * inline (e.g. an externalized blob with a non-media content type).
+     */
+    it("renders a graceful binary fallback, not a broken audio element", () => {
+      renderWith([
+        {
+          id: "msg_audio_bad_mime",
+          role: "assistant",
+          content: [
+            {
+              // Non-media mimeType → MediaPart resolves the binary category and
+              // renders the download-link fallback instead of an <audio>.
+              type: "binary",
+              mimeType: "application/octet-stream",
+              url: "/api/files/unsupported-id",
+              filename: "voice-turn.bin",
+            },
+          ],
+        } as unknown as ScenarioMessageSnapshotEvent["messages"][number],
+      ]);
+
+      // Graceful fallback present; no broken <audio> element rendered.
+      expect(screen.getByTestId("media-part-binary")).toBeInTheDocument();
+      expect(document.querySelector("audio")).toBeNull();
+      expect(screen.queryByText(/input_audio/)).toBeNull();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // #4698 — text-first part ordering + audio-only + assistant=left.
+  //
+  // The production SDK emits assistant voice turns text-FIRST
+  // (`[text, input_audio]`); every pre-existing collapse fixture is audio-first
+  // (`[input_audio, text]`). The collapse guard is order-independent (filters
+  // by kind, not index), so both orderings must produce exactly one bubble
+  // with the text as the transcript. Alignment (assistant=left, user=right) is
+  // asserted via the `data-align` test affordance because Chakra's `align`
+  // prop compiles to an atomic CSS class jsdom's getComputedStyle cannot read.
+  // -------------------------------------------------------------------------
+  describe("when an assistant voice turn carries audio + a sibling text transcript (#4698)", () => {
+    const orderings: Array<{
+      label: string;
+      parts: unknown[];
+    }> = [
+      {
+        label: "text-first [text, input_audio] (production SDK ordering)",
+        parts: [
+          { type: "text", text: "hello from the agent" },
+          {
+            type: "input_audio",
+            input_audio: { url: "/api/files/voice-id", mimeType: "audio/mpeg" },
+          },
+        ],
+      },
+      {
+        label: "audio-first [input_audio, text]",
+        parts: [
+          {
+            type: "input_audio",
+            input_audio: { url: "/api/files/voice-id", mimeType: "audio/mpeg" },
+          },
+          { type: "text", text: "hello from the agent" },
+        ],
+      },
+    ];
+
+    orderings.forEach(({ label, parts }) => {
+      describe(`given ordering: ${label}`, () => {
+        /** @scenario "Both part orderings collapse a voice turn into one assistant bubble" */
+        it("renders exactly one assistant-left bubble with the text as transcript", () => {
+          renderWith([
+            {
+              id: "msg_voice_collapse",
+              role: "assistant",
+              trace_id: "trace_voice",
+              content: parts,
+            } as unknown as ScenarioMessageSnapshotEvent["messages"][number],
+          ]);
+
+          // Exactly one audio element and one trace button — no duplicate bubble.
+          expect(document.querySelectorAll("audio")).toHaveLength(1);
+          expect(screen.getAllByTestId("trace-message")).toHaveLength(1);
+
+          // The text renders as the transcript inside the same media wrapper as
+          // the <audio> (co-contained), not as a standalone second bubble.
+          const transcript = screen.getByText("hello from the agent");
+          const audio = screen.getByTestId("media-part-audio");
+          const mediaWrapper = audio.closest("[data-align]");
+          expect(mediaWrapper).not.toBeNull();
+          expect(mediaWrapper).toContainElement(transcript);
+
+          // Assistant bubble aligns LEFT (flex-start) via the test affordance.
+          expect(mediaWrapper).toHaveAttribute("data-align", "flex-start");
+        });
+      });
+    });
+  });
+
+  describe("when a simulated-user voice turn arrives (#4698 alignment inversion)", () => {
+    /** @scenario "User-role voice turns align right" */
+    it("aligns the user media bubble to the right (flex-end)", () => {
+      renderWith([
+        {
+          id: "msg_voice_user",
+          role: "user",
+          content: [
+            {
+              type: "input_audio",
+              input_audio: {
+                url: "/api/files/user-voice",
+                mimeType: "audio/mpeg",
+              },
+            },
+          ],
+        } as unknown as ScenarioMessageSnapshotEvent["messages"][number],
+      ]);
+
+      const audio = screen.getByTestId("media-part-audio");
+      const mediaWrapper = audio.closest("[data-align]");
+      expect(mediaWrapper).toHaveAttribute("data-align", "flex-end");
+    });
+  });
+
+  describe("when an assistant voice turn is audio-only with no transcript (#4698)", () => {
+    /** @scenario "Audio-only voice turn renders one bubble with no empty transcript artifact" */
+    it("renders one assistant-left audio bubble and no italic transcript node", () => {
+      renderWith([
+        {
+          id: "msg_voice_audio_only",
+          role: "assistant",
+          content: [
+            {
+              type: "input_audio",
+              input_audio: {
+                url: "/api/files/solo-voice",
+                mimeType: "audio/mpeg",
+              },
+            },
+          ],
+        } as unknown as ScenarioMessageSnapshotEvent["messages"][number],
+      ]);
+
+      // Exactly one audio bubble.
+      expect(document.querySelectorAll("audio")).toHaveLength(1);
+
+      const audio = screen.getByTestId("media-part-audio");
+      const mediaWrapper = audio.closest("[data-align]");
+      expect(mediaWrapper).toHaveAttribute("data-align", "flex-start");
+
+      // No transcript artifact: the bubble must not render an italic caption
+      // <p>. Scoped to the media wrapper so Chakra wrappers outside the bubble
+      // never false-positive; does not depend on wrapper nesting depth.
+      expect(mediaWrapper!.querySelector("p")).toBeNull();
     });
   });
 });

@@ -1,5 +1,9 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { useMemo, useRef } from "react";
+import { LuCalendarClock, LuFileText, LuFlaskConical } from "react-icons/lu";
+import { PrivacyDroppedNotice } from "~/components/ui/PrivacyDroppedNotice";
+import { RedactedField } from "~/components/ui/RedactedField";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type {
   SpanTreeNode,
   TraceHeader,
@@ -13,9 +17,10 @@ import { AttributeTable } from "../AttributeTable";
 import { ExceptionsContent } from "../ExceptionsContent";
 import { EvalsList } from "../evalCards";
 import { IOViewer } from "../IOViewer";
+import { PromptsPanel } from "../PromptsPanel";
 import { ScopeBlock } from "../ScopeChip";
 import { AccordionShell, Section } from "./AccordionShell";
-import { EmptyEventsState, EmptyHint } from "./EmptyStates";
+import { EmptyHint, EmptySignalCard } from "./EmptyStates";
 import { EventCard } from "./EventCard";
 import { SectionFocusGlow } from "./SectionFocusGlow";
 import { useAutoOpenSections } from "./sectionPresence";
@@ -32,12 +37,18 @@ export function TraceSummaryAccordions({
   onSelectSpan?: (spanId: string) => void;
 }) {
   const hasIO = !!(trace.input || trace.output);
+  // A restrict privacy rule hides content the viewer may not see — the server
+  // nulls `input`/`output` and sets these flags. The IO section then reads as a
+  // "Redacted" state, NOT an "empty" one: there IS content, it is just hidden.
+  const hasRedactedIO = !!(trace.inputRedacted || trace.outputRedacted);
   const traceAttributes = trace.attributes ?? {};
   // Trace-level events are read as their own query (like evaluations), not off
   // the header: the fold no longer carries them, so they're derived from
   // stored_spans on demand. Includes legacy `/track-event` payloads, which the
   // SDK attaches to a synthetic span as OTel span events.
-  const { events: traceEvents } = useTraceEvents();
+  const { events: traceEvents, isLoading: eventsLoading } = useTraceEvents();
+  const { project } = useOrganizationTeamProject();
+  const promptsHref = project?.slug ? `/${project.slug}/prompts` : undefined;
   const resources = useTraceResources(trace.traceId);
   const hasResourceAttributes =
     Object.keys(resources.resourceAttributes).length > 0;
@@ -79,24 +90,69 @@ export function TraceSummaryAccordions({
   const hasError =
     trace.status === "error" && (!!trace.error || errorSpans.length > 0);
 
+  const hasEvalsContent = evalsForList.length > 0 || pendingCount > 0;
+  const hasEventsContent = traceEvents.length > 0;
+
+  // A signal counts as "empty" (→ compact card) only once its query has
+  // settled with nothing. While it's still loading it's neither a full
+  // section (no content yet) nor a card (not confirmed empty) — simply
+  // absent, so it never flashes a full-width empty state before settling.
+  const evalsEmpty = !hasEvalsContent && !evalsLoading;
+  const eventsEmpty = !hasEventsContent && !eventsLoading;
+  const promptsEmpty = !trace.containsPrompt;
+
+  // Empty signals collapse into one shared "Other" section as compact cards
+  // rather than each eating a full-width accordion. Ordered evals → events →
+  // prompts to mirror their normal section order.
+  const emptyCards = useMemo(
+    () =>
+      [
+        evalsEmpty ? ("evals" as const) : null,
+        eventsEmpty ? ("events" as const) : null,
+        promptsEmpty ? ("prompts" as const) : null,
+      ].filter((v): v is "evals" | "events" | "prompts" => v !== null),
+    [evalsEmpty, eventsEmpty, promptsEmpty],
+  );
+  const showOther = emptyCards.length > 0;
+
   const sections = useMemo(() => {
     const list: Array<
-      "io" | "attributes" | "scope" | "evals" | "events" | "exceptions"
+      | "io"
+      | "prompts"
+      | "attributes"
+      | "scope"
+      | "evals"
+      | "events"
+      | "exceptions"
+      | "other"
     > = [];
     if (hasError && !hasIO) list.push("exceptions");
     list.push("io");
     if (hasError && hasIO) list.push("exceptions");
+    // Prompts the trace used — the span-level Prompt accordion only shows
+    // when a span is selected, so the trace summary surfaced no prompt
+    // info even when spans carried managed prompts. `containsPrompt` is
+    // the cheap trace-level precondition. When absent, the prompt CTA moves
+    // into the shared "Other" section below.
+    if (trace.containsPrompt) list.push("prompts");
     list.push("attributes");
-    // Instrumentation scope is surfaced as a chip in the trace header (via
-    // sdkInfo) — no need for a separate accordion section here. Keeping the
-    // hook in case we want to bring it back later.
-    list.push("evals");
-    list.push("events");
+    // Evals / Events render as their own full-width section only once their
+    // query has content. Confirmed-empty ones drop into "Other" as a compact
+    // card; while a query is still loading the signal is simply absent (no
+    // placeholder), so it never flashes a full-width empty state on the way
+    // to becoming a card.
+    if (hasEvalsContent) list.push("evals");
+    if (hasEventsContent) list.push("events");
+    if (showOther) list.push("other");
     return list;
-  }, [hasIO, hasError]);
-
-  const hasEvalsContent = evalsForList.length > 0 || pendingCount > 0;
-  const hasEventsContent = traceEvents.length > 0;
+  }, [
+    hasIO,
+    hasError,
+    trace.containsPrompt,
+    hasEvalsContent,
+    hasEventsContent,
+    showOther,
+  ]);
 
   // Auto-open Metadata only when the trace has its own attributes — when
   // only resource attributes are present (which is most of the time on
@@ -104,11 +160,13 @@ export function TraceSummaryAccordions({
   // distracted by long resource dumps that rarely change between traces.
   const [openSections, setOpenSections] = useAutoOpenSections(trace.traceId, {
     exceptions: hasError,
-    io: hasIO,
+    io: hasIO || hasRedactedIO,
+    prompts: trace.containsPrompt,
     attributes: hasTraceAttributes,
     scope: hasScope,
     evals: hasEvalsContent,
     events: hasEventsContent,
+    other: showOther,
   });
 
   // Observe focus-section signals from external surfaces (header chips,
@@ -148,13 +206,27 @@ export function TraceSummaryAccordions({
                 key="io"
                 value="io"
                 title="Input and Output"
-                empty={!hasIO}
+                // Redacted content is hidden, not absent — don't tag the section
+                // "empty" when a privacy rule nulled the I/O.
+                empty={!hasIO && !hasRedactedIO}
                 spotlightAnchor={hasIO ? "drawer-io" : undefined}
                 isFirst={isFirst}
                 open={isOpen}
               >
-                {hasIO ? (
-                  <VStack align="stretch" gap={2}>
+                <VStack align="stretch" gap={2}>
+                  <PrivacyDroppedNotice
+                    categories={trace.privacy?.droppedCategories ?? undefined}
+                  />
+                  {/* Drive redaction off the header DTO's own flags (like the
+                      span path) so the marker can never disagree with the
+                      content the server already nulled, and a redacted side
+                      renders the shared "Redacted" marker instead of the
+                      "no input recorded" placeholder. */}
+                  <RedactedField
+                    field="input"
+                    redacted={trace.inputRedacted ?? false}
+                    visibleTo={trace.inputVisibleTo}
+                  >
                     {trace.input ? (
                       <IOViewer
                         label="Input"
@@ -164,6 +236,12 @@ export function TraceSummaryAccordions({
                     ) : (
                       <MissingIORow label="Input" mode="input" />
                     )}
+                  </RedactedField>
+                  <RedactedField
+                    field="output"
+                    redacted={trace.outputRedacted ?? false}
+                    visibleTo={trace.outputVisibleTo}
+                  >
                     {trace.output ? (
                       <IOViewer
                         label="Output"
@@ -174,10 +252,26 @@ export function TraceSummaryAccordions({
                     ) : (
                       <MissingIORow label="Output" mode="output" />
                     )}
-                  </VStack>
-                ) : (
-                  <EmptyHint>No I/O captured for this trace</EmptyHint>
-                )}
+                  </RedactedField>
+                </VStack>
+              </Section>
+            );
+          }
+          if (id === "prompts") {
+            return (
+              <Section
+                key="prompts"
+                value="prompts"
+                title="Prompts"
+                isFirst={isFirst}
+                open={isOpen}
+              >
+                <PromptsPanel
+                  trace={trace}
+                  spans={spans}
+                  onSelectSpan={onSelectSpan ?? (() => undefined)}
+                  hideHeader
+                />
               </Section>
             );
           }
@@ -295,6 +389,67 @@ export function TraceSummaryAccordions({
               </Section>
             );
           }
+          if (id === "other") {
+            // Empty evals / events / prompts share this one section as a row
+            // of compact cards instead of each consuming a full-width
+            // accordion — same info, far less vertical space.
+            return (
+              <Section
+                key="other"
+                value="other"
+                title="Other"
+                isFirst={isFirst}
+                open={isOpen}
+              >
+                <HStack align="stretch" gap={2} flexWrap="wrap">
+                  {emptyCards.map((card) => {
+                    if (card === "evals") {
+                      return (
+                        <EmptySignalCard
+                          key="evals"
+                          icon={LuFlaskConical}
+                          title="No evals"
+                          description="Score traces automatically with evaluators."
+                          ctaLabel="Learn more"
+                          ctaHref="https://docs.langwatch.ai/evaluations/online-evaluation/overview"
+                          isCtaExternal
+                        />
+                      );
+                    }
+                    if (card === "events") {
+                      return (
+                        <EmptySignalCard
+                          key="events"
+                          icon={LuCalendarClock}
+                          title="No events"
+                          description="Capture tool calls, feedback, and milestones."
+                          ctaLabel="Learn more"
+                          ctaHref="https://docs.langwatch.ai/integration/overview"
+                          isCtaExternal
+                        />
+                      );
+                    }
+                    return (
+                      <EmptySignalCard
+                        key="prompts"
+                        icon={LuFileText}
+                        title="No managed prompt"
+                        description="Version, test, and reuse prompts across traces."
+                        ctaLabel={
+                          promptsHref ? "Set up a prompt" : "Learn more"
+                        }
+                        ctaHref={
+                          promptsHref ??
+                          "https://docs.langwatch.ai/prompts/template-syntax"
+                        }
+                        isCtaExternal={!promptsHref}
+                      />
+                    );
+                  })}
+                </HStack>
+              </Section>
+            );
+          }
           // events
           return (
             <Section
@@ -302,28 +457,23 @@ export function TraceSummaryAccordions({
               value="events"
               title="Events"
               spotlightAnchor={hasEventsContent ? "drawer-events" : undefined}
-              count={traceEvents.length > 0 ? traceEvents.length : undefined}
-              empty={traceEvents.length === 0}
+              count={traceEvents.length}
               isFirst={isFirst}
               open={isOpen}
             >
-              {traceEvents.length > 0 ? (
-                <VStack align="stretch" gap={2}>
-                  {traceEvents.map((evt, i) => (
-                    <EventCard
-                      key={`${evt.spanId}-${evt.timestamp}-${i}`}
-                      name={evt.name}
-                      timestampMs={evt.timestamp}
-                      anchorMs={trace.timestamp}
-                      attributes={evt.attributes}
-                      spanId={evt.spanId}
-                      onSelectSpan={onSelectSpan}
-                    />
-                  ))}
-                </VStack>
-              ) : (
-                <EmptyEventsState />
-              )}
+              <VStack align="stretch" gap={2}>
+                {traceEvents.map((evt, i) => (
+                  <EventCard
+                    key={`${evt.spanId}-${evt.timestamp}-${i}`}
+                    name={evt.name}
+                    timestampMs={evt.timestamp}
+                    anchorMs={trace.timestamp}
+                    attributes={evt.attributes}
+                    spanId={evt.spanId}
+                    onSelectSpan={onSelectSpan}
+                  />
+                ))}
+              </VStack>
             </Section>
           );
         })}

@@ -544,9 +544,20 @@ export function SpotlightOverlay(): React.ReactElement | null {
   useEffect(() => {
     if (!spotlightsActive) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        handleDismiss();
+      if (e.key !== "Escape") return;
+      // The tour is non-modal and interactable, so users type while it's up
+      // (search bar, facet value inputs). Don't let an Escape meant to
+      // clear/blur a field also tear the tour down.
+      const target = e.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
       }
+      handleDismiss();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);

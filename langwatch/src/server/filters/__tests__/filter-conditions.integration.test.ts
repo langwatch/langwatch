@@ -1,13 +1,13 @@
+import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { FilterParam } from "~/hooks/useFilterParams";
 import {
-  getTestClickHouseClient,
   cleanupTestData,
+  getTestClickHouseClient,
 } from "../../event-sourcing/__tests__/integration/testContainers";
 import { generateClickHouseFilterConditions } from "../clickhouse/filter-conditions";
 import type { FilterField } from "../types";
-import type { FilterParam } from "~/hooks/useFilterParams";
-import type { ClickHouseClient } from "@clickhouse/client";
 
 const tenantId = `test-filter-${nanoid()}`;
 // Traces with all three legacy key formats for metadata
@@ -67,6 +67,7 @@ async function insertStoredSpan(
   ch: ClickHouseClient,
   traceId: string,
   spanType: string,
+  startTimeMs: number = now,
 ) {
   await ch.insert({
     table: "stored_spans",
@@ -80,8 +81,8 @@ async function insertStoredSpan(
         ParentTraceId: null,
         ParentIsRemote: null,
         Sampled: 1,
-        StartTime: new Date(now),
-        EndTime: new Date(now + 100),
+        StartTime: new Date(startTimeMs),
+        EndTime: new Date(startTimeMs + 100),
         DurationMs: 100,
         SpanName: "test-span",
         SpanKind: 1,
@@ -102,8 +103,12 @@ async function insertStoredSpan(
 async function queryWithFilters(
   ch: ClickHouseClient,
   filters: Partial<Record<FilterField, FilterParam>>,
+  timeWindow?: { startDate: number; endDate: number },
 ): Promise<string[]> {
-  const { conditions, params } = generateClickHouseFilterConditions(filters);
+  const { conditions, params } = generateClickHouseFilterConditions(
+    filters,
+    timeWindow,
+  );
   const whereClause =
     conditions.length > 0 ? `AND ${conditions.join(" AND ")}` : "";
 
@@ -233,6 +238,40 @@ describe("filter-conditions ClickHouse integration", () => {
       expect(traceIds).toContain(traceCanonical);
       expect(traceIds).toContain(traceLwPrefix);
       expect(traceIds).not.toContain(traceNoMeta);
+    });
+  });
+
+  describe("when filtering by spans.type with a time window", () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    const oldTraceId = `trace-old-${nanoid()}`;
+
+    beforeAll(async () => {
+      // A trace whose matching span sits ~60 days in the past. The span window
+      // (now +/- 2 days) must prune it out, while an unbounded query finds it.
+      // Deliberately no `canary` metadata so it cannot pollute the canary-based
+      // intersection tests that run after this block's beforeAll.
+      await insertTraceSummary(ch, oldTraceId, {
+        "langwatch.user_id": "user-old",
+      });
+      await insertStoredSpan(ch, oldTraceId, "llm", now - 60 * DAY);
+    });
+
+    it("still returns in-window matches when bounded", async () => {
+      const traceIds = await queryWithFilters(
+        ch,
+        { "spans.type": ["llm"] },
+        { startDate: now - DAY, endDate: now + DAY },
+      );
+      // traceCanonical's span is at `now`, comfortably inside the window.
+      expect(traceIds).toContain(traceCanonical);
+      // The 60-day-old span is outside the buffered window -> pruned out.
+      expect(traceIds).not.toContain(oldTraceId);
+    });
+
+    it("finds the old match when no window is given (backwards compat)", async () => {
+      const traceIds = await queryWithFilters(ch, { "spans.type": ["llm"] });
+      expect(traceIds).toContain(traceCanonical);
+      expect(traceIds).toContain(oldTraceId);
     });
   });
 

@@ -9,16 +9,16 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
+import type { MappingState } from "~/server/tracer/tracesMapping";
 import type { Trace } from "~/server/tracer/types";
+import type { TraceService } from "~/server/traces/trace.service";
 import type { LangEvalsClient } from "../../clients/langevals/langevals.client";
 import {
-  EvaluationExecutionService,
   type EvaluationExecutionDeps,
+  EvaluationExecutionService,
   type ModelEnvResolver,
   type WorkflowExecutor,
 } from "../evaluation-execution.service";
-import type { TraceService } from "~/server/traces/trace.service";
-import type { MappingState } from "~/server/tracer/tracesMapping";
 
 // ---------------------------------------------------------------------------
 // Test data builders
@@ -151,6 +151,7 @@ describe("Feature: Thread variables available in trace-level evaluator input map
             "proj-1",
             ["abc"],
             expect.objectContaining({ canSeeCapturedInput: true }),
+            { full: true },
           );
 
           // The conversation field should contain thread traces data

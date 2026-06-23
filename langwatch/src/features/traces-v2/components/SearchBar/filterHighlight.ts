@@ -479,6 +479,32 @@ export function setFilterChipLabels(
   }
 }
 
+/**
+ * The text the chip overlay paints at rest. Always field-qualified
+ * (`evaluator:Policy Check`) so the field prefix stays put — only the value
+ * tail swaps to the raw id on hover. Painting the bare label dropped the
+ * `evaluator:` prefix at rest and snapped it back on hover, which read as a
+ * jarring jump; keeping the field anchored fixes that.
+ *
+ * Returns undefined when there's no human label, or it equals the raw value
+ * (overlaying `status:error` on `status:error` is pointless and would just
+ * flicker on hover) — the CSS overlay only fires when the attr is set, so
+ * omission keeps the chip in its raw text-render mode. Shared with the
+ * placeholder editor so both renderers paint an identical overlay.
+ */
+export function chipOverlayLabel({
+  field,
+  value,
+  label,
+}: {
+  field: string;
+  value: string;
+  label: string | undefined;
+}): string | undefined {
+  if (!label || label === value) return undefined;
+  return `${field}:${label}`;
+}
+
 function computeDecorations(doc: ProseMirrorNode): DecorationSet {
   const decorations: Decoration[] = [];
   doc.descendants((node, pos) => {
@@ -496,16 +522,12 @@ function computeDecorations(doc: ProseMirrorNode): DecorationSet {
         attrs["data-filter-chip-end"] = String(slot.chipToken.end);
         attrs["data-filter-chip-field"] = slot.chipToken.field;
         attrs["data-filter-chip-value"] = slot.chipToken.value;
-        const label =
-          chipLabelLookup[slot.chipToken.field]?.[slot.chipToken.value];
-        // Drop the label attr when it equals the value (no real
-        // benefit overlaying "openai" on top of "openai"; the chip
-        // would just flicker on hover). The CSS overlay only fires
-        // when the attr is set, so omission keeps the chip in its
-        // raw text-render mode.
-        if (label && label !== slot.chipToken.value) {
-          attrs["data-filter-chip-label"] = label;
-        }
+        const overlay = chipOverlayLabel({
+          field: slot.chipToken.field,
+          value: slot.chipToken.value,
+          label: chipLabelLookup[slot.chipToken.field]?.[slot.chipToken.value],
+        });
+        if (overlay) attrs["data-filter-chip-label"] = overlay;
       }
       decorations.push(Decoration.inline(slot.from, slot.to, attrs));
     }

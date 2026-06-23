@@ -2,9 +2,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import isEqual from "lodash-es/isEqual";
 import { useEffect, useMemo, useRef } from "react";
 import { type DeepPartial, type Resolver, useForm } from "react-hook-form";
+import type { z } from "zod";
 import { useModelLimits } from "~/hooks/useModelLimits";
 import {
   formSchema,
+  formSchemaForSave,
   type PromptConfigFormValues,
   refinedFormSchemaWithModelLimits,
 } from "~/prompts";
@@ -40,8 +42,13 @@ export const usePromptConfigForm = ({
     }
   }, [initialConfigValues]);
 
-  // Store schema in ref so resolver can access it
-  const schemaRef = useRef(formSchema);
+  // Store schema in ref so resolver can access it.
+  // Uses the save-time schema so the system-prompt-required refinement
+  // (#3196) fires when methods.trigger() is called from the Save handler.
+  // Typed as `ZodTypeAny` because the schema can be either a `ZodObject`
+  // (limit-refined) or a `ZodEffects` wrapper; the resolver only calls
+  // `.parse`/`.safeParse`, which both shapes support.
+  const schemaRef = useRef<z.ZodTypeAny>(formSchemaForSave);
   /**
    * Parse initial values once with schema defaults applied.
    * Memoized to avoid re-parsing on every render.
@@ -80,7 +87,7 @@ export const usePromptConfigForm = ({
 
   // Update schema ref when limits change
   useEffect(() => {
-    schemaRef.current = dynamicSchema as typeof formSchema;
+    schemaRef.current = dynamicSchema;
 
     // Clamp max_tokens to model limit when limits change (prevents validation error)
     if (modelLimits?.maxOutputTokens) {

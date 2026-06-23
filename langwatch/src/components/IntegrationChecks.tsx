@@ -89,7 +89,7 @@ export const IntegrationChecks = () => {
           </Link>
         </List.Item>
         <List.Item className="group" display="block" asChild>
-          <Link href={`/${project?.slug}/messages`}>
+          <Link href={`/${project?.slug}/traces`}>
             <List.Indicator
               asChild
               color={
@@ -160,7 +160,10 @@ export const IntegrationChecks = () => {
           </Link>
         </List.Item>
         <List.Item className="group" display="block" asChild>
-          <Link href="https://docs.langwatch.ai/features/automations" isExternal>
+          <Link
+            href="https://docs.langwatch.ai/features/automations"
+            isExternal
+          >
             <List.Indicator
               asChild
               color={

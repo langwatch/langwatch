@@ -91,6 +91,7 @@ node_modules/
 licenses.json
 .pnpm-store/
 server.log
+server.*.log
 screenshot-*.png
 
 # Vitest browser-mode auto-captured test screenshots (regenerated on each run)

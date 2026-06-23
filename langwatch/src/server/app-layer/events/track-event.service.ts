@@ -1,11 +1,10 @@
 import { generate } from "@langwatch/ksuid";
 import { SpanStatusCode } from "@opentelemetry/api";
 import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
-import type { PIIRedactionLevel } from "@prisma/client";
 import { createHash } from "crypto";
 import { z } from "zod";
-
 import { getApp } from "~/server/app-layer/app";
+import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
 import type { TrackEventRESTParamsValidator } from "~/server/tracer/types";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -56,7 +55,7 @@ export const predefinedEventTypes = predefinedEventsSchemas.options.map(
  * URLs by routing both through this function.
  */
 export async function recordTrackedEventSpan(params: {
-  project: { id: string; piiRedactionLevel: PIIRedactionLevel };
+  project: { id: string };
   body: TrackEventRESTParamsValidator;
   eventId: string;
 }): Promise<void> {
@@ -131,7 +130,7 @@ export async function recordTrackedEventSpan(params: {
     },
     resource: { attributes: [] },
     instrumentationScope: { name: TRACK_EVENT_SPAN_NAME },
-    piiRedactionLevel: project.piiRedactionLevel,
+    piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
   });
 }
 

@@ -1,17 +1,20 @@
 import {
   Circle,
+  chakra,
   HoverCard,
   HStack,
+  Icon,
   Portal,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { ArrowUpRight } from "lucide-react";
 import type React from "react";
 import type { IconType } from "react-icons";
-import { LuCircleSlash, LuCircleAlert } from "react-icons/lu";
+import { LuCircleAlert, LuCircleSlash } from "react-icons/lu";
 import {
-  getEvalChipDisplay,
   type EvalChipDisplay,
+  getEvalChipDisplay,
 } from "~/utils/evaluationResults";
 import type { TraceEvalResult, TraceListEvent } from "../../../types/trace";
 
@@ -36,8 +39,10 @@ export function evalChipColor(ev: TraceEvalResult): string {
  * as muted-foreground numerals.
  */
 function VerdictSlot({ display }: { display: EvalChipDisplay }) {
-  if (display.status === "skipped") return <NoVerdictBadge label="SKIPPED" icon={LuCircleSlash} />;
-  if (display.status === "error") return <NoVerdictBadge label="ERROR" icon={LuCircleAlert} />;
+  if (display.status === "skipped")
+    return <NoVerdictBadge label="SKIPPED" icon={LuCircleSlash} />;
+  if (display.status === "error")
+    return <NoVerdictBadge label="ERROR" icon={LuCircleAlert} />;
   if (display.scoreText) {
     return (
       <Text
@@ -67,7 +72,13 @@ function VerdictSlot({ display }: { display: EvalChipDisplay }) {
   return null;
 }
 
-function NoVerdictBadge({ label, icon: Icon }: { label: string; icon: IconType }) {
+function NoVerdictBadge({
+  label,
+  icon: Icon,
+}: {
+  label: string;
+  icon: IconType;
+}) {
   return (
     <HStack
       gap={1}
@@ -93,7 +104,15 @@ function NoVerdictBadge({ label, icon: Icon }: { label: string; icon: IconType }
   );
 }
 
-export const EvalChip: React.FC<{ eval_: TraceEvalResult }> = ({ eval_ }) => {
+export const EvalChip: React.FC<{
+  eval_: TraceEvalResult;
+  /** When set, clicking the chip filters the table by this evaluator
+   *  instead of being inert. */
+  onFilter?: () => void;
+  /** When set (configured/online evaluations), the hover popover gains a
+   *  "View definition" action that opens the evaluator's editor. */
+  onViewDefinition?: () => void;
+}> = ({ eval_, onFilter, onViewDefinition }) => {
   const display = getEvalChipDisplay(eval_);
 
   return (
@@ -111,9 +130,16 @@ export const EvalChip: React.FC<{ eval_: TraceEvalResult }> = ({ eval_ }) => {
           borderWidth="1px"
           borderColor="border"
           bg="bg.panel"
-          cursor="help"
+          cursor={onFilter ? "pointer" : "help"}
           flexShrink={0}
-          onClick={(e: React.MouseEvent) => e.stopPropagation()}
+          {...(onFilter
+            ? { title: `Filter by evaluator "${display.displayName}"` }
+            : {})}
+          onClick={(e: React.MouseEvent) => {
+            if (!onFilter) return;
+            e.stopPropagation();
+            onFilter();
+          }}
         >
           {/* Dot always renders so every chip lines up regardless of
               whether the trailing slot is a score, a Pass/Fail label,
@@ -196,6 +222,32 @@ export const EvalChip: React.FC<{ eval_: TraceEvalResult }> = ({ eval_ }) => {
                   {display.statusLabel}
                 </Text>
               </HStack>
+              {onViewDefinition && (
+                <chakra.button
+                  type="button"
+                  onClick={(e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    onViewDefinition();
+                  }}
+                  display="inline-flex"
+                  alignItems="center"
+                  gap={1}
+                  textStyle="2xs"
+                  fontWeight="medium"
+                  color="blue.fg"
+                  paddingTop={1}
+                  borderTopWidth="1px"
+                  borderColor="border.subtle"
+                  marginTop={0.5}
+                  cursor="pointer"
+                  _hover={{ textDecoration: "underline" }}
+                >
+                  View definition
+                  <Icon boxSize={2.5}>
+                    <ArrowUpRight />
+                  </Icon>
+                </chakra.button>
+              )}
             </VStack>
           </HoverCard.Content>
         </HoverCard.Positioner>

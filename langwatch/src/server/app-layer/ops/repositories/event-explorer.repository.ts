@@ -29,6 +29,11 @@ export interface EventExplorerRepository {
   searchAggregates(params: {
     query: string;
     tenantIds?: string[];
+    // Optional EventOccurredAt lower bound. The ops router supplies a
+    // 1-year default for the DejaView UI (with a banner under the search
+    // box stating the bound). Other callers can omit it to scan full
+    // event_log history at the cost of a wider partition fan-out.
+    sinceMs?: number;
   }): Promise<AggregateSearchResult[]>;
 
   findEventsByAggregate(params: {

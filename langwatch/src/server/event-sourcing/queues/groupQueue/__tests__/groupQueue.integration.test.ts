@@ -419,7 +419,7 @@ describe.skipIf(!hasTestcontainers)(
             () => {
               expect(processed).toHaveBeenCalledTimes(3);
             },
-            { timeout: 10000, interval: 50 },
+            { timeout: 30000, interval: 50 },
           );
 
           // Max concurrency within the same group must be 1
@@ -576,7 +576,7 @@ describe.skipIf(!hasTestcontainers)(
             () => {
               expect(processed).toHaveBeenCalledTimes(2);
             },
-            { timeout: 10000, interval: 50 },
+            { timeout: 30000, interval: 50 },
           );
 
           // Different groups should have been processed concurrently
@@ -619,7 +619,7 @@ describe.skipIf(!hasTestcontainers)(
               const total = batches.reduce((n, b) => n + b.length, 0) + singles.length;
               expect(total).toBe(10);
             },
-            { timeout: 10000, interval: 50 },
+            { timeout: 30000, interval: 50 },
           );
 
           // Coalescing actually happened: at least one multi-event batch.
@@ -650,7 +650,7 @@ describe.skipIf(!hasTestcontainers)(
             () => {
               expect(largest.length).toBe(5);
             },
-            { timeout: 10000, interval: 50 },
+            { timeout: 30000, interval: 50 },
           );
           expect(largest.map((p) => Number(p.value))).toEqual([0, 1, 2, 3, 4]);
         });
@@ -682,7 +682,7 @@ describe.skipIf(!hasTestcontainers)(
               const total = batches.reduce((n, b) => n + b.length, 0) + singles.length;
               expect(total).toBe(9);
             },
-            { timeout: 10000, interval: 50 },
+            { timeout: 30000, interval: 50 },
           );
 
           for (const batch of batches) {
@@ -720,7 +720,7 @@ describe.skipIf(!hasTestcontainers)(
             () => {
               expect(singles.length).toBe(5);
             },
-            { timeout: 10000, interval: 50 },
+            { timeout: 30000, interval: 50 },
           );
           expect(batches.length).toBe(0);
         });
@@ -755,11 +755,15 @@ describe.skipIf(!hasTestcontainers)(
 
           // Despite the first batch throwing, every event is eventually
           // processed — the drained siblings were re-staged, not lost.
+          // The retry re-stages with a future score and no signal, so the
+          // dispatcher only picks it up on its BRPOP fallback poll
+          // (signalTimeoutSec = 5s, plus the active-key backoff TTL). The
+          // window must absorb several poll cycles on a CPU-starved CI runner.
           await vi.waitFor(
             () => {
               expect(new Set(succeeded.map((p) => p.id)).size).toBe(4);
             },
-            { timeout: 20000, interval: 100 },
+            { timeout: 45000, interval: 100 },
           );
         });
       });

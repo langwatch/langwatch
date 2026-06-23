@@ -50,6 +50,9 @@ spec:
             {{- toYaml $root.Values.cronjobs.pod.annotations | nindent 8 }}
             {{- end }}
         spec:
+          # The cron pod only curls the app over HTTP; it never calls the
+          # Kubernetes API, so don't mount the SA token.
+          automountServiceAccountToken: {{ $root.Values.global.automountServiceAccountToken }}
           # Pod security context
           {{- with (coalesce $root.Values.cronjobs.podSecurityContext $root.Values.global.podSecurityContext) }}
           securityContext:

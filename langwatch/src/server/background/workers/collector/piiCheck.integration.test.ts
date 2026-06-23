@@ -1,4 +1,3 @@
-import { PIIRedactionLevel } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import type { Trace } from "../../../tracer/types";
 import { cleanupPIIs } from "./piiCheck";
@@ -19,7 +18,7 @@ describe("PIICheck", () => {
       spans: [],
     };
     await cleanupPIIs(sampleTrace, [], {
-      piiRedactionLevel: PIIRedactionLevel.ESSENTIAL,
+      piiRedactionLevel: "ESSENTIAL",
       enforced: true,
       mainMethod: "presidio",
     });
@@ -42,7 +41,7 @@ describe("PIICheck", () => {
     };
 
     await cleanupPIIs(samplePIITrace, [], {
-      piiRedactionLevel: PIIRedactionLevel.ESSENTIAL,
+      piiRedactionLevel: "ESSENTIAL",
       enforced: true,
       mainMethod: "presidio",
     });
@@ -66,7 +65,7 @@ describe("PIICheck", () => {
       spans: [],
     };
     await cleanupPIIs(sampleTrace, [], {
-      piiRedactionLevel: PIIRedactionLevel.ESSENTIAL,
+      piiRedactionLevel: "ESSENTIAL",
       enforced: true,
       mainMethod: "google_dlp",
     });
@@ -89,7 +88,7 @@ describe("PIICheck", () => {
     };
 
     await cleanupPIIs(samplePIITrace, [], {
-      piiRedactionLevel: PIIRedactionLevel.ESSENTIAL,
+      piiRedactionLevel: "ESSENTIAL",
       enforced: true,
       mainMethod: "google_dlp",
     });

@@ -20,6 +20,7 @@ export function mapTraceListPayload(
   return (data.items as TraceListItem[]).map((item) => ({
     ...item,
     spanCount: item.spanCount ?? 0,
+    sizeBytes: item.sizeBytes ?? 0,
     evaluations: (evalMap[item.traceId] ?? []).map((e) => ({
       evaluatorId: e.evaluatorId,
       evaluatorName: e.evaluatorName,

@@ -6,8 +6,7 @@ import {
   TraceFlags,
 } from "@opentelemetry/api";
 import fastq from "fastq";
-import type IORedis from "ioredis";
-import type { Cluster } from "ioredis";
+import { Cluster, Redis as IORedis } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
 import type { SemConvAttributes } from "langwatch/observability";
 import { createLogger } from "../../../../utils/logger/server";
@@ -178,12 +177,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     this.consumerEnabled = options?.consumerEnabled ?? true;
     // Dedicated connection for BRPOP to avoid blocking the shared connection.
     // Only needed when the dispatcher loop runs (consumer mode).
-    this.blockingConnection = this.consumerEnabled
-      ? "duplicate" in effectiveConnection &&
-        typeof effectiveConnection.duplicate === "function"
-        ? effectiveConnection.duplicate()
-        : effectiveConnection
-      : effectiveConnection;
+    // IORedis.duplicate() takes an options override; Cluster.duplicate() takes no
+    // args (maxRetriesPerRequest: null is already set inside Cluster's redisOptions).
+    this.blockingConnection = !this.consumerEnabled
+      ? effectiveConnection
+      : effectiveConnection instanceof IORedis
+        ? effectiveConnection.duplicate({ maxRetriesPerRequest: null })
+        : effectiveConnection instanceof Cluster
+          ? effectiveConnection.duplicate()
+          : effectiveConnection;
     this.spanAttributes = spanAttributes;
     this.delay = delay;
     this.deduplication = deduplication;
@@ -1010,7 +1012,51 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   }
 
   async waitUntilReady(): Promise<void> {
-    // No-op — Redis connection is already established, fastq needs no setup.
+    const bc = this.blockingConnection;
+    // The shared connection's readiness is owned by whoever created it.
+    if (bc === this.redisConnection) return;
+    if (bc.status === "ready") return;
+    // `end` is ioredis's terminal state — it fires only when no further
+    // reconnection will be attempted. If we already missed the window, fail
+    // fast rather than wait for an event that will never come.
+    if (bc.status === "end") {
+      throw new Error("Blocking Redis connection ended before ready");
+    }
+    await new Promise<void>((resolve, reject) => {
+      const cleanup = () => {
+        bc.off("ready", onReady);
+        bc.off("end", onEnd);
+        bc.off("error", onError);
+      };
+      const onReady = () => {
+        cleanup();
+        resolve();
+      };
+      const onEnd = () => {
+        cleanup();
+        reject(new Error("Blocking Redis connection ended before ready"));
+      };
+      // Transient reconnect events are EXPECTED while ioredis retries with
+      // maxRetriesPerRequest: null — on an unavailable endpoint it emits
+      // `error` → `close` → `reconnecting` and can later recover with `ready`.
+      // Rejecting on `error`/`close` would turn a recoverable Redis blip into a
+      // pipeline-startup failure (the regression this guards). So we do NOT
+      // listen for `close` at all, and the `error` listener only absorbs the
+      // error (keeping a listener attached so ioredis' emit is never unhandled)
+      // and keeps waiting. Only the terminal `end` event fails readiness.
+      const onError = (err: unknown) => {
+        this.logger.debug(
+          {
+            queueName: this.queueName,
+            error: err instanceof Error ? err.message : String(err),
+          },
+          "Blocking connection error while awaiting readiness; awaiting reconnect",
+        );
+      };
+      bc.once("ready", onReady);
+      bc.once("end", onEnd);
+      bc.on("error", onError);
+    });
   }
 
   async close(): Promise<void> {

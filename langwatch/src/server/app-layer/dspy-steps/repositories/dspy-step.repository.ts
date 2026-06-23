@@ -12,21 +12,22 @@ export interface DspyStepRepository {
     runId: string,
     stepIndex: string,
   ): Promise<DspyStepData | null>;
-  deleteByExperiment(
-    tenantId: string,
-    experimentId: string,
-  ): Promise<void>;
+  deleteByExperiment(tenantId: string, experimentId: string): Promise<void>;
 }
 
 export class NullDspyStepRepository implements DspyStepRepository {
-  async upsertStep(): Promise<void> {}
+  async upsertStep(): Promise<void> {
+    // no-op: null repository
+  }
   async getStepsByExperiment(): Promise<DspyStepSummaryData[]> {
     return [];
   }
   async getStep(): Promise<DspyStepData | null> {
     return null;
   }
-  async deleteByExperiment(): Promise<void> {}
+  async deleteByExperiment(): Promise<void> {
+    // no-op: null repository
+  }
 }
 
 function mergeByHash<T extends { hash: string }>(
@@ -103,7 +104,10 @@ export class InMemoryDspyStepRepository implements DspyStepRepository {
     runId: string,
     stepIndex: string,
   ): Promise<DspyStepData | null> {
-    return this.store.get(`${tenantId}/${experimentId}/${runId}/${stepIndex}`) ?? null;
+    return (
+      this.store.get(`${tenantId}/${experimentId}/${runId}/${stepIndex}`) ??
+      null
+    );
   }
 
   async deleteByExperiment(

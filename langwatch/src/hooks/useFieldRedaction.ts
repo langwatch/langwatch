@@ -9,6 +9,7 @@ export const useFieldRedaction = (field: "input" | "output") => {
     return {
       isRedacted: false,
       isLoading: false,
+      visibleTo: null,
     };
   }
   const { project } = useOrganizationTeamProject();
@@ -29,5 +30,6 @@ export const useFieldRedaction = (field: "input" | "output") => {
   return {
     isRedacted: isLoading ? void 0 : data?.isRedacted[field],
     isLoading,
+    visibleTo: data?.visibleTo[field] ?? null,
   };
 };

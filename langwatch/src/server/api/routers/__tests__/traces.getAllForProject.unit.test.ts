@@ -46,7 +46,7 @@ vi.mock("../../utils", () => ({
   }),
 }));
 
-vi.mock("~/server/evaluations/evaluators.generated", async (importOriginal) => {
+vi.mock("~/server/evaluations/evaluators", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,

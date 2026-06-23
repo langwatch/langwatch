@@ -12,7 +12,58 @@ import { describe, expect, it } from "vitest";
 import {
   ensureDisposeNeutered,
   getSharedHighlighter,
+  normalizeShikiLang,
 } from "../shikiAdapter";
+
+describe("given the normalizeShikiLang function", () => {
+  describe("when the language is bundled", () => {
+    it("passes a bundled language through (case-insensitively)", () => {
+      expect(normalizeShikiLang("sql")).toBe("sql");
+      expect(normalizeShikiLang("json")).toBe("json");
+      expect(normalizeShikiLang("TypeScript")).toBe("typescript");
+    });
+
+    it("resolves any bundled language, not just the eager base", () => {
+      // rust / hcl aren't in the eager base but Shiki bundles them, so they
+      // resolve to themselves (and get lazy-loaded on first use).
+      expect(normalizeShikiLang("rust")).toBe("rust");
+      expect(normalizeShikiLang("hcl")).toBe("hcl");
+    });
+  });
+
+  describe("when the language is a common alias", () => {
+    /** @scenario Common aliases resolve to their canonical grammar */
+    it("resolves the alias to its canonical bundled grammar", () => {
+      expect(normalizeShikiLang("ts")).toBe("typescript");
+      expect(normalizeShikiLang("js")).toBe("javascript");
+      expect(normalizeShikiLang("py")).toBe("python");
+      // Shiki's canonical for bash is "shellscript".
+      expect(normalizeShikiLang("sh")).toBe("shellscript");
+      expect(normalizeShikiLang("yml")).toBe("yaml");
+      expect(normalizeShikiLang("md")).toBe("markdown");
+    });
+  });
+
+  describe("when the language is unknown or absent", () => {
+    /** @scenario A language Shiki does not bundle falls back to plain text */
+    it("falls back to plain text for a language Shiki does not bundle", () => {
+      expect(normalizeShikiLang("promql")).toBe("text");
+      expect(normalizeShikiLang("zzznotalang")).toBe("text");
+    });
+
+    /** @scenario An empty or missing language renders as plain text */
+    it("falls back to plain text for empty / null / undefined", () => {
+      expect(normalizeShikiLang("")).toBe("text");
+      expect(normalizeShikiLang(null)).toBe("text");
+      expect(normalizeShikiLang(undefined)).toBe("text");
+    });
+
+    it("keeps explicit plain-text ids", () => {
+      expect(normalizeShikiLang("text")).toBe("text");
+      expect(normalizeShikiLang("plaintext")).toBe("plaintext");
+    });
+  });
+});
 
 describe("given the shikiAdapter split helpers", () => {
   describe("when getSharedHighlighter() resolves", () => {

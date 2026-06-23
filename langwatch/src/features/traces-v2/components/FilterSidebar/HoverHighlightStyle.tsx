@@ -1,6 +1,5 @@
 import type React from "react";
-import type { OrGroup } from "~/server/app-layer/traces/query-language/queries";
-import { orGroupColor } from "./orGroupPalette";
+import { useFacetHoverStore } from "../../stores/facetHoverStore";
 
 /**
  * Escape characters that would break a CSS attribute-value string.
@@ -22,65 +21,46 @@ export function escapeCssAttributeValue(s: string): string {
     .replace(/\r/g, "\\D ");
 }
 
-interface HoverHighlightStyleProps {
-  group: OrGroup | null;
-  facet: { field: string; value: string } | null;
-}
-
 /**
  * Cross-component hover highlighter. Renders a `<style>` block that
- * paints every member of the currently-hovered OR group (or single
- * facet) with the group's palette colour — both the sidebar row
- * (`data-facet-*`) and the search-bar chip (`data-filter-chip-*`)
- * light up together.
+ * paints the currently-hovered facet — both the sidebar row
+ * (`data-facet-*`) and the search-bar chip (`data-filter-chip-*`) —
+ * with a `blue` highlight so the matching pair lights up together.
  *
- * Lives in its own file because the highlight cross-cuts the sidebar
- * AND the search bar — it isn't a sub-concern of the connector
- * overlay even though they originally shipped together. Mounted by
- * `OrConnectorOverlay` so there's a single instance per sidebar; if
- * we ever want it visible without the connector, lift the mount.
+ * Reads `hoveredFacet` from the global `facetHoverStore`, which both
+ * the sidebar rows and the search-bar chips write to on hover. Mounted
+ * once in `FilterSidebar`; the highlight cross-cuts the sidebar AND the
+ * search bar, so the style block lives at the document level and applies
+ * wherever the matching elements are mounted.
  */
-export const HoverHighlightStyle: React.FC<HoverHighlightStyleProps> = ({
-  group,
-  facet,
-}) => {
-  if (!group && !facet) return null;
-  const palette = group ? orGroupColor(group.id) : "blue";
+export const HoverHighlightStyle: React.FC = () => {
+  const facet = useFacetHoverStore((s) => s.hoveredFacet);
+  if (!facet) return null;
   const escape = escapeCssAttributeValue;
-  const memberSelectors: string[] = [];
-  if (group) {
-    for (const m of group.members) {
-      // Match both the search-bar chip span (data-filter-chip-*) and
-      // the sidebar row (data-facet-field + data-facet-value). One
-      // style block lights up everything that participates.
-      memberSelectors.push(
-        `[data-filter-chip-field="${escape(m.field)}"][data-filter-chip-value="${escape(m.value)}"]`,
-        `[data-facet-field="${escape(m.field)}"][data-facet-value="${escape(m.value)}"]`,
-      );
-    }
-  } else if (facet) {
-    memberSelectors.push(
-      `[data-filter-chip-field="${escape(facet.field)}"][data-filter-chip-value="${escape(facet.value)}"]`,
-      `[data-facet-field="${escape(facet.field)}"][data-facet-value="${escape(facet.value)}"]`,
-    );
-  }
-  if (memberSelectors.length === 0) return null;
-  // Background-fill highlight rather than outline. Outlines were
-  // getting clipped by parent overflow:hidden (TipTap renders chips
-  // inside a contained scroll area) and even when visible they read
-  // as a debug ring rather than a confident highlight. The fill ties
-  // the chip + sidebar row visually to the OR group's pill colour:
-  // same `subtle` background, same `fg` text colour, same `muted`
-  // border. `border-radius: inherit` lets the highlight take on
-  // whatever shape the chip already has, so it never spills outside
-  // a rounded chip into the surrounding text.
+  const selectors = [
+    `[data-filter-chip-field="${escape(facet.field)}"][data-filter-chip-value="${escape(facet.value)}"]`,
+    `[data-facet-field="${escape(facet.field)}"][data-facet-value="${escape(facet.value)}"]`,
+  ];
+  // Background-fill highlight (outlines get clipped by the chips' contained
+  // scroll area). Paint in the facet's OWN palette so the chip ↔ row pair
+  // lights up in the value's identity colour and matches the row's selected
+  // tint — instead of the old blanket blue that overrode every facet's colour.
+  // Guard the palette to a bare token name before interpolating it into a CSS
+  // var (injection safety); fall back to a neutral emphasis when the hover came
+  // from a search-bar chip, which doesn't carry a palette.
+  const palette = /^[a-z]+$/i.test(facet.palette ?? "") ? facet.palette : null;
+  const bg = palette
+    ? `var(--chakra-colors-${palette}-subtle)`
+    : "var(--chakra-colors-bg-emphasized)";
+  const border = palette
+    ? `var(--chakra-colors-${palette}-muted)`
+    : "var(--chakra-colors-border-emphasized)";
   return (
     <style>{`
-      ${memberSelectors.join(",\n      ")} {
-        background-color: var(--chakra-colors-${palette}-subtle) !important;
-        color: var(--chakra-colors-${palette}-fg) !important;
-        border-color: var(--chakra-colors-${palette}-muted) !important;
-        transition: background-color 100ms ease, color 100ms ease;
+      ${selectors.join(",\n      ")} {
+        background-color: ${bg} !important;
+        border-color: ${border} !important;
+        transition: background-color 100ms ease, border-color 100ms ease;
       }
     `}</style>
   );

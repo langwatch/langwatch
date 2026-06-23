@@ -3,7 +3,7 @@ import {
   formatDuration,
   formatRelativeTime,
 } from "../../../utils/formatters";
-import { contentToString } from "../../TraceTable/chatContent";
+import { extractSystemText } from "../transcript/parsing";
 import type { ParsedTurn } from "./types";
 
 export interface ConversationMarkdownChunk {
@@ -58,7 +58,7 @@ export function buildConversationMarkdownChunks(
   // System prompt gets its own chunk — long system prompts can dwarf the
   // conversation itself, and isolating them keeps the preamble cheap and
   // the prompt unmounted until scrolled to.
-  const systemPrompt = parseSystemPrompt(parsedTurns[0]?.turn.input);
+  const systemPrompt = extractSystemText(parsedTurns[0]?.turn.input);
   if (systemPrompt) {
     chunks.push({
       id: "system",
@@ -67,23 +67,43 @@ export function buildConversationMarkdownChunks(
   }
 
   for (let i = 0; i < parsedTurns.length; i++) {
-    const { turn, userText } = parsedTurns[i]!;
+    const { turn, userText, assistantText } = parsedTurns[i]!;
     const turnNum = i + 1;
     const model = turn.models[0] ? abbreviateModel(turn.models[0]) : "—";
     chunks.push({
       id: `turn-${turnNum}-header`,
       markdown: `## Turn ${turnNum} — ${formatRelativeTime(turn.timestamp)} · ${model} · ${formatDuration(turn.durationMs)}`,
     });
+    // Redaction is enforced server-side (content is nulled before it
+    // reaches the client when the project's redaction policy fires). The
+    // bubble view shows `[Redacted]` in place of the text; the markdown
+    // export must do the same — silently dropping the turn would make
+    // pasted transcripts look like the turn never happened.
     if (userText) {
       chunks.push({
         id: `turn-${turnNum}-user`,
         markdown: ["**User:**", "", userText].join("\n"),
       });
+    } else if (turn.inputRedacted) {
+      chunks.push({
+        id: `turn-${turnNum}-user`,
+        markdown: ["**User:**", "", "_[Redacted]_"].join("\n"),
+      });
     }
-    if (turn.output) {
+    // Prefer the pre-extracted assistant prose (same as the bubble) — it
+    // strips Anthropic `{type:"thinking"|"tool_use"}` envelopes. Fall back
+    // to raw output only when there's no extractable text (e.g. a tool-only
+    // turn), rather than dumping JSON for the common text case.
+    const assistantMarkdown = assistantText || turn.output;
+    if (assistantMarkdown) {
       chunks.push({
         id: `turn-${turnNum}-assistant`,
-        markdown: ["**Assistant:**", "", turn.output].join("\n"),
+        markdown: ["**Assistant:**", "", assistantMarkdown].join("\n"),
+      });
+    } else if (turn.outputRedacted) {
+      chunks.push({
+        id: `turn-${turnNum}-assistant`,
+        markdown: ["**Assistant:**", "", "_[Redacted]_"].join("\n"),
       });
     } else if (turn.error) {
       chunks.push({
@@ -104,60 +124,6 @@ export function joinConversationMarkdown(
     .map((c) => c.markdown)
     .join("\n\n")
     .trimEnd();
-}
-
-export function buildConversationMarkdown(
-  conversationId: string,
-  parsedTurns: ParsedTurn[],
-): string {
-  return joinConversationMarkdown(
-    buildConversationMarkdownChunks(conversationId, parsedTurns),
-  );
-}
-
-/**
- * Extract the first system message from the chat-history input. Used to render
- * the conversation-level system prompt banner. Returns "" if not chat-shaped or
- * no system role present.
- */
-export function parseSystemPrompt(raw: string | null | undefined): string {
-  if (!raw) return "";
-  try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      const sys = parsed.find(
-        (m) => m && typeof m === "object" && m.role === "system",
-      );
-      if (sys) return contentToString(sys.content);
-    }
-  } catch {
-    // not JSON
-  }
-  return "";
-}
-
-/**
- * The `input` field on a trace is often the full chat history (system + earlier
- * turns + the latest user message). For chat rendering we want just the latest
- * user message — that's the new content this turn.
- */
-export function parseLastUserText(raw: string | null | undefined): string {
-  if (!raw) return "";
-  try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      const lastUser = [...parsed]
-        .reverse()
-        .find((m) => m && typeof m === "object" && m.role === "user");
-      if (lastUser) return contentToString(lastUser.content);
-    }
-    if (typeof parsed === "object" && parsed !== null) {
-      return JSON.stringify(parsed);
-    }
-  } catch {
-    // not JSON
-  }
-  return raw;
 }
 
 export function formatGap(secs: number): string {

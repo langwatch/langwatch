@@ -18,11 +18,24 @@ export class EventRepositoryMemory implements EventRepository {
     tenantId: string,
     aggregateType: string,
     aggregateId: string,
+    occurredAtFromMs?: number,
   ): Promise<EventRecord[]> {
     const key = `${tenantId}:${aggregateType}:${String(aggregateId)}`;
     const records = this.eventsByKey.get(key) ?? [];
+    // Mirror the ClickHouse lower-bound semantics so tests exercise the same
+    // behaviour: keep events at/after the bound, plus events with an unknown
+    // occurred time (EventOccurredAt 0 / null).
+    const hasLowerBound =
+      typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
+    const filtered = hasLowerBound
+      ? records.filter(
+          (record) =>
+            !record.EventOccurredAt ||
+            record.EventOccurredAt >= occurredAtFromMs,
+        )
+      : records;
     // Return a copy to prevent mutation
-    return records.map((record) => ({ ...record }));
+    return filtered.map((record) => ({ ...record }));
   }
 
   async getEventRecordsUpTo(

@@ -174,7 +174,7 @@ Rule: All Traces lens (default)
 
   Scenario: All-traces default columns
     When the All Traces lens is active
-    Then the visible columns are: Time, Trace, Service, Duration, Cost, Tokens, Spans, Model, Evals, Events
+    Then the visible columns are: Time, Trace, Service, Duration, Cost, Tokens, Spans, Model, Labels, Evals, Events
     And the lens addons include "io-preview" and "expanded-peek"
 
   Scenario: No filters are locked
@@ -344,14 +344,33 @@ Rule: Default columns and status indicator
       | spans    | 60   | 50      |
       | model    | 180  | 140     |
 
-  Scenario: Time column shows relative time with absolute on hover
+  # SINCE and TIMESTAMP are independent columns the user picks from the
+  # Columns dropdown. The TIME column additionally switches between relative
+  # ("3m") and ISO 8601 via a Relative / ISO toggle in the column picker;
+  # the hover card is read-only and never changes the format.
+  Scenario: Time column shows compact relative time
     Given a trace occurred 2 minutes ago
     Then the Time column shows "2m"
-    And hovering shows the absolute timestamp
 
-  Scenario: Time column is sticky during horizontal scroll
+  Scenario: Since column shows verbose relative time
+    Given a trace occurred 2 minutes ago
+    And the "Since" column is enabled
+    Then the Since column shows "2 minutes ago"
+
+  Scenario: Timestamp column shows ISO 8601
+    Given the "Timestamp" column is enabled
+    Then the Timestamp column shows the full ISO 8601 timestamp
+
+  Scenario: Hovering a time cell shows a read-only breakdown
+    When the user hovers any time cell
+    Then a hover card shows verbose relative, local, UTC, and ISO forms
+    And the hover card has no control to change the column's format
+
+  Scenario: The row-select column is sticky during horizontal scroll
     When the table scrolls horizontally
-    Then the Time column stays frozen at the left edge
+    Then the leftmost row-select column stays frozen at the left edge
+    # Only the row-select gutter is sticky; no data column (including Time)
+    # is pinned.
 
   Scenario: Table header row is sticky during vertical scroll
     When the table scrolls vertically
@@ -379,6 +398,60 @@ Rule: Default columns and status indicator
   Scenario: Model column shows badge for multiple models
     Given a trace used "gpt-4o" and "claude-sonnet"
     Then the Model column shows the primary model plus a "+1" badge
+
+  Scenario: Labels column shows colour-coded badges
+    Given a trace has labels "billing" and "refund"
+    Then the Labels column shows a badge per label
+    And each badge's colour is derived deterministically from the label text
+
+  Scenario: Labels column shows an em dash when there are no labels
+    Given a trace has no labels
+    Then the Labels column shows "—"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# INTERACTIVE VALUE CHIPS
+# ─────────────────────────────────────────────────────────────────────────────
+
+Rule: Interactive value chips
+  The Labels, Model, Evaluation and Prompt cells share one interaction:
+  clicking a value chip filters the table by that value, and a trailing ↗
+  link-out reveals on hover to jump to the value's source. Clicking a chip
+  never opens the row's trace drawer (the click is contained).
+
+  Scenario: Clicking a label chip filters by that label
+    Given a trace row shows the label "billing"
+    When the user clicks the "billing" chip
+    Then `toggleFacet("label", "billing")` runs and the drawer does not open
+
+  Scenario: Clicking a model chip filters by that model
+    When the user clicks the model chip for "gpt-4o"
+    Then `toggleFacet("model", "gpt-4o")` runs
+
+  Scenario: Clicking an evaluation chip filters by that evaluator
+    When the user clicks an evaluation chip
+    Then `toggleFacet("evaluator", <evaluatorId>)` runs
+
+  Scenario: Clicking a prompt chip filters by that prompt
+    When the user clicks the prompt chip
+    Then `toggleFacet("lastUsedPrompt", <promptId>)` runs
+
+  Scenario: Known model links to provider settings
+    Given a model whose provider is recognised
+    Then its hover ↗ links to "/settings/model-providers"
+
+  Scenario: Unrecognised model is flagged and links to mapping
+    Given a model whose provider is not recognised
+    Then the chip shows an amber help glyph (no cost-regex match)
+    And its hover ↗ links to model settings to map it
+
+  Scenario: Online evaluation can open its definition
+    Given an evaluation whose evaluator id has no "/" (a configured evaluator)
+    Then its hover popover offers "View definition"
+    And an "evaluator_*" id opens the evaluator editor, others the online-evaluation drawer
+
+  Scenario: Built-in evaluator type has no definition link
+    Given an evaluation whose evaluator id is a langevals type like "ragas/faithfulness"
+    Then no "View definition" action is offered
 
   Scenario: OK status has no visual indicator
     Given a trace with OK status
@@ -423,9 +496,18 @@ Rule: Two-zone row format (compact density only)
   Scenario: LLM trace row renders the IOPreviewAddon below the header
     Given a trace has both `input` and `output` populated
     And the row is not expanded
-    Then a sub-row is rendered with `colSpan` matching the column count
-    And the sub-row body is the IOPreview component
+    Then a preview sub-row is rendered below the main row
     And the sub-row inherits the row's status border colour on the left edge
+
+  Scenario: The I/O preview stops before Labels, Evals, Prompt, or Events
+    Given a trace renders the I/O preview sub-row
+    Then the preview cell's right edge stops at the leftmost of the Labels, Evals, Prompt, or Events columns
+    And the preview cell scrolls with the table body rather than staying pinned to the left
+    And during horizontal scroll the preview text never paints over those columns
+    And its text wraps within that bounded width instead of overflowing
+    # The preview row is bounded so its right edge never overlaps a column
+    # that carries its own content (Labels, Evals, Prompt, Events).
+    # The boundary follows the live column order, so it survives reorder.
 
   Scenario: Non-LLM trace row shows header only
     Given a trace is missing either `input` or `output`
@@ -494,10 +576,10 @@ Rule: Column visibility and reorder
       evaluations, events, status, ttft, userId, conversationId,
       origin, tokensIn, tokensOut
 
-  Scenario: Evaluations section is dynamic
-    Given the project has evaluations for Faithfulness and Toxicity
-    When the columns dropdown is open
-    Then the Evaluations section shows "Evals (summary badges)", "Faithfulness", and "Toxicity"
+  # The Evaluations section lists the "Evals" summary column plus an
+  # "Add eval column" control for adding a column for a specific evaluator.
+  # That behaviour is owned by specs/traces-v2/evaluations.feature
+  # ("Per-evaluator eval columns").
 
   Scenario: Toggling a column checkbox shows or hides the column
     Given the Service column is hidden
@@ -520,58 +602,20 @@ Rule: Column visibility and reorder
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# EVAL & EVENT COLUMNS
+# EVENT COLUMNS
 # ─────────────────────────────────────────────────────────────────────────────
+# Eval columns are owned by specs/traces-v2/evaluations.feature:
+#   - per-evaluator columns (Score / Verdict / Label, added via the picker)
+#     under "Per-evaluator eval columns"
+#   - the inline summary badges column under "Evals summary column"
+# See dev/docs/adr/029-trace-table-per-evaluator-columns.md.
 
-Rule: Evaluation and event column display
-  Eval columns show scores with colored indicators. Event columns show
-  counts with exception flags.
+Rule: Event column display
+  Event columns show counts with exception flags.
 
   Background:
     Given the user is authenticated with "traces:view" permission
-    And eval columns are enabled
-
-  Scenario: Individual eval column shows numeric score with colored dot
-    Given a trace has a Faithfulness score of 8.2
-    Then the Faithfulness column shows "● 8.2" with a green dot
-
-  Scenario: Individual eval column shows pass/fail
-    Given a trace has a Toxicity eval that passed
-    Then the Toxicity column shows "● ✓" with a green dot
-
-  Scenario: Eval score coloring thresholds
-    Given a score above 7
-    Then the dot is green
-    Given a score between 4 and 7
-    Then the dot is yellow
-    Given a score below 4
-    Then the dot is red
-
-  Scenario: No eval for a trace shows dash
-    Given a trace has no Faithfulness eval
-    Then the Faithfulness column shows "—"
-
-  # Not yet implemented as of 2026-05-01 — `makeEvalColumnDef` sets
-  # `enableSorting: false`. The backend SORT_COLUMN_MAP doesn't cover eval
-  # columns either, so the UI suppresses the header click affordance.
-  @planned
-  Scenario: Eval column is sortable
-    When the user clicks the Faithfulness column header
-    Then traces are sorted by Faithfulness score
-
-  Scenario: Clicking an eval score shows detail popover
-    When the user clicks a score in an eval column
-    Then a popover shows: score, status, reasoning, and timestamp of when the eval ran
-
-  Scenario: Summary badges column shows compact inline badges
-    Given the "Evals (summary badges)" column is enabled
-    Then each row shows up to 2-3 badges like "● Faith 8.2  ● Toxic ✓"
-    And overflow shows "+N" with a hover tooltip listing remaining evals
-
-  Scenario: Summary badges exclude evals with their own column
-    Given "Faithfulness" has its own column enabled
-    And "Evals (summary badges)" is also enabled
-    Then the summary badges column does not include Faithfulness
+    And the Events column is enabled
 
   Scenario: Events column shows count and exception indicator
     Given the Events column is enabled

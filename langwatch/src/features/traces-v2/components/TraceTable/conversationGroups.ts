@@ -102,3 +102,42 @@ export function groupTracesByConversation(
 
   return result.sort((a, b) => b.latestTimestamp - a.latestTimestamp);
 }
+
+/**
+ * Per-group numeric accessors for the dimensions a lens can sort
+ * conversations by. Anything not here keeps the latest-first default.
+ */
+const GROUP_SORT_ACCESSORS: Record<string, (g: ConversationGroup) => number> = {
+  cost: (g) => g.totalCost,
+  tokens: (g) => g.totalTokens,
+  duration: (g) => g.totalDuration,
+  turns: (g) => g.traces.length,
+  started: (g) => g.earliestTimestamp,
+  lastTurn: (g) => g.latestTimestamp,
+};
+
+/**
+ * Order conversation groups by the active lens sort, using the per-group
+ * aggregates. The conversation table renders with `manualSorting`, so the
+ * order it shows is whatever we return here — without this, groups always
+ * fell back to latest-first regardless of the lens (e.g. "Expensive
+ * Conversations" didn't actually lead with the costliest, and "Longest
+ * Conversations" / "Token-Heavy Conversations" couldn't sort at all, since
+ * turn-count and group-total tokens aren't trace-level sort columns).
+ *
+ * Note: grouping is page-local — this orders the conversations within the
+ * fetched page, not globally across all data. See
+ * specs/traces-v2/lens-preset-groups.feature
+ */
+export function sortConversationGroups({
+  groups,
+  sort,
+}: {
+  groups: ConversationGroup[];
+  sort: { columnId: string; direction: "asc" | "desc" };
+}): ConversationGroup[] {
+  const accessor = GROUP_SORT_ACCESSORS[sort.columnId];
+  if (!accessor) return groups;
+  const dir = sort.direction === "asc" ? 1 : -1;
+  return [...groups].sort((a, b) => (accessor(a) - accessor(b)) * dir);
+}

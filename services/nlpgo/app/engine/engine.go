@@ -36,6 +36,7 @@ import (
 // HTTP handler invokes per /go/studio/execute_sync request.
 type Engine struct {
 	http             *httpblock.Executor
+	attachments      *attachmentFetcher
 	code             *codeblock.Executor
 	llm              app.LLMClient
 	evaluator        *evaluatorblock.Executor
@@ -54,7 +55,10 @@ type Logger interface {
 
 // Options configures an Engine.
 type Options struct {
-	HTTP             *httpblock.Executor
+	HTTP *httpblock.Executor
+	// SSRF mirrors the HTTP block's destination policy so remote prompt
+	// attachments are fetched under the same private/loopback/metadata ban.
+	SSRF             httpblock.SSRFOptions
 	Code             *codeblock.Executor
 	LLM              app.LLMClient
 	Evaluator        *evaluatorblock.Executor
@@ -70,6 +74,7 @@ func New(opts Options) *Engine {
 	}
 	return &Engine{
 		http:             opts.HTTP,
+		attachments:      newAttachmentFetcher(opts.SSRF),
 		code:             opts.Code,
 		llm:              opts.LLM,
 		evaluator:        opts.Evaluator,
@@ -509,9 +514,34 @@ func (e *Engine) runSignature(ctx context.Context, execReq ExecuteRequest, node 
 	// "(unsaved edits)".
 	emitPromptSpans(ctx, node, inputs)
 
+	// Resolve image-typed inputs that carry a remote URL into inline images
+	// before templating. An image-typed field is an explicit attachment, so a
+	// URL it holds that cannot be fetched as an image aborts the run with a
+	// clear error rather than being left as text for the model to guess from.
+	msgInputs := inputs
+	if e.attachments != nil {
+		inlined, aerr := e.attachments.inlineImageInputs(ctx, node, inputs)
+		if aerr != nil {
+			aerr.NodeID = node.ID
+			return nil, aerr
+		}
+		msgInputs = inlined
+	}
+
 	// Re-shape any template-interpolated image data URLs into multimodal
 	// content parts so the model receives actual images, not base64 text.
-	messages := splitMessagesWithImages(buildMessages(node, inputs))
+	messages := splitMessagesWithImages(buildMessages(node, msgInputs))
+	// Fetch any remote attachment URLs (http/https) referenced in the messages
+	// and deliver them as content the model can open. A failed fetch aborts the
+	// run with a clear, user-facing error instead of a broken provider request.
+	if e.attachments != nil {
+		fetched, aerr := e.attachments.rewrite(ctx, messages)
+		if aerr != nil {
+			aerr.NodeID = node.ID
+			return nil, aerr
+		}
+		messages = fetched
+	}
 	req := app.LLMRequest{
 		Model:    model,
 		Provider: provider,
@@ -541,7 +571,9 @@ func (e *Engine) runSignature(ctx context.Context, execReq ExecuteRequest, node 
 		}
 		req.ResponseFormat = composeSignatureResponseFormat(sanitizeSchemaName(schemaName), node.Data.Outputs)
 	}
-	llmCtx, llmSpan := startLLMSpan(ctx, model, provider, messages)
+	// Trace a redacted copy: the model gets the full fetched bytes (req.Messages),
+	// but the span's langwatch.input must not store the base64 attachment payload.
+	llmCtx, llmSpan := startLLMSpan(ctx, model, provider, redactAttachmentsForTracing(messages))
 	resp, err := e.llm.Execute(llmCtx, req)
 	endLLMSpan(llmSpan, resp, err)
 	if err != nil {

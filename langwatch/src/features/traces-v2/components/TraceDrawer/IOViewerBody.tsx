@@ -13,6 +13,32 @@ import type { MarkdownSubmode, ViewFormat } from "./useIOViewerState";
 const COMPACT_MAX_HEIGHT_PX = 300;
 const EXPANDED_MAX_HEIGHT_PX = 500;
 
+// Structural Markdown signals. We render plain text as Markdown in Pretty
+// mode only when one of these matches, so genuine prose / log dumps / stack
+// traces (which carry none of these) keep the literal monospace pre-wrap and
+// don't get reflowed. Emphasis + inline code are included per the spec; a
+// lone "#" or "*" mid-prose won't fire because the patterns require the
+// construct's full shape. See specs/traces-v2/io-pretty-markdown.feature
+const MARKDOWN_SIGNALS: RegExp[] = [
+  /^#{1,6}\s+\S/m, // ATX heading
+  /^\s*[-*+]\s+\S/m, // bullet list item
+  /^\s*\d+\.\s+\S/m, // ordered list item
+  /^\s*>\s+\S/m, // blockquote
+  /```/, // fenced code block
+  /\[[^\]\n]+\]\([^)\n]+\)/, // link
+  /^\|.*\|\s*$\n^\s*\|?[\s:|-]*-{2,}[\s:|-]*\|?\s*$/m, // table header + rule
+  /(\*\*|__)(?=\S)[^\n]{1,200}?\S\1/, // bold
+  /`[^`\n]{1,200}`/, // inline code
+];
+
+export function looksLikeMarkdown(text: string): boolean {
+  if (!text) return false;
+  // Markdown structure shows up early; cap the scan so a megabyte of plain
+  // text doesn't pay a regex sweep.
+  const sample = text.length > 4000 ? text.slice(0, 4000) : text;
+  return MARKDOWN_SIGNALS.some((re) => re.test(sample));
+}
+
 interface IOViewerBodyProps {
   format: ViewFormat;
   isChat: boolean;
@@ -109,6 +135,14 @@ export function IOViewerBody({
         colorMode={colorMode}
         flush
       />
+    );
+  }
+  // Plain text in Pretty mode: if it reads as Markdown, render it richly so
+  // Pretty is no longer a no-op vs the raw Text view. The "text" format
+  // still falls straight through to the literal monospace block below.
+  if (format === "pretty" && !isLong && looksLikeMarkdown(displayContent)) {
+    return (
+      <RenderedMarkdown markdown={displayContent} paddingX={3} paddingY={2} />
     );
   }
   return (

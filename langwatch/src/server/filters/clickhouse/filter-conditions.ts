@@ -2,6 +2,7 @@ import type { FilterParam } from "~/hooks/useFilterParams";
 import type { FilterField } from "../types";
 import type {
   FilterConditionBuilder,
+  FilterConditionOptions,
   FilterConditionResult,
   GenerateFilterConditionsResult,
 } from "./types";
@@ -87,7 +88,10 @@ export const clickHouseFilterConditions: Record<
       params[`${paramId}_k${i}_bare`] = rawKey;
     });
     return {
-      sql: conditions.length === 1 ? conditions[0]! : `(${conditions.join(" OR ")})`,
+      sql:
+        conditions.length === 1
+          ? conditions[0]!
+          : `(${conditions.join(" OR ")})`,
       params,
     };
   },
@@ -141,11 +145,11 @@ export const clickHouseFilterConditions: Record<
   }),
 
   // Spans
-  "spans.type": (values, paramId) => ({
+  "spans.type": (values, paramId, _key, _subkey, options) => ({
     sql: `EXISTS (
       SELECT 1 FROM stored_spans sp
       WHERE sp.TenantId = ts.TenantId
-        AND sp.TraceId = ts.TraceId
+        AND sp.TraceId = ts.TraceId${options?.spanTimeBound ?? ""}
         AND sp.SpanAttributes['langwatch.span.type'] IN ({${paramId}_values:Array(String)})
     )`,
     params: { [`${paramId}_values`]: values },
@@ -161,7 +165,11 @@ export const clickHouseFilterConditions: Record<
     const hasFalse = values.includes("false");
     if (hasTrue && hasFalse) return { sql: "1=1", params: {} };
     if (hasTrue) return { sql: "ts.HasAnnotation = true", params: {} };
-    if (hasFalse) return { sql: "(ts.HasAnnotation = false OR ts.HasAnnotation IS NULL)", params: {} };
+    if (hasFalse)
+      return {
+        sql: "(ts.HasAnnotation = false OR ts.HasAnnotation IS NULL)",
+        params: {},
+      };
     return { sql: "1=0", params: {} };
   },
 
@@ -269,17 +277,17 @@ export const clickHouseFilterConditions: Record<
   },
 
   // Events - using stored_spans table with span attributes
-  "events.event_type": (values, paramId) => ({
+  "events.event_type": (values, paramId, _key, _subkey, options) => ({
     sql: `EXISTS (
       SELECT 1 FROM stored_spans sp
       WHERE sp.TenantId = ts.TenantId
-        AND sp.TraceId = ts.TraceId
+        AND sp.TraceId = ts.TraceId${options?.spanTimeBound ?? ""}
         AND sp.SpanAttributes['event.type'] IN ({${paramId}_values:Array(String)})
     )`,
     params: { [`${paramId}_values`]: values },
   }),
 
-  "events.metrics.key": (values, paramId, key) => {
+  "events.metrics.key": (values, paramId, key, _subkey, options) => {
     if (!key) return { sql: "1=0", params: {} };
     // Build OR conditions for each metric key - these are attribute names, not values
     // Since attribute names are controlled internally, we use them directly
@@ -296,7 +304,7 @@ export const clickHouseFilterConditions: Record<
       sql: `EXISTS (
         SELECT 1 FROM stored_spans sp
         WHERE sp.TenantId = ts.TenantId
-          AND sp.TraceId = ts.TraceId
+          AND sp.TraceId = ts.TraceId${options?.spanTimeBound ?? ""}
           AND sp.SpanAttributes['event.type'] = {${paramId}_key:String}
           AND (${metricConditions.join(" OR ")})
       )`,
@@ -304,7 +312,7 @@ export const clickHouseFilterConditions: Record<
     };
   },
 
-  "events.metrics.value": (values, paramId, key, subkey) => {
+  "events.metrics.value": (values, paramId, key, subkey, options) => {
     if (!key || !subkey || values.length < 2) return { sql: "1=0", params: {} };
     const minValue = parseFloat(values[0] ?? "");
     const maxValue = parseFloat(values[1] ?? "");
@@ -319,7 +327,7 @@ export const clickHouseFilterConditions: Record<
       sql: `EXISTS (
         SELECT 1 FROM stored_spans sp
         WHERE sp.TenantId = ts.TenantId
-          AND sp.TraceId = ts.TraceId
+          AND sp.TraceId = ts.TraceId${options?.spanTimeBound ?? ""}
           AND sp.SpanAttributes['event.type'] = {${paramId}_key:String}
           AND toFloat64OrNull(sp.SpanAttributes[{${paramId}_attrkey:String}]) >= {${paramId}_min:Float64}
           AND toFloat64OrNull(sp.SpanAttributes[{${paramId}_attrkey:String}]) <= {${paramId}_max:Float64}
@@ -333,7 +341,7 @@ export const clickHouseFilterConditions: Record<
     };
   },
 
-  "events.event_details.key": (values, paramId, key) => {
+  "events.event_details.key": (values, paramId, key, _subkey, options) => {
     if (!key) return { sql: "1=0", params: {} };
     // Build OR conditions for each detail key
     const detailConditions = values.map(
@@ -349,7 +357,7 @@ export const clickHouseFilterConditions: Record<
       sql: `EXISTS (
         SELECT 1 FROM stored_spans sp
         WHERE sp.TenantId = ts.TenantId
-          AND sp.TraceId = ts.TraceId
+          AND sp.TraceId = ts.TraceId${options?.spanTimeBound ?? ""}
           AND sp.SpanAttributes['event.type'] = {${paramId}_key:String}
           AND (${detailConditions.join(" OR ")})
       )`,
@@ -375,6 +383,7 @@ function collectClickHouseConditions(
   keys: string[],
   paramCounter: { value: number },
   allParams: Record<string, unknown>,
+  options: FilterConditionOptions,
 ): { conditions: string[]; hasUnsupported: boolean } {
   const key = keys[0];
   const subkey = keys[1];
@@ -391,7 +400,7 @@ function collectClickHouseConditions(
     }
 
     const paramId = `f${paramCounter.value++}`;
-    const result = conditionBuilder(params, paramId, key, subkey);
+    const result = conditionBuilder(params, paramId, key, subkey, options);
     Object.assign(allParams, result.params);
 
     return { conditions: [result.sql], hasUnsupported: false };
@@ -409,6 +418,7 @@ function collectClickHouseConditions(
         [...keys, nextKey], // Accumulate keys as we recurse
         paramCounter,
         allParams,
+        options,
       );
 
       if (result.hasUnsupported) hasUnsupported = true;
@@ -434,19 +444,66 @@ function collectClickHouseConditions(
 }
 
 /**
+ * Spans of a trace start around the trace's `OccurredAt`, but a long-running
+ * trace can have spans a little outside the dashboard window. Widen the
+ * `stored_spans` partition window by this buffer so a matching span near a
+ * window edge is never pruned away. Matches the +/- 2 day margin used by the
+ * trace-fetch `withPartitionHint` helper. Partitions are weekly, so the buffer
+ * costs at most one extra week of partitions while still pruning the cold tail.
+ */
+const SPAN_WINDOW_BUFFER_MS = 2 * 24 * 60 * 60 * 1000;
+
+/**
+ * Build the SQL fragment + params that bound `sp.StartTime` to the dashboard
+ * window (buffered). Returned `sql` is empty when no usable window is given, so
+ * callers without a time range keep the previous unbounded behaviour.
+ */
+function buildSpanTimeBound(timeWindow?: {
+  startDate?: number;
+  endDate?: number;
+}): { sql: string; params: Record<string, unknown> } {
+  if (
+    !timeWindow ||
+    typeof timeWindow.startDate !== "number" ||
+    typeof timeWindow.endDate !== "number"
+  ) {
+    return { sql: "", params: {} };
+  }
+  return {
+    sql: " AND sp.StartTime >= fromUnixTimestamp64Milli({spanWindowStart:UInt64}) AND sp.StartTime <= fromUnixTimestamp64Milli({spanWindowEnd:UInt64})",
+    params: {
+      spanWindowStart: Math.max(
+        0,
+        timeWindow.startDate - SPAN_WINDOW_BUFFER_MS,
+      ),
+      spanWindowEnd: timeWindow.endDate + SPAN_WINDOW_BUFFER_MS,
+    },
+  };
+}
+
+/**
  * Generate ClickHouse WHERE conditions from filter parameters.
  * Returns SQL condition strings and aggregated parameters for parameterized queries.
  *
  * @param filters - The filter parameters from the request
+ * @param timeWindow - Optional dashboard time window. When provided, span/event
+ *   filters that probe `stored_spans` via an EXISTS subquery are bounded to this
+ *   window so they prune partitions instead of cold-scanning every weekly
+ *   partition (including S3-tiered ones).
  * @returns Object with conditions array, aggregated params, and unsupported filter flag
  */
 export function generateClickHouseFilterConditions(
   filters: Partial<Record<FilterField, FilterParam>>,
+  timeWindow?: { startDate?: number; endDate?: number },
 ): GenerateFilterConditionsResult {
   const conditions: string[] = [];
   const allParams: Record<string, unknown> = {};
   const paramCounter = { value: 0 };
   let hasUnsupportedFilters = false;
+
+  const spanBound = buildSpanTimeBound(timeWindow);
+  const options: FilterConditionOptions = { spanTimeBound: spanBound.sql };
+  Object.assign(allParams, spanBound.params);
 
   for (const [field, filterParams] of Object.entries(filters)) {
     if (
@@ -475,6 +532,7 @@ export function generateClickHouseFilterConditions(
       [], // Start with empty keys array
       paramCounter,
       allParams,
+      options,
     );
 
     if (result.hasUnsupported) hasUnsupportedFilters = true;
