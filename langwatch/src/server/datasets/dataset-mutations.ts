@@ -36,7 +36,7 @@ import {
 } from "./dataset-chunking";
 import { withDatasetLock } from "./dataset-lock";
 import { type DatasetStorage, getDatasetStorage } from "./dataset-storage";
-import { DatasetNotReadyError } from "./errors";
+import { DatasetNotReadyError, DuplicateRecordIdError } from "./errors";
 import { stripNullBytes } from "./sanitize";
 
 const logger = createLogger("langwatch:datasets:mutations");
@@ -65,11 +65,26 @@ type ChunkLine = { id: string; entry: unknown };
 const toChunkLines = (
   entries: unknown[],
   { forcedIds }: { forcedIds?: (string | undefined)[] } = {},
-): ChunkLine[] =>
-  entries.map((entry, i) => ({
+): ChunkLine[] => {
+  const lines = entries.map((entry, i) => ({
     id: forcedIds?.[i] ?? `record_${nanoid()}`,
     entry: stripNullBytes(entry),
   }));
+  // I-PG: row ids are unique within a dataset (the legacy PG PK). Minted ids
+  // can't collide, but caller-supplied `forcedIds` can — a double-submit or
+  // buggy SDK that repeats an id would persist two rows that edit/delete then
+  // can't disambiguate. Reject the duplicate at the id-assignment chokepoint
+  // rather than silently creating a ghost row. (Within-batch only: a cross-batch
+  // collision against an already-stored id would need an O(rowCount) id scan on
+  // every write — disproportionate; the edit create-on-miss path guards the
+  // common upsert case.)
+  const seen = new Set<string>();
+  for (const { id } of lines) {
+    if (seen.has(id)) throw new DuplicateRecordIdError(id);
+    seen.add(id);
+  }
+  return lines;
+};
 
 const isChunkLine = (line: unknown): line is ChunkLine =>
   typeof line === "object" && line !== null && "id" in line && "entry" in line;

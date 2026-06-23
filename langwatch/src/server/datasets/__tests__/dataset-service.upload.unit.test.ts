@@ -364,6 +364,7 @@ describe("DatasetService", () => {
             stagingKey: "staging/p1/bound-key",
             uploadFilename: "data.jsonl",
           }),
+          claimForProcessing: vi.fn().mockResolvedValue(1),
           update: vi.fn().mockResolvedValue({}),
         };
 
@@ -377,9 +378,12 @@ describe("DatasetService", () => {
           key: "staging/p1/bound-key",
         });
         expect(result.status).toBe("processing");
-        expect(repo.update).toHaveBeenCalledWith(
-          expect.objectContaining({ data: { status: "processing" } }),
-        );
+        // The uploading→processing transition is the atomic guarded claim, not a
+        // blind update — only one of two racing finalizes can win it.
+        expect(repo.claimForProcessing).toHaveBeenCalledWith({
+          id: "d1",
+          projectId: "p1",
+        });
         // Enqueues the normalize job with tenantId === projectId and the
         // filename bound to the row (drives format detection).
         expect(enqueueDatasetNormalize).toHaveBeenCalledWith(
@@ -412,6 +416,7 @@ describe("DatasetService", () => {
             stagingKey: "staging/p1/k",
             uploadFilename: "data.jsonl",
           }),
+          claimForProcessing: vi.fn().mockResolvedValue(1),
           update: vi.fn().mockResolvedValue({}),
           failIfProcessing: vi.fn().mockResolvedValue(1),
         };
@@ -525,14 +530,46 @@ describe("DatasetService", () => {
             datasetId: "d1",
           }),
         ).rejects.toBeInstanceOf(StagedUploadNotFoundError);
+        // @regression — the not-found branch must null stagingKey too (parity
+        // with over-cap), else retryNormalize loops re-driving a missing object.
         expect(repo.update).toHaveBeenCalledWith(
           expect.objectContaining({
             data: expect.objectContaining({
               status: "failed",
               statusError: "Uploaded object not found",
+              stagingKey: null,
             }),
           }),
         );
+      });
+    });
+
+    describe("when two finalize calls race (double-click)", () => {
+      it("only one wins the atomic claim; the loser is a finalize replay", async () => {
+        vi.mocked(getDatasetStorage).mockResolvedValue({
+          headStagedObjectSize: vi.fn().mockResolvedValue(1024),
+        } as any);
+        const repo = {
+          findOne: vi.fn().mockResolvedValue({
+            id: "d1",
+            status: "uploading",
+            stagingKey: "staging/p1/k",
+            uploadFilename: "data.jsonl",
+          }),
+          // The concurrent winner already moved the row out of `uploading`, so
+          // this claim matches 0 rows.
+          claimForProcessing: vi.fn().mockResolvedValue(0),
+          update: vi.fn().mockResolvedValue({}),
+        };
+
+        await expect(
+          makeService(repo).finalizeUpload({
+            projectId: "p1",
+            datasetId: "d1",
+          }),
+        ).rejects.toThrow(/not pending|pending/i);
+        // The loser must NOT enqueue a second normalize.
+        expect(enqueueDatasetNormalize).not.toHaveBeenCalled();
       });
     });
 

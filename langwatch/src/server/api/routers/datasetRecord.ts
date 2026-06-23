@@ -10,6 +10,7 @@ import {
   ChunkTooLargeError,
   DatasetNotReadyError,
   DatasetTooLargeToExportError,
+  DuplicateRecordIdError,
 } from "../../datasets/errors";
 import { stripNullBytes } from "../../datasets/sanitize";
 import { newDatasetEntriesSchema } from "../../datasets/types";
@@ -57,6 +58,15 @@ const rethrowDatasetNotReadyAsTRPC = (error: unknown): never => {
   if (error instanceof ChunkTooLargeError) {
     throw new TRPCError({
       code: "BAD_REQUEST",
+      message: error.message,
+      cause: error,
+    });
+  }
+  // A duplicate caller-supplied row id in the same write is a client conflict
+  // (I-PG row-id uniqueness), not a server fault — clean 4xx, not a 500.
+  if (error instanceof DuplicateRecordIdError) {
+    throw new TRPCError({
+      code: "CONFLICT",
       message: error.message,
       cause: error,
     });

@@ -22,6 +22,7 @@ import {
   studioClientEventSchema,
 } from "~/optimization_studio/types/events";
 import { hasProjectPermission } from "~/server/api/rbac";
+import { DatasetNotReadyError } from "~/server/datasets/errors";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
@@ -157,6 +158,13 @@ secured.access(
         projectId,
       );
     } catch (error) {
+      // I-READY: loading a dataset that's still preparing (s3_jsonl normalize in
+      // flight) is a client-precondition failure, not a server fault — surface a
+      // clean 425 (mirroring the dataset REST layer) and skip the Sentry capture
+      // so an expected, transient state doesn't page anyone.
+      if (error instanceof DatasetNotReadyError) {
+        return c.json({ error: error.message }, { status: 425 });
+      }
       logger.error({ error, projectId }, "error");
       captureException(toError(error), { extra: { projectId } });
       return c.json({ error: (error as Error).message }, { status: 500 });

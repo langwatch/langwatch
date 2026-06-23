@@ -171,6 +171,32 @@ export class DatasetRepository {
   }
 
   /**
+   * Atomically claim a pending upload for normalization: flip `uploading` →
+   * `processing` ONLY if the row is still `uploading` (and non-archived). The
+   * `updateMany` WHERE-clause is the concurrency guard — two finalize calls
+   * racing (double-click / client retry) can't both win, so only one enqueues a
+   * normalize. A read-then-`update` would let both pass the `status==='uploading'`
+   * read and both transition + enqueue, racing two handlers onto the same chunk
+   * keys in inline mode. Returns the rows claimed (1 = won, 0 = a concurrent
+   * finalize already moved it).
+   */
+  async claimForProcessing(input: {
+    id: string;
+    projectId: string;
+  }): Promise<number> {
+    const { count } = await this.prisma.dataset.updateMany({
+      where: {
+        id: input.id,
+        projectId: input.projectId,
+        status: "uploading",
+        archivedAt: null,
+      },
+      data: { status: "processing" },
+    });
+    return count;
+  }
+
+  /**
    * Records a normalize re-drive on a wedged `processing` row by bumping
    * `updatedAt` (Prisma's `@updatedAt` fires on any update; the no-op
    * `statusError: null` write is just the trigger — a processing row already has

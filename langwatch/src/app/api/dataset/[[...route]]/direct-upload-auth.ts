@@ -52,7 +52,12 @@ function isCrossSiteRequest(c: Context): boolean {
     return secFetchSite === "cross-site";
   }
   const origin = c.req.header("origin");
-  if (!origin) return false;
+  // Fail CLOSED: with neither `Sec-Fetch-Site` nor `Origin` there is no positive
+  // same-site signal, so treat it as cross-site. A real same-site upload from
+  // the UI always carries one of the two (modern browsers send `Sec-Fetch-Site`;
+  // older ones send `Origin` on a cross-origin POST), so this only rejects
+  // pathological/forged contexts — never a legitimate cookie-authed upload.
+  if (!origin) return true;
   const host = c.req.header("x-forwarded-host") ?? c.req.header("host") ?? "";
   try {
     return new URL(origin).host !== host;

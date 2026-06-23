@@ -8,7 +8,7 @@ import {
   recomputeDatasetCounts,
   writeInitialS3JsonlChunks,
 } from "../dataset-mutations";
-import { MissingChunkError } from "../errors";
+import { DuplicateRecordIdError, MissingChunkError } from "../errors";
 
 /**
  * Unit tests for the s3_jsonl write-mutations (ADR-032 rung 6b). Boundary mocks:
@@ -146,6 +146,24 @@ describe("dataset-mutations (s3_jsonl)", () => {
         expect(records[1]!.id).toMatch(/^record_/);
         expect(records[1]!.id).not.toBe("record_pinned");
         expect(records[1]!.id).not.toBe("record_third");
+      });
+    });
+
+    describe("when a batch carries a duplicate caller-supplied id", () => {
+      it("rejects with DuplicateRecordIdError before writing any chunk (I-PG uniqueness)", async () => {
+        const storage = makeStorage({ writeChunks: vi.fn() });
+
+        await expect(
+          writeInitialS3JsonlChunks({
+            projectId: "p1",
+            datasetId: "dataset_1",
+            entries: [{ a: 1 }, { a: 2 }],
+            forcedIds: ["record_dup", "record_dup"],
+            storage: storage as never,
+          }),
+        ).rejects.toBeInstanceOf(DuplicateRecordIdError);
+        // Rejected at the id-assignment chokepoint — no ghost row is ever stored.
+        expect(storage.writeChunks).not.toHaveBeenCalled();
       });
     });
 

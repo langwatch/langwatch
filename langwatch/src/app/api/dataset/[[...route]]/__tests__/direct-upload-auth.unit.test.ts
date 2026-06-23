@@ -89,7 +89,12 @@ describe("authorizeDirectUpload", () => {
       it("authorizes and returns the project + team", async () => {
         hasProjectPermission.mockResolvedValue(true);
 
-        const result = await authorizeDirectUpload(makeContext(), PROJECT_ID);
+        // A legit same-site upload carries a positive signal (the CSRF gate now
+        // fails closed when both Sec-Fetch-Site and Origin are absent).
+        const result = await authorizeDirectUpload(
+          makeContext({ "sec-fetch-site": "same-origin" }),
+          PROJECT_ID,
+        );
 
         expect(result).toEqual({
           ok: true,
@@ -105,8 +110,10 @@ describe("authorizeDirectUpload", () => {
       it("denies with 403 and never resolves the team", async () => {
         hasProjectPermission.mockResolvedValue(false);
 
+        // Same-site signal so this exercises the permission denial (IDOR), not
+        // the CSRF gate.
         const result = await authorizeDirectUpload(
-          makeContext(),
+          makeContext({ "sec-fetch-site": "same-origin" }),
           "project_SOMEONE_ELSE",
         );
 
@@ -144,6 +151,18 @@ describe("authorizeDirectUpload", () => {
 
         expect(result).toMatchObject({ ok: false, status: 403 });
         expect(hasProjectPermission).not.toHaveBeenCalled();
+      });
+
+      it("fails CLOSED when neither Sec-Fetch-Site nor Origin is present", async () => {
+        hasProjectPermission.mockResolvedValue(true); // would pass if reached
+
+        // No positive same-site signal at all → treated as cross-site, so a
+        // cookie-bearing request from a header-stripping context can't slip past.
+        const result = await authorizeDirectUpload(makeContext(), PROJECT_ID);
+
+        expect(result).toMatchObject({ ok: false, status: 403 });
+        expect(hasProjectPermission).not.toHaveBeenCalled();
+        expect(projectFindUnique).not.toHaveBeenCalled();
       });
     });
 

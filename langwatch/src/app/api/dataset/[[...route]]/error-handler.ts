@@ -29,6 +29,14 @@ const DOMAIN_ERROR_HTTP: Record<
   UploadTooLargeError: { status: 400, code: "UploadTooLarge" },
   StagedUploadNotFoundError: { status: 422, code: "UploadNotFound" },
   StorageNotWritableError: { status: 500, code: "StorageNotWritable" },
+  // A PATCH that changes columnTypes on an s3_jsonl dataset is a client request
+  // error, not a server fault — 400, matching the tRPC layer's BAD_REQUEST.
+  ColumnTypeChangeNotSupportedError: {
+    status: 400,
+    code: "ColumnTypeChangeNotSupported",
+  },
+  // A batch carrying a duplicate caller-supplied row id is a client conflict.
+  DuplicateRecordIdError: { status: 409, code: "DuplicateRecordId" },
 };
 
 /**

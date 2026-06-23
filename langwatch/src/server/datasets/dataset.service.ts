@@ -1494,12 +1494,22 @@ export class DatasetService {
       });
     } catch (error: unknown) {
       // M5: a never-completed upload shouldn't sit stuck in `uploading` — flip
-      // it to failed before surfacing the not-found error.
+      // it to failed before surfacing the not-found error. Null the stagingKey
+      // too (parity with the over-cap branch below): the staged object isn't
+      // there, so there is no source to re-read. Leaving the key set lets
+      // retryNormalize re-drive a missing object — it HEADs, throws
+      // StagedUploadNotFound again, re-fails, and each Retry click queues another
+      // doomed normalize. Nulling it makes retry hit DatasetNotRetryableError
+      // immediately; the user must re-upload.
       if (error instanceof StagedUploadNotFoundError) {
         await this.repository.update({
           id: datasetId,
           projectId,
-          data: { status: "failed", statusError: "Uploaded object not found" },
+          data: {
+            status: "failed",
+            statusError: "Uploaded object not found",
+            stagingKey: null,
+          },
         });
       }
       throw error;
@@ -1531,11 +1541,19 @@ export class DatasetService {
       throw new UploadTooLargeError();
     }
 
-    await this.repository.update({
+    // Atomic uploading→processing transition: the WHERE-guarded `updateMany` is
+    // the concurrency gate. Two finalize calls racing (double-click / retry)
+    // both passed the `status==='uploading'` read above, but only one wins the
+    // claim — the loser sees `claimed === 0` and bails as a finalize replay, so
+    // exactly one normalize is enqueued (a read-then-update would let both
+    // enqueue and, in inline mode, race two handlers onto the same chunk keys).
+    const claimed = await this.repository.claimForProcessing({
       id: datasetId,
       projectId,
-      data: { status: "processing" },
     });
+    if (claimed === 0) {
+      throw new UploadNotPendingError();
+    }
 
     // ADR-032 D5: enqueue the normalize GroupQueue job (fire-and-forget, with
     // synchronous-failure recovery — see `enqueueNormalize`). It streams the

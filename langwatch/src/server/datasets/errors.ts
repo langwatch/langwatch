@@ -34,6 +34,21 @@ export class DatasetConflictError extends Error {
 }
 
 /**
+ * Thrown when a write would persist two rows with the same id. The legacy PG
+ * layout enforced this with a PK on `(id, datasetId, projectId)` (I-PG); the
+ * s3_jsonl layout has no such constraint, so a batch carrying a duplicate
+ * caller-supplied id is rejected here instead — otherwise both rows persist and
+ * a later edit/delete (first-match by id) silently targets only one, leaving the
+ * other an unreachable ghost.
+ */
+export class DuplicateRecordIdError extends Error {
+  constructor(id: string) {
+    super(`Duplicate record id "${id}" in the same write`);
+    this.name = "DuplicateRecordIdError";
+  }
+}
+
+/**
  * Thrown when a dataset's persisted columnTypes is not a valid array of {name, type} objects.
  * This indicates a data integrity issue — the schema stored in the database is corrupt.
  */
