@@ -37,6 +37,11 @@
 #   binding :5563. Sourced from langwatch/.env (same secrets as the app).
 #   Start it in a second terminal alongside any compose profile above.
 #
+# NoAI (Go fake LLM, internal dev tool) — NOT in this compose:
+#   Runs on the host via `make noai` (alias for `make service svc=noai`),
+#   binding :5977. Dockerized callers reach it via LANGWATCH_NOAI_BASE_URL
+#   (default http://host.docker.internal:5977), wired in common-env below.
+#
 # Stop everything:
 #   docker compose -f compose.dev.yml --profile full down
 
@@ -52,6 +57,17 @@ x-common-env: &common-env
   # writes a per-mode overlay at `langwatch/.env.dev-up` that overrides
   # only the URLs whose services are starting locally for that mode
   # (#3860 AC#2 / AC#6).
+  # NoAI exception: the noai service runs on the host (via `make noai`),
+  # not in compose, so dockerized callers need host.docker.internal to
+  # reach it. Defaulted here (overridable from the dev's .env) because
+  # there's no compose service to point the overlay at.
+  LANGWATCH_NOAI_BASE_URL: ${LANGWATCH_NOAI_BASE_URL:-http://host.docker.internal:5977}
+
+# host.docker.internal resolution for Linux containers (no-op on macOS,
+# where Docker Desktop provides it natively); needed to reach the
+# host-run noai service from services using common-env.
+x-extra-hosts: &extra-hosts
+  - "host.docker.internal:host-gateway"
 
 services:
   # =============================================================================
@@ -202,6 +218,7 @@ services:
       "
     ports:
       - "${APP_PORT:-5560}:5560"
+    extra_hosts: *extra-hosts
     environment:
       <<: *common-env
       # BASE_HOST/NEXTAUTH_URL intentionally override langwatch/.env so
@@ -261,6 +278,7 @@ services:
       - app_modules:/app/node_modules
       - goose_bin:/opt/goose-bin:ro
     command: sh -c "export PATH=/opt/goose-bin:$$PATH && corepack enable && while true; do pnpm -w exec tsx --tsconfig tsconfig.workers.json src/workers.ts; sleep 1; done"
+    extra_hosts: *extra-hosts
     environment:
       <<: *common-env
       # Override BASE_HOST for Docker networking - scenario child processes post events here
@@ -364,6 +382,7 @@ services:
     command: sh -c "corepack enable && pnpm -w exec tsx scripts/ai-server.ts"
     ports:
       - "${AI_SERVER_PORT:-3456}:3456"
+    extra_hosts: *extra-hosts
     environment:
       <<: *common-env
       LANGWATCH_ENDPOINT: "http://app:5560/"

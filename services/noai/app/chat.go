@@ -1,0 +1,114 @@
+package app
+
+import (
+	"context"
+	"encoding/json"
+	"time"
+
+	"github.com/langwatch/langwatch/pkg/ksuid"
+)
+
+// ChatRequest is the (subset of the) OpenAI /v1/chat/completions request
+// body the noai service inspects. Unknown fields are ignored.
+type ChatRequest struct {
+	Model    string        `json:"model"`
+	Messages []ChatMessage `json:"messages"`
+	Stream   bool          `json:"stream"`
+	// Modalities mirrors OpenAI's `modalities: ["text","audio"]`. It is the
+	// sole signal noai uses to decide whether to emit an audio output.
+	Modalities []string `json:"modalities,omitempty"`
+}
+
+// ChatMessage is a single chat-completions message. Content can be a
+// string or an array of typed parts, so we keep it as raw JSON.
+type ChatMessage struct {
+	Role    string          `json:"role"`
+	Content json.RawMessage `json:"content"`
+}
+
+// ChatResponse is the non-streaming response shape.
+type ChatResponse struct {
+	ID      string       `json:"id"`
+	Object  string       `json:"object"`
+	Created int64        `json:"created"`
+	Model   string       `json:"model"`
+	Choices []ChatChoice `json:"choices"`
+	Usage   Usage        `json:"usage"`
+}
+
+// ChatChoice is a single completion choice.
+type ChatChoice struct {
+	Index        int                  `json:"index"`
+	Message      ChatAssistantMessage `json:"message"`
+	FinishReason string               `json:"finish_reason"`
+}
+
+// ChatAssistantMessage carries the assistant's text and (optionally) an
+// audio blob. OpenAI puts audio under the `audio` field, alongside text
+// content rather than inside the content array.
+type ChatAssistantMessage struct {
+	Role    string          `json:"role"`
+	Content string          `json:"content"`
+	Audio   *AssistantAudio `json:"audio,omitempty"`
+}
+
+// AssistantAudio matches OpenAI's chat audio output shape.
+type AssistantAudio struct {
+	ID         string `json:"id"`
+	Data       string `json:"data"`
+	Transcript string `json:"transcript"`
+	ExpiresAt  int64  `json:"expires_at"`
+	Format     string `json:"format,omitempty"`
+}
+
+// Usage is the OpenAI usage shape, filled with deterministic word counts.
+type Usage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+	TotalTokens      int `json:"total_tokens"`
+}
+
+// BuildChatResponse assembles a deterministic ChatResponse for the given
+// request. The caller guarantees req.Model is a known noai model (the
+// transport returns a 404 model_not_found for anything else before
+// reaching here).
+//
+// Response, audio, and message ids are KSUIDs (env-prefixed via ctx), so
+// concurrent requests get unique ids and the surfaces are traceable from
+// logs just like every other LangWatch ID.
+func BuildChatResponse(ctx context.Context, req ChatRequest, now time.Time) ChatResponse {
+	model, _ := Normalize(req.Model)
+	last := ExtractLastUserTextChat(req.Messages)
+	reply := model.Reply(last)
+
+	msg := ChatAssistantMessage{Role: "assistant", Content: reply}
+	if model.HasAudioOutput() || asksForAudio(req.Modalities) {
+		msg.Audio = &AssistantAudio{
+			ID:         ksuid.Generate(ctx, ResourceAudio).String(),
+			Data:       SilentWavBase64,
+			Transcript: reply,
+			ExpiresAt:  now.Add(1 * time.Hour).Unix(),
+			Format:     AudioFormat,
+		}
+	}
+
+	return ChatResponse{
+		ID:      ksuid.Generate(ctx, ResourceChatCompletion).String(),
+		Object:  "chat.completion",
+		Created: now.Unix(),
+		Model:   req.Model,
+		Choices: []ChatChoice{{Index: 0, Message: msg, FinishReason: "stop"}},
+		Usage:   usageFor(last, reply),
+	}
+}
+
+// usageFor returns deterministic word-count token usage for a chat reply.
+func usageFor(input, reply string) Usage {
+	prompt := countTokens(input)
+	completion := countTokens(reply)
+	return Usage{
+		PromptTokens:     prompt,
+		CompletionTokens: completion,
+		TotalTokens:      prompt + completion,
+	}
+}

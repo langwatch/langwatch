@@ -441,3 +441,113 @@ func TestCredentialToBifrostKey_BedrockHonorsAWSStyleKeys(t *testing.T) {
 		t.Errorf("Region not honored: %+v", k.BedrockKeyConfig.Region)
 	}
 }
+
+func noaiConfigured(providers []bfschemas.ModelProvider) bool {
+	for _, p := range providers {
+		if p == providerLangwatchNoai {
+			return true
+		}
+	}
+	return false
+}
+
+// langwatch_noai is a dev-only fake LLM gated by the explicit opt-in flag
+// LW_GATEWAY_NOAI_ENABLED. When enabled, the account adapter registers it
+// as a keyless CustomProvider over OpenAI, with its BaseURL defaulting to
+// http://localhost:5977.
+func TestLangwatchNoaiEnabledDefaultURL(t *testing.T) {
+	t.Setenv("LW_GATEWAY_NOAI_ENABLED", "true")
+
+	a := &account{}
+	providers, err := a.GetConfiguredProviders()
+	if err != nil {
+		t.Fatalf("GetConfiguredProviders: %v", err)
+	}
+	if !noaiConfigured(providers) {
+		t.Fatalf("expected providerLangwatchNoai in configured providers, got %v", providers)
+	}
+
+	cfg, err := a.GetConfigForProvider(providerLangwatchNoai)
+	if err != nil {
+		t.Fatalf("GetConfigForProvider: %v", err)
+	}
+	if cfg.NetworkConfig.BaseURL != "http://localhost:5977" {
+		t.Fatalf("BaseURL mismatch: got %q want default http://localhost:5977", cfg.NetworkConfig.BaseURL)
+	}
+	if cfg.CustomProviderConfig == nil {
+		t.Fatalf("expected CustomProviderConfig to be set")
+	}
+	if cfg.CustomProviderConfig.BaseProviderType != bfschemas.OpenAI {
+		t.Fatalf("BaseProviderType: got %q want openai", cfg.CustomProviderConfig.BaseProviderType)
+	}
+	if !cfg.CustomProviderConfig.IsKeyLess {
+		t.Fatalf("expected IsKeyLess=true")
+	}
+
+	keys, err := a.GetKeysForProvider(context.Background(), providerLangwatchNoai)
+	if err != nil {
+		t.Fatalf("GetKeysForProvider: %v", err)
+	}
+	if len(keys) != 1 || keys[0].ID == "" {
+		t.Fatalf("expected one keyless key, got %#v", keys)
+	}
+}
+
+// When enabled, LANGWATCH_NOAI_BASE_URL overrides the default address.
+func TestLangwatchNoaiEnabledURLOverride(t *testing.T) {
+	t.Setenv("LW_GATEWAY_NOAI_ENABLED", "1")
+	t.Setenv("LANGWATCH_NOAI_BASE_URL", "http://fake-host:5977")
+
+	a := &account{}
+	cfg, err := a.GetConfigForProvider(providerLangwatchNoai)
+	if err != nil {
+		t.Fatalf("GetConfigForProvider: %v", err)
+	}
+	if cfg.NetworkConfig.BaseURL != "http://fake-host:5977" {
+		t.Fatalf("BaseURL mismatch: got %q want http://fake-host:5977", cfg.NetworkConfig.BaseURL)
+	}
+}
+
+// Fail-closed: a configured LANGWATCH_NOAI_BASE_URL is NOT enough — without
+// the LW_GATEWAY_NOAI_ENABLED opt-in the provider must be absent from
+// GetConfiguredProviders and both per-provider methods must error.
+/** @scenario "gateway does not offer the fake provider by default" */
+func TestLangwatchNoaiDisabledIgnoresBaseURL(t *testing.T) {
+	t.Setenv("LANGWATCH_NOAI_BASE_URL", "http://fake-host:5977")
+
+	a := &account{}
+	providers, err := a.GetConfiguredProviders()
+	if err != nil {
+		t.Fatalf("GetConfiguredProviders: %v", err)
+	}
+	if noaiConfigured(providers) {
+		t.Fatalf("expected noai to be absent without the opt-in flag, got %v", providers)
+	}
+
+	if _, err := a.GetConfigForProvider(providerLangwatchNoai); err == nil {
+		t.Fatalf("expected GetConfigForProvider to error when noai disabled")
+	}
+	if _, err := a.GetKeysForProvider(context.Background(), providerLangwatchNoai); err == nil {
+		t.Fatalf("expected GetKeysForProvider to error when noai disabled")
+	}
+}
+
+// Fail-closed by default: with nothing set the provider is absent and both
+// per-provider methods error.
+func TestLangwatchNoaiDisabledByDefault(t *testing.T) {
+	a := &account{}
+	providers, err := a.GetConfiguredProviders()
+	if err != nil {
+		t.Fatalf("GetConfiguredProviders: %v", err)
+	}
+	if noaiConfigured(providers) {
+		t.Fatalf("expected noai to be absent by default, got %v", providers)
+	}
+
+	if _, err := a.GetConfigForProvider(providerLangwatchNoai); err == nil {
+		t.Fatalf("expected GetConfigForProvider to error when noai disabled")
+	}
+	if _, err := a.GetKeysForProvider(context.Background(), providerLangwatchNoai); err == nil {
+		t.Fatalf("expected GetKeysForProvider to error when noai disabled")
+	}
+}

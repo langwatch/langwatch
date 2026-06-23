@@ -470,3 +470,22 @@ func TestInlineCredentials_RequiresProvider(t *testing.T) {
 		t.Errorf("expected error when provider is empty")
 	}
 }
+
+func TestFromLiteLLMParams_LangwatchNoaiIsKeyless(t *testing.T) {
+	// noai is dev-only fake LLM with a static BaseURL in Bifrost. No
+	// credentials should make it into the inline-credentials payload —
+	// the provider name alone is what routes the request.
+	ic, err := FromLiteLLMParams("langwatch_noai", map[string]any{
+		"api_key":  "ignored",
+		"api_base": "http://ignored:1234",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ic.Provider != "langwatch_noai" {
+		t.Errorf("provider: got %q want langwatch_noai", ic.Provider)
+	}
+	if len(ic.OpenAI)+len(ic.Custom)+len(ic.Anthropic) != 0 {
+		t.Errorf("expected no credential map populated, got %+v", ic)
+	}
+}

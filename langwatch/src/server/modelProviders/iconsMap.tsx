@@ -31,4 +31,7 @@ export const modelProviderIcons: Record<
   cerebras: <Cerebras />,
   voyage: <Voyage />,
   azure_safety: <Azure />,
+  // Reuse the generic Custom icon for the local-dev fake provider — no
+  // dedicated brand asset is warranted for a dev-only echo server.
+  langwatch_noai: <Custom />,
 };

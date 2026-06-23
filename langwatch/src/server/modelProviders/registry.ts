@@ -47,6 +47,27 @@ type ModelProviderDefinition = {
    * truth for which fields render the muted "optional" affordance.
    */
   optionalKeys?: string[];
+  /**
+   * When true, this provider is filtered out of seeding and the UI in
+   * production environments (NODE_ENV === "production"). Used for the
+   * local-dev `langwatch_noai` fake provider, which is backed by a
+   * service that only runs in development.
+   */
+  devOnly?: boolean;
+};
+
+/**
+ * Returns true if the provider should be visible in this runtime.
+ * `devOnly` providers are hidden when NODE_ENV is "production".
+ */
+export const isProviderVisible = (def: ModelProviderDefinition): boolean => {
+  if (!def.devOnly) return true;
+  // Read raw `process.env.NODE_ENV` rather than the validated `~/env.mjs`
+  // accessor: this module is imported into client bundles (settings UI,
+  // onboarding, ModelSelector, hooks), and `~/env.mjs` runs t3-env
+  // validation that throws on the client. NODE_ENV is inlined at build
+  // time for both server and client, so it's safe and correct here.
+  return process.env.NODE_ENV !== "production";
 };
 
 export type MaybeStoredModelProvider = Omit<
@@ -136,14 +157,14 @@ export type MaybeStoredModelProvider = Omit<
  * Get all models from the registry
  */
 export const getAllModels = (): Record<string, LLMModelEntry> => {
-  return llmModels.models;
+  return visibleModels;
 };
 
 /**
  * Get a specific model by ID
  */
 export const getModelById = (modelId: string): LLMModelEntry | undefined => {
-  return llmModels.models[modelId];
+  return visibleModels[modelId];
 };
 
 /**
@@ -161,7 +182,7 @@ export const getModelMetadata = (
   supportsImageInput: boolean;
   supportsAudioInput: boolean;
 } | null => {
-  const model = llmModels.models[modelId];
+  const model = visibleModels[modelId];
   if (!model) return null;
 
   return {
@@ -182,7 +203,7 @@ export const getProviderModelOptions = (
   provider: string,
   mode: "chat" | "embedding",
 ) => {
-  return Object.entries(llmModels.models)
+  return Object.entries(visibleModels)
     .filter(([_, model]) => model.provider === provider && model.mode === mode)
     .map(([_, model]) => ({
       value: model.id.split("/").slice(1).join("/"),
@@ -194,7 +215,7 @@ export const getProviderModelOptions = (
  * Get all models for a provider
  */
 export const getModelsForProvider = (provider: string): LLMModelEntry[] => {
-  return Object.values(llmModels.models).filter(
+  return Object.values(visibleModels).filter(
     (model) => model.provider === provider,
   );
 };
@@ -204,7 +225,7 @@ export const getModelsForProvider = (provider: string): LLMModelEntry[] => {
  */
 export const getAllProviders = (): string[] => {
   const providers = new Set(
-    Object.values(llmModels.models).map((model) => model.provider),
+    Object.values(visibleModels).map((model) => model.provider),
   );
   return Array.from(providers).sort();
 };
@@ -390,6 +411,28 @@ export const modelProviders = {
     }),
     enabledSince: new Date("2026-05-18"),
   },
+  langwatch_noai: {
+    name: "LangWatch NoAI (Local Dev)",
+    type: "llm",
+    // Placeholder api-key env name to satisfy the plumbing that assumes
+    // every provider names one. The noai service ignores credentials, so
+    // this var is never expected to be set and is deliberately absent
+    // from `keysSchema` (which only carries the endpoint override) so
+    // prepareLitellmParams never populates params.api_key. As a devOnly
+    // provider it also short-circuits the env-key auto-enable in
+    // buildDefaultProviders, so a stray LANGWATCH_NOAI_API_KEY can never
+    // auto-enable a fake provider in SaaS.
+    apiKey: "LANGWATCH_NOAI_API_KEY",
+    endpointKey: "LANGWATCH_NOAI_BASE_URL",
+    keysSchema: z.object({
+      LANGWATCH_NOAI_BASE_URL: z.string().nullable().optional(),
+    }),
+    optionalKeys: ["LANGWATCH_NOAI_BASE_URL"],
+    enabledSince: new Date("2026-06-04"),
+    devOnly: true,
+    blurb:
+      "Static, deterministic fake LLM for local development. Backed by the local `noai` service (services/noai). Speaks OpenAI /v1/chat/completions and /v1/responses; echoes text-on-text and audio-on-audio. Hidden in production.",
+  },
   azure_safety: {
     name: "Azure Safety",
     type: "safety",
@@ -404,6 +447,34 @@ export const modelProviders = {
       "Azure Content Safety for content moderation, prompt injection, and jailbreak detection. Your subscription is billed directly by Microsoft.",
   },
 } satisfies Record<string, ModelProviderDefinition>;
+
+/**
+ * Returns true if the provider keyed by `providerKey` is visible in this
+ * runtime. Unknown provider keys (catalog models whose provider has no
+ * registry definition) are treated as visible — only devOnly providers
+ * with a definition are gated. Used to keep `langwatch_noai`'s fake-model
+ * catalog entries out of every catalog exposure in production.
+ */
+const isModelProviderVisibleByKey = (providerKey: string): boolean => {
+  const def = modelProviders[providerKey as keyof typeof modelProviders] as
+    | ModelProviderDefinition
+    | undefined;
+  if (!def) return true;
+  return isProviderVisible(def);
+};
+
+/**
+ * The model catalog with entries belonging to non-visible (devOnly in
+ * production) providers stripped out. NODE_ENV is stable for the lifetime
+ * of the process, so computing this once at module load is safe and keeps
+ * fake-model metadata (langwatch_noai/*) out of every catalog read in
+ * production frontends.
+ */
+const visibleModels: Record<string, LLMModelEntry> = Object.fromEntries(
+  Object.entries(llmModels.models).filter(([, model]) =>
+    isModelProviderVisibleByKey(model.provider),
+  ),
+);
 
 // ============================================================================
 // Parameter Constraints
@@ -462,7 +533,7 @@ export function hasVariantSuffix(modelId: string): boolean {
  */
 export const allLitellmModels: Record<string, { mode: "chat" | "embedding" }> =
   Object.fromEntries(
-    Object.entries(llmModels.models)
+    Object.entries(visibleModels)
       .filter(([id]) => !hasVariantSuffix(id))
       .map(([id, model]) => [id, { mode: model.mode }]),
   );

@@ -17,6 +17,7 @@ import {
 } from "./modelProvider.repository";
 import {
   getProviderModelOptions,
+  isProviderVisible,
   type MaybeStoredModelProvider,
   modelProviders,
 } from "./registry";
@@ -473,6 +474,18 @@ export class ModelProviderService {
       throw new Error("Invalid provider");
     }
 
+    // Reject providers whose registry definition is not visible in this
+    // runtime (devOnly providers like `langwatch_noai` in production).
+    // Without this guard a caller could persist a fake-provider row that
+    // the list paths would then have to filter back out.
+    if (
+      !isProviderVisible(
+        modelProviders[provider as keyof typeof modelProviders],
+      )
+    ) {
+      throw new Error("Invalid provider");
+    }
+
     // Validate and clean custom keys
     const { validatedKeys, customKeysProvided } = this.validateAndCleanKeys(
       provider,
@@ -772,6 +785,7 @@ export class ModelProviderService {
     return Object.fromEntries(
       Object.entries(modelProviders)
         .filter(([_, modelProvider]) => modelProvider.enabledSince)
+        .filter(([_, modelProvider]) => isProviderVisible(modelProvider))
         .map(([providerKey, modelProvider]) => {
           // Auto-enable from host env vars only when running in SaaS mode.
           // In SaaS, the platform's `ANTHROPIC_API_KEY` (etc.) is the
@@ -786,7 +800,13 @@ export class ModelProviderService {
           // Self-hosted operators who DO want global env-key sharing can
           // still set `IS_SAAS=true` explicitly; the default is the
           // safer multi-tenant isolation.
+          // devOnly providers (langwatch_noai) must NEVER auto-enable from
+          // an env key — their `apiKey` env name is a placeholder the noai
+          // service ignores, and auto-enabling would surface a fake
+          // provider as "already configured" in SaaS. Short-circuit before
+          // the env-key check.
           const enabled =
+            !("devOnly" in modelProvider && modelProvider.devOnly) &&
             env.IS_SAAS === true &&
             modelProvider.enabledSince! < project.createdAt &&
             !!process.env[modelProvider.apiKey] &&
@@ -937,6 +957,16 @@ export class ModelProviderService {
     },
     defaultProviders: Record<string, MaybeStoredModelProvider>,
   ): boolean {
+    // Drop saved rows for providers that aren't visible in this runtime
+    // (e.g. a `langwatch_noai` row seeded in dev must never surface in
+    // production). This is the single chokepoint every saved-row merge
+    // path runs through, so the devOnly gate stays airtight even for
+    // persisted rows.
+    const registryDef = modelProviders[
+      mp.provider as keyof typeof modelProviders
+    ] as (typeof modelProviders)[keyof typeof modelProviders] | undefined;
+    if (registryDef && !isProviderVisible(registryDef)) return false;
+
     // Keep if has custom keys
     if (mp.customKeys) return true;
 
