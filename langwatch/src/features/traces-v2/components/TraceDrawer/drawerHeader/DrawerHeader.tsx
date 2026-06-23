@@ -123,6 +123,7 @@ function TraceIdChip({ traceId }: { traceId: string }) {
           description: traceId,
           type: "success",
           duration: 2500,
+          meta: { closable: true },
         });
         return;
       }
@@ -134,6 +135,7 @@ function TraceIdChip({ traceId }: { traceId: string }) {
           "Clipboard access is restricted. This can happen on non-HTTPS domains. Copy the ID manually from the URL.",
         type: "error",
         duration: 6000,
+        meta: { closable: true },
       });
     }
   };
