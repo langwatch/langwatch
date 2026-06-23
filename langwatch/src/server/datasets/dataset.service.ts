@@ -47,6 +47,7 @@ import { ExperimentRepository } from "./experiment.repository";
 import {
   exceedsUploadCap,
   STALE_PENDING_UPLOAD_TTL_SECONDS,
+  STALE_PROCESSING_TTL_SECONDS,
   stagingUploadKey,
   UPLOAD_MAX_BYTES,
 } from "./presigned-upload";
@@ -1169,8 +1170,9 @@ export class DatasetService {
    * bound to the row (C1). Content lands in S3 once the normalize job runs
    * (rung 4); `columnTypes` is unknown until then.
    *
-   * Opportunistically reaps this project's abandoned prior uploads first (no
-   * scheduler — the poll-triggered cleanup; see `reapStalePendingUploads`).
+   * Opportunistically reaps this project's abandoned prior uploads and re-drives
+   * any wedged-`processing` rows first (no scheduler — the poll-triggered
+   * cleanup; see `reapStalePendingUploads` + `reapStaleProcessing`).
    */
   async createPendingUpload(params: {
     projectId: string;
@@ -1183,10 +1185,11 @@ export class DatasetService {
   }> {
     const { projectId, name, filename } = params;
 
-    // Bound the accumulation of abandoned `uploading` rows + staging objects:
-    // sweep this project's stale pending uploads as new ones start. Best-effort
-    // (never blocks this upload).
+    // Bound the accumulation of abandoned `uploading` rows + staging objects and
+    // recover any normalize wedged at `processing` (lost-after-send): sweep both
+    // as new uploads start. Best-effort (never blocks this upload).
     await this.reapStalePendingUploads(projectId);
+    await this.reapStaleProcessing(projectId);
 
     const slug = this.generateSlug(name);
     // C2: reject a name conflict before minting a presigned URL so a duplicate
@@ -1368,6 +1371,52 @@ export class DatasetService {
   }
 
   /**
+   * Poll-triggered backstop for the *lost-after-send* normalize window: a row
+   * wedged at `processing` whose normalize job vanished WITHOUT flipping it
+   * (worker died / pod killed / Redis lost the job after a successful `.send()`).
+   * The synchronous enqueue-rejection case self-heals in `enqueueNormalize`'s
+   * catch; this is the only mechanism that can detect the case no catch sees.
+   *
+   * Re-drives normalize for every `processing` row older than
+   * `STALE_PROCESSING_TTL_SECONDS` — the staged source + filename are intact and
+   * normalize is idempotent (the I-IDEM handler guard + concurrency-1 group make
+   * a re-drive of a still-running job a queued no-op, so a false positive is
+   * harmless). Like `reapStalePendingUploads`: poll-triggered (this epic adds no
+   * cron), wholly best-effort, never blocks the triggering upload. WARN-logged
+   * so a vanished job is visible in observability, not silently masked.
+   */
+  private async reapStaleProcessing(projectId: string): Promise<void> {
+    try {
+      const olderThan = new Date(
+        Date.now() - STALE_PROCESSING_TTL_SECONDS * 1000,
+      );
+      const stale = await this.repository.findStaleProcessing({
+        projectId,
+        olderThan,
+      });
+      for (const dataset of stale) {
+        // findStaleProcessing already filters stagingKey != null; a present key
+        // with no filename is a corrupt row (M1 co-sets them) — skip rather than
+        // re-drive with a format-detection guess.
+        if (!dataset.stagingKey || !dataset.uploadFilename) continue;
+        logger.warn(
+          { datasetId: dataset.id, projectId },
+          "re-driving normalize for a dataset wedged in processing (lost job)",
+        );
+        this.enqueueNormalize({
+          projectId,
+          datasetId: dataset.id,
+          stagingKey: dataset.stagingKey,
+          filename: dataset.uploadFilename,
+          logContext: "failed to re-enqueue normalize for a wedged dataset",
+        });
+      }
+    } catch {
+      // opportunistic — never let it block the triggering upload
+    }
+  }
+
+  /**
    * R3: finalize a direct upload. The staging key is read from the dataset row
    * (C1 — never trust a client-supplied key); finalize is gated to datasets in
    * `uploading` (C1 — blocks finalize replay), enforces the size cap (HEAD;
@@ -1466,19 +1515,46 @@ export class DatasetService {
       data: { status: "processing" },
     });
 
-    // ADR-032 D5: enqueue the normalize GroupQueue job (or inline-run it when no
-    // worker/queue is present). It streams the staged object → chunked JSONL and
-    // flips the dataset to `ready`. tenantId === projectId (datasets are
-    // project-scoped and the event-sourcing tenant IS the project). The filename
-    // drives format detection; M1 makes it required at presign, so
-    // `uploadFilename` is always set — the `.jsonl` fallback is purely defensive
-    // for a legacy row created before M1.
-    //
-    // M4: fire-and-forget — never block the HTTP response on normalization. In
-    // prod the GroupQueue producer `.send()` is non-blocking; the no-Redis
-    // memory-queue and inline modes would otherwise run the whole normalize
-    // inside the finalize request (violating ADR D5 "no synchronous-in-request"
-    // for the single-node self-host shape). The client polls `processing`.
+    // ADR-032 D5: enqueue the normalize GroupQueue job (fire-and-forget, with
+    // synchronous-failure recovery — see `enqueueNormalize`). It streams the
+    // staged object → chunked JSONL and flips the dataset to `ready`.
+    this.enqueueNormalize({
+      projectId,
+      datasetId,
+      stagingKey,
+      filename,
+      logContext: "failed to enqueue normalize",
+    });
+
+    return { datasetId, status: "processing" };
+  }
+
+  /**
+   * ADR-032 D5/M4: fire-and-forget the normalize enqueue (shared by
+   * `finalizeUpload` + `retryNormalize`). NEVER block the HTTP response on
+   * normalization — in prod the GroupQueue producer `.send()` is non-blocking;
+   * the no-Redis memory-queue and inline modes would otherwise run the whole
+   * normalize inside the request (violating ADR D5 "no synchronous-in-request"
+   * for the single-node self-host shape). The client polls `processing`.
+   * tenantId === projectId (datasets are project-scoped and the event-sourcing
+   * tenant IS the project). `filename` drives format detection.
+   *
+   * Recovery: if the enqueue *rejects synchronously* (the queue producer
+   * `.send()` throws), no job is in flight, so the row's `processing` is a lie —
+   * flip it to `failed` (guarded on still-`processing` via `failIfProcessing`,
+   * so it never clobbers the more specific error the inline handler already set
+   * on its own failure) so the drawer's retry surfaces. The *lost-after-send*
+   * window (send resolves, then the worker dies mid-job) is undetectable here —
+   * `reapStaleProcessing` is its poll-triggered backstop.
+   */
+  private enqueueNormalize(args: {
+    projectId: string;
+    datasetId: string;
+    stagingKey: string;
+    filename: string;
+    logContext: string;
+  }): void {
+    const { projectId, datasetId, stagingKey, filename, logContext } = args;
     void enqueueDatasetNormalize({
       prisma: this.prisma,
       payload: {
@@ -1490,10 +1566,20 @@ export class DatasetService {
         filename,
       },
     }).catch((error: unknown) => {
-      logger.error({ error, datasetId }, "failed to enqueue normalize");
+      logger.error({ error, datasetId }, logContext);
+      void this.repository
+        .failIfProcessing({
+          id: datasetId,
+          projectId,
+          statusError: "We couldn't start processing your file. Please retry.",
+        })
+        .catch((flipError: unknown) => {
+          logger.error(
+            { error: flipError, datasetId },
+            "failed to mark dataset failed after normalize enqueue error",
+          );
+        });
     });
-
-    return { datasetId, status: "processing" };
   }
 
   /**
@@ -1547,19 +1633,14 @@ export class DatasetService {
     });
 
     // M4: fire-and-forget — don't block the retry HTTP response on the
-    // normalize (see finalizeUpload). The same payload shape finalize uses.
-    void enqueueDatasetNormalize({
-      prisma: this.prisma,
-      payload: {
-        id: datasetId,
-        tenantId: projectId,
-        projectId,
-        datasetId,
-        stagingKey,
-        filename,
-      },
-    }).catch((error: unknown) => {
-      logger.error({ error, datasetId }, "failed to enqueue normalize retry");
+    // normalize (see `enqueueNormalize`). A synchronous enqueue failure flips
+    // the row back to `failed` so the user can retry again.
+    this.enqueueNormalize({
+      projectId,
+      datasetId,
+      stagingKey,
+      filename,
+      logContext: "failed to enqueue normalize retry",
     });
 
     return { datasetId, status: "processing" };

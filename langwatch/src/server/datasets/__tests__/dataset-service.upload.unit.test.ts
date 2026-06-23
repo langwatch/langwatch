@@ -184,6 +184,79 @@ describe("DatasetService", () => {
         expect(repo.create).toHaveBeenCalled();
       });
     });
+
+    describe("when a prior upload is wedged mid-processing (lost normalize job)", () => {
+      it("re-drives normalize for the stale processing row before minting", async () => {
+        vi.mocked(getDatasetStorage).mockResolvedValue({
+          createPresignedUpload: vi.fn().mockResolvedValue({
+            uploadId: "u4",
+            key: "staging/p1/u4",
+            url: "https://example/put",
+          }),
+        } as any);
+        const wedged = {
+          id: "dataset_wedged",
+          projectId: "p1",
+          status: "processing",
+          stagingKey: "staging/p1/wedged",
+          uploadFilename: "old.csv",
+        };
+        const repo = {
+          findStalePendingUploads: vi.fn().mockResolvedValue([]),
+          findStaleProcessing: vi.fn().mockResolvedValue([wedged]),
+          findBySlug: vi.fn().mockResolvedValue(null),
+          create: vi.fn().mockResolvedValue({ id: "dataset_new", slug: "ds" }),
+        };
+
+        await makeService(repo).createPendingUpload({
+          projectId: "p1",
+          name: "DS",
+          filename: "data.jsonl",
+        });
+
+        // the wedged row's normalize is re-enqueued from its bound source...
+        expect(enqueueDatasetNormalize).toHaveBeenCalledWith(
+          expect.objectContaining({
+            payload: expect.objectContaining({
+              datasetId: "dataset_wedged",
+              projectId: "p1",
+              tenantId: "p1",
+              stagingKey: "staging/p1/wedged",
+              filename: "old.csv",
+            }),
+          }),
+        );
+        // ...and the new upload still proceeds
+        expect(repo.create).toHaveBeenCalled();
+      });
+
+      it("never blocks the upload when the processing sweep itself fails", async () => {
+        vi.mocked(getDatasetStorage).mockResolvedValue({
+          createPresignedUpload: vi.fn().mockResolvedValue({
+            uploadId: "u5",
+            key: "staging/p1/u5",
+            url: "https://example/put",
+          }),
+        } as any);
+        const repo = {
+          findStalePendingUploads: vi.fn().mockResolvedValue([]),
+          findStaleProcessing: vi
+            .fn()
+            .mockRejectedValue(new Error("db down")),
+          findBySlug: vi.fn().mockResolvedValue(null),
+          create: vi.fn().mockResolvedValue({ id: "dataset_new", slug: "ds" }),
+        };
+
+        const result = await makeService(repo).createPendingUpload({
+          projectId: "p1",
+          name: "DS",
+          filename: "data.jsonl",
+        });
+
+        expect(result).toMatchObject({ datasetId: "dataset_new" });
+        expect(repo.create).toHaveBeenCalled();
+      });
+    });
   });
 
   describe("abortPendingUpload()", () => {
@@ -308,6 +381,46 @@ describe("DatasetService", () => {
               stagingKey: "staging/p1/bound-key",
               filename: "data.jsonl",
             }),
+          }),
+        );
+      });
+    });
+
+    describe("when the normalize enqueue rejects synchronously", () => {
+      it("flips the wedged processing row to failed so the UI surfaces retry", async () => {
+        vi.mocked(getDatasetStorage).mockResolvedValue({
+          headStagedObjectSize: vi.fn().mockResolvedValue(1024),
+        } as any);
+        // The queue producer .send() throws — no normalize job is ever in flight.
+        vi.mocked(enqueueDatasetNormalize).mockRejectedValueOnce(
+          new Error("queue down"),
+        );
+        const repo = {
+          findOne: vi.fn().mockResolvedValue({
+            id: "d1",
+            status: "uploading",
+            stagingKey: "staging/p1/k",
+            uploadFilename: "data.jsonl",
+          }),
+          update: vi.fn().mockResolvedValue({}),
+          failIfProcessing: vi.fn().mockResolvedValue(1),
+        };
+
+        // Fire-and-forget: the response still reports processing (never blocks
+        // on normalize, per ADR-D5) — the recovery runs on the catch.
+        const result = await makeService(repo).finalizeUpload({
+          projectId: "p1",
+          datasetId: "d1",
+        });
+        expect(result.status).toBe("processing");
+
+        // The guarded flip (status='processing' -> 'failed') runs on the rejected
+        // enqueue so the drawer's `isFailed` retry button appears.
+        await vi.waitFor(() =>
+          expect(repo.failIfProcessing).toHaveBeenCalledWith({
+            id: "d1",
+            projectId: "p1",
+            statusError: expect.stringMatching(/retry/i),
           }),
         );
       });
@@ -547,6 +660,38 @@ describe("DatasetService", () => {
               stagingKey: "staging/p1/k",
               filename: "data.jsonl",
             }),
+          }),
+        );
+      });
+    });
+
+    describe("when the retry's normalize enqueue rejects synchronously", () => {
+      it("flips the row back to failed so the user can retry again", async () => {
+        vi.mocked(enqueueDatasetNormalize).mockRejectedValueOnce(
+          new Error("queue down"),
+        );
+        const repo = {
+          findOne: vi.fn().mockResolvedValue({
+            id: "d1",
+            status: "failed",
+            stagingKey: "staging/p1/k",
+            uploadFilename: "data.jsonl",
+          }),
+          update: vi.fn().mockResolvedValue({}),
+          failIfProcessing: vi.fn().mockResolvedValue(1),
+        };
+
+        const result = await makeService(repo).retryNormalize({
+          projectId: "p1",
+          datasetId: "d1",
+        });
+        expect(result.status).toBe("processing");
+
+        await vi.waitFor(() =>
+          expect(repo.failIfProcessing).toHaveBeenCalledWith({
+            id: "d1",
+            projectId: "p1",
+            statusError: expect.stringMatching(/retry/i),
           }),
         );
       });

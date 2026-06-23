@@ -144,6 +144,57 @@ export class DatasetRepository {
   }
 
   /**
+   * Conditionally flip a dataset to `failed` ONLY while it is still
+   * `processing`. The normalize enqueue catch uses this: when the enqueue
+   * rejects synchronously no job is in flight, so the row's `processing` is a
+   * lie — flip it to `failed` so the UI exposes retry. Guarded on
+   * `status='processing'` (an `updateMany`, not `update`) so it never clobbers
+   * the more specific error the inline handler already set on ITS own failure
+   * path (the handler flips to `failed` + rethrows, so by the time this runs the
+   * row is already `failed` and this matches no row). Returns the rows flipped
+   * (0 = the handler — or a concurrent finalize — already moved it).
+   */
+  async failIfProcessing(input: {
+    id: string;
+    projectId: string;
+    statusError: string;
+  }): Promise<number> {
+    const { count } = await this.prisma.dataset.updateMany({
+      where: {
+        id: input.id,
+        projectId: input.projectId,
+        status: "processing",
+      },
+      data: { status: "failed", statusError: input.statusError },
+    });
+    return count;
+  }
+
+  /**
+   * Finds datasets wedged mid-normalize: `status='processing'`, non-archived
+   * rows with a bound staging key whose `updatedAt` (the moment they flipped to
+   * `processing`) predates `olderThan`. Drives the poll-triggered re-drive (see
+   * `DatasetService.reapStaleProcessing`) that recovers the *lost-after-send*
+   * normalize window without a scheduler. Keyed on `updatedAt`, not `createdAt`:
+   * a retried row re-enters `processing` long after it was created, so the clock
+   * must start when normalization (re)started.
+   */
+  async findStaleProcessing(input: {
+    projectId: string;
+    olderThan: Date;
+  }): Promise<Dataset[]> {
+    return await this.prisma.dataset.findMany({
+      where: {
+        projectId: input.projectId,
+        status: "processing",
+        archivedAt: null,
+        stagingKey: { not: null },
+        updatedAt: { lt: input.olderThan },
+      },
+    });
+  }
+
+  /**
    * Finds the pending (`status='uploading'`, non-archived) dataset that owns a
    * given staging key. The direct-upload staging route uses this to refuse a
    * stream into a `staging/` slot no upload row claims — otherwise an authed

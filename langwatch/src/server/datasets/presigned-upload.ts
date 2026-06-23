@@ -39,6 +39,21 @@ export const UPLOAD_TTL_SECONDS = 15 * 60;
 export const STALE_PENDING_UPLOAD_TTL_SECONDS = 24 * 60 * 60;
 
 /**
+ * Age past which a `status='processing'` row is treated as wedged and its
+ * normalize re-driven. A row sits at `processing` only while a normalize job is
+ * queued or running; lingering far past this means the job vanished WITHOUT
+ * flipping the row (worker died / pod killed / Redis lost the job after a
+ * successful `.send()`) — the *lost-after-send* window no enqueue catch can see.
+ *
+ * Much shorter than the pending TTL (a normalize finishes in minutes even for a
+ * multi-GB file, vs. a pending upload that legitimately lingers), yet a false
+ * positive is harmless: the I-IDEM handler guard + concurrency-1 group make a
+ * re-drive of a still-running normalize a queued no-op. Poll-triggered via
+ * `reapStaleProcessing` (no cron — same as the pending sweep).
+ */
+export const STALE_PROCESSING_TTL_SECONDS = 60 * 60;
+
+/**
  * Server-owned, tenant-scoped staging key the client cannot widen — the
  * presign is bound to exactly this key, so a client can only write this one
  * object under its own project prefix.
