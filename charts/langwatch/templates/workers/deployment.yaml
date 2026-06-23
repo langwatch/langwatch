@@ -114,20 +114,6 @@ spec:
             {{- end }}
             - name: tmp-dir
               mountPath: /tmp
-            {{- if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
-            # Stored-objects local-FS mount. The off-request normalize job runs
-            # HERE (on the worker), so it must read the app's staged upload and
-            # write dataset chunks to the SAME PVC the app mounts — not the
-            # worker's own ephemeral FS (where `LANGWATCH_LOCAL_STORAGE_PATH`
-            # from sharedEnv would otherwise point, and normalize would fail to
-            # find the staged file / lose its chunk writes). Renders only when
-            # local-FS is the active backend; app + workers share this one RWO
-            # PVC, which requires them co-located on a single node — the
-            # documented single-replica/hobby topology. Use app.dataplane (S3)
-            # for any multi-node deployment.
-            - name: stored-objects-data
-              mountPath: {{ .Values.app.storedObjects.localFilesystem.path }}
-            {{- end }}
 
       volumes:
         {{- with .Values.workers.extraVolumes}}
@@ -135,9 +121,4 @@ spec:
         {{- end }}
         - name: tmp-dir
           emptyDir: {}
-        {{- if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
-        - name: stored-objects-data
-          persistentVolumeClaim:
-            claimName: {{ .Release.Name }}-stored-objects
-        {{- end }}
 {{- end }}

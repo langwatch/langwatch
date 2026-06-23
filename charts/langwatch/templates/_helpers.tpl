@@ -174,12 +174,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- if gt (int .Values.app.replicaCount) 1 }}
     {{- $errors = append $errors "app.storedObjects.localFilesystem.enabled requires replicaCount=1 (pods don't share a local filesystem). Enable app.dataplane for multi-replica deployments." }}
   {{- end }}
-  {{- /* Workers mount the SAME RWO PVC as the app, so they are bound by the
-         same single-node constraint — guard workers.replicaCount too, else a
-         multi-replica worker pool renders cleanly then crashloops on the volume. */}}
-  {{- if gt (int .Values.workers.replicaCount) 1 }}
-    {{- $errors = append $errors "app.storedObjects.localFilesystem.enabled requires workers.replicaCount=1 (workers share the app's local-filesystem PVC). Enable app.dataplane for multi-replica deployments." }}
-  {{- end }}
 {{- end }}
 
 {{/* Validate dataset storage secrets */}}
