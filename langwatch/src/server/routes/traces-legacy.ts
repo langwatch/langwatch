@@ -323,11 +323,16 @@ secured.access(handlerManagedAuth(AUTH_REASON)).get("/thread/:id", async (c) => 
   const protections = await getProtectionsForProject(prisma, {
     projectId: project.id,
   });
-  const traceService = TraceService.create(prisma);
+  // Thread-detail read consumes conversation content — resolve full IO (#4991).
+  const traceService = TraceService.create(
+    prisma,
+    buildTraceBlobResolutionDeps(),
+  );
   const traces = await traceService.getTracesByThreadId(
     project.id,
     threadId,
     protections,
+    { full: true },
   );
 
   markUsed();

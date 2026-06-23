@@ -12,6 +12,7 @@ import type { PrismaClient } from "@prisma/client";
 import type { Protections } from "~/server/elasticsearch/protections";
 import type { Trace, Evaluation } from "~/server/tracer/types";
 import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
+import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import type { TraceService } from "~/server/traces/trace.service";
 import { createLogger } from "~/utils/logger/server";
 import {
@@ -59,7 +60,12 @@ export class ExportService {
     );
     const resolvedPrisma =
       prisma ?? (await import("~/server/db")).prisma;
-    const traceService = TraceServiceImpl.create(resolvedPrisma);
+    // Export is a content-consuming read: wire blob-resolution deps so a full
+    // export reads the whole IO value, not the 64 KB preview (#4991 AC1).
+    const traceService = TraceServiceImpl.create(
+      resolvedPrisma,
+      buildTraceBlobResolutionDeps(),
+    );
     return new ExportService({ traceService });
   }
 
@@ -145,6 +151,10 @@ export class ExportService {
         {
           downloadMode: true,
           includeSpans,
+          // Full export resolves offloaded IO to the whole value (#4991 AC1).
+          // Summary export (includeSpans=false) reads no span content, so it
+          // stays on the preview and issues zero event_log reads.
+          resolveBlobs: includeSpans,
           scrollId: scrollId ?? null,
         },
       );
