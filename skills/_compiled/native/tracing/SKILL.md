@@ -1,6 +1,9 @@
 ---
 name: tracing
-description: "Add LangWatch tracing and observability to your code. Use for both onboarding (instrument an entire codebase) and targeted operations (add tracing to a specific function or module). Supports Python and TypeScript with all major frameworks."
+user-prompt: "Instrument my code with LangWatch"
+description: Add LangWatch tracing and observability to your code. Use for both onboarding (instrument an entire codebase) and targeted operations (add tracing to a specific function or module). Supports Python and TypeScript with all major frameworks.
+license: MIT
+compatibility: Works with Claude Code and similar coding agents. The `langwatch` CLI is the only interface.
 ---
 
 # Add LangWatch Tracing to Your Code
@@ -37,17 +40,19 @@ Discover commands with `langwatch --help` and `langwatch <subcommand> --help`. L
 
 If no shell is available, fetch the same Markdown over plain HTTP — append `.md` to any docs path (e.g. https://langwatch.ai/docs/integration/python/guide.md). Index: https://langwatch.ai/docs/llms.txt. Scenario index: https://langwatch.ai/scenario/llms.txt
 
-**Authentication: already handled — do not ask.**
+**Projects and API keys: target a real project, not a personal one.**
 
-You are running inside the LangWatch product, already authenticated to the
-user's current project. The project's API key is present in your environment as
-`LANGWATCH_API_KEY` and the endpoint as `LANGWATCH_ENDPOINT`; the `langwatch`
-CLI and the LangWatch tools read them automatically.
+LangWatch has two kinds of project:
 
-Never ask the user for an API key, never tell them to mint or paste one, and
-never start a login or device-authentication flow — you are already signed in.
-Every action you take already targets the right real project; there is no
-personal/shared project choice to make here.
+- **Team / shared projects**: real projects inside an organization. Evaluations, experiments, prompts, datasets, simulations and instrumentation must always target one of these.
+- **Personal projects**: a private "My Workspace" scratch space tied to a single user. Never send a user's evaluations, experiments or production traces here: it is for personal exploration only and is easily confused with a real project.
+
+And two ways to authenticate:
+
+- **A project API key in `.env`** (`LANGWATCH_API_KEY`): the credential everything in these skills uses. It is scoped to one real project. This is the default; prefer it unless the user explicitly asks for something else.
+- **`langwatch login --device` (AI-tools / SSO)**: a personal device session for wrapping coding assistants (`langwatch claude`, `langwatch codex`, …). It is NOT for evaluations, prompts, datasets, scenarios or SDK instrumentation, and it points at a personal workspace. Do not run it to set up the work in these skills.
+
+So for anything in these skills: make sure `LANGWATCH_API_KEY` for a real, shared project is in the project's `.env`. If it is missing, ask the user for it (they can mint a key for a specific project at https://app.langwatch.ai/authorize). Do NOT run `langwatch login` to pick a project, and never default to a personal project. If `LANGWATCH_ENDPOINT` is set, they are self-hosted, use that endpoint instead of app.langwatch.ai.
 
 Then fetch the integration guide for this project's framework:
 

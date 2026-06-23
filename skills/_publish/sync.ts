@@ -10,20 +10,11 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { inlineMdx } from "../_lib/mdx-inline.js";
+import { FEATURE_SKILLS } from "../_lib/feature-skills.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const skillsRoot = path.resolve(__dirname, "..");
-
-const FEATURE_SKILLS = [
-  "tracing",
-  "evaluations",
-  "scenarios",
-  "prompts",
-  "analytics",
-  "level-up",
-  "datasets",
-];
 
 function cleanTarget(targetDir: string): void {
   for (const entry of fs.readdirSync(targetDir)) {

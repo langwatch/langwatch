@@ -16,14 +16,6 @@ export interface InlineOptions {
   // Strip top-level frontmatter from output. Defaults to false (preserve).
   // Partials are always frontmatter-stripped when spliced in.
   stripFrontmatter?: boolean;
-  // Swap a `_shared/` partial for an alternate file when inlining, keyed by
-  // the partial's basename (e.g. "projects-and-api-keys.mdx"). The native
-  // (in-product) skill build uses this to substitute partials whose canonical
-  // wording assumes an external, unauthenticated setup — e.g. "ask the user
-  // for an API key" — with variants that match the in-product environment
-  // where credentials and tooling are already provisioned. Resolved relative
-  // to the same `_shared/` directory as the partial it replaces.
-  partialOverrides?: Record<string, string>;
 }
 
 const parser = unified()
@@ -106,17 +98,12 @@ function inlineTree(filePath: string, opts: InlineOptions, stack: string[]): Roo
       continue;
     }
     if (node.type === "mdxJsxFlowElement" && typeof node.name === "string") {
-      let target = imports.get(node.name);
+      const target = imports.get(node.name);
       if (!target) {
         throw new Error(
           `<${node.name} /> in ${filePath} has no matching import`
         );
       }
-      // Redirect to an in-product variant before any dedup/inlining so the
-      // override participates in the same `seenShared` bookkeeping as the
-      // partial it stands in for.
-      const override = opts.partialOverrides?.[path.basename(target)];
-      if (override) target = path.resolve(path.dirname(target), override);
       // Dedup only applies to repo-wide `_shared/` partials. Other imports
       // (skill-local helpers, future per-skill components) must always inline
       // in full so we don't drop real content from a composed skill.

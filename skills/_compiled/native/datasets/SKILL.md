@@ -1,6 +1,10 @@
 ---
 name: datasets
-description: "Generate realistic synthetic evaluation datasets by analyzing the user's codebase, prompts, production traces, and reference materials. Interactive, consultant-style — asks clarifying questions, proposes a plan, generates a preview for approval, then delivers a complete dataset uploaded to LangWatch. Use when user asks to generate, create, or build a dataset for evaluation, testing, or benchmarking."
+description: Generate realistic synthetic evaluation datasets by analyzing the user's codebase, prompts, production traces, and reference materials. Interactive, consultant-style — asks clarifying questions, proposes a plan, generates a preview for approval, then delivers a complete dataset uploaded to LangWatch. Use when user asks to generate, create, or build a dataset for evaluation, testing, or benchmarking.
+license: MIT
+compatibility: Requires LangWatch CLI. Works with Claude Code and similar coding agents.
+metadata:
+  category: skill
 ---
 
 # Generate Evaluation Datasets
