@@ -138,6 +138,14 @@ func filterSensitiveEnv() []string {
 	return out
 }
 
+// openCodeSkillsDir is the directory opencode scans for a worker's skills:
+// $HOME/.config/opencode/skills. Each <name>/SKILL.md beneath it is discovered
+// at startup and exposed to the model as an invokable skill. Kept as one helper
+// so the spawn path and its test agree on exactly where skills must land.
+func openCodeSkillsDir(workerHome string) string {
+	return filepath.Join(workerHome, ".config", "opencode", "skills")
+}
+
 // setupWorkerHome creates a per-worker home dir with its own opencode
 // config, a substituted AGENTS.md, and a symlink to the shared skills/.
 // Every file is chown'd to the per-conversation UID and chmod'd 0700/0600
@@ -227,10 +235,13 @@ func setupWorkerHome(workerHome string, creds Credentials, uid uint32, otelPlugi
 		return fmt.Errorf("chown AGENTS.md: %w", err)
 	}
 
-	// Symlink skills/ to the shared template directory. The shared dir is
-	// root-owned and world-readable (see entrypoint.sh), so workers
-	// following the link can READ but cannot mutate it.
-	skillsLink := filepath.Join(workerHome, "skills")
+	// Symlink opencode's skills directory to the shared template directory.
+	// opencode discovers global skills under $HOME/.config/opencode/skills,
+	// where each <name>/SKILL.md is exposed to the model as an invokable
+	// skill — so the link MUST land there, not at $HOME/skills (which opencode
+	// never scans). The shared dir is root-owned and world-readable (see
+	// entrypoint.sh), so workers following the link can READ but not mutate it.
+	skillsLink := openCodeSkillsDir(workerHome)
 	if err := os.Symlink("/workspace/skills", skillsLink); err != nil && !errors.Is(err, os.ErrExist) {
 		return fmt.Errorf("symlink skills: %w", err)
 	}

@@ -2,6 +2,7 @@ package langyagent
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -67,5 +68,38 @@ func TestFilterSensitiveEnv_RemovesManagerSecrets(t *testing.T) {
 	// realistic envs — PATH at minimum is always set.
 	if len(env) == 0 {
 		t.Fatalf("filterSensitiveEnv returned empty slice; PATH was %q", os.Getenv("PATH"))
+	}
+}
+
+func TestOpenCodeSkillsDir_UnderOpenCodeConfig(t *testing.T) {
+	// opencode only discovers global skills under $HOME/.config/opencode/skills.
+	// If the spawn path ever links them anywhere else (the original bug linked
+	// $HOME/skills), opencode shows an empty skill menu. Lock the location.
+	home := "/home/worker-123"
+	got := openCodeSkillsDir(home)
+	want := filepath.Join(home, ".config", "opencode", "skills")
+	if got != want {
+		t.Fatalf("openCodeSkillsDir = %q, want %q", got, want)
+	}
+}
+
+func TestSkillsSymlink_PointsAtSharedTemplateDir(t *testing.T) {
+	// Replicates the symlink setupWorkerHome creates, minus the root-only
+	// chowns: the link at opencode's skills dir must resolve to the shared,
+	// root-owned /workspace/skills tree so every worker reads the same skills.
+	home := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(home, ".config", "opencode"), 0o755); err != nil {
+		t.Fatalf("mkdir config: %v", err)
+	}
+	link := openCodeSkillsDir(home)
+	if err := os.Symlink("/workspace/skills", link); err != nil {
+		t.Fatalf("symlink: %v", err)
+	}
+	target, err := os.Readlink(link)
+	if err != nil {
+		t.Fatalf("readlink: %v", err)
+	}
+	if target != "/workspace/skills" {
+		t.Errorf("skills link target = %q, want /workspace/skills", target)
 	}
 }

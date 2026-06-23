@@ -17,7 +17,9 @@ set -e
 # credential, not a pod-level env).
 
 mkdir -p /workspace/skills
-cp /opt/langy-templates/skills/*.md /workspace/skills/
+# Skills are opencode-native: a <name>/SKILL.md tree, not flat files. Copy the
+# whole tree (subdirectories included) so each skill keeps its own directory.
+cp -r /opt/langy-templates/skills/. /workspace/skills/
 cp /opt/langy-templates/AGENTS.md /workspace/AGENTS.md
 
 # Workers run as distinct non-root UIDs (see services/langy-agent/uid.go,

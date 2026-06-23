@@ -130,6 +130,14 @@ RUN chmod +x /entrypoint.sh
 # volume in k8s, which would shadow any image content placed there.
 # AGENTS.md keeps the literal ${LANGWATCH_ENDPOINT} placeholder — the
 # manager substitutes it per-worker at spawn time.
+# Canonical skills, generated from skills/<name>/SKILL.mdx — the same source
+# behind the public skill directory (https://langwatch.ai/docs/skills/directory),
+# rendered for in-product use by skills/_compiler/native.ts. One <name>/SKILL.md
+# each; opencode discovers them per worker. Regenerate via
+# skills/_compiled/generate.sh.
+COPY skills/_compiled/native/ /opt/langy-templates/skills/
+# Langy-only skills authored in the service tree (e.g. opening GitHub PRs) —
+# runtime-specific, so they don't belong in the public directory.
 COPY services/langy-agent/skills/ /opt/langy-templates/skills/
 COPY services/langy-agent/AGENTS.md.template /opt/langy-templates/AGENTS.md
 
