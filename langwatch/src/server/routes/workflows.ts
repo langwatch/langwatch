@@ -13,7 +13,7 @@ import { generateText } from "ai";
 import { streamSSE } from "hono/streaming";
 import { CompletionCopilot } from "monacopilot";
 import { z } from "zod";
-import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
+import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import {
@@ -22,13 +22,13 @@ import {
   studioClientEventSchema,
 } from "~/optimization_studio/types/events";
 import { hasProjectPermission } from "~/server/api/rbac";
-import { DatasetNotReadyError } from "~/server/datasets/errors";
+import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { getServerAuthSession } from "~/server/auth";
+import { DatasetNotReadyError } from "~/server/datasets/errors";
 import { prisma } from "~/server/db";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
-import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
 import type { NextRequestShim as any } from "./types";
 
 const logger = createLogger("langwatch:workflows");
