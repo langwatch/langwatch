@@ -6,7 +6,6 @@ import {
   getLLMModelCosts,
   type MaybeStoredLLMModelCost,
 } from "../../../modelProviders/llmModelCost";
-import { isBuildOrNoRedis } from "../../../redis";
 
 const logger = createLogger("langwatch:workers:collector:cost");
 
@@ -289,13 +288,11 @@ export const getMatchingLLMModelCost = async (
   return matchModelCostWithFallbacks(model, llmModelCosts);
 };
 
-// Pre-warm most used models
+// Pre-warm most used models. Invoked explicitly by the collector worker on
+// startup (see collectorWorker.ts) — NOT as a module-load side effect. An
+// eager import-time prewarm fired an un-awaited tiktoken BPE-rank fetch whose
+// socket/WASM-load outlived vitest teardown, wedging the unit-test worker under
+// --coverage and timing out CI (#4476). The worker owns the prewarm lifecycle.
 export const prewarmTiktokenModels = async () => {
   await tiktokenClient.prewarm(["gpt-4", "gpt-4o"]);
 };
-
-if (isBuildOrNoRedis) {
-  prewarmTiktokenModels().catch((error) => {
-    logger.error({ error }, "error prewarming tiktoken models");
-  });
-}
