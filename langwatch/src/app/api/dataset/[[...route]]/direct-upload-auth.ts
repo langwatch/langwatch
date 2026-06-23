@@ -33,6 +33,34 @@ import { prisma } from "~/server/db";
 
 const PERMISSION = "datasets:manage" as const;
 
+/**
+ * CSRF defense-in-depth for the COOKIE-authed path only. The direct-upload POST
+ * is a `multipart/form-data` "simple request" (no preflight) authenticated by the
+ * NextAuth session cookie, so without this a malicious cross-origin page could
+ * forge it with the victim's cookie. (The API-key path is not exposed: keys
+ * aren't auto-attached by the browser.)
+ *
+ * `Sec-Fetch-Site` is the primary signal — set by every modern browser based on
+ * the real request initiator and unaffected by reverse proxies; `cross-site` is
+ * exactly the CSRF vector, while `same-origin`/`same-site`/`none` (direct nav)
+ * are legitimate. For older browsers that omit it, fall back to comparing the
+ * `Origin` host against the forwarded/Host header.
+ */
+function isCrossSiteRequest(c: Context): boolean {
+  const secFetchSite = c.req.header("sec-fetch-site");
+  if (secFetchSite) {
+    return secFetchSite === "cross-site";
+  }
+  const origin = c.req.header("origin");
+  if (!origin) return false;
+  const host = c.req.header("x-forwarded-host") ?? c.req.header("host") ?? "";
+  try {
+    return new URL(origin).host !== host;
+  } catch {
+    return true; // malformed Origin → treat as cross-site
+  }
+}
+
 export type DirectUploadAuthResult =
   | { ok: true; projectId: string; teamId: string }
   | { ok: false; status: 401 | 403; error: string };
@@ -50,6 +78,15 @@ export async function authorizeDirectUpload(
   // 1. Session cookie (the upload UI).
   const session = await getServerAuthSession({ req: c.req.raw as any });
   if (session) {
+    // CSRF: a cookie-authed state change must originate same-site. Reject a
+    // cross-site request before any permission check / mutation.
+    if (isCrossSiteRequest(c)) {
+      return {
+        ok: false,
+        status: 403,
+        error: "Cross-site request blocked.",
+      };
+    }
     const permitted = await hasProjectPermission(
       { prisma, session },
       projectId,
