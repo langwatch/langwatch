@@ -35,6 +35,10 @@ import {
   SPAN_ATTRIBUTES_SECTION_KEY,
   VIBRANT_FIELDS,
 } from "../constants";
+import {
+  computeDiscreteEligible,
+  resolveNumericModeByKey,
+} from "../discreteMode";
 import { routeToggleViaOrGroups } from "../routeToggleViaOrGroups";
 import type {
   AttributeKey,
@@ -244,29 +248,19 @@ export function useFilterSidebarData() {
   // distinct-value set. Their FacetItem[] is built into `facetItems` below so
   // they can render through FacetSection; `numericModeByKey` resolves whether
   // each shows the tick-list (discrete) or the slider (range).
-  const discreteEligible = useMemo(() => {
-    const map = new Map<string, RangeSectionData>();
-    for (const r of ranges) {
-      const d = r.discrete;
-      if (
-        d &&
-        d.values.length > 0 &&
-        d.distinctCount <= DISCRETE_MODE_MAX_VALUES
-      ) {
-        map.set(r.key, r);
-      }
-    }
-    return map;
-  }, [ranges]);
+  const discreteEligible = useMemo(
+    () =>
+      computeDiscreteEligible({
+        ranges,
+        maxDistinctValues: DISCRETE_MODE_MAX_VALUES,
+      }),
+    [ranges],
+  );
 
-  const numericModeByKey = useMemo(() => {
-    const map = new Map<string, NumericMode>();
-    for (const key of discreteEligible.keys()) {
-      // Eligible facets default to discrete; a user override wins.
-      map.set(key, numericModes[key] ?? "discrete");
-    }
-    return map;
-  }, [discreteEligible, numericModes]);
+  const numericModeByKey = useMemo(
+    () => resolveNumericModeByKey({ discreteEligible, numericModes }),
+    [discreteEligible, numericModes],
+  );
 
   const attributeSections = useMemo<AttributesSectionData[]>(() => {
     const sections: AttributesSectionData[] = [];

@@ -61,30 +61,44 @@ Rule: Column visibility toggle
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# COLUMN DRAG-TO-REORDER
+# COLUMN REORDER (visible-order strip + DnD)
 # ─────────────────────────────────────────────────────────────────────────────
-# Not yet implemented as of 2026-05-01 — `viewStore.reorderColumns` exists but
-# no column-header DnD handler is wired up in `TraceTableShell`. The order
-# only changes today via toggling columns on/off.
+# Reorder runs inside the Columns picker's "visible order" strip, not on the
+# table header itself. Each visible row has a grip handle (drag) and
+# move-up / move-down buttons that translate visible-subset positions back
+# to full `columnOrder` indices.
 
-@planned
-Rule: Column drag-to-reorder
-  Users drag column headers to rearrange the display order of columns.
+Rule: Column reorder via picker strip
+  Users reorder visible columns via the picker's "visible order" strip — by
+  dragging the grip handle or by clicking the move-up / move-down buttons
+  next to each row.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And a lens is active with columns Time, Trace, Duration, Cost, Tokens, and Model visible
 
   Scenario: Dropping a column reorders the table
-    When the user drags "Cost" and drops it before "Duration"
+    When the user drags "Cost" and drops it before "Duration" in the picker strip
     Then the column order becomes Time, Trace, Cost, Duration, Tokens, Model
 
+  Scenario: Moving a column up via the move-up button
+    When the user clicks the move-up button on "Duration"
+    Then "Duration" swaps positions with the column above it
+
+  Scenario: Move-up is disabled on the first visible row
+    When the user opens the picker strip
+    Then the move-up button on the first row is disabled
+
+  Scenario: Move-down is disabled on the last visible row
+    When the user opens the picker strip
+    Then the move-down button on the last row is disabled
+
   Scenario: Reordering puts the lens into draft state
-    When the user drags and drops a column to a new position
+    When the user moves a column to a new position
     Then the active lens enters draft state with a dot indicator on its tab
 
-  Scenario: Any column can be dragged, including Time
-    When the user drags the Time column to a new position
+  Scenario: Any column can be reordered, including Time
+    When the user moves the Time column to a new position
     Then the Time column moves like any other column
 
   Scenario: Column order persists in the LensConfig columns array

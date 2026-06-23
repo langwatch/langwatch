@@ -83,7 +83,12 @@ export function LegacyPill({
           onFocus={handleOpen}
           onBlur={handleClose}
           onClick={(e: MouseEvent) => {
+            // Pill renders inside SideMenuLink's <Link href>, so a bare
+            // stopPropagation still lets the browser follow the anchor.
+            // preventDefault on the mouse path (the keyboard path below
+            // already calls it) keeps the click purely a popover toggle.
             e.stopPropagation();
+            e.preventDefault();
             setOpen((prev) => !prev);
           }}
           onKeyDown={(e: KeyboardEvent) => {
