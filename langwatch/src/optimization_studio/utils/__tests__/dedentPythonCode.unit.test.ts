@@ -67,6 +67,16 @@ describe("dedentPythonCode", () => {
     });
   });
 
+  describe("given flush code (no common indent) with a whitespace-only line", () => {
+    describe("when a line carries only spaces", () => {
+      it("collapses the whitespace-only line to empty (textwrap.dedent parity)", () => {
+        // common indent is "" because the first line is already at column 0;
+        // the whitespace-only line must still be emptied to match textwrap.dedent.
+        expect(dedentPythonCode("x\n   \n")).toBe("x\n\n");
+      });
+    });
+  });
+
   describe("given a mixed-depth nested body", () => {
     describe("when the whole block is uniformly over-indented", () => {
       it("keeps relative indentation so the method stays nested under the class", () => {
