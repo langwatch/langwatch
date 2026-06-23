@@ -18,6 +18,7 @@ vi.mock("../../api/routers/datasetRecord.utils", async (importOriginal) => {
 import { createManyDatasetRecords } from "../../api/routers/datasetRecord.utils";
 import { DatasetService } from "../dataset.service";
 import { getDatasetStorage } from "../dataset-storage";
+import { DatasetChunkCountMissingError } from "../errors";
 
 const makeService = (overrides: {
   repository?: Record<string, unknown>;
@@ -122,6 +123,32 @@ describe("DatasetService", () => {
         expect(result.pagination.total).toBe(2);
         // The PG paginator must NOT be touched for s3_jsonl.
         expect(recordRepository.listPaginated).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a ready s3_jsonl dataset has a null chunkCount and no offsets (I-COUNT drift)", () => {
+      it("throws DatasetChunkCountMissingError instead of serving an empty page against a positive rowCount", async () => {
+        const repository = {
+          findBySlugOrId: vi.fn().mockResolvedValue({
+            ...baseS3Dataset,
+            chunkCount: null,
+            rowCount: 5,
+          }),
+        };
+        // Storage is stubbed but the guard must fire BEFORE any chunk read — a
+        // `chunkCount ?? 0` would otherwise loop zero times and return [] (empty
+        // page) while total=5: silent data loss.
+        const readChunks = mockReadChunks([]);
+
+        await expect(
+          makeService({ repository }).listRecords({
+            slugOrId: "ds",
+            projectId: "p1",
+            page: 1,
+            limit: 10,
+          }),
+        ).rejects.toBeInstanceOf(DatasetChunkCountMissingError);
+        expect(readChunks).not.toHaveBeenCalled();
       });
     });
 

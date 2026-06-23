@@ -31,6 +31,7 @@ import { DatasetRecordRepository } from "./dataset-record.repository";
 import { getDatasetStorage } from "./dataset-storage";
 import {
   ColumnTypeChangeNotSupportedError,
+  DatasetChunkCountMissingError,
   DatasetConflictError,
   DatasetNotFoundError,
   DatasetNotReadyError,
@@ -684,10 +685,18 @@ export class DatasetService {
         // pod on a normal list call (offsets-present datasets take the bounded
         // branch above).
         assertDatasetReadableInHeap(dataset);
+        // I-COUNT: same guard as getFullDataset — a `ready` s3_jsonl dataset MUST
+        // have a non-null chunkCount. `chunkCount ?? 0` would loop zero times and
+        // serve an EMPTY page against a positive rowCount (silent data loss); the
+        // offsets branch above never reaches here, so this only fires on genuine
+        // drift. Throw loudly so it surfaces (and recomputeDatasetCounts repairs).
+        if (dataset.chunkCount == null) {
+          throw new DatasetChunkCountMissingError(dataset.id);
+        }
         const rows = await storage.readChunks({
           projectId: params.projectId,
           datasetId: dataset.id,
-          chunkCount: dataset.chunkCount ?? 0,
+          chunkCount: dataset.chunkCount,
         });
         const records = rows.map((line) => adaptS3JsonlRecord(line, dataset));
         pageRecords.push(...records.slice(windowStart, windowEnd));
