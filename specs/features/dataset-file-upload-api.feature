@@ -305,3 +305,9 @@ Feature: Dataset File Upload REST API
   Scenario: Upload to existing without API key returns 401
     When I POST /api/dataset/some-dataset/upload without X-Auth-Token header
     Then the request fails with 401 Unauthorized
+
+  @integration
+  Scenario: Direct-upload rejects a foreign-project API key against an owned project
+    Given a second project with its own API key
+    When I POST /api/dataset/direct-upload for the first project using the second project's API key
+    Then the request fails with 401 Unauthorized
