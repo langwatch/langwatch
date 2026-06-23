@@ -57,7 +57,9 @@ const capturedFlowCallbacks = vi.hoisted(() => ({
 }));
 
 // Router mock — path is overridden per describe block via routerQueryPath
-const routerQueryPath = vi.hoisted(() => ({ current: undefined as string[] | undefined }));
+const routerQueryPath = vi.hoisted(() => ({
+  current: undefined as string[] | undefined,
+}));
 
 /**
  * Hoisted spy on the suites.getSummaries cache invalidator. Pins AC4:
@@ -72,7 +74,9 @@ vi.mock("~/utils/compat/next-router", () => ({
     replace: mockRouterReplace,
     query: {
       project: "test-project",
-      ...(routerQueryPath.current !== undefined ? { path: routerQueryPath.current } : {}),
+      ...(routerQueryPath.current !== undefined
+        ? { path: routerQueryPath.current }
+        : {}),
     },
     pathname: "/[project]/simulations/[[...path]]",
     asPath: routerQueryPath.current?.length
