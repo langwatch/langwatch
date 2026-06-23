@@ -222,3 +222,18 @@ export const errorHasProp = (
   error !== null &&
   prop in error &&
   (error as Record<string, unknown>)[prop] === value;
+
+/**
+ * True when a caught error is a "missing object" from any storage backend —
+ * the 4-way `name`/`code` × `NoSuchKey`/`NotFound` check. AWS S3 raises
+ * `NoSuchKey`, but S3-compatible backends (MinIO, etc.) raise `NotFound`, and
+ * the SDKs disagree on whether it lands on `name` or `code`. Shared so the
+ * chunk-read path and the staged-object path classify a miss identically — a
+ * single-key check would let a MinIO `NotFound` escape as a raw SDK error
+ * instead of the typed `MissingChunkError` callers expect.
+ */
+export const isMissingObjectError = (error: unknown): boolean =>
+  errorHasProp(error, "name", "NoSuchKey") ||
+  errorHasProp(error, "name", "NotFound") ||
+  errorHasProp(error, "code", "NoSuchKey") ||
+  errorHasProp(error, "code", "NotFound");

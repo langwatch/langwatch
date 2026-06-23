@@ -652,9 +652,28 @@ export class DatasetService {
       const windowStart = skip;
       const windowEnd = skip + params.limit; // exclusive
 
-      const offsets: ChunkOffset[] = Array.isArray(dataset.chunkOffsets)
+      // Validate the offsets index before trusting it to drive page selection.
+      // A malformed/partial JSON (e.g. an interrupted migration that somehow
+      // committed a half-written array) would otherwise produce NaN comparisons
+      // → an empty page against a positive rowCount (silent data loss) or an
+      // `index: undefined` passed to readChunk. On bad data, fall THROUGH to the
+      // offsets-absent repair branch (read every chunk + slice) rather than
+      // serve a wrong page. The offsets-absent branch already throws loudly on a
+      // null chunkCount, so a genuinely-broken dataset surfaces, not silences.
+      const rawOffsets = Array.isArray(dataset.chunkOffsets)
         ? (dataset.chunkOffsets as unknown as ChunkOffset[])
         : [];
+      const offsetsValid =
+        rawOffsets.length > 0 &&
+        rawOffsets.every(
+          (o) =>
+            o != null &&
+            Number.isInteger(o.index) &&
+            Number.isFinite(o.startRow) &&
+            Number.isFinite(o.endRow) &&
+            o.endRow >= o.startRow,
+        );
+      const offsets: ChunkOffset[] = offsetsValid ? rawOffsets : [];
 
       // Read only the chunks overlapping [windowStart, windowEnd). With offsets
       // present this touches at most ⌈limit / rows-per-chunk⌉ + 1 chunks.

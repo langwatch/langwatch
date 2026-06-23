@@ -93,6 +93,25 @@ describe("S3DatasetStorage", () => {
         ).rejects.toThrow(/Missing dataset chunk/);
       });
     });
+
+    // @regression — S3-compatible backends (MinIO) raise `NotFound`, not
+    // `NoSuchKey`; a single-key check would let it escape as a raw SDK error
+    // instead of the typed MissingChunkError callers expect.
+    describe("when a chunk object is missing on an S3-compatible backend (NotFound)", () => {
+      it("still throws the missing-chunk error", async () => {
+        const { resolved, send } = makeFakeClient();
+        send.mockRejectedValue({ name: "NotFound" });
+        createS3Client.mockResolvedValue(resolved);
+
+        await expect(
+          new S3DatasetStorage().readChunks({
+            projectId: "p1",
+            datasetId: "d1",
+            chunkCount: 1,
+          }),
+        ).rejects.toThrow(/Missing dataset chunk/);
+      });
+    });
   });
 
   describe("readChunk()", () => {

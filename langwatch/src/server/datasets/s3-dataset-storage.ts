@@ -33,7 +33,7 @@ import {
   type ChunkOffset,
   chunkKey,
   type DatasetChunk,
-  errorHasProp,
+  isMissingObjectError,
   parseJsonl,
   toJsonlChunks,
   toSingleJsonl,
@@ -117,12 +117,7 @@ export class S3DatasetStorage implements DatasetStorage {
       try {
         await s3Client.send(new HeadObjectCommand({ Bucket: s3Bucket, Key }));
       } catch (error: unknown) {
-        if (
-          errorHasProp(error, "name", "NoSuchKey") ||
-          errorHasProp(error, "name", "NotFound") ||
-          errorHasProp(error, "code", "NoSuchKey") ||
-          errorHasProp(error, "code", "NotFound")
-        ) {
+        if (isMissingObjectError(error)) {
           return;
         }
         throw error;
@@ -152,7 +147,7 @@ export class S3DatasetStorage implements DatasetStorage {
         );
         jsonl = (await Body?.transformToString()) ?? "";
       } catch (error: unknown) {
-        if (errorHasProp(error, "name", "NoSuchKey")) {
+        if (isMissingObjectError(error)) {
           throw new MissingChunkError(key);
         }
         throw error;
@@ -183,7 +178,7 @@ export class S3DatasetStorage implements DatasetStorage {
       );
       jsonl = (await Body?.transformToString()) ?? "";
     } catch (error: unknown) {
-      if (errorHasProp(error, "name", "NoSuchKey")) {
+      if (isMissingObjectError(error)) {
         throw new MissingChunkError(key);
       }
       throw error;
@@ -257,12 +252,7 @@ export class S3DatasetStorage implements DatasetStorage {
     } catch (error: unknown) {
       // A never-completed (or already-reaped) upload — distinct from a too-large
       // one (M5). NoSuchKey / NotFound both surface here depending on the SDK.
-      if (
-        errorHasProp(error, "name", "NoSuchKey") ||
-        errorHasProp(error, "name", "NotFound") ||
-        errorHasProp(error, "code", "NoSuchKey") ||
-        errorHasProp(error, "code", "NotFound")
-      ) {
+      if (isMissingObjectError(error)) {
         throw new StagedUploadNotFoundError();
       }
       throw error;
@@ -307,12 +297,7 @@ export class S3DatasetStorage implements DatasetStorage {
       // the normalize job never buffers the whole staged file.
       return response.Body as Readable;
     } catch (error: unknown) {
-      if (
-        errorHasProp(error, "name", "NoSuchKey") ||
-        errorHasProp(error, "name", "NotFound") ||
-        errorHasProp(error, "code", "NoSuchKey") ||
-        errorHasProp(error, "code", "NotFound")
-      ) {
+      if (isMissingObjectError(error)) {
         throw new StagedUploadNotFoundError();
       }
       throw error;

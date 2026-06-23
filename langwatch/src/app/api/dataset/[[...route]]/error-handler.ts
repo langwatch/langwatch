@@ -44,6 +44,14 @@ const DOMAIN_ERROR_HTTP: Record<
   },
   // A batch carrying a duplicate caller-supplied row id is a client conflict.
   DuplicateRecordIdError: { status: 409, code: "DuplicateRecordId" },
+  // A single chunk exceeding the read cap is a server-side corruption/limit
+  // signal, but surfaced to the client as 400 (the request can't be served as
+  // shaped); a dataset too large to export whole is 413 Payload Too Large.
+  ChunkTooLargeError: { status: 400, code: "ChunkTooLarge" },
+  DatasetTooLargeToExportError: {
+    status: 413,
+    code: "DatasetTooLargeToExport",
+  },
 };
 
 /**
