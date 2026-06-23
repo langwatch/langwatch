@@ -96,6 +96,8 @@ export const datasetRecordRouter = createTRPCRouter({
           datasetId: input.datasetId,
           projectId: input.projectId,
           datasetRecords: input.entries,
+          // Reuse the existence-check lookup above instead of re-querying.
+          dataset,
         });
       } catch (error) {
         return rethrowDatasetNotReadyAsTRPC(error);

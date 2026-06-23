@@ -95,6 +95,7 @@ export const createManyDatasetRecords = async ({
   projectId,
   datasetRecords,
   tx,
+  dataset: providedDataset,
 }: {
   datasetId: string;
   projectId: string;
@@ -104,11 +105,18 @@ export const createManyDatasetRecords = async ({
   // Postgres path are joined to the caller's transaction so that a failure in
   // record insertion can roll back the parent dataset row.
   tx?: Prisma.TransactionClient;
+  // Optional already-loaded dataset row. Callers that just fetched it (e.g. the
+  // tRPC create procedure's existence check) pass it to skip a redundant lookup.
+  // Only used for the initial layout routing; the s3_jsonl path re-reads the
+  // authoritative state under the advisory lock regardless.
+  dataset?: Dataset | null;
 }) => {
   const db = tx ?? prisma;
-  const dataset = await db.dataset.findFirst({
-    where: { id: datasetId, projectId },
-  });
+  const dataset =
+    providedDataset ??
+    (await db.dataset.findFirst({
+      where: { id: datasetId, projectId },
+    }));
 
   if (!dataset) {
     throw new TRPCError({
