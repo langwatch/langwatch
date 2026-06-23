@@ -30,8 +30,12 @@ describe("handleDatasetError", () => {
     it("maps to 425 Too Early, not 500", async () => {
       const { c, captured } = fakeContext();
 
+      // DatasetNotReadyError carries a `status: string` (the dataset lifecycle
+      // state), which structurally clashes with the handler's
+      // `status?: ContentfulStatusCode`; the handler only reads `.name` for the
+      // domain mapping, so the cast is safe.
       await handleDatasetError(
-        new DatasetNotReadyError({ status: "processing" }),
+        new DatasetNotReadyError({ status: "processing" }) as unknown as Error,
         c,
       );
 

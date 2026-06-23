@@ -269,6 +269,76 @@ describe("DatasetService", () => {
     });
   });
 
+  // Born-on-storage writes chunk objects BEFORE the PG row insert. If the insert
+  // then fails (slug race: findBySlug passes the pre-check, but a concurrent
+  // create wins the @@unique([projectId, slug])), the chunks are orphaned —
+  // customer content in storage with no row to govern it. This is the
+  // born-on-storage equivalent of the old transaction-rollback test (gone
+  // because the create is no longer a single PG transaction).
+  describe("createNewDataset() when the row insert fails after chunks are written", () => {
+    const storageThatWrote = (deleteChunksFrom: ReturnType<typeof vi.fn>) =>
+      ({
+        writeChunks: vi
+          .fn()
+          .mockResolvedValue([
+            { index: 0, rowCount: 1, byteSize: 20, startRow: 0, endRow: 1 },
+          ]),
+        deleteChunksFrom,
+      }) as any;
+
+    it("reaps the orphaned chunks (from index 0) and rethrows the original insert error", async () => {
+      const deleteChunksFrom = vi.fn().mockResolvedValue(undefined);
+      vi.mocked(getDatasetStorage).mockResolvedValue(
+        storageThatWrote(deleteChunksFrom),
+      );
+      const insertError = new Error("unique constraint violation (slug race)");
+      const repo = {
+        findBySlug: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockRejectedValue(insertError),
+      };
+
+      await expect(
+        makeService(repo).upsertDataset({
+          projectId: "p1",
+          name: "DS",
+          columnTypes: [],
+          datasetRecords: [{ input: "a" }],
+        } as any),
+      ).rejects.toBe(insertError);
+
+      // Reap is observable: every chunk is deleted, leaving no orphan content.
+      expect(deleteChunksFrom).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: "p1", fromIndex: 0 }),
+      );
+    });
+
+    it("does not let a reap failure mask the original insert error", async () => {
+      const deleteChunksFrom = vi
+        .fn()
+        .mockRejectedValue(new Error("S3 unavailable during reap"));
+      vi.mocked(getDatasetStorage).mockResolvedValue(
+        storageThatWrote(deleteChunksFrom),
+      );
+      const insertError = new Error("unique constraint violation");
+      const repo = {
+        findBySlug: vi.fn().mockResolvedValue(null),
+        create: vi.fn().mockRejectedValue(insertError),
+      };
+
+      // The ORIGINAL insert error surfaces — the swallowed reap failure must not
+      // replace it (a failed reap is preferable to masking the real cause).
+      await expect(
+        makeService(repo).upsertDataset({
+          projectId: "p1",
+          name: "DS",
+          columnTypes: [],
+          datasetRecords: [{ input: "a" }],
+        } as any),
+      ).rejects.toBe(insertError);
+      expect(deleteChunksFrom).toHaveBeenCalled();
+    });
+  });
+
   describe("abortPendingUpload()", () => {
     describe("when aborting a still-pending upload", () => {
       it("deletes the staged object and archives the uploading row", async () => {
