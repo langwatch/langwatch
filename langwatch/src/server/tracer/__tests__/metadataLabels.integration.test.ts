@@ -345,7 +345,10 @@ describe("Metadata and Labels Flow - OTEL Path", () => {
         { key: "user.id", value: { stringValue: "user-001" } },
         { key: "session.id", value: { stringValue: "session-001" } },
         // LangWatch-specific
-        { key: "langwatch.customer.id", value: { stringValue: "customer-001" } },
+        {
+          key: "langwatch.customer.id",
+          value: { stringValue: "customer-001" },
+        },
         {
           key: "langwatch.labels",
           value: { stringValue: '["important", "v2"]' },
@@ -486,7 +489,8 @@ describe("Metadata and Labels Flow - SDK Telemetry attributes", () => {
       ],
     };
 
-    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
@@ -503,11 +507,14 @@ describe("Metadata Mapping - openTelemetryToLangWatchMetadataMapping", () => {
     const request = createOtelTraceWithAttributes([
       {
         key: "metadata",
-        value: { stringValue: JSON.stringify({ "thread.id": "mapped-thread" }) },
+        value: {
+          stringValue: JSON.stringify({ "thread.id": "mapped-thread" }),
+        },
       },
     ]);
 
-    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
@@ -519,12 +526,15 @@ describe("Metadata Mapping - openTelemetryToLangWatchMetadataMapping", () => {
       {
         key: "metadata",
         value: {
-          stringValue: JSON.stringify({ "gen_ai.conversation.id": "genai-conv" }),
+          stringValue: JSON.stringify({
+            "gen_ai.conversation.id": "genai-conv",
+          }),
         },
       },
     ]);
 
-    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
@@ -539,7 +549,8 @@ describe("Metadata Mapping - openTelemetryToLangWatchMetadataMapping", () => {
       },
     ]);
 
-    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
@@ -556,7 +567,8 @@ describe("Metadata Mapping - openTelemetryToLangWatchMetadataMapping", () => {
       },
     ]);
 
-    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
@@ -573,7 +585,8 @@ describe("Metadata Mapping - openTelemetryToLangWatchMetadataMapping", () => {
       },
     ]);
 
-    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
@@ -594,7 +607,8 @@ describe("Metadata Mapping - openTelemetryToLangWatchMetadataMapping", () => {
       },
     ]);
 
-    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
@@ -617,7 +631,8 @@ describe("Metadata Mapping - openTelemetryToLangWatchMetadataMapping", () => {
       },
     ]);
 
-    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
@@ -642,7 +657,8 @@ describe("Vercel AI SDK telemetry metadata", () => {
       },
     ]);
 
-    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
@@ -692,7 +708,10 @@ describe("Integration - Real-world SDK scenarios", () => {
                       key: "session.id",
                       value: { stringValue: "phoenix-session-123" },
                     },
-                    { key: "user.id", value: { stringValue: "phoenix-user-456" } },
+                    {
+                      key: "user.id",
+                      value: { stringValue: "phoenix-user-456" },
+                    },
                     {
                       key: "metadata",
                       value: { stringValue: '{"experiment": "test-run-1"}' },
@@ -718,7 +737,8 @@ describe("Integration - Real-world SDK scenarios", () => {
       ],
     };
 
-    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
@@ -782,7 +802,8 @@ describe("Integration - Real-world SDK scenarios", () => {
       ],
     };
 
-    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
@@ -837,7 +858,10 @@ describe("Integration - Real-world SDK scenarios", () => {
                       key: "langwatch.labels",
                       value: { stringValue: '["production", "v2.0"]' },
                     },
-                    { key: "langwatch.span.type", value: { stringValue: "llm" } },
+                    {
+                      key: "langwatch.span.type",
+                      value: { stringValue: "llm" },
+                    },
                   ],
                   status: { code: "STATUS_CODE_OK" as unknown as EStatusCode },
                 },
@@ -848,7 +872,8 @@ describe("Integration - Real-world SDK scenarios", () => {
       ],
     };
 
-    const traces = await openTelemetryTraceRequestToTracesForCollection(request);
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(request);
     expect(traces).toHaveLength(1);
 
     const trace = traces[0]!;
@@ -857,5 +882,107 @@ describe("Integration - Real-world SDK scenarios", () => {
     expect(trace.reservedTraceMetadata.customer_id).toBe("lw-customer-ghi");
     expect(trace.reservedTraceMetadata.labels).toEqual(["production", "v2.0"]);
     expect(trace.spans[0]?.type).toBe("llm");
+  });
+});
+
+/**
+ * Helper to create a minimal OTEL trace request with the given OTLP *resource*
+ * attributes (as opposed to span attributes). This mirrors how an OTel SDK
+ * serialises OTEL_RESOURCE_ATTRIBUTES — flat string-valued key/value pairs on
+ * the resource shared by every span. Used to verify that reserved metadata
+ * keys are mapped from resource attributes, not only span attributes.
+ */
+function createOtelTraceWithResourceAttributes(
+  resourceAttributes: Array<{ key: string; value: { stringValue?: string } }>,
+  traceId = "dGVzdC10cmFjZS1pZDEyMzQ=",
+): DeepPartial<IExportTraceServiceRequest> {
+  return {
+    resourceSpans: [
+      {
+        resource: { attributes: resourceAttributes },
+        scopeSpans: [
+          {
+            scope: { name: "test.instrumentation", version: "1.0.0" },
+            spans: [
+              {
+                traceId,
+                spanId: "c3Bhbi1pZC0xMjM0NTY=",
+                name: "test-span",
+                kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+                startTimeUnixNano: "1700000000000000000",
+                endTimeUnixNano: "1700000001000000000",
+                attributes: [],
+                status: { code: "STATUS_CODE_OK" as unknown as EStatusCode },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+describe("Metadata Mapping - resource attributes", () => {
+  // The opencode OTel plugin (Langy worker) sets tags via OTLP *resource*
+  // attributes, so reserved keys must be hoisted from the resource the same
+  // way they are from span attributes. See specs/assistant/langy-otel-tracing.feature.
+
+  it("maps tag.tags from resource attributes to labels", async () => {
+    const request = createOtelTraceWithResourceAttributes([
+      { key: "tag.tags", value: { stringValue: "langy" } },
+    ]);
+
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(request);
+    expect(traces).toHaveLength(1);
+
+    const trace = traces[0]!;
+    expect(trace.reservedTraceMetadata.labels).toEqual(["langy"]);
+  });
+
+  it("maps langwatch.thread.id from resource attributes to thread_id", async () => {
+    const request = createOtelTraceWithResourceAttributes([
+      { key: "langwatch.thread.id", value: { stringValue: "conv-123" } },
+    ]);
+
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(request);
+    expect(traces).toHaveLength(1);
+
+    const trace = traces[0]!;
+    expect(trace.reservedTraceMetadata.thread_id).toBe("conv-123");
+  });
+
+  it("keeps non-reserved resource attributes as custom metadata", async () => {
+    const request = createOtelTraceWithResourceAttributes([
+      { key: "service.name", value: { stringValue: "langy-agent" } },
+    ]);
+
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(request);
+    expect(traces).toHaveLength(1);
+
+    const trace = traces[0]!;
+    expect(trace.customMetadata["service.name"]).toBe("langy-agent");
+    expect(trace.reservedTraceMetadata).not.toHaveProperty("service.name");
+  });
+
+  it("maps the Langy worker's resource attributes end to end", async () => {
+    // Exactly what services/langy-agent/server.js sets via
+    // OPENCODE_RESOURCE_ATTRIBUTES for a conversation.
+    const request = createOtelTraceWithResourceAttributes([
+      { key: "tag.tags", value: { stringValue: "langy" } },
+      { key: "service.name", value: { stringValue: "langy-agent" } },
+      { key: "langwatch.thread.id", value: { stringValue: "conv-123" } },
+    ]);
+
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(request);
+    expect(traces).toHaveLength(1);
+
+    const trace = traces[0]!;
+    expect(trace.reservedTraceMetadata.labels).toEqual(["langy"]);
+    expect(trace.reservedTraceMetadata.thread_id).toBe("conv-123");
+    expect(trace.customMetadata["service.name"]).toBe("langy-agent");
   });
 });

@@ -1,0 +1,143 @@
+image:
+  # Published by the `langy-agent` matrix entry in
+  # .github/workflows/publish-docker-app.yml on every `langwatch@*` release.
+  # Self-hosters who mirror to an internal registry override `repository`.
+  repository: docker.io/langwatch/langy-agent
+  tag: ""            # defaults to .Chart.AppVersion; releases also publish `latest` and `<short-sha>`
+  pullPolicy: IfNotPresent
+
+# Lift this pod as part of the umbrella chart. Set false to run the agent
+# externally or disable Langy's backend entirely.
+chartManaged: true
+
+# Single replica is intentional — see deployment.yaml. Do NOT bump this
+# without adding conversation-sticky routing first.
+replicaCount: 1
+
+# Sized for v1 (low traffic, ~5-15 concurrent sessions). Each OpenCode
+# subprocess costs memory; LANGY_MAX_WORKERS caps concurrency.
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: "2"
+    memory: 4Gi
+
+# Manager tunables (read by services/langy-agent/config.go). Surfaced via the ConfigMap.
+manager:
+  port: 8080
+  maxWorkers: 20
+  workerIdleMs: 600000        # 10 min — idle workers are reaped
+  readinessTimeoutMs: 15000   # how long to wait for a worker's opencode to bind
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+# Auth secret shared with the control plane. Helm never materialises it —
+# the operator creates it out-of-band (terraform / external-secrets), and
+# the SAME value must be set as LANGY_INTERNAL_SECRET on langwatch-app.
+#   kubectl create secret generic langwatch-langy-agent-auth \
+#     --from-literal=LANGY_INTERNAL_SECRET=$(openssl rand -hex 32)
+secrets:
+  existingSecretName: langwatch-langy-agent-auth
+  internalSecretKey: LANGY_INTERNAL_SECRET
+
+# /health (manager HTTP) backs both probes.
+probes:
+  readiness:
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+  liveness:
+    initialDelaySeconds: 10
+    periodSeconds: 20
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# Single replica → PDB stays OFF (a minAvailable:1 PDB deadlocks drains).
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+terminationGracePeriodSeconds: 30
+
+# emptyDir for /workspace. Bump sizeLimit if many concurrent sessions write
+# large per-worker homes; leave {} for the cluster default.
+workspaceVolume: {}
+
+## SecurityContext.
+##
+## Why the manager runs as ROOT here (counter-intuitive but load-bearing):
+## per-worker UID isolation requires `child_process.spawn({uid, gid})` —
+## that syscall path needs CAP_SETUID + CAP_SETGID + CAP_CHOWN, which only
+## a root-effective-uid process holds inside a container. With the manager
+## as UID 1000, every OpenCode subprocess inherited UID 1000 too, so worker
+## A could `cat /workspace/sessions/<worker-B>/.config/opencode/config.json`
+## and steal worker B's project API key + GitHub token (PR #4913 review).
+##
+## Mitigations that keep the blast radius small even with root in the pod:
+##   - Drop ALL caps and add back ONLY the four required for the per-UID
+##     handoff (SETUID/SETGID/CHOWN/DAC_OVERRIDE). No NET_*, no SYS_*.
+##   - allowPrivilegeEscalation: false → no_new_privs is set, so children
+##     cannot regain caps via setuid binaries.
+##   - readOnlyRootFilesystem stays on so a worker can't pivot through
+##     `/etc` or `/usr`.
+##   - fsGroup intentionally OMITTED — setting it would group-share every
+##     worker's files and re-open the cross-worker boundary.
+##   - runtimeClassName: gvisor (operator-set) hardens the pod->node escape
+##     surface, complementary to the in-pod per-UID isolation.
+podSecurityContext:
+  runAsNonRoot: false
+  runAsUser: 0
+  # fsGroup intentionally absent — see header.
+
+containerSecurityContext:
+  runAsNonRoot: false
+  runAsUser: 0
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+    # These four are required so the manager can chown per-session dirs to
+    # a unique UID, write 0600 config blobs as that UID, and spawn the
+    # OpenCode subprocess directly into it. Any addition beyond this needs
+    # to be justified in the SecurityContext header above.
+    add: ["CHOWN", "DAC_OVERRIDE", "SETUID", "SETGID"]
+
+# Sandboxed container runtime for this pod. The agent runs LLM-driven
+# arbitrary code (opencode workers shell out to git/npm/gh), so the headline
+# risk is a worker breaking OUT of the container to the node. Set this to a
+# RuntimeClass the cluster defines that maps to a sandbox runtime — e.g.
+# `gvisor` (runsc), which inserts a user-space kernel between the worker and
+# the host kernel and shrinks that node-escape surface.
+# Empty (default) → field is omitted, kubelet uses the node's default runtime,
+# existing installs unchanged. Caveat: this hardens pod->host only, NOT
+# worker->worker inside this single pod — that would need per-user pods.
+runtimeClassName: ""
+
+networkPolicy:
+  enabled: true
+  # langy-agent is a subchart of the langwatch chart, so it shares the release.
+  # By default the policy targets the sibling pods that chart actually renders
+  # (templated from .Release in networkpolicy.yaml):
+  #   control plane -> app.kubernetes.io/name: <release>-app, instance: <release>
+  #   gateway       -> app.kubernetes.io/name: gateway,       instance: <release>
+  # Override any list below ONLY for a non-standard topology; an empty list
+  # means "use the release-aware default".
+  ingressFrom: []
+  controlPlanePort: 5560
+  egressToControlPlane: []
+  gatewayPort: 80
+  egressToGateway: []
+  # OpenCode may reach external hosts (its own update/telemetry). Set false
+  # once egress needs are pinned to tighten the policy.
+  allowExternalHttps: true
+
+nameOverride: ""
+fullnameOverride: ""
+nodeSelector: {}
+affinity: {}
+tolerations: []

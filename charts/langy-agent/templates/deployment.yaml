@@ -1,0 +1,112 @@
+{{- /* The single-replica topology below is a hard invariant, not a default —
+       guard against a values override silently breaking per-conversation
+       session affinity. */ -}}
+{{- if ne (int .Values.replicaCount) 1 }}
+{{- fail "langy-agent.replicaCount must remain 1 until conversation-sticky routing exists" }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "langy-agent.fullname" . }}
+  labels: {{- include "langy-agent.labels" . | nindent 4 }}
+spec:
+  # Single replica on purpose. The manager keeps per-conversation OpenCode
+  # workers in memory keyed by conversationId; a second replica would
+  # cold-start a fresh worker whenever a follow-up turn lands on the other
+  # pod. Scale vertically (resources / LANGY_MAX_WORKERS), not horizontally,
+  # until conversation-sticky routing exists. No HPA for the same reason.
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 5
+  strategy:
+    # Recreate, not RollingUpdate: a second pod briefly running alongside the
+    # old one provides no benefit (in-memory sessions don't migrate) and just
+    # doubles the worker footprint during a deploy.
+    type: Recreate
+  selector:
+    matchLabels: {{- include "langy-agent.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "langy-agent.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      securityContext: {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      # Give the manager time to drain workers on SIGTERM (it kills each
+      # OpenCode subprocess in its shutdown handler).
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds | default 30 }}
+      containers:
+        - name: agent
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext: {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.manager.port }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "langy-agent.fullname" . }}
+          env:
+            # Service-to-service auth secret shared with the control plane
+            # (langwatch-app sends it as the Bearer token; the manager
+            # verifies it). Created out-of-band — helm never materialises it.
+            - name: LANGY_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecretName }}
+                  key: {{ .Values.secrets.internalSecretKey }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          # readOnlyRootFilesystem locks the image; these emptyDir mounts are
+          # the only writable paths the entrypoint + per-session workers need.
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: tmp
+              mountPath: /tmp
+            - name: opencode-config
+              mountPath: /home/agent/.config
+            - name: opencode-cache
+              mountPath: /home/agent/.cache
+            - name: opencode-local
+              mountPath: /home/agent/.local
+      volumes:
+        - name: workspace
+          emptyDir: {{- toYaml .Values.workspaceVolume | nindent 12 }}
+        - name: tmp
+          emptyDir: {}
+        - name: opencode-config
+          emptyDir: {}
+        - name: opencode-cache
+          emptyDir: {}
+        - name: opencode-local
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.runtimeClassName }}
+      # Run under a sandboxed container runtime (e.g. gVisor/runsc) when the
+      # cluster defines a matching RuntimeClass. Empty → omitted entirely, so
+      # the kubelet uses the node's default runtime (existing installs unchanged).
+      runtimeClassName: {{ . }}
+      {{- end }}

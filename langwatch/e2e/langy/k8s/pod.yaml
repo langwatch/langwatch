@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: opencode-agent
+  labels:
+    app: opencode-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: opencode-agent
+  template:
+    metadata:
+      labels:
+        app: opencode-agent
+    spec:
+      containers:
+        - name: agent
+          image: opencode-agent:v7
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          # NO user credentials at pod level. The manager (services/langy-agent) injects
+          # per-session credentials when it spawns each worker subprocess, so
+          # there's no shared key to fall back to or leak across sessions.
+          # The ONE env var here is the service-to-service auth secret —
+          # the manager uses it to verify requests came from the control plane.
+          env:
+            - name: LANGY_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: agent-secrets
+                  key: LANGY_INTERNAL_SECRET
+          # Sized for v1 (low traffic, ~5-15 concurrent sessions). Bump
+          # limits when usage justifies it — single-line change, no rollback risk.
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "4Gi"
+              cpu: "2"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          # readOnlyRootFilesystem locks everything below /. These mounts
+          # provide the writable paths the agent + entrypoint actually need.
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: tmp
+              mountPath: /tmp
+            - name: opencode-config
+              mountPath: /home/agent/.config
+            - name: opencode-cache
+              mountPath: /home/agent/.cache
+            - name: opencode-local
+              mountPath: /home/agent/.local
+      volumes:
+        - name: workspace
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        - name: opencode-config
+          emptyDir: {}
+        - name: opencode-cache
+          emptyDir: {}
+        - name: opencode-local
+          emptyDir: {}

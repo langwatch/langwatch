@@ -107,6 +107,7 @@ model User {
   ingestionSourcesCreated IngestionSource[]        @relation("IngestionSourceCreatedBy")
   anomalyRulesCreated     AnomalyRule[]            @relation("AnomalyRuleCreatedBy")
   pinnedTraces            PinnedTrace[]
+  userGitHubCredentials   UserGitHubCredential[]
 }
 
 model VerificationToken {
@@ -273,6 +274,7 @@ model Organization {
   anomalyAlerts          AnomalyAlert[]
   aiToolEntries          AiToolEntry[]
   ingestionTemplates     IngestionTemplate[]
+  userGitHubCredentials  UserGitHubCredential[]
 
   @@index([ssoProvider])
 }
@@ -942,6 +944,39 @@ model ModelDefaultConfigScope {
     @@unique([configId, scopeType, scopeId])
     @@index([scopeType, scopeId])
     @@index([configId])
+}
+
+/// Per-user GitHub App connection used by Langy to open pull requests
+/// attributed to the requesting user. Stores ONLY the encrypted refresh
+/// token (long-lived but rotating); access tokens (8h TTL) are minted on
+/// demand by langyGithubToken.ts and never persisted.
+///
+/// Scoped (userId, organizationId): a user in two orgs connects twice so
+/// the installation context stays org-bounded. Issue: #4747. Spec:
+/// specs/assistant/langy-github-prs.feature.
+model UserGitHubCredential {
+  id                    String       @id @default(nanoid())
+  userId                String
+  user                  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId        String
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// GitHub login (e.g. "aryansharma28"). Surfaced in the "Acting as @login"
+  /// sidebar chip and used as the commit author name in the worker.
+  githubLogin           String
+  /// GitHub numeric user id. Stable across renames; used for the
+  /// noreply commit email (<id>+<login>@users.noreply.github.com).
+  githubUserId          String
+  /// AES-256-GCM encrypted refresh token. Encrypted via
+  /// langwatch/src/utils/encryption.ts (same scheme as ProjectSecret).
+  encryptedRefreshToken String
+  /// Space-separated OAuth scopes granted (informational; the App installation
+  /// is the real authority on what the token can do).
+  scopes                String?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @default(now()) @updatedAt
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
 }
 
 model ProjectSecret {
@@ -1804,6 +1839,15 @@ enum VirtualKeyStatus {
   REVOKED
 }
 
+// Why this key exists. USER = explicitly created via the gateway UI / API.
+// LANGY = auto-provisioned by the Langy in-product assistant; UI surfaces it
+// as a managed row and forbids edit/revoke. Filtering by `purpose` replaces
+// the legacy `name == "Langy" && principalUserId IS NULL` heuristic.
+enum VirtualKeyPurpose {
+  USER
+  LANGY
+}
+
 // Rotation policy for gateway provider credentials.
 // v1 ships MANUAL only - operators rotate via the Rotate button in
 // the UI or by calling POST /providers/:id/rotate. Scheduled rotation
@@ -1907,7 +1951,8 @@ model VirtualKey {
 
   name        String
   description String?
-  status      VirtualKeyStatus @default(ACTIVE)
+  status      VirtualKeyStatus  @default(ACTIVE)
+  purpose     VirtualKeyPurpose @default(USER)
 
   // Credential material. Full secret format:
   //   vk-lw-<26-char-crockford-ulid>  (32 chars total)
@@ -1967,6 +2012,7 @@ model VirtualKey {
   @@index([principalUserId])
   @@index([revision])
   @@index([routingPolicyId])
+  @@index([organizationId, purpose])
 }
 
 // VirtualKeyScope - N-scope access for VirtualKey, mirrors
@@ -2741,3 +2787,41 @@ model FeatureFlag {
     createdAt    DateTime @default(now())
     updatedAt    DateTime @default(now()) @updatedAt
 }
+
+// ============================================================================
+// Langy assistant — see specs/assistant/memory-design.md §3
+// ============================================================================
+
+model LangyConversation {
+    id          String    @id @default(cuid())
+    projectId   String
+    userId      String
+    title       String?
+    isShared    Boolean   @default(false)
+    sharedAt    DateTime?
+    sharedById  String?
+    createdAt   DateTime  @default(now())
+    updatedAt   DateTime  @updatedAt
+    deletedAt   DateTime?
+
+    messages    LangyMessage[]
+
+    @@index([projectId, userId, updatedAt])
+    @@index([projectId, isShared, updatedAt])
+    @@index([deletedAt])
+}
+
+model LangyMessage {
+    id             String   @id @default(cuid())
+    conversationId String
+    projectId      String
+    role           String
+    parts          Json
+    createdAt      DateTime @default(now())
+
+    conversation   LangyConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+    @@index([conversationId, createdAt])
+    @@index([projectId])
+}
+

@@ -1,0 +1,15 @@
+{{- if .Values.podDisruptionBudget.enabled -}}
+# Disabled by default. With a single replica, a PDB of minAvailable: 1
+# (or maxUnavailable: 0) blocks ALL voluntary evictions — node drains and
+# cluster autoscaler scale-downs would hang forever. Only enable this if you
+# have raised replicaCount and added conversation-sticky routing.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "langy-agent.fullname" . }}
+  labels: {{- include "langy-agent.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels: {{- include "langy-agent.selectorLabels" . | nindent 6 }}
+{{- end }}

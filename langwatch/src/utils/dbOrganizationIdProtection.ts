@@ -65,7 +65,8 @@ const hasCompositeOrgKey = (clause: any): boolean => {
 // id (a team or project id), so it resolves to exactly one organization.
 const hasInlineScope = (clause: any): boolean =>
   typeof clause?.scopeType === "string" &&
-  (typeof clause?.scopeId === "string" || isNonEmptyStringList(clause?.scopeId));
+  (typeof clause?.scopeId === "string" ||
+    isNonEmptyStringList(clause?.scopeId));
 
 const boundsToSingleOrg = (clause: any): boolean =>
   hasOrganizationId(clause) || hasRowId(clause) || hasCompositeOrgKey(clause);
@@ -109,6 +110,11 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   RoutingPolicy: {},
   AiToolEntry: {},
   GatewayBudget: {},
+  // Per-user GitHub App connection used by Langy to open PRs as the user.
+  // Bound by organizationId (admin reads), the row id, or the compound
+  // `userId_organizationId` unique key (every service-layer query). Issue
+  // #4747; spec specs/assistant/langy-github-prs.feature.
+  UserGitHubCredential: {},
 };
 
 /**
