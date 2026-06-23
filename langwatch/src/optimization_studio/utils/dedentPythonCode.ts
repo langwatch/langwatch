@@ -28,8 +28,7 @@ export function dedentPythonCode(code: string): string {
     common = common.slice(0, i);
     if (common === "") break;
   }
-  if (!common) return code;
-  const prefix = common;
+  const prefix = common ?? "";
   return lines
     .map((line) =>
       line.trim() === ""
