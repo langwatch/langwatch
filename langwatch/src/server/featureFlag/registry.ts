@@ -148,6 +148,18 @@ export const FEATURE_FLAGS = [
     description:
       "Gates the personal keys, admin oversight, RoutingPolicy, and IngestionSource UI surfaces. Distinct from release_ui_ai_gateway_menu_enabled — the existing gateway product ships unblocked while governance keeps cooking.",
   },
+  // Per-project gate for the dataset streaming-reads epic (ADR-033). When on,
+  // experiment runs read the dataset in byte-budgeted pages (no 5 MB
+  // truncation) and store results as a lean shape (light columns inline, heavy
+  // columns referenced by the dataset row's stable id). Off = today's behavior
+  // byte-for-byte (5 MB read cap + full-row result copy).
+  {
+    key: "release_dataset_streaming_reads",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Experiment runs read large datasets in byte-budgeted pages and store lean results-by-reference (ADR-033). Off = current behavior (5 MB read truncation + full-row result copy).",
+  },
 ] as const satisfies readonly FeatureFlagDefinition[];
 
 export const FEATURE_FLAG_FAMILIES = [

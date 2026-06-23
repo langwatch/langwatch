@@ -21,6 +21,7 @@ import type { TypedAgent } from "~/server/agents/agent.repository";
 import { getApp } from "~/server/app-layer/app";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
 import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
+import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
@@ -33,6 +34,7 @@ import {
   mapNlpEvent,
   type ResultMapperConfig,
 } from "./resultMapper";
+import { leanResultEntry, RESULT_INLINE_BYTES } from "./resultReference";
 import { createSemaphore } from "./semaphore";
 import type {
   EvaluationV3Event,
@@ -61,6 +63,8 @@ export type OrchestratorInput = {
   state: EvaluationsV3State;
   datasetRows: Array<Record<string, unknown>>;
   datasetColumns: Array<{ id: string; name: string; type: string }>;
+  /** Stable row ids aligned by index with datasetRows (ADR-033); enables result-by-reference. */
+  datasetRowIds?: Array<string | undefined>;
   loadedPrompts: Map<string, VersionedPrompt>;
   loadedAgents: Map<string, TypedAgent>;
   /** Evaluators loaded from DB - settings and names are fetched fresh from here */
@@ -81,6 +85,9 @@ export const generateCells = (
   >,
   datasetRows: Array<Record<string, unknown>>,
   scope: ExecutionScope,
+  // ADR-033: stable row ids aligned by index with datasetRows; threaded onto
+  // each cell so a result can reference the row it evaluated by id.
+  rowIds?: Array<string | undefined>,
 ): ExecutionCell[] => {
   const cells: ExecutionCell[] = [];
   const datasetId =
@@ -116,6 +123,7 @@ export const generateCells = (
         skipTarget: true,
         precomputedTargetOutput: targetOutput,
         traceId: scope.traceIds[rowIndex],
+        rowId: rowIds?.[rowIndex],
       });
     }
     return cells;
@@ -147,6 +155,7 @@ export const generateCells = (
         precomputedTargetOutput: scope.targetOutput,
         // Reuse existing trace ID to append evaluator span to the same trace
         traceId: scope.traceId,
+        rowId: rowIds?.[scope.rowIndex],
       });
     }
     return cells;
@@ -202,6 +211,7 @@ export const generateCells = (
           _datasetId: datasetId,
           ...datasetEntry,
         },
+        rowId: rowIds?.[rowIndex],
       });
     }
   }
@@ -540,6 +550,7 @@ export async function* runOrchestrator(
     state,
     datasetRows,
     datasetColumns,
+    datasetRowIds,
     loadedPrompts,
     loadedAgents,
     loadedEvaluators,
@@ -553,8 +564,19 @@ export async function* runOrchestrator(
   // Use provided run ID or generate a human-readable one like "swift-fox-42"
   const runId = providedRunId ?? generateHumanReadableId();
 
+  // ADR-033: dataset id for result-by-reference (matches generateCells's resolution).
+  const datasetId = state.datasets[0]?.id ?? state.activeDatasetId ?? undefined;
+
+  // ADR-033: gate the lean result shape per project via the postgres-cached
+  // store (same pattern as release_trace_blob_offload, ADR-022). Off (default,
+  // null row) = today's full-row copy, byte-for-byte (I-COMPAT). Once per run.
+  const streamingReadsEnabled =
+    (await getFeatureFlagStore().get("release_dataset_streaming_reads", {
+      projectId,
+    })) === true;
+
   // Generate cells to execute
-  const cells = generateCells(state, datasetRows, scope);
+  const cells = generateCells(state, datasetRows, scope, datasetRowIds);
   const totalCells = cells.length;
 
   logger.info(
@@ -649,7 +671,10 @@ export async function* runOrchestrator(
       });
     } catch (err) {
       chDispatchFailures++;
-      logger.error({ err, runId }, "Failed to dispatch startExperimentRun to CH");
+      logger.error(
+        { err, runId },
+        "Failed to dispatch startExperimentRun to CH",
+      );
       await abortManager.clearRunning(runId);
       throw err;
     }
@@ -683,10 +708,22 @@ export async function* runOrchestrator(
           evaluatorName: dbEvaluator?.name,
           traceId,
           status: evalResult.status,
-          score: evalResult.status === "processed" ? (evalResult.score ?? undefined) : undefined,
-          passed: evalResult.status === "processed" ? (evalResult.passed ?? undefined) : undefined,
-          label: evalResult.status === "processed" ? (evalResult.label ?? undefined) : undefined,
-          details: evalResult.status === "processed" ? (evalResult.details ?? undefined) : undefined,
+          score:
+            evalResult.status === "processed"
+              ? (evalResult.score ?? undefined)
+              : undefined,
+          passed:
+            evalResult.status === "processed"
+              ? (evalResult.passed ?? undefined)
+              : undefined,
+          label:
+            evalResult.status === "processed"
+              ? (evalResult.label ?? undefined)
+              : undefined,
+          details:
+            evalResult.status === "processed"
+              ? (evalResult.details ?? undefined)
+              : undefined,
           error: evalResult.status === "error" ? evalResult.details : undefined,
           occurredAt: Date.now(),
         });
@@ -703,46 +740,80 @@ export async function* runOrchestrator(
       if (event.type === "target_result") {
         const datasetEntry = datasetRows[event.rowIndex] ?? {};
         chDispatchTotal++;
-        await commands.recordTargetResult({
-          tenantId: projectId,
-          runId,
-          experimentId,
-          index: event.rowIndex,
-          targetId: event.targetId,
-          entry: datasetEntry,
-          predicted:
-            event.output === null || event.output === undefined
-              ? null
-              : { output: event.output },
-          cost: event.cost ?? null,
-          duration: event.duration ?? null,
-          error: event.error ?? null,
-          traceId: event.traceId ?? null,
-          occurredAt: Date.now(),
-        }).catch((err) => {
-          chDispatchFailures++;
-          logger.warn({ err, runId }, "Failed to dispatch recordTargetResult to CH");
-        });
-      } else if (event.type === "error" && event.rowIndex !== undefined && event.targetId) {
+        await commands
+          .recordTargetResult({
+            tenantId: projectId,
+            runId,
+            experimentId,
+            index: event.rowIndex,
+            targetId: event.targetId,
+            // ADR-033: lean result shape when the flag is on (light columns
+            // inline, heavy referenced); otherwise the full row with the
+            // reference attached. No-op for inline/id-less rows.
+            entry: leanResultEntry(
+              datasetEntry,
+              { datasetId, rowId: datasetRowIds?.[event.rowIndex] },
+              {
+                enabled: streamingReadsEnabled,
+                inlineMaxBytes: RESULT_INLINE_BYTES,
+              },
+            ),
+            predicted:
+              event.output === null || event.output === undefined
+                ? null
+                : { output: event.output },
+            cost: event.cost ?? null,
+            duration: event.duration ?? null,
+            error: event.error ?? null,
+            traceId: event.traceId ?? null,
+            occurredAt: Date.now(),
+          })
+          .catch((err) => {
+            chDispatchFailures++;
+            logger.warn(
+              { err, runId },
+              "Failed to dispatch recordTargetResult to CH",
+            );
+          });
+      } else if (
+        event.type === "error" &&
+        event.rowIndex !== undefined &&
+        event.targetId
+      ) {
         const datasetEntry = datasetRows[event.rowIndex] ?? {};
         chDispatchTotal++;
-        await commands.recordTargetResult({
-          tenantId: projectId,
-          runId,
-          experimentId,
-          index: event.rowIndex,
-          targetId: event.targetId,
-          entry: datasetEntry,
-          predicted: null,
-          cost: null,
-          duration: null,
-          error: event.message,
-          traceId: null,
-          occurredAt: Date.now(),
-        }).catch((err) => {
-          chDispatchFailures++;
-          logger.warn({ err, runId }, "Failed to dispatch recordTargetResult to CH");
-        });
+        await commands
+          .recordTargetResult({
+            tenantId: projectId,
+            runId,
+            experimentId,
+            index: event.rowIndex,
+            targetId: event.targetId,
+            // ADR-033: lean result shape when the flag is on (light columns
+            // inline, heavy referenced); otherwise the full row with the
+            // reference attached. No-op for inline/id-less rows.
+            entry: leanResultEntry(
+              datasetEntry,
+              { datasetId, rowId: datasetRowIds?.[event.rowIndex] },
+              {
+                enabled: streamingReadsEnabled,
+                inlineMaxBytes: RESULT_INLINE_BYTES,
+              },
+            ),
+            predicted: null,
+            cost: null,
+            duration: null,
+            error: event.message,
+            traceId: null,
+            occurredAt: Date.now(),
+          })
+          .catch((err) => {
+            chDispatchFailures++;
+            logger.warn(
+              { err, runId },
+              "Failed to dispatch recordTargetResult to CH",
+            );
+          });
       } else if (event.type === "evaluator_result") {
         const result = event.result as SingleEvaluationResult;
         const evaluatorConfig = state.evaluators.find(
@@ -752,36 +823,40 @@ export async function* runOrchestrator(
           ? loadedEvaluators?.get(evaluatorConfig.dbEvaluatorId)
           : null;
         chDispatchTotal++;
-        await commands.recordEvaluatorResult({
-          tenantId: projectId,
-          runId,
-          experimentId,
-          index: event.rowIndex,
-          targetId: event.targetId,
-          evaluatorId: event.evaluatorId,
-          evaluatorName: dbEvaluator?.name ?? null,
-          status: result.status,
-          score: result.status === "processed" ? result.score : null,
-          label: result.status === "processed" ? result.label : null,
-          passed: result.status === "processed" ? result.passed : null,
-          details:
-            result.status === "error"
-              ? result.details
-              : result.status === "processed"
+        await commands
+          .recordEvaluatorResult({
+            tenantId: projectId,
+            runId,
+            experimentId,
+            index: event.rowIndex,
+            targetId: event.targetId,
+            evaluatorId: event.evaluatorId,
+            evaluatorName: dbEvaluator?.name ?? null,
+            status: result.status,
+            score: result.status === "processed" ? result.score : null,
+            label: result.status === "processed" ? result.label : null,
+            passed: result.status === "processed" ? result.passed : null,
+            details:
+              result.status === "error"
                 ? result.details
+                : result.status === "processed"
+                  ? result.details
+                  : null,
+            occurredAt: Date.now(),
+            cost:
+              result.status === "processed" && result.cost
+                ? result.cost.amount
                 : null,
-          occurredAt: Date.now(),
-          cost:
-            result.status === "processed" && result.cost
-              ? result.cost.amount
-              : null,
-        }).catch((err) => {
-          chDispatchFailures++;
-          logger.warn({ err, runId }, "Failed to dispatch recordEvaluatorResult to CH");
-        });
+          })
+          .catch((err) => {
+            chDispatchFailures++;
+            logger.warn(
+              { err, runId },
+              "Failed to dispatch recordEvaluatorResult to CH",
+            );
+          });
       }
     }
-
   };
 
   // Emit execution_started
@@ -993,17 +1068,22 @@ export async function* runOrchestrator(
     // Dispatch completion event to ClickHouse.
     if (experimentId) {
       chDispatchTotal++;
-      await commands.completeExperimentRun({
-        tenantId: projectId,
-        runId,
-        experimentId,
-        finishedAt: aborted ? null : finishedAt,
-        stoppedAt: aborted ? finishedAt : null,
-        occurredAt: Date.now(),
-      }).catch((err) => {
-        chDispatchFailures++;
-        logger.warn({ err, runId }, "Failed to dispatch completeExperimentRun to CH");
-      });
+      await commands
+        .completeExperimentRun({
+          tenantId: projectId,
+          runId,
+          experimentId,
+          finishedAt: aborted ? null : finishedAt,
+          stoppedAt: aborted ? finishedAt : null,
+          occurredAt: Date.now(),
+        })
+        .catch((err) => {
+          chDispatchFailures++;
+          logger.warn(
+            { err, runId },
+            "Failed to dispatch completeExperimentRun to CH",
+          );
+        });
     }
   }
 
