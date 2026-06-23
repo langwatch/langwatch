@@ -434,15 +434,16 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
                 }}
                 textStyle="xs"
               />
-              {searchQuery.trim() && layout.facetWindow.visible.length === 0 && (
-                <Text textStyle="2xs" color="fg.muted" paddingX={1}>
-                  No match. Press <Kbd>Enter</Kbd> to filter by "
-                  <Box as="span" fontWeight="600" color="fg">
-                    {searchQuery.trim()}
-                  </Box>
-                  " anyway.
-                </Text>
-              )}
+              {searchQuery.trim() &&
+                layout.facetWindow.visible.length === 0 && (
+                  <Text textStyle="2xs" color="fg.muted" paddingX={1}>
+                    No match. Press <Kbd>Enter</Kbd> to filter by "
+                    <Box as="span" fontWeight="600" color="fg">
+                      {searchQuery.trim()}
+                    </Box>
+                    " anyway.
+                  </Text>
+                )}
             </VStack>
           )}
         </VStack>
