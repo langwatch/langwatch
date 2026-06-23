@@ -58,8 +58,7 @@ export class ExportService {
     const { TraceService: TraceServiceImpl } = await import(
       "~/server/traces/trace.service"
     );
-    const resolvedPrisma =
-      prisma ?? (await import("~/server/db")).prisma;
+    const resolvedPrisma = prisma ?? (await import("~/server/db")).prisma;
     // Export is a content-consuming read: wire blob-resolution deps so a full
     // export reads the whole IO value, not the 64 KB preview (#4991 AC1).
     const traceService = TraceServiceImpl.create(
