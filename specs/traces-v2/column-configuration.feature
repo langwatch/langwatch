@@ -19,6 +19,18 @@ Rule: Column visibility toggle
     Then a dropdown appears with checkboxes organized by section
     And the sections include Standard, Evaluations, and Events
 
+  Scenario: A trailing "+" column opens the same column picker
+    Given the trace table is rendered
+    Then the last column is a "+" add-column button
+    When the user clicks the "+" column header
+    Then the same column picker opens as from the toolbar Columns button
+
+  Scenario: The picker has a search field to filter columns by name
+    Given the column picker is open
+    When the user types in the picker's search field
+    Then only columns whose label matches the query are listed
+    # The Evaluations "Add eval column" control stays available while searching.
+
   Scenario: Toggling a column on adds it to the table
     Given the Columns dropdown is open
     And the "Service" column is hidden
@@ -34,9 +46,12 @@ Rule: Column visibility toggle
     Then "cost" is removed from `columnOrder`
     And the column disappears from the table
 
-  Scenario: Pinned columns cannot be toggled off
-    Given a column has `pinned="left"` (e.g. Time)
-    Then its checkbox is disabled in the dropdown
+  Scenario: Every column can be toggled off
+    Given any column is visible (e.g. Time)
+    When the user unchecks its checkbox
+    Then the column is hidden
+    # No column is pinned — the pinned-column concept was removed, so even
+    # Time can be toggled off and reordered like any other column.
 
   Scenario: Toggling a column puts the lens into draft state
     Given the Columns dropdown is open
@@ -46,31 +61,45 @@ Rule: Column visibility toggle
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# COLUMN DRAG-TO-REORDER
+# COLUMN REORDER (visible-order strip + DnD)
 # ─────────────────────────────────────────────────────────────────────────────
-# Not yet implemented as of 2026-05-01 — `viewStore.reorderColumns` exists but
-# no column-header DnD handler is wired up in `TraceTableShell`. The order
-# only changes today via toggling columns on/off.
+# Reorder runs inside the Columns picker's "visible order" strip, not on the
+# table header itself. Each visible row has a grip handle (drag) and
+# move-up / move-down buttons that translate visible-subset positions back
+# to full `columnOrder` indices.
 
-@planned
-Rule: Column drag-to-reorder
-  Users drag column headers to rearrange the display order of columns.
+Rule: Column reorder via picker strip
+  Users reorder visible columns via the picker's "visible order" strip — by
+  dragging the grip handle or by clicking the move-up / move-down buttons
+  next to each row.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And a lens is active with columns Time, Trace, Duration, Cost, Tokens, and Model visible
 
   Scenario: Dropping a column reorders the table
-    When the user drags "Cost" and drops it before "Duration"
+    When the user drags "Cost" and drops it before "Duration" in the picker strip
     Then the column order becomes Time, Trace, Cost, Duration, Tokens, Model
 
+  Scenario: Moving a column up via the move-up button
+    When the user clicks the move-up button on "Duration"
+    Then "Duration" swaps positions with the column above it
+
+  Scenario: Move-up is disabled on the first visible row
+    When the user opens the picker strip
+    Then the move-up button on the first row is disabled
+
+  Scenario: Move-down is disabled on the last visible row
+    When the user opens the picker strip
+    Then the move-down button on the last row is disabled
+
   Scenario: Reordering puts the lens into draft state
-    When the user drags and drops a column to a new position
+    When the user moves a column to a new position
     Then the active lens enters draft state with a dot indicator on its tab
 
-  Scenario: Pinned column cannot be dragged
-    When the user attempts to drag the Time (left-pinned) column
-    Then the column does not move
+  Scenario: Any column can be reordered, including Time
+    When the user moves the Time column to a new position
+    Then the Time column moves like any other column
 
   Scenario: Column order persists in the LensConfig columns array
     When the user reorders columns
@@ -118,34 +147,13 @@ Rule: Column resize
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PINNED COLUMN RESIZE
-# ─────────────────────────────────────────────────────────────────────────────
-
-Rule: Pinned column resize
-  Pinned columns can be resized even though they cannot be reordered.
-
-  Background:
-    Given the user is authenticated with "traces:view" permission
-    And a lens is active with the Time column pinned to the left
-
-  Scenario: Pinned column can be resized
-    When the user drags the right border of the Time column
-    Then the Time column width changes
-
-  Scenario: Resizing a pinned column adjusts the sticky offset
-    When the user widens the Time column
-    Then the sticky offset for adjacent columns adjusts accordingly
-
-
-# ─────────────────────────────────────────────────────────────────────────────
 # COLUMN STATE IN LENSCONFIG
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Column state split between LensConfig and columnSizingStore
   `LensConfig.columns: string[]` defines visible column ids (and their order).
   Per-column widths live in `columnSizingStore`, keyed by (lensId, rowKind).
-  Pinning is intrinsic to the column definition (via `pinned: "left"` on
-  `STANDARD_COLUMNS`), not stored per-lens.
+  No column is pinned — every column is toggleable and reorderable.
 
   Background:
     Given the user is authenticated with "traces:view" permission
@@ -178,22 +186,77 @@ Rule: Default column set
 
   Scenario: New lens has default columns visible
     When the user creates a new lens with grouping="flat" (the trace capability)
-    Then `defaultColumns` are: time, trace, service, duration, cost, tokens, model
+    Then `defaultColumns` are: time, trace, service, duration, cost, tokens, model, labels
     # See LENS_CAPABILITIES.flat in `lens/capabilities.ts`
+
+  Scenario: Labels column is visible by default and sits after Model
+    When the user creates a new lens
+    Then the Labels column is visible by default
+    And the Labels column appears immediately after the Model column
 
   Scenario: New lens has default minimum column widths
     When the user creates a new lens
     Then `STANDARD_COLUMNS` minWidths are: time 80, trace 300, service 120, duration 80, cost 80, tokens 80, model 100
     # Note: these are minimums (TanStack `minSize`), not fixed widths. Actual rendered widths come from columnSizingStore overrides on top of TanStack defaults.
 
-  Scenario: Time column is pinned left by default
+  Scenario: Time column is shown by default with a relative / ISO format toggle
     When the user creates a new lens
-    Then the Time column entry has `pinned: "left"` in `STANDARD_COLUMNS`
+    Then the Time column is visible by default
+    And the Time row in the column picker offers a Relative / ISO format toggle
+    # The Time column is a normal toggleable, reorderable column (no pinning).
+    # Its value format — relative ("3m") vs ISO 8601 — is switchable and
+    # the chosen format persists after a page refresh.
+
+  Scenario: The Time column widens when switched to ISO so the timestamp is not clipped
+    Given the Time column is in relative format at its default width
+    When the user switches the Time format to ISO
+    Then the Time column widens to fit a full ISO 8601 timestamp
+    When the user switches the Time format back to relative
+    Then the Time column returns to its compact relative width
+
+  Scenario: A manual Time column resize survives a format switch to ISO
+    Given the user widened the Time column past the ISO minimum
+    When the user switches the Time format to ISO
+    Then the manual width is preserved (not stomped by the format default)
+    # The ISO footprint only raises the column's default + minimum; a
+    # deliberate manual resize held in columnSizingStore still wins, while a
+    # stale narrow relative-mode width is floored up so the stamp can't clip.
 
   Scenario: Additional columns are available but hidden by default
     When the user opens the Columns dropdown
-    Then optional columns are listed: TTFT, User ID, Conversation ID, Origin, Tokens In, Tokens Out, Spans, Status
+    Then optional columns are listed: TTFT, User ID, Conversation ID, Origin, Tokens In, Tokens Out, Spans, Storage size, Status
     And they are unchecked by default (each entry's `visible: false`)
+
+  Scenario: A Storage size column surfaces each trace's payload size
+    When the user opens the Columns dropdown
+    Then a "Storage size" column is listed and hidden by default
+    When the user enables the Storage size column
+    Then each row shows the trace's stored payload size in human-readable bytes (e.g. "12 kB", "1.4 MB")
+
+  Scenario: The Storage size column is sortable
+    Given the Storage size column is visible
+    When the user clicks the Storage size column header
+    Then traces are sorted by stored payload size
+    # Backed by the materialised `_size_bytes` column on `trace_summaries`.
+
+  Scenario: Prompt column is available, hidden by default
+    When the user opens the Columns dropdown
+    Then a "Prompt" column is listed under Trace fields
+    And it is unchecked by default (`visible: false`)
+    # Surfaces the trace's last-used managed prompt (handle + version).
+
+  Scenario: Conversation ID is an ordinary optional column
+    Given the user opens the Columns dropdown
+    When the user enables the Conversation ID column
+    Then the Conversation ID column can be toggled and reordered like any other
+    # No longer pinned — the pinned-column concept was removed.
+
+  Scenario: Column titles are left-aligned
+    Given the user is viewing the trace list
+    When the table renders with any set of enabled columns
+    Then every column header is left-aligned regardless of `meta.align`
+    # Numeric cell *values* still right-align in the body; only the titles
+    # were unified to the left.
 
   Scenario: Reverting a lens restores its committed configuration
     Given the user has customized columns on a built-in lens
@@ -257,6 +320,10 @@ Rule: Data gating for columns with missing data
     Then every row in that column shows "—"
     And the column is not hidden automatically
 
+  # Canonical per-evaluator eval-column behaviour (adding, rendering,
+  # persistence) lives in specs/traces-v2/evaluations.feature under
+  # "Per-evaluator eval columns". This scenario is the generic data-gating
+  # case, kept here as one instance of the column-level rule above.
   Scenario: Eval column for a nonexistent eval type shows dash
     Given the user has enabled an evaluation column for an eval type not in the project
     When the trace table renders

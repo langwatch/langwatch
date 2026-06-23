@@ -27,6 +27,11 @@ const PAGE_GROUPS: ShortcutGroup[] = [
   {
     title: "Filter sidebar",
     items: [
+      { keys: ["C"], label: "Configure which facets show" },
+      { keys: ["F"], label: "Find a facet" },
+      { keys: ["E"], label: "Expand or collapse all sections" },
+      { keys: ["X"], label: "Clear all filters" },
+      { keys: ["R"], label: "Reset to the current lens" },
       { keys: ["Tab"], label: "Move between sections and rows" },
       { keys: ["Space"], label: "Toggle a facet (when row focused)" },
       {

@@ -9,6 +9,7 @@
  * field/value) that were easy to mis-order with positional args.
  */
 
+import type { LiqeQuery } from "liqe";
 import type { FacetState } from "./metadata";
 import { isEmptyAST, parse, serialize } from "./parse";
 import { filterAST, walkAST } from "./walk";
@@ -41,7 +42,11 @@ export function toggleFacetInQuery({
     value,
   });
   if (currentState === "neutral") {
-    return appendClause(cleaned, `${fieldName}:${escapeValue(value)}`, combinator);
+    return appendClause(
+      cleaned,
+      `${fieldName}:${escapeValue(value)}`,
+      combinator,
+    );
   }
   if (currentState === "include") {
     // Negation always combines with AND — "NOT foo OR bar" reads
@@ -49,6 +54,140 @@ export function toggleFacetInQuery({
     return appendClause(cleaned, `NOT ${fieldName}:${escapeValue(value)}`);
   }
   return cleaned;
+}
+
+/**
+ * Add a new value to a facet, OR-combining it with an existing bare value
+ * of the SAME field. Faceted-search semantics: picking two values of one
+ * field means "either/or" — a trace's `origin` can't be both `sample` and
+ * `application`, so AND-ing them matches nothing. This is the plain-click
+ * (no modifier) default for adding a second value.
+ *
+ * Behaviour, driven by what the field already looks like in the AST:
+ *   - Exactly one bare top-level include for the field (the common case
+ *     after the user's first pick) → rewrite that tag in place into a
+ *     parenthesised same-field OR group:
+ *       `model:gpt-4o AND origin:sample`
+ *         → `model:gpt-4o AND (origin:sample OR origin:application)`
+ *     The parens are mandatory: liqe binds `A AND b OR c` as
+ *     `(A AND b) OR c`, so an unparenthesised same-field OR would escape
+ *     its scope and silently widen the whole query.
+ *   - Anything else (field absent, already multi-valued via AND, or the
+ *     lone value is negated) → fall back to a plain AND append. The
+ *     splice into an *existing* OR group is a different path
+ *     (`addToOrGroupAtLocation`), reached once the group exists.
+ *
+ * Returns the original string on parse failure, matching the rest of the
+ * mutation helpers.
+ */
+export function addSameFieldOrValue({
+  currentQuery,
+  fieldName,
+  value,
+}: {
+  currentQuery: string;
+  fieldName: string;
+  value: string;
+}): string {
+  const newClause = `${fieldName}:${escapeValue(value)}`;
+  if (!currentQuery.trim()) return appendClause(currentQuery, newClause);
+
+  let ast: LiqeQuery;
+  try {
+    ast = parse(currentQuery);
+  } catch {
+    return currentQuery;
+  }
+
+  const anchor = findLoneBareInclude(ast, fieldName);
+  if (!anchor) {
+    // No single bare value to fold into — append normally. (First-ever
+    // value, an existing multi-AND state, or a negated lone value.)
+    return appendClause(currentQuery, newClause);
+  }
+
+  // Splice `(field:existing OR field:new)` over the lone tag's
+  // [start, end) span. Tag locations are in liqe's trimmed-text
+  // coordinate space, so offset by any leading whitespace — the same
+  // convention `setFacetValueAtLocation` / `addToOrGroupAtLocation` use.
+  const trimmed = currentQuery.trimStart();
+  const leadingWs = currentQuery.length - trimmed.length;
+  const existingClause = `${fieldName}:${escapeValue(anchor.value)}`;
+  const group = `(${existingClause} OR ${newClause})`;
+  return (
+    currentQuery.slice(0, leadingWs + anchor.start) +
+    group +
+    currentQuery.slice(leadingWs + anchor.end)
+  );
+}
+
+/**
+ * Locate the field's value when it appears exactly once, un-negated, as a
+ * literal Tag — the shape we can safely fold into a same-field OR group.
+ * Returns null when the field is absent, negated, multi-valued, or already
+ * sitting inside an OR group (a value whose parent is an OR
+ * `LogicalExpression` is handled by the splice path, not by wrapping).
+ */
+function findLoneBareInclude(
+  ast: LiqeQuery,
+  fieldName: string,
+): { value: string; start: number; end: number } | null {
+  const candidates: { value: string; start: number; end: number }[] = [];
+  walkAST(ast, (node, negated) => {
+    if (negated) return;
+    if (node.type !== "Tag") return;
+    if (node.field.type === "ImplicitField") return;
+    if ((node.field as { name: string }).name !== fieldName) return;
+    if (node.expression.type !== "LiteralExpression") return;
+    candidates.push({
+      value: String(node.expression.value),
+      start: node.location.start,
+      end: node.location.end,
+    });
+  });
+  if (candidates.length !== 1) return null;
+  const only = candidates[0]!;
+  // Guard: if the lone value already lives inside an OR group, leave it to
+  // the splice path. `walkAST` flattens structure, so check the parent.
+  if (isInsideOrGroup(ast, only.start, only.end)) return null;
+  return only;
+}
+
+/**
+ * True when the Tag at [start, end) is a descendant of an OR
+ * `LogicalExpression`. Used to keep `addSameFieldOrValue` from re-wrapping
+ * a value that's already part of a same-field OR group.
+ */
+function isInsideOrGroup(ast: LiqeQuery, start: number, end: number): boolean {
+  let inside = false;
+  const visit = (node: LiqeQuery, underOr: boolean): void => {
+    if (inside) return;
+    if (node.type === "Tag") {
+      if (
+        underOr &&
+        node.location.start === start &&
+        node.location.end === end
+      ) {
+        inside = true;
+      }
+      return;
+    }
+    if (node.type === "LogicalExpression") {
+      const isOr = node.operator.operator === "OR";
+      visit(node.left, underOr || isOr);
+      visit(node.right, underOr || isOr);
+      return;
+    }
+    if (node.type === "UnaryOperator") {
+      visit(node.operand, underOr);
+      return;
+    }
+    if (node.type === "ParenthesizedExpression") {
+      visit(node.expression, underOr);
+    }
+  };
+  visit(ast, false);
+  return inside;
 }
 
 /**
@@ -176,9 +315,7 @@ export function swapOperatorAtLocation({
   } else {
     return currentQuery;
   }
-  return (
-    currentQuery.slice(0, absStart) + next + currentQuery.slice(absEnd)
-  );
+  return currentQuery.slice(0, absStart) + next + currentQuery.slice(absEnd);
 }
 
 export function setRangeInQuery({
@@ -323,14 +460,16 @@ function appendClause(
 }
 
 /**
- * Wrap a value in liqe-compatible quotes when it contains characters
- * that would break unquoted parsing (whitespace, quotes, parens, or a
- * backslash). Embedded `"` and `\` are escaped so values like
- * `He said "no"` round-trip cleanly instead of producing malformed
- * liqe and silently bailing the splice.
+ * Wrap a value in liqe-compatible quotes unless it's a "bare" token of
+ * safe characters. Liqe's unquoted literal only accepts a limited set,
+ * so anything beyond `[A-Za-z0-9_.-]` — a slash in a model id like
+ * `anthropic/claude-sonnet-4-6`, a colon, whitespace, quotes, parens —
+ * must be quoted or it produces a syntax error. Embedded `"` and `\` are
+ * escaped so values like `He said "no"` round-trip cleanly. The empty
+ * string quotes to `""` rather than emitting a bare `field:`.
  */
-function escapeValue(value: string): string {
-  if (/[\s"()\\]/.test(value)) {
+export function escapeValue(value: string): string {
+  if (value === "" || !/^[A-Za-z0-9_.-]+$/.test(value)) {
     return `"${value.replace(/[\\"]/g, "\\$&")}"`;
   }
   return value;

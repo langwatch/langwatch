@@ -139,6 +139,15 @@ interface DrawerState extends DrawerUrlState {
   closeDrawer: () => void;
   selectSpan: (spanId: string) => void;
   clearSpan: () => void;
+  /**
+   * Jump to a span from anywhere in the drawer (header error chip, Summary
+   * tab eval/event/exception rows, Conversation tab span refs): switch to
+   * the Trace view and select the span so the waterfall scrolls to it and
+   * the detail pane opens. The mode switch is transient — it doesn't
+   * clobber the operator's remembered tab preference, matching the
+   * conversation-turn jump. See specs/traces-v2/span-reference-jump-to-trace.feature
+   */
+  openSpanInTrace: (spanId: string) => void;
   setViewMode: (mode: DrawerViewMode) => void;
   /**
    * Apply a view mode without writing to localStorage. Use for programmatic
@@ -551,6 +560,16 @@ export const useDrawerStore = create<DrawerState>((set, get) => ({
     }),
 
   clearSpan: () => set({ selectedSpanId: null }),
+
+  openSpanInTrace: (spanId) => {
+    // selectSpan handles re-expanding the detail pane; the transient
+    // view-mode + viz-tab switch lands us on the waterfall (where spans
+    // are scrollable) without persisting a tab preference the user
+    // didn't explicitly choose.
+    get().selectSpan(spanId);
+    get().setVizTabTransient("waterfall");
+    set({ viewMode: "trace" });
+  },
 
   setViewMode: (mode) => {
     // Remember the user's last explicit mode choice so the next trace

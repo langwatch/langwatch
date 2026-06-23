@@ -4,12 +4,32 @@ import type {
   TraceHeader,
 } from "~/server/api/routers/tracesV2.schemas";
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
-import type { ConversationTurn } from "../../hooks/useConversationContext";
+import type { RouterOutputs } from "~/utils/api";
 import type {
   TraceEvalResult,
   TraceListEvent,
   TraceListItem,
 } from "../../types/trace";
+
+/**
+ * Conversation turn exactly as the `tracesV2.conversationContext` procedure
+ * returns it (including the redaction flags), so the preview fixtures stay
+ * assignable to `utils.tracesV2.conversationContext.setData`. Preview traces are
+ * never redacted, so the fixtures fill the flags with their not-redacted values.
+ */
+type PreviewConversationTurn =
+  RouterOutputs["tracesV2"]["conversationContext"]["turns"][number];
+
+/** The not-redacted flag defaults every preview turn carries. */
+const NOT_REDACTED: Pick<
+  PreviewConversationTurn,
+  "inputRedacted" | "outputRedacted" | "inputVisibleTo" | "outputVisibleTo"
+> = {
+  inputRedacted: false,
+  outputRedacted: false,
+  inputVisibleTo: null,
+  outputVisibleTo: null,
+};
 
 /**
  * Hand-crafted client-side sample traces. **These never round-trip
@@ -57,10 +77,12 @@ interface MakeTraceArgs {
   serviceName: string;
   durationMs: number;
   models: string[];
+  labels?: string[];
   inputTokens: number;
   outputTokens: number;
   totalCost: number;
   spanCount: number;
+  sizeBytes?: number;
   input: string;
   output: string | null;
   status?: TraceListItem["status"];
@@ -84,8 +106,14 @@ function makeTrace(args: MakeTraceArgs): TraceListItem {
     inputTokens: args.inputTokens,
     outputTokens: args.outputTokens,
     models: args.models,
+    labels: args.labels ?? [],
     status: args.status ?? "ok",
     spanCount: args.spanCount,
+    // Synthetic but plausible stored-size for the sample preview: roughly the
+    // I/O text plus ~1.2 KB of attribute/metadata overhead per span.
+    sizeBytes:
+      args.sizeBytes ??
+      args.input.length + (args.output?.length ?? 0) + args.spanCount * 1200,
     input: args.input,
     output: args.output,
     error: args.error,
@@ -110,6 +138,7 @@ export const SAMPLE_PREVIEW_TRACES: readonly TraceListItem[] = [
     serviceName: "mastra-app",
     durationMs: 4820,
     models: ["claude-sonnet-4-5"],
+    labels: ["billing", "refund"],
     inputTokens: 612,
     outputTokens: 348,
     totalCost: 0.0184,
@@ -140,6 +169,7 @@ export const SAMPLE_PREVIEW_TRACES: readonly TraceListItem[] = [
     serviceName: "vercel-ai-app",
     durationMs: 1240,
     models: ["gpt-4o"],
+    labels: ["summarization"],
     inputTokens: 412,
     outputTokens: 184,
     totalCost: 0.0042,
@@ -1408,7 +1438,7 @@ function buildRichArrivalHeader(): TraceHeader {
 interface RichArrivalConversationContext {
   conversationId: string;
   total: number;
-  turns: ConversationTurn[];
+  turns: PreviewConversationTurn[];
 }
 
 function buildRichArrivalConversationContext(): RichArrivalConversationContext {
@@ -1426,6 +1456,7 @@ function buildRichArrivalConversationContext(): RichArrivalConversationContext {
         input: "How's the checkout funnel looking today?",
         output:
           "Conversion is sitting at 33.7% over the last 24h, materially below the 41.2% baseline. The drop concentrates in this morning's window. Want me to dig in?",
+        ...NOT_REDACTED,
       },
       {
         traceId: richArrival.traceId,
@@ -1435,6 +1466,7 @@ function buildRichArrivalConversationContext(): RichArrivalConversationContext {
         status: richArrival.status,
         input: richArrival.input,
         output: richArrival.output,
+        ...NOT_REDACTED,
       },
       {
         traceId: "lw-preview-arrival-conv-next",
@@ -1446,6 +1478,7 @@ function buildRichArrivalConversationContext(): RichArrivalConversationContext {
           "Re-enable the email-jobs runner now and ping me when it's caught up.",
         output:
           "Done — email-jobs is unpaused as of 09:42 UTC. Backlog is ~4,800 abandonment emails; estimated catch-up in 12 minutes. I'll ping you the moment the queue drains.",
+        ...NOT_REDACTED,
       },
     ],
   };
@@ -1696,6 +1729,7 @@ function buildPreviewConversation(
         status: trace.status,
         input: trace.input,
         output: trace.output,
+        ...NOT_REDACTED,
       },
     ],
   };

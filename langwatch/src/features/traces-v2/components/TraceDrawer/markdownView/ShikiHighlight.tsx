@@ -1,4 +1,43 @@
 import { Box, ClientOnly, CodeBlock } from "@chakra-ui/react";
+import { useEffect, useState } from "react";
+import {
+  ensureShikiLangLoaded,
+  isShikiLangReady,
+  normalizeShikiLang,
+} from "./shikiAdapter";
+
+/**
+ * Resolve a fence language to a grammar that's actually ready to render.
+ * Base languages are ready immediately; any other bundled language is
+ * lazy-loaded on first use — we render plain "text" until its grammar
+ * resolves, then re-render highlighted. Non-bundled languages stay "text",
+ * so Shiki never throws "Language X not found". See
+ * dev/docs/adr/027-trace-drawer-code-highlighting.md
+ */
+function useResolvedShikiLang(language: string): string {
+  const canonical = normalizeShikiLang(language);
+  const [, bump] = useState(0);
+  useEffect(() => {
+    if (isShikiLangReady(canonical)) {
+      return;
+    }
+    let cancelled = false;
+    // Swallow grammar-load failures (network, bad lang id) — the
+    // render falls back to "text" via `isShikiLangReady` so the UI
+    // stays safe; the unhandled rejection just spams the console.
+    void ensureShikiLangLoaded(canonical)
+      .then(() => {
+        if (!cancelled) bump((x) => x + 1);
+      })
+      .catch(() => {
+        // Intentionally swallowed — see comment above.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canonical]);
+  return isShikiLangReady(canonical) ? canonical : "text";
+}
 
 /**
  * Single Shiki-backed code block component used everywhere in the drawer.
@@ -21,6 +60,9 @@ export function ShikiCodeBlock({
   colorMode: string;
   flush?: boolean;
 }) {
+  // Resolve to a grammar that's ready now (lazy-loading non-base languages
+  // on demand); renders plain "text" until ready / for unbundled languages.
+  const lang = useResolvedShikiLang(language);
   return (
     <ClientOnly
       fallback={
@@ -47,7 +89,7 @@ export function ShikiCodeBlock({
         <CodeBlock.Root
           size="sm"
           code={code}
-          language={language}
+          language={lang}
           meta={{ colorScheme: colorMode }}
           borderRadius={flush ? 0 : "md"}
           borderWidth={flush ? 0 : "1px"}

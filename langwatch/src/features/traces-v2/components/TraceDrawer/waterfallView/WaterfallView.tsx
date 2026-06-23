@@ -39,9 +39,9 @@ const EMPTY_SIGNALS: readonly LangwatchSignalBucket[] = [];
 export const WaterfallView = memo(function WaterfallView({
   spans,
   selectedSpanId,
+  promptSpanIds,
   onSelectSpan,
   onClearSpan,
-  onSwitchToSpanList,
 }: WaterfallViewProps) {
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -517,7 +517,6 @@ export const WaterfallView = memo(function WaterfallView({
                       groupKey={groupKey}
                       isExpanded={expandedGroups.has(groupKey)}
                       onToggle={handleToggleGroup}
-                      onSwitchToSpanList={onSwitchToSpanList}
                     />
                   </Box>
                 );
@@ -551,6 +550,7 @@ export const WaterfallView = memo(function WaterfallView({
                     rootStart={rootStart}
                     rootDuration={rootDuration}
                     isSelected={node.span.spanId === selectedSpanId}
+                    isPrompt={promptSpanIds?.has(node.span.spanId) ?? false}
                     isPinned={pinnedSet.has(node.span.spanId)}
                     isCollapsed={collapsedIds.has(node.span.spanId)}
                     hasChildren={node.children.length > 0}

@@ -24,6 +24,7 @@ function makeTrace(overrides: Partial<TraceListItem> = {}): TraceListItem {
     nonBilledCost: 0,
     totalTokens: 0,
     models: [],
+    labels: [],
     status: "success" as TraceListItem["status"],
     spanCount: 1,
     input: null,
@@ -31,6 +32,7 @@ function makeTrace(overrides: Partial<TraceListItem> = {}): TraceListItem {
     origin: "application",
     evaluations: [],
     events: [],
+    sizeBytes: 0,
     ...overrides,
   };
 }

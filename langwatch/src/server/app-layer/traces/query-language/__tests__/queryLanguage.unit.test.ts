@@ -1,14 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ParseError, parse, serialize, stripAtSigils } from "../parse";
 import {
-  analyzeOrGroups,
-  buildFacetStateLookup,
-  getFacetValues,
-  getRangeValue,
-  hasCrossFacetOR,
-  validateAst,
-} from "../queries";
-import {
+  addSameFieldOrValue,
   addToOrGroupAtLocation,
   removeFacetValueFromQuery,
   removeFieldFromQuery,
@@ -18,6 +10,14 @@ import {
   swapOperatorAtLocation,
   toggleFacetInQuery,
 } from "../mutations";
+import { ParseError, parse, serialize, stripAtSigils } from "../parse";
+import {
+  analyzeOrGroups,
+  buildFacetStateLookup,
+  getFacetValues,
+  getRangeValue,
+  validateAst,
+} from "../queries";
 
 function locationOf(
   query: string,
@@ -35,8 +35,8 @@ describe("stripAtSigils", () => {
     });
 
     it("removes the sigil after whitespace", () => {
-      expect(stripAtSigils("status:error AND @model:gpt-4o")).toBe(
-        "status:error AND model:gpt-4o",
+      expect(stripAtSigils("status:error AND @model:gpt-5-mini")).toBe(
+        "status:error AND model:gpt-5-mini",
       );
     });
 
@@ -73,36 +73,38 @@ describe("removeNodeAtLocation", () => {
     it("returns an empty query", () => {
       const query = "status:error";
       const { start, end } = locationOf(query, "status:error");
-      expect(
-        removeNodeAtLocation({ currentQuery: query, start, end }),
-      ).toBe("");
+      expect(removeNodeAtLocation({ currentQuery: query, start, end })).toBe(
+        "",
+      );
     });
   });
 
   describe("given two AND-joined tags", () => {
-    it("drops the targeted tag and the now-orphaned AND keyword", () => {
-      const query = "status:error AND model:gpt-4o";
-      const { start, end } = locationOf(query, "status:error");
-      expect(
-        removeNodeAtLocation({ currentQuery: query, start, end }),
-      ).toBe("model:gpt-4o");
+    describe("when removing the first tag", () => {
+      it("drops the targeted tag and the now-orphaned AND keyword", () => {
+        const query = "status:error AND model:gpt-5-mini";
+        const { start, end } = locationOf(query, "status:error");
+        expect(removeNodeAtLocation({ currentQuery: query, start, end })).toBe(
+          "model:gpt-5-mini",
+        );
+      });
     });
   });
 
   describe("given two OR-joined tags inside parentheses", () => {
     it("drops the targeted tag and collapses the parenthesised group", () => {
-      const query = "(status:error OR status:warning) AND model:gpt-4o";
+      const query = "(status:error OR status:warning) AND model:gpt-5-mini";
       const { start, end } = locationOf(query, "status:warning");
       // The orphan paren wrapping a single tag is collapsed by the serializer.
-      expect(
-        removeNodeAtLocation({ currentQuery: query, start, end }),
-      ).toBe("status:error AND model:gpt-4o");
+      expect(removeNodeAtLocation({ currentQuery: query, start, end })).toBe(
+        "status:error AND model:gpt-5-mini",
+      );
     });
   });
 
   describe("given a tag whose location does not match", () => {
     it("leaves the query unchanged", () => {
-      const query = "status:error AND model:gpt-4o";
+      const query = "status:error AND model:gpt-5-mini";
       expect(
         removeNodeAtLocation({ currentQuery: query, start: 999, end: 1000 }),
       ).toBe(query);
@@ -127,8 +129,8 @@ describe("parse with stray sigils", () => {
 describe("parse LRU cache", () => {
   describe("when the same query is parsed twice", () => {
     it("returns the same AST reference (cache hit)", () => {
-      const a = parse("status:error AND model:gpt-4o");
-      const b = parse("status:error AND model:gpt-4o");
+      const a = parse("status:error AND model:gpt-5-mini");
+      const b = parse("status:error AND model:gpt-5-mini");
       expect(a).toBe(b);
     });
 
@@ -186,14 +188,20 @@ describe("parse operator matrix", () => {
       ["<", "cost:<5", ":<", 5],
       ["<=", "cost:<=5", ":<=", 5],
     ])("parses `%s` as a Tag with the matching liqe operator", (_, query, op, value) => {
-      const ast = parse(query) as unknown as { type: string; operator: { operator: string }; expression: { value: number } };
+      const ast = parse(query) as unknown as {
+        type: string;
+        operator: { operator: string };
+        expression: { value: number };
+      };
       expect(ast.type).toBe("Tag");
       expect(ast.operator.operator).toBe(op);
       expect(ast.expression.value).toBe(value);
     });
 
     it("parses `>=` with a decimal value", () => {
-      const ast = parse("cost:>=0.05") as unknown as { expression: { value: number } };
+      const ast = parse("cost:>=0.05") as unknown as {
+        expression: { value: number };
+      };
       expect(ast.expression.value).toBe(0.05);
     });
 
@@ -205,7 +213,10 @@ describe("parse operator matrix", () => {
 
   describe("range form", () => {
     it("parses `field:[low TO high]` as a Tag with a RangeExpression", () => {
-      const ast = parse("cost:[1 TO 10]") as { type: string; expression: { type: string; range: { min: number; max: number } } };
+      const ast = parse("cost:[1 TO 10]") as {
+        type: string;
+        expression: { type: string; range: { min: number; max: number } };
+      };
       expect(ast.type).toBe("Tag");
       expect(ast.expression.type).toBe("RangeExpression");
       expect(ast.expression.range.min).toBe(1);
@@ -218,7 +229,9 @@ describe("parse operator matrix", () => {
     });
 
     it("parses negative range bounds", () => {
-      const ast = parse("evaluatorScore:[-1 TO 1]") as { expression: { range: { min: number; max: number } } };
+      const ast = parse("evaluatorScore:[-1 TO 1]") as {
+        expression: { range: { min: number; max: number } };
+      };
       expect(ast.expression.range.min).toBe(-1);
       expect(ast.expression.range.max).toBe(1);
     });
@@ -226,18 +239,42 @@ describe("parse operator matrix", () => {
 
   describe("quoted values", () => {
     it("preserves spaces inside double-quoted values", () => {
-      const ast = parse('model:"gpt-4 turbo"') as { expression: { value: string } };
+      const ast = parse('model:"gpt-4 turbo"') as {
+        expression: { value: string };
+      };
       expect(ast.expression.value).toBe("gpt-4 turbo");
     });
 
+    it("keeps parens + whitespace inside quoted values through serialize() (regression)", () => {
+      // The post-serialise normaliser collapses whitespace hugging parens
+      // (a clause-removal tidy-up); it must NOT reach inside quoted literals.
+      // Without quote-awareness `model:"( x )"` round-trips to `model:"(x)"`,
+      // silently rewriting the user's search value when an unrelated chip is
+      // removed (serialize runs on every clause-removal mutation).
+      expect(serialize(parse('model:"( x )"'))).toBe('model:"( x )"');
+      expect(serialize(parse('user:"name ( test )"'))).toBe(
+        'user:"name ( test )"',
+      );
+      // A literal boolean word + double spaces inside a quote survive too.
+      expect(serialize(parse('user:"a  b AND  c"'))).toBe('user:"a  b AND  c"');
+    });
+
     it("normalises single-quoted values to the same Literal value", () => {
-      const single = parse("model:'gpt-4 turbo'") as { expression: { value: string } };
-      const dbl = parse('model:"gpt-4 turbo"') as { expression: { value: string } };
+      const single = parse("model:'gpt-4 turbo'") as {
+        expression: { value: string };
+      };
+      const dbl = parse('model:"gpt-4 turbo"') as {
+        expression: { value: string };
+      };
       expect(single.expression.value).toBe(dbl.expression.value);
     });
 
     it("parses a bare quoted string as ImplicitField free text", () => {
-      const ast = parse('"refund policy"') as { type: string; field: { type: string }; expression: { value: string } };
+      const ast = parse('"refund policy"') as {
+        type: string;
+        field: { type: string };
+        expression: { value: string };
+      };
       expect(ast.type).toBe("Tag");
       expect(ast.field.type).toBe("ImplicitField");
       expect(ast.expression.value).toBe("refund policy");
@@ -257,7 +294,9 @@ describe("parse operator matrix", () => {
 
   describe("special characters in unquoted values", () => {
     it("accepts `@` mid-value (e.g. emails)", () => {
-      const ast = parse("user:foo@bar.com") as { expression: { value: string } };
+      const ast = parse("user:foo@bar.com") as {
+        expression: { value: string };
+      };
       expect(ast.expression.value).toBe("foo@bar.com");
     });
 
@@ -268,16 +307,18 @@ describe("parse operator matrix", () => {
     });
 
     it("accepts `.` and `_` in field names (e.g. attribute paths)", () => {
-      const ast = parse("attribute.langwatch.user_id:abc") as { field: { name: string } };
+      const ast = parse("attribute.langwatch.user_id:abc") as {
+        field: { name: string };
+      };
       expect(ast.field.name).toBe("attribute.langwatch.user_id");
     });
   });
 
   describe("boolean operator forms", () => {
     it("uppercase AND/OR/NOT are recognised as boolean operators", () => {
-      const a = parse("status:error AND model:gpt-4o");
+      const a = parse("status:error AND model:gpt-5-mini");
       expect(a.type).toBe("LogicalExpression");
-      const o = parse("status:error OR model:gpt-4o");
+      const o = parse("status:error OR model:gpt-5-mini");
       expect(o.type).toBe("LogicalExpression");
       const n = parse("NOT status:error");
       expect(n.type).toBe("UnaryOperator");
@@ -286,9 +327,9 @@ describe("parse operator matrix", () => {
     it("lowercase `and` parses as a free-text token, not an operator", () => {
       // Documented limitation — booleans are case-sensitive. If this stops
       // being true, the docs and the AI prompt both need to update.
-      const ast = parse("status:error and model:gpt-4o");
+      const ast = parse("status:error and model:gpt-5-mini");
       // Without uppercase AND, liqe collapses adjacent terms into an
-      // implicit AND with `and`/`model:gpt-4o` as siblings — but the key
+      // implicit AND with `and`/`model:gpt-5-mini` as siblings — but the key
       // assertion is that we never get a single Tag with value `error and`.
       expect(ast.type).not.toBe("Tag");
     });
@@ -342,7 +383,10 @@ describe("parse silent miscarriages — non-obvious shapes the validator must ca
       // The user almost certainly meant negation. We can't fix this in the
       // parser, but the field `NOT-status` doesn't exist in SEARCH_FIELDS,
       // so the backend would 422. This test pins the silent-failure shape.
-      const ast = parse("NOT-status:error") as { type: string; field: { type: string; name: string } };
+      const ast = parse("NOT-status:error") as {
+        type: string;
+        field: { type: string; name: string };
+      };
       expect(ast.type).toBe("Tag");
       expect(ast.field.name).toBe("NOT-status");
     });
@@ -386,7 +430,9 @@ describe("validateAst", () => {
     });
 
     it("returns the field-name error for `field:`", () => {
-      expect(validateAst(parse("status:"))).toBe("Missing value after `status:`");
+      expect(validateAst(parse("status:"))).toBe(
+        "Missing value after `status:`",
+      );
     });
 
     it("returns the generic error when there is no field name", () => {
@@ -396,16 +442,25 @@ describe("validateAst", () => {
         validateAst({
           type: "Tag",
           field: { type: "ImplicitField" },
-          expression: { type: "EmptyExpression", location: { start: 0, end: 0 } },
-          operator: { type: "ComparisonOperator", operator: ":", location: { start: 0, end: 0 } },
+          expression: {
+            type: "EmptyExpression",
+            location: { start: 0, end: 0 },
+          },
+          operator: {
+            type: "ComparisonOperator",
+            operator: ":",
+            location: { start: 0, end: 0 },
+          },
           location: { start: 0, end: 0 },
-        // biome-ignore lint/suspicious/noExplicitAny: structural subset is sufficient for the validator
+          // biome-ignore lint/suspicious/noExplicitAny: structural subset is sufficient for the validator
         } as any),
       ).toBe("Missing value after `:`");
     });
 
     it("recurses into NOT operands", () => {
-      expect(validateAst(parse("NOT status:"))).toBe("Missing value after `status:`");
+      expect(validateAst(parse("NOT status:"))).toBe(
+        "Missing value after `status:`",
+      );
     });
 
     it("recurses into both arms of a LogicalExpression", () => {
@@ -415,9 +470,9 @@ describe("validateAst", () => {
     });
 
     it("recurses into parenthesised groups", () => {
-      expect(validateAst(parse("(status:error AND model:) OR origin:application"))).toBe(
-        "Missing value after `model:`",
-      );
+      expect(
+        validateAst(parse("(status:error AND model:) OR origin:application")),
+      ).toBe("Missing value after `model:`");
     });
   });
 });
@@ -436,7 +491,10 @@ describe("getFacetValues", () => {
   describe("given a query that doesn't mention the field", () => {
     it("returns empty arrays", () => {
       const ast = parse("status:error");
-      expect(getFacetValues(ast, "model")).toEqual({ include: [], exclude: [] });
+      expect(getFacetValues(ast, "model")).toEqual({
+        include: [],
+        exclude: [],
+      });
     });
   });
 
@@ -514,55 +572,6 @@ describe("getRangeValue", () => {
   });
 });
 
-describe("hasCrossFacetOR", () => {
-  describe("given an OR between two different fields at the top level", () => {
-    it("returns true", () => {
-      expect(hasCrossFacetOR(parse("status:error OR model:gpt-4o"))).toBe(true);
-    });
-  });
-
-  describe("given an OR between two values of the same field", () => {
-    it("returns false — same-field OR is sidebar-friendly", () => {
-      expect(hasCrossFacetOR(parse("status:error OR status:warning"))).toBe(false);
-    });
-  });
-
-  describe("given a top-level OR whose arms are simple Tags", () => {
-    it("returns true when the two Tag fields differ", () => {
-      // The detection works precisely when both arms of an OR are Tag (or
-      // NOT-Tag). Compound arms (AND/Parens) make `topField` return null,
-      // which short-circuits the cross-facet check.
-      expect(hasCrossFacetOR(parse("status:error OR model:gpt-4o"))).toBe(true);
-    });
-  });
-
-  describe("given an OR whose arms are compound", () => {
-    it("returns false when the OR's left arm is a compound AND — group has only one classifiable field", () => {
-      // `a AND b OR c` parses as `OR(AND(a,b), c)`. The OR analyzer
-      // stops at AND boundaries, so the left arm contributes no
-      // members; only `c` makes it into the group, which can't form a
-      // cross-facet OR on its own.
-      expect(
-        hasCrossFacetOR(parse("origin:application AND status:error OR model:gpt-4o")),
-      ).toBe(false);
-    });
-
-    it("returns true when an OR is wrapped in parens with two different fields", () => {
-      // The analyzer recurses into ParenthesizedExpressions, so a
-      // nested cross-facet OR is detected even with an outer AND.
-      expect(
-        hasCrossFacetOR(parse("origin:application AND (status:error OR model:gpt-4o)")),
-      ).toBe(true);
-    });
-  });
-
-  describe("given a query without any OR", () => {
-    it("returns false", () => {
-      expect(hasCrossFacetOR(parse("status:error AND model:gpt-4o"))).toBe(false);
-    });
-  });
-});
-
 describe("toggleFacetInQuery", () => {
   describe("starting from an empty query", () => {
     it("appends the clause as-is when transitioning neutral → include", () => {
@@ -574,6 +583,30 @@ describe("toggleFacetInQuery", () => {
           currentState: "neutral",
         }),
       ).toBe("status:error");
+    });
+
+    it("quotes a value with a slash so the result parses (model ids)", () => {
+      const query = toggleFacetInQuery({
+        currentQuery: "",
+        fieldName: "model",
+        value: "anthropic/claude-sonnet-4-6",
+        currentState: "neutral",
+      });
+      expect(query).toBe('model:"anthropic/claude-sonnet-4-6"');
+      // The bug was a runtime ParseError on the unquoted slash — assert
+      // the produced query actually parses, not just that it looks quoted.
+      expect(() => parse(query)).not.toThrow();
+    });
+
+    it("escapes embedded quotes in the value", () => {
+      const query = toggleFacetInQuery({
+        currentQuery: "",
+        fieldName: "label",
+        value: 'he said "hi"',
+        currentState: "neutral",
+      });
+      expect(query).toBe('label:"he said \\"hi\\""');
+      expect(() => parse(query)).not.toThrow();
     });
   });
 
@@ -607,12 +640,12 @@ describe("toggleFacetInQuery", () => {
     it("appends with AND when the query already has content", () => {
       expect(
         toggleFacetInQuery({
-          currentQuery: "model:gpt-4o",
+          currentQuery: "model:gpt-5-mini",
           fieldName: "status",
           value: "error",
           currentState: "neutral",
         }),
-      ).toBe("model:gpt-4o AND status:error");
+      ).toBe("model:gpt-5-mini AND status:error");
     });
 
     it("removes only the targeted value, leaving siblings intact", () => {
@@ -736,10 +769,10 @@ describe("removeFieldFromQuery", () => {
     it("drops every value of the field", () => {
       expect(
         removeFieldFromQuery({
-          currentQuery: "status:error AND status:warning AND model:gpt-4o",
+          currentQuery: "status:error AND status:warning AND model:gpt-5-mini",
           fieldName: "status",
         }),
-      ).toBe("model:gpt-4o");
+      ).toBe("model:gpt-5-mini");
     });
   });
 
@@ -748,10 +781,10 @@ describe("removeFieldFromQuery", () => {
       // Exact string can drift via serialiser whitespace; what matters is
       // that no clauses were dropped.
       const result = removeFieldFromQuery({
-        currentQuery: "status:error AND model:gpt-4o",
+        currentQuery: "status:error AND model:gpt-5-mini",
         fieldName: "cost",
       });
-      expect(result).toBe("status:error AND model:gpt-4o");
+      expect(result).toBe("status:error AND model:gpt-5-mini");
     });
   });
 
@@ -816,10 +849,10 @@ describe("buildFacetStateLookup", () => {
   describe("given a query with includes and excludes", () => {
     it("indexes both inclusion and exclusion states by `field|value`", () => {
       const map = buildFacetStateLookup(
-        parse("status:error AND -model:gpt-4o AND origin:application"),
+        parse("status:error AND -model:gpt-5-mini AND origin:application"),
       );
       expect(map.get("status|error")).toBe("include");
-      expect(map.get("model|gpt-4o")).toBe("exclude");
+      expect(map.get("model|gpt-5-mini")).toBe("exclude");
       expect(map.get("origin|application")).toBe("include");
       expect(map.get("status|warning")).toBeUndefined();
     });
@@ -839,7 +872,7 @@ describe("buildFacetStateLookup", () => {
         map.get(`${field}|${value}`) ?? "neutral";
       expect(get("status", "error")).toBe("include");
       expect(get("status", "warning")).toBe("neutral");
-      expect(get("model", "gpt-4o")).toBe("neutral");
+      expect(get("model", "gpt-5-mini")).toBe("neutral");
     });
   });
 });
@@ -847,7 +880,9 @@ describe("buildFacetStateLookup", () => {
 describe("analyzeOrGroups", () => {
   describe("given a query without any OR", () => {
     it("returns an empty analysis", () => {
-      const result = analyzeOrGroups(parse("status:error AND model:gpt-4o"));
+      const result = analyzeOrGroups(
+        parse("status:error AND model:gpt-5-mini"),
+      );
       expect(result.groups).toEqual([]);
       expect(result.memberToGroupId.size).toBe(0);
       expect(result.fieldToGroupIds.size).toBe(0);
@@ -871,7 +906,7 @@ describe("analyzeOrGroups", () => {
 
   describe("given a cross-facet OR", () => {
     it("emits one group whose fields span both Tags", () => {
-      const result = analyzeOrGroups(parse("status:error OR model:gpt-4o"));
+      const result = analyzeOrGroups(parse("status:error OR model:gpt-5-mini"));
       expect(result.groups).toHaveLength(1);
       const g = result.groups[0]!;
       expect(g.fields.size).toBe(2);
@@ -883,7 +918,7 @@ describe("analyzeOrGroups", () => {
   describe("given a NOT-wrapped Tag inside an OR", () => {
     it("marks that member as negated, peers as not-negated", () => {
       const result = analyzeOrGroups(
-        parse("status:error OR NOT model:gpt-4o"),
+        parse("status:error OR NOT model:gpt-5-mini"),
       );
       const members = result.groups[0]!.members;
       const status = members.find((m) => m.field === "status")!;
@@ -913,7 +948,7 @@ describe("analyzeOrGroups", () => {
   describe("given a multi-arm OR", () => {
     it("flattens nested ORs into a single group", () => {
       const result = analyzeOrGroups(
-        parse("status:error OR status:warning OR model:gpt-4o"),
+        parse("status:error OR status:warning OR model:gpt-5-mini"),
       );
       expect(result.groups).toHaveLength(1);
       const g = result.groups[0]!;
@@ -938,7 +973,7 @@ describe("analyzeOrGroups", () => {
       // so the group has 1 member — below the >1 threshold, no group
       // emitted.
       const result = analyzeOrGroups(
-        parse("(origin:application AND status:error) OR model:gpt-4o"),
+        parse("(origin:application AND status:error) OR model:gpt-5-mini"),
       );
       expect(result.groups).toEqual([]);
     });
@@ -948,7 +983,7 @@ describe("analyzeOrGroups", () => {
     it("emits one group per OR scope, each with its own id", () => {
       const result = analyzeOrGroups(
         parse(
-          "(status:error OR model:gpt-4o) AND (origin:application OR origin:simulation)",
+          "(status:error OR model:gpt-5-mini) AND (origin:application OR origin:simulation)",
         ),
       );
       expect(result.groups).toHaveLength(2);
@@ -962,7 +997,7 @@ describe("analyzeOrGroups", () => {
       // is the regression Copilot caught on the singular `fieldToGroupId`.)
       const result = analyzeOrGroups(
         parse(
-          "(status:error OR model:gpt-4o) AND (status:warning OR origin:application)",
+          "(status:error OR model:gpt-5-mini) AND (status:warning OR origin:application)",
         ),
       );
       const statusGroups = result.fieldToGroupIds.get("status");
@@ -993,20 +1028,20 @@ describe("analyzeOrGroups", () => {
 
   describe("given a cross-facet OR group's memberToGroupId map", () => {
     it("keys members by `${field}|${value}` resolving to the group id", () => {
-      const result = analyzeOrGroups(parse("status:error OR model:gpt-4o"));
+      const result = analyzeOrGroups(parse("status:error OR model:gpt-5-mini"));
       const id = result.groups[0]!.id;
       expect(result.memberToGroupId.get("status|error")).toBe(id);
     });
 
     it("returns undefined for non-member field/value pairs", () => {
-      const result = analyzeOrGroups(parse("status:error OR model:gpt-4o"));
+      const result = analyzeOrGroups(parse("status:error OR model:gpt-5-mini"));
       expect(result.memberToGroupId.get("status|warning")).toBeUndefined();
     });
   });
 
   describe("given an unparenthesised top-level OR", () => {
     it("emits a group whose location covers the full query", () => {
-      const query = "status:error OR model:gpt-4o";
+      const query = "status:error OR model:gpt-5-mini";
       const result = analyzeOrGroups(parse(query));
       const g = result.groups[0]!;
       expect(g.start).toBe(0);
@@ -1044,7 +1079,7 @@ describe("addToOrGroupAtLocation", () => {
 
   describe("given an invalid location", () => {
     it("returns the query unchanged when start === end", () => {
-      const q = "status:error OR model:gpt-4o";
+      const q = "status:error OR model:gpt-5-mini";
       expect(
         addToOrGroupAtLocation({
           currentQuery: q,
@@ -1057,7 +1092,7 @@ describe("addToOrGroupAtLocation", () => {
     });
 
     it("returns the query unchanged when end < start", () => {
-      const q = "status:error OR model:gpt-4o";
+      const q = "status:error OR model:gpt-5-mini";
       expect(
         addToOrGroupAtLocation({
           currentQuery: q,
@@ -1072,7 +1107,7 @@ describe("addToOrGroupAtLocation", () => {
 
   describe("given a top-level OR group", () => {
     it("appends ` OR field:value` after the group's end", () => {
-      const query = "status:error OR model:gpt-4o";
+      const query = "status:error OR model:gpt-5-mini";
       const ast = analyzeOrGroups(parse(query));
       const g = ast.groups[0]!;
       expect(
@@ -1083,13 +1118,13 @@ describe("addToOrGroupAtLocation", () => {
           fieldName: "origin",
           value: "app",
         }),
-      ).toBe("status:error OR model:gpt-4o OR origin:app");
+      ).toBe("status:error OR model:gpt-5-mini OR origin:app");
     });
   });
 
   describe("given a parenthesised OR group", () => {
     it("splices ` OR field:value` inside the parens", () => {
-      const query = "(status:error OR model:gpt-4o) AND name:bar";
+      const query = "(status:error OR model:gpt-5-mini) AND name:bar";
       const ast = analyzeOrGroups(parse(query));
       const g = ast.groups[0]!;
       // `g.start..g.end` covers the inner OR LogicalExpression — the
@@ -1103,14 +1138,14 @@ describe("addToOrGroupAtLocation", () => {
         value: "app",
       });
       expect(result).toBe(
-        "(status:error OR model:gpt-4o OR origin:app) AND name:bar",
+        "(status:error OR model:gpt-5-mini OR origin:app) AND name:bar",
       );
     });
   });
 
   describe("given leading whitespace on the query", () => {
     it("offsets the splice point by leading whitespace", () => {
-      const query = "  status:error OR model:gpt-4o";
+      const query = "  status:error OR model:gpt-5-mini";
       const ast = analyzeOrGroups(parse(query));
       const g = ast.groups[0]!;
       expect(
@@ -1121,7 +1156,7 @@ describe("addToOrGroupAtLocation", () => {
           fieldName: "origin",
           value: "app",
         }),
-      ).toBe("  status:error OR model:gpt-4o OR origin:app");
+      ).toBe("  status:error OR model:gpt-5-mini OR origin:app");
     });
   });
 
@@ -1139,6 +1174,233 @@ describe("addToOrGroupAtLocation", () => {
           value: "rate limit",
         }),
       ).toBe('status:error OR status:warning OR errorMessage:"rate limit"');
+    });
+  });
+});
+
+describe("addSameFieldOrValue", () => {
+  describe("given an empty query", () => {
+    describe("when adding the first value of a field", () => {
+      it("appends the bare clause — nothing to OR-combine with yet", () => {
+        expect(
+          addSameFieldOrValue({
+            currentQuery: "",
+            fieldName: "origin",
+            value: "sample",
+          }),
+        ).toBe("origin:sample");
+      });
+    });
+  });
+
+  describe("given a field that is not yet in the query", () => {
+    describe("when adding its first value alongside another field", () => {
+      it("AND-appends — a different field narrows, it does not OR", () => {
+        expect(
+          addSameFieldOrValue({
+            currentQuery: "model:gpt-5-mini",
+            fieldName: "origin",
+            value: "sample",
+          }),
+        ).toBe("model:gpt-5-mini AND origin:sample");
+      });
+    });
+  });
+
+  describe("given exactly one bare value of the field already present", () => {
+    describe("when adding a second value of the same field", () => {
+      it("wraps both into a parenthesised same-field OR group", () => {
+        // The core bug fix: two values of one field must OR, not AND —
+        // a trace's origin can't be both `sample` and `application`.
+        const out = addSameFieldOrValue({
+          currentQuery: "origin:sample",
+          fieldName: "origin",
+          value: "application",
+        });
+        expect(out).toBe("(origin:sample OR origin:application)");
+        expect(() => parse(out)).not.toThrow();
+      });
+    });
+
+    describe("when the field's lone value sits alongside a cross-field AND", () => {
+      it("parenthesises the same-field OR so it stays scoped under the AND", () => {
+        // CRITICAL precedence guard: `A AND b OR c` binds as
+        // `(A AND b) OR c` in liqe, so the same-field OR MUST be
+        // parenthesised or it silently widens the whole query.
+        const out = addSameFieldOrValue({
+          currentQuery: "model:gpt-5-mini AND origin:sample",
+          fieldName: "origin",
+          value: "application",
+        });
+        expect(out).toBe(
+          "model:gpt-5-mini AND (origin:sample OR origin:application)",
+        );
+        expect(() => parse(out)).not.toThrow();
+      });
+    });
+
+    describe("when adding a value that needs quoting", () => {
+      it("quotes the new value inside the group", () => {
+        const out = addSameFieldOrValue({
+          currentQuery: "model:gpt-5-mini",
+          fieldName: "model",
+          value: "anthropic/claude-sonnet-4-6",
+        });
+        // `model` already has one bare value → wrap into a group.
+        expect(out).toBe(
+          '(model:gpt-5-mini OR model:"anthropic/claude-sonnet-4-6")',
+        );
+        expect(() => parse(out)).not.toThrow();
+      });
+    });
+
+    describe("when the existing lone value needs quoting", () => {
+      it("re-quotes the existing value canonically inside the group", () => {
+        const out = addSameFieldOrValue({
+          currentQuery: 'errorMessage:"rate limit"',
+          fieldName: "errorMessage",
+          value: "timeout",
+        });
+        expect(out).toBe('(errorMessage:"rate limit" OR errorMessage:timeout)');
+        expect(() => parse(out)).not.toThrow();
+      });
+    });
+  });
+
+  describe("given the field's lone value is negated", () => {
+    describe("when adding a positive value of the same field", () => {
+      it("AND-appends rather than folding a NOT into an OR group", () => {
+        // `(NOT origin:sample OR origin:application)` reads ambiguously
+        // and the facet UI never produces it — leave the exclude alone.
+        const out = addSameFieldOrValue({
+          currentQuery: "NOT origin:sample",
+          fieldName: "origin",
+          value: "application",
+        });
+        expect(out).toBe("NOT origin:sample AND origin:application");
+        expect(() => parse(out)).not.toThrow();
+      });
+    });
+  });
+
+  describe("given the field already has a same-field OR group", () => {
+    describe("when adding a third value", () => {
+      it("falls back to AND-append — the splice path owns the third value", () => {
+        // Once the OR group exists, the store routes through
+        // `addToOrGroupAtLocation`; this helper is only the 1→2 step, so
+        // it must NOT try to re-wrap a value that's already OR-grouped.
+        const out = addSameFieldOrValue({
+          currentQuery: "(origin:sample OR origin:application)",
+          fieldName: "origin",
+          value: "api",
+        });
+        expect(out).toBe(
+          "(origin:sample OR origin:application) AND origin:api",
+        );
+        expect(() => parse(out)).not.toThrow();
+      });
+    });
+  });
+
+  describe("given the same-field OR sits inside an evaluator group", () => {
+    describe("when adding a second value of a normal facet", () => {
+      it("wraps only the bare facet value, leaving the evaluator group intact", () => {
+        // Regression guard for the evaluator parens group: the rewrite
+        // is location-scoped to the lone `origin` tag, so
+        // `(evaluator:X AND evaluatorVerdict:pass)` is untouched.
+        const out = addSameFieldOrValue({
+          currentQuery:
+            "origin:sample AND (evaluator:eval_1 AND evaluatorVerdict:pass)",
+          fieldName: "origin",
+          value: "application",
+        });
+        expect(out).toBe(
+          "(origin:sample OR origin:application) AND (evaluator:eval_1 AND evaluatorVerdict:pass)",
+        );
+        expect(() => parse(out)).not.toThrow();
+      });
+    });
+  });
+
+  describe("given an unparseable mid-edit query", () => {
+    it("returns the original string rather than throwing", () => {
+      expect(
+        addSameFieldOrValue({
+          currentQuery: "origin:sample AND",
+          fieldName: "origin",
+          value: "application",
+        }),
+      ).toBe("origin:sample AND");
+    });
+  });
+
+  describe("given the field appears multiple times via AND (hand-typed)", () => {
+    it("AND-appends — only a single lone value is safe to fold", () => {
+      const out = addSameFieldOrValue({
+        currentQuery: "origin:sample AND origin:application",
+        fieldName: "origin",
+        value: "api",
+      });
+      expect(out).toBe("origin:sample AND origin:application AND origin:api");
+    });
+  });
+});
+
+describe("addSameFieldOrValue removal round-trips (collapse via removeFacetValueFromQuery)", () => {
+  describe("given a three-value same-field OR group with a sibling AND", () => {
+    describe("when one value is removed (3 → 2)", () => {
+      it("keeps the parenthesised OR group", () => {
+        const out = removeFacetValueFromQuery({
+          currentQuery:
+            "(origin:sample OR origin:application OR origin:api) AND model:gpt-5-mini",
+          fieldName: "origin",
+          value: "api",
+        });
+        expect(out).toBe(
+          "(origin:sample OR origin:application) AND model:gpt-5-mini",
+        );
+        expect(() => parse(out)).not.toThrow();
+      });
+    });
+  });
+
+  describe("given a two-value same-field OR group with a sibling AND", () => {
+    describe("when one value is removed (2 → 1)", () => {
+      it("collapses to a bare tag with no stray parens or dangling OR", () => {
+        const out = removeFacetValueFromQuery({
+          currentQuery:
+            "model:gpt-5-mini AND (origin:sample OR origin:application)",
+          fieldName: "origin",
+          value: "application",
+        });
+        expect(out).toBe("model:gpt-5-mini AND origin:sample");
+        expect(() => parse(out)).not.toThrow();
+      });
+    });
+  });
+
+  describe("given a two-value same-field OR group as the whole query", () => {
+    describe("when the last-but-one value is removed (2 → 1)", () => {
+      it("collapses to a bare tag without parens", () => {
+        const out = removeFacetValueFromQuery({
+          currentQuery: "(origin:sample OR origin:application)",
+          fieldName: "origin",
+          value: "application",
+        });
+        expect(out).toBe("origin:sample");
+        expect(() => parse(out)).not.toThrow();
+      });
+    });
+
+    describe("when the final value is removed (1 → 0)", () => {
+      it("returns the empty query", () => {
+        const out = removeFacetValueFromQuery({
+          currentQuery: "origin:sample",
+          fieldName: "origin",
+          value: "sample",
+        });
+        expect(out).toBe("");
+      });
     });
   });
 });
@@ -1306,21 +1568,23 @@ describe("swapOperatorAtLocation", () => {
 
   describe("given an AND operator", () => {
     it("flips it to OR", () => {
-      const query = "status:error AND model:gpt-4o";
+      const query = "status:error AND model:gpt-5-mini";
       const { start, end } = locationOf(query, "AND");
-      expect(
-        swapOperatorAtLocation({ currentQuery: query, start, end }),
-      ).toBe("status:error OR model:gpt-4o");
+      expect(swapOperatorAtLocation({ currentQuery: query, start, end })).toBe(
+        "status:error OR model:gpt-5-mini",
+      );
     });
   });
 
   describe("given an OR operator", () => {
-    it("flips it to AND", () => {
-      const query = "status:error OR model:gpt-4o";
-      const { start, end } = locationOf(query, "OR");
-      expect(
-        swapOperatorAtLocation({ currentQuery: query, start, end }),
-      ).toBe("status:error AND model:gpt-4o");
+    describe("when swapping the operator", () => {
+      it("flips it to AND", () => {
+        const query = "status:error OR model:gpt-5-mini";
+        const { start, end } = locationOf(query, "OR");
+        expect(
+          swapOperatorAtLocation({ currentQuery: query, start, end }),
+        ).toBe("status:error AND model:gpt-5-mini");
+      });
     });
   });
 
@@ -1328,21 +1592,23 @@ describe("swapOperatorAtLocation", () => {
     it("normalises uppercase comparison and writes the canonical form", () => {
       // The comparison is case-insensitive so `and`/`AND`/`And` all
       // map; the replacement is always uppercase.
-      const query = "status:error and model:gpt-4o";
+      const query = "status:error and model:gpt-5-mini";
       const { start, end } = locationOf(query, "and");
-      expect(
-        swapOperatorAtLocation({ currentQuery: query, start, end }),
-      ).toBe("status:error OR model:gpt-4o");
+      expect(swapOperatorAtLocation({ currentQuery: query, start, end })).toBe(
+        "status:error OR model:gpt-5-mini",
+      );
     });
   });
 
   describe("given a slice that isn't an operator", () => {
-    it("returns the query unchanged", () => {
-      const query = "status:error AND model:gpt-4o";
-      const { start, end } = locationOf(query, "status");
-      expect(
-        swapOperatorAtLocation({ currentQuery: query, start, end }),
-      ).toBe(query);
+    describe("when swapping the operator", () => {
+      it("returns the query unchanged", () => {
+        const query = "status:error AND model:gpt-5-mini";
+        const { start, end } = locationOf(query, "status");
+        expect(
+          swapOperatorAtLocation({ currentQuery: query, start, end }),
+        ).toBe(query);
+      });
     });
   });
 
@@ -1350,7 +1616,7 @@ describe("swapOperatorAtLocation", () => {
     it("offsets the splice point by leading whitespace", () => {
       // The handler converts liqe-trimmed coords to absolute coords by
       // adding leadingWs before the swap.
-      const query = "  status:error AND model:gpt-4o";
+      const query = "  status:error AND model:gpt-5-mini";
       // In trimmed coords, AND is at 13..16. The function adds
       // leadingWs (2) → swaps 15..18 in the absolute string.
       expect(
@@ -1359,7 +1625,7 @@ describe("swapOperatorAtLocation", () => {
           start: 13,
           end: 16,
         }),
-      ).toBe("  status:error OR model:gpt-4o");
+      ).toBe("  status:error OR model:gpt-5-mini");
     });
   });
 });

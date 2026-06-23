@@ -1,6 +1,6 @@
 import { Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { memo, useCallback } from "react";
-import { LuLayers, LuList } from "react-icons/lu";
+import { LuLayers } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { formatDuration, SPAN_TYPE_COLORS } from "../../../utils/formatters";
 import {
@@ -22,14 +22,12 @@ export const GroupRow = memo(function GroupRow({
   groupKey,
   isExpanded,
   onToggle,
-  onSwitchToSpanList,
 }: {
   group: SiblingGroup;
   /** Stable identity for this fold — `parentSpanId::name`. */
   groupKey: string;
   isExpanded: boolean;
   onToggle: (groupKey: string) => void;
-  onSwitchToSpanList?: (nameFilter: string, typeFilter: string) => void;
 }) {
   const handleToggle = useCallback(
     () => onToggle(groupKey),
@@ -114,33 +112,6 @@ export const GroupRow = memo(function GroupRow({
             )}
           </HStack>
         </Flex>
-
-        {/* View in Span List link */}
-        {onSwitchToSpanList && (
-          <Tooltip
-            content="View in Span List"
-            positioning={{ placement: "top" }}
-          >
-            <Flex
-              as="button"
-              aria-label="View in Span List"
-              align="center"
-              justify="center"
-              width="20px"
-              height="20px"
-              borderRadius="sm"
-              color="fg.subtle"
-              _hover={{ color: "blue.fg", bg: "blue.subtle" }}
-              onClick={(e) => {
-                e.stopPropagation();
-                onSwitchToSpanList(group.name, group.type);
-              }}
-              flexShrink={0}
-            >
-              <Icon as={LuList} boxSize={3} />
-            </Flex>
-          </Tooltip>
-        )}
       </HStack>
     </Tooltip>
   );

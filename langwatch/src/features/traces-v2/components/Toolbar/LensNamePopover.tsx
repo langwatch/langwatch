@@ -1,4 +1,4 @@
-import { Button, HStack, Input } from "@chakra-ui/react";
+import { Button, HStack, Input, Stack } from "@chakra-ui/react";
 import type React from "react";
 import { useState } from "react";
 import {
@@ -21,19 +21,26 @@ interface LensNamePopoverProps {
   children: React.ReactNode;
   /** Popover content width. Defaults to 280px to match CreateLensButton. */
   width?: string;
+  /** Anchor placement. Defaults to bottom-end (right-aligned triggers). */
+  placement?: "bottom-start" | "bottom-end";
+  /** Optional content rendered under the input (e.g. a beta disclaimer). */
+  footer?: React.ReactNode;
 }
 
 /**
  * Shared "name this new lens" popover used by every save-as-new entry
- * point (Toolbar Save Lens, lens tab right-click → Save as new, lens
- * draft dot → Save as new). One Chakra popover everywhere replaces the
- * legacy `window.prompt` dialogs scattered across the codebase.
+ * point (Toolbar Save Lens, the inline + new-lens button, lens tab
+ * right-click → Save as new, lens draft dot → Save as new). One Chakra
+ * popover everywhere replaces the legacy `window.prompt` dialogs
+ * scattered across the codebase.
  */
 export const LensNamePopover: React.FC<LensNamePopoverProps> = ({
   defaultName = "",
   onSubmit,
   children,
   width = "280px",
+  placement = "bottom-end",
+  footer,
 }) => {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(defaultName);
@@ -57,32 +64,35 @@ export const LensNamePopover: React.FC<LensNamePopoverProps> = ({
         setOpen(e.open);
         if (e.open) setName(defaultName);
       }}
-      positioning={{ placement: "bottom-end" }}
+      positioning={{ placement }}
     >
       <PopoverTrigger asChild>{children}</PopoverTrigger>
       <PopoverContent width={width}>
         <PopoverBody>
-          <HStack gap={2}>
-            <Input
-              autoFocus
-              size="sm"
-              placeholder="Lens name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") submit();
-                else if (e.key === "Escape") reset();
-              }}
-            />
-            <Button
-              size="sm"
-              colorPalette="blue"
-              onClick={submit}
-              disabled={!name.trim()}
-            >
-              Create
-            </Button>
-          </HStack>
+          <Stack gap={3}>
+            <HStack gap={2}>
+              <Input
+                autoFocus
+                size="sm"
+                placeholder="Lens name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") submit();
+                  else if (e.key === "Escape") reset();
+                }}
+              />
+              <Button
+                size="sm"
+                colorPalette="blue"
+                onClick={submit}
+                disabled={!name.trim()}
+              >
+                Create
+              </Button>
+            </HStack>
+            {footer}
+          </Stack>
         </PopoverBody>
       </PopoverContent>
     </PopoverRoot>

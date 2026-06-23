@@ -4,9 +4,10 @@ import type React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { SimpleSlider } from "~/components/ui/slider";
 import {
-  getFacetValueState,
-  getRangeValue,
-} from "~/server/app-layer/traces/query-language/queries";
+  EVALUATOR_LABEL_FIELD,
+  EVALUATOR_VERDICT_FIELD,
+  readEvaluatorGroupFromAst,
+} from "~/server/app-layer/traces/query-language/evaluatorGroup";
 import { RowButton } from "./RowButton";
 import { commitRange, RangeEndpointInput, stepForSpan } from "./rangeControls";
 import type { FacetItem } from "./types";
@@ -16,29 +17,20 @@ interface EvaluatorDrilldownProps {
   /** The evaluator FacetItem (must carry aggregates). */
   item: FacetItem;
   ast: LiqeQuery;
-  toggleFacet: ({
-    field,
-    value,
-    isModifierKey,
-  }: {
-    field: string;
-    value: string;
-    isModifierKey?: boolean;
-  }) => void;
-  setRange: ({
-    field,
-    from,
-    to,
-  }: {
-    field: string;
-    from: string;
-    to: string;
-  }) => void;
-  removeRange: ({ field }: { field: string }) => void;
+  /**
+   * Toggle a verdict / label sub-condition for THIS evaluator. The caller
+   * binds it to `item.value`, wrapping the result in the evaluator's
+   * parenthesised group — so the verdict / label scopes to one evaluation.
+   */
+  toggleSubFilter: ({ field, value }: { field: string; value: string }) => void;
+  /** Set the score range inside this evaluator's group. */
+  setScoreRange: ({ from, to }: { from: string; to: string }) => void;
+  /** Clear just the score range from this evaluator's group. */
+  removeScoreRange: () => void;
 }
 
-const VERDICT_FIELD = "evaluatorVerdict";
-const SCORE_FIELD = "evaluatorScore";
+const VERDICT_FIELD = EVALUATOR_VERDICT_FIELD;
+const LABEL_FIELD = EVALUATOR_LABEL_FIELD;
 
 interface VerdictRowSpec {
   verdict: "pass" | "fail" | "error";
@@ -63,31 +55,58 @@ interface VerdictRowSpec {
 export const EvaluatorDrilldown: React.FC<EvaluatorDrilldownProps> = ({
   item,
   ast,
-  toggleFacet,
-  setRange,
-  removeRange,
+  toggleSubFilter,
+  setScoreRange,
+  removeScoreRange,
 }) => {
   // Hooks must run unconditionally; gate everything below by checking
   // `aggregates` *after* the hooks rather than early-returning above
   // them. The render result short-circuits to null when aggregates are
   // missing, but the hook order stays stable.
   const aggregates = item.aggregates;
+  // Read THIS evaluator's group state out of the AST — verdict / label /
+  // score active state is scoped to `(evaluator:<id> AND …)`, so two active
+  // evaluators that share a verdict value don't alias each other.
+  const group = useMemo(
+    () => readEvaluatorGroupFromAst(ast, item.value),
+    [ast, item.value],
+  );
   const verdicts = useMemo<VerdictRowSpec[]>(
     () => (aggregates ? buildVerdictSpecs(aggregates) : []),
     [aggregates],
   );
   const activeVerdicts = useMemo(
-    () => computeActiveVerdicts(ast, verdicts),
-    [ast, verdicts],
+    () => computeActiveSubValues(group, VERDICT_FIELD),
+    [group],
   );
-  const currentScoreRange = useMemo(
-    () => getRangeValue(ast, SCORE_FIELD),
-    [ast],
+  const activeLabels = useMemo(
+    () => computeActiveSubValues(group, LABEL_FIELD),
+    [group],
   );
+  const currentScoreRange = group.score;
 
   if (!aggregates) return null;
   const visibleVerdicts = verdicts.filter((v) => v.count > 0);
   const maxVerdictCount = Math.max(...visibleVerdicts.map((v) => v.count), 0);
+
+  const labelValues = aggregates.labelValues ?? [];
+  const visibleLabels = labelValues.filter((l) => l.count > 0);
+  const maxLabelCount = Math.max(...visibleLabels.map((l) => l.count), 0);
+
+  // The "pass/fail rows AND a score slider" confusion comes from
+  // evaluators that emit a binary 0/1 score alongside `passed` — the
+  // slider over [0,1] just re-expresses the verdict the pill rows
+  // already show. Suppress the score control in that exact case: two
+  // distinct score values spanning [0, 1]. Genuine score ranges keep it,
+  // and an evaluator whose scores only *happen* to be constant in this
+  // window (a single distinct value) still renders its mono value line
+  // via ScoreRangeControl. `hasScore` alone fired for any non-null
+  // score, which is what surfaced the redundant slider.
+  const scoreMirrorsVerdict =
+    aggregates.distinctScores === 2 &&
+    aggregates.scoreMin === 0 &&
+    aggregates.scoreMax === 1;
+  const hasMeaningfulScore = aggregates.hasScore && !scoreMirrorsVerdict;
 
   return (
     // Indented under the row by the same amount the FacetRow text starts
@@ -106,38 +125,49 @@ export const EvaluatorDrilldown: React.FC<EvaluatorDrilldownProps> = ({
         {visibleVerdicts.length > 0 && (
           <VStack align="stretch" gap={0}>
             {visibleVerdicts.map((v) => (
-              <VerdictRow
+              <ValueRow
                 key={v.verdict}
-                spec={v}
+                label={v.label}
+                count={v.count}
+                palette={v.palette}
+                showDot
                 maxCount={maxVerdictCount}
                 active={activeVerdicts.has(v.verdict)}
                 onClick={() =>
-                  toggleFacet({ field: VERDICT_FIELD, value: v.verdict })
+                  toggleSubFilter({ field: VERDICT_FIELD, value: v.verdict })
                 }
               />
             ))}
           </VStack>
         )}
-        {aggregates.hasScore && (
+        {hasMeaningfulScore && (
           <ScoreRangeControl
             scoreMin={aggregates.scoreMin}
             scoreMax={aggregates.scoreMax}
             currentFrom={currentScoreRange?.from}
             currentTo={currentScoreRange?.to}
             onChange={(from, to) =>
-              setRange({
-                field: SCORE_FIELD,
-                from: String(from),
-                to: String(to),
-              })
+              setScoreRange({ from: String(from), to: String(to) })
             }
-            onClear={() => removeRange({ field: SCORE_FIELD })}
+            onClear={removeScoreRange}
           />
         )}
-        {aggregates.hasLabel && (
-          <Text textStyle="2xs" color="fg.subtle" paddingX={1.5}>
-            Emits labels
-          </Text>
+        {visibleLabels.length > 0 && (
+          <VStack align="stretch" gap={0}>
+            {visibleLabels.map((l) => (
+              <ValueRow
+                key={l.value}
+                label={l.value}
+                count={l.count}
+                palette="purple"
+                maxCount={maxLabelCount}
+                active={activeLabels.has(l.value)}
+                onClick={() =>
+                  toggleSubFilter({ field: LABEL_FIELD, value: l.value })
+                }
+              />
+            ))}
+          </VStack>
         )}
       </VStack>
     </Box>
@@ -175,15 +205,19 @@ function buildVerdictSpecs(aggregates: {
   ];
 }
 
-function computeActiveVerdicts(
-  ast: LiqeQuery,
-  verdicts: VerdictRowSpec[],
+/**
+ * Values of `field` (verdict or label) that are actively INCLUDED in this
+ * evaluator's group. Excluded (negated) sub-conditions aren't surfaced as
+ * active — the drilldown rows only model include-state, matching the previous
+ * behaviour.
+ */
+function computeActiveSubValues(
+  group: { categorical: { field: string; value: string; negated: boolean }[] },
+  field: string,
 ): Set<string> {
   const set = new Set<string>();
-  for (const v of verdicts) {
-    if (getFacetValueState(ast, VERDICT_FIELD, v.verdict) === "include") {
-      set.add(v.verdict);
-    }
+  for (const sub of group.categorical) {
+    if (sub.field === field && !sub.negated) set.add(sub.value);
   }
   return set;
 }
@@ -191,26 +225,38 @@ function computeActiveVerdicts(
 const MIN_VISIBLE_FILL_PCT = 4;
 
 /**
- * Compact verdict row in FacetRow's visual idiom: coloured status dot,
- * label, right-aligned count, a thin proportional fill bar along the
- * bottom edge, subtle-bg + right accent bar when active.
+ * Compact, clickable filter row in FacetRow's visual idiom: optional coloured
+ * status dot, label, right-aligned count, a thin proportional fill bar along
+ * the bottom edge, subtle-bg + right accent bar when active. Shared by the
+ * verdict pills (with a status dot) and the emitted-label rows (no dot —
+ * labels are free-form strings, not a closed traffic-light enum).
  */
-const VerdictRow: React.FC<{
-  spec: VerdictRowSpec;
+const ValueRow: React.FC<{
+  label: string;
+  count: number;
+  /** Chakra palette token for the dot + active state (green / red / purple…). */
+  palette: string;
   maxCount: number;
   active: boolean;
   onClick: () => void;
-}> = ({ spec, maxCount, active, onClick }) => {
+  showDot?: boolean;
+}> = ({
+  label,
+  count,
+  palette,
+  maxCount,
+  active,
+  onClick,
+  showDot = false,
+}) => {
   const fillPct =
-    maxCount > 0
-      ? Math.max((spec.count / maxCount) * 100, MIN_VISIBLE_FILL_PCT)
-      : 0;
+    maxCount > 0 ? Math.max((count / maxCount) * 100, MIN_VISIBLE_FILL_PCT) : 0;
   return (
     <RowButton
       type="button"
       role="checkbox"
       aria-checked={active}
-      aria-label={`${spec.label} — ${active ? "included" : "click to include"}`}
+      aria-label={`${label} — ${active ? "included" : "click to include"}`}
       position="relative"
       width="full"
       paddingY={0.5}
@@ -220,12 +266,12 @@ const VerdictRow: React.FC<{
       textAlign="left"
       borderRadius="sm"
       overflow="hidden"
-      background={active ? `${spec.palette}.subtle` : "transparent"}
+      background={active ? `${palette}.subtle` : "transparent"}
       borderWidth={0}
       onClick={onClick}
       transition="background 120ms ease"
       _hover={{
-        background: active ? `${spec.palette}.subtle` : "bg.muted",
+        background: active ? `${palette}.subtle` : "bg.muted",
       }}
       _focusVisible={{
         outline: "2px solid",
@@ -239,7 +285,7 @@ const VerdictRow: React.FC<{
         left={0}
         width={`${fillPct}%`}
         height="2px"
-        bg={`${spec.palette}.solid`}
+        bg={`${palette}.solid`}
         opacity={0.55}
         pointerEvents="none"
       />
@@ -250,18 +296,20 @@ const VerdictRow: React.FC<{
           right={0}
           bottom={0}
           width="2px"
-          bg={`${spec.palette}.solid`}
+          bg={`${palette}.solid`}
           pointerEvents="none"
         />
       )}
       <HStack gap={1.5} position="relative" minWidth={0} zIndex={1}>
-        <Box
-          width="6px"
-          height="6px"
-          borderRadius="full"
-          bg={`${spec.palette}.solid`}
-          flexShrink={0}
-        />
+        {showDot && (
+          <Box
+            width="6px"
+            height="6px"
+            borderRadius="full"
+            bg={`${palette}.solid`}
+            flexShrink={0}
+          />
+        )}
         <Text
           textStyle="2xs"
           fontWeight={active ? "600" : "500"}
@@ -270,7 +318,7 @@ const VerdictRow: React.FC<{
           minWidth={0}
           color={active ? "fg" : "fg.muted"}
         >
-          {spec.label}
+          {label}
         </Text>
         <Text
           textStyle="2xs"
@@ -279,7 +327,7 @@ const VerdictRow: React.FC<{
           fontWeight={active ? "600" : "400"}
           flexShrink={0}
         >
-          {formatCount(spec.count)}
+          {formatCount(count)}
         </Text>
       </HStack>
     </RowButton>

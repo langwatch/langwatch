@@ -2,7 +2,6 @@ import { create } from "zustand";
 
 interface RefreshUIState {
   isRefreshing: boolean;
-  setRefreshing: (value: boolean) => void;
   /**
    * Briefly turn the refresh spinner on so the user gets visual feedback for
    * events that don't necessarily kick a tanstack refetch (cached
@@ -51,7 +50,6 @@ let refreshRequestTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const useRefreshUIStore = create<RefreshUIState>((set) => ({
   isRefreshing: false,
-  setRefreshing: (value) => set({ isRefreshing: value }),
   pulse: (durationMs = 900) => {
     if (pulseClearTimer) clearTimeout(pulseClearTimer);
     set({ isRefreshing: true });

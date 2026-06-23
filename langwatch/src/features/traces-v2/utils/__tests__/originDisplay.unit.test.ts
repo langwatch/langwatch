@@ -1,3 +1,4 @@
+import { isValidElement, type ReactElement } from "react";
 import { describe, expect, it } from "vitest";
 import { FACET_COLORS } from "../../components/FilterSidebar/constants";
 import {
@@ -16,10 +17,22 @@ const knownOrigins = Object.keys(ORIGIN_DISPLAY) as Array<
   keyof typeof ORIGIN_DISPLAY
 >;
 
-function renderOriginBadge(origin: string) {
-  return OriginCell.render({
+function renderOriginBadge(origin: string): ReactElement<{
+  children: React.ReactNode;
+  colorPalette: string;
+}> {
+  const rendered = OriginCell.render({
     row: { origin } as TraceListItem,
-  } as Parameters<typeof OriginCell.render>[0]);
+  } as Parameters<typeof OriginCell.render>[0]) as ReactElement<{
+    children: unknown;
+  }>;
+  // When an origin is present the Badge is wrapped in a FilterChip
+  // (click-to-filter); unwrap to the inner Badge for prop assertions.
+  const inner = rendered.props.children;
+  return (isValidElement(inner) ? inner : rendered) as ReactElement<{
+    children: React.ReactNode;
+    colorPalette: string;
+  }>;
 }
 
 describe("origin display mapping", () => {

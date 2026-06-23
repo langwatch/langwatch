@@ -12,6 +12,15 @@ export interface ConversationTurn {
   status: TraceListItem["status"];
   input: string | null;
   output: string | null;
+  /**
+   * Set when a restrict privacy rule hid the turn's content from this viewer
+   * (the server nulled `input`/`output`). Lets the strip render a "Redacted"
+   * marker instead of a "(no message)" placeholder that reads as truly absent.
+   */
+  inputRedacted?: boolean | null;
+  outputRedacted?: boolean | null;
+  inputVisibleTo?: string | null;
+  outputVisibleTo?: string | null;
 }
 
 export interface ConversationContextResult {

@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-table";
 import type React from "react";
 import { useCallback, useMemo } from "react";
+import { useEvaluatorOptions } from "../../hooks/useEvaluatorOptions";
 import {
   getColumnSizingKey,
   useColumnSizingStore,
@@ -16,6 +17,7 @@ import {
 import { useFilterStore } from "../../stores/filterStore";
 import { type LensConfig, useViewStore } from "../../stores/viewStore";
 import type { TraceListItem } from "../../types/trace";
+import { ADD_COLUMN_ID } from "./AddColumnHeader";
 import { RegistryRow } from "./registry";
 import { SELECT_COLUMN_ID } from "./registry/cells/SelectCells";
 
@@ -24,8 +26,12 @@ import { SELECT_COLUMN_ID } from "./registry/cells/SelectCells";
  * stable across renders — without it, every render would hand the
  * shell a new Set and the SortableContext would treat its items as
  * having changed, kicking off unnecessary re-mounts of the header row.
+ *
+ * Holds the two synthetic columns that frame the data columns: the
+ * leading row-select checkbox and the trailing "+" add-column affordance.
+ * Both are excluded from drag-reorder and sort.
  */
-const SELECT_COLUMN_ID_SET = new Set([SELECT_COLUMN_ID]);
+const NON_REORDERABLE_COLUMN_IDS = new Set([SELECT_COLUMN_ID, ADD_COLUMN_ID]);
 
 import { buildTracePlaceholderRows } from "./skeletonPlaceholders";
 import { TraceTableShell } from "./TraceTableShell";
@@ -63,8 +69,10 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
     () => (isLoading ? buildTracePlaceholderRows(pageSize) : traces),
     [isLoading, pageSize, traces],
   );
+  const { nameByKey: evaluatorNames } = useEvaluatorOptions();
   const { columns, registry, minWidth } = useTraceLensColumns({
     logicalColumnIds: lens.columns,
+    evaluatorNames,
   });
   const {
     selectedTraceId,
@@ -130,7 +138,7 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
   // visible leaf order on every change, keeping headers and cells in
   // lockstep with the store.
   const columnOrderState = useMemo<string[]>(
-    () => [SELECT_COLUMN_ID, ...lens.columns],
+    () => [SELECT_COLUMN_ID, ...lens.columns, ADD_COLUMN_ID],
     [lens.columns],
   );
 
@@ -194,7 +202,7 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
           // marks the active lens dirty so the change shows up in
           // the "save lens" affordance.
           onColumnReorder={setVisibleColumns}
-          pinnedColumnIds={SELECT_COLUMN_ID_SET}
+          pinnedColumnIds={NON_REORDERABLE_COLUMN_IDS}
         >
           <VirtualSpacer height={paddingTop} colSpan={colSpan} />
           {virtualItems.map((virtualItem) => {

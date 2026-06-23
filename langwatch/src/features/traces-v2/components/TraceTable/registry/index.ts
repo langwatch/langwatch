@@ -10,19 +10,16 @@ import { traceCells } from "./cells/trace";
 import type { Registry } from "./types";
 
 export const traceRegistry: Registry<TraceListItem> = {
-  rowKind: "trace",
   cells: traceCells,
   addons: traceAddons,
 };
 
 export const conversationRegistry: Registry<ConversationGroup> = {
-  rowKind: "conversation",
   cells: conversationCells,
   addons: conversationAddons,
 };
 
 export const groupRegistry: Registry<TraceGroup> = {
-  rowKind: "group",
   cells: groupCells,
   addons: groupAddons,
 };

@@ -1,4 +1,12 @@
-import { Box, Flex, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Flex,
+  HStack,
+  Icon,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { AlertTriangle, Bot, Clock, User } from "lucide-react";
 import type React from "react";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
@@ -16,34 +24,36 @@ import { type RowStyle, StatusDot } from "../../../StatusRow";
 import { Td, Tr } from "../../../TablePrimitives";
 import { Bubble } from "./Bubble";
 import { ConversationSummaryLine } from "./ConversationSummary";
+import { EXPANDED_BG_CSS } from "./expandedTurnStyles";
 import {
   formatGapSeconds,
   TURN_GAP_PAUSE_SECONDS,
   TURN_GAP_VISIBLE_SECONDS,
   turnGapSeconds,
 } from "./turnGap";
+import { SHOW_MORE_STEP, useTurnsWindow } from "./turnsWindow";
 
 interface ChatTurnsProps {
   group: ConversationGroup;
   colSpan: number;
   style: RowStyle;
-  visibleTurns: TraceListItem[];
-  overflow: number;
 }
 
 export const ChatTurns: React.FC<ChatTurnsProps> = ({
   group,
   colSpan,
   style,
-  visibleTurns,
-  overflow,
 }) => {
-  const systemPrompt = parseSystemPrompt(visibleTurns[0]?.input);
+  const systemPrompt = parseSystemPrompt(group.traces[0]?.input);
+  const { head, tail, hiddenCount, showMore, showAll, canShowMore } =
+    useTurnsWindow(group.traces);
+  const nextStep = Math.min(SHOW_MORE_STEP, hiddenCount);
 
   return (
-    <Tr bg="fg/2" borderBottomWidth="1px" borderBottomColor="border.muted">
+    <Tr borderBottomWidth="1px" borderBottomColor="border.muted">
       <Td
         colSpan={colSpan}
+        style={{ backgroundColor: EXPANDED_BG_CSS }}
         padding="20px 32px 28px 56px"
         borderLeftWidth="2px"
         borderLeftColor={style.borderColor}
@@ -52,20 +62,47 @@ export const ChatTurns: React.FC<ChatTurnsProps> = ({
           <ConversationSummaryLine group={group} />
           {systemPrompt && <SystemPromptBanner text={systemPrompt} />}
           <VStack align="stretch" gap={5}>
-            {visibleTurns.map((trace, i) => (
+            {head.map((trace, i) => (
               <ChatTurn
                 key={trace.traceId}
                 trace={trace}
                 turnIndex={i}
-                prevTrace={i > 0 ? visibleTurns[i - 1] : undefined}
+                prevTrace={i > 0 ? head[i - 1] : undefined}
               />
             ))}
+            {canShowMore && (
+              <HStack justify="center" gap={2} paddingY={1}>
+                <Box height="1px" flex={1} bg="border.muted" />
+                <Text textStyle="sm" color="fg.subtle" flexShrink={0}>
+                  … {hiddenCount} more {hiddenCount === 1 ? "turn" : "turns"}
+                </Text>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  color="blue.fg"
+                  onClick={showMore}
+                >
+                  Show {nextStep} more
+                </Button>
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  color="fg.muted"
+                  onClick={showAll}
+                >
+                  Show all
+                </Button>
+                <Box height="1px" flex={1} bg="border.muted" />
+              </HStack>
+            )}
+            {tail && (
+              <ChatTurn
+                trace={tail}
+                turnIndex={group.traces.length - 1}
+                prevTrace={undefined}
+              />
+            )}
           </VStack>
-          {overflow > 0 && (
-            <Text textStyle="sm" color="fg.subtle" textAlign="center">
-              … {overflow} more {overflow === 1 ? "turn" : "turns"}
-            </Text>
-          )}
         </VStack>
       </Td>
     </Tr>
@@ -185,10 +222,7 @@ const TurnDivider: React.FC<{
           {formatDuration(trace.durationMs)}
         </Text>
         <Box marginLeft={1}>
-          <TraceIdPeek
-            traceId={trace.traceId}
-            occurredAtMs={trace.timestamp}
-          />
+          <TraceIdPeek traceId={trace.traceId} occurredAtMs={trace.timestamp} />
         </Box>
       </HStack>
       <Box

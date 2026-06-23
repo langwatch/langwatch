@@ -32,8 +32,6 @@ export interface FacetVisibilityState {
   showFacet: (projectId: string, key: string) => void;
   /** Hide a facet key that density would show. */
   hideFacet: (projectId: string, key: string) => void;
-  /** Drop both overrides for `key` — reverts to density default. */
-  resetFacet: (projectId: string, key: string) => void;
   /** Drop ALL overrides for the project — reverts the whole sidebar. */
   resetAll: (projectId: string) => void;
 }
@@ -63,7 +61,9 @@ function readFromStorage(projectId: string): {
     if (parsed.version !== 1) return fallback;
     return {
       explicitlyShown: Array.isArray(parsed.explicitlyShown)
-        ? parsed.explicitlyShown.filter((s): s is string => typeof s === "string")
+        ? parsed.explicitlyShown.filter(
+            (s): s is string => typeof s === "string",
+          )
         : [],
       explicitlyHidden: Array.isArray(parsed.explicitlyHidden)
         ? parsed.explicitlyHidden.filter(
@@ -139,16 +139,6 @@ export const useFacetVisibilityStore = create<FacetVisibilityState>(
         explicitlyHidden: current.explicitlyHidden.includes(key)
           ? current.explicitlyHidden
           : [...current.explicitlyHidden, key],
-      };
-      writeToStorage(projectId, next);
-      set((s) => ({ byProject: { ...s.byProject, [projectId]: next } }));
-    },
-
-    resetFacet: (projectId, key) => {
-      const current = get().byProject[projectId] ?? readFromStorage(projectId);
-      const next = {
-        explicitlyShown: current.explicitlyShown.filter((k) => k !== key),
-        explicitlyHidden: current.explicitlyHidden.filter((k) => k !== key),
       };
       writeToStorage(projectId, next);
       set((s) => ({ byProject: { ...s.byProject, [projectId]: next } }));

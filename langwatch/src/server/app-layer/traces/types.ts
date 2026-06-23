@@ -87,6 +87,14 @@ export const traceSummaryDataSchema = z.object({
   topicId: z.string().nullable(),
   subTopicId: z.string().nullable(),
   annotationIds: z.array(z.string()),
+  /**
+   * Stored payload size of the trace in bytes, read from the MATERIALIZED
+   * `_size_bytes` column (CH-native `byteSize(...)`; see migration 00032).
+   * Read-only projection: it is computed server-side and never written in
+   * INSERTs (MATERIALIZED columns reject inserted values), so the write/
+   * upsert path leaves it undefined — only the list read populates it.
+   */
+  sizeBytes: z.number().optional(),
   attributes: z.record(z.string()),
   traceName: z.string(),
   /** Start time of the root span that set traceName, used for deterministic tie-breaking when multiple root spans exist. Internal bookkeeping. */

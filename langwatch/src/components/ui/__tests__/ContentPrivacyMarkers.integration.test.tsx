@@ -110,6 +110,44 @@ describe("ContentPrivacyMarkers", () => {
       expect(container.textContent).toBe("");
     });
   });
+
+  // The span I/O section frames the standalone system/tools markers so they
+  // read as an intentional, contained redaction state rather than cramped text.
+  describe("when framed", () => {
+    it("still renders the marker inside a bordered panel", () => {
+      const { container } = render(
+        <Wrapper>
+          <ContentPrivacyMarkers
+            privacy={privacy({
+              tools: { state: "restricted", visibleTo: "Admins" },
+            })}
+            categories={["system", "tools"]}
+            framed
+          />
+        </Wrapper>,
+      );
+      expect(container.textContent).toContain(
+        "Tool calls hidden (visible to Admins)",
+      );
+      // The outer wrapper carries a border so the block reads as a panel.
+      const panel = container.firstElementChild as HTMLElement | null;
+      expect(panel).not.toBeNull();
+      expect(panel!.style.borderWidth || panel!.className).toBeTruthy();
+    });
+
+    it("renders nothing when there is nothing to mark, even framed", () => {
+      const { container } = render(
+        <Wrapper>
+          <ContentPrivacyMarkers
+            privacy={privacy()}
+            categories={["system", "tools"]}
+            framed
+          />
+        </Wrapper>,
+      );
+      expect(container.textContent).toBe("");
+    });
+  });
 });
 
 describe("PiiIncompleteNotice", () => {

@@ -70,7 +70,6 @@ interface VizPlaceholderProps {
   selectedSpanId: string | null;
   onSelectSpan: (spanId: string) => void;
   onClearSpan: () => void;
-  onSwitchToSpanList?: (nameFilter: string, typeFilter: string) => void;
   /**
    * When true, the viz fills its parent's full height — the internal
    * height state and the bottom resize handle are skipped because the
@@ -222,10 +221,20 @@ export function VizPlaceholder({
   selectedSpanId,
   onSelectSpan,
   onClearSpan,
-  onSwitchToSpanList,
   fillParent = false,
   paneLayout,
 }: VizPlaceholderProps) {
+  // Span ids carrying a managed prompt. The trace summary already rolls
+  // up the selected + last-used prompt span ids, which is enough to flag
+  // prompt-bearing spans in the waterfall without loading full span
+  // params just for an icon.
+  const promptSpanIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (trace?.selectedPromptSpanId) ids.add(trace.selectedPromptSpanId);
+    if (trace?.lastUsedPromptSpanId) ids.add(trace.lastUsedPromptSpanId);
+    return ids;
+  }, [trace?.selectedPromptSpanId, trace?.lastUsedPromptSpanId]);
+
   // When the detail pane is hidden, surface a "Show details" affordance
   // in the viz tab row so the user can bring it back without having to
   // click a span. The detail pane also auto-reopens whenever a span is
@@ -293,20 +302,6 @@ export function VizPlaceholder({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasData, fillParent]);
-
-  // `handleSwitchToSpanList` used to switch the viz tab to "spanlist"
-  // and forward filter state when the user expanded a waterfall group
-  // and asked to drill in. Span list was retired during the redesign —
-  // the no-op shim below keeps existing call sites (TreeRow / GroupRow)
-  // compiling without each having to feature-flag the prop. The user is
-  // already inside the waterfall, so the prop is a no-op rather than
-  // attempting some other reasonable fallback.
-  const handleSwitchToSpanList = useCallback(
-    (_nameFilter: string, _typeFilter: string) => {
-      // intentional no-op — see comment above
-    },
-    [],
-  );
 
   const handleVizTabChange = useCallback(
     (tab: VizTab) => {
@@ -631,9 +626,9 @@ export function VizPlaceholder({
               <WaterfallView
                 spans={spans}
                 selectedSpanId={selectedSpanId}
+                promptSpanIds={promptSpanIds}
                 onSelectSpan={onSelectSpan}
                 onClearSpan={onClearSpan}
-                onSwitchToSpanList={handleSwitchToSpanList}
               />
             )}
             {/*

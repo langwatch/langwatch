@@ -20,15 +20,6 @@ export interface SortConfig {
   direction: "asc" | "desc";
 }
 
-export interface ColumnConfig {
-  id: string;
-  label: string;
-  section: "standard" | "fields" | "evaluations" | "events";
-  visible: boolean;
-  pinned?: "left";
-  minWidth: number;
-}
-
 export interface LensConfig {
   id: string;
   name: string;
@@ -274,7 +265,9 @@ const builtInLenses: LensConfig[] = [
       "tokens",
       "spans",
       "model",
+      "labels",
       "evaluations",
+      "prompt",
       "events",
     ],
     addons: ["io-preview", "expanded-peek"],
@@ -344,8 +337,11 @@ const builtInLenses: LensConfig[] = [
     filterText: "status:error",
   },
   {
+    // Id kept as "slow-requests" so existing dismissals / selected-lens
+    // persistence keyed by it survive the rename. Lives under the
+    // "Performance" dropdown (see PERFORMANCE_LENS_IDS).
     id: "slow-requests",
-    name: "Slow requests",
+    name: "Slow Traces",
     isBuiltIn: true,
     columns: [
       "time",
@@ -361,11 +357,146 @@ const builtInLenses: LensConfig[] = [
     sort: { columnId: "duration", direction: "desc" },
     filterText: "",
   },
+  {
+    // Heaviest token traces. Performance dropdown.
+    id: "token-heavy-traces",
+    name: "Token-Heavy Traces",
+    isBuiltIn: true,
+    columns: [
+      "time",
+      "trace",
+      "service",
+      "model",
+      "tokens",
+      "cost",
+      "duration",
+    ],
+    addons: ["error-detail", "io-preview"],
+    grouping: "flat",
+    sort: { columnId: "tokens", direction: "desc" },
+    filterText: "",
+  },
+  {
+    // Heaviest token conversations — tokens roll up per thread.
+    id: "token-heavy-conversations",
+    name: "Token-Heavy Conversations",
+    isBuiltIn: true,
+    columns: [
+      "conversation",
+      "turns",
+      "tokens",
+      "cost",
+      "duration",
+      "model",
+      "service",
+    ],
+    addons: ["conversation-turns"],
+    grouping: "by-conversation",
+    sort: { columnId: "tokens", direction: "desc" },
+    filterText: "",
+  },
+  {
+    // Conversations with the most turns. Sorts by turn count, which is a
+    // per-conversation aggregate (group-sorted client-side; see
+    // sortConversationGroups in conversationGroups.ts).
+    id: "longest-conversations",
+    name: "Longest Conversations",
+    isBuiltIn: true,
+    columns: [
+      "conversation",
+      "turns",
+      "duration",
+      "tokens",
+      "cost",
+      "model",
+      "service",
+    ],
+    addons: ["conversation-turns"],
+    grouping: "by-conversation",
+    sort: { columnId: "turns", direction: "desc" },
+    filterText: "",
+  },
+  {
+    // Costliest individual traces. Cost dropdown (see COST_LENS_IDS).
+    id: "expensive-traces",
+    name: "Expensive Traces",
+    isBuiltIn: true,
+    columns: [
+      "time",
+      "trace",
+      "service",
+      "model",
+      "cost",
+      "tokens",
+      "duration",
+    ],
+    addons: ["error-detail", "io-preview"],
+    grouping: "flat",
+    sort: { columnId: "cost", direction: "desc" },
+    filterText: "",
+  },
+  {
+    // Costliest conversations — cost rolls up per thread.
+    id: "expensive-conversations",
+    name: "Expensive Conversations",
+    isBuiltIn: true,
+    columns: [
+      "conversation",
+      "turns",
+      "cost",
+      "tokens",
+      "duration",
+      "model",
+      "service",
+    ],
+    addons: ["conversation-turns"],
+    grouping: "by-conversation",
+    sort: { columnId: "cost", direction: "desc" },
+    filterText: "",
+  },
+  {
+    // Largest individual traces by stored payload size. Cost dropdown (see
+    // COST_LENS_IDS); sorts by the `_size_bytes`-backed "size" column.
+    id: "large-traces",
+    name: "Large Traces",
+    isBuiltIn: true,
+    columns: [
+      "time",
+      "trace",
+      "service",
+      "model",
+      "size",
+      "tokens",
+      "duration",
+    ],
+    addons: ["error-detail", "io-preview"],
+    grouping: "flat",
+    sort: { columnId: "size", direction: "desc" },
+    filterText: "",
+  },
   // The built-in lens shelf used to ship Quality review, By Field, and By
   // Model alongside the above. Removed in the bug-bash so the tab strip
   // stays scannable — users who want them can create a custom lens with
   // the same shape via the New lens flow.
 ];
+
+/**
+ * Built-in lenses folded under named dimension dropdowns in the lens bar so
+ * they share a slot instead of crowding the flat strip. Order is the
+ * dropdown order. See specs/traces-v2/lens-preset-groups.feature
+ */
+export const COST_LENS_IDS = [
+  "expensive-traces",
+  "large-traces",
+  "expensive-conversations",
+] as const;
+
+export const PERFORMANCE_LENS_IDS = [
+  "slow-requests",
+  "token-heavy-traces",
+  "token-heavy-conversations",
+  "longest-conversations",
+] as const;
 
 const defaultColumnOrder: string[] = [
   "time",
@@ -376,6 +507,7 @@ const defaultColumnOrder: string[] = [
   "tokens",
   "spans",
   "model",
+  "labels",
 ];
 
 function generateId(): string {
@@ -490,12 +622,12 @@ export const useViewStore = create<ViewState>((set, get) => ({
       // registry doesn't recognise, leaving the user with a table missing
       // its group-label column (or any meaningful headers at all).
       //
-      // reconcileColumns drops invalid ids, retains pinned columns, and
-      // falls back to the capability's defaults when nothing survives —
-      // matching what LensConfigDialog does when the user picks a new
-      // grouping in the rich editor.
+      // reconcileColumns drops invalid ids (keeping eval:* for the trace
+      // capability) and falls back to the capability's defaults when nothing
+      // survives — matching what LensConfigDialog does when the user picks a
+      // new grouping in the rich editor.
       const capability = LENS_CAPABILITIES[mode];
-      const columns = reconcileColumns(s.columnOrder, capability);
+      const columns = reconcileColumns({ ids: s.columnOrder, capability });
       const sort = reconcileSort(s.sort, capability);
       return {
         grouping: mode,
@@ -722,9 +854,7 @@ export const useViewStore = create<ViewState>((set, get) => ({
       // empty between mount and hydration.
       // If the active lens disappeared (deleted by another browser
       // tab / teammate), fall back to the first available.
-      const activeStillPresent = allLenses.some(
-        (l) => l.id === s.activeLensId,
-      );
+      const activeStillPresent = allLenses.some((l) => l.id === s.activeLensId);
       if (activeStillPresent) return { allLenses };
       const next = allLenses[0];
       if (!next) return { allLenses };

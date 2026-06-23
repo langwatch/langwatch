@@ -11,7 +11,6 @@ import { ExportConfigDialog } from "~/components/messages/ExportConfigDialog";
 import { ExportProgress } from "~/components/messages/ExportProgress";
 import { useTracesV2Presence } from "~/features/presence/hooks/useTracesV2Presence";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { analyzeOrGroups } from "~/server/app-layer/traces/query-language/queries";
 import { useLensFilterDirtySync } from "../../hooks/useLensFilterDirtySync";
 import { useLensSync } from "../../hooks/useLensSync";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
@@ -37,7 +36,6 @@ import {
 import { useUIStore } from "../../stores/uiStore";
 import { DensityProvider } from "../DensityProvider";
 import { FilterSidebar } from "../FilterSidebar/FilterSidebar";
-import { ConnectorLaneWidth } from "../FilterSidebar/OrConnectorOverlay";
 import { SidebarResizeHandle } from "../FilterSidebar/SidebarResizeHandle";
 import { FindBar } from "../FindBar";
 import { SearchBar } from "../SearchBar/SearchBar";
@@ -339,13 +337,6 @@ const FilterAside: React.FC<{
   const collapsed = forceCollapsedSmallScreen
     ? !mobileExpandedOverride
     : persistedCollapsed;
-  // Grow the aside by one lane per active OR group so the connector
-  // overlay has room to draw without squeezing the facet rows. When
-  // the AST has no cross-facet OR the width is identical to before.
-  const orGroupCount = useFilterStore(
-    (s) => analyzeOrGroups(s.ast).groups.length,
-  );
-
   // When the operator collapses the sidebar we drop the aside from the
   // DOM entirely — no narrow rail, no icon strip. The "expand" affordance
   // lives in the table footer (see `Pagination`) so the page is one
@@ -362,15 +353,10 @@ const FilterAside: React.FC<{
   // has real facets to show even with `hasAnyTraces === false`.
   if (hasAnyTraces === false && !isSamplePreview) return null;
 
-  const autoExpandedWidth =
-    SIDEBAR_WIDTH_EXPANDED + orGroupCount * ConnectorLaneWidth;
-  // User-set width wins when present, else the auto-computed default.
-  // The dragged width still respects the auto default as a floor — adding
-  // an OR group should never visually shrink the sidebar below the lane
-  // count the connector overlay needs to draw without squeezing rows.
+  // User-set width wins when present, else the fixed default.
   const expandedWidth = persistedWidth
-    ? Math.max(persistedWidth, autoExpandedWidth)
-    : autoExpandedWidth;
+    ? Math.max(persistedWidth, SIDEBAR_WIDTH_EXPANDED)
+    : SIDEBAR_WIDTH_EXPANDED;
 
   // Don't show the resize handle on mobile (forced-collapsed) or while
   // the empty-state dim is active — neither surface supports a drag-out.

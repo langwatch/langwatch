@@ -4,20 +4,26 @@ import {
   Button,
   chakra,
   HStack,
+  Icon,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { BookOpen } from "lucide-react";
 import type React from "react";
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import {
   SEARCH_FIELDS,
-  type SearchFieldGroup,
   type SearchFieldMeta,
 } from "~/server/app-layer/traces/query-language/metadata";
 import { useUIStore } from "../../stores/uiStore";
+import {
+  FACET_GROUPS,
+  type FacetGroupDef,
+  GROUP_ICONS,
+  getFacetGroupId,
+} from "../FilterSidebar/constants";
+import { getFacetIcon } from "../FilterSidebar/utils";
 import type { SuggestionState } from "./getSuggestionState";
-import { SUGGESTION_GROUPS } from "./suggestionItems";
 import type { SuggestionRow, SuggestionUIState } from "./suggestionUI";
 
 interface SuggestionDropdownProps {
@@ -94,8 +100,11 @@ const DropdownFooter: React.FC = () => {
       bg="bg.subtle"
       justify="space-between"
     >
+      {/* ⏎ and ⇥ both accept the highlighted suggestion (see handleKey) —
+          advertise Tab too so the documented affordance is discoverable
+          from the dropdown itself, not just the syntax docs. */}
       <Text textStyle="2xs" color="fg.subtle">
-        ↑↓ navigate · ⏎ select · esc close
+        ↑↓ navigate · ⏎ ⇥ select · esc close
       </Text>
       <Button
         size="2xs"
@@ -137,7 +146,7 @@ const GroupedItems: React.FC<{
           <SuggestionRowView
             key={row.value}
             row={row}
-            state={state}
+            mode={state.mode}
             count={ui.itemCounts?.[row.value]}
             isSelected={index === ui.selectedIndex}
             onSelect={onSelect}
@@ -149,179 +158,253 @@ const GroupedItems: React.FC<{
 
   return (
     <>
-      {grouped.map((section) => (
-        <Box key={section.label}>
-          <Box
-            paddingX={3}
-            paddingY={1.5}
-            bg="bg.subtle"
-            borderTopWidth={section.first ? "0px" : "1px"}
-            borderColor="border.subtle"
-          >
-            <Text
-              textStyle="2xs"
-              fontWeight="700"
-              color="fg.subtle"
-              textTransform="uppercase"
-              letterSpacing="0.1em"
+      {grouped.map((section) => {
+        const GroupIcon =
+          section.groupId !== "other"
+            ? GROUP_ICONS[section.groupId]
+            : undefined;
+        return (
+          <Box key={section.groupId}>
+            <HStack
+              gap={1.5}
+              paddingX={3}
+              paddingY={1.5}
+              bg="bg.subtle"
+              borderTopWidth={section.first ? "0px" : "1px"}
+              borderColor="border.subtle"
             >
-              {section.label}
-            </Text>
+              {GroupIcon && (
+                <Icon boxSize="11px" color="fg.subtle">
+                  <GroupIcon />
+                </Icon>
+              )}
+              <Text
+                textStyle="2xs"
+                fontWeight="700"
+                color="fg.subtle"
+                textTransform="uppercase"
+                letterSpacing="0.1em"
+              >
+                {section.label}
+              </Text>
+            </HStack>
+            {section.rows.map(({ row, flatIndex }) => (
+              <SuggestionRowView
+                key={row.value}
+                row={row}
+                mode={state.mode}
+                count={ui.itemCounts?.[row.value]}
+                isSelected={flatIndex === ui.selectedIndex}
+                onSelect={onSelect}
+              />
+            ))}
           </Box>
-          {section.rows.map(({ row, flatIndex }) => (
-            <SuggestionRowView
-              key={row.value}
-              row={row}
-              state={state}
-              count={ui.itemCounts?.[row.value]}
-              isSelected={flatIndex === ui.selectedIndex}
-              onSelect={onSelect}
-            />
-          ))}
-        </Box>
-      ))}
+        );
+      })}
     </>
   );
 };
 
 interface GroupedSection {
+  /** FACET_GROUPS id (drives the header icon), or `"other"` for fields with
+   *  no sidebar facet group (time, scenario, dynamic-attribute prefixes). */
+  groupId: FacetGroupDef["id"] | "other";
   label: string;
   first: boolean;
   rows: Array<{ row: SuggestionRow; flatIndex: number }>;
 }
 
+const FACET_GROUP_LABEL = new Map(
+  FACET_GROUPS.map((g) => [g.id, g.label] as const),
+);
+
+/**
+ * Bucket the flat suggestion list by the SAME taxonomy the facet sidebar /
+ * manager use (`getFacetGroupId`), so the dropdown's section headers read
+ * identically to the facet manager — "Traces", "Errors", "Spans & Events",
+ * etc. Fields with no facet group (time, scenario, dynamic prefixes) fall
+ * into a trailing "Other". Group order follows `FACET_GROUPS`; within a
+ * group, rows keep their (rank-sorted) flat-list order.
+ */
 function groupRows(items: SuggestionRow[]): GroupedSection[] {
   const buckets = new Map<
     string,
-    { label: string; rows: Array<{ row: SuggestionRow; flatIndex: number }> }
+    {
+      groupId: FacetGroupDef["id"] | "other";
+      label: string;
+      rows: Array<{ row: SuggestionRow; flatIndex: number }>;
+    }
   >();
   for (let i = 0; i < items.length; i++) {
     const row = items[i]!;
-    const groupId = row.group ?? "__other__";
-    const label = labelForGroup(row.group) ?? "Other";
-    let bucket = buckets.get(groupId);
+    const facetGroupId = getFacetGroupId(row.value);
+    const bucketKey = facetGroupId ?? "other";
+    let bucket = buckets.get(bucketKey);
     if (!bucket) {
-      bucket = { label, rows: [] };
-      buckets.set(groupId, bucket);
+      bucket = {
+        groupId: facetGroupId ?? "other",
+        label: facetGroupId
+          ? (FACET_GROUP_LABEL.get(facetGroupId) ?? "Other")
+          : "Other",
+        rows: [],
+      };
+      buckets.set(bucketKey, bucket);
     }
     bucket.rows.push({ row, flatIndex: i });
   }
-  // Order sections by SUGGESTION_GROUPS, then trailing `Other`.
+  // Order sections by FACET_GROUPS, then the trailing `Other`.
   const ordered: GroupedSection[] = [];
-  for (const spec of SUGGESTION_GROUPS) {
-    const b = buckets.get(spec.id);
+  for (const group of FACET_GROUPS) {
+    const b = buckets.get(group.id);
     if (b) {
       ordered.push({
+        groupId: b.groupId,
         label: b.label,
         first: ordered.length === 0,
         rows: b.rows,
       });
-      buckets.delete(spec.id);
+      buckets.delete(group.id);
     }
   }
-  for (const [, b] of buckets) {
-    ordered.push({ label: b.label, first: ordered.length === 0, rows: b.rows });
+  const other = buckets.get("other");
+  if (other) {
+    ordered.push({
+      groupId: "other",
+      label: "Other",
+      first: ordered.length === 0,
+      rows: other.rows,
+    });
   }
   return ordered;
 }
 
-function labelForGroup(group: SearchFieldGroup | null): string | null {
-  if (!group) return null;
-  return SUGGESTION_GROUPS.find((g) => g.id === group)?.label ?? null;
-}
-
 interface SuggestionRowProps {
   row: SuggestionRow;
-  state: Extract<SuggestionState, { open: true }>;
+  /** Only the bits of the suggestion state a row actually needs. Passing the
+   *  whole state object (which carries the per-keystroke `query`) would make
+   *  every row's props change on every keystroke and defeat the row memo;
+   *  `mode` is stable while typing within one field. */
+  mode: "field" | "value";
   count?: number;
   isSelected: boolean;
   onSelect: (label: string) => void;
 }
 
-const SuggestionRowView: React.FC<SuggestionRowProps> = ({
-  row,
-  state,
-  count,
-  isSelected,
-  onSelect,
-}) => {
-  const primary = state.mode === "field" ? row.label : state.field;
-  const secondary = state.mode === "field" ? "" : `:${row.label}`;
-  const fieldMeta =
-    state.mode === "field" && !row.isPrefix
-      ? SEARCH_FIELDS[row.value]
+// Memoised: a keystroke re-runs the suggestion list, but most rows are
+// unchanged — only the previously/newly-selected rows flip `isSelected`.
+// Without memo every row re-rendered (re-instantiating a Lucide icon each),
+// which dominated the per-keystroke cost once the icon-rich redesign landed.
+const SuggestionRowView: React.FC<SuggestionRowProps> = memo(
+  function SuggestionRowView({ row, mode, count, isSelected, onSelect }) {
+    const isFieldMode = mode === "field";
+    const fieldMeta =
+      isFieldMode && !row.isPrefix ? SEARCH_FIELDS[row.value] : undefined;
+    // Field mode: the same per-facet icon the sidebar / manager use, so the
+    // two surfaces read with one visual language.
+    const FieldIcon = isFieldMode
+      ? getFacetIcon({ key: row.value })
       : undefined;
-  // In value-mode, when the row carries a human-readable label (e.g.
-  // evaluator name "Faithfulness") that differs from the raw id
-  // (`ragas/faithfulness`), surface the id as a muted hint after the
-  // label so the operator knows what's actually going into the query.
-  // The id is the canonical document value; the label is just the
-  // display overlay.
-  const idHint =
-    state.mode === "value" && row.label !== row.value ? row.value : null;
+    // In value-mode, when the row carries a human-readable label (e.g.
+    // evaluator name "Faithfulness") that differs from the raw id
+    // (`ragas/faithfulness`), surface the id as a muted hint after the
+    // label so the operator knows what's actually going into the query.
+    const idHint =
+      mode === "value" && row.label !== row.value ? row.value : null;
 
-  return (
-    <chakra.button
-      type="button"
-      display="flex"
-      alignItems="center"
-      justifyContent="space-between"
-      width="full"
-      paddingX={3}
-      paddingY={1.5}
-      textAlign="left"
-      bg={isSelected ? "blue.solid/12" : "transparent"}
-      color="fg"
-      cursor="pointer"
-      _hover={{ bg: "blue.solid/8" }}
-      onMouseDown={(event) => {
-        event.preventDefault();
-        onSelect(row.value);
-      }}
-    >
-      <HStack gap={2} minWidth={0} flex={1}>
-        <Text textStyle="xs" flexShrink={0}>
-          <Text as="span" color="fg" fontWeight="medium">
-            {primary}
-          </Text>
-          {secondary && (
-            <Text as="span" color="fg.muted">
-              {secondary}
+    return (
+      <chakra.button
+        type="button"
+        display="flex"
+        alignItems="center"
+        justifyContent="space-between"
+        width="full"
+        paddingX={3}
+        paddingY={1.5}
+        gap={2}
+        textAlign="left"
+        bg={isSelected ? "blue.solid/12" : "transparent"}
+        color="fg"
+        cursor="pointer"
+        _hover={{ bg: "blue.solid/8" }}
+        onMouseDown={(event) => {
+          event.preventDefault();
+          onSelect(row.value);
+        }}
+      >
+        <HStack gap={2} minWidth={0} flex={1}>
+          {FieldIcon && (
+            <Icon boxSize="13px" color="fg.subtle" flexShrink={0}>
+              <FieldIcon />
+            </Icon>
+          )}
+          {isFieldMode ? (
+            // Human label leads (reads like the facet sidebar), with the raw
+            // query field as a mono hint so users learn the syntax.
+            <>
+              <Text
+                textStyle="xs"
+                color="fg"
+                fontWeight="medium"
+                flexShrink={0}
+                truncate
+              >
+                {row.label}
+              </Text>
+              <Text
+                textStyle="2xs"
+                color="fg.subtle"
+                fontFamily="mono"
+                truncate
+                minWidth={0}
+                flexShrink={1}
+              >
+                {row.field}
+              </Text>
+            </>
+          ) : (
+            // Value mode: `field:value` with the value emphasised.
+            <Text textStyle="xs" flexShrink={0}>
+              <Text as="span" color="fg.muted">
+                {row.field}:
+              </Text>
+              <Text as="span" color="fg" fontWeight="medium">
+                {row.label}
+              </Text>
             </Text>
           )}
-        </Text>
-        {idHint && (
-          <Text
-            textStyle="2xs"
-            color="fg.subtle"
-            fontFamily="mono"
-            truncate
-            minWidth={0}
-            flexShrink={1}
-          >
-            {idHint}
+          {idHint && (
+            <Text
+              textStyle="2xs"
+              color="fg.subtle"
+              fontFamily="mono"
+              truncate
+              minWidth={0}
+              flexShrink={1}
+            >
+              {idHint}
+            </Text>
+          )}
+          {fieldMeta && <FieldTypeBadge meta={fieldMeta} />}
+          {row.isPrefix && (
+            <Badge
+              size="xs"
+              variant="subtle"
+              colorPalette="purple"
+              flexShrink={0}
+            >
+              drill in
+            </Badge>
+          )}
+        </HStack>
+        {count !== undefined && (
+          <Text textStyle="2xs" color="fg.subtle" marginLeft={2}>
+            {count}
           </Text>
         )}
-        {fieldMeta && <FieldMetaSummary meta={fieldMeta} />}
-        {row.isPrefix && (
-          <Badge
-            size="xs"
-            variant="subtle"
-            colorPalette="purple"
-            flexShrink={0}
-          >
-            drill in
-          </Badge>
-        )}
-      </HStack>
-      {count !== undefined && (
-        <Text textStyle="2xs" color="fg.subtle" marginLeft={2}>
-          {count}
-        </Text>
-      )}
-    </chakra.button>
-  );
-};
+      </chakra.button>
+    );
+  },
+);
 
 const TYPE_PALETTE: Record<SearchFieldMeta["valueType"], string> = {
   categorical: "blue",
@@ -330,28 +413,24 @@ const TYPE_PALETTE: Record<SearchFieldMeta["valueType"], string> = {
   existence: "purple",
 };
 
-const TYPE_HINT: Record<SearchFieldMeta["valueType"], string> = {
-  categorical: "= · *",
-  range: "> · ≥ · [..]",
-  text: '= · "…"',
-  existence: "yes/no",
+/** Short, glanceable label for each value-type. The example operators that
+ *  used to render alongside were noisy in a per-row context — the badge
+ *  alone tells the user what kind of value the field takes. */
+const TYPE_LABEL: Record<SearchFieldMeta["valueType"], string> = {
+  categorical: "value",
+  range: "number",
+  text: "text",
+  existence: "yes / no",
 };
 
-const FieldMetaSummary: React.FC<{ meta: SearchFieldMeta }> = ({ meta }) => (
-  <HStack gap={1.5} minWidth={0} flexShrink={1} overflow="hidden">
-    <Badge
-      size="xs"
-      variant="subtle"
-      colorPalette={TYPE_PALETTE[meta.valueType]}
-      flexShrink={0}
-    >
-      {meta.valueType}
-    </Badge>
-    <Text textStyle="2xs" color="fg.subtle" truncate>
-      {TYPE_HINT[meta.valueType]}
-    </Text>
-    <Text textStyle="2xs" color="fg.subtle" truncate>
-      {meta.label}
-    </Text>
-  </HStack>
+const FieldTypeBadge: React.FC<{ meta: SearchFieldMeta }> = ({ meta }) => (
+  <Badge
+    size="xs"
+    variant="subtle"
+    colorPalette={TYPE_PALETTE[meta.valueType]}
+    flexShrink={0}
+    marginLeft="auto"
+  >
+    {TYPE_LABEL[meta.valueType]}
+  </Badge>
 );

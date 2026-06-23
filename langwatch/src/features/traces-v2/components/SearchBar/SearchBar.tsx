@@ -1,4 +1,13 @@
-import { Box, chakra, Flex, HStack, Icon, IconButton, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  chakra,
+  Flex,
+  HStack,
+  Icon,
+  IconButton,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { AlertCircle, ChevronDown, ChevronUp, Search, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
@@ -8,14 +17,13 @@ import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { AiActionError } from "~/server/app-layer/traces/ai-query";
 import { SEARCH_FIELDS } from "~/server/app-layer/traces/query-language/metadata";
-import { analyzeOrGroups } from "~/server/app-layer/traces/query-language/queries";
 import { useTraceFacets } from "../../hooks/useTraceFacets";
 import { usePreviewTracesActive } from "../../onboarding/hooks/usePreviewTracesActive";
 import { useFacetHoverStore } from "../../stores/facetHoverStore";
 import { useFilterStore } from "../../stores/filterStore";
-import { AiErrorDetails, hasAiErrorDetails } from "./ErrorBannerDetail";
 import { AskAiButton } from "../ai/AskAiButton";
 import { ActiveSearchEditor } from "./ActiveSearchEditor";
+import { AiErrorDetails, hasAiErrorDetails } from "./ErrorBannerDetail";
 import { editorStyles } from "./editorStyles";
 import { FloatingAiBar } from "./FloatingAiBar";
 import { setFilterChipLabels } from "./filterHighlight";
@@ -97,10 +105,9 @@ export const SearchBar: React.FC = () => {
   const clearAll = useFilterStore((s) => s.clearAll);
   const lastAiTranslation = useFilterStore((s) => s.lastAiTranslation);
 
-  // Cross-facet OR no longer triggers a warning chip: the sidebar now
-  // marks OR-grouped facets with a coloured "OR" pill + rail (see
-  // SidebarSection.orGroupId), so the situation reads honestly without
-  // a banner. Parse errors still win.
+  // Cross-facet OR is built and edited entirely in the filter bar (the
+  // QueryBreakdownChips render the full AND/OR/paren grouping), so it
+  // doesn't need a warning chip. Parse errors still win.
   const status: SearchBarStatus = parseError
     ? { kind: "error", message: parseError }
     : { kind: "ok" };
@@ -169,7 +176,7 @@ export const SearchBar: React.FC = () => {
   // PlaceholderEditor and the live ProseMirror editor's
   // decoration-injected chips broadcast hover into the global
   // `facetHoverStore`. The sidebar listens to that store and
-  // cross-highlights the matching row + any OR-group peers.
+  // cross-highlights the matching row.
   useEffect(() => {
     // When the chip layer disappears (AI mode swap, unmount) no DOM
     // mouseout fires for the removed chip nodes — clear up front so a
@@ -189,22 +196,9 @@ export const SearchBar: React.FC = () => {
       const field = target.dataset.filterChipField ?? "";
       const value = target.dataset.filterChipValue ?? "";
       if (!field || !value) return;
-      // Only broadcast the whole OR group when this exact (field,
-      // value) is one of its members. Sharing a field with a group
-      // member doesn't count — `origin:simulation` should not drag
-      // `origin:evaluation` and `origin:application` along just
-      // because they happen to be grouped under the same field.
-      const ast = useFilterStore.getState().ast;
-      const orAnalysis = analyzeOrGroups(ast);
-      const groupId = orAnalysis.memberToGroupId.get(`${field}|${value}`);
-      const group = groupId
-        ? orAnalysis.groups.find((g) => g.id === groupId)
-        : null;
-      if (group) {
-        useFacetHoverStore.getState().setHoveredGroup(group);
-      } else {
-        useFacetHoverStore.getState().setHoveredFacet({ field, value });
-      }
+      // Highlight the matching sidebar row for this single (field,
+      // value) pair.
+      useFacetHoverStore.getState().setHoveredFacet({ field, value });
     };
     const leave = (e: Event) => {
       const related = (e as MouseEvent).relatedTarget as HTMLElement | null;
@@ -361,9 +355,16 @@ export const SearchBar: React.FC = () => {
               needsProviderPrimer={askAiNeedsProviderPrimer}
               disabledReason={askAiSampleDisabledReason}
             />
-            <Icon color="fg.subtle" flexShrink={0} boxSize="14px">
-              <Search />
-            </Icon>
+            {/* The standalone search glyph is only an at-rest hint — the
+                placeholder ("Search filters, free text, or Ask AI…") already
+                says what the field is. Once focused or non-empty it reads as
+                clutter wedged between Ask AI and the text, so it drops out and
+                the editor sits directly beside the Ask AI button. */}
+            {!editorFocused && !hasContent && (
+              <Icon color="fg.subtle" flexShrink={0} boxSize="14px">
+                <Search />
+              </Icon>
+            )}
 
             <Box flex={1} minWidth={0} position="relative" css={editorStyles}>
               {editorMounted ? (
@@ -469,42 +470,37 @@ const UnifiedErrorBanner: React.FC<{
         >
           <VStack
             gap={0}
+            // Solid red.subtle so the banner stays clearly visible in light
+            // mode; the input row above uses the same fill on error (see
+            // statusBackgroundColor) so the two read as one continuous
+            // error surface with no brightness-step "top border" seam.
             bg="red.subtle"
             borderBottomWidth="1px"
             borderColor="red.muted"
             align="stretch"
           >
-            <HStack
-              gap={2}
-              paddingX={3}
-              paddingY={1.5}
-              align="flex-start"
-            >
-              <Icon
-                color="red.fg"
-                boxSize="13px"
-                flexShrink={0}
-                marginTop="1px"
-              >
+            <HStack gap={2} paddingX={3} paddingY={1.5} align="center">
+              <Icon color="red.fg" boxSize="13px" flexShrink={0}>
                 <AlertCircle />
               </Icon>
-              <Text
-                textStyle="xs"
-                color="red.fg"
-                fontWeight="500"
-                flex={1}
-              >
+              <Text textStyle="xs" color="red.fg" fontWeight="500" flex={1}>
                 {message}
               </Text>
               {canExpand && (
                 <IconButton
-                  aria-label={expanded ? "Collapse error details" : "Expand error details"}
+                  aria-label={
+                    expanded ? "Collapse error details" : "Expand error details"
+                  }
                   size="2xs"
                   variant="ghost"
                   color="red.fg"
                   onClick={() => setExpanded((e) => !e)}
                 >
-                  {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                  {expanded ? (
+                    <ChevronUp size={12} />
+                  ) : (
+                    <ChevronDown size={12} />
+                  )}
                 </IconButton>
               )}
               <IconButton

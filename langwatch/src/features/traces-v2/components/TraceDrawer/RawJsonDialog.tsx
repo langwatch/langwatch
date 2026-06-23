@@ -21,11 +21,10 @@ import { useColorMode } from "~/components/ui/color-mode";
 import { Dialog } from "~/components/ui/dialog";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { useSpansFull } from "../../hooks/useSpansFull";
 import { ShikiCodeBlock } from "./markdownView";
 import { SegmentedToggle } from "./SegmentedToggle";
-
-const COPY_FEEDBACK_MS = 1500;
 
 type RawTab = "trace" | "spans";
 
@@ -103,7 +102,10 @@ export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
   // measures without an encoder, and doesn't collide with other
   // "bytes" readings elsewhere on the page.
   const charCount = useMemo(() => fullPayload.length, [fullPayload]);
-  const lineCount = useMemo(() => fullPayload.split("\n").length, [fullPayload]);
+  const lineCount = useMemo(
+    () => fullPayload.split("\n").length,
+    [fullPayload],
+  );
   const matchedLines = useMemo(
     () =>
       search
@@ -239,11 +241,7 @@ export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
               <Text textStyle="xs" color="fg.muted">
                 No lines match "{search}"
               </Text>
-              <Button
-                size="xs"
-                variant="ghost"
-                onClick={() => setSearch("")}
-              >
+              <Button size="xs" variant="ghost" onClick={() => setSearch("")}>
                 Clear search
               </Button>
             </VStack>
@@ -352,22 +350,14 @@ function CopyButton({
   payload: string;
   disabled?: boolean;
 }) {
-  const [copied, setCopied] = useState(false);
-  const handleClick = async () => {
+  // The hook awaits the clipboard write before flipping the success label,
+  // so a permission-denied write (Safari private mode, secure-context
+  // failures) never shows a misleading "Copied", and rejections stay silent
+  // — the surface is a small button with no slot for an error string.
+  const { copied, copy } = useCopyToClipboard();
+  const handleClick = () => {
     if (disabled) return;
-    try {
-      // Await the clipboard promise before flipping the success label.
-      // Optimistic "Copied" was misleading on permission-denied (Safari
-      // private mode, secure context failures) — users saw the
-      // confirmation even when nothing reached the clipboard.
-      await navigator.clipboard.writeText(payload);
-      setCopied(true);
-      setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
-    } catch {
-      // Stay silent on rejection — the surface is small (a button with
-      // no slot for an error string), and the user can retry. A toast
-      // here would compete with the dialog itself.
-    }
+    copy(payload);
   };
   return (
     <Button

@@ -1,4 +1,4 @@
-import { Box, CodeBlock, Flex } from "@chakra-ui/react";
+import { Box, CodeBlock, Flex, Spinner } from "@chakra-ui/react";
 import { useRef } from "react";
 import { useColorMode } from "~/components/ui/color-mode";
 import { Drawer } from "~/components/ui/drawer";
@@ -10,6 +10,7 @@ import {
   DRAWER_MIN_WIDTH_PX,
   useDrawerStore,
 } from "../../stores/drawerStore";
+import { BlurredContentGate } from "../BlurredContentGate";
 import { ConversationContext } from "./ConversationContext";
 import { ConversationView } from "./conversationView";
 import { DrawerHeader } from "./drawerHeader";
@@ -18,12 +19,12 @@ import { useShikiAdapter } from "./markdownView/shikiAdapter";
 import { PaneLayout } from "./panes/PaneLayout";
 import { ResizeRail } from "./panes/ResizeRail";
 import { usePaneLayout } from "./panes/usePaneLayout";
-import { BlurredContentGate } from "../BlurredContentGate";
 import { ScenarioRoleProvider } from "./scenarioRoles";
 import { TraceDrawerEmptyState } from "./TraceDrawerEmptyState";
 import { TraceDrawerSkeleton } from "./TraceDrawerSkeleton";
 import { TraceAccordions } from "./traceAccordions";
 import { useTraceDrawerScaffold } from "./useTraceDrawerScaffold";
+import { useTraceSwitchOverlay } from "./useTraceSwitchOverlay";
 
 export interface TraceV2DrawerShellProps {
   open?: boolean;
@@ -63,6 +64,10 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
     drawerContentRef,
   } = useTraceDrawerScaffold();
 
+  // Brief refreshing overlay when switching to a *different* trace — a
+  // same-trace live update leaves this false so the surface doesn't flash.
+  const showSwitchOverlay = useTraceSwitchOverlay({ traceId, isLoading });
+
   const viewMode = useDrawerStore((s) => s.viewMode);
   const widthPx = useDrawerStore((s) => s.widthPx);
   const shortcutsOpen = useDrawerStore((s) => s.shortcutsOpen);
@@ -71,6 +76,10 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
   const ctxPaneState = useDrawerStore((s) => s.paneState.conversationContext);
   const togglePaneCollapsed = useDrawerStore((s) => s.togglePaneCollapsed);
   const setShortcutsOpen = useDrawerStore((s) => s.setShortcutsOpen);
+  // Summary-tab span references (eval / event / exception rows) jump into
+  // the Trace view and open the span. See
+  // specs/traces-v2/span-reference-jump-to-trace.feature
+  const openSpanInTrace = useDrawerStore((s) => s.openSpanInTrace);
 
   // `open` is hardcoded `true` because the parent (`TracesPage`'s
   // `<TraceDrawerMount>`) only mounts this shell while the drawer
@@ -203,6 +212,8 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
             display="flex"
             flexDirection="column"
             minHeight={0}
+            // Positioning context for the trace-switch refresh overlay below.
+            position="relative"
           >
             {isLoading || !trace ? (
               <TraceDrawerSkeleton
@@ -336,6 +347,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                               spans={spanTree}
                               selectedSpan={null}
                               activeTab="summary"
+                              onSelectSpan={openSpanInTrace}
                             />
                           </Box>
                         </IsolatedErrorBoundary>
@@ -355,6 +367,37 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
                   </Flex>
                 </PeerCursorOverlay>
               </>
+            )}
+            {/* Trace-switch refresh overlay: a translucent blurred scrim
+                with a spinner that covers the whole body while the drawer
+                moves from one trace to another. Driven by
+                `useTraceSwitchOverlay`, which only fires on a genuine A→B
+                switch (never on a same-trace live update) and holds for a
+                short floor so even a prefetched, instant switch registers
+                as a refresh instead of popping. `pointerEvents="none"` so
+                it never traps clicks. */}
+            {showSwitchOverlay && (
+              <Box
+                position="absolute"
+                inset={0}
+                zIndex={3}
+                display="flex"
+                alignItems="center"
+                justifyContent="center"
+                borderRadius="lg"
+                bg="bg.panel/60"
+                backdropFilter="blur(8px) saturate(140%)"
+                pointerEvents="none"
+                css={{
+                  animation: "tracesV2DrawerSwitchFade 140ms ease-out",
+                  "@keyframes tracesV2DrawerSwitchFade": {
+                    from: { opacity: 0 },
+                    to: { opacity: 1 },
+                  },
+                }}
+              >
+                <Spinner size="lg" color="blue.solid" borderWidth="2px" />
+              </Box>
             )}
           </Drawer.Body>
         </Drawer.Content>

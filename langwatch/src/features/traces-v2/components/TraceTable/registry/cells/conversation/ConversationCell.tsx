@@ -1,4 +1,4 @@
-import { Box, Circle, HStack, Icon, Text } from "@chakra-ui/react";
+import { Box, Circle, chakra, HStack, Icon, Text } from "@chakra-ui/react";
 import {
   AlertTriangle,
   ChevronDown,
@@ -7,11 +7,12 @@ import {
   Zap,
 } from "lucide-react";
 import type React from "react";
+import { useFilterStore } from "../../../../../stores/filterStore";
+import { useViewStore } from "../../../../../stores/viewStore";
 import { truncateId } from "../../../../../utils/formatters";
 import type { ConversationGroup } from "../../../conversationGroups";
 import { IOPreview } from "../../../IOPreview";
-import { MonoCell } from "../../../MonoCell";
-import type { CellDef } from "../../types";
+import type { CellDef, RowActions } from "../../types";
 
 interface ConversationIO {
   input: string | null;
@@ -25,19 +26,100 @@ function conversationIO(group: ConversationGroup): ConversationIO {
   return { input, output, hasContent: input !== null || output !== null };
 }
 
+/**
+ * Chevron affordance for the inline turns expansion. The row itself also
+ * toggles expansion, but the chevron makes the action discoverable; it stops
+ * propagation so a click on it toggles exactly once rather than also firing
+ * the row handler.
+ */
+const ExpandToggle: React.FC<{
+  isExpanded: boolean;
+  actions: RowActions;
+  boxSize: string;
+  marginTop: string;
+}> = ({ isExpanded, actions, boxSize, marginTop }) => (
+  <chakra.button
+    type="button"
+    aria-label={isExpanded ? "Collapse turns" : "Expand turns"}
+    cursor="pointer"
+    display="inline-flex"
+    flexShrink={0}
+    marginTop={marginTop}
+    bg="transparent"
+    border="none"
+    p={0}
+    color="fg.subtle"
+    _hover={{ color: "fg" }}
+    onClick={(e: React.MouseEvent) => {
+      e.stopPropagation();
+      actions.onToggleExpand?.();
+    }}
+  >
+    <Icon boxSize={boxSize}>
+      {isExpanded ? <ChevronDown /> : <ChevronRight />}
+    </Icon>
+  </chakra.button>
+);
+
+/**
+ * The conversation id, rendered as a link that scopes the All lens to just
+ * this conversation. The id IS the filter affordance (the rest of the row
+ * opens the drawer), so its click stops propagation; the blue colour plus a
+ * hover underline and tooltip signal it acts differently from the row.
+ */
+const ConversationIdLabel: React.FC<{
+  conversationId: string;
+  comfortable?: boolean;
+}> = ({ conversationId, comfortable = false }) => {
+  const selectLens = useViewStore((s) => s.selectLens);
+  const applyQueryText = useFilterStore((s) => s.applyQueryText);
+
+  const filterToConversation = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // All lens, scoped to just this conversation. Escaping mirrors
+    // useConversationTurns so ids with quotes/backslashes round-trip.
+    selectLens("all-traces");
+    const escaped = conversationId.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    applyQueryText(`conversation:"${escaped}"`);
+  };
+
+  return (
+    <chakra.button
+      type="button"
+      aria-label="Filter to this conversation"
+      title="Show all traces in this conversation"
+      onClick={filterToConversation}
+      cursor="pointer"
+      flexShrink={0}
+      bg="transparent"
+      border="none"
+      p={0}
+      textAlign="left"
+      color="blue.fg"
+      textStyle="xs"
+      fontWeight={comfortable ? "500" : undefined}
+      marginTop={comfortable ? "2px" : undefined}
+      _hover={{ textDecoration: "underline" }}
+    >
+      {truncateId(conversationId)}
+    </chakra.button>
+  );
+};
+
 export const ConversationCell: CellDef<ConversationGroup> = {
   id: "conversation",
   label: "Conversation",
-  render: ({ row, isExpanded }) => {
+  render: ({ row, isExpanded, actions }) => {
     const io = conversationIO(row);
     return (
       <HStack gap={2} align="start" width="full" minWidth={0}>
-        <Icon boxSize="14px" color="fg.subtle" flexShrink={0} marginTop="2px">
-          {isExpanded ? <ChevronDown /> : <ChevronRight />}
-        </Icon>
-        <MonoCell color="blue.fg" flexShrink={0}>
-          {truncateId(row.conversationId)}
-        </MonoCell>
+        <ExpandToggle
+          isExpanded={isExpanded}
+          actions={actions}
+          boxSize="14px"
+          marginTop="2px"
+        />
+        <ConversationIdLabel conversationId={row.conversationId} />
         <Box flex={1} minWidth={0}>
           {io.hasContent ? (
             <IOPreview input={io.input} output={io.output} />
@@ -51,22 +133,17 @@ export const ConversationCell: CellDef<ConversationGroup> = {
       </HStack>
     );
   },
-  renderComfortable: ({ row, isExpanded }) => {
+  renderComfortable: ({ row, isExpanded, actions }) => {
     const io = conversationIO(row);
     return (
       <HStack gap={3} align="start" width="full" minWidth={0}>
-        <Icon boxSize="16px" color="fg.subtle" flexShrink={0} marginTop="3px">
-          {isExpanded ? <ChevronDown /> : <ChevronRight />}
-        </Icon>
-        <Text
-          textStyle="xs"
-          fontWeight="500"
-          color="blue.fg"
-          flexShrink={0}
-          marginTop="2px"
-        >
-          {truncateId(row.conversationId)}
-        </Text>
+        <ExpandToggle
+          isExpanded={isExpanded}
+          actions={actions}
+          boxSize="16px"
+          marginTop="3px"
+        />
+        <ConversationIdLabel conversationId={row.conversationId} comfortable />
         <Box flex={1} minWidth={0}>
           {io.hasContent ? (
             <IOPreview input={io.input} output={io.output} />
