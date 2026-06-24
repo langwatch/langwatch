@@ -28,6 +28,7 @@ import { migrateToColdStorage } from "~/tasks/cold/moveTracesToColdStorage";
 import { scheduleTopicClustering } from "~/server/background/queues/topicClusteringQueue";
 import cleanupOldLambdas from "~/tasks/cleanupOldLambdas";
 import { processCustomGraphTrigger } from "~/pages/api/cron/triggers/customGraphTrigger";
+import { featureFlagService } from "~/server/featureFlag";
 import {
   reportHasFailures,
   type SeedRunReport,
@@ -424,6 +425,22 @@ secured.access(cronPolicy()).get("/cron/triggers", async (c) => {
 
   for (const trigger of graphTriggers) {
     try {
+      // ADR-034 Phase 5: when this project is flagged onto the
+      // event-sourced graph-trigger path, the real-time outbox reactor
+      // (on `traceAnalytics`) + the 30s heartbeat handle this trigger.
+      // The cron must skip it to avoid double-fire. The two paths
+      // coexist per-project — never both for the same trigger.
+      const onEsPath = await featureFlagService.isEnabled(
+        "release_es_graph_triggers_firing",
+        { distinctId: trigger.projectId, projectId: trigger.projectId },
+      );
+      if (onEsPath) {
+        logger.info(
+          { triggerId: trigger.id, projectId: trigger.projectId },
+          "[graph-trigger] skipping in cron — project on event-sourced path",
+        );
+        continue;
+      }
       const result = await processCustomGraphTrigger(trigger, projects);
       results.push(result);
     } catch (error) {

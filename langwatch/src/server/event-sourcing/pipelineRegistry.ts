@@ -1,5 +1,6 @@
 import { createAlertTriggerReactor } from "@ee/governance/reactors/alertTrigger.reactor";
 import { createAlertTriggerNotifyOutboxReactor } from "@ee/governance/reactors/alertTriggerNotifyOutbox.reactor";
+import { createGraphTriggerEvaluationOutboxReactor } from "./pipelines/trace-processing/reactors/graphTriggerEvaluation.outboxReactor";
 import {
   createGatewayBudgetSyncReactor,
   type GatewayBudgetSyncReactorDeps,
@@ -39,6 +40,8 @@ import type { OrganizationService } from "../app-layer/organizations/organizatio
 import type { ProjectService } from "../app-layer/projects/project.service";
 import type { LogRecordStorageRepository } from "../app-layer/traces/repositories/log-record-storage.repository";
 import type { MetricRecordStorageRepository } from "../app-layer/traces/repositories/metric-record-storage.repository";
+import type { TraceAnalyticsRepository } from "../app-layer/traces/repositories/trace-analytics.repository";
+import type { TraceAnalyticsRollupRepository } from "../app-layer/traces/repositories/trace-analytics-rollup.repository";
 import type { TraceSummaryRepository } from "../app-layer/traces/repositories/trace-summary.repository";
 import type { SpanStorageService } from "../app-layer/traces/span-storage.service";
 import { TraceReadDerivationService } from "../app-layer/traces/trace-read-derivation.service";
@@ -98,6 +101,8 @@ import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/l
 import { MetricRecordAppendStore } from "./pipelines/trace-processing/projections/metricRecordStorage.store";
 import type { DerivedTraceEvent } from "./pipelines/trace-processing/projections/services/trace-events.derivation";
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
+import { TraceAnalyticsStore } from "./pipelines/trace-processing/projections/traceAnalytics.store";
+import { TraceAnalyticsRollupAppendStore } from "./pipelines/trace-processing/projections/traceAnalyticsRollup.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
 import { createClaudeCodeSpanSyncReactor } from "./pipelines/trace-processing/reactors/claudeCodeSpanSync.reactor";
 import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
@@ -184,6 +189,10 @@ export interface PipelineRepositories {
   traceSummaryFold: TraceSummaryRepository;
   logRecordStorage: LogRecordStorageRepository;
   metricRecordStorage: MetricRecordStorageRepository;
+  /** ADR-034 Phase 1: per-span rollup repository (app-side, replaces the MV). */
+  traceAnalyticsRollup: TraceAnalyticsRollupRepository;
+  /** ADR-034 Phase 2: slim per-trace analytics repository (dual-tap, no read path yet). */
+  traceAnalytics: TraceAnalyticsRepository;
   experimentRunItemStorage: AppendStore<ClickHouseExperimentRunResultRecord>;
 }
 
@@ -387,6 +396,15 @@ export class PipelineRegistry {
         triggers: this.deps.triggers,
       });
 
+    // ADR-034 Phase 5: real-time path for custom-graph threshold alerts.
+    // Flag-gated per project inside `decide` so a flag-OFF project sees
+    // an empty enqueue list and the cron handles its graph triggers
+    // unchanged.
+    const graphTriggerEvaluationOutboxReactor =
+      createGraphTriggerEvaluationOutboxReactor({
+        triggers: this.deps.triggers,
+      });
+
     const customEvaluationSyncReactor = createCustomEvaluationSyncReactor({
       reportEvaluation: evalCommands.reportEvaluation,
     });
@@ -467,6 +485,12 @@ export class PipelineRegistry {
     const tracePipeline = this.deps.eventSourcing.register(
       createTraceProcessingPipeline({
         spanAppendStore: new SpanAppendStore(this.deps.traces.spans.repository),
+        traceAnalyticsRollupAppendStore: new TraceAnalyticsRollupAppendStore(
+          this.deps.repositories.traceAnalyticsRollup,
+        ),
+        traceAnalyticsStore: new TraceAnalyticsStore(
+          this.deps.repositories.traceAnalytics,
+        ),
         logRecordAppendStore: new LogRecordAppendStore(
           this.deps.repositories.logRecordStorage,
         ),
@@ -478,6 +502,7 @@ export class PipelineRegistry {
         evaluationTriggerReactor,
         alertTriggerReactor,
         alertTriggerNotifyOutboxReactor,
+        graphTriggerEvaluationOutboxReactor,
         customEvaluationSyncReactor,
         traceUpdateBroadcastReactor,
         projectMetadataReactor,

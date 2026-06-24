@@ -41,6 +41,8 @@ import type { FoldProjectionStore } from "../projections/foldProjection.types";
 import { DispatchError, isDispatchError } from "./dispatchError";
 import {
   type CadenceStagePayload,
+  type GraphEvalStagePayload,
+  isGraphEval,
   type OutboxJob,
   type SettleStagePayload,
   TRIGGER_NOTIFY_REACTOR_NAME,
@@ -153,6 +155,21 @@ export interface OutboxDispatcherDeps {
     triggerId: string;
     emails: string[];
   }) => Promise<string[]>;
+  /**
+   * ADR-034 Phase 5: custom-graph threshold evaluation handler. The
+   * dispatcher's `process` callback routes `graphEval`-stage payloads
+   * to this function (single shared handler — same one the real-time
+   * reactor and the heartbeat both target). Owns its own dedup via
+   * `TriggerSent`, so the dispatcher just hands it the
+   * `(triggerId, projectId, reason)` envelope. Injected so this
+   * module stays free of the analytics / mailer dependencies the
+   * handler needs.
+   */
+  evaluateGraphTrigger: (params: {
+    triggerId: string;
+    projectId: string;
+    reason: GraphEvalStagePayload["reason"];
+  }) => Promise<void>;
 }
 
 /**
@@ -178,6 +195,8 @@ export function createOutboxDispatcher(deps: OutboxDispatcherDeps): {
     process: async (payload) => {
       if (payload.stage === "settle") {
         await handleSettle(deps, payload);
+      } else if (isGraphEval(payload)) {
+        await handleGraphEval(deps, payload);
       } else {
         // Single-job cadence path (no coalescing this round) — one-match
         // notify digest, or one persist dispatch.
@@ -186,12 +205,14 @@ export function createOutboxDispatcher(deps: OutboxDispatcherDeps): {
     },
     processBatch: async (payloads) => {
       if (payloads.length === 0) return;
-      // Settle stage's coalesceMaxBatch returns 1 so we never see a
-      // settle-stage batch here; defensive split anyway.
+      // Settle / graphEval coalesce 1 so we never see them in a batch
+      // here; defensive split anyway.
       const cadence: CadenceStagePayload[] = [];
       for (const p of payloads) {
         if (p.stage === "settle") {
           await handleSettle(deps, p);
+        } else if (isGraphEval(p)) {
+          await handleGraphEval(deps, p);
         } else {
           cadence.push(p);
         }
@@ -201,6 +222,24 @@ export function createOutboxDispatcher(deps: OutboxDispatcherDeps): {
       }
     },
   };
+}
+
+/**
+ * ADR-034 Phase 5: graph-trigger evaluation handler. Delegates to the
+ * injected `evaluateGraphTrigger` (the shared handler the real-time
+ * reactor and the heartbeat both target). Errors propagate so the
+ * outbox can retry — the handler itself is idempotent under repeated
+ * calls within the debounce window.
+ */
+async function handleGraphEval(
+  deps: OutboxDispatcherDeps,
+  payload: GraphEvalStagePayload,
+): Promise<void> {
+  await deps.evaluateGraphTrigger({
+    triggerId: payload.triggerId,
+    projectId: payload.projectId,
+    reason: payload.reason,
+  });
 }
 
 /**
