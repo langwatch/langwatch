@@ -46,7 +46,7 @@ importers:
         version: 2.1.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/core':
         specifier: ^2.0.1
-        version: 2.1.0(@opentelemetry/api@1.9.0)
+        version: 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/exporter-logs-otlp-http':
         specifier: 0.216.0
         version: 0.216.0(@opentelemetry/api@1.9.0)
@@ -639,8 +639,8 @@ packages:
     resolution: {integrity: sha512-TW4oq3Dk56h185Ty0WIr/KyRnxj6sYFHg2Ip+pOdecMPv1iT7r1z99gfvDadUsHSfXE5IUL7H7LaIkornYVQSw==}
     engines: {node: ^18.19.0 || >=20.6.0}
 
-  '@opentelemetry/core@2.1.0':
-    resolution: {integrity: sha512-RMEtHsxJs/GiHHxYT58IY57UXAQTuUnZVco6ymDEqTNlJKTimM4qPUPVe8InNFyBjhHBEAx4k3Q8LtNayBsbUQ==}
+  '@opentelemetry/core@2.7.1':
+    resolution: {integrity: sha512-QAqIj32AtK6+pEVNG7EOVxHdE06RP+FM5qpiEJ4RtDcFIqKUZHYhl7/7UY5efhwmwNAg7j8QbJVBLxMerc0+gw==}
     engines: {node: ^18.19.0 || >=20.6.0}
     peerDependencies:
       '@opentelemetry/api': ^1.9.0
@@ -3100,7 +3100,7 @@ snapshots:
   '@opentelemetry/configuration@0.216.0(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       yaml: 2.8.1
 
   '@opentelemetry/context-async-hooks@2.1.0(@opentelemetry/api@1.9.0)':
@@ -3123,7 +3123,7 @@ snapshots:
     transitivePeerDependencies:
       - '@opentelemetry/api'
 
-  '@opentelemetry/core@2.1.0(@opentelemetry/api@1.9.0)':
+  '@opentelemetry/core@2.7.1(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/semantic-conventions': 1.40.0
@@ -3132,7 +3132,7 @@ snapshots:
     dependencies:
       '@grpc/grpc-js': 1.14.3
       '@opentelemetry/api': 1.9.0
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-exporter-base': 0.216.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-grpc-exporter-base': 0.216.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-transformer': 0.216.0(@opentelemetry/api@1.9.0)
@@ -3142,7 +3142,7 @@ snapshots:
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/api-logs': 0.205.0
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-exporter-base': 0.216.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-transformer': 0.216.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-logs': 0.205.0(@opentelemetry/api@1.9.0)
@@ -3151,7 +3151,7 @@ snapshots:
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/api-logs': 0.205.0
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-exporter-base': 0.216.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-transformer': 0.216.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/resources': 2.7.0(@opentelemetry/api@1.9.0)
@@ -3162,7 +3162,7 @@ snapshots:
     dependencies:
       '@grpc/grpc-js': 1.14.3
       '@opentelemetry/api': 1.9.0
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/exporter-metrics-otlp-http': 0.216.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-exporter-base': 0.216.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-grpc-exporter-base': 0.216.0(@opentelemetry/api@1.9.0)
@@ -3173,7 +3173,7 @@ snapshots:
   '@opentelemetry/exporter-metrics-otlp-http@0.216.0(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-exporter-base': 0.216.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-transformer': 0.216.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/resources': 2.7.0(@opentelemetry/api@1.9.0)
@@ -3182,7 +3182,7 @@ snapshots:
   '@opentelemetry/exporter-metrics-otlp-proto@0.216.0(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/exporter-metrics-otlp-http': 0.216.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-exporter-base': 0.216.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-transformer': 0.216.0(@opentelemetry/api@1.9.0)
@@ -3192,7 +3192,7 @@ snapshots:
   '@opentelemetry/exporter-prometheus@0.216.0(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/resources': 2.7.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-metrics': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/semantic-conventions': 1.40.0
@@ -3201,7 +3201,7 @@ snapshots:
     dependencies:
       '@grpc/grpc-js': 1.14.3
       '@opentelemetry/api': 1.9.0
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-exporter-base': 0.216.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-grpc-exporter-base': 0.216.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-transformer': 0.216.0(@opentelemetry/api@1.9.0)
@@ -3211,7 +3211,7 @@ snapshots:
   '@opentelemetry/exporter-trace-otlp-http@0.205.0(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-exporter-base': 0.205.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-transformer': 0.205.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/resources': 2.7.0(@opentelemetry/api@1.9.0)
@@ -3220,7 +3220,7 @@ snapshots:
   '@opentelemetry/exporter-trace-otlp-proto@0.216.0(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-exporter-base': 0.216.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-transformer': 0.216.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/resources': 2.7.0(@opentelemetry/api@1.9.0)
@@ -3229,7 +3229,7 @@ snapshots:
   '@opentelemetry/exporter-zipkin@2.7.1(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/resources': 2.7.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-trace-base': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/semantic-conventions': 1.40.0
@@ -3246,20 +3246,20 @@ snapshots:
   '@opentelemetry/otlp-exporter-base@0.205.0(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-transformer': 0.205.0(@opentelemetry/api@1.9.0)
 
   '@opentelemetry/otlp-exporter-base@0.216.0(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-transformer': 0.216.0(@opentelemetry/api@1.9.0)
 
   '@opentelemetry/otlp-grpc-exporter-base@0.216.0(@opentelemetry/api@1.9.0)':
     dependencies:
       '@grpc/grpc-js': 1.14.3
       '@opentelemetry/api': 1.9.0
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-exporter-base': 0.216.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-transformer': 0.216.0(@opentelemetry/api@1.9.0)
 
@@ -3267,7 +3267,7 @@ snapshots:
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/api-logs': 0.205.0
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/resources': 2.7.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-logs': 0.205.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-metrics': 2.1.0(@opentelemetry/api@1.9.0)
@@ -3278,7 +3278,7 @@ snapshots:
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/api-logs': 0.205.0
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/resources': 2.7.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-logs': 0.205.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-metrics': 2.7.1(@opentelemetry/api@1.9.0)
@@ -3288,42 +3288,42 @@ snapshots:
   '@opentelemetry/propagator-b3@2.7.1(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
 
   '@opentelemetry/propagator-jaeger@2.7.1(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
 
   '@opentelemetry/resources@2.7.0(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/semantic-conventions': 1.40.0
 
   '@opentelemetry/sdk-logs@0.205.0(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/api-logs': 0.205.0
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/resources': 2.7.0(@opentelemetry/api@1.9.0)
 
   '@opentelemetry/sdk-metrics@2.1.0(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/resources': 2.7.0(@opentelemetry/api@1.9.0)
 
   '@opentelemetry/sdk-metrics@2.6.0(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/resources': 2.7.0(@opentelemetry/api@1.9.0)
 
   '@opentelemetry/sdk-metrics@2.7.1(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/resources': 2.7.0(@opentelemetry/api@1.9.0)
 
   '@opentelemetry/sdk-node@0.216.0(@opentelemetry/api@1.9.0)':
@@ -3332,7 +3332,7 @@ snapshots:
       '@opentelemetry/api-logs': 0.205.0
       '@opentelemetry/configuration': 0.216.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/context-async-hooks': 2.7.1(@opentelemetry/api@1.9.0)
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/exporter-logs-otlp-grpc': 0.216.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/exporter-logs-otlp-http': 0.216.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/exporter-logs-otlp-proto': 0.216.0(@opentelemetry/api@1.9.0)
@@ -3360,7 +3360,7 @@ snapshots:
   '@opentelemetry/sdk-trace-base@2.7.1(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/resources': 2.7.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/semantic-conventions': 1.40.0
 
@@ -3368,20 +3368,20 @@ snapshots:
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/context-async-hooks': 2.1.0(@opentelemetry/api@1.9.0)
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-trace-base': 2.7.1(@opentelemetry/api@1.9.0)
 
   '@opentelemetry/sdk-trace-node@2.7.1(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/context-async-hooks': 2.7.1(@opentelemetry/api@1.9.0)
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-trace-base': 2.7.1(@opentelemetry/api@1.9.0)
 
   '@opentelemetry/sdk-trace-web@2.6.0(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
-      '@opentelemetry/core': 2.1.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 2.7.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-trace-base': 2.7.1(@opentelemetry/api@1.9.0)
 
   '@opentelemetry/semantic-conventions@1.40.0': {}
