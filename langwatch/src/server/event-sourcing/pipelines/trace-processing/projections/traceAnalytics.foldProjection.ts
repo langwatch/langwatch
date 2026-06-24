@@ -56,7 +56,7 @@ import { trimAttributesForAnalytics } from "./services/analytics-attribute-trim.
 /**
  * ADR-034 Phase 2: slim per-trace fold projection.
  *
- * Writes to `trace_analytics` (migration 00037) — a ReplacingMergeTree(Version)
+ * Writes to `trace_analytics` (migration 00038) — a ReplacingMergeTree(Version)
  * keyed on (TenantId, TraceId), partitioned by toYearWeek(OccurredAt), with the
  * sort key reorganised onto time (`(TenantId, OccurredAt, TraceId)`) so
  * analytics scans pull contiguous granules.
