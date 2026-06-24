@@ -18,7 +18,7 @@ import {
 /**
  * ADR-034 Phase 7 — slim per-suite-run fold projection.
  *
- * Writes to `suite_analytics` (migration 00045) — a
+ * Writes to `suite_analytics` (migration 00046) — a
  * `ReplacingMergeTree(UpdatedAt)` keyed on (TenantId, SuiteRunId).
  *
  * Mirrors `SuiteRunStateFoldProjection`'s per-event logic for the SHARED

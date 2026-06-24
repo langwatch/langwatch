@@ -22,7 +22,7 @@ import {
 /**
  * ADR-034 Phase 7 — slim per-simulation-run fold projection.
  *
- * Writes to `simulation_analytics` (migration 00041) — a
+ * Writes to `simulation_analytics` (migration 00042) — a
  * `ReplacingMergeTree(UpdatedAt)` keyed on (TenantId, ScenarioRunId),
  * partitioned by `toYearWeek(OccurredAt)`, with a time-leading sort key
  * `(TenantId, OccurredAt, ScenarioRunId)` so analytics scans pull

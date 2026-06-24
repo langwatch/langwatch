@@ -14,7 +14,7 @@ const logger = createLogger(
 
 /**
  * ClickHouse write shape for the slim `evaluation_analytics` table
- * (ADR-034 Phase 6, migration 00039).
+ * (ADR-034 Phase 6, migration 00040).
  *
  * The 64-bit-integer column (`DurationMs`) is serialised as a STRING in
  * the JSONEachRow body — JSON numbers can't safely round-trip values past

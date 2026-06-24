@@ -14,7 +14,7 @@ const logger = createLogger(
 
 /**
  * ClickHouse write shape for the slim `experiment_analytics` table
- * (ADR-034 Phase 7, migration 00043).
+ * (ADR-034 Phase 7, migration 00044).
  *
  * `TotalDurationMs` is Int64 — serialised as a STRING in JSONEachRow for the
  * same precision reason the trace + eval slim use. `TotalCost`, `AvgScoreBps`,

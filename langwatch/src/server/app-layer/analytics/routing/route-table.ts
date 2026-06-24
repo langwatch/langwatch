@@ -130,7 +130,7 @@ export type TraceRollupMetricKey =
  * Registry metric keys that can be served from `evaluation_analytics_rollup`
  * for additive aggregations. The rollup carries pass/fail/error/skipped
  * counters, a score sum + count pair (for true avg), and total eval count;
- * see migration 00038 + `evaluationAnalyticsRollup.mapProjection.ts`.
+ * see migration 00039 + `evaluationAnalyticsRollup.mapProjection.ts`.
  *
  * `evaluations.evaluation_runs` rolls up to `EvalCount` (additive sum) —
  * the registry's `cardinality` aggregation maps to `sum(EvalCount)`. Score
@@ -199,7 +199,7 @@ export type SlimTraceMetricKey =
 /**
  * Registry metric keys that can be served from the slim
  * `evaluation_analytics` table. Each has a typed column on the slim row;
- * see migration 00039 + `evaluationAnalytics.foldProjection.ts`.
+ * see migration 00040 + `evaluationAnalytics.foldProjection.ts`.
  */
 const SLIM_ELIGIBLE_EVAL_METRIC_KEYS_LIST = [
   "evaluations.evaluation_score",
@@ -241,7 +241,7 @@ const ROLLUP_TRACE_GROUP_BY_KEYS: ReadonlySet<string> = new Set([
 
 /**
  * Eval-rollup group-by keys — the dims final at evaluation-completion time
- * AND on the rollup's keying tuple (see migration 00038):
+ * AND on the rollup's keying tuple (see migration 00039):
  *   {none, EvaluatorType, Status}.
  */
 const ROLLUP_EVAL_GROUP_BY_KEYS: ReadonlySet<string> = new Set([
