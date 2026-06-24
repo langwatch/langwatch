@@ -70,10 +70,10 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
   });
 
   it("AggregateHeaderBar — tally + filter chips + handoffs", async () => {
-    await page.viewport(1200, 80);
+    await page.viewport(1600, 70);
     render(
       <ChakraProvider value={defaultSystem}>
-        <div style={{ width: 1180, background: "white" }}>
+        <div style={{ width: 1580, background: "white" }}>
           <AggregateHeaderBar
             counts={{ a: 12, b: 7, tie: 2 }}
             variantAName="variant_a"
@@ -97,10 +97,10 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
   });
 
   it("AggregateHeaderBar — losses filter active", async () => {
-    await page.viewport(1200, 80);
+    await page.viewport(1600, 70);
     render(
       <ChakraProvider value={defaultSystem}>
-        <div style={{ width: 1180, background: "white" }}>
+        <div style={{ width: 1580, background: "white" }}>
           <AggregateHeaderBar
             counts={{ a: 12, b: 7, tie: 2 }}
             variantAName="variant_a"
@@ -124,7 +124,7 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
   });
 
   it("RowVerdictStrip — A wins", async () => {
-    await page.viewport(800, 60);
+    await page.viewport(800, 40);
     render(
       <ChakraProvider value={defaultSystem}>
         <div style={{ width: 780, background: "white" }}>
@@ -145,7 +145,7 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
   });
 
   it("RowVerdictStrip — tie", async () => {
-    await page.viewport(800, 60);
+    await page.viewport(800, 40);
     render(
       <ChakraProvider value={defaultSystem}>
         <div style={{ width: 780, background: "white" }}>
@@ -166,7 +166,7 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
   });
 
   it("RowVerdictStrip — B wins", async () => {
-    await page.viewport(800, 60);
+    await page.viewport(800, 40);
     render(
       <ChakraProvider value={defaultSystem}>
         <div style={{ width: 780, background: "white" }}>
