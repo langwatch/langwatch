@@ -20,7 +20,7 @@ import {
 /**
  * ADR-034 Phase 6 — slim per-evaluation fold projection.
  *
- * Writes to `evaluation_analytics` (migration 00039) — a
+ * Writes to `evaluation_analytics` (migration 00040) — a
  * `ReplacingMergeTree(UpdatedAt)` keyed on (TenantId, EvaluationId),
  * partitioned by `toYearWeek(OccurredAt)`, with a time-leading sort key
  * `(TenantId, OccurredAt, EvaluationId)` so analytics scans pull contiguous

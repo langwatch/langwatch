@@ -23,7 +23,7 @@ import {
 /**
  * ADR-034 Phase 7 — slim per-experiment-run fold projection.
  *
- * Writes to `experiment_analytics` (migration 00043) — a
+ * Writes to `experiment_analytics` (migration 00044) — a
  * `ReplacingMergeTree(UpdatedAt)` keyed on (TenantId, RunId), partitioned by
  * `toYearWeek(OccurredAt)`, with a time-leading sort key
  * `(TenantId, OccurredAt, RunId)` so analytics scans pull contiguous granules.
