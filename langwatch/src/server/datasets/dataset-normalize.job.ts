@@ -35,6 +35,8 @@ import type { DatasetStorage } from "./dataset-storage";
 import { UPLOAD_MAX_BYTES } from "./presigned-upload";
 import type { DatasetColumns } from "./types";
 import {
+  convertValueToColumnType,
+  dedupeHeaders,
   detectFileFormat,
   type FileFormat,
   renameReservedColumns,
@@ -167,39 +169,6 @@ const buildRenameMap = (headers: string[]): Map<string, string> => {
 };
 
 /**
- * Make column names unique by suffixing repeats `_1`, `_2`, … — the same scheme
- * papaparse's `header:true` dedup uses, but applied ONCE to the header row.
- *
- * The CSV path parses with `header:false` and maps rows to objects by index
- * (below) precisely to AVOID papaparse's header machinery: under our
- * pause/resume backpressure it re-runs its duplicate-name dedup against the
- * CURRENT data row on every resume, so any row holding two equal cells (an input
- * that equals its expected output, or two empty cells) had its second value
- * silently corrupted with a `_1` suffix — and logged a warning per row. Deduping
- * the header ourselves keeps the legitimate "two columns named the same" rename
- * without ever touching row values.
- */
-const dedupeHeaders = (headers: string[]): string[] => {
-  const seen = new Map<string, number>();
-  // Track the names actually emitted, not just the raw inputs: a suffixed
-  // candidate (`col_1`) can still collide with a column literally named `col_1`,
-  // so keep bumping the counter until the candidate is unique. Without this,
-  // `["col","col","col_1"]` would emit `["col","col_1","col_1"]` and the by-index
-  // record map below would silently overwrite one column's values with another's.
-  const emitted = new Set<string>();
-  return headers.map((header) => {
-    let count = seen.get(header) ?? 0;
-    let candidate = count === 0 ? header : `${header}_${count}`;
-    while (emitted.has(candidate)) {
-      candidate = `${header}_${++count}`;
-    }
-    seen.set(header, count + 1);
-    emitted.add(candidate);
-    return candidate;
-  });
-};
-
-/**
  * Rewrite a record's keys through the rename map so the stored JSONL row keys
  * match `columnTypes` (m4). Streaming — one record at a time, never buffers the
  * file. A no-op when nothing was renamed.
@@ -227,10 +196,49 @@ const parseInto = async (params: {
   format: FileFormat;
   writer: StreamingChunkWriter;
   sizeBytes: number;
-}): Promise<{ headers: string[] }> => {
-  const { stream, format, writer, sizeBytes } = params;
+  /**
+   * User-confirmed columns from the upload step (ADR-032 v19), positionally 1:1
+   * with the canonical (reserved-renamed / deduped) headers. When present AND
+   * the count matches, each record's keys are renamed to `targetColumns[i].name`
+   * and each value is converted to `targetColumns[i].type` as it streams; the
+   * final `appliedColumnTypes` is then this list. A count mismatch (defensive —
+   * the confirm UI locks add/remove, so it shouldn't happen) honours nothing and
+   * leaves the handler to derive all-`string` from the headers.
+   */
+  targetColumns?: DatasetColumns | null;
+}): Promise<{
+  headers: string[];
+  appliedColumnTypes: DatasetColumns | null;
+}> => {
+  const { stream, format, writer, sizeBytes, targetColumns } = params;
   let headers: string[] = [];
   let renameMap = new Map<string, string>();
+  // canonicalHeader → confirmed { name, type }; built once headers are known and
+  // only when the confirmed count matches (else stays null → derive-all-string).
+  let targetByCanonical: Map<string, DatasetColumns[number]> | null = null;
+  const buildTargetMap = (canonical: string[]): void => {
+    if (!targetColumns || targetColumns.length !== canonical.length) return;
+    targetByCanonical = new Map(
+      canonical.map((h, i) => [h, targetColumns[i]!]),
+    );
+  };
+  // Rename canonical keys to the confirmed names and convert values to the
+  // confirmed types. Identity when nothing was confirmed (or on a count
+  // mismatch) — preserving the pre-v19 all-`string` pass-through. Streaming:
+  // one record at a time, never buffers the file.
+  const applyTarget = (
+    record: Record<string, unknown>,
+  ): Record<string, unknown> => {
+    if (!targetByCanonical) return record;
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(record)) {
+      const target = targetByCanonical.get(key);
+      if (target)
+        out[target.name] = convertValueToColumnType(value, target.type);
+      else out[key] = value;
+    }
+    return out;
+  };
   // Capture headers the first time we see them, derive the rename map, and
   // expose headers in their safe (renamed) form so columnTypes matches the
   // rewritten row keys.
@@ -238,6 +246,7 @@ const parseInto = async (params: {
     if (headers.length > 0) return;
     renameMap = buildRenameMap(rawKeys);
     headers = renameReservedColumns(rawKeys);
+    buildTargetMap(headers);
   };
 
   if (format === "jsonl") {
@@ -252,9 +261,12 @@ const parseInto = async (params: {
       if (line.length === 0) continue;
       const record = JSON.parse(line) as Record<string, unknown>;
       captureHeaders(Object.keys(record));
-      await writer.push(applyRename(record, renameMap));
+      await writer.push(applyTarget(applyRename(record, renameMap)));
     }
-    return { headers };
+    return {
+      headers,
+      appliedColumnTypes: targetByCanonical ? targetColumns! : null,
+    };
   }
 
   if (format === "csv") {
@@ -287,6 +299,7 @@ const parseInto = async (params: {
             );
             csvHeaders = renameReservedColumns(dedupeHeaders(raw));
             headers = csvHeaders;
+            buildTargetMap(headers);
             return;
           }
           const record: Record<string, unknown> = {};
@@ -304,7 +317,7 @@ const parseInto = async (params: {
           }
           parser.pause();
           chain = chain
-            .then(() => writer.push(record))
+            .then(() => writer.push(applyTarget(record)))
             .then(() => parser.resume())
             .catch((error: unknown) => {
               parser.abort();
@@ -317,7 +330,10 @@ const parseInto = async (params: {
         error: (error: unknown) => reject(error),
       });
     });
-    return { headers };
+    return {
+      headers,
+      appliedColumnTypes: targetByCanonical ? targetColumns! : null,
+    };
   }
 
   // format === "json": a single array — guard the size, then buffer + parse.
@@ -331,9 +347,12 @@ const parseInto = async (params: {
   }
   for (const record of parsed as Record<string, unknown>[]) {
     captureHeaders(Object.keys(record));
-    await writer.push(applyRename(record, renameMap));
+    await writer.push(applyTarget(applyRename(record, renameMap)));
   }
-  return { headers };
+  return {
+    headers,
+    appliedColumnTypes: targetByCanonical ? targetColumns! : null,
+  };
 };
 
 /**
@@ -385,17 +404,24 @@ export const createDatasetNormalizeHandler = (deps: DatasetNormalizeDeps) => {
         datasetId,
       });
 
-      const { headers } = await parseInto({
+      // ADR-032 v19: the upload's confirm step persists the user-chosen columns
+      // on the row (names + types). Honour them — rename + type-convert per
+      // record as it streams. Absent (SDK / REST / API-key callers that don't
+      // pass a schema) → null, so parseInto leaves rows as-is and we derive
+      // all-`string` below, exactly as before.
+      const confirmedColumns = (dataset.columnTypes as DatasetColumns) ?? [];
+      const { headers, appliedColumnTypes } = await parseInto({
         stream,
         format,
         writer,
         sizeBytes,
+        targetColumns: confirmedColumns.length > 0 ? confirmedColumns : null,
       });
       // I-MEM: finalize returns the aggregated meta built from per-chunk
       // metadata only — the chunk `jsonl` payloads were released at each flush,
       // so the whole normalized file is never accumulated in heap.
       const meta = await writer.finalize();
-      const columnTypes = deriveColumnTypes(headers);
+      const columnTypes = appliedColumnTypes ?? deriveColumnTypes(headers);
 
       // m5: an empty upload is a failure, not a 0-chunk `ready` dataset — this
       // matches the legacy upload contract (which rejects an empty file).

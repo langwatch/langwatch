@@ -124,6 +124,101 @@ export function renameReservedColumns(columns: string[]): string[] {
 }
 
 /**
+ * Make column names unique by suffixing repeats `_1`, `_2`, … — the same scheme
+ * papaparse's `header:true` dedup uses, but applied ONCE to the header row.
+ *
+ * Lives here (not in the normalize job) so the browser confirm step
+ * (`parseHeaderColumns`) canonicalises the header EXACTLY as the server-side
+ * normalize job does — the confirmed `columnTypes` are then positionally 1:1
+ * with the headers normalize parses, which is what lets normalize honour them
+ * by index (ADR-032 v19). The CSV normalize path parses with `header:false` and
+ * maps rows by index precisely to AVOID papaparse re-running its dedup against
+ * each data row under pause/resume backpressure (which corrupted equal-cell
+ * rows with a `_1` suffix); deduping the header ourselves keeps the legitimate
+ * "two columns named the same" rename without ever touching row values.
+ */
+export function dedupeHeaders(headers: string[]): string[] {
+  const seen = new Map<string, number>();
+  // Track the names actually emitted, not just the raw inputs: a suffixed
+  // candidate (`col_1`) can still collide with a column literally named `col_1`,
+  // so keep bumping the counter until the candidate is unique. Without this,
+  // `["col","col","col_1"]` would emit `["col","col_1","col_1"]` and a by-index
+  // record map would silently overwrite one column's values with another's.
+  const emitted = new Set<string>();
+  return headers.map((header) => {
+    let count = seen.get(header) ?? 0;
+    let candidate = count === 0 ? header : `${header}_${count}`;
+    while (emitted.has(candidate)) {
+      candidate = `${header}_${++count}`;
+    }
+    seen.set(header, count + 1);
+    emitted.add(candidate);
+    return candidate;
+  });
+}
+
+/**
+ * Convert one raw cell value to its declared column type (ADR-032 v19). The
+ * single-value core of `convertRowsToColumnTypes` / the frontend
+ * `tryToConvertRowsToAppropriateType`, factored out so the streaming normalize
+ * job can apply a confirmed type per record without buffering rows.
+ *
+ * Mirrors the legacy semantics exactly: empty number → null; the same
+ * truthy/falsy boolean token sets; date → ISO `YYYY-MM-DD`; image kept as a
+ * string (URL); every other non-string type (list/json/spans/…) is JSON-parsed,
+ * keeping the original string if the parse fails.
+ */
+export function convertValueToColumnType(
+  value: unknown,
+  type: DatasetColumns[number]["type"],
+): unknown {
+  if (type === "number") {
+    if (!value && value !== 0) return null;
+    return !isNaN(value as number) ? parseFloat(String(value)) : value;
+  }
+  if (type === "boolean") {
+    const strValue = `${value ?? ""}`.toLowerCase();
+    if (["true", "1", "yes", "y", "on", "ok"].includes(strValue)) return true;
+    if (
+      [
+        "false",
+        "0",
+        "null",
+        "undefined",
+        "nan",
+        "inf",
+        "no",
+        "n",
+        "off",
+      ].includes(strValue)
+    ) {
+      return false;
+    }
+    return value;
+  }
+  if (type === "date") {
+    // Preserve empty/missing cells: `new Date(null)` is the Unix epoch, which
+    // would silently rewrite a nullable date column's blanks to 1970-01-01.
+    if (value === null || value === undefined || value === "") return value;
+    const dateAttempt = new Date(value as string);
+    return dateAttempt.toString() !== "Invalid Date"
+      ? dateAttempt.toISOString().split("T")[0]
+      : value;
+  }
+  // Image is a URL string; string passes through unchanged.
+  if (type === "image" || type === "string" || type === undefined) {
+    return value;
+  }
+  // list / json / spans / chat_messages / annotations / evaluations — parse JSON,
+  // keeping the original value if it isn't valid JSON.
+  try {
+    return JSON.parse(value as string);
+  } catch {
+    return value;
+  }
+}
+
+/**
  * Converts row values to match declared column types.
  * Ported from frontend tryToConvertRowsToAppropriateType.
  *
@@ -142,46 +237,8 @@ export function convertRowsToColumnTypes(
     const convertedRecord = { ...record };
     for (const [key, value] of Object.entries(record)) {
       const type = typeForColumn[key];
-      if (type === "number") {
-        if (!value && value !== 0) {
-          convertedRecord[key] = null;
-        } else if (!isNaN(value as number)) {
-          convertedRecord[key] = parseFloat(String(value));
-        }
-      } else if (type === "boolean") {
-        const strValue = `${value ?? ""}`.toLowerCase();
-        if (["true", "1", "yes", "y", "on", "ok"].includes(strValue)) {
-          convertedRecord[key] = true;
-        } else if (
-          [
-            "false",
-            "0",
-            "null",
-            "undefined",
-            "nan",
-            "inf",
-            "no",
-            "n",
-            "off",
-          ].includes(strValue)
-        ) {
-          convertedRecord[key] = false;
-        }
-      } else if (type === "date") {
-        const dateAttempt = new Date(value as string);
-        if (dateAttempt.toString() !== "Invalid Date") {
-          convertedRecord[key] = dateAttempt.toISOString().split("T")[0];
-        }
-      } else if (type === "image") {
-        // Image type is treated as a string (URL)
-        convertedRecord[key] = value;
-      } else if (type !== "string" && type !== undefined) {
-        // For json, list, spans, etc. — try parsing the string as JSON
-        try {
-          convertedRecord[key] = JSON.parse(value as string);
-        } catch {
-          // Keep original value if JSON parse fails
-        }
+      if (type !== undefined) {
+        convertedRecord[key] = convertValueToColumnType(value, type);
       }
     }
     return convertedRecord;
@@ -211,14 +268,12 @@ export function parseFileContent(params: {
     }
     case "json": {
       const records = parseJSON(cleanContent);
-      const headers =
-        records.length > 0 ? Object.keys(records[0]!) : [];
+      const headers = records.length > 0 ? Object.keys(records[0]!) : [];
       return { headers, rows: records };
     }
     case "jsonl": {
       const records = parseJSONL(cleanContent);
-      const headers =
-        records.length > 0 ? Object.keys(records[0]!) : [];
+      const headers = records.length > 0 ? Object.keys(records[0]!) : [];
       return { headers, rows: records };
     }
   }

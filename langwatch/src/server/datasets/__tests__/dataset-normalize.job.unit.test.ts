@@ -467,6 +467,165 @@ describe("createDatasetNormalizeHandler()", () => {
     });
   });
 
+  // ADR-032 v19: the upload confirm step persists user-chosen columns (names +
+  // types) on the row. Normalize must honour them — rename keys + convert values
+  // streaming — instead of deriving all-`string`.
+  describe("when the dataset carries confirmed columnTypes", () => {
+    describe("given a JSONL file and a confirmed number + rename", () => {
+      /** @scenario The dataset is prepared with the columns I confirmed */
+      it("renames keys to the confirmed names and converts values to the confirmed types", async () => {
+        const { storage, writeChunks } = makeStorage({
+          streamStaged: vi
+            .fn()
+            .mockResolvedValue(
+              Readable.from([
+                '{"qty":"5","name":"x"}\n{"qty":"12","name":"y"}\n',
+              ]),
+            ),
+        });
+        const repo = makeRepo({
+          id: "d1",
+          status: "processing",
+          // Positionally 1:1 with the canonical headers [qty, name]: rename qty
+          // → quantity as a number, keep name as a string.
+          columnTypes: [
+            { name: "quantity", type: "number" },
+            { name: "name", type: "string" },
+          ],
+        });
+
+        const handler = createDatasetNormalizeHandler({
+          repository: repo as any,
+          getStorage: async () => storage as any,
+        });
+        await handler(basePayload);
+
+        const entries = writeChunks.mock.calls
+          .flatMap((call: any) => call[0].records)
+          .map((record: any) => record.entry as Record<string, unknown>);
+        expect(entries).toEqual([
+          { quantity: 5, name: "x" },
+          { quantity: 12, name: "y" },
+        ]);
+        const update = repo.update.mock.calls[0]![0];
+        expect(update.data.status).toBe("ready");
+        // The persisted columnTypes are the confirmed ones, not derived strings.
+        expect(update.data.columnTypes).toEqual([
+          { name: "quantity", type: "number" },
+          { name: "name", type: "string" },
+        ]);
+      });
+    });
+
+    describe("given a CSV file and a confirmed number column", () => {
+      it("converts the column's values to numbers as they stream", async () => {
+        const { storage, writeChunks } = makeStorage({
+          streamStaged: vi
+            .fn()
+            .mockResolvedValue(Readable.from(["a,b\n1,x\n2,y\n"])),
+        });
+        const repo = makeRepo({
+          id: "d1",
+          status: "processing",
+          columnTypes: [
+            { name: "a", type: "number" },
+            { name: "b", type: "string" },
+          ],
+        });
+
+        const handler = createDatasetNormalizeHandler({
+          repository: repo as any,
+          getStorage: async () => storage as any,
+        });
+        await handler({ ...basePayload, filename: "data.csv" });
+
+        const entries = writeChunks.mock.calls
+          .flatMap((call: any) => call[0].records)
+          .map((record: any) => record.entry as Record<string, unknown>);
+        expect(entries).toEqual([
+          { a: 1, b: "x" },
+          { a: 2, b: "y" },
+        ]);
+      });
+    });
+
+    describe("given a JSON-array file and a confirmed number + rename", () => {
+      it("renames keys and converts values the same as the JSONL/CSV paths", async () => {
+        const { storage, writeChunks } = makeStorage({
+          streamStaged: vi
+            .fn()
+            .mockResolvedValue(
+              Readable.from([
+                '[{"qty":"5","name":"x"},{"qty":"12","name":"y"}]',
+              ]),
+            ),
+        });
+        const repo = makeRepo({
+          id: "d1",
+          status: "processing",
+          columnTypes: [
+            { name: "quantity", type: "number" },
+            { name: "name", type: "string" },
+          ],
+        });
+
+        const handler = createDatasetNormalizeHandler({
+          repository: repo as any,
+          getStorage: async () => storage as any,
+        });
+        await handler({ ...basePayload, filename: "data.json" });
+
+        const entries = writeChunks.mock.calls
+          .flatMap((call: any) => call[0].records)
+          .map((record: any) => record.entry as Record<string, unknown>);
+        expect(entries).toEqual([
+          { quantity: 5, name: "x" },
+          { quantity: 12, name: "y" },
+        ]);
+        const update = repo.update.mock.calls[0]![0];
+        expect(update.data.columnTypes).toEqual([
+          { name: "quantity", type: "number" },
+          { name: "name", type: "string" },
+        ]);
+      });
+    });
+
+    describe("when the confirmed column count does not match the file headers", () => {
+      // Defensive: the confirm UI locks add/remove so counts can't drift, but a
+      // mismatch must never misalign — fall back to deriving all-`string`.
+      it("ignores the confirmed columns and derives all-string from the headers", async () => {
+        const { storage, writeChunks } = makeStorage({
+          streamStaged: vi
+            .fn()
+            .mockResolvedValue(Readable.from(['{"a":"1","b":"x"}\n'])),
+        });
+        const repo = makeRepo({
+          id: "d1",
+          status: "processing",
+          // Only one column for a two-column file → mismatch.
+          columnTypes: [{ name: "a", type: "number" }],
+        });
+
+        const handler = createDatasetNormalizeHandler({
+          repository: repo as any,
+          getStorage: async () => storage as any,
+        });
+        await handler(basePayload);
+
+        const entries = writeChunks.mock.calls
+          .flatMap((call: any) => call[0].records)
+          .map((record: any) => record.entry as Record<string, unknown>);
+        // Values untouched (no number conversion) and original keys kept.
+        expect(entries).toEqual([{ a: "1", b: "x" }]);
+        const update = repo.update.mock.calls[0]![0];
+        expect(update.data.columnTypes).toEqual([
+          { name: "a", type: "string" },
+          { name: "b", type: "string" },
+        ]);
+      });
+    });
+  });
+
   describe("when the uploaded file has no rows", () => {
     it("fails the dataset with an empty-file statusError instead of flipping to ready", async () => {
       const { storage } = makeStorage({

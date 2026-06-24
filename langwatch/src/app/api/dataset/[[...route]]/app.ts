@@ -11,7 +11,10 @@ import { createLogger } from "~/utils/logger/server";
 import { UploadValidationError } from "../../../../server/datasets/dataset.service";
 import type { DatasetNotReadyError } from "../../../../server/datasets/errors";
 import type { DatasetColumns } from "../../../../server/datasets/types";
-import { datasetColumnTypeSchema } from "../../../../server/datasets/types";
+import {
+  datasetColumnsSchema,
+  datasetColumnTypeSchema,
+} from "../../../../server/datasets/types";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 import {
   enforceResourceLimitOrRespond,
@@ -379,6 +382,35 @@ secured.access(directUploadSessionAuth).post(
     if (!filename || typeof filename !== "string" || filename.trim() === "") {
       throw new UnprocessableEntityError("filename field is required");
     }
+    // ADR-032 v19: optional user-confirmed columns (names + types) from the
+    // upload confirm step, sent as a JSON string. Validated against the same
+    // schema the rest of the surface uses; a malformed value is rejected rather
+    // than silently dropped (so a UI bug surfaces instead of producing an
+    // all-`string` dataset). Absent → normalize derives columns as before.
+    let columnTypes: DatasetColumns | undefined;
+    if (body.columnTypes !== undefined) {
+      // Present-but-invalid is rejected, never silently dropped (the contract).
+      // Absent (undefined) is the only "no schema → derive" path.
+      if (
+        typeof body.columnTypes !== "string" ||
+        body.columnTypes.trim() === ""
+      ) {
+        throw new UnprocessableEntityError(
+          "columnTypes must be a non-empty JSON string",
+        );
+      }
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(body.columnTypes);
+      } catch {
+        throw new UnprocessableEntityError("columnTypes must be valid JSON");
+      }
+      const result = datasetColumnsSchema.safeParse(parsed);
+      if (!result.success) {
+        throw new UnprocessableEntityError("columnTypes is malformed");
+      }
+      columnTypes = result.data;
+    }
 
     // Domain errors map centrally in `handleDatasetError` (see DOMAIN_ERROR_HTTP).
     // Note: DirectUploadUnavailableError (→ 409) is the client's signal to fall
@@ -387,6 +419,7 @@ secured.access(directUploadSessionAuth).post(
       projectId: auth.projectId,
       name: name.trim(),
       filename: filename.trim(),
+      columnTypes,
     });
     return c.json(result, 201);
   },

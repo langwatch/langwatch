@@ -159,3 +159,20 @@ Feature: Large dataset storage
     When I edit one row and delete another
     Then those changes are saved
     And the other rows are unaffected
+
+  # ADR-032 v19: changing a column's type on a stored dataset re-converts the
+  # stored values to the new type — previously refused for large (S3) datasets.
+  @integration
+  Scenario: Changing a column's type re-converts the stored values
+    Given a ready dataset whose "score" column is stored as text
+    When I edit the dataset and change "score" to a number
+    Then the dataset's "score" column is reported as a number
+    And the stored values are converted to numbers
+    And the other columns and rows are unchanged
+
+  @integration
+  Scenario: Retyping a text column to an image URL keeps the value
+    Given a ready dataset with a column of base64 data URLs stored as text
+    When I edit the dataset and change that column to an image
+    Then the column is reported as an image
+    And each stored data URL is kept exactly as it was
