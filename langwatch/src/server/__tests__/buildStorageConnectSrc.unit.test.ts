@@ -33,13 +33,38 @@ describe("buildStorageConnectSrc", () => {
     });
   });
 
-  describe("when neither endpoint nor region is set", () => {
-    it("falls back to a broad AWS S3 wildcard", () => {
-      expect(buildStorageConnectSrc({})).toEqual(["https://*.amazonaws.com"]);
+  describe("when AWS is in use without endpoint or region (bucket/AWS_REGION only)", () => {
+    it("derives the region from AWS_REGION", () => {
+      expect(buildStorageConnectSrc({ AWS_REGION: "us-west-2" })).toEqual([
+        "https://s3.us-west-2.amazonaws.com",
+        "https://*.s3.us-west-2.amazonaws.com",
+      ]);
+    });
+
+    it("falls back to the broad AWS wildcard when only a bucket name is set", () => {
+      expect(buildStorageConnectSrc({ S3_BUCKET_NAME: "my-bucket" })).toEqual([
+        "https://*.amazonaws.com",
+      ]);
     });
   });
 
-  describe("when Azure blob storage is configured", () => {
+  describe("when no storage env is set at all (local-FS deployment)", () => {
+    it("emits no storage origin — nothing to allow", () => {
+      expect(buildStorageConnectSrc({})).toEqual([]);
+    });
+  });
+
+  describe("when only Azure is configured (no AWS env)", () => {
+    it("emits ONLY the Azure origin — no gratuitous amazonaws wildcard", () => {
+      expect(
+        buildStorageConnectSrc({
+          AZURE_BLOB_ENDPOINT: "https://acct.blob.core.windows.net",
+        }),
+      ).toEqual(["https://acct.blob.core.windows.net"]);
+    });
+  });
+
+  describe("when both S3 and Azure are configured", () => {
     it("adds the Azure endpoint origin alongside the S3 origin", () => {
       expect(
         buildStorageConnectSrc({
@@ -49,6 +74,32 @@ describe("buildStorageConnectSrc", () => {
       ).toEqual([
         "https://s3.eu-central-1.amazonaws.com",
         "https://acct.blob.core.windows.net",
+      ]);
+    });
+  });
+
+  describe("when S3_REGION carries an injected CSP directive (security)", () => {
+    it("rejects the non-region value and falls back to the wildcard rather than injecting", () => {
+      const result = buildStorageConnectSrc({
+        S3_REGION: "us-east-1; frame-src *",
+      });
+      expect(result).toEqual(["https://*.amazonaws.com"]);
+      expect(result.join(" ")).not.toContain(";");
+      expect(result.join(" ")).not.toContain(" frame-src");
+    });
+  });
+
+  describe("when the endpoint is an opaque-origin scheme (file://)", () => {
+    it("rejects it instead of emitting the string 'null' into the CSP", () => {
+      const result = buildStorageConnectSrc({
+        S3_ENDPOINT: "file:///mnt/storage",
+        S3_REGION: "eu-west-1",
+      });
+      expect(result).not.toContain("null");
+      // Falls through to the region-derived AWS origins.
+      expect(result).toEqual([
+        "https://s3.eu-west-1.amazonaws.com",
+        "https://*.s3.eu-west-1.amazonaws.com",
       ]);
     });
   });

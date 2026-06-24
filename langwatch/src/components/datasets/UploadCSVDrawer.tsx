@@ -611,17 +611,23 @@ export function UploadCSVForm({
     reason: "no-storage" | "presign-failed",
   ) => {
     if (file.size > MAX_FILE_SIZE_BYTES) {
+      // Exhaustive map (not a ternary): widening the `reason` union surfaces a
+      // compile error here instead of silently defaulting to one message.
+      //  - presign-failed: storage IS configured, the direct upload to it
+      //    failed — do NOT claim the deployment lacks object storage (the
+      //    misleading message a real user hit). Operator-facing CORS/
+      //    connectivity detail is in the log; the UI stays jargon-free
+      //    (copywriting.md).
+      //  - no-storage: the deployment genuinely has no object storage.
+      const oversizeMessage: Record<typeof reason, string> = {
+        "presign-failed":
+          "We couldn't upload your file to storage. Please try again, or contact your administrator if the problem persists.",
+        "no-storage":
+          "This file is too large to upload on this deployment. Large uploads require object storage.",
+      };
       // File-level error → inline row; clear any system error for exclusivity.
       setUploadError(null);
-      setSizeError(
-        reason === "presign-failed"
-          ? // Storage IS configured — the direct upload to it failed. Do NOT
-            // claim the deployment lacks object storage (the misleading message
-            // a real user hit). Operator-facing CORS/connectivity detail is in
-            // the log; the UI stays jargon-free (copywriting.md).
-            "We couldn't upload your file to storage. Please try again, or contact your administrator if the problem persists."
-          : "This file is too large to upload on this deployment. Large uploads require object storage.",
-      );
+      setSizeError(oversizeMessage[reason]);
       setIsUploading(false);
       return;
     }

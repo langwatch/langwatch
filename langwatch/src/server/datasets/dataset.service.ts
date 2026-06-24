@@ -1329,7 +1329,19 @@ export class DatasetService {
       throw new UploadNotPendingError();
     }
 
-    await this.reapPendingUpload(dataset);
+    const deleted = await this.reapPendingUpload(dataset);
+    if (deleted === 0) {
+      // TOCTOU: a finalize raced between the `status==='uploading'` read above
+      // and the status-guarded delete, flipping the row to `processing`. The
+      // status guard correctly spared the now-live dataset, so we do NOT throw
+      // (the user's cancel simply lost the race) — but log it so this rare
+      // false-"aborted" (the UI thinks it cancelled while the dataset finishes
+      // processing) is observable instead of silent.
+      logger.warn(
+        { projectId, datasetId },
+        "abortPendingUpload deleted no row — a finalize likely won the race; dataset is no longer pending",
+      );
+    }
 
     return { datasetId, aborted: true };
   }
@@ -1351,7 +1363,7 @@ export class DatasetService {
    * poll-triggered sweep (`reapStalePendingUploads`). The caller owns the
    * `status='uploading'` guard.
    */
-  private async reapPendingUpload(dataset: Dataset): Promise<void> {
+  private async reapPendingUpload(dataset: Dataset): Promise<number> {
     const { id: datasetId, projectId } = dataset;
     if (dataset.stagingKey) {
       try {
@@ -1362,7 +1374,12 @@ export class DatasetService {
       }
     }
 
-    await this.repository.deletePendingUpload({ id: datasetId, projectId });
+    // Returns the rows deleted (0 = a finalize raced and the status guard
+    // spared the now-live row); the explicit-abort caller logs that case.
+    return await this.repository.deletePendingUpload({
+      id: datasetId,
+      projectId,
+    });
   }
 
   /**

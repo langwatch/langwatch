@@ -177,6 +177,8 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
     `connect-src 'self' ${buildStorageConnectSrc({
       S3_ENDPOINT: process.env.S3_ENDPOINT,
       S3_REGION: process.env.S3_REGION,
+      S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
+      AWS_REGION: process.env.AWS_REGION,
       AZURE_BLOB_ENDPOINT: process.env.AZURE_BLOB_ENDPOINT,
     }).join(
       " ",
