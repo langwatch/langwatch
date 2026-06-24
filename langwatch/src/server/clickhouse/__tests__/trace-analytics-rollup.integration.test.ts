@@ -1,10 +1,10 @@
 /**
  * Integration tests for the `trace_analytics_rollup` AggregatingMergeTree
  * (ADR-034 Phase 1), exercised against a real ClickHouse testcontainer on the
- * production schema (migration 00035 auto-applies through goose in
+ * production schema (migration 00037 auto-applies through goose in
  * `startTestContainers`).
  *
- * Phase 1 removed the materialized view (the deleted 00036 migration) and
+ * Phase 1 removed the materialized view (an interim materialized-view migration that was never deployed) and
  * replaced it with an app-side projection (`TraceAnalyticsRollupMapProjection`)
  * that observes the same SpanReceivedEvent the trace-summary fold consumes and
  * writes one row per span via `TraceAnalyticsRollupClickHouseRepository`. These

@@ -1,7 +1,7 @@
 /**
  * Integration tests for the `trace_analytics` ReplacingMergeTree (ADR-034
  * Phase 2 — the SLIM per-trace fold), exercised against a real ClickHouse
- * testcontainer on the production schema (migration 00037 auto-applies through
+ * testcontainer on the production schema (migration 00038 auto-applies through
  * goose in `startTestContainers`).
  *
  * Drives the slim repository directly with `TraceAnalyticsRow` values shaped

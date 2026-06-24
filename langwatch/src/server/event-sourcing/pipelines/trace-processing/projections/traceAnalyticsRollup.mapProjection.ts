@@ -75,7 +75,7 @@ function toNonNegativeUInt(value: unknown): number {
  * Map projection that transforms SpanReceivedEvents into per-span rollup rows
  * for `trace_analytics_rollup` (ADR-034, Phase 1).
  *
- * This projection replaces the prior MV approach (migration 00036, now removed):
+ * This projection replaces the prior MV approach (an interim materialized-view migration that was never deployed):
  * the same SpanReceivedEvent the trace-summary fold consumes is also the source
  * of the rollup increment, computed in TypeScript using the same
  * `SpanCostService` extraction keys so a span's rollup contribution matches its

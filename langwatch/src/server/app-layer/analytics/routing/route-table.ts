@@ -5,14 +5,14 @@
  * serve a `getTimeseries` query:
  *
  *   - `trace_analytics_rollup` — additive `SimpleAggregateFunction(sum, …)`
- *     bucketed by `(TenantId, BucketStart, Model, SpanType)` (migration 00035).
+ *     bucketed by `(TenantId, BucketStart, Model, SpanType)` (migration 00037).
  *     Cheap, but only ever serves additive sums/avgs/mins/maxes on metrics that
  *     live as a column on the rollup AND group-by ∈ {none, Model, SpanType} AND
  *     no filters on dimensions the rollup is not keyed by.
  *
  *   - `trace_analytics` — slim `ReplacingMergeTree(UpdatedAt)`, one row per
  *     trace, hoisted dim columns + a heuristically-trimmed `Attributes` map
- *     (migration 00037). Serves percentiles, late/rich-dim group-bys,
+ *     (migration 00038). Serves percentiles, late/rich-dim group-bys,
  *     hoisted-column filters, metadata.* / langwatch.reserved.* attribute reads,
  *     arbitrary attribute keys whose values are known to fit ≤ 256 chars.
  *
@@ -53,7 +53,7 @@ export type AnalyticsTable =
 /**
  * Registry metric keys ("<group>.<metric>") that can be served from
  * `trace_analytics_rollup` for additive aggregations. Derived directly from
- * the rollup column set (migration 00035 — see
+ * the rollup column set (migration 00037 — see
  * `trace_analytics_rollup.mapProjection.ts`):
  *
  *   CostSum, NonBilledCostSum, DurationSum (root), PromptTokensSum,
