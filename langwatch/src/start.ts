@@ -62,6 +62,7 @@ async function loadDevHttpsCredentials(
   return { cert: Buffer.from(pems.cert), key: Buffer.from(pems.private) };
 }
 import { register } from "prom-client";
+import { buildStorageConnectSrc } from "./server/buildStorageConnectSrc";
 import { getApp } from "./server/app-layer/app";
 import { initializeWebApp } from "./server/app-layer/presets";
 import { getWorkerMetricsPort } from "./server/background/config";
@@ -170,7 +171,10 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
     "frame-ancestors 'none'",
     ...(!dev ? ["upgrade-insecure-requests"] : []),
     "worker-src 'self' blob:",
-    "connect-src 'self' https://*.posthog.com https://*.pendo.io wss://*.pendo.io wss://client.relay.crisp.chat https://client.crisp.chat https://*.googletagmanager.com https://analytics.google.com https://stats.g.doubleclick.net https://*.google-analytics.com https://www.google.com https://*.reo.dev",
+    // ADR-032: allow the browser's presigned PUT to object storage (derived
+    // from the same env the S3 client uses) — without it the CSP blocks the
+    // upload before it leaves the page and the drawer silently falls back.
+    `connect-src 'self' ${buildStorageConnectSrc(process.env).join(" ")} https://*.posthog.com https://*.pendo.io wss://*.pendo.io wss://client.relay.crisp.chat https://client.crisp.chat https://*.googletagmanager.com https://analytics.google.com https://stats.g.doubleclick.net https://*.google-analytics.com https://www.google.com https://*.reo.dev`,
     "frame-src 'self' https://*.posthog.com https://*.pendo.io https://www.youtube.com https://get.langwatch.ai https://*.googletagmanager.com https://www.google.com https://*.reo.dev",
   ].join("; ");
 
