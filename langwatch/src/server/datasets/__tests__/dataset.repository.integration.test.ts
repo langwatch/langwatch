@@ -75,7 +75,9 @@ describe("DatasetRepository.deletePendingUpload (integration)", () => {
 
         expect(count).toBe(1);
         expect(
-          await prisma.dataset.findFirst({ where: { id: row.id } }),
+          await prisma.dataset.findFirst({
+            where: { id: row.id, projectId: project.id },
+          }),
         ).toBeNull();
       });
     });
@@ -93,7 +95,9 @@ describe("DatasetRepository.deletePendingUpload (integration)", () => {
 
         expect(count).toBe(0);
         expect(
-          await prisma.dataset.findFirst({ where: { id: row.id } }),
+          await prisma.dataset.findFirst({
+            where: { id: row.id, projectId: project.id },
+          }),
         ).not.toBeNull();
       });
     });
@@ -111,7 +115,9 @@ describe("DatasetRepository.deletePendingUpload (integration)", () => {
 
         expect(count).toBe(0);
         expect(
-          await prisma.dataset.findFirst({ where: { id: row.id } }),
+          await prisma.dataset.findFirst({
+            where: { id: row.id, projectId: project.id },
+          }),
         ).not.toBeNull();
       });
     });
