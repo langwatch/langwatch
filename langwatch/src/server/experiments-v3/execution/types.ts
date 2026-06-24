@@ -191,6 +191,26 @@ export type ExecutionCell = {
   precomputedTargetOutput?: unknown;
   /** Existing trace ID to reuse (for evaluator reruns) */
   traceId?: string;
+  /**
+   * Pairwise candidates baked into the cell after Phase 1 target execution.
+   * Set ONLY for synthetic pairwise cells; targetId on those cells points
+   * at variantA so the workflow builder has a real TargetConfig to lean on,
+   * but the target step is skipped via `skipTarget`.
+   */
+  pairwise?: {
+    candidateA: {
+      id: string;
+      output: unknown;
+      cost?: number;
+      duration?: number;
+    };
+    candidateB: {
+      id: string;
+      output: unknown;
+      cost?: number;
+      duration?: number;
+    };
+  };
 };
 
 /**

@@ -197,10 +197,101 @@ export const generateCells = (
         rowIndex,
         targetId,
         targetConfig,
-        evaluatorConfigs: state.evaluators,
+        // Pairwise evaluators run in Phase 2 after both variants' outputs
+        // exist — they would crash here because candidate_b's output is not
+        // available within a single per-target cell. See generatePairwiseCells.
+        evaluatorConfigs: state.evaluators.filter((e) => !e.pairwise),
         datasetEntry: {
           _datasetId: datasetId,
           ...datasetEntry,
+        },
+      });
+    }
+  }
+
+  return cells;
+};
+
+/**
+ * Phase 2 cell generator for pairwise evaluators (#5100).
+ *
+ * Called AFTER Phase 1 (per-target) cells complete. For each pairwise
+ * evaluator and each rowIndex where BOTH variantA and variantB outputs
+ * exist in `completedTargetOutputs`, emit a synthetic cell whose
+ * `pairwise` field carries both candidates. The cell's `targetId` points
+ * at variantA so the workflow builder has a real TargetConfig to lean on;
+ * `skipTarget` short-circuits target execution. `buildEvaluatorInputs`
+ * branches on `cell.pairwise` to assemble the candidate_* + golden inputs.
+ *
+ * Rows where one variant failed to produce an output are silently skipped
+ * — there is no honest pairwise verdict without both candidates.
+ */
+export const generatePairwiseCells = (
+  state: Pick<
+    EvaluationsV3State,
+    "datasets" | "activeDatasetId" | "targets" | "evaluators"
+  >,
+  datasetRows: Array<Record<string, unknown>>,
+  completedTargetOutputs: Map<
+    string,
+    { output: unknown; cost?: number; duration?: number }
+  >,
+): ExecutionCell[] => {
+  const cells: ExecutionCell[] = [];
+  const datasetId =
+    state.datasets[0]?.id ?? state.activeDatasetId ?? "dataset-1";
+
+  const pairwiseEvaluators = state.evaluators.filter((e) => e.pairwise);
+  if (pairwiseEvaluators.length === 0) return cells;
+
+  for (const evaluator of pairwiseEvaluators) {
+    const cfg = evaluator.pairwise;
+    if (!cfg) continue;
+
+    const variantA = state.targets.find((t) => t.id === cfg.variantA);
+    const variantB = state.targets.find((t) => t.id === cfg.variantB);
+    if (!variantA || !variantB) {
+      logger.warn(
+        { evaluatorId: evaluator.id, variantA: cfg.variantA, variantB: cfg.variantB },
+        "Pairwise evaluator skipped: variant target(s) not found",
+      );
+      continue;
+    }
+
+    for (let rowIndex = 0; rowIndex < datasetRows.length; rowIndex++) {
+      const datasetEntry = datasetRows[rowIndex];
+      if (!datasetEntry) continue;
+
+      const a = completedTargetOutputs.get(`${rowIndex}:${cfg.variantA}`);
+      const b = completedTargetOutputs.get(`${rowIndex}:${cfg.variantB}`);
+      if (!a || !b) continue;
+
+      cells.push({
+        rowIndex,
+        // Point at variantA so the workflow builder has a real TargetConfig.
+        // The target step itself is skipped via `skipTarget` below.
+        targetId: cfg.variantA,
+        targetConfig: variantA,
+        evaluatorConfigs: [evaluator],
+        datasetEntry: {
+          _datasetId: datasetId,
+          ...datasetEntry,
+        },
+        skipTarget: true,
+        precomputedTargetOutput: a.output,
+        pairwise: {
+          candidateA: {
+            id: cfg.variantA,
+            output: a.output,
+            cost: a.cost,
+            duration: a.duration,
+          },
+          candidateB: {
+            id: cfg.variantB,
+            output: b.output,
+            cost: b.cost,
+            duration: b.duration,
+          },
         },
       });
     }
@@ -477,6 +568,36 @@ const buildEvaluatorInputs = (
   const evaluator = cell.evaluatorConfigs.find((e) => e.id === evaluatorId);
   if (!evaluator) return inputs;
 
+  // Pairwise branch (#5100): synthetic inputs bypassing the per-target
+  // mapping system. We have explicit knowledge of where each field comes
+  // from (golden -> dataset[goldenField]; candidate_* -> cell.pairwise),
+  // so we assemble them directly. `input` still uses an existing mapping
+  // (variantA's) if configured, otherwise falls back to the dataset's
+  // `input` column.
+  if (evaluator.pairwise && cell.pairwise) {
+    const cfg = evaluator.pairwise;
+    const variantAMappings = evaluator.mappings[datasetId]?.[cfg.variantA] ?? {};
+    const inputMapping = variantAMappings.input;
+    if (inputMapping?.type === "source" && inputMapping.source === "dataset") {
+      inputs.input = cell.datasetEntry[inputMapping.sourceField];
+    } else if (cell.datasetEntry.input !== undefined) {
+      inputs.input = cell.datasetEntry.input;
+    }
+
+    inputs.golden = cell.datasetEntry[cfg.goldenField];
+
+    inputs.candidate_a_id = cell.pairwise.candidateA.id;
+    inputs.candidate_a_output = cell.pairwise.candidateA.output;
+    inputs.candidate_a_cost = cell.pairwise.candidateA.cost;
+    inputs.candidate_a_duration = cell.pairwise.candidateA.duration;
+    inputs.candidate_b_id = cell.pairwise.candidateB.id;
+    inputs.candidate_b_output = cell.pairwise.candidateB.output;
+    inputs.candidate_b_cost = cell.pairwise.candidateB.cost;
+    inputs.candidate_b_duration = cell.pairwise.candidateB.duration;
+
+    return inputs;
+  }
+
   // Get mappings for this dataset and target
   const mappings = evaluator.mappings[datasetId]?.[cell.targetId] ?? {};
 
@@ -581,6 +702,14 @@ export async function* runOrchestrator(
   // Track traceId per cell so evaluator_result events can reference it
   const cellTraceIds = new Map<string, string>();
 
+  // Track per-(row, target) outputs as Phase 1 cells complete, so Phase 2
+  // pairwise cells (#5100) can bake both variants' outputs into their input
+  // payload before they execute.
+  const completedTargetOutputs = new Map<
+    string,
+    { output: unknown; cost?: number; duration?: number }
+  >();
+
   // Pre-seed from cells that already have a traceId (e.g., evaluator reruns
   // that skip target execution and won't generate target_result events)
   for (const cell of cells) {
@@ -660,6 +789,20 @@ export async function* runOrchestrator(
     // Track traceId from target_result so evaluator_result events can reference it.
     if (event.type === "target_result" && event.traceId) {
       cellTraceIds.set(`${event.rowIndex}:${event.targetId}`, event.traceId);
+    }
+
+    // Capture successful target outputs for Phase 2 pairwise cells.
+    if (
+      event.type === "target_result" &&
+      !event.error &&
+      event.output !== null &&
+      event.output !== undefined
+    ) {
+      completedTargetOutputs.set(`${event.rowIndex}:${event.targetId}`, {
+        output: event.output,
+        cost: event.cost ?? undefined,
+        duration: event.duration ?? undefined,
+      });
     }
 
     // Dispatch to evaluation processing pipeline for per-trace eval CH writes.
@@ -953,8 +1096,84 @@ export async function* runOrchestrator(
         void cellPromise.finally(() => activeCells.delete(cellPromise));
       }
 
-      // Wait for all remaining cells to complete
+      // Wait for all Phase 1 cells to complete
       await Promise.all(activeCells);
+
+      // Phase 2: pairwise cells (#5100). Generated AFTER Phase 1 finishes,
+      // because each pairwise cell needs both variants' outputs to exist.
+      // We reuse the same semaphore + executeCell loop; the new cells get
+      // appended to totalCells dynamically so progress events stay honest.
+      if (!aborted) {
+        const pairwiseCells = generatePairwiseCells(
+          state,
+          datasetRows,
+          completedTargetOutputs,
+        );
+
+        if (pairwiseCells.length > 0) {
+          logger.info(
+            { runId, count: pairwiseCells.length },
+            "Starting Phase 2 (pairwise) cells",
+          );
+
+          for (const cell of pairwiseCells) {
+            if (await abortManager.isAborted(runId)) {
+              aborted = true;
+              break;
+            }
+            await semaphore.acquire();
+
+            const cellPromise = (async () => {
+              try {
+                if (await abortManager.isAborted(runId)) return;
+
+                const loadedData = {
+                  ...getLoadedDataForTarget(
+                    cell.targetConfig,
+                    loadedPrompts,
+                    loadedAgents,
+                  ),
+                  evaluators: loadedEvaluators,
+                };
+
+                const checkAbort = () => abortManager.isAborted(runId);
+
+                let cellFailed = false;
+                for await (const event of executeCell(
+                  cell,
+                  projectId,
+                  datasetColumns,
+                  loadedData,
+                  resultMapperConfig,
+                  checkAbort,
+                )) {
+                  if (await abortManager.isAborted(runId)) break;
+                  pushEvent(event);
+                  await processEventForStorage(event);
+                  if (event.type === "error") cellFailed = true;
+                }
+
+                completed++;
+                if (cellFailed) failedCells++;
+                else completedCells++;
+
+                pushEvent({
+                  type: "progress",
+                  completed,
+                  total: totalCells + pairwiseCells.length,
+                });
+              } finally {
+                semaphore.release();
+              }
+            })();
+
+            activeCells.add(cellPromise);
+            void cellPromise.finally(() => activeCells.delete(cellPromise));
+          }
+
+          await Promise.all(activeCells);
+        }
+      }
     } finally {
       // Signal that all cells are complete
       signalComplete();
