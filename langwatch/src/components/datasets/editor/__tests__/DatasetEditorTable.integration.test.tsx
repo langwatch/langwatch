@@ -427,7 +427,7 @@ describe("given a large saved dataset whose read is truncated", () => {
       // rows — and flags that the view is partial.
       await waitFor(() =>
         expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
-          "Showing 3 of 1,640 records",
+          "3 out of 1,640 records",
         ),
       );
     });
@@ -453,7 +453,7 @@ describe("given a large saved dataset whose read is truncated", () => {
         ),
       );
       expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent(
-        "Showing",
+        "out of",
       );
     });
   });
