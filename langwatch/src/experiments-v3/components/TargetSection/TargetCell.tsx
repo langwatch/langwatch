@@ -20,6 +20,7 @@ import {
 import { Tooltip } from "~/components/ui/tooltip";
 import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
 import { useDrawer } from "~/hooks/useDrawer";
+import { parseEvaluationResult } from "~/utils/evaluationResults";
 import { parseLLMError } from "~/utils/formatLLMError";
 import { formatTargetOutput } from "~/utils/formatTargetOutput";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
@@ -307,6 +308,31 @@ export function TargetCellContent({
     );
   };
 
+  // Resolve pairwise winner/loser/tie state for a chip rendered against
+  // `target` (#5100). The pairwise evaluator emits one result per row
+  // whose `label` is "A" / "B" / "tie" relative to the evaluator's
+  // pairwise config (variantA / variantB target ids). This function maps
+  // that label back to a role for whichever target this chip belongs to,
+  // so the chip can tint itself green (winner), red (loser), or neutral.
+  // Returns undefined when there is no pairwise verdict for this (row,
+  // target) — either the evaluator isn't pairwise, or the verdict didn't
+  // involve this target.
+  const resolvePairwiseState = (
+    evaluator: EvaluatorConfig,
+  ): "winner" | "loser" | "tie" | undefined => {
+    const pw = evaluator.pairwise;
+    if (!pw) return undefined;
+    const parsed = parseEvaluationResult(evaluatorResults[evaluator.id]);
+    const label = parsed.label;
+    if (label !== "A" && label !== "B" && label !== "tie") return undefined;
+    if (label === "tie") return "tie";
+    const winnerId = label === "A" ? pw.variantA : pw.variantB;
+    const loserId = label === "A" ? pw.variantB : pw.variantA;
+    if (target.id === winnerId) return "winner";
+    if (target.id === loserId) return "loser";
+    return undefined;
+  };
+
   // Render the evaluator chips section
   const renderEvaluatorChips = (inExpandedView: boolean) => (
     <HStack flexWrap="wrap" gap={1.5}>
@@ -320,6 +346,7 @@ export function TargetCellContent({
           hasTargetOutput={output !== undefined && output !== null}
           hasAnyTargetOutputs={hasAnyTargetOutputs}
           targetType={target.type}
+          pairwiseState={resolvePairwiseState(evaluator)}
           onEdit={() =>
             openEvaluatorEditor({
               evaluator,
