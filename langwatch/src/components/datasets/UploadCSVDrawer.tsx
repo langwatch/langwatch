@@ -534,18 +534,30 @@ export function UploadCSVForm({
           );
         }
       }
-      // "No browser-reachable storage" and "presigned PUT failed"
-      // (CORS/network/non-ok) mean: fall back to the backend upload path. The
-      // fallback is size-guarded, so a small file + missing CORS still works, and
-      // a large file + missing CORS shows the clear "large uploads require object
-      // storage" error. Either way, no dead end.
-      if (
-        error instanceof DirectUploadUnavailableError ||
-        error instanceof PresignedUploadFailedError
-      ) {
+      // No browser-reachable storage at all (DirectUploadUnavailable): the
+      // install simply has no S3 → fall back to the in-browser parse path. A
+      // large file there hits the size guard with the accurate "requires object
+      // storage" message.
+      if (error instanceof DirectUploadUnavailableError) {
         // Parse the already-captured file NOW (the first and only in-browser
         // parse on this path) and hand off to the existing parse-and-drawer flow.
-        await runFallbackParseAndDrawer(rawFile);
+        await runFallbackParseAndDrawer(rawFile, "no-storage");
+        return;
+      }
+      // Storage IS configured but the cross-origin presigned PUT was rejected —
+      // almost always a missing/incorrect bucket CORS rule (an opaque fetch
+      // TypeError carries no status). This silently degrades the headline
+      // direct-upload path to the legacy in-browser one, so log it LOUDLY for
+      // operators — the UI can't (and per copywriting.md shouldn't) explain CORS
+      // to an end user. Then fall back for small files (resilience) but show an
+      // accurate error for large ones — never the false "requires object storage"
+      // when storage is in fact configured.
+      if (error instanceof PresignedUploadFailedError) {
+        logger.error(
+          { error, fileSizeBytes: rawFile.size, projectId },
+          "Direct-to-storage upload failed: presigned PUT rejected (likely a missing bucket CORS rule or storage connectivity). Falling back to in-browser parse.",
+        );
+        await runFallbackParseAndDrawer(rawFile, "presign-failed");
         return;
       }
       // A same-origin local-FS failure (e.g. StorageNotWritable) is a real,
@@ -594,13 +606,28 @@ export function UploadCSVForm({
    * OOM the browser (the exact failure direct upload avoids). Over the limit we
    * abort with a clear message instead of parsing.
    */
-  const runFallbackParseAndDrawer = async (file: File) => {
+  const runFallbackParseAndDrawer = async (
+    file: File,
+    reason: "no-storage" | "presign-failed",
+  ) => {
     if (file.size > MAX_FILE_SIZE_BYTES) {
+      // Exhaustive map (not a ternary): widening the `reason` union surfaces a
+      // compile error here instead of silently defaulting to one message.
+      //  - presign-failed: storage IS configured, the direct upload to it
+      //    failed — do NOT claim the deployment lacks object storage (the
+      //    misleading message a real user hit). Operator-facing CORS/
+      //    connectivity detail is in the log; the UI stays jargon-free
+      //    (copywriting.md).
+      //  - no-storage: the deployment genuinely has no object storage.
+      const oversizeMessage: Record<typeof reason, string> = {
+        "presign-failed":
+          "We couldn't upload your file to storage. Please try again, or contact your administrator if the problem persists.",
+        "no-storage":
+          "This file is too large to upload on this deployment. Large uploads require object storage.",
+      };
       // File-level error → inline row; clear any system error for exclusivity.
       setUploadError(null);
-      setSizeError(
-        "This file is too large to upload on this deployment. Large uploads require object storage.",
-      );
+      setSizeError(oversizeMessage[reason]);
       setIsUploading(false);
       return;
     }

@@ -144,6 +144,37 @@ export class DatasetRepository {
   }
 
   /**
+   * Hard-delete a still-pending upload row. Guarded on `status='uploading'`
+   * (a `deleteMany`, not `delete`) so a finalize that raced in between the
+   * caller's status check and this call — flipping the row to `processing` — is
+   * never destroyed: the predicate then matches 0 rows and the now-live dataset
+   * survives. A pending upload never held content (no records, no committed
+   * chunks), so it is detritus to discard, not a dataset to archive; deleting it
+   * frees the slug naturally and leaves no content-less ghost behind. The
+   * id+projectId predicate is the tenancy guard. Returns the count deleted
+   * (0 = already reaped, or no longer pending).
+   */
+  async deletePendingUpload(
+    input: {
+      id: string;
+      projectId: string;
+    },
+    options?: {
+      tx?: Prisma.TransactionClient;
+    },
+  ): Promise<number> {
+    const client = options?.tx ?? this.prisma;
+    const { count } = await client.dataset.deleteMany({
+      where: {
+        id: input.id,
+        projectId: input.projectId,
+        status: "uploading",
+      },
+    });
+    return count;
+  }
+
+  /**
    * Conditionally flip a dataset to `failed` ONLY while it is still
    * `processing`. The normalize enqueue catch uses this: when the enqueue
    * rejects synchronously no job is in flight, so the row's `processing` is a

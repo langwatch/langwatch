@@ -49,4 +49,8 @@ describe("DatasetRepository", () => {
   describe("findAllSlugs", () => {
     it.todo("returns all slugs for project");
   });
+
+  // deletePendingUpload's real-PG behavior (status guard, tenancy scope, and
+  // that the first-ever Dataset hard-delete succeeds under relationMode="prisma")
+  // is covered in dataset.repository.integration.test.ts.
 });
