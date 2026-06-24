@@ -224,7 +224,7 @@ describe("UploadCSVForm 409-fallback size guard", () => {
   });
 
   describe("when the presigned PUT fails (CORS/network) and the file exceeds the size limit", () => {
-    it("shows the too-large error and does NOT parse the oversize file", async () => {
+    it("shows a storage-upload-failed error (NOT the misleading 'requires object storage') and does NOT parse the oversize file", async () => {
       requestDirectUpload.mockResolvedValue({
         datasetId: "dataset_pending",
         slug: "s",
@@ -250,11 +250,18 @@ describe("UploadCSVForm 409-fallback size guard", () => {
       await user.upload(input, oversize);
       await user.click(screen.getByRole("button", { name: /upload/i }));
 
+      // Storage IS configured (the PUT failed, not the presign mint), so the
+      // error must NOT claim the deployment lacks object storage — that was the
+      // real bug a 100 MB upload hit. Surface an accurate "couldn't upload"
+      // message instead.
       await waitFor(() => {
         expect(screen.getByTestId("upload-error")).toHaveTextContent(
-          /too large to upload on this deployment/i,
+          /couldn't upload your file to storage/i,
         );
       });
+      expect(screen.getByTestId("upload-error")).not.toHaveTextContent(
+        /requires object storage/i,
+      );
       // The size-guard fires before any in-browser parse of the oversize file.
       expect(textSpy).not.toHaveBeenCalled();
     });

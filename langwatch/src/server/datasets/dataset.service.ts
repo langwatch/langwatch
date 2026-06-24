@@ -1336,11 +1336,19 @@ export class DatasetService {
 
   /**
    * Reap one pending (`uploading`, non-archived) upload row: best-effort delete
-   * its staged object, then archive the row (rename the slug + set `archivedAt`)
-   * so it stops pinning its slug/quota. The staged-object delete is non-fatal —
-   * the S3 staging lifecycle rule (IaC) reaps it otherwise; a failed delete must
-   * never block the archive. Shared by the explicit abort (`abortPendingUpload`)
-   * and the poll-triggered sweep (`reapStalePendingUploads`). The caller owns the
+   * its staged object, then HARD-DELETE the row. A pending upload never received
+   * content — the browser PUT failed/was abandoned, or finalize never ran — so
+   * there is nothing to retain. Earlier this *archived* the row (rename slug +
+   * `archivedAt`), which left a content-less ghost per failed direct upload: in a
+   * bucket-CORS outage the drawer silently falls back for small files yet still
+   * mints+orphans a row each time, so they accumulated unbounded (the "double
+   * rows in PG" — the archived placeholder alongside the fallback's real
+   * dataset). Deleting frees the slug naturally and leaves nothing behind; the
+   * repo guards the delete on `status='uploading'` so a finalize racing this call
+   * is never destroyed. The staged-object delete is non-fatal — the S3 staging
+   * lifecycle rule (IaC) reaps it otherwise; a failed delete must never block the
+   * row delete. Shared by the explicit abort (`abortPendingUpload`) and the
+   * poll-triggered sweep (`reapStalePendingUploads`). The caller owns the
    * `status='uploading'` guard.
    */
   private async reapPendingUpload(dataset: Dataset): Promise<void> {
@@ -1354,15 +1362,7 @@ export class DatasetService {
       }
     }
 
-    const slug = this.generateSlug(dataset.name);
-    await this.repository.update({
-      id: datasetId,
-      projectId,
-      data: {
-        slug: `${slug}-archived-${nanoid()}`,
-        archivedAt: new Date(),
-      },
-    });
+    await this.repository.deletePendingUpload({ id: datasetId, projectId });
   }
 
   /**

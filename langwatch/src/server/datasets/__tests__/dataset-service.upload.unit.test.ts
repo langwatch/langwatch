@@ -111,7 +111,7 @@ describe("DatasetService", () => {
     });
 
     describe("when abandoned pending uploads linger (poll-triggered reap)", () => {
-      it("archives stale uploading rows and deletes their staging objects before minting", async () => {
+      it("hard-deletes stale uploading rows and their staging objects before minting", async () => {
         const deleteStaged = vi.fn().mockResolvedValue(undefined);
         vi.mocked(getDatasetStorage).mockResolvedValue({
           deleteStaged,
@@ -133,7 +133,7 @@ describe("DatasetService", () => {
           findStalePendingUploads: vi.fn().mockResolvedValue([stale]),
           findBySlug: vi.fn().mockResolvedValue(null),
           create: vi.fn().mockResolvedValue({ id: "dataset_new", slug: "ds" }),
-          update: vi.fn().mockResolvedValue({}),
+          deletePendingUpload: vi.fn().mockResolvedValue(1),
         };
 
         await makeService(repo).createPendingUpload({
@@ -142,18 +142,16 @@ describe("DatasetService", () => {
           filename: "data.jsonl",
         });
 
-        // the abandoned row's staging object is deleted and the row archived...
+        // the abandoned row's staging object is deleted and the content-less
+        // placeholder row hard-deleted (not archived — no ghost left behind)...
         expect(deleteStaged).toHaveBeenCalledWith({
           projectId: "p1",
           key: "staging/p1/old",
         });
-        expect(repo.update).toHaveBeenCalledWith(
-          expect.objectContaining({
-            id: "dataset_stale",
-            projectId: "p1",
-            data: expect.objectContaining({ archivedAt: expect.any(Date) }),
-          }),
-        );
+        expect(repo.deletePendingUpload).toHaveBeenCalledWith({
+          id: "dataset_stale",
+          projectId: "p1",
+        });
         // ...and the new upload still proceeds
         expect(repo.create).toHaveBeenCalled();
       });
@@ -341,7 +339,7 @@ describe("DatasetService", () => {
 
   describe("abortPendingUpload()", () => {
     describe("when aborting a still-pending upload", () => {
-      it("deletes the staged object and archives the uploading row", async () => {
+      it("deletes the staged object and hard-deletes the uploading row", async () => {
         const deleteStaged = vi.fn().mockResolvedValue(undefined);
         vi.mocked(getDatasetStorage).mockResolvedValue({ deleteStaged } as any);
         const repo = {
@@ -353,7 +351,7 @@ describe("DatasetService", () => {
             stagingKey: "staging/p1/u1",
             archivedAt: null,
           }),
-          update: vi.fn().mockResolvedValue({}),
+          deletePendingUpload: vi.fn().mockResolvedValue(1),
         };
 
         const result = await makeService(repo).abortPendingUpload({
@@ -366,14 +364,12 @@ describe("DatasetService", () => {
           projectId: "p1",
           key: "staging/p1/u1",
         });
-        // Archived (soft-deleted), not hard-deleted.
-        expect(repo.update).toHaveBeenCalledWith(
-          expect.objectContaining({
-            id: "dataset_x",
-            projectId: "p1",
-            data: expect.objectContaining({ archivedAt: expect.any(Date) }),
-          }),
-        );
+        // A content-less placeholder is discarded, not soft-archived — no ghost
+        // row (the "double rows in PG") left behind.
+        expect(repo.deletePendingUpload).toHaveBeenCalledWith({
+          id: "dataset_x",
+          projectId: "p1",
+        });
       });
     });
 
@@ -389,7 +385,7 @@ describe("DatasetService", () => {
             status: "ready",
             archivedAt: null,
           }),
-          update: vi.fn(),
+          deletePendingUpload: vi.fn(),
         };
 
         await expect(
@@ -398,7 +394,7 @@ describe("DatasetService", () => {
             datasetId: "dataset_x",
           }),
         ).rejects.toThrow(/not pending/i);
-        expect(repo.update).not.toHaveBeenCalled();
+        expect(repo.deletePendingUpload).not.toHaveBeenCalled();
       });
     });
 
@@ -406,7 +402,7 @@ describe("DatasetService", () => {
       it("rejects with DatasetNotFoundError", async () => {
         const repo = {
           findOne: vi.fn().mockResolvedValue(null),
-          update: vi.fn(),
+          deletePendingUpload: vi.fn(),
         };
 
         await expect(
@@ -415,7 +411,7 @@ describe("DatasetService", () => {
             datasetId: "missing",
           }),
         ).rejects.toThrow();
-        expect(repo.update).not.toHaveBeenCalled();
+        expect(repo.deletePendingUpload).not.toHaveBeenCalled();
       });
     });
   });
