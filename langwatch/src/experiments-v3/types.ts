@@ -177,24 +177,67 @@ export type LocalEvaluatorConfig = z.infer<typeof localEvaluatorConfigSchema>;
  * - Each target (target A outputs "output", target B outputs "result")
  */
 /**
- * Pairwise evaluator config. Set only for evaluators of type
- * "langevals/pairwise_compare" (and future n-way variants). Picks two
+ * Pairwise / N-way evaluator config. Set only for evaluators of type
+ * "langevals/pairwise_compare". Picks 2 (pairwise) or N (select_best)
  * existing target columns to compare against a dataset golden field.
  *
- * - variantA / variantB: TargetConfig ids whose per-row outputs are
- *   the two candidates.
+ * - mode: "pairwise" (2 candidates, swap-and-confirm) or "select_best"
+ *   (N candidates, randomize_order). Defaults to "pairwise" for the
+ *   MVP shape from #5100.
+ * - variants: ordered TargetConfig ids whose per-row outputs are the
+ *   candidates. At least 2 entries; pairwise mode trusts exactly 2.
+ * - variantA / variantB: legacy 2-way fields from #5100. Kept on the
+ *   schema as optional for backward compat — use `normalizePairwiseConfig`
+ *   to read either shape uniformly.
  * - goldenField: dataset field name whose value is the reference answer.
  * - includeMetrics: per-candidate metrics injected into the judge prompt.
+ * - positionBiasMitigation: optional override of the evaluator's default
+ *   bias mitigation (the Python evaluator's `position_bias_mitigation`
+ *   setting). Null = let the evaluator pick the mode default.
  */
 export const pairwiseEvaluatorConfigSchema = z.object({
-  variantA: z.string(),
-  variantB: z.string(),
+  mode: z.enum(["pairwise", "select_best"]).default("pairwise"),
+  variants: z.array(z.string()).default([]),
+  /** @deprecated #5100 2-way shape; superseded by `variants`. */
+  variantA: z.string().optional(),
+  /** @deprecated #5100 2-way shape; superseded by `variants`. */
+  variantB: z.string().optional(),
   goldenField: z.string(),
   includeMetrics: z.array(z.enum(["cost", "duration"])).default([]),
+  positionBiasMitigation: z
+    .enum(["swap_and_confirm", "randomize_order", "none"])
+    .nullable()
+    .default(null),
 });
 export type PairwiseEvaluatorConfig = z.infer<
   typeof pairwiseEvaluatorConfigSchema
 >;
+
+/**
+ * Codemod for #5100 -> #5101: normalize a stored pairwise config to the
+ * unified shape. If `variants` is empty and the legacy `variantA` /
+ * `variantB` fields are populated, hydrate `variants` from them and
+ * default the mode to "pairwise". Returns a copy; never mutates input.
+ *
+ * Used by every read path that branches on a pairwise config (the
+ * orchestrator's Phase 2 generator + the EvaluatorChip / TargetCell
+ * winner-tint resolver + the verdict-strip / aggregate-header
+ * renderers), so the rest of the codebase can assume `variants` is
+ * always populated and ignore the legacy fields.
+ */
+export function normalizePairwiseConfig(
+  cfg: PairwiseEvaluatorConfig,
+): PairwiseEvaluatorConfig {
+  if (cfg.variants && cfg.variants.length > 0) return cfg;
+  if (cfg.variantA && cfg.variantB) {
+    return {
+      ...cfg,
+      variants: [cfg.variantA, cfg.variantB],
+      mode: cfg.mode ?? "pairwise",
+    };
+  }
+  return cfg;
+}
 
 export const evaluatorConfigSchema = z.object({
   id: z.string(),

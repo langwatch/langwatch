@@ -192,19 +192,36 @@ export type ExecutionCell = {
   /** Existing trace ID to reuse (for evaluator reruns) */
   traceId?: string;
   /**
-   * Pairwise candidates baked into the cell after Phase 1 target execution.
-   * Set ONLY for synthetic pairwise cells; targetId on those cells points
-   * at variantA so the workflow builder has a real TargetConfig to lean on,
-   * but the target step is skipped via `skipTarget`.
+   * Pairwise / N-way candidates baked into the cell after Phase 1 target
+   * execution. Set ONLY for synthetic comparison cells; targetId on those
+   * cells points at the first variant so the workflow builder has a real
+   * TargetConfig to lean on, but the target step is skipped via
+   * `skipTarget`.
+   *
+   * - `candidates`: ordered list of all candidate outputs. ALWAYS
+   *   populated by the orchestrator (length 2 in pairwise mode, ≥2 in
+   *   select_best mode). Downstream code should read from here.
+   * - `candidateA` / `candidateB`: legacy aliases kept for the
+   *   buildEvaluatorInputs pairwise branch that still pumps the Python
+   *   `candidate_a_*` / `candidate_b_*` entry fields. Removed once the
+   *   evaluator entry is fully migrated to the `candidates` list.
+   * - `mode`: which Python evaluator mode this cell should drive.
    */
   pairwise?: {
-    candidateA: {
+    mode: "pairwise" | "select_best";
+    candidates: Array<{
+      id: string;
+      output: unknown;
+      cost?: number;
+      duration?: number;
+    }>;
+    candidateA?: {
       id: string;
       output: unknown;
       cost?: number;
       duration?: number;
     };
-    candidateB: {
+    candidateB?: {
       id: string;
       output: unknown;
       cost?: number;
