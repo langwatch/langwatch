@@ -4,12 +4,12 @@ import {
   Field,
   HStack,
   Icon,
+  NativeSelect,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import type { ChangeEvent } from "react";
 import { LuCheck } from "react-icons/lu";
-
-import { NativeSelect } from "~/components/ui/native-select";
 
 import type {
   PairwiseEvaluatorConfig,
@@ -71,7 +71,7 @@ export function PairwiseConfigForm({
         <NativeSelect.Root>
           <NativeSelect.Field
             value={value.variantA}
-            onChange={(e) => update({ variantA: e.currentTarget.value })}
+            onChange={(e: ChangeEvent<HTMLSelectElement>) => update({ variantA: e.currentTarget.value })}
           >
             <option value="">Select a target…</option>
             {targets.map((t) => (
@@ -88,7 +88,7 @@ export function PairwiseConfigForm({
         <NativeSelect.Root>
           <NativeSelect.Field
             value={value.variantB}
-            onChange={(e) => update({ variantB: e.currentTarget.value })}
+            onChange={(e: ChangeEvent<HTMLSelectElement>) => update({ variantB: e.currentTarget.value })}
           >
             <option value="">Select a target…</option>
             {variantBOptions.map((t) => (
@@ -105,7 +105,7 @@ export function PairwiseConfigForm({
         <NativeSelect.Root>
           <NativeSelect.Field
             value={value.goldenField}
-            onChange={(e) => update({ goldenField: e.currentTarget.value })}
+            onChange={(e: ChangeEvent<HTMLSelectElement>) => update({ goldenField: e.currentTarget.value })}
           >
             <option value="">Select a dataset column…</option>
             {datasetColumns.map((c) => (
