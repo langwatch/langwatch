@@ -76,7 +76,7 @@ class EvaluatorEntry(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    def __init_subclass__(cls, **kwargs):
+    def __init_subclass__(cls, allow_extra: bool = False, **kwargs):
         super().__init_subclass__(**kwargs)  # Always call super()!
 
         required_fields_types = {
@@ -100,11 +100,17 @@ class EvaluatorEntry(BaseModel):
 
         subclass_fields_types = get_type_hints(cls)
 
-        extra_fields = subclass_fields_types.keys() - required_fields_types.keys()
-        if extra_fields:
-            raise TypeError(
-                f"Extra fields not allowed in {cls.__name__}: {extra_fields}, only {list(required_fields_types.keys())} are allowed. This is meant to keep a standard interface accross all evaluators, other settings should go into the evaluator TSettings type instead."
+        # `allow_extra=True` opts a subclass out of the strict whitelist
+        # below. Use only for evaluators whose shape genuinely doesn't fit
+        # the single-output contract (e.g. pairwise / n-way compare).
+        if not allow_extra:
+            extra_fields = (
+                subclass_fields_types.keys() - required_fields_types.keys()
             )
+            if extra_fields:
+                raise TypeError(
+                    f"Extra fields not allowed in {cls.__name__}: {extra_fields}, only {list(required_fields_types.keys())} are allowed. This is meant to keep a standard interface accross all evaluators, other settings should go into the evaluator TSettings type instead. If this evaluator genuinely needs a different shape (e.g. multi-candidate), pass `allow_extra=True` on the class definition."
+                )
 
         for field, expected_types in required_fields_types.items():
             if (

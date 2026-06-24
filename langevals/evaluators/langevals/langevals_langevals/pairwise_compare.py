@@ -10,25 +10,31 @@ on disagreement).
 Issue:        https://github.com/langwatch/langwatch/issues/5100
 Parent epic:  https://github.com/langwatch/langwatch/issues/5099
 BDD spec:     specs/experiments/pairwise-compare-mvp.feature
-
-SKELETON: this is the first commit. The full `evaluate()` body
-lands in follow-up commits per the implementation steps in the
-issue. Catalog generation is intentionally not yet wired.
 """
 
-from typing import Literal, Optional
+import json
+import os
+from typing import Literal, Optional, cast
 
+import litellm
 from langevals_core.base_evaluator import (
     BaseEvaluator,
     EvaluationResult,
     EvaluationResultSkipped,
     EvaluatorEntry,
     LLMEvaluatorSettings,
+    Money,
     SingleEvaluationResult,
 )
+from litellm import Choices, Message
+from litellm.cost_calculator import completion_cost
+from litellm.files.main import ModelResponse
 from pydantic import Field
 
 
+# Braces around placeholders are single-brace (str.format slots).
+# Any literal braces in the template must be doubled. Tool-call schema
+# below drives the response shape, so no JSON example is embedded.
 DEFAULT_PAIRWISE_PROMPT = """\
 Compare two candidate outputs against a known-good reference (golden answer).
 
@@ -42,12 +48,10 @@ Reason step-by-step about how closely each candidate matches the
 golden answer in correctness, completeness, and style. Then pick
 the better candidate, or "tie" if equivalent.
 Prefer cheaper/faster only when quality is comparable.
-
-Respond as JSON: { "reasoning": "...", "winner": "A" | "B" | "tie" }
 """
 
 
-class PairwiseCompareEntry(EvaluatorEntry):
+class PairwiseCompareEntry(EvaluatorEntry, allow_extra=True):
     input: Optional[str] = None
     golden: Optional[str] = None
     candidate_a_id: str
@@ -104,23 +108,169 @@ class PairwiseCompareEvaluator(
     Native pairwise LLM-as-judge evaluator. Compare two candidate
     outputs against a golden reference, with optional swap-and-confirm
     position-bias mitigation.
-
-    Implementation plan (issue #5100):
-
-      1. Render prompt template (with optional per-candidate metrics).
-      2. Call litellm.completion (tool-call shape — see llm_boolean.py).
-      3. Parse JSON args -> {reasoning, winner}.
-      4. If swap_and_confirm: repeat with A/B swapped; agree-or-tie.
-      5. Return PairwiseCompareResult with score/label/details/cost.
     """
 
     name = "Pairwise Compare"
     category = "quality"
-    env_vars: list[str] = []
+    env_vars = []
     default_settings = PairwiseCompareSettings()
     is_guardrail = False
 
     def evaluate(self, entry: PairwiseCompareEntry) -> SingleEvaluationResult:
-        return EvaluationResultSkipped(
-            details="Pairwise compare implementation pending — see #5100"
+        os.environ["AZURE_API_VERSION"] = "2023-12-01-preview"
+        if self.env:
+            for key, env in self.env.items():
+                os.environ[key] = env
+
+        if not entry.candidate_a_output or not entry.candidate_b_output:
+            return EvaluationResultSkipped(
+                details="Missing candidate output(s)"
+            )
+
+        first = self._judge(entry, ("A", "B"))
+
+        if not self.settings.swap_and_confirm:
+            winner = first["winner"]
+            reasoning = first["reasoning"]
+            total_cost = first["cost"] or 0.0
+        else:
+            second = self._judge(entry, ("B", "A"))
+            if first["winner"] == second["winner"]:
+                winner = first["winner"]
+            else:
+                winner = "tie"
+            reasoning = (
+                f"Call 1 (A in slot A, B in slot B): {first['reasoning']}\n\n"
+                f"Call 2 (B in slot A, A in slot B): {second['reasoning']}"
+            )
+            total_cost = (first["cost"] or 0.0) + (second["cost"] or 0.0)
+
+        score_map = {"A": 0.0, "tie": 0.5, "B": 1.0}
+
+        return PairwiseCompareResult(
+            score=score_map[winner],
+            label=cast(Literal["A", "B", "tie"], winner),
+            details=reasoning,
+            cost=Money(amount=total_cost, currency="USD") if total_cost else None,
         )
+
+    def _judge(
+        self,
+        entry: PairwiseCompareEntry,
+        order: tuple[Literal["A", "B"], Literal["A", "B"]],
+    ) -> dict:
+        """
+        Run one judge call. `order` describes which original candidate
+        fills each prompt slot: ("A","B") = unswapped, ("B","A") = swapped.
+
+        Returns {"winner": "A"|"B"|"tie", "reasoning": str, "cost": float|None}
+        where "winner" is translated back to the ORIGINAL candidate label
+        (not the slot the judge picked).
+        """
+
+        def pick(slot: Literal["A", "B"], attr: str):
+            actual = order[0] if slot == "A" else order[1]
+            return getattr(entry, f"candidate_{actual.lower()}_{attr}")
+
+        rendered_prompt = self.settings.prompt.format(
+            input=entry.input or "",
+            golden=entry.golden or "",
+            candidate_a_output=pick("A", "output"),
+            candidate_b_output=pick("B", "output"),
+        )
+
+        if self.settings.include_metrics:
+            metrics_lines = ["", "Per-candidate metrics:"]
+            for slot in ("A", "B"):
+                parts = [f"  Candidate {slot}:"]
+                if "cost" in self.settings.include_metrics:
+                    c = pick(slot, "cost")
+                    if c is not None:
+                        parts.append(f"cost=${c:.6f}")
+                if "duration" in self.settings.include_metrics:
+                    d = pick(slot, "duration")
+                    if d is not None:
+                        parts.append(f"duration={d:.3f}s")
+                if len(parts) > 1:
+                    metrics_lines.append(" ".join(parts))
+            if len(metrics_lines) > 2:
+                rendered_prompt += "\n" + "\n".join(metrics_lines)
+
+        winner_enum = ["A", "B", "tie"] if self.settings.allow_tie else ["A", "B"]
+
+        response = litellm.completion(
+            model=self.settings.model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an impartial judge comparing two candidate "
+                        "outputs. Reason briefly, then pick the winner using "
+                        "the provided function call."
+                    ),
+                },
+                {"role": "user", "content": rendered_prompt},
+            ],
+            tools=[
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "pairwise_verdict",
+                        "description": (
+                            "Record the pairwise verdict. Reason first, "
+                            "then pick the winner."
+                        ),
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "reasoning": {
+                                    "type": "string",
+                                    "description": (
+                                        "Step-by-step comparison of the two "
+                                        "candidates against the golden answer."
+                                    ),
+                                },
+                                "winner": {
+                                    "type": "string",
+                                    "enum": winner_enum,
+                                    "description": (
+                                        "Which candidate wins, by slot label. "
+                                        "Use 'tie' only when truly equivalent."
+                                    ),
+                                },
+                            },
+                            "required": ["reasoning", "winner"],
+                        },
+                    },
+                }
+            ],
+            tool_choice={
+                "type": "function",
+                "function": {"name": "pairwise_verdict"},
+            },  # type: ignore
+        )
+
+        response = cast(ModelResponse, response)
+        choice = cast(Choices, response.choices[0])
+        arguments = json.loads(
+            cast(Message, choice.message).tool_calls[0].function.arguments  # type: ignore
+        )
+
+        displayed = arguments["winner"]
+        if displayed == "tie":
+            actual_winner: Literal["A", "B", "tie"] = "tie"
+        elif displayed == "A":
+            actual_winner = order[0]
+        else:
+            actual_winner = order[1]
+
+        try:
+            call_cost = completion_cost(completion_response=response)
+        except Exception:
+            call_cost = None
+
+        return {
+            "winner": actual_winner,
+            "reasoning": arguments["reasoning"],
+            "cost": call_cost,
+        }
