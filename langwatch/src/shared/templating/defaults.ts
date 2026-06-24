@@ -67,33 +67,33 @@ export const DEFAULT_SLACK_TEMPLATE = `{% if trigger.alertType == 'INFO' %}ℹ�
  * DEFAULT_SLACK_TEMPLATE comment above.
  */
 /**
- * ADR-034 Phase 5: alert-default templates for custom-graph threshold
- * alerts. These render in metric-crossed-threshold language instead of
- * the trace-iteration shape the trace defaults use. The dispatcher /
- * test-fire path picks these via `pickTriggerDefaults({ hasCustomGraph:
- * true })` whenever the trigger has a `customGraphId` set. The matched
- * `m.trace.input` carries "Graph: <name>" and `m.trace.output` carries
- * "Current value: <v> (threshold: <op> <thr>)" — the EXACT triggerData
- * shape the cron and the new handler both produce, so the variables
- * line up without an extra context contract.
+ * ADR-034 Phase 5/8.1: alert-default templates for custom-graph threshold
+ * alerts. Render in metric-crossed-threshold language against
+ * `GraphAlertTemplateContext` — `trigger`, `graph`, `metric`,
+ * `condition`, `currentValue`, `occurredAt`, `reason`, `project`.
+ *
+ * Phase 8.1 wires the graph-trigger evaluator through the same Liquid
+ * pipeline trace triggers use, so these defaults must read those
+ * fields directly instead of the trace-iteration shape Phase 5 used as
+ * a placeholder. `pickTriggerDefaults({ hasCustomGraph: true })` picks
+ * the set; per-trigger custom Liquid (the four Trigger columns) still
+ * overrides whichever default it picks.
  */
 export const DEFAULT_ALERT_EMAIL_SUBJECT_TEMPLATE =
-  "[Alert] {{ trigger.name }}";
+  "[Alert] {{ trigger.name }} — {{ metric.label }} {{ condition.operatorLabel }} {{ condition.threshold }}";
 
 export const DEFAULT_ALERT_EMAIL_BODY_TEMPLATE = `# [Alert] {{ trigger.name }}
 
-{% for m in matches %}**{{ m.trace.input }}**
+**{{ metric.label }}** {{ condition.operatorLabel }} **{{ condition.threshold }}** over the {{ condition.timePeriodLabel }}.
 
-{{ m.trace.output }}
+Current value: **{{ currentValue }}** (threshold: {{ condition.operator }} {{ condition.threshold }}).
 
-[Open dashboard ↗]({{ m.trace.url }})
-{% endfor %}`;
+[Open dashboard ↗]({{ graph.url }})`;
 
 export const DEFAULT_ALERT_SLACK_TEMPLATE = `:rotating_light: *{{ trigger.name }}*{% if trigger.alertType %} _({{ trigger.alertType }})_{% endif %}
-{% for m in matches %}*{{ m.trace.input | mrkdwn_escape }}*
-{{ m.trace.output | mrkdwn_escape }}
-<{{ m.trace.url }}|Open dashboard>{% unless forloop.last %}
-{% endunless %}{% endfor %}`;
+*{{ metric.label | mrkdwn_escape }}* {{ condition.operatorLabel }} *{{ condition.threshold }}* over the {{ condition.timePeriodLabel }}.
+Current value: *{{ currentValue }}* (threshold: {{ condition.operator }} {{ condition.threshold }}).
+<{{ graph.url }}|Open dashboard>`;
 
 export const DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE = `[
   {
@@ -112,23 +112,23 @@ export const DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE = `[
     ]
   },
   {% endif %}
-  {% for m in matches %}
+  {%- capture _metric_line -%}*{{ metric.label | mrkdwn_escape }}* {{ condition.operatorLabel }} *{{ condition.threshold }}* over the {{ condition.timePeriodLabel }}.{%- endcapture -%}
   {
     "type": "section",
-    "text": { "type": "mrkdwn", "text": {{ m.trace.input | mrkdwn_escape | prepend: "*" | append: "*" | json }} }
+    "text": { "type": "mrkdwn", "text": {{ _metric_line | json }} }
   },
+  {%- capture _value_line -%}Current value: *{{ currentValue }}* (threshold: {{ condition.operator }} {{ condition.threshold }}).{%- endcapture -%}
   {
     "type": "section",
-    "text": { "type": "mrkdwn", "text": {{ m.trace.output | mrkdwn_escape | json }} }
+    "text": { "type": "mrkdwn", "text": {{ _value_line | json }} }
   },
-  {%- capture _link -%}<{{ m.trace.url }}|Open dashboard>{%- endcapture -%}
+  {%- capture _link -%}<{{ graph.url }}|Open dashboard>{%- endcapture -%}
   {
     "type": "context",
     "elements": [
       { "type": "mrkdwn", "text": {{ _link | json }} }
     ]
   },
-  {% endfor %}
   {
     "type": "divider"
   },

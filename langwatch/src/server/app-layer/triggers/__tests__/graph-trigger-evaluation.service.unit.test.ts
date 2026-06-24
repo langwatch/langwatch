@@ -6,6 +6,7 @@ import type {
 import { TriggerAction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TimeseriesResult } from "~/server/analytics/types";
+import type { GraphAlertDispatchResult } from "~/server/event-sourcing/pipelines/shared/graphAlertActionDispatch";
 import {
   evaluateGraphTrigger,
   type GraphTriggerEvaluationDeps,
@@ -144,8 +145,7 @@ class FakeTriggerSentRepo implements GraphTriggerSentRepository {
 interface Harness {
   deps: GraphTriggerEvaluationDeps;
   triggerSent: FakeTriggerSentRepo;
-  email: ReturnType<typeof vi.fn>;
-  slack: ReturnType<typeof vi.fn>;
+  dispatch: ReturnType<typeof vi.fn>;
   getTimeseries: ReturnType<typeof vi.fn>;
   updateLastRunAt: ReturnType<typeof vi.fn>;
   loadTrigger: ReturnType<typeof vi.fn>;
@@ -163,8 +163,15 @@ function makeHarness({
   project?: Project | null;
   series: TimeseriesResult;
 }): Harness {
-  const email = vi.fn(async () => undefined);
-  const slack = vi.fn(async () => undefined);
+  const dispatch = vi.fn<
+    [unknown],
+    Promise<GraphAlertDispatchResult>
+  >(async () => ({
+    channel: "email",
+    didSend: true,
+    missingVariables: [],
+    renderErrors: [],
+  }));
   const getTimeseries = vi.fn(async () => series);
   const updateLastRunAt = vi.fn(async () => undefined);
   const loadTrigger = vi.fn(async () => trigger);
@@ -178,17 +185,14 @@ function makeHarness({
     getTimeseries,
     triggerSent,
     updateLastRunAt,
-    notifier: {
-      sendEmail: email,
-      sendSlack: slack,
-    },
+    notifier: { dispatch },
+    baseHost: "https://app.langwatch.test",
     now: () => NOW,
   };
   return {
     deps,
     triggerSent,
-    email,
-    slack,
+    dispatch,
     getTimeseries,
     updateLastRunAt,
     loadTrigger,
@@ -204,7 +208,7 @@ describe("evaluateGraphTrigger", () => {
   });
 
   describe("given a breach with no open TriggerSent", () => {
-    it("fires the email notifier and inserts a TriggerSent", async () => {
+    it("fires the dispatch notifier and inserts a TriggerSent", async () => {
       const result = await evaluateGraphTrigger({
         deps: harness.deps,
         triggerId: TRIGGER_ID,
@@ -214,8 +218,7 @@ describe("evaluateGraphTrigger", () => {
 
       expect(result.status).toBe("fired");
       expect(result.value).toBe(15);
-      expect(harness.email).toHaveBeenCalledTimes(1);
-      expect(harness.slack).not.toHaveBeenCalled();
+      expect(harness.dispatch).toHaveBeenCalledTimes(1);
       expect(harness.triggerSent.createCalls).toBe(1);
       expect(harness.triggerSent.openRows).toHaveLength(1);
       expect(harness.triggerSent.openRows[0]?.customGraphId).toBe(GRAPH_ID);
@@ -225,10 +228,75 @@ describe("evaluateGraphTrigger", () => {
       });
     });
 
+    it("hands the dispatch helper a built GraphAlertTemplateContext", async () => {
+      await evaluateGraphTrigger({
+        deps: harness.deps,
+        triggerId: TRIGGER_ID,
+        projectId: PROJECT_ID,
+        reason: "real-time",
+      });
+
+      expect(harness.dispatch).toHaveBeenCalledTimes(1);
+      const arg = harness.dispatch.mock.calls[0]?.[0] as {
+        trigger: Trigger;
+        project: Project;
+        context: {
+          trigger: { id: string; name: string };
+          graph: { id: string; name: string; url: string };
+          metric: { label: string; seriesName: string };
+          condition: {
+            operator: string;
+            operatorLabel: string;
+            threshold: number;
+            timePeriodMinutes: number;
+            timePeriodLabel: string;
+          };
+          currentValue: number;
+          occurredAt: string;
+          reason: string;
+          project: { id: string; name: string; slug: string; url: string };
+        };
+        recipients: string[];
+        slackWebhook: string | null;
+      };
+
+      expect(arg.trigger.id).toBe(TRIGGER_ID);
+      expect(arg.project.id).toBe(PROJECT_ID);
+      expect(arg.context.graph.id).toBe(GRAPH_ID);
+      expect(arg.context.graph.name).toBe("Trace count");
+      expect(arg.context.graph.url).toBe(
+        "https://app.langwatch.test/demo/analytics/custom/graph-1",
+      );
+      expect(arg.context.metric.label).toBe("Trace count");
+      expect(arg.context.metric.seriesName).toBe(
+        "0/metadata.trace_id/cardinality",
+      );
+      expect(arg.context.condition.operator).toBe("gt");
+      expect(arg.context.condition.operatorLabel).toBe("is greater than");
+      expect(arg.context.condition.threshold).toBe(10);
+      expect(arg.context.condition.timePeriodMinutes).toBe(60);
+      expect(arg.context.condition.timePeriodLabel).toBe("last 1 hour");
+      expect(arg.context.currentValue).toBe(15);
+      expect(arg.context.occurredAt).toBe(NOW.toISOString());
+      expect(arg.context.reason).toBe("real-time");
+      expect(arg.context.project.url).toBe("https://app.langwatch.test/demo");
+      expect(arg.recipients).toEqual(["a@example.com"]);
+      expect(arg.slackWebhook).toBeNull();
+    });
+
     describe("when action is SEND_SLACK_MESSAGE", () => {
-      it("fires the slack notifier instead of email", async () => {
+      it("dispatches with the trigger's Slack action set", async () => {
         harness = makeHarness({
-          trigger: makeTrigger({ action: TriggerAction.SEND_SLACK_MESSAGE }),
+          trigger: makeTrigger({
+            action: TriggerAction.SEND_SLACK_MESSAGE,
+            actionParams: {
+              threshold: 10,
+              operator: "gt",
+              timePeriod: 60,
+              seriesName: "0/metadata.trace_id/cardinality",
+              slackWebhook: "https://hooks.slack.com/services/T/B/abc",
+            },
+          }),
           series: timeseries(15),
         });
 
@@ -240,8 +308,15 @@ describe("evaluateGraphTrigger", () => {
         });
 
         expect(result.status).toBe("fired");
-        expect(harness.slack).toHaveBeenCalledTimes(1);
-        expect(harness.email).not.toHaveBeenCalled();
+        expect(harness.dispatch).toHaveBeenCalledTimes(1);
+        const arg = harness.dispatch.mock.calls[0]?.[0] as {
+          trigger: Trigger;
+          slackWebhook: string | null;
+        };
+        expect(arg.trigger.action).toBe(TriggerAction.SEND_SLACK_MESSAGE);
+        expect(arg.slackWebhook).toBe(
+          "https://hooks.slack.com/services/T/B/abc",
+        );
       });
     });
   });
@@ -263,7 +338,7 @@ describe("evaluateGraphTrigger", () => {
       });
 
       expect(result.status).toBe("already_firing");
-      expect(harness.email).not.toHaveBeenCalled();
+      expect(harness.dispatch).not.toHaveBeenCalled();
       expect(harness.triggerSent.createCalls).toBe(0);
       expect(harness.updateLastRunAt).toHaveBeenCalledTimes(1);
     });
@@ -286,7 +361,7 @@ describe("evaluateGraphTrigger", () => {
       });
 
       expect(second.status).toBe("already_firing");
-      expect(harness.email).toHaveBeenCalledTimes(1);
+      expect(harness.dispatch).toHaveBeenCalledTimes(1);
       expect(harness.triggerSent.createCalls).toBe(1);
     });
   });
@@ -311,7 +386,7 @@ describe("evaluateGraphTrigger", () => {
       expect(result.status).toBe("resolved");
       expect(harness.triggerSent.resolveCalls).toHaveLength(1);
       expect(harness.triggerSent.resolveCalls[0]?.id).toBe("sent-prior");
-      expect(harness.email).not.toHaveBeenCalled();
+      expect(harness.dispatch).not.toHaveBeenCalled();
     });
   });
 
@@ -327,7 +402,7 @@ describe("evaluateGraphTrigger", () => {
       });
 
       expect(result.status).toBe("not_breached");
-      expect(harness.email).not.toHaveBeenCalled();
+      expect(harness.dispatch).not.toHaveBeenCalled();
       expect(harness.triggerSent.openRows).toHaveLength(0);
     });
   });
@@ -356,7 +431,7 @@ describe("evaluateGraphTrigger", () => {
 
       expect(result.status).toBe("fired");
       expect(result.detail).toBe("no-data predicate");
-      expect(harness.email).toHaveBeenCalledTimes(1);
+      expect(harness.dispatch).toHaveBeenCalledTimes(1);
       expect(harness.triggerSent.createCalls).toBe(1);
     });
   });

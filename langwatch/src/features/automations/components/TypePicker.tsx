@@ -2,6 +2,8 @@ import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import type { TriggerAction } from "@prisma/client";
 import { CLIENT_PROVIDERS } from "~/automations/providers/client";
 import type { ClientEntry } from "~/automations/providers/types";
+import { Tooltip } from "~/components/ui/tooltip";
+import type { ConditionSource } from "~/features/automations/logic/draftReducer";
 
 /**
  * The provider-card picker on the main drawer's Type section. Entries come
@@ -13,17 +15,28 @@ import type { ClientEntry } from "~/automations/providers/types";
  * to be alerted vs. pick a side-effect" once the list crosses ~4 entries.
  * The two groups also let an `action`-only future deployment hide the
  * Notify group cleanly via the category filter.
+ *
+ * Graph alerts (source = customGraph) only support `notify`-category actions
+ * — `action` cards are rendered disabled with a tooltip explaining why. The
+ * router enforces the same rule server-side, but disabling at the UI layer
+ * avoids users picking an option that errors at save time.
  */
 export function TypePicker({
   value,
   onChange,
+  source,
 }: {
   value: TriggerAction | null;
   onChange: (action: TriggerAction) => void;
+  source?: ConditionSource;
 }) {
   const entries = Object.values(CLIENT_PROVIDERS);
   const notify = entries.filter((e) => e.shared.category === "notify");
   const action = entries.filter((e) => e.shared.category === "action");
+  const actionDisabledReason =
+    source === "customGraph"
+      ? "Graph alerts only support email and Slack notifications."
+      : undefined;
 
   return (
     <Box padding={3} borderRadius="md" border="1px solid" borderColor="border">
@@ -47,6 +60,7 @@ export function TypePicker({
             entries={action}
             value={value}
             onChange={onChange}
+            disabledReason={actionDisabledReason}
           />
         ) : null}
       </VStack>
@@ -60,12 +74,14 @@ function TypeGroup({
   entries,
   value,
   onChange,
+  disabledReason,
 }: {
   label: string;
   description: string;
   entries: ClientEntry[];
   value: TriggerAction | null;
   onChange: (action: TriggerAction) => void;
+  disabledReason?: string;
 }) {
   return (
     <VStack align="stretch" gap={2}>
@@ -90,6 +106,7 @@ function TypeGroup({
             entry={entry}
             active={entry.shared.action === value}
             onClick={() => onChange(entry.shared.action)}
+            disabledReason={disabledReason}
           />
         ))}
       </Box>
@@ -101,23 +118,29 @@ function TypeCard({
   entry,
   active,
   onClick,
+  disabledReason,
 }: {
   entry: ClientEntry;
   active: boolean;
   onClick: () => void;
+  disabledReason?: string;
 }) {
   const Icon = entry.client.Icon;
-  return (
+  const disabled = Boolean(disabledReason);
+  const card = (
     <chakra.button
       type="button"
       textAlign="left"
       padding={3}
       borderRadius="md"
       border="1px solid"
-      borderColor={active ? "orange.400" : "border"}
-      bg={active ? "orange.50" : "bg"}
-      _dark={{ bg: active ? "orange.900" : "bg" }}
-      onClick={onClick}
+      borderColor={active && !disabled ? "orange.400" : "border"}
+      bg={active && !disabled ? "orange.50" : "bg"}
+      _dark={{ bg: active && !disabled ? "orange.900" : "bg" }}
+      opacity={disabled ? 0.4 : 1}
+      cursor={disabled ? "not-allowed" : "pointer"}
+      aria-disabled={disabled || undefined}
+      onClick={disabled ? undefined : onClick}
     >
       <HStack gap={2} mb={1}>
         <Icon size={18} />
@@ -127,5 +150,11 @@ function TypeCard({
         {entry.shared.description}
       </Text>
     </chakra.button>
+  );
+  if (!disabledReason) return card;
+  return (
+    <Tooltip content={disabledReason} positioning={{ placement: "top" }}>
+      {card}
+    </Tooltip>
   );
 }
