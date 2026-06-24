@@ -32,6 +32,7 @@ const evaluatorCategoryMap: Record<
   "langevals/llm_boolean": "llm_judge",
   "langevals/llm_score": "llm_judge",
   "langevals/llm_category": "llm_judge",
+  "langevals/pairwise_compare": "llm_judge",
 
   // RAG
   "ragas/faithfulness": "rag",
