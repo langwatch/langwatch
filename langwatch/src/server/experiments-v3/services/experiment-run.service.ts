@@ -40,10 +40,15 @@ interface ClickHouseCountRow {
 /**
  * ClickHouse backend for experiment run queries.
  *
- * Returns `null` from public methods when ClickHouse is not enabled
- * for the given project.
+ * No-CH-client semantics: `listRuns`, `getRunAggregatesForExperimentIds`,
+ * and `listRunsForExperimentPaginated` **throw** — ClickHouse is the only
+ * backend after the ES removal, so an unavailable CH client is an infra
+ * error worth surfacing.
  *
- * Follows the same pattern as `ClickHouseTraceService`.
+ * `getRun` is the documented exception: it returns `null` on no-CH so the
+ * polling UX in `BatchEvaluationV2EvaluationResults` can render a clean
+ * "loading" state while an event-sourcing fold catches up (see the
+ * comment on `getRun` below).
  */
 export class ExperimentRunService {
   private readonly logger = createLogger("langwatch:experiment-runs:service");
@@ -692,7 +697,23 @@ export class ExperimentRunService {
   /**
    * Get a single experiment run with all its items (dataset entries and evaluations).
    *
-   * @returns `null` if ClickHouse is not enabled for this project
+   * Unlike the rest of this class, `getRun` returns `null` (rather than
+   * throwing) when the CH client is unavailable OR when the run row has not
+   * been folded into `experiment_runs` yet. The PR #3483 dogfood revealed
+   * that a freshly-started eval-v3 run sits in a brief race window between
+   * `runOrchestrator → commands.startExperimentRun` returning and the
+   * `experiment-run-processing` pipeline projecting the row in CH; throwing
+   * during that window caused a 500-cascade in the UI's 1s poller and hid
+   * (more severe) downstream pipeline-stuck cases behind the same error
+   * string. See `getRun-null.unit.test.ts` for the regression guard.
+   *
+   * The route caller at `routes/experiments-v3.ts` therefore collapses
+   * `null` to a `404 Run not found or results not yet available` — that
+   * 404 is intentional polling UX, not infra masking. CH outages still
+   * surface elsewhere (every other read on the experiment-run path throws).
+   *
+   * @returns `null` if ClickHouse is unavailable OR if the run row has
+   *   not been folded yet — see method-level docstring for the rationale.
    */
   async getRun({
     projectId,
@@ -711,6 +732,8 @@ export class ExperimentRunService {
       async () => {
         const clickHouseClient = await getClickHouseClientForProject(projectId);
         if (!clickHouseClient) {
+          // Deliberately `null`, not `throw` — see method JSDoc above for
+          // why this method diverges from the rest of the class.
           return null;
         }
 
