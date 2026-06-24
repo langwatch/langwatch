@@ -40,14 +40,14 @@ Feature: Bulk dataset upload
     Then there are two rows for it
     And each row is tracked independently
 
-  @integration
+  @integration @unimplemented
   Scenario: A file of an unsupported type is rejected on its own row
     When I add a supported file and an unsupported file together
     Then the unsupported file's row shows it was not accepted
     And the supported file's row is still ready to upload
     And the upload action uploads only the accepted file
 
-  @integration
+  @integration @unimplemented
   Scenario: A file too large to upload is rejected on its own row
     When I add a file larger than the maximum upload size
     Then that file's row shows it is too large
@@ -84,7 +84,7 @@ Feature: Bulk dataset upload
     Then I edit the column names and types in place on that row
     And no extra drawer or dialog opens
 
-  @integration
+  @integration @unimplemented
   Scenario: A file whose columns cannot be detected still uploads
     Given I have added a file whose header cannot be read
     When I start the upload
@@ -109,7 +109,7 @@ Feature: Bulk dataset upload
     And the remaining files are shown as queued, not stuck
     And a queued file starts as soon as an earlier one finishes
 
-  @integration
+  @integration @unimplemented
   Scenario: The drawer summarises overall batch progress
     Given I have started an upload of several files
     Then I see how many are ready, preparing, queued, and failed
@@ -148,7 +148,7 @@ Feature: Bulk dataset upload
     Then the two good files still become ready
     And the failed file shows an error with the option to retry
 
-  @integration
+  @integration @unimplemented
   Scenario: An empty file fails on its own row instead of hanging
     Given I have added an empty file alongside a good one
     When I start the upload
@@ -163,14 +163,14 @@ Feature: Bulk dataset upload
     And it does not create a second dataset for the same file
     And the files that already succeeded are not touched
 
-  @integration
+  @integration @unimplemented
   Scenario: Cancelling one in-flight file leaves the others alone
     Given I have started an upload of three files
     When I cancel one file while it is still uploading
     Then that file stops and leaves nothing half-created behind
     And the other two continue preparing
 
-  @integration
+  @integration @unimplemented
   Scenario: Closing the drawer mid-upload keeps the files preparing
     Given I have started an upload of several files
     When I close the drawer before they finish
@@ -186,7 +186,7 @@ Feature: Bulk dataset upload
     Then the app stays responsive
     And the file is sent without being read into the browser first
 
-  @integration
+  @integration @unimplemented
   Scenario: Bulk upload works on a self-hosted install without object storage
     Given a self-hosted install without object storage
     When I bulk upload several files

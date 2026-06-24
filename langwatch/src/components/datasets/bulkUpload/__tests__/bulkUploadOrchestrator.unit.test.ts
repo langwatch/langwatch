@@ -32,6 +32,7 @@ describe("runWithConcurrency", () => {
       expect([...done].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4]);
     });
 
+    /** @scenario A large batch starts a few files and queues the rest */
     it("starts a queued item as soon as a slot frees", async () => {
       const gates = [deferred(), deferred(), deferred()];
       const started: number[] = [];
@@ -81,14 +82,22 @@ describe("uploadSingleFile", () => {
   const bump = (current: string) => `${current} (1)`;
 
   describe("given the happy path", () => {
-    it("creates, uploads, and finalizes, returning the dataset id", async () => {
+    /** @scenario Large files do not freeze the app while uploading */
+    it("creates, uploads, and finalizes, streaming the raw File (never read into memory)", async () => {
       const deps = makeDeps();
+      const theFile = file();
       const result = await uploadSingleFile(
-        { projectId: "p1", name: "data", file: file(), nextName: bump },
+        { projectId: "p1", name: "data", file: theFile, nextName: bump },
         deps,
       );
       expect(result).toEqual({ datasetId: "dataset_1", finalName: "data" });
+      // The raw File is handed to the PUT as-is — never read into an ArrayBuffer
+      // first — so a multi-GB file streams without freezing the tab.
       expect(deps.putFileToPresignedUrl).toHaveBeenCalledTimes(1);
+      const putCall = (deps.putFileToPresignedUrl as ReturnType<typeof vi.fn>)
+        .mock.calls[0]!;
+      expect(putCall[0]).toBe("https://s3.example/put");
+      expect(putCall[1]).toBe(theFile);
       expect(deps.finalizeDirectUpload).toHaveBeenCalledWith({
         projectId: "p1",
         datasetId: "dataset_1",
