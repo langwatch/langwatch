@@ -1,5 +1,6 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import type { FacetQuery } from "../facet-registry";
 import type { TraceSummaryData } from "../types";
 import type { TraceSummaryFieldsBase } from "./_summary-fields.types";
 import type {
@@ -621,11 +622,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
 
   async findCategoricalFacetRaw(params: {
     tenantId: string;
-    query: {
-      sql: string;
-      params: Record<string, unknown>;
-      settings?: Record<string, string>;
-    };
+    query: FacetQuery;
   }): Promise<CategoricalFacetResult> {
     EventUtils.validateTenantId(
       { tenantId: params.tenantId },
