@@ -122,7 +122,7 @@
     "@react-email/heading": "^0.0.16",
     "@react-email/html": "^0.0.12",
     "@react-email/img": "^0.0.12",
-    "@react-email/render": "^1.4.0",
+    "@react-email/render": "^2.0.8",
     "@react-email/section": "0.0.17",
     "@react-email/text": "0.1.6",
     "@sendgrid/mail": "^8.1.6",
