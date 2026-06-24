@@ -829,8 +829,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     const effectiveLimit = clampSpanReadLimit(limit);
 
     try {
-      return await withPartitionHint<Span[]>(
-        { occurredAtMs },
+      return await this.readTraceSpans<Span[]>(
+        { tenantId, traceId, occurredAtMs },
         (rows) => rows.length === 0,
         async (window) => {
           const partition = partitionFragment(window);
@@ -895,8 +895,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     // fallback covers a stale/wrong hint. The window (±2 days) dwarfs any real
     // trace duration, so a derivation read can't realistically split across it.
     try {
-      return await withPartitionHint<NormalizedSpan[]>(
-        { occurredAtMs },
+      return await this.readTraceSpans<NormalizedSpan[]>(
+        { tenantId, traceId, occurredAtMs },
         (rows) => rows.length === 0,
         async (window) => {
           const partition = partitionFragment(window);
@@ -955,8 +955,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     );
 
     try {
-      return await withPartitionHint<Span | null>(
-        { occurredAtMs },
+      return await this.readTraceSpans<Span | null>(
+        { tenantId, traceId, occurredAtMs },
         (span) => span === null,
         async (window) => {
           const partition = partitionFragment(window);
@@ -1021,8 +1021,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       "SpanStorageClickHouseRepository.findSpanResourcesByTraceId",
     );
 
-    return withPartitionHint<SpanResourceInfo[]>(
-      { occurredAtMs },
+    return this.readTraceSpans<SpanResourceInfo[]>(
+      { tenantId, traceId, occurredAtMs },
       (rows) => rows.length === 0,
       async (window) => {
         const partition = partitionFragment(window);
@@ -1134,6 +1134,42 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     const hintMs =
       occurredAtMs ?? (await this.resolveTraceOccurredAtMs(tenantId, traceId));
     return run(partitionWindowFor({ occurredAtMs: hintMs }));
+  }
+
+  /**
+   * Partition-pruned execution for the single-trace `stored_spans` reads.
+   * Mirrors {@link readTraceEvents} for the no-hint case while preserving the
+   * existing hinted behaviour:
+   *
+   *   - Caller threaded an `occurredAtMs` hint: keep
+   *     {@link withPartitionHint} (hinted scan, then an unbounded fallback if
+   *     the window misses) so a stale URL hint or clock skew still resolves.
+   *   - No hint — back-stack / conversation-jump / deep-link drawer opens and
+   *     worker callers that never had one: resolve the trace's occurrence time
+   *     from `trace_summaries` and bound the read to its ±2-day span window
+   *     instead of letting {@link withPartitionHint} fall back to an unbounded
+   *     scan that walks every weekly partition (incl. the cold S3 tier). The
+   *     window comes from the trace's own time, so an empty result is
+   *     authoritative and we do NOT rescan unbounded.
+   *
+   * Only when the trace time is genuinely unknown (the trace isn't in
+   * `trace_summaries`) do we keep the previous unbounded behaviour.
+   */
+  private async readTraceSpans<T>(
+    {
+      tenantId,
+      traceId,
+      occurredAtMs,
+    }: { tenantId: string; traceId: string } & OccurredAtHint,
+    isEmpty: (result: T) => boolean,
+    run: (window: PartitionWindow | undefined) => Promise<T>,
+  ): Promise<T> {
+    if (occurredAtMs !== undefined) {
+      return withPartitionHint<T>({ occurredAtMs }, isEmpty, run);
+    }
+    const resolved = await this.resolveTraceOccurredAtMs(tenantId, traceId);
+    if (resolved === undefined) return run(undefined);
+    return run(partitionWindowFor({ occurredAtMs: resolved }));
   }
 
   async getTraceEventsByTraceId({
@@ -1381,8 +1417,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       "SpanStorageClickHouseRepository.getSpanSummaryByTraceId",
     );
 
-    return withPartitionHint<SpanSummaryRow[]>(
-      { occurredAtMs },
+    return this.readTraceSpans<SpanSummaryRow[]>(
+      { tenantId, traceId, occurredAtMs },
       (rows) => rows.length === 0,
       async (window) => {
         const partition = partitionFragment(window);
@@ -1420,8 +1456,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       "SpanStorageClickHouseRepository.findLangwatchSignalsByTraceId",
     );
 
-    return withPartitionHint<SpanLangwatchSignalsRow[]>(
-      { occurredAtMs },
+    return this.readTraceSpans<SpanLangwatchSignalsRow[]>(
+      { tenantId, traceId, occurredAtMs },
       (rows) => rows.length === 0,
       async (window) => {
         const partition = partitionFragment(window);
@@ -1492,8 +1528,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       "SpanStorageClickHouseRepository.findSpansPaginated",
     );
 
-    return withPartitionHint<{ spans: Span[]; total: number }>(
-      { occurredAtMs },
+    return this.readTraceSpans<{ spans: Span[]; total: number }>(
+      { tenantId, traceId, occurredAtMs },
       (result) => result.spans.length === 0,
       async (window) => {
         const partition = partitionFragment(window);
@@ -1570,8 +1606,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       "SpanStorageClickHouseRepository.findSpansSince",
     );
 
-    return withPartitionHint<Span[]>(
-      { occurredAtMs },
+    return this.readTraceSpans<Span[]>(
+      { tenantId, traceId, occurredAtMs },
       (rows) => rows.length === 0,
       async (window) => {
         const partition = partitionFragment(window);
@@ -1622,8 +1658,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       "SpanStorageClickHouseRepository.findSpanSummariesPaginated",
     );
 
-    return withPartitionHint<{ rows: SpanSummaryRow[]; total: number }>(
-      { occurredAtMs },
+    return this.readTraceSpans<{ rows: SpanSummaryRow[]; total: number }>(
+      { tenantId, traceId, occurredAtMs },
       (result) => result.rows.length === 0,
       async (window) => {
         const partition = partitionFragment(window);
@@ -1697,8 +1733,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       "SpanStorageClickHouseRepository.findSpanSummariesSince",
     );
 
-    return withPartitionHint<SpanSummaryRow[]>(
-      { occurredAtMs },
+    return this.readTraceSpans<SpanSummaryRow[]>(
+      { tenantId, traceId, occurredAtMs },
       (rows) => rows.length === 0,
       async (window) => {
         const partition = partitionFragment(window);

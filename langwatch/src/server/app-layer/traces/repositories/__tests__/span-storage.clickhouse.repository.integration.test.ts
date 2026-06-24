@@ -411,4 +411,139 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
       });
     });
   });
+
+  // The single-trace span readers fire from the same hint-dropping entry points
+  // as the events read (back-stack / conversation jumps / deep links) and from
+  // worker callers that never had an `occurredAtMs`. Without a hint they used to
+  // walk every weekly `stored_spans` partition (incl. cold S3). They now seed
+  // the partition window from the trace's own `trace_summaries.OccurredAt`, the
+  // same way the events read does, and only stay unbounded when the trace isn't
+  // in `trace_summaries` at all.
+  describe("given a span read without an occurredAtMs hint", () => {
+    const hintlessTenantId = `test-span-read-hintless-${nanoid()}`;
+    const withSpansTraceId = `trace-${nanoid()}`;
+    const emptyTraceId = `trace-${nanoid()}`;
+    const orphanTraceId = `trace-${nanoid()}`;
+    const summaryOccurredAt = new Date(base);
+
+    async function insertSummary(tid: string) {
+      await ch.insert({
+        table: "trace_summaries",
+        values: [
+          {
+            ProjectionId: `proj-${nanoid()}`,
+            TenantId: hintlessTenantId,
+            TraceId: tid,
+            Version: "v1",
+            OccurredAt: summaryOccurredAt,
+            CreatedAt: summaryOccurredAt,
+            UpdatedAt: summaryOccurredAt,
+          },
+        ],
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+      });
+    }
+
+    beforeAll(async () => {
+      await insertRows([
+        makeSpanRow(0, {
+          TenantId: hintlessTenantId,
+          TraceId: withSpansTraceId,
+          SpanAttributes: { idx: "0" },
+        }),
+      ]);
+      // `withSpansTraceId` + `emptyTraceId` are in trace_summaries (time
+      // resolvable); `orphanTraceId` deliberately is not.
+      await insertSummary(withSpansTraceId);
+      await insertSummary(emptyTraceId);
+    });
+
+    afterAll(async () => {
+      await ch.exec({
+        query:
+          "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
+        query_params: { tenantId: hintlessTenantId },
+      });
+      await ch.exec({
+        query:
+          "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
+        query_params: { tenantId: hintlessTenantId },
+      });
+    });
+
+    it("resolves the partition window from trace_summaries and still returns the spans", async () => {
+      const spans = await repo.getNormalizedSpansByTraceId({
+        tenantId: hintlessTenantId,
+        traceId: withSpansTraceId,
+      });
+
+      expect(spans.map((s) => s.spanId)).toEqual([spanIdFor(0)]);
+    });
+
+    it("returns no spans for a trace without any, without an unbounded rescan", async () => {
+      const storedSpansQueries: { query: string; params: unknown }[] = [];
+      const recordingClient = new Proxy(ch, {
+        get(target, prop, receiver) {
+          if (prop === "query") {
+            return (args: { query: string; query_params?: unknown }) => {
+              if (args.query.includes("stored_spans")) {
+                storedSpansQueries.push({
+                  query: args.query,
+                  params: args.query_params,
+                });
+              }
+              return (target as ClickHouseClient).query(args as never);
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      }) as ClickHouseClient;
+      const recordingRepo = new SpanStorageClickHouseRepository(
+        async () => recordingClient,
+      );
+
+      const spans = await recordingRepo.getNormalizedSpansByTraceId({
+        tenantId: hintlessTenantId,
+        traceId: emptyTraceId,
+      });
+
+      // Window resolved from trace_summaries, so empty is authoritative: one
+      // partition-bounded read, no unbounded rescan.
+      expect(spans).toEqual([]);
+      expect(storedSpansQueries).toHaveLength(1);
+      expect(storedSpansQueries[0]!.query).toContain("StartTime >=");
+    });
+
+    it("stays unbounded for a trace that is not in trace_summaries", async () => {
+      // No resolvable time: the reader keeps its previous behaviour and scans
+      // unbounded rather than guessing a window.
+      const storedSpansQueries: string[] = [];
+      const recordingClient = new Proxy(ch, {
+        get(target, prop, receiver) {
+          if (prop === "query") {
+            return (args: { query: string; query_params?: unknown }) => {
+              if (args.query.includes("stored_spans")) {
+                storedSpansQueries.push(args.query);
+              }
+              return (target as ClickHouseClient).query(args as never);
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      }) as ClickHouseClient;
+      const recordingRepo = new SpanStorageClickHouseRepository(
+        async () => recordingClient,
+      );
+
+      const spans = await recordingRepo.getNormalizedSpansByTraceId({
+        tenantId: hintlessTenantId,
+        traceId: orphanTraceId,
+      });
+
+      expect(spans).toEqual([]);
+      expect(storedSpansQueries).toHaveLength(1);
+      expect(storedSpansQueries[0]!).not.toContain("StartTime >=");
+    });
+  });
 });
