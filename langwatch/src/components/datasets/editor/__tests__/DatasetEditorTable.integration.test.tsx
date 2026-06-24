@@ -397,3 +397,64 @@ describe("given a saved dataset", () => {
     });
   });
 });
+
+// ── Large-dataset read truncation (ADR-032) ──────────────────────────
+
+describe("given a large saved dataset whose read is truncated", () => {
+  const renderSaved = (data: Record<string, unknown>) => {
+    getAllQuery.mockReturnValue({ data, isLoading: false, refetch: vi.fn() });
+    return render(<DatasetEditorTable datasetId="dataset_big" />, {
+      wrapper: Wrapper,
+    });
+  };
+
+  describe("when the read is truncated", () => {
+    it("shows the true total with a truncation notice, not just the loaded rows", async () => {
+      renderSaved({
+        id: "dataset_big",
+        name: "dataset-images-2gb",
+        columnTypes,
+        count: 1640,
+        truncated: true,
+        datasetRecords: [
+          { id: "r1", input: "a", expected_output: "x" },
+          { id: "r2", input: "b", expected_output: "y" },
+          { id: "r3", input: "c", expected_output: "z" },
+        ],
+      });
+
+      // The count reflects the PG-authoritative total (1,640), NOT the 3 loaded
+      // rows — and flags that the view is partial.
+      await waitFor(() =>
+        expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
+          "3 out of 1,640 records",
+        ),
+      );
+    });
+  });
+
+  describe("when the read is not truncated", () => {
+    it("shows the plain total with no truncation notice", async () => {
+      renderSaved({
+        id: "dataset_small",
+        name: "small",
+        columnTypes,
+        count: 2,
+        truncated: false,
+        datasetRecords: [
+          { id: "r1", input: "a", expected_output: "x" },
+          { id: "r2", input: "b", expected_output: "y" },
+        ],
+      });
+
+      await waitFor(() =>
+        expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
+          "2 records",
+        ),
+      );
+      expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent(
+        "out of",
+      );
+    });
+  });
+});

@@ -20,6 +20,7 @@ import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   createManyDatasetRecords,
+  DATASET_EDITOR_READ_LIMIT_MB,
   getFullDataset,
   readDatasetHeadS3Jsonl,
 } from "./datasetRecord.utils";
@@ -160,6 +161,9 @@ export const datasetRecordRouter = createTRPCRouter({
         return await getFullDataset({
           datasetId: input.datasetId,
           projectId: input.projectId,
+          // Editor view loads into the browser; give heavy-row datasets a useful
+          // window instead of the 5 MB default (~3 rows of base64 images).
+          limitMb: DATASET_EDITOR_READ_LIMIT_MB,
         });
       } catch (error) {
         // Defense: a not-ready read surfaces as PRECONDITION_FAILED instead of
