@@ -50,12 +50,7 @@ describe("DatasetRepository", () => {
     it.todo("returns all slugs for project");
   });
 
-  describe("deletePendingUpload", () => {
-    // Status-guarded hard delete of a content-less upload placeholder.
-    it.todo("deletes the row while status='uploading' and returns count 1");
-    it.todo(
-      "is a no-op (count 0) when a finalize raced it to 'processing' — never destroys a now-live dataset",
-    );
-    it.todo("scopes deletion to id + projectId (tenancy guard)");
-  });
+  // deletePendingUpload's real-PG behavior (status guard, tenancy scope, and
+  // that the first-ever Dataset hard-delete succeeds under relationMode="prisma")
+  // is covered in dataset.repository.integration.test.ts.
 });
