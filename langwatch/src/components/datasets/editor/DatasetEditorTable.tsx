@@ -71,6 +71,7 @@ import {
   DatasetTableProvider,
   type DatasetTableRowData,
 } from "./DatasetTableContext";
+import { truncatedReadTooltip } from "./datasetEditorCopy";
 import { datasetTableCss } from "./datasetTableStyles";
 import {
   createDatasetEditorStore,
@@ -602,15 +603,29 @@ export function DatasetEditorTable({
         )}
         {isTruncatedRead ? (
           <Tooltip
-            content={`This dataset is too large to display in full here — showing ${rowCount.toLocaleString()} out of ${totalRecordCount.toLocaleString()} rows. Editing a visible row saves just that row; use Download as CSV for the complete dataset.`}
+            content={truncatedReadTooltip({
+              shown: rowCount,
+              total: totalRecordCount,
+            })}
           >
-            <HStack gap={1} cursor="help" data-testid="dataset-row-count">
+            <HStack
+              gap={1}
+              cursor="help"
+              // Keyboard-reachable: the explanation is otherwise hover-only, so
+              // make the chip focusable (Tooltip opens on focus too) and expose
+              // the full text to assistive tech via aria-label.
+              tabIndex={0}
+              role="note"
+              aria-label={truncatedReadTooltip({
+                shown: rowCount,
+                total: totalRecordCount,
+              })}
+              data-testid="dataset-row-count"
+            >
               <Text fontSize="13px" color="fg.muted">
                 {rowCount.toLocaleString()} out of{" "}
                 {totalRecordCount.toLocaleString()} records
               </Text>
-              {/* Icon trails the count and carries the warning color; the text
-                  stays neutral. */}
               <Box color="orange.500" display="flex">
                 <AlertTriangle size={13} />
               </Box>

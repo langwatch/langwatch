@@ -430,6 +430,14 @@ describe("given a large saved dataset whose read is truncated", () => {
           "3 out of 1,640 records",
         ),
       );
+      // The explanation is keyboard/SR-reachable: the chip is focusable and
+      // exposes the full tooltip copy via aria-label (not hover-only).
+      const chip = screen.getByTestId("dataset-row-count");
+      expect(chip).toHaveAttribute("tabindex", "0");
+      expect(chip).toHaveAttribute(
+        "aria-label",
+        expect.stringContaining("too large to display in full"),
+      );
     });
   });
 
