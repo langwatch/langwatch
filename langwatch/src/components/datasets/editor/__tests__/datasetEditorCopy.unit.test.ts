@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { truncatedReadTooltip } from "../datasetEditorCopy";
 
-describe("truncatedReadTooltip", () => {
-  describe("when a large dataset's editor read is truncated", () => {
+describe("given a dataset whose editor read is truncated", () => {
+  describe("when building the count tooltip", () => {
     it("states what is shown vs the total and how to get the full data", () => {
       const copy = truncatedReadTooltip({ shown: 3, total: 1640 });
 
@@ -12,7 +12,7 @@ describe("truncatedReadTooltip", () => {
       );
     });
 
-    it("formats both counts with thousands separators", () => {
+    it("formats both counts with a fixed en-US thousands separator (locale-independent)", () => {
       const copy = truncatedReadTooltip({ shown: 10, total: 1000000 });
       expect(copy).toContain("showing 10 out of 1,000,000 rows");
     });

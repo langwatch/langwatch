@@ -71,7 +71,7 @@ import {
   DatasetTableProvider,
   type DatasetTableRowData,
 } from "./DatasetTableContext";
-import { truncatedReadTooltip } from "./datasetEditorCopy";
+import { formatRecordCount, truncatedReadTooltip } from "./datasetEditorCopy";
 import { datasetTableCss } from "./datasetTableStyles";
 import {
   createDatasetEditorStore,
@@ -623,8 +623,8 @@ export function DatasetEditorTable({
               data-testid="dataset-row-count"
             >
               <Text fontSize="13px" color="fg.muted">
-                {rowCount.toLocaleString()} out of{" "}
-                {totalRecordCount.toLocaleString()} records
+                {formatRecordCount(rowCount)} out of{" "}
+                {formatRecordCount(totalRecordCount)} records
               </Text>
               <Box color="orange.500" display="flex">
                 <AlertTriangle size={13} />
@@ -637,7 +637,7 @@ export function DatasetEditorTable({
             color="fg.muted"
             data-testid="dataset-row-count"
           >
-            {totalRecordCount.toLocaleString()}{" "}
+            {formatRecordCount(totalRecordCount)}{" "}
             {totalRecordCount === 1 ? "record" : "records"}
           </Text>
         )}
