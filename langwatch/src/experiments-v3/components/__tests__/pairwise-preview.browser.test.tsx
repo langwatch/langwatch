@@ -7,15 +7,23 @@
  * Screenshots land under `/tmp/pr5106/` so the assistant can upload them.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { ChakraProvider, HStack, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
-import { afterEach, describe, it } from "vitest";
+import { afterEach, describe, it, vi } from "vitest";
 import { page } from "vitest/browser";
+
+vi.mock("../../hooks/useEvaluatorName", () => ({
+  useEvaluatorName: () => "Pairwise Compare",
+  useEvaluatorNames: () => new Map(),
+  useCodeEvaluatorIds: () => new Set(),
+}));
 
 import { AggregateHeaderBar } from "../AggregateHeaderBar";
 import { PairwiseConfigForm } from "../EvaluatorPanel/PairwiseConfigForm";
 import { RowVerdictStrip } from "../RowVerdictStrip";
+import { EvaluatorChip } from "../TargetSection/EvaluatorChip";
+import type { EvaluatorConfig } from "../../types";
 
 afterEach(() => cleanup());
 
@@ -183,6 +191,58 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
     await screen.findByText("variant_b");
     await page.screenshot({
       path: "/tmp/pr5106/06-row-verdict-b-wins.png",
+    });
+  });
+
+  it("EvaluatorChip — winner / loser / tie tints", async () => {
+    await page.viewport(600, 80);
+    const evaluator: EvaluatorConfig = {
+      id: "eval-1",
+      evaluatorType: "langevals/pairwise_compare" as EvaluatorConfig["evaluatorType"],
+      dbEvaluatorId: "db-eval-1",
+      mappings: {},
+      inputs: [],
+      pairwise: {
+        variantA: "variant_a",
+        variantB: "variant_b",
+        goldenField: "expected_output",
+        includeMetrics: [],
+      },
+    };
+    const winnerResult = { status: "processed", score: 0, label: "A" };
+
+    render(
+      <ChakraProvider value={defaultSystem}>
+        <div style={{ padding: 16, background: "white" }}>
+          <HStack gap={4}>
+            <EvaluatorChip
+              evaluator={evaluator}
+              result={winnerResult}
+              pairwiseState="winner"
+              onEdit={() => {}}
+              onRemove={() => {}}
+            />
+            <EvaluatorChip
+              evaluator={evaluator}
+              result={winnerResult}
+              pairwiseState="loser"
+              onEdit={() => {}}
+              onRemove={() => {}}
+            />
+            <EvaluatorChip
+              evaluator={evaluator}
+              result={{ status: "processed", score: 0.5, label: "tie" }}
+              pairwiseState="tie"
+              onEdit={() => {}}
+              onRemove={() => {}}
+            />
+          </HStack>
+        </div>
+      </ChakraProvider>,
+    );
+
+    await page.screenshot({
+      path: "/tmp/pr5106/07-evaluator-chip-tints.png",
     });
   });
 });
