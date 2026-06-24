@@ -28,6 +28,7 @@ import { useCodeEvaluatorIds } from "../../hooks/useEvaluatorName";
 import { useOpenEvaluatorEditor } from "../../hooks/useOpenEvaluatorEditor";
 import { useTargetName } from "../../hooks/useTargetName";
 import type { EvaluatorConfig, TargetConfig } from "../../types";
+import { normalizePairwiseConfig } from "../../types";
 import { formatLatency } from "../../utils/computeAggregates";
 import { evaluatorHasMissingMappings } from "../../utils/mappingValidation";
 import { PairwiseVerdictRow } from "../PairwiseVerdictRow";
@@ -310,28 +311,44 @@ export function TargetCellContent({
     );
   };
 
-  // Resolve pairwise winner/loser/tie state for a chip rendered against
-  // `target` (#5100). The pairwise evaluator emits one result per row
-  // whose `label` is "A" / "B" / "tie" relative to the evaluator's
-  // pairwise config (variantA / variantB target ids). This function maps
-  // that label back to a role for whichever target this chip belongs to,
-  // so the chip can tint itself green (winner), red (loser), or neutral.
-  // Returns undefined when there is no pairwise verdict for this (row,
-  // target) — either the evaluator isn't pairwise, or the verdict didn't
-  // involve this target.
+  // Resolve pairwise / N-way winner/loser/tie state for a chip rendered
+  // against `target` (#5100, #5101). The evaluator emits one result per
+  // row whose `label` is:
+  //
+  //   pairwise mode    — "A" | "B" | "tie" (slot label relative to
+  //                       variants[0] / variants[1])
+  //   select_best mode — candidate id | "tie" (already a target id)
+  //
+  // This function maps the label back to a role for whichever target
+  // this chip belongs to so the chip can tint itself green (winner),
+  // red (loser), or neutral. Returns undefined when there is no verdict
+  // for this (row, target) — the evaluator isn't pairwise, the verdict
+  // label is unrecognized, or this target wasn't one of the variants.
   const resolvePairwiseState = (
     evaluator: EvaluatorConfig,
   ): "winner" | "loser" | "tie" | undefined => {
-    const pw = evaluator.pairwise;
-    if (!pw) return undefined;
+    if (!evaluator.pairwise) return undefined;
+    const cfg = normalizePairwiseConfig(evaluator.pairwise);
+    if (!cfg.variants.length) return undefined;
+
     const parsed = parseEvaluationResult(evaluatorResults[evaluator.id]);
     const label = parsed.label;
-    if (label !== "A" && label !== "B" && label !== "tie") return undefined;
+    if (typeof label !== "string") return undefined;
+
     if (label === "tie") return "tie";
-    const winnerId = label === "A" ? pw.variantA : pw.variantB;
-    const loserId = label === "A" ? pw.variantB : pw.variantA;
+
+    // Translate "A" / "B" labels (pairwise mode) to the underlying
+    // variant id. In select_best mode the label IS already an id.
+    let winnerId: string | undefined;
+    if (cfg.mode === "pairwise" && (label === "A" || label === "B")) {
+      winnerId = label === "A" ? cfg.variants[0] : cfg.variants[1];
+    } else if (cfg.variants.includes(label)) {
+      winnerId = label;
+    }
+    if (!winnerId) return undefined;
+
     if (target.id === winnerId) return "winner";
-    if (target.id === loserId) return "loser";
+    if (cfg.variants.includes(target.id)) return "loser";
     return undefined;
   };
 
