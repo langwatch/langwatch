@@ -472,12 +472,15 @@ describe("createDatasetNormalizeHandler()", () => {
   // streaming — instead of deriving all-`string`.
   describe("when the dataset carries confirmed columnTypes", () => {
     describe("given a JSONL file and a confirmed number + rename", () => {
+      /** @scenario The dataset is prepared with the columns I confirmed */
       it("renames keys to the confirmed names and converts values to the confirmed types", async () => {
         const { storage, writeChunks } = makeStorage({
           streamStaged: vi
             .fn()
             .mockResolvedValue(
-              Readable.from(['{"qty":"5","name":"x"}\n{"qty":"12","name":"y"}\n']),
+              Readable.from([
+                '{"qty":"5","name":"x"}\n{"qty":"12","name":"y"}\n',
+              ]),
             ),
         });
         const repo = makeRepo({

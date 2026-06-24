@@ -423,8 +423,17 @@ describe("DatasetService", () => {
     const mockRewriteStorage = (stored: unknown[]) => {
       const readChunk = vi.fn().mockResolvedValue(stored);
       const writeChunks = vi.fn(
-        async ({ records, fromIndex = 0 }: { records: unknown[]; fromIndex?: number }) =>
-          toJsonlChunks(records).map((c) => ({ ...c, index: c.index + fromIndex })),
+        async ({
+          records,
+          fromIndex = 0,
+        }: {
+          records: unknown[];
+          fromIndex?: number;
+        }) =>
+          toJsonlChunks(records).map((c) => ({
+            ...c,
+            index: c.index + fromIndex,
+          })),
       );
       const deleteChunksFrom = vi.fn().mockResolvedValue(undefined);
       vi.mocked(getDatasetStorage).mockResolvedValue({
@@ -441,12 +450,15 @@ describe("DatasetService", () => {
       findOneOrThrow: vi.fn().mockResolvedValue({ ...twoColDataset }),
       update: vi
         .fn()
-        .mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
-          ...twoColDataset,
-          ...data,
-        })),
+        .mockImplementation(
+          async ({ data }: { data: Record<string, unknown> }) => ({
+            ...twoColDataset,
+            ...data,
+          }),
+        ),
     });
 
+    /** @scenario Changing a column's type re-converts the stored values */
     it("rewrites chunks converting a text column to a number, preserving row ids", async () => {
       const { writeChunks } = mockRewriteStorage([
         { id: "record_1", entry: { score: "1", img: "x" } },
@@ -482,6 +494,7 @@ describe("DatasetService", () => {
       ]);
     });
 
+    /** @scenario Retyping a text column to an image URL keeps the value */
     it("changes a text column to an image (URL) keeping the base64 data URL verbatim", async () => {
       // Real-world: a base64 PNG data URL stored as text, retyped to `image`.
       // `image` is a URL string, so the value must survive byte-for-byte and only

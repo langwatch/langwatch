@@ -8,6 +8,7 @@ const file = (content: string, name: string) => new File([content], name);
 
 describe("parseHeaderColumns", () => {
   describe("when the file is a CSV", () => {
+    /** @scenario Choosing a file shows its columns to confirm before uploading */
     it("returns its header columns as default-string columns", async () => {
       const result = await parseHeaderColumns(
         file("question,answer,score\nq1,a1,5\n", "data.csv"),
@@ -19,6 +20,7 @@ describe("parseHeaderColumns", () => {
       ]);
     });
 
+    /** @scenario A reserved column name is corrected before I confirm */
     it("renames a reserved column name the way normalize does", async () => {
       const result = await parseHeaderColumns(file("id,value\n1,x\n", "d.csv"));
       expect(result?.[0]).toEqual({ name: "id_", type: "string" });
