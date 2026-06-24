@@ -10,11 +10,13 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useRouter } from "~/utils/compat/next-router";
+import { useState } from "react";
 import { MoreVertical } from "react-feather";
 import CheckConfigForm, {
   type CheckConfigFormData,
 } from "../../../../components/checks/CheckConfigForm";
 import { DashboardLayout } from "../../../../components/DashboardLayout";
+import { ConfirmDialog } from "../../../../components/gateway/ConfirmDialog";
 import { Menu } from "../../../../components/ui/menu";
 import { toaster } from "../../../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
@@ -31,6 +33,7 @@ export default function EditTraceCheck() {
   );
   const updateCheck = api.monitors.update.useMutation();
   const deleteCheck = api.monitors.delete.useMutation();
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const onSubmit = async (data: CheckConfigFormData) => {
     if (!project || !data.checkType) return;
@@ -65,34 +68,7 @@ export default function EditTraceCheck() {
 
   const handleDeleteCheck = () => {
     if (!project) return;
-
-    if (window.confirm("Are you sure you want to delete this check?")) {
-      deleteCheck.mutate(
-        { id: checkId, projectId: project.id },
-        {
-          onSuccess: () => {
-            toaster.create({
-              title: "Check deleted successfully",
-              type: "success",
-              meta: {
-                closable: true,
-              },
-            });
-            void router.push(`/${project.slug}/evaluations`);
-          },
-          onError: () => {
-            toaster.create({
-              title: "Failed to delete check",
-              description: "Please try again",
-              type: "error",
-              meta: {
-                closable: true,
-              },
-            });
-          },
-        },
-      );
-    }
+    setConfirmDeleteOpen(true);
   };
 
   const defaultValues = check.data
@@ -108,6 +84,44 @@ export default function EditTraceCheck() {
 
   return (
     <DashboardLayout>
+      <ConfirmDialog
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        title="Delete check"
+        message="Are you sure you want to delete this check?"
+        confirmLabel="Delete"
+        tone="danger"
+        loading={deleteCheck.isLoading}
+        onConfirm={() => {
+          if (!project) return;
+          deleteCheck.mutate(
+            { id: checkId, projectId: project.id },
+            {
+              onSuccess: () => {
+                toaster.create({
+                  title: "Check deleted successfully",
+                  type: "success",
+                  meta: {
+                    closable: true,
+                  },
+                });
+                void router.push(`/${project.slug}/evaluations`);
+              },
+              onError: () => {
+                toaster.create({
+                  title: "Failed to delete check",
+                  description: "Please try again",
+                  type: "error",
+                  meta: {
+                    closable: true,
+                  },
+                });
+              },
+              onSettled: () => setConfirmDeleteOpen(false),
+            },
+          );
+        }}
+      />
       <Container maxWidth="1200" padding={6}>
         <VStack align="start" gap={4}>
           <HStack align="end" width="full">

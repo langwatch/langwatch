@@ -33,6 +33,7 @@ import type { AppRouter } from "../../server/api/root";
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
 import { api } from "../../utils/api";
 import { CustomGraph } from "../analytics/CustomGraph";
+import { ConfirmDialog } from "../gateway/ConfirmDialog";
 import { Link } from "../ui/link";
 import { toaster } from "../ui/toaster";
 import { CopyMonitorDialog } from "./CopyMonitorDialog";
@@ -52,6 +53,9 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
     monitorId: string;
     monitorName: string;
   } | null>(null);
+  const [monitorToDelete, setMonitorToDelete] = useState<{ id: string } | null>(
+    null,
+  );
 
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
@@ -240,18 +244,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                           color="red.fg"
                           onClick={() => {
                             if (!project) return;
-
-                            if (
-                              !confirm(
-                                "Are you sure you want to delete this monitor?",
-                              )
-                            )
-                              return;
-
-                            void deleteMonitorMutation.mutate({
-                              id: monitor.id,
-                              projectId: project.id,
-                            });
+                            setMonitorToDelete({ id: monitor.id });
                           }}
                         >
                           <LuTrash size={16} />
@@ -298,6 +291,24 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
           monitorName={copyDialogState.monitorName}
         />
       )}
+      <ConfirmDialog
+        open={!!monitorToDelete}
+        onOpenChange={(open) => {
+          if (!open) setMonitorToDelete(null);
+        }}
+        title="Delete monitor"
+        message="Are you sure you want to delete this monitor?"
+        confirmLabel="Delete"
+        tone="danger"
+        loading={deleteMonitorMutation.isLoading}
+        onConfirm={() => {
+          if (!project || !monitorToDelete) return;
+          deleteMonitorMutation.mutate(
+            { id: monitorToDelete.id, projectId: project.id },
+            { onSettled: () => setMonitorToDelete(null) },
+          );
+        }}
+      />
     </Card.Root>
   );
 };
