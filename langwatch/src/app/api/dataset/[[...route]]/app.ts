@@ -388,10 +388,17 @@ secured.access(directUploadSessionAuth).post(
     // than silently dropped (so a UI bug surfaces instead of producing an
     // all-`string` dataset). Absent → normalize derives columns as before.
     let columnTypes: DatasetColumns | undefined;
-    if (
-      typeof body.columnTypes === "string" &&
-      body.columnTypes.trim() !== ""
-    ) {
+    if (body.columnTypes !== undefined) {
+      // Present-but-invalid is rejected, never silently dropped (the contract).
+      // Absent (undefined) is the only "no schema → derive" path.
+      if (
+        typeof body.columnTypes !== "string" ||
+        body.columnTypes.trim() === ""
+      ) {
+        throw new UnprocessableEntityError(
+          "columnTypes must be a non-empty JSON string",
+        );
+      }
       let parsed: unknown;
       try {
         parsed = JSON.parse(body.columnTypes);

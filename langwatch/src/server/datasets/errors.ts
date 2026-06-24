@@ -226,6 +226,31 @@ export class DatasetTooLargeToExportError extends Error {
 }
 
 /**
+ * Changing a column's type on an `s3_jsonl` dataset rewrites every chunk (rename
+ * + type-convert) and currently buffers the dataset's rows in memory for the
+ * duration of the advisory-locked transaction (ADR-032 v19). Above a byte cap we
+ * refuse rather than risk OOMing the shared worker mid-rewrite; a streaming
+ * chunk-by-chunk rewrite is the deferred fix that lifts this cap. The route maps
+ * it to 413 (client can't have this served as-is), not a 500.
+ */
+export class DatasetTooLargeToEditColumnsError extends Error {
+  readonly sizeBytes: number;
+  readonly maxBytes: number;
+
+  constructor({
+    sizeBytes,
+    maxBytes,
+  }: { sizeBytes: number; maxBytes: number }) {
+    super(
+      "This dataset is too large to change column types in place yet. Reduce its size or contact support.",
+    );
+    this.name = "DatasetTooLargeToEditColumnsError";
+    this.sizeBytes = sizeBytes;
+    this.maxBytes = maxBytes;
+  }
+}
+
+/**
  * A chunk that the PG-authoritative `chunkCount` claims must exist is missing
  * from object storage. From a read's perspective this is corruption, not
  * emptiness, so the read paths (`readChunks`/`readChunk`) throw it rather than

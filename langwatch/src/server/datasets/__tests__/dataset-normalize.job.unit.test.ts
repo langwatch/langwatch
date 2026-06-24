@@ -549,6 +549,47 @@ describe("createDatasetNormalizeHandler()", () => {
       });
     });
 
+    describe("given a JSON-array file and a confirmed number + rename", () => {
+      it("renames keys and converts values the same as the JSONL/CSV paths", async () => {
+        const { storage, writeChunks } = makeStorage({
+          streamStaged: vi
+            .fn()
+            .mockResolvedValue(
+              Readable.from([
+                '[{"qty":"5","name":"x"},{"qty":"12","name":"y"}]',
+              ]),
+            ),
+        });
+        const repo = makeRepo({
+          id: "d1",
+          status: "processing",
+          columnTypes: [
+            { name: "quantity", type: "number" },
+            { name: "name", type: "string" },
+          ],
+        });
+
+        const handler = createDatasetNormalizeHandler({
+          repository: repo as any,
+          getStorage: async () => storage as any,
+        });
+        await handler({ ...basePayload, filename: "data.json" });
+
+        const entries = writeChunks.mock.calls
+          .flatMap((call: any) => call[0].records)
+          .map((record: any) => record.entry as Record<string, unknown>);
+        expect(entries).toEqual([
+          { quantity: 5, name: "x" },
+          { quantity: 12, name: "y" },
+        ]);
+        const update = repo.update.mock.calls[0]![0];
+        expect(update.data.columnTypes).toEqual([
+          { name: "quantity", type: "number" },
+          { name: "name", type: "string" },
+        ]);
+      });
+    });
+
     describe("when the confirmed column count does not match the file headers", () => {
       // Defensive: the confirm UI locks add/remove so counts can't drift, but a
       // mismatch must never misalign — fall back to deriving all-`string`.

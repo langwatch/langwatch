@@ -197,6 +197,9 @@ export function convertValueToColumnType(
     return value;
   }
   if (type === "date") {
+    // Preserve empty/missing cells: `new Date(null)` is the Unix epoch, which
+    // would silently rewrite a nullable date column's blanks to 1970-01-01.
+    if (value === null || value === undefined || value === "") return value;
     const dateAttempt = new Date(value as string);
     return dateAttempt.toString() !== "Invalid Date"
       ? dateAttempt.toISOString().split("T")[0]
@@ -265,14 +268,12 @@ export function parseFileContent(params: {
     }
     case "json": {
       const records = parseJSON(cleanContent);
-      const headers =
-        records.length > 0 ? Object.keys(records[0]!) : [];
+      const headers = records.length > 0 ? Object.keys(records[0]!) : [];
       return { headers, rows: records };
     }
     case "jsonl": {
       const records = parseJSONL(cleanContent);
-      const headers =
-        records.length > 0 ? Object.keys(records[0]!) : [];
+      const headers = records.length > 0 ? Object.keys(records[0]!) : [];
       return { headers, rows: records };
     }
   }

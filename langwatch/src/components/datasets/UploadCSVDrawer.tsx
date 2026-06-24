@@ -200,7 +200,7 @@ export function UploadCSVDrawer({
         <AddOrEditDatasetDrawer
           open
           localOnly
-          lockColumns
+          isColumnsLocked
           datasetToSave={{
             name: columnConfirm.proposedName,
             columnTypes: columnConfirm.columns,
@@ -432,6 +432,12 @@ export function UploadCSVForm({
     null,
   );
   const [proposedName, setProposedName] = useState<string>("");
+  // The header parse runs async on file pick; Upload must wait for it so a fast
+  // click can't bypass the confirm step. A monotonic token discards a stale
+  // parse (from a since-removed/replaced file) so it never overwrites the
+  // current file's columns.
+  const [isParsingHeader, setIsParsingHeader] = useState(false);
+  const parseHeaderTokenRef = useRef(0);
   // System/drawer-level failure (storage not writable, upload failed) → top
   // alert. File-level validation (too large / over the row limit) → inline on
   // the file's row (sizeError + overRowLimitForFallback below).
@@ -752,7 +758,8 @@ export function UploadCSVForm({
     uploadedDataset.datasetRecords.length > MAX_ROWS_LIMIT;
 
   const canUpload = enableDirectUpload
-    ? !!rawFile
+    ? // Wait for the header parse to settle so a fast click can't bypass confirm.
+      !!rawFile && !isParsingHeader
     : !!uploadedDataset &&
       uploadedDataset.datasetRecords.length > 0 &&
       !overRowLimitForFallback;
@@ -790,17 +797,31 @@ export function UploadCSVForm({
           setUploadError(null);
           setSizeError(null);
           setParsedColumns(null);
+          // Bump the token so any in-flight parse from a previous file is
+          // discarded when it resolves (no stale overwrite).
+          const token = ++parseHeaderTokenRef.current;
           // Read just the header (bounded slice — never the whole file) so the
           // confirm step can show the file's columns. Best-effort: on an
-          // unreadable header the upload proceeds without confirm.
-          if (file && enableDirectUpload) {
+          // unreadable header the upload proceeds without confirm. Upload stays
+          // disabled (`isParsingHeader`) until this settles. Only when a confirm
+          // host is wired — without it the parse result is unused, so a standalone
+          // form neither parses nor blocks.
+          if (file && enableDirectUpload && requestColumnConfirm) {
+            setIsParsingHeader(true);
             void (async () => {
-              const [columns, name] = await Promise.all([
-                parseHeaderColumns(file),
-                proposeValidName(file.name),
-              ]);
-              setParsedColumns(columns);
-              setProposedName(name);
+              try {
+                const [columns, name] = await Promise.all([
+                  parseHeaderColumns(file),
+                  proposeValidName(file.name),
+                ]);
+                if (parseHeaderTokenRef.current !== token) return; // stale
+                setParsedColumns(columns);
+                setProposedName(name);
+              } finally {
+                if (parseHeaderTokenRef.current === token) {
+                  setIsParsingHeader(false);
+                }
+              }
             })();
           }
         }}
@@ -810,6 +831,9 @@ export function UploadCSVForm({
           setUploadError(null);
           setSizeError(null);
           setParsedColumns(null);
+          // Invalidate any in-flight parse and clear the pending state.
+          parseHeaderTokenRef.current++;
+          setIsParsingHeader(false);
         }}
       />
       <HStack width="full" align="end">

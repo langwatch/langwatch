@@ -56,11 +56,10 @@ Feature: Dataset upload dropzone states
     Then its row shows it is ready
     And I stay in the drawer until I choose to view the dataset
 
-  # Confirm-columns step (ADR-032 v19): before the file is uploaded, the user
-  # sees the columns detected from the file's header and can correct the names
-  # and types — so a dataset is never born with everything typed as a string.
-  # The header is read from a small slice of the file, never the whole thing, so
-  # this works the same for a 1 KB file and a multi-GB one.
+  # Confirm-columns step: before the file is uploaded, the user sees the columns
+  # detected from the file and can correct their names and types — so a dataset is
+  # never created with everything typed as plain text. This works the same for a
+  # small file and a very large one.
 
   @unit
   Scenario: Choosing a file shows its columns to confirm before uploading

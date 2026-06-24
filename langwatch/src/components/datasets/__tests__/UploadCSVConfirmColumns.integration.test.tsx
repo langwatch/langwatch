@@ -111,13 +111,11 @@ describe("UploadCSVForm column-confirm seam", () => {
         'input[type="file"]',
       ) as HTMLInputElement;
       await user.upload(input, file);
-      // Flush the header-parse IIFE so parsedColumns is set before the click.
-      await act(async () => {
-        await Promise.resolve();
-        await Promise.resolve();
-      });
+      // Upload stays disabled until the header parse settles; wait for it.
+      const uploadButton = screen.getByRole("button", { name: /upload/i });
+      await waitFor(() => expect(uploadButton).toBeEnabled());
 
-      await user.click(screen.getByRole("button", { name: /upload/i }));
+      await user.click(uploadButton);
 
       // The host's confirm step is invoked with the parsed columns — NOT a direct
       // upload yet.

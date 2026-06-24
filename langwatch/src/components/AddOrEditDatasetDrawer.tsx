@@ -68,7 +68,7 @@ export interface AddDatasetDrawerProps {
    * data to back an invented column) or removing a column is a post-create edit
    * on the dataset page via this same drawer.
    */
-  lockColumns?: boolean;
+  isColumnsLocked?: boolean;
 }
 
 type FormValues = {
@@ -370,8 +370,12 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                             )}
                           </IconButton>
                         )}
-                        {!props.lockColumns && (
-                          <Button size="sm" onClick={() => remove(index)}>
+                        {!props.isColumnsLocked && (
+                          <Button
+                            size="sm"
+                            aria-label="Remove column"
+                            onClick={() => remove(index)}
+                          >
                             <Trash2 size={32} />
                           </Button>
                         )}
@@ -381,7 +385,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                   <Field.ErrorText>
                     {errors.columnTypes?.message}
                   </Field.ErrorText>
-                  {!props.lockColumns && (
+                  {!props.isColumnsLocked && (
                     <Button
                       onClick={() => append({ name: "", type: "string" })}
                     >
