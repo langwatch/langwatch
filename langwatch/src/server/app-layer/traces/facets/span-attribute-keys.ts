@@ -3,7 +3,7 @@ import type {
   FacetQuery,
   FacetQueryContext,
 } from "../facet-registry";
-import { baseParams, buildTimeWhere } from "./helpers";
+import { baseParams, buildTimeWhere, KEY_DISCOVERY_SETTINGS } from "./helpers";
 
 /**
  * Discover query for span attribute keys: every distinct `SpanAttributes`
@@ -61,6 +61,7 @@ export function buildSpanAttributeKeysFacetQuery(
       ...baseParams(ctx),
       ...(ctx.prefix ? { prefix: ctx.prefix } : {}),
     },
+    settings: KEY_DISCOVERY_SETTINGS,
   };
 }
 

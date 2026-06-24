@@ -621,7 +621,11 @@ export class TraceListClickHouseRepository implements TraceListRepository {
 
   async findCategoricalFacetRaw(params: {
     tenantId: string;
-    query: { sql: string; params: Record<string, unknown> };
+    query: {
+      sql: string;
+      params: Record<string, unknown>;
+      settings?: Record<string, string>;
+    };
   }): Promise<CategoricalFacetResult> {
     EventUtils.validateTenantId(
       { tenantId: params.tenantId },
@@ -632,6 +636,11 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     const result = await client.query({
       query: params.query.sql,
       query_params: params.query.params,
+      // Per-query guard (e.g. the key-discovery facets' memory ceiling); absent
+      // for facets that don't set one.
+      ...(params.query.settings
+        ? { clickhouse_settings: params.query.settings }
+        : {}),
       format: "JSONEachRow",
     });
 
