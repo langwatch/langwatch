@@ -1,10 +1,12 @@
 /**
- * Visual preview of the pairwise compare UI (#5100). Renders each new
- * component with realistic mock data in real Chromium and captures
- * screenshots that are attached to the PR. No backend, no DB — pure
- * component rendering.
+ * Visual preview of the pairwise + N-way compare UI (#5100, #5101).
+ * Renders each new component with realistic mock data in real Chromium
+ * and captures screenshots that can be attached to the PR. No backend,
+ * no DB — pure component rendering.
  *
- * Screenshots land under `/tmp/pr5106/` so the assistant can upload them.
+ * Screenshots:
+ *   - /tmp/pr5106/  — original pairwise-MVP UI (kept stable for #5100)
+ *   - /tmp/pr5107/  — N-way (#5101) extensions
  */
 
 import { ChakraProvider, HStack, defaultSystem } from "@chakra-ui/react";
@@ -27,7 +29,7 @@ import type { EvaluatorConfig } from "../../types";
 
 afterEach(() => cleanup());
 
-const targets = [
+const twoTargets = [
   {
     id: "variant_a",
     type: "prompt" as const,
@@ -44,13 +46,31 @@ const targets = [
   },
 ] as any;
 
+const fourTargets = [
+  ...twoTargets,
+  {
+    id: "variant_c",
+    type: "prompt" as const,
+    promptId: "p_c",
+    outputs: [],
+    mappings: {},
+  },
+  {
+    id: "variant_d",
+    type: "prompt" as const,
+    promptId: "p_d",
+    outputs: [],
+    mappings: {},
+  },
+] as any;
+
 const datasetColumns = [
   { id: "c1", name: "input" },
   { id: "c2", name: "expected_output" },
   { id: "c3", name: "context" },
 ];
 
-describe("Pairwise compare UI preview (PR #5106)", () => {
+describe("Pairwise compare UI preview — MVP (PR #5106)", () => {
   it("PairwiseConfigForm — initial state with metrics checked", async () => {
     await page.viewport(520, 600);
     render(
@@ -58,13 +78,14 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
         <div style={{ width: 480, padding: 16, background: "white" }}>
           <PairwiseConfigForm
             value={{
-              variantA: "variant_a",
-              variantB: "variant_b",
+              mode: "pairwise",
+              variants: ["variant_a", "variant_b"],
               goldenField: "expected_output",
               includeMetrics: ["cost", "duration"],
+              positionBiasMitigation: null,
             }}
             onChange={() => {}}
-            targets={targets}
+            targets={twoTargets}
             datasetColumns={datasetColumns}
           />
         </div>
@@ -83,15 +104,16 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
       <ChakraProvider value={defaultSystem}>
         <div style={{ width: 1580, background: "white" }}>
           <AggregateHeaderBar
-            counts={{ a: 12, b: 7, tie: 2 }}
-            variantAName="variant_a"
-            variantBName="variant_b"
+            variants={[
+              { id: "variant_a", name: "variant_a", wins: 12 },
+              { id: "variant_b", name: "variant_b", wins: 7 },
+            ]}
+            ties={2}
             totalCost={0.0421}
             activeFilter="all"
             onFilterChange={() => {}}
             onExport={() => {}}
-            onPromoteA={() => {}}
-            onPromoteB={() => {}}
+            onPromote={() => {}}
             biasCorrected={true}
           />
         </div>
@@ -110,15 +132,16 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
       <ChakraProvider value={defaultSystem}>
         <div style={{ width: 1580, background: "white" }}>
           <AggregateHeaderBar
-            counts={{ a: 12, b: 7, tie: 2 }}
-            variantAName="variant_a"
-            variantBName="variant_b"
+            variants={[
+              { id: "variant_a", name: "variant_a", wins: 12 },
+              { id: "variant_b", name: "variant_b", wins: 7 },
+            ]}
+            ties={2}
             totalCost={0.0421}
             activeFilter="losses"
             onFilterChange={() => {}}
             onExport={() => {}}
-            onPromoteA={() => {}}
-            onPromoteB={() => {}}
+            onPromote={() => {}}
             biasCorrected={true}
           />
         </div>
@@ -137,9 +160,8 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
       <ChakraProvider value={defaultSystem}>
         <div style={{ width: 780, background: "white" }}>
           <RowVerdictStrip
-            label="A"
-            variantAName="variant_a"
-            variantBName="variant_b"
+            winnerName="variant_a"
+            isTie={false}
             reasoning="Variant A's answer is more accurate and matches the golden reference word-for-word."
           />
         </div>
@@ -158,9 +180,8 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
       <ChakraProvider value={defaultSystem}>
         <div style={{ width: 780, background: "white" }}>
           <RowVerdictStrip
-            label="tie"
-            variantAName="variant_a"
-            variantBName="variant_b"
+            winnerName="Tie"
+            isTie={true}
             reasoning="Both candidates produce semantically identical answers."
           />
         </div>
@@ -179,9 +200,8 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
       <ChakraProvider value={defaultSystem}>
         <div style={{ width: 780, background: "white" }}>
           <RowVerdictStrip
-            label="B"
-            variantAName="variant_a"
-            variantBName="variant_b"
+            winnerName="variant_b"
+            isTie={false}
             reasoning="Variant B's answer is more concise while still matching the golden answer's semantics."
           />
         </div>
@@ -203,10 +223,11 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
       mappings: {},
       inputs: [],
       pairwise: {
-        variantA: "variant_a",
-        variantB: "variant_b",
+        mode: "pairwise",
+        variants: ["variant_a", "variant_b"],
         goldenField: "expected_output",
         includeMetrics: [],
+        positionBiasMitigation: null,
       },
     };
     const winnerResult = { status: "processed", score: 0, label: "A" };
@@ -243,6 +264,85 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
 
     await page.screenshot({
       path: "/tmp/pr5106/07-evaluator-chip-tints.png",
+    });
+  });
+});
+
+describe("Pairwise compare UI preview — N-way select_best (PR #5101)", () => {
+  it("PairwiseConfigForm — select_best mode with 3 of 4 variants picked", async () => {
+    await page.viewport(520, 700);
+    render(
+      <ChakraProvider value={defaultSystem}>
+        <div style={{ width: 480, padding: 16, background: "white" }}>
+          <PairwiseConfigForm
+            value={{
+              mode: "select_best",
+              variants: ["variant_a", "variant_b", "variant_c"],
+              goldenField: "expected_output",
+              includeMetrics: ["cost"],
+              positionBiasMitigation: null,
+            }}
+            onChange={() => {}}
+            targets={fourTargets}
+            datasetColumns={datasetColumns}
+          />
+        </div>
+      </ChakraProvider>,
+    );
+
+    await screen.findByText(/3 variants selected/);
+    await page.screenshot({
+      path: "/tmp/pr5107/01-pairwise-config-form-select-best.png",
+    });
+  });
+
+  it("AggregateHeaderBar — N-way tally across 4 variants", async () => {
+    await page.viewport(1800, 80);
+    render(
+      <ChakraProvider value={defaultSystem}>
+        <div style={{ width: 1780, background: "white" }}>
+          <AggregateHeaderBar
+            variants={[
+              { id: "variant_a", name: "gpt-4o v3", wins: 12 },
+              { id: "variant_b", name: "gpt-4o v4", wins: 7 },
+              { id: "variant_c", name: "claude-3.5", wins: 9 },
+              { id: "variant_d", name: "gemini-1.5", wins: 3 },
+            ]}
+            ties={2}
+            totalCost={0.1342}
+            activeFilter={{ variantId: "variant_a" }}
+            onFilterChange={() => {}}
+            onExport={() => {}}
+            onPromote={() => {}}
+            biasCorrected={true}
+          />
+        </div>
+      </ChakraProvider>,
+    );
+
+    await screen.findByText(/gpt-4o v3 wins 12/);
+    await page.screenshot({
+      path: "/tmp/pr5107/02-aggregate-header-nway.png",
+    });
+  });
+
+  it("RowVerdictStrip — N-way winner is a real variant id", async () => {
+    await page.viewport(800, 40);
+    render(
+      <ChakraProvider value={defaultSystem}>
+        <div style={{ width: 780, background: "white" }}>
+          <RowVerdictStrip
+            winnerName="claude-3.5"
+            isTie={false}
+            reasoning="Of the 4 candidates, claude-3.5 stays closest to the golden answer's structure and wording while keeping the answer concise."
+          />
+        </div>
+      </ChakraProvider>,
+    );
+
+    await screen.findByText("claude-3.5");
+    await page.screenshot({
+      path: "/tmp/pr5107/03-row-verdict-nway-winner.png",
     });
   });
 });
