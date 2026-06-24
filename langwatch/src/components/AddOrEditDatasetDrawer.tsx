@@ -372,6 +372,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                         )}
                         {!props.isColumnsLocked && (
                           <Button
+                            type="button"
                             size="sm"
                             aria-label="Remove column"
                             onClick={() => remove(index)}
@@ -387,6 +388,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                   </Field.ErrorText>
                   {!props.isColumnsLocked && (
                     <Button
+                      type="button"
                       onClick={() => append({ name: "", type: "string" })}
                     >
                       Add Column

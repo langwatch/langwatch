@@ -111,7 +111,6 @@ describe("UploadCSVForm column-confirm seam", () => {
         'input[type="file"]',
       ) as HTMLInputElement;
       await user.upload(input, file);
-      // Upload stays disabled until the header parse settles; wait for it.
       const uploadButton = screen.getByRole("button", { name: /upload/i });
       await waitFor(() => expect(uploadButton).toBeEnabled());
 

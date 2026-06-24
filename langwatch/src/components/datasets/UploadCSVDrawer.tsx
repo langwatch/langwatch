@@ -193,7 +193,7 @@ export function UploadCSVDrawer({
       {/* Confirm-columns step for the direct path (ADR-032 v19): rename + retype
           the file's columns before the upload starts. localOnly so it never
           writes the DB itself — on Apply it returns the confirmed schema to the
-          form (via onConfirmed), which then runs the direct upload. lockColumns
+          form (via onConfirmed), which then runs the direct upload. isColumnsLocked
           hides add/remove so the confirmed columns stay positionally aligned
           with the file the normalize job parses. */}
       {columnConfirm && (
@@ -817,6 +817,13 @@ export function UploadCSVForm({
                 if (parseHeaderTokenRef.current !== token) return; // stale
                 setParsedColumns(columns);
                 setProposedName(name);
+              } catch (error) {
+                // Best-effort: an unreadable header just skips the confirm step
+                // (parsedColumns stays null → upload proceeds, normalize derives).
+                logger.error(
+                  { error },
+                  "Failed to parse dataset header columns",
+                );
               } finally {
                 if (parseHeaderTokenRef.current === token) {
                   setIsParsingHeader(false);
