@@ -82,7 +82,7 @@ class PairwiseCompareSettings(LLMEvaluatorSettings):
         description="Allow the judge to return 'tie' when candidates are equivalent",
     )
     include_metrics: list[Literal["cost", "duration"]] = Field(
-        default_factory=list,
+        default=[],
         description="Per-candidate metrics to inject into the judge prompt",
     )
 
