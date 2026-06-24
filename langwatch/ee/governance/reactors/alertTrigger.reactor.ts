@@ -1,138 +1,107 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
+import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
+import type {
+  OutboxEnqueueRequest,
+  OutboxReactorDefinition,
+} from "~/server/event-sourcing/outbox/outboxReactor.types";
 import {
-  buildPreconditionTraceDataFromFoldState,
-  classifyTriggerFilters,
-  matchesTriggerFilters,
-  triggerFiltersReferenceEvents,
-} from "~/server/filters/triggerFilter.matcher";
-import { createLogger } from "~/utils/logger/server";
-import { captureException, toError } from "~/utils/posthogErrorCapture";
-import type { ReactorDefinition } from "~/server/event-sourcing/reactors/reactor.types";
-import {
-  dispatchTriggerAction,
-  type TriggerActionDispatchDeps,
-} from "~/server/event-sourcing/pipelines/shared/triggerActionDispatch";
+  auditDedupKey,
+  cadenceGroupKey,
+  type SettleStagePayload,
+  TRIGGER_NOTIFY_REACTOR_NAME,
+} from "~/server/event-sourcing/outbox/payload";
+import { NOTIFY_TRIGGER_ACTIONS } from "~/server/event-sourcing/pipelines/shared/triggerActionDispatch";
+import { defineOriginGuardedTraceOutboxReactor } from "~/server/event-sourcing/pipelines/trace-processing/reactors/_originGuardedReactor";
 import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import { defineOriginGuardedTraceReactor } from "~/server/event-sourcing/pipelines/trace-processing/reactors/_originGuardedReactor";
+import { classifyTriggerFilters } from "~/server/filters/triggerFilter.matcher";
 
-const logger = createLogger("langwatch:trace-processing:alert-trigger-reactor");
-
-export type AlertTriggerReactorDeps = TriggerActionDispatchDeps & {
-  /**
-   * Derives the trace-level events list from stored_spans. Only invoked when a
-   * trigger actually filters on event fields (see triggerFiltersReferenceEvents),
-   * so the common no-event-filter path pays nothing.
-   */
-  deriveEvents: (params: {
-    tenantId: string;
-    traceId: string;
-    occurredAtMs?: number;
-    foldVersion?: number;
-  }) => Promise<DerivedTraceEvent[]>;
-};
+export interface AlertTriggerReactorDeps {
+  triggers: TriggerService;
+}
 
 /**
- * Evaluates user-defined trace-based triggers reactively when traces arrive.
+ * Persist-class branch of the trace-pipeline alert trigger reactor,
+ * registered via `.withOutbox` (ADR-030 + ADR-032).
  *
- * Fires on every trace event (via traceSummary fold). For each active trigger
- * on the tenant, evaluates filters in-memory against the fold state. If all
- * filters match and the trace hasn't already been sent for this trigger,
- * dispatches the configured action (email, Slack, dataset, annotation queue).
+ * Fires on every trace event (via the traceSummary fold). For each
+ * active trace-only trigger whose action is PERSIST (dataset write,
+ * annotation-queue add), emits an `OutboxEnqueueRequest` whose payload
+ * is a settle-stage job stamped `actionClass: "persist"`. The settle
+ * dispatcher re-reads the fold after `traceDebounceMs`, re-runs the
+ * trace filters against the now-settled state, and (on match)
+ * re-enqueues an immediate cadence that claims `TriggerSent` and runs
+ * `dispatchTriggerAction`.
+ *
+ * Before ADR-032 this reactor dispatched persist actions inline against
+ * the (possibly half-formed) fold. It now rides the same settle/cadence
+ * outbox as notify so `traceDebounceMs` (ADR-026) applies before the
+ * claim and the side effect — the dataset row no longer diverges from
+ * the trace the operator browses later.
+ *
+ * NOTIFY-class actions (email / Slack) are owned by
+ * `alertTriggerNotifyOutbox.reactor.ts`; triggers with evaluation
+ * filters are owned by the evaluation pipeline reactors and skipped
+ * here. Pre-filtering to persist-class trace-only triggers keeps this
+ * reactor's `decide()` from emitting payloads the dispatcher would
+ * route elsewhere.
  */
 export function createAlertTriggerReactor(
   deps: AlertTriggerReactorDeps,
-): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
-  return defineOriginGuardedTraceReactor({
+): OutboxReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
+  return defineOriginGuardedTraceOutboxReactor({
     name: "alertTrigger",
     jobIdPrefix: "alert-trigger",
-    async handle(_event, context) {
+    async decide(_event, context) {
       const { tenantId, aggregateId: traceId, foldState } = context;
 
-      const triggers = await deps.triggers.getActiveTraceTriggersForProject(
-        tenantId,
-      );
-      if (triggers.length === 0) return;
+      const triggers =
+        await deps.triggers.getActiveTraceTriggersForProject(tenantId);
+      if (triggers.length === 0) return [];
 
-      // Derive the trace-level events list only if a trace-only trigger filters
-      // on event fields. Triggers with evaluation filters are skipped below
-      // (handled by evaluationAlertTrigger), so they don't need events here.
-      const needsEvents = triggers.some((t) => {
-        const { hasEvaluationFilters, traceFilters } = classifyTriggerFilters(
-          t.filters,
-        );
-        return !hasEvaluationFilters && triggerFiltersReferenceEvents(traceFilters);
-      });
-      const events = needsEvents
-        ? await deps.deriveEvents({
-            tenantId,
-            traceId,
-            occurredAtMs: foldState.occurredAt,
-            foldVersion: foldState.spanCount,
-          })
-        : null;
-
-      const traceData = buildPreconditionTraceDataFromFoldState(
-        foldState,
-        events,
-      );
-
+      const requests: OutboxEnqueueRequest[] = [];
       for (const trigger of triggers) {
-        try {
-          const { traceFilters, hasEvaluationFilters } =
-            classifyTriggerFilters(trigger.filters);
+        const { hasEvaluationFilters } = classifyTriggerFilters(
+          trigger.filters,
+        );
+        // Triggers with evaluation filters fire from the evaluation
+        // pipeline; this reactor only owns trace-only triggers. NOTIFY
+        // actions ride the notify reactor — this branch is persist-only.
+        if (hasEvaluationFilters) continue;
+        if (NOTIFY_TRIGGER_ACTIONS.has(trigger.action)) continue;
 
-          // Skip triggers that require evaluation results (handled by evaluationAlertTrigger)
-          if (hasEvaluationFilters) continue;
-
-          // Skip if no trace filters match
-          if (
-            Object.keys(traceFilters).length > 0 &&
-            !matchesTriggerFilters(traceData, traceFilters)
-          ) {
-            continue;
-          }
-
-          // Atomic claim: insert TriggerSent first, dispatch only on success.
-          // Two reactors racing on the same trigger/trace (trace pipeline +
-          // eval pipeline) will see exactly one true. A reactor retry after
-          // a dispatch failure also sees false here — at-most-once.
-          const claimed = await deps.triggers.claimSend({
+        const payload: SettleStagePayload = {
+          stage: "settle",
+          projectId: tenantId,
+          triggerId: trigger.id,
+          traceId,
+          reactorName: TRIGGER_NOTIFY_REACTOR_NAME,
+          actionClass: "persist",
+          auditDedupKey: auditDedupKey({
+            projectId: tenantId,
             triggerId: trigger.id,
             traceId,
+          }),
+          foldSnapshotAtEnqueue: {
+            computedInput: foldState.computedInput ?? "",
+            computedOutput: foldState.computedOutput ?? "",
+          },
+        };
+        requests.push({
+          dedupKey: payload.auditDedupKey,
+          groupKey: cadenceGroupKey({
             projectId: tenantId,
-          });
-          if (!claimed) continue;
-
-          await dispatchTriggerAction({
-            deps,
-            trigger,
-            traceId,
-            tenantId,
-            foldState,
-          });
-        } catch (error) {
-          logger.error(
-            {
-              tenantId,
-              traceId,
-              triggerId: trigger.id,
-              error: error instanceof Error ? error.message : String(error),
-            },
-            "Failed to evaluate trigger",
-          );
-          captureException(toError(error), {
-            extra: {
-              tenantId,
-              traceId,
-              triggerId: trigger.id,
-              triggerAction: trigger.action,
-            },
-          });
-        }
+            triggerId: trigger.id,
+          }),
+          // SettleStagePayload is a Prisma-JSON-compatible object shape;
+          // the cast crosses the structural-vs-nominal gap between our
+          // `stage: "settle"` literal type and `Prisma.InputJsonValue`.
+          payload: payload as unknown as OutboxEnqueueRequest["payload"],
+          enqueueOptions: { ttlMs: trigger.traceDebounceMs },
+        });
       }
+      return requests;
     },
   });
 }

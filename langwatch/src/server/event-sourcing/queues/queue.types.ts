@@ -88,7 +88,9 @@ export function resolveDeduplicationStrategy<Payload>(
   return strategy;
 }
 
-export interface EventSourcedQueueDefinition<Payload extends Record<string, unknown>> {
+export interface EventSourcedQueueDefinition<
+  Payload extends Record<string, unknown>,
+> {
   /**
    * Base name for the queue and job.
    * Queue name will be derived as `{name}` (with braces).
@@ -157,6 +159,80 @@ export interface EventSourcedQueueDefinition<Payload extends Record<string, unkn
    * Used by GroupQueue to ensure global ordering across nodes.
    */
   score?: (payload: Payload) => number;
+
+  /**
+   * Optional audit adapter that mirrors every job lifecycle event to a
+   * durable side-store (typically PG). Used by the outbox dispatch queue
+   * per ADR-030 revision: the queue owns scheduling and execution, and
+   * the adapter projects each transition into a row that operator
+   * dashboards query against.
+   *
+   * Adapter calls are best-effort relative to the queue's own state: a
+   * PG outage logs+metrics, the queue keeps running, the next
+   * transition's write resyncs the projection. Each call writes the
+   * latest projection, not an event log.
+   */
+  auditAdapter?: QueueAuditAdapter<Payload>;
+}
+
+/**
+ * Lifecycle hooks for queues that want to project state into a durable
+ * side-store. Used by the outbox dispatch queue (ADR-030 revision).
+ *
+ * The queue invokes:
+ *   - `onEnqueue` on a successful new-stage `send` (skipped on a
+ *     dedup-collapsed send — the row already exists from the first
+ *     send).
+ *   - `onLeased` / `onDispatched` / `onFailed` / `onDead` around the
+ *     `process` / `processBatch` callback execution.
+ *
+ * Adapter writes do not block dispatch — a thrown hook is caught and
+ * logged so a PG outage cannot stall the Redis-side queue.
+ */
+export interface QueueAuditAdapter<Payload> {
+  onEnqueue(event: {
+    payload: Payload;
+    groupKey: string;
+    dedupKey: string | undefined;
+    scheduledAt: Date;
+    maxAttempts?: number;
+  }): Promise<void>;
+
+  /**
+   * `attempt` is the current attempt number (1-indexed) carried by the
+   * job. Adapters that maintain a projection use it as a CAS token so a
+   * late event from a stale lease (attempt N) can't overwrite a
+   * re-leased row (attempt N+1).
+   *
+   * `leasedUntil` is the wall-clock time the queue intends to hold the
+   * job before its retry layer reschedules it. Adapters that track
+   * stuck-state observability project it onto the audit row.
+   */
+  onLeased(event: {
+    payload: Payload;
+    attempt: number;
+    leasedUntil?: Date;
+  }): Promise<void>;
+
+  onDispatched(event: {
+    payload: Payload;
+    at: Date;
+    attempt: number;
+  }): Promise<void>;
+
+  onFailed(event: {
+    payload: Payload;
+    error: string;
+    willRetry: boolean;
+    nextAttemptAt?: Date;
+    attempt: number;
+  }): Promise<void>;
+
+  onDead(event: {
+    payload: Payload;
+    lastError: string;
+    attempt: number;
+  }): Promise<void>;
 }
 
 /**
@@ -168,9 +244,14 @@ export interface QueueSendOptions<Payload> {
   deduplication?: DeduplicationConfig<Payload>;
 }
 
-export interface EventSourcedQueueProcessor<Payload extends Record<string, unknown>> {
+export interface EventSourcedQueueProcessor<
+  Payload extends Record<string, unknown>,
+> {
   send(payload: Payload, options?: QueueSendOptions<Payload>): Promise<void>;
-  sendBatch(payloads: Payload[], options?: QueueSendOptions<Payload>): Promise<void>;
+  sendBatch(
+    payloads: Payload[],
+    options?: QueueSendOptions<Payload>,
+  ): Promise<void>;
   /**
    * Gracefully closes the queue processor, waiting for in-flight jobs to complete.
    * Should be called during application shutdown.

@@ -2,8 +2,15 @@ import type { FeatureFlagKey } from "../../featureFlag/registry";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { CommandHandlerClass } from "../commands/commandHandlerClass";
 import type { Event, Projection } from "../domain/types";
-import type { FoldProjectionDefinition, FoldProjectionOptions } from "../projections/foldProjection.types";
-import type { MapProjectionDefinition, MapProjectionOptions } from "../projections/mapProjection.types";
+import type { OutboxReactorDefinition } from "../outbox/outboxReactor.types";
+import type {
+  FoldProjectionDefinition,
+  FoldProjectionOptions,
+} from "../projections/foldProjection.types";
+import type {
+  MapProjectionDefinition,
+  MapProjectionOptions,
+} from "../projections/mapProjection.types";
 import type { DeduplicationStrategy } from "../queues/queue.types";
 import type { ReactorDefinition } from "../reactors/reactor.types";
 import type { PipelineMetadata } from "./types";
@@ -99,7 +106,10 @@ export interface StaticPipelineDefinition<
     name: string;
     handlerClass: CommandHandlerClass<any, any, EventType>;
     /** Pre-constructed instance — when provided, queueManager uses this instead of `new handlerClass()`. */
-    handlerInstance?: import("../commands/command").CommandHandler<any, EventType>;
+    handlerInstance?: import("../commands/command").CommandHandler<
+      any,
+      EventType
+    >;
     options?: CommandHandlerOptions;
   }>;
 
@@ -113,6 +123,28 @@ export interface StaticPipelineDefinition<
   mapReactors: Map<
     string,
     { projectionName: string; definition: ReactorDefinition<EventType> }
+  >;
+
+  /**
+   * Outbox-backed reactors attached to fold projections. Dispatch
+   * runs through the ReactorOutbox + drainer rather than firing
+   * inline. See dev/docs/adr/024.
+   */
+  foldOutboxReactors: Map<
+    string,
+    {
+      projectionName: string;
+      definition: OutboxReactorDefinition<EventType>;
+    }
+  >;
+
+  /** Outbox-backed reactors attached to map projections. */
+  mapOutboxReactors: Map<
+    string,
+    {
+      projectionName: string;
+      definition: OutboxReactorDefinition<EventType>;
+    }
   >;
 
   /** Feature flag service for kill switches */

@@ -9,6 +9,19 @@ export interface ReactorContext<FoldState = unknown> {
   tenantId: string;
   aggregateId: string;
   foldState: FoldState;
+  /**
+   * True when the event was produced by a stream replay rather than
+   * live ingestion. The framework `.withOutbox` wrapper short-circuits
+   * `match` on replay to avoid re-firing customer-visible side effects
+   * after outbox rows have aged out of retention — see ADR-030.
+   *
+   * `.withReactor` handlers receive the same flag and may inspect it
+   * directly if they need replay-specific behavior; most best-effort
+   * reactors can ignore it. Optional today so existing handlers and
+   * test mocks don't need updating; framework call sites always pass
+   * a defined value (live events get `false`).
+   */
+  isReplay?: boolean;
 }
 
 /**
@@ -42,7 +55,10 @@ export interface ReactorOptions {
  *
  * See dev/docs/adr/026-reactor-should-react-predicate.md.
  */
-export interface ReactorDefinition<E extends Event = Event, FoldState = unknown> {
+export interface ReactorDefinition<
+  E extends Event = Event,
+  FoldState = unknown,
+> {
   /** Unique name for this reactor */
   name: string;
   /**

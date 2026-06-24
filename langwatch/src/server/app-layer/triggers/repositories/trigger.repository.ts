@@ -1,4 +1,5 @@
 import type { AlertType, TriggerAction } from "@prisma/client";
+import type { NotificationCadence } from "~/automations/cadences";
 import type { TriggerFilters } from "~/server/filters/types";
 
 export interface TriggerSummary {
@@ -11,6 +12,18 @@ export interface TriggerSummary {
   alertType: AlertType | null;
   message: string | null;
   customGraphId: string | null;
+  notificationCadence: NotificationCadence;
+  /** Per-trigger trace-readiness debounce in ms (ADR-026). Always populated by
+   *  the repository — the column is `NOT NULL DEFAULT 30000`. */
+  traceDebounceMs: number;
+  /** Customer-authored notification templates (ADR-028). NULL means "this
+   *  channel uses the legacy framework renderer". */
+  templates: {
+    slackTemplateType: string | null;
+    slackTemplate: string | null;
+    emailSubjectTemplate: string | null;
+    emailBodyTemplate: string | null;
+  };
 }
 
 export interface TriggerRepository {
@@ -25,6 +38,19 @@ export interface TriggerRepository {
    * same trigger/trace will each see exactly one `true`.
    */
   claimSend(params: {
+    triggerId: string;
+    traceId: string;
+    projectId: string;
+  }): Promise<boolean>;
+
+  /**
+   * Read-only existence check for a (triggerId, traceId) claim. Used by
+   * the outbox cadence dispatcher to suppress re-emits across batches
+   * without committing the at-most-once gate before the provider call
+   * returns — claiming pre-dispatch would let a retryable provider
+   * failure permanently no-op the retry.
+   */
+  isSendClaimed(params: {
     triggerId: string;
     traceId: string;
     projectId: string;
@@ -47,8 +73,16 @@ export class NullTriggerRepository implements TriggerRepository {
     return true;
   }
 
-  async updateLastRunAt(
-    _triggerId: string,
-    _projectId: string,
-  ): Promise<void> {}
+  async isSendClaimed(_params: {
+    triggerId: string;
+    traceId: string;
+    projectId: string;
+  }): Promise<boolean> {
+    return false;
+  }
+
+  async updateLastRunAt(_triggerId: string, _projectId: string): Promise<void> {
+    // no-op: NullTriggerRepository is the in-memory fallback used by tests
+    // and processes that don't write trigger metadata.
+  }
 }

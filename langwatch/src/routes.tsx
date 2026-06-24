@@ -87,6 +87,8 @@ const routes: RouteObject[] = [
   { path: "/invite/accept", ...page(() => import("./pages/invite/accept")) },
   { path: "/mcp/authorize", ...page(() => import("./pages/mcp/authorize")) },
   { path: "/share/:id", ...page(() => import("./pages/share/[id]")) },
+  // Public — no auth required; token in query-string is the authorisation
+  { path: "/unsubscribe", ...page(() => import("./pages/unsubscribe")) },
 
   // Onboarding
   { path: "/onboarding", ...page(() => import("./pages/onboarding")) },
@@ -189,6 +191,10 @@ const routes: RouteObject[] = [
   {
     path: "/settings/routing-policies",
     ...page(() => import("./pages/settings/routing-policies")),
+  },
+  {
+    path: "/settings/email-suppressions",
+    ...page(() => import("./pages/settings/email-suppressions")),
   },
   {
     // Top-level governance home (admin oversight dashboard).

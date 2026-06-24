@@ -365,6 +365,7 @@ model Project {
   annotations              Annotation[]
   projectSecrets           ProjectSecret[]
   TriggerSent              TriggerSent[]
+  ReactorOutbox            ReactorOutbox[]
   annotationScores         AnnotationScore[]
   publicShares             PublicShare[]
   workflows                Workflow[]
@@ -387,6 +388,7 @@ model Project {
   gatewayGuardrails        GatewayGuardrail[]                  @relation("ProjectGatewayGuardrails")
   gatewayChangeEvents      GatewayChangeEvent[]
   pinnedTraces             PinnedTrace[]
+  emailSuppressions        EmailSuppression[]
 
   // Denormalised mirror of parent Team's personal flag for fast
   // lookup at trace ingest time without a Team join. Always equals
@@ -742,6 +744,25 @@ model Trigger {
   message       String?
   deleted       Boolean       @default(false)
   alertType     AlertType?
+  // Customer-authored Liquid notification templates (see ADR-028). NULL on any
+  // column means "render with the framework default", so existing triggers are
+  // unchanged. slackTemplateType discriminates 'string' | 'block_kit'.
+  slackTemplateType    String?
+  slackTemplate        String?
+  emailSubjectTemplate String?
+  emailBodyTemplate    String?
+  // Per-trigger digest cadence (ADR-026). Ignored for persist actions.
+  // Values: 'immediate' | '5min_digest' | '15min_digest' | 'hourly_digest'.
+  notificationCadence  String        @default("immediate")
+  // Per-trigger trace-readiness debounce in ms (ADR-026). The column
+  // applies to every action class — a persist row captured before the
+  // trace settles diverges from the trace UI permanently. Today only
+  // notify-class triggers actually read this (they route through the
+  // outbox settle stage); persist-class triggers still dispatch inline
+  // until the persist-side debounce wiring lands. The column default
+  // is set so a future code change can enable persist-side debounce
+  // without a schema migration.
+  traceDebounceMs      Int           @default(30000)
   TriggerSent   TriggerSent[]
   customGraphId String?       @unique
   customGraph   CustomGraph?  @relation(fields: [customGraphId], references: [id], onDelete: Cascade)
@@ -996,6 +1017,27 @@ model TriggerSent {
   @@index([projectId])
   @@index([customGraphId])
   @@index([resolvedAt])
+}
+
+// ADR-031: recipient unsubscribe / suppression list for trigger emails. A row
+// suppresses delivery of trigger email to `email` within `projectId`. A null
+// `triggerId` suppresses every trigger in the project; a set `triggerId`
+// suppresses only that one. `reason` leaves room for future "bounce" rows.
+model EmailSuppression {
+  id        String   @id @default(nanoid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id])
+  email     String
+  triggerId String? // null = suppressed for every trigger in the project
+  reason    String   @default("unsubscribe")
+  createdAt DateTime @default(now())
+
+  // Prisma cannot express partial indexes. The migration replaces this with two
+  // partial unique indexes (triggerId IS NULL / IS NOT NULL) so that project-wide
+  // suppression rows (null triggerId) are deduped despite Postgres treating NULLs
+  // as distinct. Keep this @@unique for per-trigger uniqueness intent.
+  @@unique([projectId, email, triggerId])
+  @@index([projectId])
 }
 
 enum AnnotationScoreDataType {
@@ -2757,4 +2799,78 @@ model FeatureFlag {
     lastEditedBy String?
     createdAt    DateTime @default(now())
     updatedAt    DateTime @default(now()) @updatedAt
+}
+
+// Durable outbox for stake-sensitive reactor dispatch (ADR-025). Reactors
+// registered via `.withOutbox` enqueue rows here; a queue-side audit
+// adapter projects every queue lifecycle event into the row's status.
+// The unique (projectId, reactorName, dedupKey) is the claim primitive
+// that makes replays safe — `createMany skipDuplicates` is a no-op on
+// collision. projectId is part of the uniqueness contract so a caller
+// that forgets to project-scope `dedupKey` cannot silently suppress
+// another tenant's row for the same (reactorName, dedupKey) pair.
+enum ReactorOutboxStatus {
+    queued
+    dispatching
+    dispatched
+    failed_retryable
+    dead
+}
+
+model ReactorOutbox {
+    id             String              @id @default(nanoid())
+    projectId      String
+    project        Project             @relation(fields: [projectId], references: [id])
+    // Stable identifier of the reactor that enqueued the row. Matches
+    // the reactor's `name` in the pipeline builder.
+    reactorName    String
+    // Deduplication key scoped to (projectId, reactorName, ...). Typically
+    // encodes the match identity, e.g. `${triggerId}:trace:${traceId}`.
+    // Collisions on (projectId, reactorName, dedupKey) are the claim
+    // primitive that makes replays safe.
+    dedupKey       String
+    // GroupQueue routing key. Drives per-group FIFO and fair scheduling
+    // across tenants. Always `${projectId}/`-prefixed.
+    groupKey       String
+    // Reactor-defined dispatch payload (trigger config, target ids,
+    // rendered template inputs, etc).
+    payload        Json
+    status         ReactorOutboxStatus @default(queued)
+    attempts       Int                 @default(0)
+    maxAttempts    Int                 @default(8)
+    // Set to a future timestamp by the drainer when the row enters
+    // `dispatching`. A wakeup that arrives after `leasedUntil` may
+    // re-lease the row (assumed crashed worker).
+    leasedUntil    DateTime?
+    // Nullable: cleared (NULL) when a row is promoted to `dead`, since a
+    // terminal row no longer schedules a next attempt.
+    nextAttemptAt  DateTime?           @default(now())
+    lastError      String?
+    lastErrorAt    DateTime?
+    // Template render-health diagnostics captured at dispatch time
+    // (ADR-028 / ADR-029). Currently `{ missingVariables: string[] }` —
+    // the variables a custom email/Slack template referenced but the
+    // render context did not supply. NULL on a clean render (no missing
+    // variables) and on dispatches that never rendered a custom template.
+    // Lets the operator surface show "N missing variables" per dispatch
+    // instead of dropping the signal `renderTriggerEmail`/`renderTriggerSlack`
+    // already compute.
+    renderDiagnostics Json?
+    dispatchedAt   DateTime?
+    createdAt      DateTime            @default(now())
+    updatedAt      DateTime            @default(now()) @updatedAt
+
+    @@unique([projectId, reactorName, dedupKey])
+    // Drainer hot path: pick the next claimable row for a (project,
+    // reactor) whose backoff has elapsed.
+    @@index([projectId, reactorName, status, nextAttemptAt])
+    // Wakeup-driven lease scopes by (projectId, reactorName, groupKey)
+    // so one group's wakeup can't drain another group's ready rows.
+    // `map:` pins the name to ≤63 chars (Postgres identifier limit) so the
+    // migration's hand-written index name matches what Prisma expects.
+    @@index([projectId, reactorName, groupKey, status, nextAttemptAt], map: "ReactorOutbox_projectId_reactorName_groupKey_status_nextAtt_idx")
+    // Operator surface: list stuck/dead dispatches per project.
+    @@index([projectId, status, updatedAt])
+    // Crash recovery scan: find leased rows whose worker never came back.
+    @@index([status, leasedUntil])
 }

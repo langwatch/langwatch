@@ -23,6 +23,7 @@ import { dataPrivacyRouter } from "./routers/dataPrivacy";
 import { dataRetentionRouter } from "./routers/dataRetention";
 import { datasetRouter } from "./routers/dataset";
 import { datasetRecordRouter } from "./routers/datasetRecord";
+import { emailSuppressionRouter } from "./routers/emailSuppression";
 import { evaluationsRouter } from "./routers/evaluations";
 import { evaluatorsRouter } from "./routers/evaluators";
 import { experimentsRouter } from "./routers/experiments";
@@ -115,6 +116,7 @@ const coreRouters = {
   share: shareRouter,
   pinnedTrace: pinnedTraceRouter,
   dataRetention: dataRetentionRouter,
+  emailSuppression: emailSuppressionRouter,
   dataPrivacy: dataPrivacyRouter,
   translate: translateRouter,
   workflow: workflowRouter,

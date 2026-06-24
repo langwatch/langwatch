@@ -5,10 +5,12 @@ import type { PrismaClient } from "@prisma/client";
 import { env } from "~/env.mjs";
 import {
   type ClickHouseClientResolver,
+  clearCustomClientCache,
   getClickHouseClientForProject,
   getSharedClickHouseClient,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
+import { closeClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
@@ -16,7 +18,9 @@ import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
 import { getEdgeSpoolFailOpenCounter } from "~/server/metrics";
 import { getPostHogInstance } from "~/server/posthog";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
+import { createS3Client } from "~/server/storage";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
+import { liveTriggerNotifier } from "~/server/triggers/triggerNotifier";
 import { createLogger } from "~/utils/logger/server";
 import { getSaaSPlanProvider } from "../../../ee/billing";
 import { NotificationService } from "../../../ee/billing/notifications/notification.service";
@@ -44,6 +48,7 @@ import { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
 import { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
 import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
 import { EventSourcing } from "../event-sourcing";
+import { buildOutboxRuntime } from "../event-sourcing/outbox/setup";
 import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
 import {
   type AppCommands,
@@ -154,9 +159,19 @@ import {
 import { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
 import { TraceSummaryService } from "./traces/trace-summary.service";
 import { traced } from "./tracing";
+import { EmailSuppressionService } from "./triggers/emailSuppression.service";
+import {
+  PrismaEmailSuppressionNameLookupRepository,
+  PrismaEmailSuppressionRepository,
+} from "./triggers/repositories/emailSuppression.prisma.repository";
+import {
+  NullEmailSuppressionNameLookupRepository,
+  NullEmailSuppressionRepository,
+} from "./triggers/repositories/emailSuppression.repository";
 import { PrismaTriggerRepository } from "./triggers/repositories/trigger.prisma.repository";
 import { NullTriggerRepository } from "./triggers/repositories/trigger.repository";
 import { TriggerService } from "./triggers/trigger.service";
+import { TriggerTemplateService } from "./triggers/trigger-template.service";
 import { UsageService } from "./usage/usage.service";
 
 /**
@@ -249,10 +264,9 @@ export function initializeDefaultApp(options?: {
   );
   // ADR-022: construct blob/IO deps before SpanStorageService so the v2 read
   // path (spansFull / spanDetail) can resolve offloaded eventref pointers.
-  // Built via the shared factory (#4888) so the request layer and this
-  // composition root construct these deps from one definition. We pass the
-  // composition-root ClickHouse decision/resolver so the eval-path deps stay
-  // byte-identical to the pre-#4888 wiring.
+  // #4888: the same factory backs the customer-facing full=true read path; the
+  // composition root passes its own ClickHouse decision/resolver so the
+  // eval-path deps stay byte-identical to the pre-#4888 inline wiring.
   const { blobStore, ioExtractionService } = buildTraceBlobResolutionDeps({
     clickhouseEnabled,
     resolveClickHouseClient,
@@ -439,6 +453,14 @@ export function initializeDefaultApp(options?: {
     "MonitorService",
   );
   const triggers = new TriggerService(new PrismaTriggerRepository(prisma));
+  const emailSuppressions = new EmailSuppressionService(
+    new PrismaEmailSuppressionRepository(prisma),
+    new PrismaEmailSuppressionNameLookupRepository(prisma),
+  );
+  const triggerTemplates = new TriggerTemplateService({
+    baseHost: config.baseHost ?? env.BASE_HOST,
+    notifier: liveTriggerNotifier,
+  });
   const tokenizer = new TokenizerService(
     config.disableTokenization
       ? new NullTokenizerClient()
@@ -552,6 +574,23 @@ export function initializeDefaultApp(options?: {
       }
     : undefined;
 
+  // Outbox stack: worker-only consumer loop, but the send-side handle is
+  // wired into the registry so reactors can enqueue settle payloads. Web
+  // processes don't build this (no settle traffic; no consumer to drain).
+  const outbox =
+    config.processRole === "worker"
+      ? buildOutboxRuntime({
+          prisma,
+          redis: redis ?? null,
+          triggers,
+          emailSuppressions,
+          projects,
+          evaluations: { runs: evaluations.runs },
+          traces: { spans: spanStorage },
+          traceSummaryRepository: repositories.traceSummaryFold,
+        })
+      : undefined;
+
   const registry = new PipelineRegistry({
     eventSourcing: es,
     repositories,
@@ -575,6 +614,7 @@ export function initializeDefaultApp(options?: {
     blobStore,
     governanceKpisSync,
     governanceOcsfEventsSync,
+    outbox,
   });
   const commands = registry.registerAll();
   (globalForApp as any).__scenarioExecutionHandle =
@@ -665,10 +705,6 @@ export function initializeDefaultApp(options?: {
     close: () => Promise<void>;
   }> = [];
   if (clickhouseEnabled) {
-    const {
-      clearCustomClientCache,
-    } = require("~/server/clickhouse/clickhouseClient");
-    const { closeClickHouseClient } = require("~/server/clickhouse/client");
     gracefulCloseables.push({
       name: "clickhouse",
       close: async () => {
@@ -691,6 +727,9 @@ export function initializeDefaultApp(options?: {
       await broadcast.close();
     },
   });
+  // The outbox runtime piggy-backs on the main event-sourcing queue
+  // (ADR-030 revision 3), so there's nothing outbox-specific to close —
+  // the event-sourcing queue's own close registration covers it.
   gracefulCloseables.push({
     name: "prisma",
     close: () => prisma.$disconnect(),
@@ -744,6 +783,8 @@ export function initializeDefaultApp(options?: {
     evaluations,
     experiments,
     triggers,
+    triggerTemplates,
+    emailSuppressions,
     dspySteps: { steps: dspySteps },
     simulations: { runs: simulationReads },
     suiteRuns: { runs: suiteRunService },
@@ -885,6 +926,21 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
     experiments: ExperimentService.create(testPrisma),
     triggers: new TriggerService(new NullTriggerRepository()),
+    emailSuppressions: new EmailSuppressionService(
+      new NullEmailSuppressionRepository(),
+      new NullEmailSuppressionNameLookupRepository(),
+    ),
+    triggerTemplates: new TriggerTemplateService({
+      baseHost: config.baseHost ?? env.BASE_HOST,
+      notifier: {
+        sendEmail: async () => {
+          /* test no-op */
+        },
+        sendSlack: async () => {
+          /* test no-op */
+        },
+      },
+    }),
     simulations: { runs: SimulationRunService.create(null) },
     suiteRuns: {
       runs: SuiteRunService.create({

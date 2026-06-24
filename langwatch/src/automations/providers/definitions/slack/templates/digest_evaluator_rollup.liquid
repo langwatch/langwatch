@@ -1,0 +1,25 @@
+{%- capture _see_all_url -%}
+{{ project.url }}/messages?startDate={{ digest.windowStart | url_encode }}&endDate={{ digest.windowEnd | url_encode }}
+{%- endcapture -%}
+{%- capture _window_label -%}
+{%- if digest.windowStart -%}{{ digest.windowStart | date: "%H:%M" }}–{{ digest.windowEnd | date: "%H:%M %Z" }}{%- endif -%}
+{%- endcapture -%}
+{%- capture _summary -%}
+*{{ digest.count }}* match{% if digest.count != 1 %}es{% endif %}{% if _window_label != "" %} · {{ _window_label }}{% endif %}
+{%- endcapture -%}
+{%- assign _groups = matches | group_by: "evaluation.evaluatorName" -%}
+[
+  { "type": "header", "text": { "type": "plain_text", "text": {{ trigger.name | prepend: "📈 " | truncate: 140 | json }}, "emoji": true } },
+  { "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _summary | json }} }] },
+  { "type": "divider" }
+  {%- for g in _groups -%}
+  {%- capture _row -%}
+*{{ g.name | default: "Other matches" | replace: "&", "&amp;" | replace: "<", "&lt;" | replace: ">", "&gt;" }}* — {{ g.items.size }} match{% if g.items.size != 1 %}es{% endif %}
+  {%- endcapture -%}
+  ,{ "type": "section", "text": { "type": "mrkdwn", "text": {{ _row | json }} } }
+  {%- endfor -%}
+  {%- capture _more -%}
+<{{ _see_all_url }}|See all {{ digest.count }} matches in LangWatch ↗>
+  {%- endcapture -%}
+  ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _more | json }} }] }
+]

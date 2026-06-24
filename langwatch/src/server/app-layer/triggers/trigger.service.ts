@@ -42,10 +42,21 @@ export class TriggerService {
     return this.repo.claimSend(params);
   }
 
-  async updateLastRunAt(
-    triggerId: string,
-    projectId: string,
-  ): Promise<void> {
+  /**
+   * Read-only existence check for a (triggerId, traceId) claim. The
+   * outbox cadence dispatcher uses this to skip pairs already dispatched
+   * in a prior batch while keeping the actual `claimSend` write deferred
+   * until after a successful provider call — see `dispatcher.ts`.
+   */
+  async isSendClaimed(params: {
+    triggerId: string;
+    traceId: string;
+    projectId: string;
+  }): Promise<boolean> {
+    return this.repo.isSendClaimed(params);
+  }
+
+  async updateLastRunAt(triggerId: string, projectId: string): Promise<void> {
     return this.repo.updateLastRunAt(triggerId, projectId);
   }
 

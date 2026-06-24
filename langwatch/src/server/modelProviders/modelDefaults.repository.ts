@@ -1,3 +1,4 @@
+import { generate } from "@langwatch/ksuid";
 import type {
   ModelDefaultConfig,
   ModelDefaultConfigScope,
@@ -5,13 +6,10 @@ import type {
   Prisma,
   PrismaClient,
 } from "@prisma/client";
-import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "../../utils/constants";
 import { resolveSingleOrganizationForScopes } from "../scopes/resolveOrganizationForScope";
 
-export type ModelDefaultsPrisma =
-  | PrismaClient
-  | Prisma.TransactionClient;
+export type ModelDefaultsPrisma = PrismaClient | Prisma.TransactionClient;
 
 export type ScopeAttachment = {
   scopeType: ModelDefaultScopeType;
@@ -52,8 +50,13 @@ export class ModelDefaultsRepository {
     scopeType: ModelDefaultScopeType,
     scopeId: string,
   ): Promise<void> {
+    // -- @tenancy: advisory-lock helper; the lock key already carries
+    // the (scopeType, scopeId) scope and the call site is bounded by
+    // the caller's transaction. No tenancy predicate in the SQL itself
+    // because there is no row read or write here.
     await this.prisma
-      .$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`mdc:${scopeType}:${scopeId}`}, 0))`;
+      .$queryRaw`-- @tenancy: advisory-lock helper, scopeType+scopeId bounded
+SELECT pg_advisory_xact_lock(hashtextextended(${`mdc:${scopeType}:${scopeId}`}, 0))`;
   }
 
   /** Mint a fresh KSUID-prefixed id for a new config row. Exposed so
@@ -125,7 +128,10 @@ export class ModelDefaultsRepository {
    * enforces that contract. */
   async updateConfigScopes(params: {
     id: string;
-    configPayload?: { config?: Record<string, string>; authorId?: string | null };
+    configPayload?: {
+      config?: Record<string, string>;
+      authorId?: string | null;
+    };
     toAdd: ScopeAttachment[];
     toRemoveIds: string[];
   }): Promise<void> {

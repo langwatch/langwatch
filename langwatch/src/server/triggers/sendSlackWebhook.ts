@@ -1,8 +1,26 @@
 import { type AlertType, AlertType as AlertTypeEnum } from "@prisma/client";
-import { IncomingWebhook } from "@slack/webhook";
+import {
+  IncomingWebhook,
+  type IncomingWebhookSendArguments,
+} from "@slack/webhook";
+import { toDispatchError } from "~/server/event-sourcing/outbox/dispatchError";
 import type { Trace } from "~/server/tracer/types";
+import type { SlackPayload } from "~/shared/templating/renderSlack";
 import { env } from "../../env.mjs";
-import { captureException, toError } from "../../utils/posthogErrorCapture";
+import { assertSlackWebhookUrl } from "./slackWebhookGuard";
+
+/**
+ * Minimal Slack mrkdwn escaping. Slack only requires the three HTML-ish
+ * control characters to be escaped in message text; everything else is
+ * literal. Escaping these stops user-authored trace content from forging
+ * links/formatting or breaking the message structure.
+ * See https://api.slack.com/reference/surfaces/formatting#escaping
+ */
+const escapeMrkdwn = (value: unknown): string =>
+  String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 
 interface TriggerData {
   traceId?: string;
@@ -27,6 +45,12 @@ export const sendSlackWebhook = async ({
   triggerType: AlertType | null;
   triggerMessage: string;
 }) => {
+  // Defense-in-depth: never dispatch to anything that is not a genuine Slack
+  // incoming-webhook endpoint, even if an older trigger stored an arbitrary
+  // URL before the slackActionParamsSchema check landed. A bad URL can never
+  // become valid on retry, so the shared guard classifies this non-retryable.
+  assertSlackWebhookUrl(triggerWebhook, triggerName);
+
   const webhook = new IncomingWebhook(triggerWebhook);
 
   const traceIds = triggerData
@@ -67,20 +91,26 @@ export const sendSlackWebhook = async ({
     return `\n<${getLink(trace)}|${getDisplayText(trace)}>
     ${
       !triggerMessage && !isCustomGraph
-        ? ` \n*Input:* ${trace.input}
-    \n*Output:* ${trace.output}'\n`
+        ? ` \n*Input:* ${escapeMrkdwn(trace.input)}
+    \n*Output:* ${escapeMrkdwn(trace.output)}\n`
         : ""
     }
       ${
         !isCustomGraph &&
         (trace.events ?? [])
           .map((event: any) => {
-            return `\n*Event Type:* ${event.event_type}
+            return `\n*Event Type:* ${escapeMrkdwn(event.event_type)}
           ${Object.entries(event.metrics || {})
-            .map(([key, value]) => `\n*${key}:* ${value as string}`)
+            .map(
+              ([key, value]) =>
+                `\n*${escapeMrkdwn(key)}:* ${escapeMrkdwn(value)}`,
+            )
             .join("")}
           ${Object.entries(event.event_details || {})
-            .map(([key, value]) => `\n*${key}:* ${value as string}`)
+            .map(
+              ([key, value]) =>
+                `\n*${escapeMrkdwn(key)}:* ${escapeMrkdwn(value)}`,
+            )
             .join("")}
           \n-------------------`;
           })
@@ -92,13 +122,13 @@ export const sendSlackWebhook = async ({
   const alertIcon = (alertType: AlertType | null) => {
     switch (alertType) {
       case AlertTypeEnum.INFO:
-        return ":information_source:";
+        return "ℹ️";
       case AlertTypeEnum.WARNING:
-        return ":warning:";
+        return "⚠️";
       case AlertTypeEnum.CRITICAL:
-        return ":red_circle:";
+        return "🔴";
       default:
-        return ":bell:";
+        return "🔔";
     }
   };
 
@@ -111,8 +141,40 @@ export const sendSlackWebhook = async ({
       icon_emoji: ":robot_face:",
     });
   } catch (err) {
-    captureException(
-      toError(err),
+    throw toDispatchError(err, {
+      message: `Slack webhook dispatch failed for trigger "${triggerName}"`,
+    });
+  }
+};
+
+/**
+ * Sends a pre-rendered (customer-authored, ADR-028) Slack payload. Mirrors the
+ * guards and DispatchError classification of `sendSlackWebhook` exactly — same
+ * non-retryable host guard (`assertSlackWebhookUrl`) and the same
+ * toDispatchError wrap around the send — but takes the Block Kit / text payload
+ * already rendered.
+ */
+export const sendRenderedSlackMessage = async ({
+  triggerWebhook,
+  triggerName,
+  payload,
+}: {
+  triggerWebhook: string;
+  triggerName: string;
+  /** Rendered text/Block-Kit payload from the templating layer. Slack's
+   *  `IncomingWebhook.send` accepts a looser shape than its typed
+   *  `IncomingWebhookSendArguments`, so we cast at the send boundary. */
+  payload: SlackPayload;
+}) => {
+  assertSlackWebhookUrl(triggerWebhook, triggerName);
+
+  try {
+    await new IncomingWebhook(triggerWebhook).send(
+      payload as IncomingWebhookSendArguments,
     );
+  } catch (err) {
+    throw toDispatchError(err, {
+      message: `Slack webhook dispatch failed for trigger "${triggerName}"`,
+    });
   }
 };
