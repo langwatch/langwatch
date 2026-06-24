@@ -95,6 +95,26 @@ describe("usageReportingService", () => {
       });
     });
 
+    describe("when value exceeds Stripe's 15 digit limit", () => {
+      it("returns reported: false without calling Stripe", async () => {
+        const results = await service.reportUsageDelta({
+          stripeCustomerId: "cus_abc123",
+          organizationId: "org_1",
+          events: [makeEvent({ value: 1_000_000_000_000_000 })],
+        });
+
+        expect(results).toEqual([
+          {
+            identifier: "org_1:langwatch_billable_events:2026-02-19:d100",
+            reported: false,
+            valueSent: 0,
+            error: "Stripe meter event values must not exceed 15 digits",
+          },
+        ]);
+        expect(stripe.billing.meterEvents.create).not.toHaveBeenCalled();
+      });
+    });
+
     describe("when batch has multiple events", () => {
       it("processes sequentially and returns ordered results", async () => {
         const callOrder: number[] = [];
@@ -457,6 +477,31 @@ describe("usageReportingService", () => {
             payload: expect.objectContaining({ value: "200" }),
           })
         );
+      });
+    });
+
+    describe("when computed delta exceeds Stripe's 15 digit limit", () => {
+      it("returns reported: false without calling Stripe", async () => {
+        const results = await service.reportUsageSet({
+          stripeCustomerId: "cus_abc123",
+          organizationId: "org_1",
+          events: [
+            {
+              ...makeEvent({ value: 1_000_000_000_000_000 }),
+              previouslyReportedValue: 0,
+            },
+          ],
+        });
+
+        expect(results).toEqual([
+          {
+            identifier: "org_1:langwatch_billable_events:2026-02-19:d100",
+            reported: false,
+            valueSent: 0,
+            error: "Stripe meter event values must not exceed 15 digits",
+          },
+        ]);
+        expect(stripe.billing.meterEvents.create).not.toHaveBeenCalled();
       });
     });
 
