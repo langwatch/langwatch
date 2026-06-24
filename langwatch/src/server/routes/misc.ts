@@ -30,7 +30,7 @@ import { TRPCError } from "@trpc/server";
 import { env } from "~/env.mjs";
 import { getApp } from "~/server/app-layer/app";
 import type { DspyStepData } from "~/server/app-layer/dspy-steps/types";
-import { getAnalyticsService } from "~/server/analytics/analytics.service";
+import { getAnalyticsService } from "~/server/app-layer/analytics";
 import {
   type TimeseriesInputType,
   timeseriesSeriesInput,

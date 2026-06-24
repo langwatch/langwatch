@@ -128,6 +128,10 @@ export const RETENTION_TABLE_CATEGORY_MAP = {
   stored_log_records: "traces",
   stored_metric_records: "traces",
   trace_summaries: "traces",
+  // ADR-034: both analytics projections derive from trace events and age with
+  // the same per-project retention policy as trace_summaries.
+  trace_analytics: "traces",
+  trace_analytics_rollup: "traces",
   evaluation_runs: "traces",
   dspy_steps: "traces",
   simulation_runs: "scenarios",

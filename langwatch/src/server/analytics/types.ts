@@ -189,10 +189,16 @@ export interface FeedbacksResult {
 }
 
 /**
- * Analytics backend interface for dependency injection
+ * Analytics backend interface for dependency injection. The legacy
+ * `trace_summaries`-only backend. ADR-034 Phase 3 routing to
+ * trace_analytics / trace_analytics_rollup is owned by the app-layer
+ * service (`~/server/app-layer/analytics`) — this interface stays the
+ * trace_summaries-only contract for the legacy facade + its tests.
  */
 export interface AnalyticsBackend {
-  getTimeseries(input: import("./registry").TimeseriesInputType): Promise<TimeseriesResult>;
+  getTimeseries(
+    input: import("./registry").TimeseriesInputType,
+  ): Promise<TimeseriesResult>;
   getDataForFilter(
     projectId: string,
     field: FilterField,
