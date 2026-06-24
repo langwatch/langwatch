@@ -1,5 +1,5 @@
 # ── Stage 1: build ──────────────────────────────────────────────────
-FROM node:24-alpine AS builder
+FROM node:26-alpine AS builder
 RUN apk --no-cache add curl python3 make gcc g++ openssl bash
 RUN npm install -g pnpm@10.24.0
 
@@ -48,7 +48,7 @@ RUN cd langwatch && CI=true pnpm prune --prod
 RUN cd langwatch && pnpm prisma generate
 
 # ── Stage 2: runtime ───────────────────────────────────────────────
-FROM node:24-alpine
+FROM node:26-alpine
 RUN apk --no-cache add curl openssl bash
 RUN npm install -g pnpm@10.24.0
 
