@@ -852,6 +852,40 @@ export const evaluatorsSchema = z.object({
         ]),
     }),
   }),
+  "langevals/pairwise_compare": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation")
+        .default("openai/gpt-5-mini"),
+      max_tokens: z
+        .number()
+        .describe("Max tokens allowed for evaluation")
+        .default(128000),
+      prompt: z
+        .string()
+        .describe("Judge prompt template (golden-aware by default)")
+        .default(
+          'Compare two candidate outputs against a known-good reference (golden answer).\n\nTask:           {input}\nGolden answer:  {golden}\n\nCandidate A:    {candidate_a_output}\nCandidate B:    {candidate_b_output}\n\nReason step-by-step about how closely each candidate matches the\ngolden answer in correctness, completeness, and style. Then pick\nthe better candidate, or "tie" if equivalent.\nPrefer cheaper/faster only when quality is comparable.\n',
+        ),
+      swap_and_confirm: z
+        .boolean()
+        .describe(
+          "Run two judge calls with A/B positions swapped; tie on disagreement. Doubles judge cost but materially reduces position bias (PandaLM: 68% -> 51%).",
+        )
+        .default(true),
+      allow_tie: z
+        .boolean()
+        .describe(
+          "Allow the judge to return 'tie' when candidates are equivalent",
+        )
+        .default(true),
+      include_metrics: z
+        .array(z.union([z.literal("cost"), z.literal("duration")]))
+        .describe("Per-candidate metrics to inject into the judge prompt")
+        .default([]),
+    }),
+  }),
   "langevals/query_resolution": z.object({
     settings: z.object({
       model: z
@@ -2119,6 +2153,66 @@ This evaluator checks if the user message is concerning one of the allowed topic
       },
       "label": {
             "description": "The detected intent or 'other' if the intent is not in the allowed topics"
+      }
+}
+  },
+  "langevals/pairwise_compare": {
+    name: `Pairwise Compare`,
+    description: `
+Native pairwise LLM-as-judge evaluator. Compare two candidate
+outputs against a golden reference, with optional swap-and-confirm
+position-bias mitigation.
+`,
+    category: "quality",
+    docsUrl: "",
+    isGuardrail: false,
+    requiredFields: [
+      "candidate_a_id",
+      "candidate_a_output",
+      "candidate_b_id",
+      "candidate_b_output",
+    ],
+    optionalFields: [
+      "input",
+      "golden",
+      "candidate_a_cost",
+      "candidate_a_duration",
+      "candidate_b_cost",
+      "candidate_b_duration",
+    ],
+    settings: {
+      "model": {
+            "description": "The model to use for evaluation",
+            "default": "openai/gpt-5-mini"
+      },
+      "max_tokens": {
+            "description": "Max tokens allowed for evaluation",
+            "default": 128000
+      },
+      "prompt": {
+            "description": "Judge prompt template (golden-aware by default)",
+            "default": "Compare two candidate outputs against a known-good reference (golden answer).\n\nTask:           {input}\nGolden answer:  {golden}\n\nCandidate A:    {candidate_a_output}\nCandidate B:    {candidate_b_output}\n\nReason step-by-step about how closely each candidate matches the\ngolden answer in correctness, completeness, and style. Then pick\nthe better candidate, or \"tie\" if equivalent.\nPrefer cheaper/faster only when quality is comparable.\n"
+      },
+      "swap_and_confirm": {
+            "description": "Run two judge calls with A/B positions swapped; tie on disagreement. Doubles judge cost but materially reduces position bias (PandaLM: 68% -> 51%).",
+            "default": true
+      },
+      "allow_tie": {
+            "description": "Allow the judge to return 'tie' when candidates are equivalent",
+            "default": true
+      },
+      "include_metrics": {
+            "description": "Per-candidate metrics to inject into the judge prompt",
+            "default": []
+      }
+},
+    envVars: [],
+    result: {
+      "score": {
+            "description": "0=A wins, 1=B wins, 0.5=tie"
+      },
+      "label": {
+            "description": "Which candidate won, or tie"
       }
 }
   },
