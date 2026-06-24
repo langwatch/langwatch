@@ -40,7 +40,16 @@ import {
   useRef,
   useState,
 } from "react";
-import { Check, Download, Edit2, Plus, Trash2, Upload, X } from "react-feather";
+import {
+  AlertTriangle,
+  Check,
+  Download,
+  Edit2,
+  Plus,
+  Trash2,
+  Upload,
+  X,
+} from "react-feather";
 import { useStore } from "zustand";
 
 import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
@@ -335,6 +344,18 @@ export function DatasetEditorTable({
   // Always include one trailing phantom row (Excel-style "click to add")
   const displayRowCount = Math.max(rowCount + 1, 3);
 
+  // Large-dataset read truncation (ADR-032): saved datasets load via
+  // `getFullDataset`, which stops accumulating rows once it crosses a byte
+  // budget and returns the PG-authoritative total in `count` + a `truncated`
+  // flag. Without surfacing it the chrome shows only the loaded rows (e.g. "3
+  // records") for a 1640-row dataset — misleading. `count` is the source of
+  // truth for the total; `rowCount` is what's actually rendered.
+  const serverRecordCount = datasetId ? databaseDataset.data?.count : undefined;
+  const isTruncatedRead = datasetId
+    ? databaseDataset.data?.truncated === true
+    : false;
+  const totalRecordCount = serverRecordCount ?? rowCount;
+
   const rowData = useMemo((): DatasetTableRowData[] => {
     return Array.from({ length: displayRowCount }, (_, index) => {
       const record = records[index];
@@ -579,9 +600,33 @@ export function DatasetEditorTable({
         ) : (
           title
         )}
-        <Text fontSize="13px" color="fg.muted" data-testid="dataset-row-count">
-          {rowCount} {rowCount === 1 ? "record" : "records"}
-        </Text>
+        {isTruncatedRead ? (
+          <Tooltip
+            content={`This dataset is too large to display in full here — showing the first ${rowCount.toLocaleString()} of ${totalRecordCount.toLocaleString()} rows. Editing a visible row saves just that row; use Download as CSV for the complete dataset.`}
+          >
+            <HStack
+              gap={1}
+              color="orange.600"
+              cursor="help"
+              data-testid="dataset-row-count"
+            >
+              <AlertTriangle size={13} />
+              <Text fontSize="13px">
+                Showing {rowCount.toLocaleString()} of{" "}
+                {totalRecordCount.toLocaleString()} records
+              </Text>
+            </HStack>
+          </Tooltip>
+        ) : (
+          <Text
+            fontSize="13px"
+            color="fg.muted"
+            data-testid="dataset-row-count"
+          >
+            {totalRecordCount.toLocaleString()}{" "}
+            {totalRecordCount === 1 ? "record" : "records"}
+          </Text>
+        )}
         {datasetId && (
           <SaveStatusChip state={autosave.state} error={autosave.error} />
         )}
