@@ -22,6 +22,18 @@ export const baseNameFromFilename = (filename: string): string => {
   return trimmed === "" ? "New Dataset" : trimmed;
 };
 
+/**
+ * Increment a name's `" (k)"` suffix (or add `" (1)"`). Used by the orchestrator
+ * to pick the next candidate after a server slug 409 (a DB collision that the
+ * within-batch dedupe couldn't see — e.g. a name already taken by an existing
+ * dataset, or a concurrent create in another tab).
+ */
+export const bumpName = (name: string): string => {
+  const match = name.match(/^(.*) \((\d+)\)$/);
+  if (match) return `${match[1]} (${Number(match[2]) + 1})`;
+  return `${name} (1)`;
+};
+
 /** The next unused `"<name> (k)"` for k ≥ 1, given the names already taken. */
 const nextSuffixed = (name: string, taken: Set<string>): string => {
   let k = 1;
