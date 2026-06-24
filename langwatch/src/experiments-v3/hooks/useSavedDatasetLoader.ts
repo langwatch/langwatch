@@ -31,6 +31,14 @@ export const useSavedDatasetRecords = (
     },
     {
       enabled: Boolean(project?.id) && needsLoading,
+      // ADR-032 I-READY: a still-preparing/failed dataset read throws
+      // PRECONDITION_FAILED. Don't retry it — the dataset simply has no rows to
+      // load yet (the effect below no-ops while `query.data` is undefined).
+      retry: (failureCount, error) =>
+        (error as { data?: { code?: string } })?.data?.code ===
+        "PRECONDITION_FAILED"
+          ? false
+          : failureCount < 3,
     },
   );
 
@@ -125,6 +133,13 @@ export const useDatasetSelectionLoader = ({
     },
     {
       enabled: !!projectId && !!pendingDatasetLoad,
+      // ADR-032 I-READY: don't retry a not-ready dataset read; it has no rows
+      // to add yet (PRECONDITION_FAILED).
+      retry: (failureCount, error) =>
+        (error as { data?: { code?: string } })?.data?.code ===
+        "PRECONDITION_FAILED"
+          ? false
+          : failureCount < 3,
     },
   );
 

@@ -586,6 +586,23 @@ model Dataset {
   mapping          Json?
   useS3            Boolean           @default(false)
   s3RecordCount    Int?
+  // ADR-032: dataset content moves to S3 as chunked JSONL.
+  // `useS3` above is the legacy single-blob path, superseded by `contentLayout`
+  // (still write-enabled for `useCustomS3` orgs, left untouched); the new layout
+  // is marked by `contentLayout` so old pods mid-rolling-deploy don't misroute.
+  contentLayout    String            @default("postgres") // postgres | s3_jsonl
+  status           String            @default("ready") // uploading | processing | ready | failed
+  statusError      String?
+  // Server-owned staging key bound to the row at presign time, so finalize
+  // never trusts a client-supplied key (ADR-032 D4 / C1).
+  stagingKey       String?
+  // Original upload filename, captured at presign so the normalize job can
+  // detect the file format (CSV/JSONL/JSON) — the staged object carries no name.
+  uploadFilename   String?
+  rowCount         Int?
+  sizeBytes        BigInt?
+  chunkCount       Int?
+  chunkOffsets     Json?
 
   @@unique([projectId, slug])
 }

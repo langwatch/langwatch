@@ -90,9 +90,9 @@ const SelectDatasetDrawer = lazyDefault({
   factory: () => import("./datasets/SelectDatasetDrawer"),
   key: "SelectDatasetDrawer",
 });
-const UploadCSVModal = lazyDefault({
-  factory: () => import("./datasets/UploadCSVModal"),
-  key: "UploadCSVModal",
+const UploadCSVDrawer = lazyDefault({
+  factory: () => import("./datasets/UploadCSVDrawer"),
+  key: "UploadCSVDrawer",
 });
 const FeatureFlagsDrawer = lazyDefault({
   factory: () => import("./drawers/FeatureFlagsDrawer"),
@@ -232,7 +232,7 @@ export const drawers = {
   addAnnotationQueue: AddAnnotationQueueDrawer,
   addDatasetRecord: AddDatasetRecordDrawerV2,
   llmModelCost: LLMModelCostDrawer,
-  uploadCSV: UploadCSVModal,
+  uploadCSV: UploadCSVDrawer,
   addOrEditDataset: AddOrEditDatasetDrawer,
   editAutomationFilter: EditAutomationFilterDrawer,
   seriesFilters: SeriesFiltersDrawer,

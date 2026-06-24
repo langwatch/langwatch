@@ -44,6 +44,7 @@
     "test:stress": "NODE_ENV=test PINO_LOG_LEVEL=warn vitest -c vitest.stress.config.ts",
     "test:stripe-integration": "NODE_ENV=test PINO_LOG_LEVEL=warn vitest -c vitest.stripe-integration.config.ts",
     "task": " tsx --tsconfig tsconfig.workers.json src/task.ts",
+    "task:backfill-datasets-s3": "pnpm run task backfillDatasetContentToS3",
     "prisma:generate:typescript": "pnpm prisma generate",
     "prisma:generate:migration": "pnpm prisma migrate dev --create-only",
     "prisma:migrate": "sh -c 'if [ \"$SKIP_PRISMA_MIGRATE\" != \"true\" ]; then pnpm prisma migrate deploy; else echo \"Skipping Prisma migrations\"; fi'",

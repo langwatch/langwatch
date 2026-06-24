@@ -32,13 +32,14 @@ import { useRouter } from "~/utils/compat/next-router";
 import { AddOrEditDatasetDrawer } from "../../components/AddOrEditDatasetDrawer";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { CopyDatasetDialog } from "../../components/datasets/CopyDatasetDialog";
-import { UploadCSVModal } from "../../components/datasets/UploadCSVModal";
+import { UploadCSVDrawer } from "../../components/datasets/UploadCSVDrawer";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
 import { useLiteMemberGuard } from "../../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { AppRouter } from "../../server/api/root";
+import { datasetDisplayRecordCount } from "../../server/datasets/record-count";
 import type { DatasetColumns } from "../../server/datasets/types";
 import { api } from "../../utils/api";
 import { isHandledByGlobalHandler } from "../../utils/trpcError";
@@ -250,7 +251,21 @@ function DatasetsPage() {
                     onClick={() => goToDataset(dataset.id)}
                     key={dataset.id}
                   >
-                    <Table.Cell>{dataset.name}</Table.Cell>
+                    <Table.Cell>
+                      <HStack gap={2}>
+                        <Text>{dataset.name}</Text>
+                        {dataset.status === "processing" ||
+                        dataset.status === "uploading" ? (
+                          <Badge size="sm" colorPalette="blue">
+                            Processing
+                          </Badge>
+                        ) : dataset.status === "failed" ? (
+                          <Badge size="sm" colorPalette="red">
+                            Failed
+                          </Badge>
+                        ) : null}
+                      </HStack>
+                    </Table.Cell>
                     <Table.Cell maxWidth="250px">
                       <HStack wrap="wrap">
                         {((dataset.columnTypes as DatasetColumns) ?? []).map(
@@ -263,9 +278,7 @@ function DatasetsPage() {
                       </HStack>
                     </Table.Cell>
                     <Table.Cell>
-                      {dataset.useS3
-                        ? (dataset.s3RecordCount ?? 0)
-                        : (dataset._count.datasetRecords ?? 0)}
+                      {datasetDisplayRecordCount(dataset)}
                     </Table.Cell>
                     <Table.Cell>
                       {new Date(
@@ -285,35 +298,47 @@ function DatasetsPage() {
                           </Button>
                         </Menu.Trigger>
                         <Menu.Content>
-                          <Menu.Item
-                            value="copy"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setCopyDataset({
-                                datasetId: dataset.id,
-                                datasetName: dataset.name,
-                              });
-                            }}
-                          >
-                            <Copy size={16} /> Replicate to another project
-                          </Menu.Item>
+                          {/* Replicate and Edit operate on dataset CONTENT, which
+                              only exists once `ready` — copyDataset / column edits
+                              throw DatasetNotReadyError on a processing/failed row.
+                              Gate them on ready (a null status = legacy = ready).
+                              Delete stays available so a stuck/failed dataset can
+                              always be cleaned up. */}
+                          {(dataset.status === "ready" ||
+                            dataset.status == null) && (
+                            <Menu.Item
+                              value="copy"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setCopyDataset({
+                                  datasetId: dataset.id,
+                                  datasetName: dataset.name,
+                                });
+                              }}
+                            >
+                              <Copy size={16} /> Replicate to another project
+                            </Menu.Item>
+                          )}
                           {!isLiteMember && (
                             <>
-                              <Menu.Item
-                                value="edit"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setEditDataset({
-                                    datasetId: dataset.id,
-                                    name: dataset.name,
-                                    columnTypes:
-                                      dataset.columnTypes as DatasetColumns,
-                                  });
-                                  addEditDatasetDrawer.onOpen();
-                                }}
-                              >
-                                <Edit size={16} /> Edit dataset
-                              </Menu.Item>
+                              {(dataset.status === "ready" ||
+                                dataset.status == null) && (
+                                <Menu.Item
+                                  value="edit"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setEditDataset({
+                                      datasetId: dataset.id,
+                                      name: dataset.name,
+                                      columnTypes:
+                                        dataset.columnTypes as DatasetColumns,
+                                    });
+                                    addEditDatasetDrawer.onOpen();
+                                  }}
+                                >
+                                  <Edit size={16} /> Edit dataset
+                                </Menu.Item>
+                              )}
                               <Menu.Item
                                 value="delete"
                                 color="red.600"
@@ -352,7 +377,7 @@ function DatasetsPage() {
           addEditDatasetDrawer.onClose();
         }}
       />
-      <UploadCSVModal
+      <UploadCSVDrawer
         isOpen={uploadCSVModal.open}
         onClose={uploadCSVModal.onClose}
         onSuccess={() => {
