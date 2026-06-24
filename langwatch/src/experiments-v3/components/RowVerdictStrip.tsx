@@ -38,7 +38,7 @@ export function RowVerdictStrip({
       fontSize="xs"
       gap={2}
     >
-      <Text color="fg.muted">Pairwise verdict:</Text>
+      <Text color="fg.muted">Verdict:</Text>
       <Badge colorPalette={isTie ? "gray" : "green"} variant="subtle">
         {winnerName}
       </Badge>

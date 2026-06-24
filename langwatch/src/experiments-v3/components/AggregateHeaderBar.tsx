@@ -3,10 +3,12 @@ import {
   Button,
   HStack,
   Icon,
+  Popover,
   Spacer,
   Text,
+  VStack,
 } from "@chakra-ui/react";
-import { LuCheck, LuDownload, LuRocket } from "react-icons/lu";
+import { LuCheck, LuChevronDown, LuDownload, LuRocket } from "react-icons/lu";
 
 /**
  * Aggregate header bar for a pairwise / N-way evaluator run (#5100, #5101).
@@ -137,17 +139,50 @@ export function AggregateHeaderBar({
           <Icon as={LuDownload} boxSize="14px" />
           Export
         </Button>
-        {variants.map((v) => (
-          <Button
-            key={v.id}
-            size="xs"
-            variant="ghost"
-            onClick={() => onPromote(v.id)}
-          >
-            <Icon as={LuRocket} boxSize="14px" />
-            Promote {v.name}
-          </Button>
-        ))}
+        {variants.length <= 2 ? (
+          variants.map((v) => (
+            <Button
+              key={v.id}
+              size="xs"
+              variant="ghost"
+              onClick={() => onPromote(v.id)}
+            >
+              <Icon as={LuRocket} boxSize="14px" />
+              Promote {v.name}
+            </Button>
+          ))
+        ) : (
+          <Popover.Root>
+            <Popover.Trigger asChild>
+              <Button size="xs" variant="ghost">
+                <Icon as={LuRocket} boxSize="14px" />
+                Promote
+                <Icon as={LuChevronDown} boxSize="12px" />
+              </Button>
+            </Popover.Trigger>
+            <Popover.Positioner>
+              <Popover.Content width="200px">
+                <Popover.Arrow />
+                <Popover.Body padding={1}>
+                  <VStack align="stretch" gap={0}>
+                    {variants.map((v) => (
+                      <Button
+                        key={v.id}
+                        size="xs"
+                        variant="ghost"
+                        justifyContent="flex-start"
+                        onClick={() => onPromote(v.id)}
+                      >
+                        <Icon as={LuRocket} boxSize="14px" />
+                        {v.name}
+                      </Button>
+                    ))}
+                  </VStack>
+                </Popover.Body>
+              </Popover.Content>
+            </Popover.Positioner>
+          </Popover.Root>
+        )}
       </HStack>
     </HStack>
   );
