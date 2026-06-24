@@ -22,7 +22,8 @@ const MIN_DAYS_BETWEEN_ALERTS = 30;
 
 // NOTE: In-memory cooldown does not survive restarts and does not coordinate across replicas. Accepted tradeoff: worst case is a duplicate Slack alert.
 const resourceLimitCooldown = new TtlCache<true>(24 * 60 * 60 * 1000, "ttlcache:billing:limitCooldown:");
-export { resourceLimitCooldown };
+const resourceLimitInFlight = new Set<string>();
+export { resourceLimitCooldown, resourceLimitInFlight };
 
 // Guards notifyPlanLimitReached against concurrent calls (burst of traces from
 // a single org hitting the limit middleware at the same time). Two layers:
@@ -214,13 +215,17 @@ export class UsageLimitService {
 
     const cooldownKey = `${organizationId}:${limitType}`;
 
-    if (await resourceLimitCooldown.get(cooldownKey)) {
+    if (resourceLimitInFlight.has(cooldownKey)) {
       return;
     }
-
-    await resourceLimitCooldown.set(cooldownKey, true);
+    resourceLimitInFlight.add(cooldownKey);
 
     try {
+      const claimed = await resourceLimitCooldown.claim(cooldownKey, true);
+      if (!claimed) {
+        return;
+      }
+
       const org = await this.organizationService.findWithAdmins(organizationId);
 
       if (!org) {
@@ -252,7 +257,9 @@ export class UsageLimitService {
         max,
       });
     } catch {
-      resourceLimitCooldown.delete(cooldownKey);
+      await resourceLimitCooldown.delete(cooldownKey);
+    } finally {
+      resourceLimitInFlight.delete(cooldownKey);
     }
   }
 
