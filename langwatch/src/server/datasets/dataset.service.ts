@@ -24,6 +24,7 @@ import {
   deleteAllS3JsonlChunks,
   deleteS3JsonlRecords,
   editS3JsonlRecord,
+  migrateS3JsonlColumns,
   writeInitialS3JsonlChunks,
 } from "./dataset-mutations";
 import { enqueueDatasetNormalize } from "./dataset-normalize.queue";
@@ -202,6 +203,48 @@ export class DatasetService {
   }) {
     const { datasetId, projectId, name, columnTypes } = params;
 
+    // s3_jsonl column changes (rename / retype / add / remove) are a chunk
+    // rewrite under the per-dataset advisory lock (ADR-032 v19) — which owns its
+    // own transaction and so can't run inside the `$transaction` below. Handle it
+    // up front; the lock re-reads + re-validates the row under it. (Reads here are
+    // outside the lock, so this is a fast pre-check, not the authoritative gate.)
+    const preexisting = await this.repository.findOne({
+      id: datasetId,
+      projectId,
+    });
+    if (!preexisting) {
+      throw new DatasetNotFoundError();
+    }
+    if (preexisting.status != null && preexisting.status !== "ready") {
+      throw new DatasetNotReadyError({
+        status: preexisting.status,
+        statusError: preexisting.statusError,
+      });
+    }
+    const columnsChanged =
+      JSON.stringify(preexisting.columnTypes) !== JSON.stringify(columnTypes);
+    if (columnsChanged && preexisting.contentLayout === "s3_jsonl") {
+      const slug = this.generateSlug(name);
+      const conflictingDataset = await this.repository.findBySlug({
+        slug,
+        projectId,
+        excludeId: datasetId,
+      });
+      if (conflictingDataset) {
+        throw new DatasetConflictError();
+      }
+      return await migrateS3JsonlColumns({
+        prisma: this.prisma,
+        dataset: preexisting,
+        projectId,
+        oldColumnTypes: preexisting.columnTypes as DatasetColumns,
+        newColumnTypes: columnTypes,
+        name,
+        slug,
+        repository: this.repository,
+      });
+    }
+
     return await this.prisma.$transaction(async (tx) => {
       // Get existing dataset for column comparison
       const existingDataset = await this.repository.findOne(
@@ -252,11 +295,12 @@ export class DatasetService {
         JSON.stringify(existingDataset.columnTypes) !==
         JSON.stringify(columnTypes)
       ) {
-        // ADR-032: column migration rewrites every record's keys — for s3_jsonl
-        // that's a chunk-rewrite (write-mutation), which is a later rung. The PG
-        // record migrator would read zero rows (I-PG) and silently "migrate"
-        // nothing, leaving stored chunk keys out of sync with columnTypes.
-        // Refuse rather than corrupt. (Deferred: s3_jsonl column migration.)
+        // Defensive: s3_jsonl column changes are handled up front via
+        // `migrateS3JsonlColumns` (the advisory-lock chunk rewrite) and return
+        // before this transaction (ADR-032 v19). Reaching here with s3_jsonl would
+        // mean that early branch regressed — refuse rather than run the PG record
+        // migrator, which would read zero rows (I-PG) and silently corrupt nothing
+        // into the chunk store.
         if (existingDataset.contentLayout === "s3_jsonl") {
           throw new ColumnTypeChangeNotSupportedError();
         }
@@ -1197,12 +1241,19 @@ export class DatasetService {
     projectId: string;
     name: string;
     filename: string;
+    /**
+     * User-confirmed columns from the upload confirm step (ADR-032 v19): the
+     * normalize job renames + type-converts each record to match. Omitted by
+     * non-UI callers (SDK / REST / API key) that don't run the confirm step —
+     * normalize then derives all-`string` columns as before.
+     */
+    columnTypes?: DatasetColumns;
   }): Promise<{
     datasetId: string;
     slug: string;
     uploadUrl: string;
   }> {
-    const { projectId, name, filename } = params;
+    const { projectId, name, filename, columnTypes } = params;
 
     // Bound the accumulation of abandoned `uploading` rows + staging objects and
     // recover any normalize wedged at `processing` (lost-after-send) as new
@@ -1235,7 +1286,10 @@ export class DatasetService {
       slug,
       name,
       projectId,
-      columnTypes: [], // unknown until normalize parses the uploaded file
+      // Confirmed columns (names + types) from the upload step drive normalize's
+      // rename + type conversion (ADR-032 v19). Empty when the caller skipped
+      // confirm (SDK / REST / API key) — normalize then derives all-`string`.
+      columnTypes: columnTypes ?? [],
       status: "uploading",
       contentLayout: "s3_jsonl",
       // C1: bind the minted key to the row so finalize never trusts a

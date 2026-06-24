@@ -55,3 +55,30 @@ Feature: Dataset upload dropzone states
     When my uploaded dataset finishes preparing
     Then its row shows it is ready
     And I stay in the drawer until I choose to view the dataset
+
+  # Confirm-columns step (ADR-032 v19): before the file is uploaded, the user
+  # sees the columns detected from the file's header and can correct the names
+  # and types — so a dataset is never born with everything typed as a string.
+  # The header is read from a small slice of the file, never the whole thing, so
+  # this works the same for a 1 KB file and a multi-GB one.
+
+  @unit
+  Scenario: Choosing a file shows its columns to confirm before uploading
+    When I choose a CSV file
+    And I continue to confirm
+    Then I see the columns detected from the file
+    And I can rename a column and change its type
+    And I cannot add or remove columns at this step
+
+  @unit
+  Scenario: A reserved column name is corrected before I confirm
+    Given a file whose header uses a reserved column name
+    When I continue to confirm
+    Then that column is shown already renamed to a safe name
+
+  @integration
+  Scenario: The dataset is prepared with the columns I confirmed
+    Given I have chosen a file and changed a column's type to a number
+    When I confirm and the upload finishes preparing
+    Then the ready dataset reports that column as a number
+    And the other columns keep the names and types I confirmed

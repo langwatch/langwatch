@@ -56,6 +56,7 @@ import {
   requestDirectUpload,
   retryDatasetNormalize,
 } from "./services/directUpload";
+import { parseHeaderColumns } from "./utils/parseHeaderColumns";
 import { getSafeColumnName } from "./utils/reservedColumns";
 
 const logger = createLogger("UploadCSVDrawer");
@@ -90,6 +91,18 @@ export function UploadCSVDrawer({
   const [uploadedDataset, setUploadedDataset] = useState<
     InMemoryDataset | undefined
   >(undefined);
+  // Confirm-columns step (ADR-032 v19): when the form requests it, hold the
+  // parsed columns + the resume callback and render the confirm drawer. Null
+  // when no confirm is in progress (so the drawer — and its hooks — only mount
+  // while confirming).
+  const [columnConfirm, setColumnConfirm] = useState<{
+    columns: DatasetColumns;
+    proposedName: string;
+    onConfirmed: (confirmed: {
+      name: string;
+      columnTypes: DatasetColumns;
+    }) => void;
+  } | null>(null);
   // Direct-upload (ADR-032 D4) processing stays IN this drawer: once the raw
   // file is streamed + finalized, the dataset normalizes server-side. We hold
   // its id and poll its status here instead of navigating to the dataset page,
@@ -159,6 +172,7 @@ export function UploadCSVDrawer({
                 enableDirectUpload={enableDirectUpload}
                 onClose={onClose}
                 onDirectUploadComplete={setProcessingDatasetId}
+                requestColumnConfirm={setColumnConfirm}
               />
             )}
           </Drawer.Body>
@@ -176,6 +190,29 @@ export function UploadCSVDrawer({
           onClose();
         }}
       />
+      {/* Confirm-columns step for the direct path (ADR-032 v19): rename + retype
+          the file's columns before the upload starts. localOnly so it never
+          writes the DB itself — on Apply it returns the confirmed schema to the
+          form (via onConfirmed), which then runs the direct upload. lockColumns
+          hides add/remove so the confirmed columns stay positionally aligned
+          with the file the normalize job parses. */}
+      {columnConfirm && (
+        <AddOrEditDatasetDrawer
+          open
+          localOnly
+          lockColumns
+          datasetToSave={{
+            name: columnConfirm.proposedName,
+            columnTypes: columnConfirm.columns,
+          }}
+          onClose={() => setColumnConfirm(null)}
+          onSuccess={({ name, columnTypes }) => {
+            const { onConfirmed } = columnConfirm;
+            setColumnConfirm(null);
+            onConfirmed({ name, columnTypes });
+          }}
+        />
+      )}
     </>
   );
 }
@@ -345,6 +382,7 @@ export function UploadCSVForm({
   enableDirectUpload = false,
   onClose,
   onDirectUploadComplete,
+  requestColumnConfirm,
 }: {
   setUploadedDataset: (dataset: InMemoryDataset | undefined) => void;
   uploadedDataset: InMemoryDataset | undefined;
@@ -360,6 +398,19 @@ export function UploadCSVForm({
    *  host (UploadCSVDrawer) takes over and shows processing IN the drawer.
    *  When omitted, the direct path navigates to the dataset page instead. */
   onDirectUploadComplete?: (datasetId: string) => void;
+  /** Host-provided confirm-columns step (ADR-032 v19). When set, the direct
+   *  path hands the parsed header columns to the host before uploading; the host
+   *  shows the confirm drawer and calls `onConfirmed` with the final name +
+   *  columnTypes. When omitted (standalone form), the upload runs without a
+   *  confirm step (normalize derives all-`string`). */
+  requestColumnConfirm?: (params: {
+    columns: DatasetColumns;
+    proposedName: string;
+    onConfirmed: (confirmed: {
+      name: string;
+      columnTypes: DatasetColumns;
+    }) => void;
+  }) => void;
 }) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
@@ -372,6 +423,15 @@ export function UploadCSVForm({
   // used by the fallback (no-storage) flow.
   const [rawFile, setRawFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  // Confirm-columns step (ADR-032 v19, direct path only): the columns parsed
+  // from the file's header (null when the header couldn't be read → upload
+  // without a confirm step) and the proposed dataset name. The host renders the
+  // confirm drawer (see `requestColumnConfirm`); the user corrects names + types
+  // before the upload starts.
+  const [parsedColumns, setParsedColumns] = useState<DatasetColumns | null>(
+    null,
+  );
+  const [proposedName, setProposedName] = useState<string>("");
   // System/drawer-level failure (storage not writable, upload failed) → top
   // alert. File-level validation (too large / over the row limit) → inline on
   // the file's row (sizeError + overRowLimitForFallback below).
@@ -435,7 +495,10 @@ export function UploadCSVForm({
    * file and fall back to the parse-and-drawer flow, so small/self-hosted
    * setups are unaffected.
    */
-  const handleUpload = async () => {
+  const handleUpload = async (confirmed?: {
+    name: string;
+    columnTypes: DatasetColumns;
+  }) => {
     if (!enableDirectUpload || !rawFile || !projectId || !project) {
       uploadCSVData();
       return;
@@ -452,11 +515,17 @@ export function UploadCSVForm({
     let pendingDatasetId: string | undefined;
     try {
       const name =
-        uploadedDataset?.name ?? (await proposeValidName(rawFile.name));
+        confirmed?.name ??
+        uploadedDataset?.name ??
+        (await proposeValidName(rawFile.name));
       const { datasetId, uploadUrl } = await requestDirectUpload({
         projectId,
         name,
         filename: rawFile.name,
+        // Confirmed columns (names + types) drive normalize's rename + type
+        // conversion. Absent when the header couldn't be parsed → normalize
+        // derives all-`string`.
+        columnTypes: confirmed?.columnTypes,
       });
       pendingDatasetId = datasetId;
       pendingDatasetIdRef.current = datasetId;
@@ -649,6 +718,32 @@ export function UploadCSVForm({
     }
   };
 
+  /**
+   * Upload button handler. On the direct path with a parseable header AND a host
+   * that can show the confirm drawer, hand the parsed columns to the host first
+   * (ADR-032 v19) so the user fixes names + types before the upload starts; the
+   * host calls back `onConfirmed` with the final schema, which resumes
+   * `handleUpload`. Without a host confirm handler (standalone form) or an
+   * unparseable header, upload straight away — normalize then derives
+   * all-`string` columns as before.
+   */
+  const handleUploadClick = () => {
+    if (
+      enableDirectUpload &&
+      rawFile &&
+      parsedColumns &&
+      requestColumnConfirm
+    ) {
+      requestColumnConfirm({
+        columns: parsedColumns,
+        proposedName,
+        onConfirmed: (confirmed) => void handleUpload(confirmed),
+      });
+      return;
+    }
+    void handleUpload();
+  };
+
   // The direct path streams the raw file, so it is not bound by the in-browser
   // row limit. The limit only constrains the fallback (parse-and-drawer) flow.
   const overRowLimitForFallback =
@@ -694,12 +789,27 @@ export function UploadCSVForm({
           setRawFile(file);
           setUploadError(null);
           setSizeError(null);
+          setParsedColumns(null);
+          // Read just the header (bounded slice — never the whole file) so the
+          // confirm step can show the file's columns. Best-effort: on an
+          // unreadable header the upload proceeds without confirm.
+          if (file && enableDirectUpload) {
+            void (async () => {
+              const [columns, name] = await Promise.all([
+                parseHeaderColumns(file),
+                proposeValidName(file.name),
+              ]);
+              setParsedColumns(columns);
+              setProposedName(name);
+            })();
+          }
         }}
         onUploadRemoved={() => {
           setUploadedDataset(undefined);
           setRawFile(null);
           setUploadError(null);
           setSizeError(null);
+          setParsedColumns(null);
         }}
       />
       <HStack width="full" align="end">
@@ -721,7 +831,7 @@ export function UploadCSVForm({
           loading={isUploading}
           loadingText="Uploading"
           disabled={!!disabled || isUploading || !canUpload}
-          onClick={() => void handleUpload()}
+          onClick={handleUploadClick}
         >
           Upload
         </Button>

@@ -17,6 +17,8 @@
  * (see `putFileToPresignedUrl`).
  */
 
+import type { DatasetColumns } from "~/server/datasets/types";
+
 /**
  * Sentinel error for "no browser-reachable object storage" (the backend's
  * 409 `DirectUploadUnavailable`). The caller branches on this to fall back to
@@ -75,15 +77,26 @@ export async function requestDirectUpload({
   projectId,
   name,
   filename,
+  columnTypes,
 }: {
   projectId: string;
   name: string;
   filename: string;
+  /**
+   * Confirmed columns (names + types) from the upload confirm step (ADR-032
+   * v19), sent as JSON so the normalize job renames + type-converts each record
+   * to match. Omitted when the header couldn't be parsed (then normalize derives
+   * all-`string`).
+   */
+  columnTypes?: DatasetColumns;
 }): Promise<DirectUploadHandle> {
   const form = new FormData();
   form.append("projectId", projectId);
   form.append("name", name);
   form.append("filename", filename);
+  if (columnTypes && columnTypes.length > 0) {
+    form.append("columnTypes", JSON.stringify(columnTypes));
+  }
 
   const response = await fetch("/api/dataset/direct-upload", {
     method: "POST",

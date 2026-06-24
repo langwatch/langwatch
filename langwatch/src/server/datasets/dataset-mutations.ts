@@ -25,6 +25,7 @@
  */
 import type { Dataset, Prisma, PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
+import { tryToMapPreviousColumnsToNewColumns } from "~/optimization_studio/utils/datasetUtils";
 import { createLogger } from "~/utils/logger/server";
 import { DatasetRepository } from "./dataset.repository";
 import {
@@ -38,6 +39,8 @@ import { withDatasetLock } from "./dataset-lock";
 import { type DatasetStorage, getDatasetStorage } from "./dataset-storage";
 import { DatasetNotReadyError, DuplicateRecordIdError } from "./errors";
 import { stripNullBytes } from "./sanitize";
+import type { DatasetColumns, DatasetRecordEntry } from "./types";
+import { convertRowsToColumnTypes } from "./upload-utils";
 
 const logger = createLogger("langwatch:datasets:mutations");
 
@@ -875,5 +878,120 @@ export const recomputeDatasetCounts = async ({
       chunkCount: keptChunkCount,
       chunkOffsets: keptOffsets,
     };
+  });
+};
+
+/**
+ * Change an s3_jsonl dataset's column schema (rename / retype / add / remove)
+ * under the advisory lock (ADR-032 v19). The legacy PG path migrates records via
+ * `migrateDatasetRecordColumns`; the s3 equivalent is a full chunk rewrite:
+ *   1. read every row (id + entry) across all chunks,
+ *   2. remap keys old→new (exact-name then by-position, the SAME
+ *      `tryToMapPreviousColumnsToNewColumns` the PG path uses — so renames keep
+ *      data, removed columns drop, added columns are absent),
+ *   3. convert each value to its new column type (`convertRowsToColumnTypes` —
+ *      text→number/json/date/etc.; `image` is a URL string, so a text→image
+ *      change keeps the value verbatim and only the column's declared type
+ *      changes),
+ *   4. rewrite chunks from index 0 (row ids preserved via `forcedIds`), reap any
+ *      orphan chunks past the new count (converted rows may pack into fewer),
+ *   5. update counters + `columnTypes` + name/slug in the lock's tx.
+ *
+ * Memory: step 1 buffers all rows (bounded by dataset size) — the same shape as
+ * the PG record migrator this replaces, and the operation is a deliberate,
+ * user-driven edit, not the unbounded upload path (so it is NOT held to the
+ * normalize job's streaming I-MEM contract). A streaming chunk-by-chunk rewrite
+ * is a future optimization if multi-GB column edits become common.
+ */
+export const migrateS3JsonlColumns = async ({
+  prisma,
+  dataset,
+  projectId,
+  oldColumnTypes,
+  newColumnTypes,
+  name,
+  slug,
+  storage,
+  repository: providedRepository,
+}: {
+  prisma: PrismaClient;
+  dataset: Dataset;
+  projectId: string;
+  oldColumnTypes: DatasetColumns;
+  newColumnTypes: DatasetColumns;
+  name: string;
+  slug: string;
+  storage?: DatasetStorage;
+  repository?: DatasetRepository;
+}): Promise<Dataset> => {
+  const datasetStorage = storage ?? (await getDatasetStorage(projectId));
+  const repository = providedRepository ?? new DatasetRepository(prisma);
+
+  return withDatasetLock({ prisma, datasetId: dataset.id }, async (tx) => {
+    const current = await repository.findOneOrThrow(
+      { id: dataset.id, projectId },
+      { tx },
+    );
+    assertReady(current);
+
+    const chunkCount = current.chunkCount ?? 0;
+    const ids: string[] = [];
+    const oldEntries: DatasetRecordEntry[] = [];
+    for (let index = 0; index < chunkCount; index++) {
+      const rows = await datasetStorage.readChunk({
+        projectId,
+        datasetId: dataset.id,
+        index,
+      });
+      for (const line of rows) {
+        if (isChunkLine(line)) {
+          ids.push(line.id);
+          oldEntries.push(line.entry as DatasetRecordEntry);
+        }
+      }
+    }
+
+    // Remap keys old→new, then convert each value to its new declared type.
+    const remapped = tryToMapPreviousColumnsToNewColumns(
+      oldEntries,
+      oldColumnTypes,
+      newColumnTypes,
+    );
+    const converted = convertRowsToColumnTypes(
+      remapped as Record<string, unknown>[],
+      newColumnTypes,
+    );
+
+    // Rewrite chunks from 0 preserving each row's id; reap orphan chunks past the
+    // new count (converted rows can pack into fewer chunks).
+    const meta = await writeInitialS3JsonlChunks({
+      projectId,
+      datasetId: dataset.id,
+      entries: converted,
+      forcedIds: ids,
+      storage: datasetStorage,
+    });
+    await datasetStorage.deleteChunksFrom({
+      projectId,
+      datasetId: dataset.id,
+      fromIndex: meta.chunkCount,
+    });
+
+    return await repository.update(
+      {
+        id: dataset.id,
+        projectId,
+        data: {
+          name,
+          slug,
+          columnTypes: newColumnTypes as unknown as Prisma.InputJsonValue,
+          rowCount: meta.rowCount,
+          sizeBytes: BigInt(meta.sizeBytes),
+          chunkCount: meta.chunkCount,
+          chunkOffsets: meta.chunkOffsets as unknown as Prisma.InputJsonValue,
+        },
+      },
+      { tx },
+    );
   });
 };

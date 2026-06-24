@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { DatasetColumns } from "../types";
 import {
   convertRowsToColumnTypes,
+  convertValueToColumnType,
+  dedupeHeaders,
   detectFileFormat,
   parseCSV,
   parseJSON,
@@ -285,6 +287,54 @@ describe("Feature: Dataset File Upload - Upload Utils", () => {
         const result = convertRowsToColumnTypes(rows, columns);
         expect(result[0]!.text).toBe("hello");
       });
+    });
+  });
+
+  // ADR-032 v19: the single-value converter the streaming normalize job applies
+  // per record (so a confirmed type is honoured without buffering rows).
+  describe("convertValueToColumnType()", () => {
+    describe("when the type is number", () => {
+      it("parses a numeric string and nulls an empty value", () => {
+        expect(convertValueToColumnType("42", "number")).toBe(42);
+        expect(convertValueToColumnType("", "number")).toBeNull();
+        expect(convertValueToColumnType(0, "number")).toBe(0);
+      });
+    });
+
+    describe("when the type is boolean", () => {
+      it("maps the truthy/falsy token sets", () => {
+        expect(convertValueToColumnType("yes", "boolean")).toBe(true);
+        expect(convertValueToColumnType("0", "boolean")).toBe(false);
+      });
+    });
+
+    describe("when the type is image", () => {
+      it("keeps a base64 data URL verbatim (URL passthrough)", () => {
+        const dataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==";
+        expect(convertValueToColumnType(dataUrl, "image")).toBe(dataUrl);
+      });
+    });
+
+    describe("when the type is json/list", () => {
+      it("parses valid JSON and keeps the original on a parse error", () => {
+        expect(convertValueToColumnType("[1,2]", "list")).toEqual([1, 2]);
+        expect(convertValueToColumnType("not json", "json")).toBe("not json");
+      });
+    });
+  });
+
+  // Shared with the browser confirm step (`parseHeaderColumns`) so both
+  // canonicalise headers identically (positional 1:1 alignment).
+  describe("dedupeHeaders()", () => {
+    it("suffixes repeats and avoids colliding with a literal _N column", () => {
+      expect(dedupeHeaders(["col", "col"])).toEqual(["col", "col_1"]);
+      // The literal "col_1" collides with the suffix emitted for the 2nd "col",
+      // so it bumps again rather than silently overwriting it.
+      expect(dedupeHeaders(["col", "col", "col_1"])).toEqual([
+        "col",
+        "col_1",
+        "col_1_1",
+      ]);
     });
   });
 });
