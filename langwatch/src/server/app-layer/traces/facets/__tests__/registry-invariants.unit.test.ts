@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  FACET_REGISTRY,
-  TABLE_TIME_COLUMNS,
   type DynamicKeysDef,
+  FACET_REGISTRY,
   type FacetDefinition,
   type QueryBuilderCategoricalDef,
+  TABLE_TIME_COLUMNS,
 } from "../../facet-registry";
 import { SEARCH_FIELDS } from "../../query-language/metadata";
 
@@ -31,15 +31,12 @@ describe("SearchBar / sidebar parity", () => {
       d.key,
       d.label,
     ]),
-  )(
-    "[%s] is registered in SEARCH_FIELDS so the search bar dropdown can suggest it",
-    (key) => {
-      expect(
-        SEARCH_FIELDS[key],
-        `facet "${key}" exists in FACET_REGISTRY but not SEARCH_FIELDS — the search bar won't surface it`,
-      ).toBeDefined();
-    },
-  );
+  )("[%s] is registered in SEARCH_FIELDS so the search bar dropdown can suggest it", (key) => {
+    expect(
+      SEARCH_FIELDS[key],
+      `facet "${key}" exists in FACET_REGISTRY but not SEARCH_FIELDS — the search bar won't surface it`,
+    ).toBeDefined();
+  });
 });
 
 describe("FACET_REGISTRY shape", () => {
@@ -60,22 +57,21 @@ describe("FACET_REGISTRY shape", () => {
     const TITLE_CASE_OFFENDER = /\s([A-Z])(?=[a-z])/;
     const ACRONYM_ALLOWLIST = new Set(["AI"]);
 
-    it.each(FACET_REGISTRY.map((d) => [d.key, d.label]))(
-      "[%s] label '%s' is sentence case (no Title Case Words)",
-      (_key, label) => {
-        // Strip allowlisted acronyms so they don't trip the regex even
-        // though they're uppercase.
-        const stripped = [...ACRONYM_ALLOWLIST].reduce(
-          (acc, acronym) => acc.replace(acronym, ""),
-          label,
-        );
-        const match = stripped.match(TITLE_CASE_OFFENDER);
-        expect(
-          match,
-          `label "${label}" looks Title Case — expected sentence case`,
-        ).toBeNull();
-      },
-    );
+    it.each(
+      FACET_REGISTRY.map((d) => [d.key, d.label]),
+    )("[%s] label '%s' is sentence case (no Title Case Words)", (_key, label) => {
+      // Strip allowlisted acronyms so they don't trip the regex even
+      // though they're uppercase.
+      const stripped = [...ACRONYM_ALLOWLIST].reduce(
+        (acc, acronym) => acc.replace(acronym, ""),
+        label,
+      );
+      const match = stripped.match(TITLE_CASE_OFFENDER);
+      expect(
+        match,
+        `label "${label}" looks Title Case — expected sentence case`,
+      ).toBeNull();
+    });
 
     it("does not stamp '(ms)' / '(s)' style units onto duration labels", () => {
       // Cell formatters humanise the values; the label should read as
@@ -158,57 +154,57 @@ describe("FACET_REGISTRY shape", () => {
 });
 
 describe("each query-builder facet", () => {
-  it.each(queryBuilders.map((def) => [def.key, def]))(
-    "[%s] pins the query to TenantId before any other predicate",
-    (_key, def) => {
-      const { sql } = def.queryBuilder(baseCtx);
-      const idxTenant = sql.indexOf("TenantId");
-      expect(
-        idxTenant,
-        "every facet query must include TenantId — multitenancy invariant",
-      ).toBeGreaterThan(-1);
-      // No other predicate should land before TenantId in the WHERE clause.
-      // We use a coarse check: TenantId must appear before the first
-      // partition-key (`OccurredAt` / `StartTime` / `ScheduledAt`) reference.
-      for (const col of Object.values(TABLE_TIME_COLUMNS)) {
-        const idxCol = sql.indexOf(col);
-        if (idxCol > -1) {
-          expect(idxTenant).toBeLessThan(idxCol);
-        }
+  it.each(
+    queryBuilders.map((def) => [def.key, def]),
+  )("[%s] pins the query to TenantId before any other predicate", (_key, def) => {
+    const { sql } = def.queryBuilder(baseCtx);
+    const idxTenant = sql.indexOf("TenantId");
+    expect(
+      idxTenant,
+      "every facet query must include TenantId — multitenancy invariant",
+    ).toBeGreaterThan(-1);
+    // No other predicate should land before TenantId in the WHERE clause.
+    // We use a coarse check: TenantId must appear before the first
+    // partition-key (`OccurredAt` / `StartTime` / `ScheduledAt`) reference.
+    for (const col of Object.values(TABLE_TIME_COLUMNS)) {
+      const idxCol = sql.indexOf(col);
+      if (idxCol > -1) {
+        expect(idxTenant).toBeLessThan(idxCol);
       }
-    },
-  );
+    }
+  });
 
-  it.each(queryBuilders.map((def) => [def.key, def]))(
-    "[%s] binds the standard tenant + time + limit + offset params",
-    (_key, def) => {
-      const { params } = def.queryBuilder(baseCtx);
-      expect(params).toMatchObject({
-        tenantId: "tenant-X",
-        timeFrom: 1_700_000_000_000,
-        timeTo: 1_700_000_086_400_000,
-        limit: 50,
-        offset: 0,
-      });
-    },
-  );
+  it.each(
+    queryBuilders.map((def) => [def.key, def]),
+  )("[%s] binds the standard tenant + time + limit + offset params", (_key, def) => {
+    const { params } = def.queryBuilder(baseCtx);
+    expect(params).toMatchObject({
+      tenantId: "tenant-X",
+      timeFrom: 1_700_000_000_000,
+      timeTo: 1_700_000_086_400_000,
+      limit: 50,
+      offset: 0,
+    });
+  });
 
-  it.each(queryBuilders.map((def) => [def.key, def]))(
-    "[%s] never inlines an autocomplete prefix into SQL (parameterised)",
-    (_key, def) => {
-      const { sql, params } = def.queryBuilder({
-        ...baseCtx,
-        prefix: "needle",
-      });
-      // Either the builder ignores `prefix` entirely, or it binds it as a
-      // {prefix:String} param. Inlining the literal string would mean a
-      // SQL-injection hazard.
-      expect(sql).not.toContain("'needle'");
-      if ("prefix" in params) {
-        expect(params.prefix).toBe("needle");
-      }
-    },
-  );
+  it.each(
+    queryBuilders.map((def) => [def.key, def]),
+  )("[%s] never inlines an autocomplete prefix into SQL (parameterised)", (_key, def) => {
+    const { sql, params } = def.queryBuilder({
+      ...baseCtx,
+      prefix: "needle",
+    });
+    // Either the builder ignores `prefix` entirely, or it binds it as a
+    // {prefix:String} param. Inlining the literal string would mean a
+    // SQL-injection hazard.
+    expect(sql).not.toContain("'needle'");
+    if ("prefix" in params) {
+      // The user's needle must survive as a bound param (never dropped),
+      // though a namespaced facet may decorate it — e.g. the metadata facet
+      // forces the `metadata.` prefix, binding `metadata.needle`.
+      expect(String(params.prefix)).toContain("needle");
+    }
+  });
 });
 
 describe("Map-keys discovery facets", () => {
@@ -219,19 +215,20 @@ describe("Map-keys discovery facets", () => {
   const MAP_KEY_FACETS: Array<{ key: string; map: string }> = [
     { key: "spanAttributeKeys", map: "SpanAttributes" },
     { key: "metadataKeys", map: "Attributes" },
+    // metadata-scoped sibling — same `Attributes` map, `metadata.` prefix.
+    { key: "metadata", map: "Attributes" },
   ];
 
-  it.each(MAP_KEY_FACETS.map((f) => [f.key, f.map]))(
-    "[%s] keeps the empty-map filter on the keys subcolumn",
-    (key, map) => {
-      const def = FACET_REGISTRY.find((d) => d.key === key);
-      if (!def || def.kind !== "dynamic_keys") {
-        throw new Error(`expected ${key} to be a dynamic_keys facet`);
-      }
-      const { sql } = def.queryBuilder(baseCtx);
-      expect(sql).toContain(`length(${map}.keys)`);
-      // Bare `length(<Map>)` would materialise the values column.
-      expect(sql).not.toMatch(new RegExp(`length\\(${map}\\)`));
-    },
-  );
+  it.each(
+    MAP_KEY_FACETS.map((f) => [f.key, f.map]),
+  )("[%s] keeps the empty-map filter on the keys subcolumn", (key, map) => {
+    const def = FACET_REGISTRY.find((d) => d.key === key);
+    if (!def || def.kind !== "dynamic_keys") {
+      throw new Error(`expected ${key} to be a dynamic_keys facet`);
+    }
+    const { sql } = def.queryBuilder(baseCtx);
+    expect(sql).toContain(`length(${map}.keys)`);
+    // Bare `length(<Map>)` would materialise the values column.
+    expect(sql).not.toMatch(new RegExp(`length\\(${map}\\)`));
+  });
 });

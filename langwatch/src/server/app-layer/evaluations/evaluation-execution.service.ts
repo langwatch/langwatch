@@ -224,6 +224,7 @@ export class EvaluationExecutionService {
       projectId,
       [traceId],
       INTERNAL_PROTECTIONS,
+      undefined,
       { full: true },
     );
     const trace = traces[0];

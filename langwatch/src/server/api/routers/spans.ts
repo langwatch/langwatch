@@ -36,6 +36,7 @@ export const spansRouter = createTRPCRouter({
         input.projectId,
         [input.traceId],
         protections,
+        undefined,
         { full: true },
       );
       if (traces.length === 0) {

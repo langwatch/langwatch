@@ -91,6 +91,31 @@ const colorMap: Record<string, { background: string; color: string }> = {};
 
 export type RotatingColorSet = keyof typeof rotatingColors;
 
+/**
+ * Bare Chakra `colorPalette` names derived from `rotatingColors.colors` (the
+ * leading segment of each `background` token, e.g. `"orange.subtle"` →
+ * `"orange"`), so a given string hashes to the same hue whether you ask for
+ * the token pair (`getColorForString`) or the bare palette name
+ * (`getColorPaletteForString`). Deriving from the single source keeps the
+ * order in lockstep — reordering `rotatingColors.colors` can't desync the two
+ * paths. The bare name feeds `<Badge colorPalette>` so the badge's bg/border/fg
+ * are all mode-aware (good dark contrast) instead of a hand-picked
+ * subtle/emphasized token pair.
+ */
+const ROTATING_PALETTES = rotatingColors.colors.map(
+  (c) => c.background.split(".")[0]!,
+);
+
+export type RotatingPalette = string;
+
+export const getColorPaletteForString = (str: string): RotatingPalette => {
+  let sum = 0;
+  for (let i = 0; i < str.length; i++) {
+    sum += str.charCodeAt(i);
+  }
+  return ROTATING_PALETTES[sum % ROTATING_PALETTES.length]!;
+};
+
 export const getColorForString = (
   set: RotatingColorSet,
   str: string,
@@ -117,22 +142,28 @@ export const getColorForString = (
  * the ProjectAvatar / row-dot tokens for the same name, with no
  * Chakra-token-to-hex translation step.
  *
- * Palette is the `colors` set hard-coded as Chakra v3 mid-saturation
- * hex (orange-500/blue-500/green-500/yellow-500/purple-500/teal-500/
- * cyan-500/pink-500). Order matters — must match `rotatingColors.colors`
- * indices so a name that hashes to slot 3 paints `yellow.subtle` in
- * the avatar AND `#eab308` (yellow-500) in the chart.
+ * Palette values are Chakra v3 mid-saturation hex keyed by palette NAME, then
+ * projected through `ROTATING_PALETTES` so the array lands in
+ * `rotatingColors.colors` order automatically. Keying by name (rather than a
+ * second hand-ordered array) means reordering or extending
+ * `rotatingColors.colors` reshuffles the chart hues in lockstep — the index
+ * desync this used to risk can't happen. A name that hashes to slot 3 paints
+ * `yellow.subtle` in the avatar AND `#eab308` (yellow-500) in the chart.
  */
-const CHART_HEX_PALETTE = [
-  "#f97316", // orange.500 → matches rotatingColors.colors[0] (orange.subtle)
-  "#3b82f6", // blue.500   → [1] (blue.subtle)
-  "#22c55e", // green.500  → [2] (green.subtle)
-  "#eab308", // yellow.500 → [3] (yellow.subtle)
-  "#a855f7", // purple.500 → [4] (purple.subtle)
-  "#14b8a6", // teal.500   → [5] (teal.subtle)
-  "#06b6d4", // cyan.500   → [6] (cyan.subtle)
-  "#ec4899", // pink.500   → [7] (pink.subtle)
-] as const;
+const PALETTE_HEX: Record<string, string> = {
+  orange: "#f97316",
+  blue: "#3b82f6",
+  green: "#22c55e",
+  yellow: "#eab308",
+  purple: "#a855f7",
+  teal: "#14b8a6",
+  cyan: "#06b6d4",
+  pink: "#ec4899",
+};
+
+const CHART_HEX_PALETTE = ROTATING_PALETTES.map(
+  (palette) => PALETTE_HEX[palette] ?? PALETTE_HEX.orange!,
+);
 
 const hexColorMap: Record<string, string> = {};
 

@@ -57,13 +57,38 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
   const [filter, setFilter] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const seededOpenKey = useRef<string | null>(null);
 
-  // Reset transient state whenever the anchor changes — opening for a
-  // new chip should always start at the top with an empty filter, not
-  // remember the prior chip's session.
+  // Prefill the input with the chip's current value so the user can edit it
+  // as text (not just filter the list) — clicking a chip should let you tweak
+  // the value directly, as well as pick from the dropdown. Re-seeds whenever
+  // the picker opens for a different chip.
   useEffect(() => {
-    setFilter("");
+    setFilter(anchor?.currentValue ?? "");
     setActiveIndex(0);
+  }, [anchor?.field, anchor?.location.start, anchor?.currentValue]);
+
+  // Focus the search input when the picker OPENS — deferred to the next
+  // frame so it wins the race against the chip-click that opened it
+  // (a plain `autoFocus` fires mid-mount and the opening click can steal
+  // focus straight back, which read as "the popover stole my cursor and
+  // I can't type"). Keyed to the anchor identity, NOT to `filter`, so it
+  // never re-fires on keystrokes — re-focusing on every change would
+  // snap the caret to the end and make clicking mid-text to reposition
+  // impossible. See specs/traces-v2/filter-bar-interactions.feature
+  useEffect(() => {
+    if (!anchor) return;
+    const raf = requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (!el) return;
+      el.focus();
+      // Select the whole prefilled value so the first keystroke replaces it
+      // (retype from scratch) while a deliberate click still drops the caret
+      // mid-text to tweak a few characters.
+      el.setSelectionRange(0, el.value.length);
+    });
+    return () => cancelAnimationFrame(raf);
   }, [anchor?.field, anchor?.location.start]);
 
   const values = useMemo(() => {
@@ -73,18 +98,41 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
     );
     if (!cat || cat.kind !== "categorical") return [];
     const q = filter.trim().toLowerCase();
+    // While the input still holds the unedited current value (or is empty),
+    // show the FULL list so the picker still reads as a dropdown of
+    // alternatives — only narrow once the user actually edits the text.
     // Match against value AND label so typing the friendly name (e.g.
     // "Faithfulness") finds the id-keyed row ("ragas/faithfulness") —
     // mirrors the sidebar facet section's search behaviour.
-    const filtered = q
-      ? cat.topValues.filter(
+    const pristine = q === "" || q === anchor.currentValue.trim().toLowerCase();
+    const filtered = pristine
+      ? cat.topValues
+      : cat.topValues.filter(
           (v) =>
             v.value.toLowerCase().includes(q) ||
             (v.label?.toLowerCase().includes(q) ?? false),
-        )
-      : cat.topValues;
+        );
     return filtered.slice(0, MAX_VALUES_PER_PAGE);
   }, [facets, anchor, filter]);
+
+  // On open, move the highlight onto the current value's row so ↑↓ starts
+  // from where the user is and a bare Enter re-commits the current value (a
+  // no-op) rather than jumping to whichever value sorts first. Guarded so it
+  // seeds once per open — it must not fight the user's own navigation once
+  // they start editing. Waits until the prefill has landed (filter === the
+  // current value) so it reads this chip's full list, not a stale one.
+  useEffect(() => {
+    if (!anchor) {
+      seededOpenKey.current = null;
+      return;
+    }
+    const key = `${anchor.field}:${anchor.location.start}`;
+    if (seededOpenKey.current === key) return;
+    if (filter !== anchor.currentValue) return;
+    const idx = values.findIndex((v) => v.value === anchor.currentValue);
+    setActiveIndex(idx >= 0 ? idx : 0);
+    seededOpenKey.current = key;
+  }, [anchor, values, filter]);
 
   // "Use <typed> as a new value" CTA — surfaced when the user has
   // typed something that doesn't exactly match a known value's id.
@@ -265,7 +313,7 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
             height="22px"
             fontSize="xs"
             _focus={{ outline: "none", boxShadow: "none" }}
-            autoFocus
+            ref={inputRef}
           />
         </HStack>
         <VStack gap={0} align="stretch" maxHeight="320px" overflowY="auto">

@@ -5,6 +5,7 @@ import type { TraceSummaryFieldsBase } from "./_summary-fields.types";
 import type {
   BatchedFacetResult,
   CategoricalFacetResult,
+  DiscreteFacetResult,
   FacetCountResult,
   FacetTableName,
   TraceListPage,
@@ -13,6 +14,14 @@ import type {
 } from "./trace-list.repository";
 
 const TABLE_NAME = "trace_summaries" as const;
+
+/**
+ * Buffer subtracted from `since` when bounding the new-trace-count subquery
+ * scan on `stored_spans`. Spans start around their trace's OccurredAt and
+ * partitions are weekly, so +/- 2 days guarantees a matching span near the
+ * boundary is never pruned. Matches the `withPartitionHint` margin.
+ */
+const SINCE_WINDOW_BUFFER_MS = 2 * 24 * 60 * 60 * 1000;
 
 interface ClickHouseSummaryRow extends TraceSummaryFieldsBase {
   // The list mapper only reads a fixed set of keys out of `Attributes`.
@@ -28,6 +37,7 @@ interface ClickHouseSummaryRow extends TraceSummaryFieldsBase {
   AttrCacheReadTokens: string;
   AttrCacheCreationTokens: string;
   AttrReasoningTokens: string;
+  AttrLabels: string;
   LastEventOccurredAt: number;
 }
 
@@ -131,8 +141,8 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     // The inner subquery keeps WHERE/ORDER BY on raw DateTime columns —
     // aliasing DateTime to millis in the same scope shadows the column and
     // breaks the comparison. It also lists explicit columns (no `SELECT *`) so
-    // ClickHouse skips reading the full `Attributes` Map; only five keys flow
-    // through to the list mapper (see `mapToTraceListItem`).
+    // ClickHouse skips reading the full `Attributes` Map; only a fixed set
+    // of keys flow through to the list mapper (see `mapToTraceListItem`).
     const [result, countResult] = await Promise.all([
       client.query({
         query: `
@@ -148,6 +158,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           AttrCacheReadTokens,
           AttrCacheCreationTokens,
           AttrReasoningTokens,
+          AttrLabels,
           toUnixTimestamp64Milli(OccurredAt) AS OccurredAt,
           toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
           toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
@@ -184,6 +195,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           TopicId,
           SubTopicId,
           AnnotationIds,
+          SizeBytes,
           toUnixTimestamp64Milli(LastEventOccurredAt) AS LastEventOccurredAt
         FROM (
           SELECT
@@ -198,6 +210,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             Attributes['langwatch.reserved.cache_read_tokens'] AS AttrCacheReadTokens,
             Attributes['langwatch.reserved.cache_creation_tokens'] AS AttrCacheCreationTokens,
             Attributes['langwatch.reserved.reasoning_tokens'] AS AttrReasoningTokens,
+            Attributes['langwatch.labels'] AS AttrLabels,
             OccurredAt,
             CreatedAt,
             UpdatedAt,
@@ -234,6 +247,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             TopicId,
             SubTopicId,
             AnnotationIds,
+            _size_bytes AS SizeBytes,
             LastEventOccurredAt
           FROM ${TABLE_NAME}
           WHERE ${whereClause}
@@ -381,9 +395,22 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       "TraceListClickHouseRepository.findCount",
     );
 
+    // This is the live "new traces since `since`" poll. The outer count only
+    // wants traces with OccurredAt > since, but `filterWhere` can carry a
+    // span-level filter whose bounded subquery scans `stored_spans` over the
+    // whole [from, to] window. Raise the window's lower bound to `since` (less
+    // a small buffer) so that subquery prunes to the recent partitions instead
+    // of re-scanning the entire range on every poll. A trace with
+    // OccurredAt > since has its matching span StartTime >= OccurredAt > since,
+    // so the count is unchanged; the buffer covers any OccurredAt-vs-StartTime
+    // skew and matches the +/- 2 day margin used elsewhere for span pruning.
+    const effectiveFrom = Math.max(
+      params.timeRange.from,
+      params.since - SINCE_WINDOW_BUFFER_MS,
+    );
     const { sql: whereClause, params: queryParams } = buildWhereClause(
       params.tenantId,
-      params.timeRange,
+      { ...params.timeRange, from: effectiveFrom },
       params.filterWhere,
     );
 
@@ -524,6 +551,72 @@ export class TraceListClickHouseRepository implements TraceListRepository {
 
     const rows = await result.json<FacetRow>();
     return mapFacetRows(rows);
+  }
+
+  async findDiscreteValues(params: {
+    tenantId: string;
+    timeRange: { from: number; to: number };
+    table: FacetTableName;
+    timeColumn: string;
+    column: string;
+    limit: number;
+  }): Promise<DiscreteFacetResult> {
+    EventUtils.validateTenantId(
+      { tenantId: params.tenantId },
+      "TraceListClickHouseRepository.findDiscreteValues",
+    );
+
+    const { sql: whereClause, params: queryParams } = buildWhereClauseForTable(
+      params.tenantId,
+      params.timeRange,
+      params.timeColumn,
+    );
+
+    // Same ReplacingMergeTree dedup as findCategoricalFacet — only
+    // trace_summaries re-projects a logical trace across versions.
+    const needsDedup = params.table === "trace_summaries";
+    const dedupFilter = needsDedup
+      ? `AND (TenantId, TraceId, UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM ${params.table}
+            WHERE ${whereClause}
+            GROUP BY TenantId, TraceId
+          )`
+      : "";
+
+    const client = await this.resolveClient(params.tenantId);
+    const result = await client.query({
+      query: `
+        SELECT
+          ${params.column} AS discrete_value,
+          count() AS cnt,
+          count() OVER () AS total_distinct
+        FROM ${params.table}
+        WHERE ${whereClause}
+          ${dedupFilter}
+          AND ${params.column} IS NOT NULL
+        GROUP BY discrete_value
+        ORDER BY discrete_value ASC
+        LIMIT {limit:UInt32}
+      `,
+      query_params: { ...queryParams, limit: params.limit },
+      format: "JSONEachRow",
+    });
+
+    const rows = await result.json<{
+      discrete_value: number;
+      cnt: number;
+      total_distinct: number;
+    }>();
+    return {
+      values: rows.map((r) => ({
+        value: Number(r.discrete_value),
+        count: Number(r.cnt),
+      })),
+      // `count() OVER ()` is evaluated over the full grouped set before LIMIT,
+      // so this is the true distinct count even when values are capped.
+      distinctCount: Number(rows[0]?.total_distinct ?? 0),
+    };
   }
 
   async findCategoricalFacetRaw(params: {
@@ -869,6 +962,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       topicId: row.TopicId,
       subTopicId: row.SubTopicId,
       annotationIds: row.AnnotationIds ?? [],
+      sizeBytes: Number(row.SizeBytes ?? 0),
       attributes: buildListAttributes(row),
       occurredAt: Number(row.OccurredAt),
       createdAt: Number(row.CreatedAt),
@@ -893,7 +987,12 @@ type FacetRow = {
   score_min?: number | null;
   score_max?: number | null;
   has_score?: boolean | number;
+  distinct_scores?: number | string;
   has_label?: boolean | number;
+  // Top-N distinct emitted-label (value, count) tuples — ClickHouse serialises
+  // the `Array(Tuple(String, UInt64))` as `[[value, count], …]`. Counts may
+  // arrive as strings for large UInt64, so the mapper coerces with Number().
+  label_values?: [string, number | string][];
 };
 
 function mapFacetRows(rows: FacetRow[]): CategoricalFacetResult {
@@ -916,7 +1015,9 @@ function extractFacetAggregates(r: FacetRow): {
     scoreMin: number | null;
     scoreMax: number | null;
     hasScore: boolean;
+    distinctScores: number;
     hasLabel: boolean;
+    labelValues?: { value: string; count: number }[];
   };
 } {
   // Only the evaluator facet's queryBuilder emits these columns. Other
@@ -932,6 +1033,11 @@ function extractFacetAggregates(r: FacetRow): {
   ) {
     return {};
   }
+  // Reshape the `[[value, count], …]` tuples into `{ value, count }`. Drop any
+  // residual empty/blank values defensively — the SQL already filters them.
+  const labelValues = (r.label_values ?? [])
+    .filter(([value]) => value !== "")
+    .map(([value, count]) => ({ value, count: Number(count) }));
   return {
     aggregates: {
       passedCount: Number(r.passed_count ?? 0),
@@ -940,7 +1046,9 @@ function extractFacetAggregates(r: FacetRow): {
       scoreMin: r.score_min == null ? null : Number(r.score_min),
       scoreMax: r.score_max == null ? null : Number(r.score_max),
       hasScore: Boolean(r.has_score),
+      distinctScores: Number(r.distinct_scores ?? 0),
       hasLabel: Boolean(r.has_label),
+      ...(labelValues.length > 0 ? { labelValues } : {}),
     },
   };
 }
@@ -949,7 +1057,7 @@ function extractFacetAggregates(r: FacetRow): {
 // list mapper expects keys absent (so its `?? null` / `?? ""` fallbacks
 // fire) rather than present-but-empty.
 //
-// The six keys below match the explicit Attributes[...] projections in
+// The keys below match the explicit Attributes[...] projections in
 // `findAll`'s SELECT. To surface another attribute in the list, add it
 // in both places. If user-pinned attribute columns ever ship, prefer
 // extending the query input with an `extraAttributeKeys: string[]` list
@@ -974,7 +1082,8 @@ function buildListAttributes(
   // the "Cache read" / "Cache write" / reasoning rows (the raw per-span
   // gen_ai.usage.cache_* values never reach the trace attribute map).
   if (row.AttrCacheReadTokens) {
-    attributes["langwatch.reserved.cache_read_tokens"] = row.AttrCacheReadTokens;
+    attributes["langwatch.reserved.cache_read_tokens"] =
+      row.AttrCacheReadTokens;
   }
   if (row.AttrCacheCreationTokens) {
     attributes["langwatch.reserved.cache_creation_tokens"] =
@@ -983,5 +1092,9 @@ function buildListAttributes(
   if (row.AttrReasoningTokens) {
     attributes["langwatch.reserved.reasoning_tokens"] = row.AttrReasoningTokens;
   }
+  // JSON-encoded array of trace labels (e.g. '["prod","beta"]'). Preserve the
+  // raw string here because TraceSummaryData.attributes is string-valued; the
+  // list mapper decodes it into a string[] for the Labels column.
+  if (row.AttrLabels) attributes["langwatch.labels"] = row.AttrLabels;
   return attributes;
 }

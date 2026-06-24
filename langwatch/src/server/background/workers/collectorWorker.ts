@@ -764,7 +764,12 @@ export const startCollectorWorker = () => {
     return;
   }
 
-  void prewarmTiktokenModels();
+  // Fire-and-forget prewarm of the tiktoken encoders on worker boot; log fetch
+  // failures rather than leave an unhandled rejection. (This is the sole prewarm
+  // call site — cost.ts no longer prewarms as a module-load side effect.)
+  void prewarmTiktokenModels().catch((error) => {
+    logger.error({ error }, "error prewarming tiktoken models");
+  });
 
   const collectorWorker = new Worker<CollectorJob, void, string>(
     COLLECTOR_QUEUE.NAME,

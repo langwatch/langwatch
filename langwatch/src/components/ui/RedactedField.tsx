@@ -43,14 +43,25 @@ function explanationFor(visibleTo: string | null): string {
 }
 
 /**
- * The redacted-state marker and its tooltip. Kept as a separate component so the
- * organization/permission lookup it needs for the "Open privacy settings" link
- * only runs when content is actually redacted, never for content that renders
- * normally (which is the common case and may render outside an org context).
+ * The shared redacted-content marker: a lock + "Redacted" with an optional
+ * audience hint and a tooltip that links to the privacy settings. This is the
+ * ONE redaction treatment every traces-v2 surface reuses (summary I/O, span
+ * I/O, conversation context, conversation view, table cells) so a redacted
+ * field reads identically everywhere instead of each surface inventing its own
+ * "no content" placeholder.
+ *
+ * Kept as its own component so the organization/permission lookup it needs for
+ * the "Open privacy settings" link only runs when content is actually redacted,
+ * never for content that renders normally (the common case, which may render
+ * outside an org context).
+ *
+ * `size="xs"` shrinks the lock + text for dense rows (table cells, the
+ * conversation-context strip); the default reads at the drawer's `sm` body size.
  */
-const RedactedMarker: React.FC<{ visibleTo: string | null }> = ({
-  visibleTo,
-}) => {
+export const RedactedInline: React.FC<{
+  visibleTo?: string | null;
+  size?: "xs" | "sm";
+}> = ({ visibleTo = null, size = "sm" }) => {
   const { hasPermission } = useOrganizationTeamProject();
   const hint = audienceHint(visibleTo);
   const canOpenSettings = hasPermission("project:view");
@@ -77,12 +88,12 @@ const RedactedMarker: React.FC<{ visibleTo: string | null }> = ({
       <HStack
         color="fg.muted"
         fontStyle="italic"
-        fontSize="sm"
+        fontSize={size}
         gap={1}
         cursor="default"
         display="inline-flex"
       >
-        <Icon as={Lock} boxSize={3} />
+        <Icon as={Lock} boxSize={size === "xs" ? 2.5 : 3} />
         <Text>Redacted</Text>
         {hint && <Text>({hint})</Text>}
       </HStack>
@@ -109,7 +120,7 @@ export const RedactedField: React.FC<RedactedFieldProps> = ({
   }
 
   if (isRedacted) {
-    return <RedactedMarker visibleTo={visibleTo} />;
+    return <RedactedInline visibleTo={visibleTo} />;
   }
 
   return <>{children}</>;

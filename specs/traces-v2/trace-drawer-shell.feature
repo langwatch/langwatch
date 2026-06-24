@@ -59,6 +59,42 @@ Rule: Drawer layout
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# TRACE-SWITCH REFRESH OVERLAY
+# ─────────────────────────────────────────────────────────────────────────────
+
+Rule: Trace-switch refresh overlay
+  Switching the open drawer from one trace to another shows a brief
+  translucent, blurred refresh overlay over the drawer body. Sibling
+  prefetch makes most switches resolve instantly, so without this the new
+  content just pops in with no transition. The overlay is scoped to
+  genuine trace-to-trace switches — a same-trace live update must not
+  flash it, and the first open uses the full skeleton instead.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the trace drawer is open on a trace
+
+  Scenario: Switching to a different trace shows the refresh overlay
+    When the user opens a different trace in the drawer
+    Then a translucent blurred overlay with a spinner covers the drawer body
+    And it stays for a short minimum even when the next trace loads quickly
+    And it clears once the new trace has loaded and the minimum has elapsed
+
+  Scenario: A same-trace live update does not flash the overlay
+    When the open trace's summary updates in place
+    Then the refresh overlay does not appear
+
+  Scenario: The first open shows the skeleton, not the switch overlay
+    Given the drawer is opening a trace for the first time
+    Then the drawer shows its loading skeleton
+    And the trace-switch overlay does not appear
+
+  Scenario: The overlay never traps interaction
+    When the refresh overlay is visible
+    Then it does not capture pointer events
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # DRAWER MAXIMISE AND RESTORE
 # ─────────────────────────────────────────────────────────────────────────────
 #

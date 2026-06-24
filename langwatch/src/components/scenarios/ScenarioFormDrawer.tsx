@@ -274,16 +274,26 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
             // covers output validation. Share the input half of the rule with
             // the editor drawer via hasScenarioInputMapping.
             if (!hasScenarioInputMapping(mappings)) {
+              // Fallback affordance (#3411): even if the auto-open below races,
+              // is dismissed, or fails, the toast itself links back to the editor.
+              const openAgentEditor = () =>
+                openDrawer("agentWorkflowEditor", {
+                  urlParams: { agentId: target.id },
+                });
               toaster.create({
                 title: "Configure scenario mappings",
                 description:
-                  "Set up how this workflow agent maps scenario inputs and outputs before running.",
+                  'Map at least one scenario input — "input" or "messages" — to an agent input before running this workflow agent.',
                 type: "warning",
+                action: {
+                  label: "Open agent editor",
+                  onClick: openAgentEditor,
+                },
                 meta: { closable: true },
               });
-              openDrawer("agentWorkflowEditor", {
-                urlParams: { agentId: target.id },
-              });
+              // Auto-open the editor now; the toast action above is the manual
+              // fallback if this auto-open races, is dismissed, or fails.
+              openAgentEditor();
               return;
             }
           }

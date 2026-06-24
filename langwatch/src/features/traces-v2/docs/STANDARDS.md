@@ -326,15 +326,15 @@ export const useFilterStore = create<FilterState>((set) => ({
 ```tsx
 // stores/viewStore.ts
 interface ViewState {
-  activeViewId: string;
-  presetFilters: FilterNode[];          // locked filters owned by the active preset
-  columns: ColumnConfig[];
+  activeLensId: string;
+  presetFilters: FilterNode[];          // locked filters owned by the active lens
+  columnOrder: string[];                // ordered column ids; visibility is membership
   grouping: GroupingMode;
-  sortOrder: SortConfig;
-  setView: (viewId: string) => void;
-  setColumns: (columns: ColumnConfig[]) => void;
+  sort: SortConfig;
+  selectLens: (lensId: string) => void;
+  setVisibleColumns: (columns: string[]) => void;
   setGrouping: (mode: GroupingMode) => void;
-  setSortOrder: (sort: SortConfig) => void;
+  setSort: (sort: SortConfig) => void;
 }
 ```
 

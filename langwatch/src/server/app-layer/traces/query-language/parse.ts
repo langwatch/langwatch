@@ -33,17 +33,65 @@ import {
  * `liqe`'s serializer occasionally emits queries that its own parser then
  * rejects — most reliably the range form: `cost:[0.01 TO 1]AND foo:bar` (no
  * space between `]` and the next boolean operator). It also leaves runs of
- * whitespace intact when inner clauses are removed. Both round-trip into the
- * same `Invalid filter syntax` 422 from the backend.
+ * whitespace intact when inner clauses are removed — e.g. dropping the last
+ * member of a parenthesised OR group leaves `(a OR b )` with a stray space
+ * before the close paren. Both round-trip into the same `Invalid filter
+ * syntax` 422 from the backend (or, in the paren case, an ugly chip in the
+ * search bar).
  *
  * Normalise post-serialisation: insert a space between `]` / `)` and a
- * following `AND` / `OR` / `NOT`, and collapse adjacent whitespace.
+ * following `AND` / `OR` / `NOT`, drop whitespace hugging the inside of
+ * parens, and collapse adjacent whitespace.
  */
+/**
+ * Split a serialized query into alternating unquoted / quoted segments so
+ * normalisation only ever touches structure — never the inside of a `"…"` /
+ * `'…'` literal. Values can legitimately contain parens, brackets, boolean
+ * words, and runs of whitespace that must survive verbatim (e.g.
+ * `user:"name ( test )"`, which the structural passes below would otherwise
+ * rewrite to `user:"name (test)"`). The quote chars stay attached to their
+ * quoted segment; a backslash-escaped quote does not close the string.
+ */
+function splitOnQuotes(s: string): Array<{ text: string; quoted: boolean }> {
+  const segments: Array<{ text: string; quoted: boolean }> = [];
+  let buf = "";
+  let quoteChar = "";
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i]!;
+    if (quoteChar) {
+      buf += ch;
+      if (ch === quoteChar && s[i - 1] !== "\\") {
+        segments.push({ text: buf, quoted: true });
+        buf = "";
+        quoteChar = "";
+      }
+    } else if (ch === '"' || ch === "'") {
+      if (buf) segments.push({ text: buf, quoted: false });
+      buf = ch;
+      quoteChar = ch;
+    } else {
+      buf += ch;
+    }
+  }
+  if (buf) segments.push({ text: buf, quoted: quoteChar !== "" });
+  return segments;
+}
+
 function normalizeQueryString(s: string): string {
-  return s
-    .replace(/([\]\)])(?=(?:AND|OR|NOT)\b)/gi, "$1 ")
-    .replace(/\b(?:AND|OR|NOT)\b\s+/gi, (m) => m.replace(/\s+/g, " "))
-    .replace(/[ \t]{2,}/g, " ")
+  return splitOnQuotes(s)
+    .map((seg) =>
+      seg.quoted
+        ? seg.text
+        : seg.text
+            .replace(/([\]\)])(?=(?:AND|OR|NOT)\b)/gi, "$1 ")
+            .replace(/\b(?:AND|OR|NOT)\b\s+/gi, (m) => m.replace(/\s+/g, " "))
+            // Collapse whitespace immediately inside parens — `( a` / `a )`
+            // are serializer artifacts from clause removal, never canonical.
+            .replace(/\(\s+/g, "(")
+            .replace(/\s+\)/g, ")")
+            .replace(/[ \t]{2,}/g, " "),
+    )
+    .join("")
     .trim();
 }
 
@@ -115,7 +163,9 @@ export function stripAtSigils(text: string): string {
 // in `filterStore.applyQueryText` and once in the `filterHighlight`
 // ProseMirror plugin. They pass the same raw text, so caching the last few
 // inputs collapses both calls into a single liqe pass.
-type ParseEntry = { ok: true; ast: LiqeQuery } | { ok: false; error: ParseError };
+type ParseEntry =
+  | { ok: true; ast: LiqeQuery }
+  | { ok: false; error: ParseError };
 const PARSE_CACHE_LIMIT = 8;
 const parseCache = new Map<string, ParseEntry>();
 

@@ -1,7 +1,5 @@
-import type {
-  GroupingMode,
-  SortConfig,
-} from "../stores/viewStore";
+import type { GroupingMode, SortConfig } from "../stores/viewStore";
+import { isEvalColumnId } from "./evalColumnId";
 
 /**
  * Single source of truth for "what can a lens look like under grouping X".
@@ -19,8 +17,6 @@ export interface LensColumnOption {
   label: string;
   /** Optional UI grouping label inside the columns list (e.g. "Evaluations"). */
   section?: string;
-  /** Pinned columns must always be selected; rendered as disabled-on. */
-  pinned?: boolean;
 }
 
 export interface LensAddonOption {
@@ -43,7 +39,7 @@ export interface LensCapability {
 
 const TRACE_CAPABILITY: LensCapability = {
   columns: [
-    { id: "time", label: "Time", section: "Standard", pinned: true },
+    { id: "time", label: "Time", section: "Standard" },
     // Sibling time columns — TIME is the default tight relative ("3m"),
     // SINCE is the verbose form ("3 minutes ago"), TIMESTAMP is the
     // full ISO 8601 for log-query copy-paste. Same row hover, three
@@ -62,6 +58,7 @@ const TRACE_CAPABILITY: LensCapability = {
     { id: "trace-id", label: "Trace ID", section: "Trace fields" },
     { id: "input", label: "Input", section: "Trace fields" },
     { id: "output", label: "Output", section: "Trace fields" },
+    { id: "prompt", label: "Prompt", section: "Trace fields" },
     { id: "error-text", label: "Error", section: "Trace fields" },
     { id: "service", label: "Service", section: "Standard" },
     { id: "duration", label: "Duration", section: "Standard" },
@@ -70,7 +67,9 @@ const TRACE_CAPABILITY: LensCapability = {
     { id: "tokensIn", label: "Tokens In", section: "Standard" },
     { id: "tokensOut", label: "Tokens Out", section: "Standard" },
     { id: "spans", label: "Spans", section: "Standard" },
+    { id: "size", label: "Storage size", section: "Standard" },
     { id: "model", label: "Model", section: "Standard" },
+    { id: "labels", label: "Labels", section: "Standard" },
     { id: "status", label: "Status", section: "Standard" },
     { id: "ttft", label: "TTFT", section: "Standard" },
     { id: "userId", label: "User ID", section: "Standard" },
@@ -87,6 +86,7 @@ const TRACE_CAPABILITY: LensCapability = {
     "cost",
     "tokens",
     "model",
+    "labels",
   ],
   addons: [
     { id: "io-preview", label: "I/O preview" },
@@ -101,6 +101,7 @@ const TRACE_CAPABILITY: LensCapability = {
     "tokensIn",
     "tokensOut",
     "spans",
+    "size",
     "ttft",
   ],
   defaultSort: { columnId: "time", direction: "desc" },
@@ -112,7 +113,7 @@ const CONVERSATION_CAPABILITY: LensCapability = {
   // without this the dropdown falls back to "Other" for any column
   // missing a section, which reads as broken next to the dialog version.
   columns: [
-    { id: "conversation", label: "Conversation", section: "Standard", pinned: true },
+    { id: "conversation", label: "Conversation", section: "Standard" },
     { id: "turns", label: "Turns", section: "Standard" },
     { id: "started", label: "Started", section: "Standard" },
     { id: "lastTurn", label: "Last Turn", section: "Standard" },
@@ -134,14 +135,21 @@ const CONVERSATION_CAPABILITY: LensCapability = {
     "status",
   ],
   addons: [{ id: "conversation-turns", label: "Conversation turns" }],
-  sortableColumnIds: ["started", "lastTurn", "duration", "cost", "tokens", "turns"],
+  sortableColumnIds: [
+    "started",
+    "lastTurn",
+    "duration",
+    "cost",
+    "tokens",
+    "turns",
+  ],
   defaultSort: { columnId: "started", direction: "desc" },
 };
 
 function makeGroupCapability(label: string): LensCapability {
   return {
     columns: [
-      { id: "group", label, section: "Standard", pinned: true },
+      { id: "group", label, section: "Standard" },
       { id: "count", label: "Traces", section: "Standard" },
       { id: "duration", label: "Avg duration", section: "Standard" },
       { id: "cost", label: "Total cost", section: "Standard" },
@@ -175,18 +183,29 @@ export function getCapability(grouping: GroupingMode): LensCapability {
   return LENS_CAPABILITIES[grouping];
 }
 
-/** Drop ids that the capability doesn't expose — protects against stale state. */
-export function reconcileColumns(
-  ids: readonly string[],
-  capability: LensCapability,
-): string[] {
+/**
+ * Drop ids that the capability doesn't expose — protects against stale
+ * state. Dynamic per-evaluator `eval:*` columns are retained only for the
+ * trace (flat) capability — the one that renders per-trace `evaluations`;
+ * they are dropped from conversation/group lenses where they'd be dead ids.
+ * A retained eval column whose evaluator has no runs in range renders
+ * em-dashes rather than vanishing (see
+ * dev/docs/adr/029-trace-table-per-evaluator-columns.md).
+ */
+export function reconcileColumns({
+  ids,
+  capability,
+}: {
+  ids: readonly string[];
+  capability: LensCapability;
+}): string[] {
   const valid = capability.columns.map((c) => c.id);
   const validSet = new Set(valid);
-  const filtered = ids.filter((id) => validSet.has(id));
-  // Always retain pinned columns.
-  for (const col of capability.columns) {
-    if (col.pinned && !filtered.includes(col.id)) filtered.unshift(col.id);
-  }
+  // The trace capability is the one exposing the evals summary column.
+  const isTraceCapability = validSet.has("evaluations");
+  const filtered = ids.filter(
+    (id) => validSet.has(id) || (isTraceCapability && isEvalColumnId(id)),
+  );
   return filtered.length > 0 ? filtered : [...capability.defaultColumns];
 }
 

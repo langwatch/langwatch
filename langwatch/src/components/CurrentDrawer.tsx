@@ -1,3 +1,4 @@
+import { Center, Spinner } from "@chakra-ui/react";
 import { OrganizationUserRole } from "@prisma/client";
 import qs from "qs";
 import { Suspense, useEffect, useMemo } from "react";
@@ -134,7 +135,7 @@ export function CurrentDrawer({ marginTop }: { marginTop?: number }) {
           );
         }}
       >
-        <Suspense>
+        <Suspense fallback={<DrawerLoadingFallback />}>
           <CurrentDrawerComponent
             {...queryDrawer}
             {...complexProps}
@@ -143,5 +144,13 @@ export function CurrentDrawer({ marginTop }: { marginTop?: number }) {
         </Suspense>
       </ErrorBoundary>
     </DrawerOffsetProvider>
+  );
+}
+
+function DrawerLoadingFallback() {
+  return (
+    <Center height="200px">
+      <Spinner size="lg" color="blue.500" />
+    </Center>
   );
 }

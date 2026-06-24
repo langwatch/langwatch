@@ -8,18 +8,16 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useMemo } from "react";
+import { type ReactNode, useMemo } from "react";
 import {
-  LuArrowRight,
-  LuCircleCheck,
   LuCircleDashed,
+  LuCornerDownRight,
   LuExternalLink,
   LuFileText,
-  LuSparkles,
+  LuPencil,
   LuTriangleAlert,
 } from "react-icons/lu";
 import { Link } from "~/components/ui/link";
-import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
 import type {
@@ -32,7 +30,6 @@ import { useSpansFull } from "../../hooks/useSpansFull";
 import { abbreviateModel, formatDuration } from "../../utils/formatters";
 import {
   extractPromptReference,
-  formatPromptReferenceLabel,
   type PromptReference,
   parseTracePromptIds,
   promptReferenceKey,
@@ -42,6 +39,14 @@ interface PromptsPanelProps {
   trace: TraceHeader;
   spans: SpanTreeNode[];
   onSelectSpan: (spanId: string) => void;
+  /** Suppress the panel's own count header + helper line. Set when the
+   *  panel is embedded under a section that already titles it (the trace
+   *  summary's "Prompts" accordion), so the heading isn't doubled.
+   *
+   *  When embedded, the panel renders with no horizontal padding of its
+   *  own — the host `Section` already pads content to `paddingX={4}`, so
+   *  the cards align flush with every other drawer section. */
+  hideHeader?: boolean;
 }
 
 interface PromptUsage {
@@ -133,10 +138,14 @@ function aggregatePromptUsage(
   return ordered;
 }
 
+/** Which trace-level role a card plays, when more than one prompt ran. */
+type PromptRole = "pinned" | "lastUsed";
+
 export function PromptsPanel({
   trace,
   spans,
   onSelectSpan,
+  hideHeader = false,
 }: PromptsPanelProps) {
   const { openDrawer } = useDrawer();
   const onOpenPromptEditor = (handle: string) => {
@@ -163,7 +172,7 @@ export function PromptsPanel({
 
   if (usages.length === 0 && !trace.containsPrompt) {
     return (
-      <VStack align="stretch" gap={2} padding={6}>
+      <VStack align="stretch" gap={1} paddingY={2}>
         <Text textStyle="sm" fontWeight="semibold">
           No prompts in this trace
         </Text>
@@ -181,35 +190,46 @@ export function PromptsPanel({
     !!trace.lastUsedPromptId &&
     trace.selectedPromptId !== trace.lastUsedPromptId;
 
+  // Only disambiguate which prompt was pinned vs. last ran when there's
+  // more than one card — a single prompt is obviously the one that ran, so
+  // a "last used" chip there is just noise. The selected/last-used identity
+  // used to render as its own callout block above the cards, which simply
+  // duplicated whichever card it pointed at; folding it into an inline chip
+  // removes that repetition.
+  const showRoleChips = usages.length > 1;
+  const roleFor = (handle: string): PromptRole | null => {
+    if (!showRoleChips) return null;
+    if (trace.lastUsedPromptId && handle === trace.lastUsedPromptId)
+      return "lastUsed";
+    if (trace.selectedPromptId && handle === trace.selectedPromptId)
+      return "pinned";
+    return null;
+  };
+
   return (
     <VStack align="stretch" gap={0}>
-      <Box
-        paddingX={4}
-        paddingY={3}
-        borderBottomWidth="1px"
-        borderColor="border"
-      >
-        <HStack gap={2}>
-          <Icon as={LuFileText} boxSize={4} color="blue.fg" />
-          <Text textStyle="sm" fontWeight="semibold">
-            {usages.length} prompt{usages.length === 1 ? "" : "s"} in this trace
-          </Text>
-        </HStack>
-        <Text textStyle="xs" color="fg.muted" marginTop={1}>
-          Selected = what you pinned · Last used = what actually ran. Click a
-          span to focus it in the trace.
-        </Text>
-      </Box>
+      {!hideHeader && (
+        <Box
+          paddingX={4}
+          paddingY={3}
+          borderBottomWidth="1px"
+          borderColor="border"
+        >
+          <HStack gap={2}>
+            <Icon as={LuFileText} boxSize={4} color="blue.fg" />
+            <Text textStyle="sm" fontWeight="semibold">
+              {usages.length} prompt{usages.length === 1 ? "" : "s"} in this
+              trace
+            </Text>
+          </HStack>
+        </Box>
+      )}
 
-      {/* Selected / Last-used callouts. Both are projected onto the trace
-          summary with their source SpanIds, so the drawer can deep-link
-          without re-walking spans. */}
+      {/* Only surfaces when the pin drifted, the trace ran a stale version,
+          or the prompt was since deleted — the plain "this is what ran"
+          identity now lives as an inline chip on the matching card. */}
       {(trace.selectedPromptId || trace.lastUsedPromptId) && (
-        <SelectedVsLastUsedCallout
-          trace={trace}
-          hasDrift={hasDrift}
-          onSelectSpan={onSelectSpan}
-        />
+        <PromptDriftBanner trace={trace} hasDrift={hasDrift} />
       )}
 
       <VStack align="stretch" gap={0} divideY="1px" divideColor="border.muted">
@@ -217,6 +237,7 @@ export function PromptsPanel({
           <PromptUsageCard
             key={promptReferenceKey(usage.ref)}
             usage={usage}
+            role={roleFor(usage.ref.handle)}
             spanNameById={spanNameById}
             isLoadingSpans={isLoading && usage.spanIds.length === 0}
             onSelectSpan={onSelectSpan}
@@ -228,19 +249,19 @@ export function PromptsPanel({
   );
 }
 
-function SelectedVsLastUsedCallout({
+/**
+ * Renders only when something is actually wrong: the pinned prompt drifted
+ * from what ran, the trace ran an out-of-date version, or the managed prompt
+ * has since been deleted. Returns null in the common healthy case so the
+ * panel leads straight with the prompt cards.
+ */
+function PromptDriftBanner({
   trace,
   hasDrift,
-  onSelectSpan,
 }: {
   trace: TraceHeader;
   hasDrift: boolean;
-  onSelectSpan: (spanId: string) => void;
 }) {
-  const sameRef =
-    !!trace.selectedPromptId &&
-    trace.selectedPromptId === trace.lastUsedPromptId;
-
   // Look up the latest version of the last-used prompt to detect
   // out-of-date traces — when the prompt has moved on since this trace
   // ran. Falls quietly to no-warning when the lookup errors.
@@ -252,203 +273,106 @@ function SelectedVsLastUsedCallout({
     !!latestVersion &&
     latestVersion > trace.lastUsedPromptVersionNumber;
 
-  const banner = hasDrift
-    ? "yellow.solid/6"
-    : outOfDate
-      ? "yellow.solid/6"
-      : promptMissing
-        ? "bg.muted"
-        : "bg.subtle";
+  if (!hasDrift && !outOfDate && !promptMissing) return null;
+
+  const banner = hasDrift || outOfDate ? "yellow.solid/6" : "bg.muted";
 
   return (
     <VStack
       align="stretch"
       gap={2}
-      paddingX={4}
       paddingY={3}
+      marginBottom={1}
       borderBottomWidth="1px"
       borderColor="border"
       bg={banner}
     >
       {hasDrift && (
-        <HStack gap={2} align="flex-start">
-          <Icon
-            as={LuTriangleAlert}
-            boxSize={3.5}
-            color="yellow.fg"
-            marginTop="2px"
-          />
-          <VStack align="stretch" gap={0.5}>
-            <Text textStyle="xs" fontWeight="semibold" color="yellow.fg">
-              Pinned prompt drifted at runtime
-            </Text>
-            <Text textStyle="2xs" color="fg.muted">
-              The pin resolved to a different concrete prompt than what was
-              recorded as last used. Common when a tag like{" "}
-              <Text as="span">
-                production
-              </Text>{" "}
-              moves between deploys.
-            </Text>
-          </VStack>
-        </HStack>
+        <WarningRow tone="warning" title="Pinned prompt drifted at runtime">
+          The pin resolved to a different concrete prompt than what was recorded
+          as last used. Common when a tag like{" "}
+          <Text as="span" fontWeight="medium" color="fg">
+            production
+          </Text>{" "}
+          moves between deploys.
+        </WarningRow>
       )}
 
       {outOfDate && latestVersion != null && (
-        <HStack gap={2} align="flex-start">
-          <Icon
-            as={LuTriangleAlert}
-            boxSize={3.5}
-            color="yellow.fg"
-            marginTop="2px"
-          />
-          <VStack align="stretch" gap={0.5}>
-            <Text textStyle="xs" fontWeight="semibold" color="yellow.fg">
-              Trace ran an out-of-date prompt
-            </Text>
-            <Text textStyle="2xs" color="fg.muted">
-              This trace used v{trace.lastUsedPromptVersionNumber}; the
-              prompt&rsquo;s current latest is v{latestVersion}. Consider
-              re-testing against the latest version before relying on this
-              behaviour.
-            </Text>
-          </VStack>
-        </HStack>
+        <WarningRow tone="warning" title="Trace ran an out-of-date prompt">
+          This trace used v{trace.lastUsedPromptVersionNumber}; the
+          prompt&rsquo;s current latest is v{latestVersion}. Consider re-testing
+          against the latest version before relying on this behaviour.
+        </WarningRow>
       )}
 
       {promptMissing && (
-        <HStack gap={2} align="flex-start">
-          <Icon
-            as={LuCircleDashed}
-            boxSize={3.5}
-            color="fg.muted"
-            marginTop="2px"
-          />
-          <VStack align="stretch" gap={0.5}>
-            <Text textStyle="xs" fontWeight="semibold" color="fg.muted">
-              Prompt no longer exists in this project
-            </Text>
-            <Text textStyle="2xs" color="fg.muted">
-              The trace still shows what ran at the time, but the underlying
-              managed prompt has been deleted.
-            </Text>
-          </VStack>
-        </HStack>
-      )}
-
-      {sameRef && trace.lastUsedPromptId ? (
-        <PromptIdentityRow
-          label="Pinned & ran"
-          icon={LuCircleCheck}
-          accent="blue"
-          handle={trace.lastUsedPromptId}
-          versionNumber={trace.lastUsedPromptVersionNumber}
-          spanId={trace.lastUsedPromptSpanId}
-          onSelectSpan={onSelectSpan}
-        />
-      ) : (
-        <>
-          {trace.selectedPromptId && (
-            <PromptIdentityRow
-              label="Selected"
-              icon={LuCircleCheck}
-              accent="blue"
-              handle={trace.selectedPromptId}
-              versionNumber={null}
-              spanId={trace.selectedPromptSpanId}
-              onSelectSpan={onSelectSpan}
-            />
-          )}
-          {trace.lastUsedPromptId && (
-            <PromptIdentityRow
-              label="Last used"
-              icon={LuSparkles}
-              accent="purple"
-              handle={trace.lastUsedPromptId}
-              versionNumber={trace.lastUsedPromptVersionNumber}
-              spanId={trace.lastUsedPromptSpanId}
-              onSelectSpan={onSelectSpan}
-            />
-          )}
-        </>
+        <WarningRow
+          tone="muted"
+          title="Prompt no longer exists in this project"
+        >
+          The trace still shows what ran at the time, but the underlying managed
+          prompt has been deleted.
+        </WarningRow>
       )}
     </VStack>
   );
 }
 
-function PromptIdentityRow({
-  label,
-  icon,
-  accent,
-  handle,
-  versionNumber,
-  spanId,
-  onSelectSpan,
+function WarningRow({
+  tone,
+  title,
+  children,
 }: {
-  label: string;
-  icon: typeof LuCircleCheck;
-  accent: "blue" | "purple";
-  handle: string;
-  versionNumber: number | null;
-  spanId: string | null;
-  onSelectSpan: (spanId: string) => void;
+  tone: "warning" | "muted";
+  title: string;
+  children: ReactNode;
 }) {
-  const accentColor = accent === "purple" ? "purple.fg" : "blue.fg";
+  const color = tone === "warning" ? "yellow.fg" : "fg.muted";
+  const icon = tone === "warning" ? LuTriangleAlert : LuCircleDashed;
   return (
-    <HStack
-      as={spanId ? "button" : "div"}
-      onClick={spanId ? () => onSelectSpan(spanId) : undefined}
-      gap={2}
-      paddingX={2}
-      paddingY={1.5}
-      borderRadius="md"
-      cursor={spanId ? "pointer" : "default"}
-      _hover={spanId ? { bg: "bg.muted" } : undefined}
-      align="center"
-      width="full"
-      textAlign="left"
-    >
-      <Icon as={icon} boxSize={3.5} color={accentColor} flexShrink={0} />
-      <Text
-        textStyle="2xs"
-        fontWeight="semibold"
-        color="fg.muted"
-        textTransform="uppercase"
-        letterSpacing="0.04em"
-        width="80px"
+    <HStack gap={2} align="flex-start">
+      <Icon
+        as={icon}
+        boxSize={3.5}
+        color={color}
+        marginTop="2px"
         flexShrink={0}
-      >
-        {label}
-      </Text>
-      <Text
-        textStyle="sm"
-        color="fg"
-        truncate
-        flex={1}
-        minWidth={0}
-      >
-        {handle}
-      </Text>
-      {versionNumber != null && (
-        <Badge size="sm" variant="subtle" colorPalette={accent}>
-          v{versionNumber}
-        </Badge>
-      )}
-      {spanId && (
-        <Icon as={LuArrowRight} boxSize={3} color="fg.subtle" flexShrink={0} />
-      )}
+      />
+      <VStack align="stretch" gap={0.5}>
+        <Text textStyle="xs" fontWeight="semibold" color={color}>
+          {title}
+        </Text>
+        <Text textStyle="2xs" color="fg.muted">
+          {children}
+        </Text>
+      </VStack>
     </HStack>
+  );
+}
+
+function PromptRoleChip({ role }: { role: PromptRole }) {
+  return (
+    <Badge
+      size="sm"
+      variant="surface"
+      colorPalette={role === "pinned" ? "blue" : "purple"}
+    >
+      {role === "pinned" ? "pinned" : "last used"}
+    </Badge>
   );
 }
 
 function PromptUsageCard({
   usage,
+  role,
   spanNameById,
   isLoadingSpans,
   onSelectSpan,
   onOpenPromptEditor,
 }: {
   usage: PromptUsage;
+  role: PromptRole | null;
   spanNameById: Map<string, SpanTreeNode>;
   isLoadingSpans: boolean;
   onSelectSpan: (spanId: string) => void;
@@ -468,15 +392,16 @@ function PromptUsageCard({
     : "";
 
   return (
-    <VStack align="stretch" gap={3} paddingX={4} paddingY={4}>
-      <HStack justify="space-between" gap={2}>
+    <VStack align="stretch" gap={2.5} paddingY={3}>
+      <HStack justify="space-between" gap={2} align="center">
         <HStack gap={2} minWidth={0}>
-          <Text
-            textStyle="sm"
-            fontWeight="bold"
-            truncate
-            minWidth={0}
-          >
+          <Icon
+            as={LuFileText}
+            boxSize={3.5}
+            color="fg.subtle"
+            flexShrink={0}
+          />
+          <Text textStyle="sm" fontWeight="semibold" truncate minWidth={0}>
             {ref.handle}
           </Text>
           {ref.versionNumber != null && (
@@ -500,138 +425,87 @@ function PromptUsageCard({
               unsaved edits
             </Badge>
           )}
+          {role && <PromptRoleChip role={role} />}
         </HStack>
-        <HStack gap={1}>
+        <HStack gap={0.5} flexShrink={0}>
           <Button
             size="xs"
             variant="ghost"
+            color="fg.subtle"
             gap={1}
             onClick={() => onOpenPromptEditor(ref.handle)}
           >
-            <Icon as={LuExternalLink} boxSize={3} />
+            <Icon as={LuPencil} boxSize={3} />
             Open prompt
           </Button>
           {playgroundHref && (
             <Link href={playgroundHref} isExternal variant="plain">
-              <Button size="xs" variant="ghost" gap={1}>
+              <Button size="xs" variant="ghost" color="fg.subtle" gap={1}>
                 <Icon as={LuExternalLink} boxSize={3} />
-                Open in Playground
+                Playground
               </Button>
             </Link>
           )}
         </HStack>
       </HStack>
 
-      {/* Variables */}
       {variableEntries.length > 0 && (
-        <VStack align="stretch" gap={1}>
-          <Text
-            textStyle="2xs"
-            fontWeight="semibold"
-            color="fg.subtle"
-            textTransform="uppercase"
-            letterSpacing="0.04em"
-          >
-            Variables
-          </Text>
-          <Box
-            bg="bg.subtle"
-            borderRadius="md"
-            borderWidth="1px"
-            borderColor="border.muted"
-            overflow="hidden"
-          >
-            {variableEntries.map(([key, val], i) => (
-              <HStack
-                key={key}
-                paddingX={3}
-                paddingY={1.5}
-                borderBottomWidth={
-                  i < variableEntries.length - 1 ? "1px" : "0px"
-                }
-                borderColor="border.muted"
-                gap={3}
+        <Box bg="bg.subtle" borderRadius="md" overflow="hidden">
+          {variableEntries.map(([key, val]) => (
+            <HStack
+              key={key}
+              paddingX={2.5}
+              paddingY={1}
+              gap={3}
+              align="center"
+            >
+              <Text
+                width="120px"
+                flexShrink={0}
+                textStyle="xs"
+                fontFamily="mono"
+                color="fg.muted"
+                truncate
+                title={key}
               >
-                <Text
-                  width="120px"
-                  flexShrink={0}
-                  textStyle="xs"
-                  color="fg.muted"
-                >
-                  {key}
-                </Text>
-                <Text
-                  flex={1}
-                  textStyle="xs"
-                  color="fg"
-                  truncate
-                  minWidth={0}
-                >
-                  {val}
-                </Text>
-              </HStack>
-            ))}
-          </Box>
-        </VStack>
+                {key}
+              </Text>
+              <Text
+                flex={1}
+                textStyle="xs"
+                color="fg"
+                truncate
+                minWidth={0}
+                title={val}
+              >
+                {val}
+              </Text>
+            </HStack>
+          ))}
+        </Box>
       )}
 
-      {/* Spans that used this prompt */}
-      <VStack align="stretch" gap={1}>
-        <HStack justify="space-between">
-          <Text
-            textStyle="2xs"
-            fontWeight="semibold"
-            color="fg.subtle"
-            textTransform="uppercase"
-            letterSpacing="0.04em"
-          >
-            Spans
-          </Text>
-          {spanIds.length > 0 && (
-            <Text textStyle="2xs" color="fg.muted">
-              {spanIds.length}
-            </Text>
-          )}
-        </HStack>
-        {isLoadingSpans ? (
-          <VStack align="stretch" gap={1}>
-            <Skeleton height="22px" />
-            <Skeleton height="22px" width="80%" />
-          </VStack>
-        ) : spanIds.length === 0 ? (
-          <Text textStyle="xs" color="fg.subtle">
-            No span on this trace carries data for this prompt. The trace
-            attributes record it, but the spans themselves don&rsquo;t expose
-            the prompt id — likely emitted from a path that bypasses the span
-            attribute.
-          </Text>
-        ) : (
-          <VStack align="stretch" gap={0.5}>
-            {spanIds.map((spanId) => {
-              const span = spanNameById.get(spanId);
-              return (
-                <SpanRow
-                  key={spanId}
-                  spanId={spanId}
-                  span={span ?? null}
-                  onClick={() => onSelectSpan(spanId)}
-                />
-              );
-            })}
-          </VStack>
-        )}
-      </VStack>
-
-      {/* Compact label fallback for a11y when no variables */}
-      {variableEntries.length === 0 && spanIds.length > 0 && (
-        <Tooltip
-          content={`Prompt ${formatPromptReferenceLabel(ref)} ran on ${spanIds.length} span(s) without captured variables.`}
-          positioning={{ placement: "top" }}
-        >
-          <Text textStyle="xs" color="fg.muted">
-            No variables captured for these calls.
-          </Text>
-        </Tooltip>
+      {isLoadingSpans ? (
+        <VStack align="stretch" gap={1}>
+          <Skeleton height="20px" />
+          <Skeleton height="20px" width="70%" />
+        </VStack>
+      ) : spanIds.length === 0 ? (
+        <Text textStyle="xs" color="fg.subtle">
+          Recorded from trace attributes; no span on this trace exposes the
+          prompt id directly.
+        </Text>
+      ) : (
+        <VStack align="stretch" gap={0}>
+          {spanIds.map((spanId) => (
+            <SpanRow
+              key={spanId}
+              spanId={spanId}
+              span={spanNameById.get(spanId) ?? null}
+              onClick={() => onSelectSpan(spanId)}
+            />
+          ))}
+        </VStack>
       )}
     </VStack>
   );
@@ -651,7 +525,7 @@ function SpanRow({
       as="button"
       onClick={onClick}
       gap={2}
-      paddingX={2}
+      paddingX={1.5}
       paddingY={1}
       borderRadius="sm"
       cursor="pointer"
@@ -660,22 +534,22 @@ function SpanRow({
       width="full"
       textAlign="left"
     >
-      <Text
-        textStyle="xs"
-        color="fg"
-        truncate
-        flex={1}
-        minWidth={0}
-      >
+      <Icon
+        as={LuCornerDownRight}
+        boxSize={3}
+        color="fg.subtle"
+        flexShrink={0}
+      />
+      <Text textStyle="xs" color="fg" truncate flex={1} minWidth={0}>
         {span?.name ?? spanId}
       </Text>
       {span?.model && (
-        <Text textStyle="2xs" color="fg.subtle">
+        <Text textStyle="2xs" color="fg.subtle" flexShrink={0}>
           {abbreviateModel(span.model)}
         </Text>
       )}
       {span && (
-        <Text textStyle="2xs" color="fg.subtle">
+        <Text textStyle="2xs" color="fg.subtle" flexShrink={0}>
           {formatDuration(span.durationMs)}
         </Text>
       )}

@@ -127,6 +127,13 @@ export const SEARCH_FIELDS: Readonly<Record<string, SearchFieldMeta>> = {
     valueType: "range",
     group: "span",
   },
+  size: {
+    label: "Storage size",
+    hasSidebar: true,
+    facetField: "size",
+    valueType: "range",
+    group: "metrics",
+  },
   rootSpanType: {
     label: "Root span type",
     hasSidebar: true,
@@ -339,6 +346,13 @@ export const SEARCH_FIELDS: Readonly<Record<string, SearchFieldMeta>> = {
     hasSidebar: true,
     facetField: "evaluatorScore",
     valueType: "range",
+    group: "eval",
+  },
+  evaluatorLabel: {
+    label: "Evaluator label",
+    hasSidebar: true,
+    facetField: "evaluatorLabel",
+    valueType: "categorical",
     group: "eval",
   },
   traceId: {

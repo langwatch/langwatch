@@ -1,7 +1,7 @@
 import { Box, Button, Flex, Icon, IconButton } from "@chakra-ui/react";
 import { Bookmark, Compass, Download, Map, Tent } from "lucide-react";
 import type React from "react";
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useIsNewAccount } from "../../hooks/useIsNewAccount";
 import { useProjectHasTraces } from "../../hooks/useProjectHasTraces";
@@ -21,6 +21,16 @@ import { LensNamePopover } from "./LensNamePopover";
 import { LensTabs } from "./LensTabs";
 import { LiveIndicator } from "./LiveIndicator";
 import { TimeRangePicker } from "./TimeRangePicker";
+
+// Toolbar widths (the bar's own measured width, not the viewport) below which
+// controls progressively shed chrome to keep the lens tabs readable when the
+// window is narrow or the filters sidebar is wide. Two steps: first the verbose
+// labels ("Last 30 days", "Automate") collapse to their icons; then, tighter
+// still, the menu-trigger dropdown chevrons drop too. Tunable — they key off
+// the real toolbar width via ResizeObserver, so they hold across sidebar
+// resizes, not just browser-window resizes.
+const TOOLBAR_LABELS_MIN_WIDTH = 800;
+const TOOLBAR_CHEVRONS_MIN_WIDTH = 620;
 
 interface ToolbarProps {
   onExportAll?: () => void;
@@ -140,8 +150,29 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   // moment the error is resolved.
   const hasParseError = useFilterStore((s) => Boolean(s.parseError));
 
+  // Measure the toolbar's own width so controls can collapse when space runs
+  // out (narrow window OR a wide filters sidebar — viewport breakpoints miss
+  // the latter). Width 0 = not yet measured → render everything (no
+  // first-paint flash of collapsed chrome).
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const [toolbarWidth, setToolbarWidth] = useState(0);
+  useEffect(() => {
+    const el = toolbarRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      setToolbarWidth(entries[0]?.contentRect.width ?? 0);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  const labelsCompact =
+    toolbarWidth > 0 && toolbarWidth < TOOLBAR_LABELS_MIN_WIDTH;
+  const chevronsCompact =
+    toolbarWidth > 0 && toolbarWidth < TOOLBAR_CHEVRONS_MIN_WIDTH;
+
   return (
     <Flex
+      ref={toolbarRef}
       align="center"
       gap={1.5}
       paddingX={2}
@@ -207,16 +238,31 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               colorPalette="orange"
               aria-label="Save current filtered view as a new lens"
               className="group"
+              // Zero the inter-child gap so the collapsed (zero-width) label
+              // doesn't leave a phantom gap to the left of the icon at rest —
+              // that gap was what made the icon sit off-centre in the
+              // icon-only state. The text-to-icon spacing is reinstated as a
+              // `marginRight` on the label that animates in only on hover.
+              gap={0}
             >
               <Box
                 as="span"
                 maxWidth={0}
+                marginRight={0}
                 opacity={0}
                 overflow="hidden"
                 whiteSpace="nowrap"
-                transition="max-width 0.25s ease, opacity 0.2s ease"
-                _groupHover={{ maxWidth: "170px", opacity: 1 }}
-                _groupFocusVisible={{ maxWidth: "170px", opacity: 1 }}
+                transition="max-width 0.25s ease, opacity 0.2s ease, margin-right 0.25s ease"
+                _groupHover={{
+                  maxWidth: "170px",
+                  marginRight: 1.5,
+                  opacity: 1,
+                }}
+                _groupFocusVisible={{
+                  maxWidth: "170px",
+                  marginRight: 1.5,
+                  opacity: 1,
+                }}
               >
                 Save current filtered view
               </Box>
@@ -235,7 +281,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           positioning={{ placement: "bottom" }}
         >
           {/* Full "Show me around" label only for accounts younger than
-              7 days — the tour is an onboarding affordance, and the wide
+              5 days — the tour is an onboarding affordance, and the wide
               label is wasted toolbar room for everyone who's already
               been around. "End tour" always shows in full while a tour
               is running so the escape hatch stays obvious. */}
@@ -284,10 +330,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             visual hierarchy — auditor pain was "I don't know what
             each icon does, and they all blur together". */}
         <ToolbarDivider />
-        <TimeRangePicker />
+        <TimeRangePicker compact={labelsCompact} />
         <ToolbarDivider />
-        <ColumnsDropdown />
-        <GroupingSelector />
+        <ColumnsDropdown compact={chevronsCompact} />
+        <GroupingSelector compact={chevronsCompact} />
         <DensityToggle />
         {/* Toolbar Find button retired in Round 3 — Find is bound to
             ⌘/Ctrl+F, exactly where users expect it. The discoverability
@@ -312,7 +358,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             </IconButton>
           </Tooltip>
         )}
-        <AutomateButton />
+        <AutomateButton compact={labelsCompact} />
         <ToolbarDivider />
         <KeyboardShortcutsButton />
       </Flex>

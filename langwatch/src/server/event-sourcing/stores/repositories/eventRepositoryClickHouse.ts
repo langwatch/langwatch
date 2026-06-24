@@ -21,7 +21,11 @@ function normalizePayloadValue(value: unknown): unknown {
     // Only convert numeric strings to numbers
     // Do NOT parse JSON strings - they should remain as strings
     // Simple length check to skip long strings early
-    if (value.length > 0 && value.length < 32 && NUMERIC_STRING_REGEX.test(value)) {
+    if (
+      value.length > 0 &&
+      value.length < 32 &&
+      NUMERIC_STRING_REGEX.test(value)
+    ) {
       const numberValue = Number(value);
       if (Number.isFinite(numberValue)) {
         return numberValue;
@@ -39,10 +43,8 @@ function normalizePayloadValue(value: unknown): unknown {
 
   if (value && typeof value === "object") {
     const obj = value as Record<string, unknown>;
-    for (const key in obj) {
-      if (Object.prototype.hasOwnProperty.call(obj, key)) {
-        obj[key] = normalizePayloadValue(obj[key]);
-      }
+    for (const key of Object.keys(obj)) {
+      obj[key] = normalizePayloadValue(obj[key]);
     }
     return obj;
   }
@@ -71,9 +73,22 @@ export class EventRepositoryClickHouse implements EventRepository {
     tenantId: string,
     aggregateType: string,
     aggregateId: string,
+    occurredAtFromMs?: number,
   ): Promise<EventRecord[]> {
     try {
       const client = await this.getClient(tenantId);
+      // When a lower bound is supplied, add a predicate on EventOccurredAt so
+      // ClickHouse can prune the weekly partitions older than the bound instead
+      // of cold-scanning every partition on S3. Rows with an unknown occurred
+      // time (EventOccurredAt = 0) are always kept so the bound can never drop
+      // an event. EventOccurredAt is UInt64 milliseconds; the table is
+      // PARTITION BY toYearWeek(toDateTime64(EventOccurredAt / 1000, 3)), which
+      // is monotonic in EventOccurredAt so the predicate prunes partitions.
+      const hasLowerBound =
+        typeof occurredAtFromMs === "number" && occurredAtFromMs > 0;
+      const occurredAtFilter = hasLowerBound
+        ? "AND (EventOccurredAt = 0 OR EventOccurredAt >= {occurredAtFromMs:UInt64})"
+        : "";
       const result = await client.query({
         query: `
           SELECT
@@ -88,12 +103,14 @@ export class EventRepositoryClickHouse implements EventRepository {
           WHERE TenantId = {tenantId:String}
             AND AggregateType = {aggregateType:String}
             AND AggregateId = {aggregateId:String}
+            ${occurredAtFilter}
           ORDER BY EventTimestamp ASC, EventId ASC
         `,
         query_params: {
           tenantId,
           aggregateType,
           aggregateId: String(aggregateId),
+          ...(hasLowerBound ? { occurredAtFromMs } : {}),
         },
         format: "JSONEachRow",
       });
@@ -117,9 +134,10 @@ export class EventRepositoryClickHouse implements EventRepository {
         AggregateId: String(aggregateId),
         EventId: row.EventId,
         EventTimestamp: row.EventTimestamp,
-        EventOccurredAt: row.EventOccurredAt != null && row.EventOccurredAt > 0
-          ? row.EventOccurredAt
-          : null,
+        EventOccurredAt:
+          row.EventOccurredAt != null && row.EventOccurredAt > 0
+            ? row.EventOccurredAt
+            : null,
         EventType: row.EventType,
         EventVersion: row.EventVersion,
         EventPayload: normalizePayloadValue(row.EventPayload),
@@ -202,9 +220,10 @@ export class EventRepositoryClickHouse implements EventRepository {
         AggregateId: String(aggregateId),
         EventId: row.EventId,
         EventTimestamp: row.EventTimestamp,
-        EventOccurredAt: row.EventOccurredAt != null && row.EventOccurredAt > 0
-          ? row.EventOccurredAt
-          : null,
+        EventOccurredAt:
+          row.EventOccurredAt != null && row.EventOccurredAt > 0
+            ? row.EventOccurredAt
+            : null,
         EventType: row.EventType,
         EventVersion: row.EventVersion,
         EventPayload: normalizePayloadValue(row.EventPayload),
@@ -299,7 +318,6 @@ export class EventRepositoryClickHouse implements EventRepository {
         format: "JSONEachRow",
         clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
       });
-
     } catch (error) {
       this.logger.debug(
         {

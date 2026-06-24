@@ -5,6 +5,7 @@ import {
   BookMarked,
   Bookmark,
   Boxes,
+  Braces,
   Brain,
   Calculator,
   CheckSquare,
@@ -14,6 +15,7 @@ import {
   DollarSign,
   FileText,
   Gauge,
+  HardDrive,
   Hash,
   History,
   type LucideIcon,
@@ -36,6 +38,21 @@ import { ORIGIN_DISPLAY } from "../../utils/originDisplay";
 
 /** Section key for the trace-level Attributes block (reads `Attributes` map on `trace_summaries`). */
 export const ATTRIBUTES_SECTION_KEY = "__attributes__";
+
+/**
+ * Section key for the Metadata block — the `metadata.*` subset of the trace
+ * `Attributes` map, surfaced with the `metadata.` prefix stripped for display.
+ * Syntactic sugar over the trace-attribute filter (see `metadata-keys.ts`).
+ */
+export const METADATA_SECTION_KEY = "__metadata__";
+
+/**
+ * Docs anchor for the Metadata facet's empty state (how to attach metadata via
+ * the SDK). The facet stays visible with zero keys so users can find it and
+ * learn how to populate it, instead of it silently not rendering.
+ */
+export const METADATA_DOCS_URL =
+  "https://docs.langwatch.ai/integration/python/guide#adding-metadata";
 
 /** Section key for the span-level Attributes block (reads `SpanAttributes` map on `stored_spans`). */
 export const SPAN_ATTRIBUTES_SECTION_KEY = "__span_attributes__";
@@ -121,11 +138,7 @@ export const FACET_DEFAULTS: Record<string, string[]> = {
  * a disabled state (min === max === 0, flagged synthetic) so users can
  * see the affordance without being able to interact with a zero-span range.
  */
-export const RANGE_DEFAULTS: readonly string[] = [
-  "duration",
-  "cost",
-  "tokens",
-];
+export const RANGE_DEFAULTS: readonly string[] = ["duration", "cost", "tokens"];
 
 /**
  * Fields whose colour palette is curated. Other categoricals get hashed
@@ -157,6 +170,7 @@ export const FACET_ICONS: Record<string, LucideIcon> = {
   evaluatorStatus: Activity,
   evaluatorVerdict: CheckSquare,
   evaluatorScore: Hash,
+  evaluatorLabel: Tag,
   event: Activity,
   cost: DollarSign,
   duration: Clock,
@@ -166,12 +180,13 @@ export const FACET_ICONS: Record<string, LucideIcon> = {
   promptTokens: Hash,
   completionTokens: Hash,
   tokensPerSecond: Gauge,
-  metadataKeys: Database,
+  size: HardDrive,
   selectedPrompt: BookMarked,
   lastUsedPrompt: History,
   promptVersion: Hash,
   spanName: FileText,
   spanStatus: Activity,
+  [METADATA_SECTION_KEY]: Braces,
   [ATTRIBUTES_SECTION_KEY]: Database,
   [SPAN_ATTRIBUTES_SECTION_KEY]: Database,
   [EVENT_ATTRIBUTES_SECTION_KEY]: Database,
@@ -184,93 +199,125 @@ export const FACET_ICONS: Record<string, LucideIcon> = {
  * observability axis.
  */
 export const GROUP_ICONS: Record<string, LucideIcon> = {
-  origin: Compass,
-  model: Sparkles,
-  cost: DollarSign,
+  traces: Compass,
   errors: AlertCircle,
-  quality: CheckSquare,
-  events: Activity,
+  spans: Boxes,
   subjects: Users,
+  model: Sparkles,
+  prompts: BookMarked,
+  quality: CheckSquare,
   topics: Tag,
+  cost: DollarSign,
+  latency: Clock,
+  volume: Hash,
   custom: Database,
 };
 
 export interface FacetGroupDef {
   id:
-    | "origin"
-    | "model"
-    | "cost"
+    | "traces"
     | "errors"
-    | "quality"
-    | "events"
+    | "spans"
     | "subjects"
+    | "model"
+    | "prompts"
+    | "quality"
     | "topics"
+    | "cost"
+    | "latency"
+    | "volume"
     | "custom";
   label: string;
   keys: string[];
 }
 
 /**
- * AI-observability-focused taxonomy used by the FacetManagerPopover.
- * Replaces the shape-based Trace / Subjects / Span / Evaluators /
- * Metrics / Prompts grouping with one organised around the questions
- * operators open the trace explorer asking. Order matches the user's
- * stated preference: Origin → Model → Cost → Errors → Quality →
- * Events → Subjects → Topics → Custom.
+ * Finer-grained facet sub-groups, surfaced through three task-oriented
+ * "perspectives" (see {@link FACET_PERSPECTIVES}). Every facet belongs to
+ * exactly one sub-group; a perspective only reorders the sub-groups so the
+ * ones relevant to that task lead. The array order here is the default
+ * (Observability) perspective.
  *
- * The sidebar itself no longer renders these headings — it's a flat,
- * drag-reorderable list of facets. This grouping is the popover's
- * "browse what's available" structure only.
+ * The sidebar itself stays a flat, drag-reorderable column — these headings
+ * are the FacetManagerPopover's "browse what's available" structure and the
+ * unit by which a perspective reorders the sidebar.
  */
 export const FACET_GROUPS: FacetGroupDef[] = [
+  // "What kind of trace is this?" — origin / shape / human-readable name,
+  // plus the user-defined `metadata.*` and trace-attribute maps that live on
+  // the trace. The dynamic trace-attribute section sits here (not in a
+  // catch-all "Custom" group) so attribute filters live beside the trace
+  // fields they belong to.
   {
-    // "What kind of trace is this?" — origin axis. rootSpanType lives
-    // here because in practice operators slice by "what kind of work
-    // produced this trace" (workflow / agent / chain) at the same
-    // moment they pick origin. traceName is the human-readable label
-    // that turns rootSpanType into something readable.
-    id: "origin",
-    label: "Origin",
-    keys: ["origin", "rootSpanType", "traceName"],
+    id: "traces",
+    label: "Traces",
+    keys: [
+      "origin",
+      "rootSpanType",
+      "traceName",
+      METADATA_SECTION_KEY,
+      ATTRIBUTES_SECTION_KEY,
+    ],
   },
+  // "What's broken?" — error + intervention signals.
   {
-    // "Which model is this?" — the routing axis operators slice by
-    // every day when triaging a regression or a cost spike.
-    id: "model",
-    label: "Model",
-    keys: ["model", "service"],
+    id: "errors",
+    label: "Errors",
+    keys: ["status", "errorMessage", "guardrail", "containsAi"],
   },
+  // "What happened during the trace?" — per-span / per-event slices, plus
+  // the dynamic span- and event-attribute maps (kept here beside the span /
+  // event fields rather than in a catch-all "Custom" group).
   {
-    // "How much is it costing and how slow is it?" — the resource axis.
-    // Tokens grouped here because token counts are the proxy operators
-    // reach for when explaining cost variance.
+    id: "spans",
+    label: "Spans & Events",
+    keys: [
+      "spanType",
+      "spanName",
+      "spanStatus",
+      "event",
+      SPAN_ATTRIBUTES_SECTION_KEY,
+      EVENT_ATTRIBUTES_SECTION_KEY,
+    ],
+  },
+  // "Who is using it?" — person / session / tenant / simulator run.
+  {
+    id: "subjects",
+    label: "Subjects",
+    keys: ["user", "conversation", "customer", "scenarioRun"],
+  },
+  // "How slow is it?" — latency + throughput.
+  {
+    id: "latency",
+    label: "Latency",
+    keys: ["duration", "ttft", "ttlt", "tokensPerSecond"],
+  },
+  // "How big is it?" — span count and stored payload size.
+  {
+    id: "volume",
+    label: "Volume",
+    keys: ["spans", "size"],
+  },
+  // "How much does it cost?" — spend + the token counts that drive it.
+  {
     id: "cost",
-    label: "Cost & Performance",
+    label: "Cost",
     keys: [
       "cost",
       "tokens",
       "promptTokens",
       "completionTokens",
-      "duration",
-      "ttft",
-      "ttlt",
-      "tokensPerSecond",
       "tokensEstimated",
-      "spans",
     ],
   },
+  // "Which model is this?" — the routing axis.
   {
-    // "What's broken?" — the error axis. status / errorMessage /
-    // guardrail / containsAi are all "did something go wrong /
-    // need intervention" filters.
-    id: "errors",
-    label: "Errors",
-    keys: ["status", "errorMessage", "guardrail", "containsAi"],
+    id: "model",
+    label: "Model",
+    keys: ["model", "service"],
   },
+  // "Is the AI any good?" — evals + human feedback.
   {
-    // "Is the AI any good?" — the eval + human-feedback axis.
-    // Annotations sit here because they're the human-in-the-loop
-    // quality signal that pairs with evaluator output.
     id: "quality",
     label: "Quality",
     keys: [
@@ -278,47 +325,30 @@ export const FACET_GROUPS: FacetGroupDef[] = [
       "evaluatorStatus",
       "evaluatorVerdict",
       "evaluatorScore",
+      "evaluatorLabel",
       "annotation",
     ],
   },
+  // "What is this trace about?" — the semantic-clustering axis.
   {
-    // "What happened during the trace?" — the per-span / per-event
-    // axis. Useful for "show me traces that called a particular tool"
-    // or "traces with a specific event type".
-    id: "events",
-    label: "Events",
-    keys: ["event", "spanType", "spanName", "spanStatus"],
-  },
-  {
-    // "Who is using it?" — the identity axis. User / conversation /
-    // customer / scenarioRun are the "scope to a person, session,
-    // tenant, or simulator run" filters.
-    id: "subjects",
-    label: "Subjects",
-    keys: ["user", "conversation", "customer", "scenarioRun"],
-  },
-  {
-    // "What is this trace about?" — the semantic-clustering axis.
-    // Topic + subtopic + label come from the automatic clustering
-    // pipeline, so they're the answer to "what theme is this".
     id: "topics",
     label: "Topics",
     keys: ["topic", "subtopic", "label"],
   },
+  // "Which prompt produced it?" — prompt configuration.
   {
-    // Project-specific power-user fields. Custom attributes and prompt
-    // configuration filters live here because they only make sense
-    // once an operator's already established the higher-axis narrative.
+    id: "prompts",
+    label: "Prompts",
+    keys: ["selectedPrompt", "lastUsedPrompt", "promptVersion"],
+  },
+  // Fallback bucket for any section key not mapped to a group above (the
+  // `?? "custom"` callers in useFilterSidebarData / FacetManagerPopover land
+  // here). The known attribute maps now live in Traces / Spans & Events, so
+  // this is empty by default — it only catches genuinely-unmapped keys.
+  {
     id: "custom",
     label: "Custom",
-    keys: [
-      ATTRIBUTES_SECTION_KEY,
-      SPAN_ATTRIBUTES_SECTION_KEY,
-      EVENT_ATTRIBUTES_SECTION_KEY,
-      "selectedPrompt",
-      "lastUsedPrompt",
-      "promptVersion",
-    ],
+    keys: [],
   },
 ];
 
@@ -335,6 +365,131 @@ const KEY_TO_GROUP_ID: Record<string, FacetGroupDef["id"]> = (() => {
 /** Group id this section key belongs to, or `undefined` if unknown. */
 export function getFacetGroupId(key: string): FacetGroupDef["id"] | undefined {
   return KEY_TO_GROUP_ID[key];
+}
+
+/**
+ * Facet perspectives — three task-oriented views over the *same* full facet
+ * set. A perspective never hides a facet; it only reorders the sub-groups
+ * (and therefore the sidebar) so the ones relevant to that task lead. The
+ * facet manager exposes a switcher; selecting one stamps the perspective's
+ * order into the facet lens (see `facetLensStore.selectPerspective`).
+ *
+ * Named "perspectives", deliberately NOT "lenses" — the toolbar already owns
+ * "lens" for trace-list sort/filter presets (a separate control).
+ */
+export type FacetPerspectiveId = "observability" | "llm" | "cost-performance";
+
+export interface FacetPerspectiveDef {
+  id: FacetPerspectiveId;
+  label: string;
+  /**
+   * Sub-group ids in the order this perspective surfaces them. Need not be
+   * exhaustive — any omitted group is appended in registry order so a facet
+   * is never dropped (see {@link groupOrderForPerspective}).
+   */
+  groupOrder: FacetGroupDef["id"][];
+}
+
+/** The perspective a brand-new user starts in. */
+export const DEFAULT_PERSPECTIVE_ID: FacetPerspectiveId = "observability";
+
+export const FACET_PERSPECTIVES: FacetPerspectiveDef[] = [
+  {
+    id: "observability",
+    label: "Observability",
+    // Matches the FACET_GROUPS array order, so an un-stamped lens (the
+    // default) already reads as the Observability perspective.
+    groupOrder: [
+      "traces",
+      "errors",
+      "spans",
+      "subjects",
+      "latency",
+      "volume",
+      "cost",
+      "model",
+      "quality",
+      "topics",
+      "prompts",
+      "custom",
+    ],
+  },
+  {
+    id: "llm",
+    label: "LLM",
+    groupOrder: [
+      "model",
+      "prompts",
+      "quality",
+      "topics",
+      "subjects",
+      "cost",
+      "volume",
+      "traces",
+      "spans",
+      "errors",
+      "latency",
+      "custom",
+    ],
+  },
+  {
+    id: "cost-performance",
+    label: "Cost & Performance",
+    groupOrder: [
+      "cost",
+      "latency",
+      "volume",
+      "model",
+      "traces",
+      "errors",
+      "quality",
+      "spans",
+      "subjects",
+      "topics",
+      "prompts",
+      "custom",
+    ],
+  },
+];
+
+const PERSPECTIVE_BY_ID = new Map(FACET_PERSPECTIVES.map((p) => [p.id, p]));
+
+export function isFacetPerspectiveId(x: unknown): x is FacetPerspectiveId {
+  return (
+    typeof x === "string" && PERSPECTIVE_BY_ID.has(x as FacetPerspectiveId)
+  );
+}
+
+export function perspectiveById(id: FacetPerspectiveId): FacetPerspectiveDef {
+  return PERSPECTIVE_BY_ID.get(id) ?? FACET_PERSPECTIVES[0]!;
+}
+
+/**
+ * The perspective's group order, completed with any registry groups it
+ * didn't mention (appended in FACET_GROUPS order) so the set is exhaustive.
+ */
+export function groupOrderForPerspective(
+  id: FacetPerspectiveId,
+): FacetGroupDef["id"][] {
+  const order = perspectiveById(id).groupOrder;
+  const seen = new Set(order);
+  const rest = FACET_GROUPS.map((g) => g.id).filter((gid) => !seen.has(gid));
+  return [...order, ...rest];
+}
+
+/** Group defs in this perspective's order — drives the facet manager. */
+export function orderedGroupDefsForPerspective(
+  id: FacetPerspectiveId,
+): FacetGroupDef[] {
+  const byId = new Map(FACET_GROUPS.map((g) => [g.id, g] as const));
+  return groupOrderForPerspective(id)
+    .map((gid) => byId.get(gid))
+    .filter((g): g is FacetGroupDef => g !== undefined);
+}
+
+/** Facet keys grouped + ordered by this perspective — the sidebar order. */
+export function sectionOrderForPerspective(id: FacetPerspectiveId): string[] {
+  return orderedGroupDefsForPerspective(id).flatMap((g) => g.keys);
 }
 
 /**
@@ -380,7 +535,11 @@ export const NONE_TOGGLE_VALUE: Record<string, string> = {
   rootSpanType: "rootSpanType",
 };
 
-export const MAX_VISIBLE_FACETS = 10;
+/**
+ * Values shown inside a facet before the "+N more" expander. Kept low so a
+ * facet column reads at a glance; the rest are one click (or a search) away.
+ */
+export const MAX_VISIBLE_FACETS = 5;
 /**
  * Cap for the "show more" expansion. The backend `discover` query
  * returns up to TOP_N=50 facet values per section; mirroring that
@@ -392,8 +551,22 @@ export const MAX_VISIBLE_FACETS = 10;
 export const MAX_EXPANDED_FACETS = 50;
 /** Sections with at most this many values get auto-expanded. */
 export const AUTO_EXPAND_THRESHOLD = 5;
-/** When a value-list reaches this size, show an inline filter input. */
-export const SEARCHABLE_VALUE_THRESHOLD = 5;
+
+/**
+ * Attribute sections (Trace / Span / Event attributes, Metadata) can
+ * discover 30+ keys. We render only the top-N (already sorted by count
+ * desc) with a quiet "Show N more" expander for the rest, so a high-
+ * cardinality attribute map doesn't balloon the sidebar. The key filter
+ * still searches the FULL set; the cap only applies to the unfiltered list.
+ */
+export const MAX_VISIBLE_ATTRIBUTE_KEYS = 10;
+
+/**
+ * Max distinct values a numeric facet may have to offer the "Discrete"
+ * tick-list. Above this it stays a slider even when flagged `discrete` in the
+ * backend registry — ticking dozens of integers is worse than a range drag.
+ */
+export const DISCRETE_MODE_MAX_VALUES = 30;
 
 /**
  * The "easy mode" set of facet keys shown by default in **comfortable**

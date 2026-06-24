@@ -584,6 +584,10 @@ const EXEMPT_MODELS = new Set<string>([
 ]);
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
+  // Raw operations ($queryRaw / $executeRaw) have no model — they are not
+  // project-scoped and cannot be auto-guarded (the SQL author owns tenancy).
+  // Mirrors the sibling guardOrganizationId, which already exempts no-model ops.
+  if (!params.model) return;
   if (params.model && EXEMPT_MODELS.has(params.model)) return;
 
   const action = params.action;

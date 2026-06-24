@@ -13,6 +13,10 @@ export class TraceSummaryStore
 {
   constructor(private readonly repo: TraceSummaryRepository) {}
 
+  /**
+   * Persists a single trace summary. Skips empty traces (spanCount 0) and
+   * backfills the traceId from the aggregate id when the state omits it.
+   */
   async store(
     state: TraceSummaryData,
     context: ProjectionStoreContext,
@@ -23,11 +27,23 @@ export class TraceSummaryStore
       : { ...state, traceId: String(context.aggregateId) };
     const retentionDays =
       context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
-    await this.repo.upsert(stateWithId, String(context.tenantId), retentionDays);
+    await this.repo.upsert(
+      stateWithId,
+      String(context.tenantId),
+      retentionDays,
+    );
   }
 
+  /**
+   * Persists many trace summaries in one round-trip. Empty traces are dropped
+   * and the repository's batch upsert is used when available, falling back to
+   * per-entry upserts otherwise.
+   */
   async storeBatch(
-    entries: Array<{ state: TraceSummaryData; context: ProjectionStoreContext }>,
+    entries: Array<{
+      state: TraceSummaryData;
+      context: ProjectionStoreContext;
+    }>,
   ): Promise<void> {
     const batchEntries = entries
       .filter(({ state }) => hasPersistableSignal(state))
@@ -57,9 +73,18 @@ export class TraceSummaryStore
     aggregateId: string,
     context: ProjectionStoreContext,
   ): Promise<TraceSummaryData | null> {
+    // When the executor knows the processed event's occurredAt, pass it as a
+    // partition-prune hint: trace_summaries is partitioned by toYearWeek
+    // (OccurredAt) and this read otherwise has no time predicate, so it
+    // cold-scans every partition (incl. S3 tier). findByTraceId narrows to a
+    // ±2-day window around the hint and falls back to an unbounded read if the
+    // window misses, so correctness is unchanged.
     return await this.repo.findByTraceId(
       String(context.tenantId),
       aggregateId,
+      context.occurredAtMs !== undefined
+        ? { occurredAtMs: context.occurredAtMs }
+        : undefined,
     );
   }
 }

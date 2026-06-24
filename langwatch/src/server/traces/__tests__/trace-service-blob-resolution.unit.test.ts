@@ -191,6 +191,7 @@ describe("TraceService.getTracesWithSpans() — ADR-022 blob resolution pipeline
           "proj-1",
           ["trace-1"],
           protections,
+          undefined,
           { resolveBlobs: undefined },
         );
         expect(traces[0]!.trace_id).toBe("trace-1");

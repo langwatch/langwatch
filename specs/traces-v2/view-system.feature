@@ -4,6 +4,11 @@
 # Audited against `langwatch/src/features/traces-v2/{stores/viewStore.ts,components/Toolbar/*}`
 # on 2026-05-01. Scenarios that describe behavior the current code doesn't implement
 # are tagged `@planned`.
+#
+# The built-in lens ROSTER and the Cost/Performance group dropdowns are owned
+# by specs/traces-v2/lens-preset-groups.feature. The "Built-in lenses" rule
+# below covers only behaviour shared by every built-in and defers the roster
+# to that file (don't re-list the lenses here — they drift).
 
 # ─────────────────────────────────────────────────────────────────────────────
 # LENS TABS UI
@@ -50,23 +55,32 @@ Rule: Lens tab bar layout
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Built-in lenses
-  The current build ships six built-in lenses. They are immutable from the
-  user's perspective: edits are tracked locally as drafts but cannot overwrite
-  the lens definition.
+  Built-in lenses are immutable from the user's perspective: edits are tracked
+  locally as drafts but cannot overwrite the lens definition. They split into
+  flat tabs and dimension-grouped dropdowns. The exact roster, group
+  membership, and each lens's sort/grouping live in
+  specs/traces-v2/lens-preset-groups.feature — this rule covers only the
+  behaviour shared by all built-ins.
 
   Background:
     Given the user is authenticated with "traces:view" permission
     And the project has traces
 
-  Scenario: All six built-in lenses are present
+  Scenario: The flat built-in lens tabs are present in order
     When the Observe page loads
     Then the following built-in lens tabs are visible in order:
-      | All            |
-      | Conversations  |
-      | Errors         |
-      | Slow requests  |
-      | Quality review |
-      | By Model       |
+      | All           |
+      | Simplified    |
+      | Conversations |
+      | Errors        |
+    # The cost and performance built-ins are NOT flat tabs — they live in the
+    # "Cost" and "Performance" dropdowns. Roster + sorts:
+    # specs/traces-v2/lens-preset-groups.feature
+
+  Scenario: Cost and Performance built-ins render as dropdowns, not flat tabs
+    When the Observe page loads
+    Then a "Cost" dropdown and a "Performance" dropdown sit in the lens bar
+    And the expensive / slow / token / turn built-ins are reached through them
 
   Scenario: All is the default lens
     When the Observe page loads
@@ -83,18 +97,14 @@ Rule: Built-in lenses
     And only traces with a conversation ID are shown
     And the active grouping reflects the lens's saved value
 
-  Scenario: By Model lens groups by primary model
-    When the user clicks the "By Model" tab
-    Then the table groups traces by primary model (grouping mode "by-model")
-    And the active grouping reflects the lens's saved value
-
   @planned
-  # By Service / By User built-ins do not exist in the current build, but the
-  # `by-service` and `by-user` grouping modes are available via the grouping
-  # selector or as a custom lens.
-  Scenario: Dedicated "By Service" and "By User" built-in lenses
+  # The old "By Model" and "Quality review" built-ins were removed; By Service
+  # / By User never shipped. The `by-model`, `by-service`, and `by-user`
+  # grouping modes remain available via the grouping selector or a custom lens
+  # — there are just no dedicated built-in tabs for them.
+  Scenario: Dedicated "By Model", "By Service", and "By User" built-in lenses
     When the Observe page loads
-    Then dedicated "By Service" and "By User" built-in lens tabs are visible
+    Then dedicated "By Model", "By Service", and "By User" built-in lens tabs are visible
 
   Scenario: Built-in lens context menu shows the immutable-lens actions
     When the user right-clicks a built-in lens tab
@@ -216,6 +226,18 @@ Rule: Draft state on lenses
     Given the "My Lens" tab is active
     When the user changes the search-bar filter so it differs from the lens's saved `filterText`
     Then the draft dot appears on the "My Lens" tab
+
+  Scenario: Save-current-view button is icon-only and centred at rest
+    Given the active lens has unsaved draft changes
+    Then a bookmark "Save current filtered view" button appears in the toolbar
+    And at rest it shows only the bookmark icon, centred with equal padding on both sides
+    And the collapsed label leaves no phantom gap to the left of the icon
+
+  Scenario: Save-current-view button reveals its label on hover
+    Given the active lens has unsaved draft changes
+    When the user hovers or focuses the save button
+    Then the "Save current filtered view" label expands to the left of the icon
+    And a gap appears between the label and the icon only while the label is shown
 
   @planned
   # Conditional formatting is not yet wired into LensConfig or the draft store.

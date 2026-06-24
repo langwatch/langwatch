@@ -14,10 +14,20 @@ import {
 } from "@ee/governance/reactors/governanceOcsfEventsSync.reactor";
 import type { PrismaClient } from "@prisma/client";
 import type { Cluster, Redis } from "ioredis";
+import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
+import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
+import { getProtectionsForProject } from "~/server/api/utils";
+import { DatasetRepository } from "~/server/datasets/dataset.repository";
+import {
+  createDatasetNormalizeHandler,
+  type DatasetNormalizePayload,
+} from "~/server/datasets/dataset-normalize.job";
+import { registerDatasetNormalizeEnqueue } from "~/server/datasets/dataset-normalize.queue";
+import { getDatasetStorage } from "~/server/datasets/dataset-storage";
+import { TraceService } from "~/server/traces/trace.service";
 import { createLogger } from "~/utils/logger/server";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
-import { getApp } from "../app-layer/app";
 import type { BillingCheckpointService } from "../app-layer/billing/billingCheckpoint.service";
 import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
 import { getAzureSafetyEnvFromProject } from "../app-layer/evaluations/azure-safety-env.server";
@@ -63,6 +73,7 @@ import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-pr
 import { createExperimentRunEsSyncReactor } from "./pipelines/experiment-run-processing/reactors/experimentRunEsSync.reactor";
 import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
+import type { TriggerActionDispatchDeps } from "./pipelines/shared/triggerActionDispatch";
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsCommand,
@@ -85,6 +96,7 @@ import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/
 import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
 import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/logRecordStorage.store";
 import { MetricRecordAppendStore } from "./pipelines/trace-processing/projections/metricRecordStorage.store";
+import type { DerivedTraceEvent } from "./pipelines/trace-processing/projections/services/trace-events.derivation";
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
 import { createClaudeCodeSpanSyncReactor } from "./pipelines/trace-processing/reactors/claudeCodeSpanSync.reactor";
@@ -523,6 +535,34 @@ export class PipelineRegistry {
       );
     }
 
+    // ADR-032 D5: register the standalone `datasetNormalize` GroupQueue job
+    // (pure Postgres + S3, no fold/reactor). Per-group concurrency is inherent
+    // and the group key is the datasetId (framework prepends tenantId=projectId)
+    // → exactly one normalize in flight per dataset. The enqueue side is wired
+    // into the dataset domain via `registerDatasetNormalizeEnqueue`; when the
+    // global queue is unavailable the dataset module inline-runs the handler.
+    const datasetNormalizeHandler = createDatasetNormalizeHandler({
+      repository: new DatasetRepository(this.deps.prisma),
+      getStorage: getDatasetStorage,
+    });
+    const datasetNormalizeQueue =
+      tracePipeline.service.registerJob<DatasetNormalizePayload>({
+        name: "datasetNormalize",
+        process: datasetNormalizeHandler,
+        // The per-dataset group key already serializes to concurrency-1, so no
+        // deduplication block is needed; the 200ms debounce default is
+        // surprising and could swallow a fast retry (m1).
+        groupKeyFn: (p) => p.datasetId,
+      });
+
+    if (datasetNormalizeQueue) {
+      registerDatasetNormalizeEnqueue((payload) =>
+        datasetNormalizeQueue.send(payload),
+      );
+    }
+    // No else: when the global queue is absent the dataset module falls back to
+    // running the handler inline at enqueue time (dev/test without a worker).
+
     return {
       pipeline: tracePipeline,
       traceSummaryStore,
@@ -778,6 +818,13 @@ export class PipelineRegistry {
 }
 
 export type AppCommands = ReturnType<PipelineRegistry["registerAll"]>;
+
+// ============================================================================
+// Introspection — derived from the live EventSourcing runtime
+// ============================================================================
+
+import { getApp } from "../app-layer/app";
+import type { StaticPipelineDefinition } from "./pipeline/staticBuilder.types";
 
 export interface ProjectionMetadata {
   projectionName: string;

@@ -136,13 +136,6 @@ export function getRangeValue(
   return result;
 }
 
-/** Check if there's a cross-facet OR — an OR group whose members span
- * more than one field. Same-field ORs (`status:error OR status:warning`)
- * are sidebar-friendly and don't count. */
-export function hasCrossFacetOR(ast: LiqeQuery): boolean {
-  return analyzeOrGroups(ast).groups.some((g) => g.fields.size > 1);
-}
-
 /**
  * One member of a cross-facet OR group: a single Tag value within the
  * group's parenthesised expression.

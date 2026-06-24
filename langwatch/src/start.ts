@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import promBundle from "express-prom-bundle";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "http";
 import { createSecureServer } from "http2";
 import path from "path";
@@ -61,20 +61,21 @@ async function loadDevHttpsCredentials(
   writeFileSync(keyPath, pems.private);
   return { cert: Buffer.from(pems.cert), key: Buffer.from(pems.private) };
 }
-import { register } from "prom-client";
-import { getApp } from "./server/app-layer/app";
-import { initializeWebApp } from "./server/app-layer/presets";
-import { getWorkerMetricsPort } from "./server/background/config";
-import { createMcpHandler } from "./mcp/handler";
-import { shutdownPostHog } from "./server/posthog";
-import { verifyRedisReady } from "./server/redis";
-import { createLogger } from "./utils/logger/server";
 
 // Hono — unified API router
 import type { Hono } from "hono";
+import { register } from "prom-client";
+import { createMcpHandler } from "./mcp/handler";
 import { createApiRouter } from "./server/api-router";
+import { getApp } from "./server/app-layer/app";
+import { initializeWebApp } from "./server/app-layer/presets";
+import { getWorkerMetricsPort } from "./server/background/config";
+import { buildStorageConnectSrc } from "./server/buildStorageConnectSrc";
+import { shutdownPostHog } from "./server/posthog";
+import { verifyRedisReady } from "./server/redis";
 import { serveStaticOrFallback } from "./server/static-handler";
 import { setupTRPCWebSocket } from "./server/websockets/trpc-ws";
+import { createLogger } from "./utils/logger/server";
 
 const logger = createLogger("langwatch:start");
 
@@ -170,7 +171,18 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
     "frame-ancestors 'none'",
     ...(!dev ? ["upgrade-insecure-requests"] : []),
     "worker-src 'self' blob:",
-    "connect-src 'self' https://*.posthog.com https://*.pendo.io wss://*.pendo.io wss://client.relay.crisp.chat https://client.crisp.chat https://*.googletagmanager.com https://analytics.google.com https://stats.g.doubleclick.net https://*.google-analytics.com https://www.google.com https://*.reo.dev",
+    // ADR-032: allow the browser's presigned PUT to object storage (derived
+    // from the same env the S3 client uses) — without it the CSP blocks the
+    // upload before it leaves the page and the drawer silently falls back.
+    `connect-src 'self' ${buildStorageConnectSrc({
+      S3_ENDPOINT: process.env.S3_ENDPOINT,
+      S3_REGION: process.env.S3_REGION,
+      S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
+      AWS_REGION: process.env.AWS_REGION,
+      AZURE_BLOB_ENDPOINT: process.env.AZURE_BLOB_ENDPOINT,
+    }).join(
+      " ",
+    )} https://*.posthog.com https://*.pendo.io wss://*.pendo.io wss://client.relay.crisp.chat https://client.crisp.chat https://*.googletagmanager.com https://analytics.google.com https://stats.g.doubleclick.net https://*.google-analytics.com https://www.google.com https://*.reo.dev`,
     "frame-src 'self' https://*.posthog.com https://*.pendo.io https://www.youtube.com https://get.langwatch.ai https://*.googletagmanager.com https://www.google.com https://*.reo.dev",
   ].join("; ");
 

@@ -6,7 +6,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import type React from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useFilterStore } from "../../stores/filterStore";
 import type { LensConfig } from "../../stores/viewStore";
 import type { TraceListItem } from "../../types/trace";
@@ -14,8 +14,13 @@ import { buildConversationColumns } from "./columns";
 import {
   type ConversationGroup,
   groupTracesByConversation,
+  sortConversationGroups,
 } from "./conversationGroups";
 import { conversationRegistry, RegistryRow } from "./registry";
+import {
+  EXPANDED_BG,
+  EXPANDED_BG_CSS,
+} from "./registry/addons/conversation/expandedTurnStyles";
 import { conversationSelectColumnDef } from "./selectColumn";
 import { buildConversationPlaceholderRows } from "./skeletonPlaceholders";
 import { TraceTableShell } from "./TraceTableShell";
@@ -23,6 +28,11 @@ import { useTraceTableVirtualizer } from "./useTraceTableVirtualizer";
 import { VirtualSpacer } from "./VirtualSpacer";
 
 const CONVERSATION_MIN_WIDTH = "880px";
+
+// Stable reference so RegistryRow's prop memo doesn't re-render every row
+// each parent render. The expanded conversation's header row shares this
+// recessed surface with its turn rows.
+const EXPANDED_ROW_BG = { surface: EXPANDED_BG, firstCell: EXPANDED_BG_CSS };
 
 interface ConversationLensBodyProps {
   traces: TraceListItem[];
@@ -35,14 +45,19 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
   lens,
   isLoading = false,
 }) => {
+  // Group order follows the lens sort via the per-group aggregates — the
+  // table uses manualSorting, so the order we pass in is the order shown.
   const realGroups = useMemo(
-    () => groupTracesByConversation(traces),
-    [traces],
+    () =>
+      sortConversationGroups({
+        groups: groupTracesByConversation(traces),
+        sort: lens.sort,
+      }),
+    [traces, lens.sort],
   );
   const pageSize = useFilterStore((s) => s.pageSize);
   const groups = useMemo(
-    () =>
-      isLoading ? buildConversationPlaceholderRows(pageSize) : realGroups,
+    () => (isLoading ? buildConversationPlaceholderRows(pageSize) : realGroups),
     [isLoading, pageSize, realGroups],
   );
   const columns = useMemo(
@@ -55,6 +70,14 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
   const [sorting, setSorting] = useState<SortingState>([
     { id: lens.sort.columnId, desc: lens.sort.direction === "desc" },
   ]);
+  // Keep the header sort indicators in sync with the lens sort — `realGroups`
+  // is re-sorted from `lens.sort`, so without this the indicators would drift
+  // out of sync with the rendered group order when the lens changes.
+  useEffect(() => {
+    setSorting([
+      { id: lens.sort.columnId, desc: lens.sort.direction === "desc" },
+    ]);
+  }, [lens.sort.columnId, lens.sort.direction]);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
   const table = useReactTable({
@@ -105,6 +128,7 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
             isExpanded={
               !isLoading && expandedKey === row.original.conversationId
             }
+            expandedBg={EXPANDED_ROW_BG}
             onToggleExpand={
               isLoading
                 ? undefined

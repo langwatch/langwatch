@@ -1,15 +1,8 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
-import {
-  Activity,
-  Anvil,
-  Film,
-  Flag,
-  History,
-  Shield,
-} from "lucide-react";
-import { useRouter } from "~/utils/compat/next-router";
+import { Activity, Anvil, Film, Flag, History, Shield } from "lucide-react";
 import React, { useState } from "react";
+import { useRouter } from "~/utils/compat/next-router";
 import { useOpsPermission } from "../hooks/useOpsPermission";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../hooks/usePublicEnv";
@@ -131,22 +124,21 @@ export const MainMenu = React.memo(function MainMenu({
               showLabel={showExpanded}
             />
             <PageMenuLink
-              path={projectRoutes.messages.path}
-              icon={featureIcons.traces.icon}
-              label={projectRoutes.messages.title}
-              project={project}
-              isActive={router.pathname.includes("/messages")}
-              showLabel={showExpanded}
-            />
-            <PageMenuLink
               path={projectRoutes.traces_v2.path}
               icon={featureIcons.traces_v2.icon}
               label={projectRoutes.traces_v2.title}
               project={project}
               isActive={router.pathname.includes("/traces")}
               showLabel={showExpanded}
-              beta="Trace Explorer is in beta. Expect rough edges; share feedback or report issues on Slack, or open one at https://github.com/langwatch/langwatch/issues/new/choose."
-              betaLabel="Beta"
+            />
+            <PageMenuLink
+              path={projectRoutes.messages.path}
+              icon={featureIcons.traces.icon}
+              label={projectRoutes.messages.title}
+              project={project}
+              isActive={router.pathname.includes("/messages")}
+              showLabel={showExpanded}
+              legacy
             />
 
             <Text
@@ -341,11 +333,12 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
   // Off-route: read from the lightweight badge counts. Either way the
   // badge stays in sync.
   const blockedCount = isOnOpsRoute
-    ? opsData.data?.queues.reduce((sum, q) => sum + q.blockedGroupCount, 0) ?? 0
-    : opsBadge.data?.blockedCount ?? 0;
+    ? (opsData.data?.queues.reduce((sum, q) => sum + q.blockedGroupCount, 0) ??
+      0)
+    : (opsBadge.data?.blockedCount ?? 0);
   const dlqCount = isOnOpsRoute
-    ? opsData.data?.queues.reduce((sum, q) => sum + q.dlqCount, 0) ?? 0
-    : opsBadge.data?.dlqCount ?? 0;
+    ? (opsData.data?.queues.reduce((sum, q) => sum + q.dlqCount, 0) ?? 0)
+    : (opsBadge.data?.dlqCount ?? 0);
 
   return (
     <>
@@ -422,6 +415,8 @@ type PageMenuLinkProps = {
   showLabel?: boolean;
   beta?: string | boolean;
   betaLabel?: string;
+  legacy?: string | boolean;
+  legacyLabel?: string;
 };
 
 const PageMenuLink = ({
@@ -434,6 +429,8 @@ const PageMenuLink = ({
   showLabel = true,
   beta,
   betaLabel,
+  legacy,
+  legacyLabel,
 }: PageMenuLinkProps) => {
   const { isTableView } = useTableView();
 
@@ -457,6 +454,8 @@ const PageMenuLink = ({
       showLabel={showLabel}
       beta={beta}
       betaLabel={betaLabel}
+      legacy={legacy}
+      legacyLabel={legacyLabel}
     />
   );
 };

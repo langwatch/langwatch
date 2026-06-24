@@ -7,7 +7,7 @@ import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { useFieldRedaction } from "~/hooks/useFieldRedaction";
-import { RedactedField } from "../RedactedField";
+import { RedactedField, RedactedInline } from "../RedactedField";
 
 vi.mock("~/hooks/useFieldRedaction", () => ({
   useFieldRedaction: vi.fn(),
@@ -104,6 +104,84 @@ describe("RedactedField", () => {
         </Wrapper>,
       );
 
+      expect(container.textContent).toContain("Redacted");
+      expect(container.textContent).not.toContain("visible to");
+    });
+  });
+
+  // The traces-v2 drawer drives redaction from the DTO's own flags via the
+  // `redacted` prop instead of the per-field query, so the marker can never
+  // disagree with the content the server already nulled.
+  describe("when an explicit redacted prop is provided", () => {
+    it("wins over the per-field query result", () => {
+      // The query says NOT redacted; the explicit prop says redacted — the
+      // explicit prop must win and render the marker.
+      mockUseFieldRedaction.mockReturnValue({
+        isRedacted: false,
+        isLoading: false,
+        visibleTo: null,
+      });
+
+      const { container } = render(
+        <Wrapper>
+          <RedactedField field="input" redacted visibleTo="Admins">
+            the secret
+          </RedactedField>
+        </Wrapper>,
+      );
+
+      expect(container.textContent).toContain("Redacted");
+      expect(container.textContent).toContain("visible to Admins");
+      expect(container.textContent).not.toContain("the secret");
+    });
+
+    it("renders children when the explicit prop says not redacted", () => {
+      // The query says redacted; the explicit `false` prop must still win and
+      // show the content.
+      mockUseFieldRedaction.mockReturnValue({
+        isRedacted: true,
+        isLoading: false,
+        visibleTo: "Admins",
+      });
+
+      const { container } = render(
+        <Wrapper>
+          <RedactedField field="input" redacted={false}>
+            visible content
+          </RedactedField>
+        </Wrapper>,
+      );
+      expect(container.textContent).toContain("visible content");
+      expect(container.textContent).not.toContain("Redacted");
+    });
+  });
+});
+
+describe("RedactedInline", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  describe("when given a named audience", () => {
+    it("renders the lock + Redacted marker with the audience hint", () => {
+      const { container } = render(
+        <Wrapper>
+          <RedactedInline visibleTo="Admins" />
+        </Wrapper>,
+      );
+      expect(container.textContent).toContain("Redacted");
+      expect(container.textContent).toContain("visible to Admins");
+    });
+  });
+
+  describe("when given no audience", () => {
+    it("renders the generic marker", () => {
+      const { container } = render(
+        <Wrapper>
+          <RedactedInline />
+        </Wrapper>,
+      );
       expect(container.textContent).toContain("Redacted");
       expect(container.textContent).not.toContain("visible to");
     });

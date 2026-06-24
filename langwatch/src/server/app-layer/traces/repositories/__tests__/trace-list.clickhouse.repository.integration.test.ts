@@ -10,13 +10,15 @@
  * seeds far more traces than one page and asserts both correctness and a real
  * peak-memory reduction versus the naive single-scan form.
  */
+
+import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { ClickHouseClient } from "@clickhouse/client";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../../../event-sourcing/__tests__/integration/testContainers";
+import { boundedSubquery } from "../../filter-to-clickhouse/subqueries";
 import { TraceListClickHouseRepository } from "../trace-list.clickhouse.repository";
 import type { TraceListQuery } from "../trace-list.repository";
 
@@ -35,7 +37,10 @@ function traceIdFor(i: number): string {
   return `tr-${String(i).padStart(4, "0")}`;
 }
 
-function makeTraceSummaryRow(i: number, overrides: Record<string, unknown> = {}) {
+function makeTraceSummaryRow(
+  i: number,
+  overrides: Record<string, unknown> = {},
+) {
   return {
     ProjectionId: `proj-${nanoid()}`,
     TenantId: tenantId,
@@ -74,6 +79,43 @@ function makeTraceSummaryRow(i: number, overrides: Record<string, unknown> = {})
     SubTopicId: null,
     ...overrides,
   };
+}
+
+async function insertSpanRow(opts: {
+  tenantId: string;
+  traceId: string;
+  spanType: string;
+  startTimeMs: number;
+}) {
+  await ch.insert({
+    table: "stored_spans",
+    values: [
+      {
+        ProjectionId: `proj-${nanoid()}`,
+        TenantId: opts.tenantId,
+        TraceId: opts.traceId,
+        SpanId: `span-${nanoid()}`,
+        ParentSpanId: null,
+        ParentTraceId: null,
+        ParentIsRemote: null,
+        Sampled: 1,
+        StartTime: new Date(opts.startTimeMs),
+        EndTime: new Date(opts.startTimeMs + 100),
+        DurationMs: 100,
+        SpanName: "s",
+        SpanKind: 1,
+        ServiceName: "t",
+        ResourceAttributes: {},
+        SpanAttributes: { "langwatch.span.type": opts.spanType },
+        StatusCode: 1,
+        StatusMessage: "",
+        EventCount: 0,
+        LinkCount: 0,
+      },
+    ],
+    format: "JSONEachRow",
+    clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+  });
 }
 
 async function insertRows(rows: ReturnType<typeof makeTraceSummaryRow>[]) {
@@ -286,9 +328,134 @@ describe("TraceListClickHouseRepository.findAll (integration)", () => {
       expect(row?.attributes["langwatch.reserved.cache_creation_tokens"]).toBe(
         "6",
       );
-      expect(row?.attributes["langwatch.reserved.reasoning_tokens"]).toBe("100");
+      expect(row?.attributes["langwatch.reserved.reasoning_tokens"]).toBe(
+        "100",
+      );
       // The pre-existing allow-listed keys still flow through.
       expect(row?.attributes["langwatch.origin"]).toBe("coding_agent");
     });
+  });
+});
+
+describe("TraceListClickHouseRepository.findCount (integration)", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const fcTenant = `test-find-count-${nanoid()}`;
+  // The live poll asks "how many new traces since `since`". `since` is recent
+  // (1 min before `base`) while the dashboard window reaches 10 days back, so
+  // the span-filter subquery would scan 10 days of `stored_spans` without the
+  // since-pruning.
+  const since = base - 60_000;
+
+  // Span-level filter: traces that contain an `llm` span. This is the shape
+  // that injects the bounded `stored_spans` subquery the fix prunes.
+  const llmSpanFilter = {
+    sql: boundedSubquery(
+      "stored_spans",
+      "StartTime",
+      "SpanAttributes['langwatch.span.type'] = {spanType:String}",
+    ),
+    params: { spanType: "llm" },
+  };
+
+  const countParams = {
+    tenantId: fcTenant,
+    timeRange: { from: base - 10 * DAY, to: base + DAY },
+    since,
+  };
+
+  beforeAll(async () => {
+    // A: recent trace with an llm span at `base` — newer than `since`, matches.
+    await insertRows([
+      makeTraceSummaryRow(0, {
+        TenantId: fcTenant,
+        TraceId: "fc-recent",
+        OccurredAt: new Date(base),
+        UpdatedAt: new Date(base),
+        LastEventOccurredAt: new Date(base),
+      }),
+    ]);
+    await insertSpanRow({
+      tenantId: fcTenant,
+      traceId: "fc-recent",
+      spanType: "llm",
+      startTimeMs: base,
+    });
+
+    // B: old trace (5 days before `since`) with an llm span — excluded by the
+    // OccurredAt > since predicate, must not be counted.
+    await insertRows([
+      makeTraceSummaryRow(0, {
+        TenantId: fcTenant,
+        TraceId: "fc-old",
+        OccurredAt: new Date(base - 5 * DAY),
+        UpdatedAt: new Date(base - 5 * DAY),
+        LastEventOccurredAt: new Date(base - 5 * DAY),
+      }),
+    ]);
+    await insertSpanRow({
+      tenantId: fcTenant,
+      traceId: "fc-old",
+      spanType: "llm",
+      startTimeMs: base - 5 * DAY,
+    });
+
+    // C: edge trace whose OccurredAt is just AFTER `since`, but whose matching
+    // llm span STARTED ~30 min BEFORE `since` (inside the 2-day buffer). It must
+    // still be counted. A naive tighten-exactly-to-`since` would drop it; this
+    // guards the buffer.
+    await insertRows([
+      makeTraceSummaryRow(0, {
+        TenantId: fcTenant,
+        TraceId: "fc-edge",
+        OccurredAt: new Date(since + 1000),
+        UpdatedAt: new Date(since + 1000),
+        LastEventOccurredAt: new Date(since + 1000),
+      }),
+    ]);
+    await insertSpanRow({
+      tenantId: fcTenant,
+      traceId: "fc-edge",
+      spanType: "llm",
+      startTimeMs: since - 30 * 60 * 1000,
+    });
+  }, 120_000);
+
+  afterAll(async () => {
+    if (!ch) return;
+    await ch.exec({
+      query:
+        "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
+      query_params: { tenantId: fcTenant },
+    });
+    await ch.exec({
+      query:
+        "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
+      query_params: { tenantId: fcTenant },
+    });
+  });
+
+  it("counts only span-filtered traces newer than `since`", async () => {
+    const count = await repo.findCount({
+      ...countParams,
+      filterWhere: llmSpanFilter,
+    });
+    // fc-recent + fc-edge; fc-old is excluded by OccurredAt > since.
+    expect(count).toBe(2);
+  });
+
+  it("keeps a near-edge match whose span started just before `since`", async () => {
+    // fc-edge's span StartTime is before `since` but inside the buffer; pruning
+    // the stored_spans scan must not drop it.
+    const count = await repo.findCount({
+      ...countParams,
+      filterWhere: llmSpanFilter,
+    });
+    expect(count).toBeGreaterThanOrEqual(2);
+  });
+
+  it("counts new traces since `since` without a span filter", async () => {
+    const count = await repo.findCount(countParams);
+    // fc-recent + fc-edge are newer than since; fc-old is not.
+    expect(count).toBe(2);
   });
 });

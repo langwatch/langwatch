@@ -18,6 +18,7 @@ import { useMemo, useState } from "react";
 import { Database, Search } from "react-feather";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { datasetDisplayRecordCount } from "~/server/datasets/record-count";
 import type { DatasetColumns } from "~/server/datasets/types";
 import { api } from "~/utils/api";
 
@@ -45,9 +46,17 @@ export function DatasetPickerList({
 
   const filteredDatasets = useMemo(() => {
     if (!datasetsQuery.data) return [];
+    // Only `ready` datasets are usable: selecting a processing/uploading/failed
+    // one hands its id to the workbench/workflow node, which then throws
+    // DatasetNotReadyError on the first read. Hide non-ready rows from the picker
+    // so they can't be chosen. Legacy rows default status="ready"; a null status
+    // (born-before-status) is treated as ready too, matching the read gate.
+    const ready = datasetsQuery.data.filter(
+      (dataset) => dataset.status === "ready" || dataset.status == null,
+    );
     const query = searchQuery.toLowerCase().trim();
-    if (!query) return datasetsQuery.data;
-    return datasetsQuery.data.filter((dataset) =>
+    if (!query) return ready;
+    return ready.filter((dataset) =>
       dataset.name.toLowerCase().includes(query),
     );
   }, [datasetsQuery.data, searchQuery]);
@@ -72,11 +81,7 @@ export function DatasetPickerList({
               key={dataset.id}
               name={dataset.name}
               columnCount={(dataset.columnTypes as DatasetColumns).length}
-              entryCount={
-                dataset.useS3
-                  ? (dataset.s3RecordCount ?? 0)
-                  : dataset._count.datasetRecords
-              }
+              entryCount={datasetDisplayRecordCount(dataset)}
               updatedAt={dataset.updatedAt}
               onClick={() =>
                 onSelect({

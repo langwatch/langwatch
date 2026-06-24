@@ -3,6 +3,7 @@ import type { Project } from "@prisma/client";
 import type React from "react";
 import { trackEvent } from "../../utils/tracking";
 import { BetaPill } from "../ui/BetaPill";
+import { LegacyPill } from "../ui/LegacyPill";
 import { Link } from "../ui/link";
 
 export const MENU_ITEM_HEIGHT = "32px";
@@ -20,9 +21,13 @@ export type SideMenuItemProps = {
   rightElement?: React.ReactNode;
   beta?: string | boolean;
   betaLabel?: string;
+  legacy?: string | boolean;
+  legacyLabel?: string;
 };
 
 const DEFAULT_BETA_MESSAGE = "This feature is in beta";
+const DEFAULT_LEGACY_MESSAGE =
+  "This feature is legacy and will be deprecated in the coming months.";
 
 // Renders the common visual content (icon, label, badge)
 export const SideMenuItem = ({
@@ -34,6 +39,8 @@ export const SideMenuItem = ({
   rightElement,
   beta,
   betaLabel,
+  legacy,
+  legacyLabel,
 }: SideMenuItemProps) => {
   const betaPill = beta ? (
     <BetaPill
@@ -41,6 +48,16 @@ export const SideMenuItem = ({
       message={
         <Text fontSize="sm">
           {typeof beta === "string" ? beta : DEFAULT_BETA_MESSAGE}
+        </Text>
+      }
+    />
+  ) : null;
+  const legacyPill = legacy ? (
+    <LegacyPill
+      label={legacyLabel}
+      message={
+        <Text fontSize="sm">
+          {typeof legacy === "string" ? legacy : DEFAULT_LEGACY_MESSAGE}
         </Text>
       }
     />
@@ -115,6 +132,7 @@ export const SideMenuItem = ({
           </Text>
           {badge}
           {betaPill}
+          {legacyPill}
           {rightElement}
         </>
       )}
@@ -140,6 +158,8 @@ export const SideMenuLink = ({
   showLabel = true,
   beta,
   betaLabel,
+  legacy,
+  legacyLabel,
 }: SideMenuLinkProps) => {
   return (
     <Link
@@ -163,6 +183,8 @@ export const SideMenuLink = ({
         showLabel={showLabel}
         beta={beta}
         betaLabel={betaLabel}
+        legacy={legacy}
+        legacyLabel={legacyLabel}
       />
     </Link>
   );

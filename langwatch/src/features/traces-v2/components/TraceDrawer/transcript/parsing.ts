@@ -97,12 +97,33 @@ function isChatMessagesArray(data: unknown): data is ChatMessage[] {
 }
 
 /**
+ * Lenient coercion for an EXPLICIT LangWatch `chat_messages` envelope, where
+ * the producer has already declared the type. We trust that declaration and
+ * keep every entry that is an object carrying a `role` or `content`, dropping
+ * only non-objects — so one malformed message in a long conversation doesn't
+ * sink the whole transcript into the raw-JSON fallback. Returns null when
+ * nothing renderable survives.
+ */
+function coerceDeclaredChatMessages(value: unknown[]): ChatMessage[] | null {
+  const messages = value.filter(
+    (item): item is ChatMessage =>
+      typeof item === "object" &&
+      item !== null &&
+      ("role" in item || "content" in item),
+  );
+  return messages.length > 0 ? messages : null;
+}
+
+/**
  * Try to coerce a parsed value into a chat message array. Handles every
  * shape we've seen in trace input/output payloads:
  *   - the array itself                  `[{role,content},...]`
  *   - a single message object           `{role,content}`
  *   - an envelope w/ `messages` field   `{messages: [...]}`
  *   - same with `input`/`history`/`output`/`data`/`value` keys
+ *   - an explicit LangWatch typed-value `{type:"chat_messages", value:[...]}`
+ *     envelope — the declared type is trusted and coerced leniently, so one
+ *     malformed message can't drop the whole conversation to raw JSON
  *   - any of the above as a stringified JSON value (double-stringified)
  *   - any of the above with the inner `content` field itself a JSON string
  *     of a typed block (`'{"type":"thinking",…}'`) — those get parsed lazy
@@ -124,6 +145,14 @@ export function coerceToChatMessages(data: unknown): ChatMessage[] | null {
   if (isOneChatMessage(data)) return [data];
   if (data && typeof data === "object" && !Array.isArray(data)) {
     const obj = data as Record<string, unknown>;
+    // Explicit LangWatch typed-value envelope: the producer declared this as
+    // chat_messages, so trust the type and coerce leniently rather than
+    // all-or-nothing — a single odd message must not drop the whole convo to
+    // the raw-JSON fallback.
+    if (obj.type === "chat_messages" && Array.isArray(obj.value)) {
+      const declared = coerceDeclaredChatMessages(obj.value);
+      if (declared) return declared;
+    }
     for (const key of [
       "messages",
       "input",
@@ -433,6 +462,32 @@ export function extractReadableText(
 
   // Not chat-shaped — return the raw string.
   return raw;
+}
+
+/**
+ * Pull the first system/developer prompt out of a trace `input` payload, as
+ * clean prose. Used for the conversation-level system-prompt banner and the
+ * markdown export's `## System` chunk.
+ *
+ * Built on the same coercion + block-parsing path as `extractReadableText`,
+ * so it understands every chat shape (arrays, single objects, typed-value
+ * envelopes, double-stringified) and unwraps typed text blocks instead of
+ * dumping raw JSON. Multi-block content is joined with newlines (the natural
+ * separator for a prompt rendered in a banner / code fence). Matches the
+ * `system` role only (not `developer`) to preserve the behaviour of the
+ * callers it replaces. Returns "" when the payload isn't chat-shaped or
+ * carries no system prompt.
+ */
+export function extractSystemText(raw: string | null | undefined): string {
+  if (!raw) return "";
+  const chat = coerceToChatMessages(tryParseJSON(raw));
+  if (!chat) return "";
+  for (const msg of chat) {
+    if (msg.role !== "system") continue;
+    const text = joinTextBlocks(parseContentBlocks(msg.content));
+    if (text.trim()) return text;
+  }
+  return "";
 }
 
 export function getReasoning(

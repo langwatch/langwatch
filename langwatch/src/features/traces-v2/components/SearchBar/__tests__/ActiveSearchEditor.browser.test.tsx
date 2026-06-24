@@ -621,6 +621,32 @@ describe("SearchBar in real Chromium", () => {
     });
   });
 
+  describe("regression: submit path (Enter on a value not in the static dict) opens a fresh clause", () => {
+    it("after `model:gpt-4o[Enter]`, the next char lands outside the tag instead of gluing onto the value", async () => {
+      renderEditor();
+      const editor = getEditor();
+
+      await userEvent.click(editor);
+      // `model`'s values aren't in the static FIELD_VALUES dict, so there's no
+      // dropdown match to accept — Enter routes through SUBMIT, not accept.
+      // Before the submit-path boundary fix this left the caret flush against
+      // the value with no separator, so the next keystroke glued on
+      // (`model:gpt-4oX`, the reported "cursor stuck inside the chip" bug).
+      await userEvent.keyboard("model:gpt-4o[Enter]");
+
+      // The smoking-gun keystroke: it MUST land outside the tag.
+      await userEvent.keyboard("X");
+
+      // Exactly one token, value intact — the X did NOT glue onto it. The
+      // submit path inserts a NBSP boundary; `\s` normalisation lets us assert
+      // the visible text without embedding a NBSP literal in the source.
+      const tokens = editor.querySelectorAll(".filter-token");
+      expect(tokens.length).toBe(1);
+      expect(tokens[0]?.textContent).toBe("model:gpt-4o");
+      expect(plainText(editor).replace(/\s+/g, " ")).toBe("model:gpt-4o X");
+    });
+  });
+
   describe("stress: long sequence of accept + type cycles", () => {
     it("running 3 accept-then-type cycles in a row produces 3 separate tokens, no fusion", async () => {
       renderEditor();

@@ -180,6 +180,7 @@ export function SpanAccordions({
                       <ContentPrivacyMarkers
                         privacy={contentPrivacy}
                         categories={["system", "tools"]}
+                        framed
                       />
                       <PiiIncompleteNotice incomplete={piiIncomplete} />
                       <RedactedField

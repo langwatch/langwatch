@@ -16,7 +16,13 @@
  * Shape rules:
  *  - `binary` with `data` set → extract, rewrite to `id + url + data:undefined`
  *  - `image_url` with `image_url.url` starting `data:` → extract, rewrite to
- *    `image_url.url = /api/files/<id>`
+ *    `image_url.url = /api/files/<projectId>/<id>`
+ *
+ * Minted URLs carry the owning `<projectId>` (issue #4947) so the read path
+ * (`/api/files/[[...route]]`) resolves the owner directly from the URL and
+ * reads via the project-scoped ClickHouse client — no cross-tenant owner
+ * lookup. Legacy id-only URLs (`/api/files/<id>`) minted before #4947 stay
+ * resolvable via the retained cross-tenant fallback on the read route.
  *  - everything else (text, tool_call, tool_result, image_url with http URLs,
  *    bare image, unknown shapes) → pass through unchanged
  *
@@ -146,7 +152,11 @@ async function processContentPart({
 
       const rewrittenPart = {
         ...(part as Record<string, unknown>),
-        source: { type: "url", value: `/api/files/${stored.id}`, mimeType },
+        source: {
+          type: "url",
+          value: `/api/files/${projectId}/${stored.id}`,
+          mimeType,
+        },
       };
 
       return { part: rewrittenPart, ref };
@@ -204,7 +214,7 @@ async function processContentPart({
             type: "binary",
             mimeType,
             id: stored.id,
-            url: `/api/files/${stored.id}`,
+            url: `/api/files/${projectId}/${stored.id}`,
             data: undefined,
             ...(typeof original.filename === "string"
               ? { filename: original.filename }
@@ -213,7 +223,7 @@ async function processContentPart({
         : {
             ...original,
             id: stored.id,
-            url: `/api/files/${stored.id}`,
+            url: `/api/files/${projectId}/${stored.id}`,
             data: undefined,
           };
 
@@ -256,7 +266,7 @@ async function processContentPart({
         ...original,
         image_url: {
           ...originalImageUrl,
-          url: `/api/files/${stored.id}`,
+          url: `/api/files/${projectId}/${stored.id}`,
         },
       };
 
@@ -325,7 +335,7 @@ async function processContentPart({
             type: "input_audio",
             input_audio: {
               data: undefined,
-              url: `/api/files/${stored.id}`,
+              url: `/api/files/${projectId}/${stored.id}`,
               mimeType,
             },
           }
@@ -334,7 +344,7 @@ async function processContentPart({
             input_audio: {
               ...originalInputAudio,
               data: undefined,
-              url: `/api/files/${stored.id}`,
+              url: `/api/files/${projectId}/${stored.id}`,
               mimeType,
             },
           };
@@ -369,7 +379,7 @@ async function processContentPart({
 
       const rewrittenPart = {
         ...(part as Record<string, unknown>),
-        image: `/api/files/${stored.id}`,
+        image: `/api/files/${projectId}/${stored.id}`,
       };
 
       return { part: rewrittenPart, ref };

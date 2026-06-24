@@ -225,6 +225,7 @@ describe("ClickHouseTraceService — eventref resolution seam (ADR-022)", () => 
             "proj-1",
             ["trace-1"],
             protections,
+            undefined,
             { resolveBlobs: true },
           );
 

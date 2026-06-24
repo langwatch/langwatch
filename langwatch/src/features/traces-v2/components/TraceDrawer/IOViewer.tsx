@@ -1,12 +1,5 @@
 import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
-import {
-  forwardRef,
-  memo,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { forwardRef, memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   LuCheck,
   LuChevronDown,
@@ -20,10 +13,11 @@ import {
   LuPencil,
   LuPlay,
 } from "react-icons/lu";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { PersonalFeatureGateDialog } from "~/components/me/PersonalFeatureGateDialog";
 import { usePersonalFeatureGate } from "~/components/me/usePersonalFeatureGate";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
+import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { AnnotationPopover } from "./conversationView/AnnotationPopover";
 import { IOViewerBody } from "./IOViewerBody";
 import { safePrettyJson } from "./JsonHighlight";
@@ -40,13 +34,59 @@ import {
   tryParseJSON,
   VIRTUALIZE_AT,
 } from "./transcript";
-import { useIOViewerState, type ViewFormat } from "./useIOViewerState";
+import {
+  type MarkdownSubmode,
+  useIOViewerState,
+  type ViewFormat,
+} from "./useIOViewerState";
 
-const COPY_FEEDBACK_MS = 1500;
 const TRUNCATE_AT = 100_000;
 // Require a meaningful tail before offering an expander — otherwise we
 // render "Show remaining 0K chars" on borderline content right at the cap.
 const TRUNCATE_TAIL_MIN = 1_000;
+
+const IO_CONTAINER_PADDING = 3;
+
+/**
+ * Outer-container chrome for the IOViewer body. Returns whether the body
+ * paints flush (no border / radius / bg — the content owns its own chrome)
+ * and the inner padding between the border and the content.
+ *
+ *   - `flush`: only Pretty + chat goes flush — every turn already paints its
+ *     own bubble / card, so wrapping them in a redundant "bg.subtle + border"
+ *     box just adds a gray frame (operator complaint). Everything else —
+ *     plain text, JSON, *and Markdown (rendered or source)* — sits in the
+ *     bordered box so the views read consistently side by side.
+ *   - `innerPadding`: zero for views that paint edge-to-edge themselves (the
+ *     virtualized chat list owns its viewport; the Markdown *source* view is
+ *     a `flush` Shiki block whose horizontal scrollbar must hug the outer
+ *     border). Rendered Markdown is NOT one of these — it takes the standard
+ *     padding so it reads identically to Pretty's plain-text Markdown box.
+ *
+ * Round 5: rendered Markdown previously went flush, leaving it as bare text
+ * floating in the pane while Pretty sat in a tidy bordered box beside it.
+ * Both now share the bordered container.
+ */
+export function ioContainerChrome({
+  format,
+  isChat,
+  markdownSubmode,
+  isVirtualizingChat,
+}: {
+  format: ViewFormat;
+  isChat: boolean;
+  markdownSubmode: MarkdownSubmode;
+  isVirtualizingChat: boolean;
+}): { flush: boolean; innerPadding: number } {
+  const flush = format === "pretty" && isChat;
+  const isFlushMarkdownSource =
+    format === "markdown" && markdownSubmode === "source";
+  const innerPadding =
+    flush || isFlushMarkdownSource || isVirtualizingChat
+      ? 0
+      : IO_CONTAINER_PADDING;
+  return { flush, innerPadding };
+}
 
 interface IOViewerProps {
   label: string;
@@ -180,13 +220,11 @@ function SuggestCorrectionButton({
 }
 
 function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
-    void navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
+    copy(text);
   };
 
   return (
@@ -284,7 +322,6 @@ export const IOViewer = memo(function IOViewer({
     collapsed,
     setCollapsed,
     engaged,
-    setEngaged,
     engagedRef,
   } = useIOViewerState({ mode });
 
@@ -331,21 +368,12 @@ export const IOViewer = memo(function IOViewer({
   // with nested scroll containers.
   const isVirtualizingChat =
     format === "pretty" && isChat && conversationTurns.length >= VIRTUALIZE_AT;
-  // Pretty + chat: every individual turn already paints its own role
-  // chrome (bubble, card, or thread row with an avatar header). The
-  // outer IOViewer "bg.subtle + border" box around them just looks
-  // like a redundant container — operator complaint: "remove this
-  // gray box around the input, why does it exist?". Applies whether
-  // we're rendering the input history or the output reply.
-  const flushChatCard = format === "pretty" && isChat;
-  // Rendered markdown paints its own typography (headings, paragraphs,
-  // fenced code blocks, etc.) — the outer "bg.subtle + border" container
-  // makes the whole thing read as one giant code block, with the real
-  // fenced code blocks nested inside a near-identical box. Drop the
-  // outer chrome so prose looks like prose and code looks like code.
-  // Source mode (raw markdown text) keeps the box since it IS just text.
-  const flushMarkdown = format === "markdown" && markdownSubmode === "rendered";
-  const flushOuter = flushChatCard || flushMarkdown;
+  const { flush: flushOuter, innerPadding } = ioContainerChrome({
+    format,
+    isChat,
+    markdownSubmode,
+    isVirtualizingChat,
+  });
 
   // Track whether the preview box's content actually exceeds its visible
   // height. The "Click to interact" scrim only makes sense when there's
@@ -355,7 +383,9 @@ export const IOViewer = memo(function IOViewer({
   // covers the case where content height changes without the element
   // resizing (rare, but cheap to add).
   const previewBoxRef = useRef<HTMLDivElement>(null);
-  const [hasOverflow, setHasOverflow] = useState(false);
+  // Value intentionally unread — the effect re-runs measurement on resize/
+  // scroll; the overflow flag itself isn't surfaced yet.
+  const [, setHasOverflow] = useState(false);
   useEffect(() => {
     const el = previewBoxRef.current;
     if (!el) {
@@ -510,15 +540,7 @@ export const IOViewer = memo(function IOViewer({
               opacity={1}
               transition="opacity 120ms ease-out"
             >
-              <Box
-                padding={
-                  flushOuter
-                    ? 0
-                    : format === "markdown" || isVirtualizingChat
-                      ? 0
-                      : 3
-                }
-              >
+              <Box padding={innerPadding}>
                 <IOViewerBody
                   format={format}
                   isChat={isChat}

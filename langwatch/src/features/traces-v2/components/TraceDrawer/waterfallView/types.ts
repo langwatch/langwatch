@@ -16,9 +16,11 @@ import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 export interface WaterfallViewProps {
   spans: SpanTreeNode[];
   selectedSpanId: string | null;
+  /** Span ids that carry a managed prompt — rendered with a book icon so
+   *  the operator can spot prompt-bearing spans in the tree at a glance. */
+  promptSpanIds?: ReadonlySet<string>;
   onSelectSpan: (spanId: string) => void;
   onClearSpan: () => void;
-  onSwitchToSpanList?: (nameFilter: string, typeFilter: string) => void;
 }
 
 export interface WaterfallTreeNode {

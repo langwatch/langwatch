@@ -8,8 +8,9 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { AlertTriangle, Lightbulb, MessageSquare } from "lucide-react";
-import { memo, useCallback, useMemo } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Markdown } from "~/components/Markdown";
+import { RedactedInline } from "~/components/ui/RedactedField";
 import type { RouterOutputs } from "~/utils/api";
 import type { TraceListItem } from "../../../types/trace";
 import {
@@ -27,6 +28,8 @@ import {
 } from "../../TraceTable/registry/addons/conversation/Bubble";
 import { getDisplayRoleVisuals, useIsScenarioRole } from "../scenarioRoles";
 import { getRolePalette, ReasoningBlock } from "../transcript";
+import { useConversationExpand } from "./expandContext";
+import { MessageExpandToggle } from "./MessageExpandToggle";
 import { TurnActionRow, TurnAnnotationBadges } from "./TurnAnnotations";
 import type { TurnLayout } from "./types";
 import { formatGap } from "./utils";
@@ -123,7 +126,7 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
         annotationItems={annotationItems}
       />
 
-      {userText && (
+      {userText ? (
         <TurnMessage
           layout={layout}
           side={userSide}
@@ -134,7 +137,19 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           isSelected={isCurrent}
           onClick={handleSelect}
         />
-      )}
+      ) : turn.inputRedacted ? (
+        // Input hidden by a privacy rule — show the shared "Redacted" marker on
+        // the user side rather than silently omitting the bubble, so a hidden
+        // turn doesn't read as the user having said nothing.
+        <RedactedTurnLine
+          layout={layout}
+          side={userSide}
+          tone={userVisuals.displayRole}
+          label={userVisuals.bubbleLabel}
+          icon={<UserIcon />}
+          visibleTo={turn.inputVisibleTo}
+        />
+      ) : null}
 
       {assistantText ? (
         <TurnMessage
@@ -175,10 +190,97 @@ export const ChatTurnRow = memo<ChatTurnRowProps>(function ChatTurnRow({
           onClick={handleSelect}
           annotation={annotationSummary}
         />
+      ) : turn.outputRedacted ? (
+        // Output hidden by a privacy rule — the shared "Redacted" marker on the
+        // assistant side, so a hidden response isn't mistaken for an empty turn.
+        <RedactedTurnLine
+          layout={layout}
+          side={assistantSide}
+          tone={assistantVisuals.displayRole}
+          label={assistantLabel}
+          icon={<AssistantIcon />}
+          visibleTo={turn.outputVisibleTo}
+        />
       ) : null}
     </VStack>
   );
 });
+
+/**
+ * A turn message slot whose content was hidden by a privacy rule. Reuses the
+ * same role icon + label chrome as a real message (so the side/role still reads
+ * at a glance) but renders the shared `RedactedInline` marker where the prose
+ * would be. One treatment across the bubbles and thread layouts.
+ */
+function RedactedTurnLine({
+  layout,
+  side,
+  tone,
+  label,
+  icon,
+  visibleTo,
+}: {
+  layout: TurnLayout;
+  side: BubbleSide;
+  tone: BubbleTone;
+  label: string;
+  icon: React.ReactNode;
+  visibleTo?: string | null;
+}) {
+  const palette = getRolePalette(TONE_ROLE[tone]);
+  const marker = <RedactedInline visibleTo={visibleTo} size="xs" />;
+  if (layout === "thread") {
+    return (
+      <Flex gap={2.5} align="center" width="full" paddingX={3} paddingY={2.5}>
+        <Circle
+          size="24px"
+          bg={palette.muted}
+          color={palette.fg}
+          flexShrink={0}
+        >
+          <Icon boxSize="13px">{icon}</Icon>
+        </Circle>
+        <Box flex={1} minWidth={0}>
+          <Text
+            textStyle="2xs"
+            fontWeight="600"
+            color={palette.fg}
+            textTransform="uppercase"
+            letterSpacing="0.06em"
+            marginBottom={1}
+          >
+            {label}
+          </Text>
+          {marker}
+        </Box>
+      </Flex>
+    );
+  }
+  // Bubbles layout: align the marker to the message's side so it sits where the
+  // bubble would, framed by the same role label.
+  return (
+    <Flex justify={side === "right" ? "flex-end" : "flex-start"} width="full">
+      <VStack
+        align={side === "right" ? "flex-end" : "flex-start"}
+        gap={1}
+        maxWidth="78%"
+      >
+        <HStack gap={1.5} color={palette.fg}>
+          <Icon boxSize="13px">{icon}</Icon>
+          <Text
+            textStyle="2xs"
+            fontWeight="600"
+            textTransform="uppercase"
+            letterSpacing="0.06em"
+          >
+            {label}
+          </Text>
+        </HStack>
+        {marker}
+      </VStack>
+    </Flex>
+  );
+}
 
 interface TurnMessageProps {
   layout: TurnLayout;
@@ -227,8 +329,23 @@ function ThreadMessage({
 }: Omit<TurnMessageProps, "layout" | "side">) {
   const palette = getRolePalette(TONE_ROLE[tone]);
   const isError = tone === "error";
-  const display = truncateMarkdown({ text, maxChars: THREAD_MAX_CHARS });
   const hasAnnotation = !!annotation && annotation.count > 0;
+
+  // Per-message expand, seeded from the conversation-view "Expand all"
+  // toggle. A truncated message gets a Show more / Show less affordance
+  // instead of a bare "…". See
+  // specs/traces-v2/conversation-message-expand.feature
+  const { shouldExpandAll } = useConversationExpand();
+  const [expanded, setExpanded] = useState(shouldExpandAll);
+  useEffect(() => setExpanded(shouldExpandAll), [shouldExpandAll]);
+  const canExpand = text.length > THREAD_MAX_CHARS;
+  const display =
+    !canExpand || expanded
+      ? text
+      : truncateMarkdown({ text, maxChars: THREAD_MAX_CHARS }).replace(
+          /\n+…\s*$/,
+          "",
+        );
 
   // No persistent "selected" background — the active turn reads flat like the
   // rest of the thread (ChatGPT-style); only a transient hover cue signals the
@@ -319,6 +436,13 @@ function ThreadMessage({
           >
             <Markdown>{display}</Markdown>
           </Box>
+        )}
+
+        {canExpand && (
+          <MessageExpandToggle
+            expanded={expanded}
+            onToggle={() => setExpanded((v) => !v)}
+          />
         )}
       </Box>
     </Flex>

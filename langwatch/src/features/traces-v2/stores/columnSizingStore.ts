@@ -5,14 +5,13 @@ import { create } from "zustand";
  * "all-traces" lens with the trace row kind doesn't collide with the
  * conversations lens (same column ids — `duration`, `cost` — but a
  * different layout). Persisted to localStorage so widths survive page
- * reloads; cleared per-lens via `resetForLens` from the column menu.
+ * reloads.
  */
 export type ColumnSizing = Record<string, number>;
 
 interface ColumnSizingState {
   byKey: Record<string, ColumnSizing>;
   setSizing: (key: string, sizing: ColumnSizing) => void;
-  resetForKey: (key: string) => void;
 }
 
 const STORAGE_KEY = "langwatch:traces-v2:column-sizing:v1";
@@ -81,14 +80,6 @@ export const useColumnSizingStore = create<ColumnSizingState>((set) => ({
         if (typeof px === "number" && px > 0) cleaned[colId] = Math.round(px);
       }
       const next = { ...s.byKey, [key]: cleaned };
-      persist(next);
-      return { byKey: next };
-    }),
-  resetForKey: (key) =>
-    set((s) => {
-      if (!(key in s.byKey)) return s;
-      const next = { ...s.byKey };
-      delete next[key];
       persist(next);
       return { byKey: next };
     }),

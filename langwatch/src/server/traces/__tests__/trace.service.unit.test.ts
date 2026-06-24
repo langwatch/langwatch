@@ -175,6 +175,7 @@ describe("TraceService", () => {
           projectId,
           [fullId],
           protections,
+          undefined,
           { resolveBlobs: undefined },
         );
       });
