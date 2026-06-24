@@ -40,8 +40,8 @@ import type { SavedView } from "../../hooks/useSavedViews";
 import { useSavedViews } from "../../hooks/useSavedViews";
 import { getOriginColor } from "../../utils/originColors";
 import { getColorForString } from "../../utils/rotatingColors";
-import { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "../MainMenu";
 import { ConfirmDialog } from "../gateway/ConfirmDialog";
+import { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "../MainMenu";
 import { Menu } from "../ui/menu";
 
 /**

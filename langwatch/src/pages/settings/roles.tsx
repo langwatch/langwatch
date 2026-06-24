@@ -403,9 +403,7 @@ function RolesManagement({
               description={role.description ?? ""}
               permissionCount={`${role.permissions.length} permissions`}
               hasPermission={hasPermission}
-              onDelete={() =>
-                setRoleToDelete({ id: role.id, name: role.name })
-              }
+              onDelete={() => setRoleToDelete({ id: role.id, name: role.name })}
               onEdit={() => {
                 void handleEditRole(role.id);
               }}
