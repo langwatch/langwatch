@@ -176,6 +176,26 @@ export type LocalEvaluatorConfig = z.infer<typeof localEvaluatorConfigSchema>;
  * - Each dataset (same column might have different names)
  * - Each target (target A outputs "output", target B outputs "result")
  */
+/**
+ * Pairwise evaluator config. Set only for evaluators of type
+ * "langevals/pairwise_compare" (and future n-way variants). Picks two
+ * existing target columns to compare against a dataset golden field.
+ *
+ * - variantA / variantB: TargetConfig ids whose per-row outputs are
+ *   the two candidates.
+ * - goldenField: dataset field name whose value is the reference answer.
+ * - includeMetrics: per-candidate metrics injected into the judge prompt.
+ */
+export const pairwiseEvaluatorConfigSchema = z.object({
+  variantA: z.string(),
+  variantB: z.string(),
+  goldenField: z.string(),
+  includeMetrics: z.array(z.enum(["cost", "duration"])).default([]),
+});
+export type PairwiseEvaluatorConfig = z.infer<
+  typeof pairwiseEvaluatorConfigSchema
+>;
+
 export const evaluatorConfigSchema = z.object({
   id: z.string(),
   evaluatorType: z.string(),
@@ -191,6 +211,8 @@ export const evaluatorConfigSchema = z.object({
   dbEvaluatorId: z.string().optional(),
   /** Local unsaved evaluator settings that override DB values during execution */
   localEvaluatorConfig: localEvaluatorConfigSchema.optional(),
+  /** Set only for pairwise / n-way evaluators (#5100, #5101). */
+  pairwise: pairwiseEvaluatorConfigSchema.optional(),
 });
 export type EvaluatorConfig = Omit<
   z.infer<typeof evaluatorConfigSchema>,
