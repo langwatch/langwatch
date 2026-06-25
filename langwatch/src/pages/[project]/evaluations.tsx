@@ -147,7 +147,7 @@ function EvaluationsV2() {
   return (
     <DashboardLayout>
       <PageLayout.Header>
-        <PageLayout.Heading>Experiments</PageLayout.Heading>
+        <PageLayout.Heading>Evaluations</PageLayout.Heading>
         <Spacer />
         <HStack gap={2}>
           <NewEvaluationMenu
@@ -210,9 +210,9 @@ function EvaluationsV2() {
             )}
 
             <VStack align="start" gap={1}>
-              <Heading as="h1">Experiments</Heading>
+              <Heading as="h1">Evaluations</Heading>
               <Text color="fg.muted">
-                View and analyze your experiment results
+                View and analyze your evaluation results
               </Text>
             </VStack>
 
