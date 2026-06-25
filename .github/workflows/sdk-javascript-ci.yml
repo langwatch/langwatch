@@ -99,8 +99,10 @@ jobs:
       LANGWATCH_LICENSE_PUBLIC_KEY: ${{ secrets.TEST_LICENSE_PUBLIC_KEY }}
       # Chunked-JSONL dataset storage (ADR-032) requires a writable root; the
       # canonical default (/var/lib/langwatch/objects) is not provisioned on the
-      # runner, so dataset writes 500 with StorageNotWritable without this.
-      LANGWATCH_LOCAL_STORAGE_PATH: "${{ runner.temp }}/langwatch-objects"
+      # runner, so dataset writes 500 with StorageNotWritable without this. The
+      # runner context is unavailable in job-level env, so use a static tmp path
+      # (the storage layer mkdir's it on demand).
+      LANGWATCH_LOCAL_STORAGE_PATH: "/tmp/langwatch-objects"
 
     services:
       clickhouse:
