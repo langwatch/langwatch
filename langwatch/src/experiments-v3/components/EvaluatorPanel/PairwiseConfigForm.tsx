@@ -9,6 +9,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { ChangeEvent } from "react";
+import { useEffect, useState } from "react";
 import { LuCheck } from "react-icons/lu";
 
 import type {
@@ -49,12 +50,26 @@ export function PairwiseConfigForm({
   targets,
   datasetColumns,
 }: PairwiseConfigFormProps) {
+  // Track the latest config locally so rapid successive picks (e.g. user
+  // selects Variant A, then Variant B before the parent re-renders with the
+  // new value prop) don't stomp on each other. Without this each `update`
+  // spread off the stale `value` prop and only the last pick stuck. We sync
+  // back to `value` when the parent intentionally pushes new state in.
+  const [draft, setDraft] = useState<PairwiseEvaluatorConfig>(value);
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
   const update = (patch: Partial<PairwiseEvaluatorConfig>) => {
-    onChange({ ...value, ...patch });
+    setDraft((prev) => {
+      const next = { ...prev, ...patch };
+      onChange(next);
+      return next;
+    });
   };
 
   const toggleMetric = (metric: "cost" | "duration", on: boolean) => {
-    const set = new Set(value.includeMetrics);
+    const set = new Set(draft.includeMetrics);
     if (on) set.add(metric);
     else set.delete(metric);
     update({ includeMetrics: Array.from(set) });
@@ -62,7 +77,7 @@ export function PairwiseConfigForm({
 
   // Variant B options exclude variant A so the user can't pick the same
   // target twice (a pairwise comparison of X vs X is always a tie).
-  const variantBOptions = targets.filter((t) => t.id !== value.variantA);
+  const variantBOptions = targets.filter((t) => t.id !== draft.variantA);
 
   return (
     <VStack align="stretch" gap={4} padding={4}>
@@ -70,7 +85,7 @@ export function PairwiseConfigForm({
         <Field.Label>Variant A</Field.Label>
         <NativeSelect.Root>
           <NativeSelect.Field
-            value={value.variantA}
+            value={draft.variantA}
             onChange={(e: ChangeEvent<HTMLSelectElement>) => update({ variantA: e.currentTarget.value })}
           >
             <option value="">Select a target…</option>
@@ -87,7 +102,7 @@ export function PairwiseConfigForm({
         <Field.Label>Variant B</Field.Label>
         <NativeSelect.Root>
           <NativeSelect.Field
-            value={value.variantB}
+            value={draft.variantB}
             onChange={(e: ChangeEvent<HTMLSelectElement>) => update({ variantB: e.currentTarget.value })}
           >
             <option value="">Select a target…</option>
@@ -104,7 +119,7 @@ export function PairwiseConfigForm({
         <Field.Label>Golden field</Field.Label>
         <NativeSelect.Root>
           <NativeSelect.Field
-            value={value.goldenField}
+            value={draft.goldenField}
             onChange={(e: ChangeEvent<HTMLSelectElement>) => update({ goldenField: e.currentTarget.value })}
           >
             <option value="">Select a dataset column…</option>
@@ -126,7 +141,7 @@ export function PairwiseConfigForm({
         </Text>
         <VStack align="stretch" gap={1}>
           <Checkbox.Root
-            checked={value.includeMetrics.includes("cost")}
+            checked={draft.includeMetrics.includes("cost")}
             onCheckedChange={(d) => toggleMetric("cost", d.checked === true)}
           >
             <Checkbox.HiddenInput />
@@ -134,7 +149,7 @@ export function PairwiseConfigForm({
             <Checkbox.Label>Include cost</Checkbox.Label>
           </Checkbox.Root>
           <Checkbox.Root
-            checked={value.includeMetrics.includes("duration")}
+            checked={draft.includeMetrics.includes("duration")}
             onCheckedChange={(d) =>
               toggleMetric("duration", d.checked === true)
             }

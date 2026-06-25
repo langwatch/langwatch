@@ -377,6 +377,18 @@ export function EvaluationsV3Table({
         type: field.type as Field["type"],
       }));
 
+      // Pairwise column-target (#5100): seed an empty pairwise config so the
+      // column owns its variantA/variantB/goldenField selections — this is the
+      // discriminator the Run flow and validation use to render the clean
+      // PairwiseConfigForm instead of the generic per-row mappings UI. Strictly
+      // additive: only set when the underlying evaluator is pairwise_compare,
+      // so every other evaluator-as-target keeps its current behavior.
+      const config = (evaluator.config ?? null) as
+        | { evaluatorType?: string }
+        | null;
+      const isPairwiseEvaluator =
+        config?.evaluatorType === "langevals/pairwise_compare";
+
       const targetConfig: TargetConfig = {
         id: `target_${Date.now()}`,
         type: "evaluator",
@@ -384,6 +396,14 @@ export function EvaluationsV3Table({
         inputs,
         outputs,
         mappings: {},
+        ...(isPairwiseEvaluator && {
+          pairwise: {
+            variantA: "",
+            variantB: "",
+            goldenField: "",
+            includeMetrics: [],
+          },
+        }),
       };
       addOrReplaceTarget(targetConfig);
       closeDrawer();
