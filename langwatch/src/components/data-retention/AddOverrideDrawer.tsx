@@ -1,4 +1,5 @@
 import {
+  Badge,
   Button,
   createListCollection,
   Field,
@@ -30,7 +31,36 @@ import {
   RETENTION_PRESETS,
   type RetentionUnit,
   retentionUnitCollection,
+  SCOPE_ICON,
 } from "./constants";
+
+/** A row the overflow menu's Edit action targets: a single scope's policy,
+ *  prefilled into the drawer with the scope locked. */
+export type RetentionEditTarget = {
+  scope: ScopeTriadEntry;
+  scopeName: string;
+  retentionDays: number;
+};
+
+/** Map a stored day count back onto the drawer's preset/custom controls. Stored
+ *  values are always week-aligned, so the custom fallback round-trips through
+ *  whole weeks cleanly; the indefinite sentinel maps to its admin-only preset. */
+function initialRetentionState(days: number): {
+  preset: string;
+  amount: string;
+  unit: RetentionUnit;
+} {
+  if (days === INDEFINITE_RETENTION_DAYS) {
+    return { preset: INDEFINITE_PRESET_VALUE, amount: "", unit: "weeks" };
+  }
+  const match = RETENTION_PRESETS.find((p) => p.days === days);
+  if (match) return { preset: match.value, amount: "", unit: "weeks" };
+  return {
+    preset: CUSTOM_PRESET_VALUE,
+    amount: String(days / RETENTION_WEEK_DAYS),
+    unit: "weeks",
+  };
+}
 
 export function AddOverrideDrawer({
   open,
@@ -42,6 +72,7 @@ export function AddOverrideDrawer({
   isPlatformAdmin,
   isSaving,
   onSave,
+  editTarget,
 }: {
   open: boolean;
   onClose: () => void;
@@ -60,6 +91,9 @@ export function AddOverrideDrawer({
     retentionDays: number,
     applyToExisting: boolean,
   ) => void;
+  /** When set, the drawer edits this existing policy: the scope is locked and
+   *  shown read-only, and the retention is prefilled. Absent = add mode. */
+  editTarget?: RetentionEditTarget | null;
 }) {
   const [scopes, setScopes] = useState<ScopeTriadEntry[]>([]);
   const [preset, setPreset] = useState<string>(String(DEFAULT_RETENTION_DAYS));
@@ -88,21 +122,32 @@ export function AddOverrideDrawer({
     [isPlatformAdmin],
   );
 
+  const isEditing = !!editTarget;
+
   useEffect(() => {
-    if (open) {
-      // Default to the current project so the picker opens on the user's
-      // working scope, mirroring the API-key drawer pattern.
-      setScopes(
-        available.projects.some((p) => p.id === currentProjectId)
-          ? [{ scopeType: "PROJECT", scopeId: currentProjectId }]
-          : [],
-      );
-      setPreset(String(DEFAULT_RETENTION_DAYS));
-      setCustomAmount("");
-      setCustomUnit("weeks");
+    if (!open) return;
+    if (editTarget) {
+      // Edit mode: lock to the policy's scope and prefill its current value.
+      setScopes([editTarget.scope]);
+      const init = initialRetentionState(editTarget.retentionDays);
+      setPreset(init.preset);
+      setCustomAmount(init.amount);
+      setCustomUnit(init.unit);
       setApplyToExisting(true);
+      return;
     }
-  }, [open, currentProjectId, available.projects]);
+    // Add mode: default to the current project so the picker opens on the
+    // user's working scope, mirroring the API-key drawer pattern.
+    setScopes(
+      available.projects.some((p) => p.id === currentProjectId)
+        ? [{ scopeType: "PROJECT", scopeId: currentProjectId }]
+        : [],
+    );
+    setPreset(String(DEFAULT_RETENTION_DAYS));
+    setCustomAmount("");
+    setCustomUnit("weeks");
+    setApplyToExisting(true);
+  }, [open, editTarget, currentProjectId, available.projects]);
 
   const resolvedDays = (() => {
     if (preset === CUSTOM_PRESET_VALUE) {
@@ -136,7 +181,9 @@ export function AddOverrideDrawer({
     >
       <Drawer.Content bg="bg">
         <Drawer.Header>
-          <Heading size="md">Add retention policy</Heading>
+          <Heading size="md">
+            {isEditing ? "Edit retention policy" : "Add retention policy"}
+          </Heading>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
@@ -145,20 +192,29 @@ export function AddOverrideDrawer({
               <Text fontWeight="600" fontSize="sm">
                 Scope
               </Text>
-              <ScopeChipPicker
-                value={scopes}
-                onChange={setScopes}
-                organizationId={available.organization?.id}
-                organizationName={available.organization?.name}
-                availableTeams={available.teams}
-                availableProjects={available.projects}
-                label=""
-                currentOrganizationId={
-                  available.organization ? currentOrganizationId : undefined
-                }
-                currentTeamId={currentTeamId}
-                currentProjectId={currentProjectId}
-              />
+              {isEditing && editTarget ? (
+                // Scope is fixed when editing — changing it would mean deleting
+                // this rule and creating another, which is what "Add" is for.
+                <ScopeReadout
+                  scopeType={editTarget.scope.scopeType}
+                  name={editTarget.scopeName}
+                />
+              ) : (
+                <ScopeChipPicker
+                  value={scopes}
+                  onChange={setScopes}
+                  organizationId={available.organization?.id}
+                  organizationName={available.organization?.name}
+                  availableTeams={available.teams}
+                  availableProjects={available.projects}
+                  label=""
+                  currentOrganizationId={
+                    available.organization ? currentOrganizationId : undefined
+                  }
+                  currentTeamId={currentTeamId}
+                  currentProjectId={currentProjectId}
+                />
+              )}
             </VStack>
 
             <Field.Root>
@@ -247,20 +303,55 @@ export function AddOverrideDrawer({
         </Drawer.Body>
         <Drawer.Footer>
           <HStack width="full" justify="end" gap={2}>
-            <Button variant="outline" onClick={onClose} disabled={isSaving}>
-              Cancel
-            </Button>
+            {/* Edit drawers reached from a row overflow menu carry only the
+                primary action — the header X cancels (row-actions-overflow-menu.md).
+                The Add drawer keeps an explicit Cancel for its create flow. */}
+            {!isEditing && (
+              <Button variant="outline" onClick={onClose} disabled={isSaving}>
+                Cancel
+              </Button>
+            )}
             <Button
               colorPalette="blue"
               disabled={!canSave}
               loading={isSaving}
               onClick={() => onSave(scopes, resolvedDays, applyToExisting)}
             >
-              Create
+              {isEditing ? "Save changes" : "Create"}
             </Button>
           </HStack>
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+/** Read-only display of a locked scope in the edit drawer: the scope's tier
+ *  icon, name, and a tier badge, matching the policy table's row layout. */
+function ScopeReadout({
+  scopeType,
+  name,
+}: {
+  scopeType: ScopeTriadEntry["scopeType"];
+  name: string;
+}) {
+  const Icon = SCOPE_ICON[scopeType];
+  return (
+    <HStack
+      gap={2}
+      width="full"
+      paddingX={3}
+      paddingY={2}
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="md"
+      background="bg.subtle"
+    >
+      <Icon size={14} />
+      <Text>{name}</Text>
+      <Badge size="sm" colorPalette="gray">
+        {scopeType.toLowerCase()}
+      </Badge>
+    </HStack>
   );
 }

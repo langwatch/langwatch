@@ -112,6 +112,25 @@ export const dataRetentionRouter = createTRPCRouter({
       }
     }),
 
+  /**
+   * Preview the retention each category would fall back to if the scope's
+   * override were removed — the cascade value (next tier, or the platform
+   * default) the data would land on. Powers the remove-confirmation dialog so
+   * the user sees the real post-removal number, never a guessed one. Read-only;
+   * gated by the same write-on-scope check as the removal it previews, so the
+   * resolved org-default never leaks to a caller who couldn't remove the rule.
+   */
+  previewScopeRemoval: protectedProcedure
+    .input(z.object({ projectId: z.string(), scope: scopeInput }))
+    .use(authorizeInResolver)
+    .query(async ({ input, ctx }) => {
+      await assertCanWriteRetentionScope(
+        { prisma: ctx.prisma, session: ctx.session },
+        input.scope,
+      );
+      return getApp().dataRetention.policy.previewScopeRemoval(input.scope);
+    }),
+
   /** Remove one category's override at one scope; the next tier then applies. */
   removeForScope: protectedProcedure
     .input(

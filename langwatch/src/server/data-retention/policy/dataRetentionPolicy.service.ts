@@ -1,6 +1,10 @@
 import type { RetentionPolicy } from "@prisma/client";
 import type { ScopeAssignment } from "~/server/scopes/scope.types";
 import {
+  type RetentionRow,
+  resolveRetention,
+} from "../resolveRetentionDays";
+import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   type ResolvedRetention,
   type RetentionCategory,
@@ -35,6 +39,37 @@ export class DataRetentionPolicyService {
         experiments: PLATFORM_DEFAULT_RETENTION_DAYS,
       }
     );
+  }
+
+  /**
+   * The retention each category would fall back to if every override at `scope`
+   * were removed — i.e. the value the next tier in the cascade supplies, or the
+   * platform default when nothing closer applies. Pure preview (no mutation):
+   * reads the org's rows, drops the scope's own rows, and re-resolves the
+   * scope's own cascade chain. Reuses `resolveRetention` so the fallback can
+   * never diverge from what an actual removal would produce. Returns only day
+   * counts — a caller who can manage this scope never learns a sibling scope's
+   * rule identity, only the number their data would land on.
+   */
+  async previewScopeRemoval(
+    scope: ScopeAssignment,
+  ): Promise<ResolvedRetention> {
+    const organizationId =
+      await this.repository.findOrganizationForScope(scope);
+    if (!organizationId) {
+      return {
+        traces: PLATFORM_DEFAULT_RETENTION_DAYS,
+        scenarios: PLATFORM_DEFAULT_RETENTION_DAYS,
+        experiments: PLATFORM_DEFAULT_RETENTION_DAYS,
+      };
+    }
+    const rows = await this.repository.findAllInOrganization(organizationId);
+    const remaining = rows.filter(
+      (r) =>
+        !(r.scopeType === scope.scopeType && r.scopeId === scope.scopeId),
+    ) as RetentionRow[];
+    const chain = await this.repository.getScopeCascadeChain(scope);
+    return resolveRetention({ rows: remaining, chain });
   }
 
   /** Every retention override row in the organization (unfiltered). */

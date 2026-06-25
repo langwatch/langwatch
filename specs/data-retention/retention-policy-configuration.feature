@@ -68,6 +68,34 @@ Feature: Data retention policy configuration
     When the project admin removes the project-level traces override
     Then traces for "web-app" are kept for 63 days from the organization rule
 
+  # The settings table exposes per-rule actions through a single overflow menu
+  # (the established row-actions pattern), so a customer can change a value
+  # without deleting and re-creating the rule.
+
+  Scenario: Editing a policy from the row overflow menu changes only its value
+    Given a project-level traces retention of 91 days for "web-app"
+    When the project admin edits that policy from the row menu and sets 182 days
+    Then the policy's scope stays "web-app"
+    And traces for "web-app" are kept for 182 days
+
+  # Removal is a deliberate, explained action. Deleting a rule never deletes
+  # data — it only changes the retention applied to newly ingested data, which
+  # falls back to the next applicable tier (or the platform default).
+
+  Scenario: Removal asks for confirmation and previews the real fallback value
+    Given an organization-level traces retention of 49 days for "acme"
+    And a project-level traces retention of 91 days for "web-app"
+    When the project admin chooses to remove the project-level policy
+    Then a confirmation explains that existing data is not deleted
+    And it shows the retention falling back from 91 days to 49 days
+    And the policy is removed only after the admin confirms
+
+  Scenario: The previewed fallback never leaks a rule the caller cannot read
+    Given a project-level traces retention of 91 days for "web-app"
+    And an organization-level traces retention the caller is not allowed to read
+    When the caller previews removal of the project-level policy
+    Then the response contains only the resolved day count, not the org rule's scope
+
   Scenario: A project admin cannot set an organization-wide override
     Given a user who can manage project "web-app" but not the organization
     When that user attempts to set an organization-level traces retention

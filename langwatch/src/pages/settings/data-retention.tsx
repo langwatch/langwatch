@@ -12,10 +12,14 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { DatabaseBackup, Plus, Trash2 } from "lucide-react";
+import { DatabaseBackup, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { AddOverrideDrawer } from "~/components/data-retention/AddOverrideDrawer";
+import {
+  AddOverrideDrawer,
+  type RetentionEditTarget,
+} from "~/components/data-retention/AddOverrideDrawer";
 import { ApplyToExistingConfirmDialog } from "~/components/data-retention/ApplyToExistingConfirmDialog";
+import { RemoveScopeConfirmDialog } from "~/components/data-retention/RemoveScopeConfirmDialog";
 import {
   SCOPE_ICON,
   SCOPE_TIER_ORDER,
@@ -30,6 +34,7 @@ import { RetentionAndUsageCard } from "~/components/data-retention/RetentionAndU
 import { RetroactiveProgressCard } from "~/components/data-retention/RetroactiveProgressCard";
 import SettingsLayout from "~/components/SettingsLayout";
 import { ScopeFilter as ScopeFilterComponent } from "~/components/settings/ScopeFilter";
+import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useAvailableScopes } from "~/hooks/useAvailableScopes";
@@ -100,6 +105,15 @@ function DataRetentionPage({
   const isPlatformAdmin = api.user.isAdmin.useQuery({}).data?.isAdmin ?? false;
 
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // When set, the Add drawer opens in edit mode locked to this scope's policy.
+  const [editTarget, setEditTarget] = useState<RetentionEditTarget | null>(
+    null,
+  );
+  // The scope-group pending removal — drives the confirm dialog so deletion is
+  // a deliberate, explained action instead of a one-click trash button.
+  const [removeTarget, setRemoveTarget] = useState<RetentionScopeGroup | null>(
+    null,
+  );
 
   const invalidate = () =>
     utils.dataRetention.getRules.invalidate({ projectId });
@@ -229,6 +243,27 @@ function DataRetentionPage({
         type: "error",
       });
     }
+  };
+
+  // Open the Add drawer in edit mode for a scope group. The drawer edits one
+  // retention value applied to all categories, so we seed it with the group's
+  // traces value (or the first present category for a divergent legacy group).
+  const openEditForGroup = (group: RetentionScopeGroup) => {
+    const present = (Object.keys(group.byCategory) as RetentionCategory[]).find(
+      (c) => group.byCategory[c] !== undefined,
+    );
+    const retentionDays = group.byCategory.traces ?? group.byCategory[present!]!;
+    setEditTarget({
+      scope: { scopeType: group.scopeType, scopeId: group.scopeId },
+      scopeName: group.name,
+      retentionDays,
+    });
+    setDrawerOpen(true);
+  };
+
+  const closeDrawer = () => {
+    setDrawerOpen(false);
+    setEditTarget(null);
   };
 
   const resolved = resolveScopeFilter(scopeFilter, {
@@ -366,16 +401,32 @@ function DataRetentionPage({
                           </Table.Cell>
                           <Table.Cell textAlign="end">
                             {canWrite && (
-                              <Button
-                                size="xs"
-                                variant="ghost"
-                                colorPalette="red"
-                                loading={removeForScope.isLoading}
-                                onClick={() => void removeScopeGroup(group)}
-                                aria-label="Remove retention policy"
-                              >
-                                <Trash2 size={14} />
-                              </Button>
+                              <Menu.Root>
+                                <Menu.Trigger asChild>
+                                  <Button
+                                    size="xs"
+                                    variant="ghost"
+                                    aria-label={`Actions for ${group.name}`}
+                                  >
+                                    <MoreVertical size={14} />
+                                  </Button>
+                                </Menu.Trigger>
+                                <Menu.Content>
+                                  <Menu.Item
+                                    value="edit"
+                                    onClick={() => openEditForGroup(group)}
+                                  >
+                                    <Pencil size={14} /> Edit
+                                  </Menu.Item>
+                                  <Menu.Item
+                                    value="remove"
+                                    color="red.500"
+                                    onClick={() => setRemoveTarget(group)}
+                                  >
+                                    <Trash2 size={14} /> Remove
+                                  </Menu.Item>
+                                </Menu.Content>
+                              </Menu.Root>
                             )}
                           </Table.Cell>
                         </Table.Row>
@@ -399,7 +450,8 @@ function DataRetentionPage({
         {available && (
           <AddOverrideDrawer
             open={drawerOpen}
-            onClose={() => setDrawerOpen(false)}
+            onClose={closeDrawer}
+            editTarget={editTarget}
             available={available}
             currentOrganizationId={organizationId}
             currentTeamId={teamId}
@@ -476,7 +528,7 @@ function DataRetentionPage({
               if (!applyToExisting) {
                 const result = await saveOverrides();
                 const status = reportSaveResults(result);
-                if (status.success) setDrawerOpen(false);
+                if (status.success) closeDrawer();
                 return;
               }
 
@@ -555,12 +607,24 @@ function DataRetentionPage({
                       });
                     }
                   }
-                  if (status.success) setDrawerOpen(false);
+                  if (status.success) closeDrawer();
                 },
               });
             }}
           />
         )}
+
+        <RemoveScopeConfirmDialog
+          group={removeTarget}
+          projectId={projectId}
+          isRemoving={removeForScope.isLoading}
+          onCancel={() => setRemoveTarget(null)}
+          onConfirm={async () => {
+            if (!removeTarget) return;
+            await removeScopeGroup(removeTarget);
+            setRemoveTarget(null);
+          }}
+        />
 
         <ApplyToExistingConfirmDialog
           pending={pendingConfirm}
