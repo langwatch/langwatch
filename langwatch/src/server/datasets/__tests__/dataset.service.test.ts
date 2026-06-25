@@ -127,6 +127,33 @@ describe("DatasetService", () => {
             expect.anything(),
           );
         });
+
+        it("preserves entry keys not in the column list (no scrub)", async () => {
+          // Legacy datasets can carry entry keys outside columnTypes. The
+          // migration policy is faithful copy — post == pre — so a type-only
+          // edit must NOT drop them. The migrator (which DOES drop stray keys)
+          // stays skipped; scrubbing is the deferred "rectangular" decision,
+          // not a side effect of a retype.
+          const deps = makeDeps(
+            makeLegacyDataset([{ name: "image_url", type: "string" }]),
+            [{ id: "rec_1", entry: { image_url: "http://x", selected: true } }],
+          );
+
+          await deps.service.upsertDataset({
+            projectId: "project_1",
+            datasetId: "dataset_legacy",
+            name: "products_image_urls",
+            columnTypes: [{ name: "image_url", type: "image" }] as never,
+          });
+
+          // No row rewrite at all → the stray `selected` key survives untouched.
+          expect(
+            deps.recordRepository.findDatasetRecords,
+          ).not.toHaveBeenCalled();
+          expect(
+            deps.recordRepository.updateDatasetRecordsTransaction,
+          ).not.toHaveBeenCalled();
+        });
       });
 
       describe("when columns are only reordered (no rename/add/remove)", () => {
