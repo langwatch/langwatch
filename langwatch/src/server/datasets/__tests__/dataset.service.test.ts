@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { DatasetService } from "../dataset.service";
-import { DATASET_MUTATION_TXN_TIMEOUT_MS } from "../dataset-lock";
+import {
+  DATASET_MUTATION_TXN_MAX_WAIT_MS,
+  DATASET_MUTATION_TXN_TIMEOUT_MS,
+} from "../dataset-lock";
 
 describe("DatasetService", () => {
   describe("validateDatasetName", () => {
@@ -58,7 +61,10 @@ describe("DatasetService", () => {
         columnTypes,
       });
 
-      const makeDeps = (existing: ReturnType<typeof makeLegacyDataset>) => {
+      const makeDeps = (
+        existing: ReturnType<typeof makeLegacyDataset>,
+        records: Array<{ id: string; entry: Record<string, unknown> }> = [],
+      ) => {
         let capturedOptions: { timeout?: number; maxWait?: number } | null =
           null;
         const fakeTx = {} as never;
@@ -74,7 +80,7 @@ describe("DatasetService", () => {
           update: vi.fn().mockResolvedValue(existing),
         };
         const recordRepository = {
-          findDatasetRecords: vi.fn().mockResolvedValue([]),
+          findDatasetRecords: vi.fn().mockResolvedValue(records),
           updateDatasetRecordsTransaction: vi.fn().mockResolvedValue(void 0),
         };
         const service = new DatasetService(
@@ -123,10 +129,40 @@ describe("DatasetService", () => {
         });
       });
 
-      describe("when a column is renamed on a large legacy dataset", () => {
+      describe("when a column is renamed on a legacy dataset", () => {
+        it("remaps each row's value to the new column key", async () => {
+          const deps = makeDeps(
+            makeLegacyDataset([{ name: "old_name", type: "string" }]),
+            [
+              { id: "rec_1", entry: { old_name: "alpha" } },
+              { id: "rec_2", entry: { old_name: "beta" } },
+            ],
+          );
+
+          await deps.service.upsertDataset({
+            projectId: "project_1",
+            datasetId: "dataset_legacy",
+            name: "products_image_urls",
+            columnTypes: [{ name: "new_name", type: "string" }] as never,
+          });
+
+          // Data survives the rename: the value moves old_name → new_name.
+          expect(
+            deps.recordRepository.updateDatasetRecordsTransaction,
+          ).toHaveBeenCalledWith(
+            "project_1",
+            [
+              { id: "rec_1", entry: { new_name: "alpha" } },
+              { id: "rec_2", entry: { new_name: "beta" } },
+            ],
+            expect.anything(),
+          );
+        });
+
         it("runs the migration under the wide transaction budget, not the 5s default", async () => {
           const deps = makeDeps(
             makeLegacyDataset([{ name: "old_name", type: "string" }]),
+            [{ id: "rec_1", entry: { old_name: "alpha" } }],
           );
 
           await deps.service.upsertDataset({
@@ -140,6 +176,9 @@ describe("DatasetService", () => {
           expect(deps.prisma.$transaction).toHaveBeenCalledTimes(1);
           expect(deps.options()?.timeout).toBe(DATASET_MUTATION_TXN_TIMEOUT_MS);
           expect(deps.options()?.timeout).toBeGreaterThan(5_000);
+          expect(deps.options()?.maxWait).toBe(
+            DATASET_MUTATION_TXN_MAX_WAIT_MS,
+          );
         });
       });
     });

@@ -296,6 +296,8 @@ export class DatasetService {
         }
 
         const existingColumns = existingDataset.columnTypes as DatasetColumns;
+        const columnsChanged =
+          JSON.stringify(existingColumns) !== JSON.stringify(columnTypes);
 
         // Defensive: s3_jsonl column changes are handled up front via
         // `migrateS3JsonlColumns` (the advisory-lock chunk rewrite) and return
@@ -303,10 +305,7 @@ export class DatasetService {
         // changed schema would mean that early branch regressed — refuse rather
         // than run the PG record migrator, which would read zero rows (I-PG) and
         // silently corrupt nothing into the chunk store.
-        if (
-          existingDataset.contentLayout === "s3_jsonl" &&
-          JSON.stringify(existingColumns) !== JSON.stringify(columnTypes)
-        ) {
+        if (existingDataset.contentLayout === "s3_jsonl" && columnsChanged) {
           throw new ColumnTypeChangeNotSupportedError();
         }
 
@@ -317,8 +316,13 @@ export class DatasetService {
         // keys, never values. So a type-only change (e.g. string→image) would
         // rewrite every row with byte-identical JSON: O(rowCount) UPDATEs of pure
         // no-ops, which is exactly what blew the transaction budget. Skip it and
-        // let the `dataset.update` below persist the new types alone.
-        if (this.columnKeysChanged(existingColumns, columnTypes)) {
+        // let the `dataset.update` below persist the new types alone. The
+        // `columnsChanged` short-circuit means a name-only edit never reaches
+        // `columnKeysChanged` (and so never reads/maps the stored column array).
+        if (
+          columnsChanged &&
+          this.columnKeysChanged(existingColumns, columnTypes)
+        ) {
           await this.migrateDatasetRecordColumns(
             {
               datasetId,
