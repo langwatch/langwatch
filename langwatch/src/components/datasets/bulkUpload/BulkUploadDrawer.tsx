@@ -38,6 +38,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   AlertTriangle,
   CheckCircle,
@@ -156,11 +157,19 @@ function BulkColumnFields({
           ))}
         </VStack>
       </SortableContext>
-      {/* The lifted copy: position:fixed in a portal-like layer, so it escapes
-          the drawer's overflow clipping and stacks above everything. */}
-      <DragOverlay>
-        {activeColumn ? <ColumnDragOverlayRow col={activeColumn} /> : null}
-      </DragOverlay>
+      {/* The lifted copy. DragOverlay is `position: fixed`, but it must be
+          portaled to <body>: rendered inline it resolves "fixed" against the
+          drawer's transformed ancestor (Chakra slide-in + the collapse
+          `motion.div` both create a containing block), which offsets the lifted
+          row to the right by the drawer's left edge. At <body> it tracks the
+          cursor correctly and still escapes the drawer's overflow clipping. */}
+      {typeof document !== "undefined" &&
+        createPortal(
+          <DragOverlay>
+            {activeColumn ? <ColumnDragOverlayRow col={activeColumn} /> : null}
+          </DragOverlay>,
+          document.body,
+        )}
     </DndContext>
   );
 }
@@ -232,21 +241,26 @@ function SortableColumnRow({
 }
 
 /** The lifted, floating copy shown under the cursor while dragging a column.
- *  Presentational only (no inputs/listeners) — a gray-tokened, shadowed mirror
- *  of the row, with a static type chip so it reads identically. */
+ *  Presentational only (no inputs/listeners). Tinted with the brand `orange`
+ *  palette (subtle bg + emphasized border + accented grip) so the row being
+ *  dragged reads as clearly "picked up"; on drop the overlay unmounts and the
+ *  row returns to its normal colors. */
 function ColumnDragOverlayRow({ col }: { col: DatasetConfirmColumns[number] }) {
   const typeLabel =
     COLUMN_TYPE_OPTIONS.find((o) => o.value === col.type)?.label ?? col.type;
 
   return (
     <HStack
+      data-testid="column-drag-overlay"
+      colorPalette="orange"
       gap={2}
       width="full"
       paddingX={1}
+      paddingY={1}
       borderRadius="md"
       borderWidth="1px"
-      borderColor="border.emphasized"
-      bg="bg.muted"
+      borderColor="colorPalette.emphasized"
+      bg="colorPalette.subtle"
       shadow="lg"
       cursor="grabbing"
     >
@@ -254,7 +268,7 @@ function ColumnDragOverlayRow({ col }: { col: DatasetConfirmColumns[number] }) {
         display="inline-flex"
         alignItems="center"
         justifyContent="center"
-        color="fg.subtle"
+        color="colorPalette.fg"
       >
         <Icon boxSize="16px">
           <GripVertical />
