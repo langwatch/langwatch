@@ -212,7 +212,8 @@ export class TraceSummaryClickHouseRepository
     const raw = rows[0]?.occurredAtMs;
     if (raw === null || raw === undefined) return undefined;
     // min over no matching rows yields the epoch default (0); treat that — and
-    // any non-positive value — as "unknown" so the caller stays unbounded.
+    // any non-positive value — as "trace absent" so the caller returns null and
+    // skips the heavy read.
     const ms = typeof raw === "string" ? Number(raw) : raw;
     return Number.isFinite(ms) && ms > 0 ? ms : undefined;
   }
