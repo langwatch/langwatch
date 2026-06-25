@@ -9,7 +9,7 @@
  * mirroring DrawerNavigation.integration.test.tsx.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
@@ -173,9 +173,17 @@ describe("Privacy rule drawer URL routing", () => {
         />,
       );
 
+      // The drawer is modal={false}, so Ark UI attaches its Escape listener on
+      // the document only after the portaled content mounts. Wait for the
+      // drawer to be on screen before pressing Escape, otherwise the keypress
+      // can land before the listener exists (the CI flake).
+      await screen.findByText("Edit privacy rule");
+
       await user.keyboard("{Escape}");
 
-      expect(mockCloseDrawer).toHaveBeenCalled();
+      // onOpenChange -> onClose resolves a tick later, so poll rather than
+      // asserting synchronously.
+      await waitFor(() => expect(mockCloseDrawer).toHaveBeenCalled());
     });
   });
 });
