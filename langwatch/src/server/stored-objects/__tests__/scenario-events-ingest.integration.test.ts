@@ -37,10 +37,12 @@ import { prisma } from "~/server/db";
 // the `/*` chain before the POST handler; without it the middleware throws
 // "Cannot read properties of undefined (reading 'checkLimit')" and the
 // onError handler turns that into a 500 — masking the route logic entirely.
-// Hoisted so the DELETE scope-guard tests can control the scoped run-id
+// Hoisted so the DELETE scope-guard tests can control the set-scoped run-id
 // lookup and assert which runs get archived (or that none do).
-const { mockGetRunIdsForScope, mockDeleteRun } = vi.hoisted(() => ({
-  mockGetRunIdsForScope: vi.fn().mockResolvedValue([] as string[]),
+const { mockGetRunIdsForSet, mockDeleteRun } = vi.hoisted(() => ({
+  mockGetRunIdsForSet: vi
+    .fn()
+    .mockResolvedValue({ runIds: [] as string[], reachedCap: false }),
   mockDeleteRun: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -53,7 +55,7 @@ vi.mock("~/server/app-layer/app", () => ({
       textMessageEnd: vi.fn().mockResolvedValue(undefined),
       finishRun: vi.fn().mockResolvedValue(undefined),
       deleteRun: mockDeleteRun,
-      runs: { getRunIdsForScope: mockGetRunIdsForScope },
+      runs: { getRunIdsForSet: mockGetRunIdsForSet },
     },
     broadcast: {
       broadcastToTenantRateLimited: vi.fn().mockResolvedValue(undefined),
@@ -447,13 +449,13 @@ describe("POST /api/scenario-events (ingest)", () => {
 
 describe("DELETE /api/scenario-events (scoped archive)", () => {
   beforeEach(() => {
-    mockGetRunIdsForScope.mockClear();
+    mockGetRunIdsForSet.mockClear();
     mockDeleteRun.mockClear();
-    mockGetRunIdsForScope.mockResolvedValue([] as string[]);
+    mockGetRunIdsForSet.mockResolvedValue({ runIds: [], reachedCap: false });
   });
 
-  describe("when no batchRunId or scenarioSetId is provided", () => {
-    /** @scenario "Archiving scenario runs without a scope is rejected" */
+  describe("when no scenarioSetId is provided", () => {
+    /** @scenario "DELETE without scenarioSetId returns 400" */
     it("returns 400 and archives nothing — never wipes the whole project", async () => {
       const res = await app.request("/api/scenario-events", {
         method: "DELETE",
@@ -462,34 +464,82 @@ describe("DELETE /api/scenario-events (scoped archive)", () => {
 
       expect(res.status).toBe(400);
       // The footgun guard: neither the run lookup nor any archive ran.
-      expect(mockGetRunIdsForScope).not.toHaveBeenCalled();
+      expect(mockGetRunIdsForSet).not.toHaveBeenCalled();
       expect(mockDeleteRun).not.toHaveBeenCalled();
     });
   });
 
-  describe("when a batchRunId is provided", () => {
-    /** @scenario "Archiving scenario runs by batchRunId archives only that batch" */
-    it("archives only the runs the scoped lookup returns", async () => {
-      mockGetRunIdsForScope.mockResolvedValueOnce(["run-a", "run-b"]);
+  describe("when scenarioSetId is empty", () => {
+    /** @scenario "DELETE with empty scenarioSetId returns 400" */
+    it("returns 400 and archives nothing", async () => {
+      const res = await app.request("/api/scenario-events?scenarioSetId=", {
+        method: "DELETE",
+        headers: { "X-Auth-Token": testApiKey },
+      });
+
+      expect(res.status).toBe(400);
+      expect(mockGetRunIdsForSet).not.toHaveBeenCalled();
+      expect(mockDeleteRun).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a scenarioSetId is provided", () => {
+    /** @scenario "Archiving one set leaves runs in other sets untouched" */
+    it("archives only the runs the set-scoped lookup returns and reports counts", async () => {
+      mockGetRunIdsForSet.mockResolvedValueOnce({
+        runIds: ["run-a", "run-b"],
+        reachedCap: false,
+      });
 
       const res = await app.request(
-        "/api/scenario-events?batchRunId=batch-xyz",
+        "/api/scenario-events?scenarioSetId=set-a",
         { method: "DELETE", headers: { "X-Auth-Token": testApiKey } },
       );
 
       expect(res.status).toBe(200);
-      expect(mockGetRunIdsForScope).toHaveBeenCalledWith(
+      expect(mockGetRunIdsForSet).toHaveBeenCalledWith(
         expect.objectContaining({
           projectId: testProjectId,
-          batchRunId: "batch-xyz",
+          scenarioSetId: "set-a",
         }),
       );
-      // Only the two runs the scoped lookup returned are archived.
       expect(mockDeleteRun).toHaveBeenCalledTimes(2);
       const archivedIds = mockDeleteRun.mock.calls.map(
         (args) => (args[0] as { scenarioRunId: string }).scenarioRunId,
       );
       expect(archivedIds).toEqual(["run-a", "run-b"]);
+
+      const body = (await res.json()) as {
+        archived: number;
+        failed: number;
+        scenarioSetId: string;
+        hasMore: boolean;
+      };
+      expect(body).toEqual({
+        archived: 2,
+        failed: 0,
+        scenarioSetId: "set-a",
+        hasMore: false,
+      });
+    });
+  });
+
+  describe("when the run-id lookup hits its cap", () => {
+    /** @scenario "Reaching the 10k cap reports hasMore true" */
+    it("reports hasMore true", async () => {
+      mockGetRunIdsForSet.mockResolvedValueOnce({
+        runIds: ["run-a"],
+        reachedCap: true,
+      });
+
+      const res = await app.request(
+        "/api/scenario-events?scenarioSetId=big-set",
+        { method: "DELETE", headers: { "X-Auth-Token": testApiKey } },
+      );
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { hasMore: boolean };
+      expect(body.hasMore).toBe(true);
     });
   });
 });
