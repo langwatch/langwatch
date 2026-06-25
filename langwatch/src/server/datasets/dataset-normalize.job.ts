@@ -237,6 +237,11 @@ const parseInto = async (params: {
           c,
         ]),
       );
+      // Duplicate `sourceHeader`s collapse in the Map (last wins), which would
+      // bind fewer columns than `targetColumns` claims while `appliedColumnTypes`
+      // still persists the phantom duplicate. Degrade rather than emit that
+      // mismatch.
+      if (bySource.size !== targetColumns.length) return;
       // Every file header must map to a confirmed column, else degrade rather
       // than emit a half-renamed dataset.
       if (!canonical.every((h) => bySource.has(h))) return;

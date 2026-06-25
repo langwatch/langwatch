@@ -595,116 +595,162 @@ describe("createDatasetNormalizeHandler()", () => {
       // carries its immutable `sourceHeader`, so normalize must bind values BY
       // HEADER — never by array position — else a reorder would silently rename
       // every column against the wrong data.
-      it("binds each value by sourceHeader, not position, and persists the user's order", async () => {
-        const { storage, writeChunks } = makeStorage({
-          streamStaged: vi
-            .fn()
-            .mockResolvedValue(
-              Readable.from([
-                '{"qty":"5","name":"x"}\n{"qty":"12","name":"y"}\n',
-              ]),
-            ),
-        });
-        const repo = makeRepo({
-          id: "d1",
-          status: "processing",
-          // File header order is [qty, name], but the user dragged `name` first.
-          // Binding by position would map qty's values under `name` — the bug.
-          columnTypes: [
-            { name: "name", type: "string", sourceHeader: "name" },
-            { name: "quantity", type: "number", sourceHeader: "qty" },
-          ],
-        });
+      describe("when columns are reordered", () => {
+        it("binds each value by sourceHeader, not position, and persists the user's order", async () => {
+          const { storage, writeChunks } = makeStorage({
+            streamStaged: vi
+              .fn()
+              .mockResolvedValue(
+                Readable.from([
+                  '{"qty":"5","name":"x"}\n{"qty":"12","name":"y"}\n',
+                ]),
+              ),
+          });
+          const repo = makeRepo({
+            id: "d1",
+            status: "processing",
+            // File header order is [qty, name], but the user dragged `name` first.
+            // Binding by position would map qty's values under `name` — the bug.
+            columnTypes: [
+              { name: "name", type: "string", sourceHeader: "name" },
+              { name: "quantity", type: "number", sourceHeader: "qty" },
+            ],
+          });
 
-        const handler = createDatasetNormalizeHandler({
-          repository: repo as any,
-          getStorage: async () => storage as any,
-        });
-        await handler(basePayload);
+          const handler = createDatasetNormalizeHandler({
+            repository: repo as any,
+            getStorage: async () => storage as any,
+          });
+          await handler(basePayload);
 
-        const entries = writeChunks.mock.calls
-          .flatMap((call: any) => call[0].records)
-          .map((record: any) => record.entry as Record<string, unknown>);
-        // qty → quantity:number, name stays a string — each value tracked its
-        // own header through the reorder.
-        expect(entries).toEqual([
-          { quantity: 5, name: "x" },
-          { quantity: 12, name: "y" },
-        ]);
-        const update = repo.update.mock.calls[0]![0];
-        // Persisted columnTypes follow the user's drag order, sourceHeader stripped.
-        expect(update.data.columnTypes).toEqual([
-          { name: "name", type: "string" },
-          { name: "quantity", type: "number" },
-        ]);
+          const entries = writeChunks.mock.calls
+            .flatMap((call: any) => call[0].records)
+            .map((record: any) => record.entry as Record<string, unknown>);
+          // qty → quantity:number, name stays a string — each value tracked its
+          // own header through the reorder.
+          expect(entries).toEqual([
+            { quantity: 5, name: "x" },
+            { quantity: 12, name: "y" },
+          ]);
+          const update = repo.update.mock.calls[0]![0];
+          // Persisted columnTypes follow the user's drag order, sourceHeader stripped.
+          expect(update.data.columnTypes).toEqual([
+            { name: "name", type: "string" },
+            { name: "quantity", type: "number" },
+          ]);
+        });
       });
 
-      it("handles a simultaneous rename + reorder without scrambling values", async () => {
-        const { storage, writeChunks } = makeStorage({
-          streamStaged: vi
-            .fn()
-            .mockResolvedValue(Readable.from(['{"first":"a","second":"b"}\n'])),
-        });
-        const repo = makeRepo({
-          id: "d1",
-          status: "processing",
-          // Both renamed AND reordered relative to the file's [first, second].
-          columnTypes: [
-            { name: "Second Col", type: "string", sourceHeader: "second" },
-            { name: "First Col", type: "string", sourceHeader: "first" },
-          ],
-        });
+      describe("when columns are renamed and reordered", () => {
+        it("handles a simultaneous rename + reorder without scrambling values", async () => {
+          const { storage, writeChunks } = makeStorage({
+            streamStaged: vi
+              .fn()
+              .mockResolvedValue(
+                Readable.from(['{"first":"a","second":"b"}\n']),
+              ),
+          });
+          const repo = makeRepo({
+            id: "d1",
+            status: "processing",
+            // Both renamed AND reordered relative to the file's [first, second].
+            columnTypes: [
+              { name: "Second Col", type: "string", sourceHeader: "second" },
+              { name: "First Col", type: "string", sourceHeader: "first" },
+            ],
+          });
 
-        const handler = createDatasetNormalizeHandler({
-          repository: repo as any,
-          getStorage: async () => storage as any,
-        });
-        await handler(basePayload);
+          const handler = createDatasetNormalizeHandler({
+            repository: repo as any,
+            getStorage: async () => storage as any,
+          });
+          await handler(basePayload);
 
-        const entries = writeChunks.mock.calls
-          .flatMap((call: any) => call[0].records)
-          .map((record: any) => record.entry as Record<string, unknown>);
-        // "a" came from header `first` → "First Col"; "b" from `second` → "Second Col".
-        expect(entries).toEqual([{ "First Col": "a", "Second Col": "b" }]);
-        const update = repo.update.mock.calls[0]![0];
-        expect(update.data.columnTypes).toEqual([
-          { name: "Second Col", type: "string" },
-          { name: "First Col", type: "string" },
-        ]);
+          const entries = writeChunks.mock.calls
+            .flatMap((call: any) => call[0].records)
+            .map((record: any) => record.entry as Record<string, unknown>);
+          // "a" came from header `first` → "First Col"; "b" from `second` → "Second Col".
+          expect(entries).toEqual([{ "First Col": "a", "Second Col": "b" }]);
+          const update = repo.update.mock.calls[0]![0];
+          expect(update.data.columnTypes).toEqual([
+            { name: "Second Col", type: "string" },
+            { name: "First Col", type: "string" },
+          ]);
+        });
       });
 
-      it("degrades to derive-all-string when a sourceHeader does not cover the file headers", async () => {
-        // A confirmed column whose sourceHeader matches no file header (count
-        // still matches) must not half-rename — fall back, same as a count miss.
-        const { storage, writeChunks } = makeStorage({
-          streamStaged: vi
-            .fn()
-            .mockResolvedValue(Readable.from(['{"a":"1","b":"x"}\n'])),
-        });
-        const repo = makeRepo({
-          id: "d1",
-          status: "processing",
-          columnTypes: [
-            { name: "a", type: "number", sourceHeader: "a" },
-            { name: "wrong", type: "number", sourceHeader: "nonexistent" },
-          ],
-        });
+      describe("when sourceHeader coverage is incomplete", () => {
+        it("degrades to derive-all-string when a sourceHeader does not cover the file headers", async () => {
+          // A confirmed column whose sourceHeader matches no file header (count
+          // still matches) must not half-rename — fall back, same as a count miss.
+          const { storage, writeChunks } = makeStorage({
+            streamStaged: vi
+              .fn()
+              .mockResolvedValue(Readable.from(['{"a":"1","b":"x"}\n'])),
+          });
+          const repo = makeRepo({
+            id: "d1",
+            status: "processing",
+            columnTypes: [
+              { name: "a", type: "number", sourceHeader: "a" },
+              { name: "wrong", type: "number", sourceHeader: "nonexistent" },
+            ],
+          });
 
-        const handler = createDatasetNormalizeHandler({
-          repository: repo as any,
-          getStorage: async () => storage as any,
-        });
-        await handler(basePayload);
+          const handler = createDatasetNormalizeHandler({
+            repository: repo as any,
+            getStorage: async () => storage as any,
+          });
+          await handler(basePayload);
 
-        const entries = writeChunks.mock.calls
-          .flatMap((call: any) => call[0].records)
-          .map((record: any) => record.entry as Record<string, unknown>);
-        expect(entries).toEqual([{ a: "1", b: "x" }]);
-        const update = repo.update.mock.calls[0]![0];
-        expect(update.data.columnTypes).toEqual([
-          { name: "a", type: "string" },
-          { name: "b", type: "string" },
-        ]);
+          const entries = writeChunks.mock.calls
+            .flatMap((call: any) => call[0].records)
+            .map((record: any) => record.entry as Record<string, unknown>);
+          expect(entries).toEqual([{ a: "1", b: "x" }]);
+          const update = repo.update.mock.calls[0]![0];
+          expect(update.data.columnTypes).toEqual([
+            { name: "a", type: "string" },
+            { name: "b", type: "string" },
+          ]);
+        });
+      });
+
+      describe("when columns share a duplicate sourceHeader", () => {
+        // A confirm payload with the same sourceHeader twice collapses in the
+        // header→column map. Binding fewer columns than claimed would persist a
+        // half-mapped dataset, so normalize degrades to derive-all-string —
+        // exactly like a coverage miss.
+        it("degrades to derive-all-string rather than dropping the collision", async () => {
+          const { storage, writeChunks } = makeStorage({
+            streamStaged: vi
+              .fn()
+              .mockResolvedValue(Readable.from(['{"a":"1","b":"x"}\n'])),
+          });
+          const repo = makeRepo({
+            id: "d1",
+            status: "processing",
+            columnTypes: [
+              { name: "a", type: "number", sourceHeader: "a" },
+              { name: "b", type: "number", sourceHeader: "a" },
+            ],
+          });
+
+          const handler = createDatasetNormalizeHandler({
+            repository: repo as any,
+            getStorage: async () => storage as any,
+          });
+          await handler(basePayload);
+
+          const entries = writeChunks.mock.calls
+            .flatMap((call: any) => call[0].records)
+            .map((record: any) => record.entry as Record<string, unknown>);
+          expect(entries).toEqual([{ a: "1", b: "x" }]);
+          const update = repo.update.mock.calls[0]![0];
+          expect(update.data.columnTypes).toEqual([
+            { name: "a", type: "string" },
+            { name: "b", type: "string" },
+          ]);
+        });
       });
     });
 

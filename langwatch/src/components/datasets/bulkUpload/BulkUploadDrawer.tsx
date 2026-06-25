@@ -23,13 +23,14 @@ import {
   type DragEndEvent,
   DragOverlay,
   type DragStartEvent,
+  KeyboardSensor,
   PointerSensor,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
 import {
-  arrayMove,
   SortableContext,
+  sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
@@ -61,6 +62,7 @@ import {
   dropzoneSurfaceProps,
   RAINBOW_TEXT_CSS,
 } from "../datasetDropzoneStyles";
+import { reorderColumnsBySourceHeader } from "./columnReorder";
 import { type BulkFile, useBulkUpload } from "./useBulkUpload";
 
 // Visually hidden but kept in the tab order (not display:none) so the picker is
@@ -94,6 +96,11 @@ function BulkColumnFields({
   // (or the type select) is never swallowed as a drag.
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    // Keyboard reorder: focus a grip, Space to pick up, arrows to move, Space to
+    // drop — so the list is operable without a pointer.
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
   );
   // The row currently being dragged — rendered in a DragOverlay so it floats
   // above (and is never clipped by) the drawer's scroll container.
@@ -114,11 +121,13 @@ function BulkColumnFields({
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveId(null);
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const from = columnTypes.findIndex((c) => c.sourceHeader === active.id);
-    const to = columnTypes.findIndex((c) => c.sourceHeader === over.id);
-    if (from < 0 || to < 0) return;
-    onChange(arrayMove(columnTypes, from, to));
+    if (!over) return;
+    const next = reorderColumnsBySourceHeader(
+      columnTypes,
+      String(active.id),
+      String(over.id),
+    );
+    if (next !== columnTypes) onChange(next);
   };
 
   return (

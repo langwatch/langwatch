@@ -415,6 +415,22 @@ secured.access(directUploadSessionAuth).post(
       if (confirm.success) {
         columnTypes = confirm.data;
       } else {
+        // Only a plainly legacy-shaped payload may fall back to positional
+        // binding. Once any item carries `sourceHeader` the payload is from the
+        // confirm flow, so a confirm parse failure is a real client bug — reject
+        // it rather than downgrade to legacy (which would silently bind columns
+        // by position and can persist the wrong column→data mapping).
+        const looksLikeConfirmPayload =
+          Array.isArray(parsed) &&
+          parsed.some(
+            (column) =>
+              column !== null &&
+              typeof column === "object" &&
+              "sourceHeader" in column,
+          );
+        if (looksLikeConfirmPayload) {
+          throw new UnprocessableEntityError("columnTypes is malformed");
+        }
         const legacy = datasetColumnsSchema.safeParse(parsed);
         if (!legacy.success) {
           throw new UnprocessableEntityError("columnTypes is malformed");
