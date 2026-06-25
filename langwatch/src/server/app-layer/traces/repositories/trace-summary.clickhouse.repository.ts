@@ -152,10 +152,23 @@ export class TraceSummaryClickHouseRepository
         if (hinted) return hinted;
         logger.debug(
           { tenantId, traceId, occurredAtMs: options!.occurredAtMs },
-          "Trace summary not found in hint window — retrying without partition prune",
+          "Trace summary not found in hint window — resolving OccurredAt to bound the retry",
         );
       }
-      return await this.queryByTraceId(tenantId, traceId);
+      // No hint, or the hint window missed: resolve the trace's OccurredAt from
+      // a cheap sort-key seek and bound the heavy read, instead of scanning
+      // every weekly partition (incl. cold S3). OccurredAt is the trace's
+      // occurrence time and is stable across versions (it's the
+      // `PARTITION BY toYearWeek(OccurredAt)` key), so the ±2-day window always
+      // contains the row — no unbounded fallback is needed. A trace genuinely
+      // absent resolves to undefined, and we return null from the light scan
+      // without ever issuing the heavy unbounded read.
+      const resolvedMs = await this.resolveOccurredAtMs(tenantId, traceId);
+      if (resolvedMs === undefined) return null;
+      return await this.queryByTraceId(tenantId, traceId, {
+        fromMs: resolvedMs - PARTITION_WINDOW_MS,
+        toMs: resolvedMs + PARTITION_WINDOW_MS,
+      });
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -165,6 +178,43 @@ export class TraceSummaryClickHouseRepository
       );
       throw error;
     }
+  }
+
+  /**
+   * Resolve a trace's OccurredAt (the `PARTITION BY toYearWeek(...)` column)
+   * so {@link findByTraceId} can prune partitions even when the caller never
+   * threaded an `occurredAtMs` hint (or the hint window missed). The table is
+   * `ORDER BY (TenantId, TraceId)`, so this is a sort-key point seek over a
+   * couple of granules of small columns — far cheaper than letting the heavy
+   * single-trace read fall back to scanning every weekly partition (incl. cold
+   * S3). For a not-yet-projected / absent trace this also lets the caller skip
+   * the heavy read entirely. Returns undefined when the trace isn't in
+   * `trace_summaries`.
+   */
+  private async resolveOccurredAtMs(
+    tenantId: string,
+    traceId: string,
+  ): Promise<number | undefined> {
+    const client = await this.resolveClient(tenantId);
+    const result = await client.query({
+      query: `
+        SELECT toUnixTimestamp64Milli(min(OccurredAt)) AS occurredAtMs
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND TraceId = {traceId:String}
+      `,
+      query_params: { tenantId, traceId },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Array<{
+      occurredAtMs: string | number | null;
+    }>;
+    const raw = rows[0]?.occurredAtMs;
+    if (raw === null || raw === undefined) return undefined;
+    // min over no matching rows yields the epoch default (0); treat that — and
+    // any non-positive value — as "unknown" so the caller stays unbounded.
+    const ms = typeof raw === "string" ? Number(raw) : raw;
+    return Number.isFinite(ms) && ms > 0 ? ms : undefined;
   }
 
   private async queryByTraceId(
