@@ -7,7 +7,8 @@
  * Screenshots land under `/tmp/pr5106/` so the assistant can upload them.
  */
 
-import { ChakraProvider, HStack, defaultSystem } from "@chakra-ui/react";
+import { ChakraProvider, HStack } from "@chakra-ui/react";
+import { system as langwatchSystem } from "~/pages/_app";
 import { cleanup, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, it, vi } from "vitest";
@@ -54,7 +55,7 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
   it("PairwiseConfigForm — initial state with metrics checked", async () => {
     await page.viewport(520, 600);
     render(
-      <ChakraProvider value={defaultSystem}>
+      <ChakraProvider value={langwatchSystem}>
         <div style={{ width: 480, padding: 16, background: "white" }}>
           <PairwiseConfigForm
             value={{
@@ -80,7 +81,7 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
   it("AggregateHeaderBar — tally + filter chips + handoffs", async () => {
     await page.viewport(1600, 70);
     render(
-      <ChakraProvider value={defaultSystem}>
+      <ChakraProvider value={langwatchSystem}>
         <div style={{ width: 1580, background: "white" }}>
           <AggregateHeaderBar
             counts={{ a: 12, b: 7, tie: 2 }}
@@ -107,7 +108,7 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
   it("AggregateHeaderBar — losses filter active", async () => {
     await page.viewport(1600, 70);
     render(
-      <ChakraProvider value={defaultSystem}>
+      <ChakraProvider value={langwatchSystem}>
         <div style={{ width: 1580, background: "white" }}>
           <AggregateHeaderBar
             counts={{ a: 12, b: 7, tie: 2 }}
@@ -134,7 +135,7 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
   it("RowVerdictStrip — A wins", async () => {
     await page.viewport(800, 40);
     render(
-      <ChakraProvider value={defaultSystem}>
+      <ChakraProvider value={langwatchSystem}>
         <div style={{ width: 780, background: "white" }}>
           <RowVerdictStrip
             label="A"
@@ -155,7 +156,7 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
   it("RowVerdictStrip — tie", async () => {
     await page.viewport(800, 40);
     render(
-      <ChakraProvider value={defaultSystem}>
+      <ChakraProvider value={langwatchSystem}>
         <div style={{ width: 780, background: "white" }}>
           <RowVerdictStrip
             label="tie"
@@ -176,7 +177,7 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
   it("RowVerdictStrip — B wins", async () => {
     await page.viewport(800, 40);
     render(
-      <ChakraProvider value={defaultSystem}>
+      <ChakraProvider value={langwatchSystem}>
         <div style={{ width: 780, background: "white" }}>
           <RowVerdictStrip
             label="B"
@@ -212,7 +213,7 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
     const winnerResult = { status: "processed", score: 0, label: "A" };
 
     render(
-      <ChakraProvider value={defaultSystem}>
+      <ChakraProvider value={langwatchSystem}>
         <div style={{ padding: 16, background: "white" }}>
           <HStack gap={4}>
             <EvaluatorChip

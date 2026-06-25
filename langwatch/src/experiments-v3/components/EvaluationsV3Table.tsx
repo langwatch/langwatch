@@ -68,6 +68,7 @@ import { createPromptEditorCallbacks } from "../utils/promptEditorCallbacks";
 import { ColumnTypeIcon } from "./ColumnTypeIcon";
 import { DatasetSuperHeader } from "./DatasetSuperHeader";
 import { EvaluationsV3DatasetTableProvider } from "./EvaluationsV3DatasetTableProvider";
+import { PairwiseAggregateHeader } from "./PairwiseAggregateHeader";
 import { SelectionToolbar } from "./SelectionToolbar";
 import {
   CheckboxCellFromMeta,
@@ -1523,6 +1524,9 @@ export function EvaluationsV3Table({
         },
       }}
     >
+      {/* Pairwise aggregate header (#5100) — renders only when a pairwise
+          evaluator has at least one verdict. */}
+      <PairwiseAggregateHeader />
       <table ref={tableRef}>
         {/* Define column widths with colgroup for table-layout: fixed */}
         <colgroup>
