@@ -1,13 +1,13 @@
 /**
  * Bulk upload (D1/D2/D4/D6-9 UI): a dedicated drawer to drop several files at
  * once. Each file is its own row with an inline collapsed column-type confirm;
- * "Upload all" prepares them in the background, independently. Reuses the
- * single-flow's `DatasetUploadProcessing` poller for each row's processing tail.
+ * "Upload all" prepares them in the background, independently. Shares the
+ * single-file dropzone visuals (dotted grid + growing cloud + rainbow) so the
+ * two flows look identical.
  */
 import {
   Box,
   Button,
-  Collapsible,
   Heading,
   HStack,
   Input,
@@ -17,19 +17,26 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useEffect, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle,
   ChevronDown,
+  ChevronUp,
   RefreshCw,
   X,
-  XCircle,
 } from "react-feather";
 import { formatFileSize } from "react-papaparse";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { DatasetColumns } from "~/server/datasets/types";
+import { api } from "~/utils/api";
 import { Drawer } from "../../ui/drawer";
-import { DatasetUploadProcessing } from "../UploadCSVDrawer";
+import {
+  DROPZONE_DOTTED_STYLE,
+  DropzonePrompt,
+  dropzoneSurfaceProps,
+  RAINBOW_TEXT_CSS,
+} from "../datasetDropzoneStyles";
 import { type BulkFile, useBulkUpload } from "./useBulkUpload";
 
 const COLUMN_TYPE_OPTIONS = [
@@ -41,6 +48,20 @@ const COLUMN_TYPE_OPTIONS = [
   "json",
   "image",
 ] as const;
+
+// Visually hidden but kept in the tab order (not display:none) so the picker is
+// reachable + operable by keyboard.
+const SR_ONLY_INPUT: React.CSSProperties = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: "hidden",
+  clip: "rect(0 0 0 0)",
+  whiteSpace: "nowrap",
+  border: 0,
+};
 
 /** Inline, compact column-type list for one file: rename + retype only (the
  *  confirmed columns must stay positionally 1:1 with the file's headers — no
@@ -56,7 +77,7 @@ function BulkColumnFields({
     onChange(columnTypes.map((c, i) => (i === index ? { ...c, ...patch } : c)));
 
   return (
-    <VStack align="stretch" gap={2} width="full">
+    <VStack align="stretch" gap={2} width="full" paddingTop={2}>
       {columnTypes.map((col, index) => (
         <HStack key={index} gap={2} width="full">
           <Input
@@ -89,26 +110,32 @@ function BulkColumnFields({
   );
 }
 
-function StatusChip({ file }: { file: BulkFile }) {
+/** The right-aligned slot of a row: the confirm-types toggle while pending,
+ *  otherwise an inline status tracker (preparing/uploading rainbow → ready). */
+function RowTrailing({
+  file,
+  isOpen,
+  onToggle,
+}: {
+  file: BulkFile;
+  isOpen: boolean;
+  onToggle: () => void;
+}) {
   switch (file.status) {
-    case "ready":
+    case "pending":
+      if (!file.columnTypes || file.columnTypes.length === 0) return null;
       return (
-        <HStack gap={1} color="green.600" fontSize="13px">
-          <CheckCircle size={14} /> <Text>Ready</Text>
-        </HStack>
-      );
-    case "failed":
-    case "rejected":
-      return (
-        <HStack gap={1} color="red.500" fontSize="13px">
-          <XCircle size={14} />
-          <Text>
-            {file.rejectedReason === "unsupported"
-              ? "Unsupported file"
-              : file.rejectedReason === "too-large"
-                ? "Too large"
-                : (file.error ?? "Failed")}
-          </Text>
+        <HStack
+          as="button"
+          gap={1}
+          fontSize="13px"
+          color="blue.600"
+          cursor="pointer"
+          aria-label={`Confirm columns for ${file.name}`}
+          onClick={onToggle}
+        >
+          <Text>{file.columnTypes.length} columns — confirm types</Text>
+          {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </HStack>
       );
     case "queued":
@@ -118,11 +145,34 @@ function StatusChip({ file }: { file: BulkFile }) {
         </Text>
       );
     case "uploading":
+      return (
+        <Text fontSize="13px" fontWeight="medium" css={RAINBOW_TEXT_CSS}>
+          Uploading…
+        </Text>
+      );
     case "processing":
       return (
-        <HStack gap={1} color="blue.500" fontSize="13px">
-          <Spinner size="xs" /> <Text>Preparing…</Text>
+        <Text fontSize="13px" fontWeight="medium" css={RAINBOW_TEXT_CSS}>
+          Preparing…
+        </Text>
+      );
+    case "ready":
+      return (
+        <HStack gap={1} color="green.600" fontSize="13px">
+          <CheckCircle size={14} />
+          <Text>Ready</Text>
         </HStack>
+      );
+    case "failed":
+    case "rejected":
+      return (
+        <Text fontSize="13px" color="red.500">
+          {file.rejectedReason === "unsupported"
+            ? "Unsupported file"
+            : file.rejectedReason === "too-large"
+              ? "Too large"
+              : (file.error ?? "Failed")}
+        </Text>
       );
     case "cancelled":
       return (
@@ -143,6 +193,7 @@ function BulkFileRow({
   onRetry,
   onColumns,
   onReady,
+  onFailed,
 }: {
   file: BulkFile;
   projectId: string;
@@ -151,17 +202,44 @@ function BulkFileRow({
   onRetry: () => void;
   onColumns: (next: DatasetColumns) => void;
   onReady: () => void;
+  onFailed: (error?: string) => void;
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const isActive = file.status === "uploading" || file.status === "processing";
   const canConfirm =
     file.status === "pending" &&
-    file.columnTypes &&
+    !!file.columnTypes &&
     file.columnTypes.length > 0;
-  const isActive = file.status === "uploading" || file.status === "processing";
+
+  // Poll the dataset status inline once finalized (no nested container). The
+  // server normalizes off-thread; the row reports ready/failed in place.
+  const isPolling = file.status === "processing" && !!file.datasetId;
+  const statusQuery = api.dataset.getById.useQuery(
+    { projectId, datasetId: file.datasetId ?? "" },
+    {
+      enabled: isPolling,
+      refetchOnWindowFocus: false,
+      refetchInterval: (data: { status?: string } | null | undefined) =>
+        data?.status === "processing" ? 3000 : false,
+    },
+  );
+  const polledStatus = statusQuery.data?.status;
+  useEffect(() => {
+    if (!isPolling) return;
+    if (polledStatus === "ready") onReady();
+    else if (polledStatus === "failed") {
+      onFailed(
+        (statusQuery.data as { statusError?: string } | undefined)
+          ?.statusError ?? undefined,
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPolling, polledStatus]);
 
   return (
     <VStack
       align="stretch"
-      gap={2}
+      gap={0}
       padding={3}
       borderWidth="1px"
       borderRadius="lg"
@@ -172,16 +250,26 @@ function BulkFileRow({
       }
       bg="bg"
     >
-      <HStack gap={3} width="full">
+      <HStack gap={3} width="full" align="center">
         <VStack align="start" gap={0} flex={1} minW={0}>
-          <Text fontWeight="medium" truncate maxW="full">
+          <Text
+            fontWeight="medium"
+            truncate
+            maxW="full"
+            css={isActive ? RAINBOW_TEXT_CSS : undefined}
+          >
             {file.name}
           </Text>
           <Text fontSize="xs" color="fg.muted">
             {formatFileSize(file.file.size)}
           </Text>
         </VStack>
-        <StatusChip file={file} />
+        <Spacer />
+        <RowTrailing
+          file={file}
+          isOpen={isOpen}
+          onToggle={() => setIsOpen((o) => !o)}
+        />
         {file.status === "failed" && (
           <Button size="xs" variant="outline" onClick={onRetry}>
             <RefreshCw size={12} /> Retry
@@ -192,6 +280,7 @@ function BulkFileRow({
             as="button"
             aria-label="Cancel upload"
             color="fg.muted"
+            display="flex"
             _hover={{ color: "red.500" }}
             onClick={onCancel}
           >
@@ -202,6 +291,7 @@ function BulkFileRow({
             as="button"
             aria-label="Remove file"
             color="fg.muted"
+            display="flex"
             _hover={{ color: "red.500" }}
             onClick={onRemove}
           >
@@ -210,41 +300,8 @@ function BulkFileRow({
         )}
       </HStack>
 
-      {canConfirm && file.columnTypes && (
-        <Collapsible.Root>
-          <Collapsible.Trigger
-            asChild
-            aria-label={`Confirm columns for ${file.name}`}
-          >
-            <HStack
-              as="button"
-              gap={1}
-              fontSize="13px"
-              color="blue.600"
-              cursor="pointer"
-            >
-              <ChevronDown size={14} />
-              <Text>{file.columnTypes.length} columns — confirm types</Text>
-            </HStack>
-          </Collapsible.Trigger>
-          <Collapsible.Content>
-            <Box paddingTop={2}>
-              <BulkColumnFields
-                columnTypes={file.columnTypes}
-                onChange={onColumns}
-              />
-            </Box>
-          </Collapsible.Content>
-        </Collapsible.Root>
-      )}
-
-      {file.status === "processing" && file.datasetId && (
-        <DatasetUploadProcessing
-          projectId={projectId}
-          datasetId={file.datasetId}
-          onReady={onReady}
-          onViewDataset={onReady}
-        />
+      {isOpen && canConfirm && file.columnTypes && (
+        <BulkColumnFields columnTypes={file.columnTypes} onChange={onColumns} />
       )}
     </VStack>
   );
@@ -263,6 +320,7 @@ export function BulkUploadDrawer({
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
   const bulk = useBulkUpload(projectId);
+  const [zoneHover, setZoneHover] = useState(false);
 
   const onDropFiles = (fileList: FileList | null) => {
     if (fileList && fileList.length > 0) {
@@ -279,23 +337,26 @@ export function BulkUploadDrawer({
       <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header>
-          <Heading>Bulk upload</Heading>
+          <Heading>Upload datasets</Heading>
         </Drawer.Header>
         <Drawer.Body>
           <VStack align="stretch" gap={4} width="full">
             <Box
               as="label"
-              borderWidth="2px"
-              borderStyle="dashed"
-              borderColor="border"
-              borderRadius="xl"
-              padding={8}
-              textAlign="center"
-              cursor="pointer"
-              _hover={{ borderColor: "blue.300", bg: "blue.500/5" }}
-              onDragOver={(e: React.DragEvent) => e.preventDefault()}
+              {...dropzoneSurfaceProps(zoneHover)}
+              style={DROPZONE_DOTTED_STYLE}
+              display="block"
+              onDragOver={(e: React.DragEvent) => {
+                e.preventDefault();
+                setZoneHover(true);
+              }}
+              onDragLeave={(e: React.DragEvent) => {
+                e.preventDefault();
+                setZoneHover(false);
+              }}
               onDrop={(e: React.DragEvent) => {
                 e.preventDefault();
+                setZoneHover(false);
                 onDropFiles(e.dataTransfer?.files ?? null);
               }}
             >
@@ -304,33 +365,13 @@ export function BulkUploadDrawer({
                 multiple
                 accept=".csv,.json,.jsonl"
                 aria-label="Add files for bulk upload"
-                // Visually hidden but kept in the tab order (not display:none) so
-                // the picker is reachable + operable by keyboard.
-                style={{
-                  position: "absolute",
-                  width: 1,
-                  height: 1,
-                  padding: 0,
-                  margin: -1,
-                  overflow: "hidden",
-                  clip: "rect(0 0 0 0)",
-                  whiteSpace: "nowrap",
-                  border: 0,
-                }}
+                style={SR_ONLY_INPUT}
                 onChange={(e) => {
                   onDropFiles(e.target.files);
                   e.target.value = "";
                 }}
               />
-              <Text color="fg" fontSize="md">
-                Drag and drop files, or{" "}
-                <Text as="span" color="blue.500" fontWeight="medium">
-                  click to browse
-                </Text>
-              </Text>
-              <Text fontSize="xs" color="fg.muted">
-                Supported files: CSV, JSON, or JSONL — one dataset per file
-              </Text>
+              <DropzonePrompt multiple />
             </Box>
 
             {bulk.counts.total > 0 && (
@@ -375,6 +416,7 @@ export function BulkUploadDrawer({
                     bulk.markReady(file.id);
                     onUploaded?.();
                   }}
+                  onFailed={(error) => bulk.markFailed(file.id, error)}
                 />
               ))}
             </VStack>

@@ -198,8 +198,8 @@ describe("given the bulk upload drawer", () => {
         ).toBeInTheDocument(),
       );
 
-      // Collapsed: the column inputs are not visible until expanded.
-      expect(screen.queryByLabelText("Column 1 name")).not.toBeVisible?.();
+      // Collapsed: the column inputs are not rendered until expanded.
+      expect(screen.queryByLabelText("Column 1 name")).not.toBeInTheDocument();
       await user.click(screen.getByText(/2 columns — confirm types/i));
 
       const nameInput = await screen.findByLabelText("Column 1 name");
