@@ -327,7 +327,7 @@ export function TargetCellContent({
   ): "winner" | "loser" | "tie" | undefined => {
     if (!evaluator.pairwise) return undefined;
     const cfg = normalizePairwiseConfig(evaluator.pairwise);
-    if (!cfg.variants.length) return undefined;
+    if (!cfg.candidates.length) return undefined;
 
     const parsed = parseEvaluationResult(evaluatorResults[evaluator.id]);
     const label = parsed.label;
@@ -335,18 +335,30 @@ export function TargetCellContent({
 
     if (label === "tie") return "tie";
 
-    // Translate "A" / "B" labels (pairwise mode) to the underlying
-    // variant id. In select_best mode the label IS already an id.
-    let winnerId: string | undefined;
-    if (cfg.mode === "pairwise" && (label === "A" || label === "B")) {
-      winnerId = label === "A" ? cfg.variants[0] : cfg.variants[1];
-    } else if (cfg.variants.includes(label)) {
-      winnerId = label;
-    }
-    if (!winnerId) return undefined;
+    // Locate the winner candidate. In pairwise mode the label is a
+    // slot ("A"/"B"); in select_best the label IS the candidate id,
+    // which is `${fromExperimentId}::${targetId}` for cross-experiment
+    // candidates (#5102) and a bare `targetId` for primary ones.
+    const candidateId = (c: { targetId: string; fromExperimentId?: string }) =>
+      c.fromExperimentId ? `${c.fromExperimentId}::${c.targetId}` : c.targetId;
 
-    if (target.id === winnerId) return "winner";
-    if (cfg.variants.includes(target.id)) return "loser";
+    let winnerCandidate;
+    if (cfg.mode === "pairwise" && (label === "A" || label === "B")) {
+      winnerCandidate = label === "A" ? cfg.candidates[0] : cfg.candidates[1];
+    } else {
+      winnerCandidate = cfg.candidates.find((c) => candidateId(c) === label);
+    }
+    if (!winnerCandidate) return undefined;
+
+    // Only local TargetCells (no fromExperimentId) tint against local
+    // target ids. A cross-experiment winner won't tint any local cell —
+    // that's intentional: there's no local target to attach the chip to.
+    const localCandidates = cfg.candidates.filter((c) => !c.fromExperimentId);
+    const isLocalWinner =
+      !winnerCandidate.fromExperimentId &&
+      winnerCandidate.targetId === target.id;
+    if (isLocalWinner) return "winner";
+    if (localCandidates.some((c) => c.targetId === target.id)) return "loser";
     return undefined;
   };
 

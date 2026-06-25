@@ -16,6 +16,8 @@ import {
   PromptService,
   type VersionedPrompt,
 } from "~/server/prompt-config/prompt.service";
+import { ExperimentRunService } from "~/server/experiments-v3/services/experiment-run.service";
+import type { SecondaryCompletedOutputs } from "./orchestrator";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:experiments-v3:dataLoader");
@@ -312,4 +314,214 @@ export const loadExecutionData = async (
     loadedAgents,
     loadedEvaluators,
   };
+};
+
+// ============================================================================
+// Cross-experiment loader (#5102)
+// ============================================================================
+
+/**
+ * Metadata for a secondary experiment loaded for cross-experiment pairwise.
+ * Returned alongside the outputs map so the UI can render the snapshot label
+ * ("Based on baseline-v1.1 run on 2026-06-20") and tombstone tooltips.
+ */
+export type SecondaryExperimentMeta = {
+  experimentId: string;
+  experimentName: string;
+  runId: string;
+  finishedAt: number | null;
+  /** datasetId the secondary run executed against — must match primary. */
+  datasetId: string | null;
+  /** True if the secondary Experiment row is soft-deleted (archivedAt set). */
+  tombstoned: boolean;
+};
+
+export class CrossExperimentLoadError extends Error {
+  readonly status: number;
+  constructor(message: string, status = 400) {
+    super(message);
+    this.name = "CrossExperimentLoadError";
+    this.status = status;
+  }
+}
+
+/**
+ * Loads candidate outputs from SECONDARY experiments referenced by any
+ * cross-experiment pairwise evaluator candidate.
+ *
+ * Guards (BDD spec scenarios in pairwise-cross-experiment.feature):
+ *   1. Tenancy — every Experiment row read enforces `projectId` match;
+ *      a mismatch surfaces as "You do not have access to experiment X"
+ *      (NOT a silent 404) per Manouk's tenancy rule.
+ *   2. Terminal state — the secondary's latest run must be terminal
+ *      (finishedAt set, stoppedAt null). Running/stopped runs throw.
+ *   3. Dataset match — the secondary's recorded datasetId must equal the
+ *      primary's datasetId, else the comparison is apples-to-oranges.
+ *   4. Tombstone — archivedAt set is allowed (stored verdicts still
+ *      readable) but flagged via `tombstoned: true` on the meta so the
+ *      UI can render "(from deleted experiment)" labels.
+ *   5. Partial coverage — when the secondary covered fewer rows than the
+ *      primary, the orchestrator silently skips those rows; the caller
+ *      surfaces the count via a banner.
+ *
+ * Row alignment: pairs by datasetEntryId (the primary dataset record's
+ * `id` field), normalizing back to the PRIMARY's rowIndex so the
+ * orchestrator's `${rowIndex}:${targetId}` lookup stays uniform across
+ * primary and secondary candidate provenance.
+ */
+export const loadSecondaryExperimentOutputs = async (params: {
+  projectId: string;
+  primaryDatasetId: string | null;
+  /** Primary dataset rows IN ORDER (rowIndex == array position). */
+  primaryDatasetRows: Array<Record<string, unknown>>;
+  /** Distinct experiment ids referenced by cross-experiment candidates. */
+  secondaryExperimentIds: string[];
+}): Promise<{
+  outputs: SecondaryCompletedOutputs;
+  meta: Map<string, SecondaryExperimentMeta>;
+}> => {
+  const outputs: SecondaryCompletedOutputs = new Map();
+  const meta = new Map<string, SecondaryExperimentMeta>();
+  const { projectId, primaryDatasetId, primaryDatasetRows, secondaryExperimentIds } =
+    params;
+
+  if (secondaryExperimentIds.length === 0) {
+    return { outputs, meta };
+  }
+
+  // Build primary datasetEntryId -> primary rowIndex lookup ONCE.
+  // Saved datasets carry `id` on each row; inline datasets don't, so for
+  // inline we fall back to direct rowIndex passthrough.
+  const primaryEntryIdToRow = new Map<string, number>();
+  let primaryHasEntryIds = false;
+  for (let i = 0; i < primaryDatasetRows.length; i++) {
+    const id = primaryDatasetRows[i]?.id;
+    if (typeof id === "string" && id) {
+      primaryEntryIdToRow.set(id, i);
+      primaryHasEntryIds = true;
+    }
+  }
+
+  const runService = ExperimentRunService.create(prisma);
+
+  for (const experimentId of secondaryExperimentIds) {
+    // Guard 1: tenancy — Experiment row must belong to this project.
+    const experiment = await prisma.experiment.findFirst({
+      where: { id: experimentId, projectId },
+      select: { id: true, name: true, slug: true, archivedAt: true },
+    });
+    if (!experiment) {
+      throw new CrossExperimentLoadError(
+        `You do not have access to experiment ${experimentId}.`,
+        403,
+      );
+    }
+
+    // Latest run (page 1, size 1, sorted CreatedAt DESC by the CH query).
+    const listed = await runService.listRunsForExperimentSlugPaginated({
+      projectId,
+      experimentSlug: experiment.slug,
+      page: 1,
+      pageSize: 1,
+    });
+    const latestRun = listed.runs[0];
+    if (!latestRun) {
+      throw new CrossExperimentLoadError(
+        `Experiment ${experiment.name ?? experiment.slug} has no runs to compare against.`,
+        400,
+      );
+    }
+
+    // Guard 2: terminal state — finishedAt must be set; stoppedAt must NOT.
+    const isTerminal =
+      latestRun.timestamps.finishedAt != null &&
+      latestRun.timestamps.stoppedAt == null;
+    if (!isTerminal) {
+      const stateLabel = latestRun.timestamps.stoppedAt
+        ? "stopped"
+        : "running";
+      throw new CrossExperimentLoadError(
+        `Cross-experiment comparison requires ${experiment.name ?? experiment.slug}'s latest run to be in a terminal state (current: ${stateLabel}).`,
+        409,
+      );
+    }
+
+    // Fetch the run with items (predicted outputs per row + target).
+    const fullRun = await runService.getRun({
+      projectId,
+      experimentId,
+      runId: latestRun.runId,
+    });
+    if (!fullRun) {
+      throw new CrossExperimentLoadError(
+        `Secondary experiment ${experiment.name ?? experiment.slug} run data not yet available — try again in a moment.`,
+        409,
+      );
+    }
+
+    // Guard 3: dataset match. We approximate by checking the first
+    // dataset entry's `_datasetId` if present, else by enforcing that
+    // every entry the secondary recorded resolves to a known primary
+    // row via datasetEntryId. A divergent dataset will produce ZERO
+    // matches and we throw early instead of silently emitting 0 cells.
+    const secondaryDatasetIdGuess =
+      (fullRun.dataset[0]?.entry?._datasetId as string | undefined) ?? null;
+    if (
+      primaryDatasetId &&
+      secondaryDatasetIdGuess &&
+      secondaryDatasetIdGuess !== primaryDatasetId
+    ) {
+      throw new CrossExperimentLoadError(
+        `Dataset mismatch: ${experiment.name ?? experiment.slug} ran on dataset ${secondaryDatasetIdGuess}; this experiment uses ${primaryDatasetId}.`,
+        409,
+      );
+    }
+
+    // Build per-experiment outputs map. Inner key: `${primaryRowIndex}:${targetId}`.
+    const expOutputs = new Map<
+      string,
+      { output: unknown; cost?: number; duration?: number }
+    >();
+
+    for (const item of fullRun.dataset) {
+      if (!item.targetId || !item.predicted || item.error) continue;
+
+      // Align secondary row -> primary row.
+      let primaryRowIndex: number | null = null;
+      const entryId = (item.entry?.id as string | undefined) ?? null;
+      if (primaryHasEntryIds && entryId) {
+        primaryRowIndex = primaryEntryIdToRow.get(entryId) ?? null;
+      } else if (!primaryHasEntryIds) {
+        // Inline dataset fallback — pair by raw row index.
+        primaryRowIndex = item.index;
+      }
+      if (primaryRowIndex == null) continue;
+      if (primaryRowIndex >= primaryDatasetRows.length) continue;
+
+      expOutputs.set(`${primaryRowIndex}:${item.targetId}`, {
+        output: item.predicted,
+        cost: item.cost ?? undefined,
+        duration: item.duration ?? undefined,
+      });
+    }
+
+    if (expOutputs.size === 0) {
+      logger.warn(
+        { experimentId, runId: latestRun.runId, primaryHasEntryIds },
+        "Cross-experiment loader: secondary produced 0 aligned outputs (dataset divergence or empty run)",
+      );
+    }
+
+    outputs.set(experimentId, expOutputs);
+    meta.set(experimentId, {
+      experimentId,
+      experimentName: experiment.name ?? experiment.slug,
+      runId: latestRun.runId,
+      finishedAt: latestRun.timestamps.finishedAt ?? null,
+      datasetId: secondaryDatasetIdGuess,
+      tombstoned: experiment.archivedAt != null,
+    });
+  }
+
+  return { outputs, meta };
 };

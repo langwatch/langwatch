@@ -70,6 +70,16 @@ export type OrchestratorInput = {
   runId?: string;
   /** Concurrency limit for parallel execution (default 10) */
   concurrency?: number;
+  /**
+   * Pre-loaded outputs from SECONDARY experiments referenced by any
+   * cross-experiment pairwise evaluator (#5102). Map<experimentId,
+   * Map<`${primaryRowIndex}:${targetId}`, output>>. The loader is
+   * responsible for tenancy / terminal-state / dataset-match guards and
+   * for aligning each secondary experiment's outputs to the PRIMARY
+   * dataset's rowIndex via datasetEntryId. Omit when no cross-experiment
+   * candidates are configured.
+   */
+  secondaryCompletedOutputs?: SecondaryCompletedOutputs;
 };
 
 /**
@@ -230,6 +240,23 @@ export const generateCells = (
  * skipped — there is no honest comparison verdict without every
  * candidate present.
  */
+/**
+ * Per-candidate output keyed in `secondaryCompletedOutputs` by experiment id.
+ * The loader (`loadSecondaryExperimentOutputs`) is responsible for aligning
+ * each secondary experiment's outputs to the PRIMARY dataset's rowIndex via
+ * datasetEntryId — by the time this map reaches us, secondary[expId].get(
+ * `${primaryRowIndex}:${targetId}`) returns the candidate output for that
+ * primary row (or undefined if the secondary run didn't cover it).
+ *
+ * Keeping the inner key as `${rowIndex}:${targetId}` (same shape as
+ * `completedTargetOutputs`) means the cell-generation loop below stays a
+ * single uniform lookup regardless of provenance.
+ */
+export type SecondaryCompletedOutputs = Map<
+  string,
+  Map<string, { output: unknown; cost?: number; duration?: number }>
+>;
+
 export const generatePairwiseCells = (
   state: Pick<
     EvaluationsV3State,
@@ -240,6 +267,7 @@ export const generatePairwiseCells = (
     string,
     { output: unknown; cost?: number; duration?: number }
   >,
+  secondaryCompletedOutputs?: SecondaryCompletedOutputs,
 ): ExecutionCell[] => {
   const cells: ExecutionCell[] = [];
   const datasetId =
@@ -251,43 +279,100 @@ export const generatePairwiseCells = (
   for (const evaluator of pairwiseEvaluators) {
     if (!evaluator.pairwise) continue;
     const cfg = normalizePairwiseConfig(evaluator.pairwise);
+    const candidatesCfg = cfg.candidates;
 
-    if (!cfg.variants || cfg.variants.length < 2) {
+    if (candidatesCfg.length < 2) {
       logger.warn(
-        { evaluatorId: evaluator.id, variants: cfg.variants },
-        "Pairwise evaluator skipped: fewer than 2 variants configured",
+        { evaluatorId: evaluator.id, candidates: candidatesCfg },
+        "Pairwise evaluator skipped: fewer than 2 candidates configured",
       );
       continue;
     }
 
-    // Resolve all variant TargetConfigs up-front; bail if any missing.
-    const resolvedVariants = cfg.variants.map((id) =>
-      state.targets.find((t) => t.id === id),
-    );
-    if (resolvedVariants.some((t) => !t)) {
+    // Resolve PRIMARY-experiment TargetConfigs up-front so the workflow
+    // builder always has a real target to lean on. Cross-experiment
+    // candidates don't need a local TargetConfig — they ride the
+    // first-primary's config as a stand-in (skipTarget=true makes the
+    // workflow builder ignore it).
+    const firstPrimary = candidatesCfg.find((c) => !c.fromExperimentId);
+    const firstPrimaryTarget = firstPrimary
+      ? state.targets.find((t) => t.id === firstPrimary.targetId)
+      : undefined;
+    // If EVERY candidate is from a secondary experiment, we still need
+    // a TargetConfig stand-in; the first primary target in the workbench
+    // is fine. Fall back to that. If the workbench has no targets at all
+    // we have to skip this evaluator.
+    const standInTarget = firstPrimaryTarget ?? state.targets[0];
+    if (!standInTarget) {
       logger.warn(
-        { evaluatorId: evaluator.id, variants: cfg.variants },
-        "Pairwise evaluator skipped: one or more variant targets not found",
+        { evaluatorId: evaluator.id },
+        "Pairwise evaluator skipped: no target available as stand-in",
       );
       continue;
     }
-    const firstVariant = resolvedVariants[0]!;
+
+    // Validate each candidate is resolvable — primary candidates must
+    // exist in the workbench targets; secondary candidates must have a
+    // loaded outputs map for their experiment id.
+    let resolvable = true;
+    for (const c of candidatesCfg) {
+      if (c.fromExperimentId) {
+        if (!secondaryCompletedOutputs?.has(c.fromExperimentId)) {
+          logger.warn(
+            {
+              evaluatorId: evaluator.id,
+              targetId: c.targetId,
+              fromExperimentId: c.fromExperimentId,
+            },
+            "Cross-experiment pairwise candidate skipped: secondary outputs not loaded",
+          );
+          resolvable = false;
+          break;
+        }
+      } else if (!state.targets.find((t) => t.id === c.targetId)) {
+        logger.warn(
+          { evaluatorId: evaluator.id, targetId: c.targetId },
+          "Pairwise candidate skipped: primary target not found",
+        );
+        resolvable = false;
+        break;
+      }
+    }
+    if (!resolvable) continue;
 
     for (let rowIndex = 0; rowIndex < datasetRows.length; rowIndex++) {
       const datasetEntry = datasetRows[rowIndex];
       if (!datasetEntry) continue;
 
-      // Gather outputs for ALL variants — skip the row if any missing.
-      const outputs = cfg.variants.map((id) =>
-        completedTargetOutputs.get(`${rowIndex}:${id}`),
-      );
+      // Gather outputs for ALL candidates — primary lookups go to
+      // completedTargetOutputs; secondary lookups go to the per-experiment
+      // outputs map produced by the loader. Skip the row if ANY candidate
+      // is missing an output (no honest verdict without every candidate).
+      const outputs = candidatesCfg.map((c) => {
+        const key = `${rowIndex}:${c.targetId}`;
+        if (c.fromExperimentId) {
+          return secondaryCompletedOutputs!
+            .get(c.fromExperimentId)
+            ?.get(key);
+        }
+        return completedTargetOutputs.get(key);
+      });
       if (outputs.some((o) => !o)) continue;
 
-      const candidates = cfg.variants.map((id, i) => ({
-        id,
+      // Candidate ids are prefixed with `${experimentId}::` when the
+      // candidate came from a secondary experiment. That keeps Python's
+      // judge prompt able to disambiguate two outputs with the same
+      // local target id (e.g. both experiments have a "shared_prompt"
+      // target), and round-trips through `RowVerdictStrip` so the
+      // verdict label resolves back to the right variant.
+      const candidates = candidatesCfg.map((c, i) => ({
+        id: c.fromExperimentId
+          ? `${c.fromExperimentId}::${c.targetId}`
+          : c.targetId,
         output: outputs[i]!.output,
         cost: outputs[i]!.cost,
         duration: outputs[i]!.duration,
+        fromExperimentId: c.fromExperimentId,
       }));
 
       // Preserve the 2-way candidateA / candidateB aliases when running
@@ -304,11 +389,11 @@ export const generatePairwiseCells = (
 
       cells.push({
         rowIndex,
-        // Point at the first variant so the workflow builder has a
+        // Point at the stand-in target so the workflow builder has a
         // real TargetConfig. The target step itself is skipped via
         // `skipTarget` below.
-        targetId: firstVariant.id,
-        targetConfig: firstVariant,
+        targetId: standInTarget.id,
+        targetConfig: standInTarget,
         evaluatorConfigs: [evaluator],
         datasetEntry: {
           _datasetId: datasetId,
@@ -605,7 +690,12 @@ const buildEvaluatorInputs = (
   // the dataset's `input` column.
   if (evaluator.pairwise && cell.pairwise) {
     const cfg = normalizePairwiseConfig(evaluator.pairwise);
-    const firstVariantId = cfg.variants[0];
+    // Reuse the first PRIMARY candidate's mapping (if any) for the `input`
+    // field — secondary-experiment candidates don't have local mappings
+    // here, and falling through to the dataset's `input` column is the
+    // right behavior in that case.
+    const firstPrimaryCandidate = cfg.candidates.find((c) => !c.fromExperimentId);
+    const firstVariantId = firstPrimaryCandidate?.targetId;
     const firstVariantMappings =
       (firstVariantId && evaluator.mappings[datasetId]?.[firstVariantId]) ?? {};
     const inputMapping = firstVariantMappings.input;
@@ -724,6 +814,7 @@ export async function* runOrchestrator(
     loadedEvaluators,
     runId: providedRunId,
     concurrency: requestedConcurrency,
+    secondaryCompletedOutputs,
   } = input;
 
   // Use requested concurrency, environment variable, or default
@@ -1166,6 +1257,7 @@ export async function* runOrchestrator(
           state,
           datasetRows,
           completedTargetOutputs,
+          secondaryCompletedOutputs,
         );
 
         if (pairwiseCells.length > 0) {

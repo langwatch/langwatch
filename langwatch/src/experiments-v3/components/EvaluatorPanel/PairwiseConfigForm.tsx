@@ -1,5 +1,6 @@
 import {
   Box,
+  Button,
   Checkbox,
   Field,
   HStack,
@@ -10,28 +11,34 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { ChangeEvent } from "react";
-import { LuCheck, LuInfo } from "react-icons/lu";
+import { LuCheck, LuInfo, LuPlus } from "react-icons/lu";
 
 import type {
+  PairwiseCandidate,
   PairwiseEvaluatorConfig,
   TargetConfig,
 } from "../../types";
 import { normalizePairwiseConfig } from "../../types";
 
+import { CrossExperimentPicker } from "./CrossExperimentPicker";
+
 /**
  * Configuration form for the langevals/pairwise_compare evaluator.
- * Two modes (#5101 extends the #5100 MVP):
  *
- *   - "pairwise"    — exactly 2 candidates, swap-and-confirm
- *   - "select_best" — N ≥ 2 candidates, randomize_order
+ * Three feature waves, all driven by the same `candidates[]` schema
+ * (#5102) — `normalizePairwiseConfig` hydrates the legacy `variants[]`
+ * (#5101) and `variantA`/`variantB` (#5100) shapes into `candidates[]`
+ * so saved configs from any era keep working without migration.
  *
- * The form ALWAYS writes the canonical `variants` array + `mode`
- * fields. Legacy `variantA` / `variantB` are read for back-compat
- * (via normalizePairwiseConfig) but never re-written, so the rest
- * of the codebase can migrate to the canonical shape.
+ *   - mode == "pairwise"    — exactly 2 candidates, swap-and-confirm
+ *   - mode == "select_best" — N ≥ 2 candidates, randomize_order
+ *   - any candidate may set `fromExperimentId` to pull its output from
+ *     a SECONDARY experiment (cross-experiment comparison, #5102)
  *
- * Rendered inside `ConfigPanel` when the user adds an evaluator of
- * type `langevals/pairwise_compare`.
+ * Form ALWAYS writes the canonical `{ candidates, mode }` shape and
+ * clears the deprecated `variantA`/`variantB`/`variants` fields on
+ * every write — the schema still keeps `variants` as a derived view
+ * for back-compat readers, but the form is the source of truth here.
  */
 
 export type DatasetColumn = { id: string; name: string };
@@ -39,10 +46,14 @@ export type DatasetColumn = { id: string; name: string };
 export type PairwiseConfigFormProps = {
   value: PairwiseEvaluatorConfig;
   onChange: (next: PairwiseEvaluatorConfig) => void;
-  /** All targets the user has configured (excluding evaluator-as-target). */
+  /** All targets in the CURRENT workbench (excluding evaluator-as-target). */
   targets: TargetConfig[];
   /** Active dataset columns the user can pick the golden field from. */
   datasetColumns: DatasetColumn[];
+  /** Active dataset id — feeds the CrossExperimentPicker's match check. */
+  currentDatasetId?: string | null;
+  /** Currently-edited experiment id — filtered out of the "From" picker. */
+  currentExperimentId?: string;
 };
 
 export function PairwiseConfigForm({
@@ -50,49 +61,48 @@ export function PairwiseConfigForm({
   onChange,
   targets,
   datasetColumns,
+  currentDatasetId = null,
+  currentExperimentId,
 }: PairwiseConfigFormProps) {
-  // Always read through the normalizer so legacy variantA / variantB
-  // records show up correctly in the form on first load. The form
-  // emits the canonical shape going forward.
   const cfg = normalizePairwiseConfig(value);
-  const variants = cfg.variants;
+  const candidates = cfg.candidates;
   const mode = cfg.mode;
 
   const update = (patch: Partial<PairwiseEvaluatorConfig>) => {
     onChange({
       ...cfg,
-      // Clear the deprecated 2-way fields on every write so we don't
-      // leave them drifting out of sync with `variants`.
       variantA: undefined,
       variantB: undefined,
+      variants: undefined as unknown as string[],
       ...patch,
     });
   };
 
+  const setCandidates = (next: PairwiseCandidate[]) => {
+    update({ candidates: next });
+  };
+
   const setMode = (next: "pairwise" | "select_best") => {
     if (next === mode) return;
-    // Switching INTO pairwise mode keeps only the first two variants;
-    // switching INTO select_best mode just changes the mode flag.
     update({
       mode: next,
-      variants: next === "pairwise" ? variants.slice(0, 2) : variants,
+      candidates: next === "pairwise" ? candidates.slice(0, 2) : candidates,
     });
   };
 
-  const setVariantAt = (slot: 0 | 1, id: string) => {
-    // Pairwise mode keeps the legacy two-slot UX; we mirror the user's
-    // selections back into a 2-element variants array.
-    const next = [...variants];
-    while (next.length <= slot) next.push("");
-    next[slot] = id;
-    update({ variants: next.slice(0, 2) });
+  const updateCandidateAt = (i: number, patch: Partial<PairwiseCandidate>) => {
+    const next = candidates.slice();
+    next[i] = { ...next[i]!, ...patch };
+    setCandidates(next);
   };
 
-  const toggleVariant = (id: string, on: boolean) => {
-    const set = new Set(variants);
-    if (on) set.add(id);
-    else set.delete(id);
-    update({ variants: Array.from(set) });
+  const removeCandidateAt = (i: number) => {
+    setCandidates(candidates.filter((_, idx) => idx !== i));
+  };
+
+  const addCandidate = () => {
+    if (mode === "pairwise" && candidates.length >= 2) return;
+    setCandidates([...candidates, { targetId: "" }]);
   };
 
   const toggleMetric = (metric: "cost" | "duration", on: boolean) => {
@@ -102,11 +112,22 @@ export function PairwiseConfigForm({
     update({ includeMetrics: Array.from(set) });
   };
 
-  const variantA = variants[0] ?? "";
-  const variantB = variants[1] ?? "";
-  const variantBOptions = targets.filter((t) => t.id !== variantA);
+  // Ensure at least 2 rows visible in pairwise mode so the user can fill
+  // both slots even when the saved config is empty (e.g. brand-new
+  // evaluator). The empty rows aren't persisted until the user picks
+  // something — the next save round-trips through this code.
+  const displayedCandidates = (() => {
+    if (mode === "pairwise" && candidates.length < 2) {
+      const out = candidates.slice();
+      while (out.length < 2) out.push({ targetId: "" });
+      return out;
+    }
+    return candidates;
+  })();
 
-  const selectBestValid = mode !== "select_best" || variants.length >= 2;
+  const minCandidates = mode === "pairwise" ? 2 : 2;
+  const filledCount = candidates.filter((c) => c.targetId).length;
+  const valid = filledCount >= minCandidates;
 
   return (
     <VStack align="stretch" gap={4} padding={4}>
@@ -133,74 +154,63 @@ export function PairwiseConfigForm({
         </RadioGroup.Root>
       </Field.Root>
 
-      {mode === "pairwise" ? (
-        <>
-          <Field.Root required>
-            <Field.Label>Variant A</Field.Label>
-            <NativeSelect.Root>
-              <NativeSelect.Field
-                value={variantA}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-                  setVariantAt(0, e.currentTarget.value)
+      <Field.Root required invalid={!valid}>
+        <Field.Label>Candidates</Field.Label>
+        <VStack align="stretch" gap={2}>
+          {displayedCandidates.map((c, i) => (
+            <CrossExperimentPicker
+              key={i}
+              value={c}
+              onChange={(next) => {
+                // If we were rendering a "ghost" empty row (i >=
+                // candidates.length), promote it into the persisted list.
+                if (i >= candidates.length) {
+                  setCandidates([...candidates, next]);
+                } else {
+                  updateCandidateAt(i, next);
                 }
-              >
-                <option value="">Select a target…</option>
-                {targets.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.id}
-                  </option>
-                ))}
-              </NativeSelect.Field>
-            </NativeSelect.Root>
-          </Field.Root>
+              }}
+              onRemove={
+                displayedCandidates.length > minCandidates &&
+                i < candidates.length
+                  ? () => removeCandidateAt(i)
+                  : undefined
+              }
+              localTargets={targets}
+              currentDatasetId={currentDatasetId}
+              currentExperimentId={currentExperimentId}
+            />
+          ))}
+        </VStack>
 
-          <Field.Root required>
-            <Field.Label>Variant B</Field.Label>
-            <NativeSelect.Root>
-              <NativeSelect.Field
-                value={variantB}
-                onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-                  setVariantAt(1, e.currentTarget.value)
-                }
-              >
-                <option value="">Select a target…</option>
-                {variantBOptions.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.id}
-                  </option>
-                ))}
-              </NativeSelect.Field>
-            </NativeSelect.Root>
-          </Field.Root>
-        </>
-      ) : (
-        <Field.Root required invalid={!selectBestValid}>
-          <Field.Label>Variants</Field.Label>
-          <VStack align="stretch" gap={1}>
-            {targets.map((t) => (
-              <Checkbox.Root
-                key={t.id}
-                checked={variants.includes(t.id)}
-                onCheckedChange={(d) =>
-                  toggleVariant(t.id, d.checked === true)
-                }
-              >
-                <Checkbox.HiddenInput />
-                <Checkbox.Control />
-                <Checkbox.Label>{t.id}</Checkbox.Label>
-              </Checkbox.Root>
-            ))}
-          </VStack>
-          {!selectBestValid ? (
-            <Field.ErrorText>Select at least 2 variants.</Field.ErrorText>
-          ) : (
-            <Field.HelperText>
-              {variants.length} variant{variants.length === 1 ? "" : "s"}{" "}
-              selected · 1 judge call per row
-            </Field.HelperText>
-          )}
-        </Field.Root>
-      )}
+        {mode === "select_best" ? (
+          <Button
+            size="xs"
+            variant="ghost"
+            alignSelf="flex-start"
+            marginTop={2}
+            onClick={addCandidate}
+          >
+            <Icon as={LuPlus} boxSize="14px" />
+            Add candidate
+          </Button>
+        ) : null}
+
+        {!valid ? (
+          <Field.ErrorText>
+            {mode === "pairwise"
+              ? "Pick a target for both A and B."
+              : "Select at least 2 candidates."}
+          </Field.ErrorText>
+        ) : (
+          <Field.HelperText>
+            {filledCount} candidate{filledCount === 1 ? "" : "s"} selected ·{" "}
+            {mode === "pairwise"
+              ? "2 judge calls per row (swap-and-confirm)"
+              : "1 judge call per row"}
+          </Field.HelperText>
+        )}
+      </Field.Root>
 
       <Field.Root required>
         <Field.Label>Golden field</Field.Label>

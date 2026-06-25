@@ -32,7 +32,12 @@ import { hasProjectPermission } from "~/server/api/rbac";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { abortManager } from "~/server/experiments-v3/execution/abortManager";
-import { loadExecutionData } from "~/server/experiments-v3/execution/dataLoader";
+import {
+  loadExecutionData,
+  loadSecondaryExperimentOutputs,
+  CrossExperimentLoadError,
+} from "~/server/experiments-v3/execution/dataLoader";
+import { secondaryExperimentIdsOf } from "~/experiments-v3/types";
 import {
   requestAbort,
   runOrchestrator,
@@ -220,6 +225,39 @@ secured.access(sessionAuth).post("/execute", zValidator("json", executionRequest
     ui: createInitialUIState(),
   };
 
+  // Cross-experiment pairwise (#5102): if any evaluator references a
+  // SECONDARY experiment, pre-load its terminal-run outputs here so the
+  // orchestrator can route per-candidate lookups in Phase 2. The loader
+  // enforces tenancy / terminal-state / dataset-match guards and throws
+  // CrossExperimentLoadError, which we translate to a 4xx surface error
+  // BEFORE opening the SSE stream (matches the BDD spec: "no judge calls
+  // are issued" when guards fail).
+  const secondaryExperimentIds = new Set<string>();
+  for (const evaluator of request.evaluators) {
+    if (evaluator.pairwise) {
+      for (const id of secondaryExperimentIdsOf(evaluator.pairwise)) {
+        secondaryExperimentIds.add(id);
+      }
+    }
+  }
+  let secondaryCompletedOutputs;
+  if (secondaryExperimentIds.size > 0) {
+    try {
+      const result = await loadSecondaryExperimentOutputs({
+        projectId,
+        primaryDatasetId: request.dataset.datasetId ?? null,
+        primaryDatasetRows: datasetRows,
+        secondaryExperimentIds: Array.from(secondaryExperimentIds),
+      });
+      secondaryCompletedOutputs = result.outputs;
+    } catch (err) {
+      if (err instanceof CrossExperimentLoadError) {
+        return c.json({ error: err.message }, { status: err.status as 400 });
+      }
+      throw err;
+    }
+  }
+
   return streamSSE(c, async (stream) => {
     try {
       const isFullRun = request.scope.type === "full";
@@ -235,6 +273,7 @@ secured.access(sessionAuth).post("/execute", zValidator("json", executionRequest
         loadedAgents,
         loadedEvaluators,
         concurrency: request.concurrency,
+        secondaryCompletedOutputs,
       });
 
       for await (const event of orchestrator) {
@@ -400,6 +439,34 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
 
   const state = buildState(workbenchState);
 
+  // Cross-experiment pairwise loader (#5102) — same pattern as the
+  // interactive route above; fail fast with 4xx if any guard trips.
+  const ciSecondaryExperimentIds = new Set<string>();
+  for (const evaluator of workbenchState.evaluators) {
+    if (evaluator.pairwise) {
+      for (const id of secondaryExperimentIdsOf(evaluator.pairwise)) {
+        ciSecondaryExperimentIds.add(id);
+      }
+    }
+  }
+  let ciSecondaryCompletedOutputs;
+  if (ciSecondaryExperimentIds.size > 0) {
+    try {
+      const result = await loadSecondaryExperimentOutputs({
+        projectId: project.id,
+        primaryDatasetId: dataset.datasetId ?? null,
+        primaryDatasetRows: datasetRows,
+        secondaryExperimentIds: Array.from(ciSecondaryExperimentIds),
+      });
+      ciSecondaryCompletedOutputs = result.outputs;
+    } catch (err) {
+      if (err instanceof CrossExperimentLoadError) {
+        return c.json({ error: err.message }, { status: err.status as 400 });
+      }
+      throw err;
+    }
+  }
+
   const acceptHeader = c.req.header("Accept") ?? "";
   const isSSE = acceptHeader.includes("text/event-stream");
 
@@ -425,6 +492,7 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
           loadedPrompts: loadedPrompts as Map<string, VersionedPrompt>,
           loadedAgents: loadedAgents as Map<string, TypedAgent>,
           loadedEvaluators,
+          secondaryCompletedOutputs: ciSecondaryCompletedOutputs,
         });
 
         for await (const event of orchestrator) {
@@ -467,6 +535,7 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
         loadedAgents: loadedAgents as Map<string, TypedAgent>,
         loadedEvaluators,
         runId,
+        secondaryCompletedOutputs: ciSecondaryCompletedOutputs,
       });
 
       for await (const event of orchestrator) {

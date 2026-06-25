@@ -214,18 +214,22 @@ export type ExecutionCell = {
       output: unknown;
       cost?: number;
       duration?: number;
+      /** Source experiment id when candidate came from a SECONDARY experiment (#5102). Omitted for primary. */
+      fromExperimentId?: string;
     }>;
     candidateA?: {
       id: string;
       output: unknown;
       cost?: number;
       duration?: number;
+      fromExperimentId?: string;
     };
     candidateB?: {
       id: string;
       output: unknown;
       cost?: number;
       duration?: number;
+      fromExperimentId?: string;
     };
   };
 };

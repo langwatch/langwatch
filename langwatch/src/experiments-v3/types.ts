@@ -177,18 +177,37 @@ export type LocalEvaluatorConfig = z.infer<typeof localEvaluatorConfigSchema>;
  * - Each target (target A outputs "output", target B outputs "result")
  */
 /**
+ * A single candidate in a pairwise / N-way comparison (#5102).
+ *
+ * - `targetId`: the TargetConfig id whose per-row output is the candidate.
+ * - `fromExperimentId`: optional reference to a SECONDARY experiment the
+ *   output should be pulled from. Omit (or undefined) to use the current
+ *   experiment. Set this to pair across experiments — e.g. "candidate-v1.2
+ *   vs baseline-v1.1".
+ */
+export const pairwiseCandidateSchema = z.object({
+  targetId: z.string(),
+  fromExperimentId: z.string().optional(),
+});
+export type PairwiseCandidate = z.infer<typeof pairwiseCandidateSchema>;
+
+/**
  * Pairwise / N-way evaluator config. Set only for evaluators of type
  * "langevals/pairwise_compare". Picks 2 (pairwise) or N (select_best)
- * existing target columns to compare against a dataset golden field.
+ * candidate outputs to compare against a dataset golden field.
  *
  * - mode: "pairwise" (2 candidates, swap-and-confirm) or "select_best"
  *   (N candidates, randomize_order). Defaults to "pairwise" for the
  *   MVP shape from #5100.
- * - variants: ordered TargetConfig ids whose per-row outputs are the
- *   candidates. At least 2 entries; pairwise mode trusts exactly 2.
- * - variantA / variantB: legacy 2-way fields from #5100. Kept on the
- *   schema as optional for backward compat — use `normalizePairwiseConfig`
- *   to read either shape uniformly.
+ * - candidates (#5102): ordered list of candidates. Each entry names a
+ *   targetId and may optionally name a `fromExperimentId` to pull the
+ *   output from a different experiment run. At least 2 entries;
+ *   pairwise mode trusts exactly 2. ALWAYS populated post-normalize.
+ * - variants (#5101) / variantA / variantB (#5100): legacy shapes kept
+ *   on the schema for back-compat. `normalizePairwiseConfig` hydrates
+ *   `candidates` from whichever of these is present, so existing saved
+ *   evaluator configs keep working without a DB migration. New code
+ *   should write `candidates`; legacy fields are READ-ONLY.
  * - goldenField: dataset field name whose value is the reference answer.
  * - includeMetrics: per-candidate metrics injected into the judge prompt.
  * - positionBiasMitigation: optional override of the evaluator's default
@@ -197,10 +216,13 @@ export type LocalEvaluatorConfig = z.infer<typeof localEvaluatorConfigSchema>;
  */
 export const pairwiseEvaluatorConfigSchema = z.object({
   mode: z.enum(["pairwise", "select_best"]).default("pairwise"),
+  /** Canonical candidate list (#5102). Always populated post-normalize. */
+  candidates: z.array(pairwiseCandidateSchema).default([]),
+  /** @deprecated #5101 list-of-targetIds shape; superseded by `candidates`. */
   variants: z.array(z.string()).default([]),
-  /** @deprecated #5100 2-way shape; superseded by `variants`. */
+  /** @deprecated #5100 2-way shape; superseded by `candidates`. */
   variantA: z.string().optional(),
-  /** @deprecated #5100 2-way shape; superseded by `variants`. */
+  /** @deprecated #5100 2-way shape; superseded by `candidates`. */
   variantB: z.string().optional(),
   goldenField: z.string(),
   includeMetrics: z.array(z.enum(["cost", "duration"])).default([]),
@@ -214,29 +236,105 @@ export type PairwiseEvaluatorConfig = z.infer<
 >;
 
 /**
- * Codemod for #5100 -> #5101: normalize a stored pairwise config to the
- * unified shape. If `variants` is empty and the legacy `variantA` /
- * `variantB` fields are populated, hydrate `variants` from them and
- * default the mode to "pairwise". Returns a copy; never mutates input.
+ * Codemod for #5100 -> #5101 -> #5102: normalize a stored pairwise
+ * config to the unified shape. Hydrates `candidates` from whichever
+ * legacy shape is present (variants[], or variantA + variantB) and
+ * derives the back-compat `variants` view from `candidates`. Returns
+ * a copy; never mutates input.
+ *
+ * After normalize:
+ * - `candidates` is always populated (length 0 only when the config is
+ *   genuinely empty — i.e. no legacy fields and no candidates).
+ * - `variants` mirrors `candidates.map(c => c.targetId)` so any read
+ *   path still using the #5101 `variants[]` view keeps working.
+ * - `mode` defaults to "pairwise".
  *
  * Used by every read path that branches on a pairwise config (the
  * orchestrator's Phase 2 generator + the EvaluatorChip / TargetCell
  * winner-tint resolver + the verdict-strip / aggregate-header
- * renderers), so the rest of the codebase can assume `variants` is
- * always populated and ignore the legacy fields.
+ * renderers).
  */
 export function normalizePairwiseConfig(
   cfg: PairwiseEvaluatorConfig,
 ): PairwiseEvaluatorConfig {
-  if (cfg.variants && cfg.variants.length > 0) return cfg;
-  if (cfg.variantA && cfg.variantB) {
-    return {
-      ...cfg,
-      variants: [cfg.variantA, cfg.variantB],
-      mode: cfg.mode ?? "pairwise",
-    };
+  let candidates: PairwiseCandidate[] = cfg.candidates ?? [];
+
+  if (candidates.length === 0) {
+    if (cfg.variants && cfg.variants.length > 0) {
+      candidates = cfg.variants.map((targetId) => ({ targetId }));
+    } else if (cfg.variantA && cfg.variantB) {
+      candidates = [
+        { targetId: cfg.variantA },
+        { targetId: cfg.variantB },
+      ];
+    }
   }
-  return cfg;
+
+  return {
+    ...cfg,
+    mode: cfg.mode ?? "pairwise",
+    candidates,
+    variants: candidates.map((c) => c.targetId),
+  };
+}
+
+/**
+ * Returns the set of unique secondary experiment ids referenced by a
+ * pairwise config's candidates. Empty set when no candidate names a
+ * `fromExperimentId` (the common same-experiment case).
+ *
+ * The orchestrator's loader uses this set to know which secondary
+ * experiments it must load Phase 1 outputs from at execution time.
+ */
+export function secondaryExperimentIdsOf(
+  cfg: PairwiseEvaluatorConfig,
+): string[] {
+  const normalized = normalizePairwiseConfig(cfg);
+  const ids = new Set<string>();
+  for (const c of normalized.candidates) {
+    if (c.fromExperimentId) ids.add(c.fromExperimentId);
+  }
+  return Array.from(ids);
+}
+
+/**
+ * Display label for a candidate across both single- and cross-experiment
+ * contexts (#5102).
+ *
+ *   - bare local candidate          -> `targetId`
+ *   - local candidate in a cross-exp eval -> `targetId (this run)`
+ *   - secondary candidate            -> `targetId (from <expName>)`
+ *   - tombstoned secondary           -> `targetId (from deleted experiment)`
+ *
+ * `secondaryNames` is a map from experimentId to display name; pass an
+ * empty map when no cross-experiment candidates are present (the helper
+ * falls back to the bare targetId in that case).
+ *
+ * `tombstonedSecondaryIds` is the subset of `secondaryNames` keys that
+ * refer to archived/deleted Experiment rows — caller still has the name
+ * because the stored verdict carries it, but the label flips to
+ * "(from deleted experiment)" to make the loss visible.
+ *
+ * Keeping this pure (no React, no Chakra) so it's reusable by the
+ * AggregateHeaderBar adapter, the RowVerdictStrip caller, and the
+ * pairwiseHandoffs markdown export.
+ */
+export function candidateDisplayLabel(
+  candidate: PairwiseCandidate,
+  secondaryNames: Map<string, string>,
+  tombstonedSecondaryIds?: Set<string>,
+): string {
+  if (!candidate.fromExperimentId) {
+    return secondaryNames.size > 0
+      ? `${candidate.targetId} (this run)`
+      : candidate.targetId;
+  }
+  if (tombstonedSecondaryIds?.has(candidate.fromExperimentId)) {
+    return `${candidate.targetId} (from deleted experiment)`;
+  }
+  const expName =
+    secondaryNames.get(candidate.fromExperimentId) ?? candidate.fromExperimentId;
+  return `${candidate.targetId} (from ${expName})`;
 }
 
 export const evaluatorConfigSchema = z.object({
