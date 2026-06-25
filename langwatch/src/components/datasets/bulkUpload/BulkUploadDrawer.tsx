@@ -171,10 +171,18 @@ function SortableColumnRow({
       style={{
         transform: CSS.Translate.toString(transform),
         transition,
-        opacity: isDragging ? 0.6 : 1,
       }}
       gap={2}
       width="full"
+      paddingX={1}
+      borderRadius="md"
+      // While dragging, lift the row with a gray-tokened fill + ring; reverts on
+      // drop. The transparent border is always present so toggling it adds no
+      // layout shift.
+      borderWidth="1px"
+      borderColor={isDragging ? "border.emphasized" : "transparent"}
+      bg={isDragging ? "bg.muted" : "transparent"}
+      shadow={isDragging ? "sm" : "none"}
     >
       <Box
         {...attributes}
