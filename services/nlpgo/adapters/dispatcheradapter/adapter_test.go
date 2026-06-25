@@ -254,7 +254,7 @@ func TestWithDeploymentMap_SelfMapsByDefault(t *testing.T) {
 	}
 }
 
-func TestWithDeploymentMap_HonoursExplicitDeployment(t *testing.T) {
+func TestWithDeploymentMap_HonorsExplicitDeployment(t *testing.T) {
 	// When the model id differs from the Azure deployment name, the control
 	// plane forwards the real deployment as Extra["deployment"]; the model
 	// id must map to it rather than to itself.

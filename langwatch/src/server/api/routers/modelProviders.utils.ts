@@ -364,7 +364,7 @@ export const prepareLitellmParams = async ({
 
     // Map the model id to its Azure deployment name when the provider defines
     // an explicit deploymentMapping (the deployment name need not equal the
-    // model id). The gateway/control-plane path already honours this field
+    // model id). The gateway/control-plane path already honors this field
     // (config.materialiser); mirror it here so the in-process Studio /
     // playground path agrees instead of assuming model id == deployment name.
     const deploymentMap = modelProvider.deploymentMapping as Record<

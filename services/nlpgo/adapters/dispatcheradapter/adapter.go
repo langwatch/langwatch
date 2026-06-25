@@ -328,7 +328,7 @@ func geminiCred(m map[string]string) domain.Credential {
 // self-map suffices. When the provider defines an explicit deployment
 // (the model id need not equal the deployment name, e.g. an Azure
 // deployment named differently from the model), the control plane forwards
-// it as Extra["deployment"]; honour it so the model id maps to the real
+// it as Extra["deployment"]; honor it so the model id maps to the real
 // deployment. aigateway HTTP callers populate richer maps at the control
 // plane layer.
 func withDeploymentMap(cred domain.Credential, bareModel string) domain.Credential {
