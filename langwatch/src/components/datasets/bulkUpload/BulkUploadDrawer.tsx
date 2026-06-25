@@ -303,7 +303,20 @@ export function BulkUploadDrawer({
                 type="file"
                 multiple
                 accept=".csv,.json,.jsonl"
-                style={{ display: "none" }}
+                aria-label="Add files for bulk upload"
+                // Visually hidden but kept in the tab order (not display:none) so
+                // the picker is reachable + operable by keyboard.
+                style={{
+                  position: "absolute",
+                  width: 1,
+                  height: 1,
+                  padding: 0,
+                  margin: -1,
+                  overflow: "hidden",
+                  clip: "rect(0 0 0 0)",
+                  whiteSpace: "nowrap",
+                  border: 0,
+                }}
                 onChange={(e) => {
                   onDropFiles(e.target.files);
                   e.target.value = "";

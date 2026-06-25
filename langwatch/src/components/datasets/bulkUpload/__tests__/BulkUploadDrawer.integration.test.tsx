@@ -352,6 +352,12 @@ describe("given the bulk upload drawer", () => {
     it("labels the file picker, remove, and column controls", async () => {
       const user = userEvent.setup();
       render_();
+      // The file picker is keyboard-reachable: a labelled input in the tab order
+      // (not display:none), so it can be opened without a mouse.
+      const picker = screen.getByLabelText(/add files for bulk upload/i);
+      expect(picker).toBeInTheDocument();
+      expect((picker as HTMLElement).style.display).not.toBe("none");
+
       await user.upload(fileInput(), [csv("data.csv")]);
       await waitFor(() => expect(screen.getByText("data")).toBeInTheDocument());
 

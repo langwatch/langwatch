@@ -116,17 +116,24 @@ export async function uploadSingleFile(
       throw error;
     }
 
-    // The row now exists. Any failure past here must reap it (single-flow parity).
+    // The row now exists. Reap ONLY on a PUT failure/cancel — at that point no
+    // bytes finalized, so the `uploading` row is genuinely orphaned.
     try {
       await deps.putFileToPresignedUrl(uploadUrl, file, signal);
-      await deps.finalizeDirectUpload({ projectId, datasetId });
-      return { datasetId, finalName: name };
     } catch (error) {
       await deps
         .abortPendingUpload({ projectId, datasetId })
         .catch(() => undefined);
       throw error;
     }
+
+    // PUT succeeded → committed to finalizing. A finalize failure must NOT reap:
+    // finalize may have already committed server-side (a transport blip on the
+    // response would otherwise delete a real dataset), and the reap is
+    // status-guarded to `uploading` anyway — a still-`uploading` row is left to
+    // the server's stale-upload TTL sweep, not blindly deleted here.
+    await deps.finalizeDirectUpload({ projectId, datasetId });
+    return { datasetId, finalName: name };
   }
 
   throw new DatasetNameConflictError(

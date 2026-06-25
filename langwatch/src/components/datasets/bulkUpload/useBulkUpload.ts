@@ -162,7 +162,11 @@ export function useBulkUpload(projectId: string | undefined) {
     async (id: string) => {
       if (!projectId) return;
       const f = filesRef.current.find((x) => x.id === id);
-      if (!f) return;
+      // Skip rows cancelled/removed while queued — runWithConcurrency captured
+      // them at start(), but a cancel before their turn must NOT create a
+      // dataset. (Status may still read "pending" here if the queue re-render
+      // hasn't flushed; only an explicit cancel/removal blocks the run.)
+      if (!f || f.status === "cancelled") return;
       const controller = new AbortController();
       controllersRef.current.set(id, controller);
       update(id, { status: "uploading", error: undefined });
@@ -213,8 +217,14 @@ export function useBulkUpload(projectId: string | undefined) {
     (id: string) => {
       const controller = controllersRef.current.get(id);
       if (controller) {
-        controller.abort(); // runOne's catch reaps the row + marks cancelled
-      } else {
+        controller.abort(); // uploading → abort the PUT; runOne reaps the row
+        return;
+      }
+      // No in-flight PUT: only a not-yet-started row can be cancelled. A
+      // `processing` row is already finalized (its dataset exists) and can't be
+      // un-created here, so leave it.
+      const f = filesRef.current.find((x) => x.id === id);
+      if (f && (f.status === "queued" || f.status === "pending")) {
         update(id, { status: "cancelled" });
       }
     },
