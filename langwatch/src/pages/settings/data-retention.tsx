@@ -291,11 +291,13 @@ function DataRetentionPage({
   // retention value applied to all categories, so we seed it with the group's
   // traces value (or the first present category for a divergent legacy group).
   const openEditForGroup = (group: RetentionScopeGroup) => {
-    const present = (Object.keys(group.byCategory) as RetentionCategory[]).find(
-      (c) => group.byCategory[c] !== undefined,
-    );
+    // Deterministic prefill: prefer traces, then a fixed category order, so a
+    // divergent legacy group never depends on object key insertion order.
     const retentionDays =
-      group.byCategory.traces ?? group.byCategory[present!]!;
+      group.byCategory.traces ??
+      group.byCategory.scenarios ??
+      group.byCategory.experiments;
+    if (retentionDays === undefined) return;
     setEditTarget({
       scope: { scopeType: group.scopeType, scopeId: group.scopeId },
       scopeName: group.name,
@@ -502,7 +504,7 @@ function DataRetentionPage({
             currentProjectId={projectId}
             isPlatformAdmin={isPlatformAdmin}
             isSaving={setForScope.isLoading || triggerUpdate.isLoading}
-            onSave={async (scopes, retentionDays, applyToExisting) => {
+            onSave={async ({ scopes, retentionDays, applyToExisting }) => {
               const categories: RetentionCategory[] = [...RETENTION_CATEGORIES];
               const saveOverrides = async () => {
                 const pairs = scopes.flatMap((scope) =>

@@ -86,11 +86,11 @@ export function AddOverrideDrawer({
   currentProjectId: string;
   isPlatformAdmin: boolean;
   isSaving: boolean;
-  onSave: (
-    scopes: ScopeTriadEntry[],
-    retentionDays: number,
-    applyToExisting: boolean,
-  ) => void;
+  onSave: (params: {
+    scopes: ScopeTriadEntry[];
+    retentionDays: number;
+    applyToExisting: boolean;
+  }) => void;
   /** When set, the drawer edits this existing policy: the scope is locked and
    *  shown read-only, and the retention is prefilled. Absent = add mode. */
   editTarget?: RetentionEditTarget | null;
@@ -320,7 +320,9 @@ export function AddOverrideDrawer({
               colorPalette="blue"
               disabled={!canSave}
               loading={isSaving}
-              onClick={() => onSave(scopes, resolvedDays, applyToExisting)}
+              onClick={() =>
+                onSave({ scopes, retentionDays: resolvedDays, applyToExisting })
+              }
             >
               {isEditing ? "Save changes" : "Create"}
             </Button>
