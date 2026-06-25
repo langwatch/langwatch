@@ -10,6 +10,7 @@ import {
   Button,
   Heading,
   HStack,
+  Icon,
   Input,
   NativeSelect,
   Spacer,
@@ -17,6 +18,22 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   AlertTriangle,
@@ -28,7 +45,7 @@ import {
 } from "react-feather";
 import { formatFileSize } from "react-papaparse";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { DatasetColumns } from "~/server/datasets/types";
+import type { DatasetConfirmColumns } from "~/server/datasets/types";
 import { api } from "~/utils/api";
 import { Drawer } from "../../ui/drawer";
 import {
@@ -63,50 +80,141 @@ const SR_ONLY_INPUT: React.CSSProperties = {
   border: 0,
 };
 
-/** Inline, compact column-type list for one file: rename + retype only (the
- *  confirmed columns must stay positionally 1:1 with the file's headers — no
- *  add/remove). */
+/** Inline, compact column list for one file: rename, retype, and drag-reorder.
+ *  Add/remove stays locked (the columns must still cover the file's headers 1:1),
+ *  but order is free — each column carries an immutable `sourceHeader`, so the
+ *  normalize job binds values by header, not array position (see
+ *  `DatasetConfirmColumns`). The grip is the only drag affordance, so the name
+ *  input + type select stay fully interactive. */
 function BulkColumnFields({
   columnTypes,
   onChange,
 }: {
-  columnTypes: DatasetColumns;
-  onChange: (next: DatasetColumns) => void;
+  columnTypes: DatasetConfirmColumns;
+  onChange: (next: DatasetConfirmColumns) => void;
 }) {
-  const setAt = (index: number, patch: Partial<DatasetColumns[number]>) =>
-    onChange(columnTypes.map((c, i) => (i === index ? { ...c, ...patch } : c)));
+  // Drag only starts past a small threshold, so a click into the name input
+  // (or the type select) is never swallowed as a drag.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
+
+  const setBySource = (
+    sourceHeader: string,
+    patch: Partial<DatasetConfirmColumns[number]>,
+  ) =>
+    onChange(
+      columnTypes.map((c) =>
+        c.sourceHeader === sourceHeader ? { ...c, ...patch } : c,
+      ),
+    );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const from = columnTypes.findIndex((c) => c.sourceHeader === active.id);
+    const to = columnTypes.findIndex((c) => c.sourceHeader === over.id);
+    if (from < 0 || to < 0) return;
+    onChange(arrayMove(columnTypes, from, to));
+  };
 
   return (
-    <VStack align="stretch" gap={2} width="full" paddingTop={2}>
-      {columnTypes.map((col, index) => (
-        <HStack key={index} gap={2} width="full">
-          <Input
-            size="sm"
-            value={col.name}
-            aria-label={`Column ${index + 1} name`}
-            onChange={(e) => setAt(index, { name: e.target.value })}
-          />
-          <NativeSelect.Root size="sm" width="40">
-            <NativeSelect.Field
-              value={col.type}
-              aria-label={`Column ${index + 1} type`}
-              onChange={(e) =>
-                setAt(index, {
-                  type: e.target.value as DatasetColumns[number]["type"],
-                })
-              }
-            >
-              {COLUMN_TYPE_OPTIONS.map((t) => (
-                <option key={t} value={t}>
-                  {t === "image" ? "image (URL)" : t}
-                </option>
-              ))}
-            </NativeSelect.Field>
-            <NativeSelect.Indicator />
-          </NativeSelect.Root>
-        </HStack>
-      ))}
-    </VStack>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+    >
+      <SortableContext
+        items={columnTypes.map((c) => c.sourceHeader)}
+        strategy={verticalListSortingStrategy}
+      >
+        <VStack align="stretch" gap={2} width="full" paddingTop={2}>
+          {columnTypes.map((col, index) => (
+            <SortableColumnRow
+              key={col.sourceHeader}
+              col={col}
+              index={index}
+              onName={(name) => setBySource(col.sourceHeader, { name })}
+              onType={(type) => setBySource(col.sourceHeader, { type })}
+            />
+          ))}
+        </VStack>
+      </SortableContext>
+    </DndContext>
+  );
+}
+
+/** One draggable confirm-column row: grip handle + name input + type select. */
+function SortableColumnRow({
+  col,
+  index,
+  onName,
+  onType,
+}: {
+  col: DatasetConfirmColumns[number];
+  index: number;
+  onName: (name: string) => void;
+  onType: (type: DatasetConfirmColumns[number]["type"]) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: col.sourceHeader });
+
+  return (
+    <HStack
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Translate.toString(transform),
+        transition,
+        opacity: isDragging ? 0.6 : 1,
+      }}
+      gap={2}
+      width="full"
+    >
+      <Box
+        {...attributes}
+        {...(listeners ?? {})}
+        display="inline-flex"
+        alignItems="center"
+        justifyContent="center"
+        color="fg.subtle"
+        cursor="grab"
+        _active={{ cursor: "grabbing" }}
+        aria-label={`Drag to reorder ${col.name}`}
+        title="Drag to reorder"
+      >
+        <Icon boxSize="16px">
+          <GripVertical />
+        </Icon>
+      </Box>
+      <Input
+        size="sm"
+        value={col.name}
+        aria-label={`Column ${index + 1} name`}
+        onChange={(e) => onName(e.target.value)}
+      />
+      <NativeSelect.Root size="sm" width="40">
+        <NativeSelect.Field
+          value={col.type}
+          aria-label={`Column ${index + 1} type`}
+          onChange={(e) =>
+            onType(e.target.value as DatasetConfirmColumns[number]["type"])
+          }
+        >
+          {COLUMN_TYPE_OPTIONS.map((t) => (
+            <option key={t} value={t}>
+              {t === "image" ? "image (URL)" : t}
+            </option>
+          ))}
+        </NativeSelect.Field>
+        <NativeSelect.Indicator />
+      </NativeSelect.Root>
+    </HStack>
   );
 }
 
@@ -278,7 +386,7 @@ function BulkFileRow({
   onRemove: () => void;
   onCancel: () => void;
   onRetry: () => void;
-  onColumns: (next: DatasetColumns) => void;
+  onColumns: (next: DatasetConfirmColumns) => void;
   onName: (next: string) => void;
   onReady: () => void;
   onFailed: (error?: string) => void;

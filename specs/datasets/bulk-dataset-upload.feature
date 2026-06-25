@@ -79,6 +79,14 @@ Feature: Bulk dataset upload
     And I cannot add or remove columns for that file
 
   @integration
+  Scenario: Columns can be dragged to reorder before uploading
+    Given I have added a file and expanded its columns
+    Then every column has a drag handle
+    And I can drag a column to a new position
+    And the dataset is created with the columns in the order I chose
+    And each column's values stay correct despite the new order
+
+  @integration
   Scenario: Confirming columns never opens a separate drawer
     When I add a file and expand its columns
     Then I edit the column names and types in place on that row

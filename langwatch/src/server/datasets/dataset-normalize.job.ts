@@ -33,7 +33,7 @@ import type { DatasetRepository } from "./dataset.repository";
 import { StreamingChunkWriter } from "./dataset-chunk-writer";
 import type { DatasetStorage } from "./dataset-storage";
 import { UPLOAD_MAX_BYTES } from "./presigned-upload";
-import type { DatasetColumns } from "./types";
+import type { DatasetColumns, DatasetConfirmColumns } from "./types";
 import {
   convertValueToColumnType,
   dedupeHeaders,
@@ -197,15 +197,20 @@ const parseInto = async (params: {
   writer: StreamingChunkWriter;
   sizeBytes: number;
   /**
-   * User-confirmed columns from the upload step (ADR-032 v19), positionally 1:1
-   * with the canonical (reserved-renamed / deduped) headers. When present AND
-   * the count matches, each record's keys are renamed to `targetColumns[i].name`
-   * and each value is converted to `targetColumns[i].type` as it streams; the
-   * final `appliedColumnTypes` is then this list. A count mismatch (defensive —
-   * the confirm UI locks add/remove, so it shouldn't happen) honours nothing and
-   * leaves the handler to derive all-`string` from the headers.
+   * User-confirmed columns from the upload step (ADR-032 v19). When the confirm
+   * UI sent the richer shape, each column carries an immutable `sourceHeader` —
+   * the canonical header it was parsed from — and is bound to its file header BY
+   * HEADER, so the user can drag-reorder and rename in the confirm step without
+   * scrambling the data. A legacy bare name+type list (no `sourceHeader`) binds
+   * positionally (`targetColumns[i]` ↔ canonical header `i`), the pre-reorder
+   * behaviour. Each record's keys are renamed to the confirmed `name` and each
+   * value converted to the confirmed `type` as it streams; the final
+   * `appliedColumnTypes` is the confirmed list in the user's chosen order, with
+   * `sourceHeader` stripped. A count or coverage mismatch (defensive — the
+   * confirm UI locks add/remove) honours nothing and leaves the handler to
+   * derive all-`string` from the headers.
    */
-  targetColumns?: DatasetColumns | null;
+  targetColumns?: DatasetConfirmColumns | DatasetColumns | null;
 }): Promise<{
   headers: string[];
   appliedColumnTypes: DatasetColumns | null;
@@ -214,10 +219,26 @@ const parseInto = async (params: {
   let headers: string[] = [];
   let renameMap = new Map<string, string>();
   // canonicalHeader → confirmed { name, type }; built once headers are known and
-  // only when the confirmed count matches (else stays null → derive-all-string).
+  // only when the confirmed columns cover the headers (else stays null →
+  // derive-all-string).
   let targetByCanonical: Map<string, DatasetColumns[number]> | null = null;
   const buildTargetMap = (canonical: string[]): void => {
     if (!targetColumns || targetColumns.length !== canonical.length) return;
+    // Prefer binding by the immutable `sourceHeader` (survives drag-reorder +
+    // rename); fall back to positional binding for legacy bare name+type lists.
+    const hasSourceHeaders = targetColumns.every(
+      (c) => typeof (c as DatasetConfirmColumns[number]).sourceHeader === "string",
+    );
+    if (hasSourceHeaders) {
+      const bySource = new Map(
+        (targetColumns as DatasetConfirmColumns).map((c) => [c.sourceHeader, c]),
+      );
+      // Every file header must map to a confirmed column, else degrade rather
+      // than emit a half-renamed dataset.
+      if (!canonical.every((h) => bySource.has(h))) return;
+      targetByCanonical = new Map(canonical.map((h) => [h, bySource.get(h)!]));
+      return;
+    }
     targetByCanonical = new Map(
       canonical.map((h, i) => [h, targetColumns[i]!]),
     );
@@ -239,6 +260,13 @@ const parseInto = async (params: {
     }
     return out;
   };
+  // The persisted columnTypes are the confirmed columns in the user's chosen
+  // (drag) order, with the transient `sourceHeader` stripped — null when nothing
+  // bound (the handler then derives all-`string`).
+  const appliedColumnTypes = (): DatasetColumns | null =>
+    targetByCanonical
+      ? targetColumns!.map(({ name, type }) => ({ name, type }))
+      : null;
   // Capture headers the first time we see them, derive the rename map, and
   // expose headers in their safe (renamed) form so columnTypes matches the
   // rewritten row keys.
@@ -265,7 +293,7 @@ const parseInto = async (params: {
     }
     return {
       headers,
-      appliedColumnTypes: targetByCanonical ? targetColumns! : null,
+      appliedColumnTypes: appliedColumnTypes(),
     };
   }
 
@@ -332,7 +360,7 @@ const parseInto = async (params: {
     });
     return {
       headers,
-      appliedColumnTypes: targetByCanonical ? targetColumns! : null,
+      appliedColumnTypes: appliedColumnTypes(),
     };
   }
 
@@ -351,7 +379,7 @@ const parseInto = async (params: {
   }
   return {
     headers,
-    appliedColumnTypes: targetByCanonical ? targetColumns! : null,
+    appliedColumnTypes: appliedColumnTypes(),
   };
 };
 

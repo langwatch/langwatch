@@ -57,6 +57,26 @@ export const datasetColumnsSchema = z.array(
 );
 export type DatasetColumns = z.infer<typeof datasetColumnsSchema>;
 
+/**
+ * Upload-confirm columns (ADR-032 v19+). Each confirm-step column carries an
+ * immutable `sourceHeader` — the canonical (reserved-renamed / deduped) file
+ * header it was parsed from — so the normalize step binds each file header to
+ * its confirmed `name`+`type` BY HEADER, not by array position. That is what
+ * lets the confirm UI drag-reorder and rename columns without scrambling the
+ * data (positional binding silently maps values to the wrong column). The
+ * field is transient: it rides the create call onto the dataset row, then
+ * normalize strips it and persists a clean `DatasetColumns` in the user's
+ * chosen order.
+ */
+export const datasetConfirmColumnsSchema = z.array(
+  z.object({
+    name: z.string(),
+    type: datasetColumnTypeSchema,
+    sourceHeader: z.string(),
+  }),
+);
+export type DatasetConfirmColumns = z.infer<typeof datasetConfirmColumnsSchema>;
+
 export const datasetRecordFormSchema = z.object({
   name: z.string().min(1),
   columnTypes: datasetColumnsSchema,

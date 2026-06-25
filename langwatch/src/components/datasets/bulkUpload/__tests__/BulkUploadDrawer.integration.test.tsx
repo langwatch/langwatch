@@ -266,10 +266,30 @@ describe("given the bulk upload drawer", () => {
       await user.click(uploadButton());
 
       await waitFor(() => expect(requestDirectUpload).toHaveBeenCalled());
+      // Each column carries its immutable sourceHeader so normalize can bind by
+      // header (the reorder-safe contract).
       expect(requestDirectUpload.mock.calls[0]![0].columnTypes).toEqual([
-        { name: "a", type: "number" },
-        { name: "b", type: "string" },
+        { name: "a", type: "number", sourceHeader: "a" },
+        { name: "b", type: "string", sourceHeader: "b" },
       ]);
+    });
+
+    /** @scenario Columns can be dragged to reorder before uploading */
+    it("offers a drag handle on every confirm column", async () => {
+      const user = userEvent.setup();
+      render_();
+      await user.upload(fileInput(), [csv("data.csv")]);
+      await waitFor(() =>
+        expect(screen.getByText(/confirm types/i)).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText(/confirm types/i));
+
+      // One grip per column, labelled for keyboard/AT users — the drag affordance
+      // is wired without swallowing the name input / type select.
+      expect(
+        await screen.findByLabelText("Drag to reorder a"),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText("Drag to reorder b")).toBeInTheDocument();
     });
 
     /** @scenario Files that share a name become distinct datasets */
