@@ -197,6 +197,24 @@ describe("prepareLitellmParams", () => {
         expect(params.deployment).toBe("my-gpt5-deployment");
       });
 
+      it("resolves a full-key mapping via the normalized model when given the mp-id wire format", async () => {
+        // The incoming model can be the canonical `mp_.../...` wire format;
+        // the full-key fallback must use the normalized `azure/...` form, not
+        // the raw mp-id, or a "azure/gpt-5.4" mapping would miss.
+        const providerWithMapping = {
+          ...baseAzureProvider,
+          deploymentMapping: { "azure/gpt-5.4": "my-gpt5-deployment" },
+        };
+
+        const params = await prepareLitellmParams({
+          model: "mp_abc_123/gpt-5.4",
+          modelProvider: providerWithMapping,
+          projectId: "project-123",
+        });
+
+        expect(params.deployment).toBe("my-gpt5-deployment");
+      });
+
       it("leaves deployment unset when the model is not in the mapping", async () => {
         const providerWithMapping = {
           ...baseAzureProvider,

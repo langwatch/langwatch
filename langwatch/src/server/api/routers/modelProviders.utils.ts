@@ -184,9 +184,8 @@ export const listProjectModelProvidersForFrontend = async (
   projectId: string,
 ) => {
   const service = ModelProviderService.create(prisma);
-  const providers = await service.listProjectModelProvidersForFrontend(
-    projectId,
-  );
+  const providers =
+    await service.listProjectModelProvidersForFrontend(projectId);
 
   const registryMetadata = getModelMetadataForFrontend();
   const providersAsRecord = Object.fromEntries(
@@ -373,8 +372,12 @@ export const prepareLitellmParams = async ({
       string
     > | null;
     if (deploymentMap) {
+      // params.model is already normalized to `provider/model` (the incoming
+      // `model` may still be the canonical `mp_.../...` wire format), so key
+      // the lookups off it for both the bare and full-key forms.
       const bareModel = params.model.split("/").slice(1).join("/");
-      const deployment = deploymentMap[bareModel] ?? deploymentMap[model];
+      const deployment =
+        deploymentMap[bareModel] ?? deploymentMap[params.model];
       if (deployment) {
         params.deployment = deployment;
       }
