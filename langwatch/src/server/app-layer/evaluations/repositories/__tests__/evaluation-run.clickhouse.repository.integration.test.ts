@@ -63,8 +63,15 @@ beforeAll(async () => {
 
   // Two versions of the same evaluation: the dedup must return the latest
   // (v2), and the ScheduledAt resolve (argMax over UpdatedAt) must pick v2's
-  // ScheduledAt = `base`.
-  await repo.upsert(makeEval("eval-resolve-1", { score: 1 }), tenantId);
+  // ScheduledAt = `base`. v1's ScheduledAt sits 30 days back — outside the
+  // ±7-day resolve window — so if the resolver picked the wrong version the
+  // bounded read would land on the wrong partition and miss the row, failing
+  // the latest-version assertion below.
+  const staleScheduledAt = base - 30 * 24 * 60 * 60 * 1000;
+  await repo.upsert(
+    makeEval("eval-resolve-1", { score: 1, scheduledAt: staleScheduledAt }),
+    tenantId,
+  );
   await repo.upsert(
     makeEval("eval-resolve-1", { score: 2, updatedAt: base + 1000 }),
     tenantId,
