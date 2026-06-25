@@ -90,9 +90,7 @@ export class StorageMeterService {
    * project can't fail the scope total — acceptable because this powers a
    * display, not billing.
    */
-  async getTotalStorageBytesForTenants(
-    tenantIds: string[],
-  ): Promise<number> {
+  async getTotalStorageBytesForTenants(tenantIds: string[]): Promise<number> {
     const unique = Array.from(new Set(tenantIds));
     if (unique.length === 0) return 0;
 

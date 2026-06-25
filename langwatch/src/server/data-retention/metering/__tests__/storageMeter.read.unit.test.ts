@@ -94,7 +94,10 @@ describe("resolveScopeStorageUsage", () => {
       });
 
       const where = prisma.project.findMany.mock.calls[0]![0].where;
-      expect(where).toEqual({ teamId: "team_b", team: { organizationId: "org_1" } });
+      expect(where).toEqual({
+        teamId: "team_b",
+        team: { organizationId: "org_1" },
+      });
       expect(result).toEqual({ totalBytes: 200, projectCount: 2 });
     });
   });

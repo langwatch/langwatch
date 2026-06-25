@@ -29,9 +29,7 @@ describe("RetentionAndUsageCard", () => {
         </Wrapper>,
       );
       expect(
-        screen.getByText(
-          "How much space this organization's data uses today.",
-        ),
+        screen.getByText("How much space this organization's data uses today."),
       ).toBeTruthy();
       expect(screen.getByText(/2 projects/)).toBeTruthy();
     });
