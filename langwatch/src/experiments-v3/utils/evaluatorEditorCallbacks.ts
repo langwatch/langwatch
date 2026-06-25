@@ -9,7 +9,7 @@
  */
 
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
-import type { LocalEvaluatorConfig } from "../types";
+import type { LocalEvaluatorConfig, PairwiseEvaluatorConfig } from "../types";
 
 /**
  * Parameters to create evaluator editor callbacks.
@@ -48,6 +48,14 @@ export type CreateEvaluatorEditorCallbacksParams = {
     identifier: string,
     mapping: UIFieldMapping | undefined,
   ) => void;
+  /**
+   * Pairwise evaluator config sink (#5100). When present, the drawer
+   * renders PairwiseConfigForm instead of the generic per-row field
+   * mappings — pairwise evaluators don't have per-row sources for
+   * candidate_a_* / candidate_b_*, those come from two OTHER target
+   * outputs that the user picks via this form.
+   */
+  onPairwiseChange?: (config: PairwiseEvaluatorConfig) => void;
   onSave?: (evaluator: {
     id: string;
     name: string;
@@ -67,6 +75,7 @@ export type EvaluatorEditorCallbacksForTarget = {
     identifier: string,
     mapping: UIFieldMapping | undefined,
   ) => void;
+  onPairwiseChange?: (config: PairwiseEvaluatorConfig) => void;
   onSave?: (evaluator: {
     id: string;
     name: string;
@@ -111,6 +120,7 @@ export const createEvaluatorEditorCallbacks = ({
   targetId,
   updateTarget,
   onMappingChange,
+  onPairwiseChange,
   onSave,
 }: CreateEvaluatorEditorCallbacksParams): EvaluatorEditorCallbacksForTarget => {
   const callbacks: EvaluatorEditorCallbacksForTarget = {};
@@ -122,6 +132,7 @@ export const createEvaluatorEditorCallbacks = ({
     };
   }
   if (onMappingChange) callbacks.onMappingChange = onMappingChange;
+  if (onPairwiseChange) callbacks.onPairwiseChange = onPairwiseChange;
   if (onSave) callbacks.onSave = onSave;
   return callbacks;
 };
