@@ -103,28 +103,36 @@ function DataRetentionPage({
   const utils = api.useUtils();
   const rulesQuery = api.dataRetention.getRules.useQuery({ projectId });
 
+  // Resolve the active scope filter once; everything below derives from this
+  // single value so the storage scope, its description, and the row filter
+  // can't drift from one another.
+  const resolvedScopeFilter = useMemo(
+    () =>
+      resolveScopeFilter(scopeFilter, {
+        currentTeamId: teamId,
+        currentProjectId: projectId,
+      }),
+    [scopeFilter, teamId, projectId],
+  );
+
   // Storage tracks the scope selector, not just the current project. Map the
   // active filter to a concrete scope: a specific pick passes through; "all you
   // can see" resolves to the whole org (or just this project for a personal
   // account with no org).
   const storageScope = useMemo(() => {
-    const resolved = resolveScopeFilter(scopeFilter, {
-      currentTeamId: teamId,
-      currentProjectId: projectId,
-    });
-    if (resolved.kind === "specific") {
-      return { scopeType: resolved.scopeType, scopeId: resolved.scopeId };
+    if (resolvedScopeFilter.kind === "specific") {
+      return {
+        scopeType: resolvedScopeFilter.scopeType,
+        scopeId: resolvedScopeFilter.scopeId,
+      };
     }
     return organizationId
       ? { scopeType: "ORGANIZATION" as const, scopeId: organizationId }
       : { scopeType: "PROJECT" as const, scopeId: projectId };
-  }, [scopeFilter, teamId, projectId, organizationId]);
+  }, [resolvedScopeFilter, projectId, organizationId]);
 
   const storageDescription = useMemo(() => {
-    const resolved = resolveScopeFilter(scopeFilter, {
-      currentTeamId: teamId,
-      currentProjectId: projectId,
-    });
+    const resolved = resolvedScopeFilter;
     if (resolved.kind === "all") {
       return "How much space everything you can see uses today.";
     }
@@ -135,7 +143,7 @@ function DataRetentionPage({
       return "How much space this team's data uses today.";
     }
     return "How much space this project's data uses today.";
-  }, [scopeFilter, teamId, projectId]);
+  }, [resolvedScopeFilter]);
 
   const storageQuery = api.dataRetention.getScopeStorageUsage.useQuery({
     projectId,
@@ -311,14 +319,10 @@ function DataRetentionPage({
     setEditTarget(null);
   };
 
-  const resolved = resolveScopeFilter(scopeFilter, {
-    currentTeamId: teamId,
-    currentProjectId: projectId,
-  });
   const filteredRules = (snapshot?.rules ?? []).filter((r) =>
     isScopeInFilter(
       { scopeType: r.scopeType, scopeId: r.scopeId },
-      resolved,
+      resolvedScopeFilter,
       filterAvailable.hierarchy,
     ),
   );
