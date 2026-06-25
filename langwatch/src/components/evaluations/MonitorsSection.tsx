@@ -293,8 +293,8 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
       )}
       <ConfirmDialog
         open={!!monitorToDelete}
-        onOpenChange={(open) => {
-          if (!open) setMonitorToDelete(null);
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setMonitorToDelete(null);
         }}
         title="Delete monitor"
         message="Are you sure you want to delete this monitor?"

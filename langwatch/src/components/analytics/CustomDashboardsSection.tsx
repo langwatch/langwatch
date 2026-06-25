@@ -161,8 +161,8 @@ export function CustomDashboardsSection({
     <>
       <ConfirmDialog
         open={!!dashboardToDelete}
-        onOpenChange={(open) => {
-          if (!open) setDashboardToDelete(null);
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setDashboardToDelete(null);
         }}
         title="Delete dashboard"
         message="Are you sure you want to delete this dashboard? All graphs on this dashboard will be deleted."

@@ -449,8 +449,8 @@ function RolesManagement({
 
       <ConfirmDialog
         open={!!roleToDelete}
-        onOpenChange={(open) => {
-          if (!open) setRoleToDelete(null);
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setRoleToDelete(null);
         }}
         title="Delete role"
         message={`Are you sure you want to delete the role "${

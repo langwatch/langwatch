@@ -247,7 +247,7 @@ function ViewBadge({
 }) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [editName, setEditName] = useState(name);
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleDoubleClick = useCallback(() => {
@@ -363,7 +363,7 @@ function ViewBadge({
             height="14px"
             onClick={(e) => {
               e.stopPropagation();
-              setConfirmDeleteOpen(true);
+              setIsConfirmDeleteOpen(true);
             }}
             data-testid={`delete-view-${id}`}
           >
@@ -372,14 +372,14 @@ function ViewBadge({
         )}
       </HStack>
       <ConfirmDialog
-        open={confirmDeleteOpen}
-        onOpenChange={setConfirmDeleteOpen}
+        open={isConfirmDeleteOpen}
+        onOpenChange={setIsConfirmDeleteOpen}
         title="Delete saved view"
         message={`Delete "${name}" saved view?`}
         confirmLabel="Delete"
         tone="danger"
         onConfirm={() => {
-          setConfirmDeleteOpen(false);
+          setIsConfirmDeleteOpen(false);
           onDelete?.();
         }}
       />

@@ -189,8 +189,8 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
 
       <ConfirmDialog
         open={!!evaluatorToDelete}
-        onOpenChange={(open) => {
-          if (!open) setEvaluatorToDelete(null);
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setEvaluatorToDelete(null);
         }}
         title="Delete evaluator"
         message={`Are you sure you want to delete "${

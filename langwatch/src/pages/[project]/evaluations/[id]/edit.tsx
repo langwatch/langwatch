@@ -33,7 +33,7 @@ export default function EditTraceCheck() {
   );
   const updateCheck = api.monitors.update.useMutation();
   const deleteCheck = api.monitors.delete.useMutation();
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
 
   const onSubmit = async (data: CheckConfigFormData) => {
     if (!project || !data.checkType) return;
@@ -68,7 +68,7 @@ export default function EditTraceCheck() {
 
   const handleDeleteCheck = () => {
     if (!project) return;
-    setConfirmDeleteOpen(true);
+    setIsConfirmDeleteOpen(true);
   };
 
   const defaultValues = check.data
@@ -85,8 +85,8 @@ export default function EditTraceCheck() {
   return (
     <DashboardLayout>
       <ConfirmDialog
-        open={confirmDeleteOpen}
-        onOpenChange={setConfirmDeleteOpen}
+        open={isConfirmDeleteOpen}
+        onOpenChange={setIsConfirmDeleteOpen}
         title="Delete check"
         message="Are you sure you want to delete this check?"
         confirmLabel="Delete"
@@ -117,7 +117,7 @@ export default function EditTraceCheck() {
                   },
                 });
               },
-              onSettled: () => setConfirmDeleteOpen(false),
+              onSettled: () => setIsConfirmDeleteOpen(false),
             },
           );
         }}

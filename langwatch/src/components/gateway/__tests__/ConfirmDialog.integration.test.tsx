@@ -17,7 +17,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-describe("ConfirmDialog", () => {
+describe("given a ConfirmDialog", () => {
   const defaultProps = {
     open: true,
     onOpenChange: vi.fn(),

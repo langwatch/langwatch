@@ -545,8 +545,8 @@ function EvaluationsV2() {
       )}
       <ConfirmDialog
         open={!!experimentToDelete}
-        onOpenChange={(open) => {
-          if (!open) setExperimentToDelete(null);
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setExperimentToDelete(null);
         }}
         title="Delete evaluation"
         message={`Are you sure you want to delete the evaluation "${
