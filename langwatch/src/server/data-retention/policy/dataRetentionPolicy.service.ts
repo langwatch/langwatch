@@ -1,9 +1,6 @@
 import type { RetentionPolicy } from "@prisma/client";
 import type { ScopeAssignment } from "~/server/scopes/scope.types";
-import {
-  type RetentionRow,
-  resolveRetention,
-} from "../resolveRetentionDays";
+import { type RetentionRow, resolveRetention } from "../resolveRetentionDays";
 import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   type ResolvedRetention,
@@ -65,8 +62,7 @@ export class DataRetentionPolicyService {
     }
     const rows = await this.repository.findAllInOrganization(organizationId);
     const remaining = rows.filter(
-      (r) =>
-        !(r.scopeType === scope.scopeType && r.scopeId === scope.scopeId),
+      (r) => !(r.scopeType === scope.scopeType && r.scopeId === scope.scopeId),
     ) as RetentionRow[];
     const chain = await this.repository.getScopeCascadeChain(scope);
     return resolveRetention({ rows: remaining, chain });

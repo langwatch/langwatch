@@ -33,7 +33,9 @@ const editTarget: RetentionEditTarget = {
   retentionDays: 91,
 };
 
-function renderDrawer(props: Partial<React.ComponentProps<typeof AddOverrideDrawer>> = {}) {
+function renderDrawer(
+  props: Partial<React.ComponentProps<typeof AddOverrideDrawer>> = {},
+) {
   return render(
     <Wrapper>
       <AddOverrideDrawer

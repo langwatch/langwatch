@@ -38,8 +38,18 @@ describe("DataRetentionPolicyService.previewScopeRemoval", () => {
   describe("given a project override with a team rule above it", () => {
     it("falls back to the team value", async () => {
       repository.findAllInOrganization.mockResolvedValue([
-        { scopeType: "PROJECT", scopeId: "proj-1", category: "traces", retentionDays: 91 },
-        { scopeType: "TEAM", scopeId: "team-1", category: "traces", retentionDays: 63 },
+        {
+          scopeType: "PROJECT",
+          scopeId: "proj-1",
+          category: "traces",
+          retentionDays: 91,
+        },
+        {
+          scopeType: "TEAM",
+          scopeId: "team-1",
+          category: "traces",
+          retentionDays: 63,
+        },
       ]);
 
       const result = await service.previewScopeRemoval(PROJECT_SCOPE);
@@ -51,8 +61,18 @@ describe("DataRetentionPolicyService.previewScopeRemoval", () => {
   describe("given a project override with only an org rule above it", () => {
     it("falls back to the org value", async () => {
       repository.findAllInOrganization.mockResolvedValue([
-        { scopeType: "PROJECT", scopeId: "proj-1", category: "traces", retentionDays: 91 },
-        { scopeType: "ORGANIZATION", scopeId: "org-1", category: "traces", retentionDays: 182 },
+        {
+          scopeType: "PROJECT",
+          scopeId: "proj-1",
+          category: "traces",
+          retentionDays: 91,
+        },
+        {
+          scopeType: "ORGANIZATION",
+          scopeId: "org-1",
+          category: "traces",
+          retentionDays: 182,
+        },
       ]);
 
       const result = await service.previewScopeRemoval(PROJECT_SCOPE);
@@ -64,7 +84,12 @@ describe("DataRetentionPolicyService.previewScopeRemoval", () => {
   describe("given a project override and nothing else in the chain", () => {
     it("falls back to the platform default", async () => {
       repository.findAllInOrganization.mockResolvedValue([
-        { scopeType: "PROJECT", scopeId: "proj-1", category: "traces", retentionDays: 91 },
+        {
+          scopeType: "PROJECT",
+          scopeId: "proj-1",
+          category: "traces",
+          retentionDays: 91,
+        },
       ]);
 
       const result = await service.previewScopeRemoval(PROJECT_SCOPE);
@@ -81,9 +106,24 @@ describe("DataRetentionPolicyService.previewScopeRemoval", () => {
       };
       repository.getScopeCascadeChain.mockResolvedValue([orgScope]);
       repository.findAllInOrganization.mockResolvedValue([
-        { scopeType: "ORGANIZATION", scopeId: "org-1", category: "traces", retentionDays: 91 },
-        { scopeType: "ORGANIZATION", scopeId: "org-1", category: "scenarios", retentionDays: 91 },
-        { scopeType: "ORGANIZATION", scopeId: "org-1", category: "experiments", retentionDays: 91 },
+        {
+          scopeType: "ORGANIZATION",
+          scopeId: "org-1",
+          category: "traces",
+          retentionDays: 91,
+        },
+        {
+          scopeType: "ORGANIZATION",
+          scopeId: "org-1",
+          category: "scenarios",
+          retentionDays: 91,
+        },
+        {
+          scopeType: "ORGANIZATION",
+          scopeId: "org-1",
+          category: "experiments",
+          retentionDays: 91,
+        },
       ]);
 
       const result = await service.previewScopeRemoval(orgScope);
@@ -100,13 +140,38 @@ describe("DataRetentionPolicyService.previewScopeRemoval", () => {
     it("resolves each category's fallback independently", async () => {
       repository.findAllInOrganization.mockResolvedValue([
         // traces falls back to the team rule below
-        { scopeType: "PROJECT", scopeId: "proj-1", category: "traces", retentionDays: 735 },
-        { scopeType: "TEAM", scopeId: "team-1", category: "traces", retentionDays: 63 },
+        {
+          scopeType: "PROJECT",
+          scopeId: "proj-1",
+          category: "traces",
+          retentionDays: 735,
+        },
+        {
+          scopeType: "TEAM",
+          scopeId: "team-1",
+          category: "traces",
+          retentionDays: 63,
+        },
         // scenarios falls back to the org rule
-        { scopeType: "PROJECT", scopeId: "proj-1", category: "scenarios", retentionDays: 735 },
-        { scopeType: "ORGANIZATION", scopeId: "org-1", category: "scenarios", retentionDays: 182 },
+        {
+          scopeType: "PROJECT",
+          scopeId: "proj-1",
+          category: "scenarios",
+          retentionDays: 735,
+        },
+        {
+          scopeType: "ORGANIZATION",
+          scopeId: "org-1",
+          category: "scenarios",
+          retentionDays: 182,
+        },
         // experiments has no tier above → platform default
-        { scopeType: "PROJECT", scopeId: "proj-1", category: "experiments", retentionDays: 735 },
+        {
+          scopeType: "PROJECT",
+          scopeId: "proj-1",
+          category: "experiments",
+          retentionDays: 735,
+        },
       ]);
 
       const result = await service.previewScopeRemoval(PROJECT_SCOPE);
