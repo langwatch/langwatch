@@ -295,25 +295,35 @@ export class DatasetService {
           throw new DatasetConflictError();
         }
 
-        // Migrate records if column schema changed
+        const existingColumns = existingDataset.columnTypes as DatasetColumns;
+
+        // Defensive: s3_jsonl column changes are handled up front via
+        // `migrateS3JsonlColumns` (the advisory-lock chunk rewrite) and return
+        // before this transaction (ADR-032 v19). Reaching here with s3_jsonl and a
+        // changed schema would mean that early branch regressed — refuse rather
+        // than run the PG record migrator, which would read zero rows (I-PG) and
+        // silently corrupt nothing into the chunk store.
         if (
-          JSON.stringify(existingDataset.columnTypes) !==
-          JSON.stringify(columnTypes)
+          existingDataset.contentLayout === "s3_jsonl" &&
+          JSON.stringify(existingColumns) !== JSON.stringify(columnTypes)
         ) {
-          // Defensive: s3_jsonl column changes are handled up front via
-          // `migrateS3JsonlColumns` (the advisory-lock chunk rewrite) and return
-          // before this transaction (ADR-032 v19). Reaching here with s3_jsonl would
-          // mean that early branch regressed — refuse rather than run the PG record
-          // migrator, which would read zero rows (I-PG) and silently corrupt nothing
-          // into the chunk store.
-          if (existingDataset.contentLayout === "s3_jsonl") {
-            throw new ColumnTypeChangeNotSupportedError();
-          }
+          throw new ColumnTypeChangeNotSupportedError();
+        }
+
+        // Only rewrite row data when the column KEY structure changes
+        // (rename / add / remove / reorder). In the legacy postgres layout the
+        // stored `entry` JSON is untyped — column types are metadata — and the
+        // record migrator (`tryToMapPreviousColumnsToNewColumns`) only remaps
+        // keys, never values. So a type-only change (e.g. string→image) would
+        // rewrite every row with byte-identical JSON: O(rowCount) UPDATEs of pure
+        // no-ops, which is exactly what blew the transaction budget. Skip it and
+        // let the `dataset.update` below persist the new types alone.
+        if (this.columnKeysChanged(existingColumns, columnTypes)) {
           await this.migrateDatasetRecordColumns(
             {
               datasetId,
               projectId,
-              oldColumnTypes: existingDataset.columnTypes as DatasetColumns,
+              oldColumnTypes: existingColumns,
               newColumnTypes: columnTypes,
             },
             { tx },
@@ -335,13 +345,13 @@ export class DatasetService {
         );
       },
       {
-        // A column-type change runs `migrateDatasetRecordColumns` inside this
-        // transaction: one `datasetRecord.update` per row across the whole
-        // dataset. Prisma's 5s default interactive-txn timeout P2028s
-        // ("Transaction already closed") on any dataset large enough that those
-        // per-row UPDATEs take >5s. Share the same generous budget as the
-        // s3_jsonl chunk-rewrite path (`withDatasetLock`) so a legitimately-long
-        // migration completes instead of erroring mid-flight.
+        // Safety net for the remaining heavy case: a column rename / add / remove
+        // still runs `migrateDatasetRecordColumns` here — one `datasetRecord.update`
+        // per row across the whole dataset — which can exceed Prisma's 5s default
+        // interactive-txn timeout and P2028 ("Transaction already closed"). Type-only
+        // changes no longer reach the migrator (see `columnKeysChanged` above), so
+        // this budget only ever covers genuine structural rewrites. Mirrors the
+        // s3_jsonl chunk-rewrite path (`withDatasetLock`).
         timeout: DATASET_MUTATION_TXN_TIMEOUT_MS,
         maxWait: DATASET_MUTATION_TXN_MAX_WAIT_MS,
       },
@@ -447,6 +457,21 @@ export class DatasetService {
       );
       throw error;
     }
+  }
+
+  /**
+   * Whether the column KEY structure changed (names and their order), as opposed
+   * to only the declared types. The legacy record migrator remaps by name then by
+   * position, so an identical ordered name list is a guaranteed no-op on every
+   * row's keys — meaning a type-only change needs no row rewrite at all.
+   */
+  private columnKeysChanged(
+    oldColumns: DatasetColumns,
+    newColumns: DatasetColumns,
+  ): boolean {
+    const oldNames = oldColumns.map((c) => c.name);
+    const newNames = newColumns.map((c) => c.name);
+    return JSON.stringify(oldNames) !== JSON.stringify(newNames);
   }
 
   /**

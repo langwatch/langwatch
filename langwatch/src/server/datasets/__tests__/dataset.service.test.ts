@@ -39,63 +39,107 @@ describe("DatasetService", () => {
       it.todo("allows updating with same name/slug without conflict");
       it.todo("wraps all operations in transaction for atomicity");
 
-      // Regression: changing a column type on a LEGACY postgres-layout dataset
-      // runs `migrateDatasetRecordColumns` (one UPDATE per row) inside the
-      // interactive transaction. Prisma's 5s default timeout P2028s
-      // ("Transaction already closed") on any dataset big enough that the
-      // per-row UPDATEs take >5s. The transaction MUST be opened with the wider
-      // dataset-mutation budget so a legitimately-long migration completes.
-      describe("when a legacy postgres dataset changes a column type", () => {
-        it("opens the migration transaction with the wide budget, not the 5s default", async () => {
-          const legacyDataset = {
-            id: "dataset_legacy",
-            projectId: "project_1",
-            name: "products_image_urls",
-            slug: "products-image-urls",
-            status: "ready",
-            statusError: null,
-            contentLayout: "postgres",
-            columnTypes: [{ name: "image_url", type: "string" }],
-          };
+      // Regression for the reported P2028 timeout. In the legacy postgres layout
+      // a type-only column change (e.g. string→image) is metadata: the untyped
+      // `entry` JSON is unaffected, and the record migrator only remaps keys. So
+      // it must NOT rewrite a single row — doing so was O(rowCount) no-op UPDATEs
+      // that blew the 5s transaction budget on large datasets. A genuine rename
+      // still migrates, under the wider budget as a safety net.
+      const makeLegacyDataset = (
+        columnTypes: Array<{ name: string; type: string }>,
+      ) => ({
+        id: "dataset_legacy",
+        projectId: "project_1",
+        name: "products_image_urls",
+        slug: "products-image-urls",
+        status: "ready",
+        statusError: null,
+        contentLayout: "postgres",
+        columnTypes,
+      });
 
-          let capturedOptions: { timeout?: number; maxWait?: number } | null =
-            null;
-          const fakeTx = {} as never;
-          const prisma = {
-            $transaction: vi.fn(async (cb: any, options: any) => {
-              capturedOptions = options;
-              return await cb(fakeTx);
-            }),
-          } as never;
+      const makeDeps = (existing: ReturnType<typeof makeLegacyDataset>) => {
+        let capturedOptions: { timeout?: number; maxWait?: number } | null =
+          null;
+        const fakeTx = {} as never;
+        const prisma = {
+          $transaction: vi.fn(async (cb: any, options: any) => {
+            capturedOptions = options;
+            return await cb(fakeTx);
+          }),
+        };
+        const repository = {
+          findOne: vi.fn().mockResolvedValue(existing),
+          findBySlug: vi.fn().mockResolvedValue(null),
+          update: vi.fn().mockResolvedValue(existing),
+        };
+        const recordRepository = {
+          findDatasetRecords: vi.fn().mockResolvedValue([]),
+          updateDatasetRecordsTransaction: vi.fn().mockResolvedValue(void 0),
+        };
+        const service = new DatasetService(
+          prisma as never,
+          repository as never,
+          recordRepository as never,
+          {} as never,
+        );
+        return {
+          service,
+          prisma,
+          repository,
+          recordRepository,
+          options: () => capturedOptions,
+        };
+      };
 
-          const repository = {
-            findOne: vi.fn().mockResolvedValue(legacyDataset),
-            findBySlug: vi.fn().mockResolvedValue(null),
-            update: vi.fn().mockResolvedValue(legacyDataset),
-          } as never;
-          const recordRepository = {
-            findDatasetRecords: vi.fn().mockResolvedValue([]),
-            updateDatasetRecordsTransaction: vi.fn().mockResolvedValue(void 0),
-          } as never;
-          const experimentRepository = {} as never;
-
-          const service = new DatasetService(
-            prisma,
-            repository,
-            recordRepository,
-            experimentRepository,
+      describe("when only a column type changes (no rename)", () => {
+        it("skips the per-row migration entirely", async () => {
+          const deps = makeDeps(
+            makeLegacyDataset([{ name: "image_url", type: "string" }]),
           );
 
-          await service.upsertDataset({
+          await deps.service.upsertDataset({
             projectId: "project_1",
             datasetId: "dataset_legacy",
             name: "products_image_urls",
             columnTypes: [{ name: "image_url", type: "image" }] as never,
           });
 
-          expect((prisma as any).$transaction).toHaveBeenCalledTimes(1);
-          expect(capturedOptions?.timeout).toBe(DATASET_MUTATION_TXN_TIMEOUT_MS);
-          expect(capturedOptions?.timeout).toBeGreaterThan(5_000);
+          expect(
+            deps.recordRepository.findDatasetRecords,
+          ).not.toHaveBeenCalled();
+          expect(
+            deps.recordRepository.updateDatasetRecordsTransaction,
+          ).not.toHaveBeenCalled();
+          // The new types are still persisted.
+          expect(deps.repository.update).toHaveBeenCalledWith(
+            expect.objectContaining({
+              data: expect.objectContaining({
+                columnTypes: [{ name: "image_url", type: "image" }],
+              }),
+            }),
+            expect.anything(),
+          );
+        });
+      });
+
+      describe("when a column is renamed on a large legacy dataset", () => {
+        it("runs the migration under the wide transaction budget, not the 5s default", async () => {
+          const deps = makeDeps(
+            makeLegacyDataset([{ name: "old_name", type: "string" }]),
+          );
+
+          await deps.service.upsertDataset({
+            projectId: "project_1",
+            datasetId: "dataset_legacy",
+            name: "products_image_urls",
+            columnTypes: [{ name: "new_name", type: "string" }] as never,
+          });
+
+          expect(deps.recordRepository.findDatasetRecords).toHaveBeenCalled();
+          expect(deps.prisma.$transaction).toHaveBeenCalledTimes(1);
+          expect(deps.options()?.timeout).toBe(DATASET_MUTATION_TXN_TIMEOUT_MS);
+          expect(deps.options()?.timeout).toBeGreaterThan(5_000);
         });
       });
     });
