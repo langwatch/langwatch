@@ -4651,7 +4651,7 @@ wheels = [
 
 [[package]]
 name = "openinference-instrumentation-haystack"
-version = "0.1.24"
+version = "0.1.34"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "openinference-instrumentation" },
@@ -4662,9 +4662,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b1/15/d750f65dff58524fb7c1d679bae91948447e1a3547bc32e662e6d3ac7fcc/openinference_instrumentation_haystack-0.1.24.tar.gz", hash = "sha256:14aea1e46d16415e373dd3f65d4e2ae94a1aa705b7b6967e606ab6e5dbb2cc18", size = 13001, upload-time = "2025-05-31T00:10:31.585Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b4/a6/8dfddcc7bc17b0151f8539a828b74d5a6f4fe74e4011de54f252d52f29d6/openinference_instrumentation_haystack-0.1.34.tar.gz", hash = "sha256:952ebfb4abe8701374f5131d7b5e156b9fb8601bdbee4bc868eabf383d0f63d7", size = 15835, upload-time = "2026-05-18T18:51:31.822Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/96/2f/0bad4a4840de04defa9f82fc6ffaa48b02dd19aa085fdf08701ba349cb59/openinference_instrumentation_haystack-0.1.24-py3-none-any.whl", hash = "sha256:55628441fdccb13904c7bc90e3621d18d346acf9bf3884b9fac672a6dba9ad2f", size = 14415, upload-time = "2025-05-31T00:10:29.683Z" },
+    { url = "https://files.pythonhosted.org/packages/f2/ab/ffb890aa1160da8a5d45cbe043571aa0bec3eeb46d7f3cfb4b8ef89aadfd/openinference_instrumentation_haystack-0.1.34-py3-none-any.whl", hash = "sha256:8884a428ba8dc57a4adbbecf5b1b683f11cb6ad0ec6af178d403b2105e34be89", size = 17719, upload-time = "2026-05-18T18:51:30.462Z" },
 ]
 
 [[package]]
