@@ -15,11 +15,15 @@ import type { DatasetConfirmColumns } from "~/server/datasets/types";
  *  was dropped on (`over` sourceHeader). Identity-stable: returns the SAME array
  *  reference when nothing should move (drop on self, or an unknown header), so
  *  the caller can skip a no-op update. */
-export function reorderColumnsBySourceHeader(
-  columns: DatasetConfirmColumns,
-  activeSourceHeader: string,
-  overSourceHeader: string,
-): DatasetConfirmColumns {
+export function reorderColumnsBySourceHeader({
+  columns,
+  activeSourceHeader,
+  overSourceHeader,
+}: {
+  columns: DatasetConfirmColumns;
+  activeSourceHeader: string;
+  overSourceHeader: string;
+}): DatasetConfirmColumns {
   if (activeSourceHeader === overSourceHeader) return columns;
   const from = columns.findIndex((c) => c.sourceHeader === activeSourceHeader);
   const to = columns.findIndex((c) => c.sourceHeader === overSourceHeader);

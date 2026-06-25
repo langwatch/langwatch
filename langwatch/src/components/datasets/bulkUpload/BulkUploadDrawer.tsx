@@ -123,11 +123,11 @@ function BulkColumnFields({
     setActiveId(null);
     const { active, over } = event;
     if (!over) return;
-    const next = reorderColumnsBySourceHeader(
-      columnTypes,
-      String(active.id),
-      String(over.id),
-    );
+    const next = reorderColumnsBySourceHeader({
+      columns: columnTypes,
+      activeSourceHeader: String(active.id),
+      overSourceHeader: String(over.id),
+    });
     if (next !== columnTypes) onChange(next);
   };
 
@@ -157,12 +157,11 @@ function BulkColumnFields({
           ))}
         </VStack>
       </SortableContext>
-      {/* The lifted copy. DragOverlay is `position: fixed`, but it must be
-          portaled to <body>: rendered inline it resolves "fixed" against the
-          drawer's transformed ancestor (Chakra slide-in + the collapse
-          `motion.div` both create a containing block), which offsets the lifted
-          row to the right by the drawer's left edge. At <body> it tracks the
-          cursor correctly and still escapes the drawer's overflow clipping. */}
+      {/* The lifted copy. DragOverlay is `position: fixed`; rendered inline it
+          resolves "fixed" against the drawer's transformed ancestor (the Chakra
+          slide-in transform), which offsets the lifted row to the right by the
+          drawer's left edge. Portaling to <body> makes it track the cursor and
+          also escapes the drawer's overflow clipping. */}
       {typeof document !== "undefined" &&
         createPortal(
           <DragOverlay>
@@ -241,10 +240,10 @@ function SortableColumnRow({
 }
 
 /** The lifted, floating copy shown under the cursor while dragging a column.
- *  Presentational only (no inputs/listeners). Tinted with the brand `orange`
- *  palette (subtle bg + emphasized border + accented grip) so the row being
- *  dragged reads as clearly "picked up"; on drop the overlay unmounts and the
- *  row returns to its normal colors. */
+ *  A read-only drag preview (its `Input` is `readOnly`, no drag listeners).
+ *  Tinted with the brand `orange` palette (subtle bg + emphasized border +
+ *  accented grip) so the row being dragged reads as clearly "picked up"; on drop
+ *  the overlay unmounts and the row returns to its normal colors. */
 function ColumnDragOverlayRow({ col }: { col: DatasetConfirmColumns[number] }) {
   const typeLabel =
     COLUMN_TYPE_OPTIONS.find((o) => o.value === col.type)?.label ?? col.type;
