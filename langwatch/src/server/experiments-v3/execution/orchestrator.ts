@@ -606,8 +606,9 @@ const buildEvaluatorInputs = (
   if (evaluator.pairwise && cell.pairwise) {
     const cfg = normalizePairwiseConfig(evaluator.pairwise);
     const firstVariantId = cfg.variants[0];
-    const firstVariantMappings =
-      (firstVariantId && evaluator.mappings[datasetId]?.[firstVariantId]) ?? {};
+    const firstVariantMappings = firstVariantId
+      ? (evaluator.mappings[datasetId]?.[firstVariantId] ?? {})
+      : {};
     const inputMapping = firstVariantMappings.input;
     if (inputMapping?.type === "source" && inputMapping.source === "dataset") {
       inputs.input = cell.datasetEntry[inputMapping.sourceField];
