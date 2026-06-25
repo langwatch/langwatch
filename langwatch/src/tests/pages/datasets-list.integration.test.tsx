@@ -102,13 +102,14 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-vi.mock("~/components/datasets/UploadCSVDrawer", () => ({
-  UploadCSVDrawer: ({ isOpen }: { isOpen: boolean }) =>
-    isOpen ? <div data-testid="upload-csv-modal" /> : null,
+vi.mock("~/components/datasets/bulkUpload/BulkUploadDrawer", () => ({
+  BulkUploadDrawer: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="bulk-upload-drawer" /> : null,
 }));
 
 vi.mock("~/components/AddOrEditDatasetDrawer", () => ({
-  AddOrEditDatasetDrawer: () => <div data-testid="add-edit-dataset-drawer" />,
+  AddOrEditDatasetDrawer: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="add-edit-dataset-drawer" /> : null,
 }));
 
 vi.mock("~/components/datasets/CopyDatasetDialog", () => ({
@@ -226,14 +227,29 @@ describe("Datasets list page", () => {
     });
 
     /** @scenario Empty project shows a helpful empty state */
-    it("shows the empty state with a create CTA", async () => {
+    it("shows the empty state with an upload-or-create CTA", async () => {
       const user = userEvent.setup();
       renderPage();
 
       expect(screen.getByText("No datasets yet")).toBeInTheDocument();
-      const cta = screen.getByTestId("empty-state-create-dataset");
-      await user.click(cta);
-      expect(await screen.findByTestId("upload-csv-modal")).toBeInTheDocument();
+      await user.click(screen.getByTestId("empty-state-create-dataset"));
+      // The CTA is a dropdown: "Create empty dataset" opens the create drawer.
+      await user.click(await screen.findByText("Create empty dataset"));
+      expect(
+        await screen.findByTestId("add-edit-dataset-drawer"),
+      ).toBeInTheDocument();
+    });
+
+    /** @scenario Empty-state CTA can launch the bulk upload flow */
+    it("opens the bulk upload drawer from the empty-state CTA", async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      await user.click(screen.getByTestId("empty-state-create-dataset"));
+      await user.click(await screen.findByText("Upload datasets"));
+      expect(
+        await screen.findByTestId("bulk-upload-drawer"),
+      ).toBeInTheDocument();
     });
   });
 });

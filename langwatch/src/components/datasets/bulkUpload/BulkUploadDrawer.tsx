@@ -390,11 +390,15 @@ export function BulkUploadDrawer({
   open,
   onClose,
   onUploaded,
+  onCreateFromScratch,
 }: {
   open: boolean;
   onClose: () => void;
   /** Called as files reach `ready` so the host can refresh the datasets list. */
   onUploaded?: () => void;
+  /** Escape hatch out of the upload flow: create an empty dataset by hand
+   *  instead. Omit to hide the "Skip" affordance. */
+  onCreateFromScratch?: () => void;
 }) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
@@ -502,6 +506,18 @@ export function BulkUploadDrawer({
             </VStack>
 
             <HStack width="full">
+              {onCreateFromScratch && (
+                <Button
+                  variant="plain"
+                  colorPalette="gray"
+                  fontWeight="normal"
+                  color="blue.700"
+                  paddingX={0}
+                  onClick={onCreateFromScratch}
+                >
+                  Skip, create empty dataset
+                </Button>
+              )}
               <Spacer />
               <Button variant="ghost" onClick={onClose}>
                 Close

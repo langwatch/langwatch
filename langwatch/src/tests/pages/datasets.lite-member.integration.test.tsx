@@ -124,8 +124,8 @@ vi.mock("~/utils/trpcError", () => ({
   isHandledByGlobalHandler: vi.fn(() => false),
 }));
 
-vi.mock("~/components/datasets/UploadCSVDrawer", () => ({
-  UploadCSVDrawer: () => <div data-testid="upload-csv-modal" />,
+vi.mock("~/components/datasets/bulkUpload/BulkUploadDrawer", () => ({
+  BulkUploadDrawer: () => <div data-testid="bulk-upload-drawer" />,
 }));
 
 vi.mock("~/components/AddOrEditDatasetDrawer", () => ({
