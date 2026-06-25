@@ -72,14 +72,19 @@ interface StorageBreakdown {
 }
 
 export class StorageMeterService {
+  private readonly resolveClickHouseClient: ClickHouseClientResolver | null;
   private readonly cache: TtlCache<CachedBytes>;
   private readonly refreshLock: TtlCache<number>;
   private readonly now: () => number;
 
-  constructor(
-    private readonly resolveClickHouseClient: ClickHouseClientResolver | null,
-    options?: { now?: () => number },
-  ) {
+  constructor({
+    resolveClickHouseClient,
+    now,
+  }: {
+    resolveClickHouseClient: ClickHouseClientResolver | null;
+    now?: () => number;
+  }) {
+    this.resolveClickHouseClient = resolveClickHouseClient;
     this.cache = new TtlCache(STORAGE_HARD_TTL_MS, "storage-meter:v2:");
     this.refreshLock = new TtlCache(
       REFRESH_LOCK_TTL_MS,
@@ -87,7 +92,7 @@ export class StorageMeterService {
     );
     // Injectable clock so the stale-while-revalidate timing is deterministic in
     // tests; production uses the wall clock.
-    this.now = options?.now ?? (() => Date.now());
+    this.now = now ?? (() => Date.now());
   }
 
   /**
@@ -141,8 +146,8 @@ export class StorageMeterService {
    *  expire (not released) so a tenant is refreshed at most once per window, and
    *  a failed refresh keeps the last good value rather than poisoning the cache. */
   private async refreshInBackground(tenantId: string): Promise<void> {
-    const won = await this.refreshLock.claim(tenantId, 1);
-    if (!won) return;
+    const hasRefreshLock = await this.refreshLock.claim(tenantId, 1);
+    if (!hasRefreshLock) return;
     try {
       await this.computeAndStore(tenantId);
     } catch (error) {

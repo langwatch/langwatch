@@ -478,9 +478,9 @@ export function initializeDefaultApp(options?: {
   const retroactiveUpdateService = new RetroactiveUpdateService(
     clickhouseEnabled ? resolveClickHouseClient : null,
   );
-  const storageMeterService = new StorageMeterService(
-    clickhouseEnabled ? resolveClickHouseClient : null,
-  );
+  const storageMeterService = new StorageMeterService({
+    resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
+  });
   const dataRetention: DataRetentionDependencies = {
     policy: dataRetentionPolicyService,
     pinning: pinnedTraceService,
@@ -985,7 +985,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       ),
       pinning: testPinnedTraceService,
       retroactive: new RetroactiveUpdateService(null),
-      metering: new StorageMeterService(null),
+      metering: new StorageMeterService({ resolveClickHouseClient: null }),
     },
     share: new ShareService(
       new PrismaShareRepository(testPrisma),

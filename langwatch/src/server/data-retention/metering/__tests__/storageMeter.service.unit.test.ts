@@ -15,7 +15,9 @@ describe("StorageMeterService memory guard", () => {
       json: async () => [{ total: "42" }],
     });
     const client = { query } as const;
-    const service = new StorageMeterService(async () => client as any);
+    const service = new StorageMeterService({
+      resolveClickHouseClient: async () => client as any,
+    });
     return { service, query };
   }
 
@@ -68,7 +70,10 @@ describe("StorageMeterService memory guard", () => {
           })),
         } as any;
       });
-      return { service: new StorageMeterService(resolver), resolver };
+      return {
+        service: new StorageMeterService({ resolveClickHouseClient: resolver }),
+        resolver,
+      };
     }
 
     it("sums each tenant's total", async () => {
@@ -136,7 +141,8 @@ describe("StorageMeterService memory guard", () => {
         call += 1;
         return { json: async () => [{ total: String(total) }] };
       });
-      const service = new StorageMeterService(async () => ({ query }) as any, {
+      const service = new StorageMeterService({
+        resolveClickHouseClient: async () => ({ query }) as any,
         now: () => t,
       });
       return { service, query, advance: (ms: number) => (t += ms) };
@@ -204,7 +210,10 @@ describe("StorageMeterService memory guard", () => {
           if (resolverCall >= 2) throw new Error("cluster unreachable");
           return { query } as any;
         });
-        const service = new StorageMeterService(resolver, { now: () => t });
+        const service = new StorageMeterService({
+          resolveClickHouseClient: resolver,
+          now: () => t,
+        });
 
         expect(await service.getTotalStorageBytes({ tenantId: "t" })).toBe(42);
         t += FRESH_MS;
@@ -232,7 +241,10 @@ describe("StorageMeterService memory guard", () => {
           if (resolverCall === 1) throw new Error("cluster unreachable");
           return { query } as any;
         });
-        const service = new StorageMeterService(resolver, { now: () => t });
+        const service = new StorageMeterService({
+          resolveClickHouseClient: resolver,
+          now: () => t,
+        });
 
         // First ever read fails -> degraded 0, cached already-stale.
         expect(await service.getTotalStorageBytes({ tenantId: "t" })).toBe(0);
@@ -264,7 +276,9 @@ describe("StorageMeterService memory guard", () => {
             return { json: async () => [{ total: "10" }] };
           });
         const client = { query } as const;
-        const service = new StorageMeterService(async () => client as any);
+        const service = new StorageMeterService({
+          resolveClickHouseClient: async () => client as any,
+        });
 
         const total = await service.getTotalStorageBytes({
           tenantId: "p-heavy",
