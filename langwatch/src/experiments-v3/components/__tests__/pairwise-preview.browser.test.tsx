@@ -273,7 +273,7 @@ describe("Pairwise compare UI preview — N-way select_best (PR #5101)", () => {
   it("PairwiseConfigForm — select_best mode with 3 of 4 variants picked", async () => {
     await page.viewport(520, 700);
     render(
-      <ChakraProvider value={defaultSystem}>
+      <ChakraProvider value={langwatchSystem}>
         <div style={{ width: 480, padding: 16, background: "white" }}>
           <PairwiseConfigForm
             value={{
@@ -300,7 +300,7 @@ describe("Pairwise compare UI preview — N-way select_best (PR #5101)", () => {
   it("AggregateHeaderBar — N-way tally across 4 variants", async () => {
     await page.viewport(1800, 80);
     render(
-      <ChakraProvider value={defaultSystem}>
+      <ChakraProvider value={langwatchSystem}>
         <div style={{ width: 1780, background: "white" }}>
           <AggregateHeaderBar
             variants={[
@@ -330,7 +330,7 @@ describe("Pairwise compare UI preview — N-way select_best (PR #5101)", () => {
   it("RowVerdictStrip — N-way winner is a real variant id", async () => {
     await page.viewport(800, 40);
     render(
-      <ChakraProvider value={defaultSystem}>
+      <ChakraProvider value={langwatchSystem}>
         <div style={{ width: 780, background: "white" }}>
           <RowVerdictStrip
             winnerName="claude-3.5"

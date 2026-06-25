@@ -681,10 +681,11 @@ describe("computePairwiseAggregate", () => {
   const pairwiseEvaluator: Pick<EvaluatorConfig, "id" | "pairwise"> = {
     id: "eval-pw",
     pairwise: {
-      variantA: "target-a",
-      variantB: "target-b",
+      mode: "pairwise",
+      variants: ["target-a", "target-b"],
       goldenField: "expected_output",
       includeMetrics: [],
+      positionBiasMitigation: null,
     },
   };
 

@@ -21,7 +21,7 @@ import {
 } from "../utils/computeAggregates";
 import {
   AggregateHeaderBar,
-  type PairwiseFilter,
+  type AggregateFilter,
 } from "./AggregateHeaderBar";
 
 const downloadCsv = (filename: string, rows: string[][]) => {
@@ -44,7 +44,7 @@ const totalVerdicts = (counts: PairwiseAggregate["counts"]) =>
 export function PairwiseAggregateHeader() {
   const { project } = useOrganizationTeamProject();
   const trpcUtils = api.useContext();
-  const [filter, setFilter] = useState<PairwiseFilter>("all");
+  const [filter, setFilter] = useState<AggregateFilter>("all");
 
   const { evaluators, targets, results, rowCount } = useEvaluationsV3Store(
     useShallow((state) => ({
@@ -113,16 +113,25 @@ export function PairwiseAggregateHeader() {
     );
   }, [aggregate, variantANameFromCache, variantBNameFromCache]);
 
-  const handlePromote = useCallback((variantName: string) => {
-    toaster.create({
-      title: `Promote ${variantName} — coming soon`,
-      description:
-        "Promotion will register this variant as the production prompt in a follow-up PR.",
-      type: "info",
-      duration: 4000,
-      meta: { closable: true },
-    });
-  }, []);
+  const handlePromote = useCallback(
+    (variantId: string) => {
+      const name =
+        variantId === aggregate?.variantA
+          ? (variantANameFromCache ?? aggregate.variantA)
+          : variantId === aggregate?.variantB
+            ? (variantBNameFromCache ?? aggregate.variantB)
+            : variantId;
+      toaster.create({
+        title: `Promote ${name} — coming soon`,
+        description:
+          "Promotion will register this variant as the production prompt in a follow-up PR.",
+        type: "info",
+        duration: 4000,
+        meta: { closable: true },
+      });
+    },
+    [aggregate, variantANameFromCache, variantBNameFromCache],
+  );
 
   if (!aggregate || totalVerdicts(aggregate.counts) === 0) return null;
 
@@ -131,15 +140,16 @@ export function PairwiseAggregateHeader() {
 
   return (
     <AggregateHeaderBar
-      counts={aggregate.counts}
-      variantAName={variantAName}
-      variantBName={variantBName}
+      variants={[
+        { id: aggregate.variantA, name: variantAName, wins: aggregate.counts.a },
+        { id: aggregate.variantB, name: variantBName, wins: aggregate.counts.b },
+      ]}
+      ties={aggregate.counts.tie}
       totalCost={aggregate.totalCost}
       activeFilter={filter}
       onFilterChange={setFilter}
       onExport={handleExport}
-      onPromoteA={() => handlePromote(variantAName)}
-      onPromoteB={() => handlePromote(variantBName)}
+      onPromote={handlePromote}
       biasCorrected={true}
     />
   );

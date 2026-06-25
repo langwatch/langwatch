@@ -1,13 +1,15 @@
 /**
- * Per-row pairwise verdict wrapper (#5100).
+ * Per-row pairwise verdict wrapper (#5100, #5101).
  *
  * Resolves variant target ids to display names via `useTargetName` and
- * delegates rendering to RowVerdictStrip. Lives as a child component so
- * the name-resolution hooks aren't called inside parent loops.
+ * translates the raw "A"/"B"/"tie" slot label (pairwise mode from
+ * #5100) into the mode-agnostic { winnerName, isTie } prop pair that
+ * the post-#5101 RowVerdictStrip accepts. Lives as a child component
+ * so the name-resolution hooks aren't called inside parent loops.
  *
- * Used by TargetCell: when this cell's target is the variantA of a
- * pairwise evaluator AND a verdict exists for this row, render the
- * strip exactly once per row (next to variantA's output column).
+ * Used by TargetCell: when this cell's target is the first variant of
+ * a pairwise evaluator AND a verdict exists for this row, render the
+ * strip exactly once per row.
  */
 
 import type { TargetConfig } from "../types";
@@ -30,11 +32,17 @@ export function PairwiseVerdictRow({
   const variantAName = useTargetName(variantA);
   const variantBName = useTargetName(variantB);
 
+  const isTie = label === "tie";
+  const winnerName = isTie
+    ? "Tie"
+    : label === "A"
+      ? variantAName
+      : variantBName;
+
   return (
     <RowVerdictStrip
-      label={label}
-      variantAName={variantAName}
-      variantBName={variantBName}
+      winnerName={winnerName}
+      isTie={isTie}
       reasoning={reasoning}
     />
   );

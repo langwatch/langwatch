@@ -4,6 +4,7 @@ import {
   type MetricStats,
 } from "~/components/shared/MetricStatsTooltip";
 import type { EvaluationResults, EvaluatorConfig } from "../types";
+import { normalizePairwiseConfig } from "../types";
 
 export { computeMetricStats, type MetricStats };
 
@@ -267,7 +268,10 @@ export const computePairwiseAggregate = (
   rowCount: number,
 ): PairwiseAggregate | null => {
   if (!evaluator.pairwise) return null;
-  const { variantA, variantB } = evaluator.pairwise;
+  const cfg = normalizePairwiseConfig(evaluator.pairwise);
+  const variantA = cfg.variants[0];
+  const variantB = cfg.variants[1];
+  if (!variantA || !variantB) return null;
   const evalResults =
     results.evaluatorResults[variantA]?.[evaluator.id] ?? [];
 

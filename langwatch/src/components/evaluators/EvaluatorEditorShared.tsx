@@ -744,10 +744,11 @@ export function EvaluatorEditorBody({
             <PairwiseConfigForm
               value={
                 pairwiseContext.initialPairwise ?? {
-                  variantA: "",
-                  variantB: "",
+                  mode: "pairwise",
+                  variants: [],
                   goldenField: "",
                   includeMetrics: [],
+                  positionBiasMitigation: null,
                 }
               }
               onChange={onPairwiseChange}
