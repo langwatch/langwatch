@@ -600,7 +600,9 @@ describe("createDatasetNormalizeHandler()", () => {
           streamStaged: vi
             .fn()
             .mockResolvedValue(
-              Readable.from(['{"qty":"5","name":"x"}\n{"qty":"12","name":"y"}\n']),
+              Readable.from([
+                '{"qty":"5","name":"x"}\n{"qty":"12","name":"y"}\n',
+              ]),
             ),
         });
         const repo = makeRepo({

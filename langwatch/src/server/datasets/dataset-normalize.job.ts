@@ -227,11 +227,15 @@ const parseInto = async (params: {
     // Prefer binding by the immutable `sourceHeader` (survives drag-reorder +
     // rename); fall back to positional binding for legacy bare name+type lists.
     const hasSourceHeaders = targetColumns.every(
-      (c) => typeof (c as DatasetConfirmColumns[number]).sourceHeader === "string",
+      (c) =>
+        typeof (c as DatasetConfirmColumns[number]).sourceHeader === "string",
     );
     if (hasSourceHeaders) {
       const bySource = new Map(
-        (targetColumns as DatasetConfirmColumns).map((c) => [c.sourceHeader, c]),
+        (targetColumns as DatasetConfirmColumns).map((c) => [
+          c.sourceHeader,
+          c,
+        ]),
       );
       // Every file header must map to a confirmed column, else degrade rather
       // than emit a half-renamed dataset.

@@ -78,9 +78,9 @@ const isSupportedType = (file: File): boolean => {
 const parseHeaders = async (
   files: File[],
 ): Promise<(DatasetConfirmColumns | null)[]> => {
-  const results: (DatasetConfirmColumns | null)[] = new Array(files.length).fill(
-    null,
-  );
+  const results: (DatasetConfirmColumns | null)[] = new Array(
+    files.length,
+  ).fill(null);
   let cursor = 0;
   const lane = async (): Promise<void> => {
     const i = cursor++;

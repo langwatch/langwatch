@@ -11,7 +11,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import type { DatasetColumns } from "~/server/datasets/types";
+import type { DatasetConfirmColumns } from "~/server/datasets/types";
 
 const requestDirectUpload = vi.fn();
 const putFileToPresignedUrl = vi.fn();
@@ -63,9 +63,13 @@ vi.mock("~/utils/api", () => ({
 
 import { BulkUploadDrawer } from "../BulkUploadDrawer";
 
-const twoCols: DatasetColumns = [
-  { name: "a", type: "string" },
-  { name: "b", type: "string" },
+// Faithful to what `parseHeaderColumns` actually returns: each column carries
+// its immutable `sourceHeader` (the canonical header it was parsed from), which
+// is the key the confirm UI binds rename/retype/reorder to — without it,
+// `setBySource` would match every column at once.
+const twoCols: DatasetConfirmColumns = [
+  { name: "a", type: "string", sourceHeader: "a" },
+  { name: "b", type: "string", sourceHeader: "b" },
 ];
 
 const csv = (name: string) =>
@@ -205,7 +209,9 @@ describe("given the bulk upload drawer", () => {
       const nameInput = await screen.findByLabelText("Column 1 name");
       expect(nameInput).toHaveValue("a");
       // The type picker is the styled Select (icon + label), defaulting to text.
-      expect(screen.getByLabelText("Column 1 type")).toHaveTextContent(/string/i);
+      expect(screen.getByLabelText("Column 1 type")).toHaveTextContent(
+        /string/i,
+      );
       // Editing happens in place — no separate dialog/drawer with a Save button.
       expect(
         screen.queryByRole("button", { name: /^save$/i }),

@@ -41,9 +41,7 @@ describe("ColumnTypeSelect", () => {
       renderSelect({ value: "string", onChange });
 
       await user.click(screen.getByLabelText("Column 1 type"));
-      await user.click(
-        await screen.findByRole("option", { name: /number/i }),
-      );
+      await user.click(await screen.findByRole("option", { name: /number/i }));
 
       // The label is friendly ("Number") but the reported value is the stored
       // column-type string.
