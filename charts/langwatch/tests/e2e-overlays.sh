@@ -177,12 +177,12 @@ test_access_ingress() {
 test_size_overlays() {
   sep; info "Suite: size overlays"
 
-  # size-minimal: workers disabled, 1 replica each
+  # size-minimal: workers enabled (the smoke test exercises them), 1 replica each
   local min_out
   min_out=$(tmpl --set autogen.enabled=true \
     -f "${OVERLAYS}/size-minimal.yaml" \
     -f "${OVERLAYS}/access-nodeport.yaml")
-  assert_not_contains "minimal: workers disabled" "$min_out" "name: ${RELEASE}-workers"
+  assert_contains "minimal: workers deployed" "$min_out" "name: ${RELEASE}-workers"
   assert_contains "minimal: app replicas 1" "$min_out" "replicas: 1"
 
   # size-prod: 2 app replicas, PDB
@@ -200,6 +200,55 @@ test_size_overlays() {
     -f "${OVERLAYS}/access-ingress.yaml")
   assert_contains "ha: 3 CH replicas" "$ha_out" "replicas: 3"
   assert_contains "ha: Keeper StatefulSet" "$ha_out" "name: ${RELEASE}-clickhouse-keeper"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SUITE: pod security hardening — guard the strict-admission posture
+# (every container read-only-root + non-escalating + RuntimeDefault seccomp,
+# no automounted SA token, no privileged/writable-root opt-outs). These render-
+# level checks catch regressions of the hardening without needing Gatekeeper.
+# ─────────────────────────────────────────────────────────────────────────────
+test_pod_security() {
+  sep; info "Suite: pod security hardening"
+
+  # Default render: chart-managed everything (app, workers, nlp, langevals,
+  # cronjobs, postgres, redis, clickhouse, gateway).
+  local def
+  def=$(tmpl --set autogen.enabled=true)
+
+  assert_contains "hardening: read-only root filesystem set" "$def" "readOnlyRootFilesystem: true"
+  # After hardening, nothing opts back into a writable root.
+  assert_not_contains "hardening: no writable-root containers" "$def" "readOnlyRootFilesystem: false"
+  assert_contains "hardening: RuntimeDefault seccomp" "$def" "type: RuntimeDefault"
+  assert_contains "hardening: privilege escalation disabled" "$def" "allowPrivilegeEscalation: false"
+  assert_not_contains "hardening: no privileged containers" "$def" "privileged: true"
+  assert_contains "hardening: SA token not automounted" "$def" "automountServiceAccountToken: false"
+  assert_contains "hardening: clickhouse pins uid 101" "$def" "runAsUser: 101"
+  # The app moved off Next.js; the dead permissions init container stays gone.
+  assert_not_contains "hardening: no dead next.js init container" "$def" "fix-nextjs-permissions"
+
+  # read-only root should cover every workload container (app, workers, nlp,
+  # langevals, 2 cronjobs, postgres, redis, clickhouse, gateway = 10).
+  local ro_count
+  ro_count=$(count_matches "$def" "readOnlyRootFilesystem: true")
+  if (( ro_count >= 10 )); then
+    pass "hardening: read-only root on $ro_count containers (>=10)"
+  else
+    fail "hardening: expected >=10 read-only-root containers, found $ro_count"
+  fi
+
+  # Gateway pod must set automount on the POD spec, not just its ServiceAccount
+  # (regression guard for the gap this work closed).
+  local gw_block
+  gw_block=$(awk -v RS='---' '/kind: Deployment/ && /name: '"${RELEASE}"'-gateway/{print}' <<< "$def")
+  assert_contains "hardening: gateway pod automount disabled" "$gw_block" "automountServiceAccountToken: false"
+
+  # strict-admission overlay drops the components that can't comply.
+  local strict
+  strict=$(tmpl --set autogen.enabled=true -f "${OVERLAYS}/strict-admission.yaml")
+  assert_not_contains "strict-admission: prometheus subchart off" "$strict" "prometheus-config"
+  assert_not_contains "strict-admission: gateway HPA off" "$strict" "kind: HorizontalPodAutoscaler"
+  assert_not_contains "strict-admission: app metrics scrape off" "$strict" "prometheus.io/scrape"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -514,6 +563,7 @@ main() {
   test_access_nodeport
   test_access_ingress
   test_size_overlays
+  test_pod_security
   test_infra_overlays
   test_overlay_stacking
 

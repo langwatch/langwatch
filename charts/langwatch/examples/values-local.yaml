@@ -30,9 +30,10 @@ app:
 workers:
   enabled: true
   replicaCount: 1
+  # Same image as the app: needs ~2Gi to cold-load via tsx without OOM-restarts.
   resources:
-    requests: { cpu: 100m, memory: 512Mi }
-    limits:   { cpu: 500m, memory: 1Gi }
+    requests: { cpu: 250m, memory: 768Mi }
+    limits:   { cpu: 1, memory: 2Gi }
 
 langwatch_nlp:
   replicaCount: 1
@@ -53,7 +54,9 @@ clickhouse:
   chartManaged: true
   image: { pullPolicy: Never }
   replicas: 1
-  memory: 1Gi
+  # Memory scales with ingest burst size; 2Gi suits local use, raise it before
+  # replaying real trace volume.
+  memory: 2Gi
   cpu: 1
   storage: { size: 5Gi }
 

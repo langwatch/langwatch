@@ -76,27 +76,10 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 
+      {{- with .Values.app.extraInitContainers}}
       initContainers:
-        {{- with .Values.app.extraInitContainers}}
         {{- toYaml . | nindent 8 }}
-        {{- end }}
-        # Fix permissions for Next.js cache/static directories when running as non-root
-        - name: fix-nextjs-permissions
-          image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
-          command: ['sh', '-c']
-          args:
-            - |
-              cp -r /app/langwatch/.next/* /next-tmp/ 2>/dev/null || true
-              echo "Copied .next contents to writable volume"
-          volumeMounts:
-            - name: next-dir
-              mountPath: /next-tmp
-          securityContext:
-            runAsUser: 1000
-            runAsNonRoot: true
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
+      {{- end }}
       containers:
         {{- with .Values.app.extraContainers}}
         {{- toYaml . | nindent 8 }}
@@ -295,8 +278,6 @@ spec:
             {{- end }}
             - name: tmp-dir
               mountPath: /tmp
-            - name: next-dir
-              mountPath: /app/langwatch/.next
             {{- if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
             # Stored-objects local-FS mount — renders ONLY when local-FS is
             # the active backend (dataplane disabled). Single-replica only
@@ -313,8 +294,6 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
         - name: tmp-dir
-          emptyDir: {}
-        - name: next-dir
           emptyDir: {}
         {{- if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
         - name: stored-objects-data
