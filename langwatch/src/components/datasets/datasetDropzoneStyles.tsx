@@ -19,12 +19,12 @@ export const DROPZONE_DOTTED_STYLE: React.CSSProperties = {
 
 /** Shared Chakra props for the dashed dropzone surface; highlights when active
  *  (dragging a file over it) and on hover, and softly grows the cloud icon. */
-export const dropzoneSurfaceProps = (active: boolean) => ({
+export const dropzoneSurfaceProps = (isActive: boolean) => ({
   borderRadius: "xl",
   borderWidth: "2px",
   borderStyle: "dashed" as const,
-  borderColor: active ? "blue.400" : "border",
-  bg: active ? "blue.500/10" : "transparent",
+  borderColor: isActive ? "blue.400" : "border",
+  bg: isActive ? "blue.500/10" : "transparent",
   padding: 10,
   textAlign: "center" as const,
   cursor: "pointer",
@@ -32,7 +32,7 @@ export const dropzoneSurfaceProps = (active: boolean) => ({
   transition: "border-color 0.15s ease, background-color 0.15s ease",
   // Grow the icon while dragging a file over the zone; the icon's own
   // transition animates the grow/shrink smoothly.
-  "& .lw-dropzone-icon": active ? { transform: "scale(1.12)" } : {},
+  "& .lw-dropzone-icon": isActive ? { transform: "scale(1.12)" } : {},
   _hover: {
     borderColor: "blue.300",
     bg: "blue.500/5",

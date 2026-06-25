@@ -161,17 +161,23 @@ function EditableName({
     );
   }
   return (
-    <Text
-      fontWeight="medium"
-      truncate
+    <Button
+      type="button"
+      variant="plain"
+      size="sm"
+      height="auto"
+      minW={0}
       maxW="full"
-      cursor="text"
-      title="Click to rename"
+      paddingX={0}
+      justifyContent="flex-start"
+      title="Rename dataset"
       _hover={{ textDecoration: "underline dotted" }}
       onClick={() => setEditing(true)}
     >
-      {value}
-    </Text>
+      <Text as="span" fontWeight="medium" truncate maxW="full">
+        {value}
+      </Text>
+    </Button>
   );
 }
 
@@ -278,7 +284,10 @@ function BulkFileRow({
   onFailed: (error?: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const isActive = file.status === "uploading" || file.status === "processing";
+  // Only an in-flight PUT is cancellable; a `processing` row is already
+  // finalized (its dataset exists) so it offers neither cancel nor remove.
+  const canCancel = file.status === "uploading";
+  const isProcessing = file.status === "processing";
   const canConfirm =
     file.status === "pending" &&
     !!file.columnTypes &&
@@ -345,7 +354,7 @@ function BulkFileRow({
             <RefreshCw size={12} /> Retry
           </Button>
         )}
-        {isActive ? (
+        {canCancel ? (
           <Box
             as="button"
             aria-label="Cancel upload"
@@ -356,7 +365,7 @@ function BulkFileRow({
           >
             <X size={16} />
           </Box>
-        ) : (
+        ) : isProcessing ? null : (
           <Box
             as="button"
             aria-label="Remove file"
@@ -482,7 +491,7 @@ export function BulkUploadDrawer({
                   onCancel={() => bulk.cancelFile(file.id)}
                   onRetry={() => void bulk.retryFile(file.id)}
                   onColumns={(next) => bulk.setColumnTypes(file.id, next)}
-                  onName={(next) => bulk.setName(file.id, next)}
+                  onName={(next) => bulk.setName({ id: file.id, name: next })}
                   onReady={() => {
                     bulk.markReady(file.id);
                     onUploaded?.();

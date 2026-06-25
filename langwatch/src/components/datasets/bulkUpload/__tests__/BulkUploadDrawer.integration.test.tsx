@@ -219,7 +219,6 @@ describe("given the bulk upload drawer", () => {
       await user.upload(fileInput(), [csv("data.csv")]);
       await waitFor(() => expect(screen.getByText("data")).toBeInTheDocument());
 
-      // Click the name → it becomes a focused input; replace it.
       await user.click(screen.getByText("data"));
       const nameField = await screen.findByLabelText("Dataset name");
       await user.clear(nameField);

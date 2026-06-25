@@ -156,13 +156,17 @@ export function useBulkUpload(projectId: string | undefined) {
     [update],
   );
 
-  /** Rename a not-yet-uploaded file's dataset. A blank name is ignored (keeps the
-   *  current one); a within-batch collision is resolved at upload by the
-   *  orchestrator's 409 bump, so no re-dedupe is needed here. */
+  /** Rename a not-yet-uploaded file's dataset. Only `pending` rows can be renamed
+   *  (once queued/uploading the name is committed server-side); a blank name is
+   *  ignored (keeps the current one); a within-batch collision is resolved at
+   *  upload by the orchestrator's 409 bump, so no re-dedupe is needed here. */
   const setName = useCallback(
-    (id: string, name: string) => {
+    ({ id, name }: { id: string; name: string }) => {
       const trimmed = name.trim();
-      if (trimmed !== "") update(id, { name: trimmed });
+      if (trimmed === "") return;
+      const file = filesRef.current.find((f) => f.id === id);
+      if (file?.status !== "pending") return;
+      update(id, { name: trimmed });
     },
     [update],
   );
