@@ -147,6 +147,20 @@ export const FEATURE_FLAGS = [
     description:
       "Gates the personal keys, admin oversight, RoutingPolicy, and IngestionSource UI surfaces. Distinct from release_ui_ai_gateway_menu_enabled — the existing gateway product ships unblocked while governance keeps cooking.",
   },
+  // BT leaderboard aggregation for the pairwise / N-way compare evaluator
+  // (#5103). Gates the PairwiseLeaderboard panel and the BT MLE compute path.
+  // OFF by default — flag-off path is byte-identical to today's behavior:
+  // existing AggregateHeaderBar win-rate aggregation is the only surface
+  // and computeBTLeaderboard never runs. Spec calls the key
+  // `release_ui_pairwise_bt_aggregation`; the `_enabled` suffix is the
+  // codebase convention.
+  {
+    key: "release_ui_pairwise_bt_aggregation_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Surfaces the Bradley-Terry MLE leaderboard panel for pairwise / N-way compare evaluator runs (#5103). Off = existing win-rate AggregateHeaderBar is the only aggregate surface.",
+  },
 ] as const satisfies readonly FeatureFlagDefinition[];
 
 export const FEATURE_FLAG_FAMILIES = [
