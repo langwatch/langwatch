@@ -147,7 +147,12 @@ export function AddOverrideDrawer({
     setCustomAmount("");
     setCustomUnit("weeks");
     setApplyToExisting(true);
-  }, [open, editTarget, currentProjectId, available.projects]);
+    // Initialize only when the drawer opens or the edit target changes — NOT on
+    // currentProjectId / available.projects reference churn (a background
+    // snapshot refetch would otherwise re-run this and wipe in-progress edits).
+    // The latest scope inputs are read inside, so the next open re-reads them.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editTarget]);
 
   const resolvedDays = (() => {
     if (preset === CUSTOM_PRESET_VALUE) {
