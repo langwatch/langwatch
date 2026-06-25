@@ -13,7 +13,9 @@ Features demonstrated:
 - Streaming responses
 
 Requirements:
-- pip install langwatch google-adk openinference-instrumentation-google-adk
+- pip install langwatch google-adk "openinference-instrumentation-google-adk>=0.1.11"
+  (>=0.1.11 is required for Google ADK >=1.32; older versions crash with
+   AttributeError on functions.trace_tool_call)
 - Set LANGWATCH_API_KEY and GOOGLE_API_KEY environment variables
 """
 
