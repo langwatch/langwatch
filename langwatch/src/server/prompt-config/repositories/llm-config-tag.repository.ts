@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient, PromptTag, PromptTagAssignment } from "@prisma/client";
+import { Prisma, type PrismaClient, type PromptTag, type PromptTagAssignment } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { createLogger } from "~/utils/logger";
 
@@ -54,6 +54,11 @@ export class PromptTagAssignmentRepository {
    * Assign a tag to a specific version.
    * If the tag already exists for the config, it is reassigned (upsert).
    * Callers must resolve tag name → tagId before calling this method.
+   *
+   * `source` records the event that produced the assignment (e.g. a pairwise
+   * eval promotion). Passing `null`/`undefined` clears any prior source on
+   * reassignment — a new assignment event without a recorded cause replaces
+   * stale provenance rather than inheriting it.
    */
   async assignTag({
     configId,
@@ -61,6 +66,7 @@ export class PromptTagAssignmentRepository {
     tagId,
     projectId,
     userId,
+    source,
     tx,
   }: {
     configId: string;
@@ -68,6 +74,7 @@ export class PromptTagAssignmentRepository {
     tagId: string;
     projectId: string;
     userId?: string;
+    source?: Prisma.InputJsonValue | null;
     tx?: Prisma.TransactionClient;
   }): Promise<PromptTagAssignment & { promptTag: PromptTag }> {
     const client = tx ?? this.prisma;
@@ -78,6 +85,9 @@ export class PromptTagAssignmentRepository {
       projectId,
       tx,
     });
+
+    const sourceArg: Prisma.InputJsonValue | typeof Prisma.DbNull =
+      source === undefined || source === null ? Prisma.DbNull : source;
 
     const result = await client.promptTagAssignment.upsert({
       where: {
@@ -92,10 +102,12 @@ export class PromptTagAssignmentRepository {
         projectId,
         createdById: userId ?? null,
         updatedById: userId ?? null,
+        source: sourceArg,
       },
       update: {
         versionId,
         updatedById: userId ?? null,
+        source: sourceArg,
       },
       include: { promptTag: true },
     });
