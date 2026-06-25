@@ -35,6 +35,7 @@ export const useOpenEvaluatorEditor = () => {
   const {
     datasets,
     activeDatasetId,
+    targets,
     updateEvaluator,
     setEvaluatorMapping,
     removeEvaluatorMapping,
@@ -42,6 +43,7 @@ export const useOpenEvaluatorEditor = () => {
     useShallow((state) => ({
       datasets: state.datasets,
       activeDatasetId: state.activeDatasetId,
+      targets: state.targets,
       updateEvaluator: state.updateEvaluator,
       setEvaluatorMapping: state.setEvaluatorMapping,
       removeEvaluatorMapping: state.removeEvaluatorMapping,
@@ -138,6 +140,43 @@ export const useOpenEvaluatorEditor = () => {
         return;
       }
 
+      // Pairwise compare evaluators (#5100): bypass the per-row mapping form
+      // and render a target+golden picker instead. The four required input
+      // fields (candidate_a_*/candidate_b_*) have no per-row source — they
+      // come from two OTHER targets' outputs, picked once via the form.
+      // The orchestrator's Phase-2 cell generator reads evaluator.pairwise
+      // to assemble those inputs at run time.
+      if (evaluator.evaluatorType === "langevals/pairwise_compare") {
+        const activeDataset = datasets.find((d) => d.id === activeDatasetId);
+        setFlowCallbacks(
+          "evaluatorEditor",
+          createEvaluatorEditorCallbacks({
+            onLocalConfigChange: (localEvaluatorConfig) => {
+              updateEvaluator(evaluator.id, { localEvaluatorConfig });
+            },
+            onPairwiseChange: (pairwise) => {
+              updateEvaluator(evaluator.id, { pairwise });
+            },
+          }),
+        );
+        openDrawer("evaluatorEditor", {
+          evaluatorId: evaluator.dbEvaluatorId,
+          evaluatorType: evaluator.evaluatorType,
+          initialLocalConfig: evaluator.localEvaluatorConfig,
+          // Non-serializable extras consumed by the drawer body.
+          pairwiseContext: {
+            initialPairwise: evaluator.pairwise,
+            targets: targets.map((t) => ({ id: t.id })),
+            datasetColumns:
+              activeDataset?.columns.map((c) => ({
+                id: c.id,
+                name: c.name,
+              })) ?? [],
+          },
+        });
+        return;
+      }
+
       // Route all non-serializable callbacks through setFlowCallbacks.
       // onMappingChange + onLocalConfigChange must live here (not in
       // mappingsConfig) so the drawer's mappings section renders — see
@@ -163,6 +202,7 @@ export const useOpenEvaluatorEditor = () => {
       openDrawer,
       datasets,
       activeDatasetId,
+      targets,
       updateEvaluator,
       setEvaluatorMapping,
       removeEvaluatorMapping,

@@ -101,14 +101,18 @@ export const useOpenTargetEditor = () => {
   const {
     datasets,
     activeDatasetId,
+    targets,
     updateTarget,
+    updateTargetPairwise,
     setTargetMapping,
     removeTargetMapping,
   } = useEvaluationsV3Store(
     useShallow((state) => ({
       datasets: state.datasets,
       activeDatasetId: state.activeDatasetId,
+      targets: state.targets,
       updateTarget: state.updateTarget,
+      updateTargetPairwise: state.updateTargetPairwise,
       setTargetMapping: state.setTargetMapping,
       removeTargetMapping: state.removeTargetMapping,
     })),
@@ -307,6 +311,52 @@ export const useOpenTargetEditor = () => {
           console.error("Failed to fetch agent:", error);
         }
       } else if (target.type === "evaluator" && target.targetEvaluatorId) {
+        // Pairwise column-target (#5100): when the target carries a `pairwise`
+        // config, render the clean PairwiseConfigForm (Variant A / Variant B /
+        // Golden) instead of the per-row mappings UI. Derived field mappings
+        // are written into target.mappings on every change so the orchestrator
+        // sees a normal mapped target at run time. Strictly additive: every
+        // other evaluator-target falls through to the original branch below.
+        if (target.pairwise) {
+          const activeDataset = datasets.find((d) => d.id === activeDatasetId);
+          const datasetColumns =
+            activeDataset?.columns.map((c) => ({ id: c.id, name: c.name })) ??
+            [];
+          const variantOptions = targets
+            .filter((t) => t.type !== "evaluator" && t.id !== target.id)
+            .map((t) => ({ id: t.id }));
+
+          setFlowCallbacks(
+            "evaluatorEditor",
+            createEvaluatorEditorCallbacks({
+              targetId: target.id,
+              updateTarget,
+              onPairwiseChange: (next) => {
+                updateTargetPairwise(target.id, next);
+              },
+            }),
+          );
+
+          const initialLocalConfig = target.localEvaluatorConfig;
+
+          openDrawer("evaluatorEditor", {
+            evaluatorId: target.targetEvaluatorId,
+            evaluatorType: "langevals/pairwise_compare",
+            initialLocalConfig,
+            pairwiseContext: {
+              initialPairwise: target.pairwise,
+              targets: variantOptions,
+              datasetColumns,
+            },
+            urlParams: { targetId: target.id },
+          });
+
+          requestAnimationFrame(() => {
+            scrollToTargetColumn(target.id);
+          });
+          return;
+        }
+
         // Evaluator target - open evaluator editor drawer with mappings config
         const availableSources = buildAvailableSources();
         const uiMappings = buildUIMappings(target, activeDatasetId);
@@ -374,7 +424,10 @@ export const useOpenTargetEditor = () => {
     [
       buildAvailableSources,
       activeDatasetId,
+      datasets,
+      targets,
       updateTarget,
+      updateTargetPairwise,
       setTargetMapping,
       removeTargetMapping,
       openDrawer,

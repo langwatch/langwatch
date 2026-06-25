@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { EvaluationResults } from "../../types";
+import type { EvaluationResults, EvaluatorConfig } from "../../types";
 import {
   computeMetricStats,
+  computePairwiseAggregate,
   computeTargetAggregates,
   formatCost,
   formatLatency,
@@ -662,5 +663,92 @@ describe("computeTargetAggregates latencyStats and costStats", () => {
 
     expect(aggregates.latencyStats).toBeNull();
     expect(aggregates.costStats).toBeNull();
+  });
+});
+
+describe("computePairwiseAggregate", () => {
+  const createResults = (
+    overrides: Partial<EvaluationResults> = {},
+  ): EvaluationResults => ({
+    status: "success",
+    targetOutputs: {},
+    targetMetadata: {},
+    evaluatorResults: {},
+    errors: {},
+    ...overrides,
+  });
+
+  const pairwiseEvaluator: Pick<EvaluatorConfig, "id" | "pairwise"> = {
+    id: "eval-pw",
+    pairwise: {
+      variantA: "target-a",
+      variantB: "target-b",
+      goldenField: "expected_output",
+      includeMetrics: [],
+    },
+  };
+
+  it("returns null when evaluator has no pairwise config", () => {
+    const out = computePairwiseAggregate(
+      { id: "eval-1", pairwise: undefined },
+      createResults(),
+      3,
+    );
+    expect(out).toBeNull();
+  });
+
+  it("tallies A/B/tie verdicts and skips missing/errored rows", () => {
+    const results = createResults({
+      evaluatorResults: {
+        "target-a": {
+          "eval-pw": [
+            { status: "processed", label: "A", details: "A is closer to golden", cost: { amount: 0.001 } },
+            { status: "processed", label: "B", details: "B is more concise", cost: { amount: 0.002 } },
+            { status: "processed", label: "tie", details: "both equivalent", cost: { amount: 0.0015 } },
+            { status: "error", details: "judge crashed" },
+            undefined,
+            { status: "processed", label: "A", cost: { amount: 0.0005 } },
+          ],
+        },
+      },
+    });
+    const agg = computePairwiseAggregate(pairwiseEvaluator, results, 6);
+    expect(agg).not.toBeNull();
+    expect(agg!.counts).toEqual({ a: 2, b: 1, tie: 1 });
+    expect(agg!.totalCost).toBeCloseTo(0.005, 5);
+    expect(agg!.perRow[0]).toEqual({
+      label: "A",
+      reasoning: "A is closer to golden",
+      costAmount: 0.001,
+    });
+    expect(agg!.perRow[3]).toBeNull();
+    expect(agg!.perRow[4]).toBeNull();
+  });
+
+  it("handles missing cost gracefully", () => {
+    const results = createResults({
+      evaluatorResults: {
+        "target-a": {
+          "eval-pw": [{ status: "processed", label: "A" }],
+        },
+      },
+    });
+    const agg = computePairwiseAggregate(pairwiseEvaluator, results, 1);
+    expect(agg!.totalCost).toBe(0);
+    expect(agg!.perRow[0]?.costAmount).toBe(0);
+  });
+
+  it("ignores results stored under the wrong target id", () => {
+    const results = createResults({
+      evaluatorResults: {
+        // Pairwise results MUST land under variantA — anything stored under
+        // variantB or another target is invisible to the aggregator.
+        "target-b": {
+          "eval-pw": [{ status: "processed", label: "A" }],
+        },
+      },
+    });
+    const agg = computePairwiseAggregate(pairwiseEvaluator, results, 1);
+    expect(agg!.counts).toEqual({ a: 0, b: 0, tie: 0 });
   });
 });

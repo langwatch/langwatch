@@ -51,6 +51,14 @@ type EvaluatorChipProps = {
   hasAnyTargetOutputs?: boolean;
   /** The type of the target (prompt, agent, evaluator) — used for tooltip copy */
   targetType?: "prompt" | "agent" | "evaluator";
+  /**
+   * Pairwise verdict role for this chip's target on the current row (#5100).
+   * "winner" tints the chip green, "loser" tints red, "tie" stays neutral,
+   * undefined means there is no pairwise verdict for this (row, target).
+   * Callers compute this by mapping the pairwise result.label ("A" / "B" /
+   * "tie") to the chip's target id via the evaluator's pairwise config.
+   */
+  pairwiseState?: "winner" | "loser" | "tie";
   onEdit: () => void;
   onRemove: () => void;
   /** Called when user wants to run or re-run this evaluator on the current row */
@@ -67,6 +75,7 @@ export function EvaluatorChip({
   hasTargetOutput = false,
   hasAnyTargetOutputs = false,
   targetType = "prompt",
+  pairwiseState,
   onEdit,
   onRemove,
   onRerun,
@@ -122,7 +131,22 @@ export function EvaluatorChip({
           size="xs"
           fontSize="11px"
           fontWeight="medium"
-          borderColor={hasMissingMappings ? "orange.solid" : undefined}
+          borderColor={
+            hasMissingMappings
+              ? "orange.solid"
+              : pairwiseState === "winner"
+                ? "green.solid"
+                : pairwiseState === "loser"
+                  ? "red.solid"
+                  : undefined
+          }
+          bg={
+            pairwiseState === "winner"
+              ? "green.subtle"
+              : pairwiseState === "loser"
+                ? "red.subtle"
+                : undefined
+          }
           minWidth={0}
           maxWidth="100%"
           css={{
