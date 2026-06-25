@@ -12,14 +12,19 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { DatabaseBackup, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  DatabaseBackup,
+  MoreVertical,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   AddOverrideDrawer,
   type RetentionEditTarget,
 } from "~/components/data-retention/AddOverrideDrawer";
 import { ApplyToExistingConfirmDialog } from "~/components/data-retention/ApplyToExistingConfirmDialog";
-import { RemoveScopeConfirmDialog } from "~/components/data-retention/RemoveScopeConfirmDialog";
 import {
   SCOPE_ICON,
   SCOPE_TIER_ORDER,
@@ -30,6 +35,7 @@ import {
   type RetentionScopeGroup,
   renderPolicyValue,
 } from "~/components/data-retention/grouping";
+import { RemoveScopeConfirmDialog } from "~/components/data-retention/RemoveScopeConfirmDialog";
 import { RetentionAndUsageCard } from "~/components/data-retention/RetentionAndUsageCard";
 import { RetroactiveProgressCard } from "~/components/data-retention/RetroactiveProgressCard";
 import SettingsLayout from "~/components/SettingsLayout";
@@ -252,7 +258,8 @@ function DataRetentionPage({
     const present = (Object.keys(group.byCategory) as RetentionCategory[]).find(
       (c) => group.byCategory[c] !== undefined,
     );
-    const retentionDays = group.byCategory.traces ?? group.byCategory[present!]!;
+    const retentionDays =
+      group.byCategory.traces ?? group.byCategory[present!]!;
     setEditTarget({
       scope: { scopeType: group.scopeType, scopeId: group.scopeId },
       scopeName: group.name,

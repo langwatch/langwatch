@@ -2,7 +2,7 @@ import { Alert, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { ArrowRight } from "lucide-react";
 import { Dialog } from "~/components/ui/dialog";
 import { api } from "~/utils/api";
-import { renderPolicyValue, type RetentionScopeGroup } from "./grouping";
+import { type RetentionScopeGroup, renderPolicyValue } from "./grouping";
 
 /**
  * Confirms removal of a scope's retention policy. Removing a rule is not a
@@ -57,9 +57,10 @@ export function RemoveScopeConfirmDialog({
           {group && (
             <VStack align="stretch" gap={4}>
               <Text>
-                This removes the override only. <strong>No data is deleted</strong>{" "}
-                — existing data keeps the retention it was already stored with.
-                The change applies to newly ingested data from now on.
+                This removes the override only.{" "}
+                <strong>No data is deleted</strong> — existing data keeps the
+                retention it was already stored with. The change applies to
+                newly ingested data from now on.
               </Text>
 
               <VStack
@@ -85,7 +86,9 @@ export function RemoveScopeConfirmDialog({
                   <HStack gap={2}>
                     <Text fontWeight="600">{current}</Text>
                     <ArrowRight size={14} />
-                    <Text fontWeight="600">{fallback ?? "the next policy"}</Text>
+                    <Text fontWeight="600">
+                      {fallback ?? "the next policy"}
+                    </Text>
                   </HStack>
                 )}
                 <Text fontSize="xs" color="fg.muted">
