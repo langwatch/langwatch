@@ -60,14 +60,14 @@ function UploadOrCreateDatasetMenu({
   onCreate: () => void;
 }) {
   return (
-    <Menu.Root>
+    <Menu.Root positioning={{ sameWidth: true }}>
       <Menu.Trigger asChild>{children}</Menu.Trigger>
       <Menu.Content>
         <Menu.Item value="upload" onClick={onUpload}>
           <Upload size={16} /> Upload datasets
         </Menu.Item>
         <Menu.Item value="create" onClick={onCreate}>
-          <Plus size={16} /> Create dataset
+          <Plus size={16} /> Create empty dataset
         </Menu.Item>
       </Menu.Content>
     </Menu.Root>

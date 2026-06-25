@@ -233,8 +233,8 @@ describe("Datasets list page", () => {
 
       expect(screen.getByText("No datasets yet")).toBeInTheDocument();
       await user.click(screen.getByTestId("empty-state-create-dataset"));
-      // The CTA is a dropdown: "Create dataset" opens the empty-dataset drawer.
-      await user.click(await screen.findByText("Create dataset"));
+      // The CTA is a dropdown: "Create empty dataset" opens the create drawer.
+      await user.click(await screen.findByText("Create empty dataset"));
       expect(
         await screen.findByTestId("add-edit-dataset-drawer"),
       ).toBeInTheDocument();
