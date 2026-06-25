@@ -3,13 +3,13 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
+import { resolveScopeStorageUsage } from "~/server/data-retention/metering/storageMeter.read";
 import {
   assertCanDisableRetention,
   assertCanWriteRetentionScope,
   assertRetentionPlan,
   assertRetentionPlanForScope,
 } from "~/server/data-retention/policy/dataRetentionPolicy.authz";
-import { resolveScopeStorageUsage } from "~/server/data-retention/metering/storageMeter.read";
 import { getRetentionPolicySnapshot } from "~/server/data-retention/policy/dataRetentionPolicy.read";
 import { ScopeTargetNotFoundError } from "~/server/data-retention/policy/dataRetentionPolicy.service";
 
