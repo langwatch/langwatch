@@ -13,6 +13,7 @@
 import { generate } from "@langwatch/ksuid";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
 import type { EvaluationsV3State, TargetConfig } from "~/experiments-v3/types";
+import { normalizePairwiseConfig } from "~/experiments-v3/types";
 import { isRowEmpty } from "~/experiments-v3/utils/emptyRowDetection";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
@@ -213,18 +214,21 @@ export const generateCells = (
 };
 
 /**
- * Phase 2 cell generator for pairwise evaluators (#5100).
+ * Phase 2 cell generator for pairwise / N-way evaluators (#5100, #5101).
  *
  * Called AFTER Phase 1 (per-target) cells complete. For each pairwise
- * evaluator and each rowIndex where BOTH variantA and variantB outputs
- * exist in `completedTargetOutputs`, emit a synthetic cell whose
- * `pairwise` field carries both candidates. The cell's `targetId` points
- * at variantA so the workflow builder has a real TargetConfig to lean on;
- * `skipTarget` short-circuits target execution. `buildEvaluatorInputs`
- * branches on `cell.pairwise` to assemble the candidate_* + golden inputs.
+ * evaluator and each rowIndex where ALL configured variant outputs
+ * exist in `completedTargetOutputs`, emit one synthetic cell whose
+ * `pairwise` field carries the candidates list. The cell's `targetId`
+ * points at the first variant so the workflow builder has a real
+ * TargetConfig to lean on; `skipTarget` short-circuits target
+ * execution. `buildEvaluatorInputs` branches on `cell.pairwise.mode` to
+ * pump either the 2-way candidate_a_* / candidate_b_* fields or the
+ * generalized `candidates` list.
  *
- * Rows where one variant failed to produce an output are silently skipped
- * — there is no honest pairwise verdict without both candidates.
+ * Rows where any variant failed to produce an output are silently
+ * skipped — there is no honest comparison verdict without every
+ * candidate present.
  */
 export const generatePairwiseCells = (
   state: Pick<
@@ -245,53 +249,77 @@ export const generatePairwiseCells = (
   if (pairwiseEvaluators.length === 0) return cells;
 
   for (const evaluator of pairwiseEvaluators) {
-    const cfg = evaluator.pairwise;
-    if (!cfg) continue;
+    if (!evaluator.pairwise) continue;
+    const cfg = normalizePairwiseConfig(evaluator.pairwise);
 
-    const variantA = state.targets.find((t) => t.id === cfg.variantA);
-    const variantB = state.targets.find((t) => t.id === cfg.variantB);
-    if (!variantA || !variantB) {
+    if (!cfg.variants || cfg.variants.length < 2) {
       logger.warn(
-        { evaluatorId: evaluator.id, variantA: cfg.variantA, variantB: cfg.variantB },
-        "Pairwise evaluator skipped: variant target(s) not found",
+        { evaluatorId: evaluator.id, variants: cfg.variants },
+        "Pairwise evaluator skipped: fewer than 2 variants configured",
       );
       continue;
     }
+
+    // Resolve all variant TargetConfigs up-front; bail if any missing.
+    const resolvedVariants = cfg.variants.map((id) =>
+      state.targets.find((t) => t.id === id),
+    );
+    if (resolvedVariants.some((t) => !t)) {
+      logger.warn(
+        { evaluatorId: evaluator.id, variants: cfg.variants },
+        "Pairwise evaluator skipped: one or more variant targets not found",
+      );
+      continue;
+    }
+    const firstVariant = resolvedVariants[0]!;
 
     for (let rowIndex = 0; rowIndex < datasetRows.length; rowIndex++) {
       const datasetEntry = datasetRows[rowIndex];
       if (!datasetEntry) continue;
 
-      const a = completedTargetOutputs.get(`${rowIndex}:${cfg.variantA}`);
-      const b = completedTargetOutputs.get(`${rowIndex}:${cfg.variantB}`);
-      if (!a || !b) continue;
+      // Gather outputs for ALL variants — skip the row if any missing.
+      const outputs = cfg.variants.map((id) =>
+        completedTargetOutputs.get(`${rowIndex}:${id}`),
+      );
+      if (outputs.some((o) => !o)) continue;
+
+      const candidates = cfg.variants.map((id, i) => ({
+        id,
+        output: outputs[i]!.output,
+        cost: outputs[i]!.cost,
+        duration: outputs[i]!.duration,
+      }));
+
+      // Preserve the 2-way candidateA / candidateB aliases when running
+      // in pairwise mode so the existing buildEvaluatorInputs branch
+      // (which pumps Python's candidate_a_* / candidate_b_* fields)
+      // keeps working unchanged.
+      const pairwiseAliases =
+        cfg.mode === "pairwise" && candidates.length >= 2
+          ? {
+              candidateA: candidates[0],
+              candidateB: candidates[1],
+            }
+          : {};
 
       cells.push({
         rowIndex,
-        // Point at variantA so the workflow builder has a real TargetConfig.
-        // The target step itself is skipped via `skipTarget` below.
-        targetId: cfg.variantA,
-        targetConfig: variantA,
+        // Point at the first variant so the workflow builder has a
+        // real TargetConfig. The target step itself is skipped via
+        // `skipTarget` below.
+        targetId: firstVariant.id,
+        targetConfig: firstVariant,
         evaluatorConfigs: [evaluator],
         datasetEntry: {
           _datasetId: datasetId,
           ...datasetEntry,
         },
         skipTarget: true,
-        precomputedTargetOutput: a.output,
+        precomputedTargetOutput: candidates[0]!.output,
         pairwise: {
-          candidateA: {
-            id: cfg.variantA,
-            output: a.output,
-            cost: a.cost,
-            duration: a.duration,
-          },
-          candidateB: {
-            id: cfg.variantB,
-            output: b.output,
-            cost: b.cost,
-            duration: b.duration,
-          },
+          mode: cfg.mode,
+          candidates,
+          ...pairwiseAliases,
         },
       });
     }
@@ -568,16 +596,20 @@ const buildEvaluatorInputs = (
   const evaluator = cell.evaluatorConfigs.find((e) => e.id === evaluatorId);
   if (!evaluator) return inputs;
 
-  // Pairwise branch (#5100): synthetic inputs bypassing the per-target
-  // mapping system. We have explicit knowledge of where each field comes
-  // from (golden -> dataset[goldenField]; candidate_* -> cell.pairwise),
-  // so we assemble them directly. `input` still uses an existing mapping
-  // (variantA's) if configured, otherwise falls back to the dataset's
-  // `input` column.
+  // Pairwise / N-way branch (#5100, #5101): synthetic inputs bypassing
+  // the per-target mapping system. We have explicit knowledge of where
+  // each field comes from (golden -> dataset[goldenField]; candidates
+  // -> cell.pairwise.candidates), so we assemble them directly. `input`
+  // reuses the first variant's existing mapping (if configured) so
+  // dataset-side input renaming still works; otherwise it falls back to
+  // the dataset's `input` column.
   if (evaluator.pairwise && cell.pairwise) {
-    const cfg = evaluator.pairwise;
-    const variantAMappings = evaluator.mappings[datasetId]?.[cfg.variantA] ?? {};
-    const inputMapping = variantAMappings.input;
+    const cfg = normalizePairwiseConfig(evaluator.pairwise);
+    const firstVariantId = cfg.variants[0];
+    const firstVariantMappings = firstVariantId
+      ? (evaluator.mappings[datasetId]?.[firstVariantId] ?? {})
+      : {};
+    const inputMapping = firstVariantMappings.input;
     if (inputMapping?.type === "source" && inputMapping.source === "dataset") {
       inputs.input = cell.datasetEntry[inputMapping.sourceField];
     } else if (cell.datasetEntry.input !== undefined) {
@@ -586,14 +618,41 @@ const buildEvaluatorInputs = (
 
     inputs.golden = cell.datasetEntry[cfg.goldenField];
 
-    inputs.candidate_a_id = cell.pairwise.candidateA.id;
-    inputs.candidate_a_output = cell.pairwise.candidateA.output;
-    inputs.candidate_a_cost = cell.pairwise.candidateA.cost;
-    inputs.candidate_a_duration = cell.pairwise.candidateA.duration;
-    inputs.candidate_b_id = cell.pairwise.candidateB.id;
-    inputs.candidate_b_output = cell.pairwise.candidateB.output;
-    inputs.candidate_b_cost = cell.pairwise.candidateB.cost;
-    inputs.candidate_b_duration = cell.pairwise.candidateB.duration;
+    if (cell.pairwise.mode === "select_best") {
+      // Pump the generalized N-way fields. The Python evaluator
+      // accepts a `candidates: list[CandidateInput]` (id, output, cost,
+      // duration) plus a `row_index` it uses to seed the deterministic
+      // shuffle. Per-row determinism comes from row_index alone — same
+      // row + same variants -> identical judge prompt.
+      inputs.candidates = cell.pairwise.candidates.map((c) => ({
+        id: c.id,
+        output: c.output,
+        cost: c.cost,
+        duration: c.duration,
+      }));
+      inputs.row_index = cell.rowIndex;
+    } else {
+      // Pairwise mode (legacy MVP). Pump the 2-way candidate_a_* /
+      // candidate_b_* fields the Python evaluator still uses for its
+      // swap-and-confirm path. The orchestrator's Phase 2 generator
+      // populates both `candidates` and the `candidateA`/`candidateB`
+      // aliases when mode=="pairwise"; we prefer the aliases here so
+      // the per-slot fields line up unambiguously.
+      const a = cell.pairwise.candidateA ?? cell.pairwise.candidates[0];
+      const b = cell.pairwise.candidateB ?? cell.pairwise.candidates[1];
+      if (a) {
+        inputs.candidate_a_id = a.id;
+        inputs.candidate_a_output = a.output;
+        inputs.candidate_a_cost = a.cost;
+        inputs.candidate_a_duration = a.duration;
+      }
+      if (b) {
+        inputs.candidate_b_id = b.id;
+        inputs.candidate_b_output = b.output;
+        inputs.candidate_b_cost = b.cost;
+        inputs.candidate_b_duration = b.duration;
+      }
+    }
 
     return inputs;
   }

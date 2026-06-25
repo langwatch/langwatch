@@ -1,46 +1,33 @@
 import { Badge, Box, HStack, Popover, Text } from "@chakra-ui/react";
 
 /**
- * Per-row pairwise verdict strip (#5100). Rendered below each row in
- * the EvaluationsV3 table when a pairwise evaluator is configured.
+ * Per-row pairwise / N-way verdict strip (#5100, #5101). Rendered
+ * below each row in the EvaluationsV3 table when a pairwise evaluator
+ * is configured.
  *
- * Shows the winner's display label (the user's variantA or variantB
- * id, or "Tie") with the judge reasoning available in a popover.
- *
- * Caller is responsible for resolving `label` -> human display name
- * (e.g. "A" -> the variantA TargetConfig's name).
+ * Shows the winning variant's display name (or "Tie") with the judge
+ * reasoning available in a popover. The caller passes the resolved
+ * winner display name directly — this component knows nothing about
+ * the underlying variants array, slot labels, or evaluator mode.
  */
 export type RowVerdictStripProps = {
-  /** "A", "B", or "tie" — the verdict label from the pairwise evaluator. */
-  label: "A" | "B" | "tie";
-  /** Human-readable variant A name (typically the TargetConfig id). */
-  variantAName: string;
-  /** Human-readable variant B name. */
-  variantBName: string;
+  /**
+   * Display name of the winning variant, or "Tie" when the verdict
+   * was a tie. Caller resolves the raw label (whether "A"/"B" in
+   * pairwise mode or a target id in select_best mode) to a name.
+   */
+  winnerName: string;
+  /** True when the verdict was a tie. */
+  isTie: boolean;
   /** Judge reasoning text. */
   reasoning?: string;
 };
 
-const COLOR_BY_LABEL: Record<RowVerdictStripProps["label"], string> = {
-  A: "green",
-  B: "blue",
-  tie: "gray",
-};
-
 export function RowVerdictStrip({
-  label,
-  variantAName,
-  variantBName,
+  winnerName,
+  isTie,
   reasoning,
 }: RowVerdictStripProps) {
-  const winnerName =
-    label === "tie"
-      ? "Tie"
-      : label === "A"
-        ? variantAName
-        : variantBName;
-  const color = COLOR_BY_LABEL[label];
-
   return (
     <HStack
       paddingX={3}
@@ -51,8 +38,8 @@ export function RowVerdictStrip({
       fontSize="xs"
       gap={2}
     >
-      <Text color="fg.muted">Pairwise verdict:</Text>
-      <Badge colorPalette={color} variant="subtle">
+      <Text color="fg.muted">Verdict:</Text>
+      <Badge colorPalette={isTie ? "gray" : "green"} variant="subtle">
         {winnerName}
       </Badge>
       {reasoning ? (

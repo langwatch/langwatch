@@ -862,18 +862,45 @@ export const evaluatorsSchema = z.object({
         .number()
         .describe("Max tokens allowed for evaluation")
         .default(128000),
+      mode: z
+        .union([z.literal("pairwise"), z.literal("select_best")])
+        .describe(
+          "Comparison mode. 'pairwise' compares exactly 2 candidates with swap-and-confirm position-bias mitigation (2 judge calls per row). 'select_best' picks the best of N candidates in a single judge call with candidate order shuffled deterministically by row_index.",
+        )
+        .default("pairwise"),
       prompt: z
         .string()
-        .describe("Judge prompt template (golden-aware by default)")
+        .describe(
+          "Judge prompt template for pairwise mode. Placeholders: {input}, {golden}, {candidate_a_output}, {candidate_b_output}.",
+        )
         .default(
           'Compare two candidate outputs against a known-good reference (golden answer).\n\nTask:           {input}\nGolden answer:  {golden}\n\nCandidate A:    {candidate_a_output}\nCandidate B:    {candidate_b_output}\n\nReason step-by-step about how closely each candidate matches the\ngolden answer in correctness, completeness, and style. Then pick\nthe better candidate, or "tie" if equivalent.\nPrefer cheaper/faster only when quality is comparable.\n',
+        ),
+      select_best_prompt: z
+        .string()
+        .describe(
+          "Judge prompt template for select_best (N-way) mode. Placeholders: {input}, {golden}, {candidates} (a pre-rendered bulleted list with slot labels and optional per-candidate metrics).",
+        )
+        .default(
+          'Pick the best of N candidate outputs against a known-good reference (golden answer).\n\nTask:           {input}\nGolden answer:  {golden}\n\nCandidates:\n{candidates}\n\nReason step-by-step about how closely each candidate matches the\ngolden answer in correctness, completeness, and style. Then pick\nthe best candidate by its slot label, or "tie" if no clear winner.\nPrefer cheaper/faster only when quality is comparable.\n',
         ),
       swap_and_confirm: z
         .boolean()
         .describe(
-          "Run two judge calls with A/B positions swapped; tie on disagreement. Doubles judge cost but materially reduces position bias (PandaLM: 68% -> 51%).",
+          "[Deprecated — use position_bias_mitigation.] When position_bias_mitigation is unset, this boolean still controls pairwise mode: True -> swap_and_confirm, False -> none. Ignored in select_best mode.",
         )
         .default(true),
+      position_bias_mitigation: z
+        .union([
+          z.literal("swap_and_confirm"),
+          z.literal("randomize_order"),
+          z.literal("none"),
+        ])
+        .nullable()
+        .describe(
+          "How to mitigate position bias. When unset, defaults to 'swap_and_confirm' in pairwise mode (or 'none' if swap_and_confirm is False) and 'randomize_order' in select_best mode. 'swap_and_confirm' is only meaningful for 2 candidates; in select_best mode it falls back to 'randomize_order'.",
+        )
+        .default(null),
       allow_tie: z
         .boolean()
         .describe(
@@ -974,8 +1001,8 @@ export type EvaluatorDefinition<T extends EvaluatorTypes> = {
     category: "quality" | "rag" | "safety" | "policy" | "other" | "custom" | "similarity";
     docsUrl?: string;
     isGuardrail: boolean;
-    requiredFields: ("input" | "output" | "contexts" | "expected_output" | "expected_contexts" | "conversation")[];
-    optionalFields: ("input" | "output" | "contexts" | "expected_output" | "expected_contexts" | "conversation")[];
+    requiredFields: string[];
+    optionalFields: string[];
     settings: {
         [K in keyof Evaluators[T]["settings"]]: {
         description?: string;
@@ -2159,26 +2186,29 @@ This evaluator checks if the user message is concerning one of the allowed topic
   "langevals/pairwise_compare": {
     name: `Pairwise Compare`,
     description: `
-Native pairwise LLM-as-judge evaluator. Compare two candidate
-outputs against a golden reference, with optional swap-and-confirm
-position-bias mitigation.
+Native pairwise / N-way LLM-as-judge evaluator. Compares candidate
+outputs against a golden reference. Two modes:
+
+  pairwise    — exactly 2 candidates, swap-and-confirm by default
+  select_best — N candidates, randomize_order by default
 `,
     category: "quality",
     docsUrl: "",
     isGuardrail: false,
-    requiredFields: [
-      "candidate_a_id",
-      "candidate_a_output",
-      "candidate_b_id",
-      "candidate_b_output",
-    ],
+    requiredFields: [],
     optionalFields: [
       "input",
       "golden",
+      "candidate_a_id",
+      "candidate_a_output",
       "candidate_a_cost",
       "candidate_a_duration",
+      "candidate_b_id",
+      "candidate_b_output",
       "candidate_b_cost",
       "candidate_b_duration",
+      "candidates",
+      "row_index",
     ],
     settings: {
       "model": {
@@ -2189,13 +2219,25 @@ position-bias mitigation.
             "description": "Max tokens allowed for evaluation",
             "default": 128000
       },
+      "mode": {
+            "description": "Comparison mode. 'pairwise' compares exactly 2 candidates with swap-and-confirm position-bias mitigation (2 judge calls per row). 'select_best' picks the best of N candidates in a single judge call with candidate order shuffled deterministically by row_index.",
+            "default": "pairwise"
+      },
       "prompt": {
-            "description": "Judge prompt template (golden-aware by default)",
+            "description": "Judge prompt template for pairwise mode. Placeholders: {input}, {golden}, {candidate_a_output}, {candidate_b_output}.",
             "default": "Compare two candidate outputs against a known-good reference (golden answer).\n\nTask:           {input}\nGolden answer:  {golden}\n\nCandidate A:    {candidate_a_output}\nCandidate B:    {candidate_b_output}\n\nReason step-by-step about how closely each candidate matches the\ngolden answer in correctness, completeness, and style. Then pick\nthe better candidate, or \"tie\" if equivalent.\nPrefer cheaper/faster only when quality is comparable.\n"
       },
+      "select_best_prompt": {
+            "description": "Judge prompt template for select_best (N-way) mode. Placeholders: {input}, {golden}, {candidates} (a pre-rendered bulleted list with slot labels and optional per-candidate metrics).",
+            "default": "Pick the best of N candidate outputs against a known-good reference (golden answer).\n\nTask:           {input}\nGolden answer:  {golden}\n\nCandidates:\n{candidates}\n\nReason step-by-step about how closely each candidate matches the\ngolden answer in correctness, completeness, and style. Then pick\nthe best candidate by its slot label, or \"tie\" if no clear winner.\nPrefer cheaper/faster only when quality is comparable.\n"
+      },
       "swap_and_confirm": {
-            "description": "Run two judge calls with A/B positions swapped; tie on disagreement. Doubles judge cost but materially reduces position bias (PandaLM: 68% -> 51%).",
+            "description": "[Deprecated — use position_bias_mitigation.] When position_bias_mitigation is unset, this boolean still controls pairwise mode: True -> swap_and_confirm, False -> none. Ignored in select_best mode.",
             "default": true
+      },
+      "position_bias_mitigation": {
+            "description": "How to mitigate position bias. When unset, defaults to 'swap_and_confirm' in pairwise mode (or 'none' if swap_and_confirm is False) and 'randomize_order' in select_best mode. 'swap_and_confirm' is only meaningful for 2 candidates; in select_best mode it falls back to 'randomize_order'.",
+            "default": null
       },
       "allow_tie": {
             "description": "Allow the judge to return 'tie' when candidates are equivalent",
@@ -2209,10 +2251,10 @@ position-bias mitigation.
     envVars: [],
     result: {
       "score": {
-            "description": "0=A wins, 1=B wins, 0.5=tie"
+            "description": "Pairwise mode: 0=A wins, 1=B wins, 0.5=tie. Select_best mode: 1.0 when a winner was picked, 0.5 for tie."
       },
       "label": {
-            "description": "Which candidate won, or tie"
+            "description": "Pairwise mode: 'A' | 'B' | 'tie'. Select_best mode: the winning candidate id (matches the id supplied in entry.candidates) or 'tie'."
       }
 }
   },
