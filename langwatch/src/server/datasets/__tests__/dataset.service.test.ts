@@ -1,4 +1,6 @@
-import { describe, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { DatasetService } from "../dataset.service";
+import { DATASET_MUTATION_TXN_TIMEOUT_MS } from "../dataset-lock";
 
 describe("DatasetService", () => {
   describe("validateDatasetName", () => {
@@ -36,6 +38,66 @@ describe("DatasetService", () => {
       );
       it.todo("allows updating with same name/slug without conflict");
       it.todo("wraps all operations in transaction for atomicity");
+
+      // Regression: changing a column type on a LEGACY postgres-layout dataset
+      // runs `migrateDatasetRecordColumns` (one UPDATE per row) inside the
+      // interactive transaction. Prisma's 5s default timeout P2028s
+      // ("Transaction already closed") on any dataset big enough that the
+      // per-row UPDATEs take >5s. The transaction MUST be opened with the wider
+      // dataset-mutation budget so a legitimately-long migration completes.
+      describe("when a legacy postgres dataset changes a column type", () => {
+        it("opens the migration transaction with the wide budget, not the 5s default", async () => {
+          const legacyDataset = {
+            id: "dataset_legacy",
+            projectId: "project_1",
+            name: "products_image_urls",
+            slug: "products-image-urls",
+            status: "ready",
+            statusError: null,
+            contentLayout: "postgres",
+            columnTypes: [{ name: "image_url", type: "string" }],
+          };
+
+          let capturedOptions: { timeout?: number; maxWait?: number } | null =
+            null;
+          const fakeTx = {} as never;
+          const prisma = {
+            $transaction: vi.fn(async (cb: any, options: any) => {
+              capturedOptions = options;
+              return await cb(fakeTx);
+            }),
+          } as never;
+
+          const repository = {
+            findOne: vi.fn().mockResolvedValue(legacyDataset),
+            findBySlug: vi.fn().mockResolvedValue(null),
+            update: vi.fn().mockResolvedValue(legacyDataset),
+          } as never;
+          const recordRepository = {
+            findDatasetRecords: vi.fn().mockResolvedValue([]),
+            updateDatasetRecordsTransaction: vi.fn().mockResolvedValue(void 0),
+          } as never;
+          const experimentRepository = {} as never;
+
+          const service = new DatasetService(
+            prisma,
+            repository,
+            recordRepository,
+            experimentRepository,
+          );
+
+          await service.upsertDataset({
+            projectId: "project_1",
+            datasetId: "dataset_legacy",
+            name: "products_image_urls",
+            columnTypes: [{ name: "image_url", type: "image" }] as never,
+          });
+
+          expect((prisma as any).$transaction).toHaveBeenCalledTimes(1);
+          expect(capturedOptions?.timeout).toBe(DATASET_MUTATION_TXN_TIMEOUT_MS);
+          expect(capturedOptions?.timeout).toBeGreaterThan(5_000);
+        });
+      });
     });
 
     describe("when using experimentId", () => {

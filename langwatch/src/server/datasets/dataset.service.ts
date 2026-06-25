@@ -20,6 +20,10 @@ import {
 import { DatasetRepository } from "./dataset.repository";
 import type { ChunkOffset } from "./dataset-chunking";
 import {
+  DATASET_MUTATION_TXN_MAX_WAIT_MS,
+  DATASET_MUTATION_TXN_TIMEOUT_MS,
+} from "./dataset-lock";
+import {
   appendS3JsonlRecords,
   deleteAllS3JsonlChunks,
   deleteS3JsonlRecords,
@@ -245,90 +249,103 @@ export class DatasetService {
       });
     }
 
-    return await this.prisma.$transaction(async (tx) => {
-      // Get existing dataset for column comparison
-      const existingDataset = await this.repository.findOne(
-        {
-          id: datasetId,
-          projectId,
-        },
-        { tx },
-      );
-
-      if (!existingDataset) {
-        throw new DatasetNotFoundError();
-      }
-
-      // Defense in depth for the UI's ready-gate: editing a dataset that is still
-      // `uploading`/`processing` (or `failed`) races the normalize job and edits
-      // content that isn't settled. Refuse unless ready (a null status = legacy =
-      // ready). The datasets-page menu hides Edit for non-ready rows; this stops a
-      // direct/stale call too.
-      if (
-        existingDataset.status != null &&
-        existingDataset.status !== "ready"
-      ) {
-        throw new DatasetNotReadyError({
-          status: existingDataset.status,
-          statusError: existingDataset.statusError,
-        });
-      }
-
-      const slug = this.generateSlug(name);
-
-      // Check for slug collision with other datasets (excluding current one)
-      const conflictingDataset = await this.repository.findBySlug(
-        {
-          slug,
-          projectId,
-          excludeId: datasetId,
-        },
-        { tx },
-      );
-
-      if (conflictingDataset) {
-        throw new DatasetConflictError();
-      }
-
-      // Migrate records if column schema changed
-      if (
-        JSON.stringify(existingDataset.columnTypes) !==
-        JSON.stringify(columnTypes)
-      ) {
-        // Defensive: s3_jsonl column changes are handled up front via
-        // `migrateS3JsonlColumns` (the advisory-lock chunk rewrite) and return
-        // before this transaction (ADR-032 v19). Reaching here with s3_jsonl would
-        // mean that early branch regressed — refuse rather than run the PG record
-        // migrator, which would read zero rows (I-PG) and silently corrupt nothing
-        // into the chunk store.
-        if (existingDataset.contentLayout === "s3_jsonl") {
-          throw new ColumnTypeChangeNotSupportedError();
-        }
-        await this.migrateDatasetRecordColumns(
+    return await this.prisma.$transaction(
+      async (tx) => {
+        // Get existing dataset for column comparison
+        const existingDataset = await this.repository.findOne(
           {
-            datasetId,
+            id: datasetId,
             projectId,
-            oldColumnTypes: existingDataset.columnTypes as DatasetColumns,
-            newColumnTypes: columnTypes,
           },
           { tx },
         );
-      }
 
-      // Update the dataset (repository validates ownership - will throw if datasetId doesn't belong to projectId)
-      return await this.repository.update(
-        {
-          id: datasetId,
-          projectId,
-          data: {
-            name,
+        if (!existingDataset) {
+          throw new DatasetNotFoundError();
+        }
+
+        // Defense in depth for the UI's ready-gate: editing a dataset that is still
+        // `uploading`/`processing` (or `failed`) races the normalize job and edits
+        // content that isn't settled. Refuse unless ready (a null status = legacy =
+        // ready). The datasets-page menu hides Edit for non-ready rows; this stops a
+        // direct/stale call too.
+        if (
+          existingDataset.status != null &&
+          existingDataset.status !== "ready"
+        ) {
+          throw new DatasetNotReadyError({
+            status: existingDataset.status,
+            statusError: existingDataset.statusError,
+          });
+        }
+
+        const slug = this.generateSlug(name);
+
+        // Check for slug collision with other datasets (excluding current one)
+        const conflictingDataset = await this.repository.findBySlug(
+          {
             slug,
-            columnTypes,
+            projectId,
+            excludeId: datasetId,
           },
-        },
-        { tx },
-      );
-    });
+          { tx },
+        );
+
+        if (conflictingDataset) {
+          throw new DatasetConflictError();
+        }
+
+        // Migrate records if column schema changed
+        if (
+          JSON.stringify(existingDataset.columnTypes) !==
+          JSON.stringify(columnTypes)
+        ) {
+          // Defensive: s3_jsonl column changes are handled up front via
+          // `migrateS3JsonlColumns` (the advisory-lock chunk rewrite) and return
+          // before this transaction (ADR-032 v19). Reaching here with s3_jsonl would
+          // mean that early branch regressed — refuse rather than run the PG record
+          // migrator, which would read zero rows (I-PG) and silently corrupt nothing
+          // into the chunk store.
+          if (existingDataset.contentLayout === "s3_jsonl") {
+            throw new ColumnTypeChangeNotSupportedError();
+          }
+          await this.migrateDatasetRecordColumns(
+            {
+              datasetId,
+              projectId,
+              oldColumnTypes: existingDataset.columnTypes as DatasetColumns,
+              newColumnTypes: columnTypes,
+            },
+            { tx },
+          );
+        }
+
+        // Update the dataset (repository validates ownership - will throw if datasetId doesn't belong to projectId)
+        return await this.repository.update(
+          {
+            id: datasetId,
+            projectId,
+            data: {
+              name,
+              slug,
+              columnTypes,
+            },
+          },
+          { tx },
+        );
+      },
+      {
+        // A column-type change runs `migrateDatasetRecordColumns` inside this
+        // transaction: one `datasetRecord.update` per row across the whole
+        // dataset. Prisma's 5s default interactive-txn timeout P2028s
+        // ("Transaction already closed") on any dataset large enough that those
+        // per-row UPDATEs take >5s. Share the same generous budget as the
+        // s3_jsonl chunk-rewrite path (`withDatasetLock`) so a legitimately-long
+        // migration completes instead of erroring mid-flight.
+        timeout: DATASET_MUTATION_TXN_TIMEOUT_MS,
+        maxWait: DATASET_MUTATION_TXN_MAX_WAIT_MS,
+      },
+    );
   }
 
   /**
