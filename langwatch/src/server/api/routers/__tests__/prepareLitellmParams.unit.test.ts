@@ -17,7 +17,10 @@ vi.mock("~/server/modelProviders/modelProvider.service", () => ({
   },
 }));
 
-import { prepareLitellmParams } from "../modelProviders.utils";
+import {
+  DEFAULT_AZURE_API_VERSION,
+  prepareLitellmParams,
+} from "../modelProviders.utils";
 
 const baseAzureProvider = {
   provider: "azure" as const,
@@ -139,6 +142,75 @@ describe("prepareLitellmParams", () => {
       expect(params.api_base).toBe("https://gateway.example.com/azure");
       expect(params.use_azure_gateway).toBe("true");
       expect(params.api_version).toBe("2024-09-01");
+    });
+
+    describe("when no api-version is configured (direct mode)", () => {
+      it("pins a modern default so newer deployments don't 404 'Resource not found'", async () => {
+        // Regression: without an explicit api-version the downstream gateway
+        // (Bifrost) falls back to a stale 2024-10-21 default that 404s
+        // gpt-5-class Azure deployments. We must always send a modern version.
+        const params = await prepareLitellmParams({
+          model: "azure/gpt-5.4",
+          modelProvider: baseAzureProvider,
+          projectId: "project-123",
+        });
+
+        expect(params.api_version).toBe(DEFAULT_AZURE_API_VERSION);
+      });
+    });
+
+    describe("when AZURE_OPENAI_API_VERSION is configured (direct mode)", () => {
+      it("uses the provider override instead of the default", async () => {
+        const providerWithVersion = {
+          ...baseAzureProvider,
+          customKeys: {
+            ...baseAzureProvider.customKeys,
+            AZURE_OPENAI_API_VERSION: "2025-01-01-preview",
+          },
+        };
+
+        const params = await prepareLitellmParams({
+          model: "azure/gpt-5.4",
+          modelProvider: providerWithVersion,
+          projectId: "project-123",
+        });
+
+        expect(params.api_version).toBe("2025-01-01-preview");
+      });
+    });
+
+    describe("when the provider defines a deploymentMapping", () => {
+      it("maps the model id to its Azure deployment name", async () => {
+        // The deployment name need not equal the model id; honour the
+        // explicit mapping instead of assuming model id == deployment name.
+        const providerWithMapping = {
+          ...baseAzureProvider,
+          deploymentMapping: { "gpt-5.4": "my-gpt5-deployment" },
+        };
+
+        const params = await prepareLitellmParams({
+          model: "azure/gpt-5.4",
+          modelProvider: providerWithMapping,
+          projectId: "project-123",
+        });
+
+        expect(params.deployment).toBe("my-gpt5-deployment");
+      });
+
+      it("leaves deployment unset when the model is not in the mapping", async () => {
+        const providerWithMapping = {
+          ...baseAzureProvider,
+          deploymentMapping: { "gpt-4o": "my-gpt4o-deployment" },
+        };
+
+        const params = await prepareLitellmParams({
+          model: "azure/gpt-5.4",
+          modelProvider: providerWithMapping,
+          projectId: "project-123",
+        });
+
+        expect(params.deployment).toBeUndefined();
+      });
     });
   });
 });

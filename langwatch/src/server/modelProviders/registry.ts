@@ -303,13 +303,16 @@ export const modelProviders = {
       .object({
         AZURE_OPENAI_API_KEY: z.string().nullable().optional(),
         AZURE_OPENAI_ENDPOINT: z.string().nullable().optional(),
+        AZURE_OPENAI_API_VERSION: z.string().nullable().optional(),
         AZURE_API_GATEWAY_BASE_URL: z.string().nullable().optional(),
         AZURE_API_GATEWAY_VERSION: z.string().nullable().optional(),
       })
       .passthrough(),
-    // Direct-mode and gateway-mode each need both of their two fields;
+    // Direct-mode and gateway-mode each need both of their required fields;
     // the useApiGateway toggle in the UI swaps which pair is visible.
-    optionalKeys: [],
+    // AZURE_OPENAI_API_VERSION is optional — it falls back to a modern
+    // default (DEFAULT_AZURE_API_VERSION) when left blank.
+    optionalKeys: ["AZURE_OPENAI_API_VERSION"],
     enabledSince: new Date("2023-01-01"),
   },
   bedrock: {

@@ -321,13 +321,16 @@ func geminiCred(m map[string]string) domain.Credential {
 	}
 }
 
-// withDeploymentMap adds a self-deployment entry on Azure / Bedrock /
-// Vertex credentials so Bifrost's per-key-config readers ("deployments
-// not set" otherwise) accept the call. In the Studio shape the model
-// id IS the deployment name (azure/gpt-5-mini → deployment "gpt-5-mini").
-// Bifrost's deployment lookup is keyed by model so a {model: model}
-// self-map suffices for inline-credential customers; aigateway HTTP
-// callers populate richer maps at the control plane layer.
+// withDeploymentMap adds a deployment entry on Azure / Bedrock / Vertex
+// credentials so Bifrost's per-key-config readers ("deployments not set"
+// otherwise) accept the call. By default the model id IS the deployment
+// name (azure/gpt-5-mini → deployment "gpt-5-mini"), so a {model: model}
+// self-map suffices. When the provider defines an explicit deployment
+// (the model id need not equal the deployment name, e.g. an Azure
+// deployment named differently from the model), the control plane forwards
+// it as Extra["deployment"]; honour it so the model id maps to the real
+// deployment. aigateway HTTP callers populate richer maps at the control
+// plane layer.
 func withDeploymentMap(cred domain.Credential, bareModel string) domain.Credential {
 	if bareModel == "" {
 		return cred
@@ -341,7 +344,11 @@ func withDeploymentMap(cred domain.Credential, bareModel string) domain.Credenti
 		cred.DeploymentMap = map[string]string{}
 	}
 	if _, present := cred.DeploymentMap[bareModel]; !present {
-		cred.DeploymentMap[bareModel] = bareModel
+		deployment := bareModel
+		if explicit := cred.Extra["deployment"]; explicit != "" {
+			deployment = explicit
+		}
+		cred.DeploymentMap[bareModel] = deployment
 	}
 	return cred
 }
