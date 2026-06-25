@@ -110,6 +110,71 @@ function BulkColumnFields({
   );
 }
 
+/** Click-to-edit dataset name (like the prompt variable-name field): a label
+ *  that becomes a focused, text-selected input on click and commits on blur or
+ *  Enter (Escape cancels). Editable only before the upload starts. */
+function EditableName({
+  value,
+  editable,
+  onCommit,
+}: {
+  value: string;
+  editable: boolean;
+  onCommit: (next: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  useEffect(() => {
+    if (!editing) setDraft(value);
+  }, [value, editing]);
+
+  if (!editable) {
+    return (
+      <Text fontWeight="medium" truncate maxW="full">
+        {value}
+      </Text>
+    );
+  }
+  if (editing) {
+    const commit = () => {
+      onCommit(draft);
+      setEditing(false);
+    };
+    return (
+      <Input
+        size="sm"
+        autoFocus
+        value={draft}
+        fontWeight="medium"
+        aria-label="Dataset name"
+        onChange={(e) => setDraft(e.target.value)}
+        onFocus={(e) => e.currentTarget.select()}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit();
+          if (e.key === "Escape") {
+            setDraft(value);
+            setEditing(false);
+          }
+        }}
+      />
+    );
+  }
+  return (
+    <Text
+      fontWeight="medium"
+      truncate
+      maxW="full"
+      cursor="text"
+      title="Click to rename"
+      _hover={{ textDecoration: "underline dotted" }}
+      onClick={() => setEditing(true)}
+    >
+      {value}
+    </Text>
+  );
+}
+
 /** The right-aligned slot of a row: the confirm-types toggle while pending,
  *  otherwise an inline status tracker (preparing/uploading rainbow → ready). */
 function RowTrailing({
@@ -146,15 +211,21 @@ function RowTrailing({
       );
     case "uploading":
       return (
-        <Text fontSize="13px" fontWeight="medium" css={RAINBOW_TEXT_CSS}>
-          Uploading…
-        </Text>
+        <HStack gap={1.5}>
+          <Spinner size="xs" color="blue.500" />
+          <Text fontSize="13px" fontWeight="medium" css={RAINBOW_TEXT_CSS}>
+            Uploading…
+          </Text>
+        </HStack>
       );
     case "processing":
       return (
-        <Text fontSize="13px" fontWeight="medium" css={RAINBOW_TEXT_CSS}>
-          Preparing…
-        </Text>
+        <HStack gap={1.5}>
+          <Spinner size="xs" color="blue.500" />
+          <Text fontSize="13px" fontWeight="medium" css={RAINBOW_TEXT_CSS}>
+            Preparing…
+          </Text>
+        </HStack>
       );
     case "ready":
       return (
@@ -192,6 +263,7 @@ function BulkFileRow({
   onCancel,
   onRetry,
   onColumns,
+  onName,
   onReady,
   onFailed,
 }: {
@@ -201,6 +273,7 @@ function BulkFileRow({
   onCancel: () => void;
   onRetry: () => void;
   onColumns: (next: DatasetColumns) => void;
+  onName: (next: string) => void;
   onReady: () => void;
   onFailed: (error?: string) => void;
 }) {
@@ -252,14 +325,11 @@ function BulkFileRow({
     >
       <HStack gap={3} width="full" align="center">
         <VStack align="start" gap={0} flex={1} minW={0}>
-          <Text
-            fontWeight="medium"
-            truncate
-            maxW="full"
-            css={isActive ? RAINBOW_TEXT_CSS : undefined}
-          >
-            {file.name}
-          </Text>
+          <EditableName
+            value={file.name}
+            editable={file.status === "pending"}
+            onCommit={onName}
+          />
           <Text fontSize="xs" color="fg.muted">
             {formatFileSize(file.file.size)}
           </Text>
@@ -412,6 +482,7 @@ export function BulkUploadDrawer({
                   onCancel={() => bulk.cancelFile(file.id)}
                   onRetry={() => void bulk.retryFile(file.id)}
                   onColumns={(next) => bulk.setColumnTypes(file.id, next)}
+                  onName={(next) => bulk.setName(file.id, next)}
                   onReady={() => {
                     bulk.markReady(file.id);
                     onUploaded?.();

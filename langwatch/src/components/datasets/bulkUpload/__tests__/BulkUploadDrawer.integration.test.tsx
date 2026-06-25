@@ -212,6 +212,29 @@ describe("given the bulk upload drawer", () => {
     });
   });
 
+  describe("when a file's name is edited", () => {
+    it("renames the dataset in place and uploads under the new name", async () => {
+      const user = userEvent.setup();
+      render_();
+      await user.upload(fileInput(), [csv("data.csv")]);
+      await waitFor(() => expect(screen.getByText("data")).toBeInTheDocument());
+
+      // Click the name → it becomes a focused input; replace it.
+      await user.click(screen.getByText("data"));
+      const nameField = await screen.findByLabelText("Dataset name");
+      await user.clear(nameField);
+      await user.type(nameField, "renamed{Enter}");
+
+      await waitFor(() =>
+        expect(screen.getByText("renamed")).toBeInTheDocument(),
+      );
+
+      await user.click(uploadButton());
+      await waitFor(() => expect(requestDirectUpload).toHaveBeenCalled());
+      expect(requestDirectUpload.mock.calls[0]![0].name).toBe("renamed");
+    });
+  });
+
   describe("when files are uploaded", () => {
     /** @scenario Uploading prepares every file independently in the background */
     it("prepares every file and each becomes ready on its own", async () => {

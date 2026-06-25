@@ -156,6 +156,17 @@ export function useBulkUpload(projectId: string | undefined) {
     [update],
   );
 
+  /** Rename a not-yet-uploaded file's dataset. A blank name is ignored (keeps the
+   *  current one); a within-batch collision is resolved at upload by the
+   *  orchestrator's 409 bump, so no re-dedupe is needed here. */
+  const setName = useCallback(
+    (id: string, name: string) => {
+      const trimmed = name.trim();
+      if (trimmed !== "") update(id, { name: trimmed });
+    },
+    [update],
+  );
+
   /** Run one file's pipeline, updating its status. Never throws (per-file
    *  independence). */
   const runOne = useCallback(
@@ -284,6 +295,7 @@ export function useBulkUpload(projectId: string | undefined) {
     addFiles,
     removeFile,
     setColumnTypes,
+    setName,
     start,
     cancelFile,
     retryFile,
