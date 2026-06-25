@@ -9,7 +9,6 @@ vi.mock("~/server/metrics", async (importOriginal) => {
     incrementEsReactorTotal: vi.fn(),
   };
 });
-import type { QueueManager } from "../../services/queues/queueManager";
 import type { Event } from "../../domain/types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
 import {
@@ -17,29 +16,11 @@ import {
   createMockFoldProjectionStore,
   createMockMapProjectionDefinition,
   createMockAppendStore,
+  createMockQueueManager,
   createTestEvent,
   createTestTenantId,
   TEST_CONSTANTS,
 } from "../../services/__tests__/testHelpers";
-
-function createMockQueueManager(overrides?: {
-  hasReactorQueues?: boolean;
-  getReactorQueue?: ReturnType<typeof vi.fn>;
-}): QueueManager<Event> {
-  return {
-    hasProjectionQueues: vi.fn().mockReturnValue(false),
-    hasHandlerQueues: vi.fn().mockReturnValue(false),
-    hasReactorQueues: vi.fn().mockReturnValue(overrides?.hasReactorQueues ?? false),
-    getProjectionQueue: vi.fn().mockReturnValue(undefined),
-    getHandlerQueue: vi.fn().mockReturnValue(undefined),
-    getReactorQueue: overrides?.getReactorQueue ?? vi.fn().mockReturnValue(undefined),
-    close: vi.fn().mockResolvedValue(void 0),
-    waitUntilReady: vi.fn().mockResolvedValue(void 0),
-    initializeProjectionQueues: vi.fn(),
-    initializeHandlerQueues: vi.fn(),
-    initializeReactorQueues: vi.fn(),
-  } as unknown as QueueManager<Event>;
-}
 
 describe("ProjectionRouter", () => {
   const tenantId = createTestTenantId();

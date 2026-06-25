@@ -33,8 +33,13 @@ export const orgBillableEventsMeterProjection: MapProjectionDefinition<
   eventTypes: [
     SPAN_RECEIVED_EVENT_TYPE,
 
-    EVALUATION_EVENT_TYPES.SCHEDULED,
-    EVALUATION_EVENT_TYPES.STARTED,
+    // `reported` is the only evaluation event production ever emits (via
+    // reportEvaluation / ReportEvaluationCommand / ExecuteEvaluationCommand).
+    // Its idempotencyKey is `${tenantId}:${evaluationId}:reported`, so retries and
+    // replays collapse to exactly one billable unit per evaluation. The previously
+    // listed `scheduled`/`started` types are never produced outside test presets
+    // (see issue #5124) and are intentionally not subscribed.
+    EVALUATION_EVENT_TYPES.REPORTED,
 
     EXPERIMENT_RUN_EVENT_TYPES.STARTED,
     EXPERIMENT_RUN_EVENT_TYPES.EVALUATOR_RESULT,
