@@ -2138,15 +2138,17 @@ wheels = [
 
 [[package]]
 name = "haystack-ai"
-version = "2.16.1"
+version = "2.30.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "docstring-parser" },
     { name = "filetype" },
     { name = "haystack-experimental" },
+    { name = "httpx" },
     { name = "jinja2" },
     { name = "jsonschema" },
     { name = "lazy-imports" },
+    { name = "markupsafe" },
     { name = "more-itertools" },
     { name = "networkx", version = "3.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "networkx", version = "3.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
@@ -2157,15 +2159,14 @@ dependencies = [
     { name = "pydantic" },
     { name = "python-dateutil" },
     { name = "pyyaml" },
-    { name = "requests" },
     { name = "tenacity" },
     { name = "tqdm", version = "4.67.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "tqdm", version = "4.67.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/10/49/bc131880d9103234b4e1e8cf83c9b0c23d8c0bb5da6b20ae68a37766f6ab/haystack_ai-2.16.1.tar.gz", hash = "sha256:75dfddadccf636b8f357e9d76f8ca3f399a7cffcfb9c5b5bf2f7a1b435535f43", size = 385997, upload-time = "2025-07-29T14:07:11.504Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f4/64/6addccb6335cf551f2e2fa1ffc05769939a8d652246d8d6ca7de24a0a1de/haystack_ai-2.30.0.tar.gz", hash = "sha256:e9f677c5e32eb0217d9dac5f13cc0d940517a50f35bdcf02fc9e619e60128bce", size = 498234, upload-time = "2026-06-03T10:21:16.21Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ab/b7/a7928188e790d381dd7f02c2c94b0fcbbaa2213bd2e5b1220e24298db1ee/haystack_ai-2.16.1-py3-none-any.whl", hash = "sha256:43fa142e3c37a8f049ea45dee07fc9d424801cfea3f4063d945bc30ce4b5def7", size = 575327, upload-time = "2025-07-29T14:07:08.98Z" },
+    { url = "https://files.pythonhosted.org/packages/28/8d/73ae92b456dd2b33ffc0fc8c0b59fc6dbf30d4942b2adec21ed3058a7bd9/haystack_ai-2.30.0-py3-none-any.whl", hash = "sha256:7342544218c331ebcf2444ba43da5971f7376baf412c37617dbafd6332151975", size = 719742, upload-time = "2026-06-03T10:21:14.43Z" },
 ]
 
 [[package]]
