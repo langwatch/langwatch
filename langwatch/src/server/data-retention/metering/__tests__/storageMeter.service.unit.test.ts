@@ -122,6 +122,131 @@ describe("StorageMeterService memory guard", () => {
     });
   });
 
+  describe("given the stale-while-revalidate cache", () => {
+    const FRESH_MS = 5 * 60 * 1000;
+
+    // A service whose clock we control and whose query returns the next value
+    // from `totals` on each call, so we can assert fresh/stale/refresh timing
+    // without waiting real time.
+    function makeClockService(totals: number[]) {
+      let t = 0;
+      let call = 0;
+      const query = vi.fn(async () => {
+        const total = totals[Math.min(call, totals.length - 1)]!;
+        call += 1;
+        return { json: async () => [{ total: String(total) }] };
+      });
+      const service = new StorageMeterService(async () => ({ query }) as any, {
+        now: () => t,
+      });
+      return { service, query, advance: (ms: number) => (t += ms) };
+    }
+
+    describe("when the cached value is still fresh", () => {
+      it("returns it without recomputing", async () => {
+        const { service, query, advance } = makeClockService([42]);
+
+        expect(await service.getTotalStorageBytes({ tenantId: "t" })).toBe(42);
+        advance(FRESH_MS - 1);
+        expect(await service.getTotalStorageBytes({ tenantId: "t" })).toBe(42);
+
+        expect(query).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when the cached value is stale", () => {
+      it("returns the stale value immediately and refreshes in the background", async () => {
+        const { service, query, advance } = makeClockService([42, 99]);
+
+        expect(await service.getTotalStorageBytes({ tenantId: "t" })).toBe(42);
+        advance(FRESH_MS);
+
+        // The stale read serves the old value at once, not the refreshed one.
+        expect(await service.getTotalStorageBytes({ tenantId: "t" })).toBe(42);
+        await vi.waitFor(() => expect(query).toHaveBeenCalledTimes(2));
+
+        // A later read serves the value the background refresh wrote.
+        expect(await service.getTotalStorageBytes({ tenantId: "t" })).toBe(99);
+      });
+
+      it("recomputes only once when several stale reads race", async () => {
+        const { service, query, advance } = makeClockService([42, 99]);
+
+        await service.getTotalStorageBytes({ tenantId: "t" });
+        advance(FRESH_MS);
+
+        await Promise.all([
+          service.getTotalStorageBytes({ tenantId: "t" }),
+          service.getTotalStorageBytes({ tenantId: "t" }),
+          service.getTotalStorageBytes({ tenantId: "t" }),
+        ]);
+        await vi.waitFor(() => expect(query).toHaveBeenCalledTimes(2));
+
+        // Give any errant second refresh a chance to fire, then prove it didn't:
+        // the per-tenant lock single-flights the recompute.
+        await new Promise((r) => setTimeout(r, 10));
+        expect(query).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    describe("when a background refresh fails", () => {
+      it("keeps serving the last good value instead of caching the failure", async () => {
+        // The client resolver is the real fault line: queryTotalBytes catches
+        // query errors and falls back, but a failure to even resolve a client
+        // (cluster unreachable) propagates. Seed succeeds, the refresh fails.
+        let t = 0;
+        let resolverCall = 0;
+        const query = vi.fn(async () => ({
+          json: async () => [{ total: "42" }],
+        }));
+        const resolver = vi.fn(async () => {
+          resolverCall += 1;
+          if (resolverCall >= 2) throw new Error("cluster unreachable");
+          return { query } as any;
+        });
+        const service = new StorageMeterService(resolver, { now: () => t });
+
+        expect(await service.getTotalStorageBytes({ tenantId: "t" })).toBe(42);
+        t += FRESH_MS;
+
+        // Stale read returns last good 42; the background refresh throws.
+        expect(await service.getTotalStorageBytes({ tenantId: "t" })).toBe(42);
+        await vi.waitFor(() => expect(resolver).toHaveBeenCalledTimes(2));
+
+        // Still 42 — the failed refresh did not poison the cache with a 0.
+        expect(await service.getTotalStorageBytes({ tenantId: "t" })).toBe(42);
+        // The one successful read is the seed; the refresh never reached query.
+        expect(query).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when the cold read fails", () => {
+      it("degrades to 0 and self-heals on the next read", async () => {
+        let t = 0;
+        let resolverCall = 0;
+        const query = vi.fn(async () => ({
+          json: async () => [{ total: "77" }],
+        }));
+        const resolver = vi.fn(async () => {
+          resolverCall += 1;
+          if (resolverCall === 1) throw new Error("cluster unreachable");
+          return { query } as any;
+        });
+        const service = new StorageMeterService(resolver, { now: () => t });
+
+        // First ever read fails -> degraded 0, cached already-stale.
+        expect(await service.getTotalStorageBytes({ tenantId: "t" })).toBe(0);
+
+        // Next read returns the cached 0 instantly and refreshes in background.
+        expect(await service.getTotalStorageBytes({ tenantId: "t" })).toBe(0);
+        await vi.waitFor(() => expect(query).toHaveBeenCalledTimes(1));
+
+        // Once healed, the real value is served.
+        expect(await service.getTotalStorageBytes({ tenantId: "t" })).toBe(77);
+      });
+    });
+  });
+
   describe("given a heavy tenant where the aggregate query can exceed limits", () => {
     describe("when the single aggregate total query fails", () => {
       it("falls back to the per-table breakdown instead of throwing", async () => {
