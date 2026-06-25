@@ -129,6 +129,51 @@ describe("DatasetService", () => {
         });
       });
 
+      describe("when columns are only reordered (no rename/add/remove)", () => {
+        it("skips the per-row migration entirely", async () => {
+          // A pure reorder is the same no-op as a type-only change: the migrator
+          // matches every column to itself by name, so each row would be
+          // rewritten byte-identically. Column order is metadata, persisted by
+          // the dataset.update — never the row JSON.
+          const deps = makeDeps(
+            makeLegacyDataset([
+              { name: "question", type: "string" },
+              { name: "answer", type: "string" },
+            ]),
+            [{ id: "rec_1", entry: { question: "q", answer: "a" } }],
+          );
+
+          await deps.service.upsertDataset({
+            projectId: "project_1",
+            datasetId: "dataset_legacy",
+            name: "products_image_urls",
+            columnTypes: [
+              { name: "answer", type: "string" },
+              { name: "question", type: "string" },
+            ] as never,
+          });
+
+          expect(
+            deps.recordRepository.findDatasetRecords,
+          ).not.toHaveBeenCalled();
+          expect(
+            deps.recordRepository.updateDatasetRecordsTransaction,
+          ).not.toHaveBeenCalled();
+          // The reordered columns are still persisted.
+          expect(deps.repository.update).toHaveBeenCalledWith(
+            expect.objectContaining({
+              data: expect.objectContaining({
+                columnTypes: [
+                  { name: "answer", type: "string" },
+                  { name: "question", type: "string" },
+                ],
+              }),
+            }),
+            expect.anything(),
+          );
+        });
+      });
+
       describe("when a column is renamed on a legacy dataset", () => {
         it("remaps each row's value to the new column key", async () => {
           const deps = makeDeps(

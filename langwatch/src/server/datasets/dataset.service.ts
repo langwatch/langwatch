@@ -464,17 +464,21 @@ export class DatasetService {
   }
 
   /**
-   * Whether the column KEY structure changed (names and their order), as opposed
-   * to only the declared types. The legacy record migrator remaps by name then by
-   * position, so an identical ordered name list is a guaranteed no-op on every
-   * row's keys — meaning a type-only change needs no row rewrite at all.
+   * Whether the column KEY structure changed (the SET of names), as opposed to
+   * only the declared types or their order. The legacy record migrator remaps by
+   * name first and only falls back to position for names that have no match — so
+   * when the name sets are equal every column maps to itself and the rewrite is a
+   * guaranteed no-op on every row's keys. That covers both a type-only change and
+   * a pure reorder (column order is `dataset.columnTypes` metadata, persisted by
+   * the `dataset.update` regardless; it never lives in the row JSON), so neither
+   * needs a row rewrite. Compare sorted names so order alone doesn't trigger it.
    */
   private columnKeysChanged(
     oldColumns: DatasetColumns,
     newColumns: DatasetColumns,
   ): boolean {
-    const oldNames = oldColumns.map((c) => c.name);
-    const newNames = newColumns.map((c) => c.name);
+    const oldNames = oldColumns.map((c) => c.name).sort();
+    const newNames = newColumns.map((c) => c.name).sort();
     return JSON.stringify(oldNames) !== JSON.stringify(newNames);
   }
 
