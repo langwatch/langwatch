@@ -7,6 +7,7 @@ import {
   inputsSchema,
   messageSchema,
   outputsSchema,
+  promoteSourceSchema,
   promptingTechniqueSchema,
   responseFormatSchema,
   runtimeParametersSchema,
@@ -889,6 +890,12 @@ export const promptsRouter = createTRPCRouter({
   /**
    * Assign (or reassign) a tag to a specific prompt version.
    * Accepts built-in tags (production, staging) and custom tags defined for the org.
+   *
+   * Optional `source` (#5104) records the event that produced the assignment
+   * (e.g. a pairwise eval promotion); persisted as audit metadata on the
+   * resulting PromptTagAssignment row. Optional `expectedPriorVersionId`
+   * surfaces a `prod_changed` warning when the tag has been moved by another
+   * writer since the caller snapshotted it.
    */
   assignTag: protectedProcedure
     .input(
@@ -897,6 +904,8 @@ export const promptsRouter = createTRPCRouter({
         configId: z.string(),
         versionId: z.string(),
         tag: z.string().min(1),
+        source: promoteSourceSchema.optional(),
+        expectedPriorVersionId: z.string().optional(),
       }),
     )
     .use(checkProjectPermission("prompts:update"))
@@ -910,6 +919,8 @@ export const promptsRouter = createTRPCRouter({
           tag: input.tag,
           projectId: input.projectId,
           userId: ctx.session?.user?.id,
+          source: input.source,
+          expectedPriorVersionId: input.expectedPriorVersionId,
         });
       } catch (error) {
         if (error instanceof TagValidationError) {

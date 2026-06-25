@@ -10,6 +10,9 @@ import {
 } from "@chakra-ui/react";
 import { LuCheck, LuChevronDown, LuDownload, LuRocket } from "react-icons/lu";
 
+import type { TargetConfig } from "../types";
+import { PromoteWinnerButton } from "./PromoteWinnerButton";
+
 /**
  * Aggregate header bar for a pairwise / N-way evaluator run (#5100, #5101).
  *
@@ -17,6 +20,12 @@ import { LuCheck, LuChevronDown, LuDownload, LuRocket } from "react-icons/lu";
  * verdict. Shows the running tally per variant, the bias-correction
  * indicator, total judge cost, filter chips for the visible row
  * subset, and the export / promote handoff buttons.
+ *
+ * Promote buttons are real (#5104): each renders a `PromoteWinnerButton`
+ * that opens a confirmation modal and calls the existing prompts.assignTag
+ * mutation. The header forwards eval context (evalId, experimentId, runId)
+ * so the resulting tag assignment carries an audit trail back to the eval
+ * that produced the decision.
  */
 
 /**
@@ -33,6 +42,16 @@ export type VariantCount = {
   name: string;
   /** Number of rows this variant won. */
   wins: number;
+  /**
+   * Total rows judged where this variant was a contestant (wins + losses + ties
+   * scoped to it). Used by PromoteWinnerButton to compute the verdict-summary
+   * line; the header tally still derives only from wins/ties.
+   */
+  totalRows: number;
+  /** 0..1 win rate. Used to gate the promote button at the threshold. */
+  winRate: number;
+  /** TargetConfig this variant maps to — PromoteWinnerButton reads promptId/version here. */
+  target: TargetConfig;
 };
 
 export type AggregateHeaderBarProps = {
@@ -47,8 +66,19 @@ export type AggregateHeaderBarProps = {
   onFilterChange: (next: AggregateFilter) => void;
   /** Markdown export handoff. */
   onExport: () => void;
-  /** Promote a specific variant's prompt. Receives the variant id. */
-  onPromote: (variantId: string) => void;
+  /**
+   * Eval cell id that produced these verdicts. Passed to PromoteWinnerButton
+   * so the resulting tag assignment carries an audit trail back here.
+   */
+  evalId: string;
+  /** Experiment the eval ran in — same audit-trail use. */
+  experimentId: string;
+  /** Optional run id, for cross-run promote contexts. */
+  runId?: string;
+  /** Optional dataset name surfaced in the promote-confirm verdict line. */
+  datasetName?: string;
+  /** Override the default promote-threshold for this render (defaults inside PromoteWinnerButton). */
+  winRateThreshold?: number;
   /** Set true when bias-correction was applied (swap_and_confirm or randomize_order). */
   biasCorrected?: boolean;
 };
@@ -67,9 +97,19 @@ export function AggregateHeaderBar({
   activeFilter,
   onFilterChange,
   onExport,
-  onPromote,
+  evalId,
+  experimentId,
+  runId,
+  datasetName,
+  winRateThreshold,
   biasCorrected = true,
 }: AggregateHeaderBarProps) {
+  const buildVerdictSummary = (v: VariantCount) => ({
+    wins: v.wins,
+    totalRows: v.totalRows,
+    winRate: v.winRate,
+    ...(datasetName ? { datasetName } : {}),
+  });
   const tallyLine = [
     ...variants.map((v) => `${v.name} wins ${v.wins}`),
     `Ties ${ties}`,
@@ -141,15 +181,18 @@ export function AggregateHeaderBar({
         </Button>
         {variants.length <= 2 ? (
           variants.map((v) => (
-            <Button
+            <PromoteWinnerButton
               key={v.id}
-              size="xs"
-              variant="ghost"
-              onClick={() => onPromote(v.id)}
-            >
-              <Icon as={LuRocket} boxSize="14px" />
-              Promote {v.name}
-            </Button>
+              variantId={v.id}
+              variantName={v.name}
+              target={v.target}
+              verdictSummary={buildVerdictSummary(v)}
+              evalId={evalId}
+              experimentId={experimentId}
+              runId={runId}
+              winRateThreshold={winRateThreshold}
+              layout="named-button"
+            />
           ))
         ) : (
           <Popover.Root>
@@ -161,21 +204,23 @@ export function AggregateHeaderBar({
               </Button>
             </Popover.Trigger>
             <Popover.Positioner>
-              <Popover.Content width="200px">
+              <Popover.Content width="220px">
                 <Popover.Arrow />
                 <Popover.Body padding={1}>
                   <VStack align="stretch" gap={0}>
                     {variants.map((v) => (
-                      <Button
+                      <PromoteWinnerButton
                         key={v.id}
-                        size="xs"
-                        variant="ghost"
-                        justifyContent="flex-start"
-                        onClick={() => onPromote(v.id)}
-                      >
-                        <Icon as={LuRocket} boxSize="14px" />
-                        {v.name}
-                      </Button>
+                        variantId={v.id}
+                        variantName={v.name}
+                        target={v.target}
+                        verdictSummary={buildVerdictSummary(v)}
+                        evalId={evalId}
+                        experimentId={experimentId}
+                        runId={runId}
+                        winRateThreshold={winRateThreshold}
+                        layout="menu-item"
+                      />
                     ))}
                   </VStack>
                 </Popover.Body>

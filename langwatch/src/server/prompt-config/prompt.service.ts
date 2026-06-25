@@ -13,6 +13,7 @@ import {
   type outputsSchema,
   type promptingTechniqueSchema,
 } from "~/prompts/schemas/field-schemas";
+import type { PromoteSource } from "~/prompts/schemas/promote-source-schema";
 import { SchemaVersion } from "./enums";
 import { NotFoundError, SystemPromptRequiredError } from "./errors";
 import { PromptVersionService } from "./prompt-version.service";
@@ -1231,7 +1232,14 @@ export class PromptService {
     return this.tagRepository.getTagsForConfig(params);
   }
 
-  /** Assign (or reassign) a tag to a specific prompt version. */
+  /**
+   * Assign (or reassign) a tag to a specific prompt version.
+   *
+   * When `source.kind === "pairwise-eval"` (#5104), the source experiment is
+   * validated to belong to the same project, and a `prod_changed` warning is
+   * returned when `expectedPriorVersionId` is provided and another writer has
+   * moved the tag since the eval was set up.
+   */
   async assignTag(params: {
     configId: string;
     versionId: string;
@@ -1239,6 +1247,8 @@ export class PromptService {
     projectId: string;
     userId?: string;
     organizationId?: string;
+    source?: PromoteSource | null;
+    expectedPriorVersionId?: string | null;
   }) {
     // Always resolve organizationId from projectId to prevent org mismatch attacks
     const organizationId = await this.getOrganizationIdFromProjectId(
@@ -1256,13 +1266,48 @@ export class PromptService {
       );
     }
 
-    return this.tagRepository.assignTag({
+    // Cross-org guard: the source experiment must belong to the same project
+    // as the prompt being promoted, so a compromised eval id from a foreign
+    // org can't be replayed to attribute a promotion here.
+    if (params.source?.kind === "pairwise-eval") {
+      const experiment = await this.prisma.experiment.findUnique({
+        where: { id: params.source.experimentId },
+        select: { projectId: true },
+      });
+      if (!experiment || experiment.projectId !== params.projectId) {
+        throw new TagValidationError(
+          "Source experiment does not belong to this project.",
+        );
+      }
+    }
+
+    // Last-write-wins race detection: if the caller passed a snapshot of
+    // what was prod when the eval was set up, surface a warning when the tag
+    // has since been moved by another writer. The promotion still proceeds.
+    let warning: "prod_changed" | undefined;
+    if (params.expectedPriorVersionId !== undefined) {
+      const current = await this.tagRepository.getByConfigAndTagId({
+        configId: params.configId,
+        tagId,
+        projectId: params.projectId,
+      });
+      const currentVersionId = current?.versionId ?? null;
+      const expected = params.expectedPriorVersionId || null;
+      if (currentVersionId !== expected) {
+        warning = "prod_changed";
+      }
+    }
+
+    const assignment = await this.tagRepository.assignTag({
       configId: params.configId,
       versionId: params.versionId,
       tagId,
       projectId: params.projectId,
       userId: params.userId,
+      source: params.source ?? null,
     });
+
+    return warning ? { ...assignment, warning } : assignment;
   }
 
   /**

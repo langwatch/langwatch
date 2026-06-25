@@ -4,6 +4,7 @@ import {
   type BoxProps,
   Button,
   HStack,
+  Link,
   Separator,
   Spacer,
   Spinner,
@@ -12,13 +13,18 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { useCallback, useEffect } from "react";
-import { LuChevronRight } from "react-icons/lu";
+import NextLink from "~/utils/compat/next-link";
+import { useCallback, useEffect, useMemo } from "react";
+import { LuChevronRight, LuRocket } from "react-icons/lu";
 import { HistoryIcon } from "~/components/icons/History";
 import { Popover } from "~/components/ui/popover";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import {
+  type PromoteSource,
+  promoteSourceSchema,
+} from "~/prompts/schemas/promote-source-schema";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import { api } from "~/utils/api";
 import { createLogger } from "~/utils/logger";
@@ -37,6 +43,12 @@ interface VersionHistoryItemData {
   author?: {
     name: string | null;
   } | null;
+  /**
+   * Audit-trail metadata for any tag currently pointing at this version
+   * (#5104). Populated by the popover from the getTagsForConfig query;
+   * absent when no tag with a recorded source points here.
+   */
+  promoteSources?: PromoteSource[];
 }
 
 /**
@@ -71,6 +83,57 @@ const VersionNumberBox = ({
 };
 
 /**
+ * Renders a "Promoted via pairwise eval" chip linking back to the experiment
+ * that produced the decision (#5104). Renders nothing when no recognized
+ * source kind is attached — the rest of the version row is unchanged for
+ * versions without audit-trail metadata.
+ *
+ * When a project slug is unavailable we still render the chip as a passive
+ * Tag (no link) so the audit trail is at least visible.
+ */
+function PairwisePromoteChip({ sources }: { sources?: PromoteSource[] }) {
+  const { project } = useOrganizationTeamProject();
+  const pairwise = sources?.find((s) => s.kind === "pairwise-eval");
+  if (!pairwise) return null;
+
+  const label = "Promoted via pairwise eval";
+  const href = project?.slug
+    ? `/${project.slug}/experiments/${pairwise.experimentId}`
+    : undefined;
+  const tooltip = `Eval id: ${pairwise.evalId}${
+    pairwise.runId ? ` · Run id: ${pairwise.runId}` : ""
+  }`;
+
+  const chip = (
+    <Tag.Root
+      colorPalette="purple"
+      size="sm"
+      paddingX={2}
+      fontWeight="normal"
+    >
+      <Tag.StartElement>
+        <LuRocket size={10} />
+      </Tag.StartElement>
+      <Tag.Label>{label}</Tag.Label>
+    </Tag.Root>
+  );
+
+  return (
+    <Tooltip content={tooltip} positioning={{ placement: "top" }}>
+      {href ? (
+        <Link asChild>
+          <NextLink href={href} data-testid="promote-source-chip">
+            {chip}
+          </NextLink>
+        </Link>
+      ) : (
+        <Box data-testid="promote-source-chip">{chip}</Box>
+      )}
+    </Tooltip>
+  );
+}
+
+/**
  * Individual version history item showing commit message, author and restore button
  */
 function VersionHistoryItem({
@@ -97,6 +160,7 @@ function VersionHistoryItem({
               <Text fontWeight={600} fontSize="13px" lineClamp={1}>
                 {data.commitMessage}
               </Text>
+              <PairwisePromoteChip sources={data.promoteSources} />
               {isCurrent && (
                 <Tag.Root
                   colorPalette="gray"
@@ -373,6 +437,44 @@ export function VersionHistoryListPopover({
       },
     );
 
+  // #5104: enrich each version row with the audit-trail source(s) of any
+  // tag pointing at it. Failed source parses are silently skipped — they're
+  // either older rows or shapes from a newer client.
+  const { data: tagAssignments = [] } =
+    api.prompts.getTagsForConfig.useQuery(
+      {
+        configId,
+        projectId: project?.id ?? "",
+      },
+      {
+        enabled: !!project?.id && !!configId,
+      },
+    );
+
+  const sourcesByVersionId = useMemo(() => {
+    const map = new Map<string, PromoteSource[]>();
+    for (const assignment of tagAssignments) {
+      const rawSource = (assignment as { source?: unknown }).source;
+      if (!rawSource) continue;
+      const parsed = promoteSourceSchema.safeParse(rawSource);
+      if (!parsed.success) continue;
+      const versionId = (assignment as { versionId: string }).versionId;
+      const bucket = map.get(versionId) ?? [];
+      bucket.push(parsed.data);
+      map.set(versionId, bucket);
+    }
+    return map;
+  }, [tagAssignments]);
+
+  const versionsEnriched = useMemo<VersionHistoryItemData[]>(
+    () =>
+      prompts.map((p) => {
+        const sources = sourcesByVersionId.get(p.versionId);
+        return sources ? { ...p, promoteSources: sources } : p;
+      }),
+    [prompts, sourcesByVersionId],
+  );
+
   /**
    * Load version data into the form without creating a new version.
    * User will need to save manually to complete the restore.
@@ -422,7 +524,7 @@ export function VersionHistoryListPopover({
         setOpen(open);
       }}
       onRestore={handleRestore}
-      versions={prompts}
+      versions={versionsEnriched}
       isLoading={isLoading}
       hasUnsavedChanges={hasUnsavedChanges}
       currentVersionId={currentVersionId}

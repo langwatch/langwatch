@@ -21,6 +21,13 @@ vi.mock("../../hooks/useEvaluatorName", () => ({
   useCodeEvaluatorIds: () => new Set(),
 }));
 
+// PromoteWinnerButton (#5104) reads the active project from this hook to
+// decide whether to mount the confirmation modal. The modal stays closed in
+// these visual previews, so a static stub is enough.
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({ project: { id: "proj_test" } }),
+}));
+
 import { AggregateHeaderBar } from "../AggregateHeaderBar";
 import { PairwiseConfigForm } from "../EvaluatorPanel/PairwiseConfigForm";
 import { RowVerdictStrip } from "../RowVerdictStrip";
@@ -105,15 +112,30 @@ describe("Pairwise compare UI preview — MVP (PR #5106)", () => {
         <div style={{ width: 1580, background: "white" }}>
           <AggregateHeaderBar
             variants={[
-              { id: "variant_a", name: "variant_a", wins: 12 },
-              { id: "variant_b", name: "variant_b", wins: 7 },
+              {
+                id: "variant_a",
+                name: "variant_a",
+                wins: 12,
+                totalRows: 18,
+                winRate: 12 / 18,
+                target: twoTargets[0],
+              },
+              {
+                id: "variant_b",
+                name: "variant_b",
+                wins: 7,
+                totalRows: 18,
+                winRate: 7 / 18,
+                target: twoTargets[1],
+              },
             ]}
             ties={2}
             totalCost={0.0421}
             activeFilter="all"
             onFilterChange={() => {}}
             onExport={() => {}}
-            onPromote={() => {}}
+            evalId="eval_demo"
+            experimentId="exp_demo"
             biasCorrected={true}
           />
         </div>
@@ -133,15 +155,30 @@ describe("Pairwise compare UI preview — MVP (PR #5106)", () => {
         <div style={{ width: 1580, background: "white" }}>
           <AggregateHeaderBar
             variants={[
-              { id: "variant_a", name: "variant_a", wins: 12 },
-              { id: "variant_b", name: "variant_b", wins: 7 },
+              {
+                id: "variant_a",
+                name: "variant_a",
+                wins: 12,
+                totalRows: 18,
+                winRate: 12 / 18,
+                target: twoTargets[0],
+              },
+              {
+                id: "variant_b",
+                name: "variant_b",
+                wins: 7,
+                totalRows: 18,
+                winRate: 7 / 18,
+                target: twoTargets[1],
+              },
             ]}
             ties={2}
             totalCost={0.0421}
             activeFilter="losses"
             onFilterChange={() => {}}
             onExport={() => {}}
-            onPromote={() => {}}
+            evalId="eval_demo"
+            experimentId="exp_demo"
             biasCorrected={true}
           />
         </div>
@@ -303,17 +340,46 @@ describe("Pairwise compare UI preview — N-way select_best (PR #5101)", () => {
         <div style={{ width: 1780, background: "white" }}>
           <AggregateHeaderBar
             variants={[
-              { id: "variant_a", name: "gpt-4o v3", wins: 12 },
-              { id: "variant_b", name: "gpt-4o v4", wins: 7 },
-              { id: "variant_c", name: "claude-3.5", wins: 9 },
-              { id: "variant_d", name: "gemini-1.5", wins: 3 },
+              {
+                id: "variant_a",
+                name: "gpt-4o v3",
+                wins: 12,
+                totalRows: 31,
+                winRate: 12 / 31,
+                target: fourTargets[0],
+              },
+              {
+                id: "variant_b",
+                name: "gpt-4o v4",
+                wins: 7,
+                totalRows: 31,
+                winRate: 7 / 31,
+                target: fourTargets[1],
+              },
+              {
+                id: "variant_c",
+                name: "claude-3.5",
+                wins: 9,
+                totalRows: 31,
+                winRate: 9 / 31,
+                target: fourTargets[2],
+              },
+              {
+                id: "variant_d",
+                name: "gemini-1.5",
+                wins: 3,
+                totalRows: 31,
+                winRate: 3 / 31,
+                target: fourTargets[3],
+              },
             ]}
             ties={2}
             totalCost={0.1342}
             activeFilter={{ variantId: "variant_a" }}
             onFilterChange={() => {}}
             onExport={() => {}}
-            onPromote={() => {}}
+            evalId="eval_demo_nway"
+            experimentId="exp_demo_nway"
             biasCorrected={true}
           />
         </div>

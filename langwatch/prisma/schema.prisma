@@ -1409,6 +1409,8 @@ model PromptTagAssignment {
   updatedById String?
   updatedBy   User?                  @relation("versionTagUpdatedBy", fields: [updatedById], references: [id])
 
+  source Json?
+
   @@unique([configId, tagId])
   @@index([configId])
   @@index([versionId])
