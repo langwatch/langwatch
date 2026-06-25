@@ -31,6 +31,7 @@ import { useDeleteDatasetConfirmation } from "~/hooks/useDeleteDatasetConfirmati
 import { useRouter } from "~/utils/compat/next-router";
 import { AddOrEditDatasetDrawer } from "../../components/AddOrEditDatasetDrawer";
 import { DashboardLayout } from "../../components/DashboardLayout";
+import { BulkUploadDrawer } from "../../components/datasets/bulkUpload/BulkUploadDrawer";
 import { CopyDatasetDialog } from "../../components/datasets/CopyDatasetDialog";
 import { UploadCSVDrawer } from "../../components/datasets/UploadCSVDrawer";
 import { Link } from "../../components/ui/link";
@@ -47,6 +48,7 @@ import { isHandledByGlobalHandler } from "../../utils/trpcError";
 function DatasetsPage() {
   const addEditDatasetDrawer = useDisclosure();
   const uploadCSVModal = useDisclosure();
+  const bulkUploadModal = useDisclosure();
   const { project } = useOrganizationTeamProject();
   const { isLiteMember } = useLiteMemberGuard();
   const router = useRouter();
@@ -180,6 +182,12 @@ function DatasetsPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </InputGroup>
+        <PageLayout.HeaderButton
+          data-testid="bulk-upload-datasets"
+          onClick={() => bulkUploadModal.onOpen()}
+        >
+          <Upload height={17} width={17} strokeWidth={2.5} /> Bulk upload
+        </PageLayout.HeaderButton>
         <PageLayout.HeaderButton onClick={() => uploadCSVModal.onOpen()}>
           <Upload height={17} width={17} strokeWidth={2.5} /> Upload or Create
           Dataset
@@ -388,6 +396,13 @@ function DatasetsPage() {
           setTimeout(() => {
             addEditDatasetDrawer.onOpen();
           }, 100);
+        }}
+      />
+      <BulkUploadDrawer
+        open={bulkUploadModal.open}
+        onClose={bulkUploadModal.onClose}
+        onUploaded={() => {
+          void datasets.refetch();
         }}
       />
       <DeleteDialog />
