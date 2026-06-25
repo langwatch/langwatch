@@ -25,7 +25,11 @@ import type {
   AvailableSource,
   FieldMapping as UIFieldMapping,
 } from "~/components/variables";
-import type { LocalEvaluatorConfig } from "~/experiments-v3/types";
+import { PairwiseConfigForm } from "~/experiments-v3/components/EvaluatorPanel/PairwiseConfigForm";
+import type {
+  LocalEvaluatorConfig,
+  PairwiseEvaluatorConfig,
+} from "~/experiments-v3/types";
 import {
   getComplexProps,
   getDrawerStack,
@@ -77,6 +81,16 @@ export type EvaluatorEditorDrawerProps = {
     mapping: UIFieldMapping | undefined,
   ) => void;
   initialLocalConfig?: LocalEvaluatorConfig;
+  /**
+   * Pairwise compare drawer context (#5100). Non-serializable; flows
+   * through complexProps. When present, the drawer renders
+   * PairwiseConfigForm in place of the per-row mappings section.
+   */
+  pairwiseContext?: {
+    initialPairwise?: PairwiseEvaluatorConfig;
+    targets: { id: string }[];
+    datasetColumns: { id: string; name: string }[];
+  };
 };
 
 type EvaluatorFormValues = {
@@ -115,6 +129,15 @@ export type EvaluatorEditorController = {
   onMappingChange:
     | ((identifier: string, mapping: UIFieldMapping | undefined) => void)
     | undefined;
+  /** Pairwise compare drawer context (#5100). Set only for pairwise evaluator types. */
+  pairwiseContext:
+    | {
+        initialPairwise?: PairwiseEvaluatorConfig;
+        targets: { id: string }[];
+        datasetColumns: { id: string; name: string }[];
+      }
+    | undefined;
+  onPairwiseChange: ((config: PairwiseEvaluatorConfig) => void) | undefined;
   onLocalConfigChange:
     | ((config: LocalEvaluatorConfig | undefined) => void)
     | undefined;
@@ -156,6 +179,18 @@ export function useEvaluatorEditorController(
     props.mappingsConfig ??
     (complexProps.mappingsConfig as EvaluatorMappingsConfig | undefined);
   const onMappingChange = flowCallbacks?.onMappingChange;
+  // Pairwise compare (#5100): when this context is set, the drawer renders
+  // PairwiseConfigForm instead of the per-row mappings section.
+  const pairwiseContext = complexProps.pairwiseContext as
+    | {
+        initialPairwise?: PairwiseEvaluatorConfig;
+        targets: { id: string }[];
+        datasetColumns: { id: string; name: string }[];
+      }
+    | undefined;
+  const onPairwiseChange = (flowCallbacks as {
+    onPairwiseChange?: (config: PairwiseEvaluatorConfig) => void;
+  } | undefined)?.onPairwiseChange;
 
   const saveButtonText =
     props.saveButtonText ?? (complexProps.saveButtonText as string | undefined);
@@ -582,6 +617,8 @@ export function useEvaluatorEditorController(
     saveButtonText,
     mappingsConfig,
     onMappingChange,
+    pairwiseContext,
+    onPairwiseChange,
     onLocalConfigChange,
     title,
     handleSave,
@@ -615,7 +652,13 @@ export function EvaluatorEditorBody({
     projectSlug,
     mappingsConfig,
     onMappingChange,
+    pairwiseContext,
+    onPairwiseChange,
   } = controller;
+
+  // Pairwise (#5100): if the caller passed pairwise context, ignore the
+  // generic mappings UI entirely and render the targets+golden picker.
+  const isPairwise = !!(pairwiseContext && onPairwiseChange);
 
   if (evaluatorId && isLoadingEvaluator) {
     return (
@@ -688,6 +731,7 @@ export function EvaluatorEditorBody({
         )}
 
         {!hasSettings &&
+          !isPairwise &&
           (!mappingsConfig || !onMappingChange) &&
           !isWorkflowEvaluator && (
             <Text fontSize="sm" color="fg.muted">
@@ -695,7 +739,25 @@ export function EvaluatorEditorBody({
             </Text>
           )}
 
-        {mappingsConfig && onMappingChange && (
+        {isPairwise && pairwiseContext && onPairwiseChange && (
+          <Box paddingTop={4}>
+            <PairwiseConfigForm
+              value={
+                pairwiseContext.initialPairwise ?? {
+                  variantA: "",
+                  variantB: "",
+                  goldenField: "",
+                  includeMetrics: [],
+                }
+              }
+              onChange={onPairwiseChange}
+              targets={pairwiseContext.targets as never}
+              datasetColumns={pairwiseContext.datasetColumns}
+            />
+          </Box>
+        )}
+
+        {!isPairwise && mappingsConfig && onMappingChange && (
           <Box paddingTop={4}>
             <EvaluatorMappingsSection
               evaluatorDef={effectiveEvaluatorDef}
