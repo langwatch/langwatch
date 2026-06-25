@@ -101,6 +101,21 @@ Feature: Data retention policy configuration
     When that user attempts to set an organization-level traces retention
     Then the request is rejected as forbidden
 
+  # The Data Storage figure tracks the page's scope selector. A single project
+  # only ever shows that project; widening to the team or organization sums the
+  # storage of every project in that scope the caller is allowed to read.
+
+  Scenario: Storage for an organization scope sums its projects
+    Given the organization "acme" has projects "web-app" using 19 GB and "worker" using 0 B
+    And the caller can read both projects
+    When storage is shown with the organization scope selected
+    Then the Data Storage figure is the sum of both projects
+
+  Scenario: Storage never counts a project the caller cannot read
+    Given the organization "acme" has a project the caller cannot read
+    When storage is shown with the organization scope selected
+    Then that project's storage is excluded from the total
+
   Scenario: An override is anchored to a single organization
     When an admin sets a team-level traces retention for "platform"
     Then the override is anchored to the organization that owns "platform"

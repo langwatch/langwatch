@@ -9,6 +9,7 @@ import {
   assertRetentionPlan,
   assertRetentionPlanForScope,
 } from "~/server/data-retention/policy/dataRetentionPolicy.authz";
+import { resolveScopeStorageUsage } from "~/server/data-retention/metering/storageMeter.read";
 import { getRetentionPolicySnapshot } from "~/server/data-retention/policy/dataRetentionPolicy.read";
 import { ScopeTargetNotFoundError } from "~/server/data-retention/policy/dataRetentionPolicy.service";
 
@@ -222,23 +223,21 @@ export const dataRetentionRouter = createTRPCRouter({
       });
     }),
 
-  getStorageUsage: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
+  /**
+   * Total stored bytes for the projects the scope selector resolves to, summed
+   * across every in-scope project the caller can read. Lets the Data Storage
+   * card reflect the chosen scope (organization / team / project) instead of
+   * always showing only the current project. RBAC-filtering happens inside the
+   * resolver against the scope's owning org, so a wider scope never leaks a
+   * project's storage the caller couldn't see.
+   */
+  getScopeStorageUsage: protectedProcedure
+    .input(z.object({ projectId: z.string(), scope: scopeInput }))
     .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }) => {
-      const totalBytes =
-        await getApp().dataRetention.metering.getTotalStorageBytes({
-          tenantId: input.projectId,
-        });
-      return { totalBytes };
-    }),
-
-  getStorageBreakdown: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }) => {
-      return getApp().dataRetention.metering.getStorageBreakdown({
-        tenantId: input.projectId,
+    .query(async ({ input, ctx }) => {
+      return resolveScopeStorageUsage(ctx, {
+        projectId: input.projectId,
+        scope: input.scope,
       });
     }),
 });

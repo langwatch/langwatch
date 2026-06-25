@@ -75,6 +75,48 @@ export class StorageMeterService {
   }
 
   /**
+   * Total stored bytes summed across many tenants (e.g. every project in an
+   * organization or team scope). Intentionally reuses {@link getTotalStorageBytes}
+   * per tenant rather than issuing one `TenantId IN (...)` sum: each per-tenant
+   * read keeps the hardened settings (capped threads + execution time + the
+   * per-table fallback) AND its own 5-minute cache, so an org-wide total is
+   * mostly cache hits and a single heavy tenant can't blow the memory ceiling
+   * for the whole scope. A wide `IN` sum would re-expose the OOM hazard that
+   * `_size_bytes`'s lazy recompute caused in production and bypass the cache.
+   *
+   * Reads run with bounded concurrency so a cold cache over a large org issues
+   * a steady trickle rather than a thundering herd of recompute reads. A tenant
+   * whose read fails degrades to 0 (its own fallback already tried), so one
+   * project can't fail the scope total — acceptable because this powers a
+   * display, not billing.
+   */
+  async getTotalStorageBytesForTenants(
+    tenantIds: string[],
+  ): Promise<number> {
+    const unique = Array.from(new Set(tenantIds));
+    if (unique.length === 0) return 0;
+
+    const CONCURRENCY = 8;
+    let total = 0;
+    for (let i = 0; i < unique.length; i += CONCURRENCY) {
+      const batch = unique.slice(i, i + CONCURRENCY);
+      const results = await Promise.all(
+        batch.map((tenantId) =>
+          this.getTotalStorageBytes({ tenantId }).catch((error) => {
+            logger.warn(
+              { tenantId, error },
+              "Per-tenant storage read failed in scope aggregation; counting 0",
+            );
+            return 0;
+          }),
+        ),
+      );
+      total += results.reduce((a, b) => a + b, 0);
+    }
+    return total;
+  }
+
+  /**
    * Stored bytes for a tenant grouped by retention category. Each table is
    * queried independently so a single table's failure degrades that category
    * to zero rather than failing the whole breakdown.

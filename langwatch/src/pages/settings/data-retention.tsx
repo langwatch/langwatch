@@ -19,7 +19,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AddOverrideDrawer,
   type RetentionEditTarget,
@@ -102,8 +102,44 @@ function DataRetentionPage({
 }) {
   const utils = api.useUtils();
   const rulesQuery = api.dataRetention.getRules.useQuery({ projectId });
-  const storageQuery = api.dataRetention.getStorageBreakdown.useQuery({
+
+  // Storage tracks the scope selector, not just the current project. Map the
+  // active filter to a concrete scope: a specific pick passes through; "all you
+  // can see" resolves to the whole org (or just this project for a personal
+  // account with no org).
+  const storageScope = useMemo(() => {
+    const resolved = resolveScopeFilter(scopeFilter, {
+      currentTeamId: teamId,
+      currentProjectId: projectId,
+    });
+    if (resolved.kind === "specific") {
+      return { scopeType: resolved.scopeType, scopeId: resolved.scopeId };
+    }
+    return organizationId
+      ? { scopeType: "ORGANIZATION" as const, scopeId: organizationId }
+      : { scopeType: "PROJECT" as const, scopeId: projectId };
+  }, [scopeFilter, teamId, projectId, organizationId]);
+
+  const storageDescription = useMemo(() => {
+    const resolved = resolveScopeFilter(scopeFilter, {
+      currentTeamId: teamId,
+      currentProjectId: projectId,
+    });
+    if (resolved.kind === "all") {
+      return "How much space everything you can see uses today.";
+    }
+    if (resolved.scopeType === "ORGANIZATION") {
+      return "How much space this organization's data uses today.";
+    }
+    if (resolved.scopeType === "TEAM") {
+      return "How much space this team's data uses today.";
+    }
+    return "How much space this project's data uses today.";
+  }, [scopeFilter, teamId, projectId]);
+
+  const storageQuery = api.dataRetention.getScopeStorageUsage.useQuery({
     projectId,
+    scope: storageScope,
   });
   // Platform admin = email in ADMIN_EMAILS (NOT an org admin). Only they may
   // disable retention; the route enforces this independently. We use it solely
@@ -333,6 +369,7 @@ function DataRetentionPage({
             effective={snapshot.effective}
             isLoading={storageQuery.isLoading}
             data={storageQuery.data}
+            storageDescription={storageDescription}
           />
         )}
 

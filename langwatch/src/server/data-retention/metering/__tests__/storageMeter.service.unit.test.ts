@@ -51,6 +51,75 @@ describe("StorageMeterService memory guard", () => {
     });
   });
 
+  describe("when summing storage across many tenants for a scope", () => {
+    function makeMultiTenantService(
+      totals: Record<string, number>,
+      failing: Set<string> = new Set(),
+    ) {
+      const resolver = vi.fn(async (tenantId: string) => {
+        if (failing.has(tenantId)) throw new Error("cluster unreachable");
+        return {
+          query: vi.fn(async (arg: { query_params: { tenantId: string } }) => ({
+            json: async () => [
+              { total: String(totals[arg.query_params.tenantId] ?? 0) },
+            ],
+          })),
+        } as any;
+      });
+      return { service: new StorageMeterService(resolver), resolver };
+    }
+
+    it("sums each tenant's total", async () => {
+      const { service } = makeMultiTenantService({ a: 10, b: 20, c: 30 });
+
+      const total = await service.getTotalStorageBytesForTenants([
+        "a",
+        "b",
+        "c",
+      ]);
+
+      expect(total).toBe(60);
+    });
+
+    it("counts each tenant once even if passed twice", async () => {
+      const { service, resolver } = makeMultiTenantService({ a: 10, b: 20 });
+
+      const total = await service.getTotalStorageBytesForTenants([
+        "a",
+        "a",
+        "b",
+      ]);
+
+      expect(total).toBe(30);
+      // 'a' resolved once despite appearing twice in the input
+      expect(resolver).toHaveBeenCalledTimes(2);
+    });
+
+    it("returns 0 for an empty tenant list without querying", async () => {
+      const { service, resolver } = makeMultiTenantService({});
+
+      const total = await service.getTotalStorageBytesForTenants([]);
+
+      expect(total).toBe(0);
+      expect(resolver).not.toHaveBeenCalled();
+    });
+
+    it("degrades a failing tenant to 0 instead of failing the scope total", async () => {
+      const { service } = makeMultiTenantService(
+        { a: 10, b: 20, c: 30 },
+        new Set(["b"]),
+      );
+
+      const total = await service.getTotalStorageBytesForTenants([
+        "a",
+        "b",
+        "c",
+      ]);
+
+      expect(total).toBe(40);
+    });
+  });
+
   describe("given a heavy tenant where the aggregate query can exceed limits", () => {
     describe("when the single aggregate total query fails", () => {
       it("falls back to the per-table breakdown instead of throwing", async () => {
