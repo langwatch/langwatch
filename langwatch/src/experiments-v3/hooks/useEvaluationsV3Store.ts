@@ -18,6 +18,7 @@ import {
   type TargetConfig,
 } from "../types";
 import {
+  derivePairwiseTargetMappings,
   inferAllEvaluatorMappings,
   inferAllTargetMappings,
   propagateMappingsToNewDataset,
@@ -665,6 +666,40 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         });
 
       return { targets, evaluators };
+    });
+  },
+
+  updateTargetPairwise: (targetId, pairwise) => {
+    set((state) => {
+      const existingTarget = state.targets.find((r) => r.id === targetId);
+      // Strictly additive: silently skip for non-pairwise targets so we never
+      // perturb the prompt / agent / non-pairwise-evaluator code paths.
+      if (!existingTarget || existingTarget.pairwise === undefined) {
+        return state;
+      }
+
+      // Derive the per-row field mappings the orchestrator expects from the
+      // high-level pairwise picks — this is what lets the PairwiseConfigForm
+      // be a clean 3-field UI while keeping the orchestrator unchanged.
+      const newDatasetMappings: Record<
+        string,
+        Record<string, FieldMapping>
+      > = {};
+      for (const dataset of state.datasets) {
+        const derived = derivePairwiseTargetMappings(pairwise, dataset);
+        newDatasetMappings[dataset.id] = {
+          ...(existingTarget.mappings[dataset.id] ?? {}),
+          ...derived,
+        };
+      }
+
+      return {
+        targets: state.targets.map((t) =>
+          t.id === targetId
+            ? { ...t, pairwise, mappings: newDatasetMappings }
+            : t,
+        ),
+      };
     });
   },
 

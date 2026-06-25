@@ -169,6 +169,41 @@ export const getTargetMissingMappings = (
   // Evaluator targets use requiredFields/optionalFields from AVAILABLE_EVALUATORS
   const isEvaluatorTarget = target.type === "evaluator";
 
+  // Pairwise column-target (#5100): high-level PairwiseConfigForm replaces the
+  // per-row mappings UI. Validate against the pairwise config (Variant A /
+  // Variant B / Golden) instead of walking the input field list — those rows
+  // are derived from variantA/variantB at save time so the user never has to
+  // fill them in. Strictly additive: only triggered when target.pairwise is
+  // set, which only happens for langevals/pairwise_compare column-targets.
+  if (isEvaluatorTarget && target.pairwise) {
+    const pw = target.pairwise;
+    if (!pw.variantA) {
+      missingMappings.push({
+        fieldId: "variantA",
+        fieldName: "Variant A",
+        isRequired: true,
+      });
+    }
+    if (!pw.variantB) {
+      missingMappings.push({
+        fieldId: "variantB",
+        fieldName: "Variant B",
+        isRequired: true,
+      });
+    }
+    if (!pw.goldenField) {
+      missingMappings.push({
+        fieldId: "goldenField",
+        fieldName: "Golden field",
+        isRequired: true,
+      });
+    }
+    return {
+      isValid: missingMappings.length === 0,
+      missingMappings,
+    };
+  }
+
   if (isEvaluatorTarget) {
     // For evaluator targets, use the optional property on each input field
     // Fields without optional: true are considered required

@@ -12,7 +12,11 @@
 
 import { generate } from "@langwatch/ksuid";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
-import type { EvaluationsV3State, TargetConfig } from "~/experiments-v3/types";
+import type {
+  EvaluationsV3State,
+  EvaluatorConfig,
+  TargetConfig,
+} from "~/experiments-v3/types";
 import { isRowEmpty } from "~/experiments-v3/utils/emptyRowDetection";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
@@ -193,6 +197,15 @@ export const generateCells = (
       );
       if (!targetConfig) continue;
 
+      // Skip column-style pairwise targets (#5100) in Phase 1 — they need
+      // both variants' outputs which are not yet available in a single
+      // per-target cell. Picked up by generatePairwiseCells in Phase 2.
+      // Strictly additive: only triggered when target.pairwise is set,
+      // which only happens for column-style langevals/pairwise_compare.
+      if (targetConfig.type === "evaluator" && targetConfig.pairwise) {
+        continue;
+      }
+
       cells.push({
         rowIndex,
         targetId,
@@ -242,7 +255,16 @@ export const generatePairwiseCells = (
     state.datasets[0]?.id ?? state.activeDatasetId ?? "dataset-1";
 
   const pairwiseEvaluators = state.evaluators.filter((e) => e.pairwise);
-  if (pairwiseEvaluators.length === 0) return cells;
+  // Column-style pairwise targets (#5100): same Phase-2 treatment as chip
+  // evaluators, just with a synthetic EvaluatorConfig synthesized from the
+  // target's stored pairwise config. Keeping both paths in one generator
+  // keeps Phase 2 storage / progress accounting identical.
+  const pairwiseTargets = state.targets.filter(
+    (t) => t.type === "evaluator" && t.pairwise,
+  );
+  if (pairwiseEvaluators.length === 0 && pairwiseTargets.length === 0) {
+    return cells;
+  }
 
   for (const evaluator of pairwiseEvaluators) {
     const cfg = evaluator.pairwise;
@@ -273,6 +295,79 @@ export const generatePairwiseCells = (
         targetId: cfg.variantA,
         targetConfig: variantA,
         evaluatorConfigs: [evaluator],
+        datasetEntry: {
+          _datasetId: datasetId,
+          ...datasetEntry,
+        },
+        skipTarget: true,
+        precomputedTargetOutput: a.output,
+        pairwise: {
+          candidateA: {
+            id: cfg.variantA,
+            output: a.output,
+            cost: a.cost,
+            duration: a.duration,
+          },
+          candidateB: {
+            id: cfg.variantB,
+            output: b.output,
+            cost: b.cost,
+            duration: b.duration,
+          },
+        },
+      });
+    }
+  }
+
+  // Column-style pairwise targets (#5100). Each is its own column whose
+  // verdict cell stores results under TargetId=column-target.id. A
+  // synthetic EvaluatorConfig (constructed from the target's pairwise
+  // config + dbEvaluatorId) gives buildEvaluatorInputs everything it
+  // needs to take the pairwise branch, and downstream storage records
+  // the verdict against the pairwise column rather than variantA.
+  for (const target of pairwiseTargets) {
+    const cfg = target.pairwise;
+    if (!cfg || !target.targetEvaluatorId) continue;
+
+    const variantA = state.targets.find((t) => t.id === cfg.variantA);
+    const variantB = state.targets.find((t) => t.id === cfg.variantB);
+    if (!variantA || !variantB) {
+      logger.warn(
+        {
+          targetId: target.id,
+          variantA: cfg.variantA,
+          variantB: cfg.variantB,
+        },
+        "Pairwise column-target skipped: variant target(s) not found",
+      );
+      continue;
+    }
+
+    const syntheticEvaluator = {
+      id: target.id,
+      dbEvaluatorId: target.targetEvaluatorId,
+      evaluatorType: "langevals/pairwise_compare",
+      pairwise: cfg,
+      inputs: target.inputs,
+      mappings: {},
+    } as unknown as EvaluatorConfig;
+
+    for (let rowIndex = 0; rowIndex < datasetRows.length; rowIndex++) {
+      const datasetEntry = datasetRows[rowIndex];
+      if (!datasetEntry) continue;
+
+      const a = completedTargetOutputs.get(`${rowIndex}:${cfg.variantA}`);
+      const b = completedTargetOutputs.get(`${rowIndex}:${cfg.variantB}`);
+      if (!a || !b) continue;
+
+      cells.push({
+        rowIndex,
+        // Use the column-target's id so the verdict lands in the pairwise
+        // column rather than under variantA's column. Differs from the
+        // chip-style path above where verdicts hang under variantA.
+        targetId: target.id,
+        targetConfig: target,
+        evaluatorConfigs: [syntheticEvaluator],
         datasetEntry: {
           _datasetId: datasetId,
           ...datasetEntry,
