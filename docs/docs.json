@@ -399,6 +399,7 @@
               "integration/python/integrations/instructor",
               "integration/python/integrations/smolagents",
               "integration/python/integrations/google-ai",
+              "integration/go/integrations/genkit",
               "integration/python/integrations/other"
             ]
           },
@@ -440,7 +441,8 @@
               {
                 "group": "Amazon Web Services",
                 "pages": [
-                  "integration/python/integrations/aws-bedrock"
+                  "integration/python/integrations/aws-bedrock",
+                  "integration/go/integrations/amazon-bedrock"
                 ]
               },
               "integration/go/integrations/groq",

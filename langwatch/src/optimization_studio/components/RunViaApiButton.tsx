@@ -4,7 +4,10 @@ import { Terminal } from "react-feather";
 import { GenerateApiSnippetDialog } from "~/components/GenerateApiSnippetDialog";
 import type { Snippet } from "~/prompts/types";
 
-import { evaluateCurlSnippet } from "../utils/evaluateApiSnippet";
+import {
+  evaluateCurlSnippet,
+  evaluateGoSnippet,
+} from "../utils/evaluateApiSnippet";
 import type { WorkflowField } from "../utils/workflowFields";
 
 /**
@@ -40,12 +43,23 @@ export function RunViaApiButton({
         datasetName,
       }),
     },
+    {
+      target: "go_native",
+      title: "Go",
+      content: evaluateGoSnippet({
+        workflowId,
+        baseUrl,
+        entryFields,
+        datasetColumns,
+        datasetName,
+      }),
+    },
   ];
 
   return (
     <GenerateApiSnippetDialog
       snippets={snippets}
-      targets={["shell_curl"]}
+      targets={["shell_curl", "go_native"]}
       title="Run via API"
       description="Trigger this workflow's evaluation from CI or scripts. It runs against the attached dataset; parameters below set constant inputs for fields the dataset does not provide."
     >

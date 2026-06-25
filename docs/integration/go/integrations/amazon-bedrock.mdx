@@ -1,0 +1,106 @@
+---
+title: Amazon Bedrock Integration
+sidebarTitle: Go
+description: Instrument AWS Bedrock Runtime calls in Go using LangWatch to capture model usage, tokens, and cost for AI agent evaluation.
+icon: golang
+keywords: go, golang, aws, amazon bedrock, bedrockruntime, instrumentation, langwatch, smithy, converse
+---
+
+LangWatch provides native instrumentation for the AWS Bedrock Runtime client (`github.com/aws/aws-sdk-go-v2/service/bedrockruntime`). Unlike the HTTP-bytes instrumentations, Bedrock is traced via the AWS **smithy-go middleware stack**, reading the typed operation input/output structs directly, so there is no body buffering. It captures `Converse`, `ConverseStream` and (best-effort) `InvokeModel`, including cache read + write tokens and latency.
+
+## Installation
+
+```bash
+go get github.com/langwatch/langwatch/sdk-go
+go get github.com/langwatch/langwatch/sdk-go/instrumentation/bedrock
+go get github.com/aws/aws-sdk-go-v2/service/bedrockruntime
+```
+
+## Usage
+
+<Info>
+Set `LANGWATCH_API_KEY` before running, and ensure your AWS credentials and region are configured (e.g. via `AWS_REGION` and the standard AWS credential chain).
+</Info>
+
+Instrument an `aws.Config` once with `InstrumentConfig`, and every Bedrock Runtime client built from it is traced:
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
+	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime/types"
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
+	langwatch "github.com/langwatch/langwatch/sdk-go"
+	"github.com/langwatch/langwatch/sdk-go/instrumentation/bedrock"
+)
+
+func main() {
+	ctx := context.Background()
+
+	// Set up the LangWatch exporter (reads LANGWATCH_API_KEY from env).
+	exporter, err := langwatch.NewExporter(ctx)
+	if err != nil {
+		log.Fatalf("failed to create exporter: %v", err)
+	}
+	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
+	otel.SetTracerProvider(tp)
+	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed.
+
+	cfg, err := awsconfig.LoadDefaultConfig(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Add the tracing middleware to the config.
+	bedrock.InstrumentConfig(&cfg)
+
+	client := bedrockruntime.NewFromConfig(cfg)
+
+	_, err = client.Converse(ctx, &bedrockruntime.ConverseInput{
+		ModelId: aws.String("anthropic.claude-3-5-sonnet-20240620-v1:0"),
+		Messages: []types.Message{{
+			Role:    types.ConversationRoleUser,
+			Content: []types.ContentBlock{&types.ContentBlockMemberText{Value: "Hello, Bedrock!"}},
+		}},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+```
+
+### Instrumenting a single client or operation
+
+If you do not want to mutate the shared `aws.Config`, add the middleware to a single client (or call) via `APIOptions`:
+
+```go
+client := bedrockruntime.NewFromConfig(cfg, func(o *bedrockruntime.Options) {
+	o.APIOptions = append(o.APIOptions, bedrock.WithTracing())
+})
+```
+
+<Note>
+The middleware captures input and output content **by default** (`langwatch.DataCaptureAll`). Pass `bedrock.WithDataCapture(langwatch.DataCaptureNone)` to `InstrumentConfig` / `WithTracing` to opt out. Use `bedrock.WithGenAIProvider(...)` to attribute spans to the underlying foundation-model vendor instead of `aws.bedrock`.
+</Note>
+
+<Warning>
+**Close streaming responses.** For `ConverseStream`, the span is finalised when the stream drains, `Close()` is called, or the operation context is cancelled, so always `defer stream.Close()` (or pass a cancellable context), exactly as you would for any AWS event stream.
+</Warning>
+
+<Warning>
+The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
+</Warning>
+
+## Related
+
+- [Go Integration Guide](/integration/go/guide) - Setup, manual spans, data capture and the REST client
+- [Go SDK API Reference](/integration/go/reference#automatic-instrumentation) - Instrumentation options and collected attributes
+- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your Bedrock applications

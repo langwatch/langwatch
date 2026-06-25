@@ -130,28 +130,36 @@ if ($err) {
       content: `package main
 
 import (
+	"context"
 	"fmt"
-	"io"
-	"net/http"
+	"log"
+
+	"github.com/langwatch/langwatch/sdk-go/client"
 )
 
 func main() {
-	url := "https://app.langwatch.ai/api/prompts/${shorthand}"
+	ctx := context.Background()
 
-	req, _ := http.NewRequest("GET", url, nil)
-	req.Header.Add("X-Auth-Token", "${apiKey}")
+	// Initialize the LangWatch client
+	lw, err := client.New(client.WithAPIKey("${apiKey}"))
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	res, _ := http.DefaultClient.Do(req)
-	defer res.Body.Close()
+	// Fetch prompt${label ? ` (tagged "${label}")` : ""}
+	prompt, err := lw.Prompts.Get(ctx, "${shorthand}", nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	body, _ := io.ReadAll(res.Body)
-
-	fmt.Println(res)
-	fmt.Println(string(body))
+	// Access prompt properties
+	fmt.Println("Prompt Name:", prompt.Name)
+	fmt.Println("Model:", prompt.Model)
+	fmt.Println("Version:", prompt.Version)
 }
 `,
       target: "go_native",
-      title: "Get Prompts (Go)",
+      title: "Get Prompts (Go SDK)",
       path: "/api/prompts/{id}",
       method: "GET",
     },

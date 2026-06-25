@@ -2,13 +2,13 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
-	"os"
+	"net/url"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"                        // +
-	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai" // +
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
+	langwatch "github.com/langwatch/langwatch/sdk-go"              // +
+	"github.com/langwatch/langwatch/sdk-go/instrumentation/ollama" // +
+	"github.com/ollama/ollama/api"
 	"go.opentelemetry.io/otel"                    // +
 	sdktrace "go.opentelemetry.io/otel/sdk/trace" // +
 )
@@ -25,25 +25,22 @@ func main() {
 	otel.SetTracerProvider(tp)                                       // +
 	defer tp.Shutdown(ctx)                                           // +
 
-	client := openai.NewClient(
-		oaioption.WithBaseURL(os.Getenv("OLLAMA_BASE_URL")),
-		oaioption.WithAPIKey("ollama"), // Ollama doesn't require a real API key
-		oaioption.WithMiddleware(otelopenai.Middleware("<project_name>", // +
-			otelopenai.WithCaptureInput(),  // +
-			otelopenai.WithCaptureOutput(), // +
-		)), // +
-	)
+	base, _ := url.Parse("http://localhost:11434")
+	client := api.NewClient(base, ollama.NewHTTPClient()) // + traced HTTP client
 
-	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Model: "openai/gpt-5",
-		Messages: []openai.ChatCompletionMessageParamUnion{
-			openai.SystemMessage("You are a helpful assistant."),
-			openai.UserMessage("Hello, Ollama!"),
+	stream := false
+	err = client.Chat(ctx, &api.ChatRequest{
+		Model:  "llama3.2",
+		Stream: &stream,
+		Messages: []api.Message{
+			{Role: "system", Content: "You are a helpful assistant."},
+			{Role: "user", Content: "Hello, Ollama!"},
 		},
+	}, func(resp api.ChatResponse) error {
+		fmt.Print(resp.Message.Content)
+		return nil
 	})
 	if err != nil {
 		log.Fatalf("Chat completion failed: %v", err)
 	}
-
-	log.Printf("Chat completion: %s", response.Choices[0].Message.Content)
 }

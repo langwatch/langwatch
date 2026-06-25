@@ -5,12 +5,14 @@ description: Instrument Grok (xAI) API calls in Go using LangWatch to capture hi
 keywords: go, golang, grok, xai, instrumentation, langwatch, openai-compatible
 ---
 
-LangWatch supports tracing Grok (xAI) API calls using the same `otelopenai` middleware used for OpenAI. Configure the client to point to the xAI endpoint.
+LangWatch supports tracing Grok (xAI) API calls through xAI's OpenAI-compatible endpoint. Reuse the [OpenAI](/integration/go/integrations/open-ai) `otelopenai` middleware: point the client at the xAI base URL and label the spans with `WithGenAIProvider`.
 
 ## Installation
 
 ```bash
-go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+go get github.com/langwatch/langwatch/sdk-go
+go get github.com/langwatch/langwatch/sdk-go/instrumentation/openai
+go get github.com/openai/openai-go/v3
 ```
 
 ## Usage
@@ -29,32 +31,32 @@ import (
 
 	langwatch "github.com/langwatch/langwatch/sdk-go"
 	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
+
+	"github.com/openai/openai-go/v3"
+	"github.com/openai/openai-go/v3/option"
 	"go.opentelemetry.io/otel"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 func main() {
 	ctx := context.Background()
 
-	// Set up LangWatch exporter
-	exporter, err := langwatch.NewDefaultExporter(ctx)
+	// Set up the LangWatch exporter (reads LANGWATCH_API_KEY from env).
+	exporter, err := langwatch.NewExporter(ctx)
 	if err != nil {
 		log.Fatalf("failed to create exporter: %v", err)
 	}
 	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
 	otel.SetTracerProvider(tp)
-	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed
+	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed.
 
-	// Create Grok client via OpenAI-compatible API
+	// Create a Grok client via the OpenAI-compatible API.
 	client := openai.NewClient(
-		oaioption.WithAPIKey(os.Getenv("XAI_API_KEY")),
-		oaioption.WithBaseURL("https://api.grok.com/v1"),
-		oaioption.WithMiddleware(otelopenai.Middleware("my-app",
-			otelopenai.WithCaptureInput(),
-			otelopenai.WithCaptureOutput(),
-			otelopenai.WithGenAISystem("xai"),
+		option.WithBaseURL("https://api.x.ai/v1"),
+		option.WithAPIKey(os.Getenv("XAI_API_KEY")),
+		option.WithMiddleware(otelopenai.Middleware("my-app",
+			otelopenai.WithGenAIProvider(semconv.GenAIProviderNameKey.String("x_ai")),
 		)),
 	)
 
@@ -73,12 +75,16 @@ func main() {
 }
 ```
 
+<Note>
+The middleware captures input and output content **by default**. Pass `otelopenai.WithDataCapture(langwatch.DataCaptureNone)` to opt out.
+</Note>
+
 <Warning>
 The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
 </Warning>
 
 ## Related
 
-- [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
-- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
-- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your Grok applications
+- [Go Integration Guide](/integration/go/guide#openai-compatible-providers)
+- [Go SDK API Reference](/integration/go/reference#openai-middleware)
+- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails)

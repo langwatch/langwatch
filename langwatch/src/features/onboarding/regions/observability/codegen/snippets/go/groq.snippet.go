@@ -5,12 +5,13 @@ import (
 	"log"
 	"os"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"                        // +
+	langwatch "github.com/langwatch/langwatch/sdk-go"                         // +
 	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai" // +
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
-	"go.opentelemetry.io/otel"                    // +
-	sdktrace "go.opentelemetry.io/otel/sdk/trace" // +
+	"github.com/openai/openai-go/v3"
+	oaioption "github.com/openai/openai-go/v3/option"
+	"go.opentelemetry.io/otel"                         // +
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"      // +
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0" // +
 )
 
 func main() {
@@ -26,11 +27,10 @@ func main() {
 	defer tp.Shutdown(ctx)                                           // +
 
 	client := openai.NewClient(
-		oaioption.WithBaseURL("https://api.groq.com/openai/v1"),
 		oaioption.WithAPIKey(os.Getenv("GROQ_API_KEY")),
+		oaioption.WithBaseURL("https://api.groq.com/openai/v1"),
 		oaioption.WithMiddleware(otelopenai.Middleware("<project_name>", // +
-			otelopenai.WithCaptureInput(),  // +
-			otelopenai.WithCaptureOutput(), // +
+			otelopenai.WithGenAIProvider(semconv.GenAIProviderNameKey.String("groq")), // +
 		)), // +
 	)
 

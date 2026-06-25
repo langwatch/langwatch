@@ -270,6 +270,151 @@ ${
     );
   };
 
+  const GoInstructions = () => {
+    // The Go tracing SDK has no "run evaluator by slug" helper, so the Go
+    // example posts the same request the curl tab sends, authenticated with
+    // `Authorization: Bearer <LANGWATCH_API_KEY>` (never the legacy
+    // X-Auth-Token header).
+    const dataEntries: string[] = [];
+
+    const pushField = (field: string, value: string) =>
+      dataEntries.push(`\t\t\t"${field}": ${value},`);
+
+    if (
+      evaluatorDefinition.requiredFields.includes("input") ||
+      evaluatorDefinition.optionalFields.includes("input")
+    ) {
+      pushField("input", `"user input"`);
+    }
+    if (
+      evaluatorDefinition.requiredFields.includes("output") ||
+      evaluatorDefinition.optionalFields.includes("output")
+    ) {
+      pushField("output", `"generated response"`);
+    }
+    if (
+      evaluatorDefinition.requiredFields.includes("contexts") ||
+      evaluatorDefinition.optionalFields.includes("contexts")
+    ) {
+      pushField(
+        "contexts",
+        `[]string{"retrieved snippet 1", "retrieved snippet 2"}`,
+      );
+    }
+    if (
+      evaluatorDefinition.requiredFields.includes("expected_output") ||
+      evaluatorDefinition.optionalFields.includes("expected_output")
+    ) {
+      pushField("expected_output", `"gold answer"`);
+    }
+    if (
+      evaluatorDefinition.requiredFields.includes("conversation") ||
+      evaluatorDefinition.optionalFields.includes("conversation")
+    ) {
+      pushField(
+        "conversation",
+        `[]map[string]any{{"input": "hi", "output": "hello"}}`,
+      );
+    }
+
+    const dataBlock =
+      dataEntries.length > 0
+        ? `map[string]any{\n${dataEntries.join("\n")}\n\t\t}`
+        : `map[string]any{}`;
+
+    const settingsEntry = storeSettingsOnCode
+      ? `\n\t\t"settings": json.RawMessage(\`${JSON.stringify(settings ?? {})}\`),`
+      : "";
+    const asGuardrailEntry = isGuardrail ? `\n\t\t"as_guardrail": true,` : "";
+
+    const decodeAndHandle = isGuardrail
+      ? `\tvar guardrail struct {
+\t\tPassed bool \`json:"passed"\`
+\t}
+\tif err := json.NewDecoder(resp.Body).Decode(&guardrail); err != nil {
+\t\tpanic(err)
+\t}
+\tif !guardrail.Passed {
+\t\t// handle the guardrail here
+\t\tfmt.Println("I'm sorry, I can't do that.")
+\t\treturn
+\t}
+\t// ... continue with your LLM call`
+      : `\tout, _ := io.ReadAll(resp.Body)
+\tfmt.Println(string(out))`;
+
+    const ioImport = isGuardrail ? "" : `\n\t"io"`;
+
+    return (
+      <VStack align="start" width="full" gap={3}>
+        <Text fontSize="14px">
+          First, set up your traces and spans capturing as explained in the{" "}
+          <Link
+            href="https://github.com/langwatch/langwatch/tree/main/sdk-go"
+            isExternal
+          >
+            Go SDK documentation
+          </Link>
+          .
+        </Text>
+        {(!isOutputMandatory || !isGuardrail) && (
+          <>
+            <Text fontSize="14px">
+              {isGuardrail
+                ? isOutputMandatory
+                  ? "Then, after calling your LLM, check for the guardrail:"
+                  : "Then, either before or after calling your LLM, check for the guardrail:"
+                : "Then, pass in the message data to get the result of the evaluator:"}
+            </Text>
+            <Box className="markdown" width="full">
+              <RenderCode
+                code={`package main
+
+import (
+\t"bytes"
+\t"context"
+\t"encoding/json"
+\t"fmt"${ioImport}
+\t"net/http"
+\t"os"
+)
+
+// Uses LANGWATCH_API_KEY environment variable
+
+func main() {
+\tctx := context.Background()
+
+\tbody, _ := json.Marshal(map[string]any{
+\t\t"name": "${name}",
+\t\t"data": ${dataBlock},${asGuardrailEntry}${settingsEntry}
+\t})
+
+\treq, err := http.NewRequestWithContext(ctx, http.MethodPost,
+\t\t"${langwatchEndpoint()}/api/evaluations/${checkSlug}/evaluate",
+\t\tbytes.NewReader(body))
+\tif err != nil {
+\t\tpanic(err)
+\t}
+\treq.Header.Set("Authorization", "Bearer "+os.Getenv("LANGWATCH_API_KEY"))
+\treq.Header.Set("Content-Type", "application/json")
+
+\tresp, err := http.DefaultClient.Do(req)
+\tif err != nil {
+\t\tpanic(err)
+\t}
+\tdefer resp.Body.Close()
+
+${decodeAndHandle}
+}`}
+                language="go"
+              />
+            </Box>
+          </>
+        )}
+      </VStack>
+    );
+  };
+
   const settingsParamsCurl = storeSettingsOnCode
     ? `,\n  "settings": ${JSON.stringify(settings ?? {}, null, 2)
         .split("\n")
@@ -331,6 +476,7 @@ ${
           <Tabs.Trigger value="python">Python</Tabs.Trigger>
           <Tabs.Trigger value="python-async">Python (Async)</Tabs.Trigger>
           <Tabs.Trigger value="typescript">TypeScript</Tabs.Trigger>
+          <Tabs.Trigger value="go">Go</Tabs.Trigger>
           <Tabs.Trigger value="curl">Curl</Tabs.Trigger>
         </Tabs.List>
 
@@ -342,6 +488,9 @@ ${
         </Tabs.Content>
         <Tabs.Content value="typescript" padding={0}>
           <TypeScriptInstructions />
+        </Tabs.Content>
+        <Tabs.Content value="go" padding={0}>
+          <GoInstructions />
         </Tabs.Content>
         <Tabs.Content value="curl" padding={0}>
           <VStack align="start" width="full" gap={3}>

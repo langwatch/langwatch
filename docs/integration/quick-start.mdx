@@ -59,7 +59,7 @@ Let's get cracking.
   </Step>
 
   <Step title="Install the LangWatch SDK">
-    We have official SDKs for Python and Node.js ready to go. If you're using another language, our [OpenTelemetry Integration Guide](/integration/opentelemetry/guide) provides the details you need.
+    We have official SDKs for Python, Node.js, and Go ready to go. If you're using another language, our [OpenTelemetry Integration Guide](/integration/opentelemetry/guide) provides the details you need.
 
     <CodeGroup>
 ```bash Python
@@ -69,6 +69,10 @@ uv add langwatch
 ```
 ```bash JavaScript
 npm install langwatch @vercel/otel @opentelemetry/api-logs @opentelemetry/instrumentation @opentelemetry/sdk-logs
+```
+```bash Go
+go get github.com/langwatch/langwatch/sdk-go
+go get github.com/langwatch/langwatch/sdk-go/instrumentation/openai
 ```
     </CodeGroup>
   </Step>
@@ -121,6 +125,58 @@ const result = await generateText({
     isEnabled: true, // Ensure telemetry is active for relevant operations
   },
 });
+```
+```go Go
+package main
+
+import (
+	"context"
+	"log"
+	"os"
+
+	langwatch "github.com/langwatch/langwatch/sdk-go"
+	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+
+	"github.com/openai/openai-go/v3"
+	oaioption "github.com/openai/openai-go/v3/option"
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+)
+
+func main() {
+	ctx := context.Background()
+
+	// Setup LangWatch tracing (reads LANGWATCH_API_KEY from env).
+	exporter, err := langwatch.NewExporter(ctx)
+	if err != nil {
+		log.Fatalf("failed to create LangWatch exporter: %v", err)
+	}
+	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
+	otel.SetTracerProvider(tp)
+	defer tp.Shutdown(ctx)
+
+	// Add the middleware to your OpenAI client (captures request + response).
+	client := openai.NewClient(
+		oaioption.WithAPIKey(os.Getenv("OPENAI_API_KEY")),
+		oaioption.WithMiddleware(otelopenai.Middleware("your-app-name")),
+	)
+
+	// Optionally wrap your operation in a span.
+	tracer := langwatch.Tracer("your-app-name")
+	ctx, span := tracer.Start(ctx, "ChatWithUser")
+	defer span.End()
+
+	resp, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Model: openai.ChatModelGPT4oMini,
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.UserMessage("How many calories do I burn jumping to conclusions?"),
+		},
+	})
+	if err != nil {
+		log.Fatalf("chat completion failed: %v", err)
+	}
+	log.Printf("Response: %s", resp.Choices[0].Message.Content)
+}
 ```
     </CodeGroup>
   </Step>

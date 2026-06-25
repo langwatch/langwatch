@@ -5,10 +5,10 @@ import (
 	"log"
 	"os"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"                        // +
+	langwatch "github.com/langwatch/langwatch/sdk-go"                         // +
 	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai" // +
-	"github.com/openai/openai-go"
-	oaioption "github.com/openai/openai-go/option"
+	"github.com/openai/openai-go/v3"
+	oaioption "github.com/openai/openai-go/v3/option"
 	"go.opentelemetry.io/otel"                    // +
 	sdktrace "go.opentelemetry.io/otel/sdk/trace" // +
 )
@@ -27,10 +27,7 @@ func main() {
 
 	client := openai.NewClient(
 		oaioption.WithAPIKey(os.Getenv("OPENAI_API_KEY")),
-		oaioption.WithMiddleware(otelopenai.Middleware("<project_name>", // +
-			otelopenai.WithCaptureInput(),  // +
-			otelopenai.WithCaptureOutput(), // +
-		)), // +
+		oaioption.WithMiddleware(otelopenai.Middleware("<project_name>")), // +
 	)
 
 	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{

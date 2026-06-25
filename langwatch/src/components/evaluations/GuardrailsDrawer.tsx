@@ -171,6 +171,70 @@ async function llmStep(message: string): Promise<string> {
     // ... continue with your LLM call
 }`;
 
+  // The Go tracing SDK has no "run this evaluator by slug" helper, so the Go
+  // example posts the same request the curl tab does, authenticated with
+  // `Authorization: Bearer <LANGWATCH_API_KEY>` (never the legacy X-Auth-Token).
+  const goCode = `package main
+
+import (
+\t"bytes"
+\t"context"
+\t"encoding/json"
+\t"fmt"
+\t"net/http"
+\t"os"
+)
+
+// Uses LANGWATCH_API_KEY environment variable
+
+func llmStep(userInput string) (string, error) {
+\tctx := context.Background()
+
+\tbody, _ := json.Marshal(map[string]any{
+\t\t"name":         "${evaluatorName}",
+\t\t"data":         map[string]any{"input": userInput},
+\t\t"as_guardrail": true,
+\t})
+
+\treq, err := http.NewRequestWithContext(ctx, http.MethodPost,
+\t\t"https://app.langwatch.ai/api/evaluations/${evaluatorSlug}/evaluate",
+\t\tbytes.NewReader(body))
+\tif err != nil {
+\t\treturn "", err
+\t}
+\treq.Header.Set("Authorization", "Bearer "+os.Getenv("LANGWATCH_API_KEY"))
+\treq.Header.Set("Content-Type", "application/json")
+
+\tresp, err := http.DefaultClient.Do(req)
+\tif err != nil {
+\t\treturn "", err
+\t}
+\tdefer resp.Body.Close()
+
+\tvar guardrail struct {
+\t\tPassed bool \`json:"passed"\`
+\t}
+\tif err := json.NewDecoder(resp.Body).Decode(&guardrail); err != nil {
+\t\treturn "", err
+\t}
+
+\tif !guardrail.Passed {
+\t\t// handle the guardrail here
+\t\treturn "I'm sorry, I can't do that.", nil
+\t}
+
+\t// ... continue with your LLM call
+\treturn "", nil
+}
+
+func main() {
+\tout, err := llmStep("input content")
+\tif err != nil {
+\t\tpanic(err)
+\t}
+\tfmt.Println(out)
+}`;
+
   const curlCode = `# Set your API key
 API_KEY="$LANGWATCH_API_KEY"
 
@@ -204,6 +268,8 @@ EOF
         return pythonSyncCode;
       case "typescript":
         return typescriptCode;
+      case "go":
+        return goCode;
       case "bash":
         return curlCode;
       default:
@@ -218,6 +284,8 @@ EOF
         return "python";
       case "typescript":
         return "typescript";
+      case "go":
+        return "go";
       case "bash":
         return "bash";
       default:
@@ -276,6 +344,7 @@ EOF
                       <option value="python-async">Python (async)</option>
                       <option value="python">Python</option>
                       <option value="typescript">TypeScript</option>
+                      <option value="go">Go</option>
                       <option value="bash">cURL</option>
                     </NativeSelect.Field>
                     <NativeSelect.Indicator />

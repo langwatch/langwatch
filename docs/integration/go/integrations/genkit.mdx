@@ -1,0 +1,74 @@
+---
+title: Firebase Genkit Integration
+sidebarTitle: Genkit
+description: Export Firebase Genkit Go traces to LangWatch to observe flows, models, and tools for AI agent evaluation.
+keywords: go, golang, genkit, firebase, instrumentation, langwatch, opentelemetry, native, flows
+---
+
+[Firebase Genkit](https://github.com/firebase/genkit) for Go is **OpenTelemetry-native**: it already emits its own `gen_ai.*` spans for flows, models and tools onto the global OpenTelemetry tracer provider. The LangWatch Genkit package does **no body parsing**; it registers a LangWatch span processor on the tracer provider Genkit's spans flow through, so whatever Genkit records (model, token usage, prompt/completion and tool data) is exported to LangWatch.
+
+## Installation
+
+```bash
+go get github.com/langwatch/langwatch/sdk-go
+go get github.com/langwatch/langwatch/sdk-go/instrumentation/genkit
+go get github.com/firebase/genkit/go
+```
+
+## Usage
+
+<Info>
+Set the `LANGWATCH_API_KEY` environment variable before running.
+</Info>
+
+Register LangWatch once, after `genkit.Init`:
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+
+	"github.com/firebase/genkit/go/genkit"
+	"github.com/firebase/genkit/go/plugins/googlegenai"
+
+	lwgenkit "github.com/langwatch/langwatch/sdk-go/instrumentation/genkit"
+)
+
+func main() {
+	ctx := context.Background()
+
+	g := genkit.Init(ctx, genkit.WithPlugins(&googlegenai.GoogleAI{}))
+
+	// Export Genkit's OTEL spans to LangWatch (reads LANGWATCH_API_KEY from env).
+	if err := lwgenkit.RegisterLangWatch(g); err != nil {
+		log.Fatalf("failed to register LangWatch: %v", err)
+	}
+
+	// Define and run flows as usual; their spans are exported to LangWatch.
+}
+```
+
+`RegisterLangWatch` reads `LANGWATCH_API_KEY` (and `LANGWATCH_ENDPOINT`) from the environment by default. To forward exporter options (API key, endpoint, data capture, filters), pass `WithExporterOptions`:
+
+```go
+import langwatch "github.com/langwatch/langwatch/sdk-go"
+
+lwgenkit.RegisterLangWatch(g,
+	lwgenkit.WithExporterOptions(
+		langwatch.WithAPIKey("sk-lw-..."),
+		langwatch.WithDataCapture(langwatch.DataCaptureNone), // structure/metrics only
+	),
+)
+```
+
+<Note>
+LangWatch captures whatever `gen_ai.*` attributes Genkit records; there is no extra parsing in this package. If you build your own `sdktrace.TracerProvider`, use `lwgenkit.SpanProcessor(opts...)` to obtain the processor and register it yourself (Genkit reads the global tracer provider).
+</Note>
+
+## Related
+
+- [Go Integration Guide](/integration/go/guide) - Setup, manual spans, data capture and the REST client
+- [Go SDK API Reference](/integration/go/reference#automatic-instrumentation) - Instrumentation options and data capture
+- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails

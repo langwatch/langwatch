@@ -115,3 +115,118 @@ curl -X POST "${baseUrl}/api/workflows/${workflowId}/evaluate" \\
 # Optional body fields: "version_id" (defaults to the latest commit) and
 # "evaluate_on" ("full" | "test" | "train", defaults to "full").`;
 }
+
+/**
+ * The Go snippet for triggering this workflow's evaluation from the REST API.
+ * The workflow-run endpoint has no method on the typed Go client
+ * (github.com/langwatch/langwatch/sdk-go/client), so this falls back to a raw
+ * net/http POST authenticated with `Authorization: Bearer <LANGWATCH_API_KEY>`
+ * — never the legacy X-Auth-Token header. The "parameters" example mirrors the
+ * entry point's own fields exactly as the curl snippet does.
+ */
+function buildGoDatasetComment({
+  datasetColumns,
+  datasetName,
+}: {
+  datasetColumns: string[];
+  datasetName?: string;
+}): string {
+  const hasDataset = !!datasetName || datasetColumns.length > 0;
+  if (!hasDataset) {
+    return `\t// Evaluates the latest committed version. With no dataset attached, the\n\t// parameters below form the single evaluated row.`;
+  }
+  if (datasetName) {
+    return `\t// Evaluates the latest committed version against this workflow's\n\t// attached dataset ("${datasetName}").`;
+  }
+  return `\t// Evaluates the latest committed version against this workflow's\n\t// attached dataset.`;
+}
+
+function buildGoBodyJson({
+  entryFields,
+  datasetColumns,
+}: {
+  entryFields: WorkflowField[];
+  datasetColumns: string[];
+}): string {
+  const mapped = buildEvaluateParameters({ entryFields, datasetColumns });
+  const parameters =
+    Object.keys(mapped).length > 0 ? mapped : PLACEHOLDER_PARAMETERS;
+  // Indent the JSON body to sit inside the Go raw string literal.
+  return JSON.stringify({ parameters }, null, 2).replace(/\n/g, "\n\t\t");
+}
+
+function renderGoEvaluateSnippet({
+  workflowId,
+  baseUrl,
+  bodyJson,
+  datasetLine,
+}: {
+  workflowId: string;
+  baseUrl: string;
+  bodyJson: string;
+  datasetLine: string;
+}): string {
+  return `package main
+
+import (
+\t"bytes"
+\t"context"
+\t"fmt"
+\t"io"
+\t"net/http"
+\t"os"
+)
+
+func main() {
+\tctx := context.Background()
+
+${datasetLine}
+\t//
+\t// "parameters" are constant entry inputs applied to every dataset row (e.g. a
+\t// feature flag or PR number). The dataset feeds the fields it has a column for,
+\t// so set parameters only for inputs the dataset does not provide; naming a
+\t// dataset column here overrides it for every row.
+\t//
+\t// Optional body fields: "version_id" (defaults to the latest commit) and
+\t// "evaluate_on" ("full" | "test" | "train", defaults to "full").
+\tbody := []byte(\`${bodyJson}\`)
+
+\treq, err := http.NewRequestWithContext(ctx, http.MethodPost,
+\t\t"${baseUrl}/api/workflows/${workflowId}/evaluate", bytes.NewReader(body))
+\tif err != nil {
+\t\tpanic(err)
+\t}
+\treq.Header.Set("Authorization", "Bearer "+os.Getenv("LANGWATCH_API_KEY"))
+\treq.Header.Set("Content-Type", "application/json")
+
+\tresp, err := http.DefaultClient.Do(req)
+\tif err != nil {
+\t\tpanic(err)
+\t}
+\tdefer resp.Body.Close()
+
+\tout, _ := io.ReadAll(resp.Body)
+\tfmt.Println(string(out)) // => { "run_id": "run_...", "workflow_version_id": "..." }
+}`;
+}
+
+export function evaluateGoSnippet({
+  workflowId,
+  baseUrl,
+  entryFields,
+  datasetColumns,
+  datasetName,
+}: {
+  workflowId: string;
+  baseUrl: string;
+  entryFields: WorkflowField[];
+  datasetColumns: string[];
+  datasetName?: string;
+}): string {
+  return renderGoEvaluateSnippet({
+    workflowId,
+    baseUrl,
+    bodyJson: buildGoBodyJson({ entryFields, datasetColumns }),
+    datasetLine: buildGoDatasetComment({ datasetColumns, datasetName }),
+  });
+}
