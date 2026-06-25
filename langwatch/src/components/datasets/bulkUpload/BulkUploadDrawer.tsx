@@ -12,7 +12,6 @@ import {
   HStack,
   Icon,
   Input,
-  NativeSelect,
   Spacer,
   Spinner,
   Text,
@@ -22,6 +21,8 @@ import {
   closestCenter,
   DndContext,
   type DragEndEvent,
+  DragOverlay,
+  type DragStartEvent,
   PointerSensor,
   useSensor,
   useSensors,
@@ -34,6 +35,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import {
   AlertTriangle,
@@ -47,6 +49,11 @@ import { formatFileSize } from "react-papaparse";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { DatasetConfirmColumns } from "~/server/datasets/types";
 import { api } from "~/utils/api";
+import { ColumnTypeIcon } from "../../shared/ColumnTypeIcon";
+import {
+  COLUMN_TYPE_OPTIONS,
+  ColumnTypeSelect,
+} from "../../shared/ColumnTypeSelect";
 import { Drawer } from "../../ui/drawer";
 import {
   DROPZONE_DOTTED_STYLE,
@@ -55,16 +62,6 @@ import {
   RAINBOW_TEXT_CSS,
 } from "../datasetDropzoneStyles";
 import { type BulkFile, useBulkUpload } from "./useBulkUpload";
-
-const COLUMN_TYPE_OPTIONS = [
-  "string",
-  "number",
-  "boolean",
-  "date",
-  "list",
-  "json",
-  "image",
-] as const;
 
 // Visually hidden but kept in the tab order (not display:none) so the picker is
 // reachable + operable by keyboard.
@@ -98,6 +95,11 @@ function BulkColumnFields({
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
+  // The row currently being dragged — rendered in a DragOverlay so it floats
+  // above (and is never clipped by) the drawer's scroll container.
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const activeColumn =
+    columnTypes.find((c) => c.sourceHeader === activeId) ?? null;
 
   const setBySource = (
     sourceHeader: string,
@@ -110,6 +112,7 @@ function BulkColumnFields({
     );
 
   const handleDragEnd = (event: DragEndEvent) => {
+    setActiveId(null);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
     const from = columnTypes.findIndex((c) => c.sourceHeader === active.id);
@@ -122,7 +125,11 @@ function BulkColumnFields({
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
+      onDragStart={(event: DragStartEvent) =>
+        setActiveId(String(event.active.id))
+      }
       onDragEnd={handleDragEnd}
+      onDragCancel={() => setActiveId(null)}
     >
       <SortableContext
         items={columnTypes.map((c) => c.sourceHeader)}
@@ -140,11 +147,18 @@ function BulkColumnFields({
           ))}
         </VStack>
       </SortableContext>
+      {/* The lifted copy: position:fixed in a portal-like layer, so it escapes
+          the drawer's overflow clipping and stacks above everything. */}
+      <DragOverlay>
+        {activeColumn ? <ColumnDragOverlayRow col={activeColumn} /> : null}
+      </DragOverlay>
     </DndContext>
   );
 }
 
-/** One draggable confirm-column row: grip handle + name input + type select. */
+/** One draggable confirm-column row: grip handle + name input + type select.
+ *  While being dragged it dims in place to a placeholder — the lifted copy is
+ *  rendered by the DragOverlay (see {@link ColumnDragOverlayRow}). */
 function SortableColumnRow({
   col,
   index,
@@ -171,18 +185,11 @@ function SortableColumnRow({
       style={{
         transform: CSS.Translate.toString(transform),
         transition,
+        opacity: isDragging ? 0.4 : 1,
       }}
       gap={2}
       width="full"
       paddingX={1}
-      borderRadius="md"
-      // While dragging, lift the row with a gray-tokened fill + ring; reverts on
-      // drop. The transparent border is always present so toggling it adds no
-      // layout shift.
-      borderWidth="1px"
-      borderColor={isDragging ? "border.emphasized" : "transparent"}
-      bg={isDragging ? "bg.muted" : "transparent"}
-      shadow={isDragging ? "sm" : "none"}
     >
       <Box
         {...attributes}
@@ -206,22 +213,67 @@ function SortableColumnRow({
         aria-label={`Column ${index + 1} name`}
         onChange={(e) => onName(e.target.value)}
       />
-      <NativeSelect.Root size="sm" width="40">
-        <NativeSelect.Field
-          value={col.type}
-          aria-label={`Column ${index + 1} type`}
-          onChange={(e) =>
-            onType(e.target.value as DatasetConfirmColumns[number]["type"])
-          }
-        >
-          {COLUMN_TYPE_OPTIONS.map((t) => (
-            <option key={t} value={t}>
-              {t === "image" ? "image (URL)" : t}
-            </option>
-          ))}
-        </NativeSelect.Field>
-        <NativeSelect.Indicator />
-      </NativeSelect.Root>
+      <ColumnTypeSelect
+        value={col.type}
+        onChange={onType}
+        aria-label={`Column ${index + 1} type`}
+      />
+    </HStack>
+  );
+}
+
+/** The lifted, floating copy shown under the cursor while dragging a column.
+ *  Presentational only (no inputs/listeners) — a gray-tokened, shadowed mirror
+ *  of the row, with a static type chip so it reads identically. */
+function ColumnDragOverlayRow({ col }: { col: DatasetConfirmColumns[number] }) {
+  const typeLabel =
+    COLUMN_TYPE_OPTIONS.find((o) => o.value === col.type)?.label ?? col.type;
+
+  return (
+    <HStack
+      gap={2}
+      width="full"
+      paddingX={1}
+      borderRadius="md"
+      borderWidth="1px"
+      borderColor="border.emphasized"
+      bg="bg.muted"
+      shadow="lg"
+      cursor="grabbing"
+    >
+      <Box
+        display="inline-flex"
+        alignItems="center"
+        justifyContent="center"
+        color="fg.subtle"
+      >
+        <Icon boxSize="16px">
+          <GripVertical />
+        </Icon>
+      </Box>
+      <Input
+        size="sm"
+        value={col.name}
+        readOnly
+        tabIndex={-1}
+        pointerEvents="none"
+        bg="bg"
+      />
+      <HStack
+        gap={2}
+        width="44"
+        height="8"
+        flexShrink={0}
+        minW={0}
+        paddingX={3}
+        borderWidth="1px"
+        borderColor="border"
+        borderRadius="md"
+        bg="bg"
+      >
+        <ColumnTypeIcon type={col.type} size={14} />
+        <Text truncate>{typeLabel}</Text>
+      </HStack>
     </HStack>
   );
 }
@@ -495,9 +547,26 @@ function BulkFileRow({
         )}
       </HStack>
 
-      {isOpen && canConfirm && file.columnTypes && (
-        <BulkColumnFields columnTypes={file.columnTypes} onChange={onColumns} />
-      )}
+      {/* Smoothly expand/collapse the confirm columns. AnimatePresence keeps the
+          content mounted through the exit animation, then unmounts it — so a
+          collapsed row holds no focusable inputs (a11y) and stays out of the DOM. */}
+      <AnimatePresence initial={false}>
+        {isOpen && canConfirm && file.columnTypes && (
+          <motion.div
+            key="confirm-columns"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeInOut" }}
+            style={{ overflow: "hidden", width: "100%" }}
+          >
+            <BulkColumnFields
+              columnTypes={file.columnTypes}
+              onChange={onColumns}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </VStack>
   );
 }

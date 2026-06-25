@@ -204,7 +204,8 @@ describe("given the bulk upload drawer", () => {
 
       const nameInput = await screen.findByLabelText("Column 1 name");
       expect(nameInput).toHaveValue("a");
-      expect(screen.getByLabelText("Column 1 type")).toHaveValue("string");
+      // The type picker is the styled Select (icon + label), defaulting to text.
+      expect(screen.getByLabelText("Column 1 type")).toHaveTextContent(/string/i);
       // Editing happens in place — no separate dialog/drawer with a Save button.
       expect(
         screen.queryByRole("button", { name: /^save$/i }),
@@ -259,10 +260,9 @@ describe("given the bulk upload drawer", () => {
         expect(screen.getByText(/confirm types/i)).toBeInTheDocument(),
       );
       await user.click(screen.getByText(/confirm types/i));
-      await user.selectOptions(
-        await screen.findByLabelText("Column 1 type"),
-        "number",
-      );
+      // Open the styled type Select and pick "Number" from the option list.
+      await user.click(await screen.findByLabelText("Column 1 type"));
+      await user.click(await screen.findByRole("option", { name: /number/i }));
       await user.click(uploadButton());
 
       await waitFor(() => expect(requestDirectUpload).toHaveBeenCalled());

@@ -15,10 +15,14 @@ export const SelectTrigger = React.forwardRef<
   HTMLButtonElement,
   SelectTriggerProps
 >(function SelectTrigger(props, ref) {
-  const { children, clearable, ...rest } = props;
+  // `aria-label` belongs on the focusable trigger BUTTON (so it's the control's
+  // accessible name), not the Control wrapper that `...rest` spreads onto.
+  const { children, clearable, "aria-label": ariaLabel, ...rest } = props;
   return (
     <ChakraSelect.Control {...rest}>
-      <ChakraSelect.Trigger ref={ref}>{children}</ChakraSelect.Trigger>
+      <ChakraSelect.Trigger ref={ref} aria-label={ariaLabel}>
+        {children}
+      </ChakraSelect.Trigger>
       <ChakraSelect.IndicatorGroup>
         {clearable && <SelectClearTrigger />}
         <ChakraSelect.Indicator />

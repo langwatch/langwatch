@@ -313,3 +313,15 @@ globalThis.ResizeObserver = class ResizeObserver {
   // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op for test mock
   disconnect() {}
 };
+
+// Polyfill Element scroll methods for jsdom (not implemented). Zag.js/Ark
+// components (Chakra Select/Menu/Combobox) call `scrollTo` / `scrollIntoView`
+// on open to keep the active option in view; jsdom throws "not a function"
+// without this, crashing any test that opens such a control.
+if (typeof Element !== "undefined") {
+  // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op for test mock
+  Element.prototype.scrollTo = Element.prototype.scrollTo ?? function () {};
+  Element.prototype.scrollIntoView =
+    // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op for test mock
+    Element.prototype.scrollIntoView ?? function () {};
+}
