@@ -72,9 +72,13 @@ if eventHour > last:
    state[orgId] = eventHour
 ```
 
-Cross-pod single-processing is inherited from the event-sourcing dispatch — no Redis lock, no interval constants. One operational model for the billable-events and storage meters.
+Cross-pod single-processing is inherited from the event-sourcing **GroupQueue** dispatch — a custom Redis-primitive queue (**not** BullMQ; the queue's ARCHITECTURE.md was corrected in PR #4999). Three Redis mechanisms deliver it, no separate leader lock and no interval constants: (1) a per-group FIFO list + atomic `DISPATCH_LUA LPOP` dispatches each staged job to exactly one worker; (2) a `{queue}:active:{groupId}` TTL marker admits one worker per group at a time and self-heals on crash when the TTL expires; (3) **process roles** — `web` pods stage but never process, `worker` pods stage and process. Reactor-level dedup is `makeJobId` + TTL; the command pipeline's `deduplication.makeId = ${orgId}:${sealedHour}` (`ttlMs > delay`) is the job-level idempotency layer. A `runIn:["worker"]` global reactor registered in the `EventSourcing` constructor auto-runs on the GroupQueue worker — no `workers.ts` wiring. One operational model for the billable-events and storage meters.
 
 The projection short-circuits for orgs that are not SaaS-billable (no `stripeCustomerId` / no active subscription / no `STORAGE_GB` SubscriptionItem) — those orgs generate zero queries, zero rows, zero Stripe calls.
+
+**Payload contract (PR #4999):** the enqueued `ReportStorageForHourCommand` payload uses plain keys only (`organizationId`, `sealedHour`, `megabytes`) — the `__*` namespace is reserved for queue machinery and the send boundary throws on it.
+
+**Operability — kill switch + flag.** The measure+enqueue is gated behind a registered `release_storage_billing_metering` PRODUCT feature flag (default OFF), and a registered reactor additionally gets a cluster-wide `es-…-killswitch` for free. Either lets an operator stop the hourly `sum(_size_bytes)` sweep without a deploy or a Stripe change — a deliberate guardrail given that `_size_bytes` aggregation has caused prod OOM outages.
 
 ### 4. Reporting command: `ReportStorageForHourCommand` (two-phase, idempotent)
 
@@ -180,6 +184,7 @@ No ClickHouse migration; `_size_bytes` exists.
 | **Idempotent** | Replays don't change totals | Deterministic `identifier = storage_mb:${orgId}:${isoHour}` (Stripe dedups ~24h) + `StorageUsageHourly.reportedAt` cursor for cross-day dedup. Same hour sent twice = one billed event. |
 | **Deterministic (as-of sealed hour)** | Same source state → same answer | Rows are measured once; the reporter never re-measures. The CH predicate anchors to the sealed hour, not `now()`. Holds modulo TTL-eviction of far-edge rows in >35-day gaps. |
 | **Explainable** | Invoice traces to raw measurements | `SELECT sealedHour, megabytes, reportedAt FROM "StorageUsageHourly" WHERE organizationId = $1 AND sealedHour BETWEEN $a AND $b` — the invoice line is the sum of that column. |
+| **Drift-guarded** | The measured value can't silently diverge | Two guards, mirroring the ADR-034 analytics pattern (PR #5012): a **parity test** ("default-retention org reports 0"; "measured GiB-hours == reference `SUM` over the source") as a build-time check, and an optional **measure-time tripwire** that shadow-compares `measured` vs a reference query behind a flag and logs drift *before* the value is billed (the early, stronger form of the deferred reconciliation job). |
 
 ## Rationale / Trade-offs
 
