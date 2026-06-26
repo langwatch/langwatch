@@ -1,3 +1,5 @@
+import { env } from "~/env.mjs";
+
 /**
  * Builds a full platform URL for a resource so API consumers can link
  * directly to it in the LangWatch UI.
@@ -14,7 +16,7 @@ export function platformUrl({
   projectSlug: string;
   path: string;
 }): string {
-  const base = (process.env.BASE_HOST ?? "http://localhost:5560").replace(
+  const base = (env.BASE_HOST ?? "").replace(
     /\/+$/,
     "",
   );

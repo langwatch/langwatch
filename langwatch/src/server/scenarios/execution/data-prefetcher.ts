@@ -335,11 +335,11 @@ export async function prefetchScenarioData(
       modelParams: modelParamsResult.params,
       simulatorModelParams: simulatorParamsResult.params,
       judgeModelParams: judgeParamsResult.params,
-      nlpServiceUrl: env.LANGWATCH_NLP_SERVICE ?? "http://localhost:8080",
+      nlpServiceUrl: env.LANGWATCH_NLP_SERVICE,
       target,
     },
     telemetry: {
-      endpoint: process.env.LANGWATCH_ENDPOINT!,
+      endpoint: env.LANGWATCH_ENDPOINT,
       apiKey: project.apiKey,
     },
   };
