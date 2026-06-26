@@ -184,9 +184,8 @@ export const listProjectModelProvidersForFrontend = async (
   projectId: string,
 ) => {
   const service = ModelProviderService.create(prisma);
-  const providers = await service.listProjectModelProvidersForFrontend(
-    projectId,
-  );
+  const providers =
+    await service.listProjectModelProvidersForFrontend(projectId);
 
   const registryMetadata = getModelMetadataForFrontend();
   const providersAsRecord = Object.fromEntries(
@@ -273,6 +272,15 @@ export const prepareEnvKeys = (modelProvider: MaybeStoredModelProvider) => {
   );
 };
 
+/**
+ * Modern Azure OpenAI api-version used for direct (non-gateway) calls.
+ * Without an explicit version the downstream gateway (Bifrost) falls back
+ * to a stale GA default (2024-10-21) that returns "Resource not found" for
+ * newer (gpt-5-class) Azure deployments — even when the deployment name is
+ * correct. Overridable per provider via the AZURE_OPENAI_API_VERSION key.
+ */
+export const DEFAULT_AZURE_API_VERSION = "2025-04-01-preview";
+
 export const prepareLitellmParams = async ({
   model,
   modelProvider,
@@ -331,21 +339,48 @@ export const prepareLitellmParams = async ({
       getModelOrDefaultEnvKey(modelProvider, "AWS_REGION_NAME") ?? "invalid";
   }
 
-  // Handle Azure API Gateway configuration
+  // Azure: resolve api-version and deployment so the downstream gateway
+  // (Bifrost) targets the right Azure surface.
   if (modelProvider.provider === "azure") {
     const gatewayBaseUrl = getModelOrDefaultEnvKey(
       modelProvider,
       "AZURE_API_GATEWAY_BASE_URL",
     );
-    const gatewayVersion =
-      getModelOrDefaultEnvKey(modelProvider, "AZURE_API_GATEWAY_VERSION") ??
-      "2024-05-01-preview";
 
-    // If API Gateway is configured, route through the gateway endpoint
     if (gatewayBaseUrl) {
+      // API Gateway mode: route through the customer's gateway endpoint with
+      // its own pinned api-version (the gateway/APIM owns version policy).
       params.api_base = gatewayBaseUrl;
       params.use_azure_gateway = "true";
-      params.api_version = gatewayVersion;
+      params.api_version =
+        getModelOrDefaultEnvKey(modelProvider, "AZURE_API_GATEWAY_VERSION") ??
+        "2024-05-01-preview";
+    } else {
+      // Direct mode: pin a modern api-version (see DEFAULT_AZURE_API_VERSION).
+      params.api_version =
+        getModelOrDefaultEnvKey(modelProvider, "AZURE_OPENAI_API_VERSION") ??
+        DEFAULT_AZURE_API_VERSION;
+    }
+
+    // Map the model id to its Azure deployment name when the provider defines
+    // an explicit deploymentMapping (the deployment name need not equal the
+    // model id). The gateway/control-plane path already honors this field
+    // (config.materialiser); mirror it here so the in-process Studio /
+    // playground path agrees instead of assuming model id == deployment name.
+    const deploymentMap = modelProvider.deploymentMapping as Record<
+      string,
+      string
+    > | null;
+    if (deploymentMap) {
+      // params.model is already normalized to `provider/model` (the incoming
+      // `model` may still be the canonical `mp_.../...` wire format), so key
+      // the lookups off it for both the bare and full-key forms.
+      const bareModel = params.model.split("/").slice(1).join("/");
+      const deployment =
+        deploymentMap[bareModel] ?? deploymentMap[params.model];
+      if (deployment) {
+        params.deployment = deployment;
+      }
     }
 
     // Pass through all extra headers
@@ -359,8 +394,6 @@ export const prepareLitellmParams = async ({
       );
     }
   }
-
-  // TODO: add azure deployment as params.model as azure/<deployment-name>
 
   return await buildManagedBedrockLitellmParams({
     params,
