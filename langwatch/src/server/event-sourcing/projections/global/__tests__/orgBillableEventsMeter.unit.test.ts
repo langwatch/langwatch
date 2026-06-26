@@ -166,14 +166,14 @@ describe("orgBillableEventsMeterProjection.map", () => {
         makeEvent({
           id: "evt-1",
           idempotencyKey: "idem-key-abc",
-          type: "lw.evaluation.started",
+          type: "lw.evaluation.reported",
         }),
       );
 
       expect(result).toEqual(
         expect.objectContaining({
           deduplicationKey: "idem-key-abc",
-          eventType: "lw.evaluation.started",
+          eventType: "lw.evaluation.reported",
         }),
       );
     });
