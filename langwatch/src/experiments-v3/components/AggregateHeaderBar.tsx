@@ -28,12 +28,13 @@ export type AggregateHeaderBarProps = {
   onExport: () => void;
 };
 
-const FILTER_LABELS: Record<PairwiseFilter, (a: string, b: string) => string> = {
-  all: () => "All",
-  a: (a) => `${a}`,
-  b: (_a, b) => `${b}`,
-  losses: () => "Losses",
-};
+const FILTER_LABELS: Record<PairwiseFilter, (a: string, b: string) => string> =
+  {
+    all: () => "All",
+    a: (a) => `${a}`,
+    b: (_a, b) => `${b}`,
+    losses: () => "Losses",
+  };
 
 export function AggregateHeaderBar({
   counts,
@@ -45,8 +46,7 @@ export function AggregateHeaderBar({
   onExport,
 }: AggregateHeaderBarProps) {
   const total = counts.a + counts.b + counts.tie;
-  const leader =
-    counts.a > counts.b ? "a" : counts.b > counts.a ? "b" : "tie";
+  const leader = counts.a > counts.b ? "a" : counts.b > counts.a ? "b" : "tie";
   const leaderName = leader === "a" ? variantAName : variantBName;
   const otherName = leader === "a" ? variantBName : variantAName;
   const leaderWins = leader === "a" ? counts.a : counts.b;

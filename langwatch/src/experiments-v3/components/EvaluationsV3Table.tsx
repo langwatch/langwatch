@@ -382,9 +382,9 @@ export function EvaluationsV3Table({
       // PairwiseConfigForm instead of the generic per-row mappings UI. Strictly
       // additive: only set when the underlying evaluator is pairwise_compare,
       // so every other evaluator-as-target keeps its current behavior.
-      const config = (evaluator.config ?? null) as
-        | { evaluatorType?: string }
-        | null;
+      const config = (evaluator.config ?? null) as {
+        evaluatorType?: string;
+      } | null;
       const isPairwiseEvaluator =
         config?.evaluatorType === "langevals/pairwise_compare";
 
@@ -1026,26 +1026,24 @@ export function EvaluationsV3Table({
             {
               output: results.targetOutputs[target.id]?.[index] ?? null,
               // All evaluators apply to all targets
-              evaluators: Object.fromEntries(
-                [
-                  ...evaluators.map((evaluator) => [
-                    evaluator.id,
-                    results.evaluatorResults[target.id]?.[evaluator.id]?.[
-                      index
-                    ] ?? null,
-                  ]),
-                  ...(target.pairwise
-                    ? [
-                        [
-                          target.id,
-                          results.evaluatorResults[target.id]?.[target.id]?.[
-                            index
-                          ] ?? null,
-                        ],
-                      ]
-                    : []),
-                ] as Array<[string, unknown]>,
-              ),
+              evaluators: Object.fromEntries([
+                ...evaluators.map((evaluator) => [
+                  evaluator.id,
+                  results.evaluatorResults[target.id]?.[evaluator.id]?.[
+                    index
+                  ] ?? null,
+                ]),
+                ...(target.pairwise
+                  ? [
+                      [
+                        target.id,
+                        results.evaluatorResults[target.id]?.[target.id]?.[
+                          index
+                        ] ?? null,
+                      ],
+                    ]
+                  : []),
+              ] as Array<[string, unknown]>),
               // Error for this target/row
               error: results.errors[target.id]?.[index] ?? null,
               // Loading if this specific cell is in the executing set AND has no output/error yet

@@ -195,7 +195,8 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
     await page.viewport(600, 80);
     const evaluator: EvaluatorConfig = {
       id: "eval-1",
-      evaluatorType: "langevals/pairwise_compare" as EvaluatorConfig["evaluatorType"],
+      evaluatorType:
+        "langevals/pairwise_compare" as EvaluatorConfig["evaluatorType"],
       dbEvaluatorId: "db-eval-1",
       mappings: {},
       inputs: [],

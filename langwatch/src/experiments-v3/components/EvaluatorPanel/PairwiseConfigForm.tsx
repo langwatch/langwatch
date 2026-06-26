@@ -1,10 +1,4 @@
-import {
-  Button,
-  Field,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, Field, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -115,11 +109,7 @@ const Picker = ({
           width="full"
           data-testid={testId}
         >
-          <Text
-            fontSize="13px"
-            color={isEmpty ? "fg.subtle" : "fg"}
-            truncate
-          >
+          <Text fontSize="13px" color={isEmpty ? "fg.subtle" : "fg"} truncate>
             {isEmpty ? placeholder : selectedDisplay}
           </Text>
           <ChevronDown size={14} color="var(--chakra-colors-fg-muted)" />
@@ -245,7 +235,8 @@ export function PairwiseConfigForm({
       </HStack>
 
       <Text fontSize="xs" color="fg.muted">
-        Golden field is the reference answer the judge compares each candidate against.
+        Golden field is the reference answer the judge compares each candidate
+        against.
       </Text>
     </VStack>
   );

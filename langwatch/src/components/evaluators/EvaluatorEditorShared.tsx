@@ -189,9 +189,13 @@ export function useEvaluatorEditorController(
         datasetColumns: { id: string; name: string }[];
       }
     | undefined;
-  const onPairwiseChange = (flowCallbacks as {
-    onPairwiseChange?: (config: PairwiseEvaluatorConfig) => void;
-  } | undefined)?.onPairwiseChange;
+  const onPairwiseChange = (
+    flowCallbacks as
+      | {
+          onPairwiseChange?: (config: PairwiseEvaluatorConfig) => void;
+        }
+      | undefined
+  )?.onPairwiseChange;
 
   const saveButtonText =
     props.saveButtonText ?? (complexProps.saveButtonText as string | undefined);
