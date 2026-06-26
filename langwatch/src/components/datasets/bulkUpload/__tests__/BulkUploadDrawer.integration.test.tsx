@@ -298,6 +298,46 @@ describe("given the bulk upload drawer", () => {
       expect(screen.getByLabelText("Drag to reorder b")).toBeInTheDocument();
     });
 
+    /** @scenario A column can be excluded before uploading */
+    it("excludes a column and omits it from the uploaded columnTypes", async () => {
+      const user = userEvent.setup();
+      render_();
+      await user.upload(fileInput(), [csv("data.csv")]);
+      await waitFor(() =>
+        expect(screen.getByText(/confirm types/i)).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText(/confirm types/i));
+
+      // Each column has an exclude control; dropping "a" leaves only "b".
+      await user.click(await screen.findByLabelText("Exclude a"));
+      expect(screen.queryByLabelText("Column 1 name")).toHaveValue("b");
+
+      await user.click(uploadButton());
+      await waitFor(() => expect(requestDirectUpload).toHaveBeenCalled());
+      expect(requestDirectUpload.mock.calls[0]![0].columnTypes).toEqual([
+        { name: "b", type: "string", sourceHeader: "b" },
+      ]);
+    });
+
+    /** @scenario A column can be excluded before uploading */
+    it("never lets the user exclude the last remaining column", async () => {
+      const user = userEvent.setup();
+      render_();
+      await user.upload(fileInput(), [csv("data.csv")]);
+      await waitFor(() =>
+        expect(screen.getByText(/confirm types/i)).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText(/confirm types/i));
+
+      // Drop one of the two columns; the survivor's exclude control is disabled
+      // (a zero-column dataset is invalid).
+      await user.click(await screen.findByLabelText("Exclude a"));
+      expect(await screen.findByLabelText("Exclude b")).toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
+    });
+
     /** @scenario Files that share a name become distinct datasets */
     it("uploads same-named files under distinct names", async () => {
       const user = userEvent.setup();

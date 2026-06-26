@@ -35,7 +35,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical } from "lucide-react";
+import { GripVertical, Trash2 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -153,6 +153,19 @@ function BulkColumnFields({
               index={index}
               onName={(name) => setBySource(col.sourceHeader, { name })}
               onType={(type) => setBySource(col.sourceHeader, { type })}
+              // Exclude this column: drop it from the confirmed list so normalize
+              // omits it from every record + columnTypes. The last column can't
+              // be removed (a 0-column dataset is invalid).
+              onRemove={
+                columnTypes.length > 1
+                  ? () =>
+                      onChange(
+                        columnTypes.filter(
+                          (c) => c.sourceHeader !== col.sourceHeader,
+                        ),
+                      )
+                  : undefined
+              }
             />
           ))}
         </VStack>
@@ -181,11 +194,14 @@ function SortableColumnRow({
   index,
   onName,
   onType,
+  onRemove,
 }: {
   col: DatasetConfirmColumns[number];
   index: number;
   onName: (name: string) => void;
   onType: (type: DatasetConfirmColumns[number]["type"]) => void;
+  /** Exclude this column. Undefined when it's the last one (can't drop it). */
+  onRemove?: () => void;
 }) {
   const {
     attributes,
@@ -235,6 +251,22 @@ function SortableColumnRow({
         onChange={onType}
         aria-label={`Column ${index + 1} type`}
       />
+      <Box
+        as="button"
+        aria-label={`Exclude ${col.name}`}
+        title="Exclude column"
+        display="flex"
+        alignItems="center"
+        color="fg.subtle"
+        flexShrink={0}
+        aria-disabled={!onRemove}
+        cursor={onRemove ? "pointer" : "not-allowed"}
+        opacity={onRemove ? 1 : 0.3}
+        _hover={onRemove ? { color: "red.500" } : undefined}
+        onClick={onRemove}
+      >
+        <Trash2 size={16} />
+      </Box>
     </HStack>
   );
 }
@@ -296,6 +328,10 @@ function ColumnDragOverlayRow({ col }: { col: DatasetConfirmColumns[number] }) {
         <ColumnTypeIcon type={col.type} size={14} />
         <Text truncate>{typeLabel}</Text>
       </HStack>
+      {/* Mirror the row's exclude affordance so the lifted copy lines up. */}
+      <Box display="flex" alignItems="center" color="fg.subtle" flexShrink={0}>
+        <Trash2 size={16} />
+      </Box>
     </HStack>
   );
 }

@@ -752,6 +752,116 @@ describe("createDatasetNormalizeHandler()", () => {
           ]);
         });
       });
+
+      describe("when the user excluded a column (confirmed a subset)", () => {
+        // The confirm UI can drop a column. The confirmed list then covers a
+        // SUBSET of the file headers; the excluded header's values must be
+        // dropped from every record AND omitted from columnTypes — never
+        // degrade-to-all-string (which would resurrect the excluded column).
+        it("drops the excluded header's values and persists only the kept columns", async () => {
+          const { storage, writeChunks } = makeStorage({
+            streamStaged: vi
+              .fn()
+              .mockResolvedValue(Readable.from(["a,b,c\n1,2,3\n4,5,6\n"])),
+          });
+          const repo = makeRepo({
+            id: "d1",
+            status: "processing",
+            // File headers are [a, b, c]; the user excluded `b` and reordered.
+            columnTypes: [
+              { name: "c", type: "string", sourceHeader: "c" },
+              { name: "a", type: "number", sourceHeader: "a" },
+            ],
+          });
+
+          const handler = createDatasetNormalizeHandler({
+            repository: repo as any,
+            getStorage: async () => storage as any,
+          });
+          await handler({ ...basePayload, filename: "data.csv" });
+
+          const entries = writeChunks.mock.calls
+            .flatMap((call: any) => call[0].records)
+            .map((record: any) => record.entry as Record<string, unknown>);
+          // `b` is gone from every row; `a` is typed as a number; `c` kept.
+          expect(entries).toEqual([
+            { a: 1, c: "3" },
+            { a: 4, c: "6" },
+          ]);
+          const update = repo.update.mock.calls[0]![0];
+          expect(update.data.columnTypes).toEqual([
+            { name: "c", type: "string" },
+            { name: "a", type: "number" },
+          ]);
+        });
+
+        it("drops an excluded header but still preserves a truly-stray key", async () => {
+          // JSONL whose first record sets the headers [a, b]; a later record
+          // carries an extra `c` never shown in the confirm UI. Excluding `b`
+          // must drop `b` (a file header) yet keep `c` (a stray key) — the two
+          // are distinguished by whether they're in the captured header set.
+          const { storage, writeChunks } = makeStorage({
+            streamStaged: vi
+              .fn()
+              .mockResolvedValue(
+                Readable.from([
+                  '{"a":"1","b":"x"}\n{"a":"2","b":"y","c":"z"}\n',
+                ]),
+              ),
+          });
+          const repo = makeRepo({
+            id: "d1",
+            status: "processing",
+            columnTypes: [{ name: "a", type: "string", sourceHeader: "a" }],
+          });
+
+          const handler = createDatasetNormalizeHandler({
+            repository: repo as any,
+            getStorage: async () => storage as any,
+          });
+          await handler(basePayload);
+
+          const entries = writeChunks.mock.calls
+            .flatMap((call: any) => call[0].records)
+            .map((record: any) => record.entry as Record<string, unknown>);
+          expect(entries).toEqual([
+            { a: "1" }, // `b` excluded → dropped
+            { a: "2", c: "z" }, // `b` dropped, stray `c` preserved
+          ]);
+          const update = repo.update.mock.calls[0]![0];
+          expect(update.data.columnTypes).toEqual([{ name: "a", type: "string" }]);
+        });
+
+        it("degrades to derive-all-string when the confirmed list is empty", async () => {
+          // A 0-column dataset is invalid — an empty confirmed list binds nothing.
+          const { storage, writeChunks } = makeStorage({
+            streamStaged: vi
+              .fn()
+              .mockResolvedValue(Readable.from(['{"a":"1","b":"x"}\n'])),
+          });
+          const repo = makeRepo({
+            id: "d1",
+            status: "processing",
+            columnTypes: [],
+          });
+
+          const handler = createDatasetNormalizeHandler({
+            repository: repo as any,
+            getStorage: async () => storage as any,
+          });
+          await handler(basePayload);
+
+          const entries = writeChunks.mock.calls
+            .flatMap((call: any) => call[0].records)
+            .map((record: any) => record.entry as Record<string, unknown>);
+          expect(entries).toEqual([{ a: "1", b: "x" }]);
+          const update = repo.update.mock.calls[0]![0];
+          expect(update.data.columnTypes).toEqual([
+            { name: "a", type: "string" },
+            { name: "b", type: "string" },
+          ]);
+        });
+      });
     });
 
     describe("when the confirmed column count does not match the file headers", () => {

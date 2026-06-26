@@ -206,9 +206,11 @@ const parseInto = async (params: {
    * behaviour. Each record's keys are renamed to the confirmed `name` and each
    * value converted to the confirmed `type` as it streams; the final
    * `appliedColumnTypes` is the confirmed list in the user's chosen order, with
-   * `sourceHeader` stripped. A count or coverage mismatch (defensive — the
-   * confirm UI locks add/remove) honours nothing and leaves the handler to
-   * derive all-`string` from the headers.
+   * `sourceHeader` stripped. The confirmed list may cover a SUBSET of the file
+   * headers — omitted headers are columns the user excluded, and their values
+   * are dropped per record (stray keys not present as file headers are still
+   * preserved). A duplicate/phantom `sourceHeader`, an empty list, or a legacy
+   * count mismatch honours nothing and derives all-`string` from the headers.
    */
   targetColumns?: DatasetConfirmColumns | DatasetColumns | null;
 }): Promise<{
@@ -219,43 +221,51 @@ const parseInto = async (params: {
   let headers: string[] = [];
   let renameMap = new Map<string, string>();
   // canonicalHeader → confirmed { name, type }; built once headers are known and
-  // only when the confirmed columns cover the headers (else stays null →
-  // derive-all-string).
+  // only when the confirmed columns bind cleanly (else stays null →
+  // derive-all-string). With the confirm shape this may cover a SUBSET of the
+  // file headers — the omitted ones are columns the user excluded.
   let targetByCanonical: Map<string, DatasetColumns[number]> | null = null;
+  // The full set of file headers, set alongside a sourceHeader-bound map. Lets
+  // `applyTarget` tell an EXCLUDED header (in the file, not confirmed → drop)
+  // apart from a STRAY key (not a file header at all, e.g. a JSONL record with
+  // extra keys → keep). Null on the legacy positional path (no exclusion).
+  let canonicalSet: Set<string> | null = null;
   const buildTargetMap = (canonical: string[]): void => {
-    if (!targetColumns || targetColumns.length !== canonical.length) return;
+    // An empty confirmed list can't produce a 0-column dataset; degrade instead.
+    if (!targetColumns || targetColumns.length === 0) return;
     // Prefer binding by the immutable `sourceHeader` (survives drag-reorder +
-    // rename); fall back to positional binding for legacy bare name+type lists.
+    // rename + exclusion); fall back to positional binding for legacy bare
+    // name+type lists (which require an exact 1:1 count — no exclusion).
     const hasSourceHeaders = targetColumns.every(
       (c) =>
         typeof (c as DatasetConfirmColumns[number]).sourceHeader === "string",
     );
     if (hasSourceHeaders) {
-      const bySource = new Map(
-        (targetColumns as DatasetConfirmColumns).map((c) => [
-          c.sourceHeader,
-          c,
-        ]),
+      const byHeader = new Map(
+        (targetColumns as DatasetConfirmColumns).map((c) => [c.sourceHeader, c]),
       );
       // Duplicate `sourceHeader`s collapse in the Map (last wins), which would
       // bind fewer columns than `targetColumns` claims while `appliedColumnTypes`
-      // still persists the phantom duplicate. Degrade rather than emit that
-      // mismatch.
-      if (bySource.size !== targetColumns.length) return;
-      // Every file header must map to a confirmed column, else degrade rather
-      // than emit a half-renamed dataset.
-      if (!canonical.every((h) => bySource.has(h))) return;
-      targetByCanonical = new Map(canonical.map((h) => [h, bySource.get(h)!]));
+      // still persists the phantom duplicate. Degrade rather than emit that.
+      if (byHeader.size !== targetColumns.length) return;
+      // Every confirmed column must reference a real file header (no phantom).
+      // A SUBSET is allowed — headers absent from the confirmed list are the
+      // columns the user excluded, and are dropped per-record below.
+      const canonicalHeaders = new Set(canonical);
+      if (![...byHeader.keys()].every((h) => canonicalHeaders.has(h))) return;
+      targetByCanonical = byHeader;
+      canonicalSet = canonicalHeaders;
       return;
     }
+    if (targetColumns.length !== canonical.length) return;
     targetByCanonical = new Map(
       canonical.map((h, i) => [h, targetColumns[i]!]),
     );
   };
-  // Rename canonical keys to the confirmed names and convert values to the
-  // confirmed types. Identity when nothing was confirmed (or on a count
-  // mismatch) — preserving the pre-v19 all-`string` pass-through. Streaming:
-  // one record at a time, never buffers the file.
+  // Rename confirmed keys to their new names and convert their values to the
+  // confirmed types; drop excluded file headers; keep stray keys untouched.
+  // Identity when nothing was confirmed (or on a mismatch) — preserving the
+  // pre-v19 all-`string` pass-through. Streaming: one record at a time.
   const applyTarget = (
     record: Record<string, unknown>,
   ): Record<string, unknown> => {
@@ -263,9 +273,16 @@ const parseInto = async (params: {
     const out: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(record)) {
       const target = targetByCanonical.get(key);
-      if (target)
+      if (target) {
+        // Kept column: rename + type-convert.
         out[target.name] = convertValueToColumnType(value, target.type);
-      else out[key] = value;
+      } else if (canonicalSet?.has(key)) {
+        // Excluded file header: the user dropped this column — omit its value.
+        continue;
+      } else {
+        // Stray key (not a confirmed file header): preserve as-is.
+        out[key] = value;
+      }
     }
     return out;
   };
