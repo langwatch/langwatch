@@ -17,9 +17,9 @@ import { getLangWatchTracer } from "langwatch";
 import { resolveFieldMappings } from "../resolve-field-mappings";
 import type { CodeAgentData } from "../types";
 import {
+  type AdapterErrorContext,
   formatFetchError,
   formatHttpError,
-  type AdapterErrorContext,
 } from "./format-execution-error";
 
 /** Timeout for NLP service requests (2 minutes) */
@@ -58,7 +58,10 @@ export class SerializedCodeAgentAdapterError extends Error {
       cause?: unknown;
     },
   ) {
-    super(message, options.cause === undefined ? undefined : { cause: options.cause });
+    super(
+      message,
+      options.cause === undefined ? undefined : { cause: options.cause },
+    );
     this.name = "SerializedCodeAgentAdapterError";
     this.kind = options.kind;
     this.source = options.source;
@@ -114,7 +117,13 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
             type: inp.type,
             value: resolvedValues[inp.identifier] ?? "",
           }))
-        : [{ identifier: "input", type: "str", value: resolvedValues["input"] ?? "" }];
+        : [
+            {
+              identifier: "input",
+              type: "str",
+              value: resolvedValues.input ?? "",
+            },
+          ];
 
     const outputs =
       this.config.outputs.length > 0
@@ -294,10 +303,22 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
             });
           } catch (fetchError) {
             if (timedOut) {
-              span.setAttribute("error.kind", "timeout" satisfies AdapterErrorKind);
+              span.setAttribute(
+                "error.kind",
+                "timeout" satisfies AdapterErrorKind,
+              );
               throw new SerializedCodeAgentAdapterError(
-                formatFetchError({ ctx, cause: fetchError, timedOutAfterMs: NLP_FETCH_TIMEOUT_MS }),
-                { kind: "timeout", source: "timeout", endpoint, cause: fetchError },
+                formatFetchError({
+                  ctx,
+                  cause: fetchError,
+                  timedOutAfterMs: NLP_FETCH_TIMEOUT_MS,
+                }),
+                {
+                  kind: "timeout",
+                  source: "timeout",
+                  endpoint,
+                  cause: fetchError,
+                },
               );
             }
             span.setAttribute("error.kind", "fetch" satisfies AdapterErrorKind);
@@ -319,10 +340,16 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
             } catch {
               rawBody = await response.text().catch(() => "");
             }
-            const isUserCodeError = response.status === 500 && Boolean(parsedDetail);
+            const isUserCodeError =
+              response.status === 500 && Boolean(parsedDetail);
             span.setAttribute("error.kind", "http" satisfies AdapterErrorKind);
             throw new SerializedCodeAgentAdapterError(
-              formatHttpError({ ctx, status: response.status, rawBody, parsedDetail }),
+              formatHttpError({
+                ctx,
+                status: response.status,
+                rawBody,
+                parsedDetail,
+              }),
               {
                 kind: "http",
                 source: isUserCodeError ? "user_code" : "nlp_service",
@@ -381,7 +408,9 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
     }
 
     // Legacy behavior: first input = last user message, rest = ""
-    const lastUserMessage = agentInput.messages.findLast((m) => m.role === "user");
+    const lastUserMessage = agentInput.messages.findLast(
+      (m) => m.role === "user",
+    );
     const inputValue =
       typeof lastUserMessage?.content === "string"
         ? lastUserMessage.content

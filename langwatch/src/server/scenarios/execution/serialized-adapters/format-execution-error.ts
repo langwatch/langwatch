@@ -105,7 +105,9 @@ export function formatFetchError(args: {
   }
   const causeMessage = cause instanceof Error ? cause.message : String(cause);
   const innerCause =
-    cause instanceof Error && "cause" in cause && (cause as Error & { cause?: unknown }).cause
+    cause instanceof Error &&
+    "cause" in cause &&
+    (cause as Error & { cause?: unknown }).cause
       ? `\n  cause: ${String((cause as Error & { cause?: unknown }).cause)}`
       : "";
   return [
