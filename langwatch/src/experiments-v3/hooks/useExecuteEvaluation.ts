@@ -692,6 +692,19 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         body: JSON.stringify({ projectId: project.id, runId }),
       });
 
+      if (response.status === 404) {
+        // Server says the run isn't running anymore — it finished (or
+        // was already aborted) between the user's click and this request
+        // landing. Not a failure: just inform the user and reset state.
+        setIsAborting(false);
+        toaster.create({
+          title: "Already finished",
+          description:
+            "The run completed on its own before the stop request reached the server.",
+          type: "info",
+        });
+        return;
+      }
       if (!response.ok) {
         throw new Error("Failed to abort execution");
         // Note: we don't setIsAborting(false) here - we wait for the `stopped` event
@@ -732,7 +745,8 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       // Get the existing target output and trace ID from the store
       const state = useEvaluationsV3Store.getState();
       const targetOutput = state.results.targetOutputs[targetId]?.[rowIndex];
-      const traceId = state.results.targetMetadata[targetId]?.[rowIndex]?.traceId;
+      const traceId =
+        state.results.targetMetadata[targetId]?.[rowIndex]?.traceId;
 
       // Immediately set the evaluator result to "running" for UI feedback
       updateEvaluatorResult(rowIndex, targetId, evaluatorId, {

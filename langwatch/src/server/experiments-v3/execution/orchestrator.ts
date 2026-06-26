@@ -255,9 +255,25 @@ export const generateCells = (
  * `skipTarget` short-circuits target execution. `buildEvaluatorInputs`
  * branches on `cell.pairwise` to assemble the candidate_* + golden inputs.
  *
- * Rows where one variant failed to produce an output are silently skipped
- * — there is no honest pairwise verdict without both candidates.
+ * Rows where one variant failed to produce an output are reported via
+ * `skipReasons` (not silently dropped) so the caller can emit a synthetic
+ * error event per row — otherwise the pairwise column sits at
+ * "No verdict yet" with no indication that the upstream variant failed.
  */
+export type PairwiseSkipReason = {
+  rowIndex: number;
+  /** TargetId under which the pairwise verdict would have been stored. */
+  targetId: string;
+  /** The synthetic evaluator id whose cell would have run. */
+  evaluatorId: string;
+  /** Display-friendly identifier of variantA. */
+  variantAName: string;
+  /** Display-friendly identifier of variantB. */
+  variantBName: string;
+  /** Which side(s) had no output for this row. */
+  missing: "A" | "B" | "both";
+};
+
 export const generatePairwiseCells = (
   state: Pick<
     EvaluationsV3State,
@@ -273,8 +289,9 @@ export const generatePairwiseCells = (
     Array<{ name: string; score?: number; label?: string; passed?: boolean }>
   >,
   loadedPrompts?: Map<string, VersionedPrompt>,
-): ExecutionCell[] => {
+): { cells: ExecutionCell[]; skipReasons: PairwiseSkipReason[] } => {
   const cells: ExecutionCell[] = [];
+  const skipReasons: PairwiseSkipReason[] = [];
   const datasetId =
     state.datasets[0]?.id ?? state.activeDatasetId ?? "dataset-1";
 
@@ -336,7 +353,7 @@ export const generatePairwiseCells = (
     (t) => t.type === "evaluator" && t.pairwise,
   );
   if (pairwiseEvaluators.length === 0 && pairwiseTargets.length === 0) {
-    return cells;
+    return { cells, skipReasons };
   }
 
   for (const evaluator of pairwiseEvaluators) {
@@ -363,7 +380,17 @@ export const generatePairwiseCells = (
 
       const a = completedTargetOutputs.get(`${rowIndex}:${cfg.variantA}`);
       const b = completedTargetOutputs.get(`${rowIndex}:${cfg.variantB}`);
-      if (!a || !b) continue;
+      if (!a || !b) {
+        skipReasons.push({
+          rowIndex,
+          targetId: cfg.variantA,
+          evaluatorId: evaluator.id,
+          variantAName: variantIdentifierFor(variantA),
+          variantBName: variantIdentifierFor(variantB),
+          missing: !a && !b ? "both" : !a ? "A" : "B",
+        });
+        continue;
+      }
 
       cells.push({
         rowIndex,
@@ -444,7 +471,17 @@ export const generatePairwiseCells = (
 
       const a = completedTargetOutputs.get(`${rowIndex}:${cfg.variantA}`);
       const b = completedTargetOutputs.get(`${rowIndex}:${cfg.variantB}`);
-      if (!a || !b) continue;
+      if (!a || !b) {
+        skipReasons.push({
+          rowIndex,
+          targetId: target.id,
+          evaluatorId: target.id,
+          variantAName: variantIdentifierFor(variantA),
+          variantBName: variantIdentifierFor(variantB),
+          missing: !a && !b ? "both" : !a ? "A" : "B",
+        });
+        continue;
+      }
 
       // Per-row synthetic evaluator with PRE-RESOLVED value mappings for
       // every pairwise input field. Pre-fix (#5131) the synthetic was
@@ -551,7 +588,7 @@ export const generatePairwiseCells = (
     }
   }
 
-  return cells;
+  return { cells, skipReasons };
 };
 
 /**
@@ -1455,13 +1492,39 @@ export async function* runOrchestrator(
       // We reuse the same semaphore + executeCell loop; the new cells get
       // appended to totalCells dynamically so progress events stay honest.
       if (!aborted) {
-        const pairwiseCells = generatePairwiseCells(
-          state,
-          datasetRows,
-          completedTargetOutputs,
-          completedTargetEvaluatorScores,
-          loadedPrompts,
-        );
+        const { cells: pairwiseCells, skipReasons: pairwiseSkipReasons } =
+          generatePairwiseCells(
+            state,
+            datasetRows,
+            completedTargetOutputs,
+            completedTargetEvaluatorScores,
+            loadedPrompts,
+          );
+
+        // Emit a synthetic evaluator_result error event for each row we had
+        // to skip because a variant didn't produce output. Without this the
+        // pairwise column would sit at "No verdict yet" indefinitely with
+        // no indication that the upstream prompt is the actual problem.
+        for (const reason of pairwiseSkipReasons) {
+          const which =
+            reason.missing === "both"
+              ? `${reason.variantAName} and ${reason.variantBName}`
+              : reason.missing === "A"
+                ? reason.variantAName
+                : reason.variantBName;
+          const detail = `Pairwise can't compare — ${which} produced no output for this row. Run the upstream variant first or check it for errors.`;
+          await processEventForStorage({
+            type: "evaluator_result",
+            rowIndex: reason.rowIndex,
+            targetId: reason.targetId,
+            evaluatorId: reason.evaluatorId,
+            result: {
+              status: "error",
+              details: detail,
+              error_type: "MissingVariantOutput",
+            } as unknown as SingleEvaluationResult,
+          });
+        }
 
         if (pairwiseCells.length > 0) {
           logger.info(
