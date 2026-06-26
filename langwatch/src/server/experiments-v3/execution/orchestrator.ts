@@ -1505,6 +1505,10 @@ export async function* runOrchestrator(
         // to skip because a variant didn't produce output. Without this the
         // pairwise column would sit at "No verdict yet" indefinitely with
         // no indication that the upstream prompt is the actual problem.
+        //
+        // pushEvent feeds the SSE stream so the UI cell re-renders into the
+        // friendlyError surface immediately; processEventForStorage also
+        // writes it to ClickHouse for the historical record.
         for (const reason of pairwiseSkipReasons) {
           const which =
             reason.missing === "both"
@@ -1513,7 +1517,7 @@ export async function* runOrchestrator(
                 ? reason.variantAName
                 : reason.variantBName;
           const detail = `Pairwise can't compare — ${which} produced no output for this row. Run the upstream variant first or check it for errors.`;
-          await processEventForStorage({
+          const skipEvent: EvaluationV3Event = {
             type: "evaluator_result",
             rowIndex: reason.rowIndex,
             targetId: reason.targetId,
@@ -1523,7 +1527,9 @@ export async function* runOrchestrator(
               details: detail,
               error_type: "MissingVariantOutput",
             } as unknown as SingleEvaluationResult,
-          });
+          };
+          pushEvent(skipEvent);
+          await processEventForStorage(skipEvent);
         }
 
         if (pairwiseCells.length > 0) {
