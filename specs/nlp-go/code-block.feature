@@ -8,14 +8,13 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
   See _shared/contract.md §7.
 
-  # All scenarios are @unimplemented because the TS feature-parity checker only
-  # scans TS test roots, so Go-side scenarios in services/nlpgo/ cannot be bound
-  # via @scenario JSDoc until the checker grows Go-side support (or a parallel
-  # Go-side binder ships). services/nlpgo/ exists and contains the engine + a
-  # growing set of integration tests; the gap is pure tooling/binding, not
-  # service stand-up. Existing Python-side parity reference:
-  # langwatch_nlp/langwatch_nlp/studio/execute/code_node.py and
-  # langwatch_nlp/tests/studio/. Aspirational pending parity-binder coverage.
+  # The feature-parity checker (langwatch/scripts/check-feature-parity.ts) has a
+  # Go walker, so scenarios here bind to Go tests via a `@scenario` comment above
+  # the test func. The execution-semantics scenarios are bound to
+  # services/nlpgo/tests/integration (code_block_spec_test.go and
+  # code_block_realistic_test.go). The scenarios still tagged @unimplemented
+  # describe behavior not yet built (per-node stdout/stderr on the streamed
+  # execution event, and an env-driven wall-clock timeout), not a binding gap.
 
   Background:
     Given nlpgo is listening on :5562
@@ -23,7 +22,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
   Rule: Inputs are passed by name and outputs are read by name
 
-    @unit @unimplemented
+    @unit
     Scenario: a code block with two inputs and one output runs and returns the output
       Given a code node declaring inputs ["a", "b"] of type int and output "sum" of type int
       And the code body:
@@ -35,7 +34,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       Then the node's output equals {"sum": 5}
       And the node's status is "success"
 
-    @unit @unimplemented
+    @unit
     Scenario: a missing declared output is reported as an error
       Given a code node declaring outputs ["sum", "diff"]
       And the code body returns only {"sum": 5}
@@ -43,7 +42,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       Then the node's status is "error"
       And the error message contains "missing_output: diff"
 
-    @unit @unimplemented
+    @unit
     Scenario: an extra undeclared output is dropped silently
       Given a code node declaring output "sum"
       And the code body returns {"sum": 5, "scratch": [1,2,3]}
@@ -66,21 +65,21 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
   Rule: Exceptions are surfaced as structured errors with the traceback
 
-    @integration @unimplemented
+    @integration
     Scenario: ZeroDivisionError aborts the node and the workflow with the traceback intact
       Given a code node whose body computes 1/0
       When I POST /go/studio/execute_sync
       Then the response.result.status is "error"
       And the error.node_id matches the code node id
-      And the error.message contains "ZeroDivisionError: division by zero"
-      And the error.traceback contains the user code line that triggered the error
+      And the error.type is "ZeroDivisionError" and the error.message contains "division by zero"
+      And the error.traceback contains "ZeroDivisionError: division by zero" and the offending user-code frame
 
-    @integration @unimplemented
+    @integration
     Scenario: a SyntaxError in user code is surfaced before any input is sent
       Given a code node whose body is "def execute(:" (invalid syntax)
       When I POST /go/studio/execute_sync
       Then the response.result.status is "error"
-      And the error.message contains "SyntaxError"
+      And the error.type is "SyntaxError" and the error.message contains "invalid syntax"
 
   Rule: Wall-clock timeout terminates the subprocess
 
@@ -95,7 +94,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
   Rule: Process isolation prevents cross-invocation leaks
 
-    @integration @unimplemented
+    @integration
     Scenario: state set in one invocation does not leak to the next
       Given a code node that increments a global counter "x" and returns it
       When I invoke the workflow 5 times in succession
@@ -103,13 +102,13 @@ Feature: Code block — execute user Python with isolated subprocess and structu
 
   Rule: Container packages a stable Python toolchain for user code
 
-    @integration @unimplemented
+    @integration
     Scenario: the bundled Python interpreter exposes the standard library
       Given a code node whose body imports json, math, datetime, re, hashlib, base64, urllib
       When I POST /go/studio/execute_sync
       Then the node returns successfully
 
-    @integration @unimplemented
+    @integration
     Scenario: the bundled Python interpreter does not have network access by default
       Given a code node whose body opens a TCP connection to "8.8.8.8:53"
       When I POST /go/studio/execute_sync
@@ -124,7 +123,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
     # are surfaced to user code as attribute access on a `secrets` object,
     # matching the Studio code-editor hint ("Use secrets.NAME syntax").
 
-    @unit @unimplemented
+    @unit
     Scenario: a configured project secret is readable as secrets.NAME
       Given the workflow carries secret "CLOUDFLARE_ACCESS_CLIENT_ID" = "id-123"
       And a code node whose body returns {"token": secrets.CLOUDFLARE_ACCESS_CLIENT_ID}
@@ -132,7 +131,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       Then the node's output equals {"token": "id-123"}
       And the node's status is "success"
 
-    @unit @unimplemented
+    @unit
     Scenario: referencing an undefined secret raises AttributeError, not NameError
       Given the workflow carries secret "PRESENT" = "yes"
       And a code node whose body returns {"x": secrets.ABSENT}
@@ -140,7 +139,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       Then the node's status is "error"
       And the error message contains "ABSENT"
 
-    @unit @unimplemented
+    @unit
     Scenario: with no project secrets the `secrets` name is left undefined (Python parity)
       Given the workflow carries no secrets
       And a code node whose body returns {"x": secrets.ANYTHING}
@@ -148,12 +147,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       Then the node's status is "error"
       And the error message contains "secrets"
 
-  Rule: Parity with Python code-node executor
-
-    @integration @parity @unimplemented
-    Scenario: identical user code + inputs produce identical outputs on Go and Python
-      Given a fixture code workflow at tests/fixtures/workflows/code_only.json
-      And the same input
-      When I POST the input to /go/studio/execute_sync (Go) and /studio/execute_sync (Python)
-      Then both responses' result.outputs are byte-equivalent
-      And both responses' stdout captures are byte-equivalent
+  # The former "identical outputs on Go and Python" parity scenario was removed:
+  # the Python langwatch_nlp engine has been removed (see _shared/contract.md —
+  # nlpgo is the sole NLP engine), so /studio/execute_sync no longer exists and
+  # there is no second engine to compare against.
