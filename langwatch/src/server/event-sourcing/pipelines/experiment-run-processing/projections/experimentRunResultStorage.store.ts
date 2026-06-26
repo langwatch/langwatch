@@ -1,6 +1,6 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import { createLogger } from "../../../../../utils/logger";
+import { createLogger } from "~/utils/logger/server";
 import type { AppendStore } from "../../../projections/mapProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import type { ClickHouseExperimentRunResultRecord } from "./experimentRunResultStorage.mapProjection";
