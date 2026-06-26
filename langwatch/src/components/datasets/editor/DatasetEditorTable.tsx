@@ -43,6 +43,8 @@ import {
 import {
   AlertTriangle,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Download,
   Edit2,
   Plus,
@@ -104,6 +106,10 @@ export type DatasetEditorController = {
 
 const CHECKBOX_WIDTH_PX = 36;
 const MAX_ROWS_WITHOUT_VIRTUALIZATION = 100;
+/** Records per page for the saved-dataset editor (classic page N of M). One
+ *  page comfortably fits the virtualized viewport while keeping each read
+ *  bounded — an s3_jsonl page touches only the chunks overlapping the window. */
+const DATASET_EDITOR_PAGE_SIZE = 50;
 
 const toEditorColumns = (columnTypes: DatasetColumns): EditorColumn[] =>
   columnTypes.map((col, index) => ({
@@ -184,13 +190,27 @@ export function DatasetEditorTable({
 
   // ── Data loading ──────────────────────────────────────────────────
 
-  const databaseDataset = api.datasetRecord.getAll.useQuery(
-    { projectId: project?.id ?? "", datasetId: datasetId ?? "" },
+  // Saved datasets are read one page at a time (classic page N of M) instead of
+  // the whole dataset, which previously truncated past a byte cap and silently
+  // hid the rest. In-memory mode (no datasetId) keeps its full local copy.
+  const [page, setPage] = useState(1);
+
+  const databaseDataset = api.datasetRecord.listPaginated.useQuery(
+    {
+      projectId: project?.id ?? "",
+      datasetId: datasetId ?? "",
+      page,
+      limit: DATASET_EDITOR_PAGE_SIZE,
+    },
     {
       // Gated on `readEnabled` so a still-preparing/failed dataset is never read
-      // (getAll → getFullDataset throws DatasetNotReadyError otherwise).
+      // (listPaginated throws DatasetNotReadyError otherwise).
       enabled: !!project && !!datasetId && readEnabled,
       refetchOnWindowFocus: false,
+      // staleTime 0: returning to a previously-viewed page refetches in the
+      // background so a cell edited then navigated-away-from shows its saved
+      // value on return (the edit is persisted per-record, not into this cache).
+      staleTime: 0,
       onError: (error) => {
         if (isHandledByGlobalHandler(error)) return;
         toaster.create({
@@ -203,6 +223,14 @@ export function DatasetEditorTable({
       },
     },
   );
+
+  const totalPages = datasetId ? (databaseDataset.data?.totalPages ?? 1) : 1;
+  const isLastPage = page >= totalPages;
+  // Clamp the page if the dataset shrank under us (e.g. the last page's rows
+  // were all deleted), so we never sit on an empty out-of-range page.
+  useEffect(() => {
+    if (datasetId && page > totalPages) setPage(totalPages);
+  }, [datasetId, page, totalPages]);
 
   const datasetName = datasetId
     ? databaseDataset.data?.name
@@ -342,8 +370,22 @@ export function DatasetEditorTable({
   // ── Table assembly ────────────────────────────────────────────────
 
   const rowCount = records.length;
-  // Always include one trailing phantom row (Excel-style "click to add")
-  const displayRowCount = Math.max(rowCount + 1, 3);
+  // The trailing phantom row (Excel-style "click to add") appends to the END of
+  // the dataset, so on the paged saved view it belongs only on the last page —
+  // adding it on an earlier full page would create a row the user can't see.
+  // In-memory mode (no datasetId) is one local list, so it always shows it.
+  const showAddRow = !datasetId || isLastPage;
+  const displayRowCount = showAddRow ? Math.max(rowCount + 1, 3) : rowCount;
+
+  // Block page navigation while a record save is queued or in flight: switching
+  // pages reloads the store (setData drops the prior page's records), so an
+  // unsaved edit on the outgoing page would be stranded (resolveFullRecord can
+  // no longer find it). The autosave debounce is short, so this is a brief gate.
+  const hasPendingWrites =
+    autosave.state === "saving" ||
+    (datasetId
+      ? Object.keys(pendingSavedChanges[datasetId] ?? {}).length > 0
+      : false);
 
   // Large-dataset read truncation (ADR-032): saved datasets load via
   // `getFullDataset`, which stops accumulating rows once it crosses a byte
@@ -754,15 +796,54 @@ export function DatasetEditorTable({
       </Box>
 
       <HStack>
-        <Button
-          size="sm"
-          variant="ghost"
-          data-testid="add-row"
-          onClick={handleAddRow}
-        >
-          <Plus size={14} /> Add row
-        </Button>
+        {showAddRow && (
+          <Button
+            size="sm"
+            variant="ghost"
+            data-testid="add-row"
+            onClick={handleAddRow}
+          >
+            <Plus size={14} /> Add row
+          </Button>
+        )}
         <Spacer />
+        {datasetId && totalPages > 1 && (
+          <HStack gap={2} data-testid="dataset-pager">
+            <Button
+              size="xs"
+              variant="ghost"
+              data-testid="dataset-page-prev"
+              aria-label="Previous page"
+              disabled={page <= 1 || hasPendingWrites}
+              onClick={() => {
+                clearRowSelection();
+                setPage((p) => Math.max(1, p - 1));
+              }}
+            >
+              <ChevronLeft size={14} />
+            </Button>
+            <Text
+              fontSize="13px"
+              color="fg.muted"
+              data-testid="dataset-page-indicator"
+            >
+              Page {page} of {totalPages}
+            </Text>
+            <Button
+              size="xs"
+              variant="ghost"
+              data-testid="dataset-page-next"
+              aria-label="Next page"
+              disabled={page >= totalPages || hasPendingWrites}
+              onClick={() => {
+                clearRowSelection();
+                setPage((p) => Math.min(totalPages, p + 1));
+              }}
+            >
+              <ChevronRight size={14} />
+            </Button>
+          </HStack>
+        )}
       </HStack>
       {bottomSpace && <Box height={bottomSpace} flexShrink={0} />}
 

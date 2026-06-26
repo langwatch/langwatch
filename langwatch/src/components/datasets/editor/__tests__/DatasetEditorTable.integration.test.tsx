@@ -38,6 +38,12 @@ vi.mock("~/utils/api", () => ({
       getAll: {
         useQuery: (...args: unknown[]) => getAllQuery(...args),
       },
+      // The saved-dataset editor now reads one page at a time. Point it at the
+      // same mock so saved-mode fixtures (which set the records via this fn)
+      // drive the paged read; pages without `totalPages` read as a single page.
+      listPaginated: {
+        useQuery: (...args: unknown[]) => getAllQuery(...args),
+      },
       update: {
         useMutation: () => ({ mutate: updateMutate }),
       },
@@ -464,5 +470,147 @@ describe("given a large saved dataset whose read is truncated", () => {
         "out of",
       );
     });
+  });
+});
+
+// ── Pagination (classic page N of M) ─────────────────────────────────
+
+describe("given a saved dataset larger than one page", () => {
+  const TOTAL_PAGES = 3;
+  const COUNT = 150;
+
+  // Return a STABLE object reference per page, the way react-query does — an
+  // unstable ref every render would make the store-load effect re-run forever.
+  const renderPaged = () => {
+    const byPage = new Map<number, unknown>();
+    getAllQuery.mockReset();
+    getAllQuery.mockImplementation((input: { page?: number }) => {
+      const p = input?.page ?? 1;
+      if (!byPage.has(p)) {
+        byPage.set(p, {
+          data: {
+            id: "dataset_paged",
+            name: "paged",
+            columnTypes,
+            count: COUNT,
+            totalPages: TOTAL_PAGES,
+            page: p,
+            truncated: false,
+            datasetRecords: [
+              {
+                id: `p${p}r1`,
+                entry: { input: `page${p}-a`, expected_output: "x" },
+              },
+              {
+                id: `p${p}r2`,
+                entry: { input: `page${p}-b`, expected_output: "y" },
+              },
+            ],
+          },
+          isLoading: false,
+          refetch: vi.fn(),
+        });
+      }
+      return byPage.get(p);
+    });
+    return render(<DatasetEditorTable datasetId="dataset_paged" />, {
+      wrapper: Wrapper,
+    });
+  };
+
+  /** @scenario A dataset larger than one page shows the first page with a pager */
+  it("shows the first page, the pager, and the whole-dataset total", async () => {
+    renderPaged();
+    await waitFor(() =>
+      expect(screen.getByTestId("dataset-page-indicator")).toHaveTextContent(
+        "Page 1 of 3",
+      ),
+    );
+    // Total reflects the whole dataset, not just the loaded page.
+    expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
+      "150 records",
+    );
+    expect(screen.getByTestId("dataset-page-prev")).toBeDisabled();
+    expect(screen.getByTestId("dataset-page-next")).toBeEnabled();
+    // The add-row affordance is not offered on an earlier, full page.
+    expect(screen.queryByTestId("add-row")).not.toBeInTheDocument();
+  });
+
+  /** @scenario Move between pages */
+  it("moves to the next page and back", async () => {
+    const user = userEvent.setup();
+    renderPaged();
+    await screen.findByTestId("dataset-page-indicator");
+
+    await user.click(screen.getByTestId("dataset-page-next"));
+    await waitFor(() =>
+      expect(screen.getByTestId("dataset-page-indicator")).toHaveTextContent(
+        "Page 2 of 3",
+      ),
+    );
+    // The editor requested page 2 from the server (windowed read, not a slice).
+    expect(getAllQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ page: 2 }),
+      expect.anything(),
+    );
+
+    await user.click(screen.getByTestId("dataset-page-prev"));
+    await waitFor(() =>
+      expect(screen.getByTestId("dataset-page-indicator")).toHaveTextContent(
+        "Page 1 of 3",
+      ),
+    );
+  });
+
+  /** @scenario Edits on a page are saved to the right record */
+  it("saves an edit made on a later page to that page's own record", async () => {
+    updateMutate.mockImplementation(
+      (_args: unknown, opts?: { onSuccess?: () => void }) =>
+        opts?.onSuccess?.(),
+    );
+    const user = userEvent.setup();
+    renderPaged();
+    await screen.findByTestId("dataset-page-indicator");
+
+    // Move to page 2 first (no pending writes yet, so navigation is allowed),
+    // then edit its first cell.
+    await user.click(screen.getByTestId("dataset-page-next"));
+    await screen.findByText("page2-a");
+    await user.dblClick(screen.getByTestId("cell-0-input_0"));
+    const textarea = await screen.findByRole("textbox");
+    await user.clear(textarea);
+    await user.type(textarea, "edited{Enter}");
+
+    // The save targets the page-2 record by its own id — pagination binds edits
+    // per record, never by a positional slot within the page.
+    await waitFor(
+      () =>
+        expect(updateMutate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            datasetId: "dataset_paged",
+            recordId: "p2r1",
+            updatedRecord: expect.objectContaining({ input: "edited" }),
+          }),
+          expect.anything(),
+        ),
+      { timeout: 2000 },
+    );
+  });
+
+  /** @scenario A new row is added on the last page */
+  it("offers the add-row only once on the last page", async () => {
+    const user = userEvent.setup();
+    renderPaged();
+    await screen.findByTestId("dataset-page-indicator");
+    expect(screen.queryByTestId("add-row")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("dataset-page-next")); // page 2
+    await user.click(screen.getByTestId("dataset-page-next")); // page 3 (last)
+    await waitFor(() =>
+      expect(screen.getByTestId("dataset-page-indicator")).toHaveTextContent(
+        "Page 3 of 3",
+      ),
+    );
+    expect(screen.getByTestId("add-row")).toBeInTheDocument();
   });
 });

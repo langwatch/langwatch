@@ -723,7 +723,28 @@ export class DatasetService {
       slugOrId: params.slugOrId,
       projectId: params.projectId,
     });
+    return this.paginateResolvedDataset({
+      dataset,
+      projectId: params.projectId,
+      page: params.page,
+      limit: params.limit,
+    });
+  }
 
+  /**
+   * Reads one page of records from an already-resolved dataset — the shared
+   * windowed read behind both `listRecords` (slug/id lookup first) and
+   * `getDatasetPage` (the editor's paged read), so the s3_jsonl chunk-window
+   * logic lives in exactly one place and a caller that already holds the row
+   * doesn't look it up twice.
+   */
+  private async paginateResolvedDataset(params: {
+    dataset: Dataset;
+    projectId: string;
+    page: number;
+    limit: number;
+  }) {
+    const { dataset } = params;
     const skip = (params.page - 1) * params.limit;
 
     // ADR-032: s3_jsonl content lives in chunk objects, not the PG
@@ -842,6 +863,53 @@ export class DatasetService {
         total,
         totalPages: Math.ceil(total / params.limit),
       },
+    };
+  }
+
+  /**
+   * One page of a dataset for the editor: the dataset's name + columnTypes plus
+   * the page's records ({ id, entry }) and the PG-authoritative total. Replaces
+   * the editor's whole-dataset `getFullDataset` read (which truncated past a
+   * byte cap) with a bounded windowed read, so arbitrarily large datasets page
+   * instead of silently hiding rows. Resolves the row ONCE and reuses the same
+   * windowed reader as `listRecords`.
+   *
+   * @throws {DatasetNotFoundError} if dataset not found
+   * @throws {DatasetNotReadyError} if an s3_jsonl dataset is still preparing
+   */
+  async getDatasetPage(params: {
+    slugOrId: string;
+    projectId: string;
+    page: number;
+    limit: number;
+  }) {
+    const dataset = await this.getBySlugOrId({
+      slugOrId: params.slugOrId,
+      projectId: params.projectId,
+    });
+    const { data, pagination } = await this.paginateResolvedDataset({
+      dataset,
+      projectId: params.projectId,
+      page: params.page,
+      limit: params.limit,
+    });
+    return {
+      id: dataset.id,
+      name: dataset.name,
+      columnTypes: dataset.columnTypes,
+      datasetRecords: data.map((record) => ({
+        id: record.id,
+        entry: record.entry,
+      })),
+      count: pagination.total,
+      page: pagination.page,
+      limit: pagination.limit,
+      totalPages: pagination.totalPages,
+      // A page is a bounded window by construction — there is no byte-cap
+      // truncation as with the whole-dataset `getFullDataset` read. Carried so
+      // the editor's existing truncation-aware count chip stays type-safe and
+      // simply never lights up on the paged path.
+      truncated: false as boolean,
     };
   }
 
