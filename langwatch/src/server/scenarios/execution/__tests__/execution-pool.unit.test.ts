@@ -3,11 +3,11 @@
  * @see specs/scenarios/event-driven-execution-prep.feature
  */
 
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { EventEmitter } from "events";
 import type { ChildProcess } from "child_process";
-import { ScenarioExecutionPool } from "../execution-pool";
+import { EventEmitter } from "events";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExecutionJobData } from "../execution-pool";
+import { ScenarioExecutionPool } from "../execution-pool";
 
 function makeJob(id: string): ExecutionJobData {
   return {
@@ -94,7 +94,9 @@ describe("ScenarioExecutionPool", () => {
       pool.submit(makeJob("run-1"));
 
       expect(onSkip).toHaveBeenCalledTimes(1);
-      expect(onSkip).toHaveBeenCalledWith(expect.objectContaining({ scenarioRunId: "run-1" }));
+      expect(onSkip).toHaveBeenCalledWith(
+        expect.objectContaining({ scenarioRunId: "run-1" }),
+      );
     });
   });
 
@@ -129,7 +131,9 @@ describe("ScenarioExecutionPool", () => {
       await new Promise((r) => setTimeout(r, 10));
 
       expect(onSkip).toHaveBeenCalledTimes(1);
-      expect(onSkip).toHaveBeenCalledWith(expect.objectContaining({ scenarioRunId: "run-3" }));
+      expect(onSkip).toHaveBeenCalledWith(
+        expect.objectContaining({ scenarioRunId: "run-3" }),
+      );
     });
   });
 
@@ -158,6 +162,42 @@ describe("ScenarioExecutionPool", () => {
       expect(pool.pendingCount).toBe(0);
       expect((child1 as any).kill).toHaveBeenCalledWith("SIGTERM");
       expect((child2 as any).kill).toHaveBeenCalledWith("SIGTERM");
+    });
+  });
+
+  describe("inFlightJobs", () => {
+    describe("when jobs are running and buffered", () => {
+      it("returns both running and pending job data", () => {
+        pool.submit(makeJob("run-1")); // running
+        pool.submit(makeJob("run-2")); // running
+        pool.submit(makeJob("run-3")); // pending
+
+        const inFlightIds = pool.inFlightJobs.map((j) => j.scenarioRunId);
+
+        expect(inFlightIds).toHaveLength(3);
+        expect(inFlightIds).toEqual(
+          expect.arrayContaining(["run-1", "run-2", "run-3"]),
+        );
+      });
+    });
+
+    describe("when a running child is deregistered", () => {
+      it("drops it from the in-flight set", () => {
+        pool.submit(makeJob("run-1"));
+        pool.submit(makeJob("run-2"));
+
+        pool.deregisterChild("run-1");
+
+        const inFlightIds = pool.inFlightJobs.map((j) => j.scenarioRunId);
+        expect(inFlightIds).not.toContain("run-1");
+        expect(inFlightIds).toContain("run-2");
+      });
+    });
+
+    describe("when the pool is empty", () => {
+      it("returns an empty list", () => {
+        expect(pool.inFlightJobs).toEqual([]);
+      });
     });
   });
 });
