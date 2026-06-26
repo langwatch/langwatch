@@ -46,9 +46,12 @@ func signatureWorkflow() *dsl.Workflow {
 				Inputs:  []dsl.Field{{Identifier: "q", Type: "str"}},
 				Outputs: []dsl.Field{{Identifier: "answer", Type: "str"}},
 			}},
+			// End node required by the missing-End planner guard (#3198).
+			{ID: "end", Type: dsl.ComponentEnd},
 		},
 		Edges: []dsl.Edge{
 			{Source: "entry", SourceHandle: "outputs.q", Target: "sig", TargetHandle: "inputs.q"},
+			{Source: "sig", SourceHandle: "outputs.answer", Target: "end", TargetHandle: "inputs.answer"},
 		},
 	}
 }
