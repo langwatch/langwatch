@@ -168,16 +168,35 @@ export const generateCells = (
             ? [scope.rowIndex]
             : [];
 
-  // Determine which targets to process
+  // Determine which targets to process.
+  //
+  // For target-/cell-scoped runs against a pairwise column-target, the
+  // pairwise verdict needs both variants' outputs to exist before Phase 2
+  // can synthesize the comparison cell. If the user hits Play on the
+  // Pairwise Compare column without first running the variants, expand
+  // the scope to include variantA + variantB so Phase 1 produces what
+  // Phase 2 needs. Without this, only the pairwise target is dispatched,
+  // Phase 1 skips it (column-style pairwise is always Phase-2-only),
+  // and the run completes with 0 cells — visible to the user as a
+  // silent no-op with "No verdict yet" everywhere.
+  const expandPairwiseDeps = (id: string): string[] => {
+    const t = state.targets.find((tg: TargetConfig) => tg.id === id);
+    if (!t || t.type !== "evaluator" || !t.pairwise) return [id];
+    const deps = [t.pairwise.variantA, t.pairwise.variantB].filter(
+      (v): v is string => !!v,
+    );
+    return Array.from(new Set([...deps, id]));
+  };
+
   const targetIds =
     scope.type === "full"
       ? state.targets.map((t: TargetConfig) => t.id)
       : scope.type === "rows"
         ? state.targets.map((t: TargetConfig) => t.id)
         : scope.type === "target"
-          ? [scope.targetId]
+          ? expandPairwiseDeps(scope.targetId)
           : scope.type === "cell"
-            ? [scope.targetId]
+            ? expandPairwiseDeps(scope.targetId)
             : [];
 
   // Generate cells, skipping empty rows
