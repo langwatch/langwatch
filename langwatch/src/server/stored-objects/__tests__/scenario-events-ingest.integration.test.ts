@@ -219,6 +219,42 @@ function makeEventWithInlineImage(scenarioRunId: string) {
   };
 }
 
+/**
+ * A SCENARIO_MESSAGE_SNAPSHOT whose message content is a voice turn:
+ * `[text, {type:"input_audio", input_audio:{data, format}}]` — the shape the
+ * python-sdk emits and the ts-sdk's convert-core-messages translates to.
+ *
+ * Unlike TEXT_MESSAGE_END (whose `message` field is `z.record(z.unknown())` and
+ * bypasses content validation), this payload is validated by the STRICT
+ * `scenarioMessageSnapshotSchema` messages union — the exact gate that
+ * 400-rejected voice audio before #5149. This is the end-to-end wire test the
+ * isolated extractor/renderer tests were missing.
+ */
+function makeMessageSnapshotWithInputAudio(scenarioRunId: string) {
+  const audioBase64 = Buffer.from("fake-wav-bytes").toString("base64");
+  return {
+    type: ScenarioEventType.MESSAGE_SNAPSHOT,
+    timestamp: Date.now(),
+    batchRunId: `batch-${nanoid(6)}`,
+    scenarioId: `scenario-${nanoid(6)}`,
+    scenarioRunId,
+    scenarioSetId: "default",
+    messages: [
+      {
+        id: `msg-${nanoid(6)}`,
+        role: "assistant",
+        content: [
+          { type: "text", text: "Here is your audio reply" },
+          {
+            type: "input_audio",
+            input_audio: { data: audioBase64, format: "wav" },
+          },
+        ],
+      },
+    ],
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Setup / teardown
 // ---------------------------------------------------------------------------
@@ -380,6 +416,46 @@ describe("POST /api/scenario-events (ingest)", () => {
         expect.objectContaining({
           projectId: testProjectId,
           mediaType: "image/png",
+          purpose: "scenario_event",
+        }),
+      );
+    });
+  });
+
+  describe("when a MESSAGE_SNAPSHOT carries a voice input_audio turn (#5149 — missing wire leg of #4138)", () => {
+    /** @scenario "Voice MESSAGE_SNAPSHOT with input_audio is accepted (201) and the audio is externalized" */
+    it("returns 201 (not 400) and externalizes the input_audio bytes via storeFromBytes", async () => {
+      const extractedId = `stored-${nanoid(8)}`;
+      mockStoreFromBytes.mockResolvedValueOnce({
+        id: extractedId,
+        mediaType: "audio/wav",
+        isDuplicate: false,
+      });
+
+      const scenarioRunId = `run-${nanoid(6)}`;
+      const body = makeMessageSnapshotWithInputAudio(scenarioRunId);
+
+      const res = await app.request("/api/scenario-events", {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      // Before the wire-leg fix this returned 400 — the scenarioEventSchema
+      // message union (event-schemas.ts) had no `input_audio` member, so
+      // zValidator rejected the snapshot before extraction ever ran.
+      expect(res.status).toBe(201);
+
+      // The audio survived validation and reached extractInlineMediaFromEvent,
+      // which decoded the base64 and externalized it as a stored object. The
+      // wav format resolves to the audio/wav media type.
+      expect(mockStoreFromBytes).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: testProjectId,
+          mediaType: "audio/wav",
           purpose: "scenario_event",
         }),
       );
