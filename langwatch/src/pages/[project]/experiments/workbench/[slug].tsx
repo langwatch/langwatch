@@ -14,7 +14,6 @@ import { useAutosaveEvaluationsV3 } from "~/experiments-v3/hooks/useAutosaveEval
 import { useEvaluationsV3Store } from "~/experiments-v3/hooks/useEvaluationsV3Store";
 import { useLambdaWarmup } from "~/experiments-v3/hooks/useLambdaWarmup";
 import { useSavedDatasetLoader } from "~/experiments-v3/hooks/useSavedDatasetLoader";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRouter } from "~/utils/compat/next-router";
 
 /**
@@ -24,7 +23,6 @@ import { useRouter } from "~/utils/compat/next-router";
  */
 export default function ExperimentsWorkbenchPage() {
   const router = useRouter();
-  const { project } = useOrganizationTeamProject();
   const slug = router.query.slug as string | undefined;
 
   const { name, setName, datasets, reset, autosaveStatus } =

@@ -35,7 +35,7 @@ Configure your experiment once in the LangWatch Experiments via UI, then trigger
    https://app.langwatch.ai/your-project/experiments/your-experiment-slug
                                                       ^^^^^^^^^^^^^^^^^^^^
    ```
-   Or click the **CI/CD** button in the experiment toolbar.
+   Or open the **Run Options** menu in the experiment toolbar and choose **Run in CI/CD** for ready-to-copy snippets.
 
 3. **Run from CI/CD:**
 
@@ -106,6 +106,60 @@ result = langwatch.experiment.run(
 )
 result.print_summary(exit_on_failure=True)  # Exit with code 1 on failures
 ```
+
+### Reading per-row results
+
+`run(...)` waits for the run to finish and gives you the per-row results, so you can assert on them in CI or inspect them locally:
+
+<Tabs>
+  <Tab title="Python">
+```python
+result = langwatch.experiment.run("my-experiment")
+result.print_summary()      # CI-friendly summary; exits 1 on failures
+df = result.results         # per-row results as a pandas DataFrame
+print(result.run_url)       # open the run in LangWatch
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+const { rows, runUrl } = await langwatch.experiments.runWithResults("my-experiment");
+console.table(rows);        // per-row results
+console.log(runUrl);        // open the run in LangWatch
+```
+  </Tab>
+</Tabs>
+
+### Choosing what to evaluate
+
+By default the run uses the dataset attached to the experiment. You can override the data from CI without changing the platform configuration:
+
+- `parameters` — constant inputs merged into every row (and the single row when there is no dataset), handy for a feature flag or a model name
+- `data` — inline rows to evaluate
+- `dataset_id` — a different platform dataset by id (`data` and `dataset_id` are mutually exclusive)
+- `row_indices` — a subset of dataset row indices to evaluate, instead of the whole dataset
+
+<Tabs>
+  <Tab title="Python">
+```python
+# Inline rows
+langwatch.experiment.run("my-experiment", data=[{"input": "What is 2 + 2?"}])
+# A platform dataset by id
+langwatch.experiment.run("my-experiment", dataset_id="dataset_xxxxxxxxxxxx")
+# Constant parameters merged into every row
+langwatch.experiment.run("my-experiment", parameters={"model": "gpt-5-mini"})
+```
+  </Tab>
+  <Tab title="TypeScript">
+```typescript
+// Inline rows
+await langwatch.experiments.runWithResults("my-experiment", { data: [{ input: "What is 2 + 2?" }] });
+// A platform dataset by id
+await langwatch.experiments.runWithResults("my-experiment", { datasetId: "dataset_xxxxxxxxxxxx" });
+// Constant parameters merged into every row
+await langwatch.experiments.runWithResults("my-experiment", { parameters: { model: "gpt-5-mini" } });
+```
+  </Tab>
+</Tabs>
 
 ---
 
@@ -473,6 +527,15 @@ Response (completed):
   }
 }
 ```
+
+### Fetch Results
+
+```bash
+curl "https://app.langwatch.ai/api/evaluations/v3/runs/{runId}/results?experimentSlug={slug}" \
+  -H "X-Auth-Token: ${LANGWATCH_API_KEY}"
+```
+
+Returns the per-row dataset entries (input, output, trace id, duration) and evaluation scores for the run.
 
 ---
 

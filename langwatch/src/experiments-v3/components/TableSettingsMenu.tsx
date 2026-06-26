@@ -1,44 +1,37 @@
 /**
- * TableSettingsMenu - Popover menu for table settings
+ * TableSettingsMenu - "Run Options" popover menu for the workbench toolbar.
  *
  * Contains:
- * - Row height toggle (compact/expanded)
- * - Run in CI/CD option
+ * - Row height toggle (compact/fit)
+ * - Concurrency control
+ * - Automation: opens the "Run via API" dialog to run this evaluation from a
+ *   pipeline
  */
 import {
   Box,
   Button,
   HStack,
-  IconButton,
   Input,
-  Link,
   Text,
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import type { PrismLanguage } from "@react-email/components";
 import {
-  CheckIcon,
-  ChevronDownIcon,
-  ExternalLink,
   ListChevronsDownUp,
   ListChevronsUpDown,
   SlidersHorizontal,
   Terminal,
 } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { LuGauge } from "react-icons/lu";
-import { RenderCode } from "~/components/code/RenderCode";
 import type { RowHeightMode } from "~/components/datasets/editor/DatasetTableContext";
-import { Dialog } from "~/components/ui/dialog";
-import { Menu } from "~/components/ui/menu";
 import { Popover } from "~/components/ui/popover";
 import { SimpleSlider } from "~/components/ui/slider";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import NextLink from "~/utils/compat/next-link";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { DEFAULT_CONCURRENCY } from "../types";
+import { RunViaApiDialogContainer } from "./RunViaApiButton";
 
 type ToggleOption = {
   value: RowHeightMode;
@@ -173,7 +166,8 @@ type TableSettingsMenuProps = {
 };
 
 /**
- * Popover menu containing table settings and actions.
+ * Popover menu containing table settings and actions. Surfaced in the toolbar
+ * as a "Run Options" button.
  */
 export function TableSettingsMenu({
   disabled = false,
@@ -201,15 +195,15 @@ export function TableSettingsMenu({
   const isFitDisabled = rowCount > MAX_ROWS_FOR_FIT_MODE;
 
   const { project } = useOrganizationTeamProject();
-  const cicdDialog = useDisclosure();
+  const runDialog = useDisclosure();
   const [popoverOpen, setPopoverOpen] = React.useState(false);
 
-  // Show CI/CD option only if we have an experiment slug
-  const showCICDOption = !!project && !!experimentSlug;
+  // Show the Run via API automation entry only if we have an experiment slug
+  const showRunViaApi = !!project && !!experimentSlug;
 
-  const handleOpenCICDDialog = () => {
+  const handleOpenRunDialog = () => {
     setPopoverOpen(false); // Close popover first
-    cicdDialog.onOpen();
+    runDialog.onOpen();
   };
 
   return (
@@ -218,27 +212,19 @@ export function TableSettingsMenu({
         open={popoverOpen}
         onOpenChange={(e) => setPopoverOpen(e.open)}
       >
-        <Tooltip
-          content="Workbench settings"
-          positioning={{ placement: "bottom" }}
-          openDelay={100}
-        >
-          {/* The additional Box element is here to fix the tooltip: https://github.com/chakra-ui/chakra-ui/issues/2843 */}
-          <Box display="inline-block">
-            <Popover.Trigger asChild>
-              <IconButton
-                variant="ghost"
-                size="sm"
-                color="fg.muted"
-                _hover={{ color: "fg", bg: "bg.subtle" }}
-                disabled={disabled}
-                aria-label="Workbench settings"
-              >
-                <SlidersHorizontal size={18} />
-              </IconButton>
-            </Popover.Trigger>
-          </Box>
-        </Tooltip>
+        <Popover.Trigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            color="fg.muted"
+            _hover={{ color: "fg", bg: "bg.subtle" }}
+            disabled={disabled}
+            aria-label="Run Options"
+          >
+            <SlidersHorizontal size={18} />
+            Run Options
+          </Button>
+        </Popover.Trigger>
         <Popover.Content width="auto" padding={3}>
           <VStack align="stretch" gap={3}>
             {/* Row Height Section */}
@@ -306,8 +292,8 @@ export function TableSettingsMenu({
               />
             </VStack>
 
-            {/* CI/CD Section */}
-            {showCICDOption && (
+            {/* Automation Section */}
+            {showRunViaApi && (
               <>
                 <Box borderTopWidth="1px" borderColor="border" />
                 <VStack align="stretch" gap={1}>
@@ -322,7 +308,7 @@ export function TableSettingsMenu({
                     height="auto"
                     fontSize="13px"
                     fontWeight="normal"
-                    onClick={handleOpenCICDDialog}
+                    onClick={handleOpenRunDialog}
                     _hover={{ bg: "bg.subtle" }}
                   >
                     <HStack gap={2}>
@@ -342,232 +328,15 @@ export function TableSettingsMenu({
         </Popover.Content>
       </Popover.Root>
 
-      {/* CI/CD Dialog */}
-      {showCICDOption && (
-        <CICDDialog
-          open={cicdDialog.open}
-          onClose={cicdDialog.onClose}
-          experimentSlug={experimentSlug}
-          projectSlug={project.slug}
+      {/* Run via API dialog (supersedes the old CI/CD snippet dialog) */}
+      {showRunViaApi && (
+        <RunViaApiDialogContainer
+          open={runDialog.open}
+          onOpenChange={(open) =>
+            open ? runDialog.onOpen() : runDialog.onClose()
+          }
         />
       )}
     </>
   );
 }
-
-// =============================================================================
-// CI/CD Dialog Component
-// =============================================================================
-
-type Language = "python" | "typescript" | "curl";
-
-type CICDDialogProps = {
-  open: boolean;
-  onClose: () => void;
-  experimentSlug: string;
-  projectSlug: string;
-};
-
-const CICDDialog = React.memo(function CICDDialog({
-  open,
-  onClose,
-  experimentSlug,
-  projectSlug,
-}: CICDDialogProps) {
-  const [selectedLanguage, setSelectedLanguage] = useState<Language>("python");
-
-  const snippets = useMemo(() => {
-    const baseUrl =
-      typeof window !== "undefined"
-        ? window.location.origin
-        : "https://app.langwatch.ai";
-
-    return {
-      python: generatePythonSnippet(experimentSlug),
-      typescript: generateTypeScriptSnippet(experimentSlug),
-      curl: generateCurlSnippet(experimentSlug, baseUrl),
-    };
-  }, [experimentSlug]);
-
-  const languageConfig: Record<
-    Language,
-    { label: string; prism: PrismLanguage }
-  > = {
-    python: { label: "Python", prism: "python" },
-    typescript: { label: "TypeScript", prism: "typescript" },
-    curl: { label: "curl", prism: "bash" },
-  };
-
-  return (
-    <Dialog.Root
-      open={open}
-      onOpenChange={({ open: isOpen }) => !isOpen && onClose()}
-      size="xl"
-    >
-      <Dialog.Content bg="bg">
-        <Dialog.CloseTrigger />
-        <Dialog.Header width="100%" marginTop={4}>
-          <VStack alignItems="flex-start" gap={2} width="100%">
-            <Dialog.Title>Run in CI/CD</Dialog.Title>
-            <Dialog.Description>
-              Execute this evaluation from your CI/CD pipeline using one of the
-              following code snippets.
-            </Dialog.Description>
-          </VStack>
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack align="stretch" gap={4}>
-            <HStack justify="flex-start">
-              <LanguageMenu
-                selectedLanguage={selectedLanguage}
-                setSelectedLanguage={setSelectedLanguage}
-                languageConfig={languageConfig}
-              />
-            </HStack>
-            <RenderCode
-              code={snippets[selectedLanguage]}
-              language={languageConfig[selectedLanguage].prism}
-              style={{
-                fontSize: "12px",
-                lineHeight: "1.5",
-                fontFamily: "monospace",
-                whiteSpace: "pre-wrap",
-                padding: "20px",
-                borderRadius: "5px",
-              }}
-            />
-            <VStack align="flex-start" gap={2}>
-              <Text fontSize="sm" color="fg.muted">
-                Set the <code>LANGWATCH_API_KEY</code> environment variable with
-                your API key.{" "}
-                <Link asChild color="blue.fg">
-                  <NextLink href={`/${projectSlug}/setup`}>
-                    Find your API key{" "}
-                    <ExternalLink
-                      size={12}
-                      style={{ display: "inline", marginLeft: "2px" }}
-                    />
-                  </NextLink>
-                </Link>
-              </Text>
-              <Text fontSize="sm" color="fg.muted">
-                Learn more about running evaluations from CI/CD in our{" "}
-                <Link
-                  href="https://docs.langwatch.ai/llm-evaluation/offline/platform/ci-cd-execution"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  color="blue.fg"
-                >
-                  documentation{" "}
-                  <ExternalLink
-                    size={12}
-                    style={{ display: "inline", marginLeft: "2px" }}
-                  />
-                </Link>
-              </Text>
-            </VStack>
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer />
-      </Dialog.Content>
-    </Dialog.Root>
-  );
-});
-
-// =============================================================================
-// Language Menu Component
-// =============================================================================
-
-const LanguageMenu = React.memo(function LanguageMenu({
-  selectedLanguage,
-  setSelectedLanguage,
-  languageConfig,
-}: {
-  selectedLanguage: Language;
-  setSelectedLanguage: (language: Language) => void;
-  languageConfig: Record<Language, { label: string; prism: PrismLanguage }>;
-}) {
-  const { open, onOpen, onClose } = useDisclosure();
-  const languages: Language[] = ["python", "typescript", "curl"];
-
-  return (
-    <Menu.Root
-      open={open}
-      onOpenChange={({ open: isOpen }) => (isOpen ? onOpen() : onClose())}
-    >
-      <Menu.Trigger asChild>
-        <Button aria-label="Select language" size="sm" variant="outline">
-          {languageConfig[selectedLanguage].label}
-          <ChevronDownIcon />
-        </Button>
-      </Menu.Trigger>
-      <Menu.Content>
-        {languages.map((lang) => (
-          <Menu.Item
-            key={lang}
-            value={lang}
-            onClick={() => setSelectedLanguage(lang)}
-          >
-            {languageConfig[lang].label}
-            {selectedLanguage === lang && <CheckIcon />}
-          </Menu.Item>
-        ))}
-      </Menu.Content>
-    </Menu.Root>
-  );
-});
-
-// =============================================================================
-// Code Snippet Generators
-// =============================================================================
-
-const generatePythonSnippet = (slug: string): string => {
-  return `import langwatch
-
-result = langwatch.experiment.run("${slug}")
-result.print_summary()`;
-};
-
-const generateTypeScriptSnippet = (slug: string): string => {
-  return `import { LangWatch } from "langwatch";
-
-const langwatch = new LangWatch();
-
-const result = await langwatch.experiments.run("${slug}");
-result.printSummary();`;
-};
-
-const generateCurlSnippet = (slug: string, baseUrl: string): string => {
-  return `# Start the evaluation run
-RUN_RESPONSE=$(curl -s -X POST "${baseUrl}/api/experiments/${slug}/run" \\
-  -H "X-Auth-Token: \${LANGWATCH_API_KEY}")
-
-RUN_ID=$(echo $RUN_RESPONSE | jq -r '.runId')
-echo "Started run: $RUN_ID"
-
-# Poll for completion
-while true; do
-  STATUS_RESPONSE=$(curl -s "${baseUrl}/api/experiments/runs/$RUN_ID" \\
-    -H "X-Auth-Token: \${LANGWATCH_API_KEY}")
-
-  STATUS=$(echo $STATUS_RESPONSE | jq -r '.status')
-  PROGRESS=$(echo $STATUS_RESPONSE | jq -r '.progress')
-  TOTAL=$(echo $STATUS_RESPONSE | jq -r '.total')
-
-  echo "Progress: $PROGRESS/$TOTAL"
-
-  if [ "$STATUS" = "completed" ] || [ "$STATUS" = "failed" ]; then
-    break
-  fi
-
-  sleep 2
-done
-
-# Show results
-echo $STATUS_RESPONSE | jq '.summary'
-
-# Exit with error if failed
-if [ "$STATUS" = "failed" ]; then
-  exit 1
-fi`;
-};
