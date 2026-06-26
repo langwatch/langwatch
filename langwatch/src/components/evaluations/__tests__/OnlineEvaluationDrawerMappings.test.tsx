@@ -21,15 +21,17 @@ import {
 } from "~/hooks/useDrawer";
 import { clearOnlineEvaluationDrawerState } from "../OnlineEvaluationDrawer";
 import {
-  state,
   mockEvaluators,
-  Wrapper,
   resetState,
+  state,
+  Wrapper,
 } from "./OnlineEvaluationDrawer.test-helpers.tsx";
 
 // vi.mock() factories are hoisted above imports, so we use async + dynamic import
 vi.mock("~/utils/compat/next-router", async () =>
-  (await import("./OnlineEvaluationDrawer.test-helpers.tsx")).createRouterMock(),
+  (
+    await import("./OnlineEvaluationDrawer.test-helpers.tsx")
+  ).createRouterMock(),
 );
 vi.mock("~/utils/api", async () =>
   (await import("./OnlineEvaluationDrawer.test-helpers.tsx")).createApiMock(),
@@ -38,10 +40,14 @@ vi.mock("~/hooks/useOrganizationTeamProject", async () =>
   (await import("./OnlineEvaluationDrawer.test-helpers.tsx")).createOrgMock(),
 );
 vi.mock("~/stores/upgradeModalStore", async () =>
-  (await import("./OnlineEvaluationDrawer.test-helpers.tsx")).createUpgradeModalMock(),
+  (
+    await import("./OnlineEvaluationDrawer.test-helpers.tsx")
+  ).createUpgradeModalMock(),
 );
 vi.mock("~/hooks/useLicenseEnforcement", async () =>
-  (await import("./OnlineEvaluationDrawer.test-helpers.tsx")).createLicenseEnforcementMock(),
+  (
+    await import("./OnlineEvaluationDrawer.test-helpers.tsx")
+  ).createLicenseEnforcementMock(),
 );
 
 // Mock scrollIntoView which jsdom doesn't support
@@ -80,11 +86,14 @@ describe.skip("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integratio
     user: ReturnType<typeof userEvent.setup>,
     level: "trace" | "thread" = "trace",
   ) => {
-    const levelLabel = level === "trace" ? /Trace Level/i : /Thread Level/i;
+    const levelName = level === "trace" ? /Trace Level/i : /Thread Level/i;
     await waitFor(() => {
-      expect(screen.getByLabelText(levelLabel)).toBeInTheDocument();
+      expect(
+        screen.getByRole("radio", { name: levelName }),
+      ).toBeInTheDocument();
     });
-    await user.click(screen.getByLabelText(levelLabel));
+    const radio = screen.getByRole("radio", { name: levelName });
+    await user.click(radio.closest("label") ?? radio);
     await vi.advanceTimersByTimeAsync(50);
   };
 
@@ -307,8 +316,10 @@ describe.skip("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integratio
     await waitFor(() => {
       const sourceTags = screen.getAllByTestId("source-mapping-tag");
       expect(sourceTags.length).toBeGreaterThan(0);
-      const hasSpansOutputMapping = sourceTags.some((tag) =>
-        tag.textContent?.includes("spans") && tag.textContent?.includes("output"),
+      const hasSpansOutputMapping = sourceTags.some(
+        (tag) =>
+          tag.textContent?.includes("spans") &&
+          tag.textContent?.includes("output"),
       );
       expect(hasSpansOutputMapping).toBe(true);
     });
