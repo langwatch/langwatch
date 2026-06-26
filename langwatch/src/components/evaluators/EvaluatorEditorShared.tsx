@@ -700,6 +700,11 @@ export function EvaluatorEditorBody({
             prefix="settings"
             errors={form.formState.errors.settings}
             variant="default"
+            // Pairwise renders include_metrics as inline Switches in
+            // PairwiseConfigForm; suppress the generic array-of-literals
+            // renderer here so the user doesn't see two competing UIs
+            // for the same field.
+            skipFields={isPairwise ? ["include_metrics"] : undefined}
           />
         )}
 

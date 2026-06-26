@@ -11,8 +11,10 @@ import { ChakraProvider, HStack } from "@chakra-ui/react";
 import { system as langwatchSystem } from "~/pages/_app";
 import { cleanup, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
-import { afterEach, describe, it, vi } from "vitest";
-import { page } from "vitest/browser";
+import { useState } from "react";
+import { FormProvider, useForm } from "react-hook-form";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { page, userEvent } from "vitest/browser";
 
 vi.mock("../../hooks/useEvaluatorName", () => ({
   useEvaluatorName: () => "Pairwise Compare",
@@ -50,6 +52,45 @@ const datasetColumns = [
   { id: "c2", name: "expected_output" },
   { id: "c3", name: "context" },
 ];
+
+/**
+ * Harness for the unified-drawer toggle verification. Wraps the form in a
+ * real react-hook-form provider so the Include cost / Include duration
+ * switches actually drive `settings.include_metrics` (the field the
+ * runner consumes), and surfaces a live readout of that field so the
+ * test can assert the click-to-toggle behavior end-to-end.
+ */
+function PairwiseHarness({
+  initialMetrics = [] as ("cost" | "duration")[],
+}: {
+  initialMetrics?: ("cost" | "duration")[];
+}) {
+  const form = useForm({
+    defaultValues: { name: "Pairwise Compare", settings: { include_metrics: initialMetrics } },
+  });
+  const [pairwise, setPairwise] = useState({
+    variantA: "variant_a",
+    variantB: "variant_b",
+    goldenField: "expected_output",
+    includeMetrics: initialMetrics,
+  });
+  const metrics = form.watch("settings.include_metrics");
+  return (
+    <FormProvider {...form}>
+      <div style={{ width: 480, padding: 16, background: "white" }}>
+        <PairwiseConfigForm
+          value={pairwise}
+          onChange={setPairwise}
+          targets={targets}
+          datasetColumns={datasetColumns}
+        />
+        <div data-testid="metrics-readout" style={{ paddingTop: 8, fontFamily: "monospace" }}>
+          settings.include_metrics = {JSON.stringify(metrics)}
+        </div>
+      </div>
+    </FormProvider>
+  );
+}
 
 describe("Pairwise compare UI preview (PR #5106)", () => {
   it("PairwiseConfigForm — initial state with metrics checked", async () => {
@@ -245,5 +286,46 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
     await page.screenshot({
       path: "/tmp/pr5106/07-evaluator-chip-tints.png",
     });
+  });
+
+  it("Include duration switch — toggles on click and writes to settings.include_metrics", async () => {
+    await page.viewport(560, 700);
+    render(
+      <ChakraProvider value={langwatchSystem}>
+        <PairwiseHarness initialMetrics={[]} />
+      </ChakraProvider>,
+    );
+
+    const durationSwitch = await screen.findByTestId(
+      "pairwise-include-duration",
+    );
+    const readout = screen.getByTestId("metrics-readout");
+
+    // OFF: nothing in the array, switch unchecked.
+    expect(durationSwitch).toHaveAttribute("data-state", "unchecked");
+    expect(readout.textContent).toContain("settings.include_metrics = []");
+    await page.screenshot({
+      path: "/tmp/pr5106/08-include-duration-off.png",
+    });
+
+    // Use the browser's real click so Chakra's label-wrapped hidden
+    // checkbox toggles for real (synthetic fireEvent.click on the label
+    // doesn't propagate to the input).
+    await userEvent.click(page.getByTestId("pairwise-include-duration"));
+
+    // ON: duration in the array, switch checked.
+    expect(durationSwitch).toHaveAttribute("data-state", "checked");
+    expect(readout.textContent).toContain(
+      'settings.include_metrics = ["duration"]',
+    );
+    await page.screenshot({
+      path: "/tmp/pr5106/09-include-duration-on.png",
+    });
+
+    await userEvent.click(page.getByTestId("pairwise-include-duration"));
+
+    // Click again: back to OFF — proves it's a real toggle, not a one-way.
+    expect(durationSwitch).toHaveAttribute("data-state", "unchecked");
+    expect(readout.textContent).toContain("settings.include_metrics = []");
   });
 });

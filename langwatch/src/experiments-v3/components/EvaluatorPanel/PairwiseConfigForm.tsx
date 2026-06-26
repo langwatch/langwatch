@@ -1,6 +1,5 @@
 import {
   Box,
-  Checkbox,
   Field,
   HStack,
   Icon,
@@ -9,7 +8,16 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { ChangeEvent } from "react";
+import { useCallback } from "react";
+import {
+  type UseFormReturn,
+  useForm,
+  useFormContext,
+  useWatch,
+} from "react-hook-form";
 import { LuCheck } from "react-icons/lu";
+
+import { Switch } from "~/components/ui/switch";
 
 import type {
   PairwiseEvaluatorConfig,
@@ -18,18 +26,22 @@ import type {
 
 /**
  * Configuration form for the langevals/pairwise_compare evaluator
- * (#5100). Three required selects:
+ * (#5100). Required selects:
  *
  *   1. Variant A   — id of an existing TargetConfig
  *   2. Variant B   — id of a different existing TargetConfig
  *   3. Golden      — name of a dataset column whose value is the
  *                    reference answer
  *
- * Plus optional metrics checkboxes (cost / latency) that inject
- * per-candidate stats into the judge prompt.
+ * Plus per-candidate metric switches (cost / duration). The metric
+ * switches read/write directly to the parent form's
+ * `settings.include_metrics` so there's a single source of truth
+ * that the runner actually consumes — the legacy
+ * `pairwise.includeMetrics` is mirrored on every write so existing
+ * orchestrator paths keep working until they're migrated.
  *
- * Rendered inside `ConfigPanel` when the user adds an evaluator of
- * type `langevals/pairwise_compare`.
+ * Rendered inside `EvaluatorEditorBody` when the user edits an
+ * evaluator of type `langevals/pairwise_compare`.
  */
 
 export type DatasetColumn = { id: string; name: string };
@@ -43,22 +55,62 @@ export type PairwiseConfigFormProps = {
   datasetColumns: DatasetColumn[];
 };
 
+type Metric = "cost" | "duration";
+
 export function PairwiseConfigForm({
   value,
   onChange,
   targets,
   datasetColumns,
 }: PairwiseConfigFormProps) {
+  // useFormContext returns null when this form is rendered bare (the
+  // visual-preview tests do that). Maintain a local fallback form so the
+  // toggles stay interactive in that mode — useWatch needs a real control.
+  const parentForm = useFormContext<{
+    name: string;
+    settings: { include_metrics?: Metric[] };
+  }>() as
+    | UseFormReturn<{ name: string; settings: { include_metrics?: Metric[] } }>
+    | null;
+  const fallbackForm = useForm<{
+    name: string;
+    settings: { include_metrics?: Metric[] };
+  }>({
+    defaultValues: {
+      name: "",
+      settings: { include_metrics: value.includeMetrics ?? [] },
+    },
+  });
+  const form = parentForm ?? fallbackForm;
+
+  const formMetrics = useWatch({
+    control: form.control,
+    name: "settings.include_metrics",
+  }) as Metric[] | undefined;
+
+  // Single source of truth: prefer the parent form, fall back to the
+  // legacy pairwise.includeMetrics record for back-compat reads.
+  const activeMetrics: Metric[] = formMetrics ?? value.includeMetrics ?? [];
+
   const update = (patch: Partial<PairwiseEvaluatorConfig>) => {
     onChange({ ...value, ...patch });
   };
 
-  const toggleMetric = (metric: "cost" | "duration", on: boolean) => {
-    const set = new Set(value.includeMetrics);
-    if (on) set.add(metric);
-    else set.delete(metric);
-    update({ includeMetrics: Array.from(set) });
-  };
+  const toggleMetric = useCallback(
+    (metric: Metric, on: boolean) => {
+      const set = new Set(activeMetrics);
+      if (on) set.add(metric);
+      else set.delete(metric);
+      const next = Array.from(set);
+      form.setValue("settings.include_metrics", next, {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+      // Keep the legacy pairwise mirror in sync until callers stop reading it.
+      update({ includeMetrics: next });
+    },
+    [activeMetrics, form, value, onChange],
+  );
 
   // Variant B options exclude variant A so the user can't pick the same
   // target twice (a pairwise comparison of X vs X is always a tie).
@@ -66,6 +118,33 @@ export function PairwiseConfigForm({
 
   return (
     <VStack align="stretch" gap={4} padding={4}>
+      <Box>
+        <Text fontSize="sm" fontWeight="medium">
+          Include Metrics
+        </Text>
+        <Text fontSize="xs" color="fg.muted" marginBottom={2}>
+          Per-candidate metrics to inject into the judge prompt
+        </Text>
+        <VStack align="stretch" gap={2}>
+          <Switch
+            checked={activeMetrics.includes("cost")}
+            onCheckedChange={(d) => toggleMetric("cost", d.checked === true)}
+            data-testid="pairwise-include-cost"
+          >
+            Include cost
+          </Switch>
+          <Switch
+            checked={activeMetrics.includes("duration")}
+            onCheckedChange={(d) =>
+              toggleMetric("duration", d.checked === true)
+            }
+            data-testid="pairwise-include-duration"
+          >
+            Include duration
+          </Switch>
+        </VStack>
+      </Box>
+
       <Field.Root required>
         <Field.Label>Variant A</Field.Label>
         <NativeSelect.Root>
@@ -119,32 +198,6 @@ export function PairwiseConfigForm({
           Reference answer the judge compares each candidate against.
         </Field.HelperText>
       </Field.Root>
-
-      <Box>
-        <Text fontSize="sm" fontWeight="medium" marginBottom={2}>
-          Include metrics in prompt
-        </Text>
-        <VStack align="stretch" gap={1}>
-          <Checkbox.Root
-            checked={value.includeMetrics.includes("cost")}
-            onCheckedChange={(d) => toggleMetric("cost", d.checked === true)}
-          >
-            <Checkbox.HiddenInput />
-            <Checkbox.Control />
-            <Checkbox.Label>Include cost</Checkbox.Label>
-          </Checkbox.Root>
-          <Checkbox.Root
-            checked={value.includeMetrics.includes("duration")}
-            onCheckedChange={(d) =>
-              toggleMetric("duration", d.checked === true)
-            }
-          >
-            <Checkbox.HiddenInput />
-            <Checkbox.Control />
-            <Checkbox.Label>Include latency</Checkbox.Label>
-          </Checkbox.Root>
-        </VStack>
-      </Box>
 
       <HStack gap={2} color="fg.muted" fontSize="xs">
         <Icon as={LuCheck} color="green.fg" boxSize="14px" />
