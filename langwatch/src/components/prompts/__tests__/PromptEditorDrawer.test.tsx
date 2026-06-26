@@ -1114,6 +1114,52 @@ describe("PromptEditorDrawer", () => {
     });
   });
 
+  describe("when the referenced prompt is not found (imported workflow)", () => {
+    beforeEach(() => {
+      // The prompt referenced by id is not in this project: DB query returns null.
+      mockGetByIdOrHandle.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+      });
+    });
+
+    /** @scenario "A node whose library prompt is missing shows its inline config" */
+    it("falls back to inlineConfigFallback instead of an empty form", async () => {
+      const inlineConfigFallback = {
+        llm: { model: "gpt-5-mini" },
+        messages: [
+          { role: "system" as const, content: "INLINE-FALLBACK-CONTENT" },
+        ],
+        inputs: [{ identifier: "question", type: "str" as const }],
+        outputs: [{ identifier: "answer", type: "str" as const }],
+      };
+
+      renderWithProviders(
+        <PromptEditorDrawer
+          open={true}
+          promptId="missing-prompt"
+          inlineConfigFallback={inlineConfigFallback}
+        />,
+      );
+
+      // The form must initialize with the node's inline config, not an empty
+      // "New Prompt" form, so an imported workflow still shows its prompt.
+      await waitFor(() => {
+        const captured = capturedInitialConfigValues as Array<{
+          version?: {
+            configData?: { messages?: Array<{ content?: string }> };
+          };
+        }>;
+        const usedFallback = captured.some((c) =>
+          c?.version?.configData?.messages?.some(
+            (m) => m?.content === "INLINE-FALLBACK-CONTENT",
+          ),
+        );
+        expect(usedFallback).toBe(true);
+      });
+    });
+  });
+
   describe("License enforcement (prompts limit)", () => {
     beforeEach(() => {
       mockGetByIdOrHandle.mockReturnValue({
