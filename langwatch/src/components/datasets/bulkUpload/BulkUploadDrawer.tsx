@@ -8,6 +8,7 @@
 import {
   Box,
   Button,
+  chakra,
   Heading,
   HStack,
   Icon,
@@ -64,6 +65,7 @@ import {
   RAINBOW_TEXT_CSS,
 } from "../datasetDropzoneStyles";
 import { reorderColumnsBySourceHeader } from "./columnReorder";
+import { invalidColumnNameKeys } from "./columnValidation";
 import { type BulkFile, useBulkUpload } from "./useBulkUpload";
 
 // Visually hidden but kept in the tab order (not display:none) so the picker is
@@ -110,6 +112,10 @@ function BulkColumnFields({
   const activeColumn =
     columnTypes.find((c) => c.sourceHeader === activeId) ?? null;
 
+  // Columns whose name is blank or duplicated — flagged inline and blocking the
+  // upload, since normalize would otherwise drop/collide their values.
+  const invalidKeys = invalidColumnNameKeys(columnTypes);
+
   const setBySource = (
     sourceHeader: string,
     patch: Partial<DatasetConfirmColumns[number]>,
@@ -152,6 +158,7 @@ function BulkColumnFields({
               key={col.sourceHeader}
               col={col}
               index={index}
+              invalid={invalidKeys.has(col.sourceHeader)}
               onName={(name) => setBySource(col.sourceHeader, { name })}
               onType={(type) => setBySource(col.sourceHeader, { type })}
               // Exclude this column: drop it from the confirmed list so normalize
@@ -193,12 +200,15 @@ function BulkColumnFields({
 function SortableColumnRow({
   col,
   index,
+  invalid,
   onName,
   onType,
   onRemove,
 }: {
   col: DatasetConfirmColumns[number];
   index: number;
+  /** Name is blank or collides with another column — flagged + blocks upload. */
+  invalid?: boolean;
   onName: (name: string) => void;
   onType: (type: DatasetConfirmColumns[number]["type"]) => void;
   /** Exclude this column. Undefined when it's the last one (can't drop it). */
@@ -214,61 +224,73 @@ function SortableColumnRow({
   } = useSortable({ id: col.sourceHeader });
 
   return (
-    <HStack
+    <VStack
       ref={setNodeRef}
       style={{
         transform: CSS.Translate.toString(transform),
         transition,
         opacity: isDragging ? 0.4 : 1,
       }}
-      gap={2}
+      align="stretch"
+      gap={1}
       width="full"
-      paddingX={1}
     >
-      <Box
-        {...attributes}
-        {...(listeners ?? {})}
-        display="inline-flex"
-        alignItems="center"
-        justifyContent="center"
-        color="fg.subtle"
-        cursor="grab"
-        _active={{ cursor: "grabbing" }}
-        aria-label={`Drag to reorder ${col.name}`}
-        title="Drag to reorder"
-      >
-        <Icon boxSize="16px">
-          <GripVertical />
-        </Icon>
-      </Box>
-      <Input
-        size="sm"
-        value={col.name}
-        aria-label={`Column ${index + 1} name`}
-        onChange={(e) => onName(e.target.value)}
-      />
-      <ColumnTypeSelect
-        value={col.type}
-        onChange={onType}
-        aria-label={`Column ${index + 1} type`}
-      />
-      <Box
-        as="button"
-        aria-label={`Exclude ${col.name}`}
-        title="Exclude column"
-        display="flex"
-        alignItems="center"
-        color="fg.subtle"
-        flexShrink={0}
-        aria-disabled={!onRemove}
-        cursor={onRemove ? "pointer" : "not-allowed"}
-        opacity={onRemove ? 1 : 0.3}
-        _hover={onRemove ? { color: "red.500" } : undefined}
-        onClick={onRemove}
-      >
-        <Trash2 size={16} />
-      </Box>
-    </HStack>
+      <HStack gap={2} width="full" paddingX={1}>
+        <Box
+          {...attributes}
+          {...(listeners ?? {})}
+          display="inline-flex"
+          alignItems="center"
+          justifyContent="center"
+          color="fg.subtle"
+          cursor="grab"
+          _active={{ cursor: "grabbing" }}
+          aria-label={`Drag to reorder ${col.name}`}
+          title="Drag to reorder"
+        >
+          <Icon boxSize="16px">
+            <GripVertical />
+          </Icon>
+        </Box>
+        <Input
+          size="sm"
+          value={col.name}
+          aria-label={`Column ${index + 1} name`}
+          aria-invalid={invalid || undefined}
+          borderColor={invalid ? "red.400" : undefined}
+          _focusVisible={invalid ? { borderColor: "red.400" } : undefined}
+          onChange={(e) => onName(e.target.value)}
+        />
+        <ColumnTypeSelect
+          value={col.type}
+          onChange={onType}
+          aria-label={`Column ${index + 1} type`}
+        />
+        <chakra.button
+          type="button"
+          aria-label={`Exclude ${col.name}`}
+          title="Exclude column"
+          disabled={!onRemove}
+          display="flex"
+          alignItems="center"
+          color="fg.subtle"
+          flexShrink={0}
+          cursor={onRemove ? "pointer" : "not-allowed"}
+          opacity={onRemove ? 1 : 0.3}
+          _hover={onRemove ? { color: "red.500" } : undefined}
+          onClick={onRemove}
+        >
+          <Trash2 size={16} />
+        </chakra.button>
+      </HStack>
+      {invalid && (
+        <Text role="alert" fontSize="xs" color="red.500" paddingLeft={7}>
+          {col.name.trim() === ""
+            ? "Name is required"
+            : "Column names must be unique"}
+        </Text>
+      )}
+    </VStack>
   );
 }
 
@@ -649,6 +671,15 @@ export function BulkUploadDrawer({
   const bulk = useBulkUpload(projectId);
   const [zoneHover, setZoneHover] = useState(false);
 
+  // Block the upload while any pending file has a blank or duplicated column
+  // name — normalize would drop/collide those values (see invalidColumnNameKeys).
+  const hasInvalidColumns = bulk.files.some(
+    (file) =>
+      file.status === "pending" &&
+      !!file.columnTypes &&
+      invalidColumnNameKeys(file.columnTypes).size > 0,
+  );
+
   const onDropFiles = (fileList: FileList | null) => {
     if (fileList && fileList.length > 0) {
       void bulk.addFiles(Array.from(fileList));
@@ -774,7 +805,9 @@ export function BulkUploadDrawer({
               </Button>
               <Button
                 colorPalette="blue"
-                disabled={!bulk.hasUploadable || !projectId}
+                disabled={
+                  !bulk.hasUploadable || !projectId || hasInvalidColumns
+                }
                 onClick={() => bulk.start()}
               >
                 Upload all

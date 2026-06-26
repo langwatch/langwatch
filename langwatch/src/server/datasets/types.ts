@@ -68,13 +68,39 @@ export type DatasetColumns = z.infer<typeof datasetColumnsSchema>;
  * normalize strips it and persists a clean `DatasetColumns` in the user's
  * chosen order.
  */
-export const datasetConfirmColumnsSchema = z.array(
-  z.object({
-    name: z.string(),
-    type: datasetColumnTypeSchema,
-    sourceHeader: z.string(),
-  }),
-);
+export const datasetConfirmColumnsSchema = z
+  .array(
+    z.object({
+      name: z.string(),
+      type: datasetColumnTypeSchema,
+      sourceHeader: z.string(),
+    }),
+  )
+  // Names become the stored record keys (normalize writes `out[target.name]`),
+  // so a blank name yields an `""`-keyed column and a duplicated name collapses
+  // two columns onto one key — the second silently overwriting the first in
+  // every row. Reject both at the boundary rather than persist a corrupt
+  // dataset (the confirm UI blocks the same cases before upload).
+  .superRefine((columns, ctx) => {
+    const seen = new Set<string>();
+    columns.forEach((column, index) => {
+      if (column.name.trim() === "") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "column name must not be blank",
+          path: [index, "name"],
+        });
+      }
+      if (seen.has(column.name)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `duplicate column name: ${column.name}`,
+          path: [index, "name"],
+        });
+      }
+      seen.add(column.name);
+    });
+  });
 export type DatasetConfirmColumns = z.infer<typeof datasetConfirmColumnsSchema>;
 
 export const datasetRecordFormSchema = z.object({

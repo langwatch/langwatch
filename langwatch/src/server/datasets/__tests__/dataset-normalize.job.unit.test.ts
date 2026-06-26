@@ -715,6 +715,116 @@ describe("createDatasetNormalizeHandler()", () => {
         });
       });
 
+      describe("when two columns were renamed to the same name", () => {
+        it("degrades to derive-all-string instead of colliding values onto one key", async () => {
+          // `out[target.name]` would write both file values under the shared name,
+          // silently dropping one and persisting a malformed two-entry columnTypes
+          // against a one-key record. Degrade rather than corrupt.
+          const { storage, writeChunks } = makeStorage({
+            streamStaged: vi
+              .fn()
+              .mockResolvedValue(
+                Readable.from(['{"a":"VAL_A","b":"VAL_B"}\n']),
+              ),
+          });
+          const repo = makeRepo({
+            id: "d1",
+            status: "processing",
+            columnTypes: [
+              { name: "input", type: "string", sourceHeader: "a" },
+              { name: "input", type: "string", sourceHeader: "b" },
+            ],
+          });
+
+          const handler = createDatasetNormalizeHandler({
+            repository: repo as any,
+            getStorage: async () => storage as any,
+          });
+          await handler(basePayload);
+
+          const entries = writeChunks.mock.calls
+            .flatMap((call: any) => call[0].records)
+            .map((record: any) => record.entry as Record<string, unknown>);
+          // Both values preserved under their original headers — nothing dropped.
+          expect(entries).toEqual([{ a: "VAL_A", b: "VAL_B" }]);
+          const update = repo.update.mock.calls[0]![0];
+          expect(update.data.columnTypes).toEqual([
+            { name: "a", type: "string" },
+            { name: "b", type: "string" },
+          ]);
+        });
+      });
+
+      describe("when a column was renamed to a blank name", () => {
+        it("degrades to derive-all-string instead of writing an empty-keyed column", async () => {
+          const { storage, writeChunks } = makeStorage({
+            streamStaged: vi
+              .fn()
+              .mockResolvedValue(Readable.from(['{"a":"1","b":"x"}\n'])),
+          });
+          const repo = makeRepo({
+            id: "d1",
+            status: "processing",
+            columnTypes: [
+              { name: "", type: "string", sourceHeader: "a" },
+              { name: "b", type: "string", sourceHeader: "b" },
+            ],
+          });
+
+          const handler = createDatasetNormalizeHandler({
+            repository: repo as any,
+            getStorage: async () => storage as any,
+          });
+          await handler(basePayload);
+
+          const entries = writeChunks.mock.calls
+            .flatMap((call: any) => call[0].records)
+            .map((record: any) => record.entry as Record<string, unknown>);
+          expect(entries).toEqual([{ a: "1", b: "x" }]);
+          const update = repo.update.mock.calls[0]![0];
+          expect(update.data.columnTypes).toEqual([
+            { name: "a", type: "string" },
+            { name: "b", type: "string" },
+          ]);
+        });
+      });
+
+      describe("when only some columns carry a sourceHeader (partial confirm payload)", () => {
+        it("degrades to derive-all-string instead of positional-binding a client bug", async () => {
+          const { storage, writeChunks } = makeStorage({
+            streamStaged: vi
+              .fn()
+              .mockResolvedValue(Readable.from(['{"a":"1","b":"x"}\n'])),
+          });
+          const repo = makeRepo({
+            id: "d1",
+            status: "processing",
+            // `a` carries a sourceHeader, `b` lost it — a malformed confirm
+            // payload, not a legacy list. Positional-binding it could mis-map.
+            columnTypes: [
+              { name: "alpha", type: "string", sourceHeader: "a" },
+              { name: "beta", type: "string" },
+            ],
+          });
+
+          const handler = createDatasetNormalizeHandler({
+            repository: repo as any,
+            getStorage: async () => storage as any,
+          });
+          await handler(basePayload);
+
+          const entries = writeChunks.mock.calls
+            .flatMap((call: any) => call[0].records)
+            .map((record: any) => record.entry as Record<string, unknown>);
+          expect(entries).toEqual([{ a: "1", b: "x" }]);
+          const update = repo.update.mock.calls[0]![0];
+          expect(update.data.columnTypes).toEqual([
+            { name: "a", type: "string" },
+            { name: "b", type: "string" },
+          ]);
+        });
+      });
+
       describe("when columns share a duplicate sourceHeader", () => {
         // A confirm payload with the same sourceHeader twice collapses in the
         // header→column map. Binding fewer columns than claimed would persist a

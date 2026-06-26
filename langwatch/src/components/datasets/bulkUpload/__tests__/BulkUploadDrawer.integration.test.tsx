@@ -332,10 +332,33 @@ describe("given the bulk upload drawer", () => {
       // Drop one of the two columns; the survivor's exclude control is disabled
       // (a zero-column dataset is invalid).
       await user.click(await screen.findByLabelText("Exclude a"));
-      expect(await screen.findByLabelText("Exclude b")).toHaveAttribute(
-        "aria-disabled",
-        "true",
+      expect(await screen.findByLabelText("Exclude b")).toBeDisabled();
+    });
+
+    it("blocks upload while two columns share a name, and re-enables once fixed", async () => {
+      const user = userEvent.setup();
+      render_();
+      await user.upload(fileInput(), [csv("data.csv")]);
+      await waitFor(() =>
+        expect(screen.getByText(/confirm types/i)).toBeInTheDocument(),
       );
+      await user.click(screen.getByText(/confirm types/i));
+
+      // Rename the second column onto the first's name — normalize would collide
+      // their values, so the upload must be blocked until it's resolved.
+      const second = await screen.findByLabelText("Column 2 name");
+      await user.clear(second);
+      await user.type(second, "a");
+
+      await waitFor(() => expect(uploadButton()).toBeDisabled());
+      expect(
+        screen.getAllByText(/column names must be unique/i).length,
+      ).toBeGreaterThan(0);
+
+      // Resolve the collision → the gate clears.
+      await user.clear(second);
+      await user.type(second, "b");
+      await waitFor(() => expect(uploadButton()).toBeEnabled());
     });
 
     /** @scenario Files that share a name become distinct datasets */

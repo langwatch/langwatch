@@ -233,6 +233,19 @@ const parseInto = async (params: {
   const buildTargetMap = (canonical: string[]): void => {
     // An empty confirmed list can't produce a 0-column dataset; degrade instead.
     if (!targetColumns || targetColumns.length === 0) return;
+    // Confirmed names become the stored record keys (`out[target.name]` below),
+    // so a blank or duplicated name would collapse two columns onto one key
+    // (silent per-record data loss) or write an `""`-keyed column. The upload
+    // route's schema already rejects this, so reaching here means a malformed
+    // stored row — degrade to a derived all-`string` schema rather than emit the
+    // corruption.
+    const names = targetColumns.map((c) => c.name);
+    if (
+      names.some((name) => name.trim() === "") ||
+      new Set(names).size !== names.length
+    ) {
+      return;
+    }
     // Prefer binding by the immutable `sourceHeader` (survives drag-reorder +
     // rename + exclusion); fall back to positional binding for legacy bare
     // name+type lists (which require an exact 1:1 count — no exclusion).
@@ -240,6 +253,16 @@ const parseInto = async (params: {
       (c) =>
         typeof (c as DatasetConfirmColumns[number]).sourceHeader === "string",
     );
+    // A PARTIAL confirm payload (some items carry `sourceHeader`, some don't) is
+    // a client bug, not a legacy list — positional-binding it could silently map
+    // values to the wrong column. Mirror the upload route (which rejects any
+    // "looks like confirm" payload) and degrade rather than fall through to the
+    // positional branch below.
+    const hasAnySourceHeaders = targetColumns.some(
+      (c) =>
+        typeof (c as DatasetConfirmColumns[number]).sourceHeader === "string",
+    );
+    if (hasAnySourceHeaders && !hasSourceHeaders) return;
     if (hasSourceHeaders) {
       const byHeader = new Map(
         (targetColumns as DatasetConfirmColumns).map((c) => [
