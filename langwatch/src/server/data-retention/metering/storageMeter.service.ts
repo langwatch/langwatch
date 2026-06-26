@@ -6,6 +6,11 @@ import {
   RETENTION_TABLE_CATEGORY_MAP,
   type RetentionCategory,
 } from "../retentionPolicy.schema";
+import {
+  BILLABLE_AFTER_DAYS,
+  BILLABLE_AGE_EXPR_BY_TABLE,
+  buildBillableStorageQuery,
+} from "./billableStorageQuery";
 
 const logger = createLogger("langwatch:data-retention:metering");
 
@@ -42,6 +47,27 @@ const METERING_CLICKHOUSE_SETTINGS = {
   max_execution_time: METERING_MAX_EXECUTION_SECONDS,
 } as const;
 
+// The billable measurement adds an age predicate, which forces a wider scan
+// than the cached total (notably `evaluation_runs`, whose retention column
+// `UpdatedAt` is not its partition key, so its predicate cannot prune). Keep the
+// `max_threads` memory cap and add an execution-time ceiling so a pathological
+// tenant query fails fast for the dispatcher to retry rather than hanging a
+// connection and starving the box.
+const BILLABLE_METERING_CLICKHOUSE_SETTINGS = {
+  ...METERING_CLICKHOUSE_SETTINGS,
+  max_execution_time: 45,
+} as const;
+
+/** Resolves an organization's project ids (its ClickHouse tenant ids). */
+export type ProjectIdsResolver = (
+  organizationId: string,
+) => Promise<string[]>;
+
+/** `YYYY-MM-DD HH:MM:SS` in UTC for binding as a `DateTime('UTC')` param. */
+function formatClickHouseUtc(date: Date): string {
+  return date.toISOString().replace("T", " ").slice(0, 19);
+}
+
 interface StorageBreakdown {
   totalBytes: number;
   byCategory: Record<RetentionCategory, number>;
@@ -52,6 +78,7 @@ export class StorageMeterService {
 
   constructor(
     private readonly resolveClickHouseClient: ClickHouseClientResolver | null,
+    private readonly resolveProjectIds?: ProjectIdsResolver,
   ) {
     this.cache = new TtlCache(CACHE_TTL_MS, "storage-meter:");
   }
@@ -71,6 +98,60 @@ export class StorageMeterService {
 
     const total = await this.queryTotalBytes(tenantId);
     await this.cache.set(tenantId, total);
+    return total;
+  }
+
+  /**
+   * Logical (uncompressed `_size_bytes`) stored bytes an organization holds
+   * that are older than the free window, as of a sealed hour `H` (never `now()`)
+   * — the billable storage surface for ADR-027.
+   *
+   * Anchored to `H`: the cutoff is `H − {@link BILLABLE_AFTER_DAYS}` days, bound
+   * as an explicit UTC value, so the result is reproducible regardless of when
+   * it runs or the ClickHouse session timezone. Summed across the org's projects
+   * one tenant-routed query at a time — never a cross-tenant `IN` scan, which
+   * multiplies the heavy `byteSize()` recompute buffer across tenants (the prod
+   * OOM vector).
+   *
+   * Correctness over availability: any tenant query failure throws. The bill
+   * must never silently omit a tenant's bytes; the caller (the reporting
+   * dispatcher) owns retry / skip / kill-switch.
+   *
+   * Returns raw bytes — the caller rounds to MiB.
+   */
+  async getBillableStorageBytesForOrgAt({
+    organizationId,
+    sealedHour,
+  }: {
+    organizationId: string;
+    sealedHour: Date;
+  }): Promise<number> {
+    if (!this.resolveClickHouseClient) return 0;
+    if (!this.resolveProjectIds) {
+      throw new Error(
+        "StorageMeterService: project-ids resolver not configured for billable measurement",
+      );
+    }
+
+    const cutoff = formatClickHouseUtc(
+      new Date(sealedHour.getTime() - BILLABLE_AFTER_DAYS * 24 * 60 * 60 * 1000),
+    );
+    const query = buildBillableStorageQuery(BILLABLE_AGE_EXPR_BY_TABLE);
+
+    const projectIds = await this.resolveProjectIds(organizationId);
+
+    let total = 0;
+    for (const tenantId of projectIds) {
+      const client = await this.resolveClickHouseClient(tenantId);
+      const result = await client.query({
+        query,
+        query_params: { tenantId, cutoff },
+        format: "JSONEachRow",
+        clickhouse_settings: BILLABLE_METERING_CLICKHOUSE_SETTINGS,
+      });
+      const rows = (await result.json()) as Array<{ total: string }>;
+      total += Number(rows[0]?.total ?? 0);
+    }
     return total;
   }
 

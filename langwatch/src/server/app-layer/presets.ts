@@ -480,6 +480,7 @@ export function initializeDefaultApp(options?: {
   );
   const storageMeterService = new StorageMeterService(
     clickhouseEnabled ? resolveClickHouseClient : null,
+    (organizationId) => organizations.getProjectIds(organizationId),
   );
   const dataRetention: DataRetentionDependencies = {
     policy: dataRetentionPolicyService,

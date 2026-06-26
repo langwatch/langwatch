@@ -216,11 +216,25 @@ export function buildDesiredTTLExpression({
   return `${colExpr} + INTERVAL ${days} DAY TO VOLUME 'cold'`;
 }
 
-export function buildRetentionTTLExpression(config: TableTTLEntry): string | null {
+/**
+ * The DateTime expression a table's row age is measured by for retention —
+ * the same column the TTL DELETE clause ages on. Returns null for tables that
+ * carry no retention TTL (e.g. `billable_events`). Storage billing reuses this
+ * so its age predicate can never drift from what TTL actually deletes.
+ */
+export function buildRetentionAgeColumnExpression(
+  config: TableTTLEntry,
+): string | null {
   if (!config.retentionTTLColumn) return null;
-  const colExpr =
+  return (
     config.retentionTTLColumnExpression ??
-    `toDateTime(${config.retentionTTLColumn})`;
+    `toDateTime(${config.retentionTTLColumn})`
+  );
+}
+
+export function buildRetentionTTLExpression(config: TableTTLEntry): string | null {
+  const colExpr = buildRetentionAgeColumnExpression(config);
+  if (!colExpr) return null;
   return `IF(_retention_days > 0, ${colExpr} + toIntervalDay(_retention_days), toDateTime('${INDEFINITE_RETENTION_SENTINEL_DATE}')) DELETE`;
 }
 
