@@ -41,7 +41,6 @@ import {
   useState,
 } from "react";
 import {
-  AlertTriangle,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -73,7 +72,7 @@ import {
   DatasetTableProvider,
   type DatasetTableRowData,
 } from "./DatasetTableContext";
-import { formatRecordCount, truncatedReadTooltip } from "./datasetEditorCopy";
+import { formatRecordCount } from "./datasetEditorCopy";
 import { datasetTableCss } from "./datasetTableStyles";
 import {
   createDatasetEditorStore,
@@ -207,6 +206,11 @@ export function DatasetEditorTable({
       // (listPaginated throws DatasetNotReadyError otherwise).
       enabled: !!project && !!datasetId && readEnabled,
       refetchOnWindowFocus: false,
+      // A background refetch (e.g. on reconnect) would reload the store via
+      // setData and drop an unsaved local edit on the current page — page
+      // navigation is gated on pending writes, but an automatic refetch is not,
+      // so disable it.
+      refetchOnReconnect: false,
       // staleTime 0: returning to a previously-viewed page refetches in the
       // background so a cell edited then navigated-away-from shows its saved
       // value on return (the edit is persisted per-record, not into this cache).
@@ -224,13 +228,20 @@ export function DatasetEditorTable({
     },
   );
 
+  // `pageCount` is the number of pages to navigate — floored at 1 so an EMPTY
+  // dataset (server `totalPages` 0) still reads as a single page and never asks
+  // for page 0 (which the server's `positive()` guard would reject). `currentPage`
+  // is the page actually shown, clamped so it can never exceed the count.
   const totalPages = datasetId ? (databaseDataset.data?.totalPages ?? 1) : 1;
-  const isLastPage = page >= totalPages;
-  // Clamp the page if the dataset shrank under us (e.g. the last page's rows
-  // were all deleted), so we never sit on an empty out-of-range page.
+  const pageCount = Math.max(1, totalPages);
+  const currentPage = Math.min(page, pageCount);
+  const isLastPage = currentPage >= pageCount;
+  // Snap a now-out-of-range page back into range (e.g. the last page's rows were
+  // all deleted under us). Floored via `pageCount`, so this never drives the
+  // page to 0 — it only ever pulls an overshoot down to the real last page.
   useEffect(() => {
-    if (datasetId && page > totalPages) setPage(totalPages);
-  }, [datasetId, page, totalPages]);
+    if (datasetId && page > pageCount) setPage(pageCount);
+  }, [datasetId, page, pageCount]);
 
   const datasetName = datasetId
     ? databaseDataset.data?.name
@@ -387,16 +398,11 @@ export function DatasetEditorTable({
       ? Object.keys(pendingSavedChanges[datasetId] ?? {}).length > 0
       : false);
 
-  // Large-dataset read truncation (ADR-032): saved datasets load via
-  // `getFullDataset`, which stops accumulating rows once it crosses a byte
-  // budget and returns the PG-authoritative total in `count` + a `truncated`
-  // flag. Without surfacing it the chrome shows only the loaded rows (e.g. "3
-  // records") for a 1640-row dataset — misleading. `count` is the source of
-  // truth for the total; `rowCount` is what's actually rendered.
+  // The count chip shows the PG-authoritative whole-dataset total (`count`),
+  // not just the rows on this page; the pager shows the position within it.
+  // (Pagination replaced the old byte-cap truncation, so there is no longer a
+  // partial-read state to surface.)
   const serverRecordCount = datasetId ? databaseDataset.data?.count : undefined;
-  const isTruncatedRead = datasetId
-    ? databaseDataset.data?.truncated === true
-    : false;
   const totalRecordCount = serverRecordCount ?? rowCount;
 
   const rowData = useMemo((): DatasetTableRowData[] => {
@@ -643,46 +649,10 @@ export function DatasetEditorTable({
         ) : (
           title
         )}
-        {isTruncatedRead ? (
-          <Tooltip
-            content={truncatedReadTooltip({
-              shown: rowCount,
-              total: totalRecordCount,
-            })}
-          >
-            <HStack
-              gap={1}
-              cursor="help"
-              // Keyboard-reachable: the explanation is otherwise hover-only, so
-              // make the chip focusable (Tooltip opens on focus too) and expose
-              // the full text to assistive tech via aria-label.
-              tabIndex={0}
-              role="note"
-              aria-label={truncatedReadTooltip({
-                shown: rowCount,
-                total: totalRecordCount,
-              })}
-              data-testid="dataset-row-count"
-            >
-              <Text fontSize="13px" color="fg.muted">
-                {formatRecordCount(rowCount)} out of{" "}
-                {formatRecordCount(totalRecordCount)} records
-              </Text>
-              <Box color="orange.500" display="flex">
-                <AlertTriangle size={13} />
-              </Box>
-            </HStack>
-          </Tooltip>
-        ) : (
-          <Text
-            fontSize="13px"
-            color="fg.muted"
-            data-testid="dataset-row-count"
-          >
-            {formatRecordCount(totalRecordCount)}{" "}
-            {totalRecordCount === 1 ? "record" : "records"}
-          </Text>
-        )}
+        <Text fontSize="13px" color="fg.muted" data-testid="dataset-row-count">
+          {formatRecordCount(totalRecordCount)}{" "}
+          {totalRecordCount === 1 ? "record" : "records"}
+        </Text>
         {datasetId && (
           <SaveStatusChip state={autosave.state} error={autosave.error} />
         )}
@@ -807,17 +777,17 @@ export function DatasetEditorTable({
           </Button>
         )}
         <Spacer />
-        {datasetId && totalPages > 1 && (
+        {datasetId && pageCount > 1 && (
           <HStack gap={2} data-testid="dataset-pager">
             <Button
               size="xs"
               variant="ghost"
               data-testid="dataset-page-prev"
               aria-label="Previous page"
-              disabled={page <= 1 || hasPendingWrites}
+              disabled={currentPage <= 1 || hasPendingWrites}
               onClick={() => {
                 clearRowSelection();
-                setPage((p) => Math.max(1, p - 1));
+                setPage(Math.max(1, currentPage - 1));
               }}
             >
               <ChevronLeft size={14} />
@@ -827,17 +797,17 @@ export function DatasetEditorTable({
               color="fg.muted"
               data-testid="dataset-page-indicator"
             >
-              Page {page} of {totalPages}
+              Page {currentPage} of {pageCount}
             </Text>
             <Button
               size="xs"
               variant="ghost"
               data-testid="dataset-page-next"
               aria-label="Next page"
-              disabled={page >= totalPages || hasPendingWrites}
+              disabled={currentPage >= pageCount || hasPendingWrites}
               onClick={() => {
                 clearRowSelection();
-                setPage((p) => Math.min(totalPages, p + 1));
+                setPage(Math.min(pageCount, currentPage + 1));
               }}
             >
               <ChevronRight size={14} />

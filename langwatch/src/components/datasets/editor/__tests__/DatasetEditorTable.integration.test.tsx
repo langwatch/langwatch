@@ -404,71 +404,75 @@ describe("given a saved dataset", () => {
   });
 });
 
-// ── Large-dataset read truncation (ADR-032) ──────────────────────────
+// ── Whole-dataset total count ────────────────────────────────────────
 
-describe("given a large saved dataset whose read is truncated", () => {
-  const renderSaved = (data: Record<string, unknown>) => {
-    getAllQuery.mockReturnValue({ data, isLoading: false, refetch: vi.fn() });
-    return render(<DatasetEditorTable datasetId="dataset_big" />, {
-      wrapper: Wrapper,
-    });
-  };
-
-  describe("when the read is truncated", () => {
-    it("shows the true total with a truncation notice, not just the loaded rows", async () => {
-      renderSaved({
-        id: "dataset_big",
-        name: "dataset-images-2gb",
-        columnTypes,
-        count: 1640,
-        truncated: true,
-        datasetRecords: [
-          { id: "r1", input: "a", expected_output: "x" },
-          { id: "r2", input: "b", expected_output: "y" },
-          { id: "r3", input: "c", expected_output: "z" },
-        ],
+describe("given the saved dataset's record count", () => {
+  describe("when the dataset spans many pages", () => {
+    it("shows the PG-authoritative whole-dataset total, not just the loaded page", async () => {
+      getAllQuery.mockReturnValue({
+        data: {
+          id: "ds",
+          name: "ds",
+          columnTypes,
+          count: 1640,
+          totalPages: 33,
+          page: 1,
+          datasetRecords: [
+            { id: "r1", entry: { input: "a", expected_output: "x" } },
+            { id: "r2", entry: { input: "b", expected_output: "y" } },
+          ],
+        },
+        isLoading: false,
+        refetch: vi.fn(),
       });
+      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
 
-      // The count reflects the PG-authoritative total (1,640), NOT the 3 loaded
-      // rows — and flags that the view is partial.
       await waitFor(() =>
         expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
-          "3 out of 1,640 records",
+          "1,640 records",
         ),
       );
-      // The explanation is keyboard/SR-reachable: the chip is focusable and
-      // exposes the full tooltip copy via aria-label (not hover-only).
-      const chip = screen.getByTestId("dataset-row-count");
-      expect(chip).toHaveAttribute("tabindex", "0");
-      expect(chip).toHaveAttribute(
-        "aria-label",
-        expect.stringContaining("too large to display in full"),
+      // Pagination replaced byte-cap truncation — no "X out of Y" partial notice.
+      expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent(
+        "out of",
       );
     });
   });
 
-  describe("when the read is not truncated", () => {
-    it("shows the plain total with no truncation notice", async () => {
-      renderSaved({
-        id: "dataset_small",
-        name: "small",
-        columnTypes,
-        count: 2,
-        truncated: false,
-        datasetRecords: [
-          { id: "r1", input: "a", expected_output: "x" },
-          { id: "r2", input: "b", expected_output: "y" },
-        ],
+  describe("when the dataset is empty", () => {
+    it("renders a single page, no pager, and never requests page 0", async () => {
+      // total 0 -> server totalPages 0. The page must floor at 1: requesting
+      // page 0 would fail the server's positive() guard and break the editor.
+      const requested: Array<number | undefined> = [];
+      const stable = {
+        data: {
+          id: "empty",
+          name: "empty",
+          columnTypes,
+          count: 0,
+          totalPages: 0,
+          page: 1,
+          datasetRecords: [],
+        },
+        isLoading: false,
+        refetch: vi.fn(),
+      };
+      getAllQuery.mockReset();
+      getAllQuery.mockImplementation((input: { page?: number }) => {
+        requested.push(input?.page);
+        return stable; // stable ref (like react-query) — avoids a reload loop
       });
+      render(<DatasetEditorTable datasetId="empty" />, { wrapper: Wrapper });
 
       await waitFor(() =>
         expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
-          "2 records",
+          "0 records",
         ),
       );
-      expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent(
-        "out of",
-      );
+      expect(screen.queryByTestId("dataset-pager")).not.toBeInTheDocument();
+      // An empty dataset is its own last page, so the add-row stays available.
+      expect(screen.getByTestId("add-row")).toBeInTheDocument();
+      expect(requested).not.toContain(0);
     });
   });
 });

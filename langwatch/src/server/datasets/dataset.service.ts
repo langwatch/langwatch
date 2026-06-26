@@ -905,11 +905,6 @@ export class DatasetService {
       page: pagination.page,
       limit: pagination.limit,
       totalPages: pagination.totalPages,
-      // A page is a bounded window by construction — there is no byte-cap
-      // truncation as with the whole-dataset `getFullDataset` read. Carried so
-      // the editor's existing truncation-aware count chip stays type-safe and
-      // simply never lights up on the paged path.
-      truncated: false as boolean,
     };
   }
 
