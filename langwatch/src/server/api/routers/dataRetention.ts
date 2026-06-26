@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
+import { resolveScopeStorageUsage } from "~/server/data-retention/metering/storageMeter.read";
 import {
   assertCanDisableRetention,
   assertCanWriteRetentionScope,
@@ -112,6 +113,25 @@ export const dataRetentionRouter = createTRPCRouter({
       }
     }),
 
+  /**
+   * Preview the retention each category would fall back to if the scope's
+   * override were removed — the cascade value (next tier, or the platform
+   * default) the data would land on. Powers the remove-confirmation dialog so
+   * the user sees the real post-removal number, never a guessed one. Read-only;
+   * gated by the same write-on-scope check as the removal it previews, so the
+   * resolved org-default never leaks to a caller who couldn't remove the rule.
+   */
+  previewScopeRemoval: protectedProcedure
+    .input(z.object({ projectId: z.string(), scope: scopeInput }))
+    .use(authorizeInResolver)
+    .query(async ({ input, ctx }) => {
+      await assertCanWriteRetentionScope(
+        { prisma: ctx.prisma, session: ctx.session },
+        input.scope,
+      );
+      return getApp().dataRetention.policy.previewScopeRemoval(input.scope);
+    }),
+
   /** Remove one category's override at one scope; the next tier then applies. */
   removeForScope: protectedProcedure
     .input(
@@ -203,23 +223,21 @@ export const dataRetentionRouter = createTRPCRouter({
       });
     }),
 
-  getStorageUsage: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
+  /**
+   * Total stored bytes for the projects the scope selector resolves to, summed
+   * across every in-scope project the caller can read. Lets the Data Storage
+   * card reflect the chosen scope (organization / team / project) instead of
+   * always showing only the current project. RBAC-filtering happens inside the
+   * resolver against the scope's owning org, so a wider scope never leaks a
+   * project's storage the caller couldn't see.
+   */
+  getScopeStorageUsage: protectedProcedure
+    .input(z.object({ projectId: z.string(), scope: scopeInput }))
     .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }) => {
-      const totalBytes =
-        await getApp().dataRetention.metering.getTotalStorageBytes({
-          tenantId: input.projectId,
-        });
-      return { totalBytes };
-    }),
-
-  getStorageBreakdown: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }) => {
-      return getApp().dataRetention.metering.getStorageBreakdown({
-        tenantId: input.projectId,
+    .query(async ({ input, ctx }) => {
+      return resolveScopeStorageUsage(ctx, {
+        projectId: input.projectId,
+        scope: input.scope,
       });
     }),
 });
