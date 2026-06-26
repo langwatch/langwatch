@@ -9,7 +9,10 @@ import {
   formatHttpError,
 } from "../format-execution-error";
 
-const ctx = { endpoint: "http://nlp:8080/studio/execute_sync", method: "POST" } as const;
+const ctx = {
+  endpoint: "http://nlp:8080/studio/execute_sync",
+  method: "POST",
+} as const;
 
 describe("format-execution-error helpers (lw#3439)", () => {
   describe("cleanErrorDetail", () => {
@@ -54,7 +57,9 @@ describe("format-execution-error helpers (lw#3439)", () => {
         parsedDetail: "ValueError: x",
       });
       expect(out).toMatch(/user code raised an error/);
-      expect(out).toMatch(/endpoint: POST http:\/\/nlp:8080\/studio\/execute_sync/);
+      expect(out).toMatch(
+        /endpoint: POST http:\/\/nlp:8080\/studio\/execute_sync/,
+      );
       expect(out).toMatch(/status: 500/);
       expect(out).toMatch(/ValueError: x/);
     });
@@ -92,9 +97,15 @@ describe("format-execution-error helpers (lw#3439)", () => {
 
   describe("formatFetchError", () => {
     it("formats a timeout with the configured ms", () => {
-      const out = formatFetchError({ ctx, cause: new Error("aborted"), timedOutAfterMs: 120_000 });
+      const out = formatFetchError({
+        ctx,
+        cause: new Error("aborted"),
+        timedOutAfterMs: 120_000,
+      });
       expect(out).toMatch(/did not respond within 120000ms/);
-      expect(out).toMatch(/endpoint: POST http:\/\/nlp:8080\/studio\/execute_sync/);
+      expect(out).toMatch(
+        /endpoint: POST http:\/\/nlp:8080\/studio\/execute_sync/,
+      );
     });
 
     it("formats a generic fetch failure with cause and inner cause", () => {
