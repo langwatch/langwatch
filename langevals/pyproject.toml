@@ -1,6 +1,6 @@
 [project]
 name = "langevals"
-version = "2.2.0"
+version = "2.3.0"
 description = "A platform to evaluate LLM outputs using various evaluators."
 authors = [{name = "Rogerio Chaves", email = "rogerio@langwatch.ai"}]
 license = {text = "MIT"}
