@@ -81,9 +81,9 @@ vi.mock("../../components/ui/toaster", () => ({
   },
 }));
 
+import { MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 // Import after mocks
 import { useProviderFormSubmit } from "../useProviderFormSubmit";
-import { MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -161,7 +161,9 @@ describe("useProviderFormSubmit()", () => {
           await result.current.submit();
         });
 
-        expect(mockUpdateProjectDefaultModelsMutateAsync).not.toHaveBeenCalled();
+        expect(
+          mockUpdateProjectDefaultModelsMutateAsync,
+        ).not.toHaveBeenCalled();
       });
 
       it("creates an error toast", async () => {
@@ -193,7 +195,9 @@ describe("useProviderFormSubmit()", () => {
           await result.current.submit();
         });
 
-        expect(mockUpdateProjectDefaultModelsMutateAsync).not.toHaveBeenCalled();
+        expect(
+          mockUpdateProjectDefaultModelsMutateAsync,
+        ).not.toHaveBeenCalled();
       });
 
       it("creates an error toast", async () => {
@@ -232,7 +236,9 @@ describe("useProviderFormSubmit()", () => {
           await result.current.submit();
         });
 
-        expect(mockUpdateProjectDefaultModelsMutateAsync).not.toHaveBeenCalled();
+        expect(
+          mockUpdateProjectDefaultModelsMutateAsync,
+        ).not.toHaveBeenCalled();
       });
     });
   });
@@ -354,10 +360,15 @@ describe("useProviderFormSubmit()", () => {
     });
   });
 
-  // Regression tests for #3532: the !isUsingEnvVars branch must filter
-  // MASKED_KEY_PLACEHOLDER values out of customKeys before submit, otherwise
-  // env-fallback projects post the literal placeholder string and the
-  // backend rejects it as "invalid api key".
+  // Regression tests for #3532 + the scope-edit key-preservation bug: the
+  // !isUsingEnvVars branch strips MASKED_KEY_PLACEHOLDER values from customKeys
+  // before submit. When nothing real is left (the user opened the drawer
+  // without re-entering the key, e.g. to only change the scope), it sends
+  // `undefined` rather than `{}`. `undefined` tells the server "no key change"
+  // so it preserves the stored key, whereas `{}` is validated against the
+  // provider's keysSchema — which rejects it for required-key providers like
+  // openai (the "I changed the scope and the key went blank, couldn't save"
+  // report). See specs/model-providers/scope-and-multi-instance.feature.
   describe("given isUsingEnvVars is false (env-fallback project, drawer open)", () => {
     // Matches the shape of registry.ts azure.keysSchema: all keys optional,
     // .passthrough() so MASKED_KEY_PLACEHOLDER and "" both validate.
@@ -368,7 +379,7 @@ describe("useProviderFormSubmit()", () => {
       })
       .passthrough();
     describe("when all keys are still masked (Save without editing)", () => {
-      it("omits all masked entries from the submitted customKeys", async () => {
+      it("sends customKeys undefined so the server preserves the stored key", async () => {
         const snapshot = buildSnapshot({
           isUsingEnvVars: false,
           useAsDefaultProvider: false,
@@ -390,7 +401,50 @@ describe("useProviderFormSubmit()", () => {
 
         expect(mockUpdateMutateAsync).toHaveBeenCalledTimes(1);
         const payload = mockUpdateMutateAsync.mock.calls[0]?.[0];
-        expect(payload?.customKeys).toEqual({});
+        expect(payload?.customKeys).toBeUndefined();
+      });
+    });
+
+    describe("when saving a required-key provider without re-entering the masked key", () => {
+      // openai requires OPENAI_API_KEY. Opening the edit drawer and clicking
+      // Save without re-typing the key posts the masked key (stripped) plus the
+      // still-empty OPENAI_BASE_URL, leaving { OPENAI_BASE_URL: "" }. The server
+      // validates that against the required-key schema and rejects it ("key
+      // went blank, couldn't save"). With no real change the payload must be
+      // undefined so the stored credentials are preserved.
+      const openaiSchema = z.object({
+        OPENAI_API_KEY: z.string().min(1),
+        OPENAI_BASE_URL: z.string().optional(),
+      });
+
+      it("sends customKeys undefined when only the masked key and an empty optional field are present", async () => {
+        const snapshot = buildSnapshot({
+          provider: {
+            ...buildAzureProvider(),
+            provider: "openai",
+            customKeys: { OPENAI_API_KEY: "sk-stored" },
+          },
+          isUsingEnvVars: false,
+          useAsDefaultProvider: false,
+          providerKeysSchema: openaiSchema,
+          customKeys: {
+            OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+            OPENAI_BASE_URL: "",
+          },
+          initialKeys: {
+            OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+            OPENAI_BASE_URL: "",
+          },
+        });
+        const { result } = renderSubmitHook({ snapshot });
+
+        await act(async () => {
+          await result.current.submit();
+        });
+
+        expect(mockUpdateMutateAsync).toHaveBeenCalledTimes(1);
+        const payload = mockUpdateMutateAsync.mock.calls[0]?.[0];
+        expect(payload?.customKeys).toBeUndefined();
       });
     });
 

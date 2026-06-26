@@ -1,8 +1,9 @@
 import type { PrismaClient, Project } from "@prisma/client";
-import type { Session } from "~/server/auth";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { env } from "~/env.mjs";
+import type { Session } from "~/server/auth";
+import { isManagedProvider } from "../../../ee/managed-providers/managedBedrockConfig";
 import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 import type { CustomModelsInput } from "./customModel.schema";
 import { toLegacyCompatibleCustomModels } from "./customModel.schema";
@@ -21,7 +22,6 @@ import {
   modelProviders,
 } from "./registry";
 import { seedOnboardingDefaultsForProvider } from "./seedOnboardingDefaults";
-import { isManagedProvider } from "../../../ee/managed-providers/managedBedrockConfig";
 
 /**
  * Minimal ctx slice this service uses to authorize scope-level writes.
@@ -194,9 +194,8 @@ export class ModelProviderService {
     if (!project) throw new Error("Project not found");
 
     const defaultProviders = this.buildDefaultProviders(project);
-    const savedProviders = await this.repository.findAllAccessibleForProject(
-      projectId,
-    );
+    const savedProviders =
+      await this.repository.findAllAccessibleForProject(projectId);
     const savedProviderKeys = new Set(savedProviders.map((mp) => mp.provider));
 
     // Env-fed providers (process.env has the API key) that nobody has
@@ -229,18 +228,20 @@ export class ModelProviderService {
           "embedding",
         );
         const narrowestScope = this.pickNarrowestScope(mp.scopes);
-        const masked = (mp.customKeys
-          ? Object.fromEntries(
-              Object.entries(
-                mp.customKeys as Record<string, unknown>,
-              ).map(([key, value]) => [
-                key,
-                KEY_CHECK.some((k) => key.includes(k))
-                  ? MASKED_KEY_PLACEHOLDER
-                  : value,
-              ]),
-            )
-          : null) as MaybeStoredModelProvider["customKeys"];
+        const masked = (
+          mp.customKeys
+            ? Object.fromEntries(
+                Object.entries(mp.customKeys as Record<string, unknown>).map(
+                  ([key, value]) => [
+                    key,
+                    KEY_CHECK.some((k) => key.includes(k))
+                      ? MASKED_KEY_PLACEHOLDER
+                      : value,
+                  ],
+                ),
+              )
+            : null
+        ) as MaybeStoredModelProvider["customKeys"];
         const provider_: MaybeStoredModelProvider = {
           id: mp.id,
           name: mp.name,
@@ -319,10 +320,7 @@ export class ModelProviderService {
     const bedrockAlreadyShown =
       savedProviderKeys.has("bedrock") ||
       systemRows.some((r) => r.provider === "bedrock");
-    if (
-      !bedrockAlreadyShown &&
-      isManagedProvider(organizationId, "bedrock")
-    ) {
+    if (!bedrockAlreadyShown && isManagedProvider(organizationId, "bedrock")) {
       const defaultProvider = this.buildDefaultProvidersFromEnvShape(
         "bedrock",
         oldestProject,
@@ -345,18 +343,20 @@ export class ModelProviderService {
           "embedding",
         );
         const narrowestScope = this.pickNarrowestScope(mp.scopes);
-        const masked = (mp.customKeys
-          ? Object.fromEntries(
-              Object.entries(
-                mp.customKeys as Record<string, unknown>,
-              ).map(([key, value]) => [
-                key,
-                KEY_CHECK.some((k) => key.includes(k))
-                  ? MASKED_KEY_PLACEHOLDER
-                  : value,
-              ]),
-            )
-          : null) as MaybeStoredModelProvider["customKeys"];
+        const masked = (
+          mp.customKeys
+            ? Object.fromEntries(
+                Object.entries(mp.customKeys as Record<string, unknown>).map(
+                  ([key, value]) => [
+                    key,
+                    KEY_CHECK.some((k) => key.includes(k))
+                      ? MASKED_KEY_PLACEHOLDER
+                      : value,
+                  ],
+                ),
+              )
+            : null
+        ) as MaybeStoredModelProvider["customKeys"];
         const provider_: MaybeStoredModelProvider = {
           id: mp.id,
           name: mp.name,
@@ -396,8 +396,7 @@ export class ModelProviderService {
     referenceProject: Project | null,
   ): MaybeStoredModelProvider | null {
     if (!referenceProject) return null;
-    const registry =
-      modelProviders[providerKey as keyof typeof modelProviders];
+    const registry = modelProviders[providerKey as keyof typeof modelProviders];
     if (!registry?.enabledSince) return null;
     return {
       provider: providerKey,
@@ -621,10 +620,7 @@ export class ModelProviderService {
       input.provider,
       input.projectId,
     );
-    return await this.updateModelProvider(
-      { ...input, id: existing?.id },
-      ctx,
-    );
+    return await this.updateModelProvider({ ...input, id: existing?.id }, ctx);
   }
 
   /**
@@ -655,9 +651,7 @@ export class ModelProviderService {
     };
     return (
       humanized[provider] ??
-      provider
-        .replace(/_/g, " ")
-        .replace(/\b\w/g, (c) => c.toUpperCase())
+      provider.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
     );
   }
 
@@ -681,8 +675,7 @@ export class ModelProviderService {
     const { id, projectId, provider } = input;
 
     if (ctx) {
-      const organizationId =
-        await this.resolveProjectOrganizationId(projectId);
+      const organizationId = await this.resolveProjectOrganizationId(projectId);
       // Org-anchored lookup when we can resolve the tenant; otherwise fall
       // back to the legacy project-scope lookup so a missing project can't
       // widen the blast radius.
@@ -854,12 +847,9 @@ export class ModelProviderService {
             customKeys: includeKeys ? mp.customKeys : null,
             models: defaultProvider?.models ?? null,
             embeddingsModels: defaultProvider?.embeddingsModels ?? null,
-            customModels:
-              customModels.length > 0 ? customModels : null,
+            customModels: customModels.length > 0 ? customModels : null,
             customEmbeddingsModels:
-              customEmbeddingsModels.length > 0
-                ? customEmbeddingsModels
-                : null,
+              customEmbeddingsModels.length > 0 ? customEmbeddingsModels : null,
             deploymentMapping: mp.deploymentMapping,
             disabledByDefault: defaultProvider?.disabledByDefault,
             extraHeaders: mp.extraHeaders as
@@ -903,12 +893,8 @@ export class ModelProviderService {
     }
     const sorted = [...scopes].sort(
       (a, b) =>
-        this.scopePriority(
-          b.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
-        ) -
-        this.scopePriority(
-          a.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
-        ),
+        this.scopePriority(b.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT") -
+        this.scopePriority(a.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT"),
     );
     return {
       scopeType: sorted[0]!.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
@@ -1035,7 +1021,18 @@ export class ModelProviderService {
     projectId: string,
   ) {
     if (!id) return null;
-    return await this.repository.findById(id, projectId);
+    // Org-anchored lookup so an edit from a project view resolves providers
+    // granted at the org or team scope (which the settings list surfaces by
+    // inheritance), not only PROJECT-scoped rows. Mirrors the delete path
+    // (findByIdForOrganization); a PROJECT-only lookup is why editing an
+    // org-scoped provider used to 404. The per-scope manage authz on the
+    // submitted scope set still gates the write. Falls back to the
+    // project-scope lookup when the tenant can't be resolved, so a missing
+    // project can't widen the blast radius.
+    const organizationId = await this.resolveProjectOrganizationId(projectId);
+    return organizationId
+      ? await this.repository.findByIdForOrganization(id, organizationId)
+      : await this.repository.findById(id, projectId);
   }
 
   private async updateExisting(
