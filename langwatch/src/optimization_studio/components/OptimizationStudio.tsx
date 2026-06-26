@@ -493,6 +493,9 @@ export function OptimizationStudioCanvas({
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
       colorMode={colorMode}
+      // ReactFlow defaults deleteKeyCode to "Backspace" only; also bind Delete
+      // so a selected node or connection is removable with either key.
+      deleteKeyCode={["Backspace", "Delete"]}
       defaultViewport={{
         zoom: defaultZoom,
         x: 100,
