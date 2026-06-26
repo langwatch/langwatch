@@ -239,8 +239,21 @@ export function PairwiseConfigForm({
       </HStack>
 
       <Text fontSize="xs" color="fg.muted">
-        Golden field is the reference answer the judge compares each candidate
-        against.
+        Pick the dataset column that holds the{" "}
+        <Text as="span" fontWeight="medium" color="fg">
+          ground-truth answer
+        </Text>{" "}
+        — usually{" "}
+        <Text as="span" fontFamily="mono">
+          expected_output
+        </Text>
+        . The judge compares each candidate against it and prefers the one
+        closest in correctness, completeness, and style. Pick{" "}
+        <Text as="span" fontFamily="mono">
+          input
+        </Text>{" "}
+        only if your dataset has no reference answer and you want the judge to
+        compare candidates against the question itself (rarely useful).
       </Text>
 
       <MetricsSection draft={draft} update={update} />
