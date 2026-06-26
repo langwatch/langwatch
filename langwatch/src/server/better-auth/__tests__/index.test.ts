@@ -153,6 +153,17 @@ describe("better-auth config", () => {
         (c) => (c as { providerId?: string }).providerId,
       );
       expect(providerIds).toContain("auth0");
+      // Lock the OAuth `redirect_uri` to the legacy NextAuth callback path.
+      // Auth0 only has this path registered as an allowed callback; sending a
+      // different `redirect_uri` (e.g. BetterAuth's default
+      // `/api/auth/oauth2/callback/auth0`) makes Auth0 reject the
+      // authorization request — a customer-breaking regression.
+      const auth0Config = configs.find(
+        (c) => (c as { providerId?: string }).providerId === "auth0",
+      ) as { redirectURI?: string } | undefined;
+      expect(auth0Config?.redirectURI).toBe(
+        "http://localhost:3000/api/auth/callback/auth0",
+      );
       // SSO-only enforcement: no email/password bypass of the IdP in auth0 mode.
       expect(isEmailPasswordEnabled(e)).toBe(false);
     });
@@ -175,6 +186,13 @@ describe("better-auth config", () => {
         AZURE_AD_TENANT_ID: undefined,
       });
       expect(socialProviders.google).toBeDefined();
+      // Credentials must be threaded through from env, not just present.
+      const google = socialProviders.google as {
+        clientId?: string;
+        clientSecret?: string;
+      };
+      expect(google.clientId).toBe("google-client-id");
+      expect(google.clientSecret).toBe("google-client-secret");
     });
   });
 });
