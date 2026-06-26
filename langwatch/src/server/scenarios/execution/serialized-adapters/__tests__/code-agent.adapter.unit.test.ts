@@ -100,6 +100,24 @@ describe("SerializedCodeAgentAdapter", () => {
     scenarioConfig: {} as AgentInput["scenarioConfig"],
   };
 
+  // Fetch implementation that rejects with AbortError as soon as the
+  // controller's signal aborts. Returning the promise via async/await keeps
+  // the rejection attached to the awaited chain, avoiding spurious
+  // "unhandled rejection" warnings when fake timers drive the abort. Shared
+  // across the timeout describe blocks (lw#3438 + lw#3439).
+  const abortAwareFetch = (signal: AbortSignal) =>
+    new Promise<Response>((_resolve, reject) => {
+      if (signal.aborted) {
+        reject(new DOMException("The operation was aborted.", "AbortError"));
+        return;
+      }
+      const onAbort = () => {
+        signal.removeEventListener("abort", onAbort);
+        reject(new DOMException("The operation was aborted.", "AbortError"));
+      };
+      signal.addEventListener("abort", onAbort);
+    });
+
   beforeEach(() => {
     vi.clearAllMocks();
     withActiveSpanCalls.length = 0;
@@ -663,27 +681,6 @@ describe("SerializedCodeAgentAdapter", () => {
     });
 
     describe("when the NLP service times out before responding", () => {
-      // Fetch implementation that rejects with AbortError as soon as the
-      // controller's signal aborts. Returning the promise via async/await
-      // keeps the rejection attached to the awaited chain, avoiding spurious
-      // "unhandled rejection" warnings when fake timers drive the abort.
-      const abortAwareFetch = (signal: AbortSignal) =>
-        new Promise<Response>((_resolve, reject) => {
-          if (signal.aborted) {
-            reject(
-              new DOMException("The operation was aborted.", "AbortError"),
-            );
-            return;
-          }
-          const onAbort = () => {
-            signal.removeEventListener("abort", onAbort);
-            reject(
-              new DOMException("The operation was aborted.", "AbortError"),
-            );
-          };
-          signal.addEventListener("abort", onAbort);
-        });
-
       /** @scenario code-agent adapter emits an error span with kind=timeout when the NLP service hangs */
       it("throws SerializedCodeAgentAdapterError with kind=timeout and emits an error span", async () => {
         mockFetch.mockImplementation(
@@ -862,11 +859,13 @@ describe("SerializedCodeAgentAdapter", () => {
         `${nlpServiceUrl}/go/studio/execute_sync`,
       );
       expect(captured!.message).toMatch(/user code raised an error/);
-      expect(captured!.message).toMatch(
-        /endpoint: POST http:\/\/localhost:8080\/go\/studio\/execute_sync/,
-      );
       expect(captured!.message).toMatch(/status: 500/);
       expect(captured!.message).toMatch(/httpx\.TimeoutException/);
+      // The internal NLP endpoint must NOT leak into the customer-visible
+      // message — it is persisted onto the scenario-run record (lw#3439).
+      // It stays only on the structured `.endpoint` field (asserted above).
+      expect(captured!.message).not.toMatch(/localhost:8080/);
+      expect(captured!.message).not.toMatch(/execute_sync/);
     });
 
     /** @scenario adapter labels non-500 status as an NLP service failure */
@@ -893,6 +892,49 @@ describe("SerializedCodeAgentAdapter", () => {
       expect(captured!.httpStatus).toBe(503);
       expect(captured!.message).toMatch(/NLP service returned HTTP 503/);
       expect(captured!.message).toMatch(/service down/);
+    });
+
+    /**
+     * @scenario adapter labels a 500 with a non-JSON body as an NLP service failure
+     *
+     * A 500 whose body is NOT valid JSON (e.g. an upstream proxy HTML error
+     * page) leaves `parsedDetail` undefined, so it is infra, not user code.
+     * Guards the single-sourced classification: `source` must agree with the
+     * infra wording even on the json()-rejects path (review lw#3439).
+     */
+    it("labels a 500 whose body is not JSON as an infra (NLP service) failure", async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: vi
+          .fn()
+          .mockRejectedValue(new SyntaxError("Unexpected token < in JSON")),
+        text: vi
+          .fn()
+          .mockResolvedValue(
+            "<html><body>500 Internal Server Error</body></html>",
+          ),
+      });
+
+      const adapter = new SerializedCodeAgentAdapter(
+        defaultConfig,
+        nlpServiceUrl,
+        apiKey,
+      );
+      let captured: SerializedCodeAgentAdapterError | undefined;
+      try {
+        await adapter.call(defaultInput);
+      } catch (e) {
+        captured = e as SerializedCodeAgentAdapterError;
+      }
+
+      expect(captured!.source).toBe("nlp_service");
+      expect(captured!.httpStatus).toBe(500);
+      // Infra wording, NOT the "user code raised" wording — source and
+      // message agree because both derive from one classifier.
+      expect(captured!.message).toMatch(/NLP service returned HTTP 500/);
+      expect(captured!.message).not.toMatch(/user code raised/);
+      expect(captured!.message).toMatch(/500 Internal Server Error/);
     });
 
     /** @scenario adapter strips AI SDK warnings and OTEL noise from the surfaced message */
@@ -979,25 +1021,9 @@ describe("SerializedCodeAgentAdapter", () => {
 
     /** @scenario adapter labels an aborted fetch as a timeout */
     it("labels an aborted fetch (timeout) with source=timeout", async () => {
-      const abortAware = (signal: AbortSignal) =>
-        new Promise<Response>((_resolve, reject) => {
-          if (signal.aborted) {
-            reject(
-              new DOMException("The operation was aborted.", "AbortError"),
-            );
-            return;
-          }
-          const onAbort = () => {
-            signal.removeEventListener("abort", onAbort);
-            reject(
-              new DOMException("The operation was aborted.", "AbortError"),
-            );
-          };
-          signal.addEventListener("abort", onAbort);
-        });
       mockFetch.mockImplementation(
         async (_url: string, opts: { signal: AbortSignal }) =>
-          abortAware(opts.signal),
+          abortAwareFetch(opts.signal),
       );
 
       vi.useFakeTimers();

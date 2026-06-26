@@ -8,10 +8,17 @@
  *
  * The formatter:
  * - distinguishes user-code errors (HTTP 500 with `detail`) from infra
- *   errors (other status codes, fetch failures, timeouts) so logs read
- *   "user code raised: …" vs "NLP service returned 503";
- * - includes endpoint + status so multiple adapters in flight are
- *   distinguishable;
+ *   errors (other status codes, fetch failures, timeouts) so the surfaced
+ *   message reads "user code raised: …" vs "NLP service returned 503". The
+ *   classification is computed in exactly one place (`classifyHttpFailure`)
+ *   and `formatHttpError` returns the derived `source` alongside the
+ *   message so the adapter's structured `source` field can never drift from
+ *   the wording the customer sees;
+ * - deliberately omits the internal NLP endpoint host:port from the
+ *   rendered message — this string is persisted onto the user-visible
+ *   scenario-run record, so the endpoint lives only on the structured
+ *   `.endpoint` field (programmatic) and server logs, never the customer
+ *   message;
  * - strips known unrelated noise (AI SDK compat warnings, OTEL flush
  *   chatter) from the rendered detail; the raw payload is still attached
  *   to the thrown error for deep debugging;
@@ -32,9 +39,26 @@ const NOISE_PATTERNS: ReadonlyArray<RegExp> = [
 /** ANSI escape sequences from upstream Python loggers. */
 const ANSI_ESCAPE = /\x1b\[[0-9;]*[A-Za-z]/g;
 
-export interface AdapterErrorContext {
-  endpoint: string;
-  method: "POST";
+/** Whether an HTTP failure originated in the user's code or the NLP service. */
+export type HttpFailureSource = "user_code" | "nlp_service";
+
+/**
+ * Single source of truth for the user-code-vs-infra classification.
+ *
+ * langwatch_nlp re-raises Python errors via HTTPException(status_code=500,
+ * detail=…), so an HTTP 500 carrying a parsed `detail` is a user-code
+ * failure; everything else (other statuses, or a 500 with an opaque body)
+ * is treated as an NLP-service/infra failure. Both the rendered message
+ * wording and the adapter's structured `source` field derive from this one
+ * predicate, so they cannot disagree.
+ */
+export function classifyHttpFailure(args: {
+  status: number;
+  parsedDetail?: string;
+}): HttpFailureSource {
+  return args.status === 500 && Boolean(args.parsedDetail)
+    ? "user_code"
+    : "nlp_service";
 }
 
 /**
@@ -58,50 +82,57 @@ export function cleanErrorDetail(raw: string): string {
 }
 
 /**
- * Format a non-2xx response from the NLP service. HTTP 500 with a `detail`
- * is treated as user-code failure (langwatch_nlp re-raises Python errors via
- * HTTPException(status_code=500, detail=...)); other statuses are infra.
+ * Format a non-2xx response from the NLP service.
+ *
+ * Returns both the customer-facing `message` and the `source` it derived, so
+ * the adapter sets its structured `source` field from the exact same
+ * classification that chose the wording (see `classifyHttpFailure`). The
+ * internal endpoint is intentionally absent from the message.
  */
 export function formatHttpError(args: {
-  ctx: AdapterErrorContext;
   status: number;
   rawBody: string;
   parsedDetail?: string;
-}): string {
-  const { ctx, status, rawBody, parsedDetail } = args;
-  const isUserCodeError = status === 500 && Boolean(parsedDetail);
+}): { message: string; source: HttpFailureSource } {
+  const { status, rawBody, parsedDetail } = args;
+  const source = classifyHttpFailure({ status, parsedDetail });
   const cleaned = cleanErrorDetail(parsedDetail ?? rawBody);
 
-  if (isUserCodeError) {
-    return [
-      "SerializedCodeAgentAdapter: user code raised an error during execution.",
-      `  endpoint: ${ctx.method} ${ctx.endpoint}`,
-      `  status: ${status}`,
-      "  user code error:",
-      indent(cleaned, "    "),
-    ].join("\n");
+  if (source === "user_code") {
+    return {
+      source,
+      message: [
+        "SerializedCodeAgentAdapter: user code raised an error during execution.",
+        `  status: ${status}`,
+        "  user code error:",
+        indent(cleaned, "    "),
+      ].join("\n"),
+    };
   }
 
-  return [
-    `SerializedCodeAgentAdapter: NLP service returned HTTP ${status}.`,
-    `  endpoint: ${ctx.method} ${ctx.endpoint}`,
-    `  body:`,
-    indent(cleaned || "(empty)", "    "),
-  ].join("\n");
+  return {
+    source,
+    message: [
+      `SerializedCodeAgentAdapter: NLP service returned HTTP ${status}.`,
+      `  body:`,
+      indent(cleaned || "(empty)", "    "),
+    ].join("\n"),
+  };
 }
 
-/** Format a fetch-time failure (DNS, connect, abort/timeout). */
+/**
+ * Format a fetch-time failure (DNS, connect, abort/timeout).
+ *
+ * The internal endpoint is intentionally absent from the message; it lives
+ * on the thrown error's structured `.endpoint` field instead.
+ */
 export function formatFetchError(args: {
-  ctx: AdapterErrorContext;
   cause: unknown;
   timedOutAfterMs?: number;
 }): string {
-  const { ctx, cause, timedOutAfterMs } = args;
+  const { cause, timedOutAfterMs } = args;
   if (typeof timedOutAfterMs === "number") {
-    return [
-      `SerializedCodeAgentAdapter: NLP service ${ctx.endpoint} did not respond within ${timedOutAfterMs}ms (request aborted).`,
-      `  endpoint: ${ctx.method} ${ctx.endpoint}`,
-    ].join("\n");
+    return `SerializedCodeAgentAdapter: NLP service did not respond within ${timedOutAfterMs}ms (request aborted).`;
   }
   const causeMessage = cause instanceof Error ? cause.message : String(cause);
   const innerCause =
@@ -112,7 +143,6 @@ export function formatFetchError(args: {
       : "";
   return [
     `SerializedCodeAgentAdapter: failed to reach NLP service.`,
-    `  endpoint: ${ctx.method} ${ctx.endpoint}`,
     `  cause: ${causeMessage}${innerCause}`,
   ].join("\n");
 }
