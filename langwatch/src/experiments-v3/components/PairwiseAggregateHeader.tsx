@@ -12,12 +12,12 @@ import { useCallback, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useTargetName } from "../hooks/useTargetName";
+import type { TargetConfig } from "../types";
 import {
   computePairwiseAggregate,
   computePairwiseTargetAggregate,
   type PairwiseAggregate,
 } from "../utils/computeAggregates";
-import type { TargetConfig } from "../types";
 import { AggregateHeaderBar, type PairwiseFilter } from "./AggregateHeaderBar";
 
 const downloadCsv = (filename: string, rows: string[][]) => {

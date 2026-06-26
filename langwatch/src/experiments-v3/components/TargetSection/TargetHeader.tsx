@@ -9,6 +9,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
+import { Swords } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import {
   LuArrowLeftRight,
@@ -24,7 +25,6 @@ import {
   LuSquare,
   LuTrash2,
 } from "react-icons/lu";
-
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { ColorfulBlockIcon } from "~/optimization_studio/components/ColorfulBlockIcons";
@@ -32,19 +32,10 @@ import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/ut
 import { VersionBadge } from "~/prompts/components/ui/VersionBadge";
 import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../constants";
-import { Swords } from "lucide-react";
 
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import { useTargetName } from "../../hooks/useTargetName";
 import type { TargetConfig } from "../../types";
-
-// Stable reference fed to useTargetName when a pairwise variant target hasn't
-// loaded yet — keeps the hook order constant across renders.
-const PLACEHOLDER_PAIRWISE_VARIANT = {
-  id: "__pairwise-placeholder__",
-  type: "prompt",
-  promptId: undefined,
-} as unknown as TargetConfig;
 import {
   computePairwiseTargetAggregate,
   computeTargetAggregates,
@@ -53,6 +44,14 @@ import { isRowEmpty } from "../../utils/emptyRowDetection";
 import { countCellsForTarget } from "../../utils/executionScope";
 import { targetHasMissingMappings } from "../../utils/mappingValidation";
 import { TargetSummary } from "./TargetSummary";
+
+// Stable reference fed to useTargetName when a pairwise variant target hasn't
+// loaded yet — keeps the hook order constant across renders.
+const PLACEHOLDER_PAIRWISE_VARIANT = {
+  id: "__pairwise-placeholder__",
+  type: "prompt",
+  promptId: undefined,
+} as unknown as TargetConfig;
 
 // Pulsing animation for missing mapping alert
 const pulseAnimation = keyframes`

@@ -1,8 +1,8 @@
-import { parseEvaluationResult } from "~/utils/evaluationResults";
 import {
   computeMetricStats,
   type MetricStats,
 } from "~/components/shared/MetricStatsTooltip";
+import { parseEvaluationResult } from "~/utils/evaluationResults";
 import type { EvaluationResults, EvaluatorConfig } from "../types";
 
 export { computeMetricStats, type MetricStats };

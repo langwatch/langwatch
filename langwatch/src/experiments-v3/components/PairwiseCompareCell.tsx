@@ -1,8 +1,8 @@
 import { Box, HStack, Icon, Popover, Text, VStack } from "@chakra-ui/react";
 import { CircleAlert, Equal, Trophy } from "lucide-react";
+import { parseEvaluationResult } from "~/utils/evaluationResults";
 import { useTargetName } from "../hooks/useTargetName";
 import type { TargetConfig } from "../types";
-import { parseEvaluationResult } from "~/utils/evaluationResults";
 
 type PairwiseCompareCellProps = {
   result: unknown;
