@@ -12,36 +12,49 @@
  * @see specs/scenarios/event-driven-execution-prep.feature
  */
 
-import { spawn, type ChildProcess } from "child_process";
+import { type ChildProcess, spawn } from "child_process";
 import path from "path";
 import { createLogger } from "~/utils/logger/server";
-import { prisma } from "../db";
-import { connection } from "../redis";
-import { subscribeToCancellations, type CancellationMessage } from "./cancellation-channel";
 import {
-  type JobContextMetadata,
   createContextFromJobData,
-  runWithContext,
   getJobContextMetadata,
+  type JobContextMetadata,
+  runWithContext,
 } from "../context/asyncContext";
-import {
-  createDataPrefetcherDependencies,
-  prefetchScenarioData,
-} from "./execution/data-prefetcher";
-import type { ChildProcessJobData, ScenarioExecutionResult } from "./execution/types";
-import type { ExecutionJobData, ScenarioExecutionPool } from "./execution/execution-pool";
+import { prisma } from "../db";
 import {
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
 } from "../metrics";
-import { CHILD_PROCESS, SCENARIO_WORKER } from "./scenario.constants";
-import { ScenarioFailureHandler, type FailureEventParams } from "./scenario-failure-handler";
-import { ScenarioService } from "./scenario.service";
-import { resolveChildProcessSpawn } from "./execution/child-process-spawn";
+import { connection } from "../redis";
+import {
+  type CancellationMessage,
+  subscribeToCancellations,
+} from "./cancellation-channel";
 import {
   encodeScenarioLogContext,
   SCENARIO_LOG_CONTEXT_ENV,
 } from "./execution/child-logger";
+import { resolveChildProcessSpawn } from "./execution/child-process-spawn";
+import {
+  createDataPrefetcherDependencies,
+  prefetchScenarioData,
+} from "./execution/data-prefetcher";
+import type {
+  ExecutionJobData,
+  ScenarioExecutionPool,
+} from "./execution/execution-pool";
+import type {
+  ChildProcessJobData,
+  ScenarioExecutionResult,
+} from "./execution/types";
+import { reconcileOrphanedRunsOnBoot } from "./orphaned-run-reconciliation.clickhouse";
+import { CHILD_PROCESS, SCENARIO_WORKER } from "./scenario.constants";
+import { ScenarioService } from "./scenario.service";
+import {
+  type FailureEventParams,
+  ScenarioFailureHandler,
+} from "./scenario-failure-handler";
 
 // ============================================================================
 // Dependency Interfaces (Dependency Inversion Principle)
@@ -489,6 +502,15 @@ export async function startScenarioProcessor(
   logger.info(
     { concurrency: SCENARIO_WORKER.CONCURRENCY },
     "Scenario processor started (event-driven)",
+  );
+
+  // Reconcile runs orphaned by a previous worker that died mid-flight (OOM,
+  // crash, deploy). Fire-and-forget so a large/slow sweep never blocks worker
+  // startup; the finish path it uses is idempotent, so co-booting pods are safe.
+  void reconcileOrphanedRunsOnBoot({
+    failureEmitter: deps.failureEmitter,
+  }).catch((err: unknown) =>
+    logger.error({ err }, "Orphaned-run reconciliation failed on boot"),
   );
 
   return {
