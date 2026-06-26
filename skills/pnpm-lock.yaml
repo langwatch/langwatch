@@ -46,6 +46,9 @@ importers:
       '@langwatch/scenario':
         specifier: ^0.4.12
         version: 0.4.12(f5404d5076d4a6a3006663a361f74e8f)
+      '@opencode-ai/sdk':
+        specifier: ^1.17.6
+        version: 1.17.6
       '@types/mdast':
         specifier: ^4.0.4
         version: 4.0.4
@@ -377,6 +380,9 @@ packages:
     resolution: {integrity: sha512-YaKnqv0M6bCVvn47pThkFfyHz8xWJ+0Ll9ZnhvwJZ5gyPX0UxHIUeUs9SMG9BSvNuJNJHlc5uvfUDGYAmKJClw==}
     peerDependencies:
       zod: ^3.25.40 || ^4.0
+
+  '@opencode-ai/sdk@1.17.6':
+    resolution: {integrity: sha512-kCzdd9Git2sjDjXSHj4mMWuU1RXZ38d7gFEcq2rzlVz7XV6PPwNw8pelWsk99La2CtDkpfoW5lfHnpCaK6/oBQ==}
 
   '@opentelemetry/api-logs@0.205.0':
     resolution: {integrity: sha512-wBlPk1nFB37Hsm+3Qy73yQSobVn28F4isnWIBvKpd5IUH/eat8bwcL02H9yzmHyyPmukeccSl2mbN5sDQZYnPg==}
@@ -2646,6 +2652,10 @@ snapshots:
       - supports-color
       - utf-8-validate
       - ws
+
+  '@opencode-ai/sdk@1.17.6':
+    dependencies:
+      cross-spawn: 7.0.6
 
   '@opentelemetry/api-logs@0.205.0':
     dependencies:

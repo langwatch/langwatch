@@ -10,6 +10,7 @@ import { fileURLToPath } from "url";
 import { spawn, execSync } from "child_process";
 import chalk from "chalk";
 import { inlineMdx } from "../../_lib/mdx-inline.js";
+import { renderContent } from "./render-content";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -135,49 +136,6 @@ export function createClaudeCodeAgent({
   return {
     role: AgentRole.AGENT,
     call: async (state) => {
-      // Render each turn as plain text. Anthropic-format messages can have
-      // `content` as an array of blocks (text, tool_use, tool_result, image,
-      // …). String-interpolating that array yields `[object Object]`, which
-      // the next Claude Code session then sees as the previous turn — making
-      // multi-turn scenarios appear garbled to the agent. Flatten content
-      // blocks down to readable text instead.
-      const renderContent = (content: unknown): string => {
-        if (typeof content === "string") return content;
-        if (!Array.isArray(content)) {
-          try { return JSON.stringify(content); } catch { return String(content); }
-        }
-        return content
-          .map((block: any) => {
-            if (block == null) return "";
-            if (typeof block === "string") return block;
-            switch (block.type) {
-              case "text":
-                return block.text ?? "";
-              case "tool_use": {
-                const input = block.input != null
-                  ? JSON.stringify(block.input)
-                  : "";
-                return `[tool_use ${block.name ?? "?"}(${input})]`;
-              }
-              case "tool_result": {
-                const inner =
-                  typeof block.content === "string"
-                    ? block.content
-                    : Array.isArray(block.content)
-                      ? renderContent(block.content)
-                      : JSON.stringify(block.content ?? "");
-                return `[tool_result] ${inner}`;
-              }
-              case "image":
-                return "[image omitted]";
-              default:
-                try { return JSON.stringify(block); } catch { return String(block); }
-            }
-          })
-          .filter(Boolean)
-          .join("\n");
-      };
-
       const formattedMessages = state.messages
         .map((message) => `${message.role}: ${renderContent(message.content)}`)
         .join("\n\n");
