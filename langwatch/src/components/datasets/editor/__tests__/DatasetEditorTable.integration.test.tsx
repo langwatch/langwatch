@@ -469,7 +469,7 @@ describe("given the saved dataset's record count", () => {
           "0 records",
         ),
       );
-      expect(screen.queryByTestId("dataset-pager")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("pagination")).not.toBeInTheDocument();
       // An empty dataset is its own last page, so the add-row stays available.
       expect(screen.getByTestId("add-row")).toBeInTheDocument();
       expect(requested).not.toContain(0);
@@ -526,7 +526,7 @@ describe("given a saved dataset larger than one page", () => {
   it("shows the first page, the pager, and the whole-dataset total", async () => {
     renderPaged();
     await waitFor(() =>
-      expect(screen.getByTestId("dataset-page-indicator")).toHaveTextContent(
+      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
         "Page 1 of 3",
       ),
     );
@@ -534,8 +534,8 @@ describe("given a saved dataset larger than one page", () => {
     expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
       "150 records",
     );
-    expect(screen.getByTestId("dataset-page-prev")).toBeDisabled();
-    expect(screen.getByTestId("dataset-page-next")).toBeEnabled();
+    expect(screen.getByTestId("pagination-prev")).toBeDisabled();
+    expect(screen.getByTestId("pagination-next")).toBeEnabled();
     // The add-row affordance is not offered on an earlier, full page.
     expect(screen.queryByTestId("add-row")).not.toBeInTheDocument();
   });
@@ -544,11 +544,11 @@ describe("given a saved dataset larger than one page", () => {
   it("moves to the next page and back", async () => {
     const user = userEvent.setup();
     renderPaged();
-    await screen.findByTestId("dataset-page-indicator");
+    await screen.findByTestId("pagination-indicator");
 
-    await user.click(screen.getByTestId("dataset-page-next"));
+    await user.click(screen.getByTestId("pagination-next"));
     await waitFor(() =>
-      expect(screen.getByTestId("dataset-page-indicator")).toHaveTextContent(
+      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
         "Page 2 of 3",
       ),
     );
@@ -558,9 +558,9 @@ describe("given a saved dataset larger than one page", () => {
       expect.anything(),
     );
 
-    await user.click(screen.getByTestId("dataset-page-prev"));
+    await user.click(screen.getByTestId("pagination-prev"));
     await waitFor(() =>
-      expect(screen.getByTestId("dataset-page-indicator")).toHaveTextContent(
+      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
         "Page 1 of 3",
       ),
     );
@@ -611,16 +611,16 @@ describe("given a saved dataset larger than one page", () => {
         wrapper: Wrapper,
       });
       await waitFor(() =>
-        expect(screen.getByTestId("dataset-page-indicator")).toHaveTextContent(
+        expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
           "Page 1 of 3",
         ),
       );
 
-      await user.click(screen.getByTestId("dataset-page-next"));
+      await user.click(screen.getByTestId("pagination-next"));
       // Page 2 is still loading — the indicator must show page 2, not bounce to 1,
       // and the last request must be for page 2.
       await waitFor(() =>
-        expect(screen.getByTestId("dataset-page-indicator")).toHaveTextContent(
+        expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
           "Page 2 of 3",
         ),
       );
@@ -638,11 +638,11 @@ describe("given a saved dataset larger than one page", () => {
     );
     const user = userEvent.setup();
     renderPaged();
-    await screen.findByTestId("dataset-page-indicator");
+    await screen.findByTestId("pagination-indicator");
 
     // Move to page 2 first (no pending writes yet, so navigation is allowed),
     // then edit its first cell.
-    await user.click(screen.getByTestId("dataset-page-next"));
+    await user.click(screen.getByTestId("pagination-next"));
     await screen.findByText("page2-a");
     await user.dblClick(screen.getByTestId("cell-0-input_0"));
     const textarea = await screen.findByRole("textbox");
@@ -669,16 +669,47 @@ describe("given a saved dataset larger than one page", () => {
   it("offers the add-row only once on the last page", async () => {
     const user = userEvent.setup();
     renderPaged();
-    await screen.findByTestId("dataset-page-indicator");
+    await screen.findByTestId("pagination-indicator");
     expect(screen.queryByTestId("add-row")).not.toBeInTheDocument();
 
-    await user.click(screen.getByTestId("dataset-page-next")); // page 2
-    await user.click(screen.getByTestId("dataset-page-next")); // page 3 (last)
+    await user.click(screen.getByTestId("pagination-next")); // page 2
+    await user.click(screen.getByTestId("pagination-next")); // page 3 (last)
     await waitFor(() =>
-      expect(screen.getByTestId("dataset-page-indicator")).toHaveTextContent(
+      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
         "Page 3 of 3",
       ),
     );
     expect(screen.getByTestId("add-row")).toBeInTheDocument();
+  });
+
+  /** @scenario A dataset larger than one page shows the first page with a pager */
+  it("re-reads with the new limit and resets to page 1 when rows-per-page changes", async () => {
+    const user = userEvent.setup();
+    renderPaged();
+    await screen.findByTestId("pagination-indicator");
+
+    // Move off page 1 first so the reset-to-page-1 is observable.
+    await user.click(screen.getByTestId("pagination-next"));
+    await waitFor(() =>
+      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
+        "Page 2 of 3",
+      ),
+    );
+
+    // Switch to 100 rows per page. The page count is derived from
+    // count / pageSize, so 150 records collapse to 2 pages immediately, and the
+    // server is re-read with the new limit from page 1.
+    await user.click(screen.getByTestId("pagination-size-100"));
+    await waitFor(() =>
+      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
+        "Page 1 of 2",
+      ),
+    );
+    const lastCall = getAllQuery.mock.calls.at(-1)![0] as {
+      page?: number;
+      limit?: number;
+    };
+    expect(lastCall.limit).toBe(100);
+    expect(lastCall.page).toBe(1);
   });
 });
