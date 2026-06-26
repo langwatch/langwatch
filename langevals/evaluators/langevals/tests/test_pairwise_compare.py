@@ -66,7 +66,7 @@ def test_single_judge_call_when_swap_disabled():
         result = evaluator.evaluate(entry)
 
     assert mock_completion.call_count == 1
-    assert result.label == "A"
+    assert result.label == "variant_a"
     assert result.score == 0.0
     assert result.details and "A is closer" in result.details
     assert result.cost and result.cost.amount == pytest.approx(0.0001)
@@ -115,7 +115,7 @@ def test_swap_agreement_returns_agreed_winner():
     ):
         result = evaluator.evaluate(entry)
 
-    assert result.label == "A"
+    assert result.label == "variant_a"
     assert result.score == 0.0
     assert result.cost and result.cost.amount == pytest.approx(0.0002)
 
@@ -249,5 +249,5 @@ def test_b_wins_score_is_one():
     ):
         result = evaluator.evaluate(entry)
 
-    assert result.label == "B"
+    assert result.label == "variant_b"
     assert result.score == 1.0
