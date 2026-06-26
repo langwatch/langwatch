@@ -169,6 +169,17 @@ redis_port_in_use() {
   fi
 }
 
+# Predicate: is the listener on host port 6379 actually a usable local Redis?
+# redis_port_in_use only proves *something* owns the port; this confirms it
+# speaks the Redis protocol with no auth/TLS gate by issuing PING and checking
+# for a PONG reply. If redis-cli is unavailable we cannot verify it, so we
+# degrade to "not usable" and the caller refuses to reuse an unverifiable
+# listener (rather than silently breaking the in-process BullMQ workers).
+redis_listener_is_usable() {
+  command -v redis-cli >/dev/null 2>&1 || return 1
+  redis-cli -u redis://localhost:6379 ping 2>/dev/null | grep -qx 'PONG'
+}
+
 # Detect a host-side process holding port 6379 before redis tries to bind.
 check_host_redis_collision() {
   [ "${SKIP_HOST_REDIS_CHECK:-0}" = "1" ] && return 0
@@ -372,10 +383,27 @@ run_frontend_only() {
   # pins REDIS_URL=redis://localhost:6379 so the host-side `pnpm dev` reaches it.
   #
   # If a host process already owns 6379 (e.g. the operator runs their own
-  # redis), reuse it rather than failing — our container would just collide.
+  # redis), reuse it ONLY when it answers PING with PONG — i.e. a real,
+  # auth-free local Redis. A non-Redis listener, or a Redis that requires
+  # auth/TLS, would let `pnpm dev` start but silently break the in-process
+  # BullMQ workers later, so fail loudly instead of reusing it. If 6379 is
+  # free, bring up our own lightweight redis container.
   write_overrides frontend-only
-  if redis_port_in_use; then
-    echo "Port 6379 already has a listener — reusing it for in-process workers (not starting a redis container)."
+  if redis_port_in_use && redis_listener_is_usable; then
+    echo "Port 6379 already has a usable Redis — reusing it for in-process workers (not starting a redis container)."
+  elif redis_port_in_use; then
+    cat >&2 <<'EOF'
+ERROR: Port 6379 has a listener, but it could not be verified as a usable
+       local Redis (redis-cli PING did not return PONG, or redis-cli is not
+       installed). frontend-only points the in-process BullMQ workers at
+       redis://localhost:6379, so reusing a non-Redis process — or a Redis
+       that needs auth/TLS — would silently break job processing. Fix one of:
+         - install redis-cli so the launcher can verify the listener, or
+         - stop whatever owns 6379 / repoint it at a plain local Redis, or
+         - free port 6379 so this launcher can start its own redis container.
+       Pure Vite with no workers: START_WORKERS=false pnpm dev.
+EOF
+    exit 1
   else
     echo "Starting: redis compose service (preset=frontend-only)"
     $COMPOSE up -d redis
