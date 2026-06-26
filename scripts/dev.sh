@@ -155,6 +155,20 @@ EOF
   done
 }
 
+# Predicate: is something already listening on host port 6379? Used by
+# frontend-only to decide whether to start its own redis container or reuse
+# an existing host redis. Mirrors check_host_redis_collision's detection but
+# returns a status instead of exiting.
+redis_port_in_use() {
+  if command -v lsof >/dev/null 2>&1; then
+    [ -n "$(lsof -iTCP:6379 -sTCP:LISTEN -t 2>/dev/null | head -n1)" ]
+  elif command -v ss >/dev/null 2>&1; then
+    ss -ltnH "sport = :6379" 2>/dev/null | grep -q ":6379"
+  else
+    return 1
+  fi
+}
+
 # Detect a host-side process holding port 6379 before redis tries to bind.
 check_host_redis_collision() {
   [ "${SKIP_HOST_REDIS_CHECK:-0}" = "1" ] && return 0
@@ -349,11 +363,30 @@ EOF
 }
 
 run_frontend_only() {
+  # frontend-only runs no app/DB/CH compose — DB, ClickHouse, NLP and S3 all
+  # come from the operator's .env (shared dev). BUT `pnpm dev` starts the
+  # BullMQ workers in-process by default (set START_WORKERS=false for pure
+  # Vite), and those workers need Redis. Bring up only the lightweight `redis`
+  # compose service locally — sharing dev Redis would collide with other
+  # developers' jobs (same reason dev-infra runs Redis locally). The overlay
+  # pins REDIS_URL=redis://localhost:6379 so the host-side `pnpm dev` reaches it.
+  #
+  # If a host process already owns 6379 (e.g. the operator runs their own
+  # redis), reuse it rather than failing — our container would just collide.
   write_overrides frontend-only
-  echo "Preset: frontend-only — no compose. Run 'pnpm dev' from langwatch/ to start."
+  if redis_port_in_use; then
+    echo "Port 6379 already has a listener — reusing it for in-process workers (not starting a redis container)."
+  else
+    echo "Starting: redis compose service (preset=frontend-only)"
+    $COMPOSE up -d redis
+    echo "Redis is running detached on localhost:6379 (for in-process workers)."
+  fi
+  echo "Preset: frontend-only — no app compose. Run 'pnpm dev' from langwatch/ to start."
   echo ""
   echo "Tip: pure UI / design / static iteration. URLs come from langwatch/.env."
   echo "     For services on top: switch to all-local, all-local-nlp, or full-local."
+  echo "     Pure Vite with no background processing: START_WORKERS=false pnpm dev."
+  echo "     Stop redis with: scripts/dev.sh down"
   # Skip flags must be on the shell env of the pnpm dev subprocess, NOT in
   # .env.dev-up: start:prepare:db runs the migrations before the app boots
   # dotenv, so it reads the shell environment, not the overlay file. Frontend-only
