@@ -15,7 +15,6 @@ import { z } from "zod";
 import { createLogger } from "~/utils/logger/server";
 import { toError } from "~/utils/posthogErrorCapture";
 import type { DeepPartial } from "../../utils/types";
-import type { CollectorJob } from "../background/types";
 import { openTelemetryToLangWatchMetadataMapping } from "./metadata";
 import {
   extractStrandsAgentsInputOutput,
@@ -23,36 +22,38 @@ import {
   isStrandsAgentsInstrumentation,
 } from "./span-event-processing/strands-agents";
 import {
+  type BaseSpan,
+  type ChatMessage,
+  type CustomMetadata,
   chatMessageSchema,
   customMetadataSchema,
+  type LLMSpan,
+  type RAGChunk,
+  type RESTEvaluation,
+  type ReservedTraceMetadata,
   rESTEvaluationSchema,
   reservedSpanParamsSchema,
   reservedTraceMetadataSchema,
+  type Span,
+  type SpanTypes,
   spanMetricsSchema,
   spanTimestampsSchema,
   spanTypesSchema,
-  typedValueChatMessagesSchema,
-  type BaseSpan,
-  type ChatMessage,
-  type LLMSpan,
-  type RAGChunk,
-  type Span,
-  type SpanTypes,
   type TypedValueChatMessages,
+  typedValueChatMessagesSchema,
 } from "./types";
 import { decodeBase64OpenTelemetryId, decodeOpenTelemetryId } from "./utils";
 
 const logger = createLogger("langwatch.tracer.otel.traces");
 const tracer = getLangWatchTracer("langwatch.tracer.otel.traces");
 
-export type TraceForCollection = Pick<
-  CollectorJob,
-  | "traceId"
-  | "spans"
-  | "reservedTraceMetadata"
-  | "customMetadata"
-  | "evaluations"
->;
+export type TraceForCollection = {
+  traceId: string;
+  spans: Span[];
+  reservedTraceMetadata: ReservedTraceMetadata;
+  customMetadata: CustomMetadata;
+  evaluations: RESTEvaluation[] | undefined;
+};
 
 export const openTelemetryTraceRequestToTracesForCollection = async (
   otelTrace: DeepPartial<IExportTraceServiceRequest>,
@@ -105,9 +106,7 @@ export const openTelemetryTraceRequestToTracesForCollection = async (
           code: SpanStatusCode.ERROR,
           message: error instanceof Error ? error.message : "Unknown error",
         });
-        span.recordException(
-          toError(error),
-        );
+        span.recordException(toError(error));
         throw error;
       }
     },
@@ -214,9 +213,7 @@ const openTelemetryTraceRequestToTraceForCollection = (
           code: SpanStatusCode.ERROR,
           message: error instanceof Error ? error.message : "Unknown error",
         });
-        span.recordException(
-          toError(error),
-        );
+        span.recordException(toError(error));
         throw error;
       }
     },
@@ -1303,9 +1300,7 @@ const addOpenTelemetrySpanAsSpan = (
           code: SpanStatusCode.ERROR,
           message: error instanceof Error ? error.message : "Unknown error",
         });
-        otelSpan.recordException(
-          toError(error),
-        );
+        otelSpan.recordException(toError(error));
         throw error;
       }
     },

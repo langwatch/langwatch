@@ -30,7 +30,6 @@ import {
 } from "~/server/app-layer/traces/lean-for-projection";
 import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
-import type { Protections } from "~/server/elasticsearch/protections";
 import type { Event } from "~/server/event-sourcing";
 import {
   startTestContainers,
@@ -42,6 +41,7 @@ import {
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import type { Span, Trace } from "~/server/tracer/types";
+import type { Protections } from "~/server/traces/protections";
 import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 

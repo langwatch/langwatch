@@ -2,12 +2,11 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import { sharedFiltersInputSchema } from "../../../analytics/types";
-import { FilterServiceFacade } from "../../../filters/filter.service";
+import { FilterService } from "../../../filters/filter.service";
 import { availableFilters } from "../../../filters/registry";
 import { type FilterField, filterFieldsEnum } from "../../../filters/types";
 import { checkProjectPermission } from "../../rbac";
 import { protectedProcedure } from "../../trpc";
-import { generateTracesPivotQueryConditions } from "./common";
 
 export const dataForFilter = protectedProcedure
   .input(
@@ -36,21 +35,12 @@ export const dataForFilter = protectedProcedure
       });
     }
 
-    const { pivotIndexConditions } = generateTracesPivotQueryConditions({
-      ...input,
-      filters: {
-        ...(input.filters["topics.topics"]
-          ? { "topics.topics": input.filters["topics.topics"] }
-          : {}),
-      },
-    });
-
     // Exclude the current field from scope filters to avoid circular dependency
     const scopeFilters = Object.fromEntries(
       Object.entries(input.filters).filter(([key]) => key !== field),
     ) as Partial<Record<FilterField, FilterParam>>;
 
-    const filterService = FilterServiceFacade.create(ctx.prisma);
+    const filterService = FilterService.create(ctx.prisma);
     const results = await filterService.getFilterOptions({
       projectId: input.projectId,
       field,
@@ -59,7 +49,6 @@ export const dataForFilter = protectedProcedure
       subkey,
       startDate: input.startDate,
       endDate: input.endDate,
-      pivotIndexConditions,
       scopeFilters,
     });
 

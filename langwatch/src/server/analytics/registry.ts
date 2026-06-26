@@ -1,5 +1,7 @@
-import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/types";
 import { z } from "zod";
+
+type AggregationsAggregationContainer = Record<string, unknown>;
+
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { formatMoney } from "../../utils/formatMoney";
 import { filterFieldsEnum } from "../filters/types";
@@ -21,10 +23,7 @@ import {
 
 const simpleFieldAnalytics = (
   field: string,
-): Omit<
-  AnalyticsMetric,
-  "label" | "colorSet" | "allowedAggregations"
-> => ({
+): Omit<AnalyticsMetric, "label" | "colorSet" | "allowedAggregations"> => ({
   format: "0.[0]",
   increaseIs: "good",
   aggregation: (index: number, aggregation: AggregationTypes) => ({
@@ -43,10 +42,7 @@ const simpleFieldAnalytics = (
 
 const numericFieldAnalyticsWithPercentiles = (
   field: string,
-): Omit<
-  AnalyticsMetric,
-  "label" | "colorSet" | "increaseIs"
-> => ({
+): Omit<AnalyticsMetric, "label" | "colorSet" | "increaseIs"> => ({
   format: "0.[0]a",
   allowedAggregations: [
     ...numericAggregationTypes,
@@ -89,21 +85,18 @@ export const analyticsMetrics = {
       label: "Traces",
       colorSet: "orangeTones",
       allowedAggregations: ["cardinality"],
-
     },
     user_id: {
       ...simpleFieldAnalytics("metadata.user_id"),
       label: "Users",
       colorSet: "blueTones",
       allowedAggregations: ["cardinality"],
-
     },
     thread_id: {
       ...simpleFieldAnalytics("metadata.thread_id"),
       label: "Threads",
       colorSet: "greenTones",
       allowedAggregations: ["cardinality"],
-
     },
     span_type: {
       label: "Span Type",
@@ -141,7 +134,6 @@ export const analyticsMetrics = {
       extractionPath: (index: number, aggregation) => {
         return `${index}__span_type_${aggregation}>child>cardinality`;
       },
-
     },
   },
   sentiment: {
@@ -207,7 +199,6 @@ export const analyticsMetrics = {
           ? `${index}__thumbs_up_down_${aggregation}>child>cardinality`
           : `${index}__thumbs_up_down_${aggregation}>child>child>child>child`;
       },
-
     },
   },
   performance: {
@@ -217,7 +208,6 @@ export const analyticsMetrics = {
       colorSet: "greenTones",
       format: formatMilliseconds,
       increaseIs: "bad",
-
     },
     first_token: {
       ...numericFieldAnalyticsWithPercentiles("metrics.first_token_ms"),
@@ -225,7 +215,6 @@ export const analyticsMetrics = {
       colorSet: "cyanTones",
       format: formatMilliseconds,
       increaseIs: "bad",
-
     },
     total_cost: {
       ...numericFieldAnalyticsWithPercentiles("metrics.total_cost"),
@@ -233,7 +222,6 @@ export const analyticsMetrics = {
       colorSet: "greenTones",
       format: (amount) => formatMoney({ amount, currency: "USD" }),
       increaseIs: "neutral",
-
     },
     cost_billed: {
       ...numericFieldAnalyticsWithPercentiles("metrics.cost_billed"),
@@ -254,14 +242,12 @@ export const analyticsMetrics = {
       label: "Prompt Tokens",
       colorSet: "blueTones",
       increaseIs: "neutral",
-
     },
     completion_tokens: {
       ...numericFieldAnalyticsWithPercentiles("metrics.completion_tokens"),
       label: "Completion Tokens",
       colorSet: "orangeTones",
       increaseIs: "neutral",
-
     },
     cache_read_tokens: {
       ...numericFieldAnalyticsWithPercentiles("metrics.cache_read_tokens"),
@@ -335,7 +321,6 @@ export const analyticsMetrics = {
                 },
         };
       },
-
     },
     tokens_per_second: {
       ...numericFieldAnalyticsWithPercentiles("tokens_per_second"),
@@ -406,7 +391,6 @@ export const analyticsMetrics = {
             }.0`
           : `${index}__tokens_per_second_${aggregation}>child`;
       },
-
     },
   },
   events: {
@@ -450,7 +434,6 @@ export const analyticsMetrics = {
           key ? `_${key}` : ""
         }>child>cardinality`;
       },
-
     },
     event_score: {
       label: "Event Score",
@@ -520,7 +503,6 @@ export const analyticsMetrics = {
       ) => {
         return `${index}__event_score_${aggregation}_${key}_${subkey}>child>child>child>child`;
       },
-
     },
     event_details: {
       label: "Event Details",
@@ -590,7 +572,6 @@ export const analyticsMetrics = {
       ) => {
         return `${index}__event_details_${aggregation}_${key}_${subkey}>child>child>child>child`;
       },
-
     },
   },
   evaluations: {
@@ -633,7 +614,6 @@ export const analyticsMetrics = {
       extractionPath: (index: number, aggregation: AggregationTypes, key) => {
         return `${index}__evaluation_score_${aggregation}_${key}>child>child`;
       },
-
     },
     evaluation_pass_rate: {
       label: "Evaluation Pass Rate",
@@ -688,7 +668,6 @@ export const analyticsMetrics = {
       extractionPath: (index: number, aggregation: AggregationTypes, key) => {
         return `${index}__evaluation_pass_rate_${aggregation}_${key}>child>child`;
       },
-
     },
     evaluation_runs: {
       label: "Evaluation Runs",
@@ -732,7 +711,6 @@ export const analyticsMetrics = {
       extractionPath: (index: number, aggregation: AggregationTypes) => {
         return `${index}__checks_${aggregation}>child>child`;
       },
-
     },
   },
   threads: {
@@ -784,7 +762,6 @@ export const analyticsMetrics = {
       }),
       extractionPath: (index: number) =>
         `${index}__average_duration_per_thread_avg`,
-
     },
   },
 } satisfies Record<string, Record<string, AnalyticsMetric>>;
@@ -919,7 +896,6 @@ export const analyticsGroups = {
         },
       }),
       extractionPath: () => "model_group>child>child>buckets>back_to_root",
-
     },
 
     span_type: {
@@ -947,7 +923,6 @@ export const analyticsGroups = {
         },
       }),
       extractionPath: () => "model_group>child>buckets>back_to_root",
-
     },
   },
   sentiment: {
@@ -1023,7 +998,6 @@ export const analyticsGroups = {
       },
       extractionPath: () =>
         "thumbs_up_down_group>child>filter>child>buckets>back_to_root",
-
     },
   },
   events: {
@@ -1052,7 +1026,6 @@ export const analyticsGroups = {
         },
       }),
       extractionPath: () => "check_state_group>child>buckets>back_to_root",
-
     },
   },
   evaluations: {
@@ -1092,7 +1065,6 @@ export const analyticsGroups = {
       }),
       extractionPath: () =>
         "check_state_group>filter_by_evaluator>child>buckets>back_to_root",
-
     },
     evaluation_label: {
       label: "Evaluation Label",
@@ -1130,7 +1102,6 @@ export const analyticsGroups = {
       }),
       extractionPath: () =>
         "check_state_group>filter_by_evaluator>child>buckets>back_to_root",
-
     },
     evaluation_processing_state: {
       label: "Evaluation Processing State",
@@ -1169,7 +1140,6 @@ export const analyticsGroups = {
       }),
       extractionPath: () =>
         "check_state_group>filter_by_evaluator>child>buckets>back_to_root",
-
     },
   },
   error: {
@@ -1190,7 +1160,6 @@ export const analyticsGroups = {
         },
       }),
       extractionPath: () => "error_group>buckets",
-
     },
   },
 } satisfies Record<string, Record<string, AnalyticsGroup>>;

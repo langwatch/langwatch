@@ -9,15 +9,16 @@
  * these queries. These tests run real SQL against a ClickHouse testcontainer
  * to prove every distinct name / span is returned even on large lists.
  */
+
+import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import type { ClickHouseClient } from "@clickhouse/client";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../event-sourcing/__tests__/integration/testContainers";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
-import type { Protections } from "../../elasticsearch/protections";
+import type { Protections } from "../protections";
 
 const tenantId = `test-field-names-${nanoid()}`;
 const now = Date.now();
@@ -360,7 +361,9 @@ describe("ClickHouse field-name queries (integration)", () => {
 
         const spanNames = new Set(spans.map((s) => s.name));
         // The last span by StartTime is what the old LIMIT 200 BY dropped.
-        expect(spanNames.has(`bigspan-${pad(LARGE_SPAN_COUNT - 1)}`)).toBe(true);
+        expect(spanNames.has(`bigspan-${pad(LARGE_SPAN_COUNT - 1)}`)).toBe(
+          true,
+        );
       });
     });
   });

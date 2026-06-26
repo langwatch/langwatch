@@ -7,15 +7,16 @@
  *
  * Uses testcontainers ClickHouse to exercise real SQL against the production schema.
  */
+
+import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import type { ClickHouseClient } from "@clickhouse/client";
 import {
   startTestContainers,
   stopTestContainers,
 } from "../../event-sourcing/__tests__/integration/testContainers";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
-import type { Protections } from "../../elasticsearch/protections";
+import type { Protections } from "../protections";
 import type { GetAllTracesForProjectInput } from "../types";
 
 const tenantId = `test-trace-dedup-${nanoid()}`;
@@ -184,7 +185,9 @@ beforeAll(async () => {
 
   // Import the mocked prisma and build the shared service instance
   const { prisma } = await import("~/server/db");
-  service = new ClickHouseTraceService(prisma as ConstructorParameters<typeof ClickHouseTraceService>[0]);
+  service = new ClickHouseTraceService(
+    prisma as ConstructorParameters<typeof ClickHouseTraceService>[0],
+  );
 }, 60_000);
 
 afterAll(async () => {
@@ -267,7 +270,6 @@ describe("ClickHouse trace dedup (integration)", () => {
       });
 
       it("preserves heavy ComputedInput/ComputedOutput columns", async () => {
-
         const result = await service.getAllTracesForProject(
           makeQueryInput(),
           openProtections,
@@ -322,7 +324,6 @@ describe("ClickHouse trace dedup (integration)", () => {
       });
 
       it("returns both traces without duplication", async () => {
-
         const result = await service.getAllTracesForProject(
           makeQueryInput(),
           openProtections,
@@ -370,8 +371,7 @@ describe("ClickHouse trace dedup (integration)", () => {
             TraceId: traceId,
             ComputedInput: JSON.stringify({
               type: "text",
-              value:
-                "latest input with heavy payload - " + "q".repeat(500),
+              value: "latest input with heavy payload - " + "q".repeat(500),
             }),
             ComputedOutput: JSON.stringify({
               type: "text",
@@ -413,7 +413,6 @@ describe("ClickHouse trace dedup (integration)", () => {
       });
 
       it("returns only the latest trace summary version", async () => {
-
         const traces = await service.getTracesWithSpans(
           tenantId,
           [traceId],
@@ -429,7 +428,6 @@ describe("ClickHouse trace dedup (integration)", () => {
       });
 
       it("returns only the latest span version", async () => {
-
         const traces = await service.getTracesWithSpans(
           tenantId,
           [traceId],
@@ -445,7 +443,6 @@ describe("ClickHouse trace dedup (integration)", () => {
       });
 
       it("preserves heavy SpanAttributes in the result", async () => {
-
         const traces = await service.getTracesWithSpans(
           tenantId,
           [traceId],
@@ -457,14 +454,13 @@ describe("ClickHouse trace dedup (integration)", () => {
         expect(span.params).toBeDefined();
         const params = span.params as Record<string, unknown>;
         // Dot-notation keys get unflattened: "llm.model" -> { llm: { model: "gpt-5-mini" } }
-        expect(
-          (params["llm"] as Record<string, string>)?.["model"],
-        ).toBe("gpt-5-mini");
-        expect(params["payload"]).toContain("a".repeat(100));
+        expect((params.llm as Record<string, string>)?.model).toBe(
+          "gpt-5-mini",
+        );
+        expect(params.payload).toContain("a".repeat(100));
       });
 
       it("preserves heavy ComputedInput/ComputedOutput from the latest trace version", async () => {
-
         const traces = await service.getTracesWithSpans(
           tenantId,
           [traceId],
@@ -478,9 +474,7 @@ describe("ClickHouse trace dedup (integration)", () => {
           typeof trace.input === "string"
             ? JSON.parse(trace.input)
             : trace.input;
-        expect(parsedInput.value).toContain(
-          "latest input with heavy payload",
-        );
+        expect(parsedInput.value).toContain("latest input with heavy payload");
 
         expect(trace.output).not.toBeNull();
         const parsedOutput =
@@ -608,7 +602,6 @@ describe("ClickHouse trace dedup (integration)", () => {
       });
 
       it("deduplicates spans per trace correctly", async () => {
-
         const traces = await service.getTracesWithSpans(
           tenantId,
           [traceX, traceY],

@@ -30,33 +30,43 @@ import { type Job, Worker } from "bullmq";
 import { BullMQOtel } from "bullmq-otel";
 
 import { env } from "~/env.mjs";
-import type { IngestionPullerJob } from "~/server/background/types";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
-import { withJobContext } from "~/server/context/asyncContext";
 import { prisma } from "~/server/db";
-import { connection } from "~/server/redis";
+import { connection, makeQueueName } from "~/server/redis";
 import { createLogger } from "~/utils/logger/server";
 import {
   captureException,
   toError,
   withScope,
 } from "~/utils/posthogErrorCapture";
-import { PULLER_QUEUE } from "~/server/background/queues/constants";
 import { decryptCredentials } from "../activity-monitor/ingestionCredentials";
+import { withJobContext } from "~/server/queues/withJobContext";
+
+export type IngestionPullerJob = {
+  /** IngestionSource id this run targets. */
+  ingestionSourceId: string;
+  /** Wall-clock dispatch time (ms since epoch). */
+  scheduledAt: number;
+};
+
+export const PULLER_QUEUE = {
+  NAME: makeQueueName("ingestion_puller"),
+  JOB: "ingestion_puller",
+} as const;
 
 import {
+  type GovernanceOcsfEventInput,
   GovernanceOcsfEventsClickHouseRepository,
   OCSF_ACTIVITY,
   OCSF_SEVERITY,
-  type GovernanceOcsfEventInput,
 } from "../governanceOcsfEvents.clickhouse.repository";
 import { ensureHiddenGovernanceProject } from "../governanceProject.service";
 
 import {
-  pullerAdapterRegistry,
-  registerBuiltInPullers,
   type NormalizedPullEvent,
   type PullResult,
+  pullerAdapterRegistry,
+  registerBuiltInPullers,
 } from "./index";
 
 const logger = createLogger("langwatch:workers:ingestionPuller");
@@ -131,9 +141,9 @@ export async function runIngestionPullerJob(
     typeof source.pollerCursor === "string"
       ? source.pollerCursor
       : source.pollerCursor !== null && typeof source.pollerCursor === "object"
-      ? // Some adapters persist structured cursors; for now we serialize.
-        JSON.stringify(source.pollerCursor)
-      : null;
+        ? // Some adapters persist structured cursors; for now we serialize.
+          JSON.stringify(source.pollerCursor)
+        : null;
 
   let result: PullResult;
   try {
@@ -190,9 +200,7 @@ export async function runIngestionPullerJob(
       async (tenantId) => {
         const client = await getClickHouseClientForProject(tenantId);
         if (!client) {
-          throw new Error(
-            `ClickHouse not available for tenant ${tenantId}`,
-          );
+          throw new Error(`ClickHouse not available for tenant ${tenantId}`);
         }
         return client;
       },
@@ -243,9 +251,10 @@ export async function runIngestionPullerJob(
       pollerCursor: result.cursor === null ? Prisma.JsonNull : result.cursor,
       errorCount: result.errorCount > 0 ? { increment: 1 } : 0,
       lastEventAt: result.events.length > 0 ? new Date() : undefined,
-      status: source.status === "awaiting_first_event" && result.events.length > 0
-        ? "active"
-        : source.status,
+      status:
+        source.status === "awaiting_first_event" && result.events.length > 0
+          ? "active"
+          : source.status,
     },
   });
 

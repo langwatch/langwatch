@@ -117,13 +117,7 @@ Feature: Hono API endpoint authorization and tenant isolation
     @integration
     Scenario: A destructive cron route rejects callers without the secret
       Given the internal shared secret is configured
-      When the retention-cleanup cron route is called with no Authorization header
-      Then the response status is 401
-
-    @integration
-    Scenario: Worker and ops trigger endpoints reject callers without the secret
-      Given the internal shared secret is configured
-      When the worker/ops trigger endpoints are called with no Authorization header
+      When the old-lambdas-cleanup cron route is called with no Authorization header
       Then the response status is 401
 
   # ============================================================================

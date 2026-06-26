@@ -4,10 +4,10 @@
  * Negative regression test for AC16:
  *   "No automatic retention, time-based GC, or orphan reaping runs"
  *
- * Asserts that no file under langwatch/src/server/background/ (the home
- * of all scheduled workers and queues) references the string "stored_objects"
- * in a way that would imply a background purge, GC, or retention job is
- * running against the stored_objects table.
+ * Asserts that no file under langwatch/src/server (outside the stored-objects
+ * module) references the string "stored_objects" in a way that would imply a
+ * background purge, GC, or retention job is running against the stored_objects
+ * table.
  *
  * WHY: The RFC explicitly forbids automatic time-based deletion. This test
  * codifies that contract as a regression net so that any future engineer who
@@ -85,7 +85,9 @@ function isAllowlisted(rel: string): boolean {
 function findOffendingStoredObjectsRefs(absDir: string): string[] {
   const files = findSourceFiles(absDir);
   return files
-    .filter((filePath) => /stored_objects/i.test(fs.readFileSync(filePath, "utf8")))
+    .filter((filePath) =>
+      /stored_objects/i.test(fs.readFileSync(filePath, "utf8")),
+    )
     .map((f) => path.relative(REPO_ROOT, f))
     .filter((rel) => !isAllowlisted(rel));
 }
@@ -107,14 +109,6 @@ describe("AC16 — no automatic retention, GC, or orphan reaping for stored_obje
       //     update SCAN_ALLOWLIST with a one-line rationale, or
       //   - delete the reference.
       // AC16 forbids automatic retention, time-based GC, or orphan reaping.
-      expect(offending).toEqual([]);
-    });
-  });
-
-  describe("when the queue definitions are scanned for stored_objects references", () => {
-    it("finds no queue that enqueues stored_objects GC work", () => {
-      const queuesDir = path.join(REPO_ROOT, "src/server/background/queues");
-      const offending = findOffendingStoredObjectsRefs(queuesDir);
       expect(offending).toEqual([]);
     });
   });

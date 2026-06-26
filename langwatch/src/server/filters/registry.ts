@@ -1,8 +1,3 @@
-import type {
-  QueryDslBoolQuery,
-  QueryDslQueryContainer,
-} from "@elastic/elasticsearch/lib/api/types";
-
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
@@ -10,6 +5,9 @@ import {
 import { reservedTraceMetadataSchema } from "../tracer/types";
 
 import type { FilterDefinition, FilterField } from "./types";
+
+type QueryDslBoolQuery = Record<string, unknown>;
+type QueryDslQueryContainer = Record<string, unknown>;
 
 /** Label values that represent pass/fail status rather than classification labels. */
 const STATUS_LABEL_VALUES = ["succeeded", "failed"] as const;
@@ -1075,7 +1073,10 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
         return (
           result.unique_values?.child?.child?.buckets
             ?.filter(
-              (bucket: any) => !(STATUS_LABEL_VALUES as readonly string[]).includes(bucket.key),
+              (bucket: any) =>
+                !(STATUS_LABEL_VALUES as readonly string[]).includes(
+                  bucket.key,
+                ),
             )
             .map((bucket: any) => ({
               field: bucket.key,
@@ -1150,7 +1151,10 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
         return (
           result.unique_values?.child?.child?.buckets
             ?.filter(
-              (bucket: any) => !(STATUS_LABEL_VALUES as readonly string[]).includes(bucket.key),
+              (bucket: any) =>
+                !(STATUS_LABEL_VALUES as readonly string[]).includes(
+                  bucket.key,
+                ),
             )
             .map((bucket: any) => ({
               field: bucket.key,

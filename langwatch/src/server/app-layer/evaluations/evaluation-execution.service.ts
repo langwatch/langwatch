@@ -1,4 +1,3 @@
-import type { Protections } from "~/server/elasticsearch/protections";
 import {
   DEFAULT_MAPPINGS,
   migrateLegacyMappings,
@@ -32,6 +31,7 @@ import {
   type TRACE_MAPPINGS,
 } from "~/server/tracer/tracesMapping";
 import type { Trace } from "~/server/tracer/types";
+import type { Protections } from "~/server/traces/protections";
 import type { TraceService } from "~/server/traces/trace.service";
 import type { LangEvalsClient } from "../clients/langevals/langevals.client";
 import {
@@ -263,6 +263,19 @@ export class EvaluationExecutionService {
         details: "Trace has no thread_id for thread-based evaluation",
       };
     }
+
+    // Enrich evaluations: getTracesWithSpans does not populate
+    // `trace.evaluations`, but evaluator field mappings that read the
+    // `evaluations` source need them. Fetch and attach before building the
+    // mapped data so they aren't silently empty (parity with
+    // runEvaluationForTrace in runEvaluation.ts).
+    const evaluationsByTrace =
+      await this.deps.traceService.getEvaluationsMultiple(
+        projectId,
+        [traceId],
+        INTERNAL_PROTECTIONS,
+      );
+    trace.evaluations = evaluationsByTrace[traceId] ?? [];
 
     // 4. Build evaluation data
     const data = await this.buildDataForEvaluation({

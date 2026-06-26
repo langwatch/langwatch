@@ -1,12 +1,14 @@
-import { TRPCError } from "@trpc/server";
 import { on } from "node:events";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { getApp } from "~/server/app-layer/app";
-import { SimulationFacade } from "~/server/simulations/simulation.facade";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { getApp } from "~/server/app-layer/app";
+import type {
+  BatchRunDataResult,
+  ScenarioRunData,
+} from "~/server/scenarios/scenario-event.types";
 import { createLogger } from "~/utils/logger/server";
 import { checkProjectPermission } from "../../rbac";
-import type { BatchRunDataResult, ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 
 const logger = createLogger("langwatch:api:scenarios:events");
 
@@ -60,7 +62,7 @@ async function fetchSuiteRunData({
   endDate?: number;
   sinceTimestamp?: number;
 }) {
-  const service = SimulationFacade.create();
+  const service = getApp().simulations.runs;
 
   if (scenarioSetId) {
     // Single suite/set view — no conditional fetch support yet
@@ -80,7 +82,14 @@ async function fetchSuiteRunData({
       }
     }
 
-    return { changed: true as const, lastUpdatedAt: 0, runs: data.runs, scenarioSetIds, hasMore: data.hasMore, nextCursor: data.nextCursor };
+    return {
+      changed: true as const,
+      lastUpdatedAt: 0,
+      runs: data.runs,
+      scenarioSetIds,
+      hasMore: data.hasMore,
+      nextCursor: data.nextCursor,
+    };
   }
 
   // Cross-suite view — supports conditional fetch via sinceTimestamp
@@ -100,10 +109,13 @@ export const scenarioEventsRouter = createTRPCRouter({
     .input(projectSchema.extend(dateRangeFields))
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
-      logger.debug({ projectId: input.projectId }, "Fetching scenario sets data");
-      const service = SimulationFacade.create();
+      logger.debug(
+        { projectId: input.projectId },
+        "Fetching scenario sets data",
+      );
+      const service = getApp().simulations.runs;
       const dates = resolveDateRange(input);
-      return service.getScenarioSetsDataForProject({
+      return service.getScenarioSetsData({
         projectId: input.projectId,
         ...dates,
       });
@@ -124,10 +136,15 @@ export const scenarioEventsRouter = createTRPCRouter({
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
       logger.debug(
-        { projectId: input.projectId, scenarioSetId: input.scenarioSetId, limit: input.limit, hasCursor: !!input.cursor },
+        {
+          projectId: input.projectId,
+          scenarioSetId: input.scenarioSetId,
+          limit: input.limit,
+          hasCursor: !!input.cursor,
+        },
         "Fetching suite run data (unified)",
       );
-      const dates = resolveDateRange(input);
+      const _dates = resolveDateRange(input);
       return fetchSuiteRunData({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
@@ -153,10 +170,15 @@ export const scenarioEventsRouter = createTRPCRouter({
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
       logger.debug(
-        { projectId: input.projectId, scenarioSetId: input.scenarioSetId, limit: input.limit, hasCursor: !!input.cursor },
+        {
+          projectId: input.projectId,
+          scenarioSetId: input.scenarioSetId,
+          limit: input.limit,
+          hasCursor: !!input.cursor,
+        },
         "Fetching scenario set run data",
       );
-      const service = SimulationFacade.create();
+      const service = getApp().simulations.runs;
       const dates = resolveDateRange(input);
       const data = await service.getRunDataForScenarioSet({
         projectId: input.projectId,
@@ -172,10 +194,17 @@ export const scenarioEventsRouter = createTRPCRouter({
    * @deprecated Use getSuiteRunData instead. Kept for backward compatibility.
    */
   getAllScenarioSetRunData: protectedProcedure
-    .input(projectSchema.extend({ scenarioSetId: z.string() }).extend(dateRangeFields))
+    .input(
+      projectSchema
+        .extend({ scenarioSetId: z.string() })
+        .extend(dateRangeFields),
+    )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
-      logger.debug({ projectId: input.projectId, scenarioSetId: input.scenarioSetId }, "Fetching all scenario set run data (deprecated)");
+      logger.debug(
+        { projectId: input.projectId, scenarioSetId: input.scenarioSetId },
+        "Fetching all scenario set run data (deprecated)",
+      );
       const dates = resolveDateRange(input);
       const result = await fetchSuiteRunData({
         projectId: input.projectId,
@@ -189,14 +218,19 @@ export const scenarioEventsRouter = createTRPCRouter({
   // Get scenario run state
   getRunState: protectedProcedure
     .input(
-      projectSchema.extend({
-        scenarioRunId: z.string(),
-      }).extend(dateRangeFields),
+      projectSchema
+        .extend({
+          scenarioRunId: z.string(),
+        })
+        .extend(dateRangeFields),
     )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
-      logger.debug({ projectId: input.projectId, scenarioRunId: input.scenarioRunId }, "Fetching scenario run state");
-      const service = SimulationFacade.create();
+      logger.debug(
+        { projectId: input.projectId, scenarioRunId: input.scenarioRunId },
+        "Fetching scenario run state",
+      );
+      const service = getApp().simulations.runs;
       const dates = resolveDateRange(input);
       const data = await service.getScenarioRunData({
         projectId: input.projectId,
@@ -215,11 +249,18 @@ export const scenarioEventsRouter = createTRPCRouter({
 
   // Get total count of batch runs for a scenario set (for pagination)
   getScenarioSetBatchRunCount: protectedProcedure
-    .input(projectSchema.extend({ scenarioSetId: z.string() }).extend(dateRangeFields))
+    .input(
+      projectSchema
+        .extend({ scenarioSetId: z.string() })
+        .extend(dateRangeFields),
+    )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
-      logger.debug({ projectId: input.projectId, scenarioSetId: input.scenarioSetId }, "Fetching batch run count");
-      const service = SimulationFacade.create();
+      logger.debug(
+        { projectId: input.projectId, scenarioSetId: input.scenarioSetId },
+        "Fetching batch run count",
+      );
+      const service = getApp().simulations.runs;
       const dates = resolveDateRange(input);
       const count = await service.getBatchRunCountForScenarioSet({
         projectId: input.projectId,
@@ -232,14 +273,19 @@ export const scenarioEventsRouter = createTRPCRouter({
   // Get scenario run data by scenario id
   getRunDataByScenarioId: protectedProcedure
     .input(
-      projectSchema.extend({
-        scenarioId: z.string(),
-      }).extend(dateRangeFields),
+      projectSchema
+        .extend({
+          scenarioId: z.string(),
+        })
+        .extend(dateRangeFields),
     )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
-      logger.debug({ projectId: input.projectId, scenarioId: input.scenarioId }, "Fetching run data by scenario id");
-      const service = SimulationFacade.create();
+      logger.debug(
+        { projectId: input.projectId, scenarioId: input.scenarioId },
+        "Fetching run data by scenario id",
+      );
+      const service = getApp().simulations.runs;
       const dates = resolveDateRange(input);
       const data = await service.getScenarioRunDataByScenarioId({
         projectId: input.projectId,
@@ -263,10 +309,14 @@ export const scenarioEventsRouter = createTRPCRouter({
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
       logger.debug(
-        { projectId: input.projectId, scenarioSetId: input.scenarioSetId, limit: input.limit },
+        {
+          projectId: input.projectId,
+          scenarioSetId: input.scenarioSetId,
+          limit: input.limit,
+        },
         "Fetching scenario set batch history",
       );
-      const service = SimulationFacade.create();
+      const service = getApp().simulations.runs;
       const dates = resolveDateRange(input);
       return service.getBatchHistoryForScenarioSet({
         projectId: input.projectId,
@@ -280,20 +330,26 @@ export const scenarioEventsRouter = createTRPCRouter({
   // Get scenario run data for a specific batch run (conditional: skip if unchanged)
   getBatchRunData: protectedProcedure
     .input(
-      projectSchema.extend({
-        scenarioSetId: z.string(),
-        batchRunId: z.string(),
-        sinceTimestamp: z.number().optional(),
-        runTimestamps: z.record(z.string(), z.number()).optional(),
-      }).extend(dateRangeFields),
+      projectSchema
+        .extend({
+          scenarioSetId: z.string(),
+          batchRunId: z.string(),
+          sinceTimestamp: z.number().optional(),
+          runTimestamps: z.record(z.string(), z.number()).optional(),
+        })
+        .extend(dateRangeFields),
     )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
       logger.debug(
-        { projectId: input.projectId, scenarioSetId: input.scenarioSetId, batchRunId: input.batchRunId },
+        {
+          projectId: input.projectId,
+          scenarioSetId: input.scenarioSetId,
+          batchRunId: input.batchRunId,
+        },
         "Fetching batch run data",
       );
-      const service = SimulationFacade.create();
+      const service = getApp().simulations.runs;
       const dates = resolveDateRange(input);
       const result = await service.getRunDataForBatchRun({
         projectId: input.projectId,
@@ -310,8 +366,11 @@ export const scenarioEventsRouter = createTRPCRouter({
     .input(projectSchema.extend(dateRangeFields))
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
-      logger.debug({ projectId: input.projectId }, "Fetching external set summaries");
-      const service = SimulationFacade.create();
+      logger.debug(
+        { projectId: input.projectId },
+        "Fetching external set summaries",
+      );
+      const service = getApp().simulations.runs;
       const dates = resolveDateRange(input);
       return service.getExternalSetSummaries({
         projectId: input.projectId,
@@ -333,8 +392,15 @@ export const scenarioEventsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
-      logger.debug({ projectId: input.projectId, limit: input.limit, hasCursor: !!input.cursor }, "Fetching all suite run data");
-      const service = SimulationFacade.create();
+      logger.debug(
+        {
+          projectId: input.projectId,
+          limit: input.limit,
+          hasCursor: !!input.cursor,
+        },
+        "Fetching all suite run data",
+      );
+      const service = getApp().simulations.runs;
       const dates = resolveDateRange(input);
       return service.getRunDataForAllSuites({
         projectId: input.projectId,
@@ -387,5 +453,9 @@ export function filterRunsByTimestamp(
     return { changed: false as const, lastUpdatedAt: result.lastUpdatedAt };
   }
 
-  return { changed: true as const, lastUpdatedAt: result.lastUpdatedAt, runs: filtered };
+  return {
+    changed: true as const,
+    lastUpdatedAt: result.lastUpdatedAt,
+    runs: filtered,
+  };
 }

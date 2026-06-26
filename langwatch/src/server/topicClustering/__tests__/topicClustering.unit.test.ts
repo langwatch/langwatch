@@ -18,7 +18,7 @@ vi.mock("../../env.mjs", () => ({
   env: { LANGEVALS_ENDPOINT: "http://localhost:1234" },
 }));
 
-vi.mock("~/server/background/queues/topicClusteringQueue", () => ({
+vi.mock("~/server/topicClustering/topicClusteringQueue", () => ({
   scheduleTopicClusteringNextPage: vi.fn(),
 }));
 
@@ -59,9 +59,9 @@ vi.mock("../../langevals/stagedFetch", () => ({
   }),
 }));
 
-import { prisma } from "~/server/db";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
-import { scheduleTopicClusteringNextPage } from "~/server/background/queues/topicClusteringQueue";
+import { prisma } from "~/server/db";
+import { scheduleTopicClusteringNextPage } from "~/server/topicClustering/topicClusteringQueue";
 import { stagedLangevalsFetch } from "../../langevals/stagedFetch";
 import {
   clusterTopicsForProject,
@@ -96,9 +96,7 @@ describe("clusterTopicsForProject", () => {
       // CH count query (single query for all 4 counts)
       mockClickHouseQuery.mockResolvedValueOnce({
         json: () =>
-          Promise.resolve([
-            { total: "5", recent: "5", assigned: "0" },
-          ]),
+          Promise.resolve([{ total: "5", recent: "5", assigned: "0" }]),
       });
 
       // CH search query returns fewer than minimumTraces (10 for batch)
@@ -126,9 +124,7 @@ describe("clusterTopicsForProject", () => {
       // Counts
       mockClickHouseQuery.mockResolvedValueOnce({
         json: () =>
-          Promise.resolve([
-            { total: "100", recent: "100", assigned: "0" },
-          ]),
+          Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
       });
 
       // Search: a full page of empty-input traces (returnedCount > 10).
@@ -167,9 +163,7 @@ describe("clusterTopicsForProject", () => {
       // Counts
       mockClickHouseQuery.mockResolvedValueOnce({
         json: () =>
-          Promise.resolve([
-            { total: "100", recent: "100", assigned: "0" },
-          ]),
+          Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
       });
 
       // CH search returns 12 traces (above the 10 minimum for batch)
@@ -216,9 +210,7 @@ describe("clusterTopicsForProject", () => {
       // Counts
       mockClickHouseQuery.mockResolvedValueOnce({
         json: () =>
-          Promise.resolve([
-            { total: "100", recent: "100", assigned: "0" },
-          ]),
+          Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
       });
 
       // Search - empty result
@@ -252,9 +244,7 @@ describe("clusterTopicsForProject", () => {
 
       mockClickHouseQuery.mockResolvedValueOnce({
         json: () =>
-          Promise.resolve([
-            { total: "100", recent: "100", assigned: "0" },
-          ]),
+          Promise.resolve([{ total: "100", recent: "100", assigned: "0" }]),
       });
 
       // Return traces with various ComputedInput formats
@@ -291,7 +281,9 @@ describe("clusterTopicsForProject", () => {
 
       // Traces with empty/null input should be filtered, leaving 10
       const fetchCall = vi.mocked(stagedLangevalsFetch).mock.calls[0];
-      const body = fetchCall?.[0]?.body as { traces: Array<{ input: string }> } | undefined;
+      const body = fetchCall?.[0]?.body as
+        | { traces: Array<{ input: string }> }
+        | undefined;
       expect(body?.traces).toHaveLength(10);
       expect(body?.traces[0]?.input).toBe("User message 0");
     });
@@ -307,14 +299,38 @@ describe("fetchTracesFromClickHouse de-duplication", () => {
       query: vi.fn().mockResolvedValue({
         json: () =>
           Promise.resolve([
-            { TraceId: "t-0", ComputedInput: JSON.stringify("a"), TopicId: null, SubTopicId: null, OccurredAtMs: String(now) },
-            { TraceId: "t-0", ComputedInput: JSON.stringify("a"), TopicId: null, SubTopicId: null, OccurredAtMs: String(now - 1) },
-            { TraceId: "t-1", ComputedInput: JSON.stringify("b"), TopicId: null, SubTopicId: null, OccurredAtMs: String(now - 2) },
+            {
+              TraceId: "t-0",
+              ComputedInput: JSON.stringify("a"),
+              TopicId: null,
+              SubTopicId: null,
+              OccurredAtMs: String(now),
+            },
+            {
+              TraceId: "t-0",
+              ComputedInput: JSON.stringify("a"),
+              TopicId: null,
+              SubTopicId: null,
+              OccurredAtMs: String(now - 1),
+            },
+            {
+              TraceId: "t-1",
+              ComputedInput: JSON.stringify("b"),
+              TopicId: null,
+              SubTopicId: null,
+              OccurredAtMs: String(now - 2),
+            },
           ]),
       }),
     } as any;
 
-    const res = await fetchTracesFromClickHouse(mockCh, "proj-1", false, [], []);
+    const res = await fetchTracesFromClickHouse(
+      mockCh,
+      "proj-1",
+      false,
+      [],
+      [],
+    );
 
     expect(res.returnedCount).toBe(2); // t-0 counted once + t-1
     expect(res.traces).toHaveLength(2);

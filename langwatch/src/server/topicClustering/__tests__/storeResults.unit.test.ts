@@ -46,7 +46,7 @@ vi.mock("~/server/clickhouse/clickhouseClient", () => ({
   getClickHouseClientForProject: vi.fn(),
 }));
 
-vi.mock("~/server/background/queues/topicClusteringQueue", () => ({
+vi.mock("~/server/topicClustering/topicClusteringQueue", () => ({
   scheduleTopicClusteringNextPage: vi.fn(),
 }));
 

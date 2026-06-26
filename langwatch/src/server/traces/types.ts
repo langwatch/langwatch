@@ -37,7 +37,7 @@ export interface GetAllTracesForProjectOptions {
 
 /**
  * Input parameters for getAllTracesForProject.
- * Used by both ClickHouse and Elasticsearch services.
+ * Used by the ClickHouse trace services.
  * Extends the shared filters input schema with pagination and sorting options.
  */
 export type GetAllTracesForProjectInput = z.infer<
@@ -54,7 +54,7 @@ export type GetAllTracesForProjectInput = z.infer<
 
 /**
  * Result structure for getAllTracesForProject.
- * Used by both ClickHouse and Elasticsearch services.
+ * Used by the ClickHouse trace services.
  */
 export interface TracesForProjectResult {
   groups: TraceWithGuardrail[][];

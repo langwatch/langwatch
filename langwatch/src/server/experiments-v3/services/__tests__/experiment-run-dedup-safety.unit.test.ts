@@ -17,12 +17,8 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { describe, expect, it } from "vitest";
 
-describe("clickhouse-experiment-run.service dedup OOM safety", () => {
-  const sourcePath = path.resolve(
-    __dirname,
-    "..",
-    "clickhouse-experiment-run.service.ts",
-  );
+describe("experiment-run.service dedup OOM safety", () => {
+  const sourcePath = path.resolve(__dirname, "..", "experiment-run.service.ts");
   const source = fs.readFileSync(sourcePath, "utf-8");
 
   it("does not use LIMIT 1 BY anywhere in the file", () => {

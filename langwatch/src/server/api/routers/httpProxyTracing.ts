@@ -5,9 +5,12 @@
  * When a user tests an HTTP agent, this module creates a trace capturing
  * request/response details while redacting sensitive auth credentials.
  */
+
 import crypto from "node:crypto";
-import type { Span, CustomMetadata } from "../../tracer/types";
-import { scheduleTraceCollectionWithFallback } from "../../background/workers/collectorWorker";
+import { getApp } from "../../app-layer/app";
+import { DEFAULT_PII_REDACTION_LEVEL } from "../../event-sourcing/pipelines/trace-processing/schemas/commands";
+import type { CustomMetadata, Span } from "../../tracer/types";
+import { CollectorSpanUtils } from "../../traces/collectorSpan.utils";
 
 type AuthInput = {
   type: "none" | "bearer" | "api_key" | "basic";
@@ -207,26 +210,25 @@ export async function createAgentTestTrace({
     },
   };
 
-  await scheduleTraceCollectionWithFallback(
-    {
-      projectId,
-      traceId,
-      spans: [span],
-      evaluations: undefined,
-      reservedTraceMetadata: {
-        user_id: userId,
-      },
-      customMetadata,
-      expectedOutput: null,
-      existingTrace: undefined,
-      paramsMD5: crypto
-        .createHash("md5")
-        .update(JSON.stringify({ traceId, span, customMetadata }))
-        .digest("hex"),
-      collectedAt: now,
-    },
-    false,
-  );
+  // PII redaction level is resolved downstream in the recordSpan pipeline from
+  // the scoped data-privacy policy; ingestion passes the essential default
+  // (#4729 removed Project.piiRedactionLevel).
+  const piiRedactionLevel = DEFAULT_PII_REDACTION_LEVEL;
+
+  const resource = CollectorSpanUtils.buildResource({
+    reservedTraceMetadata: { user_id: userId },
+    customMetadata,
+    expectedOutput: null,
+  });
+
+  await getApp().traces.recordSpan({
+    tenantId: projectId,
+    span: CollectorSpanUtils.convertSpanToOtlp(span),
+    resource,
+    instrumentationScope: { name: "langwatch.agent_test" },
+    piiRedactionLevel,
+    occurredAt: now,
+  });
 
   return { traceId };
 }

@@ -30,9 +30,9 @@ export interface UsageLimitResult {
  * App-layer usage service.
  *
  * Orchestrates: plan → meter policy → counter.
- * The meter policy resolves the counting unit (traces/events) and backend
- * (ClickHouse/ElasticSearch). Counting execution is delegated to
- * TraceUsageService or EventUsageService depending on the resolved meter.
+ * The meter policy resolves the counting unit (traces/events).
+ * Counting execution is delegated to TraceUsageService or
+ * EventUsageService depending on the resolved meter.
  */
 export class UsageService {
   private readonly countCache: TtlCache<number>;
@@ -49,7 +49,6 @@ export class UsageService {
       SimulationRunService,
       "getDistinctExternalSetIds"
     >,
-    private readonly clickhouseAvailable: boolean,
   ) {
     this.countCache = new TtlCache<number>(
       CACHE_TTL_MS,
@@ -309,7 +308,6 @@ export class UsageService {
       licenseUsageUnit: plan.usageUnit,
       hasValidLicenseOverride,
       isFree: plan.free,
-      clickhouseAvailable: this.clickhouseAvailable,
     });
 
     return decision;

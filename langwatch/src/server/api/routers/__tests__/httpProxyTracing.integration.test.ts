@@ -5,14 +5,7 @@
  * Tests that httpProxy.execute creates traces when agentId is provided,
  * capturing request/response details with sanitized auth credentials.
  */
-import {
-  afterEach,
-  beforeAll,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { getTestUser } from "../../../../utils/testUtils";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
@@ -23,14 +16,61 @@ vi.mock("~/utils/ssrfProtection", () => ({
   ssrfSafeFetch: (...args: unknown[]) => mockSsrfSafeFetch(...args),
 }));
 
-// Mock scheduleTraceCollectionWithFallback to capture trace data
-const mockScheduleTrace = vi.fn().mockResolvedValue(undefined);
-vi.mock("~/server/background/workers/collectorWorker", () => ({
-  scheduleTraceCollectionWithFallback: (...args: unknown[]) =>
-    mockScheduleTrace(...args),
+// Mock getApp().traces.recordSpan to capture the OTLP span the route records.
+// Mock both path forms used across the codebase — relative (matches the
+// httpProxyTracing.ts import) and tsconfig-alias. vi.mock is hoisted so the
+// shared mock fn lives in vi.hoisted() to be visible to both factories.
+const { mockScheduleTrace } = vi.hoisted(() => ({
+  mockScheduleTrace: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    traces: {
+      recordSpan: (...args: unknown[]) => mockScheduleTrace(...args),
+    },
+  }),
+}));
+vi.mock("../../../app-layer/app", () => ({
+  getApp: () => ({
+    traces: {
+      recordSpan: (...args: unknown[]) => mockScheduleTrace(...args),
+    },
+  }),
 }));
 
-type CollectorJob = {
+type OtlpAttr = {
+  key: string;
+  value: { stringValue?: string; doubleValue?: number; boolValue?: boolean };
+};
+type OtlpSpan = {
+  traceId: string;
+  attributes: OtlpAttr[];
+  startTimeUnixNano: string;
+  endTimeUnixNano: string;
+  status: { code: number; message?: string };
+};
+type RecordSpanArgs = {
+  tenantId: string;
+  span: OtlpSpan;
+  resource: { attributes: OtlpAttr[] } | null;
+};
+
+function recordSpanArgs(): RecordSpanArgs {
+  return mockScheduleTrace.mock.calls[0]![0] as RecordSpanArgs;
+}
+
+function findAttr(
+  attrs: OtlpAttr[] | undefined,
+  key: string,
+): OtlpAttr["value"] | undefined {
+  return attrs?.find((a) => a.key === key)?.value;
+}
+
+function resourceAttr(key: string): string | undefined {
+  return findAttr(recordSpanArgs().resource?.attributes, key)?.stringValue;
+}
+
+type CollectorJobFacade = {
   projectId: string;
   traceId: string;
   spans: Array<{
@@ -43,13 +83,47 @@ type CollectorJob = {
   customMetadata: Record<string, unknown>;
 };
 
-function getTraceJob(): CollectorJob {
-  return mockScheduleTrace.mock.calls[0]![0] as CollectorJob;
+function getTraceJob(): CollectorJobFacade {
+  const args = recordSpanArgs();
+  const span = args.span;
+  const inputJson = findAttr(span.attributes, "langwatch.input")?.stringValue;
+  const outputJson = findAttr(span.attributes, "langwatch.output")?.stringValue;
+  const hasError =
+    findAttr(span.attributes, "error.has_error")?.boolValue ?? false;
+  const errorMessage =
+    findAttr(span.attributes, "error.message")?.stringValue ?? "";
+  return {
+    projectId: args.tenantId,
+    traceId: span.traceId,
+    spans: [
+      {
+        input: { value: inputJson ? JSON.parse(inputJson).value : undefined },
+        output: {
+          value: outputJson ? JSON.parse(outputJson).value : undefined,
+        },
+        error: hasError ? { has_error: true, message: errorMessage } : null,
+        timestamps: {
+          started_at: Math.floor(Number(span.startTimeUnixNano) / 1_000_000),
+          finished_at: Math.floor(Number(span.endTimeUnixNano) / 1_000_000),
+        },
+      },
+    ],
+    reservedTraceMetadata: { user_id: resourceAttr("langwatch.user.id") },
+    customMetadata: {
+      type: resourceAttr("langwatch.metadata.type"),
+      agent_id: resourceAttr("langwatch.metadata.agent_id"),
+    },
+  };
 }
 
-function parseOutputValue(span: CollectorJob["spans"][number]): Record<string, unknown> {
+function parseOutputValue(
+  span: CollectorJobFacade["spans"][number],
+): Record<string, unknown> {
   const value = span.output?.value;
-  return (typeof value === "string" ? JSON.parse(value) : value) as Record<string, unknown>;
+  return (typeof value === "string" ? JSON.parse(value) : value) as Record<
+    string,
+    unknown
+  >;
 }
 
 describe("HTTP Proxy Tracing", () => {
@@ -73,7 +147,9 @@ describe("HTTP Proxy Tracing", () => {
     vi.clearAllMocks();
   });
 
-  function mockSuccessResponse(body: Record<string, unknown> = { result: "success" }) {
+  function mockSuccessResponse(
+    body: Record<string, unknown> = { result: "success" },
+  ) {
     mockSsrfSafeFetch.mockResolvedValue(
       new Response(JSON.stringify(body), {
         status: 200,
@@ -236,9 +312,7 @@ describe("HTTP Proxy Tracing", () => {
         RequestInit,
       ];
       const headers = fetchOptions.headers as Record<string, string>;
-      expect(headers.traceparent).toMatch(
-        /^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/,
-      );
+      expect(headers.traceparent).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/);
     });
 
     it("uses same trace ID in traceparent header and submitted trace", async () => {
@@ -256,7 +330,8 @@ describe("HTTP Proxy Tracing", () => {
         string,
         RequestInit,
       ];
-      const traceparent = (fetchOptions.headers as Record<string, string>).traceparent!;
+      const traceparent = (fetchOptions.headers as Record<string, string>)
+        .traceparent!;
       const traceIdFromHeader = traceparent.split("-")[1];
       expect(getTraceJob().traceId).toBe(traceIdFromHeader);
     });
@@ -338,7 +413,10 @@ describe("HTTP Proxy Tracing", () => {
         body: "{}",
       });
 
-      const inputValue = getTraceJob().spans[0]!.input?.value as Record<string, unknown>;
+      const inputValue = getTraceJob().spans[0]!.input?.value as Record<
+        string,
+        unknown
+      >;
       const headers = inputValue.headers as Record<string, string>;
       expect(headers.Authorization).toBe("Bearer [REDACTED]");
     });
@@ -363,7 +441,10 @@ describe("HTTP Proxy Tracing", () => {
         body: "{}",
       });
 
-      const inputValue = getTraceJob().spans[0]!.input?.value as Record<string, unknown>;
+      const inputValue = getTraceJob().spans[0]!.input?.value as Record<
+        string,
+        unknown
+      >;
       const headers = inputValue.headers as Record<string, string>;
       expect(headers["X-API-Key"]).toBe("[REDACTED]");
     });
@@ -387,7 +468,10 @@ describe("HTTP Proxy Tracing", () => {
         body: "{}",
       });
 
-      const inputValue = getTraceJob().spans[0]!.input?.value as Record<string, unknown>;
+      const inputValue = getTraceJob().spans[0]!.input?.value as Record<
+        string,
+        unknown
+      >;
       const headers = inputValue.headers as Record<string, string>;
       expect(headers.Authorization).toBe("Basic [REDACTED]");
     });

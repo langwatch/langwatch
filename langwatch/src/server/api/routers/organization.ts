@@ -1,32 +1,30 @@
+import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
-import { RoleService } from "~/server/role/role.service";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-
-import { env } from "~/env.mjs";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import {
-  LicenseEnforcementRepository,
-} from "../../license-enforcement/license-enforcement.repository";
-import { getRoleChangeType } from "../../license-enforcement/member-classification";
-import { assertMemberTypeLimitNotExceeded } from "../../license-enforcement/license-limit-guard";
-import { scheduleUsageStatsForOrganization } from "~/server/background/queues/usageStatsQueue";
-import { decrypt } from "~/utils/encryption";
-import { isTeamRoleAllowedForOrganizationRole, type TeamRoleValue } from "~/utils/memberRoleConstraints";
-import { getApp } from "~/server/app-layer/app";
-import { trackServerEvent } from "~/server/posthog";
 import { fireTeamMemberInvitedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
 import { fireInviteAcceptedNurturingCalls } from "~/../ee/billing/nurturing/hooks/inviteAcceptance";
-import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
+import { env } from "~/env.mjs";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { getApp } from "~/server/app-layer/app";
+import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
+import { enrichTeamWithRoleBindings } from "~/server/app-layer/organizations/organization.service";
+import type { FullyLoadedOrganization } from "~/server/app-layer/organizations/repositories/organization.repository";
+import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
+import { trackServerEvent } from "~/server/posthog";
+import { RoleService } from "~/server/role/role.service";
+import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
+import { decrypt } from "~/utils/encryption";
 import {
-  InviteService,
-  ORGANIZATION_TO_TEAM_ROLE_MAP,
-} from "../../invites/invite.service";
+  isTeamRoleAllowedForOrganizationRole,
+  type TeamRoleValue,
+} from "~/utils/memberRoleConstraints";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
   DuplicateInviteError,
   INVITE_ALREADY_ACCEPTED_MESSAGE,
@@ -35,26 +33,25 @@ import {
   OrganizationNotFoundError,
 } from "../../invites/errors";
 import {
+  InviteService,
+  ORGANIZATION_TO_TEAM_ROLE_MAP,
+} from "../../invites/invite.service";
+import { LimitExceededError } from "../../license-enforcement/errors";
+import { LicenseEnforcementRepository } from "../../license-enforcement/license-enforcement.repository";
+import { assertMemberTypeLimitNotExceeded } from "../../license-enforcement/license-limit-guard";
+import { getRoleChangeType } from "../../license-enforcement/member-classification";
+import {
   assertEnterprisePlan,
   assertEnterprisePlanType,
-  isCustomRole,
   ENTERPRISE_FEATURE_ERRORS,
+  isCustomRole,
 } from "../enterprise";
-import { LimitExceededError } from "../../license-enforcement/errors";
-import { captureException, toError } from "~/utils/posthogErrorCapture";
-import { skipPermissionCheck } from "../rbac";
 import {
   checkOrganizationPermission,
   checkTeamPermission,
   hasOrganizationPermission,
+  skipPermissionCheck,
 } from "../rbac";
-import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
-import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
-import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
-import type { FullyLoadedOrganization } from "~/server/app-layer/organizations/repositories/organization.repository";
-import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
-import { enrichTeamWithRoleBindings } from "~/server/app-layer/organizations/organization.service";
-
 
 const customTeamRoleInputSchema = z
   .string()
@@ -71,7 +68,6 @@ const teamRoleInputSchema = z.union([
   builtInTeamRoleInputSchema,
   customTeamRoleInputSchema,
 ]);
-
 
 export const organizationRouter = createTRPCRouter({
   createAndAssign: protectedProcedure
@@ -91,8 +87,6 @@ export const organizationRouter = createTRPCRouter({
         signUpData: input.signUpData,
         userDisplayName: ctx.session.user.name,
       });
-
-      await scheduleUsageStatsForOrganization(result.organization);
 
       return {
         success: true,
@@ -145,9 +139,10 @@ export const organizationRouter = createTRPCRouter({
       const orgIds = organizations.map((o) => o.id);
       const userRoleBindings =
         orgIds.length > 0
-          ? await new PrismaRoleBindingRepository(ctx.prisma).listForOrganizationsAndUser({ orgIds, userId })
+          ? await new PrismaRoleBindingRepository(
+              ctx.prisma,
+            ).listForOrganizationsAndUser({ orgIds, userId })
           : [];
-
 
       for (const organization of organizations) {
         for (const project of organization.teams.flatMap(
@@ -188,16 +183,6 @@ export const organizationRouter = createTRPCRouter({
         }
         if (organization.s3Endpoint) {
           organization.s3Endpoint = decrypt(organization.s3Endpoint);
-        }
-        if (organization.elasticsearchNodeUrl) {
-          organization.elasticsearchNodeUrl = decrypt(
-            organization.elasticsearchNodeUrl,
-          );
-        }
-        if (organization.elasticsearchApiKey) {
-          organization.elasticsearchApiKey = decrypt(
-            organization.elasticsearchApiKey,
-          );
         }
 
         // A user can be an org admin via either the legacy OrganizationUser row
@@ -254,7 +239,12 @@ export const organizationRouter = createTRPCRouter({
           // NOTE: imported as a standalone function (not a service method) because
           // getApp().organizations is wrapped by traced() which would turn this
           // sync call into a Promise and silently drop team.members.
-          const enriched = enrichTeamWithRoleBindings(team, userId, userRoleBindings, organization.id);
+          const enriched = enrichTeamWithRoleBindings(
+            team,
+            userId,
+            userRoleBindings,
+            organization.id,
+          );
           team.members = enriched.members;
 
           if (isDemoOrg) return true;
@@ -295,16 +285,9 @@ export const organizationRouter = createTRPCRouter({
           s3Endpoint: z.string().optional(),
           s3AccessKeyId: z.string().optional(),
           s3SecretAccessKey: z.string().optional(),
-          elasticsearchNodeUrl: z.string().optional(),
-          elasticsearchApiKey: z.string().optional(),
           s3Bucket: z.string().optional(),
           presenceEnabled: z.boolean().optional(),
           supportContact: z.string().max(500).nullable().optional(),
-        })
-        .refine((data) => {
-          const hasNodeUrl = !!data.elasticsearchNodeUrl?.trim();
-          const hasApiKey = !!data.elasticsearchApiKey?.trim();
-          return (hasNodeUrl && hasApiKey) || (!hasNodeUrl && !hasApiKey);
         })
         .refine(
           (data) => {
@@ -331,16 +314,10 @@ export const organizationRouter = createTRPCRouter({
         s3Endpoint: input.s3Endpoint,
         s3AccessKeyId: input.s3AccessKeyId,
         s3SecretAccessKey: input.s3SecretAccessKey,
-        elasticsearchNodeUrl: input.elasticsearchNodeUrl,
-        elasticsearchApiKey: input.elasticsearchApiKey,
         s3Bucket: input.s3Bucket,
         presenceEnabled: input.presenceEnabled,
         supportContact: input.supportContact,
       });
-
-      if (input.elasticsearchNodeUrl && input.elasticsearchApiKey) {
-        await elasticsearchMigrate(input.organizationId);
-      }
 
       return { success: true };
     }),
@@ -359,11 +336,12 @@ export const organizationRouter = createTRPCRouter({
     // the way out for non-admin callers below.
     .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input, ctx }) => {
-      const organization = await getApp().organizations.getOrganizationWithMembers({
-        organizationId: input.organizationId,
-        userId: ctx.session.user.id,
-        includeDeactivated: input.includeDeactivated ?? false,
-      });
+      const organization =
+        await getApp().organizations.getOrganizationWithMembers({
+          organizationId: input.organizationId,
+          userId: ctx.session.user.id,
+          includeDeactivated: input.includeDeactivated ?? false,
+        });
 
       if (!organization) {
         throw new TRPCError({
@@ -844,9 +822,7 @@ export const organizationRouter = createTRPCRouter({
                       ? ("CUSTOM" as TeamUserRole)
                       : (t.role as TeamUserRole),
                     customRoleId:
-                      hasCustom && t.customRoleId
-                        ? t.customRoleId
-                        : undefined,
+                      hasCustom && t.customRoleId ? t.customRoleId : undefined,
                   };
                 });
 
@@ -1049,7 +1025,7 @@ export const organizationRouter = createTRPCRouter({
         });
       }
 
-      if (!session || !session.user || !session.user.email) {
+      if (!session?.user?.email) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message: "You must be signed in to accept the invite",
@@ -1143,7 +1119,11 @@ export const organizationRouter = createTRPCRouter({
       const inviteService = InviteService.create(prisma);
       const projectSlug = await inviteService.findLandingProjectSlug(invite);
 
-      return { success: true, invite, project: projectSlug ? { slug: projectSlug } : null };
+      return {
+        success: true,
+        invite,
+        project: projectSlug ? { slug: projectSlug } : null,
+      };
     }),
   updateTeamMemberRole: protectedProcedure
     .input(
@@ -1243,7 +1223,9 @@ export const organizationRouter = createTRPCRouter({
 
           const oldPermissions = currentBinding?.customRoleId
             ? await (async () => {
-                const role = await roleService.getRoleByIdOrNull(currentBinding.customRoleId!);
+                const role = await roleService.getRoleByIdOrNull(
+                  currentBinding.customRoleId!,
+                );
                 return role?.permissions as string[] | undefined;
               })()
             : undefined;

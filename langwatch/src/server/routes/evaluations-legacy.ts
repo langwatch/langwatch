@@ -38,12 +38,6 @@ import {
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { getApp } from "~/server/app-layer/app";
 import { DomainError } from "~/server/app-layer/domain-error";
-import { evaluationNameAutoslug } from "~/server/background/workers/collector/evaluationNameAutoslug";
-import { extractChunkTextualContent } from "~/server/background/workers/collector/rag";
-import {
-  type DataForEvaluation,
-  runEvaluation,
-} from "~/server/background/workers/evaluationsWorker";
 import { prisma } from "~/server/db";
 import {
   AVAILABLE_EVALUATORS,
@@ -54,6 +48,10 @@ import {
   type SingleEvaluationResult,
 } from "~/server/evaluations/evaluators";
 import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
+import {
+  type DataForEvaluation,
+  runEvaluation,
+} from "~/server/evaluations/runEvaluation";
 import {
   type EvaluationRESTParams,
   type EvaluationRESTResult,
@@ -75,6 +73,8 @@ import {
 } from "~/server/experiments/types";
 import { mapEsTargetsToTargets } from "~/server/experiments-v3/services/mappers";
 import { getPayloadSizeHistogram } from "~/server/metrics";
+import { evaluationNameAutoslug } from "~/server/tracer/collector/evaluationNameAutoslug";
+import { extractChunkTextualContent } from "~/server/tracer/collector/rag";
 import { rAGChunkSchema } from "~/server/tracer/types";
 import { coerceEvaluatorScalar } from "~/server/utils/coerceEvaluatorScalar";
 import { KSUID_RESOURCES } from "~/utils/constants";

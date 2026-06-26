@@ -37,24 +37,21 @@ async function loadDevHttpsCredentials(
   }
 
   const { generate } = await import("selfsigned");
-  const pems = generate(
-    [{ name: "commonName", value: "localhost" }],
-    {
-      days: 825, // Apple's max accepted lifetime for trusted certs.
-      keySize: 2048,
-      extensions: [
-        {
-          name: "subjectAltName",
-          altNames: [
-            { type: 2, value: "localhost" },
-            { type: 2, value: "*.localhost" },
-            { type: 7, ip: "127.0.0.1" },
-            { type: 7, ip: "::1" },
-          ],
-        },
-      ],
-    },
-  );
+  const pems = generate([{ name: "commonName", value: "localhost" }], {
+    days: 825, // Apple's max accepted lifetime for trusted certs.
+    keySize: 2048,
+    extensions: [
+      {
+        name: "subjectAltName",
+        altNames: [
+          { type: 2, value: "localhost" },
+          { type: 2, value: "*.localhost" },
+          { type: 7, ip: "127.0.0.1" },
+          { type: 7, ip: "::1" },
+        ],
+      },
+    ],
+  });
 
   mkdirSync(cacheDir, { recursive: true });
   writeFileSync(certPath, pems.cert);
@@ -69,8 +66,8 @@ import { createMcpHandler } from "./mcp/handler";
 import { createApiRouter } from "./server/api-router";
 import { getApp } from "./server/app-layer/app";
 import { initializeWebApp } from "./server/app-layer/presets";
-import { getWorkerMetricsPort } from "./server/background/config";
 import { buildStorageConnectSrc } from "./server/buildStorageConnectSrc";
+import { getWorkerMetricsPort, isMetricsAuthorized } from "./server/metrics";
 import { shutdownPostHog } from "./server/posthog";
 import { verifyRedisReady } from "./server/redis";
 import { serveStaticOrFallback } from "./server/static-handler";
@@ -100,17 +97,6 @@ export const metricsMiddleware = promBundle({
     return req.url?.split("?")[0] ?? req.url;
   },
 });
-
-const isMetricsAuthorized = (req: IncomingMessage): boolean => {
-  const authHeader = req.headers.authorization;
-  if (process.env.NODE_ENV === "production" && !process.env.METRICS_API_KEY) {
-    throw new Error("METRICS_API_KEY is not set");
-  }
-  return (
-    !process.env.METRICS_API_KEY ||
-    authHeader === `Bearer ${process.env.METRICS_API_KEY}`
-  );
-};
 
 export const startApp = async (dir = path.dirname(__dirname)) => {
   const dev = process.env.NODE_ENV !== "production";
@@ -191,7 +177,9 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
     "X-Content-Type-Options": "nosniff",
     // CSP only in production — dev needs inline scripts for Vite HMR
     ...(!dev ? { "Content-Security-Policy": cspHeader } : {}),
-    ...(!dev ? { "Strict-Transport-Security": "max-age=31536000; includeSubDomains" } : {}),
+    ...(!dev
+      ? { "Strict-Transport-Security": "max-age=31536000; includeSubDomains" }
+      : {}),
   };
 
   // Optional HTTPS + HTTP/2 path for local dev. Set
@@ -211,7 +199,10 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
     try {
       // Collapse runs of slashes so paths like `//authorize` resolve to `/authorize`
       // instead of failing the absolute-path guard on the SPA fallback below.
-      const pathname = ((req.url ?? "/").split("?")[0] ?? "/").replace(/\/{2,}/g, "/");
+      const pathname = ((req.url ?? "/").split("?")[0] ?? "/").replace(
+        /\/{2,}/g,
+        "/",
+      );
 
       // Apply security headers to all responses
       for (const [key, value] of Object.entries(securityHeaders)) {
@@ -236,7 +227,7 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
           res.end(await register.metrics());
         } else {
           const workersMetricsRes = await fetch(
-            `http://0.0.0.0:${getWorkerMetricsPort()}/metrics`
+            `http://0.0.0.0:${getWorkerMetricsPort()}/metrics`,
           );
           res.setHeader("Content-Type", register.contentType);
           res.end(await workersMetricsRes.text());
@@ -251,7 +242,13 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
 
       // ---- API Routes (all go through Hono) ----
       if (pathname.startsWith("/api/")) {
-        const handled = await routeThroughHono(honoApp, req, res, hostname, port);
+        const handled = await routeThroughHono(
+          honoApp,
+          req,
+          res,
+          hostname,
+          port,
+        );
         if (handled) return;
 
         res.statusCode = 404;
@@ -269,13 +266,18 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
       res.statusCode = 404;
       res.end("Not Found");
     } catch (err) {
-      logger.error({ url: req.url, error: err }, "error occurred handling request");
+      logger.error(
+        { url: req.url, error: err },
+        "error occurred handling request",
+      );
       res.statusCode = 500;
       res.end("internal server error");
     }
   };
 
-  let server: ReturnType<typeof createServer> | ReturnType<typeof createSecureServer>;
+  let server:
+    | ReturnType<typeof createServer>
+    | ReturnType<typeof createSecureServer>;
   if (useHttp2) {
     const { cert, key } = await loadDevHttpsCredentials(dir);
     // Node's http2 compat-API hands us the same IncomingMessage /
@@ -295,7 +297,9 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   // Bind the tRPC router to a WebSocket transport on the same HTTP server.
   // Lets high-frequency procedures (presence cursor today) escape the
   // browser's 6-connection HTTP cap by riding a single long-lived socket.
-  const wsHandle = setupTRPCWebSocket(server as ReturnType<typeof createServer>);
+  const wsHandle = setupTRPCWebSocket(
+    server as ReturnType<typeof createServer>,
+  );
 
   server.once("error", (err) => {
     logger.error({ error: err }, "error occurred on server");
@@ -323,7 +327,9 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
         hostname,
         port,
         fullUrl: `${useHttp2 ? "https" : "http"}://${hostname === "0.0.0.0" ? "localhost" : hostname}:${port}`,
-        mode: dev ? `development (API only — Vite on :${basePort})` : "production",
+        mode: dev
+          ? `development (API only — Vite on :${basePort})`
+          : "production",
       },
       "langwatch listening",
     );
@@ -368,7 +374,7 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   process.on("unhandledRejection", (reason, promise) => {
     logger.fatal(
       { reason: reason instanceof Error ? reason : { value: reason }, promise },
-      "unhandled rejection detected"
+      "unhandled rejection detected",
     );
   });
 };
@@ -378,7 +384,7 @@ async function routeThroughHono(
   req: IncomingMessage,
   res: ServerResponse,
   hostname: string,
-  port: number
+  port: number,
 ): Promise<boolean> {
   const body =
     req.method !== "GET" && req.method !== "HEAD"

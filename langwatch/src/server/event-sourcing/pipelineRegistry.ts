@@ -46,7 +46,6 @@ import type { TraceSummaryData } from "../app-layer/traces/types";
 import type { TriggerService } from "../app-layer/triggers/trigger.service";
 import { getClickHouseClientForProject } from "../clickhouse/clickhouseClient";
 import type { RetentionPolicyResolver } from "../data-retention/retentionPolicyResolver";
-import { createElasticsearchBatchEvaluationRepository } from "../experiments-v3/repositories/elasticsearchBatchEvaluation.repository";
 import { type CommandDispatcher, Deferred } from "./deferred";
 import type { EventSourcing } from "./eventSourcing";
 import { mapCommands } from "./mapCommands";
@@ -59,14 +58,11 @@ import { ExecuteEvaluationCommand } from "./pipelines/evaluation-processing/comm
 import { createEvaluationProcessingPipeline } from "./pipelines/evaluation-processing/pipeline";
 import { EvaluationRunStore } from "./pipelines/evaluation-processing/projections/evaluationRun.store";
 import { createEvaluationAlertTriggerReactor } from "./pipelines/evaluation-processing/reactors/evaluationAlertTrigger.reactor";
-import type { EvaluationEsSyncReactorDeps } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
-import { createEvaluationEsSyncReactor } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
 import { createExperimentRunProcessingPipeline } from "./pipelines/experiment-run-processing/pipeline";
 import type { ClickHouseExperimentRunResultRecord } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.mapProjection";
 import { createExperimentRunItemAppendStore } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
 import type { ExperimentRunStateData } from "./pipelines/experiment-run-processing/projections/experimentRunState.foldProjection";
 import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-processing/projections/experimentRunState.store";
-import { createExperimentRunEsSyncReactor } from "./pipelines/experiment-run-processing/reactors/experimentRunEsSync.reactor";
 import type { ExperimentRunStateRepository } from "./pipelines/experiment-run-processing/repositories/experimentRunState.repository";
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
 import type { TriggerActionDispatchDeps } from "./pipelines/shared/triggerActionDispatch";
@@ -201,7 +197,6 @@ export interface PipelineRegistryDeps {
     execution: EvaluationExecutionService;
   };
   organizations: OrganizationService;
-  esSync: EvaluationEsSyncReactorDeps;
   costRecorder: EvaluationCostRecorder;
   billingCheckpoints: BillingCheckpointService;
   usageReportingService?: UsageReportingService;
@@ -334,8 +329,6 @@ export class PipelineRegistry {
       azureSafetyEnvResolver: getAzureSafetyEnvFromProject,
     });
 
-    const esSyncReactor = createEvaluationEsSyncReactor(this.deps.esSync);
-
     const evaluationAlertTriggerReactor = createEvaluationAlertTriggerReactor({
       triggers: this.deps.triggers,
       projects: this.deps.projects,
@@ -350,7 +343,6 @@ export class PipelineRegistry {
           this.deps.evaluations.runs.repository,
         ),
         executeEvaluationCommand,
-        esSyncReactor,
         evaluationAlertTriggerReactor,
       }),
     );
@@ -773,10 +765,6 @@ export class PipelineRegistry {
         experimentRunStateFoldStore: experimentRunStore,
         experimentRunItemAppendStore:
           this.deps.repositories.experimentRunItemStorage,
-        esSync: createExperimentRunEsSyncReactor({
-          project: this.deps.projects,
-          repository: createElasticsearchBatchEvaluationRepository(),
-        }),
       }),
     );
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { PRESIDIO_STRICT_ENTITIES } from "../../../server/background/workers/collector/piiCheck";
 import { ESSENTIAL_PII_ENTITIES } from "../../../server/data-privacy/redaction/essentialPii";
+import { PRESIDIO_STRICT_ENTITIES } from "../../../server/tracer/collector/piiCheck";
 import {
   ESSENTIAL_PII_ENTITY_LABELS,
   STRICT_ADDED_PII_ENTITY_LABELS,

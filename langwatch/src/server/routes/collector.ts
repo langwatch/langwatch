@@ -1,6 +1,5 @@
 import crypto from "node:crypto";
 import { bodyLimit } from "hono/body-limit";
-import superjson from "superjson";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
@@ -17,18 +16,19 @@ import {
 } from "../api-key/auth-middleware";
 import { TokenResolver } from "../api-key/token-resolver";
 import { getApp } from "../app-layer/app";
-import { evaluationNameAutoslug } from "../background/workers/collector/evaluationNameAutoslug";
-import { maybeAddIdsToContextList } from "../background/workers/collector/rag";
-import { fetchExistingMD5s } from "../background/workers/collectorWorker";
 import { prisma } from "../db";
+import { evaluationNameAutoslug } from "../tracer/collector/evaluationNameAutoslug";
+import { maybeAddIdsToContextList } from "../tracer/collector/rag";
+import type {
+  CollectorRESTParamsValidator,
+  CustomMetadata,
+  ReservedTraceMetadata,
+  Span,
+} from "../tracer/types";
 import {
-  type CollectorRESTParamsValidator,
-  type CustomMetadata,
   collectorRESTParamsValidatorSchema,
   customMetadataSchema,
-  type ReservedTraceMetadata,
   reservedTraceMetadataSchema,
-  type Span,
   spanMetricsSchema,
   spanSchema,
   spanValidatorSchema,
@@ -294,6 +294,23 @@ secured
         );
       }
 
+      if (body.spans?.length > 200) {
+        logger.info(
+          {
+            projectId: project.id,
+            spansCount: body.spans?.length,
+            traceId: nullableTraceId,
+          },
+          "[429] Too many spans",
+        );
+        return c.json(
+          {
+            message: "Too many spans, maximum of 200 per trace",
+          },
+          429,
+        );
+      }
+
       let reservedTraceMetadata: ReservedTraceMetadata = {};
       let customMetadata: CustomMetadata = {};
       try {
@@ -494,50 +511,7 @@ secured
         }
       }
 
-      const paramsMD5 = crypto
-        .createHash("md5")
-        .update(superjson.stringify({ ...params, spans }))
-        .digest("hex");
-      const existingTrace = await fetchExistingMD5s(traceId, project.id);
-      if (existingTrace?.indexing_md5s?.includes(paramsMD5)) {
-        logger.info(
-          { traceId, projectId: project.id, paramsMD5 },
-          "trace already indexed",
-        );
-
-        return c.json({
-          message: "No changes",
-          partialSuccess: {
-            rejectedSpans: 0,
-            dedupedSpans: 0,
-            errorMessage: "",
-          },
-        });
-      }
-
-      if (existingTrace?.version && existingTrace.version > 256) {
-        logger.error(
-          { traceId, projectId: project.id, version: existingTrace.version },
-          "over 256 updates were sent for this trace already, no more updates will be accepted",
-        );
-
-        return c.json(
-          {
-            message:
-              "Over 256 updates were sent for this trace already, no more updates will be accepted",
-          },
-          400,
-        );
-      }
-      if (existingTrace?.existing_metadata?.custom) {
-        customMetadata = {
-          ...existingTrace.existing_metadata.custom,
-          ...customMetadata,
-        };
-      }
-
       let rejectedSpans = 0;
-      let dedupedSpans = 0;
       let rejectionErrors: string[] = [];
       try {
         const resource = CollectorSpanUtils.buildResource({
@@ -546,10 +520,13 @@ secured
           expectedOutput,
         });
 
-        const ingestion = getApp().traces.collection;
-        const results = await Promise.all(
+        const results = await Promise.allSettled(
           spans.map((span) =>
-            ingestion.ingestNormalizedSpan({
+            // Route through ingestNormalizedSpan (not recordSpan directly) so the
+            // REST collector shares the (tenant, trace, span) dedup gate + ADR-022
+            // spool hook with the OTLP path — a retry storm here must not bypass
+            // dedup. occurredAt is stamped inside ingestNormalizedSpan.
+            getApp().traces.collection.ingestNormalizedSpan({
               tenantId: project.id,
               span: CollectorSpanUtils.convertSpanToOtlp(span),
               resource,
@@ -559,25 +536,34 @@ secured
           ),
         );
 
-        const failures = results.filter((r) => r.status === "failed");
-        dedupedSpans = results.filter((r) => r.status === "deduped").length;
-        rejectedSpans = failures.length;
-        rejectionErrors = failures.map((f) => f.error ?? "unknown error");
-        if (failures.length > 0) {
+        // `ingestNormalizedSpan` catches its own errors and RESOLVES with
+        // `{ status: "failed", error }` (it never rejects), so inspect the
+        // resolved status — checking the allSettled "rejected" wrapper would
+        // count every failure as a success. An unexpected rejection is still
+        // treated as a failure defensively. "deduped" is a success, not an error.
+        const failureErrors = results
+          .map((r) => {
+            if (r.status === "rejected") {
+              return r.reason instanceof Error
+                ? r.reason.message
+                : String(r.reason);
+            }
+            return r.value.status === "failed"
+              ? (r.value.error ?? "span ingestion failed")
+              : null;
+          })
+          .filter((e): e is string => e !== null);
+        rejectedSpans = failureErrors.length;
+        rejectionErrors = failureErrors;
+        if (failureErrors.length > 0) {
           logger.error(
             {
               projectId: project.id,
               traceId,
-              failureCount: failures.length,
-              errors: rejectionErrors,
+              failureCount: failureErrors.length,
+              errors: failureErrors,
             },
             "Error dispatching collector spans to event sourcing",
-          );
-        }
-        if (dedupedSpans > 0) {
-          logger.info(
-            { projectId: project.id, traceId, dedupedSpans },
-            "REST collector deduped repeated spans",
           );
         }
       } catch (error) {
@@ -642,7 +628,6 @@ secured
         message: "Trace received successfully.",
         partialSuccess: {
           rejectedSpans,
-          dedupedSpans,
           errorMessage: rejectionErrors.join("; "),
         },
       });

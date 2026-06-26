@@ -10,7 +10,7 @@
  * - `otelAttr`      – OTel `gen_ai.request.*` attribute name stored in
  *                     ClickHouse span attributes.  `null` when no OTel
  *                     convention exists for this parameter.
- * - `traceAliases`  – legacy / SDK-specific key names found in Elasticsearch
+ * - `traceAliases`  – legacy / SDK-specific key names found in stored
  *                     `span.params`.  First match wins.
  * - `coercion`      – target type for the form field ("number" or "string").
  */
@@ -82,12 +82,7 @@ export const LLM_PARAMETER_MAP: readonly LlmParameterMapping[] = [
   {
     formField: "reasoning",
     otelAttr: null,
-    traceAliases: [
-      "reasoning",
-      "reasoning_effort",
-      "thinkingLevel",
-      "effort",
-    ],
+    traceAliases: ["reasoning", "reasoning_effort", "thinkingLevel", "effort"],
     coercion: "string",
   },
   {
@@ -100,7 +95,7 @@ export const LLM_PARAMETER_MAP: readonly LlmParameterMapping[] = [
 
 /**
  * Set of all known trace-level parameter alias names.
- * Used by the Elasticsearch extractor to separate known LLM parameters
+ * Used by the span parameter extractor to separate known LLM parameters
  * (mapped to dedicated fields) from unknown ones (placed in `litellmParams`).
  */
 export const KNOWN_PARAM_ALIASES = new Set(

@@ -3,14 +3,13 @@ import { getLangWatchTracer } from "langwatch";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import type { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import { prisma as defaultPrisma } from "~/server/db";
-import type { Protections } from "~/server/elasticsearch/protections";
 import { EvaluationService } from "~/server/evaluations/evaluation.service";
 import { mapTraceEvaluationsToLegacyEvaluations } from "~/server/evaluations/evaluation-run.mappers";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import type { Evaluation, Trace } from "~/server/tracer/types";
+import type { Protections } from "~/server/traces/protections";
 import { createLogger } from "~/utils/logger/server";
 import { ClickHouseTraceService } from "./clickhouse-trace.service";
-import { ElasticsearchTraceService } from "./elasticsearch-trace.service";
 import { resolveOffloadedTraces } from "./resolve-offloaded-traces";
 
 /**
@@ -154,7 +153,6 @@ export class TraceService {
   private readonly tracer = getLangWatchTracer("langwatch.traces.service");
   private readonly logger = createLogger("langwatch:traces:service");
   private readonly clickHouseService: ClickHouseTraceService;
-  private readonly elasticsearchService: ElasticsearchTraceService;
   private readonly evaluationService: EvaluationService;
   constructor(
     readonly prisma: PrismaClient,
@@ -176,7 +174,6 @@ export class TraceService {
       prisma,
       resolveTraceSpansFn,
     );
-    this.elasticsearchService = ElasticsearchTraceService.create(prisma);
     this.evaluationService = EvaluationService.create(prisma);
   }
 

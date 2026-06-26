@@ -1,22 +1,26 @@
 import { definePipeline } from "../../";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
-import type { ReactorDefinition } from "../../reactors/reactor.types";
 import {
-  StartExperimentRunCommand,
-  RecordTargetResultCommand,
-  RecordEvaluatorResultCommand,
-  ComputeExperimentRunMetricsCommand,
   CompleteExperimentRunCommand,
+  ComputeExperimentRunMetricsCommand,
+  RecordEvaluatorResultCommand,
+  RecordTargetResultCommand,
+  StartExperimentRunCommand,
 } from "./commands";
-import { ExperimentRunResultStorageMapProjection, type ClickHouseExperimentRunResultRecord } from "./projections/experimentRunResultStorage.mapProjection";
-import { ExperimentRunStateFoldProjection, type ExperimentRunStateData } from "./projections/experimentRunState.foldProjection";
+import {
+  type ClickHouseExperimentRunResultRecord,
+  ExperimentRunResultStorageMapProjection,
+} from "./projections/experimentRunResultStorage.mapProjection";
+import {
+  type ExperimentRunStateData,
+  ExperimentRunStateFoldProjection,
+} from "./projections/experimentRunState.foldProjection";
 import type { ExperimentRunProcessingEvent } from "./schemas/events";
 
 export interface ExperimentRunProcessingPipelineDeps {
   experimentRunStateFoldStore: FoldProjectionStore<ExperimentRunStateData>;
   experimentRunItemAppendStore: AppendStore<ClickHouseExperimentRunResultRecord>;
-  esSync?: ReactorDefinition<ExperimentRunProcessingEvent, ExperimentRunStateData>;
 }
 
 /**
@@ -40,26 +44,33 @@ export interface ExperimentRunProcessingPipelineDeps {
  * - recordEvaluatorResult: Emits EvaluatorResultEvent per row/evaluator
  * - completeExperimentRun: Emits ExperimentRunCompletedEvent when run finishes
  */
-export function createExperimentRunProcessingPipeline(deps: ExperimentRunProcessingPipelineDeps) {
+export function createExperimentRunProcessingPipeline(
+  deps: ExperimentRunProcessingPipelineDeps,
+) {
   const builder = definePipeline<ExperimentRunProcessingEvent>()
     .withName("experiment_run_processing")
     .withAggregateType("experiment_run")
-    .withFoldProjection("experimentRunState", new ExperimentRunStateFoldProjection({
-      store: deps.experimentRunStateFoldStore,
-    }))
-    .withMapProjection("experimentRunResultStorage", new ExperimentRunResultStorageMapProjection({
-      store: deps.experimentRunItemAppendStore,
-    }));
-
-  if (deps.esSync) {
-    builder.withReactor("experimentRunState", "experimentRunEsSync", deps.esSync);
-  }
+    .withFoldProjection(
+      "experimentRunState",
+      new ExperimentRunStateFoldProjection({
+        store: deps.experimentRunStateFoldStore,
+      }),
+    )
+    .withMapProjection(
+      "experimentRunResultStorage",
+      new ExperimentRunResultStorageMapProjection({
+        store: deps.experimentRunItemAppendStore,
+      }),
+    );
 
   return builder
     .withCommand("startExperimentRun", StartExperimentRunCommand)
     .withCommand("recordTargetResult", RecordTargetResultCommand)
     .withCommand("recordEvaluatorResult", RecordEvaluatorResultCommand)
-    .withCommand("computeExperimentRunMetrics", ComputeExperimentRunMetricsCommand)
+    .withCommand(
+      "computeExperimentRunMetrics",
+      ComputeExperimentRunMetricsCommand,
+    )
     .withCommand("completeExperimentRun", CompleteExperimentRunCommand)
     .build();
 }
