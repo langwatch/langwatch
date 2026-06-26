@@ -203,8 +203,13 @@ teardown() {
   write_dev_overrides all-local "$OUT"
   write_dev_overrides frontend-only "$OUT"
   result=$(cat "$OUT")
+  # all-local's DATABASE_URL is gone — proves replace, not append
   [[ "$result" != *"DATABASE_URL"* ]]
+  # both frontend-only overrides are present
   [[ "$result" == *"NEXTAUTH_PROVIDER=email"* ]]
+  [[ "$result" == *"REDIS_URL=redis://localhost:6379"* ]]
+  # the prior all-local REDIS_URL was replaced at the key level, not appended
+  [[ "$result" != *"redis://redis:6379"* ]]
 }
 
 # --- credential-leak invariant across all presets ---

@@ -148,7 +148,8 @@ Feature: make quickstart is the single dev environment entry point with intent-b
     Given a previous run wrote all-local overrides
     When write_overrides runs again with mode=frontend-only
     Then langwatch/.env.dev-up no longer contains DATABASE_URL
-    And only the frontend-only override (NEXTAUTH_PROVIDER) remains
+    And it contains the frontend-only overrides NEXTAUTH_PROVIDER and REDIS_URL pointing at localhost:6379
+    And the previous all-local REDIS_URL (redis:6379) was replaced, not appended
 
   # --- Stateful volume sharing (#3860 AC#4) ---
 
