@@ -4,13 +4,15 @@
 
 **Status:** Proposed
 
-> One-line: bill **GiB-hours of stored bytes aged beyond the 30-day included window**, sampled per **sealed UTC hour** by a **global event-sourced projection**, reported additively to a **`sum`-formula Stripe meter**. Ingestion (flow) billing is explicitly rejected. No "current DB" snapshots — each sealed-window ClickHouse query is anchored to a past hour, not `now()`.
+> One-line: bill **GiB-hours of stored bytes aged beyond the 35-day included window** (5 weeks — see "Billing cutoff" below), sampled per **sealed UTC hour** by a **global event-sourced projection**, reported additively to a **`sum`-formula Stripe meter**. Ingestion (flow) billing is explicitly rejected. No "current DB" snapshots — each sealed-window ClickHouse query is anchored to a past hour, not `now()`.
 
 ## Context
 
 [ADR-022](./022-data-retention.md) enforces per-tenant retention with `_retention_days` and `_size_bytes` stamped at ingest and ClickHouse-native TTL doing deletion. That decides *what we delete and when*. It does not decide *what we charge for keeping data alive*. This ADR decides the billing axis.
 
-The commercial model being encoded: **every paid plan includes 30 days of data retention for free; custom retention (60/90/180/custom) is the paid feature, billed at €3/GiB-month for bytes that live beyond 30 days.** The allowance is time-based (each byte's first 30 days are free), never volume-based — there is no "first N GiB free".
+The commercial model being encoded: **every paid plan includes 35 days of retention for free; keeping data longer (42/49/63/90/custom) is the paid feature, billed at €3/GiB-month for the bytes that live beyond 35 days.** A paid customer on the default keep deletes at 35 days and pays nothing; only retention raised above 35 accrues. The allowance is time-based (a byte's first 35 days are free), never volume-based — there is no "first N GiB free".
+
+> **Billing cutoff (decision 2026-06-26).** `BILLABLE_AFTER_DAYS = 35` (5 weeks). 35 is a clean `toYearWeek` partition boundary, so the cutoff prunes cleanly and a default-keep org's data is deleted right at the boundary → €0 *by construction*. **Coupled change:** this requires the **paid minimum retention to drop from 49 → 35 days** (`MIN_RETENTION_DAYS`); the billing model is only €0-by-default if a paid customer *can* select 35. That retention-floor change ships with this billing work, not separately. The free tier is unaffected — it keeps its own 14-day window (held + recoverable to 21d, the #4745 flow), and is never metered.
 
 Forces shaping the design:
 
@@ -24,7 +26,7 @@ Forces shaping the design:
 
 5. **Multi-instance + zero customer disruption.** LangWatch runs N k8s replicas; the dispatcher must be single-processing across pods (inherited from the event-sourcing dispatch model, [ADR-007](./007-event-sourcing-architecture.md)). Rollout must not require re-checkout, change the `subscription_id`, or alter the billing cycle.
 
-6. **Real customer base at go-live.** ~100 existing customers carry retention policies of 45/90/180 days — i.e. real beyond-30-day data exists the moment metering starts. Enterprises may run different retention policies per project within one organization (e.g. 4 months / 1 year / 5 years).
+6. **Real customer base at go-live.** ~100 existing customers carry retention policies of 45/90/180 days — i.e. real beyond-35-day data exists the moment metering starts. Enterprises may run different retention policies per project within one organization (e.g. 4 months / 1 year / 5 years).
 
 ## Decision
 
@@ -42,12 +44,12 @@ For sealed hour H, the projection queries per managed table:
 SELECT sum(_size_bytes)
 FROM <managed_table>
 WHERE TenantId IN (<projects of org>)
-  AND <retentionCol> <= dateSub(HOUR, 30 * 24, toDateTime(H))
+  AND <retentionCol> <= dateSub(HOUR, BILLABLE_AFTER_DAYS * 24, toDateTime(H))   -- 35 days (5 weeks)
 ```
 
 The cutoff is anchored to **H**, not `now()`. For a same-hour sample the two are equivalent; for a catch-up sample of a past hour they differ by the gap, and the H-anchor makes the measurement consistent with what a same-hour sampler would have captured (modulo TTL-eviction of far-edge rows in large gaps).
 
-`_retention_days` plays **no role in the predicate** — we measure row age, not the customer's configured TTL. A custom-retention customer's billable surface is exactly "rows still present that are older than 30 days". This also handles per-project retention diversity within one org for free: the org bill is the sum across its projects, and a 5-year-retention project simply contributes more old rows than a 4-month one. One meter, one invoice line, naturally weighted.
+`_retention_days` plays **no role in the predicate** — we measure row age, not the customer's configured TTL. A custom-retention customer's billable surface is exactly "rows still present that are older than the billing cutoff (35d)". This also handles per-project retention diversity within one org for free: the org bill is the sum across its projects, and a 5-year-retention project simply contributes more old rows than a 4-month one. One meter, one invoice line, naturally weighted.
 
 ### 2. Granularity: sealed UTC hour
 
@@ -102,15 +104,15 @@ Period total on the Stripe side = Σ `megabytes` = MiB-hours. The additive-delta
 
 | Customer | Custom retention | Retention reality | SubscriptionItem | Bill |
 |---|---|---|---|---|
-| **SaaS Free** | ✗ | 14-day visibility window; data held 45 days blurred as an upgrade-to-recover window (#4745) | **None — not attached** | €0; projection skips entirely |
-| **SaaS Paid** | ✓ (30d included; opt into 60/90/…) | Retention setting controls deletion | `STORAGE_GB` Price for plan × currency | €3/GiB-month × bytes aged > 30d. Orgs on plain 30d retention bill €0 *by construction* — their TTL deletes rows before they turn 31 days old. |
+| **SaaS Free** | ✗ | 14-day window; data held then blurred + recoverable to 21d (upgrade-to-recover, #4745) | **None — not attached** | €0; projection skips entirely |
+| **SaaS Paid** | ✓ (35d included; opt into 42/49/63/90/…) | Retention setting controls deletion | `STORAGE_GB` Price for plan × currency | €3/GiB-month × bytes aged > 35d. Orgs on the default 35d keep bill €0 *by construction* — TTL deletes every row at day 35. Only retention raised above 35 accrues. (Requires paid `MIN_RETENTION_DAYS` = 35.) |
 | **SaaS Enterprise** | ✓ custom, per-project policies allowed | Custom | Custom Price on the same `STORAGE_GB` meter | Negotiated rate; same projection, same pipeline |
 | **Self-hosted licensed** | ✓ **unlocked by the license** | Their infra, their disk | **None — never metered** | €0 — we do not host their data; the license gates the *feature*, not billing |
 | **Self-hosted unlicensed** | ✗ | Platform default only | None | €0 |
 
 **License = feature gate, not billing.** License holders get retention feature parity with Paid but are never attached to the storage meter. The entire pipeline (projection, command, audit table, catalog) is EE-only; OSS keeps only the existing `StorageMeterService` for the retention UI.
 
-**Go-live is forward-only.** Metering starts at the projection's first sealed hour; no backbilling of past months. Existing customers holding beyond-30-day data start accruing from go-live — the customer notice must state this explicitly, and the SubscriptionItem backfill runs only after the notice, on the announced date.
+**Go-live is forward-only.** Metering starts at the projection's first sealed hour; no backbilling of past months. Existing customers holding beyond-35-day data start accruing from go-live — the customer notice must state this explicitly, and the SubscriptionItem backfill runs only after the notice, on the announced date.
 
 ### 6. Pricing: €3/GiB-month, binary, 30-day convention, single flat rate
 
@@ -192,9 +194,9 @@ No ClickHouse migration; `_size_bytes` exists.
 
 **Hourly additive accrual, not end-of-period reporting.** Each hour is independently correct, independently retryable (35-day backdate window), and immune to period-edge timing games. Data arriving one minute before month-end contributes one hour-sample (~0.001 GiB-month) — negligible and exactly fair. The failure mode of a monthly job (one failed run = one wrong invoice) becomes "some hours retry later".
 
-**Predicate-encoded 30-day inclusion, not Stripe-side allowance.** The free window is `row_age > 30d` in the source query — one source of truth, provable with a test ("default-retention org reports 0"). A Stripe-side graduated tier-0 or credit grant would put the allowance in dashboard config that can drift from marketing copy. Trade-off: changing the window requires a deploy, not a config click. Accepted — the window is product policy, not a pricing knob.
+**Predicate-encoded 35-day inclusion, not Stripe-side allowance.** The free window is `row_age > 35d` in the source query — one source of truth, provable with a test ("default-keep org reports 0"). A Stripe-side graduated tier-0 or credit grant would put the allowance in dashboard config that can drift from marketing copy. Trade-off: changing the window requires a deploy, not a config click. Accepted — the window is product policy, not a pricing knob.
 
-**Time-based allowance, not volume-based.** "First 30 days free" rather than "first N GiB free". This is the commercial offer verbatim; no per-plan GB allowance state exists anywhere.
+**Time-based allowance, not volume-based.** "First 35 days free" rather than "first N GiB free". This is the commercial offer verbatim; no per-plan GB allowance state exists anywhere.
 
 **Event-driven projection, not a cron.** A cron would be simpler in isolation but introduces a second operational model (leader lock, interval config, separate alerting) for the same shape of work `billingMeterDispatch` already does. Trade-off: idle orgs (no events) have their cursor frozen until the next event lands, then back-fill at catch-up time. Accepted — idle orgs' billable storage is by definition near-zero or being retention-deleted, and the 35-day ceiling bounds staleness.
 
