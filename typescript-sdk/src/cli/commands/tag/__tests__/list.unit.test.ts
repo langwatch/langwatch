@@ -29,7 +29,6 @@ describe("tagListCommand", () => {
   });
 
   describe("when tags exist", () => {
-    /** @scenario "List tags displays a formatted table" */
     it("calls formatTable with Name and Created columns", async () => {
       mockListTags.mockResolvedValue([
         { name: "latest", createdAt: "2024-01-01T00:00:00Z" },
@@ -55,7 +54,6 @@ describe("tagListCommand", () => {
   });
 
   describe("when no tags exist", () => {
-    /** @scenario "List tags when none exist" */
     it("prints the empty state message", async () => {
       mockListTags.mockResolvedValue([]);
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
@@ -70,7 +68,6 @@ describe("tagListCommand", () => {
   });
 
   describe("when the API returns an error", () => {
-    /** @scenario "List tags exits 1 on API error" */
     it("propagates the error (exits 1 via caller)", async () => {
       mockListTags.mockRejectedValue(new Error("list tags failed"));
 

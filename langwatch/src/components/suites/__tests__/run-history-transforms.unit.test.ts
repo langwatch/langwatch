@@ -1,17 +1,17 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import {
-  groupRunsByBatchId,
-  groupRunsByScenarioId,
-  groupRunsByTarget,
+  availableGroupByOptions,
   computeBatchRunSummary,
   computeGroupSummary,
   computeRunHistoryTotals,
   computeSuiteRunSummaries,
   getScenarioDisplayNames,
+  groupRunsByBatchId,
+  groupRunsByScenarioId,
+  groupRunsByTarget,
   resolveOriginLabel,
-  availableGroupByOptions,
 } from "../run-history-transforms";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import { makeBatchRun, makeScenarioRunData } from "./test-helpers";
 
 describe("groupRunsByBatchId()", () => {
@@ -114,8 +114,16 @@ describe("groupRunsByScenarioId()", () => {
     it("sorts groups by their most-recent run timestamp descending", () => {
       const now = Date.now();
       const runs = [
-        makeScenarioRunData({ scenarioId: "old", scenarioRunId: "r1", timestamp: now - 60_000 }),
-        makeScenarioRunData({ scenarioId: "new", scenarioRunId: "r2", timestamp: now }),
+        makeScenarioRunData({
+          scenarioId: "old",
+          scenarioRunId: "r1",
+          timestamp: now - 60_000,
+        }),
+        makeScenarioRunData({
+          scenarioId: "new",
+          scenarioRunId: "r2",
+          timestamp: now,
+        }),
       ];
 
       const result = groupRunsByScenarioId({ runs });
@@ -137,15 +145,30 @@ describe("groupRunsByTarget()", () => {
       const runs = [
         makeScenarioRunData({
           scenarioRunId: "r1",
-          metadata: { langwatch: { targetReferenceId: "agent-1", targetType: "code" as const } },
+          metadata: {
+            langwatch: {
+              targetReferenceId: "agent-1",
+              targetType: "code" as const,
+            },
+          },
         }),
         makeScenarioRunData({
           scenarioRunId: "r2",
-          metadata: { langwatch: { targetReferenceId: "agent-1", targetType: "code" as const } },
+          metadata: {
+            langwatch: {
+              targetReferenceId: "agent-1",
+              targetType: "code" as const,
+            },
+          },
         }),
         makeScenarioRunData({
           scenarioRunId: "r3",
-          metadata: { langwatch: { targetReferenceId: "prompt-1", targetType: "prompt" as const } },
+          metadata: {
+            langwatch: {
+              targetReferenceId: "prompt-1",
+              targetType: "prompt" as const,
+            },
+          },
         }),
       ];
 
@@ -158,14 +181,19 @@ describe("groupRunsByTarget()", () => {
     });
   });
 
-  describe('when some runs have no target metadata', () => {
+  describe("when some runs have no target metadata", () => {
     /** @scenario 'groupRunsByTarget places runs without target metadata in an "Unknown" group' */
     it('puts runs without targetReferenceId in the "Unknown" group', () => {
       const targetNameMap = new Map<string, string>([["agent-1", "Agent 1"]]);
       const runs = [
         makeScenarioRunData({
           scenarioRunId: "r1",
-          metadata: { langwatch: { targetReferenceId: "agent-1", targetType: "code" as const } },
+          metadata: {
+            langwatch: {
+              targetReferenceId: "agent-1",
+              targetType: "code" as const,
+            },
+          },
         }),
         makeScenarioRunData({
           scenarioRunId: "r2",
@@ -359,8 +387,14 @@ describe("computeBatchRunSummary()", () => {
     it("returns 0% pass rate (stalled is a terminal failure)", () => {
       const batchRun = makeBatchRun({
         scenarioRuns: [
-          makeScenarioRunData({ status: ScenarioRunStatus.STALLED, scenarioRunId: "run_1" }),
-          makeScenarioRunData({ status: ScenarioRunStatus.STALLED, scenarioRunId: "run_2" }),
+          makeScenarioRunData({
+            status: ScenarioRunStatus.STALLED,
+            scenarioRunId: "run_1",
+          }),
+          makeScenarioRunData({
+            status: ScenarioRunStatus.STALLED,
+            scenarioRunId: "run_2",
+          }),
         ],
       });
 
@@ -376,7 +410,10 @@ describe("computeBatchRunSummary()", () => {
     it("returns 0% pass rate (cancelled is terminal)", () => {
       const batchRun = makeBatchRun({
         scenarioRuns: [
-          makeScenarioRunData({ status: ScenarioRunStatus.CANCELLED, scenarioRunId: "run_1" }),
+          makeScenarioRunData({
+            status: ScenarioRunStatus.CANCELLED,
+            scenarioRunId: "run_1",
+          }),
         ],
       });
 
@@ -391,9 +428,18 @@ describe("computeBatchRunSummary()", () => {
     it("includes stalled in pass rate denominator (stalled is a terminal failure)", () => {
       const batchRun = makeBatchRun({
         scenarioRuns: [
-          makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS, scenarioRunId: "run_1" }),
-          makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS, scenarioRunId: "run_2" }),
-          makeScenarioRunData({ status: ScenarioRunStatus.STALLED, scenarioRunId: "run_3" }),
+          makeScenarioRunData({
+            status: ScenarioRunStatus.SUCCESS,
+            scenarioRunId: "run_1",
+          }),
+          makeScenarioRunData({
+            status: ScenarioRunStatus.SUCCESS,
+            scenarioRunId: "run_2",
+          }),
+          makeScenarioRunData({
+            status: ScenarioRunStatus.STALLED,
+            scenarioRunId: "run_3",
+          }),
         ],
       });
 
@@ -411,8 +457,14 @@ describe("computeBatchRunSummary()", () => {
     it("returns 0% pass rate (not null)", () => {
       const batchRun = makeBatchRun({
         scenarioRuns: [
-          makeScenarioRunData({ status: ScenarioRunStatus.FAILED, scenarioRunId: "run_1" }),
-          makeScenarioRunData({ status: ScenarioRunStatus.FAILED, scenarioRunId: "run_2" }),
+          makeScenarioRunData({
+            status: ScenarioRunStatus.FAILED,
+            scenarioRunId: "run_1",
+          }),
+          makeScenarioRunData({
+            status: ScenarioRunStatus.FAILED,
+            scenarioRunId: "run_2",
+          }),
         ],
       });
 
@@ -427,12 +479,30 @@ describe("computeBatchRunSummary()", () => {
     it("computes pass rate as passed / settled (excludes in-progress and queued)", () => {
       const batchRun = makeBatchRun({
         scenarioRuns: [
-          makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS, scenarioRunId: "run_1" }),
-          makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS, scenarioRunId: "run_2" }),
-          makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS, scenarioRunId: "run_3" }),
-          makeScenarioRunData({ status: ScenarioRunStatus.FAILED, scenarioRunId: "run_4" }),
-          makeScenarioRunData({ status: ScenarioRunStatus.STALLED, scenarioRunId: "run_5" }),
-          makeScenarioRunData({ status: ScenarioRunStatus.CANCELLED, scenarioRunId: "run_6" }),
+          makeScenarioRunData({
+            status: ScenarioRunStatus.SUCCESS,
+            scenarioRunId: "run_1",
+          }),
+          makeScenarioRunData({
+            status: ScenarioRunStatus.SUCCESS,
+            scenarioRunId: "run_2",
+          }),
+          makeScenarioRunData({
+            status: ScenarioRunStatus.SUCCESS,
+            scenarioRunId: "run_3",
+          }),
+          makeScenarioRunData({
+            status: ScenarioRunStatus.FAILED,
+            scenarioRunId: "run_4",
+          }),
+          makeScenarioRunData({
+            status: ScenarioRunStatus.STALLED,
+            scenarioRunId: "run_5",
+          }),
+          makeScenarioRunData({
+            status: ScenarioRunStatus.CANCELLED,
+            scenarioRunId: "run_6",
+          }),
         ],
       });
 
@@ -481,8 +551,14 @@ describe("computeGroupSummary() metric aggregation", () => {
     it("computes average agent latency", () => {
       const group = makeBatchRun({
         scenarioRuns: [
-          makeScenarioRunData({ scenarioRunId: "run_1", roleLatencies: { Agent: [1000] } }),
-          makeScenarioRunData({ scenarioRunId: "run_2", roleLatencies: { Agent: [3000] } }),
+          makeScenarioRunData({
+            scenarioRunId: "run_1",
+            roleLatencies: { Agent: [1000] },
+          }),
+          makeScenarioRunData({
+            scenarioRunId: "run_2",
+            roleLatencies: { Agent: [3000] },
+          }),
         ],
       });
 
@@ -494,9 +570,7 @@ describe("computeGroupSummary() metric aggregation", () => {
   describe("when no runs have agent latency", () => {
     it("returns null for averageAgentLatencyMs", () => {
       const group = makeBatchRun({
-        scenarioRuns: [
-          makeScenarioRunData({ scenarioRunId: "run_1" }),
-        ],
+        scenarioRuns: [makeScenarioRunData({ scenarioRunId: "run_1" })],
       });
 
       const summary = computeGroupSummary({ group });
@@ -508,9 +582,15 @@ describe("computeGroupSummary() metric aggregation", () => {
     it("averages only runs that have data", () => {
       const group = makeBatchRun({
         scenarioRuns: [
-          makeScenarioRunData({ scenarioRunId: "run_1", roleLatencies: { Agent: [2000] } }),
+          makeScenarioRunData({
+            scenarioRunId: "run_1",
+            roleLatencies: { Agent: [2000] },
+          }),
           makeScenarioRunData({ scenarioRunId: "run_2" }),
-          makeScenarioRunData({ scenarioRunId: "run_3", roleLatencies: { Agent: [4000] } }),
+          makeScenarioRunData({
+            scenarioRunId: "run_3",
+            roleLatencies: { Agent: [4000] },
+          }),
         ],
       });
 
@@ -525,7 +605,7 @@ describe("computeGroupSummary() metric aggregation", () => {
         scenarioRuns: [
           makeScenarioRunData({ scenarioRunId: "run_1", totalCost: 0.005 }),
           makeScenarioRunData({ scenarioRunId: "run_2" }),
-          makeScenarioRunData({ scenarioRunId: "run_3", totalCost: 0.010 }),
+          makeScenarioRunData({ scenarioRunId: "run_3", totalCost: 0.01 }),
         ],
       });
 
@@ -539,10 +619,22 @@ describe("computeRunHistoryTotals()", () => {
   describe("when given multiple runs", () => {
     it("sums up totals across all runs", () => {
       const runs = [
-        makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS, scenarioRunId: "run_1" }),
-        makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS, scenarioRunId: "run_2" }),
-        makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS, scenarioRunId: "run_3" }),
-        makeScenarioRunData({ status: ScenarioRunStatus.ERROR, scenarioRunId: "run_4" }),
+        makeScenarioRunData({
+          status: ScenarioRunStatus.SUCCESS,
+          scenarioRunId: "run_1",
+        }),
+        makeScenarioRunData({
+          status: ScenarioRunStatus.SUCCESS,
+          scenarioRunId: "run_2",
+        }),
+        makeScenarioRunData({
+          status: ScenarioRunStatus.SUCCESS,
+          scenarioRunId: "run_3",
+        }),
+        makeScenarioRunData({
+          status: ScenarioRunStatus.ERROR,
+          scenarioRunId: "run_4",
+        }),
       ];
 
       const totals = computeRunHistoryTotals({ runs });
@@ -564,9 +656,18 @@ describe("computeRunHistoryTotals()", () => {
   describe("when given stalled and cancelled runs", () => {
     it("counts them as failed", () => {
       const runs = [
-        makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS, scenarioRunId: "run_1" }),
-        makeScenarioRunData({ status: ScenarioRunStatus.STALLED, scenarioRunId: "run_2" }),
-        makeScenarioRunData({ status: ScenarioRunStatus.CANCELLED, scenarioRunId: "run_3" }),
+        makeScenarioRunData({
+          status: ScenarioRunStatus.SUCCESS,
+          scenarioRunId: "run_1",
+        }),
+        makeScenarioRunData({
+          status: ScenarioRunStatus.STALLED,
+          scenarioRunId: "run_2",
+        }),
+        makeScenarioRunData({
+          status: ScenarioRunStatus.CANCELLED,
+          scenarioRunId: "run_3",
+        }),
       ];
 
       const totals = computeRunHistoryTotals({ runs });
@@ -581,7 +682,11 @@ describe("RunGroup type", () => {
   describe("when any grouping mode completes", () => {
     it("returns groups with groupKey, groupLabel, groupType, timestamp, and scenarioRuns", () => {
       const runs = [
-        makeScenarioRunData({ scenarioId: "s1", scenarioRunId: "run_1", name: "Login" }),
+        makeScenarioRunData({
+          scenarioId: "s1",
+          scenarioRunId: "run_1",
+          name: "Login",
+        }),
       ];
 
       const groups = groupRunsByScenarioId({ runs });
@@ -608,11 +713,31 @@ describe("groupRunsByScenarioId()", () => {
   describe("when given runs with different scenarioIds", () => {
     it("groups runs by scenarioId", () => {
       const runs = [
-        makeScenarioRunData({ scenarioId: "s1", scenarioRunId: "run_1", name: "Login" }),
-        makeScenarioRunData({ scenarioId: "s1", scenarioRunId: "run_2", name: "Login" }),
-        makeScenarioRunData({ scenarioId: "s2", scenarioRunId: "run_3", name: "Signup" }),
-        makeScenarioRunData({ scenarioId: "s2", scenarioRunId: "run_4", name: "Signup" }),
-        makeScenarioRunData({ scenarioId: "s2", scenarioRunId: "run_5", name: "Signup" }),
+        makeScenarioRunData({
+          scenarioId: "s1",
+          scenarioRunId: "run_1",
+          name: "Login",
+        }),
+        makeScenarioRunData({
+          scenarioId: "s1",
+          scenarioRunId: "run_2",
+          name: "Login",
+        }),
+        makeScenarioRunData({
+          scenarioId: "s2",
+          scenarioRunId: "run_3",
+          name: "Signup",
+        }),
+        makeScenarioRunData({
+          scenarioId: "s2",
+          scenarioRunId: "run_4",
+          name: "Signup",
+        }),
+        makeScenarioRunData({
+          scenarioId: "s2",
+          scenarioRunId: "run_5",
+          name: "Signup",
+        }),
       ];
 
       const result = groupRunsByScenarioId({ runs });
@@ -626,7 +751,11 @@ describe("groupRunsByScenarioId()", () => {
 
     it("uses the scenario name as groupLabel", () => {
       const runs = [
-        makeScenarioRunData({ scenarioId: "s1", scenarioRunId: "run_1", name: "Login" }),
+        makeScenarioRunData({
+          scenarioId: "s1",
+          scenarioRunId: "run_1",
+          name: "Login",
+        }),
       ];
 
       const result = groupRunsByScenarioId({ runs });
@@ -648,9 +777,21 @@ describe("groupRunsByScenarioId()", () => {
   describe("when groups have different timestamps", () => {
     it("sorts groups by most recent timestamp descending", () => {
       const runs = [
-        makeScenarioRunData({ scenarioId: "s1", scenarioRunId: "run_1", timestamp: 1000 }),
-        makeScenarioRunData({ scenarioId: "s2", scenarioRunId: "run_2", timestamp: 3000 }),
-        makeScenarioRunData({ scenarioId: "s3", scenarioRunId: "run_3", timestamp: 2000 }),
+        makeScenarioRunData({
+          scenarioId: "s1",
+          scenarioRunId: "run_1",
+          timestamp: 1000,
+        }),
+        makeScenarioRunData({
+          scenarioId: "s2",
+          scenarioRunId: "run_2",
+          timestamp: 3000,
+        }),
+        makeScenarioRunData({
+          scenarioId: "s3",
+          scenarioRunId: "run_3",
+          timestamp: 2000,
+        }),
       ];
 
       const result = groupRunsByScenarioId({ runs });
@@ -675,15 +816,21 @@ describe("groupRunsByTarget()", () => {
       const runs = [
         makeScenarioRunData({
           scenarioRunId: "run_1",
-          metadata: { langwatch: { targetReferenceId: "agent-1", targetType: "code" } },
+          metadata: {
+            langwatch: { targetReferenceId: "agent-1", targetType: "code" },
+          },
         }),
         makeScenarioRunData({
           scenarioRunId: "run_2",
-          metadata: { langwatch: { targetReferenceId: "agent-1", targetType: "code" } },
+          metadata: {
+            langwatch: { targetReferenceId: "agent-1", targetType: "code" },
+          },
         }),
         makeScenarioRunData({
           scenarioRunId: "run_3",
-          metadata: { langwatch: { targetReferenceId: "prompt-1", targetType: "prompt" } },
+          metadata: {
+            langwatch: { targetReferenceId: "prompt-1", targetType: "prompt" },
+          },
         }),
       ];
       const targetNameMap = new Map([
@@ -704,7 +851,9 @@ describe("groupRunsByTarget()", () => {
       const runs = [
         makeScenarioRunData({
           scenarioRunId: "run_1",
-          metadata: { langwatch: { targetReferenceId: "agent-1", targetType: "code" } },
+          metadata: {
+            langwatch: { targetReferenceId: "agent-1", targetType: "code" },
+          },
         }),
       ];
       const targetNameMap = new Map([["agent-1", "My Agent"]]);
@@ -718,7 +867,9 @@ describe("groupRunsByTarget()", () => {
       const runs = [
         makeScenarioRunData({
           scenarioRunId: "run_1",
-          metadata: { langwatch: { targetReferenceId: "agent-1", targetType: "code" } },
+          metadata: {
+            langwatch: { targetReferenceId: "agent-1", targetType: "code" },
+          },
         }),
       ];
 
@@ -754,17 +905,23 @@ describe("groupRunsByTarget()", () => {
         makeScenarioRunData({
           scenarioRunId: "run_1",
           timestamp: 1000,
-          metadata: { langwatch: { targetReferenceId: "a", targetType: "code" } },
+          metadata: {
+            langwatch: { targetReferenceId: "a", targetType: "code" },
+          },
         }),
         makeScenarioRunData({
           scenarioRunId: "run_2",
           timestamp: 3000,
-          metadata: { langwatch: { targetReferenceId: "b", targetType: "code" } },
+          metadata: {
+            langwatch: { targetReferenceId: "b", targetType: "code" },
+          },
         }),
         makeScenarioRunData({
           scenarioRunId: "run_3",
           timestamp: 2000,
-          metadata: { langwatch: { targetReferenceId: "c", targetType: "code" } },
+          metadata: {
+            langwatch: { targetReferenceId: "c", targetType: "code" },
+          },
         }),
       ];
 
@@ -1068,7 +1225,8 @@ describe("resolveOriginLabel()", () => {
       const suiteNameMap = new Map<string, string>();
 
       const result = resolveOriginLabel({
-        scenarioSetId: "__internal__project_owUldAg3-Pmddu7CMcgeo__on-platform-scenarios",
+        scenarioSetId:
+          "__internal__project_owUldAg3-Pmddu7CMcgeo__on-platform-scenarios",
         suiteNameMap,
       });
 

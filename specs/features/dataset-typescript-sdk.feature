@@ -3,7 +3,7 @@ Feature: Dataset TypeScript SDK
   I want full CRUD access to datasets and records through the SDK client
   So that I can programmatically manage datasets without using the REST API directly
 
-  # All 32 scenarios bound to integration/unit tests in
+  # 32 of 32 scenarios bound to integration/unit tests in
   # typescript-sdk/src/client-sdk/services/datasets/__tests__/.
 
   Background:
