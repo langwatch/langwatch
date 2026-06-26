@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.33.3](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.33.2...typescript-sdk@v0.33.3) (2026-06-26)
+
+
+### Bug Fixes
+
+* **security:** esbuild, vite and form-data floors across all workspaces ([361b301](https://github.com/langwatch/langwatch/commit/361b3014f62257e7cb2702e60588fc534a271d20))
+* **security:** esbuild, vite and form-data security floors across all workspaces ([#4827](https://github.com/langwatch/langwatch/issues/4827)) ([361b301](https://github.com/langwatch/langwatch/commit/361b3014f62257e7cb2702e60588fc534a271d20))
+
 ## [0.33.2](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.33.1...typescript-sdk@v0.33.2) (2026-06-19)
 
 
