@@ -57,6 +57,16 @@ export type ExecutionRequest = {
   scope: ExecutionScope;
   /** Concurrency limit for parallel execution (default 10) */
   concurrency?: number;
+  /**
+   * Pre-existing target outputs the client already has for targets NOT
+   * being re-run this dispatch. Used by Phase 2 pairwise so it can read
+   * variantA / variantB outputs from a prior run without forcing them to
+   * re-execute. Keyed by `${rowIndex}:${targetId}`.
+   */
+  seedTargetOutputs?: Record<
+    string,
+    { output: unknown; cost?: number; duration?: number }
+  >;
 };
 
 export const executionRequestSchema = z.object({
@@ -113,6 +123,16 @@ export const executionRequestSchema = z.object({
     }),
   ]),
   concurrency: z.number().min(1).max(24).optional(),
+  seedTargetOutputs: z
+    .record(
+      z.string(),
+      z.object({
+        output: z.unknown(),
+        cost: z.number().optional(),
+        duration: z.number().optional(),
+      }),
+    )
+    .optional(),
 });
 
 // ============================================================================

@@ -387,12 +387,17 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         datasetRows,
       });
 
-      // Mirror the server-side pairwise expansion: when the user hits Run
-      // on a pairwise column-target (or its single-cell variant), the
-      // orchestrator also re-runs variantA + variantB so Phase 2 has fresh
-      // outputs. Clear those cells client-side too — otherwise the variant
-      // columns keep showing stale ECONNRESET / old verdicts from a
-      // previous run, layered on top of the new pairwise comparison.
+      // Pairwise dispatch: when the user runs only the Pairwise column,
+      // Phase 2 needs both variants' outputs to exist. Two cases:
+      //   (a) Variants haven't run / are missing outputs for some rows →
+      //       expand the dispatch to include those variant cells so Phase 1
+      //       produces fresh outputs for them.
+      //   (b) Variants ALREADY ran and have outputs for every row → send
+      //       the existing outputs as `seedTargetOutputs` so the orchestrator
+      //       pre-fills its completedTargetOutputs map, and Phase 2 reuses
+      //       them without forcing a re-run.
+      // The two cases coexist row-by-row: re-run rows that are missing,
+      // seed rows that already have output.
       const targetPairwiseDeps = (id: string): string[] => {
         const t = targets.find((tg) => tg.id === id);
         if (!t || t.type !== "evaluator" || !t.pairwise) return [];
@@ -400,6 +405,14 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           (v): v is string => !!v,
         );
       };
+      const currentTargetOutputs =
+        useEvaluationsV3Store.getState().results.targetOutputs;
+      const currentTargetMetadata =
+        useEvaluationsV3Store.getState().results.targetMetadata;
+      const seedTargetOutputs: Record<
+        string,
+        { output: unknown; cost?: number; duration?: number }
+      > = {};
       const expandedCells = [...baseExecutionCells];
       if (scope.type === "target" || scope.type === "cell") {
         const deps = targetPairwiseDeps(scope.targetId);
@@ -409,8 +422,21 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
               ? [scope.rowIndex]
               : datasetRows.map((_, i) => i);
           for (const depTargetId of deps) {
+            const depOutputs = currentTargetOutputs[depTargetId] ?? [];
+            const depMeta = currentTargetMetadata[depTargetId] ?? [];
             for (const rowIndex of rowsForExpansion) {
-              expandedCells.push({ rowIndex, targetId: depTargetId });
+              const existing = depOutputs[rowIndex];
+              if (existing !== undefined && existing !== null) {
+                // Already have an output for this row — seed it.
+                seedTargetOutputs[`${rowIndex}:${depTargetId}`] = {
+                  output: existing,
+                  cost: depMeta[rowIndex]?.cost ?? undefined,
+                  duration: depMeta[rowIndex]?.duration ?? undefined,
+                };
+              } else {
+                // Missing — schedule the variant cell to actually run.
+                expandedCells.push({ rowIndex, targetId: depTargetId });
+              }
             }
           }
         }
@@ -597,6 +623,10 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         })),
         scope,
         concurrency,
+        seedTargetOutputs:
+          Object.keys(seedTargetOutputs).length > 0
+            ? seedTargetOutputs
+            : undefined,
       };
 
       // Helper to remove this execution's cells and evaluators from state when done

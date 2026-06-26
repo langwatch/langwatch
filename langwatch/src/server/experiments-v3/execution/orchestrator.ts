@@ -73,6 +73,15 @@ export type OrchestratorInput = {
   runId?: string;
   /** Concurrency limit for parallel execution (default 10) */
   concurrency?: number;
+  /**
+   * Pre-existing target outputs keyed by `${rowIndex}:${targetId}`. Phase 2
+   * pairwise reads from these when the user re-runs only the pairwise
+   * column on top of variants that already produced output in a prior run.
+   */
+  seedTargetOutputs?: Record<
+    string,
+    { output: unknown; cost?: number; duration?: number }
+  >;
 };
 
 /**
@@ -982,6 +991,7 @@ export async function* runOrchestrator(
     loadedEvaluators,
     runId: providedRunId,
     concurrency: requestedConcurrency,
+    seedTargetOutputs,
   } = input;
 
   // Use requested concurrency, environment variable, or default
@@ -1020,11 +1030,18 @@ export async function* runOrchestrator(
 
   // Track per-(row, target) outputs as Phase 1 cells complete, so Phase 2
   // pairwise cells (#5100) can bake both variants' outputs into their input
-  // payload before they execute.
+  // payload before they execute. Pre-seed from prior-run outputs the client
+  // already has — covers the "variants already ran, user just added the
+  // pairwise column" case so Phase 2 doesn't redundantly force a re-run.
   const completedTargetOutputs = new Map<
     string,
     { output: unknown; cost?: number; duration?: number }
   >();
+  if (seedTargetOutputs) {
+    for (const [key, value] of Object.entries(seedTargetOutputs)) {
+      completedTargetOutputs.set(key, value);
+    }
+  }
 
   // Track per-(row, target) evaluator results so the Phase 2 pairwise judge
   // can read each variant's existing evaluator scores (relevance, factuality,
