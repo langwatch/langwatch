@@ -10,6 +10,7 @@ import {
 import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useRef, useState } from "react";
 import { MenuLink } from "~/components/MenuLink";
+import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -34,6 +35,9 @@ export function CustomDashboardsSection({
     null,
   );
   const [editingName, setEditingName] = useState("");
+  const [dashboardToDelete, setDashboardToDelete] = useState<string | null>(
+    null,
+  );
   const inputRef = useRef<HTMLInputElement>(null);
 
   const dashboardsQuery = api.dashboards.getAll.useQuery(
@@ -139,39 +143,7 @@ export function CustomDashboardsSection({
       return;
     }
 
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this dashboard? All graphs on this dashboard will be deleted.",
-    );
-    if (!confirmed) return;
-
-    deleteDashboard.mutate(
-      { projectId, dashboardId },
-      {
-        onSuccess: () => {
-          void dashboardsQuery.refetch();
-          void queryClient.licenseEnforcement.checkLimit.invalidate();
-          // If we deleted the current dashboard, redirect to the first dashboard
-          if (currentDashboardId === dashboardId) {
-            const remainingDashboards = dashboards.filter(
-              (d) => d.id !== dashboardId,
-            );
-            if (remainingDashboards[0]) {
-              void router.push(
-                `/${projectSlug}/analytics/reports?dashboard=${remainingDashboards[0].id}`,
-              );
-            }
-          }
-        },
-        onError: () => {
-          toaster.create({
-            title: "Error deleting dashboard",
-            type: "error",
-            duration: 3000,
-            meta: { closable: true },
-          });
-        },
-      },
-    );
+    setDashboardToDelete(dashboardId);
   };
 
   if (dashboardsQuery.isLoading) {
@@ -187,6 +159,50 @@ export function CustomDashboardsSection({
 
   return (
     <>
+      <ConfirmDialog
+        open={!!dashboardToDelete}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setDashboardToDelete(null);
+        }}
+        title="Delete dashboard"
+        message="Are you sure you want to delete this dashboard? All graphs on this dashboard will be deleted."
+        confirmLabel="Delete"
+        tone="danger"
+        loading={deleteDashboard.isLoading}
+        onConfirm={() => {
+          if (!dashboardToDelete) return;
+          const dashboardId = dashboardToDelete;
+          deleteDashboard.mutate(
+            { projectId, dashboardId },
+            {
+              onSuccess: () => {
+                void dashboardsQuery.refetch();
+                void queryClient.licenseEnforcement.checkLimit.invalidate();
+                // If we deleted the current dashboard, redirect to the first dashboard
+                if (currentDashboardId === dashboardId) {
+                  const remainingDashboards = dashboards.filter(
+                    (d) => d.id !== dashboardId,
+                  );
+                  if (remainingDashboards[0]) {
+                    void router.push(
+                      `/${projectSlug}/analytics/reports?dashboard=${remainingDashboards[0].id}`,
+                    );
+                  }
+                }
+              },
+              onError: () => {
+                toaster.create({
+                  title: "Error deleting dashboard",
+                  type: "error",
+                  duration: 3000,
+                  meta: { closable: true },
+                });
+              },
+              onSettled: () => setDashboardToDelete(null),
+            },
+          );
+        }}
+      />
       {dashboards.map((dashboard, index) => {
         const isSelected = selectedDashboardId === dashboard.id;
         const isEditing = editingDashboardId === dashboard.id;
