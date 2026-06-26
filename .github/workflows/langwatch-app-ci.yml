@@ -36,9 +36,25 @@ jobs:
               - '.github/workflows/langwatch-app-ci.yml'
               - '.github/.release-please-manifest.json'
               - '.github/scripts/**'
+            # The parity scanner binds @scenario annotations from test files
+            # across many roots, not just specs/ and langwatch/. This list MUST
+            # cover every root the scanner reads (DEFAULT_TEST_ROOTS,
+            # DEFAULT_GO_TEST_ROOTS, DEFAULT_PYTHON_TEST_ROOTS,
+            # DEFAULT_BATS_TEST_ROOTS in langwatch/scripts/check-feature-parity.ts),
+            # otherwise a binding change in an unlisted root merges without the
+            # gate ever running and silently breaks parity on main (e.g. #5143
+            # edited only scripts/__tests__/*.bats and slipped through).
             feature-parity:
-              - 'langwatch/**'
               - 'specs/**'
+              - 'langwatch/**'
+              - 'mcp-server/**'
+              - 'typescript-sdk/**'
+              - 'python-sdk/**'
+              - 'services/**'
+              - 'pkg/**'
+              - 'langevals/**'
+              - 'langwatch_server/**'
+              - 'scripts/**'
               - '.github/workflows/langwatch-app-ci.yml'
 
   typecheck:
