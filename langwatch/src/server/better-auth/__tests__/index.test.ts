@@ -1,5 +1,5 @@
 import { hash } from "bcrypt";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // Must be mocked before importing ../index — both create persistent handles
 // (Redis socket, Prisma connection pool) that prevent Vite from closing after
@@ -93,7 +93,9 @@ describe("better-auth config", () => {
       // that enforces this — it must not be changed to `true`.
       const { auth } = await import("../index");
       const options = (auth as any).options;
-      expect(options?.account?.accountLinking?.allowDifferentEmails).toBeFalsy();
+      expect(
+        options?.account?.accountLinking?.allowDifferentEmails,
+      ).toBeFalsy();
     });
 
     /** @scenario Legacy bcrypt hashes still verify */
@@ -126,5 +128,46 @@ describe("better-auth config", () => {
       ).toBe(false);
     });
   });
-});
 
+  describe("when NEXTAUTH_PROVIDER selects auth0", () => {
+    /** @scenario Auth0 enterprise mode */
+    it("lists an auth0 provider and disables email/password (SSO-only)", async () => {
+      // The env-driven provider selection lives in pure builders so we can
+      // exercise auth0 mode without re-initializing the module under a
+      // different NEXTAUTH_PROVIDER (which would need vi.resetModules()).
+      const { buildGenericOAuthConfigs, isEmailPasswordEnabled } = await import(
+        "../index"
+      );
+      const e = {
+        NEXTAUTH_PROVIDER: "auth0",
+        AUTH0_CLIENT_ID: "auth0-client-id",
+        AUTH0_CLIENT_SECRET: "auth0-client-secret",
+        AUTH0_ISSUER: "tenant.us.auth0.com",
+        OKTA_CLIENT_ID: undefined,
+        OKTA_CLIENT_SECRET: undefined,
+        OKTA_ISSUER: undefined,
+        NEXTAUTH_URL: "http://localhost:3000",
+      };
+      const configs = buildGenericOAuthConfigs(e);
+      const providerIds = configs.map(
+        (c) => (c as { providerId?: string }).providerId,
+      );
+      expect(providerIds).toContain("auth0");
+      // SSO-only enforcement: no email/password bypass of the IdP in auth0 mode.
+      expect(isEmailPasswordEnabled(e)).toBe(false);
+    });
+  });
+
+  describe("when NEXTAUTH_PROVIDER selects google", () => {
+    /** @scenario Google mode */
+    it("includes google in the socialProviders map", async () => {
+      const { buildSocialProviders } = await import("../index");
+      const socialProviders = buildSocialProviders({
+        NEXTAUTH_PROVIDER: "google",
+        GOOGLE_CLIENT_ID: "google-client-id",
+        GOOGLE_CLIENT_SECRET: "google-client-secret",
+      });
+      expect(socialProviders.google).toBeDefined();
+    });
+  });
+});
