@@ -17,8 +17,7 @@ import {
  * Scenario: Admin approves an invitation request (lines 27-33)
  */
 test.describe("Invitation Approval - Admin Approves Request", () => {
-  // fixme(#1811): flaky — fails consistently in CI environment
-  test.fixme();
+  test.slow();
   /**
    * Scenario: Admin approves an invitation request
    * Source: update-pending-invitation.feature lines 27-33
