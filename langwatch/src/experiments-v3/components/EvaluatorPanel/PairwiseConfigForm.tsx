@@ -1,11 +1,15 @@
-import { Button, Field, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, Field, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useFormContext, useWatch } from "react-hook-form";
 
 import { Menu } from "~/components/ui/menu";
+import { Switch } from "~/components/ui/switch";
 
 import { useTargetName } from "../../hooks/useTargetName";
 import type { PairwiseEvaluatorConfig, TargetConfig } from "../../types";
+
+type Metric = "cost" | "duration";
 
 /**
  * Configuration form for the langevals/pairwise_compare evaluator
@@ -238,6 +242,74 @@ export function PairwiseConfigForm({
         Golden field is the reference answer the judge compares each candidate
         against.
       </Text>
+
+      <MetricsSection draft={draft} update={update} />
     </VStack>
+  );
+}
+
+/**
+ * Inline Switches for the include_metrics setting. Source of truth is the
+ * parent form's `settings.include_metrics` (the field the judge reads); the
+ * legacy `pairwise.includeMetrics` is mirrored on every write so any
+ * orchestrator path still reading from it keeps working. EvaluatorEditorShared
+ * suppresses DynamicZodForm's array-of-literals renderer for pairwise so the
+ * user doesn't see two UIs for the same setting.
+ */
+function MetricsSection({
+  draft,
+  update,
+}: {
+  draft: PairwiseEvaluatorConfig;
+  update: (patch: Partial<PairwiseEvaluatorConfig>) => void;
+}) {
+  const formContext = useFormContext<{
+    settings?: { include_metrics?: Metric[] };
+  }>();
+  const watchedMetrics = useWatch({
+    control: formContext?.control,
+    name: "settings.include_metrics",
+  }) as Metric[] | undefined;
+  const current = (watchedMetrics ?? draft.includeMetrics ?? []) as Metric[];
+
+  const toggle = (metric: Metric, on: boolean) => {
+    const next = on
+      ? Array.from(new Set([...current, metric]))
+      : current.filter((m) => m !== metric);
+    formContext?.setValue("settings.include_metrics", next, {
+      shouldDirty: true,
+      shouldTouch: true,
+    });
+    update({ includeMetrics: next });
+  };
+
+  return (
+    <Box paddingTop={2}>
+      <Text fontSize="13px" fontWeight="medium" marginBottom={2}>
+        Include metrics
+      </Text>
+      <VStack align="stretch" gap={2}>
+        <HStack justify="space-between">
+          <Text fontSize="13px">Include cost</Text>
+          <Switch
+            checked={current.includes("cost")}
+            onCheckedChange={({ checked }) => toggle("cost", checked)}
+            data-testid="pairwise-include-cost"
+          />
+        </HStack>
+        <HStack justify="space-between">
+          <Text fontSize="13px">Include duration</Text>
+          <Switch
+            checked={current.includes("duration")}
+            onCheckedChange={({ checked }) => toggle("duration", checked)}
+            data-testid="pairwise-include-duration"
+          />
+        </HStack>
+      </VStack>
+      <Text fontSize="xs" color="fg.muted" marginTop={2}>
+        Inject per-candidate cost / latency into the judge prompt so it can
+        prefer the cheaper / faster variant when quality is comparable.
+      </Text>
+    </Box>
   );
 }
