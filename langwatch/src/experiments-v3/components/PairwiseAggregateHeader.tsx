@@ -10,15 +10,14 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { toaster } from "~/components/ui/toaster";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
-import { resolveTargetNameFromCache } from "../hooks/resolveTargetName";
+import { useTargetName } from "../hooks/useTargetName";
 import {
   computePairwiseAggregate,
+  computePairwiseTargetAggregate,
   type PairwiseAggregate,
 } from "../utils/computeAggregates";
+import type { TargetConfig } from "../types";
 import {
   AggregateHeaderBar,
   type PairwiseFilter,
@@ -41,9 +40,78 @@ const downloadCsv = (filename: string, rows: string[][]) => {
 const totalVerdicts = (counts: PairwiseAggregate["counts"]) =>
   counts.a + counts.b + counts.tie;
 
+type ResolvedAggregateBarProps = {
+  aggregate: PairwiseAggregate;
+  variantATarget: TargetConfig | undefined;
+  variantBTarget: TargetConfig | undefined;
+  filter: PairwiseFilter;
+  setFilter: (f: PairwiseFilter) => void;
+};
+
+function ResolvedAggregateBar({
+  aggregate,
+  variantATarget,
+  variantBTarget,
+  filter,
+  setFilter,
+}: ResolvedAggregateBarProps) {
+  // Always call the hooks with a stable target reference. When a variant
+  // target is missing from the store we fall back to its raw id.
+  const variantANameRaw = useTargetName(variantATarget ?? PLACEHOLDER_TARGET);
+  const variantBNameRaw = useTargetName(variantBTarget ?? PLACEHOLDER_TARGET);
+
+  const variantAName = variantATarget
+    ? variantANameRaw || aggregate.variantA
+    : aggregate.variantA;
+  const variantBName = variantBTarget
+    ? variantBNameRaw || aggregate.variantB
+    : aggregate.variantB;
+
+  const handleExport = useCallback(() => {
+    const header = ["row_index", "winner", "reasoning", "cost_usd"];
+    const body = aggregate.perRow
+      .map((v, i) => {
+        if (!v) return null;
+        const winner =
+          v.label === "A"
+            ? variantAName
+            : v.label === "B"
+              ? variantBName
+              : "tie";
+        return [
+          String(i + 1),
+          winner,
+          v.reasoning ?? "",
+          v.costAmount.toFixed(6),
+        ];
+      })
+      .filter((row): row is string[] => row !== null);
+    downloadCsv(
+      `pairwise-verdicts-${variantAName}-vs-${variantBName}.csv`,
+      [header, ...body],
+    );
+  }, [aggregate, variantAName, variantBName]);
+
+  return (
+    <AggregateHeaderBar
+      counts={aggregate.counts}
+      variantAName={variantAName}
+      variantBName={variantBName}
+      totalCost={aggregate.totalCost}
+      activeFilter={filter}
+      onFilterChange={setFilter}
+      onExport={handleExport}
+    />
+  );
+}
+
+const PLACEHOLDER_TARGET = {
+  id: "__pairwise-placeholder__",
+  type: "prompt",
+  promptId: undefined,
+} as unknown as TargetConfig;
+
 export function PairwiseAggregateHeader() {
-  const { project } = useOrganizationTeamProject();
-  const trpcUtils = api.useContext();
   const [filter, setFilter] = useState<PairwiseFilter>("all");
 
   const { evaluators, targets, results, rowCount } = useEvaluationsV3Store(
@@ -55,92 +123,43 @@ export function PairwiseAggregateHeader() {
     })),
   );
 
-  // MVP: only render the bar for the first pairwise evaluator. Stacked
-  // pairwise evaluators (rare in practice) can be addressed later.
+  // MVP: render the first pairwise comparison. Prefer the column-target
+  // shape because that is the user-facing "Pairwise Compare" column.
   const pairwiseEvaluator = useMemo(
     () => evaluators.find((e) => e.pairwise),
     [evaluators],
   );
+  const pairwiseTarget = useMemo(
+    () => targets.find((t) => t.pairwise),
+    [targets],
+  );
 
   const aggregate = useMemo(() => {
+    if (pairwiseTarget) {
+      return computePairwiseTargetAggregate(pairwiseTarget, results, rowCount);
+    }
     if (!pairwiseEvaluator) return null;
     return computePairwiseAggregate(pairwiseEvaluator, results, rowCount);
-  }, [pairwiseEvaluator, results, rowCount]);
+  }, [pairwiseTarget, pairwiseEvaluator, results, rowCount]);
 
-  const variantANameFromCache = useMemo(() => {
-    if (!aggregate) return undefined;
-    const t = targets.find((tg) => tg.id === aggregate.variantA);
-    if (!t) return undefined;
-    return resolveTargetNameFromCache({
-      target: t,
-      utils: trpcUtils,
-      projectId: project?.id,
-    });
-  }, [aggregate, targets, trpcUtils, project?.id]);
-
-  const variantBNameFromCache = useMemo(() => {
-    if (!aggregate) return undefined;
-    const t = targets.find((tg) => tg.id === aggregate.variantB);
-    if (!t) return undefined;
-    return resolveTargetNameFromCache({
-      target: t,
-      utils: trpcUtils,
-      projectId: project?.id,
-    });
-  }, [aggregate, targets, trpcUtils, project?.id]);
-
-  const handleExport = useCallback(() => {
-    if (!aggregate) return;
-    const aName = variantANameFromCache ?? aggregate.variantA;
-    const bName = variantBNameFromCache ?? aggregate.variantB;
-    const header = ["row_index", "winner", "reasoning", "cost_usd"];
-    const body = aggregate.perRow
-      .map((v, i) => {
-        if (!v) return null;
-        const winner =
-          v.label === "A" ? aName : v.label === "B" ? bName : "tie";
-        return [
-          String(i + 1),
-          winner,
-          v.reasoning ?? "",
-          v.costAmount.toFixed(6),
-        ];
-      })
-      .filter((row): row is string[] => row !== null);
-    downloadCsv(
-      `pairwise-verdicts-${aName}-vs-${bName}.csv`,
-      [header, ...body],
-    );
-  }, [aggregate, variantANameFromCache, variantBNameFromCache]);
-
-  const handlePromote = useCallback((variantName: string) => {
-    toaster.create({
-      title: `Promote ${variantName} — coming soon`,
-      description:
-        "Promotion will register this variant as the production prompt in a follow-up PR.",
-      type: "info",
-      duration: 4000,
-      meta: { closable: true },
-    });
-  }, []);
+  const variantATarget = useMemo(
+    () => (aggregate ? targets.find((t) => t.id === aggregate.variantA) : undefined),
+    [aggregate, targets],
+  );
+  const variantBTarget = useMemo(
+    () => (aggregate ? targets.find((t) => t.id === aggregate.variantB) : undefined),
+    [aggregate, targets],
+  );
 
   if (!aggregate || totalVerdicts(aggregate.counts) === 0) return null;
 
-  const variantAName = variantANameFromCache ?? aggregate.variantA;
-  const variantBName = variantBNameFromCache ?? aggregate.variantB;
-
   return (
-    <AggregateHeaderBar
-      counts={aggregate.counts}
-      variantAName={variantAName}
-      variantBName={variantBName}
-      totalCost={aggregate.totalCost}
-      activeFilter={filter}
-      onFilterChange={setFilter}
-      onExport={handleExport}
-      onPromoteA={() => handlePromote(variantAName)}
-      onPromoteB={() => handlePromote(variantBName)}
-      biasCorrected={true}
+    <ResolvedAggregateBar
+      aggregate={aggregate}
+      variantATarget={variantATarget}
+      variantBTarget={variantBTarget}
+      filter={filter}
+      setFilter={setFilter}
     />
   );
 }

@@ -561,9 +561,30 @@ export const getEvaluatorDataForParams = (
     expected_contexts: autoparseContexts(params.expected_contexts),
   });
 
+  // Preserve evaluator-specific fields (e.g. pairwise's candidate_a_id /
+  // candidate_a_output) that the legacy default schema doesn't know
+  // about. Without this, `defaultEvaluatorInputSchema.parse` silently
+  // strips them and the downstream required-field check on the evaluator
+  // definition rejects the call with "<field> is required for <name>
+  // evaluator". The canonical 6 fields (input/output/contexts/...) are
+  // normalized below; everything else passes through as-is.
+  const canonicalKeys = new Set([
+    "input",
+    "output",
+    "contexts",
+    "expected_output",
+    "expected_contexts",
+    "conversation",
+  ]);
+  const extras: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(params)) {
+    if (!canonicalKeys.has(key)) extras[key] = value;
+  }
+
   return {
     type: "default",
     data: {
+      ...extras,
       input: data_.input ? data_.input : undefined,
       output: data_.output ? data_.output : undefined,
       contexts: JSON.stringify(data_.contexts),
@@ -927,7 +948,12 @@ async function handleEvaluatorCall(
     result = {
       status: "error",
       error_type: "INTERNAL_ERROR",
-      details: error instanceof Error ? error.message : "Internal error",
+      details:
+        error instanceof Error
+          ? error.message
+          : typeof error === "string"
+            ? error
+            : "Internal error",
       traceback: [],
     };
   } finally {

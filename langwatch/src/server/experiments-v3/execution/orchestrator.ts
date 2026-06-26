@@ -249,10 +249,62 @@ export const generatePairwiseCells = (
     string,
     { output: unknown; cost?: number; duration?: number }
   >,
+  completedTargetEvaluatorScores?: Map<
+    string,
+    Array<{ name: string; score?: number; label?: string; passed?: boolean }>
+  >,
+  loadedPrompts?: Map<string, VersionedPrompt>,
 ): ExecutionCell[] => {
   const cells: ExecutionCell[] = [];
   const datasetId =
     state.datasets[0]?.id ?? state.activeDatasetId ?? "dataset-1";
+
+  // Augment a candidate's output text with the variant's existing evaluator
+  // scores so the pairwise judge can factor them into the verdict. Skips
+  // silently when there are no scores, when the output isn't string-ish, or
+  // when the scores map isn't provided.
+  const withEvaluatorScores = (
+    output: unknown,
+    rowIndex: number,
+    variantId: string,
+  ): unknown => {
+    if (!completedTargetEvaluatorScores) return output;
+    const scores = completedTargetEvaluatorScores.get(`${rowIndex}:${variantId}`);
+    if (!scores || scores.length === 0) return output;
+    const lines = scores
+      .map((s) => {
+        const parts: string[] = [];
+        if (s.score !== undefined) parts.push(`score=${s.score}`);
+        if (s.label !== undefined) parts.push(`label=${s.label}`);
+        if (s.passed !== undefined) parts.push(`passed=${s.passed}`);
+        if (parts.length === 0) return null;
+        return `- ${s.name}: ${parts.join(", ")}`;
+      })
+      .filter((l): l is string => l !== null);
+    if (lines.length === 0) return output;
+    const block = `\n\n--- Existing evaluator scores ---\n${lines.join("\n")}`;
+    if (typeof output === "string") return output + block;
+    try {
+      return JSON.stringify(output) + block;
+    } catch {
+      return String(output ?? "") + block;
+    }
+  };
+
+  // Pick the most human-readable identifier we can derive from a TargetConfig.
+  // langevals echoes `candidate_a_id` / `candidate_b_id` back to us as the
+  // `label` on the verdict, and that label is what every programmatic consumer
+  // (REST, SDK, MCP) will read first — so the prompt's HANDLE ("say-hi") beats
+  // its KSUID-prefixed db id ("prompt_6IFkbb…") which beats the internal
+  // target id ("target_…"). `loadedPrompts` is keyed by `target.promptId`.
+  const variantIdentifierFor = (t: TargetConfig): string => {
+    if (t.type === "prompt" && t.promptId) {
+      const handle = loadedPrompts?.get(t.promptId)?.handle;
+      if (handle) return handle;
+      return t.promptId;
+    }
+    return t.id;
+  };
 
   const pairwiseEvaluators = state.evaluators.filter((e) => e.pairwise);
   // Column-style pairwise targets (#5100): same Phase-2 treatment as chip
@@ -303,14 +355,14 @@ export const generatePairwiseCells = (
         precomputedTargetOutput: a.output,
         pairwise: {
           candidateA: {
-            id: cfg.variantA,
-            output: a.output,
+            id: variantIdentifierFor(variantA),
+            output: withEvaluatorScores(a.output, rowIndex, cfg.variantA),
             cost: a.cost,
             duration: a.duration,
           },
           candidateB: {
-            id: cfg.variantB,
-            output: b.output,
+            id: variantIdentifierFor(variantB),
+            output: withEvaluatorScores(b.output, rowIndex, cfg.variantB),
             cost: b.cost,
             duration: b.duration,
           },
@@ -329,6 +381,24 @@ export const generatePairwiseCells = (
     const cfg = target.pairwise;
     if (!cfg || !target.targetEvaluatorId) continue;
 
+    // Skip column-style pairwise targets where the user hasn't finished
+    // configuring the form. Without all three the judge endpoint would
+    // 400 with "<field> is required" and the cell would render that as
+    // a verdict-shaped error — confusing for users who haven't opened
+    // the drawer yet.
+    if (!cfg.variantA || !cfg.variantB || !cfg.goldenField) {
+      logger.debug(
+        {
+          targetId: target.id,
+          variantA: cfg.variantA,
+          variantB: cfg.variantB,
+          goldenField: cfg.goldenField,
+        },
+        "Pairwise column-target skipped: variants or golden field not configured",
+      );
+      continue;
+    }
+
     const variantA = state.targets.find((t) => t.id === cfg.variantA);
     const variantB = state.targets.find((t) => t.id === cfg.variantB);
     if (!variantA || !variantB) {
@@ -343,15 +413,6 @@ export const generatePairwiseCells = (
       continue;
     }
 
-    const syntheticEvaluator = {
-      id: target.id,
-      dbEvaluatorId: target.targetEvaluatorId,
-      evaluatorType: "langevals/pairwise_compare",
-      pairwise: cfg,
-      inputs: target.inputs,
-      mappings: {},
-    } as unknown as EvaluatorConfig;
-
     for (let rowIndex = 0; rowIndex < datasetRows.length; rowIndex++) {
       const datasetEntry = datasetRows[rowIndex];
       if (!datasetEntry) continue;
@@ -359,6 +420,79 @@ export const generatePairwiseCells = (
       const a = completedTargetOutputs.get(`${rowIndex}:${cfg.variantA}`);
       const b = completedTargetOutputs.get(`${rowIndex}:${cfg.variantB}`);
       if (!a || !b) continue;
+
+      // Per-row synthetic evaluator with PRE-RESOLVED value mappings for
+      // every pairwise input field. Pre-fix (#5131) the synthetic was
+      // shared across rows with `mappings: {}`, leaving the candidate_*
+      // fields to be filled in by buildEvaluatorInputs's pairwise branch
+      // and propagated as manual inputs. That path silently dropped
+      // candidate_a_output / candidate_b_output (plus cost/duration) on
+      // the wire — the route's downstream `getEvaluatorDataForParams`
+      // rebuilt `data` from the legacy 6-field default schema, stripping
+      // everything not value-mapped at build time. Embedding the
+      // candidates as `value` mappings here means buildEvaluatorNode
+      // bakes them into the workflow node's static inputs (and the
+      // mapping-branch fallback in buildEvaluatorInputs sees them too)
+      // so the candidate fields always reach the judge regardless of
+      // which code path the dispatch ends up in.
+      const perRowMappings: Record<
+        string,
+        Record<string, Record<string, { type: "value"; value: unknown }>>
+      > = {
+        [datasetId]: {
+          [target.id]: {
+            candidate_a_id: {
+              type: "value",
+              value: variantIdentifierFor(variantA),
+            },
+            candidate_a_output: {
+              type: "value",
+              value: withEvaluatorScores(a.output, rowIndex, cfg.variantA),
+            },
+            candidate_a_cost:
+              a.cost !== undefined
+                ? { type: "value", value: a.cost }
+                : { type: "value", value: undefined },
+            candidate_a_duration:
+              a.duration !== undefined
+                ? { type: "value", value: a.duration }
+                : { type: "value", value: undefined },
+            candidate_b_id: {
+              type: "value",
+              value: variantIdentifierFor(variantB),
+            },
+            candidate_b_output: {
+              type: "value",
+              value: withEvaluatorScores(b.output, rowIndex, cfg.variantB),
+            },
+            candidate_b_cost:
+              b.cost !== undefined
+                ? { type: "value", value: b.cost }
+                : { type: "value", value: undefined },
+            candidate_b_duration:
+              b.duration !== undefined
+                ? { type: "value", value: b.duration }
+                : { type: "value", value: undefined },
+            input: {
+              type: "value",
+              value: datasetEntry.input ?? datasetEntry[cfg.goldenField],
+            },
+            golden: {
+              type: "value",
+              value: datasetEntry[cfg.goldenField],
+            },
+          },
+        },
+      };
+
+      const syntheticEvaluator = {
+        id: target.id,
+        dbEvaluatorId: target.targetEvaluatorId,
+        evaluatorType: "langevals/pairwise_compare",
+        pairwise: cfg,
+        inputs: target.inputs,
+        mappings: perRowMappings,
+      } as unknown as EvaluatorConfig;
 
       cells.push({
         rowIndex,
@@ -376,14 +510,14 @@ export const generatePairwiseCells = (
         precomputedTargetOutput: a.output,
         pairwise: {
           candidateA: {
-            id: cfg.variantA,
-            output: a.output,
+            id: variantIdentifierFor(variantA),
+            output: withEvaluatorScores(a.output, rowIndex, cfg.variantA),
             cost: a.cost,
             duration: a.duration,
           },
           candidateB: {
-            id: cfg.variantB,
-            output: b.output,
+            id: variantIdentifierFor(variantB),
+            output: withEvaluatorScores(b.output, rowIndex, cfg.variantB),
             cost: b.cost,
             duration: b.duration,
           },
@@ -681,14 +815,45 @@ const buildEvaluatorInputs = (
 
     inputs.golden = cell.datasetEntry[cfg.goldenField];
 
-    inputs.candidate_a_id = cell.pairwise.candidateA.id;
-    inputs.candidate_a_output = cell.pairwise.candidateA.output;
-    inputs.candidate_a_cost = cell.pairwise.candidateA.cost;
-    inputs.candidate_a_duration = cell.pairwise.candidateA.duration;
-    inputs.candidate_b_id = cell.pairwise.candidateB.id;
-    inputs.candidate_b_output = cell.pairwise.candidateB.output;
-    inputs.candidate_b_cost = cell.pairwise.candidateB.cost;
-    inputs.candidate_b_duration = cell.pairwise.candidateB.duration;
+    // Helper: only assign when defined, so JSON.stringify doesn't drop the
+    // key for the keep-defined receiver but also doesn't leak literal
+    // `undefined`s into the body.
+    const setIfDefined = (key: string, value: unknown): void => {
+      if (value !== undefined) inputs[key] = value;
+    };
+
+    setIfDefined("candidate_a_id", cell.pairwise.candidateA.id);
+    setIfDefined("candidate_a_output", cell.pairwise.candidateA.output);
+    setIfDefined("candidate_a_cost", cell.pairwise.candidateA.cost);
+    setIfDefined(
+      "candidate_a_duration",
+      cell.pairwise.candidateA.duration,
+    );
+    setIfDefined("candidate_b_id", cell.pairwise.candidateB.id);
+    setIfDefined("candidate_b_output", cell.pairwise.candidateB.output);
+    setIfDefined("candidate_b_cost", cell.pairwise.candidateB.cost);
+    setIfDefined(
+      "candidate_b_duration",
+      cell.pairwise.candidateB.duration,
+    );
+
+    // Defensive fallback: when generatePairwiseCells lost a candidate
+    // output between completedTargetOutputs.set and the cell push (eg.
+    // a stale reference), pull the value from the per-row synthetic
+    // mappings we now also populate at cell-creation time. Strictly
+    // additive — only fires when the primary cell.pairwise read came
+    // back undefined.
+    const cellMappings =
+      evaluator.mappings[datasetId]?.[cell.targetId] ?? {};
+    for (const [field, mapping] of Object.entries(cellMappings)) {
+      if (
+        mapping.type === "value" &&
+        mapping.value !== undefined &&
+        inputs[field] === undefined
+      ) {
+        inputs[field] = mapping.value;
+      }
+    }
 
     return inputs;
   }
@@ -805,6 +970,15 @@ export async function* runOrchestrator(
     { output: unknown; cost?: number; duration?: number }
   >();
 
+  // Track per-(row, target) evaluator results so the Phase 2 pairwise judge
+  // can read each variant's existing evaluator scores (relevance, factuality,
+  // etc.) and factor them into its verdict. Keyed by `${rowIndex}:${targetId}`,
+  // value is an array of one entry per evaluator that produced a usable score.
+  const completedTargetEvaluatorScores = new Map<
+    string,
+    Array<{ name: string; score?: number; label?: string; passed?: boolean }>
+  >();
+
   // Pre-seed from cells that already have a traceId (e.g., evaluator reruns
   // that skip target execution and won't generate target_result events)
   for (const cell of cells) {
@@ -906,6 +1080,33 @@ export async function* runOrchestrator(
       const evaluatorConfig = state.evaluators.find(
         (e) => e.id === event.evaluatorId,
       );
+
+      // Cache per-(row, target) evaluator scores so the Phase 2 pairwise judge
+      // can see what each variant already scored on its non-pairwise
+      // evaluators. Skip pairwise evaluators themselves (a pairwise judge
+      // reading another pairwise verdict is circular).
+      if (
+        evalResult.status === "processed" &&
+        evaluatorConfig &&
+        !evaluatorConfig.pairwise
+      ) {
+        const dbEval = evaluatorConfig.dbEvaluatorId
+          ? loadedEvaluators?.get(evaluatorConfig.dbEvaluatorId)
+          : null;
+        const name =
+          dbEval?.name ??
+          evaluatorConfig.evaluatorType?.split("/").pop() ??
+          evaluatorConfig.id;
+        const key = `${event.rowIndex}:${event.targetId}`;
+        const arr = completedTargetEvaluatorScores.get(key) ?? [];
+        arr.push({
+          name,
+          score: evalResult.score ?? undefined,
+          label: evalResult.label ?? undefined,
+          passed: evalResult.passed ?? undefined,
+        });
+        completedTargetEvaluatorScores.set(key, arr);
+      }
       const dbEvaluator = evaluatorConfig?.dbEvaluatorId
         ? loadedEvaluators?.get(evaluatorConfig.dbEvaluatorId)
         : null;
@@ -923,6 +1124,9 @@ export async function* runOrchestrator(
           status: evalResult.status,
           score: evalResult.status === "processed" ? (evalResult.score ?? undefined) : undefined,
           passed: evalResult.status === "processed" ? (evalResult.passed ?? undefined) : undefined,
+          // For pairwise verdicts, langevals now returns the winner's
+          // candidate id (or "tie") directly in `label`. No translation
+          // needed here; SDK / REST / MCP consumers see the winner by id.
           label: evalResult.status === "processed" ? (evalResult.label ?? undefined) : undefined,
           details: evalResult.status === "processed" ? (evalResult.details ?? undefined) : undefined,
           error: evalResult.status === "error" ? evalResult.details : undefined,
@@ -1203,6 +1407,8 @@ export async function* runOrchestrator(
           state,
           datasetRows,
           completedTargetOutputs,
+          completedTargetEvaluatorScores,
+          loadedPrompts,
         );
 
         if (pairwiseCells.length > 0) {

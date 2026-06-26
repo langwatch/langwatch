@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { EvaluationsV3State } from "~/experiments-v3/types";
-import { generateCells } from "../orchestrator";
+import { generateCells, generatePairwiseCells } from "../orchestrator";
 import type { ExecutionScope } from "../types";
 
 describe("orchestrator", () => {
@@ -209,6 +209,147 @@ describe("orchestrator", () => {
       const cells = generateCells(state, datasetRows, scope);
 
       expect(cells[0]?.evaluatorConfigs).toHaveLength(3);
+    });
+
+    it("defers pairwise evaluators to phase 2 instead of attaching them to target cells", () => {
+      const state = createTestState(2, 1);
+      state.evaluators.push({
+        id: "pairwise-eval",
+        evaluatorType: "langevals/pairwise_compare",
+        inputs: [
+          { identifier: "candidate_a_output", type: "str" },
+          { identifier: "candidate_b_output", type: "str" },
+          { identifier: "golden", type: "str" },
+        ],
+        mappings: {},
+        pairwise: {
+          variantA: "target-1",
+          variantB: "target-2",
+          goldenField: "expected",
+          includeMetrics: [],
+        },
+      });
+      const datasetRows = createTestDataset(1);
+      const scope: ExecutionScope = { type: "full" };
+
+      const cells = generateCells(state, datasetRows, scope);
+
+      expect(cells).toHaveLength(2);
+      expect(
+        cells.every((cell) =>
+          cell.evaluatorConfigs.every((evaluator) => !evaluator.pairwise),
+        ),
+      ).toBe(true);
+    });
+
+    it("skips column-style pairwise evaluator targets during phase 1", () => {
+      const state = createTestState(2, 0);
+      state.targets.push({
+        id: "pairwise-target",
+        type: "evaluator",
+        targetEvaluatorId: "db-pairwise-evaluator",
+        inputs: [
+          { identifier: "candidate_a_output", type: "str" },
+          { identifier: "candidate_b_output", type: "str" },
+          { identifier: "golden", type: "str" },
+        ],
+        outputs: [{ identifier: "label", type: "str" }],
+        mappings: {},
+        pairwise: {
+          variantA: "target-1",
+          variantB: "target-2",
+          goldenField: "expected",
+          includeMetrics: [],
+        },
+      });
+      const datasetRows = createTestDataset(1);
+      const scope: ExecutionScope = { type: "full" };
+
+      const cells = generateCells(state, datasetRows, scope);
+
+      expect(cells.map((cell) => cell.targetId)).toEqual([
+        "target-1",
+        "target-2",
+      ]);
+    });
+  });
+
+  describe("generatePairwiseCells", () => {
+    it("creates a column-target pairwise cell with both candidate outputs", () => {
+      const state = createTestState(2, 0);
+      state.targets.push({
+        id: "pairwise-target",
+        type: "evaluator",
+        targetEvaluatorId: "db-pairwise-evaluator",
+        inputs: [
+          { identifier: "candidate_a_output", type: "str" },
+          { identifier: "candidate_b_output", type: "str" },
+          { identifier: "golden", type: "str" },
+        ],
+        outputs: [{ identifier: "label", type: "str" }],
+        mappings: {},
+        pairwise: {
+          variantA: "target-1",
+          variantB: "target-2",
+          goldenField: "expected",
+          includeMetrics: [],
+        },
+      });
+      const completedTargetOutputs = new Map([
+        [
+          "0:target-1",
+          { output: { output: "answer from A" }, cost: 0.01, duration: 120 },
+        ],
+        [
+          "0:target-2",
+          { output: { output: "answer from B" }, cost: 0.02, duration: 150 },
+        ],
+      ]);
+
+      const cells = generatePairwiseCells(
+        state,
+        createTestDataset(1),
+        completedTargetOutputs,
+      );
+
+      expect(cells).toHaveLength(1);
+      expect(cells[0]?.targetId).toBe("pairwise-target");
+      expect(cells[0]?.skipTarget).toBe(true);
+      expect(cells[0]?.pairwise?.candidateA.output).toEqual({
+        output: "answer from A",
+      });
+      expect(cells[0]?.pairwise?.candidateB.output).toEqual({
+        output: "answer from B",
+      });
+      expect(cells[0]?.evaluatorConfigs[0]?.pairwise?.goldenField).toBe(
+        "expected",
+      );
+    });
+
+    it("does not create pairwise cells until both variants have output", () => {
+      const state = createTestState(2, 0);
+      state.targets.push({
+        id: "pairwise-target",
+        type: "evaluator",
+        targetEvaluatorId: "db-pairwise-evaluator",
+        inputs: [],
+        outputs: [],
+        mappings: {},
+        pairwise: {
+          variantA: "target-1",
+          variantB: "target-2",
+          goldenField: "expected",
+          includeMetrics: [],
+        },
+      });
+
+      const cells = generatePairwiseCells(
+        state,
+        createTestDataset(1),
+        new Map([["0:target-1", { output: { output: "answer from A" } }]]),
+      );
+
+      expect(cells).toHaveLength(0);
     });
   });
 

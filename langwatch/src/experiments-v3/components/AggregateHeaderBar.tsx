@@ -1,20 +1,14 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Icon,
-  Spacer,
-  Text,
-} from "@chakra-ui/react";
-import { LuCheck, LuDownload, LuRocket } from "react-icons/lu";
+import { Box, Button, HStack, Icon, Spacer, Text } from "@chakra-ui/react";
+import { Download, Equal, Trophy } from "lucide-react";
+
+import { Tooltip } from "~/components/ui/tooltip";
 
 /**
  * Aggregate header bar for a pairwise evaluator run (#5100).
  *
  * Renders above the EvaluationsV3 table when at least one row has a
- * pairwise verdict. Shows the running tally, the bias-corrected
- * indicator, total judge cost, filter chips for the visible row
- * subset, and the export / promote handoff buttons (see step F).
+ * pairwise verdict. Compact scoreboard: leader + score + ties + filter
+ * + Download CSV.
  */
 
 export type PairwiseFilter = "all" | "a" | "b" | "losses";
@@ -22,7 +16,7 @@ export type PairwiseFilter = "all" | "a" | "b" | "losses";
 export type AggregateHeaderBarProps = {
   /** Counts across all rows with a verdict. */
   counts: { a: number; b: number; tie: number };
-  /** Human-readable variant names for the tally labels. */
+  /** Human-readable variant names. */
   variantAName: string;
   variantBName: string;
   /** Total judge cost (sum of all per-row pairwise costs), in USD. */
@@ -30,19 +24,15 @@ export type AggregateHeaderBarProps = {
   /** Currently active filter chip. */
   activeFilter: PairwiseFilter;
   onFilterChange: (next: PairwiseFilter) => void;
-  /** Step F handoffs — see issue #5100. */
+  /** Download per-row verdicts as CSV. */
   onExport: () => void;
-  onPromoteA: () => void;
-  onPromoteB: () => void;
-  /** Set true when swap_and_confirm produced these results. */
-  biasCorrected?: boolean;
 };
 
 const FILTER_LABELS: Record<PairwiseFilter, (a: string, b: string) => string> = {
   all: () => "All",
-  a: (a) => a,
-  b: (_a, b) => b,
-  losses: () => "Losses (regressions)",
+  a: (a) => `${a}`,
+  b: (_a, b) => `${b}`,
+  losses: () => "Losses",
 };
 
 export function AggregateHeaderBar({
@@ -53,10 +43,15 @@ export function AggregateHeaderBar({
   activeFilter,
   onFilterChange,
   onExport,
-  onPromoteA,
-  onPromoteB,
-  biasCorrected = true,
 }: AggregateHeaderBarProps) {
+  const total = counts.a + counts.b + counts.tie;
+  const leader =
+    counts.a > counts.b ? "a" : counts.b > counts.a ? "b" : "tie";
+  const leaderName = leader === "a" ? variantAName : variantBName;
+  const otherName = leader === "a" ? variantBName : variantAName;
+  const leaderWins = leader === "a" ? counts.a : counts.b;
+  const otherWins = leader === "a" ? counts.b : counts.a;
+
   return (
     <HStack
       paddingX={3}
@@ -68,20 +63,38 @@ export function AggregateHeaderBar({
       gap={3}
       flexWrap="wrap"
     >
-      <Text fontWeight="medium">
-        {variantAName} wins {counts.a} · {variantBName} wins {counts.b} · Ties{" "}
-        {counts.tie}
-      </Text>
-
-      {biasCorrected ? (
-        <HStack gap={1} color="green.fg" fontSize="xs">
-          <Icon as={LuCheck} boxSize="14px" />
-          <Text>Bias-corrected</Text>
+      {leader === "tie" ? (
+        <HStack gap={2}>
+          <Icon as={Equal} color="fg.muted" boxSize="14px" />
+          <Text fontWeight="medium">
+            Even{" "}
+            <Text as="span" color="fg.muted" fontWeight="normal">
+              · {variantAName} {counts.a} – {variantBName} {counts.b}
+              {counts.tie ? ` · ${counts.tie} ties` : ""}
+            </Text>
+          </Text>
         </HStack>
-      ) : null}
+      ) : (
+        <HStack gap={2}>
+          <Icon as={Trophy} color="yellow.fg" boxSize="14px" />
+          <Text>
+            <Text as="span" fontWeight="semibold" color="green.fg">
+              {leaderName}
+            </Text>{" "}
+            <Text as="span" fontWeight="medium">
+              {leaderWins}
+            </Text>
+            <Text as="span" color="fg.muted">
+              {" "}
+              – {otherWins} {otherName}
+              {counts.tie ? ` · ${counts.tie} ties` : ""} · {total} verdicts
+            </Text>
+          </Text>
+        </HStack>
+      )}
 
       <Text fontSize="xs" color="fg.muted">
-        Judge cost: ${totalCost.toFixed(4)}
+        ${totalCost.toFixed(4)}
       </Text>
 
       <Spacer />
@@ -101,20 +114,12 @@ export function AggregateHeaderBar({
 
       <Box width="1px" height="20px" bg="border.muted" />
 
-      <HStack gap={1}>
+      <Tooltip content="Download per-row verdicts as CSV">
         <Button size="xs" variant="ghost" onClick={onExport}>
-          <Icon as={LuDownload} boxSize="14px" />
-          Export
+          <Icon as={Download} boxSize="14px" />
+          CSV
         </Button>
-        <Button size="xs" variant="ghost" onClick={onPromoteA}>
-          <Icon as={LuRocket} boxSize="14px" />
-          Promote {variantAName}
-        </Button>
-        <Button size="xs" variant="ghost" onClick={onPromoteB}>
-          <Icon as={LuRocket} boxSize="14px" />
-          Promote {variantBName}
-        </Button>
-      </HStack>
+      </Tooltip>
     </HStack>
   );
 }

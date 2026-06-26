@@ -29,6 +29,7 @@ import { PairwiseConfigForm } from "~/experiments-v3/components/EvaluatorPanel/P
 import type {
   LocalEvaluatorConfig,
   PairwiseEvaluatorConfig,
+  TargetConfig,
 } from "~/experiments-v3/types";
 import {
   getComplexProps,
@@ -133,7 +134,7 @@ export type EvaluatorEditorController = {
   pairwiseContext:
     | {
         initialPairwise?: PairwiseEvaluatorConfig;
-        targets: { id: string }[];
+        targets: TargetConfig[];
         datasetColumns: { id: string; name: string }[];
       }
     | undefined;
@@ -184,7 +185,7 @@ export function useEvaluatorEditorController(
   const pairwiseContext = complexProps.pairwiseContext as
     | {
         initialPairwise?: PairwiseEvaluatorConfig;
-        targets: { id: string }[];
+        targets: TargetConfig[];
         datasetColumns: { id: string; name: string }[];
       }
     | undefined;
@@ -751,7 +752,7 @@ export function EvaluatorEditorBody({
                 }
               }
               onChange={onPairwiseChange}
-              targets={pairwiseContext.targets as never}
+              targets={pairwiseContext.targets}
               datasetColumns={pairwiseContext.datasetColumns}
             />
           </Box>
