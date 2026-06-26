@@ -80,11 +80,12 @@ const SR_ONLY_INPUT: React.CSSProperties = {
   border: 0,
 };
 
-/** Inline, compact column list for one file: rename, retype, and drag-reorder.
- *  Add/remove stays locked (the columns must still cover the file's headers 1:1),
- *  but order is free — each column carries an immutable `sourceHeader`, so the
- *  normalize job binds values by header, not array position (see
- *  `DatasetConfirmColumns`). The grip is the only drag affordance, so the name
+/** Inline, compact column list for one file: rename, retype, drag-reorder, and
+ *  exclude. Adding columns the file lacks is impossible (no data to back them);
+ *  excluding is allowed down to the last column. Each column carries an immutable
+ *  `sourceHeader`, so the normalize job binds values by header (not array
+ *  position) and drops the headers absent from this list — see
+ *  `DatasetConfirmColumns`. The grip is the only drag affordance, so the name
  *  input + type select stay fully interactive. */
 function BulkColumnFields({
   columnTypes,

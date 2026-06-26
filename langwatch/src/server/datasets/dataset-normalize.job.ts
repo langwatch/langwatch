@@ -242,7 +242,10 @@ const parseInto = async (params: {
     );
     if (hasSourceHeaders) {
       const byHeader = new Map(
-        (targetColumns as DatasetConfirmColumns).map((c) => [c.sourceHeader, c]),
+        (targetColumns as DatasetConfirmColumns).map((c) => [
+          c.sourceHeader,
+          c,
+        ]),
       );
       // Duplicate `sourceHeader`s collapse in the Map (last wins), which would
       // bind fewer columns than `targetColumns` claims while `appliedColumnTypes`

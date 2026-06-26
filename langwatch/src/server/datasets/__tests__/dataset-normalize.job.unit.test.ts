@@ -829,7 +829,9 @@ describe("createDatasetNormalizeHandler()", () => {
             { a: "2", c: "z" }, // `b` dropped, stray `c` preserved
           ]);
           const update = repo.update.mock.calls[0]![0];
-          expect(update.data.columnTypes).toEqual([{ name: "a", type: "string" }]);
+          expect(update.data.columnTypes).toEqual([
+            { name: "a", type: "string" },
+          ]);
         });
 
         it("degrades to derive-all-string when the confirmed list is empty", async () => {
