@@ -235,6 +235,7 @@ secured.access(sessionAuth).post("/execute", zValidator("json", executionRequest
         loadedAgents,
         loadedEvaluators,
         concurrency: request.concurrency,
+        seedTargetOutputs: request.seedTargetOutputs,
       });
 
       for await (const event of orchestrator) {
