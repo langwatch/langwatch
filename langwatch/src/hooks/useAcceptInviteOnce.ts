@@ -47,7 +47,7 @@ export interface UseAcceptInviteOnceOptions {
 }
 
 /**
- * Fire `organization.acceptInvite` at most once per invite code and drive the
+ * Fire `invite.acceptInvite` at most once per invite code and drive the
  * page through a small state machine.
  *
  * ## Why a module-scoped `Set` one-shot guard instead of `mutation.isIdle` or `useRef`?

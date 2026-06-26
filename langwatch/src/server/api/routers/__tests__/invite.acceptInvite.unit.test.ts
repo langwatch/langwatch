@@ -102,7 +102,7 @@ function makeInvite(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe("organization.acceptInvite", () => {
+describe("invite.acceptInvite", () => {
   let findUniqueMock: ReturnType<typeof vi.fn>;
   let transactionMock: ReturnType<typeof vi.fn>;
 
