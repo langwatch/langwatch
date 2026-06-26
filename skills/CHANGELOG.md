@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.2](https://github.com/langwatch/langwatch/compare/skills@v0.6.1...skills@v0.6.2) (2026-06-26)
+
+
+### Bug Fixes
+
+* **security:** esbuild, vite and form-data floors across all workspaces ([361b301](https://github.com/langwatch/langwatch/commit/361b3014f62257e7cb2702e60588fc534a271d20))
+* **security:** esbuild, vite and form-data security floors across all workspaces ([#4827](https://github.com/langwatch/langwatch/issues/4827)) ([361b301](https://github.com/langwatch/langwatch/commit/361b3014f62257e7cb2702e60588fc534a271d20))
+
 ## [0.6.1](https://github.com/langwatch/langwatch/compare/skills@v0.6.0...skills@v0.6.1) (2026-06-19)
 
 
