@@ -284,11 +284,22 @@ const readCostAmount = (raw: unknown): number => {
  * Aggregates verdicts for a single pairwise evaluator across all rows.
  * Skips rows whose result is missing, errored, or has a non-A/B/tie label.
  */
+/**
+ * Optional resolved-handle hints from the caller. The orchestrator emits the
+ * prompt's HANDLE (e.g. `"say-hi"`) as the verdict label — not its `promptId`
+ * KSUID. Callers who can resolve a handle (via `useTargetName` or the trpc
+ * prompt cache) should pass it here so the normalizer can match against it.
+ */
+export type PairwiseAggregateHandles = {
+  variantAHandle?: string;
+  variantBHandle?: string;
+};
+
 export const computePairwiseAggregate = (
   evaluator: Pick<EvaluatorConfig, "id" | "pairwise">,
   results: EvaluationResults,
   rowCount: number,
-  targets?: Array<{ id: string; promptId?: string | null }>,
+  handles?: PairwiseAggregateHandles,
 ): PairwiseAggregate | null => {
   if (!evaluator.pairwise) return null;
   return computePairwiseAggregateFromResults({
@@ -297,7 +308,7 @@ export const computePairwiseAggregate = (
     results,
     rowCount,
     resultTargetId: evaluator.pairwise.variantA,
-    targets,
+    handles,
   });
 };
 
@@ -305,7 +316,7 @@ export const computePairwiseTargetAggregate = (
   target: { id: string; pairwise?: EvaluatorConfig["pairwise"] },
   results: EvaluationResults,
   rowCount: number,
-  targets?: Array<{ id: string; promptId?: string | null }>,
+  handles?: PairwiseAggregateHandles,
 ): PairwiseAggregate | null => {
   if (!target.pairwise) return null;
   return computePairwiseAggregateFromResults({
@@ -314,7 +325,7 @@ export const computePairwiseTargetAggregate = (
     results,
     rowCount,
     resultTargetId: target.id,
-    targets,
+    handles,
   });
 };
 
@@ -324,25 +335,20 @@ const computePairwiseAggregateFromResults = ({
   results,
   rowCount,
   resultTargetId,
-  targets,
+  handles,
 }: {
   id: string;
   pairwise: NonNullable<EvaluatorConfig["pairwise"]>;
   results: EvaluationResults;
   rowCount: number;
   resultTargetId: string;
-  targets?: Array<{ id: string; promptId?: string | null }>;
+  handles?: PairwiseAggregateHandles;
 }): PairwiseAggregate | null => {
   const { variantA, variantB } = pairwise;
   const evalResults = results.evaluatorResults[resultTargetId]?.[id] ?? [];
 
-  // Resolve the human-readable handle for each variant (when targets are
-  // available) so the normalizer can match the langevals-stored label
-  // against either the internal target id or the prompt handle.
-  const variantAHandle =
-    targets?.find((t) => t.id === variantA)?.promptId ?? undefined;
-  const variantBHandle =
-    targets?.find((t) => t.id === variantB)?.promptId ?? undefined;
+  const variantAHandle = handles?.variantAHandle;
+  const variantBHandle = handles?.variantBHandle;
 
   const counts = { a: 0, b: 0, tie: 0 };
   let totalCost = 0;

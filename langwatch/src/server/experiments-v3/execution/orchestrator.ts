@@ -331,10 +331,16 @@ export const generatePairwiseCells = (
     if (lines.length === 0) return output;
     const block = `\n\n--- Existing evaluator scores ---\n${lines.join("\n")}`;
     if (typeof output === "string") return output + block;
+    // For non-string outputs, try to serialize. If JSON.stringify throws
+    // (circular refs / BigInt) we skip the score block entirely and return
+    // the raw output unchanged — appending the block to "[object Object]"
+    // would just confuse the judge without giving it usable context.
     try {
-      return JSON.stringify(output) + block;
+      const serialized = JSON.stringify(output);
+      if (serialized === undefined) return output;
+      return serialized + block;
     } catch {
-      return String(output ?? "") + block;
+      return output;
     }
   };
 
@@ -1527,6 +1533,12 @@ export async function* runOrchestrator(
         // friendlyError surface immediately; processEventForStorage also
         // writes it to ClickHouse for the historical record.
         for (const reason of pairwiseSkipReasons) {
+          // Respect user-triggered abort mid-loop; otherwise a long skip-reason
+          // burst would keep writing to CH after the run was meant to stop.
+          if (await abortManager.isAborted(runId)) {
+            aborted = true;
+            break;
+          }
           const which =
             reason.missing === "both"
               ? `${reason.variantAName} and ${reason.variantBName}`

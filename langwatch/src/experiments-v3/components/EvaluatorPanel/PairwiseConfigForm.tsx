@@ -1,6 +1,6 @@
 import { Box, Button, Field, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 
 import { Menu } from "~/components/ui/menu";
@@ -150,12 +150,20 @@ export function PairwiseConfigForm({
     setDraft(value);
   }, [value]);
 
+  // Mirror `draft` into a ref so `update` can compute `next` from the
+  // freshest value without putting a side-effect inside `setDraft`'s updater
+  // function (which React 18 StrictMode invokes twice for purity checks —
+  // double-firing the `onChange` callback against the parent).
+  const draftRef = useRef(draft);
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
+
   const update = (patch: Partial<PairwiseEvaluatorConfig>) => {
-    setDraft((prev) => {
-      const next = { ...prev, ...patch };
-      onChange(next);
-      return next;
-    });
+    const next = { ...draftRef.current, ...patch };
+    draftRef.current = next;
+    setDraft(next);
+    onChange(next);
   };
 
   // Variant B options exclude variant A so the user can't pick the same

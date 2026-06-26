@@ -100,13 +100,17 @@ function friendlyError(details: string | undefined): {
     lower.includes("no output for this row") ||
     lower.includes("missingvariantoutput")
   ) {
-    // Orchestrator emits this for rows where a variant didn't produce an
-    // output (e.g. its upstream prompt hasn't run, or errored). The raw
-    // detail already names which variant and what to do next.
-    return {
-      headline: "Waiting on an upstream variant",
-      hint: raw,
-    };
+    // Orchestrator emits a "Waiting on {variant} — no output…" detail with
+    // the variant name + actionable hint embedded. Split it so we don't
+    // print the same sentence twice (headline + hint).
+    const dashIdx = raw.indexOf("—");
+    if (dashIdx > 0) {
+      return {
+        headline: raw.slice(0, dashIdx).trim(),
+        hint: raw.slice(dashIdx + 1).trim(),
+      };
+    }
+    return { headline: raw };
   }
   if (lower.includes("missing candidate output")) {
     return {
