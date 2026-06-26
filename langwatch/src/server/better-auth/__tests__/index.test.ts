@@ -166,6 +166,13 @@ describe("better-auth config", () => {
         NEXTAUTH_PROVIDER: "google",
         GOOGLE_CLIENT_ID: "google-client-id",
         GOOGLE_CLIENT_SECRET: "google-client-secret",
+        GITHUB_CLIENT_ID: undefined,
+        GITHUB_CLIENT_SECRET: undefined,
+        GITLAB_CLIENT_ID: undefined,
+        GITLAB_CLIENT_SECRET: undefined,
+        AZURE_AD_CLIENT_ID: undefined,
+        AZURE_AD_CLIENT_SECRET: undefined,
+        AZURE_AD_TENANT_ID: undefined,
       });
       expect(socialProviders.google).toBeDefined();
     });
