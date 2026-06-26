@@ -6,7 +6,8 @@
 # **Use `make quickstart` — not direct compose.** ADR-004 (2026-05, #3860)
 # established `make quickstart` as the single entry point for local dev. It
 # sets VOLUME_PREFIX via scripts/dev.sh so per-worktree volumes (goose_bin,
-# app_modules, bullboard_modules, see line ~360) get isolated names; running
+# app_modules, bullboard_modules, mcp_server_modules, see the volumes block)
+# get isolated names; running
 # `docker compose -f compose.dev.yml up` directly collapses every worktree
 # onto the same volumes.
 #
@@ -145,6 +146,7 @@ services:
       - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
       - ./package.json:/package.json:ro
       - ./mcp-server:/mcp-server
+      - mcp_server_modules:/mcp-server/node_modules
       - ./langevals:/langevals
       - ./typescript-sdk:/typescript-sdk:ro
       - ./python-sdk:/python-sdk:ro
@@ -187,6 +189,7 @@ services:
       - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
       - ./package.json:/package.json:ro
       - ./mcp-server:/mcp-server
+      - mcp_server_modules:/mcp-server/node_modules
       - ./langevals:/langevals
       - ./typescript-sdk:/typescript-sdk:ro
       - ./python-sdk:/python-sdk:ro
@@ -255,6 +258,7 @@ services:
       - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
       - ./package.json:/package.json:ro
       - ./mcp-server:/mcp-server
+      - mcp_server_modules:/mcp-server/node_modules
       - ./langevals:/langevals
       - ./typescript-sdk:/typescript-sdk:ro
       - ./python-sdk:/python-sdk:ro
@@ -375,6 +379,7 @@ services:
       - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
       - ./package.json:/package.json:ro
       - ./mcp-server:/mcp-server
+      - mcp_server_modules:/mcp-server/node_modules
       - ./langevals:/langevals
       - ./typescript-sdk:/typescript-sdk:ro
       - ./python-sdk:/python-sdk:ro
@@ -421,6 +426,13 @@ volumes:
     name: ${VOLUME_PREFIX:-langwatch}-app-modules
   bullboard_modules:
     name: ${VOLUME_PREFIX:-langwatch}-bullboard-modules
+  # mcp-server is a standalone pnpm workspace whose install + build run in the
+  # `init` container against the `./mcp-server` bind mount. Without isolation
+  # the container install writes container-shaped pnpm symlinks into the host
+  # tree, which then dangle and break a host-side build (#5144). Isolating
+  # node_modules in a named volume keeps the host tree untouched.
+  mcp_server_modules:
+    name: ${VOLUME_PREFIX:-langwatch}-mcp-server-modules
   # Always shared (cache only).
   pnpm_store:
     name: langwatch-pnpm-store
