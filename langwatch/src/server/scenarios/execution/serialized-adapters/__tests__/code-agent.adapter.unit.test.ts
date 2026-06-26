@@ -902,6 +902,7 @@ describe("SerializedCodeAgentAdapter", () => {
      * Guards the single-sourced classification: `source` must agree with the
      * infra wording even on the json()-rejects path (review lw#3439).
      */
+    /** @scenario adapter labels a 500 with a non-JSON body as an NLP service failure */
     it("labels a 500 whose body is not JSON as an infra (NLP service) failure", async () => {
       mockFetch.mockResolvedValue({
         ok: false,
