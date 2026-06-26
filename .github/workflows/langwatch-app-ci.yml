@@ -356,7 +356,7 @@ jobs:
         id: pnpm-cache
 
       - name: Cache pnpm store
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@2c8a9bd7457de244a408f35966fab2fb45fda9c8 # v6.0.0
         with:
           path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('langwatch/pnpm-lock.yaml') }}
@@ -365,14 +365,14 @@ jobs:
 
       # Cache Prisma client separately for faster regeneration
       - name: Cache Prisma client
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@2c8a9bd7457de244a408f35966fab2fb45fda9c8 # v6.0.0
         with:
           path: langwatch/node_modules/.prisma
           key: ${{ runner.os }}-prisma-${{ hashFiles('langwatch/prisma/schema.prisma') }}
 
       # Cache Vite build artifacts
       - name: Cache Vite
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@2c8a9bd7457de244a408f35966fab2fb45fda9c8 # v6.0.0
         with:
           path: |
             langwatch/node_modules/.vite
@@ -383,7 +383,7 @@ jobs:
 
       # Cache Turbo build outputs
       - name: Cache Turbo
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@2c8a9bd7457de244a408f35966fab2fb45fda9c8 # v6.0.0
         with:
           path: langwatch/.turbo
           key: ${{ runner.os }}-turbo-${{ github.sha }}
