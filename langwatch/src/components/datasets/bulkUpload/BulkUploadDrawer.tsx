@@ -664,7 +664,13 @@ export function BulkUploadDrawer({
       <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header>
-          <Heading>Upload datasets</Heading>
+          <VStack align="start" gap={1}>
+            <Heading>Upload datasets</Heading>
+            <Text fontSize="sm" color="fg.muted" fontWeight="normal">
+              Bring CSV or JSON files into LangWatch to build evaluation sets,
+              review past generations, and turn real data into new test cases.
+            </Text>
+          </VStack>
         </Drawer.Header>
         <Drawer.Body>
           <VStack align="stretch" gap={4} width="full">
