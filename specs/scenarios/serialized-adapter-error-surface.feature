@@ -13,8 +13,10 @@ Feature: Serialized adapters surface user-vs-infra failures distinctly
     Given the NLP service returns HTTP 500 with a Python traceback in `detail`
     When SerializedCodeAgentAdapter.call rejects
     Then the error is a SerializedCodeAgentAdapterError with source="user_code"
-    And the message includes the endpoint and "user code raised"
+    And the message includes "user code raised"
     And the message includes the original Python exception class name
+    And the message does not leak the internal NLP endpoint host
+    And the error's structured endpoint field still carries the endpoint for operators
 
   @unit
   Scenario: adapter labels non-500 status as an NLP service failure
@@ -22,6 +24,14 @@ Feature: Serialized adapters surface user-vs-infra failures distinctly
     When SerializedCodeAgentAdapter.call rejects
     Then the error has source="nlp_service" and httpStatus=503
     And the message starts with "NLP service returned HTTP 503"
+
+  @unit
+  Scenario: adapter labels a 500 with a non-JSON body as an NLP service failure
+    Given the NLP service returns HTTP 500 whose body is not valid JSON
+    When SerializedCodeAgentAdapter.call rejects
+    Then the error has source="nlp_service"
+    And the message starts with "NLP service returned HTTP 500"
+    And the message does not claim user code raised the error
 
   @unit
   Scenario: adapter strips AI SDK warnings and OTEL noise from the surfaced message

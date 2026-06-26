@@ -16,17 +16,13 @@ import { randomBytes } from "crypto";
 import { getLangWatchTracer } from "langwatch";
 import { resolveFieldMappings } from "../resolve-field-mappings";
 import type { CodeAgentData } from "../types";
-import {
-  type AdapterErrorContext,
-  formatFetchError,
-  formatHttpError,
-} from "./format-execution-error";
+import { formatFetchError, formatHttpError } from "./format-execution-error";
 
 /** Timeout for NLP service requests (2 minutes) */
 const NLP_FETCH_TIMEOUT_MS = 120_000;
 
 /** Categories for adapter failures, surfaced as the `error.kind` span attribute. */
-type AdapterErrorKind = "timeout" | "fetch" | "http" | "nlp_error";
+type AdapterErrorKind = "timeout" | "fetch" | "http";
 
 /**
  * Failure surfaced by the adapter to the scenario runner.
@@ -271,7 +267,6 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
     };
 
     const endpoint = `${this.nlpServiceUrl}/go/studio/execute_sync`;
-    const ctx: AdapterErrorContext = { endpoint, method: "POST" };
 
     return tracer.withActiveSpan(
       "SerializedCodeAgentAdapter.execute_nlp_request",
@@ -309,7 +304,6 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
               );
               throw new SerializedCodeAgentAdapterError(
                 formatFetchError({
-                  ctx,
                   cause: fetchError,
                   timedOutAfterMs: NLP_FETCH_TIMEOUT_MS,
                 }),
@@ -323,7 +317,7 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
             }
             span.setAttribute("error.kind", "fetch" satisfies AdapterErrorKind);
             throw new SerializedCodeAgentAdapterError(
-              formatFetchError({ ctx, cause: fetchError }),
+              formatFetchError({ cause: fetchError }),
               { kind: "fetch", source: "network", endpoint, cause: fetchError },
             );
           }
@@ -340,24 +334,22 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
             } catch {
               rawBody = await response.text().catch(() => "");
             }
-            const isUserCodeError =
-              response.status === 500 && Boolean(parsedDetail);
+            // Classification is single-sourced inside formatHttpError: the
+            // returned `source` is derived from the same predicate that chose
+            // the message wording, so they can never drift (lw#3439).
+            const { message, source } = formatHttpError({
+              status: response.status,
+              rawBody,
+              parsedDetail,
+            });
             span.setAttribute("error.kind", "http" satisfies AdapterErrorKind);
-            throw new SerializedCodeAgentAdapterError(
-              formatHttpError({
-                ctx,
-                status: response.status,
-                rawBody,
-                parsedDetail,
-              }),
-              {
-                kind: "http",
-                source: isUserCodeError ? "user_code" : "nlp_service",
-                endpoint,
-                httpStatus: response.status,
-                rawDetail: parsedDetail ?? rawBody,
-              },
-            );
+            throw new SerializedCodeAgentAdapterError(message, {
+              kind: "http",
+              source,
+              endpoint,
+              httpStatus: response.status,
+              rawDetail: parsedDetail ?? rawBody,
+            });
           }
 
           const result = (await response.json()) as {
