@@ -95,6 +95,25 @@ function friendlyError(details: string | undefined): {
       raw,
     };
   }
+  if (
+    lower.includes("produced no output") ||
+    lower.includes("missingvariantoutput")
+  ) {
+    // Orchestrator emits this for rows where a variant didn't produce an
+    // output (e.g. its upstream prompt errored). The raw details already
+    // name which variant failed and what to do.
+    return {
+      headline: "Upstream variant has no output",
+      hint: raw,
+    };
+  }
+  if (lower.includes("missing candidate output")) {
+    return {
+      headline: "Variant produced an empty output",
+      hint: "Check that the variant's prompt actually returns text — empty strings can't be compared.",
+      raw,
+    };
+  }
 
   // Otherwise: use the first line as the headline and keep the rest under "show details".
   const lines = raw.split(/\r?\n/);
