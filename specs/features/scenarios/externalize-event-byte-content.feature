@@ -360,6 +360,19 @@ Feature: Externalize event byte content to stored_objects
     And the event payload remains a valid MESSAGE_SNAPSHOT shape
 
   @integration
+  Scenario: Voice MESSAGE_SNAPSHOT with input_audio is accepted (201) and the audio is externalized
+    # The WIRE leg of voice-scenario audio: #5149, the missing half of #4138
+    # (which fixed only the UI render leg). The route validator
+    # (scenarioEventSchema) must accept an input_audio content part so the
+    # snapshot reaches the extractor — otherwise it is 400-rejected at the
+    # zValidator before any externalization can run, and the run shows zero
+    # turns. The SDK emits voice turns as [text, input_audio].
+    Given a MESSAGE_SNAPSHOT whose message content is a voice turn [text, {type:"input_audio", input_audio:{data, format:"wav"}}]
+    When the event is POSTed to /api/scenario-events
+    Then the request is accepted with 201 rather than 400 from schema validation
+    And the inline audio bytes are decoded and externalized to a stored_objects row with media type audio/wav
+
+  @integration
   Scenario: Content parts with an unrecognised shape cause the message to pass through unchanged
     Given a message whose content array contains a part with an unrecognized type
     When the extractor walks the part list
