@@ -781,3 +781,50 @@ describe("given the editor is switched to a different dataset", () => {
     });
   });
 });
+
+// Deleting rows shrinks the dataset, but only the current page lives in the
+// store, so the server total must be re-read — otherwise the pager keeps the
+// stale page count and can strand the user on a now-empty last page.
+describe("given rows are deleted from a paginated dataset", () => {
+  describe("when the deletion is saved", () => {
+    /** @scenario Move between pages */
+    it("refreshes the server total so the pager cannot strand an empty page", async () => {
+      deleteManyMutate.mockImplementation(
+        (_args: unknown, opts?: { onSuccess?: () => void }) =>
+          opts?.onSuccess?.(),
+      );
+      const refetchSpy = vi.fn();
+      getAllQuery.mockReset();
+      getAllQuery.mockReturnValue({
+        data: {
+          id: "dp",
+          name: "dp",
+          columnTypes,
+          count: 51,
+          totalPages: 2,
+          page: 1,
+          datasetRecords: [
+            { id: "r1", entry: { input: "a", expected_output: "x" } },
+            { id: "r2", entry: { input: "b", expected_output: "y" } },
+          ],
+        },
+        isLoading: false,
+        isPreviousData: false,
+        refetch: refetchSpy,
+      });
+
+      const user = userEvent.setup();
+      render(<DatasetEditorTable datasetId="dp" />, { wrapper: Wrapper });
+      await screen.findByText("a");
+
+      await user.click(screen.getByLabelText("Select row 1"));
+      await user.click(await screen.findByTestId("delete-selected-rows"));
+
+      // The editor re-reads the page (and thus the whole-dataset count) once the
+      // delete settles, instead of trusting the now-stale cached total.
+      await waitFor(() => expect(refetchSpy).toHaveBeenCalled(), {
+        timeout: 2000,
+      });
+    });
+  });
+});

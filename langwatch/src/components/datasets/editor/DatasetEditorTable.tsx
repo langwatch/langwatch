@@ -237,11 +237,11 @@ export function DatasetEditorTable({
   const pageCount = Math.max(1, Math.ceil((serverRecordCount ?? 0) / pageSize));
   const currentPage = Math.min(page, pageCount);
   const isLastPage = currentPage >= pageCount;
-  // Snap a now-out-of-range page back into range (e.g. the last page's rows were
-  // all deleted under us, or the rows-per-page grew). Acts ONLY on an
-  // authoritative count — never on absent data — so an in-flight page switch
-  // can't bounce navigation back to page 1. Floored at 1, so it never drives the
-  // page to 0.
+  // Snap a now-out-of-range page back into range — e.g. the last page's rows
+  // were all deleted under us (the post-delete refetch shrinks the count) or a
+  // navigation refetch returned a smaller dataset. Acts ONLY on an authoritative
+  // count — never on absent data — so an in-flight page switch can't bounce
+  // navigation back to page 1. Floored at 1, so it never drives the page to 0.
   useEffect(() => {
     if (serverRecordCount == null) return;
     const count = Math.max(1, Math.ceil(serverRecordCount / pageSize));
@@ -387,6 +387,14 @@ export function DatasetEditorTable({
     resolveFullRecord,
     clearPendingChange,
     onStatus,
+    // After a deletion settles, refresh the server total so the pager reflects
+    // the smaller dataset and the clamp effect can snap off a now-empty last
+    // page. Saved mode only — in-memory deletes never touch this query.
+    onRecordsDeleted: datasetId
+      ? () => {
+          void databaseDataset.refetch();
+        }
+      : undefined,
   });
 
   // ── Table assembly ────────────────────────────────────────────────
