@@ -293,7 +293,14 @@ services:
   # dial http://langwatch_nlp:5561 (LANGWATCH_NLP_SERVICE) unchanged.
 
   langwatch_nlp:
-    image: langwatch/langwatch_nlp:latest
+    # Build from local services/nlpgo source (via Dockerfile.langwatch_nlp)
+    # instead of the published langwatch/langwatch_nlp:latest image, which
+    # lags the source. Building from source keeps the engine in lockstep with
+    # this checkout, so evaluator output (e.g. the `details`/reasoning
+    # envelope) matches the code here. See #5151.
+    build:
+      context: .
+      dockerfile: Dockerfile.langwatch_nlp
     profiles: [nlp, scenarios, full]
     # No host port - accessed via docker network as "langwatch_nlp:5561"
     environment:
@@ -307,7 +314,14 @@ services:
           cpus: "0.5"
 
   langevals:
-    image: langwatch/langevals:latest
+    # Build from local ./langevals source (via Dockerfile.langevals) instead
+    # of the published langwatch/langevals:latest image, which lags the
+    # source. Newer evaluators present in this checkout 404 against :latest;
+    # building from source guarantees the container serves exactly the
+    # evaluators in this checkout. See #5151.
+    build:
+      context: .
+      dockerfile: Dockerfile.langevals
     profiles: [nlp, full]
     # No host port - accessed via docker network as "langevals:5562"
     environment:
@@ -315,7 +329,11 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256m
+          # langevals imports ragas/langchain at boot and OOM-kills at 256m
+          # before it can serve a single request — even with preload disabled.
+          # Production (charts/langwatch) requests 6Gi/limits 8Gi; 4g is enough
+          # for the dev import footprint plus LLM-judge evaluators.
+          memory: 4g
           cpus: "0.5"
 
   # =============================================================================
