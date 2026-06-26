@@ -13,17 +13,25 @@ describe("parseHeaderColumns", () => {
       const result = await parseHeaderColumns(
         file("question,answer,score\nq1,a1,5\n", "data.csv"),
       );
+      // `sourceHeader` mirrors the canonical name — it's the immutable binding
+      // the normalize job uses so the confirm UI can rename + drag-reorder.
       expect(result).toEqual([
-        { name: "question", type: "string" },
-        { name: "answer", type: "string" },
-        { name: "score", type: "string" },
+        { name: "question", type: "string", sourceHeader: "question" },
+        { name: "answer", type: "string", sourceHeader: "answer" },
+        { name: "score", type: "string", sourceHeader: "score" },
       ]);
     });
 
     /** @scenario A reserved column name is corrected before I confirm */
     it("renames a reserved column name the way normalize does", async () => {
       const result = await parseHeaderColumns(file("id,value\n1,x\n", "d.csv"));
-      expect(result?.[0]).toEqual({ name: "id_", type: "string" });
+      // The reserved-rename applies to BOTH name and sourceHeader — normalize
+      // reserved-renames the file header too, so the binding stays aligned.
+      expect(result?.[0]).toEqual({
+        name: "id_",
+        type: "string",
+        sourceHeader: "id_",
+      });
     });
 
     it("dedupes repeated header names so they stay 1:1 with parsed rows", async () => {
@@ -38,8 +46,8 @@ describe("parseHeaderColumns", () => {
         file('{"a":"1","b":"x"}\n{"a":"2","b":"y"}\n', "data.jsonl"),
       );
       expect(result).toEqual([
-        { name: "a", type: "string" },
-        { name: "b", type: "string" },
+        { name: "a", type: "string", sourceHeader: "a" },
+        { name: "b", type: "string", sourceHeader: "b" },
       ]);
     });
   });

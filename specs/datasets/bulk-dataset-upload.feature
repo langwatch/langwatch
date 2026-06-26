@@ -76,7 +76,24 @@ Feature: Bulk dataset upload
     Then its detected columns are shown collapsed
     And every column defaults to text
     And I can expand the row to rename a column or change its type
-    And I cannot add or remove columns for that file
+    And I cannot add new columns that the file does not contain
+
+  @integration
+  Scenario: Columns can be dragged to reorder before uploading
+    Given I have added a file and expanded its columns
+    Then every column has a drag handle
+    And I can drag a column to a new position
+    And the dataset is created with the columns in the order I chose
+    And each column's values stay correct despite the new order
+
+  @integration
+  Scenario: A column can be excluded before uploading
+    Given I have added a file and expanded its columns
+    Then each column has a control to exclude it
+    And excluding a column removes it from the list
+    And the created dataset omits that column and its values
+    And the remaining columns keep their correct values
+    But I cannot exclude the last remaining column
 
   @integration
   Scenario: Confirming columns never opens a separate drawer
