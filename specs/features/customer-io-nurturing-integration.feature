@@ -370,14 +370,14 @@ Feature: Customer.io nurturing integration
       | via-claude-desktop   | mcp            |
       | manually             | manual_sdk     |
 
-  @integration
+  @unit
   Scenario: Integration-method identify call is fire-and-forget
     Given a user reaches the "How do you want to integrate?" onboarding screen
     When the user selects "Observability"
     Then the integration_method identify call is dispatched without awaiting a response
     And the caller receives control back immediately
 
-  @integration
+  @unit
   Scenario: Integration-method identify failure does not break onboarding navigation
     Given a user reaches the "How do you want to integrate?" onboarding screen
     And the Customer.io API is unavailable

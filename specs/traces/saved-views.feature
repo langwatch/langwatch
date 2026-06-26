@@ -349,7 +349,7 @@ Feature: Saved Views on Traces List
     Then the name is truncated to 50 characters
 
   @unit
-  Scenario: First-visit projects auto-seed and show All Traces plus 4 seed views
+  Scenario: First-visit projects auto-seed and show All Traces plus 5 seed views
     Given the project has no saved views in the database
     When the bar renders for the first time
     Then 5 seed views are auto-created (Application, Evaluations, Simulations, Playground, Gateway)
