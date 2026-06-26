@@ -18,10 +18,7 @@ import {
   type PairwiseAggregate,
 } from "../utils/computeAggregates";
 import type { TargetConfig } from "../types";
-import {
-  AggregateHeaderBar,
-  type PairwiseFilter,
-} from "./AggregateHeaderBar";
+import { AggregateHeaderBar, type PairwiseFilter } from "./AggregateHeaderBar";
 
 const downloadCsv = (filename: string, rows: string[][]) => {
   const escape = (cell: string) => `"${cell.replace(/"/g, '""')}"`;
@@ -86,10 +83,10 @@ function ResolvedAggregateBar({
         ];
       })
       .filter((row): row is string[] => row !== null);
-    downloadCsv(
-      `pairwise-verdicts-${variantAName}-vs-${variantBName}.csv`,
-      [header, ...body],
-    );
+    downloadCsv(`pairwise-verdicts-${variantAName}-vs-${variantBName}.csv`, [
+      header,
+      ...body,
+    ]);
   }, [aggregate, variantAName, variantBName]);
 
   return (
@@ -143,11 +140,13 @@ export function PairwiseAggregateHeader() {
   }, [pairwiseTarget, pairwiseEvaluator, results, rowCount]);
 
   const variantATarget = useMemo(
-    () => (aggregate ? targets.find((t) => t.id === aggregate.variantA) : undefined),
+    () =>
+      aggregate ? targets.find((t) => t.id === aggregate.variantA) : undefined,
     [aggregate, targets],
   );
   const variantBTarget = useMemo(
-    () => (aggregate ? targets.find((t) => t.id === aggregate.variantB) : undefined),
+    () =>
+      aggregate ? targets.find((t) => t.id === aggregate.variantB) : undefined,
     [aggregate, targets],
   );
 

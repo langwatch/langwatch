@@ -148,7 +148,11 @@ const MetricToggleField = ({
                   >
                     Include {meta.label.toLowerCase()}
                   </Field.Label>
-                  <Tooltip content={meta.tooltip} showArrow positioning={{ placement: "top" }}>
+                  <Tooltip
+                    content={meta.tooltip}
+                    showArrow
+                    positioning={{ placement: "top" }}
+                  >
                     <Box
                       as="span"
                       display="inline-flex"
@@ -301,13 +305,14 @@ const DynamicZodForm = ({
     { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
     { enabled: !!project?.id },
   );
-  const resolvedDefaultEmbeddings = api.modelProvider.getResolvedDefault.useQuery(
-    {
-      projectId: project?.id ?? "",
-      featureKey: "analytics.topic_clustering_embeddings",
-    },
-    { enabled: !!project?.id },
-  );
+  const resolvedDefaultEmbeddings =
+    api.modelProvider.getResolvedDefault.useQuery(
+      {
+        projectId: project?.id ?? "",
+        featureKey: "analytics.topic_clustering_embeddings",
+      },
+      { enabled: !!project?.id },
+    );
 
   const renderField = <T extends EvaluatorTypes>(
     fieldSchema: ZodType,

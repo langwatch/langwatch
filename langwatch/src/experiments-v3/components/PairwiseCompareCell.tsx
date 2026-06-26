@@ -20,9 +20,7 @@ type PairwiseCompareCellProps = {
  */
 function stripBiasPreamble(details: string | undefined): string | undefined {
   if (!details) return details;
-  return details
-    .replace(/^Call \d+ \([^)]*\):\s*/i, "")
-    .trim();
+  return details.replace(/^Call \d+ \([^)]*\):\s*/i, "").trim();
 }
 
 /**
@@ -39,21 +37,33 @@ function friendlyError(details: string | undefined): {
   if (!raw) return { headline: "Pairwise compare failed" };
 
   const lower = raw.toLowerCase();
-  if (lower.includes("authenticationerror") || lower.includes("api key") || lower.includes("api_key")) {
+  if (
+    lower.includes("authenticationerror") ||
+    lower.includes("api key") ||
+    lower.includes("api_key")
+  ) {
     return {
       headline: "Missing or invalid model API key",
       hint: "Add the provider key in Settings → AI Gateway, then re-run.",
       raw,
     };
   }
-  if (lower.includes("rate limit") || lower.includes("ratelimit") || lower.includes("429")) {
+  if (
+    lower.includes("rate limit") ||
+    lower.includes("ratelimit") ||
+    lower.includes("429")
+  ) {
     return {
       headline: "Judge model rate-limited",
       hint: "Slow the run down (lower concurrency) or try a different model.",
       raw,
     };
   }
-  if (lower.includes("model not found") || lower.includes("invalid model") || lower.includes("does not exist")) {
+  if (
+    lower.includes("model not found") ||
+    lower.includes("invalid model") ||
+    lower.includes("does not exist")
+  ) {
     return {
       headline: "Judge model not available",
       hint: "Pick a different model in the evaluator config.",
@@ -74,7 +84,11 @@ function friendlyError(details: string | undefined): {
       raw,
     };
   }
-  if (lower.includes("candidate_a") || lower.includes("candidate_b") || lower.includes("is required")) {
+  if (
+    lower.includes("candidate_a") ||
+    lower.includes("candidate_b") ||
+    lower.includes("is required")
+  ) {
     return {
       headline: "Variant outputs missing",
       hint: "Run the upstream prompts/agents first so both variants have outputs.",

@@ -90,10 +90,10 @@ describe("buildExportReport", () => {
   });
 
   it("marks bias-corrected as no when meta.biasCorrected is false", () => {
-    const md = buildExportReport(
-      [makeRow()],
-      { ...meta, biasCorrected: false },
-    );
+    const md = buildExportReport([makeRow()], {
+      ...meta,
+      biasCorrected: false,
+    });
     expect(md).toContain("**Bias-corrected:** no");
   });
 });

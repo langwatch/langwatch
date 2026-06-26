@@ -702,9 +702,24 @@ describe("computePairwiseAggregate", () => {
       evaluatorResults: {
         "target-a": {
           "eval-pw": [
-            { status: "processed", label: "A", details: "A is closer to golden", cost: { amount: 0.001 } },
-            { status: "processed", label: "B", details: "B is more concise", cost: { amount: 0.002 } },
-            { status: "processed", label: "tie", details: "both equivalent", cost: { amount: 0.0015 } },
+            {
+              status: "processed",
+              label: "A",
+              details: "A is closer to golden",
+              cost: { amount: 0.001 },
+            },
+            {
+              status: "processed",
+              label: "B",
+              details: "B is more concise",
+              cost: { amount: 0.002 },
+            },
+            {
+              status: "processed",
+              label: "tie",
+              details: "both equivalent",
+              cost: { amount: 0.0015 },
+            },
             { status: "error", details: "judge crashed" },
             undefined,
             { status: "processed", label: "A", cost: { amount: 0.0005 } },

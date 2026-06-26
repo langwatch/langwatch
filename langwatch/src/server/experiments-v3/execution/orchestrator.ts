@@ -269,7 +269,9 @@ export const generatePairwiseCells = (
     variantId: string,
   ): unknown => {
     if (!completedTargetEvaluatorScores) return output;
-    const scores = completedTargetEvaluatorScores.get(`${rowIndex}:${variantId}`);
+    const scores = completedTargetEvaluatorScores.get(
+      `${rowIndex}:${variantId}`,
+    );
     if (!scores || scores.length === 0) return output;
     const lines = scores
       .map((s) => {
@@ -326,7 +328,11 @@ export const generatePairwiseCells = (
     const variantB = state.targets.find((t) => t.id === cfg.variantB);
     if (!variantA || !variantB) {
       logger.warn(
-        { evaluatorId: evaluator.id, variantA: cfg.variantA, variantB: cfg.variantB },
+        {
+          evaluatorId: evaluator.id,
+          variantA: cfg.variantA,
+          variantB: cfg.variantB,
+        },
         "Pairwise evaluator skipped: variant target(s) not found",
       );
       continue;
@@ -805,7 +811,8 @@ const buildEvaluatorInputs = (
   // `input` column.
   if (evaluator.pairwise && cell.pairwise) {
     const cfg = evaluator.pairwise;
-    const variantAMappings = evaluator.mappings[datasetId]?.[cfg.variantA] ?? {};
+    const variantAMappings =
+      evaluator.mappings[datasetId]?.[cfg.variantA] ?? {};
     const inputMapping = variantAMappings.input;
     if (inputMapping?.type === "source" && inputMapping.source === "dataset") {
       inputs.input = cell.datasetEntry[inputMapping.sourceField];
@@ -825,17 +832,11 @@ const buildEvaluatorInputs = (
     setIfDefined("candidate_a_id", cell.pairwise.candidateA.id);
     setIfDefined("candidate_a_output", cell.pairwise.candidateA.output);
     setIfDefined("candidate_a_cost", cell.pairwise.candidateA.cost);
-    setIfDefined(
-      "candidate_a_duration",
-      cell.pairwise.candidateA.duration,
-    );
+    setIfDefined("candidate_a_duration", cell.pairwise.candidateA.duration);
     setIfDefined("candidate_b_id", cell.pairwise.candidateB.id);
     setIfDefined("candidate_b_output", cell.pairwise.candidateB.output);
     setIfDefined("candidate_b_cost", cell.pairwise.candidateB.cost);
-    setIfDefined(
-      "candidate_b_duration",
-      cell.pairwise.candidateB.duration,
-    );
+    setIfDefined("candidate_b_duration", cell.pairwise.candidateB.duration);
 
     // Defensive fallback: when generatePairwiseCells lost a candidate
     // output between completedTargetOutputs.set and the cell push (eg.
@@ -843,8 +844,7 @@ const buildEvaluatorInputs = (
     // mappings we now also populate at cell-creation time. Strictly
     // additive — only fires when the primary cell.pairwise read came
     // back undefined.
-    const cellMappings =
-      evaluator.mappings[datasetId]?.[cell.targetId] ?? {};
+    const cellMappings = evaluator.mappings[datasetId]?.[cell.targetId] ?? {};
     for (const [field, mapping] of Object.entries(cellMappings)) {
       if (
         mapping.type === "value" &&
@@ -1047,7 +1047,10 @@ export async function* runOrchestrator(
       });
     } catch (err) {
       chDispatchFailures++;
-      logger.error({ err, runId }, "Failed to dispatch startExperimentRun to CH");
+      logger.error(
+        { err, runId },
+        "Failed to dispatch startExperimentRun to CH",
+      );
       await abortManager.clearRunning(runId);
       throw err;
     }
@@ -1122,13 +1125,25 @@ export async function* runOrchestrator(
           evaluatorName: dbEvaluator?.name,
           traceId,
           status: evalResult.status,
-          score: evalResult.status === "processed" ? (evalResult.score ?? undefined) : undefined,
-          passed: evalResult.status === "processed" ? (evalResult.passed ?? undefined) : undefined,
+          score:
+            evalResult.status === "processed"
+              ? (evalResult.score ?? undefined)
+              : undefined,
+          passed:
+            evalResult.status === "processed"
+              ? (evalResult.passed ?? undefined)
+              : undefined,
           // For pairwise verdicts, langevals now returns the winner's
           // candidate id (or "tie") directly in `label`. No translation
           // needed here; SDK / REST / MCP consumers see the winner by id.
-          label: evalResult.status === "processed" ? (evalResult.label ?? undefined) : undefined,
-          details: evalResult.status === "processed" ? (evalResult.details ?? undefined) : undefined,
+          label:
+            evalResult.status === "processed"
+              ? (evalResult.label ?? undefined)
+              : undefined,
+          details:
+            evalResult.status === "processed"
+              ? (evalResult.details ?? undefined)
+              : undefined,
           error: evalResult.status === "error" ? evalResult.details : undefined,
           occurredAt: Date.now(),
         });
@@ -1145,46 +1160,60 @@ export async function* runOrchestrator(
       if (event.type === "target_result") {
         const datasetEntry = datasetRows[event.rowIndex] ?? {};
         chDispatchTotal++;
-        await commands.recordTargetResult({
-          tenantId: projectId,
-          runId,
-          experimentId,
-          index: event.rowIndex,
-          targetId: event.targetId,
-          entry: datasetEntry,
-          predicted:
-            event.output === null || event.output === undefined
-              ? null
-              : { output: event.output },
-          cost: event.cost ?? null,
-          duration: event.duration ?? null,
-          error: event.error ?? null,
-          traceId: event.traceId ?? null,
-          occurredAt: Date.now(),
-        }).catch((err) => {
-          chDispatchFailures++;
-          logger.warn({ err, runId }, "Failed to dispatch recordTargetResult to CH");
-        });
-      } else if (event.type === "error" && event.rowIndex !== undefined && event.targetId) {
+        await commands
+          .recordTargetResult({
+            tenantId: projectId,
+            runId,
+            experimentId,
+            index: event.rowIndex,
+            targetId: event.targetId,
+            entry: datasetEntry,
+            predicted:
+              event.output === null || event.output === undefined
+                ? null
+                : { output: event.output },
+            cost: event.cost ?? null,
+            duration: event.duration ?? null,
+            error: event.error ?? null,
+            traceId: event.traceId ?? null,
+            occurredAt: Date.now(),
+          })
+          .catch((err) => {
+            chDispatchFailures++;
+            logger.warn(
+              { err, runId },
+              "Failed to dispatch recordTargetResult to CH",
+            );
+          });
+      } else if (
+        event.type === "error" &&
+        event.rowIndex !== undefined &&
+        event.targetId
+      ) {
         const datasetEntry = datasetRows[event.rowIndex] ?? {};
         chDispatchTotal++;
-        await commands.recordTargetResult({
-          tenantId: projectId,
-          runId,
-          experimentId,
-          index: event.rowIndex,
-          targetId: event.targetId,
-          entry: datasetEntry,
-          predicted: null,
-          cost: null,
-          duration: null,
-          error: event.message,
-          traceId: null,
-          occurredAt: Date.now(),
-        }).catch((err) => {
-          chDispatchFailures++;
-          logger.warn({ err, runId }, "Failed to dispatch recordTargetResult to CH");
-        });
+        await commands
+          .recordTargetResult({
+            tenantId: projectId,
+            runId,
+            experimentId,
+            index: event.rowIndex,
+            targetId: event.targetId,
+            entry: datasetEntry,
+            predicted: null,
+            cost: null,
+            duration: null,
+            error: event.message,
+            traceId: null,
+            occurredAt: Date.now(),
+          })
+          .catch((err) => {
+            chDispatchFailures++;
+            logger.warn(
+              { err, runId },
+              "Failed to dispatch recordTargetResult to CH",
+            );
+          });
       } else if (event.type === "evaluator_result") {
         const result = event.result as SingleEvaluationResult;
         const evaluatorConfig = state.evaluators.find(
@@ -1194,36 +1223,40 @@ export async function* runOrchestrator(
           ? loadedEvaluators?.get(evaluatorConfig.dbEvaluatorId)
           : null;
         chDispatchTotal++;
-        await commands.recordEvaluatorResult({
-          tenantId: projectId,
-          runId,
-          experimentId,
-          index: event.rowIndex,
-          targetId: event.targetId,
-          evaluatorId: event.evaluatorId,
-          evaluatorName: dbEvaluator?.name ?? null,
-          status: result.status,
-          score: result.status === "processed" ? result.score : null,
-          label: result.status === "processed" ? result.label : null,
-          passed: result.status === "processed" ? result.passed : null,
-          details:
-            result.status === "error"
-              ? result.details
-              : result.status === "processed"
+        await commands
+          .recordEvaluatorResult({
+            tenantId: projectId,
+            runId,
+            experimentId,
+            index: event.rowIndex,
+            targetId: event.targetId,
+            evaluatorId: event.evaluatorId,
+            evaluatorName: dbEvaluator?.name ?? null,
+            status: result.status,
+            score: result.status === "processed" ? result.score : null,
+            label: result.status === "processed" ? result.label : null,
+            passed: result.status === "processed" ? result.passed : null,
+            details:
+              result.status === "error"
                 ? result.details
+                : result.status === "processed"
+                  ? result.details
+                  : null,
+            occurredAt: Date.now(),
+            cost:
+              result.status === "processed" && result.cost
+                ? result.cost.amount
                 : null,
-          occurredAt: Date.now(),
-          cost:
-            result.status === "processed" && result.cost
-              ? result.cost.amount
-              : null,
-        }).catch((err) => {
-          chDispatchFailures++;
-          logger.warn({ err, runId }, "Failed to dispatch recordEvaluatorResult to CH");
-        });
+          })
+          .catch((err) => {
+            chDispatchFailures++;
+            logger.warn(
+              { err, runId },
+              "Failed to dispatch recordEvaluatorResult to CH",
+            );
+          });
       }
     }
-
   };
 
   // Emit execution_started
@@ -1513,17 +1546,22 @@ export async function* runOrchestrator(
     // Dispatch completion event to ClickHouse.
     if (experimentId) {
       chDispatchTotal++;
-      await commands.completeExperimentRun({
-        tenantId: projectId,
-        runId,
-        experimentId,
-        finishedAt: aborted ? null : finishedAt,
-        stoppedAt: aborted ? finishedAt : null,
-        occurredAt: Date.now(),
-      }).catch((err) => {
-        chDispatchFailures++;
-        logger.warn({ err, runId }, "Failed to dispatch completeExperimentRun to CH");
-      });
+      await commands
+        .completeExperimentRun({
+          tenantId: projectId,
+          runId,
+          experimentId,
+          finishedAt: aborted ? null : finishedAt,
+          stoppedAt: aborted ? finishedAt : null,
+          occurredAt: Date.now(),
+        })
+        .catch((err) => {
+          chDispatchFailures++;
+          logger.warn(
+            { err, runId },
+            "Failed to dispatch completeExperimentRun to CH",
+          );
+        });
     }
   }
 
