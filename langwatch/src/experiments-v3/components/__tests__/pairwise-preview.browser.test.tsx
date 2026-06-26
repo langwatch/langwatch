@@ -91,15 +91,14 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
             activeFilter="all"
             onFilterChange={() => {}}
             onExport={() => {}}
-            onPromoteA={() => {}}
-            onPromoteB={() => {}}
-            biasCorrected={true}
           />
         </div>
       </ChakraProvider>,
     );
 
-    await screen.findByText(/variant_a wins 12/);
+    // New scoreboard format: "{leader} {leaderWins} – {loserWins} {loser}".
+    // Leader has 12 wins.
+    await screen.findByText(/variant_a/);
     await page.screenshot({
       path: "/tmp/pr5106/02-aggregate-header-bar.png",
     });
@@ -118,9 +117,6 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
             activeFilter="losses"
             onFilterChange={() => {}}
             onExport={() => {}}
-            onPromoteA={() => {}}
-            onPromoteB={() => {}}
-            biasCorrected={true}
           />
         </div>
       </ChakraProvider>,
