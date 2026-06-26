@@ -8,12 +8,12 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import {
+  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type ReactNode,
 } from "react";
 import {
   LuCheck,

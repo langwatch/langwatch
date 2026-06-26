@@ -10,8 +10,8 @@
  * strip exactly once per row (next to variantA's output column).
  */
 
-import type { TargetConfig } from "../types";
 import { useTargetName } from "../hooks/useTargetName";
+import type { TargetConfig } from "../types";
 import { RowVerdictStrip } from "./RowVerdictStrip";
 
 export type PairwiseVerdictRowProps = {

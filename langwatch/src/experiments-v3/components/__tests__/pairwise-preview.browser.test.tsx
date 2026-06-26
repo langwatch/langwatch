@@ -8,8 +8,8 @@
  */
 
 import { ChakraProvider, HStack } from "@chakra-ui/react";
-import { system as langwatchSystem } from "~/pages/_app";
 import { cleanup, render, screen } from "@testing-library/react";
+import { system as langwatchSystem } from "~/pages/_app";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, it, vi } from "vitest";
 import { page } from "vitest/browser";
@@ -20,11 +20,11 @@ vi.mock("../../hooks/useEvaluatorName", () => ({
   useCodeEvaluatorIds: () => new Set(),
 }));
 
+import type { EvaluatorConfig } from "../../types";
 import { AggregateHeaderBar } from "../AggregateHeaderBar";
 import { PairwiseConfigForm } from "../EvaluatorPanel/PairwiseConfigForm";
 import { RowVerdictStrip } from "../RowVerdictStrip";
 import { EvaluatorChip } from "../TargetSection/EvaluatorChip";
-import type { EvaluatorConfig } from "../../types";
 
 afterEach(() => cleanup());
 
