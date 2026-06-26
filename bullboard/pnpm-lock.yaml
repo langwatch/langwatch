@@ -16,10 +16,10 @@ importers:
         version: 6.20.3(@bull-board/ui@6.20.3)
       '@bull-board/hono':
         specifier: ^6.20.2
-        version: 6.20.3(hono@4.12.23)
+        version: 6.20.3(hono@4.12.25)
       '@hono/node-server':
         specifier: ^2.0.0
-        version: 2.0.0(hono@4.12.23)
+        version: 2.0.0(hono@4.12.25)
       bullmq:
         specifier: ^5.70.1
         version: 5.70.1
@@ -27,8 +27,8 @@ importers:
         specifier: ^17.3.1
         version: 17.3.1
       hono:
-        specifier: ^4.12.18
-        version: 4.12.23
+        specifier: ^4.12.25
+        version: 4.12.25
       ioredis:
         specifier: ^5.9.3
         version: 5.9.3
@@ -140,8 +140,8 @@ packages:
   filelist@1.0.4:
     resolution: {integrity: sha512-w1cEuf3S+DrLCQL7ET6kz+gmlJdbq9J7yXCSjK/OZCPA+qEN1WyF4ZAf0YYJa4/shHJra2t/d/r8SV4Ji+x+8Q==}
 
-  hono@4.12.23:
-    resolution: {integrity: sha512-eIaZ9qDgu7XV0pxOCrg7/WhnQ6Ivm22UcxhXx/A3dcbqbbYgBEkc6e/J/s7j2tS96zoB0S9VBdLwQNCWwUo4LA==}
+  hono@4.12.25:
+    resolution: {integrity: sha512-2NFaIyNVgJmBs/ecmtGzlmluTFs5cHEWGTdu0t1HBwYzoGXOL5nUQBRMXsXWla5i4KkG//QMzVP88m1+I3fdAQ==}
     engines: {node: '>=16.9.0'}
 
   ioredis@5.9.3:
@@ -228,20 +228,20 @@ snapshots:
       '@bull-board/ui': 6.20.3
       redis-info: 3.1.0
 
-  '@bull-board/hono@6.20.3(hono@4.12.23)':
+  '@bull-board/hono@6.20.3(hono@4.12.25)':
     dependencies:
       '@bull-board/api': 6.20.3(@bull-board/ui@6.20.3)
       '@bull-board/ui': 6.20.3
       ejs: 3.1.10
-      hono: 4.12.23
+      hono: 4.12.25
 
   '@bull-board/ui@6.20.3':
     dependencies:
       '@bull-board/api': 6.20.3(@bull-board/ui@6.20.3)
 
-  '@hono/node-server@2.0.0(hono@4.12.23)':
+  '@hono/node-server@2.0.0(hono@4.12.25)':
     dependencies:
-      hono: 4.12.23
+      hono: 4.12.25
 
   '@ioredis/commands@1.5.0': {}
 
@@ -308,7 +308,7 @@ snapshots:
     dependencies:
       minimatch: 5.1.9
 
-  hono@4.12.23: {}
+  hono@4.12.25: {}
 
   ioredis@5.9.3:
     dependencies:
