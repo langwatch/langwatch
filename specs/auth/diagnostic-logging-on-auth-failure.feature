@@ -51,7 +51,7 @@ Feature: Diagnostic logging on auth failure
     # and resolver-prefix-only assertions are aspirational pending dedicated
     # logger fixtures that observe the actual logger output.
 
-  @unit
+  @unit @unimplemented
   Scenario: Authorization header from a proxy does not poison X-Auth-Token fallback
     Given a corporate proxy injects "Authorization: Basic <its-own-base64>" into the request
     And the customer's request also carries "X-Auth-Token: <valid-key>"
@@ -60,7 +60,7 @@ Feature: Diagnostic logging on auth failure
     And the customer's legitimate token is used for project resolution
     And the request is not 401'd by the proxy header
 
-  @unit
+  @unit @unimplemented
   Scenario: Empty or whitespace-only Bearer token does not poison X-Auth-Token fallback
     Given a request carries "Authorization: Bearer " (empty or whitespace-only)
     And the same request carries "X-Auth-Token: <valid-key>"

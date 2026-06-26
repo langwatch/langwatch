@@ -1,15 +1,16 @@
-import { betterAuth, type BetterAuthOptions } from "better-auth";
+import { compare, hash } from "bcrypt";
+import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { APIError } from "better-auth/api";
 import { auth0, genericOAuth, okta } from "better-auth/plugins/generic-oauth";
-import { compare, hash } from "bcrypt";
 
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
 import { connection as redisConnection } from "~/server/redis";
-import { createLogger } from "../../utils/logger/server";
 import { fireActivityTrackingNurturing } from "../../../ee/billing/nurturing/hooks/activityTracking";
 import { ensureUserSyncedToCio } from "../../../ee/billing/nurturing/hooks/userSync";
+import { createLogger } from "../../utils/logger/server";
+import { sendResetPasswordEmail } from "../mailer/resetPasswordEmail";
 import {
   afterAccountCreate,
   afterAccountUpdate,
@@ -20,7 +21,6 @@ import {
   beforeUserCreate,
 } from "./hooks";
 import { revokeAllSessionsForUser } from "./revokeSessions";
-import { sendResetPasswordEmail } from "../mailer/resetPasswordEmail";
 
 const logger = createLogger("langwatch:better-auth");
 
@@ -48,66 +48,114 @@ export const fallbackName = (profile: Record<string, any>): string => {
   );
 };
 
-const socialProviders: NonNullable<BetterAuthOptions["socialProviders"]> = {};
+/**
+ * Subset of env needed to select and configure a `socialProviders` entry.
+ */
+type SocialProviderEnv = Pick<
+  typeof env,
+  | "NEXTAUTH_PROVIDER"
+  | "GOOGLE_CLIENT_ID"
+  | "GOOGLE_CLIENT_SECRET"
+  | "GITHUB_CLIENT_ID"
+  | "GITHUB_CLIENT_SECRET"
+  | "GITLAB_CLIENT_ID"
+  | "GITLAB_CLIENT_SECRET"
+  | "AZURE_AD_CLIENT_ID"
+  | "AZURE_AD_CLIENT_SECRET"
+  | "AZURE_AD_TENANT_ID"
+>;
 
-if (env.NEXTAUTH_PROVIDER === "google" && env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
-  socialProviders.google = {
-    clientId: env.GOOGLE_CLIENT_ID,
-    clientSecret: env.GOOGLE_CLIENT_SECRET,
-    mapProfileToUser: (profile) => ({
-      name: fallbackName(profile as Record<string, any>),
-      email: (profile as { email?: string }).email,
-      image: (profile as { picture?: string }).picture,
-    }),
-  };
-}
+/**
+ * Builds BetterAuth's `socialProviders` map from environment configuration.
+ * Mirrors the original NextAuth "exactly one provider" behavior: only the
+ * provider named by `NEXTAUTH_PROVIDER` is configured, and only when its
+ * client credentials are present.
+ *
+ * Exported for unit testing — lets us exercise google/github/gitlab/azure
+ * selection directly, without re-initializing the module under a different
+ * `NEXTAUTH_PROVIDER`.
+ */
+export const buildSocialProviders = (
+  e: SocialProviderEnv,
+): NonNullable<BetterAuthOptions["socialProviders"]> => {
+  const socialProviders: NonNullable<BetterAuthOptions["socialProviders"]> = {};
 
-if (env.NEXTAUTH_PROVIDER === "github" && env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET) {
-  socialProviders.github = {
-    clientId: env.GITHUB_CLIENT_ID,
-    clientSecret: env.GITHUB_CLIENT_SECRET,
-    mapProfileToUser: (profile) => ({
-      name: fallbackName(profile as Record<string, any>),
-      email: (profile as { email?: string }).email,
-      image: (profile as { avatar_url?: string }).avatar_url,
-    }),
-  };
-}
+  if (
+    e.NEXTAUTH_PROVIDER === "google" &&
+    e.GOOGLE_CLIENT_ID &&
+    e.GOOGLE_CLIENT_SECRET
+  ) {
+    socialProviders.google = {
+      clientId: e.GOOGLE_CLIENT_ID,
+      clientSecret: e.GOOGLE_CLIENT_SECRET,
+      mapProfileToUser: (profile) => ({
+        name: fallbackName(profile as Record<string, any>),
+        email: (profile as { email?: string }).email,
+        image: (profile as { picture?: string }).picture,
+      }),
+    };
+  }
 
-if (env.NEXTAUTH_PROVIDER === "gitlab" && env.GITLAB_CLIENT_ID && env.GITLAB_CLIENT_SECRET) {
-  socialProviders.gitlab = {
-    clientId: env.GITLAB_CLIENT_ID,
-    clientSecret: env.GITLAB_CLIENT_SECRET,
-    mapProfileToUser: (profile) => ({
-      name: fallbackName(profile as Record<string, any>),
-      email: (profile as { email?: string }).email,
-      image: (profile as { avatar_url?: string }).avatar_url,
-    }),
-  };
-}
+  if (
+    e.NEXTAUTH_PROVIDER === "github" &&
+    e.GITHUB_CLIENT_ID &&
+    e.GITHUB_CLIENT_SECRET
+  ) {
+    socialProviders.github = {
+      clientId: e.GITHUB_CLIENT_ID,
+      clientSecret: e.GITHUB_CLIENT_SECRET,
+      mapProfileToUser: (profile) => ({
+        name: fallbackName(profile as Record<string, any>),
+        email: (profile as { email?: string }).email,
+        image: (profile as { avatar_url?: string }).avatar_url,
+      }),
+    };
+  }
 
-if (
-  env.NEXTAUTH_PROVIDER === "azure-ad" &&
-  env.AZURE_AD_CLIENT_ID &&
-  env.AZURE_AD_CLIENT_SECRET &&
-  env.AZURE_AD_TENANT_ID
-) {
-  socialProviders.microsoft = {
-    clientId: env.AZURE_AD_CLIENT_ID,
-    clientSecret: env.AZURE_AD_CLIENT_SECRET,
-    tenantId: env.AZURE_AD_TENANT_ID,
-    mapProfileToUser: (profile) => ({
-      name: fallbackName(profile as Record<string, any>),
-      email:
-        (profile as { email?: string; mail?: string; userPrincipalName?: string })
-          .email ??
-        (profile as { mail?: string }).mail ??
-        (profile as { userPrincipalName?: string }).userPrincipalName,
-    }),
-  };
-}
+  if (
+    e.NEXTAUTH_PROVIDER === "gitlab" &&
+    e.GITLAB_CLIENT_ID &&
+    e.GITLAB_CLIENT_SECRET
+  ) {
+    socialProviders.gitlab = {
+      clientId: e.GITLAB_CLIENT_ID,
+      clientSecret: e.GITLAB_CLIENT_SECRET,
+      mapProfileToUser: (profile) => ({
+        name: fallbackName(profile as Record<string, any>),
+        email: (profile as { email?: string }).email,
+        image: (profile as { avatar_url?: string }).avatar_url,
+      }),
+    };
+  }
 
-const genericOAuthConfigs: Parameters<typeof genericOAuth>[0]["config"] = [];
+  if (
+    e.NEXTAUTH_PROVIDER === "azure-ad" &&
+    e.AZURE_AD_CLIENT_ID &&
+    e.AZURE_AD_CLIENT_SECRET &&
+    e.AZURE_AD_TENANT_ID
+  ) {
+    socialProviders.microsoft = {
+      clientId: e.AZURE_AD_CLIENT_ID,
+      clientSecret: e.AZURE_AD_CLIENT_SECRET,
+      tenantId: e.AZURE_AD_TENANT_ID,
+      mapProfileToUser: (profile) => ({
+        name: fallbackName(profile as Record<string, any>),
+        email:
+          (
+            profile as {
+              email?: string;
+              mail?: string;
+              userPrincipalName?: string;
+            }
+          ).email ??
+          (profile as { mail?: string }).mail ??
+          (profile as { userPrincipalName?: string }).userPrincipalName,
+      }),
+    };
+  }
+
+  return socialProviders;
+};
 
 /**
  * Forgiving issuer URL parser. Accepts:
@@ -135,67 +183,117 @@ export const parseIssuerUrl = (issuer: string, envName: string): URL => {
   }
 };
 
-if (
-  env.NEXTAUTH_PROVIDER === "auth0" &&
-  env.AUTH0_CLIENT_ID &&
-  env.AUTH0_CLIENT_SECRET &&
-  env.AUTH0_ISSUER
-) {
-  const issuerUrl = parseIssuerUrl(env.AUTH0_ISSUER, "AUTH0_ISSUER");
-  genericOAuthConfigs.push({
-    ...auth0({
-      clientId: env.AUTH0_CLIENT_ID,
-      clientSecret: env.AUTH0_CLIENT_SECRET,
-      domain: issuerUrl.host,
-    }),
-    // The `prompt=login` forces Auth0 to always show the login screen
-    // instead of silently using an existing session — matches the original
-    // NextAuth Auth0Provider behavior (`authorization: { params: { prompt: "login" } }`).
-    authorizationUrlParams: { prompt: "login" },
-    // Pin the OAuth `redirect_uri` to the LEGACY NextAuth callback path
-    // (`/api/auth/callback/auth0`). BetterAuth's genericOAuth plugin
-    // defaults to `/api/auth/oauth2/callback/auth0`, but existing customer
-    // Auth0 applications have only the legacy path registered as an
-    // allowed callback. Sending a different `redirect_uri` would cause
-    // Auth0 to reject the authorization request.
-    // The legacy path is wired back to BetterAuth's plugin handler via
-    // a Next.js rewrite in `next.config.mjs`.
-    redirectURI: `${env.NEXTAUTH_URL}/api/auth/callback/auth0`,
-    mapProfileToUser: (profile) => ({
-      name: fallbackName(profile),
-      email: profile.email,
-      image: profile.picture,
-    }),
-  });
-}
+/**
+ * Subset of env needed to select and configure a generic-OAuth provider.
+ */
+type GenericOAuthEnv = Pick<
+  typeof env,
+  | "NEXTAUTH_PROVIDER"
+  | "AUTH0_CLIENT_ID"
+  | "AUTH0_CLIENT_SECRET"
+  | "AUTH0_ISSUER"
+  | "OKTA_CLIENT_ID"
+  | "OKTA_CLIENT_SECRET"
+  | "OKTA_ISSUER"
+  | "NEXTAUTH_URL"
+>;
 
-if (
-  env.NEXTAUTH_PROVIDER === "okta" &&
-  env.OKTA_CLIENT_ID &&
-  env.OKTA_CLIENT_SECRET &&
-  env.OKTA_ISSUER
-) {
-  // Normalize issuer to a full URL — BetterAuth's okta helper builds the
-  // discovery URL by string concatenation and would otherwise fail
-  // silently at first sign-in if the issuer has no scheme.
-  const oktaIssuerUrl = parseIssuerUrl(env.OKTA_ISSUER, "OKTA_ISSUER");
-  genericOAuthConfigs.push({
-    ...okta({
-      clientId: env.OKTA_CLIENT_ID,
-      clientSecret: env.OKTA_CLIENT_SECRET,
-      issuer: oktaIssuerUrl.toString().replace(/\/$/, ""),
-    }),
-    // Same backward-compat reasoning as auth0 above — pin the legacy
-    // NextAuth callback path so existing Okta applications don't need
-    // their allowed callback list updated during cutover.
-    redirectURI: `${env.NEXTAUTH_URL}/api/auth/callback/okta`,
-    mapProfileToUser: (profile) => ({
-      name: fallbackName(profile),
-      email: profile.email,
-      image: profile.image ?? profile.picture,
-    }),
-  });
-}
+/**
+ * Builds the BetterAuth genericOAuth `config` array from environment
+ * configuration. Only the provider named by `NEXTAUTH_PROVIDER` is added, and
+ * only when its credentials are present. Each entry carries a `providerId`
+ * (`"auth0"` / `"okta"`) so the genericOAuth plugin registers it under that id.
+ *
+ * Exported for unit testing — lets us assert auth0/okta provider selection
+ * directly, without re-initializing the module under a different
+ * `NEXTAUTH_PROVIDER`.
+ */
+export const buildGenericOAuthConfigs = (
+  e: GenericOAuthEnv,
+): Parameters<typeof genericOAuth>[0]["config"] => {
+  const genericOAuthConfigs: Parameters<typeof genericOAuth>[0]["config"] = [];
+
+  if (
+    e.NEXTAUTH_PROVIDER === "auth0" &&
+    e.AUTH0_CLIENT_ID &&
+    e.AUTH0_CLIENT_SECRET &&
+    e.AUTH0_ISSUER
+  ) {
+    const issuerUrl = parseIssuerUrl(e.AUTH0_ISSUER, "AUTH0_ISSUER");
+    genericOAuthConfigs.push({
+      ...auth0({
+        clientId: e.AUTH0_CLIENT_ID,
+        clientSecret: e.AUTH0_CLIENT_SECRET,
+        domain: issuerUrl.host,
+      }),
+      // The `prompt=login` forces Auth0 to always show the login screen
+      // instead of silently using an existing session — matches the original
+      // NextAuth Auth0Provider behavior (`authorization: { params: { prompt: "login" } }`).
+      authorizationUrlParams: { prompt: "login" },
+      // Pin the OAuth `redirect_uri` to the LEGACY NextAuth callback path
+      // (`/api/auth/callback/auth0`). BetterAuth's genericOAuth plugin
+      // defaults to `/api/auth/oauth2/callback/auth0`, but existing customer
+      // Auth0 applications have only the legacy path registered as an
+      // allowed callback. Sending a different `redirect_uri` would cause
+      // Auth0 to reject the authorization request.
+      // The legacy path is wired back to BetterAuth's plugin handler via
+      // a Next.js rewrite in `next.config.mjs`.
+      redirectURI: `${e.NEXTAUTH_URL}/api/auth/callback/auth0`,
+      mapProfileToUser: (profile) => ({
+        name: fallbackName(profile),
+        email: profile.email,
+        image: profile.picture,
+      }),
+    });
+  }
+
+  if (
+    e.NEXTAUTH_PROVIDER === "okta" &&
+    e.OKTA_CLIENT_ID &&
+    e.OKTA_CLIENT_SECRET &&
+    e.OKTA_ISSUER
+  ) {
+    // Normalize issuer to a full URL — BetterAuth's okta helper builds the
+    // discovery URL by string concatenation and would otherwise fail
+    // silently at first sign-in if the issuer has no scheme.
+    const oktaIssuerUrl = parseIssuerUrl(e.OKTA_ISSUER, "OKTA_ISSUER");
+    genericOAuthConfigs.push({
+      ...okta({
+        clientId: e.OKTA_CLIENT_ID,
+        clientSecret: e.OKTA_CLIENT_SECRET,
+        issuer: oktaIssuerUrl.toString().replace(/\/$/, ""),
+      }),
+      // Same backward-compat reasoning as auth0 above — pin the legacy
+      // NextAuth callback path so existing Okta applications don't need
+      // their allowed callback list updated during cutover.
+      redirectURI: `${e.NEXTAUTH_URL}/api/auth/callback/okta`,
+      mapProfileToUser: (profile) => ({
+        name: fallbackName(profile),
+        email: profile.email,
+        image: profile.image ?? profile.picture,
+      }),
+    });
+  }
+
+  return genericOAuthConfigs;
+};
+
+/**
+ * Whether BetterAuth's email/password (credentials) routes are enabled.
+ * Credentials signin/signup is ONLY enabled in on-prem `email` mode — in
+ * cloud/SSO deployments the original NextAuth code mounted EITHER a social
+ * provider OR CredentialsProvider, never both, so users could not bypass the
+ * configured SSO. This gate mirrors that invariant.
+ *
+ * Exported for unit testing — lets us assert the credentials gate per provider
+ * without re-initializing the module under a different `NEXTAUTH_PROVIDER`.
+ */
+export const isEmailPasswordEnabled = (
+  e: Pick<typeof env, "NEXTAUTH_PROVIDER">,
+): boolean => e.NEXTAUTH_PROVIDER === "email";
+
+const socialProviders = buildSocialProviders(env);
+const genericOAuthConfigs = buildGenericOAuthConfigs(env);
 
 // NOTE: BetterAuth's admin plugin is intentionally NOT used. It expects
 // `User.role` and `User.banned` columns which our schema doesn't have, and
@@ -261,11 +359,7 @@ export const auth = betterAuth({
    */
   advanced: {
     ipAddress: {
-      ipAddressHeaders: [
-        "cf-connecting-ip",
-        "x-forwarded-for",
-        "x-real-ip",
-      ],
+      ipAddressHeaders: ["cf-connecting-ip", "x-forwarded-for", "x-real-ip"],
     },
   },
 
@@ -375,10 +469,11 @@ export const auth = betterAuth({
    * in cloud mode and bypass Auth0/SSO entirely.
    */
   emailAndPassword: {
-    enabled: env.NEXTAUTH_PROVIDER === "email",
+    enabled: isEmailPasswordEnabled(env),
     password: {
       hash: async (password: string) => hash(password, 10),
-      verify: async ({ password, hash: storedHash }) => compare(password, storedHash),
+      verify: async ({ password, hash: storedHash }) =>
+        compare(password, storedHash),
     },
     /**
      * Reset-link lifetime. Kept at BetterAuth's one-hour default but stated
@@ -451,10 +546,16 @@ export const auth = betterAuth({
         before: async (user) =>
           beforeUserCreate({
             prisma,
-            user: user as { email: string; deactivatedAt?: Date | null } & Record<string, unknown>,
+            user: user as {
+              email: string;
+              deactivatedAt?: Date | null;
+            } & Record<string, unknown>,
           }),
         after: async (user) => {
-          await afterUserCreate({ prisma, user: user as { id: string; email: string; name: string } });
+          await afterUserCreate({
+            prisma,
+            user: user as { id: string; email: string; name: string },
+          });
         },
       },
     },
@@ -471,7 +572,8 @@ export const auth = betterAuth({
           });
         },
         after: async (account) => {
-          if (!account.userId || !account.providerId || !account.accountId) return;
+          if (!account.userId || !account.providerId || !account.accountId)
+            return;
           await afterAccountCreate({
             prisma,
             account: {
@@ -487,7 +589,8 @@ export const auth = betterAuth({
           // BetterAuth refreshes tokens on the linked Account row on every
           // OAuth sign-in. Use that as the trigger to reconcile pendingSsoSetup
           // for users whose correct-provider account is already linked.
-          if (!account.userId || !account.providerId || !account.accountId) return;
+          if (!account.userId || !account.providerId || !account.accountId)
+            return;
           await afterAccountUpdate({
             prisma,
             account: {
