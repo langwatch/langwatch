@@ -90,6 +90,6 @@ class RagasSummarizationScoreEvaluator(
 
         return RagasResult(
             score=score,
-            cost=cost,
+            cost=cost.money,
             details=details,
         )
