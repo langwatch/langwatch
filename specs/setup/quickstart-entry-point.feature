@@ -49,16 +49,60 @@ Feature: make quickstart is the single dev environment entry point with intent-b
   # --- Default = fastest path (#3860 AC#3) ---
 
   @unit
-  Scenario: frontend-only mode starts no compose containers
+  Scenario: frontend-only pins host-side Redis for in-process workers, no other compose
     When I run "make quickstart frontend-only"
-    Then no compose services are brought up
-    And langwatch/.env.dev-up contains only NEXTAUTH_PROVIDER=email
-    And no infrastructure URLs are overridden
+    Then langwatch/.env.dev-up pins REDIS_URL=redis://localhost:6379
+    And it sets NEXTAUTH_PROVIDER=email
+    And no DATABASE_URL, CLICKHOUSE_URL, or LANGWATCH_NLP_SERVICE override is written
 
   @integration @unimplemented
   Scenario: frontend-only mode is fast — under 5 seconds to ready hint
     When I run "make quickstart frontend-only"
     Then the command completes in under 5 seconds with a hint to run "pnpm dev"
+
+  # frontend-only runs the BullMQ workers in-process via `pnpm dev`, so it needs
+  # a broker. dev.sh verifies host port 6379 is a *usable* Redis (redis-cli PING
+  # -> PONG) before reusing it, errors out when the port is held by something
+  # unverifiable, and only starts its own redis compose container when free.
+  Rule: frontend-only verifies host Redis is usable before reuse
+
+    @unit
+    Scenario: redis-cli PONG reply means the listener is a usable local Redis
+      Given redis-cli answers PING with "PONG"
+      When redis_listener_is_usable runs
+      Then it reports the listener as a usable Redis
+
+    @unit
+    Scenario: a listener that does not reply PONG is not a usable Redis
+      Given redis-cli answers PING with a non-PONG reply
+      When redis_listener_is_usable runs
+      Then it reports the listener as not usable
+
+    @unit
+    Scenario: absent redis-cli degrades gracefully to not-usable (no crash)
+      Given redis-cli is not on PATH
+      When redis_listener_is_usable runs
+      Then it reports the listener as not usable without crashing
+
+    @unit
+    Scenario: frontend-only reuses a verified usable Redis without starting a container
+      Given host port 6379 is in use by a verified usable Redis
+      When I run "make quickstart frontend-only"
+      Then it reuses the existing Redis for the in-process workers
+      And it does not start a redis compose container
+
+    @unit
+    Scenario: frontend-only errors out when 6379 is occupied by an unusable listener
+      Given host port 6379 is in use by a listener that is not a usable Redis
+      When I run "make quickstart frontend-only"
+      Then it fails with an actionable error and a non-zero exit
+      And it does not start a redis compose container
+
+    @unit
+    Scenario: frontend-only starts its own redis container when 6379 is free
+      Given host port 6379 is free
+      When I run "make quickstart frontend-only"
+      Then it starts the redis compose service
 
   # --- URL rewrite per mode (#3860 AC#6) ---
 
