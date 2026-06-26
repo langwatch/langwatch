@@ -192,9 +192,9 @@ export const datasetRecordRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("datasets:view"))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       try {
-        return await DatasetService.create(prisma).getDatasetPage({
+        return await DatasetService.create(ctx.prisma).getDatasetPage({
           slugOrId: input.datasetId,
           projectId: input.projectId,
           page: input.page,

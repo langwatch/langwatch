@@ -566,6 +566,70 @@ describe("given a saved dataset larger than one page", () => {
     );
   });
 
+  describe("when the next page is still loading", () => {
+    /** @scenario Move between pages */
+    it("stays on the requested page instead of bouncing back to page 1", async () => {
+      // react-query holds the previous page's result while the next page's key
+      // loads (keepPreviousData). Simulate that: page 2 is not yet "ready", so
+      // the hook returns page 1's data — the page count must NOT momentarily
+      // reset and snap navigation back to page 1.
+      const ready = new Set([1]);
+      const cache = new Map<number, unknown>();
+      let lastReady = 1;
+      const pageResult = (p: number) => ({
+        data: {
+          id: "dataset_paged",
+          name: "paged",
+          columnTypes,
+          count: 150,
+          totalPages: 3,
+          page: p,
+          datasetRecords: [
+            {
+              id: `p${p}r1`,
+              entry: { input: `page${p}-a`, expected_output: "x" },
+            },
+          ],
+        },
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+      getAllQuery.mockReset();
+      getAllQuery.mockImplementation((input: { page?: number }) => {
+        const p = input?.page ?? 1;
+        if (ready.has(p)) {
+          lastReady = p;
+          if (!cache.has(p)) cache.set(p, pageResult(p));
+          return cache.get(p);
+        }
+        if (!cache.has(lastReady)) cache.set(lastReady, pageResult(lastReady));
+        return cache.get(lastReady); // previous page held while page p loads
+      });
+
+      const user = userEvent.setup();
+      render(<DatasetEditorTable datasetId="dataset_paged" />, {
+        wrapper: Wrapper,
+      });
+      await waitFor(() =>
+        expect(screen.getByTestId("dataset-page-indicator")).toHaveTextContent(
+          "Page 1 of 3",
+        ),
+      );
+
+      await user.click(screen.getByTestId("dataset-page-next"));
+      // Page 2 is still loading — the indicator must show page 2, not bounce to 1,
+      // and the last request must be for page 2.
+      await waitFor(() =>
+        expect(screen.getByTestId("dataset-page-indicator")).toHaveTextContent(
+          "Page 2 of 3",
+        ),
+      );
+      expect(
+        (getAllQuery.mock.calls.at(-1)![0] as { page?: number }).page,
+      ).toBe(2);
+    });
+  });
+
   /** @scenario Edits on a page are saved to the right record */
   it("saves an edit made on a later page to that page's own record", async () => {
     updateMutate.mockImplementation(

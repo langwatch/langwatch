@@ -206,6 +206,10 @@ export function DatasetEditorTable({
       // (listPaginated throws DatasetNotReadyError otherwise).
       enabled: !!project && !!datasetId && readEnabled,
       refetchOnWindowFocus: false,
+      // Hold the previous page's result while the next page loads, so a page
+      // switch doesn't blank the grid (and doesn't momentarily drop the page
+      // count, which would otherwise bounce navigation back to page 1).
+      keepPreviousData: true,
       // A background refetch (e.g. on reconnect) would reload the store via
       // setData and drop an unsaved local edit on the current page — page
       // navigation is gated on pending writes, but an automatic refetch is not,
@@ -228,20 +232,27 @@ export function DatasetEditorTable({
     },
   );
 
-  // `pageCount` is the number of pages to navigate — floored at 1 so an EMPTY
+  // The PG-authoritative page count from the last settled read (undefined until
+  // the first response; held across a page switch by keepPreviousData so it never
+  // momentarily resets mid-navigation). `pageCount` floors at 1 so an EMPTY
   // dataset (server `totalPages` 0) still reads as a single page and never asks
   // for page 0 (which the server's `positive()` guard would reject). `currentPage`
   // is the page actually shown, clamped so it can never exceed the count.
-  const totalPages = datasetId ? (databaseDataset.data?.totalPages ?? 1) : 1;
-  const pageCount = Math.max(1, totalPages);
+  const serverTotalPages = datasetId
+    ? databaseDataset.data?.totalPages
+    : undefined;
+  const pageCount = Math.max(1, serverTotalPages ?? 1);
   const currentPage = Math.min(page, pageCount);
   const isLastPage = currentPage >= pageCount;
   // Snap a now-out-of-range page back into range (e.g. the last page's rows were
-  // all deleted under us). Floored via `pageCount`, so this never drives the
-  // page to 0 — it only ever pulls an overshoot down to the real last page.
+  // all deleted under us). Acts ONLY on an authoritative count — never on absent
+  // data — so an in-flight page switch can't bounce navigation back to page 1.
+  // Floored at 1, so it never drives the page to 0.
   useEffect(() => {
-    if (datasetId && page > pageCount) setPage(pageCount);
-  }, [datasetId, page, pageCount]);
+    if (serverTotalPages == null) return;
+    const count = Math.max(1, serverTotalPages);
+    if (page > count) setPage(count);
+  }, [serverTotalPages, page]);
 
   const datasetName = datasetId
     ? databaseDataset.data?.name
