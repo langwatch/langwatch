@@ -36,9 +36,9 @@ const mockPrisma = {
   organizationUser: {
     findFirst: vi.fn(),
   },
-  $transaction: vi.fn().mockImplementation((fn: (tx: any) => Promise<any>) =>
-    fn(mockPrisma),
-  ),
+  $transaction: vi
+    .fn()
+    .mockImplementation((fn: (tx: any) => Promise<any>) => fn(mockPrisma)),
 } as any;
 
 describe("RoleService Tests", () => {
@@ -349,7 +349,11 @@ describe("RoleService Tests", () => {
       });
       expect(mockPrisma.roleBinding.deleteMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ userId: "user-123", scopeType: "TEAM", scopeId: "team-123" }),
+          where: expect.objectContaining({
+            userId: "user-123",
+            scopeType: "TEAM",
+            scopeId: "team-123",
+          }),
         }),
       );
       expect(mockPrisma.roleBinding.create).toHaveBeenCalledWith(
@@ -448,7 +452,11 @@ describe("RoleService Tests", () => {
       expect(result).toEqual({ success: true });
       expect(mockPrisma.roleBinding.deleteMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: expect.objectContaining({ userId: "user-123", scopeType: "TEAM", scopeId: "team-123" }),
+          where: expect.objectContaining({
+            userId: "user-123",
+            scopeType: "TEAM",
+            scopeId: "team-123",
+          }),
         }),
       );
       expect(mockPrisma.roleBinding.create).toHaveBeenCalledWith(

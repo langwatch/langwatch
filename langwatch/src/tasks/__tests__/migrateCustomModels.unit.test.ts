@@ -86,9 +86,7 @@ describe("migrateCustomModelsRow()", () => {
           displayName: "ft:gpt-4o:my-org:custom:abc123",
           mode: "chat",
           maxTokens: 8192,
-          supportedParameters: [
-            "temperature",
-          ],
+          supportedParameters: ["temperature"],
         },
       ]);
       expect(result!.customEmbeddingsModels).toEqual([
@@ -173,9 +171,7 @@ describe("migrateCustomModelsRow()", () => {
           displayName: "my-custom-chat-model",
           mode: "chat",
           maxTokens: 8192,
-          supportedParameters: [
-            "temperature",
-          ],
+          supportedParameters: ["temperature"],
         },
       ]);
       expect(result!.customEmbeddingsModels).toBeNull();

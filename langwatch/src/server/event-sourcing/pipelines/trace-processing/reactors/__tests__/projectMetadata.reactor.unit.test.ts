@@ -7,7 +7,6 @@ import {
   type ProjectMetadataReactorDeps,
 } from "../projectMetadata.reactor";
 
-
 function createFoldState(
   overrides: Partial<TraceSummaryData> = {},
 ): TraceSummaryData {
@@ -328,8 +327,6 @@ describe("createProjectMetadataReactor()", () => {
       // Must not throw
       await expect(reactor.handle(event, context)).resolves.toBeUndefined();
     });
-
-
   });
 
   it("uses dedup makeJobId based on tenantId", () => {

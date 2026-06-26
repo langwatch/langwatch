@@ -1,9 +1,6 @@
-import { describe, it, expect } from "vitest";
 import { PricingModel } from "@prisma/client";
-import {
-  resolveUsageMeter,
-  normalizeUsageUnit,
-} from "../usage-meter-policy";
+import { describe, expect, it } from "vitest";
+import { normalizeUsageUnit, resolveUsageMeter } from "../usage-meter-policy";
 
 describe("resolveUsageMeter", () => {
   describe("when paid organization (isFree=false)", () => {

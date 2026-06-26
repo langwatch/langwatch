@@ -3,11 +3,11 @@ import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { ReactorContext } from "../../../../reactors/reactor.types";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
-  createOriginGateReactor,
   createDeferredOriginHandler,
+  createOriginGateReactor,
+  type DeferredOriginPayload,
   makeDeferredJobId,
   type OriginGateReactorDeps,
-  type DeferredOriginPayload,
 } from "../originGate.reactor";
 
 function createFoldState(
@@ -141,7 +141,12 @@ describe("originGate reactor", () => {
     });
 
     it("skips for all origin types", async () => {
-      for (const origin of ["application", "evaluation", "simulation", "workflow"]) {
+      for (const origin of [
+        "application",
+        "evaluation",
+        "simulation",
+        "workflow",
+      ]) {
         const deps = createDeps();
         const reactor = createOriginGateReactor(deps);
         const state = createFoldState({
@@ -258,7 +263,9 @@ describe("createDeferredOriginHandler()", () => {
 
   describe("when resolveOrigin throws", () => {
     it("propagates the error", async () => {
-      const resolveOriginFn = vi.fn().mockRejectedValue(new Error("command failed"));
+      const resolveOriginFn = vi
+        .fn()
+        .mockRejectedValue(new Error("command failed"));
       const handler = createDeferredOriginHandler(resolveOriginFn);
       const payload: DeferredOriginPayload = {
         id: "trace-1",

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("~/env.mjs", () => ({
   env: {
@@ -17,10 +17,7 @@ vi.mock("~/utils/logger/server", () => ({
 }));
 
 import { env } from "~/env.mjs";
-import {
-  buildMessagePrefix,
-  buildUpgradeAction,
-} from "../limit-message";
+import { buildMessagePrefix, buildUpgradeAction } from "../limit-message";
 
 describe("buildMessagePrefix", () => {
   it("returns 'Free plan' for free planSource", () => {

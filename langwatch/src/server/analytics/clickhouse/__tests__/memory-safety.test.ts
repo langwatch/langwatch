@@ -9,12 +9,13 @@
  *
  * @see specs/analytics/clickhouse-memory-safety.feature (Layer 1: @unit scenarios)
  */
-import { beforeEach, describe, expect, it } from "vitest";
-import { resetParamCounter } from "../filter-translator";
-import { buildTimeseriesQuery } from "../aggregation-builder";
-import type { FlattenAnalyticsMetricsEnum } from "../../registry";
+
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { beforeEach, describe, expect, it } from "vitest";
+import type { FlattenAnalyticsMetricsEnum } from "../../registry";
+import { buildTimeseriesQuery } from "../aggregation-builder";
+import { resetParamCounter } from "../filter-translator";
 
 describe("memory-safety", () => {
   beforeEach(() => {
@@ -58,10 +59,7 @@ describe("memory-safety", () => {
       while (i < sql.length) {
         if (sql[i] === "(") depth++;
         else if (sql[i] === ")") depth--;
-        else if (
-          depth === 0 &&
-          sql.slice(i, i + 4) === "FROM"
-        ) {
+        else if (depth === 0 && sql.slice(i, i + 4) === "FROM") {
           return sql.slice(selectIdx, i);
         }
         i++;
@@ -360,13 +358,10 @@ describe("memory-safety", () => {
         const translatorSource = fs.readFileSync(translatorPath, "utf-8");
 
         // Find all metric.startsWith("prefix.") patterns
-        const prefixPattern =
-          /metric\.startsWith\("([^"]+)\."\)/g;
+        const prefixPattern = /metric\.startsWith\("([^"]+)\."\)/g;
         const registeredPrefixes = new Set<string>();
         let prefixMatch: RegExpExecArray | null;
-        while (
-          (prefixMatch = prefixPattern.exec(translatorSource)) !== null
-        ) {
+        while ((prefixMatch = prefixPattern.exec(translatorSource)) !== null) {
           registeredPrefixes.add(prefixMatch[1]!);
         }
 
@@ -396,9 +391,7 @@ describe("memory-safety", () => {
         // Check groupBy: groupBy: "prefix.something"
         const groupByPattern = /groupBy:\s*"([a-z_]+)\.[a-z_]+"/g;
         let groupByRef: RegExpExecArray | null;
-        while (
-          (groupByRef = groupByPattern.exec(pruningTestSource)) !== null
-        ) {
+        while ((groupByRef = groupByPattern.exec(pruningTestSource)) !== null) {
           coveredPrefixes.add(groupByRef[1]!);
         }
 
