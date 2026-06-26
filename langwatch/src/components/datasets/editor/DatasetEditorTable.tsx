@@ -265,8 +265,14 @@ export function DatasetEditorTable({
   // other way via onUpdateDataset).
   const loadedRef = useRef(false);
   const lastPropagatedRef = useRef<EditorRecord[] | null>(null);
+  // While `keepPreviousData` serves the prior key's result during a key change,
+  // `isPreviousData` is true. Skip hydrating from it: a `datasetId` switch would
+  // otherwise populate the grid with the OLD dataset's rows under the NEW id
+  // (a data-integrity mismatch until the new query settles). For a same-dataset
+  // page switch this just holds the current page until the next one lands.
+  const holdingPreviousData = databaseDataset.isPreviousData;
   useEffect(() => {
-    if (datasetId && databaseDataset.data) {
+    if (datasetId && databaseDataset.data && !holdingPreviousData) {
       const columns = toEditorColumns(
         (databaseDataset.data.columnTypes ?? []) as DatasetColumns,
       );
@@ -295,7 +301,7 @@ export function DatasetEditorTable({
       lastPropagatedRef.current = store.getState().records;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [datasetId, databaseDataset.data, store]);
+  }, [datasetId, databaseDataset.data, holdingPreviousData, store]);
 
   // Imperative controller for external writers (AI generation streams)
   useEffect(() => {

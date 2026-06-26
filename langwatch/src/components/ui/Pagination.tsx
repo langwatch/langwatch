@@ -14,6 +14,103 @@ import { ChevronLeft, ChevronRight } from "react-feather";
 
 const DEFAULT_PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 
+type PaginationProps = {
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange?: (size: number) => void;
+  pageSizeOptions?: readonly number[];
+  isLoading?: boolean;
+  /**
+   * Extra disable for the controls beyond loading + boundaries — e.g. an editor
+   * that blocks navigation (and a page-size change, which also resets the page)
+   * while a record save is still in flight.
+   */
+  navDisabled?: boolean;
+  /** Plural noun shown after the total, e.g. "records". Omit to hide the total. */
+  unitLabel?: string;
+};
+
+function PageSizeSelector({
+  pageSize,
+  pageSizeOptions,
+  disabled,
+  onPageSizeChange,
+}: {
+  pageSize: number;
+  pageSizeOptions: readonly number[];
+  disabled: boolean;
+  onPageSizeChange: (size: number) => void;
+}) {
+  return (
+    <Flex align="center" gap={0.5}>
+      <Text textStyle="xs" color="fg.subtle" flexShrink={0}>
+        Rows
+      </Text>
+      {pageSizeOptions.map((size) => {
+        const active = pageSize === size;
+        return (
+          <Button
+            key={size}
+            variant="ghost"
+            size="2xs"
+            // Same nav gate as prev/next: a size change clears selection, resets
+            // to page 1, and refetches, so it must not run while a save is in
+            // flight. The already-active size is a no-op.
+            disabled={disabled || active}
+            color={active ? "fg" : "fg.subtle"}
+            fontWeight={active ? "semibold" : "normal"}
+            onClick={() => onPageSizeChange(size)}
+            paddingX={1.5}
+            minWidth="auto"
+            data-testid={`pagination-size-${size}`}
+          >
+            {size}
+          </Button>
+        );
+      })}
+    </Flex>
+  );
+}
+
+function PageNav({
+  currentPage,
+  totalPages,
+  disabled,
+  onPageChange,
+}: {
+  currentPage: number;
+  totalPages: number;
+  disabled: boolean;
+  onPageChange: (page: number) => void;
+}) {
+  return (
+    <Flex gap={1}>
+      <IconButton
+        aria-label="Previous page"
+        variant="ghost"
+        size="xs"
+        disabled={disabled || currentPage <= 1}
+        onClick={() => onPageChange(currentPage - 1)}
+        data-testid="pagination-prev"
+      >
+        <ChevronLeft size={14} />
+      </IconButton>
+      <IconButton
+        aria-label="Next page"
+        variant="ghost"
+        size="xs"
+        disabled={disabled || currentPage >= totalPages}
+        onClick={() => onPageChange(currentPage + 1)}
+        data-testid="pagination-next"
+      >
+        <ChevronRight size={14} />
+      </IconButton>
+    </Flex>
+  );
+}
+
 export function Pagination({
   page,
   pageSize,
@@ -22,27 +119,11 @@ export function Pagination({
   onPageSizeChange,
   pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
   isLoading = false,
-  /**
-   * Extra disable for the prev/next arrows beyond loading + boundaries — e.g. an
-   * editor that blocks navigation while a record save is still in flight.
-   */
   navDisabled = false,
-  /** Plural noun shown after the total, e.g. "records". Omit to hide the total. */
   unitLabel,
-}: {
-  page: number;
-  pageSize: number;
-  totalCount: number;
-  onPageChange: (page: number) => void;
-  onPageSizeChange?: (size: number) => void;
-  pageSizeOptions?: readonly number[];
-  isLoading?: boolean;
-  navDisabled?: boolean;
-  unitLabel?: string;
-}) {
+}: PaginationProps) {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const currentPage = Math.min(Math.max(1, page), totalPages);
-
   // Nothing to page through once the count is known to be zero.
   if (!isLoading && totalCount === 0) return null;
 
@@ -63,26 +144,12 @@ export function Pagination({
       ) : (
         <>
           {onPageSizeChange && (
-            <Flex align="center" gap={0.5}>
-              <Text textStyle="xs" color="fg.subtle" flexShrink={0}>
-                Rows
-              </Text>
-              {pageSizeOptions.map((size) => (
-                <Button
-                  key={size}
-                  variant="ghost"
-                  size="2xs"
-                  color={pageSize === size ? "fg" : "fg.subtle"}
-                  fontWeight={pageSize === size ? "semibold" : "normal"}
-                  onClick={() => onPageSizeChange(size)}
-                  paddingX={1.5}
-                  minWidth="auto"
-                  data-testid={`pagination-size-${size}`}
-                >
-                  {size}
-                </Button>
-              ))}
-            </Flex>
+            <PageSizeSelector
+              pageSize={pageSize}
+              pageSizeOptions={pageSizeOptions}
+              disabled={navDisabled}
+              onPageSizeChange={onPageSizeChange}
+            />
           )}
           <Text
             textStyle="xs"
@@ -94,28 +161,12 @@ export function Pagination({
           </Text>
         </>
       )}
-      <Flex gap={1}>
-        <IconButton
-          aria-label="Previous page"
-          variant="ghost"
-          size="xs"
-          disabled={isLoading || navDisabled || currentPage <= 1}
-          onClick={() => onPageChange(currentPage - 1)}
-          data-testid="pagination-prev"
-        >
-          <ChevronLeft size={14} />
-        </IconButton>
-        <IconButton
-          aria-label="Next page"
-          variant="ghost"
-          size="xs"
-          disabled={isLoading || navDisabled || currentPage >= totalPages}
-          onClick={() => onPageChange(currentPage + 1)}
-          data-testid="pagination-next"
-        >
-          <ChevronRight size={14} />
-        </IconButton>
-      </Flex>
+      <PageNav
+        currentPage={currentPage}
+        totalPages={totalPages}
+        disabled={isLoading || navDisabled}
+        onPageChange={onPageChange}
+      />
     </Flex>
   );
 }

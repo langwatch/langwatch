@@ -688,6 +688,10 @@ describe("given a saved dataset larger than one page", () => {
     renderPaged();
     await screen.findByTestId("pagination-indicator");
 
+    // The active size (default 50) is a no-op — disabled so it can't re-trigger
+    // the clear-selection / reset-to-page-1 / refetch path with no real change.
+    expect(screen.getByTestId("pagination-size-50")).toBeDisabled();
+
     // Move off page 1 first so the reset-to-page-1 is observable.
     await user.click(screen.getByTestId("pagination-next"));
     await waitFor(() =>
@@ -711,5 +715,69 @@ describe("given a saved dataset larger than one page", () => {
     };
     expect(lastCall.limit).toBe(100);
     expect(lastCall.page).toBe(1);
+  });
+});
+
+// keepPreviousData (held for the pagination no-bounce) must NOT bleed one
+// dataset's rows into another when the editor is pointed at a different
+// datasetId while the previous result is still being served.
+describe("given the editor is switched to a different dataset", () => {
+  const datasetAResult = (isPreviousData: boolean) => ({
+    data: {
+      id: "dataset_a",
+      name: "A",
+      columnTypes,
+      count: 1,
+      totalPages: 1,
+      page: 1,
+      datasetRecords: [
+        { id: "a1", entry: { input: "alpha", expected_output: "x" } },
+      ],
+    },
+    isLoading: false,
+    // react-query sets this while keepPreviousData serves the prior key's data.
+    isPreviousData,
+    refetch: vi.fn(),
+  });
+
+  describe("when the previous dataset's data is still being served", () => {
+    /** @scenario Edits on a page are saved to the right record */
+    it("never hydrates the new dataset id with the previous dataset's rows", async () => {
+      updateMutate.mockImplementation(
+        (_args: unknown, opts?: { onSuccess?: () => void }) =>
+          opts?.onSuccess?.(),
+      );
+      getAllQuery.mockReset();
+      getAllQuery.mockReturnValue(datasetAResult(false));
+
+      const user = userEvent.setup();
+      const { rerender } = render(
+        <DatasetEditorTable datasetId="dataset_a" />,
+        { wrapper: Wrapper },
+      );
+      await screen.findByText("alpha");
+
+      // Point the editor at dataset B; keepPreviousData still serves A's rows
+      // (isPreviousData), so the grid keeps showing them until B settles.
+      getAllQuery.mockReturnValue(datasetAResult(true));
+      rerender(<DatasetEditorTable datasetId="dataset_b" />);
+
+      // Edit the held cell before B's own data arrives.
+      await user.dblClick(screen.getByTestId("cell-0-input_0"));
+      const textarea = await screen.findByRole("textbox");
+      await user.clear(textarea);
+      await user.type(textarea, "edited{Enter}");
+
+      await waitFor(() => expect(updateMutate).toHaveBeenCalled(), {
+        timeout: 2000,
+      });
+      // The write targets the dataset the rows actually belong to (A), never the
+      // newly-selected B — without the guard the store would be hydrated as
+      // B-id-with-A-rows and corrupt dataset B.
+      expect(updateMutate).not.toHaveBeenCalledWith(
+        expect.objectContaining({ datasetId: "dataset_b" }),
+        expect.anything(),
+      );
+    });
   });
 });
