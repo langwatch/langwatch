@@ -26,6 +26,7 @@ import { useReplayStatus } from "~/hooks/useReplayStatus";
 import { api } from "~/utils/api";
 import { formatDuration } from "~/components/ops/shared/formatters";
 import { PhaseTimeline, PHASE_ICONS, PHASE_LABELS } from "~/components/ops/shared/PhaseTimeline";
+import { parseActiveProjections } from "~/components/ops/replay-progress/parseActiveProjections";
 
 export function ReplayProgressDrawer({
   open,
@@ -47,6 +48,10 @@ export function ReplayProgressDrawer({
 
   const status = statusQuery.data;
   const isRunning = status?.state === "running";
+  const activeProjectionNames = parseActiveProjections(
+    status?.currentProjection,
+  );
+  const activeProjections = new Set(activeProjectionNames);
 
   const stateColor =
     status?.state === "completed"
@@ -66,10 +71,11 @@ export function ReplayProgressDrawer({
 
   const throughputRate = useMemo(() => {
     if (!status?.startedAt || !status.eventsProcessed) return null;
-    const elapsed = (Date.now() - new Date(status.startedAt).getTime()) / 1000;
+    const end = status.completedAt ? new Date(status.completedAt).getTime() : Date.now();
+    const elapsed = (end - new Date(status.startedAt).getTime()) / 1000;
     if (elapsed < 1) return null;
     return Math.round(status.eventsProcessed / elapsed);
-  }, [status?.startedAt, status?.eventsProcessed]);
+  }, [status?.startedAt, status?.completedAt, status?.eventsProcessed]);
 
   return (
     <DrawerRoot
@@ -115,9 +121,11 @@ export function ReplayProgressDrawer({
                     <Text textStyle="sm" fontWeight="medium">
                       {PHASE_LABELS[status.currentPhase] ?? status.currentPhase}
                     </Text>
-                    {status.currentProjection && (
+                    {activeProjectionNames.length > 0 && (
                       <Text textStyle="xs" color="fg.muted">
-                        {status.currentProjection}
+                        {activeProjectionNames.length === 1
+                          ? activeProjectionNames[0]
+                          : `${activeProjectionNames.length} projections`}
                       </Text>
                     )}
                   </VStack>
@@ -174,7 +182,7 @@ export function ReplayProgressDrawer({
                 <Stat.Root>
                   <Stat.Label>Elapsed</Stat.Label>
                   <Stat.ValueText textStyle="lg">
-                    {status.startedAt ? formatDuration(status.startedAt) : "—"}
+                    {status.startedAt ? formatDuration(status.startedAt, status.completedAt) : "—"}
                   </Stat.ValueText>
                 </Stat.Root>
               </HStack>
@@ -189,8 +197,8 @@ export function ReplayProgressDrawer({
                     <Badge
                       key={name}
                       size="sm"
-                      variant={name === status.currentProjection ? "solid" : "subtle"}
-                      colorPalette={name === status.currentProjection ? "orange" : "gray"}
+                      variant={isRunning && activeProjections.has(name) ? "solid" : "subtle"}
+                      colorPalette={isRunning && activeProjections.has(name) ? "orange" : "gray"}
                     >
                       {name}
                     </Badge>

@@ -12,6 +12,7 @@ vi.mock("~/server/metrics", async (importOriginal) => {
 import type { QueueManager } from "../../services/queues/queueManager";
 import type { Event } from "../../domain/types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
+import { ReplayDeferralError } from "../replayMarkerCheck";
 import {
   createMockFoldProjectionDefinition,
   createMockFoldProjectionStore,
@@ -1059,6 +1060,131 @@ describe("ProjectionRouter", () => {
           expect.anything(),
           expect.objectContaining({ retentionPolicy }),
         );
+      });
+    });
+  });
+
+  describe("replay marker on map projections", () => {
+    describe("when marker returns 'skip'", () => {
+      it("does not invoke map.append for that event", async () => {
+        const queueManager = createMockQueueManager();
+        const markerChecker = {
+          check: vi.fn().mockResolvedValue("skip" as const),
+        };
+        const router = new ProjectionRouter(
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          queueManager,
+          undefined,
+          undefined,
+          markerChecker,
+        );
+
+        const store = createMockAppendStore<Record<string, unknown>>();
+        const mapProj = createMockMapProjectionDefinition("skipped-map", {
+          store,
+          eventTypes: [],
+        });
+        router.registerMapProjection(mapProj);
+
+        const event = createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        );
+
+        await router.dispatch([event], { tenantId });
+
+        expect(markerChecker.check).toHaveBeenCalledWith("skipped-map", event);
+        expect(store.append).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when marker returns 'process'", () => {
+      it("proceeds with map.append", async () => {
+        const queueManager = createMockQueueManager();
+        const markerChecker = {
+          check: vi.fn().mockResolvedValue("process" as const),
+        };
+        const router = new ProjectionRouter(
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          queueManager,
+          undefined,
+          undefined,
+          markerChecker,
+        );
+
+        const store = createMockAppendStore<Record<string, unknown>>();
+        const mapProj = createMockMapProjectionDefinition("allowed-map", {
+          store,
+          eventTypes: [],
+        });
+        router.registerMapProjection(mapProj);
+
+        const event = createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        );
+
+        await router.dispatch([event], { tenantId });
+
+        expect(markerChecker.check).toHaveBeenCalledWith("allowed-map", event);
+        expect(store.append).toHaveBeenCalled();
+      });
+    });
+
+    describe("when marker throws ReplayDeferralError", () => {
+      it("surfaces the deferral inside the AggregateError so the queue retries the event", async () => {
+        const queueManager = createMockQueueManager();
+        const deferError = new ReplayDeferralError(
+          "deferred-map",
+          `${String(tenantId)}:${TEST_CONSTANTS.AGGREGATE_TYPE}:${TEST_CONSTANTS.AGGREGATE_ID}`,
+          "replay pending",
+        );
+        const markerChecker = {
+          check: vi.fn().mockRejectedValue(deferError),
+        };
+        const router = new ProjectionRouter(
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          queueManager,
+          undefined,
+          undefined,
+          markerChecker,
+        );
+
+        const store = createMockAppendStore<Record<string, unknown>>();
+        const mapProj = createMockMapProjectionDefinition("deferred-map", {
+          store,
+          eventTypes: [],
+        });
+        router.registerMapProjection(mapProj);
+
+        const event = createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        );
+
+        const rejection = await router.dispatch([event], { tenantId }).then(
+          () => {
+            throw new Error("expected dispatch to reject");
+          },
+          (error: unknown) => error,
+        );
+
+        expect(rejection).toBeInstanceOf(AggregateError);
+        const aggregateError = rejection as AggregateError;
+        expect(aggregateError.message).toContain(
+          "1 projection(s) failed during dispatch",
+        );
+        expect(aggregateError.errors).toHaveLength(1);
+        expect(aggregateError.errors[0]).toBeInstanceOf(ReplayDeferralError);
+        expect(aggregateError.errors[0]).toBe(deferError);
+        expect(markerChecker.check).toHaveBeenCalledWith("deferred-map", event);
+        expect(store.append).not.toHaveBeenCalled();
       });
     });
   });

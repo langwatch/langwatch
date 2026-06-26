@@ -23,6 +23,7 @@ import { formatDuration } from "~/components/ops/shared/formatters";
 import { replayStateColor } from "~/components/ops/shared/ReplayStateBadge";
 import { PhaseTimeline } from "~/components/ops/shared/PhaseTimeline";
 import { CowboyAnimation } from "./CowboyAnimation";
+import { parseActiveProjections } from "./parseActiveProjections";
 import type { ReplayStatus, ReplayHistoryEntry } from "~/server/app-layer/ops/repositories/replay.repository";
 
 const MESH_PULSE_CSS = `
@@ -149,10 +150,20 @@ function LiveRunView({
 }) {
   const throughputRate = useMemo(() => {
     if (!status.startedAt || !status.eventsProcessed) return null;
-    const elapsed = (Date.now() - new Date(status.startedAt).getTime()) / 1000;
+    const end = status.completedAt ? new Date(status.completedAt).getTime() : Date.now();
+    const elapsed = (end - new Date(status.startedAt).getTime()) / 1000;
     if (elapsed < 1) return null;
     return Math.round(status.eventsProcessed / elapsed);
-  }, [status.startedAt, status.eventsProcessed]);
+  }, [status.startedAt, status.completedAt, status.eventsProcessed]);
+
+  const activeProjectionNames = useMemo(
+    () => parseActiveProjections(status.currentProjection),
+    [status.currentProjection],
+  );
+  const activeProjections = useMemo(
+    () => new Set(activeProjectionNames),
+    [activeProjectionNames],
+  );
 
   return (
     <VStack align="stretch" gap={4}>
@@ -228,9 +239,11 @@ function LiveRunView({
                     ? "in progress"
                     : status.state}
                 </Text>
-                {status.currentProjection && isRunning && (
+                {activeProjectionNames.length > 0 && isRunning && (
                   <Badge size="sm" variant="subtle">
-                    {status.currentProjection}
+                    {activeProjectionNames.length === 1
+                      ? activeProjectionNames[0]
+                      : `${activeProjectionNames.length} projections`}
                   </Badge>
                 )}
               </HStack>
@@ -269,7 +282,12 @@ function LiveRunView({
 
             <HStack gap={2} flexWrap="wrap">
               {status.projectionNames.map((name) => (
-                <Badge key={name} size="sm" variant="subtle">
+                <Badge
+                  key={name}
+                  size="sm"
+                  variant={isRunning && activeProjections.has(name) ? "solid" : "subtle"}
+                  colorPalette={isRunning && activeProjections.has(name) ? "orange" : "gray"}
+                >
                   {name}
                 </Badge>
               ))}
