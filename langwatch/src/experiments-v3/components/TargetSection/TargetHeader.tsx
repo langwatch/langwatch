@@ -156,13 +156,13 @@ export const TargetHeader = memo(function TargetHeader({
     : "Variant B";
 
   // Get results, evaluators, and dataset for computing aggregates
-  const { results, evaluators, activeDataset, allTargets } =
-    useEvaluationsV3Store((state) => ({
+  const { results, evaluators, activeDataset } = useEvaluationsV3Store(
+    (state) => ({
       results: state.results,
       evaluators: state.evaluators,
       activeDataset: state.datasets.find((d) => d.id === state.activeDatasetId),
-      allTargets: state.targets,
-    }));
+    }),
+  );
 
   // Count non-empty rows (empty rows are skipped during execution)
   // Handles both inline and saved datasets, with fallback to persisted results
@@ -231,13 +231,22 @@ export const TargetHeader = memo(function TargetHeader({
 
   const pairwiseAggregate = useMemo(() => {
     if (!target.pairwise) return null;
-    return computePairwiseTargetAggregate(
-      target,
-      results,
-      effectiveRowCount,
-      allTargets,
-    );
-  }, [target, results, effectiveRowCount, allTargets]);
+    return computePairwiseTargetAggregate(target, results, effectiveRowCount, {
+      // Pass the RESOLVED prompt handle (e.g. "say-hi") so the normalizer can
+      // match what the orchestrator emits as the verdict label. variantANameRaw
+      // already comes from useTargetName, which is handle-aware.
+      variantAHandle: variantATarget ? variantANameRaw : undefined,
+      variantBHandle: variantBTarget ? variantBNameRaw : undefined,
+    });
+  }, [
+    target,
+    results,
+    effectiveRowCount,
+    variantATarget,
+    variantBTarget,
+    variantANameRaw,
+    variantBNameRaw,
+  ]);
 
   // Show aggregates only when we have results or errors or running
   const hasAggregates =
