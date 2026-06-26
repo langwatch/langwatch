@@ -96,21 +96,22 @@ function friendlyError(details: string | undefined): {
     };
   }
   if (
-    lower.includes("produced no output") ||
+    lower.includes("waiting on") ||
+    lower.includes("no output for this row") ||
     lower.includes("missingvariantoutput")
   ) {
     // Orchestrator emits this for rows where a variant didn't produce an
-    // output (e.g. its upstream prompt errored). The raw details already
-    // name which variant failed and what to do.
+    // output (e.g. its upstream prompt hasn't run, or errored). The raw
+    // detail already names which variant and what to do next.
     return {
-      headline: "Upstream variant has no output",
+      headline: "Waiting on an upstream variant",
       hint: raw,
     };
   }
   if (lower.includes("missing candidate output")) {
     return {
-      headline: "Variant produced an empty output",
-      hint: "Check that the variant's prompt actually returns text — empty strings can't be compared.",
+      headline: "One of the candidates is blank",
+      hint: "Its prompt returned an empty string — nothing for the judge to compare against. Re-run that prompt or check what it's returning.",
       raw,
     };
   }

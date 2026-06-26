@@ -381,11 +381,41 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         ? transposeColumnsFirstToRowsFirstWithId(activeDataset.inline.records)
         : (activeDataset.savedRecords ?? []);
 
-      const executionCells = computeExecutionCells({
+      const baseExecutionCells = computeExecutionCells({
         scope,
         targetIds: targets.map((t) => t.id),
         datasetRows,
       });
+
+      // Mirror the server-side pairwise expansion: when the user hits Run
+      // on a pairwise column-target (or its single-cell variant), the
+      // orchestrator also re-runs variantA + variantB so Phase 2 has fresh
+      // outputs. Clear those cells client-side too — otherwise the variant
+      // columns keep showing stale ECONNRESET / old verdicts from a
+      // previous run, layered on top of the new pairwise comparison.
+      const targetPairwiseDeps = (id: string): string[] => {
+        const t = targets.find((tg) => tg.id === id);
+        if (!t || t.type !== "evaluator" || !t.pairwise) return [];
+        return [t.pairwise.variantA, t.pairwise.variantB].filter(
+          (v): v is string => !!v,
+        );
+      };
+      const expandedCells = [...baseExecutionCells];
+      if (scope.type === "target" || scope.type === "cell") {
+        const deps = targetPairwiseDeps(scope.targetId);
+        if (deps.length) {
+          const rowsForExpansion =
+            scope.type === "cell"
+              ? [scope.rowIndex]
+              : datasetRows.map((_, i) => i);
+          for (const depTargetId of deps) {
+            for (const rowIndex of rowsForExpansion) {
+              expandedCells.push({ rowIndex, targetId: depTargetId });
+            }
+          }
+        }
+      }
+      const executionCells = expandedCells;
       const executingCellsSet = createExecutionCellSet(executionCells);
 
       // Set progress based on actual cells to execute

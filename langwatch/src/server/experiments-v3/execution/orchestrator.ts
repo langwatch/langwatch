@@ -1516,7 +1516,8 @@ export async function* runOrchestrator(
               : reason.missing === "A"
                 ? reason.variantAName
                 : reason.variantBName;
-          const detail = `Pairwise can't compare — ${which} produced no output for this row. Run the upstream variant first or check it for errors.`;
+          const noun = reason.missing === "both" ? "outputs" : "output";
+          const detail = `Waiting on ${which} — no ${noun} for this row yet. Run ${which} first, then re-run this comparison.`;
           const skipEvent: EvaluationV3Event = {
             type: "evaluator_result",
             rowIndex: reason.rowIndex,
