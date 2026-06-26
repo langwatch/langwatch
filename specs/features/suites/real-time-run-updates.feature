@@ -90,13 +90,13 @@ Feature: Real-time run updates via SSE and adaptive polling
 
   # --- Debounce and coalescing ---
 
-  @unit @unimplemented
+  @unit
   Scenario: First SSE event triggers immediate refetch
     Given no SSE event has fired recently
     When an onSimulationUpdate event fires
     Then the refetch happens immediately without debounce delay
 
-  @unit @unimplemented
+  @unit
   Scenario: Rapid SSE events are coalesced into a single refetch
     Given an SSE event just fired and triggered a refetch
     When three more events fire within the debounce window

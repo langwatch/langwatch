@@ -2,21 +2,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTenantId } from "../../../../domain/tenantId";
 import type { FoldProjectionStore } from "../../../../projections/foldProjection.types";
 import {
-    SIMULATION_EVENT_VERSIONS,
-    SIMULATION_RUN_EVENT_TYPES,
+  SIMULATION_EVENT_VERSIONS,
+  SIMULATION_RUN_EVENT_TYPES,
 } from "../../schemas/constants";
 import type {
-    SimulationMessageSnapshotEvent,
-    SimulationProcessingEvent,
-    SimulationRunDeletedEvent,
-    SimulationRunFinishedEvent,
-    SimulationRunStartedEvent,
-    SimulationTextMessageEndEvent,
-    SimulationTextMessageStartEvent,
+  SimulationMessageSnapshotEvent,
+  SimulationProcessingEvent,
+  SimulationRunCancelRequestedEvent,
+  SimulationRunDeletedEvent,
+  SimulationRunFinishedEvent,
+  SimulationRunStartedEvent,
+  SimulationTextMessageEndEvent,
+  SimulationTextMessageStartEvent,
 } from "../../schemas/events";
 import {
-    SimulationRunStateFoldProjection,
-    type SimulationRunStateData,
+  type SimulationRunStateData,
+  SimulationRunStateFoldProjection,
 } from "../simulationRunState.foldProjection";
 
 // Create a dummy store -- only init/apply are tested, not persistence
@@ -24,7 +25,9 @@ const noopStore: FoldProjectionStore<SimulationRunStateData> = {
   store: async () => {},
   get: async () => null,
 };
-const foldProjection = new SimulationRunStateFoldProjection({ store: noopStore });
+const foldProjection = new SimulationRunStateFoldProjection({
+  store: noopStore,
+});
 
 const TEST_TENANT_ID = createTenantId("tenant-1");
 
@@ -117,6 +120,27 @@ function createRunDeletedEvent(
   };
 }
 
+function createCancelRequestedEvent(
+  overrides: Partial<SimulationRunCancelRequestedEvent["data"]> = {},
+  eventOverrides: Partial<SimulationRunCancelRequestedEvent> = {},
+): SimulationRunCancelRequestedEvent {
+  return {
+    id: "event-cancel-1",
+    aggregateId: "scenario-run-1",
+    aggregateType: "simulation_run",
+    tenantId: TEST_TENANT_ID,
+    createdAt: 5000,
+    occurredAt: 5000,
+    type: SIMULATION_RUN_EVENT_TYPES.CANCEL_REQUESTED,
+    version: SIMULATION_EVENT_VERSIONS.CANCEL_REQUESTED,
+    data: {
+      scenarioRunId: "scenario-run-1",
+      ...overrides,
+    },
+    ...eventOverrides,
+  };
+}
+
 function createTextMessageStartEvent(
   overrides: Partial<SimulationTextMessageStartEvent["data"]> = {},
   eventOverrides: Partial<SimulationTextMessageStartEvent> = {},
@@ -167,7 +191,9 @@ function createTextMessageEndEvent(
 /**
  * Helper to fold a sequence of events through init() + apply().
  */
-function foldEvents(events: SimulationProcessingEvent[]): SimulationRunStateData {
+function foldEvents(
+  events: SimulationProcessingEvent[],
+): SimulationRunStateData {
   let state = foldProjection.init();
   for (const event of events) {
     state = foldProjection.apply(state, event);
@@ -231,7 +257,10 @@ describe("simulationRunStateFoldProjection", () => {
       const state = foldEvents([
         createRunStartedEvent(),
         createMessageSnapshotEvent({
-          messages: [{ role: "user", content: "hello" }, { role: "assistant", content: "hi" }],
+          messages: [
+            { role: "user", content: "hello" },
+            { role: "assistant", content: "hi" },
+          ],
           traceIds: ["trace-1", "trace-2"],
         }),
       ]);
@@ -462,6 +491,38 @@ describe("simulationRunStateFoldProjection", () => {
     });
   });
 
+  describe("when CancelRequested event is applied to an in-progress run", () => {
+    /** @scenario "Fold projection sets CancellationRequestedAt without changing Status" */
+    it("sets CancellationRequestedAt without changing Status", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createCancelRequestedEvent({}, { occurredAt: 5500 }),
+      ]);
+
+      expect(state.CancellationRequestedAt).toBe(5500);
+      expect(state.Status).toBe("IN_PROGRESS");
+    });
+  });
+
+  describe("when CancelRequested event is applied a second time", () => {
+    /** @scenario "Cancel request is idempotent" */
+    it("preserves the original CancellationRequestedAt", () => {
+      const state = foldEvents([
+        createRunStartedEvent(),
+        createCancelRequestedEvent(
+          {},
+          { id: "event-cancel-first", occurredAt: 5500 },
+        ),
+        createCancelRequestedEvent(
+          {},
+          { id: "event-cancel-second", occurredAt: 7000 },
+        ),
+      ]);
+
+      expect(state.CancellationRequestedAt).toBe(5500);
+    });
+  });
+
   describe("when TextMessageStart event is applied", () => {
     it("creates a placeholder message row", () => {
       const state = foldEvents([
@@ -530,7 +591,13 @@ describe("simulationRunStateFoldProjection", () => {
       ]);
 
       expect(state.Messages).toEqual([
-        { Id: "msg-1", Role: "user", Content: "hello world", TraceId: "trace-abc", Rest: "" },
+        {
+          Id: "msg-1",
+          Role: "user",
+          Content: "hello world",
+          TraceId: "trace-abc",
+          Rest: "",
+        },
       ]);
       expect(state.TraceIds).toEqual(["trace-abc"]);
     });
@@ -553,11 +620,21 @@ describe("simulationRunStateFoldProjection", () => {
       const state = foldEvents([
         createRunStartedEvent(),
         createTextMessageEndEvent(
-          { messageId: "msg-1", role: "user", content: "hello", traceId: "trace-1" },
+          {
+            messageId: "msg-1",
+            role: "user",
+            content: "hello",
+            traceId: "trace-1",
+          },
           { id: "event-tme-1", occurredAt: 1500 },
         ),
         createTextMessageEndEvent(
-          { messageId: "msg-2", role: "assistant", content: "hi", traceId: "trace-1" },
+          {
+            messageId: "msg-2",
+            role: "assistant",
+            content: "hi",
+            traceId: "trace-1",
+          },
           { id: "event-tme-2", occurredAt: 1600 },
         ),
       ]);
@@ -591,7 +668,12 @@ describe("simulationRunStateFoldProjection", () => {
           messageId: "msg-1",
           role: "assistant",
           content: "hi",
-          message: { id: "msg-1", role: "assistant", content: "hi", toolCalls: [{ id: "tc1" }] },
+          message: {
+            id: "msg-1",
+            role: "assistant",
+            content: "hi",
+            toolCalls: [{ id: "tc1" }],
+          },
         }),
       ]);
 
@@ -632,14 +714,31 @@ describe("simulationRunStateFoldProjection", () => {
           { id: "e3", occurredAt: 2100 },
         ),
         createTextMessageEndEvent(
-          { messageId: "msg-2", role: "assistant", content: "hi back", traceId: "t2" },
+          {
+            messageId: "msg-2",
+            role: "assistant",
+            content: "hi back",
+            traceId: "t2",
+          },
           { id: "e4", occurredAt: 2500 },
         ),
       ]);
 
       expect(state.Messages).toHaveLength(2);
-      expect(state.Messages[0]).toEqual({ Id: "msg-1", Role: "user", Content: "hello", TraceId: "t1", Rest: "" });
-      expect(state.Messages[1]).toEqual({ Id: "msg-2", Role: "assistant", Content: "hi back", TraceId: "t2", Rest: "" });
+      expect(state.Messages[0]).toEqual({
+        Id: "msg-1",
+        Role: "user",
+        Content: "hello",
+        TraceId: "t1",
+        Rest: "",
+      });
+      expect(state.Messages[1]).toEqual({
+        Id: "msg-2",
+        Role: "assistant",
+        Content: "hi back",
+        TraceId: "t2",
+        Rest: "",
+      });
       expect(state.TraceIds).toEqual(["t1", "t2"]);
     });
   });
@@ -670,8 +769,20 @@ describe("simulationRunStateFoldProjection", () => {
 
       // Snapshot replaces everything
       expect(state.Messages).toEqual([
-        { Id: "", Role: "user", Content: "snapshot-msg", TraceId: "", Rest: "" },
-        { Id: "", Role: "assistant", Content: "snapshot-reply", TraceId: "", Rest: "" },
+        {
+          Id: "",
+          Role: "user",
+          Content: "snapshot-msg",
+          TraceId: "",
+          Rest: "",
+        },
+        {
+          Id: "",
+          Role: "assistant",
+          Content: "snapshot-reply",
+          TraceId: "",
+          Rest: "",
+        },
       ]);
       expect(state.TraceIds).toEqual(["snap-trace"]);
     });
@@ -708,7 +819,9 @@ describe("simulationRunStateFoldProjection", () => {
   });
 
   describe("when SimulationRunCancelRequested event is applied", () => {
-    function createCancelRequestedEvent(occurredAt = 5000): SimulationProcessingEvent {
+    function createCancelRequestedEvent(
+      occurredAt = 5000,
+    ): SimulationProcessingEvent {
       return {
         id: "event-cancel",
         aggregateId: "scenario-run-1",

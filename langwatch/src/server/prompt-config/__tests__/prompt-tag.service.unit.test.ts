@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
+import type { PromptTag } from "@prisma/client";
+import { describe, expect, it, vi } from "vitest";
 import {
   PromptTagConflictError,
   PromptTagNotFoundError,
@@ -7,8 +8,10 @@ import {
   PromptTagValidationError,
   validateTagName,
 } from "../prompt-tag.service";
-import { PromptTagRepository } from "../repositories/prompt-tag.repository";
-import type { PromptTag } from "@prisma/client";
+import {
+  PROTECTED_TAGS,
+  type PromptTagRepository,
+} from "../repositories/prompt-tag.repository";
 
 function makeTag(overrides: Partial<PromptTag> = {}): PromptTag {
   return {
@@ -23,7 +26,9 @@ function makeTag(overrides: Partial<PromptTag> = {}): PromptTag {
   };
 }
 
-function makeRepo(overrides: Partial<PromptTagRepository> = {}): PromptTagRepository {
+function makeRepo(
+  overrides: Partial<PromptTagRepository> = {},
+): PromptTagRepository {
   return {
     findAll: vi.fn().mockResolvedValue([]),
     findById: vi.fn().mockResolvedValue(null),
@@ -40,7 +45,7 @@ function makeRepo(overrides: Partial<PromptTagRepository> = {}): PromptTagReposi
 
 describe("validateTagName()", () => {
   describe("when name is valid", () => {
-    /** @scenario Accepts valid non-numeric tag during creation */
+    /** @scenario "Validation accepts well-formed custom tag names" */
     it("does not throw for a lowercase slug", () => {
       expect(() => validateTagName("canary")).not.toThrow();
     });
@@ -48,26 +53,57 @@ describe("validateTagName()", () => {
     it("does not throw for names with hyphens and underscores", () => {
       expect(() => validateTagName("ab-test_v2")).not.toThrow();
     });
-  });
 
-  describe("when name is empty", () => {
-    it("throws PromptTagValidationError", () => {
-      expect(() => validateTagName("")).toThrow(PromptTagValidationError);
+    /** @scenario 'Validation accepts "production" as a tag name' */
+    /** @scenario "Accepts valid non-numeric tag during creation" */
+    it("does not throw for the seeded 'production' tag name", () => {
+      expect(() => validateTagName("production")).not.toThrow();
+    });
+
+    /** @scenario 'Validation accepts "staging" as a tag name' */
+    it("does not throw for the seeded 'staging' tag name", () => {
+      expect(() => validateTagName("staging")).not.toThrow();
     });
   });
 
-  describe("when name is purely numeric", () => {
-    /** @scenario Rejects zero as a tag name during creation */
-    it("throws PromptTagValidationError mentioning numeric", () => {
-      expect(() => validateTagName("42")).toThrow(
-        expect.objectContaining({ name: "PromptTagValidationError", message: expect.stringMatching(/numeric/i) }),
+  describe("when name is empty", () => {
+    /** @scenario "Validation rejects empty tag names" */
+    it("throws PromptTagValidationError mentioning empty", () => {
+      expect(() => validateTagName("")).toThrow(
+        expect.objectContaining({
+          name: "PromptTagValidationError",
+          message: expect.stringMatching(/empty/i),
+        }),
       );
     });
   });
 
+  describe("when name is purely numeric", () => {
+    /** @scenario "Validation rejects purely numeric tag names" */
+    it("throws PromptTagValidationError mentioning numeric", () => {
+      expect(() => validateTagName("42")).toThrow(
+        expect.objectContaining({
+          name: "PromptTagValidationError",
+          message: expect.stringMatching(/numeric/i),
+        }),
+      );
+    });
+
+    /** @scenario "Rejects zero as a tag name during creation" */
+    it("rejects '0' (single-digit numeric)", () => {
+      expect(() => validateTagName("0")).toThrow(PromptTagValidationError);
+    });
+  });
+
   describe("when name contains invalid characters", () => {
-    it("throws for uppercase names", () => {
-      expect(() => validateTagName("CANARY")).toThrow(PromptTagValidationError);
+    /** @scenario "Validation rejects uppercase tag names" */
+    it("throws for uppercase names mentioning lowercase", () => {
+      expect(() => validateTagName("CANARY")).toThrow(
+        expect.objectContaining({
+          name: "PromptTagValidationError",
+          message: expect.stringMatching(/lowercase/i),
+        }),
+      );
     });
 
     it("throws for names starting with a digit", () => {
@@ -76,10 +112,23 @@ describe("validateTagName()", () => {
   });
 
   describe("when name is a protected tag", () => {
+    /** @scenario 'Validation rejects creating a tag named "latest"' */
+    /** @scenario 'Cannot create a tag that shadows the protected "latest" tag' */
     it("throws PromptTagValidationError mentioning protected for 'latest'", () => {
       expect(() => validateTagName("latest")).toThrow(
-        expect.objectContaining({ name: "PromptTagValidationError", message: expect.stringMatching(/protected/i) }),
+        expect.objectContaining({
+          name: "PromptTagValidationError",
+          message: expect.stringMatching(/protected/i),
+        }),
       );
+    });
+  });
+
+  describe("when inspecting PROTECTED_TAGS", () => {
+    /** @scenario 'Only "latest" is a protected tag' */
+    /** @scenario 'Only "latest" is a protected (built-in) tag' */
+    it("contains only 'latest'", () => {
+      expect([...PROTECTED_TAGS]).toEqual(["latest"]);
     });
   });
 });
@@ -90,7 +139,10 @@ describe("PromptTagService", () => {
   describe("getAll()", () => {
     describe("when org has tags", () => {
       it("delegates to repo.findAll and returns tags", async () => {
-        const tags = [makeTag({ name: "canary" }), makeTag({ name: "ab-test" })];
+        const tags = [
+          makeTag({ name: "canary" }),
+          makeTag({ name: "ab-test" }),
+        ];
         const repo = makeRepo({ findAll: vi.fn().mockResolvedValue(tags) });
         const service = new PromptTagService(repo);
 
@@ -154,9 +206,9 @@ describe("PromptTagService", () => {
         const repo = makeRepo();
         const service = new PromptTagService(repo);
 
-        await expect(service.create({ organizationId, name: "INVALID" })).rejects.toThrow(
-          PromptTagValidationError,
-        );
+        await expect(
+          service.create({ organizationId, name: "INVALID" }),
+        ).rejects.toThrow(PromptTagValidationError);
         expect(repo.create).not.toHaveBeenCalled();
       });
     });
@@ -164,12 +216,14 @@ describe("PromptTagService", () => {
     describe("when repo signals a unique constraint violation", () => {
       it("throws PromptTagConflictError", async () => {
         const prismaError = { code: "P2002" };
-        const repo = makeRepo({ create: vi.fn().mockRejectedValue(prismaError) });
+        const repo = makeRepo({
+          create: vi.fn().mockRejectedValue(prismaError),
+        });
         const service = new PromptTagService(repo);
 
-        await expect(service.create({ organizationId, name: "canary" })).rejects.toThrow(
-          PromptTagConflictError,
-        );
+        await expect(
+          service.create({ organizationId, name: "canary" }),
+        ).rejects.toThrow(PromptTagConflictError);
       });
     });
   });
@@ -180,7 +234,10 @@ describe("PromptTagService", () => {
         const repo = makeRepo({ findById: vi.fn().mockResolvedValue(null) });
         const service = new PromptTagService(repo);
 
-        const result = await service.delete({ id: "ptag_unknown", organizationId });
+        const result = await service.delete({
+          id: "ptag_unknown",
+          organizationId,
+        });
 
         expect(result).toBeNull();
         expect(repo.delete).not.toHaveBeenCalled();
@@ -203,7 +260,9 @@ describe("PromptTagService", () => {
         const repo = makeRepo({ findById: vi.fn().mockResolvedValue(tag) });
         const service = new PromptTagService(repo);
 
-        await expect(service.delete({ id: tag.id, organizationId })).rejects.toThrow();
+        await expect(
+          service.delete({ id: tag.id, organizationId }),
+        ).rejects.toThrow();
         expect(repo.delete).not.toHaveBeenCalled();
       });
 
@@ -229,7 +288,10 @@ describe("PromptTagService", () => {
 
         const result = await service.delete({ id: tag.id, organizationId });
 
-        expect(repo.delete).toHaveBeenCalledWith({ id: tag.id, organizationId });
+        expect(repo.delete).toHaveBeenCalledWith({
+          id: tag.id,
+          organizationId,
+        });
         expect(result).toEqual(tag);
       });
 
@@ -252,7 +314,10 @@ describe("PromptTagService", () => {
         const repo = makeRepo({ findByName: vi.fn().mockResolvedValue(null) });
         const service = new PromptTagService(repo);
 
-        const result = await service.deleteByName({ organizationId, name: "nonexistent" });
+        const result = await service.deleteByName({
+          organizationId,
+          name: "nonexistent",
+        });
 
         expect(result).toBeNull();
         expect(repo.deleteByName).not.toHaveBeenCalled();
@@ -273,7 +338,9 @@ describe("PromptTagService", () => {
         const repo = makeRepo();
         const service = new PromptTagService(repo);
 
-        await expect(service.deleteByName({ organizationId, name: "latest" })).rejects.toThrow();
+        await expect(
+          service.deleteByName({ organizationId, name: "latest" }),
+        ).rejects.toThrow();
         expect(repo.deleteByName).not.toHaveBeenCalled();
       });
     });
@@ -287,9 +354,15 @@ describe("PromptTagService", () => {
         });
         const service = new PromptTagService(repo);
 
-        const result = await service.deleteByName({ organizationId, name: "canary" });
+        const result = await service.deleteByName({
+          organizationId,
+          name: "canary",
+        });
 
-        expect(repo.deleteByName).toHaveBeenCalledWith({ organizationId, name: "canary" });
+        expect(repo.deleteByName).toHaveBeenCalledWith({
+          organizationId,
+          name: "canary",
+        });
         expect(result).toEqual(tag);
       });
     });
@@ -325,7 +398,11 @@ describe("PromptTagService", () => {
         const service = new PromptTagService(repo);
 
         await expect(
-          service.rename({ organizationId, oldName: "latest", newName: "beta" }),
+          service.rename({
+            organizationId,
+            oldName: "latest",
+            newName: "beta",
+          }),
         ).rejects.toThrow(PromptTagProtectedError);
         expect(repo.rename).not.toHaveBeenCalled();
       });
@@ -337,7 +414,11 @@ describe("PromptTagService", () => {
         const service = new PromptTagService(repo);
 
         await expect(
-          service.rename({ organizationId, oldName: "canary", newName: "INVALID" }),
+          service.rename({
+            organizationId,
+            oldName: "canary",
+            newName: "INVALID",
+          }),
         ).rejects.toThrow(PromptTagValidationError);
         expect(repo.rename).not.toHaveBeenCalled();
       });
@@ -352,7 +433,11 @@ describe("PromptTagService", () => {
         const service = new PromptTagService(repo);
 
         await expect(
-          service.rename({ organizationId, oldName: "canary", newName: "staging" }),
+          service.rename({
+            organizationId,
+            oldName: "canary",
+            newName: "staging",
+          }),
         ).rejects.toThrow(PromptTagConflictError);
       });
     });
@@ -360,12 +445,18 @@ describe("PromptTagService", () => {
     describe("when repo throws not-found error", () => {
       it("throws PromptTagNotFoundError", async () => {
         const repo = makeRepo({
-          rename: vi.fn().mockRejectedValue(new Error('Tag "canary" not found')),
+          rename: vi
+            .fn()
+            .mockRejectedValue(new Error('Tag "canary" not found')),
         });
         const service = new PromptTagService(repo);
 
         await expect(
-          service.rename({ organizationId, oldName: "canary", newName: "beta" }),
+          service.rename({
+            organizationId,
+            oldName: "canary",
+            newName: "beta",
+          }),
         ).rejects.toThrow(PromptTagNotFoundError);
       });
     });

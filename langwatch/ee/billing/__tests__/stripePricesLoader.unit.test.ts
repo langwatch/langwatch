@@ -14,7 +14,9 @@ describe("stripeCatalog", () => {
       const parsed = parseStripePricesFile(stripeCatalogData);
 
       expect(parsed.schemaVersion).toBe(1);
-      expect(Object.keys(parsed.mapping)).toHaveLength(STRIPE_PRICE_NAMES.length);
+      expect(Object.keys(parsed.mapping)).toHaveLength(
+        STRIPE_PRICE_NAMES.length,
+      );
       expect(Object.keys(parsed.prices).length).toBeGreaterThan(0);
     });
 
@@ -50,6 +52,37 @@ describe("stripeCatalog", () => {
 
       for (const key of STRIPE_PRICE_NAMES) {
         expect(resolved[key]).toBe(parsed.mapping[key].live);
+      }
+    });
+
+    /** @scenario "Extra development prices do not break required mapping validation" */
+    it("accepts catalogs with additional non-required prices alongside required mappings", () => {
+      const augmented = {
+        ...stripeCatalogData,
+        prices: {
+          ...stripeCatalogData.prices,
+          DEV_ONLY_PRICE_FOR_LOCAL_TESTING: {
+            id: "price_dev_only_local_testing",
+            active: false,
+            livemode: false,
+            product: null,
+            unitAmount: 100,
+            currency: "usd",
+            type: "one_time" as const,
+            recurring: null,
+            nickname: null,
+            lookupKey: null,
+            metadata: {},
+          },
+        },
+      };
+
+      expect(() => parseStripePricesFile(augmented)).not.toThrow();
+
+      const parsed = parseStripePricesFile(augmented);
+      const resolved = resolveStripePriceMap(parsed, "test");
+      for (const key of STRIPE_PRICE_NAMES) {
+        expect(resolved[key]).toBeDefined();
       }
     });
 

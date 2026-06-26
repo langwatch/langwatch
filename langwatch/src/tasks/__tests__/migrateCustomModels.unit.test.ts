@@ -50,6 +50,7 @@ describe("migrateCustomModelsRow()", () => {
   };
 
   describe("when all custom models match registry entries", () => {
+    /** @scenario "Migration drops custom models that match registry entries" */
     it("returns empty arrays", () => {
       const row = buildRow({
         provider: "openai",
@@ -85,9 +86,7 @@ describe("migrateCustomModelsRow()", () => {
           displayName: "ft:gpt-4o:my-org:custom:abc123",
           mode: "chat",
           maxTokens: 8192,
-          supportedParameters: [
-            "temperature",
-          ],
+          supportedParameters: ["temperature"],
         },
       ]);
       expect(result!.customEmbeddingsModels).toEqual([
@@ -172,9 +171,7 @@ describe("migrateCustomModelsRow()", () => {
           displayName: "my-custom-chat-model",
           mode: "chat",
           maxTokens: 8192,
-          supportedParameters: [
-            "temperature",
-          ],
+          supportedParameters: ["temperature"],
         },
       ]);
       expect(result!.customEmbeddingsModels).toBeNull();

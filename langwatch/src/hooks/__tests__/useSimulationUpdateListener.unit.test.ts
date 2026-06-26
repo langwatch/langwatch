@@ -1,8 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Capture the onData callback from useSSESubscription
 let capturedOnData: ((data: { event: string }) => void) | undefined;
@@ -164,6 +165,7 @@ describe("useSimulationUpdateListener()", () => {
   });
 
   describe("when no SSE event has fired recently", () => {
+    /** @scenario "First SSE event triggers immediate refetch" */
     it("fires refetch immediately without debounce delay", () => {
       renderHook(() =>
         useSimulationUpdateListener({
@@ -183,6 +185,7 @@ describe("useSimulationUpdateListener()", () => {
   });
 
   describe("when rapid SSE events fire within the debounce window", () => {
+    /** @scenario "Rapid SSE events are coalesced into a single refetch" */
     it("coalesces them into one additional refetch", () => {
       renderHook(() =>
         useSimulationUpdateListener({
