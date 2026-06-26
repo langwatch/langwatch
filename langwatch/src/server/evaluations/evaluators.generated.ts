@@ -241,27 +241,25 @@ export const evaluatorsSchema = z.object({
           "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
         )
         .default(2048),
-      rubrics: z
-        .array(z.object({ description: z.string() }))
-        .default([
-          { description: "The response is incorrect, irrelevant." },
-          {
-            description:
-              "The response partially answers the question but includes significant errors, omissions, or irrelevant information.",
-          },
-          {
-            description:
-              "The response partially answers the question but includes minor errors, omissions, or irrelevant information.",
-          },
-          {
-            description:
-              "The response fully answers the question and includes minor errors, omissions, or irrelevant information.",
-          },
-          {
-            description:
-              "The response fully answers the question and includes no errors, omissions, or irrelevant information.",
-          },
-        ]),
+      rubrics: z.array(z.object({ description: z.string() })).default([
+        { description: "The response is incorrect, irrelevant." },
+        {
+          description:
+            "The response partially answers the question but includes significant errors, omissions, or irrelevant information.",
+        },
+        {
+          description:
+            "The response partially answers the question but includes minor errors, omissions, or irrelevant information.",
+        },
+        {
+          description:
+            "The response fully answers the question and includes minor errors, omissions, or irrelevant information.",
+        },
+        {
+          description:
+            "The response fully answers the question and includes no errors, omissions, or irrelevant information.",
+        },
+      ]),
     }),
   }),
   "ragas/sql_query_equivalence": z.object({
