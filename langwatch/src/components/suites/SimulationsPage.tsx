@@ -227,13 +227,14 @@ export default function SimulationsPage() {
   });
 
   const { requestRun, isPending: isRunPending, pendingBatchRunId, dialogProps: runDialogProps } = useRunSuite({
-    onRunScheduled: (suiteId) => {
+    onRunScheduled: () => {
       void utils.suites.getSummaries.invalidate();
-      // Navigate to the suite so the user sees the run starting
+    },
+    // Quick Run stays in place (issue #3363); the success toast's "View run"
+    // action is the opt-in path to the run plan detail page.
+    onViewRun: (suiteId) => {
       const suite = suites?.find((s) => s.id === suiteId);
-      if (suite && selectedSuiteSlug !== suite.slug) {
-        navigateToSuite(suite.slug);
-      }
+      if (suite) navigateToSuite(suite.slug);
     },
   });
 
