@@ -548,6 +548,14 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           mappings: t.mappings,
           localPromptConfig: t.localPromptConfig,
           localEvaluatorConfig: t.localEvaluatorConfig,
+          // Pairwise column-targets (#5100) need this on the wire so the
+          // orchestrator can skip the column in Phase 1 and emit Phase 2
+          // synthetic cells with both variants' outputs baked in. Without
+          // it, the server falls through to a normal evaluator-target
+          // dispatch whose mappings have no per-row candidate outputs,
+          // and the judge endpoint 400s with "candidate_a_output is
+          // required".
+          pairwise: t.pairwise,
         })),
         evaluators: evaluators.map((e) => ({
           id: e.id,

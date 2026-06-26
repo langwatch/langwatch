@@ -89,9 +89,13 @@ class PairwiseCompareSettings(LLMEvaluatorSettings):
 
 class PairwiseCompareResult(EvaluationResult):
     score: float = Field(default=0.5, description="0=A wins, 1=B wins, 0.5=tie")
-    label: Optional[Literal["A", "B", "tie"]] = Field(
+    label: Optional[str] = Field(
         default=None,
-        description="Which candidate won, or tie",
+        description=(
+            "Winner identifier: candidate_a_id, candidate_b_id, or 'tie'. "
+            "Programmatic consumers can read this directly without "
+            "dereferencing the evaluator's candidate slot mapping."
+        ),
     )
     details: Optional[str] = Field(
         default=None,
@@ -147,9 +151,19 @@ class PairwiseCompareEvaluator(
 
         score_map = {"A": 0.0, "tie": 0.5, "B": 1.0}
 
+        # Translate slot-winner ("A"/"B") into the actual candidate identifier
+        # so the persisted result tells consumers WHICH variant won by name —
+        # not a slot letter they'd have to dereference. "tie" passes through.
+        if winner == "A":
+            winner_label = entry.candidate_a_id
+        elif winner == "B":
+            winner_label = entry.candidate_b_id
+        else:
+            winner_label = "tie"
+
         return PairwiseCompareResult(
             score=score_map[winner],
-            label=cast(Literal["A", "B", "tie"], winner),
+            label=winner_label,
             details=reasoning,
             cost=Money(amount=total_cost, currency="USD") if total_cost else None,
         )

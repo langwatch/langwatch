@@ -322,9 +322,9 @@ export const useOpenTargetEditor = () => {
           const datasetColumns =
             activeDataset?.columns.map((c) => ({ id: c.id, name: c.name })) ??
             [];
-          const variantOptions = targets
-            .filter((t) => t.type !== "evaluator" && t.id !== target.id)
-            .map((t) => ({ id: t.id }));
+          const variantOptions = targets.filter(
+            (t) => t.type !== "evaluator" && t.id !== target.id,
+          );
 
           setFlowCallbacks(
             "evaluatorEditor",

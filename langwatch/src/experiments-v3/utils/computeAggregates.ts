@@ -244,10 +244,33 @@ export type PairwiseAggregate = {
   perRow: Array<PairwiseVerdict | null>;
 };
 
-const isPairwiseLabel = (
+const isPairwiseLegacyLabel = (
   value: unknown,
 ): value is PairwiseVerdict["label"] =>
   value === "A" || value === "B" || value === "tie";
+
+/**
+ * Normalize a stored pairwise label to its slot ("A" / "B" / "tie").
+ * langevals now stores the winner's candidate identifier (or "tie");
+ * older runs still hold legacy "A"/"B"/"tie". We accept both. The
+ * identifier may be either the variant's internal target id OR its
+ * prompt handle (set in the orchestrator's `variantIdentifierFor`).
+ */
+const normalizePairwiseLabel = (
+  value: unknown,
+  variantA: string,
+  variantB: string,
+  variantAHandle?: string,
+  variantBHandle?: string,
+): PairwiseVerdict["label"] | undefined => {
+  if (isPairwiseLegacyLabel(value)) return value;
+  if (typeof value !== "string") return undefined;
+  if (value === variantA || (variantAHandle && value === variantAHandle))
+    return "A";
+  if (value === variantB || (variantBHandle && value === variantBHandle))
+    return "B";
+  return undefined;
+};
 
 const readCostAmount = (raw: unknown): number => {
   if (!raw || typeof raw !== "object") return 0;
@@ -265,11 +288,61 @@ export const computePairwiseAggregate = (
   evaluator: Pick<EvaluatorConfig, "id" | "pairwise">,
   results: EvaluationResults,
   rowCount: number,
+  targets?: Array<{ id: string; promptId?: string | null }>,
 ): PairwiseAggregate | null => {
   if (!evaluator.pairwise) return null;
-  const { variantA, variantB } = evaluator.pairwise;
-  const evalResults =
-    results.evaluatorResults[variantA]?.[evaluator.id] ?? [];
+  return computePairwiseAggregateFromResults({
+    id: evaluator.id,
+    pairwise: evaluator.pairwise,
+    results,
+    rowCount,
+    resultTargetId: evaluator.pairwise.variantA,
+    targets,
+  });
+};
+
+export const computePairwiseTargetAggregate = (
+  target: { id: string; pairwise?: EvaluatorConfig["pairwise"] },
+  results: EvaluationResults,
+  rowCount: number,
+  targets?: Array<{ id: string; promptId?: string | null }>,
+): PairwiseAggregate | null => {
+  if (!target.pairwise) return null;
+  return computePairwiseAggregateFromResults({
+    id: target.id,
+    pairwise: target.pairwise,
+    results,
+    rowCount,
+    resultTargetId: target.id,
+    targets,
+  });
+};
+
+const computePairwiseAggregateFromResults = ({
+  id,
+  pairwise,
+  results,
+  rowCount,
+  resultTargetId,
+  targets,
+}: {
+  id: string;
+  pairwise: NonNullable<EvaluatorConfig["pairwise"]>;
+  results: EvaluationResults;
+  rowCount: number;
+  resultTargetId: string;
+  targets?: Array<{ id: string; promptId?: string | null }>;
+}): PairwiseAggregate | null => {
+  const { variantA, variantB } = pairwise;
+  const evalResults = results.evaluatorResults[resultTargetId]?.[id] ?? [];
+
+  // Resolve the human-readable handle for each variant (when targets are
+  // available) so the normalizer can match the langevals-stored label
+  // against either the internal target id or the prompt handle.
+  const variantAHandle =
+    targets?.find((t) => t.id === variantA)?.promptId ?? undefined;
+  const variantBHandle =
+    targets?.find((t) => t.id === variantB)?.promptId ?? undefined;
 
   const counts = { a: 0, b: 0, tie: 0 };
   let totalCost = 0;
@@ -278,11 +351,17 @@ export const computePairwiseAggregate = (
   for (let i = 0; i < rowCount; i++) {
     const raw = evalResults[i];
     const parsed = parseEvaluationResult(raw);
-    if (parsed.status !== "processed" || !isPairwiseLabel(parsed.label)) {
+    const label = normalizePairwiseLabel(
+      parsed.label,
+      variantA,
+      variantB,
+      variantAHandle ?? undefined,
+      variantBHandle ?? undefined,
+    );
+    if (parsed.status !== "processed" || !label) {
       perRow.push(null);
       continue;
     }
-    const label = parsed.label;
     const costAmount = readCostAmount(raw);
     if (label === "A") counts.a++;
     else if (label === "B") counts.b++;
@@ -296,7 +375,7 @@ export const computePairwiseAggregate = (
   }
 
   return {
-    evaluatorId: evaluator.id,
+    evaluatorId: id,
     variantA,
     variantB,
     counts,

@@ -68,7 +68,6 @@ import { createPromptEditorCallbacks } from "../utils/promptEditorCallbacks";
 import { ColumnTypeIcon } from "./ColumnTypeIcon";
 import { DatasetSuperHeader } from "./DatasetSuperHeader";
 import { EvaluationsV3DatasetTableProvider } from "./EvaluationsV3DatasetTableProvider";
-import { PairwiseAggregateHeader } from "./PairwiseAggregateHeader";
 import { SelectionToolbar } from "./SelectionToolbar";
 import {
   CheckboxCellFromMeta,
@@ -1028,12 +1027,24 @@ export function EvaluationsV3Table({
               output: results.targetOutputs[target.id]?.[index] ?? null,
               // All evaluators apply to all targets
               evaluators: Object.fromEntries(
-                evaluators.map((evaluator) => [
-                  evaluator.id,
-                  results.evaluatorResults[target.id]?.[evaluator.id]?.[
-                    index
-                  ] ?? null,
-                ]),
+                [
+                  ...evaluators.map((evaluator) => [
+                    evaluator.id,
+                    results.evaluatorResults[target.id]?.[evaluator.id]?.[
+                      index
+                    ] ?? null,
+                  ]),
+                  ...(target.pairwise
+                    ? [
+                        [
+                          target.id,
+                          results.evaluatorResults[target.id]?.[target.id]?.[
+                            index
+                          ] ?? null,
+                        ],
+                      ]
+                    : []),
+                ] as Array<[string, unknown]>,
               ),
               // Error for this target/row
               error: results.errors[target.id]?.[index] ?? null,
@@ -1544,9 +1555,9 @@ export function EvaluationsV3Table({
         },
       }}
     >
-      {/* Pairwise aggregate header (#5100) — renders only when a pairwise
-          evaluator has at least one verdict. */}
-      <PairwiseAggregateHeader />
+      {/* Pairwise scoreboard moved into the column header — the top bar was
+          redundant with the column's mini-summary. CSV export + filter chips
+          will move into the column header's overflow menu in a follow-up. */}
       <table ref={tableRef}>
         {/* Define column widths with colgroup for table-layout: fixed */}
         <colgroup>

@@ -1,21 +1,17 @@
 import {
-  Box,
-  Checkbox,
+  Button,
   Field,
   HStack,
-  Icon,
-  NativeSelect,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { ChangeEvent } from "react";
+import { ChevronDown } from "lucide-react";
 import { useEffect, useState } from "react";
-import { LuCheck } from "react-icons/lu";
 
-import type {
-  PairwiseEvaluatorConfig,
-  TargetConfig,
-} from "../../types";
+import { Menu } from "~/components/ui/menu";
+
+import { useTargetName } from "../../hooks/useTargetName";
+import type { PairwiseEvaluatorConfig, TargetConfig } from "../../types";
 
 /**
  * Configuration form for the langevals/pairwise_compare evaluator
@@ -26,11 +22,17 @@ import type {
  *   3. Golden      — name of a dataset column whose value is the
  *                    reference answer
  *
- * Plus optional metrics checkboxes (cost / latency) that inject
- * per-candidate stats into the judge prompt.
+ * Per-candidate metrics (cost / duration) are configured in the
+ * settings section above via the schema-driven `include_metrics`
+ * toggles — that's the single source of truth the judge prompt reads.
  *
- * Rendered inside `ConfigPanel` when the user adds an evaluator of
- * type `langevals/pairwise_compare`.
+ * Pickers use the project's Menu-button pattern (see FieldTypeSelect
+ * for the canonical reference) so the drawer reads as a peer of the
+ * other LangWatch surfaces instead of a browser-native control.
+ *
+ * Variant labels come from `useTargetName`, the same reactive hook the
+ * column header uses — so the dropdown shows the prompt/agent name
+ * ("say-hi"), not the internal target_NNNN id.
  */
 
 export type DatasetColumn = { id: string; name: string };
@@ -43,6 +45,100 @@ export type PairwiseConfigFormProps = {
   /** Active dataset columns the user can pick the golden field from. */
   datasetColumns: DatasetColumn[];
 };
+
+/**
+ * One row inside a Variant A/B menu. Lives in its own component so each
+ * row owns its own `useTargetName` hook call — calling the hook inside
+ * a .map() over `targets` would break the rules of hooks when the list
+ * grows or shrinks between renders.
+ */
+const VariantMenuItem = ({
+  target,
+  onSelect,
+  testId,
+}: {
+  target: TargetConfig;
+  onSelect: (id: string) => void;
+  testId?: string;
+}) => {
+  const name = useTargetName(target);
+  const label = name || target.id;
+  return (
+    <Menu.Item
+      value={target.id}
+      onClick={() => onSelect(target.id)}
+      data-testid={testId}
+    >
+      <Text fontSize="13px">{label}</Text>
+    </Menu.Item>
+  );
+};
+
+/**
+ * Inline label for the selected variant inside the picker trigger. Same
+ * reactive name resolution as VariantMenuItem.
+ */
+const SelectedVariantLabel = ({ target }: { target: TargetConfig }) => {
+  const name = useTargetName(target);
+  return <>{name || target.id}</>;
+};
+
+type PickerProps = {
+  label: string;
+  selectedDisplay: React.ReactNode;
+  placeholder: string;
+  isEmpty: boolean;
+  testId?: string;
+  children: React.ReactNode;
+};
+
+const Picker = ({
+  label,
+  selectedDisplay,
+  placeholder,
+  isEmpty,
+  testId,
+  children,
+}: PickerProps) => (
+  <Field.Root required flex="1">
+    <Field.Label fontSize="13px" color="fg.muted" marginBottom={1}>
+      {label}
+    </Field.Label>
+    <Menu.Root>
+      <Menu.Trigger asChild>
+        <Button
+          variant="outline"
+          colorPalette="gray"
+          size="sm"
+          fontWeight="normal"
+          justifyContent="space-between"
+          width="full"
+          data-testid={testId}
+        >
+          <Text
+            fontSize="13px"
+            color={isEmpty ? "fg.subtle" : "fg"}
+            truncate
+          >
+            {isEmpty ? placeholder : selectedDisplay}
+          </Text>
+          <ChevronDown size={14} color="var(--chakra-colors-fg-muted)" />
+        </Button>
+      </Menu.Trigger>
+      <Menu.Content portalled={true} maxHeight="240px" overflowY="auto">
+        {children}
+      </Menu.Content>
+    </Menu.Root>
+  </Field.Root>
+);
+
+const EmptyMenuItem = () => (
+  <Menu.Item value="__empty__" disabled>
+    <Text fontSize="13px" color="fg.subtle">
+      No options available
+    </Text>
+  </Menu.Item>
+);
 
 export function PairwiseConfigForm({
   value,
@@ -68,103 +164,89 @@ export function PairwiseConfigForm({
     });
   };
 
-  const toggleMetric = (metric: "cost" | "duration", on: boolean) => {
-    const set = new Set(draft.includeMetrics);
-    if (on) set.add(metric);
-    else set.delete(metric);
-    update({ includeMetrics: Array.from(set) });
-  };
-
   // Variant B options exclude variant A so the user can't pick the same
   // target twice (a pairwise comparison of X vs X is always a tie).
   const variantBOptions = targets.filter((t) => t.id !== draft.variantA);
 
+  const selectedA = targets.find((t) => t.id === draft.variantA);
+  const selectedB = targets.find((t) => t.id === draft.variantB);
+
   return (
-    <VStack align="stretch" gap={4} padding={4}>
-      <Field.Root required>
-        <Field.Label>Variant A</Field.Label>
-        <NativeSelect.Root>
-          <NativeSelect.Field
-            value={draft.variantA}
-            onChange={(e: ChangeEvent<HTMLSelectElement>) => update({ variantA: e.currentTarget.value })}
-          >
-            <option value="">Select a target…</option>
-            {targets.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.id}
-              </option>
-            ))}
-          </NativeSelect.Field>
-        </NativeSelect.Root>
-      </Field.Root>
+    <VStack align="stretch" gap={3} padding={4}>
+      <HStack align="end" gap={3}>
+        <Picker
+          label="Variant A"
+          placeholder="Select a target…"
+          isEmpty={!selectedA}
+          selectedDisplay={
+            selectedA ? <SelectedVariantLabel target={selectedA} /> : null
+          }
+          testId="pairwise-variant-a"
+        >
+          {targets.length === 0 ? (
+            <EmptyMenuItem />
+          ) : (
+            targets.map((t) => (
+              <VariantMenuItem
+                key={t.id}
+                target={t}
+                onSelect={(id) => update({ variantA: id })}
+                testId={`pairwise-variant-a-option-${t.id}`}
+              />
+            ))
+          )}
+        </Picker>
 
-      <Field.Root required>
-        <Field.Label>Variant B</Field.Label>
-        <NativeSelect.Root>
-          <NativeSelect.Field
-            value={draft.variantB}
-            onChange={(e: ChangeEvent<HTMLSelectElement>) => update({ variantB: e.currentTarget.value })}
-          >
-            <option value="">Select a target…</option>
-            {variantBOptions.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.id}
-              </option>
-            ))}
-          </NativeSelect.Field>
-        </NativeSelect.Root>
-      </Field.Root>
+        <Picker
+          label="Variant B"
+          placeholder="Select a target…"
+          isEmpty={!selectedB}
+          selectedDisplay={
+            selectedB ? <SelectedVariantLabel target={selectedB} /> : null
+          }
+          testId="pairwise-variant-b"
+        >
+          {variantBOptions.length === 0 ? (
+            <EmptyMenuItem />
+          ) : (
+            variantBOptions.map((t) => (
+              <VariantMenuItem
+                key={t.id}
+                target={t}
+                onSelect={(id) => update({ variantB: id })}
+                testId={`pairwise-variant-b-option-${t.id}`}
+              />
+            ))
+          )}
+        </Picker>
 
-      <Field.Root required>
-        <Field.Label>Golden field</Field.Label>
-        <NativeSelect.Root>
-          <NativeSelect.Field
-            value={draft.goldenField}
-            onChange={(e: ChangeEvent<HTMLSelectElement>) => update({ goldenField: e.currentTarget.value })}
-          >
-            <option value="">Select a dataset column…</option>
-            {datasetColumns.map((c) => (
-              <option key={c.id} value={c.name}>
-                {c.name}
-              </option>
-            ))}
-          </NativeSelect.Field>
-        </NativeSelect.Root>
-        <Field.HelperText>
-          Reference answer the judge compares each candidate against.
-        </Field.HelperText>
-      </Field.Root>
-
-      <Box>
-        <Text fontSize="sm" fontWeight="medium" marginBottom={2}>
-          Include metrics in prompt
-        </Text>
-        <VStack align="stretch" gap={1}>
-          <Checkbox.Root
-            checked={draft.includeMetrics.includes("cost")}
-            onCheckedChange={(d) => toggleMetric("cost", d.checked === true)}
-          >
-            <Checkbox.HiddenInput />
-            <Checkbox.Control />
-            <Checkbox.Label>Include cost</Checkbox.Label>
-          </Checkbox.Root>
-          <Checkbox.Root
-            checked={draft.includeMetrics.includes("duration")}
-            onCheckedChange={(d) =>
-              toggleMetric("duration", d.checked === true)
-            }
-          >
-            <Checkbox.HiddenInput />
-            <Checkbox.Control />
-            <Checkbox.Label>Include latency</Checkbox.Label>
-          </Checkbox.Root>
-        </VStack>
-      </Box>
-
-      <HStack gap={2} color="fg.muted" fontSize="xs">
-        <Icon as={LuCheck} color="green.fg" boxSize="14px" />
-        <Text>Bias-corrected (2× judge calls)</Text>
+        <Picker
+          label="Golden field"
+          placeholder="Select a dataset column…"
+          isEmpty={!draft.goldenField}
+          selectedDisplay={<>{draft.goldenField}</>}
+          testId="pairwise-golden-field"
+        >
+          {datasetColumns.length === 0 ? (
+            <EmptyMenuItem />
+          ) : (
+            datasetColumns.map((c) => (
+              <Menu.Item
+                key={c.id}
+                value={c.name}
+                onClick={() => update({ goldenField: c.name })}
+                data-testid={`pairwise-golden-field-option-${c.name}`}
+              >
+                <Text fontSize="13px">{c.name}</Text>
+              </Menu.Item>
+            ))
+          )}
+        </Picker>
       </HStack>
+
+      <Text fontSize="xs" color="fg.muted">
+        Golden field is the reference answer the judge compares each candidate against.
+      </Text>
     </VStack>
   );
 }
