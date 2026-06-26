@@ -49,16 +49,63 @@ Feature: make quickstart is the single dev environment entry point with intent-b
   # --- Default = fastest path (#3860 AC#3) ---
 
   @unit
-  Scenario: frontend-only mode starts no compose containers
-    When I run "make quickstart frontend-only"
-    Then no compose services are brought up
-    And langwatch/.env.dev-up contains only NEXTAUTH_PROVIDER=email
-    And no infrastructure URLs are overridden
+  Scenario: frontend-only pins host-side Redis for in-process workers, no other compose
+    When write_overrides is called with mode=frontend-only
+    Then langwatch/.env.dev-up contains NEXTAUTH_PROVIDER=email
+    And REDIS_URL pointing at localhost:6379 (for the in-process BullMQ workers)
+    And it does NOT override DATABASE_URL, CLICKHOUSE_URL, or LANGWATCH_NLP_SERVICE
 
   @integration @unimplemented
   Scenario: frontend-only mode is fast — under 5 seconds to ready hint
     When I run "make quickstart frontend-only"
     Then the command completes in under 5 seconds with a hint to run "pnpm dev"
+
+  # --- Host-Redis verification before reuse (#5143, CodeRabbit 4579126710) ---
+  # frontend-only runs the BullMQ workers in-process under `pnpm dev`, so it
+  # needs a usable local Redis on host :6379. A bare port-in-use check is not
+  # enough — the listener might be a non-Redis process or a Redis that needs
+  # auth/TLS. dev.sh verifies the listener with `redis-cli ... ping` (PONG)
+  # before reusing it, errors out when :6379 is occupied by something
+  # unverifiable, and only starts its own container when the port is free.
+  # Bound to `scripts/__tests__/dev-redis-detection.unit.bats`.
+
+  @unit
+  Scenario: redis-cli PONG reply means the listener is a usable local Redis
+    Given redis-cli is on PATH and the listener on 6379 replies PONG to ping
+    When redis_listener_is_usable runs
+    Then it succeeds (the listener is treated as a usable local Redis)
+
+  @unit
+  Scenario: a listener that does not reply PONG is not a usable Redis
+    Given a listener on 6379 that replies with something other than PONG
+    When redis_listener_is_usable runs
+    Then it fails (the listener is not treated as a usable Redis)
+
+  @unit
+  Scenario: absent redis-cli degrades gracefully to not-usable (no crash)
+    Given redis-cli is not on PATH
+    When redis_listener_is_usable runs
+    Then it fails without crashing (the listener cannot be verified)
+
+  @unit
+  Scenario: frontend-only reuses a verified usable Redis without starting a container
+    Given host port 6379 is in use and the listener verifies as a usable Redis
+    When run_frontend_only runs
+    Then it reuses the existing Redis for the in-process workers
+    And it does not start a redis compose container
+
+  @unit
+  Scenario: frontend-only errors out when 6379 is occupied by an unusable listener
+    Given host port 6379 is in use but the listener does not verify as a usable Redis
+    When run_frontend_only runs
+    Then it errors out with a non-zero exit
+    And it does not start a redis compose container
+
+  @unit
+  Scenario: frontend-only starts its own redis container when 6379 is free
+    Given host port 6379 is free
+    When run_frontend_only runs
+    Then it starts its own redis compose container for the in-process workers
 
   # --- URL rewrite per mode (#3860 AC#6) ---
 
