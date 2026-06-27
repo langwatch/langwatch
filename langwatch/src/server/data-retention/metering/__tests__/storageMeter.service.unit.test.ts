@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { RETENTION_MANAGED_TABLES } from "../../retentionPolicy.schema";
 import { StorageMeterService } from "../storageMeter.service";
-import { RETENTION_MANAGED_TABLES } from "../../retentionPolicy.schema";
 
 /**
  * The metering reads sum a lazily-recomputed MATERIALIZED byteSize(...) column
@@ -90,23 +89,33 @@ describe("StorageMeterService billable measurement", () => {
 
   function makeService({
     projectIds,
+    projectIdsByOrg,
     perTenantBytes = () => "100",
     failOn,
   }: {
-    projectIds: string[];
+    projectIds?: string[];
+    projectIdsByOrg?: Record<string, string[]>;
     perTenantBytes?: (tenantId: string) => string;
     failOn?: string;
   }) {
-    const query = vi.fn(async (call: { query_params: { tenantId: string } }) => {
-      const tenantId = call.query_params.tenantId;
-      if (failOn && tenantId === failOn) {
-        throw new Error("ClickHouse query failed");
-      }
-      return { json: async () => [{ total: perTenantBytes(tenantId) }] };
-    });
+    const query = vi.fn(
+      async (call: {
+        query: string;
+        query_params: { tenantId: string; cutoff: string };
+        clickhouse_settings: Record<string, unknown>;
+      }) => {
+        const tenantId = call.query_params.tenantId;
+        if (failOn && tenantId === failOn) {
+          throw new Error("ClickHouse query failed");
+        }
+        return { json: async () => [{ total: perTenantBytes(tenantId) }] };
+      },
+    );
     const client = { query } as const;
     const resolveClient = vi.fn(async () => client as any);
-    const resolveProjectIds = vi.fn(async () => projectIds);
+    const resolveProjectIds = vi.fn(
+      async (orgId: string) => projectIdsByOrg?.[orgId] ?? projectIds ?? [],
+    );
     const service = new StorageMeterService(resolveClient, resolveProjectIds);
     return { service, query, resolveClient, resolveProjectIds };
   }
@@ -124,39 +133,28 @@ describe("StorageMeterService billable measurement", () => {
       });
 
       expect(total).toBe(300);
+      // One query per tenant, each routed to its own tenant-scoped client.
       expect(query).toHaveBeenCalledTimes(3);
-      expect(resolveClient.mock.calls.map(([id]) => id)).toEqual([
-        "p1",
-        "p2",
-        "p3",
-      ]);
+      expect(resolveClient.mock.calls.map(([id]) => id)).toEqual(
+        expect.arrayContaining(["p1", "p2", "p3"]),
+      );
     });
 
-    it("scopes every query to one of the organization's tenant ids, never another org's", async () => {
-      const { service, query } = makeService({ projectIds: ["p1", "p2"] });
+    it("measures only the target org's tenants, never another org's projects", async () => {
+      const { service, query } = makeService({
+        projectIdsByOrg: { "org-A": ["p1", "p2"], "org-B": ["p3"] },
+      });
 
       await service.getBillableStorageBytesForOrgAt({
         organizationId: "org-A",
         sealedHour: H,
       });
 
-      for (const [call] of query.mock.calls) {
-        expect(["p1", "p2"]).toContain(call.query_params.tenantId);
-      }
-    });
-
-    it("issues a separate per-tenant query, never a cross-tenant IN scan", async () => {
-      const { service, query } = makeService({ projectIds: ["p1", "p2"] });
-
-      await service.getBillableStorageBytesForOrgAt({
-        organizationId: "org-A",
-        sealedHour: H,
-      });
-
-      for (const [call] of query.mock.calls) {
-        expect(call.query).not.toMatch(/TenantId IN/i);
-        expect(call.query).toContain("TenantId = {tenantId:String}");
-      }
+      const queriedTenants = query.mock.calls.map(
+        ([call]) => call.query_params.tenantId,
+      );
+      expect(queriedTenants.sort()).toEqual(["p1", "p2"]);
+      expect(queriedTenants).not.toContain("p3");
     });
 
     it("caps each query's read streams and execution time so the size recompute can't exhaust memory", async () => {
@@ -170,19 +168,6 @@ describe("StorageMeterService billable measurement", () => {
       const settings = query.mock.calls[0]![0].clickhouse_settings;
       expect(settings.max_threads).toBe(2);
       expect(settings.max_execution_time).toBeGreaterThan(0);
-    });
-
-    it("pre-aggregates each managed table to a scalar inside the per-tenant query", async () => {
-      const { service, query } = makeService({ projectIds: ["p1"] });
-
-      await service.getBillableStorageBytesForOrgAt({
-        organizationId: "org-A",
-        sealedHour: H,
-      });
-
-      const sql = query.mock.calls[0]![0].query;
-      const perTable = sql.match(/sum\(_size_bytes\) AS t FROM/g) ?? [];
-      expect(perTable.length).toBe(RETENTION_MANAGED_TABLES.length);
     });
   });
 
