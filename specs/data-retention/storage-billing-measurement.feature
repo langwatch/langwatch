@@ -1,9 +1,3 @@
-# Spec introduced ahead of its implementation (the measurement lands in the
-# stacked PR that adds the binding tests). Until then every scenario is an
-# @unimplemented tracked gap so the feature-parity gate doesn't require bindings
-# that live on a later branch. The implementation PR removes this feature-level
-# tag and binds each scenario to a test.
-@unimplemented
 Feature: Billable stored-bytes measurement (ADR-027, Phase 2)
   As the storage-billing pipeline
   I want to measure the stored bytes an organization holds that are older than the free window, as of a sealed hour
