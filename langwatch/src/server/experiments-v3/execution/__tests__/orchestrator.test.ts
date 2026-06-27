@@ -326,6 +326,93 @@ describe("orchestrator", () => {
       );
     });
 
+    it("uses the prompt handle as candidate id when loadedPrompts has it", () => {
+      const state = createTestState(2, 0);
+      // Mark the variants as prompt-typed so variantIdentifierFor can look
+      // them up. The IDs in createTestState are "target-1" and "target-2".
+      const variantA = state.targets[0]!;
+      const variantB = state.targets[1]!;
+      (variantA as { type: string; promptId?: string }).type = "prompt";
+      (variantA as { type: string; promptId?: string }).promptId = "prompt_A";
+      (variantB as { type: string; promptId?: string }).type = "prompt";
+      (variantB as { type: string; promptId?: string }).promptId = "prompt_B";
+      state.targets.push({
+        id: "pairwise-target",
+        type: "evaluator",
+        targetEvaluatorId: "db-pairwise-evaluator",
+        inputs: [],
+        outputs: [],
+        mappings: {},
+        pairwise: {
+          variantA: variantA.id,
+          variantB: variantB.id,
+          goldenField: "expected",
+          includeMetrics: [],
+        },
+      });
+      const loadedPrompts = new Map<
+        string,
+        { handle: string } & Record<string, unknown>
+      >([
+        ["prompt_A", { handle: "say-hi" } as never],
+        ["prompt_B", { handle: "be-formal" } as never],
+      ]);
+      const { cells } = generatePairwiseCells(
+        state,
+        createTestDataset(1),
+        new Map([
+          ["0:" + variantA.id, { output: "a" }],
+          ["0:" + variantB.id, { output: "b" }],
+        ]),
+        undefined,
+        loadedPrompts as never,
+      );
+      expect(cells).toHaveLength(1);
+      expect(cells[0]?.pairwise?.candidateA.id).toBe("say-hi");
+      expect(cells[0]?.pairwise?.candidateB.id).toBe("be-formal");
+    });
+
+    it("falls back to target id (not promptId) when handle is unavailable", () => {
+      const state = createTestState(2, 0);
+      // Prompt-typed variants with promptIds but NO entry in loadedPrompts —
+      // simulates a deleted prompt or a worker that hasn't loaded the cache.
+      const variantA = state.targets[0]!;
+      const variantB = state.targets[1]!;
+      (variantA as { type: string; promptId?: string }).type = "prompt";
+      (variantA as { type: string; promptId?: string }).promptId = "prompt_A";
+      (variantB as { type: string; promptId?: string }).type = "prompt";
+      (variantB as { type: string; promptId?: string }).promptId = "prompt_B";
+      state.targets.push({
+        id: "pairwise-target",
+        type: "evaluator",
+        targetEvaluatorId: "db-pairwise-evaluator",
+        inputs: [],
+        outputs: [],
+        mappings: {},
+        pairwise: {
+          variantA: variantA.id,
+          variantB: variantB.id,
+          goldenField: "expected",
+          includeMetrics: [],
+        },
+      });
+      const { cells } = generatePairwiseCells(
+        state,
+        createTestDataset(1),
+        new Map([
+          ["0:" + variantA.id, { output: "a" }],
+          ["0:" + variantB.id, { output: "b" }],
+        ]),
+        undefined,
+        new Map(),
+      );
+      // Must be the internal target id (which the aggregator can normalize),
+      // never the raw promptId KSUID which would silently drop the verdict.
+      expect(cells[0]?.pairwise?.candidateA.id).toBe(variantA.id);
+      expect(cells[0]?.pairwise?.candidateB.id).toBe(variantB.id);
+      expect(cells[0]?.pairwise?.candidateA.id).not.toBe("prompt_A");
+    });
+
     it("does not create pairwise cells until both variants have output", () => {
       const state = createTestState(2, 0);
       state.targets.push({

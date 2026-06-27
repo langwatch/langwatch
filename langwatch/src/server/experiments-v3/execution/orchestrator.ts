@@ -347,14 +347,16 @@ export const generatePairwiseCells = (
   // Pick the most human-readable identifier we can derive from a TargetConfig.
   // langevals echoes `candidate_a_id` / `candidate_b_id` back to us as the
   // `label` on the verdict, and that label is what every programmatic consumer
-  // (REST, SDK, MCP) will read first — so the prompt's HANDLE ("say-hi") beats
-  // its KSUID-prefixed db id ("prompt_6IFkbb…") which beats the internal
-  // target id ("target_…"). `loadedPrompts` is keyed by `target.promptId`.
+  // (REST, SDK, MCP) will read first — so prefer the prompt's HANDLE
+  // ("say-hi") when we can resolve it; otherwise fall back to the internal
+  // target id ("target_..."). We deliberately do NOT fall back to `promptId`
+  // (the KSUID like "prompt_6IFkbb..."): the aggregator's normalizer matches
+  // against (a) legacy A/B/tie, (b) target.id, or (c) the supplied handle —
+  // a raw promptId KSUID wouldn't normalize and the verdict would be dropped.
   const variantIdentifierFor = (t: TargetConfig): string => {
     if (t.type === "prompt" && t.promptId) {
       const handle = loadedPrompts?.get(t.promptId)?.handle;
       if (handle) return handle;
-      return t.promptId;
     }
     return t.id;
   };
