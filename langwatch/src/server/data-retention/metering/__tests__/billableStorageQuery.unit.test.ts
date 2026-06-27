@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { RETENTION_MANAGED_TABLES } from "../../retentionPolicy.schema";
 import {
   BILLABLE_AFTER_DAYS,
   BILLABLE_AGE_EXPR_BY_TABLE,
   buildBillableStorageQuery,
 } from "../billableStorageQuery";
-import { RETENTION_MANAGED_TABLES } from "../../retentionPolicy.schema";
 
 describe("buildBillableStorageQuery", () => {
   const sql = buildBillableStorageQuery(BILLABLE_AGE_EXPR_BY_TABLE);

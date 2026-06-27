@@ -60,9 +60,7 @@ const BILLABLE_METERING_CLICKHOUSE_SETTINGS = {
 } as const;
 
 /** Resolves an organization's project ids (its ClickHouse tenant ids). */
-export type ProjectIdsResolver = (
-  organizationId: string,
-) => Promise<string[]>;
+export type ProjectIdsResolver = (organizationId: string) => Promise<string[]>;
 
 // The per-tenant billable query is identical across orgs and hours (only its
 // params vary), so build it once at module load rather than per call.
@@ -147,7 +145,9 @@ export class StorageMeterService {
     // expression is DateTime, and the explicit type keeps the boundary from
     // shifting with the ClickHouse session timezone.
     const cutoff = formatClickHouseDateTime(
-      new Date(sealedHour.getTime() - BILLABLE_AFTER_DAYS * 24 * 60 * 60 * 1000),
+      new Date(
+        sealedHour.getTime() - BILLABLE_AFTER_DAYS * 24 * 60 * 60 * 1000,
+      ),
     ).slice(0, 19);
 
     const projectIds = await this.resolveProjectIds(organizationId);
