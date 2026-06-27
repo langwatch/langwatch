@@ -166,7 +166,11 @@ export const useOpenEvaluatorEditor = () => {
           // Non-serializable extras consumed by the drawer body.
           pairwiseContext: {
             initialPairwise: evaluator.pairwise,
-            targets: targets.map((t) => ({ id: t.id })),
+            // Pass full TargetConfig so the picker's `useTargetName` hook
+            // can resolve human-readable handles (it needs `type`,
+            // `promptId`, `dbAgentId`, `targetEvaluatorId` — stripping to
+            // `{id}` would force the dropdown to show raw `target_NNNN` ids).
+            targets,
             datasetColumns:
               activeDataset?.columns.map((c) => ({
                 id: c.id,
