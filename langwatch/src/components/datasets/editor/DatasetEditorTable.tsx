@@ -40,20 +40,12 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  AlertTriangle,
-  Check,
-  Download,
-  Edit2,
-  Plus,
-  Trash2,
-  Upload,
-  X,
-} from "react-feather";
+import { Check, Download, Edit2, Plus, Trash2, Upload, X } from "react-feather";
 import { useStore } from "zustand";
 
 import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
 import { ColumnTypeIcon } from "~/components/shared/ColumnTypeIcon";
+import { Pagination } from "~/components/ui/Pagination";
 import { SelectionActionBar } from "~/components/ui/SelectionActionBar";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -71,7 +63,7 @@ import {
   DatasetTableProvider,
   type DatasetTableRowData,
 } from "./DatasetTableContext";
-import { formatRecordCount, truncatedReadTooltip } from "./datasetEditorCopy";
+import { formatRecordCount } from "./datasetEditorCopy";
 import { datasetTableCss } from "./datasetTableStyles";
 import {
   createDatasetEditorStore,
@@ -104,6 +96,10 @@ export type DatasetEditorController = {
 
 const CHECKBOX_WIDTH_PX = 36;
 const MAX_ROWS_WITHOUT_VIRTUALIZATION = 100;
+/** Records per page for the saved-dataset editor (classic page N of M). One
+ *  page comfortably fits the virtualized viewport while keeping each read
+ *  bounded — an s3_jsonl page touches only the chunks overlapping the window. */
+const DATASET_EDITOR_PAGE_SIZE = 50;
 
 const toEditorColumns = (columnTypes: DatasetColumns): EditorColumn[] =>
   columnTypes.map((col, index) => ({
@@ -184,13 +180,37 @@ export function DatasetEditorTable({
 
   // ── Data loading ──────────────────────────────────────────────────
 
-  const databaseDataset = api.datasetRecord.getAll.useQuery(
-    { projectId: project?.id ?? "", datasetId: datasetId ?? "" },
+  // Saved datasets are read one page at a time (classic page N of M) instead of
+  // the whole dataset, which previously truncated past a byte cap and silently
+  // hid the rest. In-memory mode (no datasetId) keeps its full local copy.
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DATASET_EDITOR_PAGE_SIZE);
+
+  const databaseDataset = api.datasetRecord.listPaginated.useQuery(
+    {
+      projectId: project?.id ?? "",
+      datasetId: datasetId ?? "",
+      page,
+      limit: pageSize,
+    },
     {
       // Gated on `readEnabled` so a still-preparing/failed dataset is never read
-      // (getAll → getFullDataset throws DatasetNotReadyError otherwise).
+      // (listPaginated throws DatasetNotReadyError otherwise).
       enabled: !!project && !!datasetId && readEnabled,
       refetchOnWindowFocus: false,
+      // Hold the previous page's result while the next page loads, so a page
+      // switch doesn't blank the grid (and doesn't momentarily drop the page
+      // count, which would otherwise bounce navigation back to page 1).
+      keepPreviousData: true,
+      // A background refetch (e.g. on reconnect) would reload the store via
+      // setData and drop an unsaved local edit on the current page — page
+      // navigation is gated on pending writes, but an automatic refetch is not,
+      // so disable it.
+      refetchOnReconnect: false,
+      // staleTime 0: returning to a previously-viewed page refetches in the
+      // background so a cell edited then navigated-away-from shows its saved
+      // value on return (the edit is persisted per-record, not into this cache).
+      staleTime: 0,
       onError: (error) => {
         if (isHandledByGlobalHandler(error)) return;
         toaster.create({
@@ -203,6 +223,30 @@ export function DatasetEditorTable({
       },
     },
   );
+
+  // The PG-authoritative total record count from the last settled read (undefined
+  // until the first response; held across a page switch by keepPreviousData so it
+  // never momentarily resets mid-navigation). Deriving the page count from
+  // `count / pageSize` — rather than reading the server's `totalPages` — keeps it
+  // correct the instant the user changes the rows-per-page, before any refetch.
+  // `pageCount` floors at 1 so an EMPTY dataset still reads as a single page and
+  // never asks for page 0 (which the server's `positive()` guard would reject).
+  // `currentPage` is the page actually shown, clamped so it can never exceed the
+  // count.
+  const serverRecordCount = datasetId ? databaseDataset.data?.count : undefined;
+  const pageCount = Math.max(1, Math.ceil((serverRecordCount ?? 0) / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const isLastPage = currentPage >= pageCount;
+  // Snap a now-out-of-range page back into range — e.g. the last page's rows
+  // were all deleted under us (the post-delete refetch shrinks the count) or a
+  // navigation refetch returned a smaller dataset. Acts ONLY on an authoritative
+  // count — never on absent data — so an in-flight page switch can't bounce
+  // navigation back to page 1. Floored at 1, so it never drives the page to 0.
+  useEffect(() => {
+    if (serverRecordCount == null) return;
+    const count = Math.max(1, Math.ceil(serverRecordCount / pageSize));
+    if (page > count) setPage(count);
+  }, [serverRecordCount, pageSize, page]);
 
   const datasetName = datasetId
     ? databaseDataset.data?.name
@@ -221,8 +265,14 @@ export function DatasetEditorTable({
   // other way via onUpdateDataset).
   const loadedRef = useRef(false);
   const lastPropagatedRef = useRef<EditorRecord[] | null>(null);
+  // While `keepPreviousData` serves the prior key's result during a key change,
+  // `isPreviousData` is true. Skip hydrating from it: a `datasetId` switch would
+  // otherwise populate the grid with the OLD dataset's rows under the NEW id
+  // (a data-integrity mismatch until the new query settles). For a same-dataset
+  // page switch this just holds the current page until the next one lands.
+  const holdingPreviousData = databaseDataset.isPreviousData;
   useEffect(() => {
-    if (datasetId && databaseDataset.data) {
+    if (datasetId && databaseDataset.data && !holdingPreviousData) {
       const columns = toEditorColumns(
         (databaseDataset.data.columnTypes ?? []) as DatasetColumns,
       );
@@ -251,7 +301,7 @@ export function DatasetEditorTable({
       lastPropagatedRef.current = store.getState().records;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [datasetId, databaseDataset.data, store]);
+  }, [datasetId, databaseDataset.data, holdingPreviousData, store]);
 
   // Imperative controller for external writers (AI generation streams)
   useEffect(() => {
@@ -337,24 +387,40 @@ export function DatasetEditorTable({
     resolveFullRecord,
     clearPendingChange,
     onStatus,
+    // After a deletion settles, refresh the server total so the pager reflects
+    // the smaller dataset and the clamp effect can snap off a now-empty last
+    // page. Saved mode only — in-memory deletes never touch this query.
+    onRecordsDeleted: datasetId
+      ? () => {
+          void databaseDataset.refetch();
+        }
+      : undefined,
   });
 
   // ── Table assembly ────────────────────────────────────────────────
 
   const rowCount = records.length;
-  // Always include one trailing phantom row (Excel-style "click to add")
-  const displayRowCount = Math.max(rowCount + 1, 3);
+  // The trailing phantom row (Excel-style "click to add") appends to the END of
+  // the dataset, so on the paged saved view it belongs only on the last page —
+  // adding it on an earlier full page would create a row the user can't see.
+  // In-memory mode (no datasetId) is one local list, so it always shows it.
+  const showAddRow = !datasetId || isLastPage;
+  const displayRowCount = showAddRow ? Math.max(rowCount + 1, 3) : rowCount;
 
-  // Large-dataset read truncation (ADR-032): saved datasets load via
-  // `getFullDataset`, which stops accumulating rows once it crosses a byte
-  // budget and returns the PG-authoritative total in `count` + a `truncated`
-  // flag. Without surfacing it the chrome shows only the loaded rows (e.g. "3
-  // records") for a 1640-row dataset — misleading. `count` is the source of
-  // truth for the total; `rowCount` is what's actually rendered.
-  const serverRecordCount = datasetId ? databaseDataset.data?.count : undefined;
-  const isTruncatedRead = datasetId
-    ? databaseDataset.data?.truncated === true
-    : false;
+  // Block page navigation while a record save is queued or in flight: switching
+  // pages reloads the store (setData drops the prior page's records), so an
+  // unsaved edit on the outgoing page would be stranded (resolveFullRecord can
+  // no longer find it). The autosave debounce is short, so this is a brief gate.
+  const hasPendingWrites =
+    autosave.state === "saving" ||
+    (datasetId
+      ? Object.keys(pendingSavedChanges[datasetId] ?? {}).length > 0
+      : false);
+
+  // The count chip shows the PG-authoritative whole-dataset total (`count`),
+  // not just the rows on this page; the pager shows the position within it.
+  // (Pagination replaced the old byte-cap truncation, so there is no longer a
+  // partial-read state to surface.) `serverRecordCount` is derived once above.
   const totalRecordCount = serverRecordCount ?? rowCount;
 
   const rowData = useMemo((): DatasetTableRowData[] => {
@@ -601,46 +667,10 @@ export function DatasetEditorTable({
         ) : (
           title
         )}
-        {isTruncatedRead ? (
-          <Tooltip
-            content={truncatedReadTooltip({
-              shown: rowCount,
-              total: totalRecordCount,
-            })}
-          >
-            <HStack
-              gap={1}
-              cursor="help"
-              // Keyboard-reachable: the explanation is otherwise hover-only, so
-              // make the chip focusable (Tooltip opens on focus too) and expose
-              // the full text to assistive tech via aria-label.
-              tabIndex={0}
-              role="note"
-              aria-label={truncatedReadTooltip({
-                shown: rowCount,
-                total: totalRecordCount,
-              })}
-              data-testid="dataset-row-count"
-            >
-              <Text fontSize="13px" color="fg.muted">
-                {formatRecordCount(rowCount)} out of{" "}
-                {formatRecordCount(totalRecordCount)} records
-              </Text>
-              <Box color="orange.500" display="flex">
-                <AlertTriangle size={13} />
-              </Box>
-            </HStack>
-          </Tooltip>
-        ) : (
-          <Text
-            fontSize="13px"
-            color="fg.muted"
-            data-testid="dataset-row-count"
-          >
-            {formatRecordCount(totalRecordCount)}{" "}
-            {totalRecordCount === 1 ? "record" : "records"}
-          </Text>
-        )}
+        <Text fontSize="13px" color="fg.muted" data-testid="dataset-row-count">
+          {formatRecordCount(totalRecordCount)}{" "}
+          {totalRecordCount === 1 ? "record" : "records"}
+        </Text>
         {datasetId && (
           <SaveStatusChip state={autosave.state} error={autosave.error} />
         )}
@@ -754,16 +784,38 @@ export function DatasetEditorTable({
       </Box>
 
       <HStack>
-        <Button
-          size="sm"
-          variant="ghost"
-          data-testid="add-row"
-          onClick={handleAddRow}
-        >
-          <Plus size={14} /> Add row
-        </Button>
+        {showAddRow && (
+          <Button
+            size="sm"
+            variant="ghost"
+            data-testid="add-row"
+            onClick={handleAddRow}
+          >
+            <Plus size={14} /> Add row
+          </Button>
+        )}
         <Spacer />
       </HStack>
+      {datasetId && (
+        <Pagination
+          page={currentPage}
+          pageSize={pageSize}
+          totalCount={totalRecordCount}
+          isLoading={databaseDataset.isLoading}
+          // Block navigation while a record save is queued or in flight; a page
+          // switch reloads the store and would strand an unsaved edit.
+          navDisabled={hasPendingWrites}
+          onPageChange={(nextPage) => {
+            clearRowSelection();
+            setPage(nextPage);
+          }}
+          onPageSizeChange={(nextSize) => {
+            clearRowSelection();
+            setPageSize(nextSize);
+            setPage(1);
+          }}
+        />
+      )}
       {bottomSpace && <Box height={bottomSpace} flexShrink={0} />}
 
       {floatingSelectionBar && selectedRows.size > 0 && (

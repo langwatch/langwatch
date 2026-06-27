@@ -2,12 +2,14 @@ import type { Dataset, PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
+import { DatasetService } from "../../datasets/dataset.service";
 import {
   deleteS3JsonlRecords,
   editS3JsonlRecord,
 } from "../../datasets/dataset-mutations";
 import {
   ChunkTooLargeError,
+  DatasetNotFoundError,
   DatasetNotReadyError,
   DatasetTooLargeToExportError,
   DuplicateRecordIdError,
@@ -169,6 +171,40 @@ export const datasetRecordRouter = createTRPCRouter({
         // Defense: a not-ready read surfaces as PRECONDITION_FAILED instead of
         // INTERNAL_SERVER_ERROR (the UI already gates, but downstream consumers
         // rely on a clean 4xx — see useGetDatasetData / useSavedDatasetLoader).
+        return rethrowDatasetNotReadyAsTRPC(error);
+      }
+    }),
+  /**
+   * One page of a dataset for the editor (classic page N of M). Replaces the
+   * editor's whole-dataset `getAll` read — which truncated past a byte cap and
+   * silently hid the rest — with a bounded windowed read (s3_jsonl reads only
+   * the chunks overlapping the page; PG paginates by skip/take). Total is the
+   * PG-authoritative `count`. Editing still works on the visible page because
+   * record mutations target each record by its own id.
+   */
+  listPaginated: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        datasetId: z.string(),
+        page: z.number().int().positive().default(1),
+        limit: z.number().int().positive().max(200).default(50),
+      }),
+    )
+    .use(checkProjectPermission("datasets:view"))
+    .query(async ({ ctx, input }) => {
+      try {
+        return await DatasetService.create(ctx.prisma).getDatasetPage({
+          slugOrId: input.datasetId,
+          projectId: input.projectId,
+          page: input.page,
+          limit: input.limit,
+        });
+      } catch (error) {
+        // Parity with getAll/getFullDataset: an archived/missing dataset reads
+        // as null (the editor surfaces "no longer available"), not a 500. A
+        // still-preparing dataset maps to PRECONDITION_FAILED like the others.
+        if (error instanceof DatasetNotFoundError) return null;
         return rethrowDatasetNotReadyAsTRPC(error);
       }
     }),
