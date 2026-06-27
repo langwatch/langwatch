@@ -1,6 +1,6 @@
 import {
-  TABLE_TTL_CONFIG,
   buildRetentionAgeColumnExpression,
+  TABLE_TTL_CONFIG,
 } from "~/server/clickhouse/ttlReconciler";
 import { RETENTION_MANAGED_TABLES } from "../retentionPolicy.schema";
 
