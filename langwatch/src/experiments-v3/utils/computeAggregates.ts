@@ -1,9 +1,9 @@
-import { parseEvaluationResult } from "~/utils/evaluationResults";
 import {
   computeMetricStats,
   type MetricStats,
 } from "~/components/shared/MetricStatsTooltip";
-import type { EvaluationResults } from "../types";
+import { parseEvaluationResult } from "~/utils/evaluationResults";
+import type { EvaluationResults, EvaluatorConfig } from "../types";
 
 export { computeMetricStats, type MetricStats };
 
@@ -220,6 +220,173 @@ export const computeTargetAggregates = (
     totalDuration: latencyStats?.total ?? null,
     latencyStats,
     costStats,
+  };
+};
+
+/**
+ * Pairwise verdict for a single row (#5100). Lives on
+ * `results.evaluatorResults[variantA][evaluatorId][rowIndex]` — the
+ * orchestrator stores the Phase-2 result against the variantA target id
+ * because that's the synthetic target the workflow builder anchors on.
+ */
+export type PairwiseVerdict = {
+  label: "A" | "B" | "tie";
+  reasoning?: string;
+  costAmount: number;
+};
+
+export type PairwiseAggregate = {
+  evaluatorId: string;
+  variantA: string;
+  variantB: string;
+  counts: { a: number; b: number; tie: number };
+  totalCost: number;
+  perRow: Array<PairwiseVerdict | null>;
+};
+
+const isPairwiseLegacyLabel = (
+  value: unknown,
+): value is PairwiseVerdict["label"] =>
+  value === "A" || value === "B" || value === "tie";
+
+/**
+ * Normalize a stored pairwise label to its slot ("A" / "B" / "tie").
+ * langevals now stores the winner's candidate identifier (or "tie");
+ * older runs still hold legacy "A"/"B"/"tie". We accept both. The
+ * identifier may be either the variant's internal target id OR its
+ * prompt handle (set in the orchestrator's `variantIdentifierFor`).
+ */
+const normalizePairwiseLabel = (
+  value: unknown,
+  variantA: string,
+  variantB: string,
+  variantAHandle?: string,
+  variantBHandle?: string,
+): PairwiseVerdict["label"] | undefined => {
+  if (isPairwiseLegacyLabel(value)) return value;
+  if (typeof value !== "string") return undefined;
+  if (value === variantA || (variantAHandle && value === variantAHandle))
+    return "A";
+  if (value === variantB || (variantBHandle && value === variantBHandle))
+    return "B";
+  return undefined;
+};
+
+const readCostAmount = (raw: unknown): number => {
+  if (!raw || typeof raw !== "object") return 0;
+  const cost = (raw as { cost?: unknown }).cost;
+  if (!cost || typeof cost !== "object") return 0;
+  const amount = (cost as { amount?: unknown }).amount;
+  return typeof amount === "number" && Number.isFinite(amount) ? amount : 0;
+};
+
+/**
+ * Aggregates verdicts for a single pairwise evaluator across all rows.
+ * Skips rows whose result is missing, errored, or has a non-A/B/tie label.
+ */
+/**
+ * Optional resolved-handle hints from the caller. The orchestrator emits the
+ * prompt's HANDLE (e.g. `"say-hi"`) as the verdict label — not its `promptId`
+ * KSUID. Callers who can resolve a handle (via `useTargetName` or the trpc
+ * prompt cache) should pass it here so the normalizer can match against it.
+ */
+export type PairwiseAggregateHandles = {
+  variantAHandle?: string;
+  variantBHandle?: string;
+};
+
+export const computePairwiseAggregate = (
+  evaluator: Pick<EvaluatorConfig, "id" | "pairwise">,
+  results: EvaluationResults,
+  rowCount: number,
+  handles?: PairwiseAggregateHandles,
+): PairwiseAggregate | null => {
+  if (!evaluator.pairwise) return null;
+  return computePairwiseAggregateFromResults({
+    id: evaluator.id,
+    pairwise: evaluator.pairwise,
+    results,
+    rowCount,
+    resultTargetId: evaluator.pairwise.variantA,
+    handles,
+  });
+};
+
+export const computePairwiseTargetAggregate = (
+  target: { id: string; pairwise?: EvaluatorConfig["pairwise"] },
+  results: EvaluationResults,
+  rowCount: number,
+  handles?: PairwiseAggregateHandles,
+): PairwiseAggregate | null => {
+  if (!target.pairwise) return null;
+  return computePairwiseAggregateFromResults({
+    id: target.id,
+    pairwise: target.pairwise,
+    results,
+    rowCount,
+    resultTargetId: target.id,
+    handles,
+  });
+};
+
+const computePairwiseAggregateFromResults = ({
+  id,
+  pairwise,
+  results,
+  rowCount,
+  resultTargetId,
+  handles,
+}: {
+  id: string;
+  pairwise: NonNullable<EvaluatorConfig["pairwise"]>;
+  results: EvaluationResults;
+  rowCount: number;
+  resultTargetId: string;
+  handles?: PairwiseAggregateHandles;
+}): PairwiseAggregate | null => {
+  const { variantA, variantB } = pairwise;
+  const evalResults = results.evaluatorResults[resultTargetId]?.[id] ?? [];
+
+  const variantAHandle = handles?.variantAHandle;
+  const variantBHandle = handles?.variantBHandle;
+
+  const counts = { a: 0, b: 0, tie: 0 };
+  let totalCost = 0;
+  const perRow: Array<PairwiseVerdict | null> = [];
+
+  for (let i = 0; i < rowCount; i++) {
+    const raw = evalResults[i];
+    const parsed = parseEvaluationResult(raw);
+    const label = normalizePairwiseLabel(
+      parsed.label,
+      variantA,
+      variantB,
+      variantAHandle ?? undefined,
+      variantBHandle ?? undefined,
+    );
+    if (parsed.status !== "processed" || !label) {
+      perRow.push(null);
+      continue;
+    }
+    const costAmount = readCostAmount(raw);
+    if (label === "A") counts.a++;
+    else if (label === "B") counts.b++;
+    else counts.tie++;
+    totalCost += costAmount;
+    perRow.push({
+      label,
+      reasoning: parsed.details,
+      costAmount,
+    });
+  }
+
+  return {
+    evaluatorId: id,
+    variantA,
+    variantB,
+    counts,
+    totalCost,
+    perRow,
   };
 };
 

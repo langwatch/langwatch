@@ -67,7 +67,10 @@ const apiKeyAuth = handlerManagedAuth(
 export const legacyAliasApp = new Hono().basePath("/api/evaluations/v3");
 legacyAliasApp.all("/*", (c) => {
   const url = new URL(c.req.url);
-  url.pathname = url.pathname.replace(/^\/api\/evaluations\/v3/, "/api/experiments");
+  url.pathname = url.pathname.replace(
+    /^\/api\/evaluations\/v3/,
+    "/api/experiments",
+  );
   return app.fetch(new Request(url.toString(), c.req.raw));
 });
 
@@ -152,127 +155,130 @@ const getRunUrl = (
 
 // ── POST /execute ────────────────────────────────────────────────────
 
-secured.access(sessionAuth).post("/execute", zValidator("json", executionRequestSchema), async (c) => {
-  const request = await c.req.json();
-  const { projectId } = request;
+secured
+  .access(sessionAuth)
+  .post("/execute", zValidator("json", executionRequestSchema), async (c) => {
+    const request = await c.req.json();
+    const { projectId } = request;
 
-  logger.info(
-    { projectId, scope: request.scope },
-    "Starting experiment execution",
-  );
-
-  const session = await getServerAuthSession({ req: c.req.raw as any });
-  if (!session) {
-    return c.json(
-      { error: "You must be logged in to access this endpoint." },
-      { status: 401 },
+    logger.info(
+      { projectId, scope: request.scope },
+      "Starting experiment execution",
     );
-  }
 
-  const hasPermission = await hasProjectPermission(
-    { prisma, session },
-    projectId,
-    "evaluations:manage",
-  );
-  if (!hasPermission) {
-    return c.json(
-      { error: "You do not have permission to access this endpoint." },
-      { status: 403 },
+    const session = await getServerAuthSession({ req: c.req.raw as any });
+    if (!session) {
+      return c.json(
+        { error: "You must be logged in to access this endpoint." },
+        { status: 401 },
+      );
+    }
+
+    const hasPermission = await hasProjectPermission(
+      { prisma, session },
+      projectId,
+      "evaluations:manage",
     );
-  }
+    if (!hasPermission) {
+      return c.json(
+        { error: "You do not have permission to access this endpoint." },
+        { status: 403 },
+      );
+    }
 
-  const dataResult = await loadExecutionData(
-    projectId,
-    request.dataset,
-    request.targets,
-    request.evaluators,
-  );
-
-  if ("error" in dataResult) {
-    return c.json(
-      { error: dataResult.error },
-      { status: dataResult.status as 400 | 404 },
+    const dataResult = await loadExecutionData(
+      projectId,
+      request.dataset,
+      request.targets,
+      request.evaluators,
     );
-  }
 
-  const {
-    datasetRows,
-    datasetColumns,
-    loadedPrompts,
-    loadedAgents,
-    loadedEvaluators,
-  } = dataResult;
+    if ("error" in dataResult) {
+      return c.json(
+        { error: dataResult.error },
+        { status: dataResult.status as 400 | 404 },
+      );
+    }
 
-  const state: EvaluationsV3State = {
-    name: request.name,
-    datasets: [request.dataset],
-    activeDatasetId: request.dataset.id ?? "dataset-1",
-    targets: request.targets as EvaluationsV3State["targets"],
-    evaluators: request.evaluators as EvaluationsV3State["evaluators"],
-    results: {
-      status: "running",
-      targetOutputs: {},
-      targetMetadata: {},
-      evaluatorResults: {},
-      errors: {},
-    },
-    pendingSavedChanges: {},
-    ui: createInitialUIState(),
-  };
+    const {
+      datasetRows,
+      datasetColumns,
+      loadedPrompts,
+      loadedAgents,
+      loadedEvaluators,
+    } = dataResult;
 
-  return streamSSE(c, async (stream) => {
-    try {
-      const isFullRun = request.scope.type === "full";
+    const state: EvaluationsV3State = {
+      name: request.name,
+      datasets: [request.dataset],
+      activeDatasetId: request.dataset.id ?? "dataset-1",
+      targets: request.targets as EvaluationsV3State["targets"],
+      evaluators: request.evaluators as EvaluationsV3State["evaluators"],
+      results: {
+        status: "running",
+        targetOutputs: {},
+        targetMetadata: {},
+        evaluatorResults: {},
+        errors: {},
+      },
+      pendingSavedChanges: {},
+      ui: createInitialUIState(),
+    };
 
-      const orchestrator = runOrchestrator({
-        projectId,
-        experimentId: request.experimentId,
-        scope: request.scope,
-        state,
-        datasetRows,
-        datasetColumns,
-        loadedPrompts,
-        loadedAgents,
-        loadedEvaluators,
-        concurrency: request.concurrency,
-      });
+    return streamSSE(c, async (stream) => {
+      try {
+        const isFullRun = request.scope.type === "full";
 
-      for await (const event of orchestrator) {
-        await stream.writeSSE({
-          data: JSON.stringify(event),
+        const orchestrator = runOrchestrator({
+          projectId,
+          experimentId: request.experimentId,
+          scope: request.scope,
+          state,
+          datasetRows,
+          datasetColumns,
+          loadedPrompts,
+          loadedAgents,
+          loadedEvaluators,
+          concurrency: request.concurrency,
+          seedTargetOutputs: request.seedTargetOutputs,
         });
 
-        if (event.type === "done" || event.type === "stopped") {
-          if (session?.user?.id) {
-            trackServerEvent({
-              userId: session.user.id,
-              event: "evaluation_ran",
-              projectId,
-            });
-            if (request.experimentId && isFullRun) {
-              fireExperimentRanNurturing({
+        for await (const event of orchestrator) {
+          await stream.writeSSE({
+            data: JSON.stringify(event),
+          });
+
+          if (event.type === "done" || event.type === "stopped") {
+            if (session?.user?.id) {
+              trackServerEvent({
                 userId: session.user.id,
-                experimentId: request.experimentId,
+                event: "evaluation_ran",
                 projectId,
               });
+              if (request.experimentId && isFullRun) {
+                fireExperimentRanNurturing({
+                  userId: session.user.id,
+                  experimentId: request.experimentId,
+                  projectId,
+                });
+              }
             }
+            break;
           }
-          break;
         }
-      }
-    } catch (error) {
-      logger.error({ error, projectId }, "Orchestrator error");
-      captureException(toError(error), { extra: { projectId } });
+      } catch (error) {
+        logger.error({ error, projectId }, "Orchestrator error");
+        captureException(toError(error), { extra: { projectId } });
 
-      await stream.writeSSE({
-        data: JSON.stringify({
-          type: "error",
-          message: (error as Error).message,
-        }),
-      });
-    }
+        await stream.writeSSE({
+          data: JSON.stringify({
+            type: "error",
+            message: (error as Error).message,
+          }),
+        });
+      }
+    });
   });
-});
 
 // ── POST /abort ──────────────────────────────────────────────────────
 
@@ -287,7 +293,10 @@ secured.access(sessionAuth).post("/abort", async (c) => {
   const { projectId, runId } = body;
   if (!projectId || !runId) {
     return c.json(
-      { error: "Invalid request body", details: "projectId and runId are required" },
+      {
+        error: "Invalid request body",
+        details: "projectId and runId are required",
+      },
       { status: 400 },
     );
   }
@@ -367,7 +376,10 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
       { slug, errors: parseResult.error.errors },
       "Invalid workbenchState",
     );
-    return c.json({ error: "Invalid experiment configuration" }, { status: 400 });
+    return c.json(
+      { error: "Invalid experiment configuration" },
+      { status: 400 },
+    );
   }
 
   const workbenchState = parseResult.data;
@@ -441,7 +453,9 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
           { error, projectId: project.id, slug },
           "Orchestrator error",
         );
-        captureException(toError(error), { extra: { projectId: project.id, slug } });
+        captureException(toError(error), {
+          extra: { projectId: project.id, slug },
+        });
 
         await stream.writeSSE({
           data: JSON.stringify({

@@ -92,6 +92,27 @@ describe("getEvaluatorDataForParams coercion", () => {
     });
   });
 
+  describe("when an evaluator declares fields outside the default schema", () => {
+    it("preserves pairwise candidate fields for downstream required-field validation", () => {
+      const result = getEvaluatorDataForParams("langevals/pairwise_compare", {
+        input: "Write a greeting",
+        golden: "Hello there",
+        candidate_a_id: "target-a",
+        candidate_a_output: "Hello",
+        candidate_b_id: "target-b",
+        candidate_b_output: "Hi",
+      });
+
+      expect(result.type).toBe("default");
+      if (result.type !== "default") throw new Error("unreachable");
+      expect(result.data.candidate_a_id).toBe("target-a");
+      expect(result.data.candidate_a_output).toBe("Hello");
+      expect(result.data.candidate_b_id).toBe("target-b");
+      expect(result.data.candidate_b_output).toBe("Hi");
+      expect(result.data.golden).toBe("Hello there");
+    });
+  });
+
   describe("when checkType is a custom evaluator", () => {
     it("passes params through without coercion (custom evaluators self-validate)", () => {
       const result = getEvaluatorDataForParams("custom/wf_123", {

@@ -12,7 +12,11 @@
 
 import { generate } from "@langwatch/ksuid";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
-import type { EvaluationsV3State, TargetConfig } from "~/experiments-v3/types";
+import type {
+  EvaluationsV3State,
+  EvaluatorConfig,
+  TargetConfig,
+} from "~/experiments-v3/types";
 import { isRowEmpty } from "~/experiments-v3/utils/emptyRowDetection";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
@@ -69,6 +73,15 @@ export type OrchestratorInput = {
   runId?: string;
   /** Concurrency limit for parallel execution (default 10) */
   concurrency?: number;
+  /**
+   * Pre-existing target outputs keyed by `${rowIndex}:${targetId}`. Phase 2
+   * pairwise reads from these when the user re-runs only the pairwise
+   * column on top of variants that already produced output in a prior run.
+   */
+  seedTargetOutputs?: Record<
+    string,
+    { output: unknown; cost?: number; duration?: number }
+  >;
 };
 
 /**
@@ -164,16 +177,35 @@ export const generateCells = (
             ? [scope.rowIndex]
             : [];
 
-  // Determine which targets to process
+  // Determine which targets to process.
+  //
+  // For target-/cell-scoped runs against a pairwise column-target, the
+  // pairwise verdict needs both variants' outputs to exist before Phase 2
+  // can synthesize the comparison cell. If the user hits Play on the
+  // Pairwise Compare column without first running the variants, expand
+  // the scope to include variantA + variantB so Phase 1 produces what
+  // Phase 2 needs. Without this, only the pairwise target is dispatched,
+  // Phase 1 skips it (column-style pairwise is always Phase-2-only),
+  // and the run completes with 0 cells — visible to the user as a
+  // silent no-op with "No verdict yet" everywhere.
+  const expandPairwiseDeps = (id: string): string[] => {
+    const t = state.targets.find((tg: TargetConfig) => tg.id === id);
+    if (!t || t.type !== "evaluator" || !t.pairwise) return [id];
+    const deps = [t.pairwise.variantA, t.pairwise.variantB].filter(
+      (v): v is string => !!v,
+    );
+    return Array.from(new Set([...deps, id]));
+  };
+
   const targetIds =
     scope.type === "full"
       ? state.targets.map((t: TargetConfig) => t.id)
       : scope.type === "rows"
         ? state.targets.map((t: TargetConfig) => t.id)
         : scope.type === "target"
-          ? [scope.targetId]
+          ? expandPairwiseDeps(scope.targetId)
           : scope.type === "cell"
-            ? [scope.targetId]
+            ? expandPairwiseDeps(scope.targetId)
             : [];
 
   // Generate cells, skipping empty rows
@@ -193,11 +225,23 @@ export const generateCells = (
       );
       if (!targetConfig) continue;
 
+      // Skip column-style pairwise targets (#5100) in Phase 1 — they need
+      // both variants' outputs which are not yet available in a single
+      // per-target cell. Picked up by generatePairwiseCells in Phase 2.
+      // Strictly additive: only triggered when target.pairwise is set,
+      // which only happens for column-style langevals/pairwise_compare.
+      if (targetConfig.type === "evaluator" && targetConfig.pairwise) {
+        continue;
+      }
+
       cells.push({
         rowIndex,
         targetId,
         targetConfig,
-        evaluatorConfigs: state.evaluators,
+        // Pairwise evaluators run in Phase 2 after both variants' outputs
+        // exist — they would crash here because candidate_b's output is not
+        // available within a single per-target cell. See generatePairwiseCells.
+        evaluatorConfigs: state.evaluators.filter((e) => !e.pairwise),
         datasetEntry: {
           _datasetId: datasetId,
           ...datasetEntry,
@@ -207,6 +251,361 @@ export const generateCells = (
   }
 
   return cells;
+};
+
+/**
+ * Phase 2 cell generator for pairwise evaluators (#5100).
+ *
+ * Called AFTER Phase 1 (per-target) cells complete. For each pairwise
+ * evaluator and each rowIndex where BOTH variantA and variantB outputs
+ * exist in `completedTargetOutputs`, emit a synthetic cell whose
+ * `pairwise` field carries both candidates. The cell's `targetId` points
+ * at variantA so the workflow builder has a real TargetConfig to lean on;
+ * `skipTarget` short-circuits target execution. `buildEvaluatorInputs`
+ * branches on `cell.pairwise` to assemble the candidate_* + golden inputs.
+ *
+ * Rows where one variant failed to produce an output are reported via
+ * `skipReasons` (not silently dropped) so the caller can emit a synthetic
+ * error event per row — otherwise the pairwise column sits at
+ * "No verdict yet" with no indication that the upstream variant failed.
+ */
+export type PairwiseSkipReason = {
+  rowIndex: number;
+  /** TargetId under which the pairwise verdict would have been stored. */
+  targetId: string;
+  /** The synthetic evaluator id whose cell would have run. */
+  evaluatorId: string;
+  /** Display-friendly identifier of variantA. */
+  variantAName: string;
+  /** Display-friendly identifier of variantB. */
+  variantBName: string;
+  /** Which side(s) had no output for this row. */
+  missing: "A" | "B" | "both";
+};
+
+export const generatePairwiseCells = (
+  state: Pick<
+    EvaluationsV3State,
+    "datasets" | "activeDatasetId" | "targets" | "evaluators"
+  >,
+  datasetRows: Array<Record<string, unknown>>,
+  completedTargetOutputs: Map<
+    string,
+    { output: unknown; cost?: number; duration?: number }
+  >,
+  completedTargetEvaluatorScores?: Map<
+    string,
+    Array<{ name: string; score?: number; label?: string; passed?: boolean }>
+  >,
+  loadedPrompts?: Map<string, VersionedPrompt>,
+): { cells: ExecutionCell[]; skipReasons: PairwiseSkipReason[] } => {
+  const cells: ExecutionCell[] = [];
+  const skipReasons: PairwiseSkipReason[] = [];
+  const datasetId =
+    state.datasets[0]?.id ?? state.activeDatasetId ?? "dataset-1";
+
+  // Augment a candidate's output text with the variant's existing evaluator
+  // scores so the pairwise judge can factor them into the verdict. Skips
+  // silently when there are no scores, when the output isn't string-ish, or
+  // when the scores map isn't provided.
+  const withEvaluatorScores = (
+    output: unknown,
+    rowIndex: number,
+    variantId: string,
+  ): unknown => {
+    if (!completedTargetEvaluatorScores) return output;
+    const scores = completedTargetEvaluatorScores.get(
+      `${rowIndex}:${variantId}`,
+    );
+    if (!scores || scores.length === 0) return output;
+    const lines = scores
+      .map((s) => {
+        const parts: string[] = [];
+        if (s.score !== undefined) parts.push(`score=${s.score}`);
+        if (s.label !== undefined) parts.push(`label=${s.label}`);
+        if (s.passed !== undefined) parts.push(`passed=${s.passed}`);
+        if (parts.length === 0) return null;
+        return `- ${s.name}: ${parts.join(", ")}`;
+      })
+      .filter((l): l is string => l !== null);
+    if (lines.length === 0) return output;
+    const block = `\n\n--- Existing evaluator scores ---\n${lines.join("\n")}`;
+    if (typeof output === "string") return output + block;
+    // For non-string outputs, try to serialize. If JSON.stringify throws
+    // (circular refs / BigInt) we skip the score block entirely and return
+    // the raw output unchanged — appending the block to "[object Object]"
+    // would just confuse the judge without giving it usable context.
+    try {
+      const serialized = JSON.stringify(output);
+      if (serialized === undefined) return output;
+      return serialized + block;
+    } catch {
+      return output;
+    }
+  };
+
+  // Pick the most human-readable identifier we can derive from a TargetConfig.
+  // langevals echoes `candidate_a_id` / `candidate_b_id` back to us as the
+  // `label` on the verdict, and that label is what every programmatic consumer
+  // (REST, SDK, MCP) will read first — so prefer the prompt's HANDLE
+  // ("say-hi") when we can resolve it; otherwise fall back to the internal
+  // target id ("target_..."). We deliberately do NOT fall back to `promptId`
+  // (the KSUID like "prompt_6IFkbb..."): the aggregator's normalizer matches
+  // against (a) legacy A/B/tie, (b) target.id, or (c) the supplied handle —
+  // a raw promptId KSUID wouldn't normalize and the verdict would be dropped.
+  const variantIdentifierFor = (t: TargetConfig): string => {
+    if (t.type === "prompt" && t.promptId) {
+      const handle = loadedPrompts?.get(t.promptId)?.handle;
+      if (handle) return handle;
+    }
+    return t.id;
+  };
+
+  const pairwiseEvaluators = state.evaluators.filter((e) => e.pairwise);
+  // Column-style pairwise targets (#5100): same Phase-2 treatment as chip
+  // evaluators, just with a synthetic EvaluatorConfig synthesized from the
+  // target's stored pairwise config. Keeping both paths in one generator
+  // keeps Phase 2 storage / progress accounting identical.
+  const pairwiseTargets = state.targets.filter(
+    (t) => t.type === "evaluator" && t.pairwise,
+  );
+  if (pairwiseEvaluators.length === 0 && pairwiseTargets.length === 0) {
+    return { cells, skipReasons };
+  }
+
+  for (const evaluator of pairwiseEvaluators) {
+    const cfg = evaluator.pairwise;
+    if (!cfg) continue;
+
+    const variantA = state.targets.find((t) => t.id === cfg.variantA);
+    const variantB = state.targets.find((t) => t.id === cfg.variantB);
+    if (!variantA || !variantB) {
+      logger.warn(
+        {
+          evaluatorId: evaluator.id,
+          variantA: cfg.variantA,
+          variantB: cfg.variantB,
+        },
+        "Pairwise evaluator skipped: variant target(s) not found",
+      );
+      continue;
+    }
+
+    for (let rowIndex = 0; rowIndex < datasetRows.length; rowIndex++) {
+      const datasetEntry = datasetRows[rowIndex];
+      if (!datasetEntry) continue;
+
+      const a = completedTargetOutputs.get(`${rowIndex}:${cfg.variantA}`);
+      const b = completedTargetOutputs.get(`${rowIndex}:${cfg.variantB}`);
+      if (!a || !b) {
+        skipReasons.push({
+          rowIndex,
+          targetId: cfg.variantA,
+          evaluatorId: evaluator.id,
+          variantAName: variantIdentifierFor(variantA),
+          variantBName: variantIdentifierFor(variantB),
+          missing: !a && !b ? "both" : !a ? "A" : "B",
+        });
+        continue;
+      }
+
+      cells.push({
+        rowIndex,
+        // Point at variantA so the workflow builder has a real TargetConfig.
+        // The target step itself is skipped via `skipTarget` below.
+        targetId: cfg.variantA,
+        targetConfig: variantA,
+        evaluatorConfigs: [evaluator],
+        datasetEntry: {
+          _datasetId: datasetId,
+          ...datasetEntry,
+        },
+        skipTarget: true,
+        precomputedTargetOutput: a.output,
+        pairwise: {
+          candidateA: {
+            id: variantIdentifierFor(variantA),
+            output: withEvaluatorScores(a.output, rowIndex, cfg.variantA),
+            cost: a.cost,
+            duration: a.duration,
+          },
+          candidateB: {
+            id: variantIdentifierFor(variantB),
+            output: withEvaluatorScores(b.output, rowIndex, cfg.variantB),
+            cost: b.cost,
+            duration: b.duration,
+          },
+        },
+      });
+    }
+  }
+
+  // Column-style pairwise targets (#5100). Each is its own column whose
+  // verdict cell stores results under TargetId=column-target.id. A
+  // synthetic EvaluatorConfig (constructed from the target's pairwise
+  // config + dbEvaluatorId) gives buildEvaluatorInputs everything it
+  // needs to take the pairwise branch, and downstream storage records
+  // the verdict against the pairwise column rather than variantA.
+  for (const target of pairwiseTargets) {
+    const cfg = target.pairwise;
+    if (!cfg || !target.targetEvaluatorId) continue;
+
+    // Skip column-style pairwise targets where the user hasn't finished
+    // configuring the form. Without all three the judge endpoint would
+    // 400 with "<field> is required" and the cell would render that as
+    // a verdict-shaped error — confusing for users who haven't opened
+    // the drawer yet.
+    if (!cfg.variantA || !cfg.variantB || !cfg.goldenField) {
+      logger.debug(
+        {
+          targetId: target.id,
+          variantA: cfg.variantA,
+          variantB: cfg.variantB,
+          goldenField: cfg.goldenField,
+        },
+        "Pairwise column-target skipped: variants or golden field not configured",
+      );
+      continue;
+    }
+
+    const variantA = state.targets.find((t) => t.id === cfg.variantA);
+    const variantB = state.targets.find((t) => t.id === cfg.variantB);
+    if (!variantA || !variantB) {
+      logger.warn(
+        {
+          targetId: target.id,
+          variantA: cfg.variantA,
+          variantB: cfg.variantB,
+        },
+        "Pairwise column-target skipped: variant target(s) not found",
+      );
+      continue;
+    }
+
+    for (let rowIndex = 0; rowIndex < datasetRows.length; rowIndex++) {
+      const datasetEntry = datasetRows[rowIndex];
+      if (!datasetEntry) continue;
+
+      const a = completedTargetOutputs.get(`${rowIndex}:${cfg.variantA}`);
+      const b = completedTargetOutputs.get(`${rowIndex}:${cfg.variantB}`);
+      if (!a || !b) {
+        skipReasons.push({
+          rowIndex,
+          targetId: target.id,
+          evaluatorId: target.id,
+          variantAName: variantIdentifierFor(variantA),
+          variantBName: variantIdentifierFor(variantB),
+          missing: !a && !b ? "both" : !a ? "A" : "B",
+        });
+        continue;
+      }
+
+      // Per-row synthetic evaluator with PRE-RESOLVED value mappings for
+      // every pairwise input field. Pre-fix (#5131) the synthetic was
+      // shared across rows with `mappings: {}`, leaving the candidate_*
+      // fields to be filled in by buildEvaluatorInputs's pairwise branch
+      // and propagated as manual inputs. That path silently dropped
+      // candidate_a_output / candidate_b_output (plus cost/duration) on
+      // the wire — the route's downstream `getEvaluatorDataForParams`
+      // rebuilt `data` from the legacy 6-field default schema, stripping
+      // everything not value-mapped at build time. Embedding the
+      // candidates as `value` mappings here means buildEvaluatorNode
+      // bakes them into the workflow node's static inputs (and the
+      // mapping-branch fallback in buildEvaluatorInputs sees them too)
+      // so the candidate fields always reach the judge regardless of
+      // which code path the dispatch ends up in.
+      const perRowMappings: Record<
+        string,
+        Record<string, Record<string, { type: "value"; value: unknown }>>
+      > = {
+        [datasetId]: {
+          [target.id]: {
+            candidate_a_id: {
+              type: "value",
+              value: variantIdentifierFor(variantA),
+            },
+            candidate_a_output: {
+              type: "value",
+              value: withEvaluatorScores(a.output, rowIndex, cfg.variantA),
+            },
+            candidate_a_cost:
+              a.cost !== undefined
+                ? { type: "value", value: a.cost }
+                : { type: "value", value: undefined },
+            candidate_a_duration:
+              a.duration !== undefined
+                ? { type: "value", value: a.duration }
+                : { type: "value", value: undefined },
+            candidate_b_id: {
+              type: "value",
+              value: variantIdentifierFor(variantB),
+            },
+            candidate_b_output: {
+              type: "value",
+              value: withEvaluatorScores(b.output, rowIndex, cfg.variantB),
+            },
+            candidate_b_cost:
+              b.cost !== undefined
+                ? { type: "value", value: b.cost }
+                : { type: "value", value: undefined },
+            candidate_b_duration:
+              b.duration !== undefined
+                ? { type: "value", value: b.duration }
+                : { type: "value", value: undefined },
+            input: {
+              type: "value",
+              value: datasetEntry.input ?? datasetEntry[cfg.goldenField],
+            },
+            golden: {
+              type: "value",
+              value: datasetEntry[cfg.goldenField],
+            },
+          },
+        },
+      };
+
+      const syntheticEvaluator = {
+        id: target.id,
+        dbEvaluatorId: target.targetEvaluatorId,
+        evaluatorType: "langevals/pairwise_compare",
+        pairwise: cfg,
+        inputs: target.inputs,
+        mappings: perRowMappings,
+      } as unknown as EvaluatorConfig;
+
+      cells.push({
+        rowIndex,
+        // Use the column-target's id so the verdict lands in the pairwise
+        // column rather than under variantA's column. Differs from the
+        // chip-style path above where verdicts hang under variantA.
+        targetId: target.id,
+        targetConfig: target,
+        evaluatorConfigs: [syntheticEvaluator],
+        datasetEntry: {
+          _datasetId: datasetId,
+          ...datasetEntry,
+        },
+        skipTarget: true,
+        precomputedTargetOutput: a.output,
+        pairwise: {
+          candidateA: {
+            id: variantIdentifierFor(variantA),
+            output: withEvaluatorScores(a.output, rowIndex, cfg.variantA),
+            cost: a.cost,
+            duration: a.duration,
+          },
+          candidateB: {
+            id: variantIdentifierFor(variantB),
+            output: withEvaluatorScores(b.output, rowIndex, cfg.variantB),
+            cost: b.cost,
+            duration: b.duration,
+          },
+        },
+      });
+    }
+  }
+
+  return { cells, skipReasons };
 };
 
 /**
@@ -477,6 +876,61 @@ const buildEvaluatorInputs = (
   const evaluator = cell.evaluatorConfigs.find((e) => e.id === evaluatorId);
   if (!evaluator) return inputs;
 
+  // Pairwise branch (#5100): synthetic inputs bypassing the per-target
+  // mapping system. We have explicit knowledge of where each field comes
+  // from (golden -> dataset[goldenField]; candidate_* -> cell.pairwise),
+  // so we assemble them directly. `input` still uses an existing mapping
+  // (variantA's) if configured, otherwise falls back to the dataset's
+  // `input` column.
+  if (evaluator.pairwise && cell.pairwise) {
+    const cfg = evaluator.pairwise;
+    const variantAMappings =
+      evaluator.mappings[datasetId]?.[cfg.variantA] ?? {};
+    const inputMapping = variantAMappings.input;
+    if (inputMapping?.type === "source" && inputMapping.source === "dataset") {
+      inputs.input = cell.datasetEntry[inputMapping.sourceField];
+    } else if (cell.datasetEntry.input !== undefined) {
+      inputs.input = cell.datasetEntry.input;
+    }
+
+    inputs.golden = cell.datasetEntry[cfg.goldenField];
+
+    // Helper: only assign when defined, so JSON.stringify doesn't drop the
+    // key for the keep-defined receiver but also doesn't leak literal
+    // `undefined`s into the body.
+    const setIfDefined = (key: string, value: unknown): void => {
+      if (value !== undefined) inputs[key] = value;
+    };
+
+    setIfDefined("candidate_a_id", cell.pairwise.candidateA.id);
+    setIfDefined("candidate_a_output", cell.pairwise.candidateA.output);
+    setIfDefined("candidate_a_cost", cell.pairwise.candidateA.cost);
+    setIfDefined("candidate_a_duration", cell.pairwise.candidateA.duration);
+    setIfDefined("candidate_b_id", cell.pairwise.candidateB.id);
+    setIfDefined("candidate_b_output", cell.pairwise.candidateB.output);
+    setIfDefined("candidate_b_cost", cell.pairwise.candidateB.cost);
+    setIfDefined("candidate_b_duration", cell.pairwise.candidateB.duration);
+
+    // Defensive fallback: when generatePairwiseCells lost a candidate
+    // output between completedTargetOutputs.set and the cell push (eg.
+    // a stale reference), pull the value from the per-row synthetic
+    // mappings we now also populate at cell-creation time. Strictly
+    // additive — only fires when the primary cell.pairwise read came
+    // back undefined.
+    const cellMappings = evaluator.mappings[datasetId]?.[cell.targetId] ?? {};
+    for (const [field, mapping] of Object.entries(cellMappings)) {
+      if (
+        mapping.type === "value" &&
+        mapping.value !== undefined &&
+        inputs[field] === undefined
+      ) {
+        inputs[field] = mapping.value;
+      }
+    }
+
+    return inputs;
+  }
+
   // Get mappings for this dataset and target
   const mappings = evaluator.mappings[datasetId]?.[cell.targetId] ?? {};
 
@@ -545,6 +999,7 @@ export async function* runOrchestrator(
     loadedEvaluators,
     runId: providedRunId,
     concurrency: requestedConcurrency,
+    seedTargetOutputs,
   } = input;
 
   // Use requested concurrency, environment variable, or default
@@ -580,6 +1035,30 @@ export async function* runOrchestrator(
 
   // Track traceId per cell so evaluator_result events can reference it
   const cellTraceIds = new Map<string, string>();
+
+  // Track per-(row, target) outputs as Phase 1 cells complete, so Phase 2
+  // pairwise cells (#5100) can bake both variants' outputs into their input
+  // payload before they execute. Pre-seed from prior-run outputs the client
+  // already has — covers the "variants already ran, user just added the
+  // pairwise column" case so Phase 2 doesn't redundantly force a re-run.
+  const completedTargetOutputs = new Map<
+    string,
+    { output: unknown; cost?: number; duration?: number }
+  >();
+  if (seedTargetOutputs) {
+    for (const [key, value] of Object.entries(seedTargetOutputs)) {
+      completedTargetOutputs.set(key, value);
+    }
+  }
+
+  // Track per-(row, target) evaluator results so the Phase 2 pairwise judge
+  // can read each variant's existing evaluator scores (relevance, factuality,
+  // etc.) and factor them into its verdict. Keyed by `${rowIndex}:${targetId}`,
+  // value is an array of one entry per evaluator that produced a usable score.
+  const completedTargetEvaluatorScores = new Map<
+    string,
+    Array<{ name: string; score?: number; label?: string; passed?: boolean }>
+  >();
 
   // Pre-seed from cells that already have a traceId (e.g., evaluator reruns
   // that skip target execution and won't generate target_result events)
@@ -649,7 +1128,10 @@ export async function* runOrchestrator(
       });
     } catch (err) {
       chDispatchFailures++;
-      logger.error({ err, runId }, "Failed to dispatch startExperimentRun to CH");
+      logger.error(
+        { err, runId },
+        "Failed to dispatch startExperimentRun to CH",
+      );
       await abortManager.clearRunning(runId);
       throw err;
     }
@@ -662,12 +1144,53 @@ export async function* runOrchestrator(
       cellTraceIds.set(`${event.rowIndex}:${event.targetId}`, event.traceId);
     }
 
+    // Capture successful target outputs for Phase 2 pairwise cells.
+    if (
+      event.type === "target_result" &&
+      !event.error &&
+      event.output !== null &&
+      event.output !== undefined
+    ) {
+      completedTargetOutputs.set(`${event.rowIndex}:${event.targetId}`, {
+        output: event.output,
+        cost: event.cost ?? undefined,
+        duration: event.duration ?? undefined,
+      });
+    }
+
     // Dispatch to evaluation processing pipeline for per-trace eval CH writes.
     if (event.type === "evaluator_result") {
       const evalResult = event.result as SingleEvaluationResult;
       const evaluatorConfig = state.evaluators.find(
         (e) => e.id === event.evaluatorId,
       );
+
+      // Cache per-(row, target) evaluator scores so the Phase 2 pairwise judge
+      // can see what each variant already scored on its non-pairwise
+      // evaluators. Skip pairwise evaluators themselves (a pairwise judge
+      // reading another pairwise verdict is circular).
+      if (
+        evalResult.status === "processed" &&
+        evaluatorConfig &&
+        !evaluatorConfig.pairwise
+      ) {
+        const dbEval = evaluatorConfig.dbEvaluatorId
+          ? loadedEvaluators?.get(evaluatorConfig.dbEvaluatorId)
+          : null;
+        const name =
+          dbEval?.name ??
+          evaluatorConfig.evaluatorType?.split("/").pop() ??
+          evaluatorConfig.id;
+        const key = `${event.rowIndex}:${event.targetId}`;
+        const arr = completedTargetEvaluatorScores.get(key) ?? [];
+        arr.push({
+          name,
+          score: evalResult.score ?? undefined,
+          label: evalResult.label ?? undefined,
+          passed: evalResult.passed ?? undefined,
+        });
+        completedTargetEvaluatorScores.set(key, arr);
+      }
       const dbEvaluator = evaluatorConfig?.dbEvaluatorId
         ? loadedEvaluators?.get(evaluatorConfig.dbEvaluatorId)
         : null;
@@ -683,10 +1206,25 @@ export async function* runOrchestrator(
           evaluatorName: dbEvaluator?.name,
           traceId,
           status: evalResult.status,
-          score: evalResult.status === "processed" ? (evalResult.score ?? undefined) : undefined,
-          passed: evalResult.status === "processed" ? (evalResult.passed ?? undefined) : undefined,
-          label: evalResult.status === "processed" ? (evalResult.label ?? undefined) : undefined,
-          details: evalResult.status === "processed" ? (evalResult.details ?? undefined) : undefined,
+          score:
+            evalResult.status === "processed"
+              ? (evalResult.score ?? undefined)
+              : undefined,
+          passed:
+            evalResult.status === "processed"
+              ? (evalResult.passed ?? undefined)
+              : undefined,
+          // For pairwise verdicts, langevals now returns the winner's
+          // candidate id (or "tie") directly in `label`. No translation
+          // needed here; SDK / REST / MCP consumers see the winner by id.
+          label:
+            evalResult.status === "processed"
+              ? (evalResult.label ?? undefined)
+              : undefined,
+          details:
+            evalResult.status === "processed"
+              ? (evalResult.details ?? undefined)
+              : undefined,
           error: evalResult.status === "error" ? evalResult.details : undefined,
           occurredAt: Date.now(),
         });
@@ -703,46 +1241,60 @@ export async function* runOrchestrator(
       if (event.type === "target_result") {
         const datasetEntry = datasetRows[event.rowIndex] ?? {};
         chDispatchTotal++;
-        await commands.recordTargetResult({
-          tenantId: projectId,
-          runId,
-          experimentId,
-          index: event.rowIndex,
-          targetId: event.targetId,
-          entry: datasetEntry,
-          predicted:
-            event.output === null || event.output === undefined
-              ? null
-              : { output: event.output },
-          cost: event.cost ?? null,
-          duration: event.duration ?? null,
-          error: event.error ?? null,
-          traceId: event.traceId ?? null,
-          occurredAt: Date.now(),
-        }).catch((err) => {
-          chDispatchFailures++;
-          logger.warn({ err, runId }, "Failed to dispatch recordTargetResult to CH");
-        });
-      } else if (event.type === "error" && event.rowIndex !== undefined && event.targetId) {
+        await commands
+          .recordTargetResult({
+            tenantId: projectId,
+            runId,
+            experimentId,
+            index: event.rowIndex,
+            targetId: event.targetId,
+            entry: datasetEntry,
+            predicted:
+              event.output === null || event.output === undefined
+                ? null
+                : { output: event.output },
+            cost: event.cost ?? null,
+            duration: event.duration ?? null,
+            error: event.error ?? null,
+            traceId: event.traceId ?? null,
+            occurredAt: Date.now(),
+          })
+          .catch((err) => {
+            chDispatchFailures++;
+            logger.warn(
+              { err, runId },
+              "Failed to dispatch recordTargetResult to CH",
+            );
+          });
+      } else if (
+        event.type === "error" &&
+        event.rowIndex !== undefined &&
+        event.targetId
+      ) {
         const datasetEntry = datasetRows[event.rowIndex] ?? {};
         chDispatchTotal++;
-        await commands.recordTargetResult({
-          tenantId: projectId,
-          runId,
-          experimentId,
-          index: event.rowIndex,
-          targetId: event.targetId,
-          entry: datasetEntry,
-          predicted: null,
-          cost: null,
-          duration: null,
-          error: event.message,
-          traceId: null,
-          occurredAt: Date.now(),
-        }).catch((err) => {
-          chDispatchFailures++;
-          logger.warn({ err, runId }, "Failed to dispatch recordTargetResult to CH");
-        });
+        await commands
+          .recordTargetResult({
+            tenantId: projectId,
+            runId,
+            experimentId,
+            index: event.rowIndex,
+            targetId: event.targetId,
+            entry: datasetEntry,
+            predicted: null,
+            cost: null,
+            duration: null,
+            error: event.message,
+            traceId: null,
+            occurredAt: Date.now(),
+          })
+          .catch((err) => {
+            chDispatchFailures++;
+            logger.warn(
+              { err, runId },
+              "Failed to dispatch recordTargetResult to CH",
+            );
+          });
       } else if (event.type === "evaluator_result") {
         const result = event.result as SingleEvaluationResult;
         const evaluatorConfig = state.evaluators.find(
@@ -752,36 +1304,40 @@ export async function* runOrchestrator(
           ? loadedEvaluators?.get(evaluatorConfig.dbEvaluatorId)
           : null;
         chDispatchTotal++;
-        await commands.recordEvaluatorResult({
-          tenantId: projectId,
-          runId,
-          experimentId,
-          index: event.rowIndex,
-          targetId: event.targetId,
-          evaluatorId: event.evaluatorId,
-          evaluatorName: dbEvaluator?.name ?? null,
-          status: result.status,
-          score: result.status === "processed" ? result.score : null,
-          label: result.status === "processed" ? result.label : null,
-          passed: result.status === "processed" ? result.passed : null,
-          details:
-            result.status === "error"
-              ? result.details
-              : result.status === "processed"
+        await commands
+          .recordEvaluatorResult({
+            tenantId: projectId,
+            runId,
+            experimentId,
+            index: event.rowIndex,
+            targetId: event.targetId,
+            evaluatorId: event.evaluatorId,
+            evaluatorName: dbEvaluator?.name ?? null,
+            status: result.status,
+            score: result.status === "processed" ? result.score : null,
+            label: result.status === "processed" ? result.label : null,
+            passed: result.status === "processed" ? result.passed : null,
+            details:
+              result.status === "error"
                 ? result.details
+                : result.status === "processed"
+                  ? result.details
+                  : null,
+            occurredAt: Date.now(),
+            cost:
+              result.status === "processed" && result.cost
+                ? result.cost.amount
                 : null,
-          occurredAt: Date.now(),
-          cost:
-            result.status === "processed" && result.cost
-              ? result.cost.amount
-              : null,
-        }).catch((err) => {
-          chDispatchFailures++;
-          logger.warn({ err, runId }, "Failed to dispatch recordEvaluatorResult to CH");
-        });
+          })
+          .catch((err) => {
+            chDispatchFailures++;
+            logger.warn(
+              { err, runId },
+              "Failed to dispatch recordEvaluatorResult to CH",
+            );
+          });
       }
     }
-
   };
 
   // Emit execution_started
@@ -953,8 +1509,125 @@ export async function* runOrchestrator(
         void cellPromise.finally(() => activeCells.delete(cellPromise));
       }
 
-      // Wait for all remaining cells to complete
+      // Wait for all Phase 1 cells to complete
       await Promise.all(activeCells);
+
+      // Phase 2: pairwise cells (#5100). Generated AFTER Phase 1 finishes,
+      // because each pairwise cell needs both variants' outputs to exist.
+      // We reuse the same semaphore + executeCell loop; the new cells get
+      // appended to totalCells dynamically so progress events stay honest.
+      if (!aborted) {
+        const { cells: pairwiseCells, skipReasons: pairwiseSkipReasons } =
+          generatePairwiseCells(
+            state,
+            datasetRows,
+            completedTargetOutputs,
+            completedTargetEvaluatorScores,
+            loadedPrompts,
+          );
+
+        // Emit a synthetic evaluator_result error event for each row we had
+        // to skip because a variant didn't produce output. Without this the
+        // pairwise column would sit at "No verdict yet" indefinitely with
+        // no indication that the upstream prompt is the actual problem.
+        //
+        // pushEvent feeds the SSE stream so the UI cell re-renders into the
+        // friendlyError surface immediately; processEventForStorage also
+        // writes it to ClickHouse for the historical record.
+        for (const reason of pairwiseSkipReasons) {
+          // Respect user-triggered abort mid-loop; otherwise a long skip-reason
+          // burst would keep writing to CH after the run was meant to stop.
+          if (await abortManager.isAborted(runId)) {
+            aborted = true;
+            break;
+          }
+          const which =
+            reason.missing === "both"
+              ? `${reason.variantAName} and ${reason.variantBName}`
+              : reason.missing === "A"
+                ? reason.variantAName
+                : reason.variantBName;
+          const noun = reason.missing === "both" ? "outputs" : "output";
+          const detail = `Waiting on ${which} — no ${noun} for this row yet. Run ${which} first, then re-run this comparison.`;
+          const skipEvent: EvaluationV3Event = {
+            type: "evaluator_result",
+            rowIndex: reason.rowIndex,
+            targetId: reason.targetId,
+            evaluatorId: reason.evaluatorId,
+            result: {
+              status: "error",
+              details: detail,
+              error_type: "MissingVariantOutput",
+            } as unknown as SingleEvaluationResult,
+          };
+          pushEvent(skipEvent);
+          await processEventForStorage(skipEvent);
+        }
+
+        if (pairwiseCells.length > 0) {
+          logger.info(
+            { runId, count: pairwiseCells.length },
+            "Starting Phase 2 (pairwise) cells",
+          );
+
+          for (const cell of pairwiseCells) {
+            if (await abortManager.isAborted(runId)) {
+              aborted = true;
+              break;
+            }
+            await semaphore.acquire();
+
+            const cellPromise = (async () => {
+              try {
+                if (await abortManager.isAborted(runId)) return;
+
+                const loadedData = {
+                  ...getLoadedDataForTarget(
+                    cell.targetConfig,
+                    loadedPrompts,
+                    loadedAgents,
+                  ),
+                  evaluators: loadedEvaluators,
+                };
+
+                const checkAbort = () => abortManager.isAborted(runId);
+
+                let cellFailed = false;
+                for await (const event of executeCell(
+                  cell,
+                  projectId,
+                  datasetColumns,
+                  loadedData,
+                  resultMapperConfig,
+                  checkAbort,
+                )) {
+                  if (await abortManager.isAborted(runId)) break;
+                  pushEvent(event);
+                  await processEventForStorage(event);
+                  if (event.type === "error") cellFailed = true;
+                }
+
+                completed++;
+                if (cellFailed) failedCells++;
+                else completedCells++;
+
+                pushEvent({
+                  type: "progress",
+                  completed,
+                  total: totalCells + pairwiseCells.length,
+                });
+              } finally {
+                semaphore.release();
+              }
+            })();
+
+            activeCells.add(cellPromise);
+            void cellPromise.finally(() => activeCells.delete(cellPromise));
+          }
+
+          await Promise.all(activeCells);
+        }
+      }
     } finally {
       // Signal that all cells are complete
       signalComplete();
@@ -993,17 +1666,22 @@ export async function* runOrchestrator(
     // Dispatch completion event to ClickHouse.
     if (experimentId) {
       chDispatchTotal++;
-      await commands.completeExperimentRun({
-        tenantId: projectId,
-        runId,
-        experimentId,
-        finishedAt: aborted ? null : finishedAt,
-        stoppedAt: aborted ? finishedAt : null,
-        occurredAt: Date.now(),
-      }).catch((err) => {
-        chDispatchFailures++;
-        logger.warn({ err, runId }, "Failed to dispatch completeExperimentRun to CH");
-      });
+      await commands
+        .completeExperimentRun({
+          tenantId: projectId,
+          runId,
+          experimentId,
+          finishedAt: aborted ? null : finishedAt,
+          stoppedAt: aborted ? finishedAt : null,
+          occurredAt: Date.now(),
+        })
+        .catch((err) => {
+          chDispatchFailures++;
+          logger.warn(
+            { err, runId },
+            "Failed to dispatch completeExperimentRun to CH",
+          );
+        });
     }
   }
 

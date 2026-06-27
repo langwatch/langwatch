@@ -7,7 +7,14 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   LuCheck,
   LuCircleAlert,
@@ -20,6 +27,7 @@ import {
 import { Tooltip } from "~/components/ui/tooltip";
 import { TraceIdPeek } from "~/features/traces-v2/components/TraceIdPeek";
 import { useDrawer } from "~/hooks/useDrawer";
+import { parseEvaluationResult } from "~/utils/evaluationResults";
 import { parseLLMError } from "~/utils/formatLLMError";
 import { formatTargetOutput } from "~/utils/formatTargetOutput";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
@@ -29,6 +37,7 @@ import { useTargetName } from "../../hooks/useTargetName";
 import type { EvaluatorConfig, TargetConfig } from "../../types";
 import { formatLatency } from "../../utils/computeAggregates";
 import { evaluatorHasMissingMappings } from "../../utils/mappingValidation";
+import { PairwiseVerdictRow } from "../PairwiseVerdictRow";
 import { EvaluatorChip } from "../TargetSection/EvaluatorChip";
 
 // Max characters to display for performance reasons
@@ -84,9 +93,10 @@ export function TargetCellContent({
   const { openDrawer } = useDrawer();
   const targetName = useTargetName(target);
   const openEvaluatorEditor = useOpenEvaluatorEditor();
-  const { evaluators, activeDatasetId, removeEvaluator } =
+  const { evaluators, targets, activeDatasetId, removeEvaluator } =
     useEvaluationsV3Store((state) => ({
       evaluators: state.evaluators,
+      targets: state.targets,
       activeDatasetId: state.activeDatasetId,
       removeEvaluator: state.removeEvaluator,
     }));
@@ -307,6 +317,61 @@ export function TargetCellContent({
     );
   };
 
+  // Resolve pairwise winner/loser/tie state for a chip rendered against
+  // `target` (#5100). The pairwise evaluator emits one result per row
+  // whose `label` is "A" / "B" / "tie" relative to the evaluator's
+  // pairwise config (variantA / variantB target ids). This function maps
+  // that label back to a role for whichever target this chip belongs to,
+  // so the chip can tint itself green (winner), red (loser), or neutral.
+  // Returns undefined when there is no pairwise verdict for this (row,
+  // target) — either the evaluator isn't pairwise, or the verdict didn't
+  // involve this target.
+  const resolvePairwiseState = (
+    evaluator: EvaluatorConfig,
+  ): "winner" | "loser" | "tie" | undefined => {
+    const pw = evaluator.pairwise;
+    if (!pw) return undefined;
+    const parsed = parseEvaluationResult(evaluatorResults[evaluator.id]);
+    const label = parsed.label;
+    if (label !== "A" && label !== "B" && label !== "tie") return undefined;
+    if (label === "tie") return "tie";
+    const winnerId = label === "A" ? pw.variantA : pw.variantB;
+    const loserId = label === "A" ? pw.variantB : pw.variantA;
+    if (target.id === winnerId) return "winner";
+    if (target.id === loserId) return "loser";
+    return undefined;
+  };
+
+  // Render any pairwise verdict strips for this row (#5100). Rendered only
+  // when `target` is the variantA of a pairwise evaluator so we get one
+  // strip per row, not duplicated under variantB. The verdict result lives
+  // at `evaluatorResults[evaluator.id]` because the orchestrator anchors
+  // the Phase-2 cell on variantA.
+  const renderPairwiseVerdicts = () => {
+    const strips: ReactNode[] = [];
+    for (const evaluator of evaluators) {
+      const pw = evaluator.pairwise;
+      if (!pw) continue;
+      if (pw.variantA !== target.id) continue;
+      const parsed = parseEvaluationResult(evaluatorResults[evaluator.id]);
+      if (parsed.status !== "processed") continue;
+      const label = parsed.label;
+      if (label !== "A" && label !== "B" && label !== "tie") continue;
+      const variantBTarget = targets.find((t) => t.id === pw.variantB);
+      if (!variantBTarget) continue;
+      strips.push(
+        <PairwiseVerdictRow
+          key={evaluator.id}
+          variantA={target}
+          variantB={variantBTarget}
+          label={label as "A" | "B" | "tie"}
+          reasoning={parsed.details}
+        />,
+      );
+    }
+    return strips.length > 0 ? <>{strips}</> : null;
+  };
+
   // Render the evaluator chips section
   const renderEvaluatorChips = (inExpandedView: boolean) => (
     <HStack flexWrap="wrap" gap={1.5}>
@@ -320,6 +385,7 @@ export function TargetCellContent({
           hasTargetOutput={output !== undefined && output !== null}
           hasAnyTargetOutputs={hasAnyTargetOutputs}
           targetType={target.type}
+          pairwiseState={resolvePairwiseState(evaluator)}
           onEdit={() =>
             openEvaluatorEditor({
               evaluator,
@@ -492,6 +558,7 @@ export function TargetCellContent({
         <VStack align="stretch" gap={2}>
           {renderActionButtons(false)}
           {renderOutput(false)}
+          {renderPairwiseVerdicts()}
           {renderEvaluatorChips(false)}
         </VStack>
       </Box>

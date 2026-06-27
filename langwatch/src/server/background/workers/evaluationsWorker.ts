@@ -636,6 +636,25 @@ export const runEvaluation = async ({
 
   let response;
   try {
+    // Preserve evaluator-specific fields (e.g. pairwise's candidate_a_id,
+    // candidate_a_output, etc.) that the legacy canonical-6 forward
+    // would otherwise strip. The langevals Python evaluator validates
+    // its own typed fields against this body, so any input it requires
+    // must reach it verbatim. The canonical 6 are normalized below; the
+    // rest pass through as-is. Without this spread the pairwise judge
+    // 500s with "Internal error" because data.candidate_a_id is None.
+    const canonicalKeys = new Set([
+      "input",
+      "output",
+      "contexts",
+      "expected_contexts",
+      "expected_output",
+      "conversation",
+    ]);
+    const extras: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data.data)) {
+      if (!canonicalKeys.has(key)) extras[key] = value;
+    }
     response = await stagedLangevalsFetch({
       url: `${env.LANGEVALS_ENDPOINT}/${builtInEvaluatorType}/evaluate`,
       projectId,
@@ -643,6 +662,7 @@ export const runEvaluation = async ({
       body: {
         data: [
           {
+            ...extras,
             input: tryAndConvertTo(data.data.input, "string"),
             output: tryAndConvertTo(data.data.output, "string"),
             contexts: tryAndConvertTo(data.data.contexts, "string[]"),

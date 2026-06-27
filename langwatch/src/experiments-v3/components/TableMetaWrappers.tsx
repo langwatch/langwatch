@@ -6,6 +6,7 @@ import { Checkbox } from "@chakra-ui/react";
 import type { HeaderContext } from "@tanstack/react-table";
 
 import type { TableMeta, TableRowData } from "../types";
+import { PairwiseCompareCell } from "./PairwiseCompareCell";
 import { TargetCellContent } from "./TargetSection/TargetCell";
 import { TargetHeader } from "./TargetSection/TargetHeader";
 
@@ -129,6 +130,19 @@ export const TargetCellFromMeta = ({
   const target = tableMeta?.targetsMap.get(targetId);
 
   if (!target) return null;
+
+  if (target.pairwise) {
+    const variantATarget = tableMeta?.targetsMap.get(target.pairwise.variantA);
+    const variantBTarget = tableMeta?.targetsMap.get(target.pairwise.variantB);
+    return (
+      <PairwiseCompareCell
+        result={data?.evaluators?.[target.id]}
+        isLoading={data?.isLoading}
+        variantATarget={variantATarget}
+        variantBTarget={variantBTarget}
+      />
+    );
+  }
 
   return (
     <TargetCellContent

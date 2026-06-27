@@ -176,6 +176,26 @@ export type LocalEvaluatorConfig = z.infer<typeof localEvaluatorConfigSchema>;
  * - Each dataset (same column might have different names)
  * - Each target (target A outputs "output", target B outputs "result")
  */
+/**
+ * Pairwise evaluator config. Set only for evaluators of type
+ * "langevals/pairwise_compare" (and future n-way variants). Picks two
+ * existing target columns to compare against a dataset golden field.
+ *
+ * - variantA / variantB: TargetConfig ids whose per-row outputs are
+ *   the two candidates.
+ * - goldenField: dataset field name whose value is the reference answer.
+ * - includeMetrics: per-candidate metrics injected into the judge prompt.
+ */
+export const pairwiseEvaluatorConfigSchema = z.object({
+  variantA: z.string(),
+  variantB: z.string(),
+  goldenField: z.string(),
+  includeMetrics: z.array(z.enum(["cost", "duration"])).default([]),
+});
+export type PairwiseEvaluatorConfig = z.infer<
+  typeof pairwiseEvaluatorConfigSchema
+>;
+
 export const evaluatorConfigSchema = z.object({
   id: z.string(),
   evaluatorType: z.string(),
@@ -191,6 +211,8 @@ export const evaluatorConfigSchema = z.object({
   dbEvaluatorId: z.string().optional(),
   /** Local unsaved evaluator settings that override DB values during execution */
   localEvaluatorConfig: localEvaluatorConfigSchema.optional(),
+  /** Set only for pairwise / n-way evaluators (#5100, #5101). */
+  pairwise: pairwiseEvaluatorConfigSchema.optional(),
 });
 export type EvaluatorConfig = Omit<
   z.infer<typeof evaluatorConfigSchema>,
@@ -275,6 +297,15 @@ export const targetConfigSchema = z.object({
    * Only set when type === "evaluator".
    */
   localEvaluatorConfig: localEvaluatorConfigSchema.optional(),
+  /**
+   * Pairwise config for column-style pairwise evaluator targets (#5100).
+   * Set only when type === "evaluator" AND the underlying evaluator is
+   * langevals/pairwise_compare. Mirrors the evaluator-as-chip pairwise
+   * field so the column path has a single source of truth for which two
+   * other targets to compare. Per-row input mappings are derived from
+   * variantA/variantB/goldenField at save time and run time.
+   */
+  pairwise: pairwiseEvaluatorConfigSchema.optional(),
   inputs: z.array(fieldSchema).optional(),
   outputs: z.array(fieldSchema).optional(),
   // Per-dataset mappings: datasetId -> inputFieldName -> FieldMapping
@@ -495,6 +526,15 @@ export type EvaluationsV3Actions = {
     targetId: string,
     datasetId: string,
     inputField: string,
+  ) => void;
+  /**
+   * Pairwise column-target (#5100): write the high-level pairwise config and
+   * deterministically derive the per-row field mappings on the same target.
+   * Strictly additive — leaves non-pairwise targets untouched.
+   */
+  updateTargetPairwise: (
+    targetId: string,
+    pairwise: PairwiseEvaluatorConfig,
   ) => void;
 
   // Global evaluator actions (evaluators apply to ALL targets automatically)
