@@ -22,7 +22,7 @@ Feature: Pairwise compare evaluator (MVP)
     Given a pairwise evaluator is configured with default settings
     When I run the evaluator
     Then for each row a row-level verdict result is produced
-    And each result has a label in ("A", "B", "tie")
+    And each result has a label equal to the winning candidate's identifier or "tie"
     And each result has a reasoning string
 
   Scenario: Position bias mitigation by default
@@ -33,10 +33,9 @@ Feature: Pairwise compare evaluator (MVP)
     And when they disagree, "tie" is returned
 
   Scenario: Aggregate header reflects tally
-    Given 21 rows have been evaluated with verdicts: 12 A, 7 B, 2 tie
+    Given 21 rows have been evaluated where variant_a wins 12, variant_b wins 7, and 2 ties
     When I view the aggregate header
-    Then I see "A wins 12 · B wins 7 · Ties 2"
-    And I see a "Bias-corrected" indicator
+    Then I see the scoreboard "variant_a 12 – 7 variant_b · 2 ties · 21 verdicts"
 
   Scenario: Copy as bug report on losing row
     Given a row where Variant B lost

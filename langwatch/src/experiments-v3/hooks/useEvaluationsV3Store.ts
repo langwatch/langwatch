@@ -681,14 +681,29 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       // Derive the per-row field mappings the orchestrator expects from the
       // high-level pairwise picks — this is what lets the PairwiseConfigForm
       // be a clean 3-field UI while keeping the orchestrator unchanged.
+      // Keys we own — must be stripped from prior mappings BEFORE spreading
+      // derived on top. Otherwise clearing a variant (or goldenField) just
+      // leaves the previously-derived candidate_*_id / golden mapping in
+      // place, and the orchestrator dispatches against a dead variant id
+      // or stale golden column.
+      const PAIRWISE_DERIVED_KEYS = [
+        "candidate_a_id",
+        "candidate_a_output",
+        "candidate_b_id",
+        "candidate_b_output",
+        "golden",
+        "input",
+      ];
       const newDatasetMappings: Record<
         string,
         Record<string, FieldMapping>
       > = {};
       for (const dataset of state.datasets) {
         const derived = derivePairwiseTargetMappings(pairwise, dataset);
+        const existing = { ...(existingTarget.mappings[dataset.id] ?? {}) };
+        for (const key of PAIRWISE_DERIVED_KEYS) delete existing[key];
         newDatasetMappings[dataset.id] = {
-          ...(existingTarget.mappings[dataset.id] ?? {}),
+          ...existing,
           ...derived,
         };
       }
