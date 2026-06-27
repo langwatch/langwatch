@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/langwatch-langwatch-badge.png)](https://mseep.ai/app/langwatch-langwatch)
+
 <img width="1212" height="395" alt="012d1688-24ae-4759-ae70-5f8f81a13c0e" src="https://github.com/user-attachments/assets/27b6e50e-efde-41cf-9f7c-94b829b25a8c" />
 
 
