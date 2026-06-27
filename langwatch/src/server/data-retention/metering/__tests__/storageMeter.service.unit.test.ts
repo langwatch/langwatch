@@ -198,6 +198,33 @@ describe("StorageMeterService billable measurement", () => {
       );
       expect(typeof query.mock.calls[0]![0].query_params.cutoff).toBe("string");
     });
+
+    it("advances the cutoff for a later hour while an earlier hour's cutoff is unchanged", async () => {
+      // The measurement at H depends only on (rows present, H): its cutoff is a
+      // pure function of the sealed hour. A later hour scans a wider window
+      // (later cutoff), so retention deletion between the two can only lower the
+      // later measurement — it can never alter what was already measured at H.
+      const { service, query } = makeService({ projectIds: ["p1"] });
+      const laterHour = new Date(H.getTime() + 60 * 60 * 1000); // H + 1h
+
+      await service.getBillableStorageBytesForOrgAt({
+        organizationId: "org-A",
+        sealedHour: H,
+      });
+      await service.getBillableStorageBytesForOrgAt({
+        organizationId: "org-A",
+        sealedHour: laterHour,
+      });
+
+      const [atH, atLater] = query.mock.calls.map(
+        ([call]) => call.query_params.cutoff,
+      );
+      expect(atH).toBe(EXPECTED_CUTOFF);
+      expect(atLater).toBe("2026-05-22 13:00:00");
+      expect(new Date(`${atLater}Z`).getTime()).toBeGreaterThan(
+        new Date(`${atH}Z`).getTime(),
+      );
+    });
   });
 
   describe("given an organization whose projects hold only data within the free window", () => {
