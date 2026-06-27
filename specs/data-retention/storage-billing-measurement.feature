@@ -1,9 +1,3 @@
-# Spec introduced ahead of its implementation (the measurement lands in the
-# stacked PR that adds the binding tests). Until then every scenario is an
-# @unimplemented tracked gap so the feature-parity gate doesn't require bindings
-# that live on a later branch. The implementation PR removes this feature-level
-# tag and binds each scenario to a test.
-@unimplemented
 Feature: Billable stored-bytes measurement (ADR-027, Phase 2)
   As the storage-billing pipeline
   I want to measure the stored bytes an organization holds that are older than the free window, as of a sealed hour
@@ -150,7 +144,9 @@ Feature: Billable stored-bytes measurement (ADR-027, Phase 2)
   # ReplacingMergeTree tables count every un-collapsed row version in a plain sum(_size_bytes), so a
   # churny tenant's un-merged duplicates over-bill. Billing — unlike the UI's degrade-to-0 display —
   # cannot silently over-count. The dedup-vs-OOM trade-off must be a decided, documented behaviour.
-  @integration
+  # @unimplemented: needs a real ClickHouse instance with un-merged parts; deferred to a dedicated
+  # integration test (see PR follow-ups). Tracked gap, not yet bound.
+  @integration @unimplemented
   Scenario: Un-merged duplicate row versions do not silently over-bill
     Given a table with un-merged duplicate versions of the same row
     When billable storage is measured as of H
