@@ -7,7 +7,7 @@
  * cells, portal editor); only the tRPC transport is mocked.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -825,6 +825,78 @@ describe("given rows are deleted from a paginated dataset", () => {
       await waitFor(() => expect(refetchSpy).toHaveBeenCalled(), {
         timeout: 2000,
       });
+    });
+  });
+
+  describe("when the delete commits but a later update in the batch fails", () => {
+    /** @scenario Move between pages */
+    it("still refreshes the total — a committed delete must not be masked by an update error", async () => {
+      // Force the bug-triggering interleave: both ops are dispatched, the delete
+      // commits, and the update fails LAST — so the batch only reaches zero
+      // pending ops via the error path. The count refresh must fire from there
+      // too, or a committed delete leaves the pager count stale. (Settling the
+      // delete synchronously would hide the bug, since ops would hit zero on the
+      // delete's own success.)
+      let resolveDelete: (() => void) | undefined;
+      let rejectUpdate: ((e: { message: string }) => void) | undefined;
+      deleteManyMutate.mockImplementation(
+        (_args: unknown, opts?: { onSuccess?: () => void }) => {
+          resolveDelete = opts?.onSuccess;
+        },
+      );
+      updateMutate.mockImplementation(
+        (
+          _args: unknown,
+          opts?: { onError?: (e: { message: string }) => void },
+        ) => {
+          rejectUpdate = opts?.onError;
+        },
+      );
+      const refetchSpy = vi.fn();
+      getAllQuery.mockReset();
+      getAllQuery.mockReturnValue({
+        data: {
+          id: "dp",
+          name: "dp",
+          columnTypes,
+          count: 51,
+          totalPages: 2,
+          page: 1,
+          datasetRecords: [
+            { id: "r1", entry: { input: "a", expected_output: "x" } },
+            { id: "r2", entry: { input: "b", expected_output: "y" } },
+          ],
+        },
+        isLoading: false,
+        isPreviousData: false,
+        refetch: refetchSpy,
+      });
+
+      const user = userEvent.setup();
+      render(<DatasetEditorTable datasetId="dp" />, { wrapper: Wrapper });
+      await screen.findByText("a");
+
+      // Queue a delete (row 1) and an edit (row 2, now at index 0) into the same
+      // debounce batch.
+      await user.click(screen.getByLabelText("Select row 1"));
+      await user.click(await screen.findByTestId("delete-selected-rows"));
+      await user.dblClick(screen.getByTestId("cell-0-input_0"));
+      const textarea = await screen.findByRole("textbox");
+      await user.clear(textarea);
+      await user.type(textarea, "edited{Enter}");
+
+      // Both mutations dispatched; settle them delete-then-update so ops reaches
+      // zero through the error path.
+      await waitFor(() => {
+        expect(resolveDelete).toBeDefined();
+        expect(rejectUpdate).toBeDefined();
+      });
+      await act(async () => {
+        resolveDelete?.();
+        rejectUpdate?.({ message: "boom" });
+      });
+
+      expect(refetchSpy).toHaveBeenCalled();
     });
   });
 });

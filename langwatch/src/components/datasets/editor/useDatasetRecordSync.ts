@@ -102,21 +102,31 @@ export const useDatasetRecordSync = ({
     onStatusRef.current("saving");
   }, []);
 
+  // Once the batch fully drains, refresh the count if it deleted anything —
+  // fired from BOTH the success and error paths, so a committed delete still
+  // refreshes even when a later update in the same batch fails.
+  const flushDeletedBatch = useCallback(() => {
+    if (pendingOpsRef.current !== 0 || !batchHadDeleteRef.current) return;
+    batchHadDeleteRef.current = false;
+    onRecordsDeletedRef.current?.();
+  }, []);
+
   const handleSyncSuccess = useCallback(() => {
     pendingOpsRef.current = Math.max(0, pendingOpsRef.current - 1);
     if (pendingOpsRef.current === 0) {
       markSaved();
-      if (batchHadDeleteRef.current) {
-        batchHadDeleteRef.current = false;
-        onRecordsDeletedRef.current?.();
-      }
+      flushDeletedBatch();
     }
-  }, [markSaved]);
+  }, [flushDeletedBatch, markSaved]);
 
-  const handleSyncError = useCallback((error: { message: string }) => {
-    pendingOpsRef.current = Math.max(0, pendingOpsRef.current - 1);
-    onStatusRef.current("error", error.message);
-  }, []);
+  const handleSyncError = useCallback(
+    (error: { message: string }) => {
+      pendingOpsRef.current = Math.max(0, pendingOpsRef.current - 1);
+      onStatusRef.current("error", error.message);
+      flushDeletedBatch();
+    },
+    [flushDeletedBatch],
+  );
 
   // Drain pending changes to the DB (debounced)
   useEffect(() => {
