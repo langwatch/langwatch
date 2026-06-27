@@ -766,4 +766,44 @@ describe("computePairwiseAggregate", () => {
     const agg = computePairwiseAggregate(pairwiseEvaluator, results, 1);
     expect(agg!.counts).toEqual({ a: 0, b: 0, tie: 0 });
   });
+
+  it("tallies labels that arrive as the variant's prompt handle (Option C)", () => {
+    // Regression for the handle-vs-promptId mismatch (PR #5142 review):
+    // orchestrator emits the prompt HANDLE (e.g. "say-hi") as the verdict
+    // label, not the target id or promptId. The aggregator must match it
+    // through the `handles` hint or every handle-shaped label gets dropped
+    // and the header collapses to 0/0/0 "Tied".
+    const results = createResults({
+      evaluatorResults: {
+        "target-a": {
+          "eval-pw": [
+            { status: "processed", label: "say-hi", details: "A wins" },
+            { status: "processed", label: "be-formal", details: "B wins" },
+            { status: "processed", label: "tie", details: "equal" },
+          ],
+        },
+      },
+    });
+    const agg = computePairwiseAggregate(pairwiseEvaluator, results, 3, {
+      variantAHandle: "say-hi",
+      variantBHandle: "be-formal",
+    });
+    expect(agg!.counts).toEqual({ a: 1, b: 1, tie: 1 });
+  });
+
+  it("falls back to legacy A/B/tie when no handles are supplied", () => {
+    const results = createResults({
+      evaluatorResults: {
+        "target-a": {
+          "eval-pw": [
+            { status: "processed", label: "A" },
+            { status: "processed", label: "tie" },
+          ],
+        },
+      },
+    });
+    // No `handles` arg → only the legacy slot labels match.
+    const agg = computePairwiseAggregate(pairwiseEvaluator, results, 2);
+    expect(agg!.counts).toEqual({ a: 1, b: 0, tie: 1 });
+  });
 });
