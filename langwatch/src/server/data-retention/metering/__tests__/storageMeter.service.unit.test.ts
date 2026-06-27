@@ -121,6 +121,7 @@ describe("StorageMeterService billable measurement", () => {
   }
 
   describe("given an organization with several projects", () => {
+    /** @scenario An organization's measurement sums across all its projects */
     it("sums each project's billable bytes across its own tenant-routed query", async () => {
       const { service, query, resolveClient } = makeService({
         projectIds: ["p1", "p2", "p3"],
@@ -140,6 +141,7 @@ describe("StorageMeterService billable measurement", () => {
       );
     });
 
+    /** @scenario Another organization's data is never included */
     it("measures only the target org's tenants, never another org's projects", async () => {
       const { service, query } = makeService({
         projectIdsByOrg: { "org-A": ["p1", "p2"], "org-B": ["p3"] },
@@ -157,6 +159,7 @@ describe("StorageMeterService billable measurement", () => {
       expect(queriedTenants).not.toContain("p3");
     });
 
+    /** @scenario The measurement reuses the per-tenant path, not a cross-tenant IN, and caps each query */
     it("caps each query's read streams and execution time so the size recompute can't exhaust memory", async () => {
       const { service, query } = makeService({ projectIds: ["p1"] });
 
@@ -172,6 +175,7 @@ describe("StorageMeterService billable measurement", () => {
   });
 
   describe("given the measurement is anchored to a sealed hour", () => {
+    /** @scenario The cutoff is anchored to the sealed hour, not now */
     it("binds the cutoff as H − 35 days, independent of wall-clock time", async () => {
       const { service, query } = makeService({ projectIds: ["p1"] });
 
@@ -183,6 +187,7 @@ describe("StorageMeterService billable measurement", () => {
       expect(query.mock.calls[0]![0].query_params.cutoff).toBe(EXPECTED_CUTOFF);
     });
 
+    /** @scenario The sealed hour and cutoff are interpreted in UTC regardless of ClickHouse session timezone */
     it("binds the cutoff as an explicit UTC value unaffected by session timezone", async () => {
       const { service, query } = makeService({ projectIds: ["p1"] });
 
@@ -199,6 +204,7 @@ describe("StorageMeterService billable measurement", () => {
       expect(typeof query.mock.calls[0]![0].query_params.cutoff).toBe("string");
     });
 
+    /** @scenario Deletion lowers a later hour's measurement, never an earlier one */
     it("advances the cutoff for a later hour while an earlier hour's cutoff is unchanged", async () => {
       // The measurement at H depends only on (rows present, H): its cutoff is a
       // pure function of the sealed hour. A later hour scans a wider window
@@ -228,6 +234,8 @@ describe("StorageMeterService billable measurement", () => {
   });
 
   describe("given an organization whose projects hold only data within the free window", () => {
+    /** @scenario An organization with no old data measures zero */
+    /** @scenario A default-keep paid org bills zero by construction */
     it("measures zero", async () => {
       const { service } = makeService({
         projectIds: ["p1", "p2"],
@@ -244,6 +252,7 @@ describe("StorageMeterService billable measurement", () => {
   });
 
   describe("when one table query fails", () => {
+    /** @scenario A table query failure fails the measurement instead of silently undercounting */
     it("throws instead of returning a total that omits the failed tenant's bytes", async () => {
       const { service } = makeService({
         projectIds: ["p1", "p2"],
@@ -260,6 +269,7 @@ describe("StorageMeterService billable measurement", () => {
   });
 
   describe("when measuring billable bytes", () => {
+    /** @scenario The service returns raw logical bytes and leaves rounding to the caller */
     it("returns the raw logical byte count without rounding to MiB", async () => {
       const { service } = makeService({
         projectIds: ["p1"],
