@@ -186,12 +186,19 @@ class PairwiseCompareEvaluator(
             actual = order[0] if slot == "A" else order[1]
             return getattr(entry, f"candidate_{actual.lower()}_{attr}")
 
-        rendered_prompt = self.settings.prompt.format(
-            input=entry.input or "",
-            golden=entry.golden or "",
-            candidate_a_output=pick("A", "output"),
-            candidate_b_output=pick("B", "output"),
-        )
+        # `str.format` raises KeyError on any placeholder the user added that
+        # we don't know about (e.g. a custom prompt with `{candidate_a_id}`),
+        # surfacing as an opaque evaluator error. Use literal substitution
+        # for the slots we know about; anything else passes through verbatim
+        # — the judge gets a slightly weird prompt instead of a hard crash.
+        rendered_prompt = self.settings.prompt
+        for key, val in {
+            "input": entry.input or "",
+            "golden": entry.golden or "",
+            "candidate_a_output": pick("A", "output"),
+            "candidate_b_output": pick("B", "output"),
+        }.items():
+            rendered_prompt = rendered_prompt.replace("{" + key + "}", str(val))
 
         if self.settings.include_metrics:
             metrics_lines = ["", "Per-candidate metrics:"]
