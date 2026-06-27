@@ -150,7 +150,9 @@ Feature: Billable stored-bytes measurement (ADR-027, Phase 2)
   # ReplacingMergeTree tables count every un-collapsed row version in a plain sum(_size_bytes), so a
   # churny tenant's un-merged duplicates over-bill. Billing — unlike the UI's degrade-to-0 display —
   # cannot silently over-count. The dedup-vs-OOM trade-off must be a decided, documented behaviour.
-  @integration
+  # @unimplemented: needs a real ClickHouse instance with un-merged parts; deferred to a dedicated
+  # integration test (see PR follow-ups). Tracked gap, not yet bound.
+  @integration @unimplemented
   Scenario: Un-merged duplicate row versions do not silently over-bill
     Given a table with un-merged duplicate versions of the same row
     When billable storage is measured as of H

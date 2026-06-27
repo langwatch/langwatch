@@ -10,6 +10,7 @@ describe("buildBillableStorageQuery", () => {
   const sql = buildBillableStorageQuery(BILLABLE_AGE_EXPR_BY_TABLE);
 
   describe("given the managed-table age-expression map", () => {
+    /** @scenario Each table is aged by its retention/TTL column, so the measurement matches what TTL deletes */
     it("covers exactly the retention-managed tables", () => {
       expect(Object.keys(BILLABLE_AGE_EXPR_BY_TABLE).sort()).toEqual(
         [...RETENTION_MANAGED_TABLES].sort(),
@@ -34,6 +35,8 @@ describe("buildBillableStorageQuery", () => {
       expect(scoped.length).toBe(RETENTION_MANAGED_TABLES.length);
     });
 
+    /** @scenario Data older than the free window is billable */
+    /** @scenario Data inside the free window is free */
     it("ages every subquery against the UTC cutoff parameter", () => {
       const aged = sql.match(/<= \{cutoff:DateTime\('UTC'\)\}/g) ?? [];
       expect(aged.length).toBe(RETENTION_MANAGED_TABLES.length);
@@ -44,6 +47,8 @@ describe("buildBillableStorageQuery", () => {
       expect(sql).not.toContain("IN (");
     });
 
+    /** @scenario A table whose partition key differs from its retention column is not pruned by an unsound predicate */
+    /** @scenario evaluation_runs bills on time-since-last-update, a documented limitation */
     it("ages evaluation_runs on UpdatedAt and never synthesizes a ScheduledAt predicate", () => {
       expect(BILLABLE_AGE_EXPR_BY_TABLE.evaluation_runs).toBe(
         "toDateTime(UpdatedAt)",
@@ -55,6 +60,7 @@ describe("buildBillableStorageQuery", () => {
       expect(evalSub).not.toContain("ScheduledAt");
     });
 
+    /** @scenario The age comparison is byte-identical to the TTL delete expression */
     it("ages event_log on the epoch-millis conversion sourced from the retention config", () => {
       expect(BILLABLE_AGE_EXPR_BY_TABLE.event_log).toBe(
         "toDateTime(EventOccurredAt / 1000)",
