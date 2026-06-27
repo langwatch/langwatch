@@ -1,4 +1,5 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import { formatClickHouseDateTime } from "~/server/clickhouse/dateTime";
 import { TtlCache } from "~/server/utils/ttlCache";
 import { createLogger } from "~/utils/logger/server";
 import {
@@ -63,10 +64,11 @@ export type ProjectIdsResolver = (
   organizationId: string,
 ) => Promise<string[]>;
 
-/** `YYYY-MM-DD HH:MM:SS` in UTC for binding as a `DateTime('UTC')` param. */
-function formatClickHouseUtc(date: Date): string {
-  return date.toISOString().replace("T", " ").slice(0, 19);
-}
+// The per-tenant billable query is identical across orgs and hours (only its
+// params vary), so build it once at module load rather than per call.
+const BILLABLE_STORAGE_QUERY = buildBillableStorageQuery(
+  BILLABLE_AGE_EXPR_BY_TABLE,
+);
 
 interface StorageBreakdown {
   totalBytes: number;
@@ -76,6 +78,11 @@ interface StorageBreakdown {
 export class StorageMeterService {
   private readonly cache: TtlCache<number>;
 
+  /**
+   * @param resolveProjectIds required only by {@link getBillableStorageBytesForOrgAt}
+   *   (billing). The retention-UI reads work without it; the OSS construction
+   *   omits it because the billing path never runs there.
+   */
   constructor(
     private readonly resolveClickHouseClient: ClickHouseClientResolver | null,
     private readonly resolveProjectIds?: ProjectIdsResolver,
@@ -126,17 +133,22 @@ export class StorageMeterService {
     organizationId: string;
     sealedHour: Date;
   }): Promise<number> {
-    if (!this.resolveClickHouseClient) return 0;
-    if (!this.resolveProjectIds) {
+    if (!this.resolveClickHouseClient || !this.resolveProjectIds) {
+      // Billing requires both ClickHouse and the org→projects resolver. Unlike
+      // the retention-UI reads (which degrade to 0 in OSS), a billing read must
+      // never silently return 0 — that under-bills. The dispatcher only builds
+      // this on the SaaS path where both are present, so a miss is a misconfig.
       throw new Error(
-        "StorageMeterService: project-ids resolver not configured for billable measurement",
+        "StorageMeterService: billable measurement requires a ClickHouse client and a project-ids resolver",
       );
     }
 
-    const cutoff = formatClickHouseUtc(
+    // Second-precision UTC string bound as a DateTime('UTC') param — the column
+    // expression is DateTime, and the explicit type keeps the boundary from
+    // shifting with the ClickHouse session timezone.
+    const cutoff = formatClickHouseDateTime(
       new Date(sealedHour.getTime() - BILLABLE_AFTER_DAYS * 24 * 60 * 60 * 1000),
-    );
-    const query = buildBillableStorageQuery(BILLABLE_AGE_EXPR_BY_TABLE);
+    ).slice(0, 19);
 
     const projectIds = await this.resolveProjectIds(organizationId);
 
@@ -144,7 +156,7 @@ export class StorageMeterService {
     for (const tenantId of projectIds) {
       const client = await this.resolveClickHouseClient(tenantId);
       const result = await client.query({
-        query,
+        query: BILLABLE_STORAGE_QUERY,
         query_params: { tenantId, cutoff },
         format: "JSONEachRow",
         clickhouse_settings: BILLABLE_METERING_CLICKHOUSE_SETTINGS,
