@@ -112,7 +112,7 @@ describe("StorageMeterService billable measurement", () => {
       },
     );
     const client = { query } as const;
-    const resolveClient = vi.fn(async () => client as any);
+    const resolveClient = vi.fn(async (_tenantId: string) => client as any);
     const resolveProjectIds = vi.fn(
       async (orgId: string) => projectIdsByOrg?.[orgId] ?? projectIds ?? [],
     );
