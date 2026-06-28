@@ -62,6 +62,11 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const seededOpenKey = useRef<string | null>(null);
+  // Anchor (`field:start`) the `filter` has been (re)seeded for. Gates the
+  // server query so a direct chip-to-chip switch can't fire for the new field
+  // carrying the previous chip's text — `anchor` changes one render before the
+  // reseed effect below resets `filter`. Same keyed-ref idiom as seededOpenKey.
+  const filterSeededAnchorKey = useRef<string | null>(null);
 
   // Prefill the input with the chip's current value so the user can edit it
   // as text (not just filter the list) — clicking a chip should let you tweak
@@ -70,6 +75,9 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
   useEffect(() => {
     setFilter(anchor?.currentValue ?? "");
     setActiveIndex(0);
+    filterSeededAnchorKey.current = anchor
+      ? `${anchor.field}:${anchor.location.start}`
+      : null;
   }, [anchor?.field, anchor?.location.start, anchor?.currentValue]);
 
   // Focus the search input when the picker OPENS — deferred to the next
@@ -133,11 +141,19 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
   // Gated on BOTH the live `pristine` and the debounced `serverPristine`: the
   // debounced gate waits for typing to settle before fetching, the live gate
   // disables the query the instant the text returns to the chip's value so a
-  // stale prefix can't keep firing for the debounce window.
+  // stale prefix can't keep firing for the debounce window. Also gated on the
+  // filter having been (re)seeded for the CURRENT anchor — a chip-to-chip switch
+  // changes `anchor.field` one render before the reseed effect resets `filter`,
+  // so without this the query would fire for the new field with the old text.
   const serverSearch = useFacetSearch({
     facetKey: anchor?.field ?? "",
     prefix: debouncedFilter,
-    enabled: !!cat && !pristine && !serverPristine,
+    enabled:
+      !!cat &&
+      !pristine &&
+      !serverPristine &&
+      filterSeededAnchorKey.current ===
+        (anchor ? `${anchor.field}:${anchor.location.start}` : null),
   });
 
   const values = useMemo(() => {
