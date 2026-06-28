@@ -12,10 +12,12 @@ import { BookOpen, Check, Plus, Search } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { useFacetSearch } from "../../hooks/useFacetSearch";
 import { useTraceFacets } from "../../hooks/useTraceFacets";
 import { useFilterStore } from "../../stores/filterStore";
 import { useUIStore } from "../../stores/uiStore";
+import { dedupeByValue } from "../../utils/dedupeByValue";
 
 const MAX_VALUES_PER_PAGE = 60;
 const POPOVER_WIDTH = 320;
@@ -114,27 +116,50 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
     filter.trim() === "" ||
     filter.trim().toLowerCase() === anchor.currentValue.trim().toLowerCase();
 
+  // Debounce the typed text before it hits the server — a per-keystroke
+  // `facetValues` prefix scan over a high-cardinality facet is a real
+  // ClickHouse round-trip. The client-side substring filter in the `values`
+  // memo below stays on the live `filter` for instant local narrowing; only
+  // this server query reads the debounced value. `serverPristine` mirrors
+  // `pristine` on the debounced text so the query doesn't fire until typing
+  // settles.
+  const debouncedFilter = useDebouncedValue(filter, 300);
+  const serverPristine =
+    !anchor ||
+    debouncedFilter.trim() === "" ||
+    debouncedFilter.trim().toLowerCase() ===
+      anchor.currentValue.trim().toLowerCase();
+
   const serverSearch = useFacetSearch({
     facetKey: anchor?.field ?? "",
-    prefix: filter,
-    enabled: !!cat && !pristine,
+    prefix: debouncedFilter,
+    enabled: !!cat && !serverPristine,
   });
 
-  const values = useMemo<
-    { value: string; label?: string; count: number }[]
-  >(() => {
+  const values = useMemo(() => {
     if (!anchor || !cat) return [];
-    // Pristine → the preloaded alternatives. Edited → server-side prefix
-    // results matched against ALL values (the server matches value AND label),
-    // not just the preloaded top-N. Annotated to the common shape so `.map`
-    // resolves over the two source arrays without a union-of-arrays call error.
+    // Pristine → the preloaded alternatives, shown unfiltered as a dropdown.
+    // Edited → SUPPLEMENT the preloaded top-N with the server prefix results
+    // (union, preloaded first so it wins on a shared value), then narrow by the
+    // live (undebounced) substring filter: a server prefix hit is also a
+    // substring match so it survives, while a substring living WITHIN a
+    // preloaded value (which the server's anchored prefix match misses) is
+    // still found locally. Annotated to the common shape so `.map` resolves
+    // over the two source arrays without a union-of-arrays call error.
     const source: { value: string; label?: string; count: number }[] = pristine
       ? cat.topValues
-      : serverSearch.values;
+      : dedupeByValue([...cat.topValues, ...serverSearch.values]);
+    const q = pristine ? "" : filter.trim().toLowerCase();
     return source
+      .filter(
+        (v) =>
+          !q ||
+          v.value.toLowerCase().includes(q) ||
+          (v.label?.toLowerCase().includes(q) ?? false),
+      )
       .map((v) => ({ value: v.value, label: v.label, count: v.count }))
       .slice(0, MAX_VALUES_PER_PAGE);
-  }, [anchor, cat, pristine, serverSearch.values]);
+  }, [anchor, cat, pristine, serverSearch.values, filter]);
 
   // On open, move the highlight onto the current value's row so ↑↓ starts
   // from where the user is and a bare Enter re-commits the current value (a

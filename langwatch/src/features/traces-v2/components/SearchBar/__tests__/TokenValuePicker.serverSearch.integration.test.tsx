@@ -8,7 +8,13 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -100,12 +106,16 @@ describe("<TokenValuePicker /> server-side search", () => {
       const input = screen.getByPlaceholderText(/Filter service values/i);
       fireEvent.change(input, { target: { value: "finance" } });
 
-      expect(apiMock.useQuery).toHaveBeenCalledWith(
-        expect.objectContaining({
-          facetKey: "service",
-          prefix: expect.stringContaining("finance"),
-        }),
-        expect.objectContaining({ enabled: true }),
+      // The typed text is debounced before the server query fires, hence
+      // waitFor rather than a synchronous assertion.
+      await waitFor(() =>
+        expect(apiMock.useQuery).toHaveBeenCalledWith(
+          expect.objectContaining({
+            facetKey: "service",
+            prefix: expect.stringContaining("finance"),
+          }),
+          expect.objectContaining({ enabled: true }),
+        ),
       );
       expect(await screen.findByText("finance-prod-99")).toBeInTheDocument();
     });

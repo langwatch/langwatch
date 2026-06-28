@@ -53,18 +53,21 @@ const PRELOADED: FacetItem[] = [
 
 const neutral = (): FacetValueState => "neutral";
 
-function renderSection(props?: { supportsValueSearch?: boolean }) {
+function renderSection(props?: {
+  serverValueSearch?: boolean;
+  items?: FacetItem[];
+}) {
   return render(
     <ChakraProvider value={defaultSystem}>
       <FacetSection
         title="SERVICE"
         icon={Server}
         field="service"
-        items={PRELOADED}
+        items={props?.items ?? PRELOADED}
         getValueState={neutral}
         onToggle={vi.fn()}
         onExclude={vi.fn()}
-        supportsValueSearch={props?.supportsValueSearch}
+        serverValueSearch={props?.serverValueSearch}
       />
     </ChakraProvider>,
   );
@@ -111,25 +114,71 @@ describe("<FacetSection /> server-side value search", () => {
         },
       );
 
-      renderSection({ supportsValueSearch: true });
+      renderSection({ serverValueSearch: true });
       openSearchAndType("finance");
 
-      // The query reached past the preloaded five with a server-side prefix.
-      expect(apiMock.useQuery).toHaveBeenCalledWith(
-        expect.objectContaining({
-          facetKey: "service",
-          prefix: expect.stringContaining("finance"),
-        }),
-        expect.objectContaining({ enabled: true }),
+      // The query reached past the preloaded five with a server-side prefix
+      // (the typed text is debounced before it fires, hence waitFor).
+      await waitFor(() =>
+        expect(apiMock.useQuery).toHaveBeenCalledWith(
+          expect.objectContaining({
+            facetKey: "service",
+            prefix: expect.stringContaining("finance"),
+          }),
+          expect.objectContaining({ enabled: true }),
+        ),
       );
       // And the server-only value renders as a row.
       expect(await screen.findByText("finance-team-42")).toBeInTheDocument();
     });
   });
 
+  describe("given a substring match lives within a preloaded value", () => {
+    // The server does a PREFIX match anchored at the start, so "gpt-4o" misses
+    // the namespaced "openai/gpt-4o-mini" and returns nothing. Pre-fix the code
+    // REPLACED the preloaded list with the (empty) server result and blanked
+    // the client query, so the row vanished. The SUPPLEMENT fix unions
+    // preloaded + server and keeps the live client substring filter, so a value
+    // beyond the server's anchored match is still found locally.
+    it("still finds a substring match within the preloaded items while the server search is active", async () => {
+      apiMock.useQuery.mockImplementation(
+        (_input: { prefix?: string }, opts: { enabled?: boolean }) =>
+          opts?.enabled
+            ? { data: { values: [], totalDistinct: 0 }, isLoading: false }
+            : { data: undefined, isLoading: false },
+      );
+
+      renderSection({
+        serverValueSearch: true,
+        items: [
+          ...PRELOADED,
+          {
+            value: "openai/gpt-4o-mini",
+            label: "openai/gpt-4o-mini",
+            count: 5,
+          },
+        ],
+      });
+      openSearchAndType("gpt-4o");
+
+      // Server search goes active (debounced) and prefix-misses → empty result…
+      await waitFor(() =>
+        expect(apiMock.useQuery).toHaveBeenCalledWith(
+          expect.objectContaining({
+            prefix: expect.stringContaining("gpt-4o"),
+          }),
+          expect.objectContaining({ enabled: true }),
+        ),
+      );
+      // …yet the client substring filter over the preloaded∪server union still
+      // surfaces it.
+      expect(await screen.findByText("openai/gpt-4o-mini")).toBeInTheDocument();
+    });
+  });
+
   describe("given a facet that does NOT support value search (range/discrete)", () => {
     it("never enables the server query", () => {
-      renderSection({ supportsValueSearch: false });
+      renderSection({ serverValueSearch: false });
       openSearchAndType("finance");
 
       expect(apiMock.useQuery).not.toHaveBeenCalledWith(
@@ -154,7 +203,7 @@ describe("<FacetSection /> server-side value search", () => {
             : { data: undefined, isLoading: false },
       );
 
-      renderSection({ supportsValueSearch: true });
+      renderSection({ serverValueSearch: true });
       const input = openSearchAndType("finance");
       expect(await screen.findByText("finance-team-42")).toBeInTheDocument();
 
@@ -165,14 +214,18 @@ describe("<FacetSection /> server-side value search", () => {
         expect(screen.queryByText("finance-team-42")).not.toBeInTheDocument(),
       );
       expect(screen.getByText("checkout")).toBeInTheDocument();
-      // The most recent facetValues call is disabled.
-      const lastCall = apiMock.useQuery.mock.calls.at(-1);
-      expect(lastCall?.[1]?.enabled).toBe(false);
+      // The server query disables once the debounce settles to "" — the
+      // debounced prefix lingers ~300ms after the input is cleared, so poll
+      // until the latest facetValues call is disabled (the live client filter
+      // already restored the preloaded items synchronously, above).
+      await waitFor(() =>
+        expect(apiMock.useQuery.mock.calls.at(-1)?.[1]?.enabled).toBe(false),
+      );
     });
   });
 
-  describe("while the server search is loading", () => {
-    it("shows a spinner row", () => {
+  describe("when the server search is loading", () => {
+    it("shows a spinner row", async () => {
       apiMock.useQuery.mockImplementation(
         (_input: { prefix?: string }, opts: { enabled?: boolean }) =>
           opts?.enabled
@@ -180,10 +233,13 @@ describe("<FacetSection /> server-side value search", () => {
             : { data: undefined, isLoading: false },
       );
 
-      renderSection({ supportsValueSearch: true });
+      renderSection({ serverValueSearch: true });
       openSearchAndType("finance");
 
-      expect(screen.getByTestId("facet-search-spinner")).toBeInTheDocument();
+      // Debounced: the spinner appears once the server query actually fires.
+      expect(
+        await screen.findByTestId("facet-search-spinner"),
+      ).toBeInTheDocument();
     });
   });
 });

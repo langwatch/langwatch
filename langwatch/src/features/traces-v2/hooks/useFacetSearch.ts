@@ -13,10 +13,12 @@ const EMPTY: { value: string; label?: string; count: number }[] = [];
  * facet (models, users, services, trace names, labels) surface a value
  * beyond #50.
  *
- * Only valid for CATEGORICAL facets (and `attribute.*`) — `facetValues`
- * throws for range facets. Callers therefore gate `enabled`: the sidebar
- * passes it only from the categorical render branch; the value picker only
- * once the resolved descriptor is categorical.
+ * Server search is categorical-only (this is the canonical statement of that
+ * rule — callers just point here): valid for CATEGORICAL facets (and
+ * `attribute.*`), because `facetValues` throws for range facets. Callers
+ * therefore gate `enabled` — the sidebar passes it only from the categorical
+ * render branch (`serverValueSearch`); the value picker only once the resolved
+ * descriptor is categorical.
  *
  * Also the shared engine behind {@link useAttributeValues}, which delegates
  * here with no prefix to lazy-load an attribute's top values.

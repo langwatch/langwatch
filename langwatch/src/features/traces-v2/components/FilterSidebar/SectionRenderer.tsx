@@ -233,12 +233,10 @@ const SectionRendererInner: React.FC<SectionRendererProps> = ({
         renderActiveRowExtras={renderActiveRowExtras}
         renderInactiveRowExtras={renderInactiveRowExtras}
         synthetic={section.synthetic}
-        // Categorical facets support server-side value search — `facetValues`
-        // accepts them. Range facets do NOT (it throws for a range key, e.g.
-        // promptVersion), so the discrete-range branch below deliberately
-        // omits this prop. The discriminator is the render BRANCH, not the
-        // `field` (a discrete-range key can read like a categorical one).
-        supportsValueSearch
+        // Categorical facets get server-side value search; the discrete-range
+        // branch below omits it (the discriminator is the render BRANCH, not
+        // the `field`). See useFacetSearch — server search is categorical-only.
+        serverValueSearch
       />
     );
 

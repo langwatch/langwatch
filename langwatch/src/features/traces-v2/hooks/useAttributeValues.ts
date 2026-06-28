@@ -10,12 +10,17 @@ import { useFacetSearch } from "./useFacetSearch";
  * values, it does not search them — and the long staleTime keeps an expanded
  * section from refetching every time the rolling time range ticks (SSE
  * invalidates on real changes).
+ *
+ * The `attrKey.length > 0` guard matters because the prefixed `facetKey`
+ * (`attribute.`) is truthy even for an empty key, so useFacetSearch's own
+ * `!!facetKey` guard would NOT catch it — without this the query would fire
+ * for a bare `attribute.` key.
  */
 export function useAttributeValues(attrKey: string, enabled: boolean) {
   return useFacetSearch({
     facetKey: `attribute.${attrKey}`,
     prefix: "",
-    enabled,
+    enabled: enabled && attrKey.length > 0,
     limit: 30,
     staleTimeMs: 5 * 60_000,
   });

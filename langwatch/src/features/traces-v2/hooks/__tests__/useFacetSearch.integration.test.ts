@@ -97,7 +97,7 @@ describe("useFacetSearch", () => {
   // AttributeKeyRow has always relied on — an attribute-prefixed key, limit
   // 30, a 5-minute staleTime, and crucially NO prefix (it lazy-loads the top
   // values, it does not search them).
-  describe("useAttributeValues (delegates to useFacetSearch)", () => {
+  describe("given useAttributeValues delegates to useFacetSearch", () => {
     it("queries facetValues with the attribute-prefixed key, limit 30, no prefix", () => {
       renderHook(() => useAttributeValues("langwatch.user_id", true));
 
@@ -106,6 +106,15 @@ describe("useFacetSearch", () => {
       expect(call?.[0]?.limit).toBe(30);
       expect(call?.[0]?.prefix).toBeUndefined();
       expect(call?.[1]?.staleTime).toBe(5 * 60_000);
+    });
+
+    // The prefixed facetKey ("attribute.") is truthy even for an empty key, so
+    // useFacetSearch's own `!!facetKey` guard would not catch it —
+    // useAttributeValues must additionally gate on a non-empty attribute key.
+    it("disables the query when the attribute key is empty", () => {
+      renderHook(() => useAttributeValues("", true));
+
+      expect(lastOpts()?.enabled).toBe(false);
     });
   });
 });
