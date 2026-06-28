@@ -1,7 +1,16 @@
-import { Box, Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  HStack,
+  Input,
+  Spinner,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import type React from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
+import { useFacetSearch } from "../../hooks/useFacetSearch";
 import { useFacetLensStore } from "../../stores/facetLensStore";
 import {
   AUTO_EXPAND_THRESHOLD,
@@ -42,6 +51,16 @@ interface FacetSectionProps {
     mode: "range" | "discrete";
     onToggle: () => void;
   };
+  /**
+   * When true, the per-facet value search runs SERVER-SIDE: typing queries
+   * `facetValues` with the text as a `prefix`, matching against ALL of this
+   * facet's distinct values (not just the preloaded `items`). Set only by
+   * the categorical render branch — `facetValues` throws for range facets,
+   * so the discrete-range branch leaves it unset and the search stays the
+   * client-side filter over `items`. The Enter-to-filter fallback is kept in
+   * both modes for arbitrary / not-yet-ingested values.
+   */
+  supportsValueSearch?: boolean;
   /**
    * Optional per-row extras renderer. Invoked for any row whose value
    * is currently active (i.e. surfaced via `pinnedContent`). The
@@ -100,6 +119,7 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
   renderInactiveRowExtras,
   synthetic,
   modeToggleProps,
+  supportsValueSearch,
 }) => {
   const [expandedInactiveRows, setExpandedInactiveRows] = useState<Set<string>>(
     () => new Set(),
@@ -169,9 +189,42 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
   // in the list for one-click filtering; the badge just stops tallying them.
   const presentValueCount = useMemo(() => countPresentValues(items), [items]);
 
+  // Server-side value search. When the per-facet search is open with a
+  // non-empty query, query `facetValues` with that text as a `prefix` so the
+  // match runs against ALL of this facet's distinct values — not just the
+  // preloaded top-N `items`. Gated on `supportsValueSearch` because
+  // `facetValues` throws for range facets (SectionRenderer sets the prop only
+  // on the categorical render branch). The hook is always called (hooks can't
+  // be conditional) but stays disabled until the gate opens.
+  const serverSearchActive =
+    !!supportsValueSearch && searchOpen && searchQuery.trim().length > 0;
+  const serverSearch = useFacetSearch({
+    facetKey: field,
+    prefix: searchQuery,
+    enabled: serverSearchActive,
+  });
+  const serverItems = useMemo<FacetItem[]>(
+    () =>
+      serverSearch.values.map((v) => ({
+        value: v.value,
+        label: v.label ?? v.value,
+        count: v.count,
+      })),
+    [serverSearch.values],
+  );
+
+  // While server search is active the server has already matched the prefix
+  // against every value, so feed those into the pipeline instead of the
+  // preloaded top-N. Skip the client-side substring narrowing (pass an empty
+  // query to the sorter) — the server is the source of truth for what matches.
+  const baseItems = serverSearchActive ? serverItems : items;
   const filtered = useMemo(
-    () => filterAndSortItems({ items, searchQuery }),
-    [items, searchQuery],
+    () =>
+      filterAndSortItems({
+        items: baseItems,
+        searchQuery: serverSearchActive ? "" : searchQuery,
+      }),
+    [baseItems, serverSearchActive, searchQuery],
   );
 
   // Active rows = currently-filtered values (same-field OR values are
@@ -434,7 +487,21 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
                 }}
                 textStyle="xs"
               />
+              {serverSearchActive && serverSearch.isLoading && (
+                <HStack
+                  data-testid="facet-search-spinner"
+                  gap={2}
+                  paddingX={1}
+                  paddingY={1}
+                >
+                  <Spinner size="xs" />
+                  <Text textStyle="2xs" color="fg.subtle">
+                    Searching all values…
+                  </Text>
+                </HStack>
+              )}
               {searchQuery.trim() &&
+                !(serverSearchActive && serverSearch.isLoading) &&
                 layout.facetWindow.visible.length === 0 && (
                   <Text textStyle="2xs" color="fg.muted" paddingX={1}>
                     No match. Press <Kbd>Enter</Kbd> to filter by "

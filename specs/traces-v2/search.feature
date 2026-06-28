@@ -1092,6 +1092,7 @@ Rule: Very high-cardinality facets
     Then 30 total values are visible
     And a message reads "And 30 more — use search to filter"
 
+  @integration
   Scenario: Facet search matches against all values
     When the user types "finance" in the Service facet search
     Then values matching "finance" from all 60 services are shown inline

@@ -12,6 +12,7 @@ import { BookOpen, Check, Plus, Search } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useFacetSearch } from "../../hooks/useFacetSearch";
 import { useTraceFacets } from "../../hooks/useTraceFacets";
 import { useFilterStore } from "../../stores/filterStore";
 import { useUIStore } from "../../stores/uiStore";
@@ -91,29 +92,49 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
     return () => cancelAnimationFrame(raf);
   }, [anchor?.field, anchor?.location.start]);
 
-  const values = useMemo(() => {
-    if (!anchor) return [];
-    const cat = facets.find(
+  // Resolve this chip's field to a categorical descriptor. Lifted above the
+  // value memo so the server-search hook's `enabled` can depend on it.
+  // `facetValues` only accepts categorical facets, so a non-categorical /
+  // unknown field leaves `cat` undefined and the picker shows nothing.
+  const cat = useMemo(() => {
+    if (!anchor) return undefined;
+    const found = facets.find(
       (d) => d.kind === "categorical" && d.key === anchor.field,
     );
-    if (!cat || cat.kind !== "categorical") return [];
-    const q = filter.trim().toLowerCase();
-    // While the input still holds the unedited current value (or is empty),
-    // show the FULL list so the picker still reads as a dropdown of
-    // alternatives — only narrow once the user actually edits the text.
-    // Match against value AND label so typing the friendly name (e.g.
-    // "Faithfulness") finds the id-keyed row ("ragas/faithfulness") —
-    // mirrors the sidebar facet section's search behaviour.
-    const pristine = q === "" || q === anchor.currentValue.trim().toLowerCase();
-    const filtered = pristine
+    return found && found.kind === "categorical" ? found : undefined;
+  }, [facets, anchor]);
+
+  // "Pristine" = the input still holds the chip's unedited value (or is
+  // empty). While pristine the picker reads as a dropdown of alternatives —
+  // show the full preloaded top-N and DON'T hit the server. Once the user
+  // edits the text we switch to a server-side prefix search so a value beyond
+  // the preloaded top-N can be found and picked.
+  const pristine =
+    !anchor ||
+    filter.trim() === "" ||
+    filter.trim().toLowerCase() === anchor.currentValue.trim().toLowerCase();
+
+  const serverSearch = useFacetSearch({
+    facetKey: anchor?.field ?? "",
+    prefix: filter,
+    enabled: !!cat && !pristine,
+  });
+
+  const values = useMemo<
+    { value: string; label?: string; count: number }[]
+  >(() => {
+    if (!anchor || !cat) return [];
+    // Pristine → the preloaded alternatives. Edited → server-side prefix
+    // results matched against ALL values (the server matches value AND label),
+    // not just the preloaded top-N. Annotated to the common shape so `.map`
+    // resolves over the two source arrays without a union-of-arrays call error.
+    const source: { value: string; label?: string; count: number }[] = pristine
       ? cat.topValues
-      : cat.topValues.filter(
-          (v) =>
-            v.value.toLowerCase().includes(q) ||
-            (v.label?.toLowerCase().includes(q) ?? false),
-        );
-    return filtered.slice(0, MAX_VALUES_PER_PAGE);
-  }, [facets, anchor, filter]);
+      : serverSearch.values;
+    return source
+      .map((v) => ({ value: v.value, label: v.label, count: v.count }))
+      .slice(0, MAX_VALUES_PER_PAGE);
+  }, [anchor, cat, pristine, serverSearch.values]);
 
   // On open, move the highlight onto the current value's row so ↑↓ starts
   // from where the user is and a bare Enter re-commits the current value (a
