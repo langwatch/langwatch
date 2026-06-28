@@ -432,11 +432,7 @@ describe("<ScenarioFormDrawer /> mapping gate", () => {
     });
   });
 
-  // ── Issue #3412 — minimal input mapping ─────────────────────────────────────
-  // The run gate in handleSaveAndRun already uses hasScenarioInputMapping (input
-  // mapping only, no output required). This block documents that contract so a
-  // future regression that adds output checks to the run gate is caught early.
-
+  // These guard the PRE-EXISTING input-only run-gate contract (this PR only corrected a comment in ScenarioFormDrawer.tsx, not its logic).
   describe("when target is a workflow agent with a valid input mapping and no outputField", () => {
     beforeEach(() => {
       // Agent has scenarioMappings that satisfies hasScenarioInputMapping

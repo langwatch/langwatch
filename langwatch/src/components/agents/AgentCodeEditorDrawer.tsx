@@ -248,7 +248,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
   });
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
-  const isValid = name.trim().length > 0 && isScenarioMappingValid({ mappings: scenarioMappings, outputs, outputField: scenarioOutputField });
+  const isValid = name.trim().length > 0 && isScenarioMappingValid({ mappings: scenarioMappings });
 
   const handleSave = useCallback(() => {
     if (!project?.id || !isValid) return;
