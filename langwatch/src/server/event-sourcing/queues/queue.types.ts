@@ -51,7 +51,7 @@ export interface DeduplicationConfig<Payload> {
    * triggers may arrive (fixes per-trace evaluations running twice, #3912).
    * @default false
    */
-  survivesDispatch?: boolean;
+  shouldSurviveDispatch?: boolean;
 }
 
 /**

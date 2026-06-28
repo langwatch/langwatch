@@ -282,7 +282,7 @@ async function dispatchEvaluations({
               // dispatch delay (both = threadIdleTimeout), so the post-dispatch
               // squash window is ~0. The load-bearing fix is the trace-level
               // deferred branch below (6-min TTL >> dispatch latency) (#3912).
-              survivesDispatch: true,
+              shouldSurviveDispatch: true,
             },
           }
         : {
@@ -296,7 +296,7 @@ async function dispatchEvaluations({
               // Honor the still-alive dedup key even after the first command was
               // dispatched, so the second trigger is squashed rather than
               // DEL+restaged into a duplicate evaluation run (#3912).
-              survivesDispatch: true,
+              shouldSurviveDispatch: true,
             },
           };
 

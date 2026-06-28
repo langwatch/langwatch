@@ -305,13 +305,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     let dedupTtlMs = 0;
     let shouldExtend = true;
     let shouldReplace = true;
-    let survivesDispatch = false;
+    let shouldSurviveDispatch = false;
     if (dedup) {
       dedupId = dedup.makeId(payload).replaceAll(":", ".");
       dedupTtlMs = dedup.ttlMs ?? DEFAULT_DEDUPLICATION_TTL_MS;
       shouldExtend = dedup.extend !== false;
       shouldReplace = dedup.replace !== false;
-      survivesDispatch = dedup.survivesDispatch === true;
+      shouldSurviveDispatch = dedup.shouldSurviveDispatch === true;
     }
 
     // Attach context metadata to the payload
@@ -342,7 +342,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       }),
       shouldExtend,
       shouldReplace,
-      survivesDispatch,
+      shouldSurviveDispatch,
     });
 
     // A dedup squash displaced a staged payload; reclaim its offloaded blob so
@@ -405,7 +405,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
     const shouldExtend = dedup ? dedup.extend !== false : true;
     const shouldReplace = dedup ? dedup.replace !== false : true;
-    const survivesDispatch = dedup ? dedup.survivesDispatch === true : false;
+    const shouldSurviveDispatch = dedup
+      ? dedup.shouldSurviveDispatch === true
+      : false;
 
     const jobsToStage = await Promise.all(
       payloads.map(async (payload, index) => {
@@ -439,7 +441,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           }),
           shouldExtend,
           shouldReplace,
-          survivesDispatch,
+          shouldSurviveDispatch,
         };
       }),
     );

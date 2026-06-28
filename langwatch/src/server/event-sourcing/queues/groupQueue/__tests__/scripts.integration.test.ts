@@ -360,7 +360,7 @@ describe("GroupStagingScripts", () => {
       });
     });
 
-    describe("when survivesDispatch is set and the job was already dispatched", () => {
+    describe("when shouldSurviveDispatch is set and the job was already dispatched", () => {
       it("squashes the new job instead of re-staging it (no re-run after dispatch)", async () => {
         // Stage j1 with a dedup key configured to survive dispatch, then dispatch
         // it so it leaves staging while the dedup key's TTL is still alive.
@@ -370,7 +370,7 @@ describe("GroupStagingScripts", () => {
             dedupId: "survive-1",
             dedupTtlMs: 60000,
             dispatchAfterMs: 0,
-            survivesDispatch: true,
+            shouldSurviveDispatch: true,
           }),
         );
 
@@ -383,7 +383,7 @@ describe("GroupStagingScripts", () => {
         expect(await inspectGroupJobs("group-a")).toEqual([]);
 
         // A late re-trigger stages the same dedup id AFTER dispatch. With
-        // survivesDispatch the still-alive TTL is HONORED: the new job is squashed
+        // shouldSurviveDispatch the still-alive TTL is HONORED: the new job is squashed
         // (isNew=false) rather than DEL+restaged as the default TOCTOU path does.
         const { isNew } = await scripts.stage(
           makeJob({
@@ -391,7 +391,7 @@ describe("GroupStagingScripts", () => {
             dedupId: "survive-1",
             dedupTtlMs: 60000,
             dispatchAfterMs: 5000,
-            survivesDispatch: true,
+            shouldSurviveDispatch: true,
           }),
         );
 
@@ -1023,7 +1023,7 @@ describe("GroupStagingScripts", () => {
       });
     });
 
-    describe("when survivesDispatch is set and a batch dedup was already dispatched", () => {
+    describe("when shouldSurviveDispatch is set and a batch dedup was already dispatched", () => {
       it("squashes the dispatched-dedup job instead of staging it as new", async () => {
         // j0 staged with a survives-dispatch dedup, then dispatched (left staging
         // while its dedup key TTL is still alive).
@@ -1034,13 +1034,13 @@ describe("GroupStagingScripts", () => {
             dedupId: "batch-survive",
             dedupTtlMs: 60000,
             dispatchAfterMs: 0,
-            survivesDispatch: true,
+            shouldSurviveDispatch: true,
           }),
         );
         await scripts.dispatch({ nowMs: Date.now(), activeTtlSec: 300 });
 
         // Batch: j1 re-triggers the same (already-dispatched) dedup with
-        // survivesDispatch, j2 has no dedup. Only j2 is new; j1 is squashed by the
+        // shouldSurviveDispatch, j2 has no dedup. Only j2 is new; j1 is squashed by the
         // surviving dedup key rather than DEL+restaged as the default race path does.
         const { newStagedCount, orphanedValues } = await scripts.stageBatch([
           makeJob({
@@ -1049,7 +1049,7 @@ describe("GroupStagingScripts", () => {
             dedupId: "batch-survive",
             dedupTtlMs: 60000,
             dispatchAfterMs: 5000,
-            survivesDispatch: true,
+            shouldSurviveDispatch: true,
             jobDataJson: JSON.stringify({ from: "j1" }),
           }),
           makeJob({
@@ -1074,6 +1074,58 @@ describe("GroupStagingScripts", () => {
 
         // The dedup key is preserved (still the dispatched job), not deleted.
         expect(await inspectDedupKey("batch-survive")).toBe("j0");
+      });
+    });
+
+    describe("when a shouldSurviveDispatch batch squash targets an already-drained group", () => {
+      it("does not resurrect the drained group into the ready set", async () => {
+        // Stage j0 under a survives-dispatch dedup, dispatch it, then COMPLETE it
+        // so the group fully drains: it leaves staging AND the ready set while the
+        // dedup key's TTL is still alive.
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j0",
+            groupId: "group-drain",
+            dedupId: "drained-survive",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 0,
+            shouldSurviveDispatch: true,
+          }),
+        );
+        await scripts.dispatch({ nowMs: Date.now(), activeTtlSec: 300 });
+        await scripts.complete({ groupId: "group-drain", stagedJobId: "j0" });
+
+        // Precondition: the group is drained — gone from ready and from staging.
+        expect(
+          await redis.zscore(`${keyPrefix()}ready`, "group-drain"),
+        ).toBeNull();
+        expect(await inspectGroupJobs("group-drain")).toEqual([]);
+
+        // A late re-trigger batches ONLY the same (already-dispatched) dedup with
+        // shouldSurviveDispatch. It is squashed (stages no job), so the group must
+        // NOT be re-added to ready — doing so would resurrect a drained, empty
+        // group into the dispatch scan after the loop.
+        const { newStagedCount } = await scripts.stageBatch([
+          makeJob({
+            stagedJobId: "j1",
+            groupId: "group-drain",
+            dedupId: "drained-survive",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 5000,
+            shouldSurviveDispatch: true,
+          }),
+        ]);
+
+        // The squash staged nothing...
+        expect(newStagedCount).toBe(0);
+        // ...and did NOT resurrect the drained group into ready.
+        expect(
+          await redis.zscore(`${keyPrefix()}ready`, "group-drain"),
+        ).toBeNull();
+        expect(await inspectReadySet()).toEqual([]);
+        // Still drained from staging; the dedup key is preserved, not re-staged.
+        expect(await inspectGroupJobs("group-drain")).toEqual([]);
+        expect(await inspectDedupKey("drained-survive")).toBe("j0");
       });
     });
   });

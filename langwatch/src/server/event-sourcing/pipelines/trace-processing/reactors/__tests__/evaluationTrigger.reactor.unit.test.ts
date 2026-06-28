@@ -430,10 +430,10 @@ describe("evaluationTrigger reactor", () => {
 
       // The reactor can fire a second time after the command was already
       // dispatched (a late span, then the deferred OriginResolvedEvent). The
-      // dedup key outlives dispatch (6-min TTL), so survivesDispatch must be set
+      // dedup key outlives dispatch (6-min TTL), so shouldSurviveDispatch must be set
       // for that second dispatch to be squashed instead of re-run as a duplicate.
       const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
-      expect(options!.deduplication!.survivesDispatch).toBe(true);
+      expect(options!.deduplication!.shouldSurviveDispatch).toBe(true);
     });
   });
 
@@ -465,7 +465,7 @@ describe("evaluationTrigger reactor", () => {
       const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
       // delay == threadIdleTimeout * 1000 confirms the thread-level branch was taken.
       expect(options!.delay).toBe(300 * 1000);
-      expect(options!.deduplication!.survivesDispatch).toBe(true);
+      expect(options!.deduplication!.shouldSurviveDispatch).toBe(true);
     });
   });
 

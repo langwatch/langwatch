@@ -477,7 +477,7 @@ if dedupId ~= "" and dedupTtlMs > 0 then
       return {0, orphanedValue}
     end
     -- Already dispatched. Default: the dedup key is stale, clean it up and let a
-    -- new job stage (the historical TOCTOU behavior). When survivesDispatch is
+    -- new job stage (the historical TOCTOU behavior). When shouldSurviveDispatch is
     -- set, HONOR the still-alive TTL instead — squash the new job and report its
     -- payload as the orphaned value (same {0, orphanedValue} shape the in-staging
     -- squash returns) so a late re-trigger after dispatch cannot re-run it (#3912).
@@ -557,6 +557,10 @@ for i = 1, count do
 
   local isDeduped = false
   local orphanedValue = ""
+  -- True only for the post-dispatch squash (already-dispatched dedup honored):
+  -- that item stages no job AND the deduped job is already gone, so it must NOT
+  -- contribute this group to the post-loop ready bookkeeping (see below).
+  local squashedPostDispatch = false
   if dedupId ~= "" and dedupTtlMs > 0 then
     local existingJobId = redis.call("GET", dedupKey)
     if existingJobId then
@@ -577,13 +581,14 @@ for i = 1, count do
         isDeduped = true
       else
         -- Already dispatched. Default: the dedup key is stale, clean it up and let
-        -- a new job stage (the historical TOCTOU behavior). When survivesDispatch
+        -- a new job stage (the historical TOCTOU behavior). When shouldSurviveDispatch
         -- is set, HONOR the still-alive TTL instead — squash the new job (mark it
         -- deduped and report its payload as orphaned, mirroring the in-staging
         -- squash above) so a late re-trigger after dispatch cannot re-run it (#3912).
         if shouldSurviveDispatch == 1 then
           orphanedValue = jobDataJson
           isDeduped = true
+          squashedPostDispatch = true
         else
           redis.call("DEL", dedupKey)
         end
@@ -603,10 +608,16 @@ for i = 1, count do
 
   refreshGroupKeyTtl(groupJobsKey, dataKey, nowMs)
 
-  -- Track minimum dispatchAfter per affected group
-  local existingMin = affectedGroups[groupId]
-  if existingMin == nil or dispatchAfter < existingMin then
-    affectedGroups[groupId] = dispatchAfter
+  -- Track minimum dispatchAfter per affected group. A post-dispatch squash is
+  -- skipped: it staged no job and the deduped job already left staging, so
+  -- adding the group here would reinsert a drained (empty) group into ready /
+  -- demanding-tenants after the loop. A normal stage and an in-staging squash
+  -- (rank found — that job IS staged) still register, so the group stays ready.
+  if not squashedPostDispatch then
+    local existingMin = affectedGroups[groupId]
+    if existingMin == nil or dispatchAfter < existingMin then
+      affectedGroups[groupId] = dispatchAfter
+    end
   end
 end
 
@@ -1544,7 +1555,7 @@ export class GroupStagingScripts {
     jobDataJson,
     shouldExtend = true,
     shouldReplace = true,
-    survivesDispatch = false,
+    shouldSurviveDispatch = false,
   }: {
     stagedJobId: string;
     groupId: string;
@@ -1554,7 +1565,7 @@ export class GroupStagingScripts {
     jobDataJson: string;
     shouldExtend?: boolean;
     shouldReplace?: boolean;
-    survivesDispatch?: boolean;
+    shouldSurviveDispatch?: boolean;
   }): Promise<{ isNew: boolean; orphanedValue: string }> {
     const groupJobsKey = `${this.keyPrefix}group:${groupId}:jobs`;
     const readyKey = `${this.keyPrefix}ready`;
@@ -1591,7 +1602,7 @@ export class GroupStagingScripts {
       String(Date.now()),
       String(readGlobalBudget()),
       // ARGV[11] — appended after globalBudget so no existing index shifts.
-      String(survivesDispatch ? 1 : 0),
+      String(shouldSurviveDispatch ? 1 : 0),
     );
 
     // STAGE_LUA returns [code, orphanedValue]. Tolerate a bare integer reply
@@ -1622,7 +1633,7 @@ export class GroupStagingScripts {
       jobDataJson: string;
       shouldExtend?: boolean;
       shouldReplace?: boolean;
-      survivesDispatch?: boolean;
+      shouldSurviveDispatch?: boolean;
     }>,
   ): Promise<{ newStagedCount: number; orphanedValues: string[] }> {
     if (jobs.length === 0) return { newStagedCount: 0, orphanedValues: [] };
@@ -1645,7 +1656,7 @@ export class GroupStagingScripts {
         // 9th per-job arg (offset + 9 in the Lua). Kept in the per-job block,
         // alongside the other dedup flags, so the trailing nowMs/globalBudget
         // remain end-relative (ARGV[#ARGV-1]/ARGV[#ARGV]).
-        String((job.survivesDispatch ?? false) ? 1 : 0),
+        String((job.shouldSurviveDispatch ?? false) ? 1 : 0),
       );
     }
     // Appended after all per-job args: nowMs then globalBudget last, so the Lua
