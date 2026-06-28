@@ -29,8 +29,10 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 }));
 
 // The picker resolves its field's categorical descriptor from useTraceFacets.
-// Its top values are only "checkout" / "billing" — "finance-prod-99" exists
-// only server-side, so finding it proves the search reached past the top-N.
+// Preloaded top values: "checkout" / "billing" (so a server-only value like
+// "finance-prod-99" proves the search reached past the top-N), plus the
+// namespaced "openai/gpt-4o-mini" — the server's ANCHORED prefix "gpt-4o"
+// misses it, so it exercises the supplement (preloaded ∪ server) regression.
 vi.mock("../../../hooks/useTraceFacets", () => ({
   useTraceFacets: () => ({
     data: [
@@ -41,6 +43,7 @@ vi.mock("../../../hooks/useTraceFacets", () => ({
         topValues: [
           { value: "checkout", count: 50 },
           { value: "billing", count: 40 },
+          { value: "openai/gpt-4o-mini", count: 5 },
         ],
       },
     ],
@@ -94,7 +97,6 @@ afterEach(() => cleanup());
 
 describe("<TokenValuePicker /> server-side search", () => {
   describe("given the user edits a categorical chip's value", () => {
-    /** @scenario "Editing a search-bar value chip searches all values, not just the preloaded set" */
     it("queries facetValues with a prefix and surfaces a value beyond the preloaded top-N", async () => {
       render(
         <ChakraProvider value={defaultSystem}>
@@ -133,6 +135,49 @@ describe("<TokenValuePicker /> server-side search", () => {
         expect.anything(),
         expect.objectContaining({ enabled: true }),
       );
+    });
+  });
+
+  describe("given a substring match lives within a preloaded value", () => {
+    // The server does a PREFIX match anchored at the start, so "gpt-4o" misses
+    // the namespaced "openai/gpt-4o-mini" and returns nothing. A replace-regression
+    // (the empty server result REPLACING the preloaded list) would drop the row;
+    // the SUPPLEMENT contract unions preloaded + server and keeps the live client
+    // substring filter, so the preloaded value — a substring match — stays shown.
+    // Mirrors FacetSection.serverSearch's preloaded-survival regression.
+    /** @scenario "Editing a search-bar value chip searches all values, not just the preloaded set" */
+    it("keeps a matching preloaded value when the server prefix search misses it (supplement, not replace)", async () => {
+      apiMock.useQuery.mockImplementation(
+        (_input: { prefix?: string }, opts: { enabled?: boolean }) =>
+          opts?.enabled
+            ? { data: { values: [], totalDistinct: 0 }, isLoading: false }
+            : { data: undefined, isLoading: false },
+      );
+
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <TokenValuePicker anchor={anchor} onClose={vi.fn()} />
+        </ChakraProvider>,
+      );
+
+      // Editing "checkout" → "gpt-4o" flips to a server-side search whose
+      // anchored prefix misses the namespaced preloaded value.
+      const input = screen.getByPlaceholderText(/Filter service values/i);
+      fireEvent.change(input, { target: { value: "gpt-4o" } });
+
+      // Server search goes active (debounced) and prefix-misses → empty result…
+      await waitFor(() =>
+        expect(apiMock.useQuery).toHaveBeenCalledWith(
+          expect.objectContaining({
+            facetKey: "service",
+            prefix: expect.stringContaining("gpt-4o"),
+          }),
+          expect.objectContaining({ enabled: true }),
+        ),
+      );
+      // …yet the preloaded value, a substring match over the preloaded∪server
+      // union, is still shown. Under a replace-regression it would vanish.
+      expect(await screen.findByText("openai/gpt-4o-mini")).toBeInTheDocument();
     });
   });
 });

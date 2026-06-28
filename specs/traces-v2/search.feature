@@ -1101,8 +1101,9 @@ Rule: Very high-cardinality facets
   @integration
   Scenario: Editing a search-bar value chip searches all values, not just the preloaded set
     Given the user has a "service:" filter chip in the search bar
-    When the user clicks the chip and edits the value to a prefix matching a service beyond the preloaded top set
-    Then the matching service value beyond the preloaded set appears in the picker
+    When the user clicks the chip and edits the value to a prefix
+    Then the matching preloaded values and any matching values beyond the preloaded set both appear in the picker
+    And they supplement the preloaded set rather than replacing it
 
   Scenario: Clearing facet search returns to top-5 view
     Given the user is searching in the Service facet
