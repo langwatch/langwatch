@@ -22,31 +22,32 @@ Feature: Scenario agent needs only a single input mapping to save and run
   # ── Core predicate ────────────────────────────────────────────────────────
 
   @unit
-  Scenario: Valid input mapping with no outputs configured passes the predicate
+  Scenario: Input mapping alone passes the predicate
     Given an agent configuration with a source mapping for the "input" scenario field
-    And no outputs are declared
     When the mapping validity is evaluated
     Then the result is valid
 
   @unit
-  Scenario: Valid input mapping with outputField explicitly cleared passes the predicate
-    Given an agent configuration with a source mapping for the "input" scenario field
-    And outputs are declared
-    But the output-field selection has been explicitly cleared
-    When the mapping validity is evaluated
-    Then the result is valid
-
-  @unit
-  Scenario: Valid messages mapping with no outputs configured passes the predicate
+  Scenario: Messages mapping alone passes the predicate
     Given an agent configuration with a source mapping for the "messages" scenario field
-    And no outputs are declared
     When the mapping validity is evaluated
     Then the result is valid
 
   @unit
-  Scenario: No input or messages mapping fails the predicate regardless of outputs
-    Given an agent configuration with no source mapping for "input" or "messages"
-    And outputs are fully configured
+  Scenario: ThreadId-only mapping fails the predicate
+    Given an agent configuration with only a "threadId" source mapping
+    When the mapping validity is evaluated
+    Then the result is invalid
+
+  @unit
+  Scenario: Static value mapping fails the predicate
+    Given an agent configuration with only a static value mapping
+    When the mapping validity is evaluated
+    Then the result is invalid
+
+  @unit
+  Scenario: Empty mappings fail the predicate
+    Given an agent configuration with no mappings at all
     When the mapping validity is evaluated
     Then the result is invalid
 
@@ -91,13 +92,30 @@ Feature: Scenario agent needs only a single input mapping to save and run
     When the agent editor drawer renders
     Then the Save Changes button is disabled
 
+  # ── Save & Run gate ───────────────────────────────────────────────────────
+  # A scenario must be runnable with only the input mapping (issue AC1). The
+  # run gate already used the input-only rule; these guard that contract.
+
+  @integration
+  Scenario: Run gate passes for workflow agent with input-only mapping
+    Given a workflow agent with a valid input mapping and no output mapping
+    When the user clicks Save and run
+    Then the scenario run starts without opening the mapping editor
+
+  @integration
+  Scenario: Run gate emits no mapping warning when input is mapped
+    Given a workflow agent with a valid input mapping and no output mapping
+    When the user clicks Save and run
+    Then no mapping-required warning is shown
+
   # ── AC Coverage Map ───────────────────────────────────────────────────────
   # "isScenarioMappingValid returns true for input-only mapping" →
-  #   "Valid input mapping with no outputs configured passes the predicate"
-  #   "Valid input mapping with outputField explicitly cleared passes the predicate"
-  #   "Valid messages mapping with no outputs configured passes the predicate"
+  #   "Input mapping alone passes the predicate"
+  #   "Messages mapping alone passes the predicate"
   # "isScenarioMappingValid is fail-closed" →
-  #   "No input or messages mapping fails the predicate regardless of outputs"
+  #   "ThreadId-only mapping fails the predicate"
+  #   "Static value mapping fails the predicate"
+  #   "Empty mappings fail the predicate"
   # "Workflow drawer Save gate passes for input-only mapping" →
   #   "Save workflow agent when output mapping is cleared but input mapping present"
   # "Structural workflow-output guard is preserved" →

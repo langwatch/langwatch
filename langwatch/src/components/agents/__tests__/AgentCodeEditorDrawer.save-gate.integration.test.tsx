@@ -26,12 +26,13 @@
  *
  * @see specs/features/scenarios/minimal-input-mapping.feature
  */
-import type React from "react";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AgentCodeEditorDrawer } from "../AgentCodeEditorDrawer";
 import type { ScenarioInputMappingSectionProps } from "~/components/suites/ScenarioInputMappingSection";
+import { AgentCodeEditorDrawer } from "../AgentCodeEditorDrawer";
 
 // ── Hoisted mock state ────────────────────────────────────────────────────────
 
@@ -194,7 +195,8 @@ const CODE_AGENT_INPUT_MAPPED_OUTPUT_CLEARED = {
       {
         identifier: "code",
         type: "code",
-        value: "class Code:\n    def __call__(self, userQuery: str):\n        return {'response': userQuery}",
+        value:
+          "class Code:\n    def __call__(self, userQuery: str):\n        return {'response': userQuery}",
       },
     ],
     inputs: [{ identifier: "userQuery", type: "str" }],
@@ -230,7 +232,8 @@ const CODE_AGENT_NO_INPUT_MAPPING = {
       {
         identifier: "code",
         type: "code",
-        value: "class Code:\n    def __call__(self, sessionId: str):\n        return {'response': sessionId}",
+        value:
+          "class Code:\n    def __call__(self, sessionId: str):\n        return {'response': sessionId}",
       },
     ],
     inputs: [{ identifier: "sessionId", type: "str" }],
@@ -257,10 +260,9 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 function renderDrawer(agentId: string) {
-  return render(
-    <AgentCodeEditorDrawer open={true} agentId={agentId} />,
-    { wrapper: Wrapper },
-  );
+  return render(<AgentCodeEditorDrawer open={true} agentId={agentId} />, {
+    wrapper: Wrapper,
+  });
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -276,26 +278,12 @@ describe("AgentCodeEditorDrawer save gate", () => {
     });
 
     describe("when the drawer renders with the pre-saved config", () => {
-      /**
-       * @scenario Save code agent when output mapping is cleared but input mapping present
-       *
-       * FAILS current code:
-       *   isScenarioMappingValid checks hasOutputMapping = hasOutputs && outputField !== ""
-       *   outputs = [{ identifier: "response" }] → hasOutputs = true
-       *   outputField = "" → "" !== "" = false → hasOutputMapping = false
-       *   isValid = false → button disabled
-       *
-       * After fix (isScenarioMappingValid drops && hasOutputMapping):
-       *   isScenarioMappingValid returns hasScenarioInputMapping(mappings) = true
-       *   isValid = true → button enabled
-       */
+      /** @scenario Save code agent when output mapping is cleared but input mapping present */
       it("enables the Save Changes button", async () => {
         renderDrawer("code-agent-cleared");
 
         await waitFor(() => {
-          expect(
-            screen.getByTestId("save-agent-button"),
-          ).not.toBeDisabled();
+          expect(screen.getByTestId("save-agent-button")).not.toBeDisabled();
         });
       });
     });
@@ -308,11 +296,7 @@ describe("AgentCodeEditorDrawer save gate", () => {
     });
 
     describe("when the drawer renders with threadId-only mapping", () => {
-      /**
-       * No "input" or "messages" source mapping → hasScenarioInputMapping = false
-       * → isScenarioMappingValid = false → Save disabled.
-       * Green both before and after the fix — fail-closed preserved.
-       */
+      /** @scenario Save code agent stays blocked when no input mapping is configured */
       it("keeps the Save Changes button disabled", async () => {
         renderDrawer("code-agent-no-input");
 

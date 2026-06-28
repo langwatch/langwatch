@@ -8,8 +8,8 @@
  * @see specs/scenarios/minimal-input-mapping.feature
  */
 import { describe, expect, it } from "vitest";
-import { isScenarioMappingValid } from "../ScenarioInputMappingSection";
 import type { FieldMapping } from "~/components/variables/VariableMappingInput";
+import { isScenarioMappingValid } from "../ScenarioInputMappingSection";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -40,6 +40,7 @@ describe("isScenarioMappingValid", () => {
 
   describe("given a valid 'input' mapping", () => {
     describe("when no output is configured", () => {
+      /** @scenario Input mapping alone passes the predicate */
       it("returns true", () => {
         expect(
           isScenarioMappingValid({
@@ -52,6 +53,7 @@ describe("isScenarioMappingValid", () => {
 
   describe("given a valid 'messages' mapping", () => {
     describe("when no output is configured", () => {
+      /** @scenario Messages mapping alone passes the predicate */
       it("returns true", () => {
         expect(
           isScenarioMappingValid({
@@ -68,6 +70,7 @@ describe("isScenarioMappingValid", () => {
 
   describe("given no input-field mapping (fail-closed)", () => {
     describe("when threadId-only mapping is present", () => {
+      /** @scenario ThreadId-only mapping fails the predicate */
       it("returns false", () => {
         expect(
           isScenarioMappingValid({
@@ -78,6 +81,7 @@ describe("isScenarioMappingValid", () => {
     });
 
     describe("when only a static value mapping is present", () => {
+      /** @scenario Static value mapping fails the predicate */
       it("returns false", () => {
         expect(
           isScenarioMappingValid({
@@ -88,6 +92,7 @@ describe("isScenarioMappingValid", () => {
     });
 
     describe("when mappings are empty", () => {
+      /** @scenario Empty mappings fail the predicate */
       it("returns false", () => {
         expect(
           isScenarioMappingValid({
