@@ -570,13 +570,17 @@ describe("given a saved dataset larger than one page", () => {
     /** @scenario Move between pages */
     it("stays on the requested page instead of bouncing back to page 1", async () => {
       // react-query holds the previous page's result while the next page's key
-      // loads (keepPreviousData). Simulate that: page 2 is not yet "ready", so
-      // the hook returns page 1's data — the page count must NOT momentarily
-      // reset and snap navigation back to page 1.
+      // loads (keepPreviousData), flagging it `isPreviousData: true`. Simulate
+      // that faithfully: page 2 is not yet "ready", so the hook returns page 1's
+      // data marked as held — the page count must NOT momentarily reset and snap
+      // navigation back to page 1, and the held data must not re-hydrate the
+      // store (the guard skips it). Stable refs per (page, held) so the
+      // store-load effect can't loop.
       const ready = new Set([1]);
-      const cache = new Map<number, unknown>();
+      const fresh = new Map<number, unknown>();
+      const held = new Map<number, unknown>();
       let lastReady = 1;
-      const pageResult = (p: number) => ({
+      const pageResult = (p: number, isPreviousData: boolean) => ({
         data: {
           id: "dataset_paged",
           name: "paged",
@@ -592,6 +596,7 @@ describe("given a saved dataset larger than one page", () => {
           ],
         },
         isLoading: false,
+        isPreviousData,
         refetch: vi.fn(),
       });
       getAllQuery.mockReset();
@@ -599,11 +604,13 @@ describe("given a saved dataset larger than one page", () => {
         const p = input?.page ?? 1;
         if (ready.has(p)) {
           lastReady = p;
-          if (!cache.has(p)) cache.set(p, pageResult(p));
-          return cache.get(p);
+          if (!fresh.has(p)) fresh.set(p, pageResult(p, false));
+          return fresh.get(p);
         }
-        if (!cache.has(lastReady)) cache.set(lastReady, pageResult(lastReady));
-        return cache.get(lastReady); // previous page held while page p loads
+        // Previous page held while page p loads → flagged isPreviousData.
+        if (!held.has(lastReady))
+          held.set(lastReady, pageResult(lastReady, true));
+        return held.get(lastReady);
       });
 
       const user = userEvent.setup();
@@ -682,7 +689,7 @@ describe("given a saved dataset larger than one page", () => {
     expect(screen.getByTestId("add-row")).toBeInTheDocument();
   });
 
-  /** @scenario A dataset larger than one page shows the first page with a pager */
+  /** @scenario Change how many rows are shown per page */
   it("re-reads with the new limit and resets to page 1 when rows-per-page changes", async () => {
     const user = userEvent.setup();
     renderPaged();
@@ -741,7 +748,8 @@ describe("given the editor is switched to a different dataset", () => {
   });
 
   describe("when the previous dataset's data is still being served", () => {
-    /** @scenario Edits on a page are saved to the right record */
+    // Regression: robustness of the keepPreviousData hold across a datasetId
+    // switch — not a feature scenario, so deliberately not @scenario-bound.
     it("never hydrates the new dataset id with the previous dataset's rows", async () => {
       updateMutate.mockImplementation(
         (_args: unknown, opts?: { onSuccess?: () => void }) =>
@@ -787,7 +795,7 @@ describe("given the editor is switched to a different dataset", () => {
 // stale page count and can strand the user on a now-empty last page.
 describe("given rows are deleted from a paginated dataset", () => {
   describe("when the deletion is saved", () => {
-    /** @scenario Move between pages */
+    // Regression: post-delete count refresh — not a feature scenario.
     it("refreshes the server total so the pager cannot strand an empty page", async () => {
       deleteManyMutate.mockImplementation(
         (_args: unknown, opts?: { onSuccess?: () => void }) =>
@@ -829,7 +837,8 @@ describe("given rows are deleted from a paginated dataset", () => {
   });
 
   describe("when the delete commits but a later update in the batch fails", () => {
-    /** @scenario Move between pages */
+    // Regression: count refresh must fire on batch settle via the error path
+    // too — not a feature scenario.
     it("still refreshes the total — a committed delete must not be masked by an update error", async () => {
       // Force the bug-triggering interleave: both ops are dispatched, the delete
       // commits, and the update fails LAST — so the batch only reaches zero

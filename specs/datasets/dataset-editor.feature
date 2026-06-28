@@ -69,6 +69,13 @@ Feature: Dataset editor
     Then an empty row to add a record is available there
     And it is not offered on earlier, full pages
 
+  @integration
+  Scenario: Change how many rows are shown per page
+    Given the dataset has more records than fit on one page
+    When I change how many rows are shown per page
+    Then that many records are loaded
+    And I am returned to the first page
+
   # ============================================================================
   # Inline cell editing
   # ============================================================================
