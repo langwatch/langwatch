@@ -70,5 +70,11 @@ export function useFacetSearch({
     values: query.data?.values ?? EMPTY,
     totalDistinct: query.data?.totalDistinct ?? 0,
     isLoading: query.isLoading && enabled,
+    // `keepPreviousData` keeps `isLoading` true only on the COLD first fetch, so
+    // refinement keystrokes (which refetch while prior values stay on screen)
+    // need `isFetching` to drive the "Searching all values…" spinner. Exposed
+    // ALONGSIDE `isLoading` — useAttributeValues / AttributeKeyRow rely on the
+    // latter, so it stays.
+    isFetching: (query.isFetching ?? false) && enabled,
   };
 }

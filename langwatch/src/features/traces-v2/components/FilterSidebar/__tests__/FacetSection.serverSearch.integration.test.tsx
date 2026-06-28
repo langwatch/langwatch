@@ -209,28 +209,25 @@ describe("<FacetSection /> server-side value search", () => {
 
       fireEvent.change(input, { target: { value: "" } });
 
-      // The preloaded list is back; the server-only value is gone.
-      await waitFor(() =>
-        expect(screen.queryByText("finance-team-42")).not.toBeInTheDocument(),
-      );
+      // The live-input gate disables the server query SYNCHRONOUSLY on clear —
+      // no 300ms stale window where the debounced prefix would keep firing.
+      expect(apiMock.useQuery.mock.calls.at(-1)?.[1]?.enabled).toBe(false);
+      // The preloaded list is back and the server-only value is gone.
       expect(screen.getByText("checkout")).toBeInTheDocument();
-      // The server query disables once the debounce settles to "" — the
-      // debounced prefix lingers ~300ms after the input is cleared, so poll
-      // until the latest facetValues call is disabled (the live client filter
-      // already restored the preloaded items synchronously, above).
-      await waitFor(() =>
-        expect(apiMock.useQuery.mock.calls.at(-1)?.[1]?.enabled).toBe(false),
-      );
+      expect(screen.queryByText("finance-team-42")).not.toBeInTheDocument();
     });
   });
 
   describe("when the server search is loading", () => {
     it("shows a spinner row", async () => {
+      // keepPreviousData means a refinement refetch reports isLoading:false but
+      // isFetching:true — the spinner must follow isFetching, not isLoading
+      // (see useFacetSearch). Revert the gate to isLoading and this fails.
       apiMock.useQuery.mockImplementation(
         (_input: { prefix?: string }, opts: { enabled?: boolean }) =>
           opts?.enabled
-            ? { data: undefined, isLoading: true }
-            : { data: undefined, isLoading: false },
+            ? { data: undefined, isLoading: false, isFetching: true }
+            : { data: undefined, isLoading: false, isFetching: false },
       );
 
       renderSection({ serverValueSearch: true });

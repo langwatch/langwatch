@@ -196,11 +196,17 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
   // preloaded top-N `items`. The typed text is debounced before it hits the
   // server: a per-keystroke prefix scan over a high-cardinality facet is a real
   // ClickHouse round-trip. Gated on `serverValueSearch` — see useFacetSearch
-  // (server search is categorical-only). The hook is always called (hooks can't
-  // be conditional) but stays disabled until the gate opens.
+  // (server search is categorical-only) — AND on BOTH the live and debounced
+  // query: the debounced value drives the fetch (wait for typing to settle),
+  // while the live value disables it the instant the input is cleared so a
+  // stale prefix can't keep firing for the debounce window. The hook is always
+  // called (hooks can't be conditional) but stays disabled until the gate opens.
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
   const serverSearchActive =
-    !!serverValueSearch && searchOpen && debouncedSearchQuery.trim().length > 0;
+    !!serverValueSearch &&
+    searchOpen &&
+    searchQuery.trim().length > 0 &&
+    debouncedSearchQuery.trim().length > 0;
   const serverSearch = useFacetSearch({
     facetKey: field,
     prefix: debouncedSearchQuery,
@@ -494,7 +500,7 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
                 }}
                 textStyle="xs"
               />
-              {serverSearchActive && serverSearch.isLoading && (
+              {serverSearchActive && serverSearch.isFetching && (
                 <HStack
                   data-testid="facet-search-spinner"
                   gap={2}
@@ -508,7 +514,7 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
                 </HStack>
               )}
               {searchQuery.trim() &&
-                !(serverSearchActive && serverSearch.isLoading) &&
+                !(serverSearchActive && serverSearch.isFetching) &&
                 layout.facetWindow.visible.length === 0 && (
                   <Text textStyle="2xs" color="fg.muted" paddingX={1}>
                     No match. Press <Kbd>Enter</Kbd> to filter by "

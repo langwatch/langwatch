@@ -130,10 +130,14 @@ export const TokenValuePicker: React.FC<TokenValuePickerProps> = ({
     debouncedFilter.trim().toLowerCase() ===
       anchor.currentValue.trim().toLowerCase();
 
+  // Gated on BOTH the live `pristine` and the debounced `serverPristine`: the
+  // debounced gate waits for typing to settle before fetching, the live gate
+  // disables the query the instant the text returns to the chip's value so a
+  // stale prefix can't keep firing for the debounce window.
   const serverSearch = useFacetSearch({
     facetKey: anchor?.field ?? "",
     prefix: debouncedFilter,
-    enabled: !!cat && !serverPristine,
+    enabled: !!cat && !pristine && !serverPristine,
   });
 
   const values = useMemo(() => {

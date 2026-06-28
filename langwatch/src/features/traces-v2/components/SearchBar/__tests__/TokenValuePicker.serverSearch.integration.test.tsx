@@ -94,6 +94,7 @@ afterEach(() => cleanup());
 
 describe("<TokenValuePicker /> server-side search", () => {
   describe("given the user edits a categorical chip's value", () => {
+    /** @scenario "Editing a search-bar value chip searches all values, not just the preloaded set" */
     it("queries facetValues with a prefix and surfaces a value beyond the preloaded top-N", async () => {
       render(
         <ChakraProvider value={defaultSystem}>
