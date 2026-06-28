@@ -270,6 +270,9 @@ async function dispatchEvaluations({
               deduplication: {
                 makeId: ExecuteEvaluationCommand.makeJobId,
                 ttlMs: monitor.threadIdleTimeout! * 1000,
+                // Squash a re-trigger that lands after the command was dispatched
+                // (within the TTL) instead of re-running it (#3912).
+                survivesDispatch: true,
               },
             }
           : {
@@ -280,6 +283,10 @@ async function dispatchEvaluations({
                 // once from the deferred OriginResolvedEvent), the second
                 // dispatch is squashed by the dedup key.
                 ttlMs: DEFERRED_CHECK_DELAY_MS + 60_000,
+                // Honor the still-alive dedup key even after the first command was
+                // dispatched, so the second trigger is squashed rather than
+                // DEL+restaged into a duplicate evaluation run (#3912).
+                survivesDispatch: true,
               },
             };
 

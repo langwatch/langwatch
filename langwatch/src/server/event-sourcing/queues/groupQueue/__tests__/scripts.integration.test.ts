@@ -344,6 +344,51 @@ describe("GroupStagingScripts", () => {
       });
     });
 
+    describe("when survivesDispatch is set and the job was already dispatched", () => {
+      it("squashes the new job instead of re-staging it (no re-run after dispatch)", async () => {
+        // Stage j1 with a dedup key configured to survive dispatch, then dispatch
+        // it so it leaves staging while the dedup key's TTL is still alive.
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j1",
+            dedupId: "survive-1",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 0,
+            survivesDispatch: true,
+          }),
+        );
+
+        const dispatched = await scripts.dispatch({
+          nowMs: Date.now(),
+          activeTtlSec: 300,
+        });
+        expect(dispatched).not.toBeNull();
+        expect(dispatched!.stagedJobId).toBe("j1");
+        expect(await inspectGroupJobs("group-a")).toEqual([]);
+
+        // A late re-trigger stages the same dedup id AFTER dispatch. With
+        // survivesDispatch the still-alive TTL is HONORED: the new job is squashed
+        // (isNew=false) rather than DEL+restaged as the default TOCTOU path does.
+        const { isNew } = await scripts.stage(
+          makeJob({
+            stagedJobId: "j2",
+            dedupId: "survive-1",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 5000,
+            survivesDispatch: true,
+          }),
+        );
+
+        expect(isNew).toBe(false);
+        // No new job staged for the group — the duplicate is squashed.
+        expect(await inspectGroupJobs("group-a")).toEqual([]);
+        // The dedup key is preserved (still the dispatched job), not deleted.
+        expect(await inspectDedupKey("survive-1")).toBe("j1");
+        // The originally dispatched job stays active and untouched.
+        expect(await inspectActiveKey("group-a")).toBe("j1");
+      });
+    });
+
     describe("extend/replace flags", () => {
       it("updates score when extend is true", async () => {
         await scripts.stage(
@@ -936,6 +981,60 @@ describe("GroupStagingScripts", () => {
 
         const data = await inspectDataHash("group-a");
         expect(data["j0"]).toBe(JSON.stringify({ from: "j2" }));
+      });
+    });
+
+    describe("when survivesDispatch is set and a batch dedup was already dispatched", () => {
+      it("squashes the dispatched-dedup job instead of staging it as new", async () => {
+        // j0 staged with a survives-dispatch dedup, then dispatched (left staging
+        // while its dedup key TTL is still alive).
+        await scripts.stage(
+          makeJob({
+            stagedJobId: "j0",
+            groupId: "group-x",
+            dedupId: "batch-survive",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 0,
+            survivesDispatch: true,
+          }),
+        );
+        await scripts.dispatch({ nowMs: Date.now(), activeTtlSec: 300 });
+
+        // Batch: j1 re-triggers the same (already-dispatched) dedup with
+        // survivesDispatch, j2 has no dedup. Only j2 is new; j1 is squashed by the
+        // surviving dedup key rather than DEL+restaged as the default race path does.
+        const { newStagedCount, orphanedValues } = await scripts.stageBatch([
+          makeJob({
+            stagedJobId: "j1",
+            groupId: "group-x",
+            dedupId: "batch-survive",
+            dedupTtlMs: 60000,
+            dispatchAfterMs: 5000,
+            survivesDispatch: true,
+            jobDataJson: JSON.stringify({ from: "j1" }),
+          }),
+          makeJob({
+            stagedJobId: "j2",
+            groupId: "group-y",
+            dispatchAfterMs: 1000,
+          }),
+        ]);
+
+        // Only j2 is new; j1 was squashed by the surviving dedup key.
+        expect(newStagedCount).toBe(1);
+        // j1's payload is reported as the orphaned value (index-aligned with the
+        // batch); j2 displaced nothing.
+        expect(orphanedValues).toEqual([JSON.stringify({ from: "j1" }), ""]);
+
+        const jobsX = await inspectGroupJobs("group-x");
+        expect(jobsX).not.toContain("j1");
+        expect(jobsX).not.toContain("j0");
+
+        const jobsY = await inspectGroupJobs("group-y");
+        expect(jobsY).toContain("j2");
+
+        // The dedup key is preserved (still the dispatched job), not deleted.
+        expect(await inspectDedupKey("batch-survive")).toBe("j0");
       });
     });
   });

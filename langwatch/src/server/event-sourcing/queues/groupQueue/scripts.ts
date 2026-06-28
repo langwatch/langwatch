@@ -431,6 +431,11 @@ local globalBudget   = tonumber(ARGV[10]) or 0
 if globalBudget > 0 then
   redis.call("ZADD", parkKeyPrefixOf(readyKey) .. "demanding-tenants", nowMs, parkTenantOf(groupId))
 end
+-- Opt-in (default 0 = unchanged behavior). When 1, a dedup key whose job has
+-- already been DISPATCHED but whose TTL is still alive HONORS the dispatch and
+-- squashes the new job instead of DEL+restaging, so a late re-trigger after
+-- dispatch cannot re-run the command (fixes #3912 double evaluations).
+local shouldSurviveDispatch = tonumber(ARGV[11]) or 0
 
 -- Skip ready-score updates while the group is processing (active key set) or
 -- blocked. In those states the ready score is owned by REFRESH_LUA / COMPLETE_LUA
@@ -471,7 +476,14 @@ if dedupId ~= "" and dedupTtlMs > 0 then
       redis.call("LTRIM", signalKey, 0, 999)
       return {0, orphanedValue}
     end
-    -- Already dispatched: dedup key is stale, clean it up
+    -- Already dispatched. Default: the dedup key is stale, clean it up and let a
+    -- new job stage (the historical TOCTOU behavior). When survivesDispatch is
+    -- set, HONOR the still-alive TTL instead — squash the new job and report its
+    -- payload as the orphaned value (same {0, orphanedValue} shape the in-staging
+    -- squash returns) so a late re-trigger after dispatch cannot re-run it (#3912).
+    if shouldSurviveDispatch == 1 then
+      return {0, jobDataJson}
+    end
     redis.call("DEL", dedupKey)
   end
 end
@@ -523,7 +535,10 @@ local affectedGroups = {}
 local orphanedValues = {}
 
 for i = 1, count do
-  local offset = 2 + (i - 1) * 8
+  -- Per-job stride is 9: stagedJobId..shouldReplace (8) + shouldSurviveDispatch
+  -- (1). nowMs/globalBudget stay appended once AFTER the loop and are read
+  -- end-relative (ARGV[#ARGV-1]/ARGV[#ARGV]), so they are unaffected by the stride.
+  local offset = 2 + (i - 1) * 9
   local stagedJobId   = ARGV[offset + 1]
   local groupId       = ARGV[offset + 2]
   local dispatchAfter = tonumber(ARGV[offset + 3])
@@ -532,6 +547,9 @@ for i = 1, count do
   local jobDataJson   = ARGV[offset + 6]
   local shouldExtend  = tonumber(ARGV[offset + 7])
   local shouldReplace = tonumber(ARGV[offset + 8])
+  -- Opt-in (default 0 = unchanged). See STAGE_LUA: when 1, a dispatched-but-TTL-
+  -- alive dedup key squashes the new job instead of being cleaned up (#3912).
+  local shouldSurviveDispatch = tonumber(ARGV[offset + 9]) or 0
 
   local groupJobsKey = keyPrefix .. "group:" .. groupId .. ":jobs"
   local dataKey      = keyPrefix .. "group:" .. groupId .. ":data"
@@ -558,8 +576,17 @@ for i = 1, count do
         redis.call("SET", dedupKey, existingJobId, "PX", dedupTtlMs)
         isDeduped = true
       else
-        -- Already dispatched: dedup key is stale, clean it up
-        redis.call("DEL", dedupKey)
+        -- Already dispatched. Default: the dedup key is stale, clean it up and let
+        -- a new job stage (the historical TOCTOU behavior). When survivesDispatch
+        -- is set, HONOR the still-alive TTL instead — squash the new job (mark it
+        -- deduped and report its payload as orphaned, mirroring the in-staging
+        -- squash above) so a late re-trigger after dispatch cannot re-run it (#3912).
+        if shouldSurviveDispatch == 1 then
+          orphanedValue = jobDataJson
+          isDeduped = true
+        else
+          redis.call("DEL", dedupKey)
+        end
       end
     end
   end
@@ -1517,6 +1544,7 @@ export class GroupStagingScripts {
     jobDataJson,
     shouldExtend = true,
     shouldReplace = true,
+    survivesDispatch = false,
   }: {
     stagedJobId: string;
     groupId: string;
@@ -1526,6 +1554,7 @@ export class GroupStagingScripts {
     jobDataJson: string;
     shouldExtend?: boolean;
     shouldReplace?: boolean;
+    survivesDispatch?: boolean;
   }): Promise<{ isNew: boolean; orphanedValue: string }> {
     const groupJobsKey = `${this.keyPrefix}group:${groupId}:jobs`;
     const readyKey = `${this.keyPrefix}ready`;
@@ -1561,6 +1590,8 @@ export class GroupStagingScripts {
       String(shouldReplace ? 1 : 0),
       String(Date.now()),
       String(readGlobalBudget()),
+      // ARGV[11] — appended after globalBudget so no existing index shifts.
+      String(survivesDispatch ? 1 : 0),
     );
 
     // STAGE_LUA returns [code, orphanedValue]. Tolerate a bare integer reply
@@ -1591,6 +1622,7 @@ export class GroupStagingScripts {
       jobDataJson: string;
       shouldExtend?: boolean;
       shouldReplace?: boolean;
+      survivesDispatch?: boolean;
     }>,
   ): Promise<{ newStagedCount: number; orphanedValues: string[] }> {
     if (jobs.length === 0) return { newStagedCount: 0, orphanedValues: [] };
@@ -1610,6 +1642,10 @@ export class GroupStagingScripts {
         job.jobDataJson,
         String((job.shouldExtend ?? true) ? 1 : 0),
         String((job.shouldReplace ?? true) ? 1 : 0),
+        // 9th per-job arg (offset + 9 in the Lua). Kept in the per-job block,
+        // alongside the other dedup flags, so the trailing nowMs/globalBudget
+        // remain end-relative (ARGV[#ARGV-1]/ARGV[#ARGV]).
+        String((job.survivesDispatch ?? false) ? 1 : 0),
       );
     }
     // Appended after all per-job args: nowMs then globalBudget last, so the Lua

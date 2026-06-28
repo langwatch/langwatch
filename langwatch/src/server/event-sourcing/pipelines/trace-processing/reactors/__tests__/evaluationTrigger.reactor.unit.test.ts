@@ -400,6 +400,23 @@ describe("evaluationTrigger reactor", () => {
       expect(options!.deduplication!.ttlMs).toBe(DEFERRED_CHECK_DELAY_MS + 60_000);
       expect(options!.delay).toBeUndefined();
     });
+
+    it("marks the dedup as surviving dispatch so a re-trigger after dispatch is squashed (#3912)", async () => {
+      const deps = createDeps();
+      const reactor = createEvaluationTriggerReactor(deps);
+      const state = createFoldState({
+        attributes: { "langwatch.origin": "application" },
+      });
+
+      await reactor.handle(createOriginEvent(), createContext(state));
+
+      // The reactor can fire a second time after the command was already
+      // dispatched (a late span, then the deferred OriginResolvedEvent). The
+      // dedup key outlives dispatch (6-min TTL), so survivesDispatch must be set
+      // for that second dispatch to be squashed instead of re-run as a duplicate.
+      const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
+      expect(options!.deduplication!.survivesDispatch).toBe(true);
+    });
   });
 
   describe("when trace is blocked by guardrail with no output", () => {
