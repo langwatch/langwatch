@@ -145,39 +145,41 @@ describe("<TokenValuePicker /> server-side search", () => {
     // the SUPPLEMENT contract unions preloaded + server and keeps the live client
     // substring filter, so the preloaded value — a substring match — stays shown.
     // Mirrors FacetSection.serverSearch's preloaded-survival regression.
-    /** @scenario "Editing a search-bar value chip searches all values, not just the preloaded set" */
-    it("keeps a matching preloaded value when the server prefix search misses it (supplement, not replace)", async () => {
-      apiMock.useQuery.mockImplementation(
-        (_input: { prefix?: string }, opts: { enabled?: boolean }) =>
-          opts?.enabled
-            ? { data: { values: [], totalDistinct: 0 }, isLoading: false }
-            : { data: undefined, isLoading: false },
-      );
+    describe("when the user edits the chip to a value the server prefix-search misses", () => {
+      /** @scenario "Editing a search-bar value chip searches all values, not just the preloaded set" */
+      it("keeps a matching preloaded value when the server prefix search misses it (supplement, not replace)", async () => {
+        apiMock.useQuery.mockImplementation(
+          (_input: { prefix?: string }, opts: { enabled?: boolean }) =>
+            opts?.enabled
+              ? { data: { values: [], totalDistinct: 0 }, isLoading: false }
+              : { data: undefined, isLoading: false },
+        );
 
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <TokenValuePicker anchor={anchor} onClose={vi.fn()} />
-        </ChakraProvider>,
-      );
+        render(
+          <ChakraProvider value={defaultSystem}>
+            <TokenValuePicker anchor={anchor} onClose={vi.fn()} />
+          </ChakraProvider>,
+        );
 
-      // Editing "checkout" → "gpt-4o" flips to a server-side search whose
-      // anchored prefix misses the namespaced preloaded value.
-      const input = screen.getByPlaceholderText(/Filter service values/i);
-      fireEvent.change(input, { target: { value: "gpt-4o" } });
+        const input = screen.getByPlaceholderText(/Filter service values/i);
+        fireEvent.change(input, { target: { value: "gpt-4o" } });
 
-      // Server search goes active (debounced) and prefix-misses → empty result…
-      await waitFor(() =>
-        expect(apiMock.useQuery).toHaveBeenCalledWith(
-          expect.objectContaining({
-            facetKey: "service",
-            prefix: expect.stringContaining("gpt-4o"),
-          }),
-          expect.objectContaining({ enabled: true }),
-        ),
-      );
-      // …yet the preloaded value, a substring match over the preloaded∪server
-      // union, is still shown. Under a replace-regression it would vanish.
-      expect(await screen.findByText("openai/gpt-4o-mini")).toBeInTheDocument();
+        // Server search goes active (debounced) and prefix-misses → empty result…
+        await waitFor(() =>
+          expect(apiMock.useQuery).toHaveBeenCalledWith(
+            expect.objectContaining({
+              facetKey: "service",
+              prefix: expect.stringContaining("gpt-4o"),
+            }),
+            expect.objectContaining({ enabled: true }),
+          ),
+        );
+        // …yet the preloaded value, a substring match over the preloaded∪server
+        // union, is still shown. Under a replace-regression it would vanish.
+        expect(
+          await screen.findByText("openai/gpt-4o-mini"),
+        ).toBeInTheDocument();
+      });
     });
   });
 });
