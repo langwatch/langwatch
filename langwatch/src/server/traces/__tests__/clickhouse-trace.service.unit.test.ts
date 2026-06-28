@@ -761,6 +761,99 @@ describe("ClickHouseTraceService", () => {
           service.getAllTracesForProject(baseInput, protections),
         ).rejects.toThrow("SYNTAX_ERROR");
       });
+
+      it("bisects a 25-ID batch that still OOMs and resolves both halves", async () => {
+        const traceIds = Array.from({ length: 30 }, (_, i) => `trace-${i}`);
+        const summaryRows = traceIds.map((id, i) => ({
+          ...makeSummaryRow(id),
+          ts_OccurredAt: Date.now() - i * 1000,
+        }));
+        const idRows = traceIds.map((id) => ({ TraceId: id }));
+
+        mockClickHouseQuery
+          // count
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([{ total: String(traceIds.length) }]),
+          })
+          // IDs
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(idRows),
+          })
+          // summary full list — OOM, drops to fixed-size batches
+          .mockRejectedValueOnce(new Error("MEMORY_LIMIT_EXCEEDED"))
+          // first 25-ID batch — STILL OOMs, triggers recursive bisection
+          .mockRejectedValueOnce(new Error("MEMORY_LIMIT_EXCEEDED"))
+          // bisected lower half (ids 0-11)
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(summaryRows.slice(0, 12)),
+          })
+          // bisected upper half (ids 12-24)
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(summaryRows.slice(12, 25)),
+          })
+          // second fixed-size batch (ids 25-29)
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(summaryRows.slice(25)),
+          })
+          // evaluations
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([]),
+          });
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        const result = await service.getAllTracesForProject(
+          { ...baseInput, pageSize: 30 } as GetAllTracesForProjectInput,
+          protections,
+        );
+
+        expect(result).not.toBeNull();
+        expect(result!.groups.flat()).toHaveLength(30);
+        // calls: 0=count, 1=IDs, 2=full OOM, 3=25-ID batch OOM, 4 & 5 = halves
+        expect(
+          mockClickHouseQuery.mock.calls[3]![0].query_params.pageTraceIds,
+        ).toHaveLength(25);
+        expect(
+          mockClickHouseQuery.mock.calls[4]![0].query_params.pageTraceIds,
+        ).toHaveLength(12);
+        expect(
+          mockClickHouseQuery.mock.calls[5]![0].query_params.pageTraceIds,
+        ).toHaveLength(13);
+      });
+
+      it("rethrows when a single-ID summary batch still OOMs after bisecting", async () => {
+        const traceIds = ["trace-0", "trace-1"];
+        const idRows = traceIds.map((id) => ({ TraceId: id }));
+
+        mockClickHouseQuery
+          // count
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([{ total: String(traceIds.length) }]),
+          })
+          // IDs
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(idRows),
+          })
+          // every summary read OOMs: full list, the batch, then the bisected
+          // single id — which can no longer be split, so it propagates.
+          .mockRejectedValue(new Error("MEMORY_LIMIT_EXCEEDED"));
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        await expect(
+          service.getAllTracesForProject(
+            { ...baseInput, pageSize: 2 } as GetAllTracesForProjectInput,
+            protections,
+          ),
+        ).rejects.toThrow("MEMORY_LIMIT_EXCEEDED");
+        // count, IDs, full-list OOM, 2-ID batch OOM, then the bisected 1-ID OOM
+        // — proof the helper descended to a single id before giving up.
+        expect(mockClickHouseQuery).toHaveBeenCalledTimes(5);
+      });
     });
 
     describe("when ClickHouse MEMORY_LIMIT_EXCEEDED on evaluations query", () => {
@@ -801,6 +894,96 @@ describe("ClickHouseTraceService", () => {
 
         expect(result).not.toBeNull();
         expect(result!.groups.flat()).toHaveLength(1);
+      });
+
+      it("bisects a 25-ID evaluations batch that still OOMs and resolves both halves", async () => {
+        const traceIds = Array.from({ length: 30 }, (_, i) => `trace-${i}`);
+        const summaryRows = traceIds.map((id) => makeSummaryRow(id));
+        const idRows = traceIds.map((id) => ({ TraceId: id }));
+
+        mockClickHouseQuery
+          // count
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([{ total: String(traceIds.length) }]),
+          })
+          // IDs
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(idRows),
+          })
+          // summary — succeeds in one read
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(summaryRows),
+          })
+          // evaluations full list — OOM, drops to fixed-size batches
+          .mockRejectedValueOnce(new Error("MEMORY_LIMIT_EXCEEDED"))
+          // first 25-ID eval batch — STILL OOMs, triggers recursive bisection
+          .mockRejectedValueOnce(new Error("MEMORY_LIMIT_EXCEEDED"))
+          // bisected lower half (12 ids)
+          .mockResolvedValueOnce({ json: () => Promise.resolve([]) })
+          // bisected upper half (13 ids)
+          .mockResolvedValueOnce({ json: () => Promise.resolve([]) })
+          // second fixed-size eval batch (5 ids)
+          .mockResolvedValueOnce({ json: () => Promise.resolve([]) });
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        const result = await service.getAllTracesForProject(
+          { ...baseInput, pageSize: 30 } as GetAllTracesForProjectInput,
+          protections,
+        );
+
+        expect(result).not.toBeNull();
+        expect(result!.groups.flat()).toHaveLength(30);
+        // calls: 0=count, 1=IDs, 2=summary, 3=full eval OOM, 4=25-ID OOM, 5 & 6 = halves
+        expect(
+          mockClickHouseQuery.mock.calls[4]![0].query_params.traceIds,
+        ).toHaveLength(25);
+        expect(
+          mockClickHouseQuery.mock.calls[5]![0].query_params.traceIds,
+        ).toHaveLength(12);
+        expect(
+          mockClickHouseQuery.mock.calls[6]![0].query_params.traceIds,
+        ).toHaveLength(13);
+      });
+
+      it("rethrows when a single-ID evaluations batch still OOMs after bisecting", async () => {
+        const summaryRows = [
+          makeSummaryRow("trace-0"),
+          makeSummaryRow("trace-1"),
+        ];
+        const idRows = [{ TraceId: "trace-0" }, { TraceId: "trace-1" }];
+
+        mockClickHouseQuery
+          // count
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([{ total: "2" }]),
+          })
+          // IDs
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(idRows),
+          })
+          // summary — succeeds
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve(summaryRows),
+          })
+          // every evaluations read OOMs, down to the single-id batch which can
+          // no longer be split — so it propagates.
+          .mockRejectedValue(new Error("MEMORY_LIMIT_EXCEEDED"));
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        await expect(
+          service.getAllTracesForProject(
+            { ...baseInput, pageSize: 2 } as GetAllTracesForProjectInput,
+            protections,
+          ),
+        ).rejects.toThrow("MEMORY_LIMIT_EXCEEDED");
+        // count, IDs, summary, full eval OOM, 2-ID batch OOM, bisected 1-ID OOM
+        expect(mockClickHouseQuery).toHaveBeenCalledTimes(6);
       });
     });
 
@@ -959,6 +1142,71 @@ describe("ClickHouseTraceService", () => {
         ).rejects.toThrow();
         // The single failed query is not followed by per-batch retries.
         expect(mockClickHouseQuery).toHaveBeenCalledTimes(1);
+      });
+
+      it("bisects a 25-trace join batch that still OOMs and resolves both halves", async () => {
+        const traceIds = Array.from({ length: 30 }, (_, i) => `trace-${i}`);
+
+        mockClickHouseQuery
+          // full-list summary — OOM, drops to fixed-size batches
+          .mockRejectedValueOnce(new Error("MEMORY_LIMIT_EXCEEDED"))
+          // first 25-trace batch summary — STILL OOMs, triggers bisection
+          .mockRejectedValueOnce(new Error("MEMORY_LIMIT_EXCEEDED"))
+          // bisected lower half (12): summary then spans
+          .mockResolvedValueOnce({
+            json: () =>
+              Promise.resolve(
+                traceIds.slice(0, 12).map((id) => makeSummaryRow(id)),
+              ),
+          })
+          .mockResolvedValueOnce({
+            json: () =>
+              Promise.resolve(
+                traceIds.slice(0, 12).map((id) => makeSpanRow(id, `${id}-s`)),
+              ),
+          })
+          // bisected upper half (13): summary then spans
+          .mockResolvedValueOnce({
+            json: () =>
+              Promise.resolve(
+                traceIds.slice(12, 25).map((id) => makeSummaryRow(id)),
+              ),
+          })
+          .mockResolvedValueOnce({
+            json: () =>
+              Promise.resolve(
+                traceIds.slice(12, 25).map((id) => makeSpanRow(id, `${id}-s`)),
+              ),
+          })
+          // second fixed-size batch (5): summary then spans
+          .mockResolvedValueOnce({
+            json: () =>
+              Promise.resolve(
+                traceIds.slice(25).map((id) => makeSummaryRow(id)),
+              ),
+          })
+          .mockResolvedValueOnce({
+            json: () =>
+              Promise.resolve(
+                traceIds.slice(25).map((id) => makeSpanRow(id, `${id}-s`)),
+              ),
+          });
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        const traces = await service.getTracesWithSpans(
+          "proj_123",
+          traceIds,
+          protections,
+        );
+
+        expect(traces).not.toBeNull();
+        expect(traces).toHaveLength(30);
+        for (const trace of traces!) {
+          expect(trace.spans).toHaveLength(1);
+        }
       });
     });
 

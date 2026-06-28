@@ -1772,10 +1772,51 @@ export class ClickHouseTraceService {
   private static readonly SUMMARY_BATCH_SIZE = 25;
 
   /**
+   * Run `runQuery` over `ids` in fixed-size chunks of `batchSize`, returning the
+   * concatenated rows. This is the shared OOM fallback the trace reads use after
+   * a full-list query trips ClickHouse's per-query memory cap.
+   *
+   * If a chunk itself OOMs (MEMORY_LIMIT_EXCEEDED) the chunk is recursively
+   * BISECTED — halve, retry each half — down to a single id, so one unusually
+   * heavy trace can no longer fail the whole page. The two halves run
+   * SEQUENTIALLY (not in parallel) so a retry never compounds memory pressure on
+   * an instance that just OOMed. A single-id batch that still OOMs — or any
+   * non-OOM error — is rethrown.
+   */
+  private static async retryInBatchesWithBisect<T>(
+    runQuery: (ids: string[]) => Promise<T[]>,
+    ids: string[],
+    batchSize: number,
+  ): Promise<T[]> {
+    const runChunk = async (chunk: string[]): Promise<T[]> => {
+      try {
+        return await runQuery(chunk);
+      } catch (error) {
+        if (chunk.length <= 1 || !isClickHouseMemoryLimitError(error)) {
+          throw error;
+        }
+        const mid = Math.floor(chunk.length / 2);
+        // Sequential, not parallel: running both halves at once would
+        // re-pressure the same instance that just OOMed.
+        const lowerHalf = await runChunk(chunk.slice(0, mid));
+        const upperHalf = await runChunk(chunk.slice(mid));
+        return [...lowerHalf, ...upperHalf];
+      }
+    };
+
+    const rows: T[] = [];
+    for (let i = 0; i < ids.length; i += batchSize) {
+      rows.push(...(await runChunk(ids.slice(i, i + batchSize))));
+    }
+    return rows;
+  }
+
+  /**
    * Fetch full trace summary rows for a set of trace IDs.
-   * On ClickHouse MEMORY_LIMIT_EXCEEDED, retries in smaller batches
-   * so that heavy ComputedInput/ComputedOutput columns don't blow the
-   * per-query memory cap. If a single batch still OOMs the error propagates.
+   * On ClickHouse MEMORY_LIMIT_EXCEEDED, retries in smaller batches —
+   * bisecting any batch that still OOMs down to a single id — so heavy
+   * ComputedInput/ComputedOutput columns don't blow the per-query memory cap.
+   * Only a single-id batch that still OOMs propagates.
    */
   private async fetchTraceSummaryRows({
     clickHouseClient,
@@ -1793,7 +1834,7 @@ export class ClickHouseTraceService {
     startDate: number;
     endDate: number;
     traceIds: string[];
-    orderDirection: string;
+    orderDirection: "ASC" | "DESC";
     /** Fetch the heavy Computed* columns independently. False reads '' instead —
      * the row shape is unchanged but ClickHouse never materializes that column. */
     fetchInput?: boolean;
@@ -1891,20 +1932,14 @@ export class ClickHouseTraceService {
         `Summary query OOM for ${traceIds.length} traces, retrying in batches of ${ClickHouseTraceService.SUMMARY_BATCH_SIZE}`,
       );
 
-      const allRows: TraceSummaryRow[] = [];
-      for (
-        let i = 0;
-        i < traceIds.length;
-        i += ClickHouseTraceService.SUMMARY_BATCH_SIZE
-      ) {
-        const batch = traceIds.slice(
-          i,
-          i + ClickHouseTraceService.SUMMARY_BATCH_SIZE,
-        );
-        const batchRows = await runQuery(batch);
-        allRows.push(...batchRows);
-      }
+      const allRows = await ClickHouseTraceService.retryInBatchesWithBisect(
+        runQuery,
+        traceIds,
+        ClickHouseTraceService.SUMMARY_BATCH_SIZE,
+      );
 
+      // Batches come back in chunk order, not the page's global sort order —
+      // re-impose the ORDER BY (date axis, then TraceId) across the merged set.
       const dir = orderDirection === "DESC" ? -1 : 1;
       allRows.sort((a, b) => {
         const timeDiff = a[sortColumn] - b[sortColumn];
@@ -2149,21 +2184,11 @@ export class ClickHouseTraceService {
         `Evaluations query OOM for ${traceIds.length} traces, retrying in batches of ${ClickHouseTraceService.SUMMARY_BATCH_SIZE}`,
       );
 
-      const allRows: ClickHouseEvaluationRunRow[] = [];
-      for (
-        let i = 0;
-        i < traceIds.length;
-        i += ClickHouseTraceService.SUMMARY_BATCH_SIZE
-      ) {
-        const batch = traceIds.slice(
-          i,
-          i + ClickHouseTraceService.SUMMARY_BATCH_SIZE,
-        );
-        const batchRows = await runQuery(batch);
-        allRows.push(...batchRows);
-      }
-
-      return allRows;
+      return await ClickHouseTraceService.retryInBatchesWithBisect(
+        runQuery,
+        traceIds,
+        ClickHouseTraceService.SUMMARY_BATCH_SIZE,
+      );
     }
   }
 
@@ -2647,25 +2672,17 @@ export class ClickHouseTraceService {
             `Traces-with-spans join OOM for ${traceIds.length} traces, retrying in batches of ${ClickHouseTraceService.SUMMARY_BATCH_SIZE}`,
           );
 
-          const merged = new Map<
-            string,
-            { summary: TraceSummaryData; spans: NormalizedSpan[] }
-          >();
-          for (
-            let i = 0;
-            i < traceIds.length;
-            i += ClickHouseTraceService.SUMMARY_BATCH_SIZE
-          ) {
-            const batch = traceIds.slice(
-              i,
-              i + ClickHouseTraceService.SUMMARY_BATCH_SIZE,
+          // runBatch returns a Map keyed by TraceId; flatten each batch's
+          // entries so the shared bisecting helper can concatenate them, then
+          // rebuild the Map. Per-batch id sets are disjoint, so no entry is lost
+          // when reconstructing.
+          const mergedEntries =
+            await ClickHouseTraceService.retryInBatchesWithBisect(
+              async (ids) => [...(await runBatch(ids))],
+              traceIds,
+              ClickHouseTraceService.SUMMARY_BATCH_SIZE,
             );
-            const batchMap = await runBatch(batch);
-            for (const [traceId, value] of batchMap) {
-              merged.set(traceId, value);
-            }
-          }
-          return merged;
+          return new Map(mergedEntries);
         }
       },
     );
