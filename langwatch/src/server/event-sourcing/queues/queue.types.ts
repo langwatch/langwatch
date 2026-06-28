@@ -103,7 +103,9 @@ export function resolveDeduplicationStrategy<Payload>(
   return strategy;
 }
 
-export interface EventSourcedQueueDefinition<Payload extends Record<string, unknown>> {
+export interface EventSourcedQueueDefinition<
+  Payload extends Record<string, unknown>,
+> {
   /**
    * Base name for the queue and job.
    * Queue name will be derived as `{name}` (with braces).
@@ -183,9 +185,14 @@ export interface QueueSendOptions<Payload> {
   deduplication?: DeduplicationConfig<Payload>;
 }
 
-export interface EventSourcedQueueProcessor<Payload extends Record<string, unknown>> {
+export interface EventSourcedQueueProcessor<
+  Payload extends Record<string, unknown>,
+> {
   send(payload: Payload, options?: QueueSendOptions<Payload>): Promise<void>;
-  sendBatch(payloads: Payload[], options?: QueueSendOptions<Payload>): Promise<void>;
+  sendBatch(
+    payloads: Payload[],
+    options?: QueueSendOptions<Payload>,
+  ): Promise<void>;
   /**
    * Gracefully closes the queue processor, waiting for in-flight jobs to complete.
    * Should be called during application shutdown.
