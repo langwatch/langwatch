@@ -278,9 +278,11 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           if (agent) {
             const config = agent.config as CustomComponentConfig;
             const mappings = config.scenarioMappings ?? {};
-            // We don't have workflow outputs here — server-side pre-run check
-            // covers output validation. Share the input half of the rule with
-            // the editor drawer via hasScenarioInputMapping.
+            // Run gate is input-only by design (#3412): a scenario needs only one
+            // input ("input" or "messages") mapped to be runnable; output mapping
+            // is optional (auto-populates to first output, or graceful stringify
+            // fallback). Uses shared hasScenarioInputMapping SSOT so the run gate
+            // and editor Save gate agree on the same input rule.
             if (!hasScenarioInputMapping(mappings)) {
               // Fallback affordance (#3411): even if the auto-open below races,
               // is dismissed, or fails, the toast itself links back to the editor.
