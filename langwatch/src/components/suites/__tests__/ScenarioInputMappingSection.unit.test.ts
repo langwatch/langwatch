@@ -5,7 +5,7 @@
  * The function returns true whenever a source mapping wires to "input" or
  * "messages", and false (fail-closed) when no such mapping is present.
  *
- * @see specs/scenarios/minimal-input-mapping.feature
+ * @see specs/features/scenarios/minimal-input-mapping.feature
  */
 import { describe, expect, it } from "vitest";
 import type { FieldMapping } from "~/components/variables/VariableMappingInput";

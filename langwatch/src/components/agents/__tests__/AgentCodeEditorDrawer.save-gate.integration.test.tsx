@@ -3,9 +3,9 @@
  *
  * Integration tests for AgentCodeEditorDrawer Save gate — Issue #3412
  *
- * AgentCodeEditorDrawer.tsx:251 computes:
+ * AgentCodeEditorDrawer.tsx computes:
  *   isValid = name.trim().length > 0 &&
- *             isScenarioMappingValid({ mappings, outputs, outputField })
+ *             isScenarioMappingValid({ mappings: scenarioMappings })
  *
  * There is NO structural workflowOutputs.length guard here — the code agent
  * always has its own outputs declared in state (DEFAULT_OUTPUTS or loaded from
