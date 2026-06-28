@@ -1783,11 +1783,14 @@ export class ClickHouseTraceService {
    * an instance that just OOMed. A single-id batch that still OOMs — or any
    * non-OOM error — is rethrown.
    */
-  private static async retryInBatchesWithBisect<T>(
+  private async retryInBatchesWithBisect<T>(
     runQuery: (ids: string[]) => Promise<T[]>,
     ids: string[],
     batchSize: number,
   ): Promise<T[]> {
+    if (batchSize <= 0) {
+      throw new Error("retryInBatchesWithBisect: batchSize must be > 0");
+    }
     const runChunk = async (chunk: string[]): Promise<T[]> => {
       try {
         return await runQuery(chunk);
@@ -1796,6 +1799,13 @@ export class ClickHouseTraceService {
           throw error;
         }
         const mid = Math.floor(chunk.length / 2);
+        // Only the initial full-list OOM logs at the call site; this is the
+        // sole signal that a page descended into per-batch bisection — and it
+        // fires only under memory stress, exactly when the signal matters.
+        this.logger.warn(
+          { batchSize: chunk.length, mid },
+          "ClickHouse batch still OOMed; bisecting",
+        );
         // Sequential, not parallel: running both halves at once would
         // re-pressure the same instance that just OOMed.
         const lowerHalf = await runChunk(chunk.slice(0, mid));
@@ -1932,7 +1942,7 @@ export class ClickHouseTraceService {
         `Summary query OOM for ${traceIds.length} traces, retrying in batches of ${ClickHouseTraceService.SUMMARY_BATCH_SIZE}`,
       );
 
-      const allRows = await ClickHouseTraceService.retryInBatchesWithBisect(
+      const allRows = await this.retryInBatchesWithBisect(
         runQuery,
         traceIds,
         ClickHouseTraceService.SUMMARY_BATCH_SIZE,
@@ -2184,7 +2194,7 @@ export class ClickHouseTraceService {
         `Evaluations query OOM for ${traceIds.length} traces, retrying in batches of ${ClickHouseTraceService.SUMMARY_BATCH_SIZE}`,
       );
 
-      return await ClickHouseTraceService.retryInBatchesWithBisect(
+      return await this.retryInBatchesWithBisect(
         runQuery,
         traceIds,
         ClickHouseTraceService.SUMMARY_BATCH_SIZE,
@@ -2676,12 +2686,11 @@ export class ClickHouseTraceService {
           // entries so the shared bisecting helper can concatenate them, then
           // rebuild the Map. Per-batch id sets are disjoint, so no entry is lost
           // when reconstructing.
-          const mergedEntries =
-            await ClickHouseTraceService.retryInBatchesWithBisect(
-              async (ids) => [...(await runBatch(ids))],
-              traceIds,
-              ClickHouseTraceService.SUMMARY_BATCH_SIZE,
-            );
+          const mergedEntries = await this.retryInBatchesWithBisect(
+            async (ids) => [...(await runBatch(ids))],
+            traceIds,
+            ClickHouseTraceService.SUMMARY_BATCH_SIZE,
+          );
           return new Map(mergedEntries);
         }
       },
