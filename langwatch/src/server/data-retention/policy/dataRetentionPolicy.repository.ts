@@ -120,6 +120,42 @@ export class DataRetentionPolicyRepository {
   }
 
   /**
+   * The cascade chain for an arbitrary scope, most-specific-first and including
+   * the scope itself: PROJECT → [PROJECT, TEAM, ORGANIZATION]; TEAM → [TEAM,
+   * ORGANIZATION]; ORGANIZATION → [ORGANIZATION]. The removal-preview resolver
+   * walks this chain over the org's rows minus the scope's own rows, so the
+   * scope tier contributes nothing and each category falls through to the next
+   * tier (or the platform default). Returns just the scope itself when the
+   * lineage can't be resolved (e.g. a personal-account project with no team).
+   */
+  async getScopeCascadeChain(
+    scope: ScopeAssignment,
+  ): Promise<ScopeAssignment[]> {
+    if (scope.scopeType === "PROJECT") {
+      const ctx = await this.getProjectScopeContext(scope.scopeId);
+      if (!ctx) return [{ scopeType: "PROJECT", scopeId: scope.scopeId }];
+      return resolveScopeChain(ctx);
+    }
+    if (scope.scopeType === "TEAM") {
+      const team = await this.prisma.team.findFirst({
+        where: { id: scope.scopeId },
+        select: { organizationId: true },
+      });
+      const chain: ScopeAssignment[] = [
+        { scopeType: "TEAM", scopeId: scope.scopeId },
+      ];
+      if (team?.organizationId) {
+        chain.push({
+          scopeType: "ORGANIZATION",
+          scopeId: team.organizationId,
+        });
+      }
+      return chain;
+    }
+    return [{ scopeType: "ORGANIZATION", scopeId: scope.scopeId }];
+  }
+
+  /**
    * Resolve the organization a (scopeType, scopeId) target belongs to.
    * Wraps the generic scope resolver so the service can stay free of
    * raw Prisma access.

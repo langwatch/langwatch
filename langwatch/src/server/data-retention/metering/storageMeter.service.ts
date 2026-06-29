@@ -9,7 +9,31 @@ import {
 
 const logger = createLogger("langwatch:data-retention:metering");
 
-const CACHE_TTL_MS = 5 * 60 * 1000;
+// Stale-while-revalidate windows for the per-tenant byte total.
+//
+// A read within FRESH_MS returns the cached value untouched. Past it (but
+// before the entry's hard TTL lapses in Redis) the read still returns the
+// cached value *immediately* and kicks a background recompute — so the only
+// request that ever blocks on the heavy `_size_bytes` read is the very first
+// for a tenant (or one after a long idle gap). HARD_TTL_MS is the underlying
+// Redis TTL: long enough that an active org keeps serving instantly across the
+// 5-minute freshness boundary, short enough that a cold entry eventually drops.
+const STORAGE_FRESH_MS = 5 * 60 * 1000;
+const STORAGE_HARD_TTL_MS = 30 * 60 * 1000;
+
+// Background refreshes are single-flighted through a short-lived Redis lock
+// (SET NX): when many pods/tabs see the same entry go stale at once, only the
+// one that claims the lock recomputes — the rest skip. The lock is left to
+// expire rather than released, throttling a tenant's refreshes to at most one
+// per window so a persistently slow tenant can't be re-read every few seconds.
+const REFRESH_LOCK_TTL_MS = 60 * 1000;
+
+/** Cached per-tenant byte total plus the wall-clock it was computed at, so the
+ *  read path can tell fresh from stale without a second timestamp store. */
+interface CachedBytes {
+  bytes: number;
+  computedAt: number;
+}
 
 // Storage metering sums `_size_bytes`, a `UInt32 MATERIALIZED byteSize(...)`
 // column over each table's payload columns. On parts written before that
@@ -48,29 +72,131 @@ interface StorageBreakdown {
 }
 
 export class StorageMeterService {
-  private readonly cache: TtlCache<number>;
+  private readonly resolveClickHouseClient: ClickHouseClientResolver | null;
+  private readonly cache: TtlCache<CachedBytes>;
+  private readonly refreshLock: TtlCache<number>;
+  private readonly now: () => number;
 
-  constructor(
-    private readonly resolveClickHouseClient: ClickHouseClientResolver | null,
-  ) {
-    this.cache = new TtlCache(CACHE_TTL_MS, "storage-meter:");
+  constructor({
+    resolveClickHouseClient,
+    now,
+  }: {
+    resolveClickHouseClient: ClickHouseClientResolver | null;
+    now?: () => number;
+  }) {
+    this.resolveClickHouseClient = resolveClickHouseClient;
+    this.cache = new TtlCache(STORAGE_HARD_TTL_MS, "storage-meter:v2:");
+    this.refreshLock = new TtlCache(
+      REFRESH_LOCK_TTL_MS,
+      "storage-meter:refresh:",
+    );
+    // Injectable clock so the stale-while-revalidate timing is deterministic in
+    // tests; production uses the wall clock.
+    this.now = now ?? (() => Date.now());
   }
 
   /**
-   * Total stored bytes for a tenant across all retention-managed tables,
-   * served from a short-lived cache and computed via {@link queryTotalBytes}
-   * on a miss.
+   * Total stored bytes for a tenant across all retention-managed tables, served
+   * stale-while-revalidate: a cached value is returned immediately, and if it
+   * has aged past {@link STORAGE_FRESH_MS} a single-flighted background refresh
+   * is kicked (see {@link refreshInBackground}). Only the first read for a
+   * tenant — when nothing is cached — blocks on the heavy {@link queryTotalBytes}.
    */
   async getTotalStorageBytes({
     tenantId,
   }: {
     tenantId: string;
   }): Promise<number> {
-    const cached = await this.cache.get(tenantId);
-    if (cached !== undefined) return cached;
+    const entry = await this.cache.get(tenantId);
+    if (entry !== undefined) {
+      if (this.now() - entry.computedAt >= STORAGE_FRESH_MS) {
+        void this.refreshInBackground(tenantId);
+      }
+      return entry.bytes;
+    }
 
-    const total = await this.queryTotalBytes(tenantId);
-    await this.cache.set(tenantId, total);
+    // Cold (or long-idle) tenant: compute synchronously so the caller gets a
+    // real number. A failing read caches a degraded 0 marked already-stale, so
+    // the scope total doesn't re-trigger this heavy failing query every request
+    // yet self-heals via a background refresh on the next read.
+    try {
+      return await this.computeAndStore(tenantId);
+    } catch (error) {
+      logger.warn(
+        { tenantId, error },
+        "Cold storage read failed; caching degraded 0 (self-heals on next read)",
+      );
+      await this.cache.set(tenantId, {
+        bytes: 0,
+        computedAt: this.now() - STORAGE_FRESH_MS,
+      });
+      return 0;
+    }
+  }
+
+  /** Recompute a tenant's total and write it to the cache stamped now. Shared by
+   *  the cold path and the background refresh. */
+  private async computeAndStore(tenantId: string): Promise<number> {
+    const bytes = await this.queryTotalBytes(tenantId);
+    await this.cache.set(tenantId, { bytes, computedAt: this.now() });
+    return bytes;
+  }
+
+  /** Single-flighted background recompute for a stale entry. The lock is left to
+   *  expire (not released) so a tenant is refreshed at most once per window, and
+   *  a failed refresh keeps the last good value rather than poisoning the cache. */
+  private async refreshInBackground(tenantId: string): Promise<void> {
+    const hasRefreshLock = await this.refreshLock.claim(tenantId, 1);
+    if (!hasRefreshLock) return;
+    try {
+      await this.computeAndStore(tenantId);
+    } catch (error) {
+      logger.warn(
+        { tenantId, error },
+        "Background storage refresh failed; keeping last good value",
+      );
+    }
+  }
+
+  /**
+   * Total stored bytes summed across many tenants (e.g. every project in an
+   * organization or team scope). Intentionally reuses {@link getTotalStorageBytes}
+   * per tenant rather than issuing one `TenantId IN (...)` sum: each per-tenant
+   * read keeps the hardened settings (capped threads + execution time + the
+   * per-table fallback) AND its own stale-while-revalidate cache, so an org-wide
+   * total is mostly instant cache hits, a stale entry refreshes in the
+   * background instead of blocking the page, and a single heavy tenant can't
+   * blow the memory ceiling for the whole scope. A wide `IN` sum would re-expose
+   * the OOM hazard that `_size_bytes`'s lazy recompute caused in production and
+   * bypass the cache.
+   *
+   * Reads run with bounded concurrency so a cold cache over a large org issues
+   * a steady trickle rather than a thundering herd of recompute reads. A tenant
+   * whose read fails degrades to 0 (its own fallback already tried), so one
+   * project can't fail the scope total — acceptable because this powers a
+   * display, not billing.
+   */
+  async getTotalStorageBytesForTenants(tenantIds: string[]): Promise<number> {
+    const unique = Array.from(new Set(tenantIds));
+    if (unique.length === 0) return 0;
+
+    const CONCURRENCY = 8;
+    let total = 0;
+    for (let i = 0; i < unique.length; i += CONCURRENCY) {
+      const batch = unique.slice(i, i + CONCURRENCY);
+      const results = await Promise.all(
+        batch.map((tenantId) =>
+          this.getTotalStorageBytes({ tenantId }).catch((error) => {
+            logger.warn(
+              { tenantId, error },
+              "Per-tenant storage read failed in scope aggregation; counting 0",
+            );
+            return 0;
+          }),
+        ),
+      );
+      total += results.reduce((a, b) => a + b, 0);
+    }
     return total;
   }
 

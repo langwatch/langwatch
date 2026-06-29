@@ -12,9 +12,18 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { DatabaseBackup, Plus, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { AddOverrideDrawer } from "~/components/data-retention/AddOverrideDrawer";
+import {
+  DatabaseBackup,
+  MoreVertical,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  AddOverrideDrawer,
+  type RetentionEditTarget,
+} from "~/components/data-retention/AddOverrideDrawer";
 import { ApplyToExistingConfirmDialog } from "~/components/data-retention/ApplyToExistingConfirmDialog";
 import {
   SCOPE_ICON,
@@ -26,10 +35,12 @@ import {
   type RetentionScopeGroup,
   renderPolicyValue,
 } from "~/components/data-retention/grouping";
+import { RemoveScopeConfirmDialog } from "~/components/data-retention/RemoveScopeConfirmDialog";
 import { RetentionAndUsageCard } from "~/components/data-retention/RetentionAndUsageCard";
 import { RetroactiveProgressCard } from "~/components/data-retention/RetroactiveProgressCard";
 import SettingsLayout from "~/components/SettingsLayout";
 import { ScopeFilter as ScopeFilterComponent } from "~/components/settings/ScopeFilter";
+import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useAvailableScopes } from "~/hooks/useAvailableScopes";
@@ -91,8 +102,52 @@ function DataRetentionPage({
 }) {
   const utils = api.useUtils();
   const rulesQuery = api.dataRetention.getRules.useQuery({ projectId });
-  const storageQuery = api.dataRetention.getStorageBreakdown.useQuery({
+
+  // Resolve the active scope filter once; everything below derives from this
+  // single value so the storage scope, its description, and the row filter
+  // can't drift from one another.
+  const resolvedScopeFilter = useMemo(
+    () =>
+      resolveScopeFilter(scopeFilter, {
+        currentTeamId: teamId,
+        currentProjectId: projectId,
+      }),
+    [scopeFilter, teamId, projectId],
+  );
+
+  // Storage tracks the scope selector, not just the current project. Map the
+  // active filter to a concrete scope: a specific pick passes through; "all you
+  // can see" resolves to the whole org (or just this project for a personal
+  // account with no org).
+  const storageScope = useMemo(() => {
+    if (resolvedScopeFilter.kind === "specific") {
+      return {
+        scopeType: resolvedScopeFilter.scopeType,
+        scopeId: resolvedScopeFilter.scopeId,
+      };
+    }
+    return organizationId
+      ? { scopeType: "ORGANIZATION" as const, scopeId: organizationId }
+      : { scopeType: "PROJECT" as const, scopeId: projectId };
+  }, [resolvedScopeFilter, projectId, organizationId]);
+
+  const storageDescription = useMemo(() => {
+    const resolved = resolvedScopeFilter;
+    if (resolved.kind === "all") {
+      return "How much space everything you can see uses today.";
+    }
+    if (resolved.scopeType === "ORGANIZATION") {
+      return "How much space this organization's data uses today.";
+    }
+    if (resolved.scopeType === "TEAM") {
+      return "How much space this team's data uses today.";
+    }
+    return "How much space this project's data uses today.";
+  }, [resolvedScopeFilter]);
+
+  const storageQuery = api.dataRetention.getScopeStorageUsage.useQuery({
     projectId,
+    scope: storageScope,
   });
   // Platform admin = email in ADMIN_EMAILS (NOT an org admin). Only they may
   // disable retention; the route enforces this independently. We use it solely
@@ -100,6 +155,15 @@ function DataRetentionPage({
   const isPlatformAdmin = api.user.isAdmin.useQuery({}).data?.isAdmin ?? false;
 
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // When set, the Add drawer opens in edit mode locked to this scope's policy.
+  const [editTarget, setEditTarget] = useState<RetentionEditTarget | null>(
+    null,
+  );
+  // The scope-group pending removal — drives the confirm dialog so deletion is
+  // a deliberate, explained action instead of a one-click trash button.
+  const [removeTarget, setRemoveTarget] = useState<RetentionScopeGroup | null>(
+    null,
+  );
 
   const invalidate = () =>
     utils.dataRetention.getRules.invalidate({ projectId });
@@ -231,14 +295,34 @@ function DataRetentionPage({
     }
   };
 
-  const resolved = resolveScopeFilter(scopeFilter, {
-    currentTeamId: teamId,
-    currentProjectId: projectId,
-  });
+  // Open the Add drawer in edit mode for a scope group. The drawer edits one
+  // retention value applied to all categories, so we seed it with the group's
+  // traces value (or the first present category for a divergent legacy group).
+  const openEditForGroup = (group: RetentionScopeGroup) => {
+    // Deterministic prefill: prefer traces, then a fixed category order, so a
+    // divergent legacy group never depends on object key insertion order.
+    const retentionDays =
+      group.byCategory.traces ??
+      group.byCategory.scenarios ??
+      group.byCategory.experiments;
+    if (retentionDays === undefined) return;
+    setEditTarget({
+      scope: { scopeType: group.scopeType, scopeId: group.scopeId },
+      scopeName: group.name,
+      retentionDays,
+    });
+    setDrawerOpen(true);
+  };
+
+  const closeDrawer = () => {
+    setDrawerOpen(false);
+    setEditTarget(null);
+  };
+
   const filteredRules = (snapshot?.rules ?? []).filter((r) =>
     isScopeInFilter(
       { scopeType: r.scopeType, scopeId: r.scopeId },
-      resolved,
+      resolvedScopeFilter,
       filterAvailable.hierarchy,
     ),
   );
@@ -291,6 +375,7 @@ function DataRetentionPage({
             effective={snapshot.effective}
             isLoading={storageQuery.isLoading}
             data={storageQuery.data}
+            storageDescription={storageDescription}
           />
         )}
 
@@ -366,16 +451,32 @@ function DataRetentionPage({
                           </Table.Cell>
                           <Table.Cell textAlign="end">
                             {canWrite && (
-                              <Button
-                                size="xs"
-                                variant="ghost"
-                                colorPalette="red"
-                                loading={removeForScope.isLoading}
-                                onClick={() => void removeScopeGroup(group)}
-                                aria-label="Remove retention policy"
-                              >
-                                <Trash2 size={14} />
-                              </Button>
+                              <Menu.Root>
+                                <Menu.Trigger asChild>
+                                  <Button
+                                    size="xs"
+                                    variant="ghost"
+                                    aria-label={`Actions for ${group.name}`}
+                                  >
+                                    <MoreVertical size={14} />
+                                  </Button>
+                                </Menu.Trigger>
+                                <Menu.Content>
+                                  <Menu.Item
+                                    value="edit"
+                                    onClick={() => openEditForGroup(group)}
+                                  >
+                                    <Pencil size={14} /> Edit
+                                  </Menu.Item>
+                                  <Menu.Item
+                                    value="remove"
+                                    color="red.500"
+                                    onClick={() => setRemoveTarget(group)}
+                                  >
+                                    <Trash2 size={14} /> Remove
+                                  </Menu.Item>
+                                </Menu.Content>
+                              </Menu.Root>
                             )}
                           </Table.Cell>
                         </Table.Row>
@@ -399,14 +500,15 @@ function DataRetentionPage({
         {available && (
           <AddOverrideDrawer
             open={drawerOpen}
-            onClose={() => setDrawerOpen(false)}
+            onClose={closeDrawer}
+            editTarget={editTarget}
             available={available}
             currentOrganizationId={organizationId}
             currentTeamId={teamId}
             currentProjectId={projectId}
             isPlatformAdmin={isPlatformAdmin}
             isSaving={setForScope.isLoading || triggerUpdate.isLoading}
-            onSave={async (scopes, retentionDays, applyToExisting) => {
+            onSave={async ({ scopes, retentionDays, applyToExisting }) => {
               const categories: RetentionCategory[] = [...RETENTION_CATEGORIES];
               const saveOverrides = async () => {
                 const pairs = scopes.flatMap((scope) =>
@@ -476,7 +578,7 @@ function DataRetentionPage({
               if (!applyToExisting) {
                 const result = await saveOverrides();
                 const status = reportSaveResults(result);
-                if (status.success) setDrawerOpen(false);
+                if (status.success) closeDrawer();
                 return;
               }
 
@@ -555,12 +657,24 @@ function DataRetentionPage({
                       });
                     }
                   }
-                  if (status.success) setDrawerOpen(false);
+                  if (status.success) closeDrawer();
                 },
               });
             }}
           />
         )}
+
+        <RemoveScopeConfirmDialog
+          group={removeTarget}
+          projectId={projectId}
+          isRemoving={removeForScope.isLoading}
+          onCancel={() => setRemoveTarget(null)}
+          onConfirm={async () => {
+            if (!removeTarget) return;
+            await removeScopeGroup(removeTarget);
+            setRemoveTarget(null);
+          }}
+        />
 
         <ApplyToExistingConfirmDialog
           pending={pendingConfirm}
