@@ -3,7 +3,7 @@ import { Bot, CheckCircle, FileText, Swords } from "lucide-react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
-import type { TargetType } from "~/experiments-v3/types";
+import type { PairwiseEvaluatorConfig, TargetConfig, TargetType } from "~/experiments-v3/types";
 import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
 
 // Re-export for backward compatibility
@@ -18,6 +18,12 @@ export type TargetTypeSelectorDrawerProps = {
   open?: boolean;
   onClose?: () => void;
   onSelect?: (type: TargetType) => void;
+  /** Passed through to evaluatorEditor when "Pairwise Compare" is selected. */
+  pairwiseContext?: {
+    initialPairwise?: PairwiseEvaluatorConfig;
+    targets: TargetConfig[];
+    datasetColumns: { id: string; name: string }[];
+  };
 };
 
 const targetTypes: Array<{
@@ -71,12 +77,15 @@ export function TargetTypeSelectorDrawer(props: TargetTypeSelectorDrawerProps) {
     // Pairwise is a UI shortcut: skip the category/type picker and jump
     // straight into the pairwise_compare evaluator config. The save flow
     // (set up by handleAddTarget) creates the column as an evaluator-target.
+    // Forward pairwiseContext from handleAddTarget so the creation form shows
+    // Variant A / Variant B / Golden field immediately (matching edit-mode UX).
     if (type === "pairwise") {
       openDrawer(
         "evaluatorEditor",
         {
           evaluatorType: "langevals/pairwise_compare",
           category: "llm_judge",
+          pairwiseContext: complexProps.pairwiseContext as TargetTypeSelectorDrawerProps["pairwiseContext"],
         },
         { replace: true },
       );
