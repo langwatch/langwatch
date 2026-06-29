@@ -460,12 +460,6 @@ export class ModelProviderService {
       fallbackPriorityGlobal,
       providerConfig,
     };
-    const hasAdvancedWrite =
-      rateLimitRpm !== undefined ||
-      rateLimitTpm !== undefined ||
-      rateLimitRpd !== undefined ||
-      fallbackPriorityGlobal !== undefined ||
-      providerConfig !== undefined;
 
     // Validate provider exists
     if (!(provider in modelProviders)) {
@@ -505,22 +499,15 @@ export class ModelProviderService {
         ? [{ scopeType: input.scopeType, scopeId: input.scopeId }]
         : undefined);
 
-    // Fail-closed scope authz. Every (scopeType, scopeId) entry in the
-    // target set must pass the caller's manage-permission check; a
-    // single failure aborts the whole operation so partial-success
-    // cannot silently rebind a credential the caller can't see.
-    if (ctx && scopes) {
-      await assertCanManageAllScopes(ctx, scopes);
-    }
-
-    // Advanced (Gateway) writes also require manage on every scope the
-    // existing row is bound to — not just the project the caller is in.
-    // Matches the previous `updateAdvancedSettings` contract: a project
-    // admin must not nudge rate limits on a credential that's also
-    // bound to its parent org/team without manage there. The basic
-    // update path keeps its existing semantics (project:update gate
-    // only) so this PR doesn't tighten unrelated writes.
-    if (ctx && hasAdvancedWrite && existingProvider) {
+    // Existing-scope authz, fail-closed. The id-based lookup above is
+    // org-anchored (findByIdForOrganization) so the resolved row may be
+    // bound to an ORGANIZATION or TEAM scope a project admin cannot
+    // manage. Without this check, that admin could update an inherited
+    // row by submitting `scopes: [{PROJECT, theirProjectId}]` — the
+    // submitted-scopes check would pass, but the row they're touching
+    // is one they have no rights on. Validate against the row's
+    // *current* scopes before considering any incoming changes.
+    if (ctx && existingProvider) {
       await assertCanManageAllScopes(
         ctx,
         existingProvider.scopes.map((s) => ({
@@ -528,6 +515,15 @@ export class ModelProviderService {
           scopeId: s.scopeId,
         })),
       );
+    }
+
+    // Submitted-scope authz, fail-closed. Every (scopeType, scopeId) in
+    // the target set must also pass the manage-permission check, so a
+    // caller can't widen a row into a scope they don't control. A
+    // single failure aborts the whole operation; partial-success cannot
+    // silently rebind a credential the caller can't see.
+    if (ctx && scopes) {
+      await assertCanManageAllScopes(ctx, scopes);
     }
 
     return await this.prisma.$transaction(async (tx) => {
