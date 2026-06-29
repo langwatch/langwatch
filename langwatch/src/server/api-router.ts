@@ -17,6 +17,7 @@ import { app as exportTracesApp } from "../app/api/export/traces/[[...route]]/ap
 import { app as gatewayPlatformApp } from "../app/api/gateway-platform/[[...route]]/app";
 import { app as governanceApp } from "../app/api/governance/[[...route]]/app";
 import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
+import { app as meApp } from "../app/api/me/[[...route]]/app";
 import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
@@ -120,6 +121,7 @@ export function createApiRouter() {
   api.route("/", gatewayPlatformApp);
   api.route("/", governanceApp);
   api.route("/", graphsApp);
+  api.route("/", meApp);                  // /api/me/usage — personal spend/usage
   api.route("/", modelDefaultsApp);
   api.route("/", modelProvidersApp);
   api.route("/", monitorsApp);
