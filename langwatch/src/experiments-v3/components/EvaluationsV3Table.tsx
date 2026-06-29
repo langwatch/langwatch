@@ -1148,10 +1148,31 @@ export function EvaluationsV3Table({
   // Build columns - columnHelper is stable (useMemo to prevent recreating)
   const columnHelper = useMemo(() => createColumnHelper<TableRowData>(), []);
 
-  // Extract target IDs for stable column structure
-  // Only recreate when the actual IDs change, not when target data changes
-  const targetIdsKey = targets.map((r) => r.id).join(",");
-  const targetIds = useMemo(() => targets.map((r) => r.id), [targetIdsKey]);
+  // Extract target IDs for stable column structure.
+  // Sort so non-evaluator targets (prompts/agents) always precede evaluator
+  // targets (pairwise, custom evals) — giving the logical left-to-right order:
+  // Target A | Target B | Pairwise.
+  const targetIdsKey = targets
+    .slice()
+    .sort((a, b) => {
+      if (a.type === "evaluator" && b.type !== "evaluator") return 1;
+      if (a.type !== "evaluator" && b.type === "evaluator") return -1;
+      return 0;
+    })
+    .map((r) => r.id)
+    .join(",");
+  const targetIds = useMemo(
+    () =>
+      targets
+        .slice()
+        .sort((a, b) => {
+          if (a.type === "evaluator" && b.type !== "evaluator") return 1;
+          if (a.type !== "evaluator" && b.type === "evaluator") return -1;
+          return 0;
+        })
+        .map((r) => r.id),
+    [targetIdsKey],
+  );
 
   // Similarly stabilize dataset columns - include type in key so icon updates when type changes
   const datasetColumnsKey = datasetColumns
