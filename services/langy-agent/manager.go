@@ -291,18 +291,44 @@ func (m *Manager) spawn(ctx context.Context, conversationID string, creds Creden
 		return nil, err
 	}
 
-	port, err := getFreePort()
+	// Two ports per worker:
+	//   - externalPort: the authProxy listens here, requires Bearer auth.
+	//     handler.go always dials this one (worker.port).
+	//   - internalPort: opencode's actual TCP listen, fronted by the proxy.
+	//     Never exposed to handler.go; the proxy is the only consumer.
+	externalPort, err := getFreePort()
+	if err != nil {
+		_ = os.RemoveAll(workerHome)
+		cleanupUID()
+		return nil, err
+	}
+	internalPort, err := getFreePort()
 	if err != nil {
 		_ = os.RemoveAll(workerHome)
 		cleanupUID()
 		return nil, err
 	}
 
+	bearerToken, err := generateBearerToken()
+	if err != nil {
+		_ = os.RemoveAll(workerHome)
+		cleanupUID()
+		return nil, err
+	}
+
+	proxy, err := startAuthProxy(externalPort, internalPort, bearerToken, m.log)
+	if err != nil {
+		_ = os.RemoveAll(workerHome)
+		cleanupUID()
+		return nil, fmt.Errorf("start authproxy: %w", err)
+	}
+
 	// We pass context.Background() to the worker process — the per-request
 	// context controls a single chat turn, but the worker stays alive across
 	// turns and only dies on idle/shutdown.
-	cmd, err := spawnOpenCode(context.Background(), m.cfg, conversationID, workerHome, uid, port, creds)
+	cmd, err := spawnOpenCode(context.Background(), m.cfg, conversationID, workerHome, uid, internalPort, creds)
 	if err != nil {
+		proxy.shutdown()
 		_ = os.RemoveAll(workerHome)
 		cleanupUID()
 		return nil, err
@@ -322,27 +348,33 @@ func (m *Manager) spawn(ctx context.Context, conversationID string, creds Creden
 
 	readinessCtx, cancel := context.WithTimeout(ctx, m.cfg.ReadinessTimeout)
 	defer cancel()
-	if err := waitForReadiness(readinessCtx, port, m.cfg.ReadinessTimeout); err != nil {
+	if err := waitForReadiness(readinessCtx, externalPort, bearerToken, m.cfg.ReadinessTimeout); err != nil {
 		_ = cmd.Process.Kill()
+		proxy.shutdown()
 		return nil, err
 	}
 
-	sessionID, err := createOpenCodeSession(ctx, port)
+	sessionID, err := createOpenCodeSession(ctx, externalPort, bearerToken)
 	if err != nil {
 		_ = cmd.Process.Kill()
+		proxy.shutdown()
 		return nil, err
 	}
 
 	m.log.Info("worker ready",
 		zap.String("conversation", conversationID),
-		zap.Int("port", port),
+		zap.Int("port", externalPort),
+		zap.Int("internalPort", internalPort),
 		zap.String("session", sessionID),
 		zap.Uint32("uid", uid),
 	)
 
 	return &Worker{
 		conversationID:    conversationID,
-		port:              port,
+		port:              externalPort,
+		internalPort:      internalPort,
+		bearerToken:       bearerToken,
+		authProxy:         proxy,
 		openCodeSessionID: sessionID,
 		cmd:               cmd,
 		uid:               uid,
@@ -380,8 +412,10 @@ func (m *Manager) onWorkerExit(conversationID string, cmd *exec.Cmd, uid uint32)
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	shouldWipe := false
+	var proxyToShutdown *authProxy
 	if w, ok := m.workers[conversationID]; ok {
 		if w.cmd == cmd {
+			proxyToShutdown = w.authProxy
 			delete(m.workers, conversationID)
 			shouldWipe = true
 		}
@@ -395,6 +429,12 @@ func (m *Manager) onWorkerExit(conversationID string, cmd *exec.Cmd, uid uint32)
 	m.releaseUIDLocked(uid, conversationID)
 	if shouldWipe {
 		removeWorkerHome(m.cfg.SessionsRoot, conversationID, m.log)
+	}
+	// Shutdown the per-worker authproxy after releasing the registry lock —
+	// Shutdown drains in-flight requests and we don't want to hold m.mu
+	// across that wait.
+	if proxyToShutdown != nil {
+		go proxyToShutdown.shutdown()
 	}
 }
 
@@ -427,6 +467,12 @@ func (m *Manager) kill(conversationID, reason string) {
 			time.Sleep(2 * time.Second)
 			_ = p.Kill()
 		}(w.cmd.Process)
+	}
+	// Shut down the authproxy so its externally-advertised port frees
+	// up immediately; otherwise a respawn picking the same port would
+	// fail with EADDRINUSE on the listener bind.
+	if w.authProxy != nil {
+		go w.authProxy.shutdown()
 	}
 }
 

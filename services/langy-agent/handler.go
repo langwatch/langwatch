@@ -168,10 +168,10 @@ func handleChat(w http.ResponseWriter, r *http.Request, mgr *Manager, cfg Config
 	// opencode is fast to start producing.
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- streamSessionEvents(streamCtx, worker.port, worker.openCodeSessionID, w, flush)
+		errCh <- streamSessionEvents(streamCtx, worker.port, worker.bearerToken, worker.openCodeSessionID, w, flush)
 	}()
 
-	if err := postMessage(ctx, worker.port, worker.openCodeSessionID, req.System, req.Prompt); err != nil {
+	if err := postMessage(ctx, worker.port, worker.bearerToken, worker.openCodeSessionID, req.System, req.Prompt); err != nil {
 		// Cancel the SSE consumer so `<-errCh` unblocks immediately instead of
 		// waiting on the outer request ctx (up to 120s). Worker stays claimed
 		// until `defer worker.release()` — keep that window small.

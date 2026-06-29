@@ -38,6 +38,15 @@ var httpClient = &http.Client{Transport: &http.Transport{
 	IdleConnTimeout:     30 * time.Second,
 }}
 
+// addBearer attaches the per-worker bearer token to an outgoing request.
+// Every helper in this file routes through the authProxy on port and so
+// must carry the token; an empty token here would surface as a 401 from
+// the authproxy, which is the correct fail-closed shape — better an early
+// 401 than a silent missing header.
+func addBearer(req *http.Request, bearerToken string) {
+	req.Header.Set("Authorization", "Bearer "+bearerToken)
+}
+
 // getFreePort asks the kernel for an ephemeral port and returns it after
 // closing the listener. There is a brief race window between Close() and
 // opencode binding the port, but it is short enough in practice (and
@@ -56,12 +65,19 @@ func getFreePort() (int, error) {
 // back. opencode answers 404 on /, which is fine — any HTTP status means
 // the server is listening. Connection refused is the "not yet" state we
 // keep polling through.
-func waitForReadiness(ctx context.Context, port int, deadline time.Duration) error {
+//
+// Probed via the authProxy port so a successful poll also proves the
+// proxy chain is wired correctly. 401 from the proxy counts as ready
+// (the proxy is up); we treat it as a non-error status code along with
+// 2xx/3xx/4xx/5xx — anything other than transport failure means a
+// listener answered.
+func waitForReadiness(ctx context.Context, port int, bearerToken string, deadline time.Duration) error {
 	dl := time.Now().Add(deadline)
 	url := fmt.Sprintf("http://127.0.0.1:%d/", port)
 	for time.Now().Before(dl) {
 		reqCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 		req, _ := http.NewRequestWithContext(reqCtx, http.MethodGet, url, nil)
+		addBearer(req, bearerToken)
 		resp, err := httpClient.Do(req)
 		cancel()
 		if err == nil {
@@ -79,7 +95,7 @@ func waitForReadiness(ctx context.Context, port int, deadline time.Duration) err
 
 // createOpenCodeSession posts a fresh session to the worker. Returns the
 // session id we route subsequent prompts to.
-func createOpenCodeSession(ctx context.Context, port int) (string, error) {
+func createOpenCodeSession(ctx context.Context, port int, bearerToken string) (string, error) {
 	body := bytes.NewBufferString(`{"title":"langy"}`)
 	url := fmt.Sprintf("http://127.0.0.1:%d/session", port)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
@@ -87,6 +103,7 @@ func createOpenCodeSession(ctx context.Context, port int) (string, error) {
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	addBearer(req, bearerToken)
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", err
@@ -114,7 +131,7 @@ func createOpenCodeSession(ctx context.Context, port int) (string, error) {
 // postMessage queues a turn for the worker. 204/2xx → success. 404 means
 // the session vanished (rare; surfaces as errSessionNotFound so handler.go
 // can recycle the worker).
-func postMessage(ctx context.Context, port int, sessionID, system, userText string) error {
+func postMessage(ctx context.Context, port int, bearerToken, sessionID, system, userText string) error {
 	type part struct {
 		Type string `json:"type"`
 		Text string `json:"text"`
@@ -133,6 +150,7 @@ func postMessage(ctx context.Context, port int, sessionID, system, userText stri
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	addBearer(req, bearerToken)
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return err
@@ -153,12 +171,13 @@ func postMessage(ctx context.Context, port int, sessionID, system, userText stri
 // event lands or the context is cancelled. The fetch carries the same ctx
 // so a client disconnect aborts the upstream socket immediately — opencode
 // would otherwise hold it open until it had something to send.
-func streamSessionEvents(ctx context.Context, port int, sessionID string, w io.Writer, flush func()) error {
+func streamSessionEvents(ctx context.Context, port int, bearerToken, sessionID string, w io.Writer, flush func()) error {
 	url := fmt.Sprintf("http://127.0.0.1:%d/event", port)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
 	}
+	addBearer(req, bearerToken)
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		// Client disconnect: ctx.Err() is what we want to surface.

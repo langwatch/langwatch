@@ -98,12 +98,37 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-# Install opencode as root (its installer drops files in $HOME), then copy the
-# binary to /usr/local/bin so the non-root worker UIDs can execute it without
-# needing access to /root.
-RUN curl -fsSL https://opencode.ai/install | bash && \
-    find /root -name opencode -type f 2>/dev/null | head -1 | xargs -I{} cp {} /usr/local/bin/opencode && \
-    chmod +x /usr/local/bin/opencode
+# Pin opencode to a specific release artifact + verify sha256. The previous
+# `curl https://opencode.ai/install | bash` shape installed whatever was
+# `latest` at build time — every rebuild silently re-evaluated trust in
+# opencode upstream. opencode runs in every worker with the user's API
+# keys + GitHub user-to-server token in env, so it sits on the same
+# supply-chain surface as gh (already pinned above) and the npm packages.
+#
+# Bump procedure when raising OPENCODE_VERSION:
+#   v=NEW_VERSION
+#   curl -fsSL "https://github.com/anomalyco/opencode/releases/download/v${v}/opencode-linux-x64.tar.gz"  | sha256sum
+#   curl -fsSL "https://github.com/anomalyco/opencode/releases/download/v${v}/opencode-linux-arm64.tar.gz" | sha256sum
+# Paste both values below. Dev-cluster nodes are arm64 (Graviton) and CI
+# builds amd64 — both must verify.
+ARG OPENCODE_VERSION=1.17.11
+ARG OPENCODE_SHA256_AMD64=6aefcbbb7f04cdb4642be5208ddbfabb3c3d274f816bf42bff72eea5c244dca2
+ARG OPENCODE_SHA256_ARM64=6c0ae8212401c78f9dcddead35d385953c7a44eb1616309365b58503dbd1b4cd
+
+RUN set -eux; \
+    arch=$(dpkg --print-architecture); \
+    case "$arch" in \
+      amd64) target=linux-x64; sha=${OPENCODE_SHA256_AMD64} ;; \
+      arm64) target=linux-arm64; sha=${OPENCODE_SHA256_ARM64} ;; \
+      *) echo "Unsupported architecture for opencode pin: $arch" >&2; exit 1 ;; \
+    esac; \
+    url="https://github.com/anomalyco/opencode/releases/download/v${OPENCODE_VERSION}/opencode-${target}.tar.gz"; \
+    curl -fsSL "$url" -o /tmp/opencode.tar.gz; \
+    echo "${sha}  /tmp/opencode.tar.gz" | sha256sum -c -; \
+    tar -xzf /tmp/opencode.tar.gz -C /tmp; \
+    install -m0755 /tmp/opencode /usr/local/bin/opencode; \
+    rm -f /tmp/opencode /tmp/opencode.tar.gz; \
+    opencode --version
 
 # CLI (`langwatch`) + MCP server (`langwatch-mcp-server`) from npm. Replaces
 # the old locally-`pnpm pack`'d tarballs so the image builds reproducibly in

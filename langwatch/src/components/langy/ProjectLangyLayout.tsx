@@ -75,7 +75,7 @@ function useShowLangy(): boolean {
     (team?.members?.some((member) => member.userId === user?.id) ?? false) ||
     organizationRole === OrganizationUserRole.ADMIN;
 
-  const staff = isLangwatchStaff(user?.email);
+  const staff = isLangwatchStaff(user);
   // Skip the flag query entirely for staff (always allowed) and for non-members
   // (never allowed); the answer is decided without it. This keeps the menu
   // rendering on the first paint instead of waiting on a flag round-trip.

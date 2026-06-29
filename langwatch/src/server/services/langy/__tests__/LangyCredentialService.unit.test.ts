@@ -22,11 +22,17 @@ vi.mock("~/server/modelProviders/modelDefaults.read", () => ({
 }));
 
 // The dedicated Langy API key has its own unit suite; here it is a
-// collaborator. getLangyApiKeyToken → null makes getOrProvision fall back
-// to the project ingestion key, which the assertions below rely on.
-vi.mock("../langyApiKey", () => ({
+// collaborator. The default mock returns a real token so the credential
+// service can hand the worker a least-privilege key. The "no token"
+// path now throws — covered by an explicit test below. Hoisted so the
+// vi.mock factory can reference them without TDZ errors.
+const { getLangyApiKeyToken, provisionLangyApiKey } = vi.hoisted(() => ({
+  getLangyApiKeyToken: vi.fn().mockResolvedValue("sk-lw-test-langy-token"),
   provisionLangyApiKey: vi.fn().mockResolvedValue(undefined),
-  getLangyApiKeyToken: vi.fn().mockResolvedValue(null),
+}));
+vi.mock("../langyApiKey", () => ({
+  provisionLangyApiKey,
+  getLangyApiKeyToken,
 }));
 
 import {
@@ -57,6 +63,10 @@ beforeEach(() => {
     secret: "lw_vk_live_provisioned",
     virtualKey: { id: "vk-1" },
   });
+  getLangyApiKeyToken.mockReset();
+  getLangyApiKeyToken.mockResolvedValue("sk-lw-test-langy-token");
+  provisionLangyApiKey.mockReset();
+  provisionLangyApiKey.mockResolvedValue(undefined);
   process.env.LANGWATCH_API_URL = "https://api.langwatch.test";
   process.env.LW_GATEWAY_BASE_URL = "http://gateway.test:5563/v1";
   // Clear LW_GATEWAY_PUBLIC_URL so it doesn't leak in from the developer's
@@ -87,7 +97,7 @@ describe("LangyCredentialService", () => {
         });
 
         expect(creds.llmVirtualKey).toBe("lw_vk_live_stored");
-        expect(creds.langwatchApiKey).toBe("sk-lw-test-project-key");
+        expect(creds.langwatchApiKey).toBe("sk-lw-test-langy-token");
         expect(creds.langwatchEndpoint).toBe("https://api.langwatch.test");
         expect(creds.gatewayBaseUrl).toBe("http://gateway.test:5563/v1");
         expect(vkCreate).not.toHaveBeenCalled();
@@ -185,6 +195,30 @@ describe("LangyCredentialService", () => {
         await expect(
           svc.getOrProvision({ projectId: "missing", actorUserId: "u1" }),
         ).rejects.toThrow(LangyCredentialResolutionError);
+      });
+    });
+  });
+
+  describe("given Langy API key provisioning yields no token", () => {
+    // Reachable when resolveAttributionUserId returns null (e.g. an org
+    // with no active members). Falling back to project.apiKey here would
+    // hand the worker a key that bypasses LANGY_REQUIRED_PERMISSIONS — the
+    // whole RBAC gate. Fail-closed: throw so the route returns 409 and the
+    // user gets a clear actionable error instead of silent over-privilege.
+    describe("when getLangyApiKeyToken returns null", () => {
+      it("throws LangyCredentialResolutionError and does not fall back to project.apiKey", async () => {
+        getLangyApiKeyToken.mockResolvedValue(null);
+        const prisma = makePrisma();
+        const svc = new LangyCredentialService(prisma);
+
+        await expect(
+          svc.getOrProvision({ projectId: "p1", actorUserId: "u1" }),
+        ).rejects.toThrowError(
+          expect.objectContaining({
+            name: "LangyCredentialResolutionError",
+            message: expect.stringMatching(/no user could be attributed/),
+          }),
+        );
       });
     });
   });

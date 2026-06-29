@@ -173,7 +173,7 @@ secured.hono.use("/langy/*", async (c, next) => {
   // staff-only behaviour. Without this gate, ordinary project/team members
   // would see and call Langy regardless of the flag, defeating the stated
   // staff-only-by-default policy.
-  if (!isLangwatchStaff(session.user.email)) {
+  if (!isLangwatchStaff(session.user)) {
     // User-level targeting only: the langy/* surface is varied (chat takes
     // projectId in body, others take it in query) so the middleware can't
     // cleanly enrich with org context without re-parsing every request. The

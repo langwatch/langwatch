@@ -119,10 +119,11 @@ export class LangyCredentialService {
       );
     }
 
-    // Prefer the dedicated, least-privilege "Langy" key over the human's
-    // ingestion key. Provision-on-first-use makes it self-healing if project
-    // creation / backfill missed it; we fall back to project.apiKey only when
-    // no token could be stored (e.g. no resolvable user to attribute it to).
+    // Use the dedicated, least-privilege "Langy" key (LANGY_REQUIRED_PERMISSIONS
+    // only). Provision-on-first-use makes it self-healing if project creation
+    // missed it. Fail-closed if it can't be created — falling back to
+    // project.apiKey (full ingestion power) would silently bypass the RBAC
+    // gate the chat route enforces on every request.
     await provisionLangyApiKey({
       prisma: this.prisma,
       projectId,
@@ -133,6 +134,13 @@ export class LangyCredentialService {
       prisma: this.prisma,
       projectId,
     });
+    if (!langyApiKeyToken) {
+      throw new LangyCredentialResolutionError(
+        `Failed to provision Langy API key for project ${projectId} — ` +
+          "no user could be attributed (the project's organization has no " +
+          "resolvable members). Ensure the org has at least one active member.",
+      );
+    }
 
     const llmVirtualKey = await this.getOrProvisionVirtualKey({
       projectId,
@@ -169,7 +177,7 @@ export class LangyCredentialService {
     }
 
     return {
-      langwatchApiKey: langyApiKeyToken ?? project.apiKey,
+      langwatchApiKey: langyApiKeyToken,
       llmVirtualKey,
       langwatchEndpoint,
       gatewayBaseUrl: ensureGatewayV1BaseUrl(gatewayBaseUrl),

@@ -96,7 +96,7 @@ export async function provisionLangyApiKey({
   if (!creatorId) {
     logger.warn(
       { projectId },
-      "no user to attribute the Langy key token to; skipping — the runtime falls back to the project ingestion key",
+      "no user to attribute the Langy key token to; skipping — chat will 409 until a member with permissions can attribute the key",
     );
     return;
   }
