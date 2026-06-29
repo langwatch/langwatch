@@ -255,8 +255,13 @@ const isPairwiseLegacyLabel = (
  * older runs still hold legacy "A"/"B"/"tie". We accept both. The
  * identifier may be either the variant's internal target id OR its
  * prompt handle (set in the orchestrator's `variantIdentifierFor`).
+ *
+ * Exported so UI surfaces (chip-tint resolver, per-row verdict strip)
+ * share the same matcher — anything that compares a stored pairwise
+ * label against slot-shape must route through this helper, or the new
+ * winner-by-id contract silently fails for prompt-typed variants.
  */
-const normalizePairwiseLabel = (
+export const normalizePairwiseLabel = (
   value: unknown,
   variantA: string,
   variantB: string,

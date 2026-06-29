@@ -10,7 +10,14 @@ import { Equal, Trophy } from "lucide-react";
  * surfaced via a "why?" popover.
  */
 export type RowVerdictStripProps = {
-  /** "A", "B", or "tie" — the verdict label from the pairwise evaluator. */
+  /**
+   * Slot-letter form of the verdict ("A", "B", or "tie"). The pairwise
+   * evaluator's stored label is now the winner's candidate id under the
+   * Option C contract, so callers must normalize via
+   * `normalizePairwiseLabel` before rendering. `PairwiseVerdictRow` is
+   * the production caller and does this; tests and preview stories can
+   * pass slot letters directly.
+   */
   label: "A" | "B" | "tie";
   /** Human-readable variant A name (typically the TargetConfig id). */
   variantAName: string;
