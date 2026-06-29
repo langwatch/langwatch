@@ -82,6 +82,93 @@ const ModelSelectorWithWarning = ({
 
 import { EvaluatorLLMConfigField } from "./EvaluatorLLMConfigField";
 
+// Toggle-button field for array-of-literal-union fields (e.g. include_metrics:
+// z.array(z.union([z.literal("cost"), z.literal("duration")]))). Each option
+// is a sticky toggle button with a hover-tooltip explaining what the metric
+// is and why it matters for the judge prompt — replaces the generic dropdown
+// + "Add" array UI for fields where the option set is small and fixed.
+type MetricMeta = { label: string; tooltip: string };
+const METRIC_META: Record<string, MetricMeta> = {
+  cost: {
+    label: "Cost",
+    tooltip:
+      "Per-candidate model spend (USD), summed across the candidate's run. Injected so the judge can prefer cheaper options when quality is comparable. Use cautiously — judges may over-weight cost.",
+  },
+  duration: {
+    label: "Duration",
+    tooltip:
+      "Per-candidate wall-clock latency (ms) for this row's call. For aggregate views, p95 is reported in the leaderboard — the value sent to the judge here is the single-row time.",
+  },
+};
+
+const MetricToggleField = ({
+  fieldName,
+  options,
+  variant,
+}: {
+  fieldName: string;
+  options: string[];
+  variant: "default" | "studio";
+}) => {
+  const { control } = useFormContext();
+  return (
+    <Controller
+      name={fieldName}
+      control={control}
+      defaultValue={[]}
+      render={({ field: { value, onChange } }) => {
+        const selected: string[] = Array.isArray(value) ? value : [];
+        const toggle = (opt: string) => {
+          const next = selected.includes(opt)
+            ? selected.filter((v) => v !== opt)
+            : [...selected, opt];
+          onChange(next);
+        };
+        return (
+          <VStack align="start" gap={2} width="full">
+            {options.map((opt) => {
+              const meta = METRIC_META[opt] ?? { label: opt, tooltip: opt };
+              const isOn = selected.includes(opt);
+              return (
+                <HStack key={opt} gap={2} width="full">
+                  <Switch
+                    id={`metric-${opt}`}
+                    checked={isOn}
+                    onCheckedChange={({ checked }) => {
+                      if (checked !== isOn) toggle(opt);
+                    }}
+                    size={variant === "studio" ? "sm" : "md"}
+                  />
+                  <Field.Label
+                    htmlFor={`metric-${opt}`}
+                    marginBottom="0"
+                    fontWeight={variant === "studio" ? 400 : undefined}
+                    fontSize={variant === "studio" ? "13px" : undefined}
+                    cursor="pointer"
+                  >
+                    Include {meta.label.toLowerCase()}
+                  </Field.Label>
+                  <Tooltip content={meta.tooltip} showArrow positioning={{ placement: "top" }}>
+                    <Box
+                      as="span"
+                      display="inline-flex"
+                      color="fg.subtle"
+                      _hover={{ color: "fg.muted" }}
+                      cursor="help"
+                    >
+                      <Info size={14} />
+                    </Box>
+                  </Tooltip>
+                </HStack>
+              );
+            })}
+          </VStack>
+        );
+      }}
+    />
+  );
+};
+
 // Separate component for array fields to handle useFieldArray hook
 const ArrayField = <T extends EvaluatorTypes>({
   fieldSchema,
@@ -385,6 +472,26 @@ const DynamicZodForm = ({
         />
       );
     } else if (fieldSchema_ instanceof z.ZodArray) {
+      // Special-case: small, fixed sets of literal options render as toggle
+      // pills with hover-tooltips (e.g. include_metrics for pairwise_compare).
+      // The array UI's dropdown + "Add" pattern hides what each option means
+      // and over-fits to large open-ended arrays.
+      const element = fieldSchema_.element;
+      const isLiteralUnion =
+        element instanceof z.ZodUnion &&
+        element.options.every((o: any) => o instanceof z.ZodLiteral);
+      if (fieldKey === "include_metrics" && isLiteralUnion) {
+        const options = (element.options as z.ZodLiteral<string>[]).map(
+          (o) => o.value,
+        );
+        return (
+          <MetricToggleField
+            fieldName={fullPath}
+            options={options}
+            variant={variant}
+          />
+        );
+      }
       return (
         <ArrayField
           fieldSchema={fieldSchema_}

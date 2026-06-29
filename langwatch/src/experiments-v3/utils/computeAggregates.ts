@@ -3,7 +3,7 @@ import {
   computeMetricStats,
   type MetricStats,
 } from "~/components/shared/MetricStatsTooltip";
-import type { EvaluationResults } from "../types";
+import type { EvaluationResults, EvaluatorConfig } from "../types";
 
 export { computeMetricStats, type MetricStats };
 
@@ -220,6 +220,88 @@ export const computeTargetAggregates = (
     totalDuration: latencyStats?.total ?? null,
     latencyStats,
     costStats,
+  };
+};
+
+/**
+ * Pairwise verdict for a single row (#5100). Lives on
+ * `results.evaluatorResults[variantA][evaluatorId][rowIndex]` — the
+ * orchestrator stores the Phase-2 result against the variantA target id
+ * because that's the synthetic target the workflow builder anchors on.
+ */
+export type PairwiseVerdict = {
+  label: "A" | "B" | "tie";
+  reasoning?: string;
+  costAmount: number;
+};
+
+export type PairwiseAggregate = {
+  evaluatorId: string;
+  variantA: string;
+  variantB: string;
+  counts: { a: number; b: number; tie: number };
+  totalCost: number;
+  perRow: Array<PairwiseVerdict | null>;
+};
+
+const isPairwiseLabel = (
+  value: unknown,
+): value is PairwiseVerdict["label"] =>
+  value === "A" || value === "B" || value === "tie";
+
+const readCostAmount = (raw: unknown): number => {
+  if (!raw || typeof raw !== "object") return 0;
+  const cost = (raw as { cost?: unknown }).cost;
+  if (!cost || typeof cost !== "object") return 0;
+  const amount = (cost as { amount?: unknown }).amount;
+  return typeof amount === "number" && Number.isFinite(amount) ? amount : 0;
+};
+
+/**
+ * Aggregates verdicts for a single pairwise evaluator across all rows.
+ * Skips rows whose result is missing, errored, or has a non-A/B/tie label.
+ */
+export const computePairwiseAggregate = (
+  evaluator: Pick<EvaluatorConfig, "id" | "pairwise">,
+  results: EvaluationResults,
+  rowCount: number,
+): PairwiseAggregate | null => {
+  if (!evaluator.pairwise) return null;
+  const { variantA, variantB } = evaluator.pairwise;
+  const evalResults =
+    results.evaluatorResults[variantA]?.[evaluator.id] ?? [];
+
+  const counts = { a: 0, b: 0, tie: 0 };
+  let totalCost = 0;
+  const perRow: Array<PairwiseVerdict | null> = [];
+
+  for (let i = 0; i < rowCount; i++) {
+    const raw = evalResults[i];
+    const parsed = parseEvaluationResult(raw);
+    if (parsed.status !== "processed" || !isPairwiseLabel(parsed.label)) {
+      perRow.push(null);
+      continue;
+    }
+    const label = parsed.label;
+    const costAmount = readCostAmount(raw);
+    if (label === "A") counts.a++;
+    else if (label === "B") counts.b++;
+    else counts.tie++;
+    totalCost += costAmount;
+    perRow.push({
+      label,
+      reasoning: parsed.details,
+      costAmount,
+    });
+  }
+
+  return {
+    evaluatorId: evaluator.id,
+    variantA,
+    variantB,
+    counts,
+    totalCost,
+    perRow,
   };
 };
 
