@@ -961,7 +961,7 @@ requires-dist = [
     { name = "dspy-ai", marker = "extra == 'dspy'", specifier = ">=3.0.3,<4" },
     { name = "factory-boy", marker = "extra == 'tests'", specifier = ">=3.3.0,<4.0.0" },
     { name = "httpx", specifier = ">=0.27.0" },
-    { name = "langchain-core", marker = "extra == 'langchain'", specifier = ">=0.3.0,<2.0.0" },
+    { name = "langchain-core", marker = "extra == 'langchain'", specifier = ">=1.4.8,<2.0.0" },
     { name = "litellm", marker = "extra == 'litellm'", specifier = ">=1.52.1" },
     { name = "nanoid", specifier = ">=2.0.0,<3.0.0" },
     { name = "openinference-instrumentation-haystack", specifier = ">=0.1.20" },
