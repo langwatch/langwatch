@@ -165,7 +165,8 @@ describe('setupObservability Integration - Configuration Options', () => {
     span.end();
     await new Promise(resolve => setTimeout(resolve, 50));
     expect(onEndSpy).toHaveBeenCalled();
-    await handle.shutdown();
+    // Shutdown may throw network errors from the LangWatch exporter — ignore them.
+    await handle.shutdown().catch(() => {});
   });
 
   // For options that cannot be directly inspected, keep logger or side-effect checks
