@@ -179,7 +179,7 @@ const openTelemetryTraceRequestToTraceForCollection = (
         // them on the resource, so this is what makes its traces land labeled
         // "langy" and grouped by conversation. Everything else stays custom.
         const customMetadata: Record<string, any> = {};
-        const resourceReservedSource: Record<string, string> = {};
+        const resourceReservedSource: Record<string, string | string[]> = {};
         for (const resourceSpan of otelTrace.resourceSpans ?? []) {
           for (const attribute of resourceSpan?.resource?.attributes ?? []) {
             if (!attribute?.key) continue;

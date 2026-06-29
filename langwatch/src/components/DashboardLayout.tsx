@@ -1090,9 +1090,3 @@ export const DashboardLayout = ({
     </Box>
   );
 };
-
-function GlobalUpgradeModal() {
-  const { isOpen, variant, close } = useUpgradeModalStore();
-  if (!variant) return null;
-  return <UpgradeModal open={isOpen} onClose={close} variant={variant} />;
-}

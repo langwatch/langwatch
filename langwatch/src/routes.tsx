@@ -1,17 +1,17 @@
+import NProgress from "nprogress";
 import { Suspense, useEffect } from "react";
+import { ErrorBoundary } from "react-error-boundary";
 import {
   createBrowserRouter,
   Outlet,
+  type RouteObject,
   redirect,
   useLocation,
   useNavigation,
-  type RouteObject,
 } from "react-router";
-import { ErrorBoundary } from "react-error-boundary";
-import NProgress from "nprogress";
+import { PageErrorFallback } from "~/components/ui/PageErrorFallback";
 import { InnerProviders } from "./AppProviders";
 import NotFoundOrErrorPage from "./pages/_not-found";
-import { PageErrorFallback } from "~/components/ui/PageErrorFallback";
 import { reloadOnChunkError } from "./utils/chunkReload";
 
 /**

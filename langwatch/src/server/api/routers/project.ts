@@ -21,7 +21,7 @@ import { provisionLangyApiKey } from "~/server/services/langy/langyApiKey";
 import { provisionLangyVirtualKey } from "~/server/services/langy/langyVirtualKey";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
 import { auditLog } from "../../auditLog";
 import {
@@ -224,7 +224,7 @@ export const projectRouter = createTRPCRouter({
           createdByUserId: userId,
         });
       } catch (error) {
-        captureException(error, {
+        captureException(toError(error), {
           extra: {
             projectId: project.id,
             context: "provisionLangyApiKey:project.create",
@@ -245,7 +245,7 @@ export const projectRouter = createTRPCRouter({
           actorUserId: userId,
         });
       } catch (error) {
-        captureException(error, {
+        captureException(toError(error), {
           extra: {
             projectId: project.id,
             context: "provisionLangyVirtualKey:project.create",

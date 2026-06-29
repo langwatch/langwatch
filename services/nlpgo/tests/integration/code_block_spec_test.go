@@ -244,7 +244,7 @@ func TestSync_CodeBlock_NoStateLeakAcrossInvocations(t *testing.T) {
 
 	// A module-level counter incremented on each call. A fresh subprocess
 	// per invocation means it always starts at 0 and returns 1.
-	//nolint:dupword // Python source literal: `{"x": x}` is test code, not prose.
+	//nolint:dupword // `global x\n    x += 1` is Python syntax, not a typo
 	code := "x = 0\n\ndef execute(a):\n    global x\n    x += 1\n    return {\"x\": x}\n"
 	body := codeWorkflow("state-leak", "counter", code,
 		map[string]any{"a": 1}, map[string]string{"a": "int"},

@@ -88,3 +88,17 @@ Feature: Langy opens GitHub PRs as the requesting user
     When I ask Langy to open another PR
     Then Langy reports the daily cap is reached
     And no pull request is created until the cap resets
+
+  @integration
+  Scenario: Permit must be released on every non-PR exit
+    Given a PR-cap permit has been reserved for the current request
+    When the request errors before any PR is opened
+    Then the permit is released back to the daily counter
+    And the user's remaining daily cap is unchanged
+
+  @integration
+  Scenario: Invalid modelOverride must NOT burn a permit
+    Given the project's allowlist excludes the requested model
+    When the user asks Langy with that modelOverride
+    Then the request fails the allowlist check with 400
+    And no permit was reserved against the daily counter

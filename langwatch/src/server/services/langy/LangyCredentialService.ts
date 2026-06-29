@@ -159,7 +159,7 @@ export class LangyCredentialService {
         { error, projectId, userId: actorUserId },
         "github token mint failed; chat continues without it",
       );
-      captureException(error, {
+      captureException(toError(error), {
         extra: {
           projectId,
           context:

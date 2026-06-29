@@ -10,21 +10,21 @@
  * those scope rows + an optional RoutingPolicy reference (see
  * `scopeResolver.ts`); the service does not own a per-VK provider chain.
  */
-import { randomBytes } from "crypto";
 
 import type { Prisma, PrismaClient, VirtualKey } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import { randomBytes } from "crypto";
 
 import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
 import { ChangeEventRepository } from "./changeEvent.repository";
 import {
   defaultVirtualKeyConfig,
-  parseVirtualKeyConfig,
-  virtualKeyConfigSchema,
   type GuardrailAttachment,
   type GuardrailDirection,
+  parseVirtualKeyConfig,
   type VirtualKeyConfig,
+  virtualKeyConfigSchema,
 } from "./virtualKey.config";
 import {
   hashVirtualKeySecret,
@@ -32,8 +32,8 @@ import {
   parseVirtualKey,
 } from "./virtualKey.crypto";
 import {
-  VirtualKeyRepository,
   type ScopeInput,
+  VirtualKeyRepository,
   type VirtualKeyWithScopes,
 } from "./virtualKey.repository";
 
@@ -424,7 +424,10 @@ export class VirtualKeyService {
   ): Promise<VirtualKeyWithScopes> {
     const existing = await this.repository.findById(id, organizationId);
     if (!existing) {
-      throw new TRPCError({ code: "NOT_FOUND", message: "Virtual key not found" });
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Virtual key not found",
+      });
     }
     return existing;
   }

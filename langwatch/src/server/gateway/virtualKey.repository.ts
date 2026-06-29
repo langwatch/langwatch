@@ -17,7 +17,11 @@ import type {
 
 export type VirtualKeyWithScopes = VirtualKey & {
   scopes: VirtualKeyScope[];
-  principalUser?: { id: string; name: string | null; email: string | null } | null;
+  principalUser?: {
+    id: string;
+    name: string | null;
+    email: string | null;
+  } | null;
   routingPolicy?: {
     id: string;
     modelAliases: Prisma.JsonValue;

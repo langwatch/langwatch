@@ -181,7 +181,8 @@ export function isVisibleToMembership(
   if (membership.isOrgAdmin) return true;
   return scopes.some((scope) => {
     if (scope.scopeType === "ORGANIZATION") return membership.isOrgMember;
-    if (scope.scopeType === "TEAM") return membership.teamIds.has(scope.scopeId);
+    if (scope.scopeType === "TEAM")
+      return membership.teamIds.has(scope.scopeId);
     return membership.projectIds.has(scope.scopeId);
   });
 }
