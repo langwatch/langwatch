@@ -55,7 +55,12 @@ beforeEach(() => {
   // Staff bypass the rollout flag, so the chat-gate test below isolates the
   // RBAC check from the rollout-flag check (one variable per test).
   getServerAuthSession.mockResolvedValue({
-    user: { email: "dev@langwatch.ai", id: "u1" },
+    // `emailVerified: true` mirrors what OAuth providers assert + what
+    // BetterAuth stores after a verified signup. The Langy access gate now
+    // requires it (see isLangwatchStaff in src/utils/isLangwatchStaff.ts)
+    // so the staff bypass is closed to attacker@langwatch.ai self-registered
+    // accounts in self-hosted email-password mode.
+    user: { email: "dev@langwatch.ai", emailVerified: true, id: "u1" },
   });
 });
 

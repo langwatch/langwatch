@@ -229,7 +229,9 @@ secured
       );
       if (!allowed) {
         return c.json(
-          { error: "GitHub connect is not currently enabled for this account." },
+          {
+            error: "GitHub connect is not currently enabled for this account.",
+          },
           { status: 404 },
         );
       }
@@ -337,7 +339,11 @@ secured
         organizationId: state.organizationId,
       }))
     ) {
-      return popupHtml(c, popupErrorHtml("Not a member of this organization"), 403);
+      return popupHtml(
+        c,
+        popupErrorHtml("Not a member of this organization"),
+        403,
+      );
     }
 
     const redirectUri = `${appOrigin(c.req.url)}/api/github-langy/callback`;

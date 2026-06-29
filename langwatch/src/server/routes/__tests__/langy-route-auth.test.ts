@@ -42,7 +42,11 @@ describe("Langy access gate", () => {
   describe("when the caller is LangWatch staff", () => {
     it("reaches the handler regardless of the rollout flag", async () => {
       getServerAuthSession.mockResolvedValue({
-        user: { email: "dev@langwatch.ai", id: "u1" },
+        // emailVerified is required by isLangwatchStaff — OAuth providers
+        // assert it on sign-in, BetterAuth stores it on verified signups.
+        // Without it, a self-hosted email-password attacker could register
+        // attacker@langwatch.ai and bypass the rollout flag.
+        user: { email: "dev@langwatch.ai", emailVerified: true, id: "u1" },
       });
       isEnabled.mockResolvedValue(false);
 

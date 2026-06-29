@@ -73,9 +73,7 @@ describe("isLangwatchStaff", () => {
   describe("given a non-staff email", () => {
     it("rejects plain third-party domains", () => {
       expect(isLangwatchStaff(verifiedStaff("user@example.com"))).toBe(false);
-      expect(isLangwatchStaff(verifiedStaff("attacker@gmail.com"))).toBe(
-        false,
-      );
+      expect(isLangwatchStaff(verifiedStaff("attacker@gmail.com"))).toBe(false);
     });
   });
 
