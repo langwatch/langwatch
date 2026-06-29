@@ -57,6 +57,16 @@ export type ExecutionRequest = {
   scope: ExecutionScope;
   /** Concurrency limit for parallel execution (default 10) */
   concurrency?: number;
+  /**
+   * Pre-existing target outputs the client already has for targets NOT
+   * being re-run this dispatch. Used by Phase 2 pairwise so it can read
+   * variantA / variantB outputs from a prior run without forcing them to
+   * re-execute. Keyed by `${rowIndex}:${targetId}`.
+   */
+  seedTargetOutputs?: Record<
+    string,
+    { output: unknown; cost?: number; duration?: number }
+  >;
 };
 
 export const executionRequestSchema = z.object({
@@ -113,6 +123,16 @@ export const executionRequestSchema = z.object({
     }),
   ]),
   concurrency: z.number().min(1).max(24).optional(),
+  seedTargetOutputs: z
+    .record(
+      z.string(),
+      z.object({
+        output: z.unknown(),
+        cost: z.number().optional(),
+        duration: z.number().optional(),
+      }),
+    )
+    .optional(),
 });
 
 // ============================================================================
@@ -191,6 +211,26 @@ export type ExecutionCell = {
   precomputedTargetOutput?: unknown;
   /** Existing trace ID to reuse (for evaluator reruns) */
   traceId?: string;
+  /**
+   * Pairwise candidates baked into the cell after Phase 1 target execution.
+   * Set ONLY for synthetic pairwise cells; targetId on those cells points
+   * at variantA so the workflow builder has a real TargetConfig to lean on,
+   * but the target step is skipped via `skipTarget`.
+   */
+  pairwise?: {
+    candidateA: {
+      id: string;
+      output: unknown;
+      cost?: number;
+      duration?: number;
+    };
+    candidateB: {
+      id: string;
+      output: unknown;
+      cost?: number;
+      duration?: number;
+    };
+  };
 };
 
 /**

@@ -376,6 +376,18 @@ export function EvaluationsV3Table({
         type: field.type as Field["type"],
       }));
 
+      // Pairwise column-target (#5100): seed an empty pairwise config so the
+      // column owns its variantA/variantB/goldenField selections — this is the
+      // discriminator the Run flow and validation use to render the clean
+      // PairwiseConfigForm instead of the generic per-row mappings UI. Strictly
+      // additive: only set when the underlying evaluator is pairwise_compare,
+      // so every other evaluator-as-target keeps its current behavior.
+      const config = (evaluator.config ?? null) as {
+        evaluatorType?: string;
+      } | null;
+      const isPairwiseEvaluator =
+        config?.evaluatorType === "langevals/pairwise_compare";
+
       const targetConfig: TargetConfig = {
         id: `target_${Date.now()}`,
         type: "evaluator",
@@ -383,6 +395,14 @@ export function EvaluationsV3Table({
         inputs,
         outputs,
         mappings: {},
+        ...(isPairwiseEvaluator && {
+          pairwise: {
+            variantA: "",
+            variantB: "",
+            goldenField: "",
+            includeMetrics: [],
+          },
+        }),
       };
       addOrReplaceTarget(targetConfig);
       closeDrawer();
@@ -1006,14 +1026,24 @@ export function EvaluationsV3Table({
             {
               output: results.targetOutputs[target.id]?.[index] ?? null,
               // All evaluators apply to all targets
-              evaluators: Object.fromEntries(
-                evaluators.map((evaluator) => [
+              evaluators: Object.fromEntries([
+                ...evaluators.map((evaluator) => [
                   evaluator.id,
                   results.evaluatorResults[target.id]?.[evaluator.id]?.[
                     index
                   ] ?? null,
                 ]),
-              ),
+                ...(target.pairwise
+                  ? [
+                      [
+                        target.id,
+                        results.evaluatorResults[target.id]?.[target.id]?.[
+                          index
+                        ] ?? null,
+                      ],
+                    ]
+                  : []),
+              ] as Array<[string, unknown]>),
               // Error for this target/row
               error: results.errors[target.id]?.[index] ?? null,
               // Loading if this specific cell is in the executing set AND has no output/error yet
@@ -1523,6 +1553,9 @@ export function EvaluationsV3Table({
         },
       }}
     >
+      {/* Pairwise scoreboard moved into the column header — the top bar was
+          redundant with the column's mini-summary. CSV export + filter chips
+          will move into the column header's overflow menu in a follow-up. */}
       <table ref={tableRef}>
         {/* Define column widths with colgroup for table-layout: fixed */}
         <colgroup>

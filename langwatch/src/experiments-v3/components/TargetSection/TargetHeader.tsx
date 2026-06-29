@@ -9,6 +9,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
+import { Swords } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import {
   LuArrowLeftRight,
@@ -24,7 +25,6 @@ import {
   LuSquare,
   LuTrash2,
 } from "react-icons/lu";
-
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { ColorfulBlockIcon } from "~/optimization_studio/components/ColorfulBlockIcons";
@@ -32,14 +32,26 @@ import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/ut
 import { VersionBadge } from "~/prompts/components/ui/VersionBadge";
 import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../constants";
+
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import { useTargetName } from "../../hooks/useTargetName";
 import type { TargetConfig } from "../../types";
-import { computeTargetAggregates } from "../../utils/computeAggregates";
+import {
+  computePairwiseTargetAggregate,
+  computeTargetAggregates,
+} from "../../utils/computeAggregates";
 import { isRowEmpty } from "../../utils/emptyRowDetection";
 import { countCellsForTarget } from "../../utils/executionScope";
 import { targetHasMissingMappings } from "../../utils/mappingValidation";
 import { TargetSummary } from "./TargetSummary";
+
+// Stable reference fed to useTargetName when a pairwise variant target hasn't
+// loaded yet — keeps the hook order constant across renders.
+const PLACEHOLDER_PAIRWISE_VARIANT = {
+  id: "__pairwise-placeholder__",
+  type: "prompt",
+  promptId: undefined,
+} as unknown as TargetConfig;
 
 // Pulsing animation for missing mapping alert
 const pulseAnimation = keyframes`
@@ -115,6 +127,34 @@ export const TargetHeader = memo(function TargetHeader({
   // Get the display name for this target
   const targetName = useTargetName(target);
 
+  // For pairwise column-targets, resolve variant A/B display names so the
+  // mini-summary at the right can say "{winner} wins 2" instead of just "2 wins".
+  const variantATarget = useEvaluationsV3Store((state) =>
+    target.pairwise?.variantA
+      ? state.targets.find((t) => t.id === target.pairwise!.variantA)
+      : undefined,
+  );
+  const variantBTarget = useEvaluationsV3Store((state) =>
+    target.pairwise?.variantB
+      ? state.targets.find((t) => t.id === target.pairwise!.variantB)
+      : undefined,
+  );
+  // Always call useTargetName (Rules of Hooks). Fall back to a placeholder
+  // when the variant target isn't present; we suppress the placeholder
+  // result by checking the original variant ref before rendering.
+  const variantANameRaw = useTargetName(
+    variantATarget ?? (PLACEHOLDER_PAIRWISE_VARIANT as TargetConfig),
+  );
+  const variantBNameRaw = useTargetName(
+    variantBTarget ?? (PLACEHOLDER_PAIRWISE_VARIANT as TargetConfig),
+  );
+  const variantAName = variantATarget
+    ? variantANameRaw || target.pairwise?.variantA || ""
+    : "Variant A";
+  const variantBName = variantBTarget
+    ? variantBNameRaw || target.pairwise?.variantB || ""
+    : "Variant B";
+
   // Get results, evaluators, and dataset for computing aggregates
   const { results, evaluators, activeDataset } = useEvaluationsV3Store(
     (state) => ({
@@ -189,6 +229,25 @@ export const TargetHeader = memo(function TargetHeader({
     [target.id, results, evaluators, effectiveRowCount],
   );
 
+  const pairwiseAggregate = useMemo(() => {
+    if (!target.pairwise) return null;
+    return computePairwiseTargetAggregate(target, results, effectiveRowCount, {
+      // Pass the RESOLVED prompt handle (e.g. "say-hi") so the normalizer can
+      // match what the orchestrator emits as the verdict label. variantANameRaw
+      // already comes from useTargetName, which is handle-aware.
+      variantAHandle: variantATarget ? variantANameRaw : undefined,
+      variantBHandle: variantBTarget ? variantBNameRaw : undefined,
+    });
+  }, [
+    target,
+    results,
+    effectiveRowCount,
+    variantATarget,
+    variantBTarget,
+    variantANameRaw,
+    variantBNameRaw,
+  ]);
+
   // Show aggregates only when we have results or errors or running
   const hasAggregates =
     aggregates.completedRows > 0 ||
@@ -235,6 +294,16 @@ export const TargetHeader = memo(function TargetHeader({
       );
     }
     if (target.type === "evaluator") {
+      // Pairwise column-targets use the Swords icon (matches the picker card)
+      // so the column visually reads as "head-to-head comparison" rather than
+      // a generic evaluator.
+      if (target.pairwise) {
+        return (
+          <span data-testid="icon-pairwise">
+            <Swords size={12} />
+          </span>
+        );
+      }
       return (
         <span data-testid="icon-evaluator">
           <LuCircleCheck size={12} />
@@ -258,6 +327,11 @@ export const TargetHeader = memo(function TargetHeader({
   };
 
   const getTargetColor = () => {
+    // Pairwise column-targets render in purple to match the picker card and
+    // signal "comparison" at a glance.
+    if (target.type === "evaluator" && target.pairwise) {
+      return "purple.emphasized";
+    }
     if (target.type === "prompt" || target.type === "evaluator") {
       return "green.emphasized";
     }
@@ -396,13 +470,45 @@ export const TargetHeader = memo(function TargetHeader({
       <Spacer />
 
       {/* Summary statistics (positioned on the right before play button) */}
-      {hasAggregates && (
+      {pairwiseAggregate &&
+      pairwiseAggregate.counts.a +
+        pairwiseAggregate.counts.b +
+        pairwiseAggregate.counts.tie >
+        0 ? (
+        (() => {
+          const { a, b, tie } = pairwiseAggregate.counts;
+          const isTie = a === b;
+          const winnerName = a > b ? variantAName : variantBName;
+          const winnerCount = Math.max(a, b);
+          const shortName = (s: string) =>
+            s.length > 18 ? `${s.slice(0, 17)}…` : s;
+          const summary = isTie
+            ? tie > 0
+              ? `Tied · ${tie} tie${tie === 1 ? "" : "s"}`
+              : "Tied"
+            : `${shortName(winnerName)} wins ${winnerCount}` +
+              (tie > 0 ? ` · ${tie} tie${tie === 1 ? "" : "s"}` : "");
+          return (
+            <Tooltip
+              content={`${variantAName}: ${a} wins · ${variantBName}: ${b} wins${
+                tie > 0 ? ` · ${tie} ${tie === 1 ? "tie" : "ties"}` : ""
+              }`}
+              positioning={{ placement: "top" }}
+              openDelay={200}
+            >
+              <Text fontSize="11px" color="fg.muted" whiteSpace="nowrap">
+                {summary}
+              </Text>
+            </Tooltip>
+          );
+        })()
+      ) : hasAggregates ? (
         <TargetSummary
           aggregates={aggregates}
           evaluators={evaluators}
           isRunning={isRunning}
         />
-      )}
+      ) : null}
 
       {/* Play/Stop button on far right */}
       <Tooltip

@@ -16,6 +16,7 @@ import type {
   DatasetReference,
   EvaluatorConfig,
   FieldMapping,
+  PairwiseEvaluatorConfig,
   TargetConfig,
 } from "../types";
 
@@ -496,4 +497,77 @@ export const inferAllEvaluatorMappings = (
   }
 
   return result;
+};
+
+/**
+ * Derive per-row field mappings for a column-style pairwise evaluator target
+ * (#5100) from its high-level pairwise config.
+ *
+ * The PairwiseConfigForm is a 3-field UI (Variant A / Variant B / Golden) —
+ * the orchestrator still needs the underlying field mappings to do the
+ * row-level lookup. Rather than expose those rows in the UI, we compute
+ * them deterministically from variantA/variantB/goldenField.
+ *
+ * - candidate_*_id  -> literal value of the variant target id (so the judge
+ *   prompt can label A vs B if it references {candidate_a_id}). Output
+ *   field is the variant target's "output" field.
+ * - candidate_*_cost / *_duration are NOT mapped here — those are evaluator-
+ *   schema optional fields the orchestrator must source from each variant's
+ *   run telemetry, not from a dataset/target field source. include_metrics
+ *   on the evaluator config gates whether they appear in the judge prompt.
+ * - input defaults to a dataset column literally named "input" (or its
+ *   semantic equivalents) if one exists; otherwise omitted so validation
+ *   surfaces it via the optional field path.
+ * - golden uses the user-picked goldenField directly.
+ */
+export const derivePairwiseTargetMappings = (
+  pairwise: PairwiseEvaluatorConfig,
+  dataset: DatasetReference | undefined,
+): Record<string, FieldMapping> => {
+  const mappings: Record<string, FieldMapping> = {};
+
+  if (pairwise.variantA) {
+    mappings.candidate_a_id = { type: "value", value: pairwise.variantA };
+    mappings.candidate_a_output = {
+      type: "source",
+      source: "target",
+      sourceId: pairwise.variantA,
+      sourceField: "output",
+    };
+  }
+  if (pairwise.variantB) {
+    mappings.candidate_b_id = { type: "value", value: pairwise.variantB };
+    mappings.candidate_b_output = {
+      type: "source",
+      source: "target",
+      sourceId: pairwise.variantB,
+      sourceField: "output",
+    };
+  }
+
+  if (dataset) {
+    // Auto-map "input" to the most likely dataset column so the user doesn't
+    // have to re-pick something obvious. Falls back to skipping if there's
+    // no plausible match — input is an optional field on pairwise_compare.
+    const inputColumn = findMatchingColumn("input", dataset.columns);
+    if (inputColumn) {
+      mappings.input = {
+        type: "source",
+        source: "dataset",
+        sourceId: dataset.id,
+        sourceField: inputColumn,
+      };
+    }
+
+    if (pairwise.goldenField) {
+      mappings.golden = {
+        type: "source",
+        source: "dataset",
+        sourceId: dataset.id,
+        sourceField: pairwise.goldenField,
+      };
+    }
+  }
+
+  return mappings;
 };
