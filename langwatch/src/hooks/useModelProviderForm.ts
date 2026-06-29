@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CustomModelEntry } from "../server/modelProviders/customModel.schema";
 import {
-  modelProviders as modelProvidersRegistry,
   type MaybeStoredModelProvider,
+  modelProviders as modelProvidersRegistry,
 } from "../server/modelProviders/registry";
 import {
   hasUserEnteredNewApiKey,
@@ -19,6 +19,7 @@ function humanizeProviderName(providerKey: string): string {
     .replace(/_/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
+
 import {
   computeInitialUseApiGateway,
   useCredentialKeys,
@@ -203,7 +204,7 @@ export function useModelProviderForm(
     ? "PROJECT"
     : scopes.some((s) => s.scopeType === "TEAM")
       ? "TEAM"
-      : scopes[0]?.scopeType ?? defaultNewScope;
+      : (scopes[0]?.scopeType ?? defaultNewScope);
 
   const scopeId =
     scopes.find((s) => s.scopeType === scopeType)?.scopeId ?? undefined;

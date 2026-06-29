@@ -1,8 +1,8 @@
 import { Box, Button, Field, HStack, Input, VStack } from "@chakra-ui/react";
-import { SmallLabel } from "../SmallLabel";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { useDrawer } from "../../hooks/useDrawer";
+import { useFeatureFlag } from "../../hooks/useFeatureFlag";
 import { useModelProviderApiKeyValidation } from "../../hooks/useModelProviderApiKeyValidation";
 import { useModelProviderForm } from "../../hooks/useModelProviderForm";
 import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
@@ -16,13 +16,8 @@ import {
   hasUserModifiedNonApiKeyFields,
 } from "../../utils/modelProviderHelpers";
 import { parseZodFieldErrors, type ZodErrorStructure } from "../../utils/zod";
+import { SmallLabel } from "../SmallLabel";
 import { Switch } from "../ui/switch";
-import { CredentialsSection } from "./ModelProviderCredentialsSection";
-import { CustomModelInputSection } from "./ModelProviderCustomModelInput";
-// DefaultProviderSection has been moved out of this drawer to a page-level
-// section on the model-providers settings page (DefaultModelsSection). See
-// specs/model-providers/hierarchical-default-models.feature.
-import { ExtraHeadersSection } from "./ModelProviderExtraHeadersSection";
 import {
   draftFromProvider,
   EMPTY_ADVANCED_DRAFT,
@@ -30,8 +25,13 @@ import {
   ModelProviderAdvancedSection,
   parseAdvancedDraft,
 } from "./ModelProviderAdvancedSection";
+import { CredentialsSection } from "./ModelProviderCredentialsSection";
+import { CustomModelInputSection } from "./ModelProviderCustomModelInput";
+// DefaultProviderSection has been moved out of this drawer to a page-level
+// section on the model-providers settings page (DefaultModelsSection). See
+// specs/model-providers/hierarchical-default-models.feature.
+import { ExtraHeadersSection } from "./ModelProviderExtraHeadersSection";
 import { ProviderScopeSection } from "./ModelProviderScopeSection";
-import { useFeatureFlag } from "../../hooks/useFeatureFlag";
 
 export type EditModelProviderFormProps = {
   projectId?: string | undefined;
@@ -50,7 +50,8 @@ export const EditModelProviderForm = ({
     projectId: projectId,
   });
   const { closeDrawer } = useDrawer();
-  const { project, team, organization, hasPermission } = useOrganizationTeamProject();
+  const { project, team, organization, hasPermission } =
+    useOrganizationTeamProject();
   const canManageOrganization = hasPermission("organization:manage");
   const canManageTeam = hasPermission("team:manage");
 
@@ -179,8 +180,7 @@ export const EditModelProviderForm = ({
       fallbackPriorityGlobal:
         (provider as { fallbackPriorityGlobal?: number | null })
           .fallbackPriorityGlobal ?? null,
-      providerConfig: (provider as { providerConfig?: unknown })
-        .providerConfig,
+      providerConfig: (provider as { providerConfig?: unknown }).providerConfig,
     });
   }, [gatewayMenuEnabled, provider]);
   const isAdvancedDirty =
@@ -325,8 +325,8 @@ export const EditModelProviderForm = ({
             />
           </Box>
           <Field.HelperText>
-            Distinguish multiple instances (e.g. "OpenAI – EU prod" vs
-            "OpenAI – Dev").
+            Distinguish multiple instances (e.g. "OpenAI – EU prod" vs "OpenAI –
+            Dev").
           </Field.HelperText>
         </Field.Root>
 
@@ -407,12 +407,16 @@ export const EditModelProviderForm = ({
             initial={{
               healthStatus: (provider as { healthStatus?: string | null })
                 .healthStatus,
-              circuitOpenedAt: (provider as {
-                circuitOpenedAt?: Date | string | null;
-              }).circuitOpenedAt,
-              lastHealthCheckAt: (provider as {
-                lastHealthCheckAt?: Date | string | null;
-              }).lastHealthCheckAt,
+              circuitOpenedAt: (
+                provider as {
+                  circuitOpenedAt?: Date | string | null;
+                }
+              ).circuitOpenedAt,
+              lastHealthCheckAt: (
+                provider as {
+                  lastHealthCheckAt?: Date | string | null;
+                }
+              ).lastHealthCheckAt,
               disabledAt: (provider as { disabledAt?: Date | string | null })
                 .disabledAt,
             }}

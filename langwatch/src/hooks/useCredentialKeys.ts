@@ -95,10 +95,7 @@ export function useCredentialKeys({
   );
 
   const setUseApiGateway = useCallback(
-    (
-      use: boolean,
-      onGatewayToggle?: (useGateway: boolean) => void,
-    ) => {
+    (use: boolean, onGatewayToggle?: (useGateway: boolean) => void) => {
       setUseApiGatewayState(use);
       setCustomKeys((previousKeys) => {
         originalStoredKeysRef.current = {
