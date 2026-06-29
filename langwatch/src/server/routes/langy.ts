@@ -30,8 +30,10 @@ import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { auditLog } from "~/server/auditLog";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
+
 import { featureFlagService } from "~/server/featureFlag";
 import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy";
+
 import {
   LANGY_GITHUB_PRS_PER_DAY,
   releaseLangyGithubPrPermit,
@@ -482,119 +484,119 @@ langyRoute().post("/langy/chat", async (c) => {
       try {
         writer.write({ type: "text-start", id: textId });
 
-      const reader = agentResponse.body!.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
+        const reader = agentResponse.body!.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
 
-      const handleLine = (line: string) => {
-        if (!line.trim()) return;
-        try {
-          const event = JSON.parse(line) as {
-            type: string;
-            part?: { type?: string; text?: string };
-            properties?: {
-              field?: string;
-              delta?: string;
+        const handleLine = (line: string) => {
+          if (!line.trim()) return;
+          try {
+            const event = JSON.parse(line) as {
+              type: string;
               part?: { type?: string; text?: string };
+              properties?: {
+                field?: string;
+                delta?: string;
+                part?: { type?: string; text?: string };
+              };
             };
-          };
-          // Legacy shape (kept for older agent versions).
-          if (event.type === "text" && event.part?.text) {
-            fullText += event.part.text;
-            writer.write({
-              type: "text-delta",
-              delta: event.part.text,
-              id: textId,
-            });
-            return;
+            // Legacy shape (kept for older agent versions).
+            if (event.type === "text" && event.part?.text) {
+              fullText += event.part.text;
+              writer.write({
+                type: "text-delta",
+                delta: event.part.text,
+                id: textId,
+              });
+              return;
+            }
+            // OpenCode shape: text deltas arrive as message.part.delta with field=text.
+            if (
+              event.type === "message.part.delta" &&
+              event.properties?.field === "text" &&
+              typeof event.properties?.delta === "string"
+            ) {
+              fullText += event.properties.delta;
+              writer.write({
+                type: "text-delta",
+                delta: event.properties.delta,
+                id: textId,
+              });
+            }
+          } catch {
+            // Ignore malformed/partial JSON lines from the agent stream.
           }
-          // OpenCode shape: text deltas arrive as message.part.delta with field=text.
-          if (
-            event.type === "message.part.delta" &&
-            event.properties?.field === "text" &&
-            typeof event.properties?.delta === "string"
-          ) {
-            fullText += event.properties.delta;
-            writer.write({
-              type: "text-delta",
-              delta: event.properties.delta,
-              id: textId,
-            });
+        };
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            handleLine(line);
           }
-        } catch {
-          // Ignore malformed/partial JSON lines from the agent stream.
         }
-      };
+        // Flush the trailing record when the stream ends without a final newline,
+        // otherwise the last delta is silently dropped and the reply is truncated.
+        if (buffer.trim()) handleLine(buffer);
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
+        writer.write({ type: "text-end", id: textId });
 
-        for (const line of lines) {
-          handleLine(line);
-        }
-      }
-      // Flush the trailing record when the stream ends without a final newline,
-      // otherwise the last delta is silently dropped and the reply is truncated.
-      if (buffer.trim()) handleLine(buffer);
-
-      writer.write({ type: "text-end", id: textId });
-
-      // Strip every Langy sentinel ([langy:connect-github] + [langy:progress:...])
-      // from the persisted body — they're wire-protocol for the live UI, not
-      // history. Persisting them re-triggers the connect card on history reload
-      // and pollutes GDPR exports. Keep `fullText` unchanged for PR-URL
-      // extraction below: PR URLs live in prose, not sentinels.
-      const persistedText = stripLangySentinels(fullText);
-      try {
-        await persistMessage({
-          conversationId: conversation.id,
-          projectId,
-          role: "assistant",
-          parts: [{ type: "text", text: persistedText, role: "assistant" }],
-        });
-      } catch (error) {
-        logger.error({ error }, "failed to persist langy assistant message");
-      }
-
-      // Audit each PR the assistant actually OPENED this turn — links are
-      // cross-referenced against the skill's `[langy:progress:opened:...]`
-      // sentinels so merely *mentioning* a PR ("summarize PR #4751") doesn't
-      // forge a `pr_opened` audit entry. Parse from `fullText` (pre-strip) —
-      // sentinels are gone from `persistedText`.
-      //
-      // Counting is owned by the pre-turn `reserveLangyGithubPrPermit` (one
-      // permit per turn, atomic). If the turn opened MORE than one PR, the
-      // permit covers the first; further PRs are still audited but won't
-      // double-bump the daily counter. If the turn opened ZERO PRs, the
-      // permit is released by the executor's finally below so a question
-      // doesn't burn a permit.
-      try {
-        const links = extractOpenedPrLinks(fullText);
-        if (links.length > 0) {
-          // PR was actually opened — the permit is consumed, latch it
-          // closed so the cleanup finally doesn't reverse the consumption.
-          permitReleased = true;
-        }
-        for (const link of links) {
-          await auditLog({
-            userId: session.user.id,
+        // Strip every Langy sentinel ([langy:connect-github] + [langy:progress:...])
+        // from the persisted body — they're wire-protocol for the live UI, not
+        // history. Persisting them re-triggers the connect card on history reload
+        // and pollutes GDPR exports. Keep `fullText` unchanged for PR-URL
+        // extraction below: PR URLs live in prose, not sentinels.
+        const persistedText = stripLangySentinels(fullText);
+        try {
+          await persistMessage({
+            conversationId: conversation.id,
             projectId,
-            action: "langy.github.pr_opened",
-            args: {
-              owner: link.owner,
-              repo: link.repo,
-              number: link.number,
-              url: link.url,
-            },
+            role: "assistant",
+            parts: [{ type: "text", text: persistedText, role: "assistant" }],
           });
+        } catch (error) {
+          logger.error({ error }, "failed to persist langy assistant message");
         }
-      } catch (error) {
-        logger.error({ error }, "failed to record langy github PR usage");
-      }
+
+        // Audit each PR the assistant actually OPENED this turn — links are
+        // cross-referenced against the skill's `[langy:progress:opened:...]`
+        // sentinels so merely *mentioning* a PR ("summarize PR #4751") doesn't
+        // forge a `pr_opened` audit entry. Parse from `fullText` (pre-strip) —
+        // sentinels are gone from `persistedText`.
+        //
+        // Counting is owned by the pre-turn `reserveLangyGithubPrPermit` (one
+        // permit per turn, atomic). If the turn opened MORE than one PR, the
+        // permit covers the first; further PRs are still audited but won't
+        // double-bump the daily counter. If the turn opened ZERO PRs, the
+        // permit is released by the executor's finally below so a question
+        // doesn't burn a permit.
+        try {
+          const links = extractOpenedPrLinks(fullText);
+          if (links.length > 0) {
+            // PR was actually opened — the permit is consumed, latch it
+            // closed so the cleanup finally doesn't reverse the consumption.
+            permitReleased = true;
+          }
+          for (const link of links) {
+            await auditLog({
+              userId: session.user.id,
+              projectId,
+              action: "langy.github.pr_opened",
+              args: {
+                owner: link.owner,
+                repo: link.repo,
+                number: link.number,
+                url: link.url,
+              },
+            });
+          }
+        } catch (error) {
+          logger.error({ error }, "failed to record langy github PR usage");
+        }
       } finally {
         // Single release point for the executor's normal end AND any throw
         // inside it. If a PR was opened, the earlier block latched
