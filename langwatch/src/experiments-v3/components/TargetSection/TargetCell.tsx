@@ -624,10 +624,7 @@ function PairwiseAwareEvaluatorChip({
   target: TargetConfig;
   targets: TargetConfig[];
   result: unknown;
-  chipProps: Omit<
-    React.ComponentProps<typeof EvaluatorChip>,
-    "pairwiseState"
-  >;
+  chipProps: Omit<React.ComponentProps<typeof EvaluatorChip>, "pairwiseState">;
 }) {
   const pw = chipProps.evaluator.pairwise;
   const variantATarget = pw
@@ -639,11 +636,7 @@ function PairwiseAwareEvaluatorChip({
   const variantAName = useTargetName(variantATarget);
   const variantBName = useTargetName(variantBTarget);
 
-  const pairwiseState = useMemo(():
-    | "winner"
-    | "loser"
-    | "tie"
-    | undefined => {
+  const pairwiseState = useMemo((): "winner" | "loser" | "tie" | undefined => {
     if (!pw) return undefined;
     const parsed = parseEvaluationResult(result);
     if (parsed.status !== "processed") return undefined;
@@ -658,13 +651,7 @@ function PairwiseAwareEvaluatorChip({
     if (slot === "tie") return "tie";
     if (slot === "A") return target.id === pw.variantA ? "winner" : "loser";
     return target.id === pw.variantB ? "winner" : "loser";
-  }, [
-    pw,
-    result,
-    target.id,
-    variantAName,
-    variantBName,
-  ]);
+  }, [pw, result, target.id, variantAName, variantBName]);
 
   return <EvaluatorChip {...chipProps} pairwiseState={pairwiseState} />;
 }
