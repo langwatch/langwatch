@@ -7,7 +7,7 @@
  * cells, portal editor); only the tRPC transport is mocked.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -36,6 +36,12 @@ vi.mock("~/utils/api", () => ({
   api: {
     datasetRecord: {
       getAll: {
+        useQuery: (...args: unknown[]) => getAllQuery(...args),
+      },
+      // The saved-dataset editor now reads one page at a time. Point it at the
+      // same mock so saved-mode fixtures (which set the records via this fn)
+      // drive the paged read; pages without `totalPages` read as a single page.
+      listPaginated: {
         useQuery: (...args: unknown[]) => getAllQuery(...args),
       },
       update: {
@@ -398,71 +404,508 @@ describe("given a saved dataset", () => {
   });
 });
 
-// ── Large-dataset read truncation (ADR-032) ──────────────────────────
+// ── Whole-dataset total count ────────────────────────────────────────
 
-describe("given a large saved dataset whose read is truncated", () => {
-  const renderSaved = (data: Record<string, unknown>) => {
-    getAllQuery.mockReturnValue({ data, isLoading: false, refetch: vi.fn() });
-    return render(<DatasetEditorTable datasetId="dataset_big" />, {
-      wrapper: Wrapper,
-    });
-  };
-
-  describe("when the read is truncated", () => {
-    it("shows the true total with a truncation notice, not just the loaded rows", async () => {
-      renderSaved({
-        id: "dataset_big",
-        name: "dataset-images-2gb",
-        columnTypes,
-        count: 1640,
-        truncated: true,
-        datasetRecords: [
-          { id: "r1", input: "a", expected_output: "x" },
-          { id: "r2", input: "b", expected_output: "y" },
-          { id: "r3", input: "c", expected_output: "z" },
-        ],
+describe("given the saved dataset's record count", () => {
+  describe("when the dataset spans many pages", () => {
+    it("shows the PG-authoritative whole-dataset total, not just the loaded page", async () => {
+      getAllQuery.mockReturnValue({
+        data: {
+          id: "ds",
+          name: "ds",
+          columnTypes,
+          count: 1640,
+          totalPages: 33,
+          page: 1,
+          datasetRecords: [
+            { id: "r1", entry: { input: "a", expected_output: "x" } },
+            { id: "r2", entry: { input: "b", expected_output: "y" } },
+          ],
+        },
+        isLoading: false,
+        refetch: vi.fn(),
       });
+      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
 
-      // The count reflects the PG-authoritative total (1,640), NOT the 3 loaded
-      // rows — and flags that the view is partial.
       await waitFor(() =>
         expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
-          "3 out of 1,640 records",
+          "1,640 records",
         ),
       );
-      // The explanation is keyboard/SR-reachable: the chip is focusable and
-      // exposes the full tooltip copy via aria-label (not hover-only).
-      const chip = screen.getByTestId("dataset-row-count");
-      expect(chip).toHaveAttribute("tabindex", "0");
-      expect(chip).toHaveAttribute(
-        "aria-label",
-        expect.stringContaining("too large to display in full"),
+      // Pagination replaced byte-cap truncation — no "X out of Y" partial notice.
+      expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent(
+        "out of",
       );
     });
   });
 
-  describe("when the read is not truncated", () => {
-    it("shows the plain total with no truncation notice", async () => {
-      renderSaved({
-        id: "dataset_small",
-        name: "small",
-        columnTypes,
-        count: 2,
-        truncated: false,
-        datasetRecords: [
-          { id: "r1", input: "a", expected_output: "x" },
-          { id: "r2", input: "b", expected_output: "y" },
-        ],
+  describe("when the dataset is empty", () => {
+    it("renders a single page, no pager, and never requests page 0", async () => {
+      // total 0 -> server totalPages 0. The page must floor at 1: requesting
+      // page 0 would fail the server's positive() guard and break the editor.
+      const requested: Array<number | undefined> = [];
+      const stable = {
+        data: {
+          id: "empty",
+          name: "empty",
+          columnTypes,
+          count: 0,
+          totalPages: 0,
+          page: 1,
+          datasetRecords: [],
+        },
+        isLoading: false,
+        refetch: vi.fn(),
+      };
+      getAllQuery.mockReset();
+      getAllQuery.mockImplementation((input: { page?: number }) => {
+        requested.push(input?.page);
+        return stable; // stable ref (like react-query) — avoids a reload loop
       });
+      render(<DatasetEditorTable datasetId="empty" />, { wrapper: Wrapper });
 
       await waitFor(() =>
         expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
-          "2 records",
+          "0 records",
         ),
       );
-      expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent(
-        "out of",
+      expect(screen.queryByTestId("pagination")).not.toBeInTheDocument();
+      // An empty dataset is its own last page, so the add-row stays available.
+      expect(screen.getByTestId("add-row")).toBeInTheDocument();
+      expect(requested).not.toContain(0);
+    });
+  });
+});
+
+// ── Pagination (classic page N of M) ─────────────────────────────────
+
+describe("given a saved dataset larger than one page", () => {
+  const TOTAL_PAGES = 3;
+  const COUNT = 150;
+
+  // Return a STABLE object reference per page, the way react-query does — an
+  // unstable ref every render would make the store-load effect re-run forever.
+  const renderPaged = () => {
+    const byPage = new Map<number, unknown>();
+    getAllQuery.mockReset();
+    getAllQuery.mockImplementation((input: { page?: number }) => {
+      const p = input?.page ?? 1;
+      if (!byPage.has(p)) {
+        byPage.set(p, {
+          data: {
+            id: "dataset_paged",
+            name: "paged",
+            columnTypes,
+            count: COUNT,
+            totalPages: TOTAL_PAGES,
+            page: p,
+            truncated: false,
+            datasetRecords: [
+              {
+                id: `p${p}r1`,
+                entry: { input: `page${p}-a`, expected_output: "x" },
+              },
+              {
+                id: `p${p}r2`,
+                entry: { input: `page${p}-b`, expected_output: "y" },
+              },
+            ],
+          },
+          isLoading: false,
+          refetch: vi.fn(),
+        });
+      }
+      return byPage.get(p);
+    });
+    return render(<DatasetEditorTable datasetId="dataset_paged" />, {
+      wrapper: Wrapper,
+    });
+  };
+
+  /** @scenario A dataset larger than one page shows the first page with a pager */
+  it("shows the first page, the pager, and the whole-dataset total", async () => {
+    renderPaged();
+    await waitFor(() =>
+      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
+        "Page 1 of 3",
+      ),
+    );
+    // Total reflects the whole dataset, not just the loaded page.
+    expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
+      "150 records",
+    );
+    expect(screen.getByTestId("pagination-prev")).toBeDisabled();
+    expect(screen.getByTestId("pagination-next")).toBeEnabled();
+    // The add-row affordance is not offered on an earlier, full page.
+    expect(screen.queryByTestId("add-row")).not.toBeInTheDocument();
+  });
+
+  /** @scenario Move between pages */
+  it("moves to the next page and back", async () => {
+    const user = userEvent.setup();
+    renderPaged();
+    await screen.findByTestId("pagination-indicator");
+
+    await user.click(screen.getByTestId("pagination-next"));
+    await waitFor(() =>
+      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
+        "Page 2 of 3",
+      ),
+    );
+    // The editor requested page 2 from the server (windowed read, not a slice).
+    expect(getAllQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ page: 2 }),
+      expect.anything(),
+    );
+
+    await user.click(screen.getByTestId("pagination-prev"));
+    await waitFor(() =>
+      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
+        "Page 1 of 3",
+      ),
+    );
+  });
+
+  describe("when the next page is still loading", () => {
+    /** @scenario Move between pages */
+    it("stays on the requested page instead of bouncing back to page 1", async () => {
+      // react-query holds the previous page's result while the next page's key
+      // loads (keepPreviousData), flagging it `isPreviousData: true`. Simulate
+      // that faithfully: page 2 is not yet "ready", so the hook returns page 1's
+      // data marked as held — the page count must NOT momentarily reset and snap
+      // navigation back to page 1, and the held data must not re-hydrate the
+      // store (the guard skips it). Stable refs per (page, held) so the
+      // store-load effect can't loop.
+      const ready = new Set([1]);
+      const fresh = new Map<number, unknown>();
+      const held = new Map<number, unknown>();
+      let lastReady = 1;
+      const pageResult = (p: number, isPreviousData: boolean) => ({
+        data: {
+          id: "dataset_paged",
+          name: "paged",
+          columnTypes,
+          count: 150,
+          totalPages: 3,
+          page: p,
+          datasetRecords: [
+            {
+              id: `p${p}r1`,
+              entry: { input: `page${p}-a`, expected_output: "x" },
+            },
+          ],
+        },
+        isLoading: false,
+        isPreviousData,
+        refetch: vi.fn(),
+      });
+      getAllQuery.mockReset();
+      getAllQuery.mockImplementation((input: { page?: number }) => {
+        const p = input?.page ?? 1;
+        if (ready.has(p)) {
+          lastReady = p;
+          if (!fresh.has(p)) fresh.set(p, pageResult(p, false));
+          return fresh.get(p);
+        }
+        // Previous page held while page p loads → flagged isPreviousData.
+        if (!held.has(lastReady))
+          held.set(lastReady, pageResult(lastReady, true));
+        return held.get(lastReady);
+      });
+
+      const user = userEvent.setup();
+      render(<DatasetEditorTable datasetId="dataset_paged" />, {
+        wrapper: Wrapper,
+      });
+      await waitFor(() =>
+        expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
+          "Page 1 of 3",
+        ),
       );
+
+      await user.click(screen.getByTestId("pagination-next"));
+      // Page 2 is still loading — the indicator must show page 2, not bounce to 1,
+      // and the last request must be for page 2.
+      await waitFor(() =>
+        expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
+          "Page 2 of 3",
+        ),
+      );
+      expect(
+        (getAllQuery.mock.calls.at(-1)![0] as { page?: number }).page,
+      ).toBe(2);
+    });
+  });
+
+  /** @scenario Edits on a page are saved to the right record */
+  it("saves an edit made on a later page to that page's own record", async () => {
+    updateMutate.mockImplementation(
+      (_args: unknown, opts?: { onSuccess?: () => void }) =>
+        opts?.onSuccess?.(),
+    );
+    const user = userEvent.setup();
+    renderPaged();
+    await screen.findByTestId("pagination-indicator");
+
+    // Move to page 2 first (no pending writes yet, so navigation is allowed),
+    // then edit its first cell.
+    await user.click(screen.getByTestId("pagination-next"));
+    await screen.findByText("page2-a");
+    await user.dblClick(screen.getByTestId("cell-0-input_0"));
+    const textarea = await screen.findByRole("textbox");
+    await user.clear(textarea);
+    await user.type(textarea, "edited{Enter}");
+
+    // The save targets the page-2 record by its own id — pagination binds edits
+    // per record, never by a positional slot within the page.
+    await waitFor(
+      () =>
+        expect(updateMutate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            datasetId: "dataset_paged",
+            recordId: "p2r1",
+            updatedRecord: expect.objectContaining({ input: "edited" }),
+          }),
+          expect.anything(),
+        ),
+      { timeout: 2000 },
+    );
+  });
+
+  /** @scenario A new row is added on the last page */
+  it("offers the add-row only once on the last page", async () => {
+    const user = userEvent.setup();
+    renderPaged();
+    await screen.findByTestId("pagination-indicator");
+    expect(screen.queryByTestId("add-row")).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId("pagination-next")); // page 2
+    await user.click(screen.getByTestId("pagination-next")); // page 3 (last)
+    await waitFor(() =>
+      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
+        "Page 3 of 3",
+      ),
+    );
+    expect(screen.getByTestId("add-row")).toBeInTheDocument();
+  });
+
+  /** @scenario Change how many rows are shown per page */
+  it("re-reads with the new limit and resets to page 1 when rows-per-page changes", async () => {
+    const user = userEvent.setup();
+    renderPaged();
+    await screen.findByTestId("pagination-indicator");
+
+    // The active size (default 50) is a no-op — disabled so it can't re-trigger
+    // the clear-selection / reset-to-page-1 / refetch path with no real change.
+    expect(screen.getByTestId("pagination-size-50")).toBeDisabled();
+
+    // Move off page 1 first so the reset-to-page-1 is observable.
+    await user.click(screen.getByTestId("pagination-next"));
+    await waitFor(() =>
+      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
+        "Page 2 of 3",
+      ),
+    );
+
+    // Switch to 100 rows per page. The page count is derived from
+    // count / pageSize, so 150 records collapse to 2 pages immediately, and the
+    // server is re-read with the new limit from page 1.
+    await user.click(screen.getByTestId("pagination-size-100"));
+    await waitFor(() =>
+      expect(screen.getByTestId("pagination-indicator")).toHaveTextContent(
+        "Page 1 of 2",
+      ),
+    );
+    const lastCall = getAllQuery.mock.calls.at(-1)![0] as {
+      page?: number;
+      limit?: number;
+    };
+    expect(lastCall.limit).toBe(100);
+    expect(lastCall.page).toBe(1);
+  });
+});
+
+// keepPreviousData (held for the pagination no-bounce) must NOT bleed one
+// dataset's rows into another when the editor is pointed at a different
+// datasetId while the previous result is still being served.
+describe("given the editor is switched to a different dataset", () => {
+  const datasetAResult = (isPreviousData: boolean) => ({
+    data: {
+      id: "dataset_a",
+      name: "A",
+      columnTypes,
+      count: 1,
+      totalPages: 1,
+      page: 1,
+      datasetRecords: [
+        { id: "a1", entry: { input: "alpha", expected_output: "x" } },
+      ],
+    },
+    isLoading: false,
+    // react-query sets this while keepPreviousData serves the prior key's data.
+    isPreviousData,
+    refetch: vi.fn(),
+  });
+
+  describe("when the previous dataset's data is still being served", () => {
+    // Regression: robustness of the keepPreviousData hold across a datasetId
+    // switch — not a feature scenario, so deliberately not @scenario-bound.
+    it("never hydrates the new dataset id with the previous dataset's rows", async () => {
+      updateMutate.mockImplementation(
+        (_args: unknown, opts?: { onSuccess?: () => void }) =>
+          opts?.onSuccess?.(),
+      );
+      getAllQuery.mockReset();
+      getAllQuery.mockReturnValue(datasetAResult(false));
+
+      const user = userEvent.setup();
+      const { rerender } = render(
+        <DatasetEditorTable datasetId="dataset_a" />,
+        { wrapper: Wrapper },
+      );
+      await screen.findByText("alpha");
+
+      // Point the editor at dataset B; keepPreviousData still serves A's rows
+      // (isPreviousData), so the grid keeps showing them until B settles.
+      getAllQuery.mockReturnValue(datasetAResult(true));
+      rerender(<DatasetEditorTable datasetId="dataset_b" />);
+
+      // Edit the held cell before B's own data arrives.
+      await user.dblClick(screen.getByTestId("cell-0-input_0"));
+      const textarea = await screen.findByRole("textbox");
+      await user.clear(textarea);
+      await user.type(textarea, "edited{Enter}");
+
+      await waitFor(() => expect(updateMutate).toHaveBeenCalled(), {
+        timeout: 2000,
+      });
+      // The write targets the dataset the rows actually belong to (A), never the
+      // newly-selected B — without the guard the store would be hydrated as
+      // B-id-with-A-rows and corrupt dataset B.
+      expect(updateMutate).not.toHaveBeenCalledWith(
+        expect.objectContaining({ datasetId: "dataset_b" }),
+        expect.anything(),
+      );
+    });
+  });
+});
+
+// Deleting rows shrinks the dataset, but only the current page lives in the
+// store, so the server total must be re-read — otherwise the pager keeps the
+// stale page count and can strand the user on a now-empty last page.
+describe("given rows are deleted from a paginated dataset", () => {
+  describe("when the deletion is saved", () => {
+    // Regression: post-delete count refresh — not a feature scenario.
+    it("refreshes the server total so the pager cannot strand an empty page", async () => {
+      deleteManyMutate.mockImplementation(
+        (_args: unknown, opts?: { onSuccess?: () => void }) =>
+          opts?.onSuccess?.(),
+      );
+      const refetchSpy = vi.fn();
+      getAllQuery.mockReset();
+      getAllQuery.mockReturnValue({
+        data: {
+          id: "dp",
+          name: "dp",
+          columnTypes,
+          count: 51,
+          totalPages: 2,
+          page: 1,
+          datasetRecords: [
+            { id: "r1", entry: { input: "a", expected_output: "x" } },
+            { id: "r2", entry: { input: "b", expected_output: "y" } },
+          ],
+        },
+        isLoading: false,
+        isPreviousData: false,
+        refetch: refetchSpy,
+      });
+
+      const user = userEvent.setup();
+      render(<DatasetEditorTable datasetId="dp" />, { wrapper: Wrapper });
+      await screen.findByText("a");
+
+      await user.click(screen.getByLabelText("Select row 1"));
+      await user.click(await screen.findByTestId("delete-selected-rows"));
+
+      // The editor re-reads the page (and thus the whole-dataset count) once the
+      // delete settles, instead of trusting the now-stale cached total.
+      await waitFor(() => expect(refetchSpy).toHaveBeenCalled(), {
+        timeout: 2000,
+      });
+    });
+  });
+
+  describe("when the delete commits but a later update in the batch fails", () => {
+    // Regression: count refresh must fire on batch settle via the error path
+    // too — not a feature scenario.
+    it("still refreshes the total — a committed delete must not be masked by an update error", async () => {
+      // Force the bug-triggering interleave: both ops are dispatched, the delete
+      // commits, and the update fails LAST — so the batch only reaches zero
+      // pending ops via the error path. The count refresh must fire from there
+      // too, or a committed delete leaves the pager count stale. (Settling the
+      // delete synchronously would hide the bug, since ops would hit zero on the
+      // delete's own success.)
+      let resolveDelete: (() => void) | undefined;
+      let rejectUpdate: ((e: { message: string }) => void) | undefined;
+      deleteManyMutate.mockImplementation(
+        (_args: unknown, opts?: { onSuccess?: () => void }) => {
+          resolveDelete = opts?.onSuccess;
+        },
+      );
+      updateMutate.mockImplementation(
+        (
+          _args: unknown,
+          opts?: { onError?: (e: { message: string }) => void },
+        ) => {
+          rejectUpdate = opts?.onError;
+        },
+      );
+      const refetchSpy = vi.fn();
+      getAllQuery.mockReset();
+      getAllQuery.mockReturnValue({
+        data: {
+          id: "dp",
+          name: "dp",
+          columnTypes,
+          count: 51,
+          totalPages: 2,
+          page: 1,
+          datasetRecords: [
+            { id: "r1", entry: { input: "a", expected_output: "x" } },
+            { id: "r2", entry: { input: "b", expected_output: "y" } },
+          ],
+        },
+        isLoading: false,
+        isPreviousData: false,
+        refetch: refetchSpy,
+      });
+
+      const user = userEvent.setup();
+      render(<DatasetEditorTable datasetId="dp" />, { wrapper: Wrapper });
+      await screen.findByText("a");
+
+      // Queue a delete (row 1) and an edit (row 2, now at index 0) into the same
+      // debounce batch.
+      await user.click(screen.getByLabelText("Select row 1"));
+      await user.click(await screen.findByTestId("delete-selected-rows"));
+      await user.dblClick(screen.getByTestId("cell-0-input_0"));
+      const textarea = await screen.findByRole("textbox");
+      await user.clear(textarea);
+      await user.type(textarea, "edited{Enter}");
+
+      // Both mutations dispatched; settle them delete-then-update so ops reaches
+      // zero through the error path.
+      await waitFor(() => {
+        expect(resolveDelete).toBeDefined();
+        expect(rejectUpdate).toBeDefined();
+      });
+      await act(async () => {
+        resolveDelete?.();
+        rejectUpdate?.({ message: "boom" });
+      });
+
+      expect(refetchSpy).toHaveBeenCalled();
     });
   });
 });
