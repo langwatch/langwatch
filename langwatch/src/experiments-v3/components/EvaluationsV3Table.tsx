@@ -287,6 +287,15 @@ export function EvaluationsV3Table({
   // Track pending mappings for new prompts (before they become targets)
   const pendingMappingsRef = useRef<Record<string, UIFieldMapping>>({});
 
+  // Track pairwise variant selections made inside the creation evaluatorEditor
+  // so handleSelectEvaluatorAsTarget can apply them on save instead of empty defaults.
+  const pendingPairwiseRef = useRef<{
+    variantA: string;
+    variantB: string;
+    goldenField: string;
+    includeMetrics: ("cost" | "duration")[];
+  } | null>(null);
+
   // Track target being switched (null when adding new, target ID when switching)
   const switchingTargetIdRef = useRef<string | null>(null);
 
@@ -397,7 +406,7 @@ export function EvaluationsV3Table({
         outputs,
         mappings: {},
         ...(isPairwiseEvaluator && {
-          pairwise: {
+          pairwise: pendingPairwiseRef.current ?? {
             variantA: "",
             variantB: "",
             goldenField: "",
@@ -405,10 +414,20 @@ export function EvaluationsV3Table({
           },
         }),
       };
+      pendingPairwiseRef.current = null;
       addOrReplaceTarget(targetConfig);
-      closeDrawer();
+      // For pairwise-as-target, open the PairwiseConfigForm immediately so the
+      // user can configure Variant A / Variant B / Golden field without having
+      // to find and click the target chip again.
+      if (isPairwiseEvaluator) {
+        // openTargetEditor reads fresh store state, so the target we just added
+        // is visible when the drawer opens.
+        void openTargetEditor(targetConfig);
+      } else {
+        closeDrawer();
+      }
     },
-    [addOrReplaceTarget, closeDrawer],
+    [addOrReplaceTarget, closeDrawer, openTargetEditor],
   );
 
   // Handler for when a prompt is selected from the drawer
@@ -794,6 +813,21 @@ export function EvaluationsV3Table({
     setFlowCallbacks("evaluatorList", {
       onSelect: handleSelectEvaluatorAsTarget,
     });
+    // Build pairwiseContext so TargetTypeSelectorDrawer can pass it to
+    // evaluatorEditor when "Pairwise Compare" is selected — this makes the
+    // creation form show Variant A / Variant B / Golden field immediately,
+    // matching the edit-mode experience (see #5195).
+    pendingPairwiseRef.current = null;
+    const state = useEvaluationsV3Store.getState();
+    const variantOptions = state.targets.filter((t) => t.type !== "evaluator");
+    const activeDs = state.datasets.find((d) => d.id === state.activeDatasetId);
+    const pairwiseContext = {
+      initialPairwise: undefined,
+      targets: variantOptions,
+      datasetColumns:
+        activeDs?.columns.map((c) => ({ id: c.id, name: c.name })) ?? [],
+    };
+
     // Set up flow callback for when a NEW evaluator is created during the target flow
     // This handles: add comparison > evaluator > create new > category > fill form > create
     setFlowCallbacks(
@@ -815,9 +849,12 @@ export function EvaluationsV3Table({
           handleSelectEvaluatorAsTarget(evaluator);
           return true; // Indicate navigation was handled to prevent default back behavior
         },
+        onPairwiseChange: (next) => {
+          pendingPairwiseRef.current = next;
+        },
       }),
     );
-    openDrawer("targetTypeSelector");
+    openDrawer("targetTypeSelector", { pairwiseContext });
   }, [
     buildAvailableSources,
     openDrawer,
@@ -1351,9 +1388,7 @@ export function EvaluationsV3Table({
           {
             id: `pairwise.${evaluatorId}`,
             header: (context) => {
-              const meta = context.table.options.meta as
-                | TableMeta
-                | undefined;
+              const meta = context.table.options.meta as TableMeta | undefined;
               const evaluator = meta?.evaluatorsMap.get(evaluatorId);
               return (
                 <HStack gap={1}>
@@ -1365,9 +1400,7 @@ export function EvaluationsV3Table({
             },
             cell: (info) => {
               if (info.row.original.isEmpty) return null;
-              const meta = info.table.options.meta as
-                | TableMeta
-                | undefined;
+              const meta = info.table.options.meta as TableMeta | undefined;
               const variantATarget = meta?.targetsMap.get(variantAId);
               const variantBTarget = meta?.targetsMap.get(variantBId);
               const rowData = info.row.original.targets[variantAId];
