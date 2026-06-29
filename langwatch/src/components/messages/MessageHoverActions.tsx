@@ -12,7 +12,6 @@ import type { Trace } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { getExtractedInput } from "../../utils/traceExtraction";
 
-import { toaster } from "../ui/toaster";
 import { Tooltip } from "../ui/tooltip";
 
 export const useTranslationState = () => {
@@ -109,15 +108,12 @@ export const MessageHoverActions = ({
         setTranslatedTextOutput(outputData.translation);
       })
       .catch(() => {
-        toaster.create({
-          title: "Error translating",
-          description:
-            "There was an error translating the message, please try again.",
-          type: "error",
-          meta: {
-            closable: true,
-          },
-        });
+        // Revert the optimistic toggle. We deliberately don't raise a
+        // toast here: the typed-error toasts (missing model / provider
+        // disabled / AI call failed) are raised by the global tRPC error
+        // handler in utils/api.tsx. A generic "please try again" toast at
+        // this layer would shadow that actionable message.
+        setTranslationActive(false);
       });
   };
 

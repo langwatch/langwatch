@@ -2,8 +2,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { PrismaClient } from "@prisma/client";
 import { translateRouter } from "../translate";
 import { createInnerTRPCContext } from "../../trpc";
+import { AiCallFailedError } from "../../../modelProviders/aiCallFailedError";
+import { ModelNotConfiguredError } from "../../../modelProviders/modelNotConfiguredError";
 
 // Regression: translate previously hardcoded openai("gpt-4-turbo"), ignoring project model config
+// Regression: translate previously rewrapped every failure in a generic
+// INTERNAL_SERVER_ERROR ("Check model provider configuration"), stripping
+// the typed cause so the frontend could only show "please try again". It
+// must now surface typed model errors so the global tRPC handler raises the
+// actionable toast (missing model / provider disabled / AI call failed).
 
 const mockGetVercelAIModel = vi.fn();
 vi.mock("../../../modelProviders/utils", () => ({
@@ -114,9 +121,10 @@ describe("translateRouter.translate()", () => {
   });
 
   describe("when the model call fails", () => {
-    it("throws a TRPCError with a generic message that hides upstream details", async () => {
-      const underlyingError = new Error("Invalid API key: FAKE_KEY_FOR_TESTING");
-      mockGenerateText.mockRejectedValue(underlyingError);
+    it("re-raises as BAD_REQUEST carrying a typed AI_CALL_FAILED cause so the frontend shows the actionable toast", async () => {
+      mockGenerateText.mockRejectedValue(
+        new Error("Invalid API key: FAKE_KEY_FOR_TESTING"),
+      );
 
       await expect(
         caller.translate({
@@ -124,45 +132,37 @@ describe("translateRouter.translate()", () => {
           textToTranslate: "Hola",
         }),
       ).rejects.toMatchObject({
-        code: "INTERNAL_SERVER_ERROR",
-        message:
-          "Failed to get translation. Check model provider configuration.",
+        code: "BAD_REQUEST",
+        cause: {
+          cause: "AI_CALL_FAILED",
+          featureKey: "translate.text",
+          // The provider message is surfaced (truncated) so the failure
+          // is diagnosable — the whole point of the fix.
+          originalErrorMessage:
+            expect.stringContaining("FAKE_KEY_FOR_TESTING"),
+        },
       });
     });
 
-    it("does not leak the upstream error message to the client", async () => {
-      const underlyingError = new Error("Invalid API key: FAKE_KEY_FOR_TESTING");
-      mockGenerateText.mockRejectedValue(underlyingError);
-
-      await expect(
-        caller.translate({
-          projectId: "project_abc123",
-          textToTranslate: "Hola",
-        }),
-      ).rejects.toMatchObject({
-        message: expect.not.stringContaining("FAKE_KEY_FOR_TESTING"),
-      });
-    });
-
-    it("includes the original error as cause for server-side debugging", async () => {
-      const underlyingError = new Error("Rate limit exceeded");
-      mockGenerateText.mockRejectedValue(underlyingError);
-
-      await expect(
-        caller.translate({
-          projectId: "project_abc123",
-          textToTranslate: "Hola",
-        }),
-      ).rejects.toMatchObject({
-        cause: underlyingError,
-      });
+    it("wraps generateText failures in AiCallFailedError before the middleware re-raises them", () => {
+      // Guard the discriminator the wire contract above depends on.
+      const err = new AiCallFailedError(
+        "translate.text",
+        "FAST",
+        "Inline translation",
+        "boom",
+      );
+      expect(err.cause).toBe("AI_CALL_FAILED");
     });
   });
 
-  describe("when getVercelAIModel fails", () => {
-    it("throws a TRPCError with a generic message and preserves cause", async () => {
-      const modelError = new Error(
-        "Model provider openai not configured or disabled for project",
+  describe("when the model cannot be resolved", () => {
+    it("propagates a typed MODEL_NOT_CONFIGURED cause to its own toast surface", async () => {
+      const modelError = new ModelNotConfiguredError(
+        "translate.text",
+        "FAST",
+        "Inline translation",
+        "project_abc123",
       );
       mockGetVercelAIModel.mockRejectedValue(modelError);
 
@@ -172,10 +172,11 @@ describe("translateRouter.translate()", () => {
           textToTranslate: "Hola",
         }),
       ).rejects.toMatchObject({
-        code: "INTERNAL_SERVER_ERROR",
-        message:
-          "Failed to get translation. Check model provider configuration.",
-        cause: modelError,
+        code: "BAD_REQUEST",
+        cause: {
+          cause: "MODEL_NOT_CONFIGURED",
+          featureKey: "translate.text",
+        },
       });
     });
   });
