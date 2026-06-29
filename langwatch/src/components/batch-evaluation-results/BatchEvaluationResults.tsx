@@ -211,7 +211,7 @@ export function BatchEvaluationResults({
       runId: selectedRunId ?? "",
     },
     {
-      enabled: !!selectedRunId,
+      enabled: !!project && !!experiment && !!selectedRunId,
       refetchInterval: runDataRefetchInterval,
     },
   );

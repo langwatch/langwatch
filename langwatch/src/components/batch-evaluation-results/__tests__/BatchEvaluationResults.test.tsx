@@ -19,7 +19,6 @@ import {
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Component, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExperimentRunWithItems } from "~/server/experiments-v3/services/types";
 import { BatchEvaluationResults } from "../BatchEvaluationResults";
@@ -902,42 +901,31 @@ describe.skip("BatchEvaluationResults Integration", () => {
 /**
  * Regression guard for issue #5196.
  *
- * The runs query (api.experiments.getExperimentBatchEvaluationRuns.useQuery)
- * must NOT fire until both `project` and `experiment` are resolved. Without an
- * `enabled` guard the query fires with an empty experimentId before the
- * experiment loads, and the backend returns 404 NOT_FOUND
- * ("Experiment not found: "). Two sibling call-sites already guard this the
- * same way (BatchEvaluationV2.tsx and experiments-v3 HistoryButton.tsx).
+ * Both batch-evaluation queries must NOT fire until `project` and `experiment`
+ * are resolved. Without an `enabled` guard they fire with an empty
+ * experimentId before the experiment loads, and the backend returns 404
+ * NOT_FOUND ("Experiment not found: "). Two sibling call-sites already guard
+ * the runs query the same way (BatchEvaluationV2.tsx and experiments-v3
+ * HistoryButton.tsx).
  *
- * These tests assert on the OPTIONS argument the component passes to useQuery
- * rather than on rendered output: the runs query is invoked early in render
- * (before any child renders), so its recorded call args are available even
- * though the full integration suite above is skipped due to an unrelated jsdom
- * render crash. The few hooks that run ahead of it (useLiteMemberGuard, the
- * router, useMultiRunData) are mocked above so render reaches the query; an
- * error boundary then guards against any later crash masking the assertion.
+ *   - getExperimentBatchEvaluationRuns (plural, "runs query"): guarded by
+ *     `!!project && !!experiment`.
+ *   - getExperimentBatchEvaluationRun (singular, "run-data query"): on a
+ *     deep-link (?runId=X) the selected run id resolves from the router/prop
+ *     BEFORE `experiment` loads, so `!!selectedRunId` alone is not enough — it
+ *     must also require `!!project && !!experiment`.
+ *
+ * These tests assert on the OPTIONS argument each query receives rather than on
+ * rendered output: both queries are invoked early in render (before any child
+ * renders), so their recorded call args are available even though the full
+ * integration suite above is skipped due to an unrelated jsdom render crash.
+ * The hooks that run ahead of them (useLiteMemberGuard, the router,
+ * useMultiRunData) are mocked above so render reaches both query call-sites.
  */
-class RenderBoundary extends Component<
-  { children: ReactNode },
-  { hasError: boolean }
-> {
-  state = { hasError: false };
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-  componentDidCatch() {
-    // Swallow: the runs-query hook has already been invoked by the time any
-    // downstream render error is thrown. We only care about its call args.
-  }
-  render() {
-    return this.state.hasError ? null : this.props.children;
-  }
-}
-
-describe("BatchEvaluationResults runs-query enabled guard (#5196)", () => {
+describe("given the BatchEvaluationResults batch-evaluation queries (#5196)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Benign loading state so the component does not depend on runs data.
+    // Benign loading state so the component does not depend on query data.
     vi.mocked(
       api.experiments.getExperimentBatchEvaluationRuns.useQuery,
     ).mockReturnValue({
@@ -962,7 +950,7 @@ describe("BatchEvaluationResults runs-query enabled guard (#5196)", () => {
     cleanup();
   });
 
-  /** Options object passed to the runs query on its first invocation. */
+  /** Options object passed to the runs (plural) query on its first invocation. */
   const runsQueryOptions = () => {
     const mock = vi.mocked(
       api.experiments.getExperimentBatchEvaluationRuns.useQuery,
@@ -971,42 +959,90 @@ describe("BatchEvaluationResults runs-query enabled guard (#5196)", () => {
     return mock.mock.calls[0]?.[1] as { enabled?: boolean } | undefined;
   };
 
-  it("disables the runs query when experiment is undefined", () => {
-    render(
-      <RenderBoundary>
-        <BatchEvaluationResults project={mockProject} experiment={undefined} />
-      </RenderBoundary>,
-      { wrapper: Wrapper },
+  /** Options object passed to the run-data (singular) query on first invocation. */
+  const runDataQueryOptions = () => {
+    const mock = vi.mocked(
+      api.experiments.getExperimentBatchEvaluationRun.useQuery,
     );
+    expect(mock).toHaveBeenCalled();
+    return mock.mock.calls[0]?.[1] as { enabled?: boolean } | undefined;
+  };
 
-    expect(runsQueryOptions()?.enabled).toBeFalsy();
+  describe("the runs query (getExperimentBatchEvaluationRuns, plural)", () => {
+    describe("when experiment is undefined", () => {
+      it("is disabled", () => {
+        render(
+          <BatchEvaluationResults
+            project={mockProject}
+            experiment={undefined}
+          />,
+          { wrapper: Wrapper },
+        );
+
+        expect(runsQueryOptions()?.enabled).toBeFalsy();
+      });
+    });
+
+    describe("when project is undefined", () => {
+      it("is disabled", () => {
+        render(
+          <BatchEvaluationResults
+            project={undefined}
+            experiment={mockExperiment}
+          />,
+          { wrapper: Wrapper },
+        );
+
+        expect(runsQueryOptions()?.enabled).toBeFalsy();
+      });
+    });
+
+    describe("when both project and experiment are set", () => {
+      it("is enabled", () => {
+        render(
+          <BatchEvaluationResults
+            project={mockProject}
+            experiment={mockExperiment}
+          />,
+          { wrapper: Wrapper },
+        );
+
+        expect(runsQueryOptions()?.enabled).toBe(true);
+      });
+    });
   });
 
-  it("disables the runs query when project is undefined", () => {
-    render(
-      <RenderBoundary>
-        <BatchEvaluationResults
-          project={undefined}
-          experiment={mockExperiment}
-        />
-      </RenderBoundary>,
-      { wrapper: Wrapper },
-    );
+  describe("the run-data query (getExperimentBatchEvaluationRun, singular)", () => {
+    describe("when deep-linked to a run before the experiment loads (experiment undefined, selectedRunId present)", () => {
+      it("is disabled", () => {
+        // Simulate ?runId=X resolving via the external prop before `experiment`
+        // is available: selectedRunId is truthy yet experiment is undefined.
+        render(
+          <BatchEvaluationResults
+            project={mockProject}
+            experiment={undefined}
+            selectedRunId="deep-linked-run"
+          />,
+          { wrapper: Wrapper },
+        );
 
-    expect(runsQueryOptions()?.enabled).toBeFalsy();
-  });
+        expect(runDataQueryOptions()?.enabled).toBeFalsy();
+      });
+    });
 
-  it("enables the runs query when both project and experiment are set", () => {
-    render(
-      <RenderBoundary>
-        <BatchEvaluationResults
-          project={mockProject}
-          experiment={mockExperiment}
-        />
-      </RenderBoundary>,
-      { wrapper: Wrapper },
-    );
+    describe("when project, experiment, and a selected run are all set", () => {
+      it("is enabled", () => {
+        render(
+          <BatchEvaluationResults
+            project={mockProject}
+            experiment={mockExperiment}
+            selectedRunId="swift-bright-fox"
+          />,
+          { wrapper: Wrapper },
+        );
 
-    expect(runsQueryOptions()?.enabled).toBe(true);
+        expect(runDataQueryOptions()?.enabled).toBe(true);
+      });
+    });
   });
 });
