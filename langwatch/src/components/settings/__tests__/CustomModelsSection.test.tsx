@@ -30,6 +30,7 @@ function buildState(
   overrides: Partial<UseModelProviderFormState> = {},
 ): UseModelProviderFormState {
   return {
+    isDirty: false,
     useApiGateway: false,
     customKeys: {},
     displayKeys: {},

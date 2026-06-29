@@ -1,9 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CustomModelEntry } from "../server/modelProviders/customModel.schema";
 import {
-  modelProviders as modelProvidersRegistry,
   type MaybeStoredModelProvider,
+  modelProviders as modelProvidersRegistry,
 } from "../server/modelProviders/registry";
+import {
+  hasUserEnteredNewApiKey,
+  hasUserModifiedNonApiKeyFields,
+} from "../utils/modelProviderHelpers";
 
 // Mirrors the server's deriveDefaultName. Kept here so the drawer can
 // pre-fill the input on open without an extra tRPC round trip.
@@ -15,7 +19,11 @@ function humanizeProviderName(providerKey: string): string {
     .replace(/_/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
-import { useCredentialKeys } from "./useCredentialKeys";
+
+import {
+  computeInitialUseApiGateway,
+  useCredentialKeys,
+} from "./useCredentialKeys";
 import { useCustomModels } from "./useCustomModels";
 import { useDefaultProviderSelection } from "./useDefaultProviderSelection";
 import { type ExtraHeader, useExtraHeaders } from "./useExtraHeaders";
@@ -95,6 +103,15 @@ export type UseModelProviderFormState = {
   errors: {
     customKeysRoot?: string;
   };
+  /**
+   * True when any user-editable form field differs from the loaded
+   * provider's initial values. Drives the Save button's disabled state
+   * so a drawer opened-and-immediately-saved no-op stays out of the
+   * mutation path entirely (and never produces a misleading "Updated"
+   * toast). Advanced (Gateway) fields live outside this hook, so the
+   * parent form ORs in its own advanced-draft dirty signal.
+   */
+  isDirty: boolean;
 };
 
 export type UseModelProviderFormActions = {
@@ -187,7 +204,7 @@ export function useModelProviderForm(
     ? "PROJECT"
     : scopes.some((s) => s.scopeType === "TEAM")
       ? "TEAM"
-      : scopes[0]?.scopeType ?? defaultNewScope;
+      : (scopes[0]?.scopeType ?? defaultNewScope);
 
   const scopeId =
     scopes.find((s) => s.scopeType === scopeType)?.scopeId ?? undefined;
@@ -265,6 +282,90 @@ export function useModelProviderForm(
     onError,
   });
 
+  // Dirty detection drives the Save button. Compared per-field so the
+  // helpers that already know about MASKED_KEY_PLACEHOLDER (api keys) are
+  // reused — a naive JSON.stringify of customKeys would always look dirty
+  // because the form shows the masked sentinel while the stored value is
+  // the real key.
+  const isDirty = useMemo(() => {
+    const initialName =
+      (provider as { name?: string }).name ??
+      humanizeProviderName(provider.provider);
+    if (name.trim() !== initialName.trim()) return true;
+
+    if (hasUserEnteredNewApiKey(credentialKeysHook.customKeys)) return true;
+    if (
+      hasUserModifiedNonApiKeyFields(
+        credentialKeysHook.customKeys,
+        credentialKeysHook.originalStoredKeysRef.current as Record<
+          string,
+          unknown
+        >,
+      )
+    ) {
+      return true;
+    }
+
+    if (
+      credentialKeysHook.useApiGateway !== computeInitialUseApiGateway(provider)
+    ) {
+      return true;
+    }
+
+    // Scope set: order-insensitive — two scopes added in different order
+    // shouldn't read as dirty.
+    const storedScopes: { scopeType: string; scopeId: string }[] =
+      provider.scopes && provider.scopes.length > 0
+        ? provider.scopes
+        : provider.scopeType && provider.scopeId
+          ? [{ scopeType: provider.scopeType, scopeId: provider.scopeId }]
+          : [];
+    const scopeSig = (xs: { scopeType: string; scopeId: string }[]) =>
+      xs
+        .map((s) => `${s.scopeType}|${s.scopeId}`)
+        .sort()
+        .join(",");
+    if (scopeSig(scopes) !== scopeSig(storedScopes)) return true;
+
+    // Headers and models: order-sensitive JSON compare. Reordering a list
+    // counts as dirty here, which matches user intent (the user dragged
+    // them on purpose).
+    if (
+      JSON.stringify(extraHeadersHook.extraHeaders) !==
+      JSON.stringify(provider.extraHeaders ?? [])
+    ) {
+      return true;
+    }
+    const providerWithModels = provider as {
+      customModels?: unknown;
+      customEmbeddingsModels?: unknown;
+    };
+    if (
+      JSON.stringify(customModelsHook.customModels) !==
+      JSON.stringify(providerWithModels.customModels ?? [])
+    ) {
+      return true;
+    }
+    if (
+      JSON.stringify(customModelsHook.customEmbeddingsModels) !==
+      JSON.stringify(providerWithModels.customEmbeddingsModels ?? [])
+    ) {
+      return true;
+    }
+
+    return false;
+  }, [
+    provider,
+    name,
+    credentialKeysHook.customKeys,
+    credentialKeysHook.originalStoredKeysRef,
+    credentialKeysHook.useApiGateway,
+    scopes,
+    extraHeadersHook.extraHeaders,
+    customModelsHook.customModels,
+    customModelsHook.customEmbeddingsModels,
+  ]);
+
   // --- Cross-hook coordination: gateway toggle wires credential keys → extra headers ---
   const handleGatewayToggle = useCallback(
     (useGateway: boolean) => {
@@ -329,6 +430,7 @@ export function useModelProviderForm(
       scopeType,
       isSaving: formSubmitHook.isSaving,
       errors: formSubmitHook.errors,
+      isDirty,
     },
     {
       setEnabled: formSubmitHook.setEnabled,
