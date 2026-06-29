@@ -1190,9 +1190,10 @@ export function EvaluationsV3Table({
       (e) =>
         e.evaluatorType === "langevals/pairwise_compare" &&
         e.pairwise?.variantA &&
-        e.pairwise?.variantB,
+        e.pairwise?.variantB &&
+        e.pairwise?.goldenField,
     )
-    .map((e) => e.id)
+    .map((e) => `${e.id}:${e.pairwise?.variantA}:${e.pairwise?.variantB}`)
     .join(",");
   const stablePairwiseEvaluators = useMemo(
     () =>
@@ -1200,7 +1201,8 @@ export function EvaluationsV3Table({
         (e) =>
           e.evaluatorType === "langevals/pairwise_compare" &&
           e.pairwise?.variantA &&
-          e.pairwise?.variantB,
+          e.pairwise?.variantB &&
+          e.pairwise?.goldenField,
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [pairwiseEvaluatorsKey],

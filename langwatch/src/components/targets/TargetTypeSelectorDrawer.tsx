@@ -97,8 +97,8 @@ export function TargetTypeSelectorDrawer(props: TargetTypeSelectorDrawerProps) {
         {
           evaluatorType: "langevals/pairwise_compare",
           category: "llm_judge",
-          pairwiseContext:
-            complexProps.pairwiseContext as TargetTypeSelectorDrawerProps["pairwiseContext"],
+          pairwiseContext: (complexProps.pairwiseContext ??
+            props.pairwiseContext) as TargetTypeSelectorDrawerProps["pairwiseContext"],
         },
         { replace: true },
       );
