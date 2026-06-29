@@ -74,7 +74,7 @@ markers = [
 [dependency-groups]
 dev = ["black>=26.3.1"]
 examples = [
-    "anthropic>=0.36.0,<0.37.0",
+    "anthropic>=0.36.0,<0.112.0",
     "chainlit>=2.11.1,<3",
     "cloudpickle>=3.1.1",
     "dspy-ai>=3.0.3,<4",
