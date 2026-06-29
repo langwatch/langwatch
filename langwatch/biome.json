@@ -6,7 +6,8 @@
 		"useIgnoreFile": true
 	},
 	"files": {
-		"ignoreUnknown": false
+		"ignoreUnknown": false,
+		"includes": ["**", "!src/server/modelProviders/llmModels.json"]
 	},
 	"formatter": {
 		"enabled": true,
