@@ -29,12 +29,14 @@ export const translateRouter = createTRPCRouter({
 
       // Don't wrap everything in a generic INTERNAL_SERVER_ERROR — that
       // strips the typed `cause` the frontend needs and the user only ever
-      // sees "please try again". Resolve the model OUTSIDE wrapAiCall so
-      // model-resolution failures (ModelNotConfiguredError /
-      // ModelProviderDisabledError) propagate untouched to their own toast
-      // surfaces via domainErrorMiddleware — wrapAiCall only passes
-      // ModelNotConfiguredError through, so wrapping resolution too would
-      // mis-tag a disabled provider as an AI_CALL_FAILED.
+      // sees "please try again". Resolve the model OUTSIDE wrapAiCall: the
+      // cascade resolver (resolveModelForFeature) throws the typed
+      // ModelNotConfiguredError when nothing is set and
+      // ModelProviderDisabledError when the resolved FAST model's provider
+      // is disabled, and both must reach domainErrorMiddleware untouched to
+      // open their own toasts. wrapAiCall only passes ModelNotConfiguredError
+      // through, so resolving inside it would mis-tag a disabled provider as
+      // an AI_CALL_FAILED.
       const model = await getVercelAIModel({
         projectId: input.projectId,
         featureKey: TRANSLATE_FEATURE_KEY,

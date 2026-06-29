@@ -1,9 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { PrismaClient } from "@prisma/client";
-import { translateRouter } from "../translate";
-import { createInnerTRPCContext } from "../../trpc";
-import { AiCallFailedError } from "../../../modelProviders/aiCallFailedError";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ModelNotConfiguredError } from "../../../modelProviders/modelNotConfiguredError";
+import { createInnerTRPCContext, errorFormatterForTesting } from "../../trpc";
+import { translateRouter } from "../translate";
 
 // Regression: translate previously hardcoded openai("gpt-4-turbo"), ignoring project model config
 // Regression: translate previously rewrapped every failure in a generic
@@ -121,38 +120,31 @@ describe("translateRouter.translate()", () => {
   });
 
   describe("when the model call fails", () => {
-    it("re-raises as BAD_REQUEST carrying a typed AI_CALL_FAILED cause so the frontend shows the actionable toast", async () => {
+    it("re-raises as BAD_REQUEST and serialises a typed AI_CALL_FAILED cause the toast can read", async () => {
       mockGenerateText.mockRejectedValue(
         new Error("Invalid API key: FAKE_KEY_FOR_TESTING"),
       );
 
-      await expect(
-        caller.translate({
-          projectId: "project_abc123",
-          textToTranslate: "Hola",
-        }),
-      ).rejects.toMatchObject({
-        code: "BAD_REQUEST",
-        cause: {
-          cause: "AI_CALL_FAILED",
-          featureKey: "translate.text",
-          // The provider message is surfaced (truncated) so the failure
-          // is diagnosable — the whole point of the fix.
-          originalErrorMessage:
-            expect.stringContaining("FAKE_KEY_FOR_TESTING"),
-        },
-      });
-    });
+      const error = await caller
+        .translate({ projectId: "project_abc123", textToTranslate: "Hola" })
+        .then(() => null)
+        .catch((e: unknown) => e);
 
-    it("wraps generateText failures in AiCallFailedError before the middleware re-raises them", () => {
-      // Guard the discriminator the wire contract above depends on.
-      const err = new AiCallFailedError(
-        "translate.text",
-        "FAST",
-        "Inline translation",
-        "boom",
-      );
-      expect(err.cause).toBe("AI_CALL_FAILED");
+      expect(error).toMatchObject({ code: "BAD_REQUEST" });
+
+      // Assert the *serialised* wire shape (error.data.cause) the frontend
+      // extractor in utils/trpcError.ts::extractAiCallFailedInfo reads — not
+      // the raw class property — so this fails if the formatter stops
+      // emitting the field the toast consumes.
+      const wire = errorFormatterForTesting({
+        shape: { data: {} },
+        error: error as { cause?: unknown },
+      });
+      expect(wire.data.cause).toMatchObject({
+        code: "AI_CALL_FAILED",
+        featureKey: "translate.text",
+        errorMessage: expect.stringContaining("FAKE_KEY_FOR_TESTING"),
+      });
     });
   });
 
