@@ -637,12 +637,13 @@ export const runEvaluation = async ({
   let response;
   try {
     // Preserve evaluator-specific fields (e.g. pairwise's candidate_a_id,
-    // candidate_a_output, etc.) that the legacy canonical-6 forward
-    // would otherwise strip. The langevals Python evaluator validates
-    // its own typed fields against this body, so any input it requires
-    // must reach it verbatim. The canonical 6 are normalized below; the
-    // rest pass through as-is. Without this spread the pairwise judge
-    // 500s with "Internal error" because data.candidate_a_id is None.
+    // candidate_a_output) that the legacy canonical-6 forward would
+    // otherwise strip. Bounded to the evaluator's declared required +
+    // optional fields so a stray mapping output on a non-pairwise
+    // evaluator can't ride through and 422 a strict pydantic model on
+    // the langevals side — the spread is opt-in per evaluator, not a
+    // catch-all. The canonical 6 are normalized below; everything else
+    // listed in the evaluator's contract passes through as-is.
     const canonicalKeys = new Set([
       "input",
       "output",
@@ -651,9 +652,15 @@ export const runEvaluation = async ({
       "expected_output",
       "conversation",
     ]);
+    const allowedExtras = new Set([
+      ...(evaluator.requiredFields ?? []),
+      ...(evaluator.optionalFields ?? []),
+    ]);
     const extras: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(data.data)) {
-      if (!canonicalKeys.has(key)) extras[key] = value;
+      if (canonicalKeys.has(key)) continue;
+      if (!allowedExtras.has(key)) continue;
+      extras[key] = value;
     }
     response = await stagedLangevalsFetch({
       url: `${env.LANGEVALS_ENDPOINT}/${builtInEvaluatorType}/evaluate`,

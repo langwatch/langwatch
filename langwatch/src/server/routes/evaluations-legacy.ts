@@ -158,7 +158,9 @@ secured
             ...value,
             name: evaluatorTempNameMap[value.name] ?? value.name,
             settings_json_schema: zodToJsonSchema(
-              // @ts-ignore
+              // @ts-expect-error `key` indexes the union of every evaluator
+              // type, so `.shape.settings` resolves to a heterogeneous union
+              // that zodToJsonSchema accepts at runtime but TS can't narrow.
               evaluatorsSchema.shape[key].shape.settings,
             ),
           },
@@ -562,12 +564,13 @@ export const getEvaluatorDataForParams = (
   });
 
   // Preserve evaluator-specific fields (e.g. pairwise's candidate_a_id /
-  // candidate_a_output) that the legacy default schema doesn't know
-  // about. Without this, `defaultEvaluatorInputSchema.parse` silently
-  // strips them and the downstream required-field check on the evaluator
-  // definition rejects the call with "<field> is required for <name>
-  // evaluator". The canonical 6 fields (input/output/contexts/...) are
-  // normalized below; everything else passes through as-is.
+  // candidate_a_output) that the legacy default schema strips. Bounded
+  // to the evaluator's declared required + optional fields so a stray
+  // mapping output on a non-pairwise evaluator can't ride through and
+  // trip a strict pydantic model on the langevals side — the spread is
+  // opt-in per evaluator, not a catch-all. The canonical 6 fields are
+  // normalized below; everything else listed in the evaluator's
+  // contract passes through as-is.
   const canonicalKeys = new Set([
     "input",
     "output",
@@ -576,9 +579,16 @@ export const getEvaluatorDataForParams = (
     "expected_contexts",
     "conversation",
   ]);
+  const evaluatorContract = AVAILABLE_EVALUATORS[checkType as EvaluatorTypes];
+  const allowedExtras = new Set([
+    ...(evaluatorContract?.requiredFields ?? []),
+    ...(evaluatorContract?.optionalFields ?? []),
+  ]);
   const extras: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(params)) {
-    if (!canonicalKeys.has(key)) extras[key] = value;
+    if (canonicalKeys.has(key)) continue;
+    if (!allowedExtras.has(key)) continue;
+    extras[key] = value;
   }
 
   return {
