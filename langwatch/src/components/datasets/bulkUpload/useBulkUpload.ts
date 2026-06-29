@@ -10,7 +10,7 @@
  */
 import { nanoid } from "nanoid";
 import { useCallback, useRef, useState } from "react";
-import type { DatasetColumns } from "~/server/datasets/types";
+import type { DatasetConfirmColumns } from "~/server/datasets/types";
 import { detectFileFormat } from "~/server/datasets/upload-utils";
 import { retryDatasetNormalize } from "../services/directUpload";
 import { parseHeaderColumns } from "../utils/parseHeaderColumns";
@@ -46,9 +46,11 @@ export type BulkFile = {
   /** Proposed dataset name (deduped within the batch). */
   name: string;
   /** Parsed header columns; null = header unreadable → columns derived server-side. */
-  columns: DatasetColumns | null;
-  /** Confirmed columns (defaults to `columns`); sent to the server's normalize. */
-  columnTypes: DatasetColumns | null;
+  columns: DatasetConfirmColumns | null;
+  /** Confirmed columns (defaults to `columns`); sent to the server's normalize.
+   *  Carries each column's immutable `sourceHeader` so the confirm UI can
+   *  rename + drag-reorder without breaking the header→column binding. */
+  columnTypes: DatasetConfirmColumns | null;
   status: BulkFileStatus;
   datasetId?: string;
   error?: string;
@@ -75,8 +77,10 @@ const isSupportedType = (file: File): boolean => {
 /** Parse `files` headers with a small concurrency so a large drop stays smooth. */
 const parseHeaders = async (
   files: File[],
-): Promise<(DatasetColumns | null)[]> => {
-  const results: (DatasetColumns | null)[] = new Array(files.length).fill(null);
+): Promise<(DatasetConfirmColumns | null)[]> => {
+  const results: (DatasetConfirmColumns | null)[] = new Array(
+    files.length,
+  ).fill(null);
   let cursor = 0;
   const lane = async (): Promise<void> => {
     const i = cursor++;
@@ -152,7 +156,8 @@ export function useBulkUpload(projectId: string | undefined) {
   }, []);
 
   const setColumnTypes = useCallback(
-    (id: string, columnTypes: DatasetColumns) => update(id, { columnTypes }),
+    (id: string, columnTypes: DatasetConfirmColumns) =>
+      update(id, { columnTypes }),
     [update],
   );
 
@@ -310,7 +315,7 @@ export function useBulkUpload(projectId: string | undefined) {
 
 const makeRejected = (
   file: File,
-  columns: DatasetColumns | null,
+  columns: DatasetConfirmColumns | null,
   reason: "unsupported" | "too-large",
 ): BulkFile => ({
   id: nanoid(),

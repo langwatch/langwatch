@@ -19,8 +19,8 @@
 
 import Papa from "papaparse";
 import type {
-  DatasetColumns,
   DatasetColumnType,
+  DatasetConfirmColumns,
 } from "~/server/datasets/types";
 import {
   dedupeHeaders,
@@ -38,11 +38,14 @@ export const HEADER_PARSE_MAX_BYTES = 256 * 1024;
 
 const DEFAULT_TYPE: DatasetColumnType = "string";
 
-/** Wrap raw header names as default-`string` columns (the user picks types). */
+/** Wrap raw header names as default-`string` columns (the user picks types).
+ *  `sourceHeader` is the canonical header itself, captured immutably so the
+ *  confirm UI can rename/reorder while normalize still binds each file header
+ *  to its column by header (not by position). */
 const toColumns = (
   rawHeaders: string[],
   format: FileFormat,
-): DatasetColumns => {
+): DatasetConfirmColumns => {
   // CSV maps rows to objects by index, so duplicate headers must be deduped the
   // same way normalize does; JSON/JSONL keys are already unique (an object can't
   // repeat a key) so only reserved-renaming applies — mirroring the job exactly.
@@ -52,7 +55,7 @@ const toColumns = (
       : renameReservedColumns(rawHeaders);
   return canonical
     .filter((name) => name.trim() !== "")
-    .map((name) => ({ name, type: DEFAULT_TYPE }));
+    .map((name) => ({ name, type: DEFAULT_TYPE, sourceHeader: name }));
 };
 
 /** First non-empty line of a (possibly truncated) text slice. */
@@ -97,7 +100,7 @@ const keysOf = (value: unknown): string[] | null =>
 
 export async function parseHeaderColumns(
   file: File,
-): Promise<DatasetColumns | null> {
+): Promise<DatasetConfirmColumns | null> {
   let format: FileFormat;
   try {
     format = detectFileFormat(file.name);

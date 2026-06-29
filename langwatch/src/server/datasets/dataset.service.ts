@@ -60,6 +60,7 @@ import { datasetDisplayRecordCount } from "./record-count";
 import { stripNullBytes } from "./sanitize";
 import type {
   DatasetColumns,
+  DatasetConfirmColumns,
   DatasetRecordEntry,
   DatasetRecordInput,
 } from "./types";
@@ -1356,11 +1357,16 @@ export class DatasetService {
     filename: string;
     /**
      * User-confirmed columns from the upload confirm step (ADR-032 v19): the
-     * normalize job renames + type-converts each record to match. Omitted by
-     * non-UI callers (SDK / REST / API key) that don't run the confirm step —
-     * normalize then derives all-`string` columns as before.
+     * normalize job binds each file header to its column and renames +
+     * type-converts each record to match. The confirm UI sends the richer shape
+     * carrying each column's immutable `sourceHeader` (reorder/rename-safe
+     * binding); legacy callers may send the bare name+type shape (normalize then
+     * falls back to positional binding). Omitted by non-UI callers (SDK / REST /
+     * API key) that don't run the confirm step — normalize then derives
+     * all-`string` columns as before. Stored transiently on the row; normalize
+     * strips `sourceHeader` and persists a clean `DatasetColumns`.
      */
-    columnTypes?: DatasetColumns;
+    columnTypes?: DatasetConfirmColumns | DatasetColumns;
   }): Promise<{
     datasetId: string;
     slug: string;

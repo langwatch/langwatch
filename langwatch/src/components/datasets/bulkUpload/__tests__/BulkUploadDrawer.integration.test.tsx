@@ -11,7 +11,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import type { DatasetColumns } from "~/server/datasets/types";
+import type { DatasetConfirmColumns } from "~/server/datasets/types";
 
 const requestDirectUpload = vi.fn();
 const putFileToPresignedUrl = vi.fn();
@@ -63,9 +63,13 @@ vi.mock("~/utils/api", () => ({
 
 import { BulkUploadDrawer } from "../BulkUploadDrawer";
 
-const twoCols: DatasetColumns = [
-  { name: "a", type: "string" },
-  { name: "b", type: "string" },
+// Faithful to what `parseHeaderColumns` actually returns: each column carries
+// its immutable `sourceHeader` (the canonical header it was parsed from), which
+// is the key the confirm UI binds rename/retype/reorder to — without it,
+// `setBySource` would match every column at once.
+const twoCols: DatasetConfirmColumns = [
+  { name: "a", type: "string", sourceHeader: "a" },
+  { name: "b", type: "string", sourceHeader: "b" },
 ];
 
 const csv = (name: string) =>
@@ -204,7 +208,10 @@ describe("given the bulk upload drawer", () => {
 
       const nameInput = await screen.findByLabelText("Column 1 name");
       expect(nameInput).toHaveValue("a");
-      expect(screen.getByLabelText("Column 1 type")).toHaveValue("string");
+      // The type picker is the styled Select (icon + label), defaulting to text.
+      expect(screen.getByLabelText("Column 1 type")).toHaveTextContent(
+        /string/i,
+      );
       // Editing happens in place — no separate dialog/drawer with a Save button.
       expect(
         screen.queryByRole("button", { name: /^save$/i }),
@@ -259,17 +266,99 @@ describe("given the bulk upload drawer", () => {
         expect(screen.getByText(/confirm types/i)).toBeInTheDocument(),
       );
       await user.click(screen.getByText(/confirm types/i));
-      await user.selectOptions(
-        await screen.findByLabelText("Column 1 type"),
-        "number",
-      );
+      // Open the styled type Select and pick "Number" from the option list.
+      await user.click(await screen.findByLabelText("Column 1 type"));
+      await user.click(await screen.findByRole("option", { name: /number/i }));
       await user.click(uploadButton());
 
       await waitFor(() => expect(requestDirectUpload).toHaveBeenCalled());
+      // Each column carries its immutable sourceHeader so normalize can bind by
+      // header (the reorder-safe contract).
       expect(requestDirectUpload.mock.calls[0]![0].columnTypes).toEqual([
-        { name: "a", type: "number" },
-        { name: "b", type: "string" },
+        { name: "a", type: "number", sourceHeader: "a" },
+        { name: "b", type: "string", sourceHeader: "b" },
       ]);
+    });
+
+    /** @scenario Columns can be dragged to reorder before uploading */
+    it("offers a drag handle on every confirm column", async () => {
+      const user = userEvent.setup();
+      render_();
+      await user.upload(fileInput(), [csv("data.csv")]);
+      await waitFor(() =>
+        expect(screen.getByText(/confirm types/i)).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText(/confirm types/i));
+
+      // One grip per column, labelled for keyboard/AT users — the drag affordance
+      // is wired without swallowing the name input / type select.
+      expect(
+        await screen.findByLabelText("Drag to reorder a"),
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText("Drag to reorder b")).toBeInTheDocument();
+    });
+
+    /** @scenario A column can be excluded before uploading */
+    it("excludes a column and omits it from the uploaded columnTypes", async () => {
+      const user = userEvent.setup();
+      render_();
+      await user.upload(fileInput(), [csv("data.csv")]);
+      await waitFor(() =>
+        expect(screen.getByText(/confirm types/i)).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText(/confirm types/i));
+
+      // Each column has an exclude control; dropping "a" leaves only "b".
+      await user.click(await screen.findByLabelText("Exclude a"));
+      expect(screen.queryByLabelText("Column 1 name")).toHaveValue("b");
+
+      await user.click(uploadButton());
+      await waitFor(() => expect(requestDirectUpload).toHaveBeenCalled());
+      expect(requestDirectUpload.mock.calls[0]![0].columnTypes).toEqual([
+        { name: "b", type: "string", sourceHeader: "b" },
+      ]);
+    });
+
+    /** @scenario A column can be excluded before uploading */
+    it("never lets the user exclude the last remaining column", async () => {
+      const user = userEvent.setup();
+      render_();
+      await user.upload(fileInput(), [csv("data.csv")]);
+      await waitFor(() =>
+        expect(screen.getByText(/confirm types/i)).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText(/confirm types/i));
+
+      // Drop one of the two columns; the survivor's exclude control is disabled
+      // (a zero-column dataset is invalid).
+      await user.click(await screen.findByLabelText("Exclude a"));
+      expect(await screen.findByLabelText("Exclude b")).toBeDisabled();
+    });
+
+    it("blocks upload while two columns share a name, and re-enables once fixed", async () => {
+      const user = userEvent.setup();
+      render_();
+      await user.upload(fileInput(), [csv("data.csv")]);
+      await waitFor(() =>
+        expect(screen.getByText(/confirm types/i)).toBeInTheDocument(),
+      );
+      await user.click(screen.getByText(/confirm types/i));
+
+      // Rename the second column onto the first's name — normalize would collide
+      // their values, so the upload must be blocked until it's resolved.
+      const second = await screen.findByLabelText("Column 2 name");
+      await user.clear(second);
+      await user.type(second, "a");
+
+      await waitFor(() => expect(uploadButton()).toBeDisabled());
+      expect(
+        screen.getAllByText(/column names must be unique/i).length,
+      ).toBeGreaterThan(0);
+
+      // Resolve the collision → the gate clears.
+      await user.clear(second);
+      await user.type(second, "b");
+      await waitFor(() => expect(uploadButton()).toBeEnabled());
     });
 
     /** @scenario Files that share a name become distinct datasets */

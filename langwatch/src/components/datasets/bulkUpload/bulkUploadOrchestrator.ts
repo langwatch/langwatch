@@ -13,7 +13,7 @@
  * Both take their collaborators as injected deps so tests drive them with fakes.
  */
 
-import type { DatasetColumns } from "~/server/datasets/types";
+import type { DatasetConfirmColumns } from "~/server/datasets/types";
 import {
   abortPendingUpload,
   DatasetNameConflictError,
@@ -84,7 +84,7 @@ export async function uploadSingleFile(
     projectId: string;
     name: string;
     file: File;
-    columnTypes?: DatasetColumns;
+    columnTypes?: DatasetConfirmColumns;
     signal?: AbortSignal;
     /** Produce the next candidate name when the current one conflicts. */
     nextName: (current: string) => string;

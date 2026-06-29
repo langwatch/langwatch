@@ -8,16 +8,38 @@
 import {
   Box,
   Button,
+  chakra,
   Heading,
   HStack,
+  Icon,
   Input,
-  NativeSelect,
   Spacer,
   Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  DragOverlay,
+  type DragStartEvent,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical, Trash2 } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   AlertTriangle,
   CheckCircle,
@@ -28,8 +50,13 @@ import {
 } from "react-feather";
 import { formatFileSize } from "react-papaparse";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { DatasetColumns } from "~/server/datasets/types";
+import type { DatasetConfirmColumns } from "~/server/datasets/types";
 import { api } from "~/utils/api";
+import { ColumnTypeIcon } from "../../shared/ColumnTypeIcon";
+import {
+  COLUMN_TYPE_OPTIONS,
+  ColumnTypeSelect,
+} from "../../shared/ColumnTypeSelect";
 import { Drawer } from "../../ui/drawer";
 import {
   DROPZONE_DOTTED_STYLE,
@@ -37,17 +64,9 @@ import {
   dropzoneSurfaceProps,
   RAINBOW_TEXT_CSS,
 } from "../datasetDropzoneStyles";
+import { reorderColumnsBySourceHeader } from "./columnReorder";
+import { invalidColumnNameKeys } from "./columnValidation";
 import { type BulkFile, useBulkUpload } from "./useBulkUpload";
-
-const COLUMN_TYPE_OPTIONS = [
-  "string",
-  "number",
-  "boolean",
-  "date",
-  "list",
-  "json",
-  "image",
-] as const;
 
 // Visually hidden but kept in the tab order (not display:none) so the picker is
 // reachable + operable by keyboard.
@@ -63,50 +82,280 @@ const SR_ONLY_INPUT: React.CSSProperties = {
   border: 0,
 };
 
-/** Inline, compact column-type list for one file: rename + retype only (the
- *  confirmed columns must stay positionally 1:1 with the file's headers — no
- *  add/remove). */
+/** Inline, compact column list for one file: rename, retype, drag-reorder, and
+ *  exclude. Adding columns the file lacks is impossible (no data to back them);
+ *  excluding is allowed down to the last column. Each column carries an immutable
+ *  `sourceHeader`, so the normalize job binds values by header (not array
+ *  position) and drops the headers absent from this list — see
+ *  `DatasetConfirmColumns`. The grip is the only drag affordance, so the name
+ *  input + type select stay fully interactive. */
 function BulkColumnFields({
   columnTypes,
   onChange,
 }: {
-  columnTypes: DatasetColumns;
-  onChange: (next: DatasetColumns) => void;
+  columnTypes: DatasetConfirmColumns;
+  onChange: (next: DatasetConfirmColumns) => void;
 }) {
-  const setAt = (index: number, patch: Partial<DatasetColumns[number]>) =>
-    onChange(columnTypes.map((c, i) => (i === index ? { ...c, ...patch } : c)));
+  // Drag only starts past a small threshold, so a click into the name input
+  // (or the type select) is never swallowed as a drag.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    // Keyboard reorder: focus a grip, Space to pick up, arrows to move, Space to
+    // drop — so the list is operable without a pointer.
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+  // The row currently being dragged — rendered in a DragOverlay so it floats
+  // above (and is never clipped by) the drawer's scroll container.
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const activeColumn =
+    columnTypes.find((c) => c.sourceHeader === activeId) ?? null;
+
+  // Columns whose name is blank or duplicated — flagged inline and blocking the
+  // upload, since normalize would otherwise drop/collide their values.
+  const invalidKeys = invalidColumnNameKeys(columnTypes);
+
+  const setBySource = (
+    sourceHeader: string,
+    patch: Partial<DatasetConfirmColumns[number]>,
+  ) =>
+    onChange(
+      columnTypes.map((c) =>
+        c.sourceHeader === sourceHeader ? { ...c, ...patch } : c,
+      ),
+    );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveId(null);
+    const { active, over } = event;
+    if (!over) return;
+    const next = reorderColumnsBySourceHeader({
+      columns: columnTypes,
+      activeSourceHeader: String(active.id),
+      overSourceHeader: String(over.id),
+    });
+    if (next !== columnTypes) onChange(next);
+  };
 
   return (
-    <VStack align="stretch" gap={2} width="full" paddingTop={2}>
-      {columnTypes.map((col, index) => (
-        <HStack key={index} gap={2} width="full">
-          <Input
-            size="sm"
-            value={col.name}
-            aria-label={`Column ${index + 1} name`}
-            onChange={(e) => setAt(index, { name: e.target.value })}
-          />
-          <NativeSelect.Root size="sm" width="40">
-            <NativeSelect.Field
-              value={col.type}
-              aria-label={`Column ${index + 1} type`}
-              onChange={(e) =>
-                setAt(index, {
-                  type: e.target.value as DatasetColumns[number]["type"],
-                })
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={(event: DragStartEvent) =>
+        setActiveId(String(event.active.id))
+      }
+      onDragEnd={handleDragEnd}
+      onDragCancel={() => setActiveId(null)}
+    >
+      <SortableContext
+        items={columnTypes.map((c) => c.sourceHeader)}
+        strategy={verticalListSortingStrategy}
+      >
+        <VStack align="stretch" gap={2} width="full" paddingTop={2}>
+          {columnTypes.map((col, index) => (
+            <SortableColumnRow
+              key={col.sourceHeader}
+              col={col}
+              index={index}
+              invalid={invalidKeys.has(col.sourceHeader)}
+              onName={(name) => setBySource(col.sourceHeader, { name })}
+              onType={(type) => setBySource(col.sourceHeader, { type })}
+              // Exclude this column: drop it from the confirmed list so normalize
+              // omits it from every record + columnTypes. The last column can't
+              // be removed (a 0-column dataset is invalid).
+              onRemove={
+                columnTypes.length > 1
+                  ? () =>
+                      onChange(
+                        columnTypes.filter(
+                          (c) => c.sourceHeader !== col.sourceHeader,
+                        ),
+                      )
+                  : undefined
               }
-            >
-              {COLUMN_TYPE_OPTIONS.map((t) => (
-                <option key={t} value={t}>
-                  {t === "image" ? "image (URL)" : t}
-                </option>
-              ))}
-            </NativeSelect.Field>
-            <NativeSelect.Indicator />
-          </NativeSelect.Root>
-        </HStack>
-      ))}
+            />
+          ))}
+        </VStack>
+      </SortableContext>
+      {/* The lifted copy. DragOverlay is `position: fixed`; rendered inline it
+          resolves "fixed" against the drawer's transformed ancestor (the Chakra
+          slide-in transform), which offsets the lifted row to the right by the
+          drawer's left edge. Portaling to <body> makes it track the cursor and
+          also escapes the drawer's overflow clipping. */}
+      {typeof document !== "undefined" &&
+        createPortal(
+          <DragOverlay>
+            {activeColumn ? <ColumnDragOverlayRow col={activeColumn} /> : null}
+          </DragOverlay>,
+          document.body,
+        )}
+    </DndContext>
+  );
+}
+
+/** One draggable confirm-column row: grip handle + name input + type select.
+ *  While being dragged it dims in place to a placeholder — the lifted copy is
+ *  rendered by the DragOverlay (see {@link ColumnDragOverlayRow}). */
+function SortableColumnRow({
+  col,
+  index,
+  invalid,
+  onName,
+  onType,
+  onRemove,
+}: {
+  col: DatasetConfirmColumns[number];
+  index: number;
+  /** Name is blank or collides with another column — flagged + blocks upload. */
+  invalid?: boolean;
+  onName: (name: string) => void;
+  onType: (type: DatasetConfirmColumns[number]["type"]) => void;
+  /** Exclude this column. Undefined when it's the last one (can't drop it). */
+  onRemove?: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: col.sourceHeader });
+
+  return (
+    <VStack
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Translate.toString(transform),
+        transition,
+        opacity: isDragging ? 0.4 : 1,
+      }}
+      align="stretch"
+      gap={1}
+      width="full"
+    >
+      <HStack gap={2} width="full" paddingX={1}>
+        <Box
+          {...attributes}
+          {...(listeners ?? {})}
+          display="inline-flex"
+          alignItems="center"
+          justifyContent="center"
+          color="fg.subtle"
+          cursor="grab"
+          _active={{ cursor: "grabbing" }}
+          aria-label={`Drag to reorder ${col.name}`}
+          title="Drag to reorder"
+        >
+          <Icon boxSize="16px">
+            <GripVertical />
+          </Icon>
+        </Box>
+        <Input
+          size="sm"
+          value={col.name}
+          aria-label={`Column ${index + 1} name`}
+          aria-invalid={invalid || undefined}
+          borderColor={invalid ? "red.400" : undefined}
+          _focusVisible={invalid ? { borderColor: "red.400" } : undefined}
+          onChange={(e) => onName(e.target.value)}
+        />
+        <ColumnTypeSelect
+          value={col.type}
+          onChange={onType}
+          aria-label={`Column ${index + 1} type`}
+        />
+        <chakra.button
+          type="button"
+          aria-label={`Exclude ${col.name}`}
+          title="Exclude column"
+          disabled={!onRemove}
+          display="flex"
+          alignItems="center"
+          color="fg.subtle"
+          flexShrink={0}
+          cursor={onRemove ? "pointer" : "not-allowed"}
+          opacity={onRemove ? 1 : 0.3}
+          _hover={onRemove ? { color: "red.500" } : undefined}
+          onClick={onRemove}
+        >
+          <Trash2 size={16} />
+        </chakra.button>
+      </HStack>
+      {invalid && (
+        <Text role="alert" fontSize="xs" color="red.500" paddingLeft={7}>
+          {col.name.trim() === ""
+            ? "Name is required"
+            : "Column names must be unique"}
+        </Text>
+      )}
     </VStack>
+  );
+}
+
+/** The lifted, floating copy shown under the cursor while dragging a column.
+ *  A read-only drag preview (its `Input` is `readOnly`, no drag listeners).
+ *  Tinted with the brand `orange` palette (subtle bg + emphasized border +
+ *  accented grip) so the row being dragged reads as clearly "picked up"; on drop
+ *  the overlay unmounts and the row returns to its normal colors. */
+function ColumnDragOverlayRow({ col }: { col: DatasetConfirmColumns[number] }) {
+  const typeLabel =
+    COLUMN_TYPE_OPTIONS.find((o) => o.value === col.type)?.label ?? col.type;
+
+  return (
+    <HStack
+      data-testid="column-drag-overlay"
+      colorPalette="orange"
+      gap={2}
+      width="full"
+      paddingX={1}
+      paddingY={1}
+      borderRadius="md"
+      borderWidth="1px"
+      borderColor="colorPalette.emphasized"
+      bg="colorPalette.subtle"
+      shadow="lg"
+      cursor="grabbing"
+    >
+      <Box
+        display="inline-flex"
+        alignItems="center"
+        justifyContent="center"
+        color="colorPalette.fg"
+      >
+        <Icon boxSize="16px">
+          <GripVertical />
+        </Icon>
+      </Box>
+      <Input
+        size="sm"
+        value={col.name}
+        readOnly
+        tabIndex={-1}
+        pointerEvents="none"
+        bg="bg"
+      />
+      <HStack
+        gap={2}
+        width="44"
+        height="8"
+        flexShrink={0}
+        minW={0}
+        paddingX={3}
+        borderWidth="1px"
+        borderColor="border"
+        borderRadius="md"
+        bg="bg"
+      >
+        <ColumnTypeIcon type={col.type} size={14} />
+        <Text truncate>{typeLabel}</Text>
+      </HStack>
+      {/* Mirror the row's exclude affordance so the lifted copy lines up. */}
+      <Box display="flex" alignItems="center" color="fg.subtle" flexShrink={0}>
+        <Trash2 size={16} />
+      </Box>
+    </HStack>
   );
 }
 
@@ -278,7 +527,7 @@ function BulkFileRow({
   onRemove: () => void;
   onCancel: () => void;
   onRetry: () => void;
-  onColumns: (next: DatasetColumns) => void;
+  onColumns: (next: DatasetConfirmColumns) => void;
   onName: (next: string) => void;
   onReady: () => void;
   onFailed: (error?: string) => void;
@@ -379,9 +628,26 @@ function BulkFileRow({
         )}
       </HStack>
 
-      {isOpen && canConfirm && file.columnTypes && (
-        <BulkColumnFields columnTypes={file.columnTypes} onChange={onColumns} />
-      )}
+      {/* Smoothly expand/collapse the confirm columns. AnimatePresence keeps the
+          content mounted through the exit animation, then unmounts it — so a
+          collapsed row holds no focusable inputs (a11y) and stays out of the DOM. */}
+      <AnimatePresence initial={false}>
+        {isOpen && canConfirm && file.columnTypes && (
+          <motion.div
+            key="confirm-columns"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeInOut" }}
+            style={{ overflow: "hidden", width: "100%" }}
+          >
+            <BulkColumnFields
+              columnTypes={file.columnTypes}
+              onChange={onColumns}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </VStack>
   );
 }
@@ -405,6 +671,15 @@ export function BulkUploadDrawer({
   const bulk = useBulkUpload(projectId);
   const [zoneHover, setZoneHover] = useState(false);
 
+  // Block the upload while any pending file has a blank or duplicated column
+  // name — normalize would drop/collide those values (see invalidColumnNameKeys).
+  const hasInvalidColumns = bulk.files.some(
+    (file) =>
+      file.status === "pending" &&
+      !!file.columnTypes &&
+      invalidColumnNameKeys(file.columnTypes).size > 0,
+  );
+
   const onDropFiles = (fileList: FileList | null) => {
     if (fileList && fileList.length > 0) {
       void bulk.addFiles(Array.from(fileList));
@@ -420,7 +695,13 @@ export function BulkUploadDrawer({
       <Drawer.Content bg="bg">
         <Drawer.CloseTrigger />
         <Drawer.Header>
-          <Heading>Upload datasets</Heading>
+          <VStack align="start" gap={1}>
+            <Heading>Upload datasets</Heading>
+            <Text fontSize="sm" color="fg.muted" fontWeight="normal">
+              Bring CSV or JSON files into LangWatch to build evaluation sets,
+              review past generations, and turn real data into new test cases.
+            </Text>
+          </VStack>
         </Drawer.Header>
         <Drawer.Body>
           <VStack align="stretch" gap={4} width="full">
@@ -524,7 +805,9 @@ export function BulkUploadDrawer({
               </Button>
               <Button
                 colorPalette="blue"
-                disabled={!bulk.hasUploadable || !projectId}
+                disabled={
+                  !bulk.hasUploadable || !projectId || hasInvalidColumns
+                }
                 onClick={() => bulk.start()}
               >
                 Upload all
