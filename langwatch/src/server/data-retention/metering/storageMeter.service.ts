@@ -48,17 +48,6 @@ const METERING_CLICKHOUSE_SETTINGS = {
   max_execution_time: METERING_MAX_EXECUTION_SECONDS,
 } as const;
 
-// The billable measurement adds an age predicate, which forces a wider scan
-// than the cached total (notably `evaluation_runs`, whose retention column
-// `UpdatedAt` is not its partition key, so its predicate cannot prune). Keep the
-// `max_threads` memory cap and add an execution-time ceiling so a pathological
-// tenant query fails fast for the dispatcher to retry rather than hanging a
-// connection and starving the box.
-const BILLABLE_METERING_CLICKHOUSE_SETTINGS = {
-  ...METERING_CLICKHOUSE_SETTINGS,
-  max_execution_time: 45,
-} as const;
-
 /** Resolves an organization's project ids (its ClickHouse tenant ids). */
 export type ProjectIdsResolver = (organizationId: string) => Promise<string[]>;
 
@@ -155,11 +144,16 @@ export class StorageMeterService {
     let total = 0;
     for (const tenantId of projectIds) {
       const client = await this.resolveClickHouseClient(tenantId);
+      // Reuse the metering caps: `max_threads` bounds the `byteSize()` recompute
+      // and `max_execution_time` fails fast on the pathological scan (the age
+      // predicate widens it — notably `evaluation_runs`, whose retention column
+      // `UpdatedAt` is not its partition key, so it can't prune) rather than
+      // hanging a connection for the dispatcher.
       const result = await client.query({
         query: BILLABLE_STORAGE_QUERY,
         query_params: { tenantId, cutoff },
         format: "JSONEachRow",
-        clickhouse_settings: BILLABLE_METERING_CLICKHOUSE_SETTINGS,
+        clickhouse_settings: METERING_CLICKHOUSE_SETTINGS,
       });
       const rows = (await result.json()) as Array<{ total: string }>;
       total += Number(rows[0]?.total ?? 0);
