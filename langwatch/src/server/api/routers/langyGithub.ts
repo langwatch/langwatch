@@ -77,6 +77,11 @@ async function revokeAtGitHub({
           "User-Agent": "langwatch-langy",
         },
         body: JSON.stringify({ access_token: accessToken }),
+        // Cap the upstream wait — a hung GitHub endpoint would otherwise
+        // block the disconnect tRPC call until the request context timed
+        // out. Revocation is already best-effort (we log on failure), so
+        // a 5s deadline is enough to give GitHub a fair chance.
+        signal: AbortSignal.timeout(5_000),
       },
     );
   } catch (err) {

@@ -108,7 +108,8 @@ function isDoneFor(
   // 'cloning' arrives before 'cloned'; cap intermediate states so the cloned
   // pill lights up the moment a clone is in progress.
   if (stage === "cloned" && reached.has("cloning")) return true;
-  // 'opening_pr' is the in-flight precursor to 'opened'.
-  if (stage === "opened" && reached.has("opening_pr")) return false;
+  // Note: 'opening_pr' is the in-flight precursor to 'opened' — we
+  // intentionally do NOT light 'opened' until the real 'opened' event
+  // arrives, so the final pill flips on PR creation, not on the attempt.
   return false;
 }

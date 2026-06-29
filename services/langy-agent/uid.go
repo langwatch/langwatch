@@ -25,8 +25,11 @@ const (
 
 // workerUIDFor returns a deterministic UID for a conversation. Collisions
 // across the 60k range are astronomically rare for the practical worker
-// count (MAX_WORKERS=20 by default), and a collision is benign — the same
-// UID is only reused after the prior worker for that UID has been reaped.
+// count (MAX_WORKERS=20 by default). Concurrent collision safety is NOT
+// provided by reaping — it's provided by reserveUIDLocked's linear probe
+// (see manager.go: reserveUIDLocked) which picks the next free slot when
+// the deterministic UID is in use by a live worker. The reaping comment
+// above is what makes the SAME UID safe to reuse AFTER a worker exits.
 func workerUIDFor(conversationID string) uint32 {
 	sum := sha256.Sum256([]byte(conversationID))
 	slot := binary.BigEndian.Uint32(sum[:4]) % workerUIDRange

@@ -206,7 +206,29 @@ export async function releaseLangyGithubPrPermit({
   const bucket = dayBucket();
   const key = `langy:gh:prs:${userId}:${bucket}`;
   try {
-    await (connection as { decr: (k: string) => Promise<number> }).decr(key);
+    // Floor the decrement at 0. A naked DECR can underflow: if `release` is
+    // called twice for the same reservation (retry path, double-call from a
+    // crashed handler, or any reservation that never INCRed because Redis
+    // was up-then-down), the counter goes negative — and a negative count
+    // < limit means the next 20+ reservations all `allowed: true`. Lua keeps
+    // the check-and-decr atomic.
+    const conn = connection as {
+      eval?: (
+        script: string,
+        numKeys: number,
+        ...args: string[]
+      ) => Promise<number | string | null>;
+      decr: (k: string) => Promise<number>;
+    };
+    if (typeof conn.eval === "function") {
+      const script =
+        "local n = tonumber(redis.call('GET', KEYS[1]) or '0')\n" +
+        "if n <= 0 then return 0 end\n" +
+        "return redis.call('DECR', KEYS[1])";
+      await conn.eval(script, 1, key);
+      return;
+    }
+    await conn.decr(key);
   } catch {
     /* best-effort */
   }

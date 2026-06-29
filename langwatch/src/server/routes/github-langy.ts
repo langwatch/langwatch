@@ -52,7 +52,9 @@ import {
   consumeGithubOauthNonce,
   registerGithubOauthNonce,
 } from "~/server/services/langy/langyGithubToken";
+import { featureFlagService } from "~/server/featureFlag";
 import { encrypt } from "~/utils/encryption";
+import { isLangwatchStaff } from "~/utils/isLangwatchStaff";
 import { createLogger } from "~/utils/logger/server";
 
 import type { NextRequestShim } from "./types";
@@ -151,6 +153,44 @@ function withGithubError(returnTo: string, message: string): string {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
+// CSP for the popup HTMLs: deny everything except the page's own inline
+// script + style. The popup needs `unsafe-inline` because the template
+// literally inlines `<script>postMessage(...)</script>` — using a nonce
+// would require threading it through popupResponseHtml/popupErrorHtml,
+// which we'd need to also serve here. `frame-ancestors 'none'` blocks the
+// popup from being iframed by another site (defense-in-depth against
+// click-jacking the close-and-postMessage interaction).
+const POPUP_CSP =
+  "default-src 'none'; " +
+  "script-src 'unsafe-inline'; " +
+  "style-src 'unsafe-inline'; " +
+  "base-uri 'none'; " +
+  "form-action 'none'; " +
+  "frame-ancestors 'none'";
+
+// Untyped `c` here so we don't have to pull Hono's ContentfulStatusCode
+// internals through the helper signature. Every caller passes the route
+// `c` so type inference at the call site is unaffected.
+function popupHtml(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  c: any,
+  body: string,
+  status: number,
+): Response {
+  c.header("Content-Security-Policy", POPUP_CSP);
+  c.header("X-Frame-Options", "DENY");
+  return c.html(body, status);
+}
+
+// Sanitises an unexpected error message before it lands in a URL query
+// parameter the next page renders. The query-string value would otherwise
+// surface raw exception text (DB errors, internal paths) to the user —
+// and embedding an arbitrary string in the URL means anywhere that page
+// later renders ?githubError without its own escaping inherits the risk.
+function publicGithubErrorMessage(): string {
+  return "GitHub connection failed. Please try again.";
+}
+
 secured
   .access(handlerManagedAuth(CONNECT_HANDLER_AUTH_REASON))
   .get("/github-langy/connect", async (c) => {
@@ -175,6 +215,24 @@ secured
     });
     if (!session?.user) {
       return c.json({ error: "Not authenticated" }, { status: 401 });
+    }
+    // Gate /connect by release_langy_enabled so a member can't store a
+    // UserGitHubCredential before the assistant is rolled out for them.
+    // Staff bypass mirrors the same shape /langy/* uses (auth-middleware).
+    // /callback intentionally stays open — once a user has initiated the
+    // flow and GitHub has redirected back with a signed state, the state
+    // signature + session re-bind are the guard, not the flag.
+    if (!isLangwatchStaff(session.user)) {
+      const allowed = await featureFlagService.isEnabled(
+        "release_langy_enabled",
+        { distinctId: session.user.id },
+      );
+      if (!allowed) {
+        return c.json(
+          { error: "GitHub connect is not currently enabled for this account." },
+          { status: 404 },
+        );
+      }
     }
     const organizationId = c.req.query("organizationId") ?? "";
     if (!organizationId) {
@@ -245,7 +303,7 @@ secured
     const code = c.req.query("code");
     const state = verifyState(c.req.query("state") ?? null);
     if (!code || !state) {
-      return c.html(popupErrorHtml("Invalid state or missing code"), 400);
+      return popupHtml(c, popupErrorHtml("Invalid state or missing code"), 400);
     }
 
     // Re-check the session matches the state's user. Defends against the case
@@ -255,7 +313,7 @@ secured
       req: c.req.raw as NextRequestShim,
     });
     if (!session?.user || session.user.id !== state.userId) {
-      return c.html(popupErrorHtml("Session changed mid-flow"), 401);
+      return popupHtml(c, popupErrorHtml("Session changed mid-flow"), 401);
     }
 
     // Burn the nonce. If the nonce was registered at /connect and is missing
@@ -265,7 +323,7 @@ secured
     if (state.nonceRegistered) {
       const nonceConsumed = await consumeGithubOauthNonce(state.nonce);
       if (nonceConsumed === false) {
-        return c.html(popupErrorHtml("State already used"), 401);
+        return popupHtml(c, popupErrorHtml("State already used"), 401);
       }
     }
 
@@ -279,7 +337,7 @@ secured
         organizationId: state.organizationId,
       }))
     ) {
-      return c.html(popupErrorHtml("Not a member of this organization"), 403);
+      return popupHtml(c, popupErrorHtml("Not a member of this organization"), 403);
     }
 
     const redirectUri = `${appOrigin(c.req.url)}/api/github-langy/callback`;
@@ -295,10 +353,13 @@ secured
       user = await fetchGithubUser(token.access_token!);
     } catch (err) {
       logger.warn({ err }, "github callback exchange failed");
-      const msg = err instanceof Error ? err.message : String(err);
+      // Real error in the server log; surface a generic message to the
+      // user so we don't leak internals (DB error text, GitHub HTTP
+      // response bodies) into the URL or the popup HTML.
+      const publicMsg = publicGithubErrorMessage();
       return state.mode === "popup"
-        ? c.html(popupErrorHtml(msg), 502)
-        : c.redirect(withGithubError(returnTo, msg), 302);
+        ? popupHtml(c, popupErrorHtml(publicMsg), 502)
+        : c.redirect(withGithubError(returnTo, publicMsg), 302);
     }
 
     await upsertGithubCredential({
@@ -327,7 +388,7 @@ secured
     });
 
     if (state.mode === "popup") {
-      return c.html(popupResponseHtml(user.login), 200);
+      return popupHtml(c, popupResponseHtml(user.login), 200);
     }
     return c.redirect(returnTo, 302);
   });

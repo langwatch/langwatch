@@ -187,28 +187,21 @@ function ProposalCard({
   const openLabel = appliedOutcome?.label ?? "Open";
   const hasOpen = !!onOpen || !!openHref;
 
-  const overlineLabel = isApplied
-    ? destructive
-      ? "Done"
-      : "Applied"
-    : isDiscarded
-      ? "Discarded"
-      : isApplying
-        ? destructive
-          ? "Deleting…"
-          : "Applying…"
-        : destructive
-          ? "Wants to delete"
-          : "Proposal";
+  // Resolve overline copy + colour up front so the JSX below doesn't read
+  // like a five-deep nested ternary. Each branch states one thing.
+  const overlineLabel = (() => {
+    if (isApplied) return destructive ? "Done" : "Applied";
+    if (isDiscarded) return "Discarded";
+    if (isApplying) return destructive ? "Deleting…" : "Applying…";
+    return destructive ? "Wants to delete" : "Proposal";
+  })();
 
-  const overlineColor =
-    destructive && !isApplied
-      ? "var(--chakra-colors-red-fg)"
-      : isApplied && !destructive
-        ? "var(--chakra-colors-green-fg)"
-        : isDiscarded
-          ? "var(--chakra-colors-fg-muted)"
-          : "var(--chakra-colors-purple-fg)";
+  const overlineColor = (() => {
+    if (destructive && !isApplied) return "var(--chakra-colors-red-fg)";
+    if (isApplied && !destructive) return "var(--chakra-colors-green-fg)";
+    if (isDiscarded) return "var(--chakra-colors-fg-muted)";
+    return "var(--chakra-colors-purple-fg)";
+  })();
 
   const triggerOpen = () => {
     if (onOpen) {

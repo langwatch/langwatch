@@ -144,7 +144,15 @@ func (w *Worker) release() {
 var sensitiveEnvPattern = regexp.MustCompile(
 	`^(LANGY_INTERNAL_SECRET$|GITHUB_LANGY_|CREDENTIALS_SECRET$|NEXTAUTH_|DATABASE_URL$|AWS_SECRET_|LW_GATEWAY_|LW_VIRTUAL_KEY_)` +
 		`|_(API_)?KEY$` +
-		`|_SECRET(_|$)`,
+		`|_SECRET(_|$)` +
+		// `_TOKEN(_|$)` catches `GH_TOKEN`, `GITHUB_TOKEN`, `API_TOKEN_*`, etc.
+		// — the worker still receives an explicit `GH_TOKEN=` from
+		// spawnOpenCode AFTER this filter, so blocking the inherited variant
+		// is correct (it would shadow the per-conversation creds otherwise).
+		// `_PASSWORD(_|$)` catches `POSTGRES_PASSWORD`/`REDIS_PASSWORD` and
+		// anything else an `envFrom: secretRef` mounts under that convention.
+		`|_TOKEN(_|$)` +
+		`|_PASSWORD(_|$)`,
 )
 
 // filterSensitiveEnv returns the process env minus anything matching
@@ -328,6 +336,12 @@ func spawnOpenCode(
 		Credential: &syscall.Credential{
 			Uid: uid,
 			Gid: uid,
+			// Explicit empty Groups forces setgroups([]) on exec — without
+			// this, the child inherits root's supplementary groups (the
+			// manager runs as root). Combined with the unique per-conv UID,
+			// the worker now belongs to exactly one identity at the kernel
+			// level, no shared group footing from the manager process.
+			Groups: []uint32{},
 		},
 		// Setpgid puts opencode in its own process group so a SIGTERM to the
 		// manager doesn't tear down the worker before we've gracefully reaped

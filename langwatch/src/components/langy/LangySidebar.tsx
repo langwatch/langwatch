@@ -408,24 +408,32 @@ function LangyPanel({
 
   const send = async (text: string) => {
     if (!text.trim() || !projectId || isBusy) return;
-    setInput("");
     // modelOverride is empty until the resolved-default query lands OR until
     // the user picks; in either case the chat route falls back to the project
     // DEFAULT-role resolution when this field is absent.
-    await sendMessage(
-      { role: "user", parts: [{ type: "text", text }] },
-      {
-        body: {
-          projectId,
-          // Stay in the active conversation; null/absent means "start a new
-          // one" and the transport adopts the id the server returns.
-          ...(currentConversationId
-            ? { conversationId: currentConversationId }
-            : {}),
-          ...(modelOverride ? { modelOverride } : {}),
+    try {
+      await sendMessage(
+        { role: "user", parts: [{ type: "text", text }] },
+        {
+          body: {
+            projectId,
+            // Stay in the active conversation; null/absent means "start a new
+            // one" and the transport adopts the id the server returns.
+            ...(currentConversationId
+              ? { conversationId: currentConversationId }
+              : {}),
+            ...(modelOverride ? { modelOverride } : {}),
+          },
         },
-      },
-    );
+      );
+      // Clear AFTER success so a failed send (network drop, 5xx) leaves
+      // the user's typed text in the composer where they can retry it.
+      // Clearing eagerly was losing input on every transient failure.
+      setInput("");
+    } catch {
+      // sendMessage surfaces the error via the useChat() error channel; we
+      // keep the input populated so the user can retry without retyping.
+    }
   };
 
   const handleNewChat = () => {
@@ -678,8 +686,25 @@ function ThinkingIndicator({ messages }: { messages: UIMessage[] }) {
     last?.role === "assistant"
       ? last.parts.findLast((part) => part.type?.startsWith("tool-"))
       : undefined;
-  const toolLabel = activeTool?.type
-    ? activeTool.type.replace(/^tool-/, "").replace(/_/g, " ")
+  // Map raw tool ids to human-readable verbs so the indicator doesn't read
+  // like dev console output ("Langy is search traces…" → "Langy is reading
+  // your traces…"). Unknown tools fall through to a stripped/spaced shape
+  // so we always say SOMETHING rather than blanking out, but ids that ship
+  // unbranded are an indication a new tool needs a copy entry here.
+  const TOOL_VERBS: Record<string, string> = {
+    search_traces: "reading your traces",
+    get_trace: "loading a trace",
+    search: "searching",
+    read: "reading files",
+    write: "drafting changes",
+    edit: "editing files",
+    bash: "running a command",
+    list: "listing files",
+    todowrite: "planning",
+  };
+  const rawId = activeTool?.type?.replace(/^tool-/, "") ?? null;
+  const toolLabel = rawId
+    ? (TOOL_VERBS[rawId] ?? `using ${rawId.replace(/_/g, " ")}`)
     : null;
 
   // While a tool is active, surface what it is — that's higher-signal

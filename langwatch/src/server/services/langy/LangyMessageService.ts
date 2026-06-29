@@ -44,7 +44,12 @@ export class LangyMessageRepository {
   }) {
     return await this.prisma.langyMessage.findMany({
       where: { conversationId, projectId },
-      orderBy: { createdAt: "asc" },
+      // Tiebreak by id when two messages share a createdAt — cuid is not
+      // strictly time-sortable, but cuid IDs ARE lexicographically stable,
+      // so this gives a deterministic order without changing the schema.
+      // Without the tiebreak, two messages inserted in the same millisecond
+      // could swap order across replays, splicing assistant/user turns.
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     });
   }
 

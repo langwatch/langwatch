@@ -684,12 +684,25 @@ langyRoute().get("/langy/conversations/:id", async (c) => {
   return c.json({ conversation: conv, messages });
 });
 
+const patchConversationSchema = z.object({
+  projectId: z.string().min(1),
+  // `null` clears the title; `undefined` (omitted) leaves it alone. We don't
+  // accept arbitrary types here — `as` casting would let `isShared: "yes"`
+  // (truthy string) trip the share/audit branch and let a non-string `title`
+  // reach the service layer where the column type would silently coerce.
+  title: z.string().nullable().optional(),
+  isShared: z.boolean().optional(),
+});
+
 langyRoute().patch("/langy/conversations/:id", async (c) => {
-  const body = (await c.req.json()) as {
-    projectId: string;
-    title?: string | null;
-    isShared?: boolean;
-  };
+  const parsed = patchConversationSchema.safeParse(await c.req.json());
+  if (!parsed.success) {
+    return c.json(
+      { error: "Invalid request body", issues: parsed.error.issues },
+      { status: 400 },
+    );
+  }
+  const body = parsed.data;
   const guard = await requireSessionAndPermission(c, body.projectId);
   if (guard.error) return guard.error;
   const id = c.req.param("id");

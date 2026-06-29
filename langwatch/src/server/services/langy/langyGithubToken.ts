@@ -408,6 +408,11 @@ export async function consumeGithubOauthNonce(
     // sequence if the client doesn't support it.
     const conn = connection as {
       getdel?: (k: string) => Promise<string | null>;
+      eval?: (
+        script: string,
+        numKeys: number,
+        ...args: string[]
+      ) => Promise<number | string | null>;
       get: (k: string) => Promise<string | null>;
       del: (k: string) => Promise<number>;
     };
@@ -416,6 +421,18 @@ export async function consumeGithubOauthNonce(
       const v = await conn.getdel(key);
       return v !== null;
     }
+    // Pre-6.2 fallback: a get+del sequence allows replay (two callbacks
+    // both see the value, both succeed). Use a Lua script so the consume
+    // is atomic: returns 1 if it deleted, 0 if the key was missing.
+    if (typeof conn.eval === "function") {
+      const script =
+        "local v = redis.call('GET', KEYS[1])\n" +
+        "if v then redis.call('DEL', KEYS[1]) return 1 else return 0 end";
+      const result = await conn.eval(script, 1, key);
+      return result === 1 || result === "1";
+    }
+    // Last-resort fallback (no eval): keep the racy shape. This is the
+    // pre-existing behaviour; flagged here so it surfaces in a grep.
     const v = await conn.get(key);
     if (v === null) return false;
     await conn.del(key);
@@ -428,11 +445,32 @@ export async function consumeGithubOauthNonce(
 async function releaseLock(key: string, token: string): Promise<void> {
   if (!connection) return;
   try {
-    const current = await (
-      connection as { get: (k: string) => Promise<string | null> }
-    ).get(key);
+    // Atomic compare-and-delete via Lua so a concurrent holder's lock
+    // can't be dropped: a get→compare→del round trip can race when the
+    // current holder's lock expires between get and del, and the next
+    // holder takes ownership; the original holder then DELs a key that
+    // no longer belongs to them. The Lua script keeps it one round trip.
+    const conn = connection as {
+      eval?: (
+        script: string,
+        numKeys: number,
+        ...args: string[]
+      ) => Promise<number | string | null>;
+      get: (k: string) => Promise<string | null>;
+      del: (k: string) => Promise<number>;
+    };
+    if (typeof conn.eval === "function") {
+      const script =
+        "if redis.call('GET', KEYS[1]) == ARGV[1] then " +
+        "return redis.call('DEL', KEYS[1]) else return 0 end";
+      await conn.eval(script, 1, key, token);
+      return;
+    }
+    // Pre-existing get+compare+del fallback for clients without eval.
+    // Documented residual: narrow race window during lock expiry.
+    const current = await conn.get(key);
     if (current === token) {
-      await (connection as { del: (k: string) => Promise<number> }).del(key);
+      await conn.del(key);
     }
   } catch {
     /* lock will expire on its own */
