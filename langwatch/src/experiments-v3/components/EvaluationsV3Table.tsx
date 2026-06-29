@@ -68,6 +68,7 @@ import { createPromptEditorCallbacks } from "../utils/promptEditorCallbacks";
 import { ColumnTypeIcon } from "./ColumnTypeIcon";
 import { DatasetSuperHeader } from "./DatasetSuperHeader";
 import { EvaluationsV3DatasetTableProvider } from "./EvaluationsV3DatasetTableProvider";
+import { PairwiseCompareCell } from "./PairwiseCompareCell";
 import { SelectionToolbar } from "./SelectionToolbar";
 import {
   CheckboxCellFromMeta,
@@ -552,9 +553,40 @@ export function EvaluationsV3Table({
       // The first target provides the mapping context for the drawer.
       const firstTarget = state.targets[0];
 
+      if (!addedId || !added) {
+        closeDrawer();
+        return;
+      }
+
+      // Pairwise evaluators always open their dedicated target-picker form
+      // (PairwiseConfigForm), regardless of whether targets exist yet.
+      // useOpenEvaluatorEditor routes pairwise_compare to PairwiseConfigForm
+      // and ignores the `target` / `targetName` params, so we pass a stub
+      // when no real target exists yet.
+      if (added.evaluatorType === "langevals/pairwise_compare") {
+        const stubTarget: TargetConfig = firstTarget ?? {
+          id: "",
+          type: "prompt",
+          inputs: [],
+          outputs: [],
+          mappings: {},
+        };
+        openEvaluatorEditor({
+          evaluator: added,
+          target: stubTarget,
+          targetName: firstTarget
+            ? (resolveTargetNameFromCache({
+                target: firstTarget,
+                utils: trpcUtils,
+                projectId: project?.id,
+              }) ?? "")
+            : "",
+          isCodeEvaluator: false,
+        });
+        return;
+      }
+
       if (
-        addedId &&
-        added &&
         firstTarget &&
         evaluatorHasMissingMappings(
           added,
@@ -1093,6 +1125,29 @@ export function EvaluationsV3Table({
     [datasetColumnsKey],
   );
 
+  // Stabilize pairwise evaluators — only those with both variants configured.
+  // Only recreate columns when the set of configured pairwise evaluators changes.
+  const pairwiseEvaluatorsKey = evaluators
+    .filter(
+      (e) =>
+        e.evaluatorType === "langevals/pairwise_compare" &&
+        e.pairwise?.variantA &&
+        e.pairwise?.variantB,
+    )
+    .map((e) => e.id)
+    .join(",");
+  const stablePairwiseEvaluators = useMemo(
+    () =>
+      evaluators.filter(
+        (e) =>
+          e.evaluatorType === "langevals/pairwise_compare" &&
+          e.pairwise?.variantA &&
+          e.pairwise?.variantB,
+      ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pairwiseEvaluatorsKey],
+  );
+
   // Build table meta for passing dynamic data to headers/cells
   // This allows column definitions to stay stable while data changes
   const targetsMap = useMemo(
@@ -1283,12 +1338,66 @@ export function EvaluationsV3Table({
       );
     }
 
+    // Dedicated pairwise result columns — one per fully-configured pairwise
+    // evaluator, rendered AFTER all target columns (Target A, Target B, Pairwise).
+    // The orchestrator anchors Phase-2 results on variantA's cell.
+    for (const pwEval of stablePairwiseEvaluators) {
+      const evaluatorId = pwEval.id;
+      const variantAId = pwEval.pairwise!.variantA;
+      const variantBId = pwEval.pairwise!.variantB;
+      cols.push(
+        columnHelper.accessor(
+          (row) => row.targets[variantAId]?.evaluators[evaluatorId],
+          {
+            id: `pairwise.${evaluatorId}`,
+            header: (context) => {
+              const meta = context.table.options.meta as
+                | TableMeta
+                | undefined;
+              const evaluator = meta?.evaluatorsMap.get(evaluatorId);
+              return (
+                <HStack gap={1}>
+                  <Text fontSize="13px" fontWeight="medium">
+                    🏆 {evaluator?.localEvaluatorConfig?.name ?? "Pairwise"}
+                  </Text>
+                </HStack>
+              );
+            },
+            cell: (info) => {
+              if (info.row.original.isEmpty) return null;
+              const meta = info.table.options.meta as
+                | TableMeta
+                | undefined;
+              const variantATarget = meta?.targetsMap.get(variantAId);
+              const variantBTarget = meta?.targetsMap.get(variantBId);
+              const rowData = info.row.original.targets[variantAId];
+              return (
+                <PairwiseCompareCell
+                  result={info.getValue()}
+                  isLoading={rowData?.isLoading}
+                  variantATarget={variantATarget}
+                  variantBTarget={variantBTarget}
+                />
+              );
+            },
+            size: TARGET_COL_DEFAULT_PCT,
+            minSize: 10,
+            meta: {
+              columnType: "pairwise" as ColumnType,
+              columnId: `pairwise.${evaluatorId}`,
+            },
+          },
+        ) as ColumnDef<TableRowData>,
+      );
+    }
+
     return cols;
   }, [
     // ONLY structural dependencies - columns should almost never change
     // All dynamic data goes through tableMeta
     targetIds,
     stableDatasetColumns,
+    stablePairwiseEvaluators,
     columnHelper,
   ]);
 
