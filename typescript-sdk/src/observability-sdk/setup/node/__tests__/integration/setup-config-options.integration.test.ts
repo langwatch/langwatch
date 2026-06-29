@@ -55,7 +55,7 @@ describe('setupObservability Integration - Configuration Options', () => {
     // Shutdown may throw DNS errors from the LangWatch exporter trying to
     // reach the fake endpoint — that's fine, we only care about the spy.
     // eslint-disable-next-line @typescript-eslint/no-empty-function
-    await handle.shutdown().catch(() => {});
+    await handle.shutdown().catch((_e) => undefined);
     expect(exportSpy).toHaveBeenCalled();
   });
 
@@ -165,7 +165,8 @@ describe('setupObservability Integration - Configuration Options', () => {
     span.end();
     await new Promise(resolve => setTimeout(resolve, 50));
     expect(onEndSpy).toHaveBeenCalled();
-    await handle.shutdown();
+    // Shutdown may throw network errors from the LangWatch exporter — ignore them.
+    await handle.shutdown().catch((_e) => undefined);
   });
 
   // For options that cannot be directly inspected, keep logger or side-effect checks
