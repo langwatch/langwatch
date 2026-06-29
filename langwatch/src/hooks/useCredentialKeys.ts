@@ -41,7 +41,7 @@ export type UseCredentialKeysReturn = UseCredentialKeysState &
       | undefined;
   };
 
-function computeInitialUseApiGateway(
+export function computeInitialUseApiGateway(
   provider: MaybeStoredModelProvider,
 ): boolean {
   if (provider.provider === "azure" && provider.customKeys) {

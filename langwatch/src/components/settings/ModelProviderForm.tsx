@@ -163,6 +163,29 @@ export const EditModelProviderForm = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gatewayMenuEnabled, providerId]);
 
+  // The same expression the reset effect above uses — extracted so the
+  // Save button's dirty check has something to diff the live draft
+  // against. When the gateway flag is off we never render the section,
+  // so the empty draft is the only valid initial.
+  const initialAdvancedDraft = useMemo<ModelProviderAdvancedDraft>(() => {
+    if (!gatewayMenuEnabled) return EMPTY_ADVANCED_DRAFT;
+    return draftFromProvider({
+      rateLimitRpm:
+        (provider as { rateLimitRpm?: number | null }).rateLimitRpm ?? null,
+      rateLimitTpm:
+        (provider as { rateLimitTpm?: number | null }).rateLimitTpm ?? null,
+      rateLimitRpd:
+        (provider as { rateLimitRpd?: number | null }).rateLimitRpd ?? null,
+      fallbackPriorityGlobal:
+        (provider as { fallbackPriorityGlobal?: number | null })
+          .fallbackPriorityGlobal ?? null,
+      providerConfig: (provider as { providerConfig?: unknown })
+        .providerConfig,
+    });
+  }, [gatewayMenuEnabled, provider]);
+  const isAdvancedDirty =
+    JSON.stringify(advancedDraft) !== JSON.stringify(initialAdvancedDraft);
+
   // Controlled accordion state: collapsed by default, but expands
   // automatically when the user clicks Save with malformed JSON so the
   // inline error is actually visible.
@@ -213,7 +236,6 @@ export const EditModelProviderForm = ({
 
   const {
     validate: validateApiKey,
-    validateWithCustomUrl,
     isValidating: isValidatingApiKey,
     validationError: apiKeyValidationError,
     clearError: clearApiKeyError,
@@ -227,12 +249,6 @@ export const EditModelProviderForm = ({
     // Clear previous errors
     setFieldErrors({});
     clearApiKeyError();
-
-    // Get custom base URL if provided
-    const endpointKey = providerDefinition?.endpointKey;
-    const customBaseUrl = endpointKey
-      ? state.customKeys[endpointKey]?.trim() || undefined
-      : undefined;
 
     // Check if user entered a new API key
     const userEnteredNewApiKey = hasUserEnteredNewApiKey(state.customKeys);
@@ -265,21 +281,18 @@ export const EditModelProviderForm = ({
       }
     }
 
-    // Validate API key on save for LLM providers. Safety providers like
-    // azure_safety point at content moderation endpoints and can't be
-    // validated with the OpenAI-compatible chat-completion probe, so we
-    // skip client-side validation and let runtime usage surface errors.
-    if (isLlmProvider) {
-      if (userEnteredNewApiKey) {
-        const isValid = await validateApiKey();
-        if (!isValid) return;
-      } else if (customBaseUrl) {
-        const isValid = await validateWithCustomUrl(customBaseUrl);
-        if (!isValid) return;
-      } else {
-        const isValid = await validateWithCustomUrl();
-        if (!isValid) return;
-      }
+    // Only probe the upstream provider when the user has actually entered
+    // a new API key. Re-probing the stored credentials on every save —
+    // including saves that only touch unrelated fields like name or scope —
+    // makes those edits depend on third-party uptime and rate-limits, and
+    // blocks the user with a misleading "Invalid API key" toast whenever
+    // the stored key has drifted out-of-band (rotated in the provider's
+    // console, hit a temporary 401, etc.). Safety providers like
+    // azure_safety also skip this — their endpoints can't answer the
+    // OpenAI-compatible probe at all.
+    if (isLlmProvider && userEnteredNewApiKey) {
+      const isValid = await validateApiKey();
+      if (!isValid) return;
     }
 
     void actions.submit();
@@ -291,7 +304,6 @@ export const EditModelProviderForm = ({
     state.initialKeys,
     actions,
     validateApiKey,
-    validateWithCustomUrl,
     clearApiKeyError,
   ]);
 
@@ -412,6 +424,7 @@ export const EditModelProviderForm = ({
             size="sm"
             colorPalette="orange"
             loading={state.isSaving || isValidatingApiKey}
+            disabled={!state.isDirty && !isAdvancedDirty}
             onClick={handleSave}
           >
             Save
