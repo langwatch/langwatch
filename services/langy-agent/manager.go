@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -307,24 +308,16 @@ func (m *Manager) spawn(ctx context.Context, conversationID string, creds Creden
 		return nil, err
 	}
 
-	// Watch for the subprocess dying on its own (crash, OOM, kill). The
-	// registry delete is guarded by *exec.Cmd identity: if a replacement
-	// worker (different *exec.Cmd) was spawned for the same conversation
-	// after this one was killed, the prior child's exit must not clobber
-	// the replacement's registry slot or its UID reservation.
+	// Watch for the subprocess dying on its own (crash, OOM, kill). See
+	// onWorkerExit for the registry / UID / home-dir teardown logic and
+	// the replacement-race invariants it preserves.
 	go func() {
 		err := cmd.Wait()
 		m.log.Info("worker exited",
 			zap.String("conversation", conversationID),
 			zap.Error(err),
 		)
-		m.mu.Lock()
-		if w, ok := m.workers[conversationID]; ok && w.cmd == cmd {
-			delete(m.workers, conversationID)
-		}
-		m.releaseUIDLocked(uid, conversationID)
-		m.mu.Unlock()
-		removeWorkerHome(m.cfg.SessionsRoot, conversationID, m.log)
+		m.onWorkerExit(conversationID, cmd, uid)
 	}()
 
 	readinessCtx, cancel := context.WithTimeout(ctx, m.cfg.ReadinessTimeout)
@@ -356,6 +349,48 @@ func (m *Manager) spawn(ctx context.Context, conversationID string, creds Creden
 		credSig:           sig,
 		lastSeen:          time.Now(),
 	}, nil
+}
+
+// onWorkerExit is the teardown decision the exit watcher in spawn() fires
+// when a worker subprocess returns from cmd.Wait(). It runs under m.mu so
+// a concurrent spawn() trying to reserve the same UID or set up the same
+// home path blocks until the decision (and any wipe) completes.
+//
+// Replacement-race invariants the decision preserves:
+//
+//  1. **Wipe iff we still own the slot OR the slot is empty.** If the slot
+//     holds a different *exec.Cmd, a replacement worker is using our home
+//     path right now (its setupWorkerHome just wrote credentials there);
+//     wiping it would rm -rf live data underneath the replacement.
+//  2. **Registry delete is identity-guarded.** Only delete m.workers[X]
+//     if we're still the entry there. A racing kill() may already have
+//     dropped us; a racing spawn() may have replaced us — both cases mean
+//     the entry is not ours to delete.
+//  3. **UID release is convId-guarded** inside releaseUIDLocked: it's a
+//     no-op if the UID was reassigned to a different conversation since
+//     this worker reserved it.
+//
+// Follow-up: switch to generation-suffixed home paths
+// (/workspace/sessions/<convID>-<gen>/) so the wipe can happen lock-free
+// outside this critical section.
+func (m *Manager) onWorkerExit(conversationID string, cmd *exec.Cmd, uid uint32) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	shouldWipe := false
+	if w, ok := m.workers[conversationID]; ok {
+		if w.cmd == cmd {
+			delete(m.workers, conversationID)
+			shouldWipe = true
+		}
+		// else: replacement is in the slot; leave its home alone.
+	} else {
+		// Slot empty (kill() dropped it, no replacement yet) — home is ours.
+		shouldWipe = true
+	}
+	m.releaseUIDLocked(uid, conversationID)
+	if shouldWipe {
+		removeWorkerHome(m.cfg.SessionsRoot, conversationID, m.log)
+	}
 }
 
 // kill terminates a worker and cleans its home. The exit-watcher goroutine

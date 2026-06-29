@@ -1,6 +1,9 @@
 package langyagent
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -116,6 +119,108 @@ func TestManager_UIDAllocator_ExhaustionSurfacesError(t *testing.T) {
 			t.Errorf("unexpected error message: %v", err)
 		}
 	})
+}
+
+// The bot's 2026-06-22 P1: kill() removes the registry entry and the old
+// subprocess exits asynchronously; meanwhile a replacement worker can be
+// spawned for the same conversationID — same home path. If the old exit
+// watcher wipes the home unconditionally, it rm -rf's the replacement's
+// freshly written config / credentials / skills link. Verify the wipe
+// decision now respects "did a replacement take our slot?".
+func TestManager_OnWorkerExit_ReplacementHomeSurvives(t *testing.T) {
+	sessionsRoot := t.TempDir()
+	conv := "conv-respawn"
+	homeDir := filepath.Join(sessionsRoot, conv)
+	if err := os.MkdirAll(homeDir, 0o700); err != nil {
+		t.Fatalf("setup tempdir: %v", err)
+	}
+	// Marker file standing in for the replacement worker's config.json.
+	marker := filepath.Join(homeDir, "config.json")
+	if err := os.WriteFile(marker, []byte("replacement-creds"), 0o600); err != nil {
+		t.Fatalf("write marker: %v", err)
+	}
+
+	m := newTestManager(64)
+	m.cfg.SessionsRoot = sessionsRoot
+
+	oldCmd := &exec.Cmd{}
+	newCmd := &exec.Cmd{}
+
+	// Simulate: kill() ran (registry entry dropped) and a replacement
+	// worker is now in the slot with newCmd, holding the freshly written
+	// home. The old worker's process then exits and onWorkerExit fires.
+	withLocked(m, func() {
+		uid, err := m.reserveUIDLocked(conv)
+		if err != nil {
+			t.Fatalf("reserve uid: %v", err)
+		}
+		m.workers[conv] = &Worker{cmd: newCmd, uid: uid}
+		// Trigger the old worker's exit watcher with oldCmd, the prior generation.
+		go m.onWorkerExit(conv, oldCmd, uid)
+	})
+
+	// Drain: onWorkerExit acquires the same lock; let it run.
+	// (Loop a few times until the goroutine has had its chance.)
+	for i := 0; i < 50; i++ {
+		m.mu.Lock()
+		_, stillThere := m.workers[conv]
+		m.mu.Unlock()
+		if stillThere {
+			break
+		}
+	}
+
+	// The replacement entry MUST still be in the registry: oldCmd != newCmd
+	// so onWorkerExit must not have deleted it.
+	m.mu.Lock()
+	w, ok := m.workers[conv]
+	m.mu.Unlock()
+	if !ok {
+		t.Fatalf("registry entry for %q was deleted by old exit watcher; replacement was lost", conv)
+	}
+	if w.cmd != newCmd {
+		t.Fatalf("registry entry is not the replacement (cmd mismatch)")
+	}
+
+	// The home dir MUST still hold the replacement's marker file.
+	got, err := os.ReadFile(marker)
+	if err != nil {
+		t.Fatalf("replacement marker was wiped by old exit watcher: %v", err)
+	}
+	if string(got) != "replacement-creds" {
+		t.Fatalf("replacement marker content was changed: %q", string(got))
+	}
+}
+
+// Sibling case: kill() ran, no replacement spawned yet. The old worker's
+// exit watcher SHOULD wipe its home (otherwise we leak credentials on disk
+// across pod lifetimes for any reaped-and-not-resumed conversation).
+func TestManager_OnWorkerExit_EmptySlotWipesHome(t *testing.T) {
+	sessionsRoot := t.TempDir()
+	conv := "conv-reaped"
+	homeDir := filepath.Join(sessionsRoot, conv)
+	if err := os.MkdirAll(homeDir, 0o700); err != nil {
+		t.Fatalf("setup tempdir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(homeDir, "config.json"), []byte("dead-creds"), 0o600); err != nil {
+		t.Fatalf("write marker: %v", err)
+	}
+
+	m := newTestManager(64)
+	m.cfg.SessionsRoot = sessionsRoot
+
+	oldCmd := &exec.Cmd{}
+	var uid uint32
+	withLocked(m, func() {
+		uid, _ = m.reserveUIDLocked(conv)
+		// Slot intentionally empty: kill() removed the entry, no respawn yet.
+	})
+
+	m.onWorkerExit(conv, oldCmd, uid)
+
+	if _, err := os.Stat(homeDir); !os.IsNotExist(err) {
+		t.Fatalf("home dir %q should be wiped when slot is empty; stat err: %v", homeDir, err)
+	}
 }
 
 func TestCredentialSignature_DetectsModelAndGithubChanges(t *testing.T) {
