@@ -62,8 +62,8 @@ Langy worker for traces + MCP automatically; model selection routes through the 
 **WIP to port from `~/langwatch_codebase/langy-full-rebase` (branch `issue4273/langy-default-api-key`):**
 These were written on the diverged `langy/full` base but their dependencies all exist on #4272, so they
 port cleanly (adapt imports/line refs only):
-- `src/server/services/langy/langyApiKey.ts` — `provisionLangyApiKey()` + `backfillLangyApiKeys()` (idempotent, least-privilege, excludes hidden `kind != "application"` projects).
-- `scripts/backfill-langy-api-keys.ts` — runnable backfill (`--dry-run` supported).
+- `src/server/services/langy/langyApiKey.ts` — `provisionLangyApiKey()` (the `backfillLangyApiKeys()` export was removed in PR #4913, see header).
+- ~~`scripts/backfill-langy-api-keys.ts`~~ — removed in PR #4913 (see header).
 - `specs/assistant/langy-api-key-provisioning.feature` — BDD spec (6 scenarios).
 - `src/server/api/routers/__tests__/project.create.langyKey.integration.test.ts` — real-DB integration test.
 
@@ -98,7 +98,7 @@ Spec: `specs/assistant/langy-api-key-provisioning.feature`.
     Hooking the app-layer service would be **dead code** *and* break the repository abstraction
     (the service holds `this.repo`, not a `PrismaClient`). So it's intentionally **not** hooked;
     the **backfill reconciler** is the safety net for any path that ever bypasses provisioning.
-- [x] **Backfill script** → `scripts/backfill-langy-api-keys.ts` (idempotent; `--dry-run`).
+- [x] ~~**Backfill script** → `scripts/backfill-langy-api-keys.ts` (idempotent; `--dry-run`).~~ Removed in PR #4913 — lazy provisioning via `LangyCredentialService.getOrProvision()` superseded it.
 - [x] `pnpm typecheck` → exit 0 (whole project).
 - [ ] **Run integration tests end-to-end** — NOT yet run. The worktree `.env` `DATABASE_URL` points at the
       **shared dev RDS**; do NOT run create/delete tests against it. Bring up a local PG and override:
