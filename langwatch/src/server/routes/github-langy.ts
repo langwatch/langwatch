@@ -27,6 +27,7 @@ import {
 import { auditLog } from "~/server/auditLog";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
+import { featureFlagService } from "~/server/featureFlag";
 import {
   exchangeCode,
   fetchGithubUser,
@@ -52,7 +53,6 @@ import {
   consumeGithubOauthNonce,
   registerGithubOauthNonce,
 } from "~/server/services/langy/langyGithubToken";
-import { featureFlagService } from "~/server/featureFlag";
 import { encrypt } from "~/utils/encryption";
 import { isLangwatchStaff } from "~/utils/isLangwatchStaff";
 import { createLogger } from "~/utils/logger/server";
