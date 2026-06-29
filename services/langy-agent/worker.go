@@ -113,10 +113,25 @@ func (w *Worker) release() {
 }
 
 // sensitiveEnvPattern matches env names that must never reach a worker. The
-// JS manager listed these by name; the Go version mirrors the policy. Add
-// new prefixes here when introducing manager-only secrets.
+// JS manager listed these by name; the Go version mirrors that policy and
+// extends it with two suffix classes so arbitrary provider keys inherited
+// from a local-dev .env (OPENAI_API_KEY, ANTHROPIC_API_KEY, GROQ_API_KEY,
+// API_TOKEN_JWT_SECRET, ...) cannot reach a per-conversation OpenCode
+// subprocess. The worker still receives its own llmVirtualKey + langwatch
+// API key via Credentials.* — those are written into the env explicitly
+// after this filter, so blocking the inherited variants is the desired
+// posture (only the per-project Langy VK reaches the model, never the
+// human's personal provider key).
+//
+// This stays a denylist for compatibility; a true allowlist (PATH, HOME,
+// LANG, USER, TZ + OTEL_/LANGY_ vars actually needed) is the more secure
+// long-term shape but requires testing every var an OpenCode subprocess
+// might legitimately read. Add new prefixes here when introducing
+// manager-only secrets.
 var sensitiveEnvPattern = regexp.MustCompile(
-	`^(LANGY_INTERNAL_SECRET$|GITHUB_LANGY_|CREDENTIALS_SECRET$|NEXTAUTH_|DATABASE_URL$|AWS_SECRET_)`,
+	`^(LANGY_INTERNAL_SECRET$|GITHUB_LANGY_|CREDENTIALS_SECRET$|NEXTAUTH_|DATABASE_URL$|AWS_SECRET_|LW_GATEWAY_|LW_VIRTUAL_KEY_)` +
+		`|_(API_)?KEY$` +
+		`|_SECRET(_|$)`,
 )
 
 // filterSensitiveEnv returns the process env minus anything matching

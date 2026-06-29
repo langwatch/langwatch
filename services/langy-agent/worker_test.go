@@ -10,18 +10,30 @@ import (
 func TestFilterSensitiveEnv_RemovesManagerSecrets(t *testing.T) {
 	// Snapshot original env so we can restore after the test.
 	for k, v := range map[string]string{
-		"LANGY_INTERNAL_SECRET":    "must-not-leak",
-		"GITHUB_LANGY_APP_ID":      "must-not-leak",
-		"CREDENTIALS_SECRET":       "must-not-leak",
-		"NEXTAUTH_URL":             "must-not-leak",
-		"NEXTAUTH_SECRET":          "must-not-leak",
-		"DATABASE_URL":             "must-not-leak",
-		"AWS_SECRET_ACCESS_KEY":    "must-not-leak",
-		"LANGY_MAX_WORKERS":        "keep-me", // LANGY_ prefix but not the secret one
-		"OPENCODE_AGENT_URL":       "keep-me",
-		"OPENCODE_OTLP_ENDPOINT":   "keep-me",
-		"HOME":                     "keep-me",
-		"LANGWATCH_API_KEY_OUTER":  "keep-me", // worker injects its own LANGWATCH_API_KEY after
+		"LANGY_INTERNAL_SECRET":      "must-not-leak",
+		"GITHUB_LANGY_APP_ID":        "must-not-leak",
+		"CREDENTIALS_SECRET":         "must-not-leak",
+		"NEXTAUTH_URL":               "must-not-leak",
+		"NEXTAUTH_SECRET":            "must-not-leak",
+		"DATABASE_URL":               "must-not-leak",
+		"AWS_SECRET_ACCESS_KEY":      "must-not-leak",
+		// Suffix patterns: any *_API_KEY / *_KEY / *_SECRET inherited from a
+		// local-dev .env must not reach the worker. The worker gets its own
+		// llmVirtualKey + langwatchApiKey injected via Credentials.* after.
+		"OPENAI_API_KEY":             "must-not-leak",
+		"ANTHROPIC_API_KEY":          "must-not-leak",
+		"GROQ_API_KEY":               "must-not-leak",
+		"AZURE_OPENAI_API_KEY":       "must-not-leak",
+		"SENDGRID_API_KEY":           "must-not-leak",
+		"API_TOKEN_JWT_SECRET":       "must-not-leak",
+		"LW_GATEWAY_INTERNAL_SECRET": "must-not-leak",
+		"LW_GATEWAY_JWT_SECRET":      "must-not-leak",
+		"LW_VIRTUAL_KEY_PEPPER":      "must-not-leak",
+		"LANGY_MAX_WORKERS":          "keep-me", // LANGY_ prefix but not the secret one
+		"OPENCODE_AGENT_URL":         "keep-me",
+		"OPENCODE_OTLP_ENDPOINT":     "keep-me",
+		"HOME":                       "keep-me",
+		"LANGWATCH_API_KEY_OUTER":    "keep-me", // worker injects its own LANGWATCH_API_KEY after
 	} {
 		t.Setenv(k, v)
 	}
@@ -36,6 +48,15 @@ func TestFilterSensitiveEnv_RemovesManagerSecrets(t *testing.T) {
 		"NEXTAUTH_SECRET=",
 		"DATABASE_URL=",
 		"AWS_SECRET_ACCESS_KEY=",
+		"OPENAI_API_KEY=",
+		"ANTHROPIC_API_KEY=",
+		"GROQ_API_KEY=",
+		"AZURE_OPENAI_API_KEY=",
+		"SENDGRID_API_KEY=",
+		"API_TOKEN_JWT_SECRET=",
+		"LW_GATEWAY_INTERNAL_SECRET=",
+		"LW_GATEWAY_JWT_SECRET=",
+		"LW_VIRTUAL_KEY_PEPPER=",
 	}
 	for _, prefix := range mustBeAbsent {
 		for _, kv := range env {
