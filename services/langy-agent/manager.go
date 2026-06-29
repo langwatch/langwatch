@@ -358,10 +358,13 @@ func (m *Manager) spawn(ctx context.Context, conversationID string, creds Creden
 //
 // Replacement-race invariants the decision preserves:
 //
-//  1. **Wipe iff we still own the slot OR the slot is empty.** If the slot
-//     holds a different *exec.Cmd, a replacement worker is using our home
-//     path right now (its setupWorkerHome just wrote credentials there);
-//     wiping it would rm -rf live data underneath the replacement.
+//  1. **Wipe iff we still own the slot AND no replacement is in flight.**
+//     If the slot holds a different *exec.Cmd, a replacement is already
+//     committed. If the slot is empty but spawnLocks[X] is set, a
+//     replacement's setupWorkerHome is writing into our home path right
+//     now — its registry commit happens at Get() line ~199 only after
+//     setupWorkerHome returns. Either way, wiping would rm -rf live data
+//     under the replacement.
 //  2. **Registry delete is identity-guarded.** Only delete m.workers[X]
 //     if we're still the entry there. A racing kill() may already have
 //     dropped us; a racing spawn() may have replaced us — both cases mean
@@ -383,8 +386,10 @@ func (m *Manager) onWorkerExit(conversationID string, cmd *exec.Cmd, uid uint32)
 			shouldWipe = true
 		}
 		// else: replacement is in the slot; leave its home alone.
-	} else {
-		// Slot empty (kill() dropped it, no replacement yet) — home is ours.
+	} else if _, spawning := m.spawnLocks[conversationID]; !spawning {
+		// Slot empty AND no spawn in flight — home is ours to wipe.
+		// (If a spawn IS in flight, its setupWorkerHome is writing into
+		// the home dir right now; wiping would corrupt the new worker.)
 		shouldWipe = true
 	}
 	m.releaseUIDLocked(uid, conversationID)

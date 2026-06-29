@@ -223,6 +223,56 @@ func TestManager_OnWorkerExit_EmptySlotWipesHome(t *testing.T) {
 	}
 }
 
+// The 2026-06-29 P1: kill() removes the registry entry, a new spawn for the
+// same conversationID begins (spawnLocks[X] is set, setupWorkerHome is
+// writing into /workspace/sessions/X/), but the new worker hasn't yet been
+// committed to m.workers — so onWorkerExit sees an empty slot. The old
+// behavior took the empty-slot branch and wiped the home dir while the
+// replacement's setupWorkerHome was still writing it. Verify the in-flight
+// spawn now suppresses the wipe.
+func TestManager_OnWorkerExit_InflightSpawnSuppressesWipe(t *testing.T) {
+	sessionsRoot := t.TempDir()
+	conv := "conv-inflight"
+	homeDir := filepath.Join(sessionsRoot, conv)
+	if err := os.MkdirAll(homeDir, 0o700); err != nil {
+		t.Fatalf("setup tempdir: %v", err)
+	}
+	// Marker file standing in for setupWorkerHome's writes that the new
+	// spawn is in the middle of laying down.
+	marker := filepath.Join(homeDir, "credentials")
+	if err := os.WriteFile(marker, []byte("new-creds-in-flight"), 0o600); err != nil {
+		t.Fatalf("write marker: %v", err)
+	}
+
+	m := newTestManager(64)
+	m.cfg.SessionsRoot = sessionsRoot
+
+	oldCmd := &exec.Cmd{}
+	var uid uint32
+
+	// Simulate the in-flight state: kill() ran (workers[conv] dropped),
+	// Get() has reserved spawnLocks[conv] and called spawn() which is
+	// currently between MkdirAll/setupWorkerHome and the workers[conv] = w
+	// commit. The old worker's exit watcher now fires.
+	withLocked(m, func() {
+		uid, _ = m.reserveUIDLocked(conv)
+		m.spawnLocks[conv] = make(chan struct{})
+		// Slot empty: workers[conv] absent. spawnLocks[conv] present.
+	})
+
+	m.onWorkerExit(conv, oldCmd, uid)
+
+	// The in-flight spawn's home dir MUST survive — wiping it would
+	// destroy the credentials the new worker is about to use.
+	got, err := os.ReadFile(marker)
+	if err != nil {
+		t.Fatalf("in-flight spawn's marker was wiped by old exit watcher: %v", err)
+	}
+	if string(got) != "new-creds-in-flight" {
+		t.Fatalf("marker content was changed: %q", string(got))
+	}
+}
+
 func TestCredentialSignature_DetectsModelAndGithubChanges(t *testing.T) {
 	base := Credentials{Model: "openai/gpt-5-mini"}
 	sigBase := signatureOf(base)
