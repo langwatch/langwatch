@@ -79,9 +79,27 @@ spec:
           port: {{ .Values.networkPolicy.gatewayPort }}
     {{- if .Values.networkPolicy.allowExternalHttps }}
     # External HTTPS (OpenCode update/telemetry, etc.). Loosen/tighten here.
+    #
+    # ipBlock `except` denies the standard private ranges so a compromised
+    # OpenCode subprocess (RCE via prompt injection, supply-chain, etc.)
+    # cannot use this public-egress rule to reach internal services on :443
+    # — the kube apiserver, sidecar containers on the same node, neighbor
+    # pods, or the cloud metadata service (169.254.169.254, classic SSRF
+    # target for IAM credential theft). Legitimate cluster-internal traffic
+    # (the gateway, DNS) is allowed via explicit podSelector rules above.
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 169.254.0.0/16
+        - ipBlock:
+            cidr: ::/0
+            except:
+              - fd00::/8
+              - fe80::/10
       ports:
         - protocol: TCP
           port: 443
