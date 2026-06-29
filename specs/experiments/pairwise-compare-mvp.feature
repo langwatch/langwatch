@@ -32,17 +32,7 @@ Feature: Pairwise compare evaluator (MVP)
     And when both calls agree, the agreed winner is returned
     And when they disagree, "tie" is returned
 
-  Scenario: Aggregate header reflects tally
+  Scenario: Column scoreboard reflects tally
     Given 21 rows have been evaluated where variant_a wins 12, variant_b wins 7, and 2 ties
-    When I view the aggregate header
-    Then I see the scoreboard "variant_a 12 – 7 variant_b · 2 ties · 21 verdicts"
-
-  Scenario: Copy as bug report on losing row
-    Given a row where Variant B lost
-    When I click "Copy as bug report" on that row
-    Then the clipboard contains markdown with: input, output A, output B, golden, reasoning, winner
-
-  Scenario: Filter chip — show losses
-    Given Variant A is selected as the "current prod" baseline
-    When I click "Losses (regressions)"
-    Then only rows where the verdict is not "A" are shown
+    When I view the Pairwise Compare column header
+    Then I see "variant_a wins 12 · 2 ties" with the full breakdown in the tooltip

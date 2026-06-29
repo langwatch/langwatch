@@ -21,7 +21,6 @@ vi.mock("../../hooks/useEvaluatorName", () => ({
 }));
 
 import type { EvaluatorConfig } from "../../types";
-import { AggregateHeaderBar } from "../AggregateHeaderBar";
 import { PairwiseConfigForm } from "../EvaluatorPanel/PairwiseConfigForm";
 import { RowVerdictStrip } from "../RowVerdictStrip";
 import { EvaluatorChip } from "../TargetSection/EvaluatorChip";
@@ -75,56 +74,6 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
     await screen.findByText(/Variant A/);
     await page.screenshot({
       path: "/tmp/pr5106/01-pairwise-config-form.png",
-    });
-  });
-
-  it("AggregateHeaderBar — tally + filter chips + handoffs", async () => {
-    await page.viewport(1600, 70);
-    render(
-      <ChakraProvider value={langwatchSystem}>
-        <div style={{ width: 1580, background: "white" }}>
-          <AggregateHeaderBar
-            counts={{ a: 12, b: 7, tie: 2 }}
-            variantAName="variant_a"
-            variantBName="variant_b"
-            totalCost={0.0421}
-            activeFilter="all"
-            onFilterChange={() => {}}
-            onExport={() => {}}
-          />
-        </div>
-      </ChakraProvider>,
-    );
-
-    // New scoreboard format: "{leader} {leaderWins} – {loserWins} {loser}".
-    // Leader has 12 wins.
-    await screen.findByText(/variant_a/);
-    await page.screenshot({
-      path: "/tmp/pr5106/02-aggregate-header-bar.png",
-    });
-  });
-
-  it("AggregateHeaderBar — losses filter active", async () => {
-    await page.viewport(1600, 70);
-    render(
-      <ChakraProvider value={langwatchSystem}>
-        <div style={{ width: 1580, background: "white" }}>
-          <AggregateHeaderBar
-            counts={{ a: 12, b: 7, tie: 2 }}
-            variantAName="variant_a"
-            variantBName="variant_b"
-            totalCost={0.0421}
-            activeFilter="losses"
-            onFilterChange={() => {}}
-            onExport={() => {}}
-          />
-        </div>
-      </ChakraProvider>,
-    );
-
-    await screen.findByText(/Losses/);
-    await page.screenshot({
-      path: "/tmp/pr5106/03-aggregate-header-losses.png",
     });
   });
 
