@@ -1,6 +1,7 @@
 package langyagent
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -155,14 +156,26 @@ func handleChat(w http.ResponseWriter, r *http.Request, mgr *Manager, cfg Config
 
 	w.WriteHeader(http.StatusOK)
 
+	// Inner ctx whose lifetime this handler owns: the SSE consumer is bound to
+	// it so a postMessage failure (below) can cancel the consumer immediately
+	// rather than wait for the outer request ctx to time out — without this,
+	// the deferred `<-errCh` blocked up to AbortSignal.timeout (~120s) while
+	// `defer worker.release()` was still pending, locking the conversation.
+	streamCtx, cancelStream := context.WithCancel(ctx)
+	defer cancelStream()
+
 	// Kick the SSE consumer first so we don't lose the first delta if
 	// opencode is fast to start producing.
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- streamSessionEvents(ctx, worker.port, worker.openCodeSessionID, w, flush)
+		errCh <- streamSessionEvents(streamCtx, worker.port, worker.openCodeSessionID, w, flush)
 	}()
 
 	if err := postMessage(ctx, worker.port, worker.openCodeSessionID, req.System, req.Prompt); err != nil {
+		// Cancel the SSE consumer so `<-errCh` unblocks immediately instead of
+		// waiting on the outer request ctx (up to 120s). Worker stays claimed
+		// until `defer worker.release()` — keep that window small.
+		cancelStream()
 		if errors.Is(err, errSessionNotFound) {
 			mgr.KillSessionVanished(req.ConversationID)
 			writeErrorEvent(w, "session-not-found")
