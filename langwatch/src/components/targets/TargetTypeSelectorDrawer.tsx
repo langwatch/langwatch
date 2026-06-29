@@ -1,9 +1,21 @@
-import { Box, Button, Heading, HStack, Separator, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Heading,
+  HStack,
+  Separator,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { Bot, CheckCircle, FileText, Swords } from "lucide-react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
-import type { PairwiseEvaluatorConfig, TargetConfig, TargetType } from "~/experiments-v3/types";
+import type {
+  PairwiseEvaluatorConfig,
+  TargetConfig,
+  TargetType,
+} from "~/experiments-v3/types";
 import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
 
 // Re-export for backward compatibility
@@ -85,7 +97,8 @@ export function TargetTypeSelectorDrawer(props: TargetTypeSelectorDrawerProps) {
         {
           evaluatorType: "langevals/pairwise_compare",
           category: "llm_judge",
-          pairwiseContext: complexProps.pairwiseContext as TargetTypeSelectorDrawerProps["pairwiseContext"],
+          pairwiseContext:
+            complexProps.pairwiseContext as TargetTypeSelectorDrawerProps["pairwiseContext"],
         },
         { replace: true },
       );
