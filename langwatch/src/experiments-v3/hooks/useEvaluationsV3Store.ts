@@ -560,6 +560,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       };
 
       // Also auto-map evaluator inputs for this new target
+      const newTargets = [...state.targets, targetWithMappings];
       const evaluatorsWithNewMappings = state.evaluators.map((evaluator) => {
         const newMappings = inferAllEvaluatorMappings(
           evaluator,
@@ -574,11 +575,32 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
           }
           Object.assign(mergedMappings[datasetId]!, targetMappings);
         }
+
+        // Auto-wire pairwise variants when going from 1 → 2 targets.
+        // Guard: only fires at exactly 2 targets (3+ is ambiguous).
+        if (
+          evaluator.evaluatorType === "langevals/pairwise_compare" &&
+          evaluator.pairwise &&
+          newTargets.length === 2 &&
+          !evaluator.pairwise.variantA &&
+          !evaluator.pairwise.variantB
+        ) {
+          return {
+            ...evaluator,
+            mappings: mergedMappings,
+            pairwise: {
+              ...evaluator.pairwise,
+              variantA: state.targets[0]!.id,
+              variantB: targetWithMappings.id,
+            },
+          };
+        }
+
         return { ...evaluator, mappings: mergedMappings };
       });
 
       return {
-        targets: [...state.targets, targetWithMappings],
+        targets: newTargets,
         evaluators: evaluatorsWithNewMappings,
       };
     });
@@ -766,13 +788,33 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         state.datasets,
         state.targets,
       );
-      const evaluatorWithMappings = {
+      let evaluatorWithMappings = {
         ...evaluator,
         mappings: {
           ...evaluator.mappings,
           ...autoMappings,
         },
       };
+
+      // Auto-wire pairwise variants when exactly 2 targets already exist.
+      // Guard: only fires at exactly 2 targets (3+ is ambiguous, user configures manually).
+      if (
+        evaluatorWithMappings.evaluatorType === "langevals/pairwise_compare" &&
+        evaluatorWithMappings.pairwise &&
+        state.targets.length === 2 &&
+        !evaluatorWithMappings.pairwise.variantA &&
+        !evaluatorWithMappings.pairwise.variantB
+      ) {
+        evaluatorWithMappings = {
+          ...evaluatorWithMappings,
+          pairwise: {
+            ...evaluatorWithMappings.pairwise,
+            variantA: state.targets[0]!.id,
+            variantB: state.targets[1]!.id,
+          },
+        };
+      }
+
       return {
         evaluators: [...state.evaluators, evaluatorWithMappings],
       };
