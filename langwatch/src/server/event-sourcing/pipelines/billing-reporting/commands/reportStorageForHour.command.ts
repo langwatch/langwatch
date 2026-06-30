@@ -6,6 +6,7 @@ import {
   withScope,
 } from "~/utils/posthogErrorCapture";
 import type { UsageReportingService } from "../../../../../../ee/billing/services/usageReportingService";
+import { STORAGE_METER_EVENT_NAME } from "../../../../../../ee/billing/stripe/storagePricing";
 import type { StorageBillingCheckpointService } from "../../../../app-layer/billing/storageBillingCheckpoint.service";
 import type { StorageUsageHourlyRepository } from "../../../../app-layer/billing/storageUsageHourly.repository";
 import type { OrganizationService } from "../../../../app-layer/organizations/organization.service";
@@ -19,9 +20,6 @@ import { BILLING_REPORT_COMMAND_TYPES } from "../schemas/constants";
 const logger = createLogger(
   "langwatch:billing-reporting:report-storage-for-hour",
 );
-
-/** Stripe meter event name for additive hourly storage (MiB). */
-const STORAGE_MEGABYTES_EVENT_NAME = "langwatch_storage_megabytes_hourly";
 
 /** Maximum consecutive failures before the circuit-breaker trips. */
 const MAX_CONSECUTIVE_FAILURES = 5;
@@ -233,7 +231,7 @@ export class ReportStorageForHourCommand
         organizationId,
         events: [
           {
-            eventName: STORAGE_MEGABYTES_EVENT_NAME,
+            eventName: STORAGE_METER_EVENT_NAME,
             identifier,
             timestamp: Math.floor(sealedHourDate.getTime() / 1000),
             value: hour.megabytes,
