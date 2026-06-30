@@ -1,9 +1,3 @@
-# Spec introduced ahead of its implementation (the measurement lands in the
-# stacked PR that adds the binding tests). Until then every scenario is an
-# @unimplemented tracked gap so the feature-parity gate doesn't require bindings
-# that live on a later branch. The implementation PR removes this feature-level
-# tag and binds each scenario to a test.
-@unimplemented
 Feature: Billable stored-bytes measurement (ADR-027, Phase 2)
   As the storage-billing pipeline
   I want to measure the stored bytes an organization holds that are older than the free window, as of a sealed hour
@@ -109,21 +103,26 @@ Feature: Billable stored-bytes measurement (ADR-027, Phase 2)
     Then the comparison uses the same column expression the TTL DELETE uses, sourced from the retention config
     So that billing can never diverge from deletion by reimplementing the conversion
 
-  # evaluation_runs is the one table whose partition key (ScheduledAt, nullable) differs from its
-  # retention/TTL column (UpdatedAt). We do NOT synthesize a ScheduledAt predicate from the UpdatedAt
-  # predicate — UpdatedAt <= cutoff does not imply ScheduledAt <= cutoff (ScheduledAt can be future or
-  # NULL), so such a predicate would silently drop rows from the bill.
+  # evaluation_runs is retention-anchored on UpdatedAt (the column the TTL DELETE ages on). Its
+  # PARTITION BY column is deliberately NOT relied upon: it differs across environments (schema drift,
+  # see issue #5209 — some report toYearWeek(UpdatedAt), some toYearWeek(ScheduledAt), with ScheduledAt
+  # nullable in at least one). So we filter ONLY on UpdatedAt and never synthesize a partition-key
+  # predicate to force pruning — UpdatedAt <= cutoff does not imply ScheduledAt <= cutoff (ScheduledAt
+  # can be future, and is nullable in some environments), so such a predicate would silently drop rows
+  # from the bill. Partition pruning is a best-effort side effect (it happens only where UpdatedAt is
+  # itself the partition key); billing correctness never depends on it.
   @unit
-  Scenario: A table whose partition key differs from its retention column is not pruned by an unsound predicate
-    Given the evaluation_runs table partitioned by ScheduledAt but retention-anchored on UpdatedAt
+  Scenario: The query filters only on the retention column, never on an assumed partition key
+    Given the evaluation_runs table retention-anchored on UpdatedAt with a partition key not guaranteed across environments
     When billable storage is measured as of H
     Then the query filters only on the UpdatedAt retention column
-    And no ScheduledAt predicate is synthesized that could exclude future-dated or NULL-ScheduledAt rows
+    And no predicate is synthesized on any other column that could exclude future-dated or NULL rows
 
   # KNOWN, ACCEPTED SEMANTIC (needs sign-off): evaluation_runs is billed on UpdatedAt, which is
   # mutable. A row re-written after creation resets its age and can fall back inside the free window.
   # This is the only column under which "billed iff still present" stays coherent with what TTL
-  # deletes (ScheduledAt/StartedAt are nullable and rejected by ClickHouse TTL).
+  # deletes: UpdatedAt is non-null and TTL-valid, whereas StartedAt (and ScheduledAt, in some
+  # environments — see #5209) is nullable and rejected by ClickHouse TTL.
   @unit
   Scenario: evaluation_runs bills on time-since-last-update, a documented limitation
     Given an evaluation_runs row older than the free window by creation but updated within the free window
@@ -150,7 +149,9 @@ Feature: Billable stored-bytes measurement (ADR-027, Phase 2)
   # ReplacingMergeTree tables count every un-collapsed row version in a plain sum(_size_bytes), so a
   # churny tenant's un-merged duplicates over-bill. Billing — unlike the UI's degrade-to-0 display —
   # cannot silently over-count. The dedup-vs-OOM trade-off must be a decided, documented behaviour.
-  @integration
+  # @unimplemented: needs a real ClickHouse instance with un-merged parts; deferred to a dedicated
+  # integration test (see PR follow-ups). Tracked gap, not yet bound.
+  @integration @unimplemented
   Scenario: Un-merged duplicate row versions do not silently over-bill
     Given a table with un-merged duplicate versions of the same row
     When billable storage is measured as of H
