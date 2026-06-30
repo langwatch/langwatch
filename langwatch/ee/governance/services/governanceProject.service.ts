@@ -42,6 +42,27 @@ export const PROJECT_KIND = {
 export type ProjectKind = (typeof PROJECT_KIND)[keyof typeof PROJECT_KIND];
 
 /**
+ * Read-only lookup of the org's hidden Governance Project. Unlike
+ * `ensureHiddenGovernanceProject`, this NEVER creates — read paths (e.g.
+ * the personal-usage rollups powering /me) must not provision a
+ * Governance Project as a side effect of a GET. Returns null when the org
+ * has never minted an ingestion source, in which case there is no
+ * ingestion-ledger traffic to union in.
+ */
+export async function findHiddenGovernanceProject(
+  prisma: PrismaClient,
+  organizationId: string,
+): Promise<Project | null> {
+  return prisma.project.findFirst({
+    where: {
+      kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+      team: { organizationId },
+      archivedAt: null,
+    },
+  });
+}
+
+/**
  * Resolve the org's hidden Governance Project, creating one on first
  * call. Idempotent — concurrent callers may briefly race; the
  * org-scoped composite-unique guard on (teamId, kind) collapses the
@@ -56,13 +77,7 @@ export async function ensureHiddenGovernanceProject(
   prisma: PrismaClient,
   organizationId: string,
 ): Promise<Project> {
-  const existing = await prisma.project.findFirst({
-    where: {
-      kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
-      team: { organizationId },
-      archivedAt: null,
-    },
-  });
+  const existing = await findHiddenGovernanceProject(prisma, organizationId);
   if (existing) return existing;
 
   const team = await prisma.team.findFirst({

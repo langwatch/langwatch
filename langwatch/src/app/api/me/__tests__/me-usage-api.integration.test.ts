@@ -76,6 +76,57 @@ async function insertTrace({
   });
 }
 
+/**
+ * Minimal gateway_budget_ledger_events seed — mirrors the columns
+ * insertDebit writes (budget.clickhouse.repository.ts). PRINCIPAL-scope
+ * rows are how ingestion sources (Claude Code OTLP) land per-user spend,
+ * written under the org's hidden Governance Project tenant.
+ */
+async function insertLedgerRow({
+  ch,
+  tenantId,
+  scopeId,
+  amountUsd,
+  model,
+  occurredAt,
+}: {
+  ch: ClickHouseClient;
+  tenantId: string;
+  scopeId: string;
+  amountUsd: number;
+  model: string;
+  occurredAt: Date;
+}): Promise<void> {
+  await ch.insert({
+    table: "gateway_budget_ledger_events",
+    values: [
+      {
+        TenantId: tenantId,
+        BudgetId: `budget-${nanoid(6)}`,
+        Scope: "principal",
+        ScopeId: scopeId,
+        Window: "MONTH",
+        VirtualKeyId: "",
+        ProviderCredentialId: "",
+        GatewayRequestId: `req-${nanoid(8)}`,
+        AmountUSD: amountUsd,
+        TokensInput: 10,
+        TokensOutput: 5,
+        TokensCacheRead: 0,
+        TokensCacheWrite: 0,
+        Model: model,
+        ProviderSlot: "",
+        DurationMS: 0,
+        Status: "success",
+        OccurredAt: occurredAt.getTime(),
+        EventTimestamp: occurredAt.getTime(),
+      },
+    ],
+    format: "JSONEachRow",
+    clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+  });
+}
+
 describe("Feature: Personal usage REST API", () => {
   const ns = `me-usage-api-${nanoid(8)}`;
 
@@ -94,6 +145,14 @@ describe("Feature: Personal usage REST API", () => {
   // to prove the ownership guard (caller must own the project it targets).
   let otherUsersPersonalProjectId: string;
   let callerUserToken: string;
+
+  // Ingestion-source fixtures: a hidden Governance Project (where PRINCIPAL
+  // ledger rows land), plus a dedicated user + personal project so the
+  // ledger seed doesn't perturb the seededProject assertions above.
+  let governanceProjectId: string;
+  let ingestionProject: { id: string; apiKey: string };
+  let ingestionUserId: string;
+  const foreignGovTenantId = `project_foreign_gov_${nanoid(8)}`;
 
   // Deterministic window around the seeded in-window trace.
   const inWindow = new Date(Date.UTC(2026, 0, 15, 12, 0, 0));
@@ -233,6 +292,53 @@ describe("Feature: Personal usage REST API", () => {
       })
     ).token;
 
+    // Hidden Governance Project for the org — ingestion-source PRINCIPAL
+    // ledger rows are written under this tenant (ingestionRoutes.ts).
+    const governanceProject = await prisma.project.create({
+      data: {
+        id: `project_${nanoid()}`,
+        name: "Governance (internal)",
+        slug: `governance-${testOrganization.id}`,
+        language: "internal",
+        framework: "governance",
+        apiKey: `sk-lw-${nanoid(48)}`,
+        teamId: testTeam.id,
+        kind: "internal_governance",
+        isPersonal: false,
+        ownerUserId: null,
+      },
+    });
+    governanceProjectId = governanceProject.id;
+
+    // Dedicated ingestion user + personal project (keeps the seededProject
+    // assertions above untouched).
+    const ingestionUser = await prisma.user.create({
+      data: { name: "Ingestion User", email: `ingest-${ns}@example.com` },
+    });
+    ingestionUserId = ingestionUser.id;
+    await prisma.organizationUser.create({
+      data: {
+        userId: ingestionUserId,
+        organizationId: testOrganization.id,
+        role: OrganizationUserRole.MEMBER,
+      },
+    });
+    const ingestionApiKey = `sk-lw-${nanoid(48)}`;
+    const ingestionProj = await prisma.project.create({
+      data: {
+        id: `project_${nanoid()}`,
+        name: "Ingestion Personal Workspace",
+        slug: `--test-ingest-${nanoid(8)}`,
+        language: "typescript",
+        framework: "other",
+        apiKey: ingestionApiKey,
+        teamId: testTeam.id,
+        isPersonal: true,
+        ownerUserId: ingestionUserId,
+      },
+    });
+    ingestionProject = { id: ingestionProj.id, apiKey: ingestionApiKey };
+
     if (ch) {
       // One trace inside the window, one outside — the window test proves the
       // out-of-window trace is excluded.
@@ -252,12 +358,51 @@ describe("Feature: Personal usage REST API", () => {
         totalCost: 2.0,
         models: ["claude-opus-4-8"],
       });
+
+      // Ingestion ledger for ingestionUser: one row under THIS org's
+      // governance tenant (must count), one under a FOREIGN tenant (must be
+      // excluded by the TenantId scope — the multi-org-leak guard), and one
+      // under the right tenant but OUT of window (must be excluded by time).
+      await insertLedgerRow({
+        ch,
+        tenantId: governanceProjectId,
+        scopeId: ingestionUserId,
+        amountUsd: 0.3,
+        model: "claude-sonnet-4-6",
+        occurredAt: inWindow,
+      });
+      await insertLedgerRow({
+        ch,
+        tenantId: foreignGovTenantId,
+        scopeId: ingestionUserId,
+        amountUsd: 99.0,
+        model: "gpt-4o",
+        occurredAt: inWindow,
+      });
+      await insertLedgerRow({
+        ch,
+        tenantId: governanceProjectId,
+        scopeId: ingestionUserId,
+        amountUsd: 7.0,
+        model: "claude-sonnet-4-6",
+        occurredAt: outOfWindow,
+      });
     }
   });
 
   afterAll(async () => {
     if (ch) {
       await cleanupTestData(seededProject.id).catch(() => {});
+      // gateway_budget_ledger_events isn't covered by cleanupTestData.
+      // Best-effort delete the rows this suite seeded (unique ScopeId per
+      // run, so a lagging async mutation can't collide with other suites).
+      await ch
+        .command({
+          query:
+            "ALTER TABLE gateway_budget_ledger_events DELETE WHERE ScopeId = {scopeId:String}",
+          query_params: { scopeId: ingestionUserId },
+        })
+        .catch(() => {});
     }
     await prisma.apiKey
       .deleteMany({ where: { organizationId: testOrganization.id } })
@@ -466,6 +611,37 @@ describe("Feature: Personal usage REST API", () => {
           }),
         });
         expect(res.status).toBe(200);
+      });
+    });
+  });
+
+  describe("given ingestion-source spend in the org's governance tenant", () => {
+    describe("when reading usage for the explicit window", () => {
+      /** @scenario "Ingestion ledger spend is unioned, scoped to this org's tenant" */
+      it("unions only this org's governance-tenant rows, excluding foreign tenants", async () => {
+        const res = await app.request(
+          `/api/me/usage?windowStartMs=${windowStartMs}&windowEndMs=${windowEndMs}`,
+          {
+            headers: authHeaders({
+              apiKey: ingestionProject.apiKey,
+              projectId: ingestionProject.id,
+            }),
+          },
+        );
+        expect(res.status).toBe(200);
+        const body = await res.json();
+
+        // Only the in-org, in-window ledger row ($0.30, 1 request) counts.
+        // The $99 foreign-tenant row is excluded by the TenantId scope (the
+        // multi-org leak guard) and the $7 out-of-window row by time.
+        expect(body.summary.spentUsd).toBeCloseTo(0.3, 5);
+        expect(body.summary.requests).toBe(1);
+        const labels = body.breakdownByModel.map(
+          (m: { label: string }) => m.label,
+        );
+        expect(labels).toContain("claude-sonnet-4-6");
+        // gpt-4o only appears on the foreign-tenant row — proves exclusion.
+        expect(labels).not.toContain("gpt-4o");
       });
     });
   });
