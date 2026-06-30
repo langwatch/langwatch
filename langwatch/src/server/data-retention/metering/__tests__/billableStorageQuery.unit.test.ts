@@ -47,7 +47,7 @@ describe("buildBillableStorageQuery", () => {
       expect(sql).not.toContain("IN (");
     });
 
-    /** @scenario A table whose partition key differs from its retention column is not pruned by an unsound predicate */
+    /** @scenario The query filters only on the retention column, never on an assumed partition key */
     /** @scenario evaluation_runs bills on time-since-last-update, a documented limitation */
     it("ages evaluation_runs on UpdatedAt and never synthesizes a ScheduledAt predicate", () => {
       expect(BILLABLE_AGE_EXPR_BY_TABLE.evaluation_runs).toBe(
