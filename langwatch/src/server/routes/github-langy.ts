@@ -365,12 +365,7 @@ secured
         organizationId: state.organizationId,
       }))
     ) {
-      return callbackError(
-        c,
-        state,
-        "Not a member of this organization",
-        403,
-      );
+      return callbackError(c, state, "Not a member of this organization", 403);
     }
 
     const redirectUri = `${appOrigin(c.req.url)}/api/github-langy/callback`;
