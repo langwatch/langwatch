@@ -30,6 +30,9 @@ export class ProjectRepository {
       select: { apiKey: true, team: { select: { organizationId: true } } },
     });
     if (!project?.team) return null;
-    return { apiKey: project.apiKey, organizationId: project.team.organizationId };
+    return {
+      apiKey: project.apiKey,
+      organizationId: project.team.organizationId,
+    };
   }
 }

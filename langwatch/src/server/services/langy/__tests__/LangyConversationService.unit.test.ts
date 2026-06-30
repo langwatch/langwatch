@@ -171,8 +171,8 @@ describe("LangyConversationService", () => {
   });
 
   describe("when getAll maps rows for the conversation list", () => {
-    it("exposes the row's updatedAt as lastActivityAt (the field the UI sorts on)", async () => {
-      const updatedAt = new Date("2026-05-01T10:00:00.000Z");
+    it("exposes the row's lastActivityAt and messageCount for the UI list", async () => {
+      const lastActivityAt = new Date("2026-05-01T10:00:00.000Z");
       const repo = makeRepo({
         findAllForUser: vi.fn().mockResolvedValue([
           {
@@ -180,8 +180,9 @@ describe("LangyConversationService", () => {
             title: "t",
             isShared: false,
             userId: "alice",
-            updatedAt,
-            _count: { messages: 3 },
+            lastActivityAt,
+            messageCount: 3,
+            createdAt: new Date("2026-04-01T00:00:00.000Z"),
           },
         ]),
       });
@@ -190,10 +191,30 @@ describe("LangyConversationService", () => {
       expect(result[0]).toMatchObject({
         id: "c1",
         isOwn: true,
-        lastActivityAt: updatedAt,
+        lastActivityAt,
         messageCount: 3,
       });
       expect(result[0]).not.toHaveProperty("updatedAt");
+    });
+
+    it("falls back to createdAt when lastActivityAt is null (row created before first message)", async () => {
+      const createdAt = new Date("2026-04-01T00:00:00.000Z");
+      const repo = makeRepo({
+        findAllForUser: vi.fn().mockResolvedValue([
+          {
+            id: "c2",
+            title: null,
+            isShared: false,
+            userId: "alice",
+            lastActivityAt: null,
+            messageCount: 0,
+            createdAt,
+          },
+        ]),
+      });
+      const svc = new LangyConversationService(repo);
+      const result = await svc.getAll({ projectId: "p1", userId: "alice" });
+      expect(result[0]?.lastActivityAt).toEqual(createdAt);
     });
   });
 

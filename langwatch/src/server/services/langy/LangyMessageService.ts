@@ -116,7 +116,9 @@ export class LangyMessageService {
     const resolver: ClickHouseClientResolver = async (projectId) => {
       const client = await getClickHouseClientForProject(projectId);
       if (!client)
-        throw new Error(`No ClickHouse client configured for project ${projectId}`);
+        throw new Error(
+          `No ClickHouse client configured for project ${projectId}`,
+        );
       return client;
     };
     return new LangyMessageService(new LangyMessageRepository(resolver));
