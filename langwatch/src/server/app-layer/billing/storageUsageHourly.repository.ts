@@ -24,6 +24,25 @@ export interface StorageUsageHourlyRepository {
     sealedHour: Date;
     reportedAt: Date;
   }): Promise<void>;
+
+  /**
+   * Inserts a measured hour, doing nothing if the (org, hour) row already
+   * exists (ON CONFLICT DO NOTHING). Idempotent so the dispatcher can re-measure
+   * a hour across pods/restarts without ever double-counting or clobbering a
+   * row that may already be reported.
+   */
+  recordHour(params: {
+    organizationId: string;
+    sealedHour: Date;
+    megabytes: number;
+  }): Promise<void>;
+
+  /**
+   * The latest sealed hour already measured for an organization, or null if it
+   * has none. The dispatcher's cursor — read per run so it survives restarts
+   * and stays correct across pods without in-memory state.
+   */
+  getLastMeasuredHour(params: { organizationId: string }): Promise<Date | null>;
 }
 
 export class PrismaStorageUsageHourlyRepository
@@ -61,5 +80,33 @@ export class PrismaStorageUsageHourlyRepository
       },
       data: { reportedAt: params.reportedAt },
     });
+  }
+
+  async recordHour(params: {
+    organizationId: string;
+    sealedHour: Date;
+    megabytes: number;
+  }): Promise<void> {
+    await this.prisma.storageUsageHourly.createMany({
+      data: [
+        {
+          organizationId: params.organizationId,
+          sealedHour: params.sealedHour,
+          megabytes: params.megabytes,
+        },
+      ],
+      skipDuplicates: true,
+    });
+  }
+
+  async getLastMeasuredHour(params: {
+    organizationId: string;
+  }): Promise<Date | null> {
+    const row = await this.prisma.storageUsageHourly.findFirst({
+      where: { organizationId: params.organizationId },
+      orderBy: { sealedHour: "desc" },
+      select: { sealedHour: true },
+    });
+    return row?.sealedHour ?? null;
   }
 }
