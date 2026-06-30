@@ -10,6 +10,7 @@ import {
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
 import { prisma as globalPrisma } from "~/server/db";
+import { featureFlagService } from "~/server/featureFlag/featureFlag.service";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
@@ -49,6 +50,7 @@ import {
   type AppCommands,
   PipelineRegistry,
 } from "../event-sourcing/pipelineRegistry";
+import { BILLING_REPORTING_PIPELINE_NAME } from "../event-sourcing/pipelines/billing-reporting/pipeline";
 import { createExperimentRunItemAppendStore } from "../event-sourcing/pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
 import {
   ExperimentRunStateRepositoryClickHouse,
@@ -74,6 +76,7 @@ import { runEvaluationWorkflow } from "../workflows/runWorkflow";
 import { App, getApp, globalForApp, initializeApp } from "./app";
 import { PrismaBillingCheckpointService } from "./billing/billingCheckpoint.service";
 import { PrismaStorageBillingCheckpointService } from "./billing/storageBillingCheckpoint.service";
+import { StorageMeterDispatchService } from "./billing/storageMeterDispatch.service";
 import { PrismaStorageUsageHourlyRepository } from "./billing/storageUsageHourly.repository";
 import { BroadcastService } from "./broadcast/broadcast.service";
 import { createClickHouseClientFromConfig } from "./clients/clickhouse.factory";
@@ -496,6 +499,13 @@ export function initializeDefaultApp(options?: {
     "ShareService",
   );
 
+  // ADR-027 Phase 4: shared StorageUsageHourly repo (registry + dispatch) and a
+  // forward reference for the dispatch service, which is built after the command
+  // pipeline exists. The reactor's getStorageMeterDispatch is lazy, so the
+  // late assignment is safe — it's only dereferenced at event-handling time.
+  const storageUsageHourlyRepo = new PrismaStorageUsageHourlyRepository(prisma);
+  let storageMeterDispatchService: StorageMeterDispatchService | undefined;
+
   const es = new EventSourcing({
     clickhouse: clickhouseEnabled ? resolveClickHouseClient : void 0,
     redis,
@@ -503,6 +513,9 @@ export function initializeDefaultApp(options?: {
     isSaas: config.isSaas,
     processRole: config.processRole,
     retentionPolicyResolver: retentionPolicyCache,
+    getStorageMeterDispatch: config.isSaas
+      ? () => (params) => storageMeterDispatchService!.dispatchForOrg(params)
+      : undefined,
   });
 
   // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
@@ -573,7 +586,7 @@ export function initializeDefaultApp(options?: {
     storageBillingCheckpoints: new PrismaStorageBillingCheckpointService(
       prisma,
     ),
-    storageUsageHourly: new PrismaStorageUsageHourlyRepository(prisma),
+    storageUsageHourly: storageUsageHourlyRepo,
     usageReportingService,
     gatewayBudgetSync,
     // ADR-022: Inject BlobStore into the pipeline registry so RecordSpanCommand
@@ -586,6 +599,27 @@ export function initializeDefaultApp(options?: {
   const commands = registry.registerAll();
   (globalForApp as any).__scenarioExecutionHandle =
     commands.scenarioExecutionHandle;
+
+  // ADR-027 Phase 4: now that the command pipeline exists, build the storage
+  // meter dispatch brain and satisfy the forward reference the ES reactor holds.
+  if (config.isSaas) {
+    storageMeterDispatchService = new StorageMeterDispatchService({
+      isMeteringEnabled: (organizationId) =>
+        featureFlagService.isEnabled("release_storage_billing_metering", {
+          distinctId: organizationId,
+          organizationId,
+        }),
+      getBillableOrg: (organizationId) =>
+        organizations.getOrganizationForBilling(organizationId),
+      measureBytesAt: (params) =>
+        storageMeterService.getBillableStorageBytesForOrgAt(params),
+      storageUsageHourly: storageUsageHourlyRepo,
+      enqueueReport: (data) =>
+        es
+          .getPipeline(BILLING_REPORTING_PIPELINE_NAME)
+          .commands.reportStorageForHour.send(data),
+    });
+  }
 
   const suiteRunService = SuiteRunService.create({
     resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
