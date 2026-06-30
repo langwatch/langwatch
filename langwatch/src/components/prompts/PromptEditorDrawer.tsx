@@ -479,6 +479,11 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         : defaults;
 
       setConfigValues(formValues);
+      // Treat the fallback baseline as the "saved" reference for dirty tracking.
+      // Without this, the watch sees a non-null promptId AND an empty
+      // savedFormValuesRef, falls through both branches, leaves isUnsaved=false,
+      // and silently drops every edit by calling onLocalConfigChange(undefined).
+      savedFormValuesRef.current = formValues;
       // Set ref BEFORE methods.reset() — see comment in DB prompt branch above.
       isFormInitializedRef.current = true;
       methods.reset(formValues);

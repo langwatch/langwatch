@@ -95,6 +95,9 @@ vi.mock("~/optimization_studio/components/nodes/Nodes", () => ({
 
 // Track initialConfigValues passed to usePromptConfigForm
 const capturedInitialConfigValues: unknown[] = [];
+// Track the latest form methods returned by the mock so tests can drive edits
+// and exercise the real watch subscription inside PromptEditorDrawer.
+const capturedFormMethods: ReturnType<typeof useForm>[] = [];
 
 // Mock usePromptConfigForm to return a real form
 const mockDefaultFormValues = {
@@ -122,6 +125,7 @@ vi.mock("~/prompts/hooks/usePromptConfigForm", () => ({
     const methods = useForm({
       defaultValues: initialConfigValues ?? mockDefaultFormValues,
     });
+    capturedFormMethods.push(methods);
     return { methods };
   },
 }));
@@ -344,6 +348,7 @@ describe("PromptEditorDrawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     capturedInitialConfigValues.length = 0;
+    capturedFormMethods.length = 0;
     mockGetByIdOrHandle.mockReturnValue({ data: undefined, isLoading: false });
     // Default: form values equal saved values (no changes)
     mockAreFormValuesEqual.mockReturnValue(true);
@@ -1156,6 +1161,64 @@ describe("PromptEditorDrawer", () => {
           ),
         );
         expect(usedFallback).toBe(true);
+      });
+    });
+
+    /**
+     * Regression for the dirty-tracking gap in the missing-prompt branch.
+     * Before the fix, the watch subscription saw promptId set AND
+     * savedFormValuesRef.current undefined, so neither dirty-tracking branch
+     * fired and onLocalConfigChange(undefined) was called instead of the
+     * extracted config — silently dropping every edit the user made to the
+     * imported workflow's prompt.
+     */
+    it("propagates edits to the fallback via onLocalConfigChange", async () => {
+      const inlineConfigFallback = {
+        llm: { model: "gpt-5-mini" },
+        messages: [
+          { role: "system" as const, content: "INLINE-FALLBACK-CONTENT" },
+        ],
+        inputs: [{ identifier: "question", type: "str" as const }],
+        outputs: [{ identifier: "answer", type: "str" as const }],
+      };
+      // Form values differ from the fallback baseline once edited; the watch
+      // subscription must observe this and mark the form as unsaved.
+      mockAreFormValuesEqual.mockReturnValue(false);
+      const onLocalConfigChange = vi.fn();
+
+      renderWithProviders(
+        <PromptEditorDrawer
+          open={true}
+          promptId="missing-prompt"
+          inlineConfigFallback={inlineConfigFallback}
+          onLocalConfigChange={onLocalConfigChange}
+        />,
+      );
+
+      // Wait until the form has initialized with the fallback content.
+      await waitFor(() => {
+        expect(capturedFormMethods.length).toBeGreaterThan(0);
+      });
+
+      // Simulate a user edit to the system message.
+      const methods = capturedFormMethods[capturedFormMethods.length - 1]!;
+      methods.setValue(
+        "version.configData.messages.0.content",
+        "EDITED-IN-MISSING-PROMPT-BRANCH",
+      );
+
+      // The bridge must receive a real LocalPromptConfig with the edited
+      // content — never undefined — so the studio can persist the edit.
+      await waitFor(() => {
+        const editedCall = onLocalConfigChange.mock.calls.find((args) => {
+          const cfg = args[0] as
+            | { messages?: Array<{ content?: string }> }
+            | undefined;
+          return cfg?.messages?.some(
+            (m) => m?.content === "EDITED-IN-MISSING-PROMPT-BRANCH",
+          );
+        });
+        expect(editedCall).toBeDefined();
       });
     });
   });
