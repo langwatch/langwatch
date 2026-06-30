@@ -73,6 +73,8 @@ import { TraceUsageService } from "../traces/trace-usage.service";
 import { runEvaluationWorkflow } from "../workflows/runWorkflow";
 import { App, getApp, globalForApp, initializeApp } from "./app";
 import { PrismaBillingCheckpointService } from "./billing/billingCheckpoint.service";
+import { PrismaStorageBillingCheckpointService } from "./billing/storageBillingCheckpoint.service";
+import { PrismaStorageUsageHourlyRepository } from "./billing/storageUsageHourly.repository";
 import { BroadcastService } from "./broadcast/broadcast.service";
 import { createClickHouseClientFromConfig } from "./clients/clickhouse.factory";
 import { NullLangevalsClient } from "./clients/langevals/langevals.client";
@@ -568,6 +570,10 @@ export function initializeDefaultApp(options?: {
     esSync: { esClient, traceIndex: TRACE_INDEX, traceIndexId, prisma },
     costRecorder: new PrismaEvaluationCostRecorder(prisma),
     billingCheckpoints: new PrismaBillingCheckpointService(prisma),
+    storageBillingCheckpoints: new PrismaStorageBillingCheckpointService(
+      prisma,
+    ),
+    storageUsageHourly: new PrismaStorageUsageHourlyRepository(prisma),
     usageReportingService,
     gatewayBudgetSync,
     // ADR-022: Inject BlobStore into the pipeline registry so RecordSpanCommand
@@ -964,6 +970,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       } as AppCommands["suiteRuns"],
       billing: {
         reportUsageForMonth: noop,
+        reportStorageForHour: noop,
       } as AppCommands["billing"],
       scenarioExecutionHandle: {
         reactor: {
