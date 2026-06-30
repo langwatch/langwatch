@@ -321,7 +321,7 @@ vi.mock("~/server/services/langy/LangyConversationService", () => ({
   LangyConversationService: {
     create: () => ({
       ensureConversation: (...args: unknown[]) => ensureConversation(...args),
-      touch: (...args: unknown[]) => touchConversation(...args),
+      bumpActivity: (...args: unknown[]) => touchConversation(...args),
     }),
   },
 }));
