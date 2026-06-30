@@ -61,6 +61,28 @@ func getFreePort() (int, error) {
 	return port, nil
 }
 
+// getFreePortInRange asks the kernel for a free port WITHIN [min, max].
+// Used for the INTERNAL opencode listen so the iptables loopback-lockdown
+// rule can target a known port range. The kernel picks an ephemeral port
+// (range governed by /proc/sys/net/ipv4/ip_local_port_range, usually
+// 32768-60999) which overlaps our locked window; we retry until the pick
+// falls inside [min, max]. Bounded loop — with a 10k-slot range and ~36%
+// overlap, rarely loops more than twice.
+func getFreePortInRange(minPort, maxPort int) (int, error) {
+	for try := 0; try < 64; try++ {
+		l, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			return 0, err
+		}
+		port := l.Addr().(*net.TCPAddr).Port
+		_ = l.Close()
+		if port >= minPort && port <= maxPort {
+			return port, nil
+		}
+	}
+	return 0, fmt.Errorf("no free port in range %d-%d after 64 tries", minPort, maxPort)
+}
+
 // waitForReadiness polls the worker's HTTP root until any response comes
 // back. opencode answers 404 on /, which is fine — any HTTP status means
 // the server is listening. Connection refused is the "not yet" state we

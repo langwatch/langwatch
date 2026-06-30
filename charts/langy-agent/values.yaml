@@ -101,11 +101,23 @@ containerSecurityContext:
   allowPrivilegeEscalation: false
   capabilities:
     drop: ["ALL"]
-    # These four are required so the manager can chown per-session dirs to
-    # a unique UID, write 0600 config blobs as that UID, and spawn the
-    # OpenCode subprocess directly into it. Any addition beyond this needs
-    # to be justified in the SecurityContext header above.
-    add: ["CHOWN", "DAC_OVERRIDE", "SETUID", "SETGID"]
+    # CHOWN, DAC_OVERRIDE, SETUID, SETGID are required so the manager can
+    # chown per-session dirs to a unique UID, write 0600 config blobs as
+    # that UID, and spawn the OpenCode subprocess directly into it.
+    #
+    # NET_ADMIN was added on 2026-06-30 so the manager can install an
+    # iptables OUTPUT rule at startup that drops loopback-TCP packets
+    # from non-root UIDs to the locked opencode internal port range
+    # (40000-49999). Without that rule, a prompt-injected worker scans
+    # /proc/net/tcp, connects to a sibling worker's unauthenticated
+    # opencode TCP as the victim's UID, and `env` exfiltrates the
+    # victim's LANGWATCH_API_KEY / GH_TOKEN / OPENAI_API_KEY out of the
+    # victim's own process. See services/langy-agent/iptables.go for
+    # the exact rule and Sergio's P1 review on PR #4913 for the threat.
+    #
+    # Any addition beyond this needs to be justified in the
+    # SecurityContext header above.
+    add: ["CHOWN", "DAC_OVERRIDE", "SETUID", "SETGID", "NET_ADMIN"]
 
 # Sandboxed container runtime for this pod. The agent runs LLM-driven
 # arbitrary code (opencode workers shell out to git/npm/gh), so the headline

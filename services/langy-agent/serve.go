@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -17,6 +18,26 @@ import (
 // SIGINT or ctx cancellation. Mirrors the JS manager's lifecycle (start
 // reaper, accept traffic, drain on shutdown).
 func Serve(ctx context.Context, cfg Config, log *zap.Logger) error {
+	// Install the loopback iptables lockdown BEFORE accepting traffic so
+	// no worker spawn can race in front of the rule. Without this, a
+	// prompt-injected worker can reach a sibling worker's unauthenticated
+	// opencode internal port via /proc/net/tcp scanning. Requires
+	// CAP_NET_ADMIN on the pod (added to chart's containerSecurityContext).
+	//
+	// LANGY_LOOPBACK_LOCKDOWN_DISABLED=true downgrades a failure to a
+	// warning — for dev environments without iptables / NET_ADMIN. In
+	// production the chart NEVER sets this; the failure aborts startup
+	// rather than booting a known-insecure manager.
+	if err := LockdownLoopbackPortRange(InternalPortRangeMin, InternalPortRangeMax, log); err != nil {
+		if os.Getenv("LANGY_LOOPBACK_LOCKDOWN_DISABLED") == "true" {
+			log.Warn("loopback lockdown disabled by env — INSECURE; dev only",
+				zap.Error(err),
+			)
+		} else {
+			return fmt.Errorf("loopback lockdown init: %w (set LANGY_LOOPBACK_LOCKDOWN_DISABLED=true to bypass in dev)", err)
+		}
+	}
+
 	mgr, err := NewManager(cfg, log)
 	if err != nil {
 		return fmt.Errorf("manager init: %w", err)

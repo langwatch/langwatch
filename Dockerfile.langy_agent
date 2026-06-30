@@ -71,7 +71,15 @@ ARG OPENCODE_OTEL_PLUGIN_VERSION=1.0.0
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl git ca-certificates unzip build-essential python3 \
+    iptables \
     && rm -rf /var/lib/apt/lists/*
+# `iptables` is installed so the manager (services/langy-agent/iptables.go)
+# can install a loopback OWNER-match DROP rule at startup. The rule closes
+# the sibling-worker exfiltration path Sergio flagged on 2026-06-30:
+# without it, a prompt-injected worker scans /proc/net/tcp, connects to a
+# sibling worker's unauthenticated opencode internal port as the victim's
+# UID, and `env` exfiltrates the victim's credentials. Requires
+# CAP_NET_ADMIN on the pod (set in charts/langy-agent/values.yaml).
 
 # GitHub CLI (`gh`) is what Langy's github.md skill uses to open PRs
 # attributed to the requesting user. The user's short-lived user-to-server

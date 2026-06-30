@@ -302,7 +302,12 @@ func (m *Manager) spawn(ctx context.Context, conversationID string, creds Creden
 		cleanupUID()
 		return nil, err
 	}
-	internalPort, err := getFreePort()
+	// Internal opencode listen lives in the iptables-locked port range so
+	// the kernel drops connect() attempts from non-root UIDs at the OUTPUT
+	// chain. See iptables.go::LockdownLoopbackPortRange for the rule and
+	// Sergio's 2026-06-30 P1 for the threat (worker A scans /proc/net/tcp,
+	// connects to worker B's opencode TCP as B's UID, exfiltrates B's env).
+	internalPort, err := getFreePortInRange(InternalPortRangeMin, InternalPortRangeMax)
 	if err != nil {
 		_ = os.RemoveAll(workerHome)
 		cleanupUID()
