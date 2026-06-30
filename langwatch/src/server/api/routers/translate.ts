@@ -1,11 +1,14 @@
 import { TRPCError } from "@trpc/server";
 import { generateText } from "ai";
 import { z } from "zod";
+import { createLogger } from "~/utils/logger/server";
 import { wrapAiCall } from "../../modelProviders/aiCallFailedError";
 import { featureByKey } from "../../modelProviders/featureRegistry";
 import { getVercelAIModel } from "../../modelProviders/utils";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+
+const logger = createLogger("langwatch:translate");
 
 const TRANSLATE_FEATURE_KEY = "translate.text";
 
@@ -44,13 +47,24 @@ export const translateRouter = createTRPCRouter({
 
       // Any provider/SDK failure during the call surfaces as a typed
       // AiCallFailedError → "double-check your model configuration" toast
-      // carrying the real (truncated) provider error message.
-      const { text } = await wrapAiCall(feature, async () =>
-        generateText({
-          model,
-          prompt: `Translate the following text to English only reply with the translated text, do not include any other text: ${input.textToTranslate}`,
-        }),
-      );
+      // carrying the real (truncated) provider error message. wrapAiCall
+      // truncates that message to the first line for the client, so log the
+      // FULL underlying error server-side first — the later lines (provider
+      // status bodies, gateway 404 detail) are what we need for prod triage.
+      const { text } = await wrapAiCall(feature, async () => {
+        try {
+          return await generateText({
+            model,
+            prompt: `Translate the following text to English only reply with the translated text, do not include any other text: ${input.textToTranslate}`,
+          });
+        } catch (error) {
+          logger.error(
+            { error, projectId: input.projectId },
+            "Translation model call failed",
+          );
+          throw error;
+        }
+      });
 
       return { translation: text };
     }),

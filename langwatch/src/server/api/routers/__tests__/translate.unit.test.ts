@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ModelNotConfiguredError } from "../../../modelProviders/modelNotConfiguredError";
+import { ModelProviderDisabledError } from "../../../modelProviders/modelProviderDisabledError";
 import { createInnerTRPCContext, errorFormatterForTesting } from "../../trpc";
 import { translateRouter } from "../translate";
 
@@ -169,6 +170,41 @@ describe("translateRouter.translate()", () => {
           cause: "MODEL_NOT_CONFIGURED",
           featureKey: "translate.text",
         },
+      });
+    });
+
+    it("propagates a typed MODEL_PROVIDER_DISABLED cause to its own toast surface", async () => {
+      const modelError = new ModelProviderDisabledError(
+        "translate.text",
+        "Inline translation",
+        "FAST",
+        "project_abc123",
+        "project",
+        "openai/gpt-5-mini",
+        "openai",
+        null,
+      );
+      mockGetVercelAIModel.mockRejectedValue(modelError);
+
+      const error = await caller
+        .translate({ projectId: "project_abc123", textToTranslate: "Hola" })
+        .then(() => null)
+        .catch((e: unknown) => e);
+
+      expect(error).toMatchObject({ code: "BAD_REQUEST" });
+
+      // Serialised wire shape the frontend extractor reads — proves the
+      // typed error reaches domainErrorMiddleware untouched (the claim the
+      // translate.ts comment makes) instead of being mis-tagged as an
+      // AI_CALL_FAILED or flattened to a generic 500.
+      const wire = errorFormatterForTesting({
+        shape: { data: {} },
+        error: error as { cause?: unknown },
+      });
+      expect(wire.data.cause).toMatchObject({
+        code: "MODEL_PROVIDER_DISABLED",
+        featureKey: "translate.text",
+        providerKey: "openai",
       });
     });
   });
