@@ -49,10 +49,13 @@ export type ProjectKind = (typeof PROJECT_KIND)[keyof typeof PROJECT_KIND];
  * has never minted an ingestion source, in which case there is no
  * ingestion-ledger traffic to union in.
  */
-export async function findHiddenGovernanceProject(
-  prisma: PrismaClient,
-  organizationId: string,
-): Promise<Project | null> {
+export async function findHiddenGovernanceProject({
+  prisma,
+  organizationId,
+}: {
+  prisma: PrismaClient;
+  organizationId: string;
+}): Promise<Project | null> {
   return prisma.project.findFirst({
     where: {
       kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
@@ -77,7 +80,10 @@ export async function ensureHiddenGovernanceProject(
   prisma: PrismaClient,
   organizationId: string,
 ): Promise<Project> {
-  const existing = await findHiddenGovernanceProject(prisma, organizationId);
+  const existing = await findHiddenGovernanceProject({
+    prisma,
+    organizationId,
+  });
   if (existing) return existing;
 
   const team = await prisma.team.findFirst({

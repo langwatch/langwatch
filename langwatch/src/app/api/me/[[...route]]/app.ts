@@ -99,7 +99,10 @@ export function registerMeRoutes(
         select: { organizationId: true },
       });
       const governanceProject = team
-        ? await findHiddenGovernanceProject(prisma, team.organizationId)
+        ? await findHiddenGovernanceProject({
+            prisma,
+            organizationId: team.organizationId,
+          })
         : null;
 
       const usage = new PersonalUsageService();

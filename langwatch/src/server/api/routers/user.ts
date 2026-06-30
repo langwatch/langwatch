@@ -567,10 +567,10 @@ export const userRouter = createTRPCRouter({
       // Ingestion-source ledger rows (Claude Code OTLP, etc.) land under
       // the org's hidden Governance Project tenant. Resolve it read-only
       // so the PRINCIPAL-ledger union is scoped to this org's tenant.
-      const governanceProject = await findHiddenGovernanceProject(
-        ctx.prisma,
-        input.organizationId,
-      );
+      const governanceProject = await findHiddenGovernanceProject({
+        prisma: ctx.prisma,
+        organizationId: input.organizationId,
+      });
 
       // Run the rollup queries in parallel — they're independent and the
       // CH server happily multiplexes. userId + ingestionTenantId are
