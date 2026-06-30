@@ -207,6 +207,7 @@ describe("POST /api/langy/chat — unconnected user asks for a PR", () => {
       allowed: true,
       remaining: 20,
       resetAt: Date.now() + 86_400_000,
+      reserved: true,
     });
     releaseLangyGithubPrPermit.mockResolvedValue(undefined);
     ensureConversation.mockResolvedValue({ id: "conv-1" });

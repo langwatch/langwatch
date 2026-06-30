@@ -340,9 +340,37 @@ func (m *Manager) spawn(ctx context.Context, conversationID string, creds Creden
 		return nil, err
 	}
 
-	// Watch for the subprocess dying on its own (crash, OOM, kill). See
-	// onWorkerExit for the registry / UID / home-dir teardown logic and
-	// the replacement-race invariants it preserves.
+	// failSpawn is the cleanup path for readiness/session failures. The
+	// watcher goroutine has NOT started yet at these call sites, so this
+	// function owns cmd.Wait() without a race. It kills the process, drains
+	// its exit, shuts down the auth proxy, removes the worker home (which
+	// may already hold config.json with the project API key), and releases
+	// the UID reservation — leaving no sensitive material on the emptyDir.
+	failSpawn := func(cause error) error {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait() // drain; goroutine not started yet, no race
+		proxy.shutdown()
+		_ = os.RemoveAll(workerHome)
+		cleanupUID()
+		return cause
+	}
+
+	readinessCtx, cancel := context.WithTimeout(ctx, m.cfg.ReadinessTimeout)
+	defer cancel()
+	if err := waitForReadiness(readinessCtx, externalPort, bearerToken, m.cfg.ReadinessTimeout); err != nil {
+		return nil, failSpawn(err)
+	}
+
+	sessionID, err := createOpenCodeSession(ctx, externalPort, bearerToken)
+	if err != nil {
+		return nil, failSpawn(err)
+	}
+
+	// Process is healthy — transfer watch ownership to the goroutine.
+	// Started AFTER readiness + session so the failSpawn path above owns
+	// cmd.Wait() cleanly; starting it earlier left the watcher racing the
+	// spawnLocks guard in onWorkerExit and suppressing the home wipe on
+	// startup failures (P2 finding, goated-review langwatch-agent 2026-06-30).
 	go func() {
 		err := cmd.Wait()
 		m.log.Info("worker exited",
@@ -351,21 +379,6 @@ func (m *Manager) spawn(ctx context.Context, conversationID string, creds Creden
 		)
 		m.onWorkerExit(conversationID, cmd, uid)
 	}()
-
-	readinessCtx, cancel := context.WithTimeout(ctx, m.cfg.ReadinessTimeout)
-	defer cancel()
-	if err := waitForReadiness(readinessCtx, externalPort, bearerToken, m.cfg.ReadinessTimeout); err != nil {
-		_ = cmd.Process.Kill()
-		proxy.shutdown()
-		return nil, err
-	}
-
-	sessionID, err := createOpenCodeSession(ctx, externalPort, bearerToken)
-	if err != nil {
-		_ = cmd.Process.Kill()
-		proxy.shutdown()
-		return nil, err
-	}
 
 	m.log.Info("worker ready",
 		zap.String("conversation", conversationID),
