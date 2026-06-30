@@ -167,7 +167,7 @@ teardown() {
 # though `docker compose up` would idempotently reuse it. The guard now exempts
 # this project's own redis container and only errors on a foreign listener.
 
-# @scenario "an explicit SKIP flag short-circuits the guard"
+# @scenario "the host-redis collision check is skipped when SKIP_HOST_REDIS_CHECK is set"
 @test "check_host_redis_collision: SKIP_HOST_REDIS_CHECK=1 -> returns 0" {
   run bash -c '
     scripts_dir="$1"
@@ -181,7 +181,7 @@ teardown() {
   [ "$status" -eq 0 ]
 }
 
-# @scenario "port 6379 free -> guard passes (own redis container will start)"
+# @scenario "container presets pass the host-redis check when 6379 is free"
 @test "check_host_redis_collision: 6379 free -> returns 0" {
   run bash -c '
     scripts_dir="$1"
@@ -210,7 +210,7 @@ teardown() {
   [[ "$output" != *"already listening on host port 6379"* ]]
 }
 
-# @scenario "a foreign (non-Docker) listener on 6379 still fails loudly"
+# @scenario "a foreign listener on 6379 fails the host-redis check loudly"
 @test "check_host_redis_collision: foreign listener on 6379 -> error + exit 1" {
   run bash -c '
     scripts_dir="$1"
@@ -228,7 +228,7 @@ teardown() {
 
 # --- redis_6379_owned_by_this_project() ---
 
-# @scenario "absent docker degrades to not-owned (no crash, falls through to guard)"
+# @scenario "redis ownership degrades to not-ours when docker is unavailable"
 @test "redis_6379_owned_by_this_project: docker absent -> not owned" {
   run bash -c '
     scripts_dir="$1"; empty_dir="$2"
@@ -241,7 +241,7 @@ teardown() {
   [ "$status" -ne 0 ]
 }
 
-# @scenario "a container publishing host 6379 under THIS compose project is owned"
+# @scenario "a redis on host 6379 from this same project counts as ours"
 @test "redis_6379_owned_by_this_project: matching compose project -> owned" {
   STUB_DOCKER="$TEST_DIR/bin-docker-match"
   mkdir -p "$STUB_DOCKER"
@@ -264,7 +264,7 @@ teardown() {
   [ "$status" -eq 0 ]
 }
 
-# @scenario "a container publishing host 6379 under ANOTHER project is not owned"
+# @scenario "a redis on host 6379 from another project does not count as ours"
 @test "redis_6379_owned_by_this_project: foreign compose project -> not owned" {
   STUB_DOCKER="$TEST_DIR/bin-docker-foreign"
   mkdir -p "$STUB_DOCKER"
@@ -287,7 +287,7 @@ teardown() {
   [ "$status" -ne 0 ]
 }
 
-# @scenario "nothing publishing host 6379 -> not owned (e.g. stray redis on another host port)"
+# @scenario "a redis mapped to a different host port does not count as ours"
 @test "redis_6379_owned_by_this_project: no publisher on 6379 -> not owned" {
   STUB_DOCKER="$TEST_DIR/bin-docker-none"
   mkdir -p "$STUB_DOCKER"

@@ -107,6 +107,62 @@ Feature: make quickstart is the single dev environment entry point with intent-b
     When run_frontend_only runs
     Then it starts its own redis compose container for the in-process workers
 
+  # --- Container presets reuse their own running redis (#5213) ---
+  # Container presets (all-local, all-local-nlp, dev-storage, full-local) start a
+  # redis container bound to host :6379. A blunt "anything on :6379 fails" check
+  # false-positives when this same project's redis is already running from a prior
+  # run — docker compose would simply reuse it. The check now exempts this
+  # project's own redis container and only fails on a foreign listener it cannot
+  # bind over. Bound to `scripts/__tests__/dev-redis-detection.unit.bats`.
+
+  @unit
+  Scenario: the host-redis collision check is skipped when SKIP_HOST_REDIS_CHECK is set
+    Given SKIP_HOST_REDIS_CHECK is set to 1
+    When check_host_redis_collision runs
+    Then it returns success without inspecting the port
+
+  @unit
+  Scenario: container presets pass the host-redis check when 6379 is free
+    Given host port 6379 is free
+    When check_host_redis_collision runs
+    Then it returns success so the preset can start its own redis container
+
+  @unit
+  Scenario: this project's own running redis on 6379 is reused, not rejected
+    Given this project's own redis container already holds host port 6379
+    When check_host_redis_collision runs
+    Then it returns success and prints no collision error
+
+  @unit
+  Scenario: a foreign listener on 6379 fails the host-redis check loudly
+    Given host port 6379 is held by a process that is not this project's redis
+    When check_host_redis_collision runs
+    Then it exits non-zero with a message explaining how to free the port or skip the check
+
+  @unit
+  Scenario: redis ownership degrades to not-ours when docker is unavailable
+    Given docker is not on PATH
+    When redis_6379_owned_by_this_project runs
+    Then it reports the port is not owned by this project without crashing
+
+  @unit
+  Scenario: a redis on host 6379 from this same project counts as ours
+    Given a container from this compose project publishes host port 6379
+    When redis_6379_owned_by_this_project runs
+    Then it reports the port is owned by this project
+
+  @unit
+  Scenario: a redis on host 6379 from another project does not count as ours
+    Given a container from a different compose project publishes host port 6379
+    When redis_6379_owned_by_this_project runs
+    Then it reports the port is not owned by this project
+
+  @unit
+  Scenario: a redis mapped to a different host port does not count as ours
+    Given no container publishes host port 6379
+    When redis_6379_owned_by_this_project runs
+    Then it reports the port is not owned by this project
+
   # --- URL rewrite per mode (#3860 AC#6) ---
 
   @unit
