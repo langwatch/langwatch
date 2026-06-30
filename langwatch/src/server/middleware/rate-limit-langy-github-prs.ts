@@ -309,15 +309,25 @@ export async function releaseLangyGithubPrPermit({
       ) => Promise<number | string | null>;
       decr: (k: string) => Promise<number>;
     };
+    const script =
+      "local n = tonumber(redis.call('GET', KEYS[1]) or '0')\n" +
+      "if n <= 0 then return 0 end\n" +
+      "return redis.call('DECR', KEYS[1])";
     if (typeof conn.eval === "function") {
-      const script =
-        "local n = tonumber(redis.call('GET', KEYS[1]) or '0')\n" +
-        "if n <= 0 then return 0 end\n" +
-        "return redis.call('DECR', KEYS[1])";
       await conn.eval(script, 1, key);
       return;
     }
-    await conn.decr(key);
+    // Pre-Redis-6.2 or mock-Redis fallback: no eval, so guard with a
+    // read-before-decrement. Not atomic, but the decrement is best-effort
+    // anyway (a race here yields a slightly under-counted cap, not an
+    // underflow to negative that would grant unlimited permits).
+    const raw = await (
+      connection as unknown as { get: (k: string) => Promise<string | null> }
+    ).get(key);
+    const n = parseInt(raw ?? "0", 10);
+    if (n > 0) {
+      await conn.decr(key);
+    }
   } catch {
     /* best-effort */
   }
