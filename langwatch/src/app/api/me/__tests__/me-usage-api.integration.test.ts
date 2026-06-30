@@ -296,21 +296,38 @@ describe("Feature: Personal usage REST API", () => {
     });
 
     describe("when an inverted window is provided", () => {
-      /** @scenario "An inverted window is rejected" */
-      it("returns 400 explaining start must be before end", async () => {
-        const res = await app.request(
-          `/api/me/usage?windowStartMs=${windowEndMs}&windowEndMs=${windowStartMs}`,
-          {
-            headers: authHeaders({
-              apiKey: seededProject.apiKey,
-              projectId: seededProject.id,
-            }),
-          },
-        );
-        expect(res.status).toBe(400);
-        const body = await res.json();
-        expect(JSON.stringify(body)).toContain("before");
-      });
+      // "at or after the end time" — cover both start > end and start === end
+      // so a regression from `<` to `<=` in the schema check can't slip through.
+      const invertedCases: Array<{
+        label: string;
+        start: number;
+        end: number;
+      }> = [
+        { label: "start after end", start: windowEndMs, end: windowStartMs },
+        {
+          label: "start equal to end",
+          start: windowStartMs,
+          end: windowStartMs,
+        },
+      ];
+
+      for (const { label, start, end } of invertedCases) {
+        /** @scenario "An inverted window is rejected" */
+        it(`returns 400 explaining start must be before end (${label})`, async () => {
+          const res = await app.request(
+            `/api/me/usage?windowStartMs=${start}&windowEndMs=${end}`,
+            {
+              headers: authHeaders({
+                apiKey: seededProject.apiKey,
+                projectId: seededProject.id,
+              }),
+            },
+          );
+          expect(res.status).toBe(400);
+          const body = await res.json();
+          expect(JSON.stringify(body)).toContain("before");
+        });
+      }
     });
 
     describe("when the workspace has no usage in the window", () => {
