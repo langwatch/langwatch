@@ -427,6 +427,10 @@ describe("Feature: Langy chat opens PRs as the requesting user", () => {
     featureFlagIsEnabled.mockResolvedValue(true);
     reserveLangyGithubPrPermit.mockResolvedValue({
       allowed: true,
+      // `reserved: true` means an INCR actually committed under this
+      // call — release-side gates on this, NOT on `allowed`. See
+      // SR2 on PR #4913 (commit ecf6a3f5c) for the dual-flag rationale.
+      reserved: true,
       remaining: 20,
       resetAt: Date.now() + 86_400_000,
     });
@@ -593,6 +597,11 @@ describe("Feature: Langy chat opens PRs as the requesting user", () => {
           // the cap; the helper rolls back internally and reports denied).
           reserveLangyGithubPrPermit.mockResolvedValue({
             allowed: false,
+            // Over-cap rollback: the helper INCRs, sees count > limit,
+            // then DECRs back. From the caller's perspective no permit
+            // is held → reserved: false → release-side is a no-op
+            // (denied permits don't need releasing, they were never held).
+            reserved: false,
             remaining: 0,
             resetAt: Date.parse("2030-01-02T00:00:00.000Z"),
           });
