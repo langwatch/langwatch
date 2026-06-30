@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 
 import { parseVirtualKeyConfig } from "~/server/gateway/virtualKey.config";
+import { ProjectRepository } from "~/server/projects/project.repository";
 import { VirtualKeyRepository } from "~/server/gateway/virtualKey.repository";
 import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -93,13 +94,8 @@ export class LangyCredentialService {
     projectId: string;
     actorUserId: string;
   }): Promise<LangyCredentials> {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      select: {
-        apiKey: true,
-        team: { select: { organizationId: true } },
-      },
-    });
+    const projectRepo = new ProjectRepository(this.prisma);
+    const project = await projectRepo.findForLangyCredentials(projectId);
     if (!project) {
       throw new LangyCredentialResolutionError(
         `Project ${projectId} not found.`,
@@ -127,7 +123,7 @@ export class LangyCredentialService {
     await provisionLangyApiKey({
       prisma: this.prisma,
       projectId,
-      organizationId: project.team.organizationId,
+      organizationId: project.organizationId,
       createdByUserId: actorUserId,
     });
     const langyApiKeyToken = await getLangyApiKeyToken({
@@ -137,7 +133,7 @@ export class LangyCredentialService {
 
     const llmVirtualKey = await this.getOrProvisionVirtualKey({
       projectId,
-      organizationId: project.team.organizationId,
+      organizationId: project.organizationId,
       actorUserId,
     });
 
@@ -149,7 +145,7 @@ export class LangyCredentialService {
       const gh = await getGithubTokenForUser({
         prisma: this.prisma,
         userId: actorUserId,
-        organizationId: project.team.organizationId,
+        organizationId: project.organizationId,
       });
       if (gh) {
         githubToken = gh.token;
@@ -174,7 +170,7 @@ export class LangyCredentialService {
       llmVirtualKey,
       langwatchEndpoint,
       gatewayBaseUrl: ensureGatewayV1BaseUrl(gatewayBaseUrl),
-      organizationId: project.team.organizationId,
+      organizationId: project.organizationId,
       ...(githubToken ? { githubToken } : {}),
       ...(githubLogin ? { githubLogin } : {}),
     };
