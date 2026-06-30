@@ -22,6 +22,7 @@ import {
   type DatasetNormalizePayload,
 } from "~/server/datasets/dataset-normalize.job";
 import { registerDatasetNormalizeEnqueue } from "~/server/datasets/dataset-normalize.queue";
+import { makeEmitDatasetProgress } from "~/server/datasets/dataset-progress";
 import { getDatasetStorage } from "~/server/datasets/dataset-storage";
 import { TraceService } from "~/server/traces/trace.service";
 import { createLogger } from "~/utils/logger/server";
@@ -552,6 +553,11 @@ export class PipelineRegistry {
     const datasetNormalizeHandler = createDatasetNormalizeHandler({
       repository: new DatasetRepository(this.deps.prisma),
       getStorage: getDatasetStorage,
+      // ADR-034: broadcast live progress over the export SSE spine. Resolved
+      // lazily so `getApp()` is read at job-execution time (app fully up), and
+      // works cross-pod via Redis pub/sub (I-XPOD).
+      emitProgress: (projectId, event) =>
+        makeEmitDatasetProgress(getApp().broadcast)(projectId, event),
     });
     const datasetNormalizeQueue =
       tracePipeline.service.registerJob<DatasetNormalizePayload>({

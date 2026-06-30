@@ -1,7 +1,10 @@
+import { on } from "node:events";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { getApp } from "~/server/app-layer/app";
 import { slugify } from "~/utils/slugify";
+import { datasetProgressEventSchema } from "../../datasets/dataset-progress";
 import { DatasetService } from "../../datasets/dataset.service";
 import { datasetErrorHandler } from "../../datasets/middleware";
 import {
@@ -131,6 +134,38 @@ export const datasetRouter = createTRPCRouter({
       });
 
       return dataset;
+    }),
+  /**
+   * ADR-034: subscribe to live dataset-processing progress for the project.
+   *
+   * One multiplexed subscription per project — it yields every `dataset_progress`
+   * event for the tenant and the client filters by the datasetId(s) it is
+   * watching (detail page = 1, bulk drawer = N) on a single emitter listener,
+   * sidestepping the 50-listener-per-tenant ceiling. Progress is ephemeral; the
+   * durable terminal state is reconciled by the client via `getById`
+   * (I-TERMINAL-REACHED), so this never needs replay and never breaks on a single
+   * dataset's terminal event — it lives until the client unsubscribes.
+   */
+  onDatasetProgress: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("datasets:view"))
+    .subscription(async function* (opts) {
+      const { projectId } = opts.input;
+      const emitter = getApp().broadcast.getTenantEmitter(projectId);
+      for await (const eventArgs of on(emitter, "dataset_progress", {
+        // @ts-expect-error - signal is not typed on the Node EventEmitter overload
+        signal: opts.signal,
+      })) {
+        const raw = eventArgs[0] as { event: string; timestamp: number };
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(raw.event);
+        } catch {
+          continue;
+        }
+        const result = datasetProgressEventSchema.safeParse(parsed);
+        if (result.success) yield result.data;
+      }
     }),
   deleteById: protectedProcedure
     .input(

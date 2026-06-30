@@ -13,6 +13,7 @@ import {
   HStack,
   Icon,
   Input,
+  Progress,
   Spacer,
   Spinner,
   Text,
@@ -58,6 +59,8 @@ import {
   ColumnTypeSelect,
 } from "../../shared/ColumnTypeSelect";
 import { Drawer } from "../../ui/drawer";
+import type { DatasetProgressLive } from "../processing/datasetProgressView";
+import { useDatasetProgressMap } from "../processing/useDatasetProgressMap";
 import {
   DROPZONE_DOTTED_STYLE,
   DropzonePrompt,
@@ -436,10 +439,13 @@ function RowTrailing({
   file,
   isOpen,
   onToggle,
+  live,
 }: {
   file: BulkFile;
   isOpen: boolean;
   onToggle: () => void;
+  /** ADR-034: latest ephemeral progress tick for this row's dataset, if any. */
+  live?: DatasetProgressLive;
 }) {
   switch (file.status) {
     case "pending":
@@ -473,15 +479,40 @@ function RowTrailing({
           </Text>
         </HStack>
       );
-    case "processing":
+    case "processing": {
+      // ADR-034: a determinate bar once a live tick with a total has arrived;
+      // an honest "Preparing…" until then (or if the worker is silent).
+      const percent =
+        live && live.totalBytes && live.totalBytes > 0
+          ? Math.min(100, Math.round(((live.bytesRead ?? 0) / live.totalBytes) * 100))
+          : null;
       return (
-        <HStack gap={1.5}>
-          <Spinner size="xs" color="blue.500" />
-          <Text fontSize="13px" fontWeight="medium" css={RAINBOW_TEXT_CSS}>
-            Preparing…
-          </Text>
-        </HStack>
+        <VStack align="end" gap={1} minW="150px">
+          <HStack gap={1.5}>
+            <Spinner size="xs" color="blue.500" />
+            <Text fontSize="13px" fontWeight="medium" css={RAINBOW_TEXT_CSS}>
+              {percent == null
+                ? "Preparing…"
+                : `${percent}%${
+                    live?.rows != null
+                      ? ` · ${live.rows.toLocaleString()} rows`
+                      : ""
+                  }`}
+            </Text>
+          </HStack>
+          <Progress.Root
+            value={percent}
+            colorPalette="blue"
+            size="xs"
+            width="150px"
+          >
+            <Progress.Track>
+              <Progress.Range />
+            </Progress.Track>
+          </Progress.Root>
+        </VStack>
       );
+    }
     case "ready":
       return (
         <HStack gap={1} color="green.600" fontSize="13px">
@@ -514,6 +545,7 @@ function RowTrailing({
 function BulkFileRow({
   file,
   projectId,
+  live,
   onRemove,
   onCancel,
   onRetry,
@@ -524,6 +556,9 @@ function BulkFileRow({
 }: {
   file: BulkFile;
   projectId: string;
+  /** ADR-034: latest ephemeral progress tick for this dataset (from the drawer's
+   *  single lifted subscription), or undefined before the first tick. */
+  live?: DatasetProgressLive;
   onRemove: () => void;
   onCancel: () => void;
   onRetry: () => void;
@@ -597,6 +632,7 @@ function BulkFileRow({
           file={file}
           isOpen={isOpen}
           onToggle={() => setIsOpen((o) => !o)}
+          live={live}
         />
         {file.status === "failed" && (
           <Button size="xs" variant="outline" onClick={onRetry}>
@@ -670,6 +706,17 @@ export function BulkUploadDrawer({
   const projectId = project?.id;
   const bulk = useBulkUpload(projectId);
   const [zoneHover, setZoneHover] = useState(false);
+
+  // ADR-034: ONE project-wide progress subscription for the whole drawer (not
+  // one per row — that would hit the 50-listener emitter ceiling). Enabled only
+  // while something is in flight; rows read their live tick by datasetId.
+  const anyActive = bulk.files.some(
+    (file) => file.status === "processing" || file.status === "uploading",
+  );
+  const progressMap = useDatasetProgressMap({
+    projectId: projectId ?? "",
+    enabled: anyActive,
+  });
 
   // Block the upload while any pending file has a blank or duplicated column
   // name — normalize would drop/collide those values (see invalidColumnNameKeys).
@@ -772,6 +819,7 @@ export function BulkUploadDrawer({
                   key={file.id}
                   file={file}
                   projectId={projectId ?? ""}
+                  live={file.datasetId ? progressMap[file.datasetId] : undefined}
                   onRemove={() => bulk.removeFile(file.id)}
                   onCancel={() => bulk.cancelFile(file.id)}
                   onRetry={() => void bulk.retryFile(file.id)}

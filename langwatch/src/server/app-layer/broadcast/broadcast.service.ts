@@ -9,6 +9,12 @@ export type BroadcastEventType =
   | "trace_updated"
   | "simulation_updated"
   | "export_progress"
+  // ADR-034: ephemeral live progress for an async dataset-normalize job
+  // (bytes / rows / phase). Registered here AND in ALL_EVENT_TYPES below so the
+  // Redis subscriber actually subscribes to its channel — otherwise progress is
+  // silently delivered only when the worker and the SSE subscriber share a pod
+  // (I-XPOD). Multiplexed per project; the client filters by datasetId.
+  | "dataset_progress"
   | "presence_updated"
   | "presence_cursor"
   // Fires when a tenant's facet `discover` payload finishes background
@@ -23,6 +29,7 @@ const ALL_EVENT_TYPES: BroadcastEventType[] = [
   "trace_updated",
   "simulation_updated",
   "export_progress",
+  "dataset_progress",
   "presence_updated",
   "presence_cursor",
   "discover_updated",
