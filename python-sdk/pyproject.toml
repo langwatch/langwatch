@@ -118,3 +118,10 @@ tests = [
 
 [tool.uv]
 exclude-newer = "7 days"
+
+# Transitive-dependency security pins. Keep these even when the importing
+# package isn't a direct dependency, so a future re-resolution can't silently
+# pull a vulnerable version back in.
+constraint-dependencies = [
+    "jupyter-server>=2.20.0",  # security: CVE-2026-44727 stored XSS in nbconvert handlers (GHSA-fcw5-x6j4-ccmp)
+]
