@@ -167,7 +167,7 @@ export class LangyConversationService {
       title: r.title,
       isShared: r.isShared,
       isOwn: r.userId === userId,
-      lastActivityAt: r.lastActivityAt,
+      lastActivityAt: r.lastActivityAt ?? r.createdAt,
       messageCount: r.messageCount,
     }));
   }

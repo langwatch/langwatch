@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import {
-  getClickHouseClientForProject,
   type ClickHouseClientResolver,
+  getClickHouseClientForProject,
 } from "~/server/clickhouse/clickhouseClient";
 
 export type MessageRole = "user" | "assistant" | "tool" | "system";
@@ -113,9 +113,13 @@ export class LangyMessageService {
   constructor(private readonly repository: LangyMessageRepository) {}
 
   static create(): LangyMessageService {
-    return new LangyMessageService(
-      new LangyMessageRepository(getClickHouseClientForProject),
-    );
+    const resolver: ClickHouseClientResolver = async (projectId) => {
+      const client = await getClickHouseClientForProject(projectId);
+      if (!client)
+        throw new Error(`No ClickHouse client configured for project ${projectId}`);
+      return client;
+    };
+    return new LangyMessageService(new LangyMessageRepository(resolver));
   }
 
   async getAllByConversation({

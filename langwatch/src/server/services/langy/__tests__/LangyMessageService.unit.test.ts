@@ -49,7 +49,12 @@ describe("LangyMessageService", () => {
     it("yields empty content when a row has no text parts rather than throwing", async () => {
       const repo = makeRepo({
         findAllByConversation: vi.fn().mockResolvedValue([
-          { id: "m1", role: "assistant", parts: [{ type: "tool-call" }], createdAt: new Date() },
+          {
+            id: "m1",
+            role: "assistant",
+            parts: [{ type: "tool-call" }],
+            createdAt: new Date(),
+          },
           { id: "m2", role: "user", parts: null, createdAt: new Date() },
         ]),
       });
