@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"go.uber.org/zap"
@@ -466,12 +467,24 @@ func (m *Manager) kill(conversationID, reason string) {
 		zap.String("reason", reason),
 	)
 	if w.cmd != nil && w.cmd.Process != nil {
-		_ = w.cmd.Process.Signal(os.Interrupt)
-		// Best-effort hard kill if SIGINT didn't take.
-		go func(p *os.Process) {
+		// Signal the WHOLE process group, not just opencode's leader pid.
+		// spawnOpenCode sets Setpgid: true (worker.go), so opencode + every
+		// child it shelled out to (`gh`, `git`, `npm`, `gh auth git-credential
+		// fill`) share one pgid == leader pid. Without `-pgid`, a `kill()`
+		// against the leader leaves the children reparented to PID 1 (the
+		// manager) holding the user's `GH_TOKEN`/`OPENAI_API_KEY`/
+		// `LANGWATCH_API_KEY` in env, on the network, until they finish.
+		// That breaks the per-conversation isolation guarantee on the
+		// temporal axis. Adversarial review F1.
+		pid := w.cmd.Process.Pid
+		_ = syscall.Kill(-pid, syscall.SIGINT)
+		// Best-effort hard kill if SIGINT didn't take. Negative pid sends
+		// to the whole group; opencode's `defer` cleanup gets SIGINT first
+		// for a chance to flush, then SIGKILL nukes the tree.
+		go func(pid int) {
 			time.Sleep(2 * time.Second)
-			_ = p.Kill()
-		}(w.cmd.Process)
+			_ = syscall.Kill(-pid, syscall.SIGKILL)
+		}(pid)
 	}
 	// Shut down the authproxy so its externally-advertised port frees
 	// up immediately; otherwise a respawn picking the same port would

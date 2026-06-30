@@ -44,6 +44,14 @@ func Serve(ctx context.Context, cfg Config, log *zap.Logger) error {
 	}
 	mgr.StartReaper()
 
+	// PID-1 orphan reaper. When the manager kills a worker pgroup, opencode's
+	// child processes (gh, git, npm) get SIGINT/SIGKILL alongside opencode
+	// itself — and their zombie entries accumulate under the manager (which
+	// is PID 1 inside the pod) until reaped. Without this loop, long-running
+	// pods leak one process-table entry per worker recycle and eventually
+	// hit pid_max / nproc rlimit. See orphan_reaper.go for the why.
+	startOrphanReaper(ctx, log)
+
 	srv := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
 		Handler:           newRouter(mgr, cfg, log),

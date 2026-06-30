@@ -182,6 +182,28 @@ function popupHtml(
   return c.html(body, status);
 }
 
+// Render the callback's error path consistently across `popup` and
+// `redirect` modes. The four pre-credential rejection branches (invalid
+// state, session changed, state replay, non-member) used to always
+// return popup HTML — which is a UX dead end in redirect mode (the user
+// lands on a static page whose `window.close()` is a no-op in a top tab
+// and whose `postMessage` fires to a null opener). When the state has
+// been verified and carries a mode, honour it. Adversarial review N3
+// from goated-review round 4.
+function callbackError(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  c: any,
+  state: GithubOauthStatePayload | null,
+  errorMessage: string,
+  status: number,
+): Response {
+  if (state && state.mode === "redirect") {
+    const returnTo = safeReturnTo(state.returnTo);
+    return c.redirect(withGithubError(returnTo, errorMessage), 302);
+  }
+  return popupHtml(c, popupErrorHtml(errorMessage), status);
+}
+
 // Sanitises an unexpected error message before it lands in a URL query
 // parameter the next page renders. The query-string value would otherwise
 // surface raw exception text (DB errors, internal paths) to the user —
@@ -305,7 +327,11 @@ secured
     const code = c.req.query("code");
     const state = verifyState(c.req.query("state") ?? null);
     if (!code || !state) {
-      return popupHtml(c, popupErrorHtml("Invalid state or missing code"), 400);
+      // No verified state → no mode known → default to popup (the most
+      // common /connect entry point). A redirect-mode caller landing
+      // here is rare (would mean a tampered or expired URL) and gets
+      // the same fallback page.
+      return callbackError(c, null, "Invalid state or missing code", 400);
     }
 
     // Re-check the session matches the state's user. Defends against the case
@@ -315,7 +341,7 @@ secured
       req: c.req.raw as NextRequestShim,
     });
     if (!session?.user || session.user.id !== state.userId) {
-      return popupHtml(c, popupErrorHtml("Session changed mid-flow"), 401);
+      return callbackError(c, state, "Session changed mid-flow", 401);
     }
 
     // Burn the nonce. If the nonce was registered at /connect and is missing
@@ -325,7 +351,7 @@ secured
     if (state.nonceRegistered) {
       const nonceConsumed = await consumeGithubOauthNonce(state.nonce);
       if (nonceConsumed === false) {
-        return popupHtml(c, popupErrorHtml("State already used"), 401);
+        return callbackError(c, state, "State already used", 401);
       }
     }
 
@@ -339,9 +365,10 @@ secured
         organizationId: state.organizationId,
       }))
     ) {
-      return popupHtml(
+      return callbackError(
         c,
-        popupErrorHtml("Not a member of this organization"),
+        state,
+        "Not a member of this organization",
         403,
       );
     }
@@ -386,12 +413,25 @@ secured
       organizationId: state.organizationId,
     });
 
-    await auditLog({
-      userId: state.userId,
-      organizationId: state.organizationId,
-      action: "langy.github.connect",
-      args: { githubLogin: user.login },
-    });
+    try {
+      await auditLog({
+        userId: state.userId,
+        organizationId: state.organizationId,
+        action: "langy.github.connect",
+        args: { githubLogin: user.login },
+      });
+    } catch (err) {
+      // The credential is ALREADY persisted at this point. An auditLog
+      // throw used to bubble up as a 500 and silently drop the audit row
+      // even though the user's connection landed. Log and proceed — we
+      // honour the user's successful connect over the audit-completeness
+      // requirement. Operator-visible via the audit-write logger.
+      // Adversarial review N4 from goated-review round 4.
+      logger.warn(
+        { err, userId: state.userId, organizationId: state.organizationId },
+        "audit log write failed after github connect — credential persisted",
+      );
+    }
 
     if (state.mode === "popup") {
       return popupHtml(c, popupResponseHtml(user.login), 200);

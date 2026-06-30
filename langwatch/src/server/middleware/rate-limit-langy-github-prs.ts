@@ -207,46 +207,22 @@ export async function reserveLangyGithubPrPermit({
   }
   const bucket = dayBucket();
   const key = `langy:gh:prs:${userId}:${bucket}`;
+  // Track each step's outcome explicitly so a Redis blip MID-flow doesn't
+  // collapse two different states into the same fail-open shape. The N1/N2
+  // adversarial findings (goated-review round 4): the previous catch-all
+  // could send back `allowed: true, reserved: false` even when the count
+  // had ALREADY gone over the limit (DECR throw on over-cap), letting a
+  // 21st request squeak past while the counter stayed inflated. Now the
+  // over-cap path is detected up front; if DECR fails best-effort, the
+  // result is still `allowed: false` because we honour what the kernel
+  // already told us about the count.
+  let count: number | null = null;
   try {
-    const count = await (
-      connection as { incr: (k: string) => Promise<number> }
-    ).incr(key);
-    if (count === 1) {
-      await (
-        connection as { expire: (k: string, s: number) => Promise<number> }
-      ).expire(key, 60 * 60 * 24 * 2);
-    }
-    if (count > limit) {
-      // Over-cap: roll back our INCR so the counter still reflects committed
-      // permits (otherwise N concurrent over-cap reservers would each leave
-      // the counter inflated by 1, pushing the visible "remaining" further
-      // negative without granting anyone access).
-      await (connection as { decr: (k: string) => Promise<number> }).decr(key);
-      return {
-        allowed: false,
-        remaining: 0,
-        resetAt: resetAtForBucket(bucket),
-        // Rolled back — no DECR should happen on release either.
-        reserved: false,
-      };
-    }
-    return {
-      allowed: true,
-      remaining: Math.max(0, limit - count),
-      resetAt: resetAtForBucket(bucket),
-      // INCR committed and survived the cap check — caller may release.
-      reserved: true,
-    };
+    count = await (connection as { incr: (k: string) => Promise<number> }).incr(
+      key,
+    );
   } catch {
-    // Redis blip — fail OPEN on `allowed` so a transient outage doesn't
-    // strip GitHub capability from every connected user (mirrors the
-    // project-wide rate-limit convention). But mark `reserved: false`
-    // because we don't actually know whether the INCR committed: a
-    // successful INCR followed by a failed EXPIRE lands here, and so
-    // does a totally-failed INCR. The release-side gates on `reserved`,
-    // so the worst case is "counter briefly off by one" rather than
-    // "DECR walks the shared counter into negative space and refunds
-    // 20+ free permits to the next caller".
+    // INCR itself never committed — no side effect to undo.
     return {
       allowed: true,
       remaining: limit,
@@ -254,6 +230,54 @@ export async function reserveLangyGithubPrPermit({
       reserved: false,
     };
   }
+  if (count === 1) {
+    // EXPIRE failures used to leak through the catch as `allowed: true`
+    // PLUS leave the key without a TTL. Retry once in a tail-call; if
+    // the retry also fails, log and proceed — the key will outlive the
+    // bucket but cap enforcement still works (the count starts correct).
+    try {
+      await (
+        connection as { expire: (k: string, s: number) => Promise<number> }
+      ).expire(key, 60 * 60 * 24 * 2);
+    } catch {
+      // Best-effort retry; on persistent EXPIRE failure the key has no
+      // TTL — operator-visible via redis monitoring of `langy:gh:prs:*`
+      // keys older than 2 days. Documented residual; cap still works.
+      try {
+        await (
+          connection as { expire: (k: string, s: number) => Promise<number> }
+        ).expire(key, 60 * 60 * 24 * 2);
+      } catch {
+        /* TTL-less key; cap enforcement unaffected this bucket */
+      }
+    }
+  }
+  if (count > limit) {
+    // Over-cap: count already past the limit before any DECR attempt. Even
+    // if the DECR throws below, the right answer is `allowed: false`.
+    try {
+      await (connection as { decr: (k: string) => Promise<number> }).decr(key);
+    } catch {
+      // DECR throw on the over-cap path: the counter stays inflated at
+      // `count` for the day, but the caller is correctly denied. Sergio's
+      // SR2/SR3 floor-at-0 release path covers the inverse case
+      // (release without matching INCR). The cap still holds; future
+      // reservations on this user/day see the inflated count and deny.
+    }
+    return {
+      allowed: false,
+      remaining: 0,
+      resetAt: resetAtForBucket(bucket),
+      reserved: false,
+    };
+  }
+  // INCR committed AND count is within cap — caller holds the permit.
+  return {
+    allowed: true,
+    remaining: Math.max(0, limit - count),
+    resetAt: resetAtForBucket(bucket),
+    reserved: true,
+  };
 }
 
 /**
