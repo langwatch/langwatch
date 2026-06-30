@@ -143,6 +143,10 @@ func (w *Worker) release() {
 // manager-only secrets.
 var sensitiveEnvPattern = regexp.MustCompile(
 	`^(LANGY_INTERNAL_SECRET$|GITHUB_LANGY_|CREDENTIALS_SECRET$|NEXTAUTH_|DATABASE_URL$|AWS_SECRET_|LW_GATEWAY_|LW_VIRTUAL_KEY_)` +
+		// `AWS_ACCESS_KEY_ID` ends in `_ID`, NOT `_KEY` — the suffix
+		// rules below would miss it. Anchor an explicit literal so the
+		// access-key half of an AWS credential pair can't leak.
+		`|^AWS_ACCESS_KEY_ID$` +
 		`|_(API_)?KEY$` +
 		`|_SECRET(_|$)` +
 		// `_TOKEN(_|$)` catches `GH_TOKEN`, `GITHUB_TOKEN`, `API_TOKEN_*`, etc.
@@ -152,7 +156,18 @@ var sensitiveEnvPattern = regexp.MustCompile(
 		// `_PASSWORD(_|$)` catches `POSTGRES_PASSWORD`/`REDIS_PASSWORD` and
 		// anything else an `envFrom: secretRef` mounts under that convention.
 		`|_TOKEN(_|$)` +
-		`|_PASSWORD(_|$)`,
+		`|_PASSWORD(_|$)` +
+		// `_URL$` / `_URI$` block credential-bearing connection strings
+		// (`REDIS_URL=redis://user:pass@host:6379/0`, `POSTGRES_URL`,
+		// `MONGODB_URI`, `CLICKHOUSE_URL`, ...). The worker runs model-
+		// driven shell with HTTPS egress, so a prompt-injected turn could
+		// otherwise `env | grep -iE 'redis|postgres'` and exfiltrate the
+		// password embedded in the URL userinfo.
+		// `_DSN$` covers `SENTRY_DSN` and similar telemetry creds (DSNs
+		// embed the project key in the URL).
+		`|_URL$` +
+		`|_URI$` +
+		`|_DSN$`,
 )
 
 // filterSensitiveEnv returns the process env minus anything matching

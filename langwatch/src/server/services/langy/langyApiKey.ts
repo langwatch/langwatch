@@ -1,10 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { Prisma } from "@prisma/client";
+import type { Permission } from "~/server/api/rbac";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
-import {
-  type AccessLevel,
-  computePermissionsFromSelections,
-} from "~/server/api-key/permission-categories";
 import { decrypt, encrypt } from "~/utils/encryption";
 import { createLogger } from "~/utils/logger/server";
 import { resolveAttributionUserId } from "./langyAttribution";
@@ -19,26 +16,54 @@ export const LANGY_API_KEY_NAME = "Langy";
 // server) to retrieve it later — same pattern as the Langy virtual key.
 export const LANGY_API_KEY_SECRET_NAME = "langy_api_key_secret";
 
-// Least-privilege surface for the Langy assistant, expressed in the same
-// permission categories the API-key UI uses so it stays valid and auditable.
-// Deliberately omits secrets, project/team management, and the audit log — a
-// leaked Langy key must not be able to administer the project or read secrets.
-const LANGY_PERMISSION_SELECTIONS: Record<string, AccessLevel | "none"> = {
-  traces: "write",
-  evaluations: "write",
-  datasets: "write",
-  scenarios: "write",
-  annotations: "write",
-  analytics: "write",
-  prompts: "write",
-  triggers: "write",
-  workflows: "write",
-  cost: "read",
-};
-
-const LANGY_PERMISSIONS = computePermissionsFromSelections(
-  LANGY_PERMISSION_SELECTIONS,
-);
+// Least-privilege surface for the Langy assistant. Hand-rolled rather than
+// derived from `computePermissionsFromSelections(...)` because the category
+// system's `"write"` level is too coarse for this key:
+//
+//   - For non-traces resources, `"write"` expands to `[:view, :manage]` and
+//     `:manage` includes `:delete` via the hierarchy in rbac.ts. The Langy
+//     assistant must never be able to delete a user's prompts/datasets/etc.
+//   - For traces, `"write"` includes `:share`, which creates PUBLIC trace
+//     links. Langy doesn't need to expose user traces; the share endpoint is
+//     a separate user-driven UI affordance.
+//   - `cost:read` was previously included but Langy doesn't need cost data
+//     to do its job — it surfaces spend data only via gateway-emitted
+//     telemetry on the conversation's own messages, never via the key.
+//
+// Each resource lists exactly `:view, :create, :update` — matches the
+// LANGY_REQUIRED_PERMISSIONS gate on /langy/chat (which checks `:update` on
+// every resource) and gives MCP tools enough to actually create + edit data,
+// but stops short of delete/manage/share. Leaked key blast radius == the
+// blast radius of the human who triggered Langy.
+const LANGY_PERMISSIONS: Permission[] = [
+  "traces:view",
+  "traces:create",
+  "traces:update",
+  "evaluations:view",
+  "evaluations:create",
+  "evaluations:update",
+  "datasets:view",
+  "datasets:create",
+  "datasets:update",
+  "scenarios:view",
+  "scenarios:create",
+  "scenarios:update",
+  "annotations:view",
+  "annotations:create",
+  "annotations:update",
+  "analytics:view",
+  "analytics:create",
+  "analytics:update",
+  "prompts:view",
+  "prompts:create",
+  "prompts:update",
+  "triggers:view",
+  "triggers:create",
+  "triggers:update",
+  "workflows:view",
+  "workflows:create",
+  "workflows:update",
+];
 
 /**
  * Returns the decrypted, ready-to-use dedicated Langy key token for a project,

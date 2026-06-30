@@ -19,6 +19,19 @@ export type GithubPrLimitResult = {
   remaining: number;
   /** When the day-bucket rolls over (epoch ms). */
   resetAt: number;
+  /**
+   * True only when a real `INCR` actually committed to Redis under this call.
+   * Read-only `getLangyGithubPrUsage` always returns `false` (no INCR ran).
+   * `reserveLangyGithubPrPermit` returns `true` only on the happy path; the
+   * Redis-down / Redis-blip / over-cap paths return `false` even when the
+   * function fails OPEN on `allowed`. Callers that release reservations
+   * (`releasePermitIfUnused`) MUST gate on `reserved`, not on `allowed`:
+   * gating on `allowed` would DECR a key that was never INCR'd, walking the
+   * shared daily counter into the negative space — the floor at 0 then
+   * refunds N free permits to whoever calls reserve next. Sergio caught
+   * this as the P2 erosion-via-blip path on 2026-06-30.
+   */
+  reserved: boolean;
 };
 
 function dayBucket(now = Date.now()): number {
@@ -45,6 +58,7 @@ export async function getLangyGithubPrUsage({
       allowed: true,
       remaining: limit,
       resetAt: resetAtForBucket(dayBucket()),
+      reserved: false,
     };
   }
   const bucket = dayBucket();
@@ -60,12 +74,14 @@ export async function getLangyGithubPrUsage({
       allowed: true,
       remaining: limit,
       resetAt: resetAtForBucket(bucket),
+      reserved: false,
     };
   }
   return {
     allowed: count < limit,
     remaining: Math.max(0, limit - count),
     resetAt: resetAtForBucket(bucket),
+    reserved: false,
   };
 }
 
@@ -91,6 +107,7 @@ export async function recordLangyGithubPr({
       allowed: true,
       remaining: limit,
       resetAt: resetAtForBucket(dayBucket()),
+      reserved: false,
     };
   }
   const bucket = dayBucket();
@@ -112,13 +129,46 @@ export async function recordLangyGithubPr({
       allowed: true,
       remaining: limit,
       resetAt: resetAtForBucket(bucket),
+      reserved: false,
     };
   }
   return {
     allowed: count <= limit,
     remaining: Math.max(0, limit - count),
     resetAt: resetAtForBucket(bucket),
+    reserved: true,
   };
+}
+
+/**
+ * Apply EXTRA increments (beyond the up-front reservation) when a single
+ * chat turn opens more PRs than the one permit we held. Lets the daily
+ * counter reflect what actually happened on the wire instead of "one bump
+ * per turn regardless of PR count" — the previous shape let an injected
+ * worker open hundreds of PRs against a single permit. Best-effort: a
+ * Redis blip means the counter is briefly under-counted, but the next call
+ * will re-tally on top of whatever made it through.
+ */
+export async function recordExtraLangyGithubPrs({
+  userId,
+  extra,
+}: {
+  userId: string;
+  extra: number;
+}): Promise<void> {
+  if (!connection) return;
+  if (extra <= 0) return;
+  const bucket = dayBucket();
+  const key = `langy:gh:prs:${userId}:${bucket}`;
+  try {
+    await (
+      connection as {
+        incrby: (k: string, n: number) => Promise<number>;
+      }
+    ).incrby(key, extra);
+  } catch {
+    /* best-effort */
+  }
 }
 
 /**
@@ -145,10 +195,14 @@ export async function reserveLangyGithubPrPermit({
   limit?: number;
 }): Promise<GithubPrLimitResult> {
   if (!connection) {
+    // No Redis configured (dev / smaller self-hosters). `allowed: true`
+    // keeps GitHub PRs working in those environments; `reserved: false`
+    // tells the caller "no INCR happened, do NOT DECR on release".
     return {
       allowed: true,
       remaining: limit,
       resetAt: resetAtForBucket(dayBucket()),
+      reserved: false,
     };
   }
   const bucket = dayBucket();
@@ -172,21 +226,32 @@ export async function reserveLangyGithubPrPermit({
         allowed: false,
         remaining: 0,
         resetAt: resetAtForBucket(bucket),
+        // Rolled back — no DECR should happen on release either.
+        reserved: false,
       };
     }
     return {
       allowed: true,
       remaining: Math.max(0, limit - count),
       resetAt: resetAtForBucket(bucket),
+      // INCR committed and survived the cap check — caller may release.
+      reserved: true,
     };
   } catch {
-    // Redis blip — fail open so a Redis hiccup doesn't strip GitHub
-    // capability from every connected user. Same shape as the no-Redis
-    // branch above, matching the project-wide rate-limit convention.
+    // Redis blip — fail OPEN on `allowed` so a transient outage doesn't
+    // strip GitHub capability from every connected user (mirrors the
+    // project-wide rate-limit convention). But mark `reserved: false`
+    // because we don't actually know whether the INCR committed: a
+    // successful INCR followed by a failed EXPIRE lands here, and so
+    // does a totally-failed INCR. The release-side gates on `reserved`,
+    // so the worst case is "counter briefly off by one" rather than
+    // "DECR walks the shared counter into negative space and refunds
+    // 20+ free permits to the next caller".
     return {
       allowed: true,
       remaining: limit,
       resetAt: resetAtForBucket(bucket),
+      reserved: false,
     };
   }
 }

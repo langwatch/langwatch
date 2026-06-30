@@ -228,14 +228,25 @@ export class LangyCredentialService {
     projectId: string;
     organizationId: string;
   }): Promise<string[] | null> {
+    // status=ACTIVE + orderBy:updatedAt-desc protect against the duplicate-VK
+    // race documented at `langyVirtualKey.ts:82-95`: a lost first-chat race
+    // leaves a second `purpose=LANGY` row alive. Without `status=ACTIVE` an
+    // archived twin's `modelsAllowed` could be returned; without `orderBy`,
+    // a `findFirst` could pick the OTHER row from the one the gateway
+    // authenticates against. Take the most recently updated active row as a
+    // stable tiebreaker — that's also the one the gateway picks via its own
+    // unique-by-hashedSecret lookup since the live row's `updatedAt` is
+    // touched on every rotation.
     const langyVk = await this.prisma.virtualKey.findFirst({
       where: {
         organizationId,
         purpose: "LANGY",
+        status: "ACTIVE",
         scopes: {
           some: { scopeType: "PROJECT", scopeId: projectId },
         },
       },
+      orderBy: { updatedAt: "desc" },
       select: { config: true },
     });
     if (!langyVk) return null;

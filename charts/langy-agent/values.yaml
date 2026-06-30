@@ -109,14 +109,27 @@ containerSecurityContext:
 
 # Sandboxed container runtime for this pod. The agent runs LLM-driven
 # arbitrary code (opencode workers shell out to git/npm/gh), so the headline
-# risk is a worker breaking OUT of the container to the node. Set this to a
-# RuntimeClass the cluster defines that maps to a sandbox runtime — e.g.
-# `gvisor` (runsc), which inserts a user-space kernel between the worker and
-# the host kernel and shrinks that node-escape surface.
-# Empty (default) → field is omitted, kubelet uses the node's default runtime,
-# existing installs unchanged. Caveat: this hardens pod->host only, NOT
-# worker->worker inside this single pod — that would need per-user pods.
-runtimeClassName: ""
+# risk is a worker breaking OUT of the container to the node. The default
+# `gvisor` (runsc) inserts a user-space kernel between the worker and the
+# host kernel and shrinks that node-escape surface — required posture for
+# this workload.
+#
+# OPERATOR REQUIREMENT — the cluster MUST define a `gvisor` RuntimeClass
+# before the langy-agent chart is enabled (`langy-agent.chartManaged: true`).
+# Without it, pods will fail to schedule with
+#   FailedCreatePodSandBox: ... runtimeclasses.node.k8s.io "gvisor" not found
+# Install via the gVisor operator or by applying the RuntimeClass manifest
+# from https://gvisor.dev/docs/user_guide/install/. The langy-agent chart
+# refuses to deploy with chartManaged=true and an unset/empty runtimeClass
+# would be a security regression, so the default is opinionated.
+#
+# To opt OUT (NOT recommended; documented for completeness): set
+#   runtimeClassName: ""
+# which omits the field from the pod spec → kubelet uses the node default
+# runtime (runc/containerd, no sandbox). Worker→worker isolation inside the
+# pod is still enforced by the per-UID + bearer-token authproxy work, but
+# pod→host isolation reverts to standard cgroups + namespaces only.
+runtimeClassName: "gvisor"
 
 networkPolicy:
   enabled: true

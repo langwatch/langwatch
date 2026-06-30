@@ -29,11 +29,26 @@ func TestFilterSensitiveEnv_RemovesManagerSecrets(t *testing.T) {
 		"LW_GATEWAY_INTERNAL_SECRET": "must-not-leak",
 		"LW_GATEWAY_JWT_SECRET":      "must-not-leak",
 		"LW_VIRTUAL_KEY_PEPPER":      "must-not-leak",
+		// New suffix patterns: credential-bearing connection strings, DSNs,
+		// and the AWS_ACCESS_KEY_ID half of an AWS credential pair (ends in
+		// `_ID`, not `_KEY`, so the suffix block needs an explicit literal).
+		"REDIS_URL":                  "redis://user:secret@host:6379/0",
+		"POSTGRES_URL":               "postgres://user:secret@host:5432/db",
+		"CLICKHOUSE_URL":             "https://user:secret@host:8443/db",
+		"MONGODB_URI":                "mongodb://user:secret@host:27017/db",
+		"SENTRY_DSN":                 "https://abc123@o123.ingest.sentry.io/456",
+		"AWS_ACCESS_KEY_ID":          "AKIA_must_not_leak",
+		"GH_TOKEN":                   "ghp_inherited_must_not_leak",
+		"GITHUB_TOKEN":               "ghp_ci_token_must_not_leak",
+		"POSTGRES_PASSWORD":          "must-not-leak",
+		// PASS-THROUGH cases: only entries WITHOUT credentials and without a
+		// blocked suffix. The OPENCODE_* env values the worker actually needs
+		// (OPENCODE_OTLP_ENDPOINT etc.) are explicitly re-injected by
+		// spawnOpenCode AFTER this filter runs, so filtering the inherited
+		// variants is correct.
 		"LANGY_MAX_WORKERS":          "keep-me", // LANGY_ prefix but not the secret one
-		"OPENCODE_AGENT_URL":         "keep-me",
-		"OPENCODE_OTLP_ENDPOINT":     "keep-me",
 		"HOME":                       "keep-me",
-		"LANGWATCH_API_KEY_OUTER":    "keep-me", // worker injects its own LANGWATCH_API_KEY after
+		"LANGWATCH_API_KEY_OUTER":    "keep-me", // worker injects its own LANGWATCH_API_KEY after; the _OUTER suffix is neither _KEY nor _SECRET
 	} {
 		t.Setenv(k, v)
 	}
@@ -57,6 +72,18 @@ func TestFilterSensitiveEnv_RemovesManagerSecrets(t *testing.T) {
 		"LW_GATEWAY_INTERNAL_SECRET=",
 		"LW_GATEWAY_JWT_SECRET=",
 		"LW_VIRTUAL_KEY_PEPPER=",
+		// New patterns — credential-bearing connection strings and the AWS
+		// access-key half. A prompt-injected worker could otherwise
+		// `env | grep -iE 'redis|postgres|sentry'` and exfiltrate.
+		"REDIS_URL=",
+		"POSTGRES_URL=",
+		"CLICKHOUSE_URL=",
+		"MONGODB_URI=",
+		"SENTRY_DSN=",
+		"AWS_ACCESS_KEY_ID=",
+		"GH_TOKEN=",
+		"GITHUB_TOKEN=",
+		"POSTGRES_PASSWORD=",
 	}
 	for _, prefix := range mustBeAbsent {
 		for _, kv := range env {
@@ -68,8 +95,6 @@ func TestFilterSensitiveEnv_RemovesManagerSecrets(t *testing.T) {
 
 	mustBePresent := []string{
 		"LANGY_MAX_WORKERS=keep-me",
-		"OPENCODE_AGENT_URL=keep-me",
-		"OPENCODE_OTLP_ENDPOINT=keep-me",
 		"LANGWATCH_API_KEY_OUTER=keep-me",
 	}
 	for _, want := range mustBePresent {

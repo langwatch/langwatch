@@ -21,6 +21,7 @@
 import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
 import type { Context } from "hono";
 import { z } from "zod";
+import { env } from "~/env.mjs";
 import {
   hasProjectPermission,
   type Permission,
@@ -36,6 +37,7 @@ import { checkLangyMessageRateLimit } from "~/server/middleware/rate-limit-langy
 
 import {
   LANGY_GITHUB_PRS_PER_DAY,
+  recordExtraLangyGithubPrs,
   releaseLangyGithubPrPermit,
   reserveLangyGithubPrPermit,
 } from "~/server/middleware/rate-limit-langy-github-prs";
@@ -397,15 +399,19 @@ langyRoute().post("/langy/chat", async (c) => {
   // pre-stream error (502, throw, disconnect) leaked one permit per turn.
   const permit = await reserveLangyGithubPrPermit({ userId: session.user.id });
   let permitReleased = false;
+  // Release MUST gate on `permit.reserved`, NOT `permit.allowed`. The
+  // reserve-side returns `allowed: true, reserved: false` on Redis-down /
+  // Redis-blip paths (so a transient outage doesn't strip GitHub from
+  // every connected user). If we DECR on those paths, we walk the shared
+  // daily counter into negative space — the Lua floor at 0 then refunds N
+  // free permits to whoever calls reserve next. Sergio caught this as the
+  // erosion-via-blip cap-bypass on 2026-06-30.
   const releasePermitIfUnused = async () => {
-    if (!permit.allowed || permitReleased) return;
+    if (!permit.reserved || permitReleased) return;
     permitReleased = true;
     try {
       await releaseLangyGithubPrPermit({ userId: session.user.id });
     } catch (error) {
-      // Releasing a permit can fail (Redis blip); the daily counter would
-      // then be off by one until reset. Logged, not fatal — the same fail-
-      // open posture the reserve side uses.
       logger.warn({ error }, "failed to release langy github PR permit");
     }
   };
@@ -568,18 +574,25 @@ langyRoute().post("/langy/chat", async (c) => {
         // forge a `pr_opened` audit entry. Parse from `fullText` (pre-strip) —
         // sentinels are gone from `persistedText`.
         //
-        // Counting is owned by the pre-turn `reserveLangyGithubPrPermit` (one
-        // permit per turn, atomic). If the turn opened MORE than one PR, the
-        // permit covers the first; further PRs are still audited but won't
-        // double-bump the daily counter. If the turn opened ZERO PRs, the
-        // permit is released by the executor's finally below so a question
-        // doesn't burn a permit.
+        // Counting reconciles: the pre-turn reserve was a single permit
+        // (gate-keeping GH_TOKEN). The actual PR count is whatever the
+        // worker opened. Bump the daily counter by the remaining N-1 PRs
+        // so the cap is per-PR, not per-turn. Sergio caught this as the
+        // "20/day actually means 20-turns/day, a runaway loop opens
+        // hundreds against one permit" bug on 2026-06-30.
         try {
           const links = extractOpenedPrLinks(fullText);
           if (links.length > 0) {
-            // PR was actually opened — the permit is consumed, latch it
+            // PR(s) opened — the up-front permit is consumed, latch it
             // closed so the cleanup finally doesn't reverse the consumption.
             permitReleased = true;
+            // Reconcile: if N>1 PRs landed, INCRBY (N - 1). If N==1, no-op.
+            if (links.length > 1 && permit.reserved) {
+              await recordExtraLangyGithubPrs({
+                userId: session.user.id,
+                extra: links.length - 1,
+              });
+            }
           }
           for (const link of links) {
             await auditLog({
@@ -641,6 +654,25 @@ async function requireSessionAndPermission(
     return { error: c.json({ error: "Unauthorized" }, { status: 401 }) };
   if (!projectId)
     return { error: c.json({ error: "Missing projectId" }, { status: 400 }) };
+  // Reject the demo project explicitly: `hasProjectPermission(..., "evaluations:view")`
+  // grants every authenticated user view on the demo via `isDemoProject`'s
+  // globally-readable allowlist (see rbac.ts:DEMO_VIEW_PERMISSIONS). For Langy
+  // conversation/memory routes that's a leak — a user past the rollout flag
+  // could `GET/PATCH/DELETE /langy/conversations*` and `/langy/memory*` on
+  // the demo project, accessing or destroying chat content that belongs to
+  // whichever user actually used Langy there. The demo project IS public,
+  // but per-user chat conversations on it should not be. Recurring #3323
+  // trap — feature surfaces that look read-only-public still need to gate
+  // user-owned data inside them.
+  const demoId = process.env.DEMO_PROJECT_ID ?? env.DEMO_PROJECT_ID;
+  if (demoId && projectId === demoId) {
+    return {
+      error: c.json(
+        { error: "Langy is not available on the demo project." },
+        { status: 403 },
+      ),
+    };
+  }
   const ok = await hasProjectPermission(
     { prisma, session },
     projectId,

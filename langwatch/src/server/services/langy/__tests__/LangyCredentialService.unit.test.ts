@@ -303,17 +303,24 @@ describe("LangyCredentialService", () => {
         });
 
         expect(result).toEqual(["anthropic/claude-opus-4-7"]);
-        // Tenancy (org), identity (purpose=LANGY), and reachability
-        // (scope row) all enforced at the DB layer — not by a post-fetch
-        // in-memory filter. Drift in any of these is a load-bearing bug.
+        // Tenancy (org), identity (purpose=LANGY), reachability (scope
+        // row), AND liveness (status=ACTIVE) all enforced at the DB layer.
+        // status=ACTIVE blocks an archived twin's modelsAllowed from
+        // bleeding through after the provisioning race leaves a duplicate
+        // row alive (langyVirtualKey.ts:82-95); orderBy:updatedAt-desc
+        // picks the most recently rotated row when more than one ACTIVE
+        // row exists, matching the gateway's own resolution priority.
+        // Drift in any of these is a load-bearing bug.
         expect(prisma.virtualKey.findFirst).toHaveBeenCalledWith({
           where: {
             organizationId: "org-1",
             purpose: "LANGY",
+            status: "ACTIVE",
             scopes: {
               some: { scopeType: "PROJECT", scopeId: "p1" },
             },
           },
+          orderBy: { updatedAt: "desc" },
           select: { config: true },
         });
       });
