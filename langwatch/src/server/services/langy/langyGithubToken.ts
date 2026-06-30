@@ -11,9 +11,9 @@
  *
  * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
  */
-import { randomBytes } from "crypto";
 
 import type { PrismaClient } from "@prisma/client";
+import { randomBytes } from "crypto";
 
 import { env } from "~/env.mjs";
 import { connection } from "~/server/redis";
