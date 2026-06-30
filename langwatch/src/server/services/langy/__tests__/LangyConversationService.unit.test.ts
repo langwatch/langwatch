@@ -1,3 +1,4 @@
+import type { LangyConversation } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import {
   LangyConversationNotOwnedError,
@@ -13,11 +14,28 @@ function makeRepo(overrides?: Partial<LangyConversationRepository>) {
     update: vi.fn(),
     softDelete: vi.fn(),
     softDeleteAllForUser: vi.fn(),
-    touch: vi.fn(),
+    bumpActivity: vi.fn(),
     ...overrides,
   } as unknown as LangyConversationRepository;
   return repo;
 }
+
+// Base fixture typed against the real Prisma model so TypeScript catches
+// shape drift when the schema changes. Tests override only the fields they care about.
+const baseConversation = {
+  id: "c1",
+  projectId: "p1",
+  userId: "alice",
+  title: null,
+  isShared: false,
+  sharedAt: null,
+  sharedById: null,
+  lastActivityAt: null,
+  messageCount: 0,
+  createdAt: new Date("2026-04-01T00:00:00.000Z"),
+  updatedAt: new Date("2026-04-01T00:00:00.000Z"),
+  deletedAt: null,
+} satisfies LangyConversation;
 
 describe("LangyConversationService", () => {
   describe("given a conversation owned by another user in the same project", () => {
@@ -175,15 +193,7 @@ describe("LangyConversationService", () => {
       const lastActivityAt = new Date("2026-05-01T10:00:00.000Z");
       const repo = makeRepo({
         findAllForUser: vi.fn().mockResolvedValue([
-          {
-            id: "c1",
-            title: "t",
-            isShared: false,
-            userId: "alice",
-            lastActivityAt,
-            messageCount: 3,
-            createdAt: new Date("2026-04-01T00:00:00.000Z"),
-          },
+          { ...baseConversation, title: "t", lastActivityAt, messageCount: 3 },
         ]),
       });
       const svc = new LangyConversationService(repo);
@@ -201,15 +211,7 @@ describe("LangyConversationService", () => {
       const createdAt = new Date("2026-04-01T00:00:00.000Z");
       const repo = makeRepo({
         findAllForUser: vi.fn().mockResolvedValue([
-          {
-            id: "c2",
-            title: null,
-            isShared: false,
-            userId: "alice",
-            lastActivityAt: null,
-            messageCount: 0,
-            createdAt,
-          },
+          { ...baseConversation, id: "c2", lastActivityAt: null, createdAt },
         ]),
       });
       const svc = new LangyConversationService(repo);
