@@ -118,8 +118,8 @@ const chatRequestSchema = z.object({
 // Token counts live on the gateway-emitted OTel trace (see the per-worker
 // OPENCODE_OTLP_* env in services/langy-agent — the OpenCode OTel plugin
 // exports gen_ai.usage.{prompt,completion}_tokens for every LLM call). The
-// LangyMessage row is the text+role+parts of a chat turn; consumers that need
-// usage figures should fold the trace by langwatch.thread.id=conversationId,
+// langy_messages (ClickHouse) is the text+role+parts of a chat turn; consumers
+// that need usage figures should fold the trace by langwatch.thread.id=conversationId,
 // not double-count with an in-process tokenizer here. Discussed on PR #4913.
 async function persistMessage(opts: {
   conversationId: string;
@@ -127,20 +127,18 @@ async function persistMessage(opts: {
   role: "user" | "assistant";
   parts: unknown;
 }) {
-  const messageService = LangyMessageService.create(prisma);
+  const messageService = LangyMessageService.create();
   await messageService.append({
     conversationId: opts.conversationId,
     projectId: opts.projectId,
     role: opts.role,
     parts: opts.parts ?? [],
   });
-  if (opts.role === "assistant") {
-    const conversationService = LangyConversationService.create(prisma);
-    await conversationService.touch({
-      id: opts.conversationId,
-      projectId: opts.projectId,
-    });
-  }
+  const conversationService = LangyConversationService.create(prisma);
+  await conversationService.bumpActivity({
+    id: opts.conversationId,
+    projectId: opts.projectId,
+  });
 }
 
 // Every Langy route does its own authentication in-handler: the app-level
@@ -674,7 +672,7 @@ langyRoute().get("/langy/conversations/:id", async (c) => {
     userId: guard.session!.user.id,
   });
   if (!conv) return c.json({ error: "Not found" }, { status: 404 });
-  const msgService = LangyMessageService.create(prisma);
+  const msgService = LangyMessageService.create();
   const messages = await msgService.getRecordsByConversation({
     conversationId: conv.id,
     projectId: projectId!,
@@ -765,7 +763,7 @@ langyRoute().get("/langy/memory/export", async (c) => {
     userId,
     limit: 1000,
   });
-  const msgService = LangyMessageService.create(prisma);
+  const msgService = LangyMessageService.create();
   const conversationsWithMessages = await Promise.all(
     conversations
       .filter((c) => c.isOwn)

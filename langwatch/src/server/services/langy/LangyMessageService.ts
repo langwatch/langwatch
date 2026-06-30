@@ -1,4 +1,8 @@
-import type { LangyMessage, PrismaClient } from "@prisma/client";
+import { randomUUID } from "crypto";
+import {
+  getClickHouseClientForProject,
+  type ClickHouseClientResolver,
+} from "~/server/clickhouse/clickhouseClient";
 
 export type MessageRole = "user" | "assistant" | "tool" | "system";
 
@@ -9,10 +13,17 @@ export type CreateMessageInput = {
   parts: unknown;
 };
 
+export type LangyMessageRow = {
+  id: string;
+  role: MessageRole;
+  parts: unknown;
+  createdAt: Date;
+};
+
 /**
  * Display shape the UI consumes when restoring a conversation. The raw
- * row stores `parts` (JSONB); the UI only renders text, so we flatten
- * the text parts into `content` here rather than leaking the JSONB blob.
+ * row stores `parts` (JSON string); the UI only renders text, so we flatten
+ * the text parts into `content` here rather than leaking the blob.
  */
 export type LangyMessageRecord = {
   id: string;
@@ -32,8 +43,10 @@ export function extractTextFromParts(parts: unknown): string {
     .join("\n");
 }
 
+const TABLE_NAME = "langy_messages" as const;
+
 export class LangyMessageRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(private readonly resolver: ClickHouseClientResolver) {}
 
   async findAllByConversation({
     conversationId,
@@ -41,30 +54,68 @@ export class LangyMessageRepository {
   }: {
     conversationId: string;
     projectId: string;
-  }) {
-    return await this.prisma.langyMessage.findMany({
-      where: { conversationId, projectId },
-      orderBy: { createdAt: "asc" },
+  }): Promise<LangyMessageRow[]> {
+    const client = await this.resolver(projectId);
+    const result = await client.query({
+      query: `
+        SELECT MessageId, Role, Parts, CreatedAt
+        FROM ${TABLE_NAME} FINAL
+        WHERE TenantId = {tenantId:String}
+          AND ConversationId = {conversationId:String}
+        ORDER BY CreatedAt ASC
+      `,
+      query_params: { tenantId: projectId, conversationId },
     });
+    const rows = await result.json<{
+      MessageId: string;
+      Role: string;
+      Parts: string;
+      CreatedAt: string;
+    }>();
+    return rows.data.map((r) => ({
+      id: r.MessageId,
+      role: r.Role as MessageRole,
+      parts: JSON.parse(r.Parts) as unknown,
+      createdAt: new Date(r.CreatedAt),
+    }));
   }
 
-  async create(input: CreateMessageInput): Promise<LangyMessage> {
-    return await this.prisma.langyMessage.create({
-      data: {
-        conversationId: input.conversationId,
-        projectId: input.projectId,
-        role: input.role,
-        parts: input.parts as never,
-      },
+  async create(input: CreateMessageInput): Promise<LangyMessageRow> {
+    const client = await this.resolver(input.projectId);
+    const messageId = randomUUID();
+    const now = new Date().toISOString();
+    await client.insert({
+      table: TABLE_NAME,
+      values: [
+        {
+          TenantId: input.projectId,
+          ConversationId: input.conversationId,
+          MessageId: messageId,
+          Role: input.role,
+          Parts: JSON.stringify(input.parts ?? []),
+          CreatedAt: now,
+          UpdatedAt: now,
+        },
+      ],
+      format: "JSONEachRow",
+      clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
     });
+    return {
+      id: messageId,
+      role: input.role,
+      parts: input.parts,
+      createdAt: new Date(now),
+    };
   }
 }
 
 export class LangyMessageService {
   constructor(private readonly repository: LangyMessageRepository) {}
 
-  static create(prisma: PrismaClient): LangyMessageService {
-    return new LangyMessageService(new LangyMessageRepository(prisma));
+  static create(): LangyMessageService {
+    return new LangyMessageService(
+      new LangyMessageRepository(getClickHouseClientForProject),
+    );
   }
 
   async getAllByConversation({
@@ -73,7 +124,7 @@ export class LangyMessageService {
   }: {
     conversationId: string;
     projectId: string;
-  }): Promise<LangyMessage[]> {
+  }): Promise<LangyMessageRow[]> {
     return await this.repository.findAllByConversation({
       conversationId,
       projectId,
@@ -93,12 +144,12 @@ export class LangyMessageService {
     });
     return rows.map((r) => ({
       id: r.id,
-      role: r.role as MessageRole,
+      role: r.role,
       content: extractTextFromParts(r.parts),
     }));
   }
 
-  async append(input: CreateMessageInput): Promise<LangyMessage> {
+  async append(input: CreateMessageInput): Promise<LangyMessageRow> {
     return await this.repository.create(input);
   }
 }
