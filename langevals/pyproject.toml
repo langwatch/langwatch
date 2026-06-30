@@ -70,7 +70,9 @@ packages = ["langevals"]
 exclude-newer = "7 days"
 override-dependencies = [
     "langchain>=0.3.30",
-    "langsmith>=0.8.0",
+    # security: GHSA-f4xh-w4cj-qxq8 — LangSmith SDK TracingMiddleware arbitrary
+    # server-side file read; patched in 0.8.18.
+    "langsmith>=0.8.18",
     # Force a patched strawberry-graphql (GHSA-fr49-mhgj-crfc, GHSA-qfwv-87qj-98xq,
     # GHSA-x97m-qp5c-w9xj). arize-phoenix 14.6.0 pins it to 0.314.3; the patched
     # 0.316.0 is API-compatible with Phoenix and is the version Phoenix itself moved
