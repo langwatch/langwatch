@@ -57,6 +57,25 @@ export interface StorageBillingCheckpointService {
     pendingReportedTotal: number;
     consecutiveFailures: number;
   }): Promise<void>;
+
+  /**
+   * Breaker-only failure record (ADR-027 Phase 3). Storage reporting is
+   * per-hour and idempotent via the `StorageUsageHourly.reportedAt` cursor, so
+   * it does not use the lastReportedTotal/pendingReportedTotal accumulator —
+   * only the consecutive-failure counter that trips the circuit breaker. Upsert
+   * so the first failure on a fresh (org, month) creates the row.
+   */
+  recordFailure(params: {
+    organizationId: string;
+    billingMonth: string;
+    consecutiveFailures: number;
+  }): Promise<void>;
+
+  /** Clears the consecutive-failure counter after a successful report. */
+  recordSuccess(params: {
+    organizationId: string;
+    billingMonth: string;
+  }): Promise<void>;
 }
 
 /**
@@ -181,6 +200,51 @@ export class PrismaStorageBillingCheckpointService
       },
       update: {
         consecutiveFailures: params.consecutiveFailures,
+      },
+    });
+  }
+
+  async recordFailure(params: {
+    organizationId: string;
+    billingMonth: string;
+    consecutiveFailures: number;
+  }): Promise<void> {
+    await this.prisma.storageBillingCheckpoint.upsert({
+      where: {
+        organizationId_billingMonth: {
+          organizationId: params.organizationId,
+          billingMonth: params.billingMonth,
+        },
+      },
+      create: {
+        organizationId: params.organizationId,
+        billingMonth: params.billingMonth,
+        consecutiveFailures: params.consecutiveFailures,
+      },
+      update: {
+        consecutiveFailures: params.consecutiveFailures,
+      },
+    });
+  }
+
+  async recordSuccess(params: {
+    organizationId: string;
+    billingMonth: string;
+  }): Promise<void> {
+    await this.prisma.storageBillingCheckpoint.upsert({
+      where: {
+        organizationId_billingMonth: {
+          organizationId: params.organizationId,
+          billingMonth: params.billingMonth,
+        },
+      },
+      create: {
+        organizationId: params.organizationId,
+        billingMonth: params.billingMonth,
+        consecutiveFailures: 0,
+      },
+      update: {
+        consecutiveFailures: 0,
       },
     });
   }
