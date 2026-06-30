@@ -7,12 +7,18 @@ import { z } from "zod";
  * match that existing surface so the two entrypoints don't drift.
  */
 
+// Max absolute epoch-ms representable by a JS `Date` (ECMA-262); anything
+// beyond becomes `Invalid Date`, so bound the inputs before they reach
+// `new Date(...)` in the route handler.
+const MAX_DATE_MS = 8_640_000_000_000_000;
+const epochMs = z.coerce.number().int().min(-MAX_DATE_MS).max(MAX_DATE_MS);
+
 export const meUsageQuerySchema = z
   .object({
     /** Inclusive window start in epoch ms. Defaults to start-of-month. */
-    windowStartMs: z.coerce.number().int().optional(),
+    windowStartMs: epochMs.optional(),
     /** Exclusive window end in epoch ms. Defaults to now. */
-    windowEndMs: z.coerce.number().int().optional(),
+    windowEndMs: epochMs.optional(),
   })
   // A half-specified window is ambiguous — require both bounds or neither,
   // rather than silently dropping a lone bound and returning the default month.

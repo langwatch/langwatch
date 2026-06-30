@@ -23,6 +23,11 @@ Feature: Personal usage REST API
     Then the response status is 400
     And the error explains both bounds must be provided together
 
+  Scenario: An inverted window is rejected
+    When I GET /api/me/usage with a start time at or after the end time
+    Then the response status is 400
+    And the error explains the start must be before the end
+
   Scenario: Empty state is safe
     Given my personal workspace has no usage in the window
     When I GET /api/me/usage
