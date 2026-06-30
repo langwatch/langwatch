@@ -1,7 +1,7 @@
+import { PersonalUsageService } from "@ee/governance/services/personalUsage.service";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
-import { PersonalUsageService } from "@ee/governance/services/personalUsage.service";
 import {
   createProjectApp,
   requires,

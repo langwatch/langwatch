@@ -7,12 +7,29 @@ import { z } from "zod";
  * match that existing surface so the two entrypoints don't drift.
  */
 
-export const meUsageQuerySchema = z.object({
-  /** Inclusive window start in epoch ms. Defaults to start-of-month. */
-  windowStartMs: z.coerce.number().int().optional(),
-  /** Exclusive window end in epoch ms. Defaults to now. */
-  windowEndMs: z.coerce.number().int().optional(),
-});
+export const meUsageQuerySchema = z
+  .object({
+    /** Inclusive window start in epoch ms. Defaults to start-of-month. */
+    windowStartMs: z.coerce.number().int().optional(),
+    /** Exclusive window end in epoch ms. Defaults to now. */
+    windowEndMs: z.coerce.number().int().optional(),
+  })
+  // A half-specified window is ambiguous — require both bounds or neither,
+  // rather than silently dropping a lone bound and returning the default month.
+  .refine(
+    (q) => (q.windowStartMs === undefined) === (q.windowEndMs === undefined),
+    {
+      message:
+        "windowStartMs and windowEndMs must be provided together (or both omitted for the current month).",
+    },
+  )
+  .refine(
+    (q) =>
+      q.windowStartMs === undefined ||
+      q.windowEndMs === undefined ||
+      q.windowStartMs < q.windowEndMs,
+    { message: "windowStartMs must be before windowEndMs." },
+  );
 
 const mostUsedModelSchema = z
   .object({ name: z.string(), usagePct: z.number() })

@@ -1,54 +1,115 @@
+import type { ClickHouseClient } from "@clickhouse/client";
 import {
-  OrganizationUserRole,
-  RoleBindingScopeType,
-  TeamUserRole,
   type Organization,
+  OrganizationUserRole,
   type Team,
+  TeamUserRole,
 } from "@prisma/client";
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import { prisma } from "~/server/db";
-import { ApiKeyService } from "~/server/api-key/api-key.service";
+import {
+  cleanupTestData,
+  getTestClickHouseClient,
+} from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { app } from "../[[...route]]/app";
+
+/** Minimal trace_summaries seed — mirrors the PersonalUsageService test helper. */
+async function insertTrace(
+  ch: ClickHouseClient,
+  tenantId: string,
+  t: { traceId: string; occurredAt: Date; totalCost: number; models: string[] },
+): Promise<void> {
+  await ch.insert({
+    table: "trace_summaries",
+    values: [
+      {
+        ProjectionId: `proj-${nanoid()}`,
+        TenantId: tenantId,
+        TraceId: t.traceId,
+        Version: "v1",
+        Attributes: {},
+        OccurredAt: t.occurredAt,
+        CreatedAt: t.occurredAt,
+        UpdatedAt: t.occurredAt,
+        ComputedIOSchemaVersion: "",
+        ComputedInput: null,
+        ComputedOutput: null,
+        TimeToFirstTokenMs: null,
+        TimeToLastTokenMs: null,
+        TotalDurationMs: 100,
+        TokensPerSecond: null,
+        SpanCount: 1,
+        ContainsErrorStatus: 0,
+        ContainsOKStatus: 1,
+        ErrorMessage: null,
+        Models: t.models,
+        TotalCost: t.totalCost,
+        NonBilledCost: 0,
+        TokensEstimated: false,
+        TotalPromptTokenCount: 10,
+        TotalCompletionTokenCount: 5,
+        OutputFromRootSpan: 0,
+        OutputSpanEndTimeMs: 0,
+        BlockedByGuardrail: 0,
+        TopicId: null,
+        SubTopicId: null,
+        HasAnnotation: null,
+      },
+    ],
+    format: "JSONEachRow",
+    clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+  });
+}
 
 describe("Feature: Personal usage REST API", () => {
   const ns = `me-usage-api-${nanoid(8)}`;
 
   let testOrganization: Organization;
   let testTeam: Team;
-  let personalProjectId: string;
-  let sharedProjectId: string;
-  let personalToken: string;
-  let sharedToken: string;
   let userId: string;
+  let ch: ClickHouseClient | null = null;
 
-  const authHeaders = (token: string, projectId: string) => ({
-    Authorization: `Bearer ${token}`,
+  // A personal project with seeded usage, a personal project with none, and a
+  // shared (non-personal) project — each authenticated by its OWN api key so
+  // the personal-vs-shared contract is exercised at the credential layer.
+  let seededProject: { id: string; apiKey: string };
+  let emptyProject: { id: string; apiKey: string };
+  let sharedProject: { id: string; apiKey: string };
+
+  // Deterministic window around the seeded in-window trace.
+  const inWindow = new Date(Date.UTC(2026, 0, 15, 12, 0, 0));
+  const outOfWindow = new Date(Date.UTC(2025, 11, 15, 12, 0, 0));
+  const windowStartMs = Date.UTC(2026, 0, 1);
+  const windowEndMs = Date.UTC(2026, 0, 31);
+
+  const authHeaders = (apiKey: string, projectId: string) => ({
+    Authorization: `Bearer ${apiKey}`,
     "X-Project-Id": projectId,
     "Content-Type": "application/json",
   });
 
-  const mintToken = async () =>
-    (
-      await ApiKeyService.create(prisma).create({
-        name: `me-usage-bootstrap-${nanoid(6)}`,
-        userId,
-        createdByUserId: userId,
-        organizationId: testOrganization.id,
-        permissionMode: "all",
-        bindings: [
-          {
-            role: TeamUserRole.ADMIN,
-            scopeType: RoleBindingScopeType.ORGANIZATION,
-            scopeId: testOrganization.id,
-          },
-        ],
-      })
-    ).token;
+  const makeProject = async (name: string, isPersonal: boolean) => {
+    const apiKey = `sk-lw-${nanoid(48)}`;
+    const project = await prisma.project.create({
+      data: {
+        id: `project_${nanoid()}`,
+        name,
+        slug: `--test-${nanoid(8)}`,
+        language: "typescript",
+        framework: "other",
+        apiKey,
+        teamId: testTeam.id,
+        isPersonal,
+        ownerUserId: isPersonal ? userId : null,
+      },
+    });
+    return { id: project.id, apiKey };
+  };
 
   beforeAll(async () => {
+    ch = getTestClickHouseClient();
+
     testOrganization = await prisma.organization.create({
       data: { name: "Me Usage Test Org", slug: `--test-org-${ns}` },
     });
@@ -73,55 +134,33 @@ describe("Feature: Personal usage REST API", () => {
     await prisma.teamUser.create({
       data: { userId, teamId: testTeam.id, role: TeamUserRole.ADMIN },
     });
-    await prisma.roleBinding.create({
-      data: {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId: testOrganization.id,
-        userId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: testOrganization.id,
-      },
-    });
 
-    const personalProject = await prisma.project.create({
-      data: {
-        id: `project_${nanoid()}`,
-        name: "Personal Workspace",
-        slug: `--test-personal-${ns}`,
-        language: "typescript",
-        framework: "other",
-        apiKey: `sk-lw-${nanoid(48)}`,
-        teamId: testTeam.id,
-        isPersonal: true,
-        ownerUserId: userId,
-      },
-    });
-    personalProjectId = personalProject.id;
+    seededProject = await makeProject("Personal Workspace", true);
+    emptyProject = await makeProject("Empty Personal Workspace", true);
+    sharedProject = await makeProject("Shared Project", false);
 
-    const sharedProject = await prisma.project.create({
-      data: {
-        id: `project_${nanoid()}`,
-        name: "Shared Project",
-        slug: `--test-shared-${ns}`,
-        language: "typescript",
-        framework: "other",
-        apiKey: `sk-lw-${nanoid(48)}`,
-        teamId: testTeam.id,
-        isPersonal: false,
-      },
-    });
-    sharedProjectId = sharedProject.id;
-
-    personalToken = await mintToken();
-    sharedToken = await mintToken();
+    if (ch) {
+      // One trace inside the window, one outside — the window test proves the
+      // out-of-window trace is excluded.
+      await insertTrace(ch, seededProject.id, {
+        traceId: `t-in-${nanoid(6)}`,
+        occurredAt: inWindow,
+        totalCost: 0.5,
+        models: ["gpt-4o"],
+      });
+      await insertTrace(ch, seededProject.id, {
+        traceId: `t-out-${nanoid(6)}`,
+        occurredAt: outOfWindow,
+        totalCost: 2.0,
+        models: ["claude-opus-4-8"],
+      });
+    }
   });
 
   afterAll(async () => {
-    await prisma.roleBinding
-      .deleteMany({ where: { organizationId: testOrganization.id } })
-      .catch(() => {});
-    await prisma.apiKey.deleteMany({ where: { userId } }).catch(() => {});
+    if (ch) {
+      await cleanupTestData(seededProject.id).catch(() => {});
+    }
     await prisma.project
       .deleteMany({ where: { teamId: testTeam.id } })
       .catch(() => {});
@@ -138,57 +177,94 @@ describe("Feature: Personal usage REST API", () => {
       .catch(() => {});
   });
 
-  describe("when no auth header is provided", () => {
-    it("returns 401", async () => {
-      const headers = new Headers();
-      headers.set("X-Project-Id", personalProjectId);
-      const res = await app.request("/api/me/usage", { headers });
-      expect(res.status).toBe(401);
+  describe("given no authentication", () => {
+    describe("when reading usage", () => {
+      it("returns 401", async () => {
+        const headers = new Headers();
+        headers.set("X-Project-Id", seededProject.id);
+        const res = await app.request("/api/me/usage", { headers });
+        expect(res.status).toBe(401);
+      });
     });
   });
 
-  describe("when the project key is a personal-project key", () => {
-    it("returns the personal-usage envelope (empty-state safe)", async () => {
-      const res = await app.request("/api/me/usage", {
-        headers: authHeaders(personalToken, personalProjectId),
-      });
-      expect(res.status).toBe(200);
-      const body = await res.json();
+  describe("given a personal-workspace API key", () => {
+    describe("when reading usage for an explicit window", () => {
+      it("rolls up only usage inside the window", async () => {
+        const res = await app.request(
+          `/api/me/usage?windowStartMs=${windowStartMs}&windowEndMs=${windowEndMs}`,
+          { headers: authHeaders(seededProject.apiKey, seededProject.id) },
+        );
+        expect(res.status).toBe(200);
+        const body = await res.json();
 
-      expect(body.summary).toMatchObject({
-        spentUsd: 0,
-        billedUsd: 0,
-        requests: 0,
-        promptTokens: 0,
-        completionTokens: 0,
-        mostUsedModel: null,
+        // Only the in-window trace ($0.50, 1 request) counts; the $2.00
+        // out-of-window trace is excluded.
+        expect(body.summary.spentUsd).toBeCloseTo(0.5, 5);
+        expect(body.summary.requests).toBe(1);
+        expect(body.dailyBuckets.length).toBeGreaterThanOrEqual(1);
+        const total = body.dailyBuckets.reduce(
+          (sum: number, b: { spentUsd: number }) => sum + b.spentUsd,
+          0,
+        );
+        expect(total).toBeCloseTo(0.5, 5);
+        expect(
+          body.breakdownByModel.map((m: { label: string }) => m.label),
+        ).toContain("gpt-4o");
       });
-      expect(Array.isArray(body.dailyBuckets)).toBe(true);
-      expect(Array.isArray(body.breakdownByModel)).toBe(true);
-      expect(body.breakdownByModel).toEqual([]);
     });
 
-    it("accepts an explicit window via query params", async () => {
-      const end = 1_700_000_000_000;
-      const start = end - 7 * 24 * 60 * 60 * 1000;
-      const res = await app.request(
-        `/api/me/usage?windowStartMs=${start}&windowEndMs=${end}`,
-        { headers: authHeaders(personalToken, personalProjectId) },
-      );
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.summary.spentUsd).toBe(0);
+    describe("when a half-specified window is provided", () => {
+      it("returns 400", async () => {
+        const res = await app.request(
+          `/api/me/usage?windowStartMs=${windowStartMs}`,
+          { headers: authHeaders(seededProject.apiKey, seededProject.id) },
+        );
+        expect(res.status).toBe(400);
+      });
+    });
+
+    describe("when the workspace has no usage in the window", () => {
+      it("returns the empty-state envelope", async () => {
+        const res = await app.request("/api/me/usage", {
+          headers: authHeaders(emptyProject.apiKey, emptyProject.id),
+        });
+        expect(res.status).toBe(200);
+        const body = await res.json();
+
+        expect(body.summary).toMatchObject({
+          spentUsd: 0,
+          billedUsd: 0,
+          requests: 0,
+          promptTokens: 0,
+          completionTokens: 0,
+          mostUsedModel: null,
+        });
+        // dailyBuckets is dense (one zero-filled bucket per day in the
+        // window via fillEmptyBuckets), so empty-state means every bucket is
+        // zero — not an empty array.
+        expect(body.dailyBuckets.length).toBeGreaterThan(0);
+        expect(
+          body.dailyBuckets.every(
+            (b: { spentUsd: number; requests: number }) =>
+              b.spentUsd === 0 && b.requests === 0,
+          ),
+        ).toBe(true);
+        expect(body.breakdownByModel).toEqual([]);
+      });
     });
   });
 
-  describe("when the project key is a shared (non-personal) project key", () => {
-    it("returns 400 explaining a personal-project key is required", async () => {
-      const res = await app.request("/api/me/usage", {
-        headers: authHeaders(sharedToken, sharedProjectId),
+  describe("given a shared (non-personal) workspace API key", () => {
+    describe("when reading usage", () => {
+      it("returns 400 explaining a personal-workspace key is required", async () => {
+        const res = await app.request("/api/me/usage", {
+          headers: authHeaders(sharedProject.apiKey, sharedProject.id),
+        });
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(JSON.stringify(body)).toContain("personal-project");
       });
-      expect(res.status).toBe(400);
-      const body = await res.json();
-      expect(JSON.stringify(body)).toContain("personal-project");
     });
   });
 });
