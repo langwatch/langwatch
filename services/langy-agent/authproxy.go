@@ -43,7 +43,7 @@ func generateBearerToken() (string, error) {
 // on a UNIX domain socket (Bun.serve supports `unix:`, opencode does not
 // expose a flag for it today) or running each opencode in its own network
 // namespace (CAP_NET_ADMIN, broader cap surface than we want). Documented
-// as a follow-up in specs/assistant/langy-worker-isolation.feature.
+// as a follow-up in specs/langy/langy-worker-isolation.feature.
 type authProxy struct {
 	server *http.Server
 	listen net.Listener

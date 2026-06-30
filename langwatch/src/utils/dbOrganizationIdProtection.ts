@@ -113,7 +113,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // Per-user GitHub App connection used by Langy to open PRs as the user.
   // Bound by organizationId (admin reads), the row id, or the compound
   // `userId_organizationId` unique key (every service-layer query). Issue
-  // #4747; spec specs/assistant/langy-github-prs.feature.
+  // #4747; spec specs/langy/langy-github-prs.feature.
   UserGitHubCredential: {},
 };
 

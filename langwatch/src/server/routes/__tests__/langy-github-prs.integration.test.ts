@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  *
- * Spec: specs/assistant/langy-github-prs.feature — "Langy opens GitHub PRs as
+ * Spec: specs/langy/langy-github-prs.feature — "Langy opens GitHub PRs as
  * the requesting user". Issue: #4747.
  *
  * These are integration tests: each boundary is mocked at its module/fetch

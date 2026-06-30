@@ -3,7 +3,7 @@
 - **Issue:** langwatch/langwatch#4747
 - **Branch:** `langy/github-prs-plan` (this doc) → implementation PRs listed below
 - **Base:** `langy/per-session-manager` (PR #4272)
-- **Spec:** `specs/assistant/langy-github-prs.feature` (added alongside this plan)
+- **Spec:** `specs/langy/langy-github-prs.feature` (added alongside this plan)
 
 ## Goal
 
@@ -113,7 +113,7 @@ exception.
 ### PR 1 — Spec + data model
 *Branch `langy/github-prs-1-model`, base `langy/per-session-manager`*
 
-- [ ] `specs/assistant/langy-github-prs.feature` — `@unimplemented` scenarios (shipped with this plan; flip tags as built)
+- [ ] `specs/langy/langy-github-prs.feature` — `@unimplemented` scenarios (shipped with this plan; flip tags as built)
 - [ ] Prisma: `UserGitHubCredential` model
   ```prisma
   model UserGitHubCredential {
@@ -202,7 +202,7 @@ exception.
 - [ ] Scenario test (`langwatch/src/tests/langy/`): unconnected user asks "open a PR on repo X" → judge criteria: replies with connect link, does NOT error, does NOT hallucinate a PR
 - [ ] E2E on sandbox repo (manual, checklist below): real PR attributed correctly; `grep -r "$TOKEN" <worker-home>` finds nothing
 - [ ] `auditLog` `langy.github.pr_created` (skill instructs Langy to report the PR URL; manager parses or app-side hook — pick simplest: log on the app side when the reply contains a PR URL, revisit later)
-- [ ] Docs: `.env.example`, self-host note (App registration steps), `specs/assistant/` tag flips to `@integration`
+- [ ] Docs: `.env.example`, self-host note (App registration steps), `specs/langy/` tag flips to `@integration`
 
 ## Verification checklist (from the issue, kept live)
 

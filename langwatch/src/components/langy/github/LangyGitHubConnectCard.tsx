@@ -7,7 +7,7 @@
  * connected GitHub login and the caller can refetch / replay the user's last
  * prompt so the conversation continues seamlessly.
  *
- * Spec: specs/assistant/langy-github-prs.feature. Issue: #4747.
+ * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
  */
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";

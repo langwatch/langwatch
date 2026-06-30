@@ -1500,7 +1500,7 @@ describe("Langy via HTTP wrapper", () => {
     //
     // Connected end-to-end (clone → branch → commit → push → PR) is gated
     // behind real credentials + a sandbox repo, so we mark that scenario @e2e
-    // in specs/assistant/langy-github-prs.feature and run it manually for
+    // in specs/langy/langy-github-prs.feature and run it manually for
     // now. The unconnected path is what regresses if the skill drifts.
 
     it("renders the connect card for an unconnected user instead of erroring", async () => {

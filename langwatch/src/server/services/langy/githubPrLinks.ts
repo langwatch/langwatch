@@ -10,7 +10,7 @@
  * can import the same pure function without dragging React or Chakra into the
  * server bundle.
  *
- * Spec: specs/assistant/langy-github-prs.feature. Issue: #4747.
+ * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
  */
 
 import { parseGithubProgressEvents } from "./githubProgressEvents";

@@ -925,7 +925,7 @@ function createOtelTraceWithResourceAttributes(
 describe("Metadata Mapping - resource attributes", () => {
   // The opencode OTel plugin (Langy worker) sets tags via OTLP *resource*
   // attributes, so reserved keys must be hoisted from the resource the same
-  // way they are from span attributes. See specs/assistant/langy-otel-tracing.feature.
+  // way they are from span attributes. See specs/langy/langy-otel-tracing.feature.
 
   it("maps tag.tags from resource attributes to labels", async () => {
     const request = createOtelTraceWithResourceAttributes([

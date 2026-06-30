@@ -15,7 +15,7 @@
  * v0 keeps stages a closed enum: anything else is dropped (logged once if a
  * skill drifts). Cheap, observable, no breaking changes to the worker.
  *
- * Spec: specs/assistant/langy-github-prs.feature. Issue: #4747.
+ * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
  */
 
 export type GithubProgressStage =

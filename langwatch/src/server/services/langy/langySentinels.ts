@@ -16,7 +16,7 @@
  *                                       multiple per reply, in order; see
  *                                       githubProgressEvents.ts for parsing.
  *
- * Spec: specs/assistant/langy-github-prs.feature. Issue: #4747.
+ * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
  */
 import { parseGithubProgressEvents } from "./githubProgressEvents";
 

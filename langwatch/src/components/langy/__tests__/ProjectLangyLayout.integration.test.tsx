@@ -4,7 +4,7 @@
  * Integration test for ProjectLangyLayout — the layout route that mounts Langy
  * once per project so it survives navigation between project pages.
  *
- * Spec: specs/assistant/langy-navigation-persistence.feature
+ * Spec: specs/langy/langy-navigation-persistence.feature
  *
  * Boundary mocks: the gate-input hooks (session / project / flag / staff) and
  * the heavy LangyDrawer chat surface. LangyContext is REAL, so the open/closed

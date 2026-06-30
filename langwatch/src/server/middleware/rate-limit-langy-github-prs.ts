@@ -8,7 +8,7 @@
  * the natural place to bump the counter is the control-plane side AFTER a
  * chat reply that contains a github.com PR URL. See LangyMessageService.
  *
- * Issue #4747. Spec: specs/assistant/langy-github-prs.feature.
+ * Issue #4747. Spec: specs/langy/langy-github-prs.feature.
  */
 import { connection } from "../redis";
 

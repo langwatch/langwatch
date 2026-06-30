@@ -29,7 +29,7 @@ import {
  * project-scoped). Visibility itself is unchanged from the previous
  * DashboardLayout gate — see useShowLangy.
  *
- * Spec: specs/assistant/langy-navigation-persistence.feature
+ * Spec: specs/langy/langy-navigation-persistence.feature
  */
 export default function ProjectLangyLayout() {
   const { project: projectSlug } = useParams();

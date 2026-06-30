@@ -9,7 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const skillsRoot = path.resolve(__dirname, "..");
 const skills = listPublishedSkills(skillsRoot);
 
-// Backs specs/assistant/langy-native-skills.feature. Langy must load EXACTLY the
+// Backs specs/langy/langy-native-skills.feature. Langy must load EXACTLY the
 // published skills — the curated feature skills plus every recipe — with their
 // content verbatim. Driving generation off listPublishedSkills (the same
 // selection the publisher uses) is what makes "what we publish, Langy has" true.

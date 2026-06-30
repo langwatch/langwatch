@@ -15,7 +15,7 @@
  * shape responses. Everything else (DB writes, GitHub HTTP, popup HTML) lives
  * in services/langy/* siblings.
  *
- * Spec: specs/assistant/langy-github-prs.feature. Issue: #4747.
+ * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
  */
 import { randomBytes } from "crypto";
 import { env } from "~/env.mjs";

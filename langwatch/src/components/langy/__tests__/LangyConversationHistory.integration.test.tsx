@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * Integration tests for LangyPanel conversation history.
- * Spec: specs/assistant/langy-baseline.feature
+ * Spec: specs/langy/langy-baseline.feature
  *
  * Boundary mocks: useOrganizationTeamProject (project context),
  * @ai-sdk/react useChat (no real streaming), global.fetch (observable

@@ -7,7 +7,7 @@
  * OAuth dance in a separate window and `postMessage`s the result back so the
  * sidebar can pick the conversation up exactly where it left off.
  *
- * Spec: specs/assistant/langy-github-prs.feature. Issue: #4747.
+ * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
  */
 import { useCallback, useEffect, useRef } from "react";
 

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Spec: specs/assistant/langy-inline-model-setup.feature — "Langy
+ * Spec: specs/langy/langy-inline-model-setup.feature — "Langy
  * prompts for a model when the project has none configured".
  *
  * Component integration test of the Langy panel's inline model-setup branch.

@@ -337,7 +337,7 @@ const routes: RouteObject[] = [
   // in-flight response survive navigation between project pages. The layout
   // component is keyed by :project, so Langy resets on project switch. Loaded
   // lazily via page() so Langy's chat bundle stays out of the initial load.
-  // See ProjectLangyLayout + specs/assistant/langy-navigation-persistence.feature
+  // See ProjectLangyLayout + specs/langy/langy-navigation-persistence.feature
   {
     ...page(() => import("./components/langy/ProjectLangyLayout")),
     children: [

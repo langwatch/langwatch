@@ -5,7 +5,7 @@
  * Real database — mocks only the planProvider / usageLimits system boundary
  * (so project.create runs without a real subscription).
  *
- * Spec: specs/assistant/langy-api-key-provisioning.feature
+ * Spec: specs/langy/langy-api-key-provisioning.feature
  * Requires: PostgreSQL database (Prisma)
  */
 import {

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  *
- * Spec: specs/assistant/langy-github-prs.feature — "Unconnected user gets a
+ * Spec: specs/langy/langy-github-prs.feature — "Unconnected user gets a
  * connect card, not an error". Issue: #4747.
  *
  * The connect-card EMISSION decision is the agent worker's: when GH_TOKEN is

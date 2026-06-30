@@ -64,7 +64,7 @@ These were written on the diverged `langy/full` base but their dependencies all 
 port cleanly (adapt imports/line refs only):
 - `src/server/services/langy/langyApiKey.ts` — `provisionLangyApiKey()` (the `backfillLangyApiKeys()` export was removed in PR #4913, see header).
 - ~~`scripts/backfill-langy-api-keys.ts`~~ — removed in PR #4913 (see header).
-- `specs/assistant/langy-api-key-provisioning.feature` — BDD spec (6 scenarios).
+- `specs/langy/langy-api-key-provisioning.feature` — BDD spec (6 scenarios).
 - `src/server/api/routers/__tests__/project.create.langyKey.integration.test.ts` — real-DB integration test.
 
 ## Locked decisions
@@ -82,9 +82,9 @@ port cleanly (adapt imports/line refs only):
 
 ## PR 1 — dedicated Langy API key (#4273)  ·  *foundation*  ·  **CODE COMPLETE, typecheck green**
 
-Spec: `specs/assistant/langy-api-key-provisioning.feature`.
+Spec: `specs/langy/langy-api-key-provisioning.feature`.
 
-- [x] **Spec-first** — `.feature` in `specs/assistant/` (6 scenarios).
+- [x] **Spec-first** — `.feature` in `specs/langy/` (6 scenarios).
 - [x] **Integration tests** (real DB, no mocks) — `src/server/api/routers/__tests__/project.create.langyKey.integration.test.ts`:
   - new project → a `Langy` service key exists, distinct from `Project.apiKey`
   - key bound only to its project · no org-admin (least-privilege) · `permissionMode: "restricted"`

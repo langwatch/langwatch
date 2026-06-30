@@ -7,7 +7,7 @@
  * parses out via {@link parseGithubProgressEvents} — see
  * server/services/langy/githubProgressEvents.ts.
  *
- * Spec: specs/assistant/langy-github-prs.feature. Issue: #4747.
+ * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
  */
 import { Box, HStack, Text } from "@chakra-ui/react";
 import {

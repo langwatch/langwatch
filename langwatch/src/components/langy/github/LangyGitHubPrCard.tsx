@@ -6,7 +6,7 @@
  * v0 derives owner/repo/number from the URL itself; a follow-up will add live
  * +/- stats and author lookup against the GitHub API using the user's token.
  *
- * Spec: specs/assistant/langy-github-prs.feature. Issue: #4747.
+ * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
  */
 import { Box, HStack, Link, Text, VStack } from "@chakra-ui/react";
 import { GitPullRequest } from "react-feather";

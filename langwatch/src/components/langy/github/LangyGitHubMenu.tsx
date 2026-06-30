@@ -18,7 +18,7 @@
  * instance has the GitHub feature off (query errors / returns nothing and
  * connect would 503 — the header shouldn't advertise a dead button).
  *
- * Spec: specs/assistant/langy-github-prs.feature. Issue: #4747.
+ * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
  */
 import { Box, IconButton } from "@chakra-ui/react";
 import { useState } from "react";

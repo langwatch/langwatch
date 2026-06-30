@@ -9,7 +9,7 @@
  * credential. We guard the refresh with a short-lived Redis lock and serve a
  * cached access token whenever it's still valid, so the lock is rarely hit.
  *
- * Spec: specs/assistant/langy-github-prs.feature. Issue: #4747.
+ * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
  */
 import type { PrismaClient } from "@prisma/client";
 

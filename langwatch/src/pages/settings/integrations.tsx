@@ -6,7 +6,7 @@
  * redirect-mode variant so a user landing here from a "Connect GitHub in
  * settings" link gets a normal full-page round-trip.
  *
- * Spec: specs/assistant/langy-github-prs.feature. Issue: #4747.
+ * Spec: specs/langy/langy-github-prs.feature. Issue: #4747.
  */
 import {
   Badge,

@@ -7,7 +7,7 @@
  *
  * Pulled out of the route so the security-critical sign/verify pair can be
  * tested without bringing up the Hono app. Spec:
- * specs/assistant/langy-github-prs.feature. Issue: #4747.
+ * specs/langy/langy-github-prs.feature. Issue: #4747.
  */
 import { createHmac, timingSafeEqual } from "crypto";
 
