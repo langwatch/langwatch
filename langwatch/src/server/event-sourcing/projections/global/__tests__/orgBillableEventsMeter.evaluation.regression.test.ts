@@ -41,7 +41,10 @@ function createMeterRouterWithSpyStore() {
   );
   router.registerMapProjection({
     ...orgBillableEventsMeterProjection,
-    store: { ...createMockAppendStore<BillableEventRecord>(), append: appendSpy },
+    store: {
+      ...createMockAppendStore<BillableEventRecord>(),
+      append: appendSpy,
+    },
   });
   return { router, appendSpy };
 }
@@ -66,75 +69,77 @@ function createReportedEvent(
 }
 
 describe("orgBillableEventsMeter — evaluation billing (issue #5124)", () => {
-  describe("when an evaluation reported event is dispatched", () => {
-    it("records exactly one billable row keyed on the evaluation", async () => {
-      const tenantId = createTestTenantId();
-      const evaluationId = "eval-abc";
-      const { router, appendSpy } = createMeterRouterWithSpyStore();
+  describe("given the real meter projection registered on a router", () => {
+    describe("when an evaluation reported event is dispatched", () => {
+      it("records exactly one billable row keyed on the evaluation", async () => {
+        const tenantId = createTestTenantId();
+        const evaluationId = "eval-abc";
+        const { router, appendSpy } = createMeterRouterWithSpyStore();
 
-      await router.dispatch([createReportedEvent(tenantId, evaluationId)], {
-        tenantId,
+        await router.dispatch([createReportedEvent(tenantId, evaluationId)], {
+          tenantId,
+        });
+
+        expect(appendSpy).toHaveBeenCalledTimes(1);
+        const record = appendSpy.mock.calls[0]![0] as BillableEventRecord;
+        expect(record).toEqual(
+          expect.objectContaining({
+            tenantId: String(tenantId),
+            eventType: EVALUATION_EVENT_TYPES.REPORTED,
+            deduplicationKey: `${tenantId}:${evaluationId}:reported`,
+          }),
+        );
       });
-
-      expect(appendSpy).toHaveBeenCalledTimes(1);
-      const record = appendSpy.mock.calls[0]![0] as BillableEventRecord;
-      expect(record).toEqual(
-        expect.objectContaining({
-          tenantId: String(tenantId),
-          eventType: EVALUATION_EVENT_TYPES.REPORTED,
-          deduplicationKey: `${tenantId}:${evaluationId}:reported`,
-        }),
-      );
     });
-  });
 
-  describe("when the same evaluation is reported twice (retry/replay)", () => {
-    it("produces the same dedup key so it collapses to one billable unit", async () => {
-      const tenantId = createTestTenantId();
-      const evaluationId = "eval-retry";
-      const { router, appendSpy } = createMeterRouterWithSpyStore();
+    describe("when the same evaluation is reported twice (retry/replay)", () => {
+      it("produces the same dedup key so it collapses to one billable unit", async () => {
+        const tenantId = createTestTenantId();
+        const evaluationId = "eval-retry";
+        const { router, appendSpy } = createMeterRouterWithSpyStore();
 
-      await router.dispatch(
-        [
-          createReportedEvent(tenantId, evaluationId),
-          createReportedEvent(tenantId, evaluationId),
-        ],
-        { tenantId },
-      );
+        await router.dispatch(
+          [
+            createReportedEvent(tenantId, evaluationId),
+            createReportedEvent(tenantId, evaluationId),
+          ],
+          { tenantId },
+        );
 
-      expect(appendSpy).toHaveBeenCalledTimes(2);
-      const keys = appendSpy.mock.calls.map(
-        (call) => (call[0] as BillableEventRecord).deduplicationKey,
-      );
-      expect(new Set(keys).size).toBe(1);
-      expect(keys[0]).toBe(`${tenantId}:${evaluationId}:reported`);
+        expect(appendSpy).toHaveBeenCalledTimes(2);
+        const keys = appendSpy.mock.calls.map(
+          (call) => (call[0] as BillableEventRecord).deduplicationKey,
+        );
+        expect(new Set(keys).size).toBe(1);
+        expect(keys[0]).toBe(`${tenantId}:${evaluationId}:reported`);
+      });
     });
-  });
 
-  describe("when never-emitted evaluation event types are dispatched", () => {
-    it("ignores lw.evaluation.scheduled and lw.evaluation.started since production never emits them", async () => {
-      const tenantId = createTestTenantId();
-      const { router, appendSpy } = createMeterRouterWithSpyStore();
+    describe("when never-emitted evaluation event types are dispatched", () => {
+      it("ignores lw.evaluation.scheduled and lw.evaluation.started since production never emits them", async () => {
+        const tenantId = createTestTenantId();
+        const { router, appendSpy } = createMeterRouterWithSpyStore();
 
-      await router.dispatch(
-        [
-          createTestEvent(
-            "eval-1",
-            TEST_CONSTANTS.AGGREGATE_TYPE,
-            tenantId,
-            EVALUATION_EVENT_TYPES.SCHEDULED,
-          ),
-          createTestEvent(
-            "eval-2",
-            TEST_CONSTANTS.AGGREGATE_TYPE,
-            tenantId,
-            EVALUATION_EVENT_TYPES.STARTED,
-          ),
-        ],
-        { tenantId },
-      );
+        await router.dispatch(
+          [
+            createTestEvent(
+              "eval-1",
+              TEST_CONSTANTS.AGGREGATE_TYPE,
+              tenantId,
+              EVALUATION_EVENT_TYPES.SCHEDULED,
+            ),
+            createTestEvent(
+              "eval-2",
+              TEST_CONSTANTS.AGGREGATE_TYPE,
+              tenantId,
+              EVALUATION_EVENT_TYPES.STARTED,
+            ),
+          ],
+          { tenantId },
+        );
 
-      expect(appendSpy).not.toHaveBeenCalled();
+        expect(appendSpy).not.toHaveBeenCalled();
+      });
     });
   });
 });
