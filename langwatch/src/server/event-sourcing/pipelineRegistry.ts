@@ -28,6 +28,8 @@ import { createLogger } from "~/utils/logger/server";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
 import type { BillingCheckpointService } from "../app-layer/billing/billingCheckpoint.service";
+import type { StorageBillingCheckpointService } from "../app-layer/billing/storageBillingCheckpoint.service";
+import type { StorageUsageHourlyRepository } from "../app-layer/billing/storageUsageHourly.repository";
 import type { BroadcastService } from "../app-layer/broadcast/broadcast.service";
 import { getAzureSafetyEnvFromProject } from "../app-layer/evaluations/azure-safety-env.server";
 import type { EvaluationCostRecorder } from "../app-layer/evaluations/evaluation-cost.recorder";
@@ -50,6 +52,7 @@ import { createElasticsearchBatchEvaluationRepository } from "../experiments-v3/
 import { type CommandDispatcher, Deferred } from "./deferred";
 import type { EventSourcing } from "./eventSourcing";
 import { mapCommands } from "./mapCommands";
+import { ReportStorageForHourCommand } from "./pipelines/billing-reporting/commands/reportStorageForHour.command";
 import { ReportUsageForMonthCommand } from "./pipelines/billing-reporting/commands/reportUsageForMonth.command";
 import {
   BILLING_REPORTING_PIPELINE_NAME,
@@ -204,6 +207,8 @@ export interface PipelineRegistryDeps {
   esSync: EvaluationEsSyncReactorDeps;
   costRecorder: EvaluationCostRecorder;
   billingCheckpoints: BillingCheckpointService;
+  storageBillingCheckpoints: StorageBillingCheckpointService;
+  storageUsageHourly: StorageUsageHourlyRepository;
   usageReportingService?: UsageReportingService;
   gatewayBudgetSync?: GatewayBudgetSyncReactorDeps;
   /**
@@ -747,9 +752,23 @@ export class PipelineRegistry {
       },
     });
 
+    const reportStorageForHourCommand = new ReportStorageForHourCommand({
+      organizations: this.deps.organizations,
+      storageBillingCheckpoints: this.deps.storageBillingCheckpoints,
+      storageUsageHourly: this.deps.storageUsageHourly,
+      getUsageReportingService: () => this.deps.usageReportingService,
+      selfDispatch: (data) => {
+        const pipeline = this.deps.eventSourcing.getPipeline(
+          BILLING_REPORTING_PIPELINE_NAME,
+        );
+        return pipeline.commands.reportStorageForHour.send(data);
+      },
+    });
+
     return this.deps.eventSourcing.register(
       createBillingReportingPipeline({
         reportUsageForMonthCommand,
+        reportStorageForHourCommand,
       }),
     );
   }

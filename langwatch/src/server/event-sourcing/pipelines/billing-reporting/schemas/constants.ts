@@ -4,10 +4,12 @@
 
 export const BILLING_REPORT_COMMAND_TYPES = {
   REPORT_USAGE_FOR_MONTH: "lw.billing_report.report_usage_for_month",
+  REPORT_STORAGE_FOR_HOUR: "lw.billing_report.report_storage_for_hour",
 } as const;
 
 export const BILLING_REPORTING_COMMAND_TYPES = [
   BILLING_REPORT_COMMAND_TYPES.REPORT_USAGE_FOR_MONTH,
+  BILLING_REPORT_COMMAND_TYPES.REPORT_STORAGE_FOR_HOUR,
 ] as const;
 
 export type BillingReportingCommandType =
