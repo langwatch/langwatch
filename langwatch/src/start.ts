@@ -373,7 +373,9 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   });
 };
 
-async function routeThroughHono(
+// Exported for the langwatch#5219 regression test, which drives the
+// null-body branch directly to prove it never writes a 0-byte body.
+export async function routeThroughHono(
   honoApp: Hono,
   req: IncomingMessage,
   res: ServerResponse,
@@ -425,8 +427,35 @@ async function routeThroughHono(
       res.write(value);
     }
     res.end();
+  } else if (
+    ![204, 205, 304].includes(honoRes.status) &&
+    req.method !== "HEAD"
+  ) {
+    // Null-body responses on a status that SHOULD carry a body (e.g. an error
+    // that slipped past a handler's own serialization) would otherwise
+    // `res.end("")` — a 0-byte body. A tRPC client then throws `Unexpected end
+    // of JSON input` on `response.json()` (langwatch#5219). Never emit an empty
+    // body here: fall back to a parseable JSON error so the client gets
+    // something it can decode.
+    const text = await honoRes.text();
+    if (text.length > 0) {
+      res.end(text);
+    } else {
+      if (!res.getHeader("Content-Type")) {
+        res.setHeader("Content-Type", "application/json");
+      }
+      res.end(
+        JSON.stringify({
+          error: "Internal server error",
+          message: "The server returned an empty response.",
+        }),
+      );
+    }
   } else {
-    res.end(await honoRes.text());
+    // 204/205/304 and HEAD legitimately carry no body — write nothing. Injecting
+    // a JSON error here would corrupt valid no-content paths (e.g. a 304
+    // revision-poll or a 204 long-poll no-diff).
+    res.end();
   }
   return true;
 }
