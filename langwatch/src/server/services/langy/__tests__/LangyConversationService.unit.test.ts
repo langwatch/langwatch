@@ -192,9 +192,16 @@ describe("LangyConversationService", () => {
     it("exposes the row's lastActivityAt and messageCount for the UI list", async () => {
       const lastActivityAt = new Date("2026-05-01T10:00:00.000Z");
       const repo = makeRepo({
-        findAllForUser: vi.fn().mockResolvedValue([
-          { ...baseConversation, title: "t", lastActivityAt, messageCount: 3 },
-        ]),
+        findAllForUser: vi
+          .fn()
+          .mockResolvedValue([
+            {
+              ...baseConversation,
+              title: "t",
+              lastActivityAt,
+              messageCount: 3,
+            },
+          ]),
       });
       const svc = new LangyConversationService(repo);
       const result = await svc.getAll({ projectId: "p1", userId: "alice" });
@@ -210,9 +217,11 @@ describe("LangyConversationService", () => {
     it("falls back to createdAt when lastActivityAt is null (row created before first message)", async () => {
       const createdAt = new Date("2026-04-01T00:00:00.000Z");
       const repo = makeRepo({
-        findAllForUser: vi.fn().mockResolvedValue([
-          { ...baseConversation, id: "c2", lastActivityAt: null, createdAt },
-        ]),
+        findAllForUser: vi
+          .fn()
+          .mockResolvedValue([
+            { ...baseConversation, id: "c2", lastActivityAt: null, createdAt },
+          ]),
       });
       const svc = new LangyConversationService(repo);
       const result = await svc.getAll({ projectId: "p1", userId: "alice" });
