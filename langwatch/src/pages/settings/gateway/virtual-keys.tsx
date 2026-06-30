@@ -123,9 +123,11 @@ function VirtualKeysPage() {
   const [rotating, setRotating] = useState<{ id: string; name: string } | null>(
     null,
   );
-  const [revoking, setRevoking] = useState<{ id: string; name: string } | null>(
-    null,
-  );
+  const [revoking, setRevoking] = useState<{
+    id: string;
+    name: string;
+    purpose: "user" | "langy";
+  } | null>(null);
   const [statusTab, setStatusTab] = useState<"active" | "revoked">("active");
 
   const allRows = listQuery.data ?? [];
@@ -470,6 +472,7 @@ function VirtualKeysPage() {
                                           setRevoking({
                                             id: vk.id,
                                             name: vk.name,
+                                            purpose: vk.purpose,
                                           })
                                         }
                                       >
@@ -545,7 +548,7 @@ function VirtualKeysPage() {
           // revoking it stops the in-product assistant cold. Lead with the
           // Langy-specific consequence before the generic 401 warning so
           // someone clicking through doesn't accidentally break Langy.
-          revoking?.name === "Langy"
+          revoking && isLangyManagedVk(revoking)
             ? "This is the auto-provisioned Langy virtual key. Revoking it will stop the in-product assistant from working until a new one is provisioned (it'll be re-created automatically on the next chat). Clients using this secret directly start receiving 401s within ~60 seconds. This cannot be undone — revoked keys are never reactivated."
             : "Clients using this key start receiving 401s within ~60 seconds. This cannot be undone — revoked keys are never reactivated."
         }

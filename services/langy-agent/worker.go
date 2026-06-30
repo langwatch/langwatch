@@ -213,6 +213,18 @@ func setupWorkerHome(workerHome string, creds Credentials, uid uint32, otelPlugi
 		return fmt.Errorf("chmod home: %w", err)
 	}
 
+	// Per-worker tmp dir. Without this, npm/git/opencode scratch lands in
+	// the shared pod /tmp (world-writable, readable by all worker UIDs).
+	// Setting TMPDIR to a 0700 subdirectory of the worker home puts the
+	// same UID-enforced boundary on scratch files as on config.json.
+	tmpDir := filepath.Join(workerHome, "tmp")
+	if err := os.MkdirAll(tmpDir, 0o700); err != nil {
+		return fmt.Errorf("mkdir tmp: %w", err)
+	}
+	if err := os.Chown(tmpDir, int(uid), int(uid)); err != nil {
+		return fmt.Errorf("chown tmp: %w", err)
+	}
+
 	configDir := filepath.Join(workerHome, ".config", "opencode")
 	if err := os.MkdirAll(configDir, 0o700); err != nil {
 		return fmt.Errorf("mkdir config: %w", err)
@@ -320,6 +332,7 @@ func spawnOpenCode(
 	env := filterSensitiveEnv()
 	env = append(env,
 		"HOME="+workerHome,
+		"TMPDIR="+filepath.Join(workerHome, "tmp"),
 		"OPENAI_BASE_URL="+creds.GatewayBaseURL,
 		"OPENAI_API_KEY="+creds.LLMVirtualKey,
 		"LANGWATCH_API_KEY="+creds.LangwatchAPIKey,
