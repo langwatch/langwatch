@@ -164,6 +164,32 @@ export class VirtualKeyRepository {
     });
   }
 
+  /**
+   * Returns the raw `config` JSON of the LANGY virtual key scoped to
+   * `projectId` within `organizationId`. Null when no such VK exists.
+   * Used by LangyCredentialService.getModelsAllowed to validate per-send
+   * modelOverride without reaching into prisma directly.
+   */
+  async findLangyVkConfig({
+    projectId,
+    organizationId,
+  }: {
+    projectId: string;
+    organizationId: string;
+  }): Promise<Prisma.JsonValue | null> {
+    const vk = await this.prisma.virtualKey.findFirst({
+      where: {
+        organizationId,
+        purpose: "LANGY",
+        scopes: {
+          some: { scopeType: "PROJECT", scopeId: projectId },
+        },
+      },
+      select: { config: true },
+    });
+    return vk?.config ?? null;
+  }
+
   async create(
     data: CreateVirtualKeyData,
     tx?: Prisma.TransactionClient,

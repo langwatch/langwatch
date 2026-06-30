@@ -357,10 +357,17 @@ langyRoute().post("/langy/chat", async (c) => {
   // modelOverride doesn't burn a daily PR slot. The earlier ordering leaked
   // a permit on every 400 here.
   if (modelOverride) {
-    const modelsAllowed = await credentialService.getModelsAllowed({
-      projectId,
-      organizationId: credentials.organizationId,
-    });
+    let modelsAllowed: string[] | null = null;
+    try {
+      modelsAllowed = await credentialService.getModelsAllowed({
+        projectId,
+        organizationId: credentials.organizationId,
+      });
+    } catch (error) {
+      // Corrupt VK config or DB hiccup — fail open so a misconfigured VK
+      // doesn't brick every chat. The gateway is still the final enforcer.
+      logger.warn({ error, projectId }, "getModelsAllowed failed — skipping allowlist check");
+    }
     if (modelsAllowed && !modelsAllowed.includes(modelOverride)) {
       // Don't log the full allowlist on every reject — it's the project's
       // configured-model list and travels further than the user's UI does

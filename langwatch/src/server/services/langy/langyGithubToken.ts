@@ -11,6 +11,8 @@
  *
  * Spec: specs/assistant/langy-github-prs.feature. Issue: #4747.
  */
+import { randomBytes } from "crypto";
+
 import type { PrismaClient } from "@prisma/client";
 
 import { env } from "~/env.mjs";
@@ -340,7 +342,7 @@ async function redisSetEx(
 // peer is mid-refresh).
 async function acquireLock(key: string): Promise<LockResult> {
   if (!connection) return { kind: "no-redis" };
-  const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  const token = randomBytes(16).toString("hex");
   const deadline = Date.now() + LOCK_MAX_WAIT_MS;
   while (Date.now() < deadline) {
     try {

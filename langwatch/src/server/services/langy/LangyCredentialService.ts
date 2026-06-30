@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 
 import { parseVirtualKeyConfig } from "~/server/gateway/virtualKey.config";
+import { VirtualKeyRepository } from "~/server/gateway/virtualKey.repository";
 import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { getLangyApiKeyToken, provisionLangyApiKey } from "./langyApiKey";
@@ -220,19 +221,19 @@ export class LangyCredentialService {
     projectId: string;
     organizationId: string;
   }): Promise<string[] | null> {
-    const langyVk = await this.prisma.virtualKey.findFirst({
-      where: {
-        organizationId,
-        purpose: "LANGY",
-        scopes: {
-          some: { scopeType: "PROJECT", scopeId: projectId },
-        },
-      },
-      select: { config: true },
-    });
-    if (!langyVk) return null;
-    const parsed = parseVirtualKeyConfig(langyVk.config);
-    const allowed = parsed.modelsAllowed;
-    return allowed && allowed.length > 0 ? allowed : null;
+    const vkRepo = new VirtualKeyRepository(this.prisma);
+    const config = await vkRepo.findLangyVkConfig({ projectId, organizationId });
+    if (!config) return null;
+    try {
+      const parsed = parseVirtualKeyConfig(config);
+      const allowed = parsed.modelsAllowed;
+      return allowed && allowed.length > 0 ? allowed : null;
+    } catch {
+      // Corrupt VK config (schema drift, manual edit). Fail open — the
+      // gateway is still the authoritative enforcer; this check is defence
+      // in depth only. Log so ops can spot it without exposing internals.
+      githubLogger.warn({ projectId, organizationId }, "langy VK config parse failed — skipping model allowlist check");
+      return null;
+    }
   }
 }
