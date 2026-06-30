@@ -297,13 +297,13 @@ langyRoute().post("/langy/chat", async (c) => {
   try {
     await getVercelAIModel({ projectId });
   } catch (error) {
+    // Real error in the server log; surface a generic public message
+    // to the user. `error.message` could leak internals (model-provider
+    // config-store internals, stack details, env hints). Sergio's
+    // 2026-06-30 review round 3.
+    logger.warn({ error, projectId }, "getVercelAIModel failed");
     return c.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "No model configured for this project.",
-      },
+      { error: "No model configured for this project." },
       { status: 409 },
     );
   }

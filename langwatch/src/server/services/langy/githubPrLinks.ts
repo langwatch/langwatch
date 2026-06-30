@@ -49,23 +49,27 @@ export function extractGithubPrLinks(text: string): GithubPrLink[] {
  * audit log: counting every github.com/pull URL in prose lets "summarize PR
  * #4751" twenty times exhaust the cap and forge audit entries.
  *
- * The github.md skill prints `[langy:progress:opened:<owner>/<repo>#<n>]`
- * after `gh pr create`, so when progress sentinels are present we count only
- * links matching an `opened` event. With NO progress events at all (older
- * skill, sentinel stripped upstream) we fall back to every link — the
- * pre-existing over-counting beats silently never counting.
+ * Hard contract: returns ONLY links the github.md skill explicitly marked
+ * with a `[langy:progress:opened:<owner>/<repo>#<n>]` sentinel. With no
+ * progress events at all → return `[]`. The skill is pinned in this PR so
+ * its sentinels are always present on actual PR creation; the previous
+ * "fall back to every link when no events" branch was a footgun (a
+ * read-only chat summarising 20 PRs forged 20 audit rows + burned the
+ * daily cap). Sergio caught this on 2026-06-30 review round 3.
  */
 export function extractOpenedPrLinks(text: string): GithubPrLink[] {
   const links = extractGithubPrLinks(text);
   const { events } = parseGithubProgressEvents(text);
-  if (events.length === 0) return links;
+  if (events.length === 0) return [];
 
   const openedDetails = events
     .filter((e) => e.stage === "opened")
     .map((e) => e.detail)
     .filter((d): d is string => Boolean(d));
   // `opened` fired but the detail didn't survive (skill drift) — fall back
-  // rather than undercount a real PR.
+  // to every link rather than undercount a real PR. Bounded: this branch
+  // only fires when the skill emitted at least one `opened` event, so a
+  // pure mention-summary turn never reaches it.
   if (openedDetails.length === 0) {
     return events.some((e) => e.stage === "opened") ? links : [];
   }

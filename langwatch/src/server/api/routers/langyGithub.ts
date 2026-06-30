@@ -99,9 +99,12 @@ async function ensureOrganizationMember({
   organizationId: string;
 }): Promise<void> {
   if (!(await isOrganizationMember({ prisma, userId, organizationId }))) {
+    // Generic message — embedding the organization UUID in the response
+    // confirms a valid org id to a caller who isn't a member of it
+    // (light enumeration oracle). Sergio's 2026-06-30 review round 3.
     throw new TRPCError({
       code: "FORBIDDEN",
-      message: `Not a member of organization ${organizationId}`,
+      message: "Forbidden",
     });
   }
 }

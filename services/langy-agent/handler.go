@@ -2,6 +2,7 @@ package langyagent
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -65,7 +66,15 @@ func newRouter(mgr *Manager, cfg Config, log *zap.Logger) http.Handler {
 // kills the upstream socket immediately rather than waiting for opencode
 // to send a byte.
 func handleChat(w http.ResponseWriter, r *http.Request, mgr *Manager, cfg Config, log *zap.Logger) {
-	if h := r.Header.Get("Authorization"); h != "Bearer "+cfg.InternalSecret {
+	// Constant-time compare on the shared internal secret. The manager
+	// binds 0.0.0.0 (cluster service surface), so any pod that can route
+	// to it could otherwise probe the secret one byte at a time via
+	// response-timing differences. Mirrors authproxy.go's bearer check
+	// for the per-worker boundary — same primitive on both internal
+	// secrets, by Sergio's 2026-06-30 review round 3.
+	expected := []byte("Bearer " + cfg.InternalSecret)
+	got := []byte(r.Header.Get("Authorization"))
+	if len(got) != len(expected) || subtle.ConstantTimeCompare(got, expected) != 1 {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		return
 	}

@@ -79,8 +79,11 @@ workspaceVolume: {}
 ## and steal worker B's project API key + GitHub token (PR #4913 review).
 ##
 ## Mitigations that keep the blast radius small even with root in the pod:
-##   - Drop ALL caps and add back ONLY the four required for the per-UID
-##     handoff (SETUID/SETGID/CHOWN/DAC_OVERRIDE). No NET_*, no SYS_*.
+##   - Drop ALL caps and add back ONLY what's strictly required: the four
+##     per-UID-handoff caps (SETUID/SETGID/CHOWN/DAC_OVERRIDE) plus
+##     NET_ADMIN for the iptables OUTPUT-OWNER drop on loopback that
+##     closes the worker→worker exfil hole at the kernel layer (see
+##     services/langy-agent/iptables.go). No SYS_*.
 ##   - allowPrivilegeEscalation: false → no_new_privs is set, so children
 ##     cannot regain caps via setuid binaries.
 ##   - readOnlyRootFilesystem stays on so a worker can't pivot through
@@ -154,12 +157,25 @@ networkPolicy:
   # means "use the release-aware default".
   ingressFrom: []
   controlPlanePort: 5560
+  # The gateway pod (charts/gateway) listens on containerPort 5563 — NOT 80.
+  # NetworkPolicy egress uses a podSelector + ports[].port, which Kubernetes
+  # matches against the destination POD port (post-DNAT), not the Service
+  # port. The earlier value 80 was the Service port: traffic to the gateway
+  # at 5563 was dropped, so opencode couldn't reach the gateway and Langy
+  # was dead-on-arrival the moment an operator enabled `chartManaged: true`.
   egressToControlPlane: []
-  gatewayPort: 80
+  gatewayPort: 5563
   egressToGateway: []
-  # OpenCode may reach external hosts (its own update/telemetry). Set false
-  # once egress needs are pinned to tighten the policy.
-  allowExternalHttps: true
+  # External HTTPS egress for OpenCode workers — needed for `git clone`,
+  # `gh` API calls, npm/pip installs the LLM-driven tools shell out to, and
+  # opencode's own update/telemetry. Default false: this pod runs LLM-
+  # driven arbitrary shell with the user's API key + GitHub user-to-server
+  # token in env, so default-on egress IS the most dangerous posture (a
+  # prompt-injection can curl creds to attacker-controlled IPs). Private
+  # ranges + the cloud metadata service are blocked above regardless, but
+  # operators who actually need PR-opening / git-clone must opt in
+  # explicitly here. Sergio's 2026-06-30 review round 3.
+  allowExternalHttps: false
 
 nameOverride: ""
 fullnameOverride: ""

@@ -2824,14 +2824,22 @@ model LangyConversation {
   updatedAt  DateTime  @updatedAt
   deletedAt  DateTime?
 
-  // PII purge path: deleting a Project or User cascades the conversation
-  // (and its messages via the LangyMessage cascade below). Postgres tables
-  // are outside the ClickHouse retention sweep, so without this the chat
-  // text would be retained indefinitely. relationMode="prisma" means the
-  // cascade runs at the Prisma-client layer — raw SQL DELETEs do not
-  // cascade. The sharedBy relation uses SetNull so a shared conversation
-  // outlives the sharer's account (the recipient can still see it,
-  // attributed to no one).
+  // PII purge path: when a Project or User is deleted VIA THE PRISMA
+  // CLIENT, the conversation (and its messages via the LangyMessage
+  // cascade below) goes too. Postgres tables are outside the ClickHouse
+  // retention sweep, so without this the chat text would be retained
+  // indefinitely.
+  //
+  // IMPORTANT under relationMode="prisma": NO SQL FK constraint is
+  // emitted. The cascade runs at the Prisma-client layer ONLY — a raw
+  // `DELETE FROM "Project"` issued via psql or direct-SQL admin tooling
+  // will NOT cascade and will orphan chat content. For GDPR-correct
+  // purges, all Project/User deletes MUST route through the Prisma
+  // client (or a future SQL trigger we haven't built yet).
+  //
+  // The sharedBy relation uses SetNull so a shared conversation outlives
+  // the sharer's account (the recipient can still see it, attributed to
+  // no one).
   project  Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user     User           @relation("LangyConversationUser", fields: [userId], references: [id], onDelete: Cascade)
   sharedBy User?          @relation("LangyConversationSharedBy", fields: [sharedById], references: [id], onDelete: SetNull)
@@ -2853,9 +2861,11 @@ model LangyMessage {
   createdAt      DateTime @default(now())
 
   conversation LangyConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  // Belt-and-braces: messages also reference the project directly so a
-  // raw project delete (admin tooling, GDPR purge) can't leave orphan
-  // message rows even if the conversation cascade is bypassed.
+  // Belt-and-braces: messages also reference the project directly so
+  // `prisma.project.delete()` cascades to messages even if a future
+  // refactor breaks the conversation→message cascade chain. NOTE: as
+  // with the conversation relations above, relationMode="prisma" means
+  // a raw `DELETE FROM "Project"` issued via SQL will NOT cascade.
   project      Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([conversationId, createdAt])

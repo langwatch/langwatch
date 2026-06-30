@@ -45,6 +45,12 @@ export async function exchangeCode(
       code,
       redirect_uri: redirectUri,
     }),
+    // Bound the upstream wait — a hung GitHub /access_token would otherwise
+    // block the callback handler until the runtime tears the socket down
+    // (Linux defaults: tens of minutes). 10s is the same shape as
+    // refreshAtGitHub uses for the refresh-token side; matches the bounded-
+    // GitHub-call convention. Sergio's 2026-06-30 review round 3.
+    signal: AbortSignal.timeout(10_000),
   });
   const body = (await res.json()) as GithubTokenResponse;
   if (!res.ok || body.error || !body.access_token || !body.refresh_token) {
@@ -64,6 +70,8 @@ export async function fetchGithubUser(
       Authorization: `Bearer ${accessToken}`,
       "User-Agent": "langwatch-langy",
     },
+    // Bounded for the same reason exchangeCode is bounded — see above.
+    signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok) {
     throw new Error(`GitHub /user failed: ${res.status}`);

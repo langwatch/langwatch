@@ -51,30 +51,44 @@ func LockdownLoopbackPortRange(minPort, maxPort int, log *zap.Logger) error {
 		"-j", "DROP",
 	}
 
-	// `iptables -C OUTPUT <rule>` exits 0 if the rule exists, non-zero
-	// otherwise. We don't care about the error message; existence is the
-	// only signal we need.
+	// Install on BOTH IPv4 (iptables) AND IPv6 (ip6tables). opencode
+	// binds 127.0.0.1 today, so IPv4-only would already block the
+	// known exfil path — but a future opencode bump that flips to dual-
+	// stack or `::1` would silently re-open the hole. ip6tables is the
+	// belt-and-braces companion. Sergio's 2026-06-30 review round 3.
+	for _, bin := range []string{"iptables", "ip6tables"} {
+		if err := installLoopbackDrop(bin, ruleSpec, dport, log); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// installLoopbackDrop adds (idempotently) the OWNER-DROP rule on the OUTPUT
+// chain of `bin` (either iptables or ip6tables). Factored out so the IPv4
+// and IPv6 installs share one code path and one failure-handling shape.
+func installLoopbackDrop(bin string, ruleSpec []string, dport string, log *zap.Logger) error {
+	// `bin -C OUTPUT <rule>` exits 0 if the rule exists, non-zero otherwise.
 	checkArgs := append([]string{"-C", "OUTPUT"}, ruleSpec...)
-	if err := exec.Command("iptables", checkArgs...).Run(); err == nil {
+	if err := exec.Command(bin, checkArgs...).Run(); err == nil {
 		log.Info("loopback lockdown rule already present",
-			zap.Int("min", minPort),
-			zap.Int("max", maxPort),
+			zap.String("bin", bin),
+			zap.String("dport", dport),
 		)
 		return nil
 	}
 
 	// Insert at the top of OUTPUT so it short-circuits any later
-	// permissive rule. `-I OUTPUT 1` is the canonical "first slot"
-	// position; subsequent rules from other tooling won't outrank us.
+	// permissive rule.
 	insertArgs := append([]string{"-I", "OUTPUT", "1"}, ruleSpec...)
-	out, err := exec.Command("iptables", insertArgs...).CombinedOutput()
+	out, err := exec.Command(bin, insertArgs...).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("iptables insert (uid != 0 drop lo:%s): %w: %s",
-			dport, err, strings.TrimSpace(string(out)))
+		return fmt.Errorf("%s insert (uid != 0 drop lo:%s): %w: %s",
+			bin, dport, err, strings.TrimSpace(string(out)))
 	}
 	log.Info("loopback lockdown rule installed",
-		zap.Int("min", minPort),
-		zap.Int("max", maxPort),
+		zap.String("bin", bin),
+		zap.String("dport", dport),
 		zap.String("rule", "OUTPUT -o lo -p tcp --dport "+dport+" -m owner ! --uid-owner 0 -j DROP"),
 	)
 	return nil

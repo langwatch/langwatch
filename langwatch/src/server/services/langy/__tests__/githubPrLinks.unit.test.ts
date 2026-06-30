@@ -105,9 +105,15 @@ describe("extractOpenedPrLinks", () => {
   });
 
   describe("when the reply has PR URLs but NO progress sentinels at all", () => {
-    it("falls back to counting every link (older skill / stripped sentinels)", () => {
+    // The github.md skill is PINNED in this PR; opened PRs always emit a
+    // `[langy:progress:opened:...]` sentinel. A reply with NO sentinels
+    // therefore represents prose containing a PR URL (a summary, a
+    // reference), NOT an actually-opened PR. Counting these would burn
+    // the daily cap and forge audit rows on a read-only chat — the bug
+    // Sergio caught in 2026-06-30 review round 3.
+    it("returns [] — no sentinels means no PR was actually opened", () => {
       const text = "Done: https://github.com/acme/foo/pull/5";
-      expect(extractOpenedPrLinks(text).map((l) => l.number)).toEqual([5]);
+      expect(extractOpenedPrLinks(text)).toEqual([]);
     });
   });
 
