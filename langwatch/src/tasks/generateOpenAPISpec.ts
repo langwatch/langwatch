@@ -1,4 +1,3 @@
-import deepmerge from "deepmerge";
 import fs from "fs";
 import { generateSpecs } from "hono-openapi";
 import path from "path";
@@ -12,22 +11,20 @@ import { app as eventsApp } from "../app/api/events/[[...route]]/app";
 import { app as gatewayPlatformApp } from "../app/api/gateway-platform/[[...route]]/app";
 import { app as governanceApp } from "../app/api/governance/[[...route]]/app";
 import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
+import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
+import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
+import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
 import currentSpec from "../app/api/openapiLangWatch.json";
 import { app as llmConfigsApp } from "../app/api/prompts/[[...route]]/app";
 import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
 import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
-import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
-import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
-import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
-import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
+import { app as secretsApp } from "../app/api/secrets/[[...route]]/app";
 import { app as simulationRunsApp } from "../app/api/simulation-runs/[[...route]]/app";
 import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
-import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
-import { app as secretsApp } from "../app/api/secrets/[[...route]]/app";
+import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
+import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
 import { app as workflowsApp } from "../app/api/workflows/[[...route]]/app";
-
-const overwriteMerge = (_destinationArray: any[], sourceArray: any[]) =>
-  sourceArray;
+import { mergeOpenAPISpecs } from "./mergeOpenAPISpecs";
 
 const langwatchSpec = {
   openapi: "3.1.0",
@@ -39,11 +36,14 @@ const langwatchSpec = {
 };
 
 /**
- * This task generates the OpenAPI spec for the dataset API.
+ * This task generates the OpenAPI spec for the LangWatch API.
  *
- * It will always update the current spec with new endpoints,
- * so deleting endpoints needs to be done manually from the the
- * original file.
+ * Each Hono app owns its `/api/<namespace>` entirely, so paths in those
+ * namespaces are refreshed from the apps every run: routes an app no longer
+ * generates (removed routes, renamed path params) are pruned automatically
+ * instead of lingering. Paths in namespaces that no app generates are
+ * hand-maintained in the committed spec and preserved untouched. See
+ * `mergeOpenAPISpecs` for the merge contract.
  */
 export default async function execute() {
   console.log("Generating OpenAPI spec...");
@@ -90,68 +90,38 @@ export default async function execute() {
   console.log("Building workflows spec...");
   const workflowsSpec = await generateSpecs(workflowsApp);
   console.log("Merging specs...");
-  const mergedSpec = deepmerge.all(
-    // Merges this way ==>
-    [
-      currentSpec,
-      agentsSpec,
-      analyticsSpec,
-      dashboardsSpec,
-      datasetSpec,
-      evaluatorsSpec,
-      eventsSpec,
-      gatewayPlatformSpec,
-      governanceSpec,
-      graphsSpec,
-      llmConfigsSpec,
-      modelDefaultsSpec,
-      modelProvidersSpec,
-      monitorsSpec,
-      scenarioEventsSpec,
-      scenariosSpec,
-      secretsSpec,
-      simulationRunsSpec,
-      suitesSpec,
-      tracesSpec,
-      triggersSpec,
-      workflowsSpec,
-      langwatchSpec,
-    ],
-    {
-      arrayMerge: overwriteMerge,
-      customMerge(key) {
-        // Since we get these routes from the app directly,
-        // we don't want to merge, we just want to replace.
-        if (
-          key.includes("/api/agents") ||
-          key.includes("/api/analytics") ||
-          key.includes("/api/dashboards") ||
-          key.includes("/api/evaluators") ||
-          key.includes("/api/events") ||
-          key.includes("/api/gateway/v1") ||
-          key.includes("/api/governance") ||
-          key.includes("/api/graphs") ||
-          key.includes("/api/prompts") ||
-          key.includes("/api/dataset") ||
-          key.includes("/api/model-providers") ||
-          key.includes("/api/monitors") ||
-          key.includes("/api/scenario-events") ||
-          key.includes("/api/scenarios") ||
-          key.includes("/api/secrets") ||
-          key.includes("/api/simulation-runs") ||
-          key.includes("/api/suites") ||
-          key.includes("/api/traces") ||
-          key.includes("/api/triggers") ||
-          key.includes("/api/workflows")
-        ) {
-          // Replace with new
-          return (_target, source) => {
-            return source;
-          };
-        }
-      },
-    },
-  );
+  // Order carried over from the legacy deepmerge.all call: specs are deep-merged
+  // in array order (a later spec deep-merges onto earlier ones; arrays are
+  // replaced). Apps own disjoint /api/<namespace>s, so their paths never collide
+  // here — order only affects shared top-level keys such as components.schemas.
+  const appSpecs = [
+    agentsSpec,
+    analyticsSpec,
+    dashboardsSpec,
+    datasetSpec,
+    evaluatorsSpec,
+    eventsSpec,
+    gatewayPlatformSpec,
+    governanceSpec,
+    graphsSpec,
+    llmConfigsSpec,
+    modelDefaultsSpec,
+    modelProvidersSpec,
+    monitorsSpec,
+    scenarioEventsSpec,
+    scenariosSpec,
+    secretsSpec,
+    simulationRunsSpec,
+    suitesSpec,
+    tracesSpec,
+    triggersSpec,
+    workflowsSpec,
+  ];
+  const mergedSpec = mergeOpenAPISpecs({
+    currentSpec,
+    appSpecs,
+    baseSpec: langwatchSpec,
+  });
 
   fs.writeFileSync(
     path.join(__dirname, "../app/api/openapiLangWatch.json"),
