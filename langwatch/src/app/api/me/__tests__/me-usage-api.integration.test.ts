@@ -1,17 +1,21 @@
 import type { ClickHouseClient } from "@clickhouse/client";
+import { generate } from "@langwatch/ksuid";
 import {
   type Organization,
   OrganizationUserRole,
+  RoleBindingScopeType,
   type Team,
   TeamUserRole,
 } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { prisma } from "~/server/db";
 import {
   cleanupTestData,
   getTestClickHouseClient,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { app } from "../[[...route]]/app";
 
 /** Minimal trace_summaries seed — mirrors the PersonalUsageService test helper. */
@@ -86,6 +90,10 @@ describe("Feature: Personal usage REST API", () => {
   let seededProject: { id: string; apiKey: string };
   let emptyProject: { id: string; apiKey: string };
   let sharedProject: { id: string; apiKey: string };
+  // A second user's personal project + a user-bound key for the first user,
+  // to prove the ownership guard (caller must own the project it targets).
+  let otherUsersPersonalProjectId: string;
+  let callerUserToken: string;
 
   // Deterministic window around the seeded in-window trace.
   const inWindow = new Date(Date.UTC(2026, 0, 15, 12, 0, 0));
@@ -170,6 +178,61 @@ describe("Feature: Personal usage REST API", () => {
       isPersonal: false,
     });
 
+    // A second user with their OWN personal project (owned by them, not the
+    // caller). The caller gets an org-ADMIN role binding + a user-bound key, so
+    // it can view this project (project:view) — the guard must still 403.
+    const otherUser = await prisma.user.create({
+      data: { name: "Other User", email: `other-${ns}@example.com` },
+    });
+    await prisma.organizationUser.create({
+      data: {
+        userId: otherUser.id,
+        organizationId: testOrganization.id,
+        role: OrganizationUserRole.MEMBER,
+      },
+    });
+    const otherPersonal = await prisma.project.create({
+      data: {
+        id: `project_${nanoid()}`,
+        name: "Personal Workspace",
+        slug: `--test-other-${nanoid(8)}`,
+        language: "typescript",
+        framework: "other",
+        apiKey: `sk-lw-${nanoid(48)}`,
+        teamId: testTeam.id,
+        isPersonal: true,
+        ownerUserId: otherUser.id,
+      },
+    });
+    otherUsersPersonalProjectId = otherPersonal.id;
+
+    await prisma.roleBinding.create({
+      data: {
+        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+        organizationId: testOrganization.id,
+        userId,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: testOrganization.id,
+      },
+    });
+    callerUserToken = (
+      await ApiKeyService.create(prisma).create({
+        name: `me-usage-caller-${nanoid(6)}`,
+        userId,
+        createdByUserId: userId,
+        organizationId: testOrganization.id,
+        permissionMode: "all",
+        bindings: [
+          {
+            role: TeamUserRole.ADMIN,
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+            scopeId: testOrganization.id,
+          },
+        ],
+      })
+    ).token;
+
     if (ch) {
       // One trace inside the window, one outside — the window test proves the
       // out-of-window trace is excluded.
@@ -196,15 +259,27 @@ describe("Feature: Personal usage REST API", () => {
     if (ch) {
       await cleanupTestData(seededProject.id).catch(() => {});
     }
+    await prisma.apiKey
+      .deleteMany({ where: { organizationId: testOrganization.id } })
+      .catch(() => {});
+    await prisma.roleBinding
+      .deleteMany({ where: { organizationId: testOrganization.id } })
+      .catch(() => {});
     await prisma.project
       .deleteMany({ where: { teamId: testTeam.id } })
       .catch(() => {});
     await prisma.teamUser
       .deleteMany({ where: { teamId: testTeam.id } })
       .catch(() => {});
+    const orgUsers = await prisma.organizationUser
+      .findMany({ where: { organizationId: testOrganization.id } })
+      .catch(() => []);
     await prisma.organizationUser
       .deleteMany({ where: { organizationId: testOrganization.id } })
       .catch(() => {});
+    for (const ou of orgUsers) {
+      await prisma.user.delete({ where: { id: ou.userId } }).catch(() => {});
+    }
     await prisma.user.delete({ where: { id: userId } }).catch(() => {});
     await prisma.team.delete({ where: { id: testTeam.id } }).catch(() => {});
     await prisma.organization
@@ -361,6 +436,36 @@ describe("Feature: Personal usage REST API", () => {
           ),
         ).toBe(true);
         expect(body.breakdownByModel).toEqual([]);
+      });
+    });
+  });
+
+  describe("given a user-bound key that can view another user's personal workspace", () => {
+    describe("when reading that other user's usage", () => {
+      /** @scenario "A key cannot read another user's personal usage" */
+      it("returns 403 — ownership guard, not just project:view", async () => {
+        const res = await app.request("/api/me/usage", {
+          headers: authHeaders({
+            apiKey: callerUserToken,
+            projectId: otherUsersPersonalProjectId,
+          }),
+        });
+        expect(res.status).toBe(403);
+        const body = await res.json();
+        expect(JSON.stringify(body)).toContain("another user");
+      });
+    });
+
+    describe("when reading their OWN personal workspace", () => {
+      /** @scenario "Reading personal usage for the current month" */
+      it("returns 200 (caller is the owner)", async () => {
+        const res = await app.request("/api/me/usage", {
+          headers: authHeaders({
+            apiKey: callerUserToken,
+            projectId: seededProject.id,
+          }),
+        });
+        expect(res.status).toBe(200);
       });
     });
   });

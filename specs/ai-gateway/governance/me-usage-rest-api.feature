@@ -35,6 +35,12 @@ Feature: Personal usage REST API
     And the spend is 0 and there is no most-used model
     And every daily bucket shows zero spend and the per-model breakdown is empty
 
+  Scenario: A key cannot read another user's personal usage
+    Given I authenticate with a user-bound key that can view another user's personal workspace
+    When I GET /api/me/usage for that other workspace
+    Then the response status is 403
+    And the error explains the key cannot read another user's personal usage
+
   Scenario: A shared-workspace API key is rejected
     Given I authenticate with an API key from a shared (non-personal) workspace
     When I GET /api/me/usage

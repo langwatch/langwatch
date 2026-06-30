@@ -68,6 +68,17 @@ export function registerMeRoutes(
         });
       }
 
+      // Ownership guard: a user-bound key must own the personal project it
+      // targets. A legacy project key has no `apiKeyUserId` — it is that
+      // project's own key, so the caller is the owner by construction.
+      const callerUserId = c.get("apiKeyUserId");
+      if (callerUserId && callerUserId !== project.ownerUserId) {
+        throw new HTTPException(403, {
+          message:
+            "This API key cannot read another user's personal usage. Use a key scoped to your own personal workspace.",
+        });
+      }
+
       const { windowStartMs, windowEndMs } = c.req.valid("query");
       const window =
         windowStartMs !== undefined && windowEndMs !== undefined
