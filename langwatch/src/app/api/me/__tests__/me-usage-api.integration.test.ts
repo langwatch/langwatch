@@ -617,7 +617,7 @@ describe("Feature: Personal usage REST API", () => {
 
   describe("given ingestion-source spend in the org's governance tenant", () => {
     describe("when reading usage for the explicit window", () => {
-      /** @scenario "Ingestion ledger spend is unioned, scoped to this org's tenant" */
+      /** @scenario "Ingestion-source spend is included and scoped to this organization" */
       it("unions only this org's governance-tenant rows, excluding foreign tenants", async () => {
         const res = await app.request(
           `/api/me/usage?windowStartMs=${windowStartMs}&windowEndMs=${windowEndMs}`,
