@@ -155,10 +155,9 @@ EOF
   done
 }
 
-# Predicate: is something already listening on host port 6379? Used by
-# frontend-only to decide whether to start its own redis container or reuse
-# an existing host redis. Mirrors check_host_redis_collision's detection but
-# returns a status instead of exiting.
+# Predicate: is something already listening on host port 6379? Shared by
+# check_host_redis_collision (the pre-flight guard for container presets) and
+# frontend-only's reuse/start branch. Returns a status; never exits.
 redis_port_in_use() {
   if command -v lsof >/dev/null 2>&1; then
     [ -n "$(lsof -iTCP:6379 -sTCP:LISTEN -t 2>/dev/null | head -n1)" ]
@@ -180,22 +179,38 @@ redis_listener_is_usable() {
   redis-cli -u redis://localhost:6379 ping 2>/dev/null | grep -qx 'PONG'
 }
 
-# Detect a host-side process holding port 6379 before redis tries to bind.
+# Predicate: is host port 6379 published by THIS compose project's own redis
+# container? The compose `redis` service binds 6379:6379, so when our own stack
+# is already up (a prior `make quickstart` left it running), `docker compose up`
+# idempotently reuses that container — re-running quickstart must NOT treat it as
+# a port collision. `--filter publish=6379` matches by the *host* published port,
+# so a stray redis mapped to some other host port (e.g. 55002->6379) is correctly
+# ignored. Another worktree's redis is rejected earlier by
+# check_stateful_collision with a clearer, volume-scoped message, so only our own
+# project's container reaches this exemption.
+redis_6379_owned_by_this_project() {
+  command -v docker >/dev/null 2>&1 || return 1
+  local me="${COMPOSE_PROJECT_NAME:-langwatch}" cid project
+  for cid in $(docker ps -q --filter "publish=6379" 2>/dev/null); do
+    project=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$cid" 2>/dev/null || true)
+    [ "$project" = "$me" ] && return 0
+  done
+  return 1
+}
+
+# Detect a host-side process holding port 6379 before the compose redis service
+# tries to bind it. Our own already-running redis container is exempt: docker
+# compose reuses it, so re-running quickstart on an up stack must not fail.
 check_host_redis_collision() {
   [ "${SKIP_HOST_REDIS_CHECK:-0}" = "1" ] && return 0
-  local pid=""
-  if command -v lsof >/dev/null 2>&1; then
-    pid=$(lsof -iTCP:6379 -sTCP:LISTEN -t 2>/dev/null | head -n1)
-  elif command -v ss >/dev/null 2>&1; then
-    ss -ltnH "sport = :6379" 2>/dev/null | grep -q ":6379" && pid="<unknown>"
-  fi
-  [ -z "$pid" ] && return 0
+  redis_port_in_use || return 0
+  redis_6379_owned_by_this_project && return 0
   cat >&2 <<EOF
-ERROR: A process is already listening on host port 6379 (redis).
-       The dev-stack redis container needs that port to bind. Stop the
-       host-side redis first (e.g. 'brew services stop redis' on macOS,
-       'sudo systemctl stop redis-server' on Linux), or set
-       SKIP_HOST_REDIS_CHECK=1 if you've intentionally repointed the dev
+ERROR: A process is already listening on host port 6379 (redis), and it is not
+       this dev stack's own redis container. The compose redis service needs
+       that port to bind. Stop the host-side redis first (e.g. 'brew services
+       stop redis' on macOS, 'sudo systemctl stop redis-server' on Linux), or
+       set SKIP_HOST_REDIS_CHECK=1 if you've intentionally repointed the dev
        stack at a host redis.
 EOF
   exit 1

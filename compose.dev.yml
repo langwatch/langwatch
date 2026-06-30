@@ -85,10 +85,12 @@ services:
   # own. Compose treats this as belonging to the first project that brings it
   # up; subsequent `quickstart`s detect the running container and reuse it.
   #
-  # Prerequisite: no host-side redis-server may be holding 6379. `make
-  # quickstart` calls `check_host_redis_collision` (scripts/dev.sh) which
-  # detects this case and prints a clear hint. On macOS:
-  # `brew services stop redis`. On Linux: `sudo systemctl stop redis-server`.
+  # Prerequisite: no NON-Docker process (e.g. a host redis-server) may be
+  # holding 6379. `make quickstart` calls `check_host_redis_collision`
+  # (scripts/dev.sh), which exempts this project's own already-running redis
+  # container (idempotent reuse) and only errors on a foreign listener it cannot
+  # rebind over. To free a host redis — macOS: `brew services stop redis`;
+  # Linux: `sudo systemctl stop redis-server`.
   redis:
     image: redis:alpine
     ports:

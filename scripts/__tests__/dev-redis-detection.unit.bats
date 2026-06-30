@@ -157,3 +157,152 @@ teardown() {
   [[ "$output" == *"Starting: redis compose service"* ]]
   [[ "$output" == *"__COMPOSE_CALLED__ up -d redis"* ]]
 }
+
+# --- check_host_redis_collision() (container-preset pre-flight guard) ---
+#
+# Why these exist: check_host_redis_collision used to hard-fail whenever
+# *anything* held host port 6379. That false-positives on the common case of
+# re-running quickstart against an already-up stack — the compose `redis`
+# service binds 6379:6379, so our own running container owns the port even
+# though `docker compose up` would idempotently reuse it. The guard now exempts
+# this project's own redis container and only errors on a foreign listener.
+
+# @scenario "the host-redis collision check is skipped when SKIP_HOST_REDIS_CHECK is set"
+@test "check_host_redis_collision: SKIP_HOST_REDIS_CHECK=1 -> returns 0" {
+  run bash -c '
+    scripts_dir="$1"
+    set --
+    cd "$scripts_dir" || exit 90
+    source ./dev.sh
+    redis_port_in_use() { return 0; }
+    redis_6379_owned_by_this_project() { return 1; }
+    SKIP_HOST_REDIS_CHECK=1 check_host_redis_collision
+  ' _ "$SCRIPT_DIR"
+  [ "$status" -eq 0 ]
+}
+
+# @scenario "container presets pass the host-redis check when 6379 is free"
+@test "check_host_redis_collision: 6379 free -> returns 0" {
+  run bash -c '
+    scripts_dir="$1"
+    set --
+    cd "$scripts_dir" || exit 90
+    source ./dev.sh
+    redis_port_in_use() { return 1; }
+    redis_6379_owned_by_this_project() { return 1; }
+    check_host_redis_collision
+  ' _ "$SCRIPT_DIR"
+  [ "$status" -eq 0 ]
+}
+
+# @scenario "this project's own running redis on 6379 is reused, not rejected"
+@test "check_host_redis_collision: own redis container on 6379 -> returns 0, no error" {
+  run bash -c '
+    scripts_dir="$1"
+    set --
+    cd "$scripts_dir" || exit 90
+    source ./dev.sh
+    redis_port_in_use() { return 0; }
+    redis_6379_owned_by_this_project() { return 0; }
+    check_host_redis_collision
+  ' _ "$SCRIPT_DIR"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"already listening on host port 6379"* ]]
+}
+
+# @scenario "a foreign listener on 6379 fails the host-redis check loudly"
+@test "check_host_redis_collision: foreign listener on 6379 -> error + exit 1" {
+  run bash -c '
+    scripts_dir="$1"
+    set --
+    cd "$scripts_dir" || exit 90
+    source ./dev.sh
+    redis_port_in_use() { return 0; }
+    redis_6379_owned_by_this_project() { return 1; }
+    check_host_redis_collision
+  ' _ "$SCRIPT_DIR"
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"not"*"this dev stack"*"own redis container"* ]]
+  [[ "$output" == *"SKIP_HOST_REDIS_CHECK=1"* ]]
+}
+
+# --- redis_6379_owned_by_this_project() ---
+
+# @scenario "redis ownership degrades to not-ours when docker is unavailable"
+@test "redis_6379_owned_by_this_project: docker absent -> not owned" {
+  run bash -c '
+    scripts_dir="$1"; empty_dir="$2"
+    set --
+    cd "$scripts_dir" || exit 90
+    source ./dev.sh
+    PATH="$empty_dir"
+    redis_6379_owned_by_this_project
+  ' _ "$SCRIPT_DIR" "$EMPTY_DIR"
+  [ "$status" -ne 0 ]
+}
+
+# @scenario "a redis on host 6379 from this same project counts as ours"
+@test "redis_6379_owned_by_this_project: matching compose project -> owned" {
+  STUB_DOCKER="$TEST_DIR/bin-docker-match"
+  mkdir -p "$STUB_DOCKER"
+  printf '%s\n' \
+    '#!/usr/bin/env bash' \
+    'case "$*" in' \
+    '  *"ps -q --filter publish=6379"*) echo cidA ;;' \
+    '  *"inspect"*"compose.project"*) echo my-worktree ;;' \
+    '  *) ;;' \
+    'esac' > "$STUB_DOCKER/docker"
+  chmod +x "$STUB_DOCKER/docker"
+  run bash -c '
+    scripts_dir="$1"; stub="$2"
+    set --
+    cd "$scripts_dir" || exit 90
+    source ./dev.sh
+    PATH="$stub:$PATH"
+    COMPOSE_PROJECT_NAME=my-worktree redis_6379_owned_by_this_project
+  ' _ "$SCRIPT_DIR" "$STUB_DOCKER"
+  [ "$status" -eq 0 ]
+}
+
+# @scenario "a redis on host 6379 from another project does not count as ours"
+@test "redis_6379_owned_by_this_project: foreign compose project -> not owned" {
+  STUB_DOCKER="$TEST_DIR/bin-docker-foreign"
+  mkdir -p "$STUB_DOCKER"
+  printf '%s\n' \
+    '#!/usr/bin/env bash' \
+    'case "$*" in' \
+    '  *"ps -q --filter publish=6379"*) echo cidA ;;' \
+    '  *"inspect"*"compose.project"*) echo some-other-app ;;' \
+    '  *) ;;' \
+    'esac' > "$STUB_DOCKER/docker"
+  chmod +x "$STUB_DOCKER/docker"
+  run bash -c '
+    scripts_dir="$1"; stub="$2"
+    set --
+    cd "$scripts_dir" || exit 90
+    source ./dev.sh
+    PATH="$stub:$PATH"
+    COMPOSE_PROJECT_NAME=my-worktree redis_6379_owned_by_this_project
+  ' _ "$SCRIPT_DIR" "$STUB_DOCKER"
+  [ "$status" -ne 0 ]
+}
+
+# @scenario "a redis mapped to a different host port does not count as ours"
+@test "redis_6379_owned_by_this_project: no publisher on 6379 -> not owned" {
+  STUB_DOCKER="$TEST_DIR/bin-docker-none"
+  mkdir -p "$STUB_DOCKER"
+  printf '%s\n' \
+    '#!/usr/bin/env bash' \
+    '# ps returns nothing; any inspect returns nothing' \
+    'exit 0' > "$STUB_DOCKER/docker"
+  chmod +x "$STUB_DOCKER/docker"
+  run bash -c '
+    scripts_dir="$1"; stub="$2"
+    set --
+    cd "$scripts_dir" || exit 90
+    source ./dev.sh
+    PATH="$stub:$PATH"
+    COMPOSE_PROJECT_NAME=my-worktree redis_6379_owned_by_this_project
+  ' _ "$SCRIPT_DIR" "$STUB_DOCKER"
+  [ "$status" -ne 0 ]
+}
