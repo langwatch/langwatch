@@ -392,7 +392,6 @@ model Project {
   gatewayChangeEvents GatewayChangeEvent[]
   pinnedTraces        PinnedTrace[]
   langyConversations  LangyConversation[]
-  langyMessages       LangyMessage[]
 
   // Denormalised mirror of parent Team's personal flag for fast
   // lookup at trace ingest time without a Team join. Always equals
@@ -2813,16 +2812,18 @@ model FeatureFlag {
 // ============================================================================
 
 model LangyConversation {
-  id         String    @id @default(cuid())
-  projectId  String
-  userId     String
-  title      String?
-  isShared   Boolean   @default(false)
-  sharedAt   DateTime?
-  sharedById String?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  deletedAt  DateTime?
+  id              String    @id @default(cuid())
+  projectId       String
+  userId          String
+  title           String?
+  isShared        Boolean   @default(false)
+  sharedAt        DateTime?
+  sharedById      String?
+  lastActivityAt  DateTime?
+  messageCount    Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
 
   // PII purge path: when a Project or User is deleted VIA THE PRISMA
   // CLIENT, the conversation (and its messages via the LangyMessage
@@ -2843,31 +2844,10 @@ model LangyConversation {
   project  Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user     User           @relation("LangyConversationUser", fields: [userId], references: [id], onDelete: Cascade)
   sharedBy User?          @relation("LangyConversationSharedBy", fields: [sharedById], references: [id], onDelete: SetNull)
-  messages LangyMessage[]
-
-  @@index([projectId, userId, updatedAt])
+  @@index([projectId, userId, lastActivityAt])
   @@index([projectId, isShared, updatedAt])
   @@index([deletedAt])
   @@index([userId])
   @@index([sharedById])
 }
 
-model LangyMessage {
-  id             String   @id @default(cuid())
-  conversationId String
-  projectId      String
-  role           String
-  parts          Json
-  createdAt      DateTime @default(now())
-
-  conversation LangyConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  // Belt-and-braces: messages also reference the project directly so
-  // `prisma.project.delete()` cascades to messages even if a future
-  // refactor breaks the conversation→message cascade chain. NOTE: as
-  // with the conversation relations above, relationMode="prisma" means
-  // a raw `DELETE FROM "Project"` issued via SQL will NOT cascade.
-  project      Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@index([conversationId, createdAt])
-  @@index([projectId])
-}

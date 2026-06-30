@@ -78,22 +78,10 @@ spec:
               mountPath: /workspace
             - name: tmp
               mountPath: /tmp
-            - name: opencode-config
-              mountPath: /home/agent/.config
-            - name: opencode-cache
-              mountPath: /home/agent/.cache
-            - name: opencode-local
-              mountPath: /home/agent/.local
       volumes:
         - name: workspace
           emptyDir: {{- toYaml .Values.workspaceVolume | nindent 12 }}
         - name: tmp
-          emptyDir: {}
-        - name: opencode-config
-          emptyDir: {}
-        - name: opencode-cache
-          emptyDir: {}
-        - name: opencode-local
           emptyDir: {}
       {{- with .Values.nodeSelector }}
       nodeSelector: {{- toYaml . | nindent 8 }}

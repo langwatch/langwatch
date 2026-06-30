@@ -54,9 +54,8 @@ export class LangyConversationRepository {
         deletedAt: null,
         OR: [{ userId }, { isShared: true }],
       },
-      orderBy: { updatedAt: "desc" },
+      orderBy: { lastActivityAt: "desc" },
       take: limit,
-      include: { _count: { select: { messages: true } } },
     });
   }
 
@@ -114,10 +113,13 @@ export class LangyConversationRepository {
     });
   }
 
-  async touch({ id, projectId }: { id: string; projectId: string }) {
+  async bumpActivity({ id, projectId }: { id: string; projectId: string }) {
     return await this.prisma.langyConversation.updateMany({
       where: { id, projectId },
-      data: { updatedAt: new Date() },
+      data: {
+        lastActivityAt: new Date(),
+        messageCount: { increment: 1 },
+      },
     });
   }
 }
@@ -165,8 +167,8 @@ export class LangyConversationService {
       title: r.title,
       isShared: r.isShared,
       isOwn: r.userId === userId,
-      lastActivityAt: r.updatedAt,
-      messageCount: r._count.messages,
+      lastActivityAt: r.lastActivityAt,
+      messageCount: r.messageCount,
     }));
   }
 
@@ -264,7 +266,7 @@ export class LangyConversationService {
     return { deletedCount: result.count };
   }
 
-  async touch({ id, projectId }: { id: string; projectId: string }) {
-    await this.repository.touch({ id, projectId });
+  async bumpActivity({ id, projectId }: { id: string; projectId: string }) {
+    await this.repository.bumpActivity({ id, projectId });
   }
 }
