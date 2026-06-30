@@ -147,11 +147,13 @@ func (m *Manager) Get(ctx context.Context, conversationID string, creds Credenti
 			m.mu.Unlock()
 			return w, nil
 		}
-		// Capability mismatch: kill the existing worker, then fall through to
-		// the regular spawn path. We release the lock around kill so the
-		// exit goroutine can land its cleanup without contending.
+		// Capability mismatch: delete the registry entry NOW under the lock so
+		// no concurrent Get sees the stale worker after we release. Then kill
+		// the process outside the lock — the SIGINT is slow, and blocking
+		// other conversations on it hurts throughput.
+		delete(m.workers, conversationID)
 		m.mu.Unlock()
-		m.kill(conversationID, "credential capability changed")
+		m.killWorker(w, conversationID, "credential capability changed")
 		m.mu.Lock()
 	}
 	if ch, ok := m.spawnLocks[conversationID]; ok {
@@ -319,12 +321,20 @@ func (m *Manager) spawn(ctx context.Context, conversationID string, creds Creden
 			zap.Error(err),
 		)
 		m.mu.Lock()
+		ownedEntry := false
 		if w, ok := m.workers[conversationID]; ok && w.cmd == cmd {
 			delete(m.workers, conversationID)
+			ownedEntry = true
 		}
 		m.releaseUIDLocked(uid, conversationID)
 		m.mu.Unlock()
-		removeWorkerHome(m.cfg.SessionsRoot, conversationID, m.log)
+		// Only remove the home if this goroutine owned the registry entry.
+		// A replacement worker spawned for the same conversationID after this
+		// one was killed (credential mismatch) shares the same path; removing
+		// it unconditionally would wipe the replacement's home and credentials.
+		if ownedEntry {
+			removeWorkerHome(m.cfg.SessionsRoot, conversationID, m.log)
+		}
 	}()
 
 	readinessCtx, cancel := context.WithTimeout(ctx, m.cfg.ReadinessTimeout)
@@ -358,14 +368,10 @@ func (m *Manager) spawn(ctx context.Context, conversationID string, creds Creden
 	}, nil
 }
 
-// kill terminates a worker and cleans its home. The exit-watcher goroutine
-// in spawn() ultimately fires the registry delete on the actual process
-// exit; this synchronous path drops the entry immediately so callers don't
-// see a half-dead worker. UID release stays with the exit watcher so the
-// slot isn't reusable until the kernel has fully torn down the prior
-// process (a fresh worker getting the same UID before the old one's
-// process-table entry is gone could find leftover files owned by the
-// same UID).
+// kill terminates a worker and removes it from the registry. The exit-watcher
+// goroutine in spawn() fires the home-cleanup on actual process exit; this
+// synchronous path drops the entry immediately so callers don't see a
+// half-dead worker.
 func (m *Manager) kill(conversationID, reason string) {
 	m.mu.Lock()
 	w, ok := m.workers[conversationID]
@@ -376,13 +382,20 @@ func (m *Manager) kill(conversationID, reason string) {
 	if !ok {
 		return
 	}
+	m.killWorker(w, conversationID, reason)
+}
+
+// killWorker sends SIGINT to the worker process and schedules a hard SIGKILL
+// after 2 s. Callers that have already removed the entry from the registry
+// (e.g. Get's credential-mismatch path, which deletes under the lock) use
+// this directly so they don't double-delete.
+func (m *Manager) killWorker(w *Worker, conversationID, reason string) {
 	m.log.Info("killing worker",
 		zap.String("conversation", conversationID),
 		zap.String("reason", reason),
 	)
 	if w.cmd != nil && w.cmd.Process != nil {
 		_ = w.cmd.Process.Signal(os.Interrupt)
-		// Best-effort hard kill if SIGINT didn't take.
 		go func(p *os.Process) {
 			time.Sleep(2 * time.Second)
 			_ = p.Kill()

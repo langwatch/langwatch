@@ -161,6 +161,20 @@ func setupWorkerHome(workerHome string, creds Credentials, uid uint32, otelPlugi
 		return fmt.Errorf("chmod home: %w", err)
 	}
 
+	// Per-worker tmp dir: TMPDIR is set in the subprocess env so opencode and
+	// any tool it shells out to write temporary files here rather than /tmp.
+	// The pod's /tmp is an emptyDir shared across all UIDs; without this a
+	// prompt-injected worker could drop a world-readable file there (umask 0022)
+	// and a sibling worker could read it. 0700 + chown enforces the same
+	// kernel-level EACCES boundary as the rest of the home.
+	tmpDir := filepath.Join(workerHome, "tmp")
+	if err := os.Mkdir(tmpDir, 0o700); err != nil {
+		return fmt.Errorf("mkdir tmp: %w", err)
+	}
+	if err := os.Chown(tmpDir, int(uid), int(uid)); err != nil {
+		return fmt.Errorf("chown tmp: %w", err)
+	}
+
 	configDir := filepath.Join(workerHome, ".config", "opencode")
 	if err := os.MkdirAll(configDir, 0o700); err != nil {
 		return fmt.Errorf("mkdir config: %w", err)
@@ -268,6 +282,7 @@ func spawnOpenCode(
 	env := filterSensitiveEnv()
 	env = append(env,
 		"HOME="+workerHome,
+		"TMPDIR="+filepath.Join(workerHome, "tmp"),
 		"OPENAI_BASE_URL="+creds.GatewayBaseURL,
 		"OPENAI_API_KEY="+creds.LLMVirtualKey,
 		"LANGWATCH_API_KEY="+creds.LangwatchAPIKey,
