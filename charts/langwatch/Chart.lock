@@ -8,5 +8,8 @@ dependencies:
 - name: langwatch-gateway
   repository: file://../gateway
   version: 3.5.0
-digest: sha256:8b12e4ae1d55d312f9cba6dd5bf6b25d0e305058c735de7f5ad9ab481d2ef763
-generated: "2026-06-29T15:46:32.725812287Z"
+- name: langwatch-langy-agent
+  repository: file://../langy-agent
+  version: 3.3.0
+digest: sha256:0ae797989a3808b2223357afcc8d56b8ef61a4add59410d1a6ff3abc87cbea4c
+generated: "2026-06-29T23:03:15.803979584+02:00"

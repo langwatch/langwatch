@@ -58,55 +58,58 @@ model Session {
 }
 
 model User {
-  id                      String                   @id @default(nanoid())
-  name                    String?
-  email                   String?                  @unique
-  emailVerified           Boolean                  @default(false)
-  image                   String?                  @db.Text
-  pendingSsoSetup         Boolean                  @default(false)
-  accounts                Account[]
-  sessions                Session[]
-  teamMemberships         TeamUser[]
-  orgMemberships          OrganizationUser[]
-  createdAt               DateTime                 @default(now())
-  updatedAt               DateTime                 @default(now()) @updatedAt
-  lastLoginAt             DateTime?
-  deactivatedAt           DateTime?
+  id                       String                   @id @default(nanoid())
+  name                     String?
+  email                    String?                  @unique
+  emailVerified            Boolean                  @default(false)
+  image                    String?                  @db.Text
+  pendingSsoSetup          Boolean                  @default(false)
+  accounts                 Account[]
+  sessions                 Session[]
+  teamMemberships          TeamUser[]
+  orgMemberships           OrganizationUser[]
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @default(now()) @updatedAt
+  lastLoginAt              DateTime?
+  deactivatedAt            DateTime?
   // User-level pin for the persona-resolver redirect target. NULL = use
   // auto-detection. When set, wins over auto-detected persona destination.
   // Spec: specs/ai-gateway/governance/persona-home-content.feature
-  lastHomePath            String?
-  Annotation              Annotation[]
-  publicShares            PublicShare[]
-  Workflow                Workflow[]
-  WorkflowVersion         WorkflowVersion[]
-  annotationQueues        AnnotationQueueMembers[]
-  assignedQueueItems      AnnotationQueueItem[]    @relation("AssignedTo")
-  createdQueueItems       AnnotationQueueItem[]    @relation("CreatedBy")
-  llmPromptConfigVersions LlmPromptConfigVersion[]
-  scenarios               Scenario[]
-  inviteRequests          OrganizationInvite[]
-  secretsCreated          ProjectSecret[]          @relation("secretCreatedBy")
-  secretsUpdated          ProjectSecret[]          @relation("secretUpdatedBy")
-  savedViews              SavedView[]
-  versionTagsCreated      PromptTagAssignment[]    @relation("versionTagCreatedBy")
-  versionTagsUpdated      PromptTagAssignment[]    @relation("versionTagUpdatedBy")
-  promptTagsCreated       PromptTag[]              @relation("promptTagCreatedBy")
-  promptTagsUpdated       PromptTag[]              @relation("promptTagUpdatedBy")
-  groupMemberships        GroupMembership[]
-  roleBindings            RoleBinding[]
-  apiKeys                 ApiKey[]
-  gatewayBudgetsCreated   GatewayBudget[]          @relation("GatewayBudgetCreatedBy")
-  principalVirtualKeys    VirtualKey[]             @relation("PrincipalScopedVirtualKeys")
-  personalTeams           Team[]                   @relation("PersonalTeamOwner")
-  personalProjects        Project[]                @relation("PersonalProjectOwner")
-  routingPoliciesCreated  RoutingPolicy[]          @relation("RoutingPolicyCreatedBy")
-  routingPoliciesUpdated  RoutingPolicy[]          @relation("RoutingPolicyUpdatedBy")
-  gatewayGuardrailsCreated GatewayGuardrail[]      @relation("GatewayGuardrailCreatedBy")
-  gatewayGuardrailsUpdated GatewayGuardrail[]      @relation("GatewayGuardrailUpdatedBy")
-  ingestionSourcesCreated IngestionSource[]        @relation("IngestionSourceCreatedBy")
-  anomalyRulesCreated     AnomalyRule[]            @relation("AnomalyRuleCreatedBy")
-  pinnedTraces            PinnedTrace[]
+  lastHomePath             String?
+  Annotation               Annotation[]
+  publicShares             PublicShare[]
+  Workflow                 Workflow[]
+  WorkflowVersion          WorkflowVersion[]
+  annotationQueues         AnnotationQueueMembers[]
+  assignedQueueItems       AnnotationQueueItem[]    @relation("AssignedTo")
+  createdQueueItems        AnnotationQueueItem[]    @relation("CreatedBy")
+  llmPromptConfigVersions  LlmPromptConfigVersion[]
+  scenarios                Scenario[]
+  inviteRequests           OrganizationInvite[]
+  secretsCreated           ProjectSecret[]          @relation("secretCreatedBy")
+  secretsUpdated           ProjectSecret[]          @relation("secretUpdatedBy")
+  savedViews               SavedView[]
+  versionTagsCreated       PromptTagAssignment[]    @relation("versionTagCreatedBy")
+  versionTagsUpdated       PromptTagAssignment[]    @relation("versionTagUpdatedBy")
+  promptTagsCreated        PromptTag[]              @relation("promptTagCreatedBy")
+  promptTagsUpdated        PromptTag[]              @relation("promptTagUpdatedBy")
+  groupMemberships         GroupMembership[]
+  roleBindings             RoleBinding[]
+  apiKeys                  ApiKey[]
+  gatewayBudgetsCreated    GatewayBudget[]          @relation("GatewayBudgetCreatedBy")
+  principalVirtualKeys     VirtualKey[]             @relation("PrincipalScopedVirtualKeys")
+  personalTeams            Team[]                   @relation("PersonalTeamOwner")
+  personalProjects         Project[]                @relation("PersonalProjectOwner")
+  routingPoliciesCreated   RoutingPolicy[]          @relation("RoutingPolicyCreatedBy")
+  routingPoliciesUpdated   RoutingPolicy[]          @relation("RoutingPolicyUpdatedBy")
+  gatewayGuardrailsCreated GatewayGuardrail[]       @relation("GatewayGuardrailCreatedBy")
+  gatewayGuardrailsUpdated GatewayGuardrail[]       @relation("GatewayGuardrailUpdatedBy")
+  ingestionSourcesCreated  IngestionSource[]        @relation("IngestionSourceCreatedBy")
+  anomalyRulesCreated      AnomalyRule[]            @relation("AnomalyRuleCreatedBy")
+  pinnedTraces             PinnedTrace[]
+  userGitHubCredentials    UserGitHubCredential[]
+  langyConversations       LangyConversation[]      @relation("LangyConversationUser")
+  sharedLangyConversations LangyConversation[]      @relation("LangyConversationSharedBy")
 }
 
 model VerificationToken {
@@ -179,15 +182,15 @@ model OrganizationUser {
 }
 
 model Team {
-  id             String          @id @default(nanoid())
+  id             String       @id @default(nanoid())
   name           String
-  slug           String          @unique
+  slug           String       @unique
   members        TeamUser[]
   organizationId String
-  organization   Organization    @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id])
   projects       Project[]
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @default(now()) @updatedAt
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @default(now()) @updatedAt
   archivedAt     DateTime?
 
   // Personal workspace per (org, user). Created on user's first
@@ -210,16 +213,16 @@ model Team {
 }
 
 model Organization {
-  id                       String               @id @default(nanoid())
-  name                     String
-  phoneNumber              String?
-  slug                     String               @unique
-  members                  OrganizationUser[]
-  teams                    Team[]
-  createdAt                DateTime             @default(now())
-  updatedAt                DateTime             @default(now()) @updatedAt
-  OrganizationInvite       OrganizationInvite[]
-  usageSpendingMaxLimit    Int?
+  id                     String               @id @default(nanoid())
+  name                   String
+  phoneNumber            String?
+  slug                   String               @unique
+  members                OrganizationUser[]
+  teams                  Team[]
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @default(now()) @updatedAt
+  OrganizationInvite     OrganizationInvite[]
+  usageSpendingMaxLimit  Int?
   /// Phase 8 - admin-configurable max lifetime for CLI device-flow
   /// sessions, in days. 0 = unbounded (default, mirrors GitHub CLI /
   /// gh-style flows). Companies that need finite session lifetime
@@ -228,27 +231,27 @@ model Organization {
   /// endpoint rejects refresh attempts where now - issued_at exceeds
   /// this value, regardless of the underlying refresh-token TTL.
   /// Spec: specs/ai-governance/sessions/session-ttl.feature.
-  maxSessionDurationDays   Int                  @default(0)
-  signupData               Json?
-  signedDPA                Boolean              @default(false)
-  elasticsearchNodeUrl     String?
-  elasticsearchApiKey      String?
-  useCustomElasticsearch   Boolean              @default(false)
-  s3Endpoint               String?
-  s3AccessKeyId            String?
-  s3SecretAccessKey        String?
-  s3Bucket                 String?
-  useCustomS3              Boolean              @default(false)
-  sentPlanLimitAlert       DateTime?
-  ssoDomain                String?              @unique
-  ssoProvider              String?
-  presenceEnabled          Boolean              @default(true)
+  maxSessionDurationDays Int                  @default(0)
+  signupData             Json?
+  signedDPA              Boolean              @default(false)
+  elasticsearchNodeUrl   String?
+  elasticsearchApiKey    String?
+  useCustomElasticsearch Boolean              @default(false)
+  s3Endpoint             String?
+  s3AccessKeyId          String?
+  s3SecretAccessKey      String?
+  s3Bucket               String?
+  useCustomS3            Boolean              @default(false)
+  sentPlanLimitAlert     DateTime?
+  ssoDomain              String?              @unique
+  ssoProvider            String?
+  presenceEnabled        Boolean              @default(true)
   /// Org-configurable contact surfaced to users in CLI "contact your
   /// admin" messages and the in-app budget-exceeded banner. Free text:
   /// accepts an email, a URL (internal ticketing system), or any other
   /// instruction. When null, callers fall back to the first ADMIN
   /// member's email (`resolveSupportContact` helper).
-  supportContact           String?
+  supportContact         String?
 
   promoCode              String?
   stripeCustomerId       String?                @unique
@@ -273,6 +276,7 @@ model Organization {
   anomalyAlerts          AnomalyAlert[]
   aiToolEntries          AiToolEntry[]
   ingestionTemplates     IngestionTemplate[]
+  userGitHubCredentials  UserGitHubCredential[]
 
   @@index([ssoProvider])
 }
@@ -323,14 +327,14 @@ enum Currency {
 }
 
 model Project {
-  id                       String                              @id @default(nanoid())
-  name                     String
-  slug                     String                              @unique
-  apiKey                   String                              @unique
-  teamId                   String
-  team                     Team                                @relation(fields: [teamId], references: [id])
-  language                 String
-  framework                String
+  id                  String                @id @default(nanoid())
+  name                String
+  slug                String                @unique
+  apiKey              String                @unique
+  teamId              String
+  team                Team                  @relation(fields: [teamId], references: [id])
+  language            String
+  framework           String
   /// Project kind:
   ///   - "application": user-facing workspace where developers send their
   ///     own app traces. The default for everything created via the
@@ -344,49 +348,50 @@ model Project {
   ///     specs/ai-gateway/governance/ui-contract.feature codifies this.
   /// Stored as a free-form string (matching IngestionSource.sourceType
   /// pattern) so future routing kinds can ship without schema migrations.
-  kind                     String                              @default("application")
-  firstMessage             Boolean                             @default(false)
-  integrated               Boolean                             @default(false)
-  createdAt                DateTime                            @default(now())
-  updatedAt                DateTime                            @default(now()) @updatedAt
-  userLinkTemplate         String?
-  checks                   Monitor[]
-  costs                    Cost[]
-  topics                   Topic[]
-  datasets                 Dataset[]
-  datasetRecords           DatasetRecord[]
-  customGraphs             CustomGraph[]
-  dashboards               Dashboard[]
-  batchEvaluations         BatchEvaluation[]
-  traceSharingEnabled      Boolean                             @default(true)
-  presenceEnabled          Boolean                             @default(true)
-  triggers                 Trigger[]
-  experiments              Experiment[]
-  annotations              Annotation[]
-  projectSecrets           ProjectSecret[]
-  TriggerSent              TriggerSent[]
-  annotationScores         AnnotationScore[]
-  publicShares             PublicShare[]
-  workflows                Workflow[]
-  WorkflowVersion          WorkflowVersion[]
-  AnnotationQueue          AnnotationQueue[]
-  AnnotationQueueItem      AnnotationQueueItem[]
-  s3Endpoint               String?
-  s3AccessKeyId            String?
-  s3SecretAccessKey        String?
-  s3Bucket                 String?
-  llmPromptConfigs         LlmPromptConfig[]
-  analytics                Analytics[]
-  archivedAt               DateTime?
-  notifications            Notification[]
-  agents                   Agent[]
-  evaluators               Evaluator[]
-  scenarios                Scenario[]
-  suiteConfigurations      SimulationSuite[]
-  savedViews               SavedView[]
-  gatewayGuardrails        GatewayGuardrail[]                  @relation("ProjectGatewayGuardrails")
-  gatewayChangeEvents      GatewayChangeEvent[]
-  pinnedTraces             PinnedTrace[]
+  kind                String                @default("application")
+  firstMessage        Boolean               @default(false)
+  integrated          Boolean               @default(false)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @default(now()) @updatedAt
+  userLinkTemplate    String?
+  checks              Monitor[]
+  costs               Cost[]
+  topics              Topic[]
+  datasets            Dataset[]
+  datasetRecords      DatasetRecord[]
+  customGraphs        CustomGraph[]
+  dashboards          Dashboard[]
+  batchEvaluations    BatchEvaluation[]
+  traceSharingEnabled Boolean               @default(true)
+  presenceEnabled     Boolean               @default(true)
+  triggers            Trigger[]
+  experiments         Experiment[]
+  annotations         Annotation[]
+  projectSecrets      ProjectSecret[]
+  TriggerSent         TriggerSent[]
+  annotationScores    AnnotationScore[]
+  publicShares        PublicShare[]
+  workflows           Workflow[]
+  WorkflowVersion     WorkflowVersion[]
+  AnnotationQueue     AnnotationQueue[]
+  AnnotationQueueItem AnnotationQueueItem[]
+  s3Endpoint          String?
+  s3AccessKeyId       String?
+  s3SecretAccessKey   String?
+  s3Bucket            String?
+  llmPromptConfigs    LlmPromptConfig[]
+  analytics           Analytics[]
+  archivedAt          DateTime?
+  notifications       Notification[]
+  agents              Agent[]
+  evaluators          Evaluator[]
+  scenarios           Scenario[]
+  suiteConfigurations SimulationSuite[]
+  savedViews          SavedView[]
+  gatewayGuardrails   GatewayGuardrail[]    @relation("ProjectGatewayGuardrails")
+  gatewayChangeEvents GatewayChangeEvent[]
+  pinnedTraces        PinnedTrace[]
+  langyConversations  LangyConversation[]
 
   // Denormalised mirror of parent Team's personal flag for fast
   // lookup at trace ingest time without a Team join. Always equals
@@ -815,7 +820,7 @@ model Annotation {
 // fields below - same fields that lived on GatewayProviderCredential
 // pre-110, just collapsed onto the provider they always 1:1-bound.
 model ModelProvider {
-  id                     String   @id @default(nanoid())
+  id                     String  @id @default(nanoid())
   // Human-readable name (iter 109): one "OpenAI" by default, auto-
   // suffixed as "OpenAI 2" / "OpenAI 3" when duplicates coexist
   // under the same organization. Model selectors use this to group
@@ -833,35 +838,35 @@ model ModelProvider {
   deploymentMapping      Json?
 
   // Gateway rate-limits (advanced). Optional caps applied per MP.
-  rateLimitRpm           Int?
-  rateLimitTpm           Int?
-  rateLimitRpd           Int?
+  rateLimitRpm Int?
+  rateLimitTpm Int?
+  rateLimitRpd Int?
 
   // Per-MP credential rotation policy (gateway-only). v1 ships MANUAL
   // only; AUTO + external-secret-store integration are v1.1 scope.
-  rotationPolicy         GatewayProviderRotationPolicy @default(MANUAL)
+  rotationPolicy GatewayProviderRotationPolicy @default(MANUAL)
 
   // Provider-specific routing hints (e.g. bedrock region, azure
   // deployment override). Gateway applies on top of standard config.
-  providerConfig         Json?
+  providerConfig Json?
 
   // Fallback priority used when a VK has no RoutingPolicy. Lower =
   // tried first. Tiebreak by createdAt ASC. Deterministic across runs.
   fallbackPriorityGlobal Int?
 
   // Health / circuit breaker state written by the gateway.
-  healthStatus           GatewayProviderHealthStatus @default(UNKNOWN)
-  circuitOpenedAt        DateTime?
-  lastHealthCheckAt      DateTime?
+  healthStatus      GatewayProviderHealthStatus @default(UNKNOWN)
+  circuitOpenedAt   DateTime?
+  lastHealthCheckAt DateTime?
 
-  disabledAt             DateTime?
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @default(now()) @updatedAt
-  scopes                 ModelProviderScope[]
+  disabledAt DateTime?
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @default(now()) @updatedAt
+  scopes     ModelProviderScope[]
 
   // Single-organization tenancy anchor (ADR-021). Every scope of a given
   // provider resolves to the same organization, so this column is that org.
-  organizationId         String
+  organizationId String
 
   @@index([healthStatus])
   @@index([fallbackPriorityGlobal])
@@ -879,9 +884,9 @@ model ModelProvider {
 // convention (RoleBindingScopeType / GatewayBudgetScopeType / etc).
 // See dev/docs/best_practices/scoped-resources.md.
 enum ModelProviderScopeType {
-    ORGANIZATION
-    TEAM
-    PROJECT
+  ORGANIZATION
+  TEAM
+  PROJECT
 }
 
 model ModelProviderScope {
@@ -909,9 +914,9 @@ model ModelProviderScope {
 // scopeType uses its own Postgres enum - same per-table convention as
 // ModelProviderScopeType. See dev/docs/best_practices/scoped-resources.md.
 enum ModelDefaultScopeType {
-    ORGANIZATION
-    TEAM
-    PROJECT
+  ORGANIZATION
+  TEAM
+  PROJECT
 }
 
 // ModelDefaultConfig is one CSS-style cascading policy. The JSON `config`
@@ -931,34 +936,67 @@ enum ModelDefaultScopeType {
 // always beat higher-tier ones even if higher tier was created later
 // (CSS specificity wins over recency across tiers).
 model ModelDefaultConfig {
-    id        String                    @id @default(nanoid())
-    config    Json
-    authorId  String?
-    createdAt DateTime                  @default(now())
-    updatedAt DateTime                  @updatedAt
-    scopes    ModelDefaultConfigScope[]
+  id        String                    @id @default(nanoid())
+  config    Json
+  authorId  String?
+  createdAt DateTime                  @default(now())
+  updatedAt DateTime                  @updatedAt
+  scopes    ModelDefaultConfigScope[]
 
-    // Single-organization tenancy anchor (ADR-021). Every scope a config
-    // attaches to resolves to the same organization.
-    organizationId String
+  // Single-organization tenancy anchor (ADR-021). Every scope a config
+  // attaches to resolves to the same organization.
+  organizationId String
 
-    @@index([organizationId])
+  @@index([organizationId])
 }
 
 // Join table binding a ModelDefaultConfig to a (scopeType, scopeId).
 // One config can have many scope attachments; one scope can have many
 // configs (resolver tiebreaks by createdAt DESC).
 model ModelDefaultConfigScope {
-    id        String                @id @default(nanoid())
-    configId  String
-    config    ModelDefaultConfig    @relation(fields: [configId], references: [id], onDelete: Cascade)
-    scopeType ModelDefaultScopeType
-    scopeId   String
-    createdAt DateTime              @default(now())
+  id        String                @id @default(nanoid())
+  configId  String
+  config    ModelDefaultConfig    @relation(fields: [configId], references: [id], onDelete: Cascade)
+  scopeType ModelDefaultScopeType
+  scopeId   String
+  createdAt DateTime              @default(now())
 
-    @@unique([configId, scopeType, scopeId])
-    @@index([scopeType, scopeId])
-    @@index([configId])
+  @@unique([configId, scopeType, scopeId])
+  @@index([scopeType, scopeId])
+  @@index([configId])
+}
+
+/// Per-user GitHub App connection used by Langy to open pull requests
+/// attributed to the requesting user. Stores ONLY the encrypted refresh
+/// token (long-lived but rotating); access tokens (8h TTL) are minted on
+/// demand by langyGithubToken.ts and never persisted.
+///
+/// Scoped (userId, organizationId): a user in two orgs connects twice so
+/// the installation context stays org-bounded. Issue: #4747. Spec:
+/// specs/assistant/langy-github-prs.feature.
+model UserGitHubCredential {
+  id                    String       @id @default(nanoid())
+  userId                String
+  user                  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organizationId        String
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// GitHub login (e.g. "aryansharma28"). Surfaced in the "Acting as @login"
+  /// sidebar chip and used as the commit author name in the worker.
+  githubLogin           String
+  /// GitHub numeric user id. Stable across renames; used for the
+  /// noreply commit email (<id>+<login>@users.noreply.github.com).
+  githubUserId          String
+  /// AES-256-GCM encrypted refresh token. Encrypted via
+  /// langwatch/src/utils/encryption.ts (same scheme as ProjectSecret).
+  encryptedRefreshToken String
+  /// Space-separated OAuth scopes granted (informational; the App installation
+  /// is the real authority on what the token can do).
+  scopes                String?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @default(now()) @updatedAt
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
 }
 
 model ProjectSecret {
@@ -1111,23 +1149,23 @@ model PublicShare {
 }
 
 enum PinSource {
-    manual
-    share
+  manual
+  share
 }
 
 model PinnedTrace {
-    id        String    @id @default(nanoid())
-    projectId String
-    project   Project   @relation(fields: [projectId], references: [id])
-    traceId   String
-    userId    String?
-    user      User?     @relation(fields: [userId], references: [id])
-    source    PinSource @default(manual)
-    reason    String?
-    createdAt DateTime  @default(now())
+  id        String    @id @default(nanoid())
+  projectId String
+  project   Project   @relation(fields: [projectId], references: [id])
+  traceId   String
+  userId    String?
+  user      User?     @relation(fields: [userId], references: [id])
+  source    PinSource @default(manual)
+  reason    String?
+  createdAt DateTime  @default(now())
 
-    @@unique([projectId, traceId])
-    @@index([projectId])
+  @@unique([projectId, traceId])
+  @@index([projectId])
 }
 
 enum RetentionPolicyScopeType {
@@ -1511,23 +1549,23 @@ model Agent {
 }
 
 model Evaluator {
-  id                    String      @id @default(nanoid())
+  id                    String             @id @default(nanoid())
   projectId             String
-  project               Project     @relation(fields: [projectId], references: [id])
+  project               Project            @relation(fields: [projectId], references: [id])
   name                  String
   slug                  String? // Human-readable identifier for guardrails API
   type                  String // "evaluator" (built-in) | "workflow" (custom)
   config                Json // Settings for built-in, or empty for workflow
   workflowId            String? // For "workflow" type - top level for joins
-  workflow              Workflow?   @relation(fields: [workflowId], references: [id])
+  workflow              Workflow?          @relation(fields: [workflowId], references: [id])
   copiedFromEvaluatorId String?
-  copiedFrom            Evaluator?  @relation("EvaluatorCopies", fields: [copiedFromEvaluatorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-  copiedEvaluators      Evaluator[] @relation("EvaluatorCopies")
+  copiedFrom            Evaluator?         @relation("EvaluatorCopies", fields: [copiedFromEvaluatorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  copiedEvaluators      Evaluator[]        @relation("EvaluatorCopies")
   monitors              Monitor[] // Monitors using this evaluator
   gatewayGuardrails     GatewayGuardrail[] @relation("EvaluatorGatewayGuardrails")
   archivedAt            DateTime?
-  createdAt             DateTime    @default(now())
-  updatedAt             DateTime    @default(now()) @updatedAt
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @default(now()) @updatedAt
 
   @@unique([projectId, slug])
   @@index([projectId])
@@ -1558,25 +1596,25 @@ model Scenario {
 }
 
 model SimulationSuite {
-  id          String    @id @default(nanoid())
-  projectId   String
-  project     Project   @relation(fields: [projectId], references: [id])
-  name        String
-  slug        String
-  description String?
-  scenarioIds String[]
-  targets     Json // Array of { type: "prompt" | "http", referenceId: string }
-  repeatCount Int       @default(1)
-  labels      String[]
+  id             String    @id @default(nanoid())
+  projectId      String
+  project        Project   @relation(fields: [projectId], references: [id])
+  name           String
+  slug           String
+  description    String?
+  scenarioIds    String[]
+  targets        Json // Array of { type: "prompt" | "http", referenceId: string }
+  repeatCount    Int       @default(1)
+  labels         String[]
   // Optional run-plan-wide model overrides. When set they take precedence
   // over each scenario's own override for every scenario in the run; when
   // null the per-scenario value (or the project default) applies. See
   // specs/suites/suite-model-selection.feature.
   simulatorModel String?
   judgeModel     String?
-  archivedAt  DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @default(now()) @updatedAt
+  archivedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now()) @updatedAt
 
   @@unique([projectId, slug])
   @@index([projectId])
@@ -1703,11 +1741,11 @@ model RoleBinding {
 
   // Principal - exactly one must be set
   userId   String?
-  user     User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
   groupId  String?
-  group    Group?   @relation("GroupBindings", fields: [groupId], references: [id], onDelete: Cascade)
+  group    Group?  @relation("GroupBindings", fields: [groupId], references: [id], onDelete: Cascade)
   apiKeyId String?
-  apiKey   ApiKey?  @relation(fields: [apiKeyId], references: [id], onDelete: Restrict)
+  apiKey   ApiKey? @relation(fields: [apiKeyId], references: [id], onDelete: Restrict)
 
   // Role - built-in named role or custom
   role         TeamUserRole
@@ -1741,7 +1779,7 @@ model ApiKey {
   permissionMode  String        @default("all") // "all" | "readonly" | "restricted"
   userId          String?
   user            User?         @relation(fields: [userId], references: [id], onDelete: Restrict)
-  createdByUserId String?       // null = self-created; set when admin creates for another user
+  createdByUserId String? // null = self-created; set when admin creates for another user
   organizationId  String
   organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   roleBindings    RoleBinding[]
@@ -1771,8 +1809,8 @@ model ApiKey {
   /// a CLI old enough to predate device metadata.
   createdByDeviceLabel String?
 
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @default(now()) @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
   @@index([userId])
   @@index([organizationId])
@@ -1815,10 +1853,18 @@ model BillingMeterCheckpoint {
 //   every gateway-surface mutation alongside platform mutations.
 // ============================================================================
 
-
 enum VirtualKeyStatus {
   ACTIVE
   REVOKED
+}
+
+// Why this key exists. USER = explicitly created via the gateway UI / API.
+// LANGY = auto-provisioned by the Langy in-product assistant; UI surfaces it
+// as a managed row and forbids edit/revoke. Filtering by `purpose` replaces
+// the legacy `name == "Langy" && principalUserId IS NULL` heuristic.
+enum VirtualKeyPurpose {
+  USER
+  LANGY
 }
 
 // Rotation policy for gateway provider credentials.
@@ -1924,7 +1970,8 @@ model VirtualKey {
 
   name        String
   description String?
-  status      VirtualKeyStatus @default(ACTIVE)
+  status      VirtualKeyStatus  @default(ACTIVE)
+  purpose     VirtualKeyPurpose @default(USER)
 
   // Credential material. Full secret format:
   //   vk-lw-<26-char-crockford-ulid>  (32 chars total)
@@ -1984,6 +2031,7 @@ model VirtualKey {
   @@index([principalUserId])
   @@index([revision])
   @@index([routingPolicyId])
+  @@index([organizationId, purpose])
 }
 
 // VirtualKeyScope - N-scope access for VirtualKey, mirrors
@@ -2741,20 +2789,65 @@ model GatewayCacheRule {
 // flip cluster-wide; PostHog still owns user/A-B targeting for product
 // flags via the PRODUCT scope path in featureFlagService.
 model FeatureFlag {
-    key          String   @id
-    enabled      Boolean
-    // Optional list of targeting rules evaluated before the `enabled`
-    // fallback. Each rule is `{ match: { projectId?, organizationId? },
-    // enabled: boolean }` - first match wins. Shape lives in
-    // `src/server/featureFlag/rules.ts` so it can grow over time
-    // (percentage rollouts, email-domain matches, etc.) without a
-    // migration. Storing as JSON keeps the surface flexible while
-    // postgres handles the row-level cache invalidation.
-    rules        Json?
-    // Last operator to flip the value. Free-form string (user id), no FK
-    // because the same table serves SaaS and self-hosted installs where
-    // the User table is not guaranteed to share lifecycle with this row.
-    lastEditedBy String?
-    createdAt    DateTime @default(now())
-    updatedAt    DateTime @default(now()) @updatedAt
+  key          String   @id
+  enabled      Boolean
+  // Optional list of targeting rules evaluated before the `enabled`
+  // fallback. Each rule is `{ match: { projectId?, organizationId? },
+  // enabled: boolean }` - first match wins. Shape lives in
+  // `src/server/featureFlag/rules.ts` so it can grow over time
+  // (percentage rollouts, email-domain matches, etc.) without a
+  // migration. Storing as JSON keeps the surface flexible while
+  // postgres handles the row-level cache invalidation.
+  rules        Json?
+  // Last operator to flip the value. Free-form string (user id), no FK
+  // because the same table serves SaaS and self-hosted installs where
+  // the User table is not guaranteed to share lifecycle with this row.
+  lastEditedBy String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
 }
+
+// ============================================================================
+// Langy assistant — see specs/assistant/memory-design.md §3
+// ============================================================================
+
+model LangyConversation {
+  id              String    @id @default(cuid())
+  projectId       String
+  userId          String
+  title           String?
+  isShared        Boolean   @default(false)
+  sharedAt        DateTime?
+  sharedById      String?
+  lastActivityAt  DateTime?
+  messageCount    Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  // PII purge path: when a Project or User is deleted VIA THE PRISMA
+  // CLIENT, the conversation (and its messages via the LangyMessage
+  // cascade below) goes too. Postgres tables are outside the ClickHouse
+  // retention sweep, so without this the chat text would be retained
+  // indefinitely.
+  //
+  // IMPORTANT under relationMode="prisma": NO SQL FK constraint is
+  // emitted. The cascade runs at the Prisma-client layer ONLY — a raw
+  // `DELETE FROM "Project"` issued via psql or direct-SQL admin tooling
+  // will NOT cascade and will orphan chat content. For GDPR-correct
+  // purges, all Project/User deletes MUST route through the Prisma
+  // client (or a future SQL trigger we haven't built yet).
+  //
+  // The sharedBy relation uses SetNull so a shared conversation outlives
+  // the sharer's account (the recipient can still see it, attributed to
+  // no one).
+  project  Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user     User           @relation("LangyConversationUser", fields: [userId], references: [id], onDelete: Cascade)
+  sharedBy User?          @relation("LangyConversationSharedBy", fields: [sharedById], references: [id], onDelete: SetNull)
+  @@index([projectId, userId, lastActivityAt])
+  @@index([projectId, isShared, updatedAt])
+  @@index([deletedAt])
+  @@index([userId])
+  @@index([sharedById])
+}
+

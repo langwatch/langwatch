@@ -17,9 +17,11 @@ import {
 } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
+import { provisionLangyApiKey } from "~/server/services/langy/langyApiKey";
+import { provisionLangyVirtualKey } from "~/server/services/langy/langyVirtualKey";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
 import { auditLog } from "../../auditLog";
 import {
@@ -210,6 +212,46 @@ export const projectRouter = createTRPCRouter({
           apiKey: generateApiKey(),
         },
       });
+
+      // Best-effort: mint Langy's dedicated, least-privilege service key so the
+      // assistant works the moment the project exists. A failure here must never
+      // block project creation — the backfill reconciler mints any that slip through.
+      try {
+        await provisionLangyApiKey({
+          prisma,
+          projectId: project.id,
+          organizationId: input.organizationId,
+          createdByUserId: userId,
+        });
+      } catch (error) {
+        captureException(toError(error), {
+          extra: {
+            projectId: project.id,
+            context: "provisionLangyApiKey:project.create",
+          },
+        });
+      }
+
+      // Best-effort: mint Langy's gateway virtual key so it shows up in the
+      // user's /virtual-keys list from day 1 (configurable model + fallback
+      // chain + spend tracking like any other VK). Same best-effort contract
+      // as the API key: failure here doesn't block project creation; the
+      // credential service re-attempts on first /chat call.
+      try {
+        await provisionLangyVirtualKey({
+          prisma,
+          projectId: project.id,
+          organizationId: input.organizationId,
+          actorUserId: userId,
+        });
+      } catch (error) {
+        captureException(toError(error), {
+          extra: {
+            projectId: project.id,
+            context: "provisionLangyVirtualKey:project.create",
+          },
+        });
+      }
 
       return { success: true, projectSlug: project.slug };
     }),
