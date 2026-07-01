@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.7.0](https://github.com/langwatch/langwatch/compare/skills@v0.6.1...skills@v0.7.0) (2026-07-01)
+
+
+### Features
+
+* **langy:** ship Langy in-product AI assistant — workers, GitHub PRs, setup ([#4913](https://github.com/langwatch/langwatch/issues/4913)) ([897f039](https://github.com/langwatch/langwatch/commit/897f039b05bb81b08636c3f559488e89910abe79))
+
+
+### Bug Fixes
+
+* **langy:** hoist release_langy_enabled flag hook above early returns (React [#310](https://github.com/langwatch/langwatch/issues/310)) ([897f039](https://github.com/langwatch/langwatch/commit/897f039b05bb81b08636c3f559488e89910abe79))
+* **security:** bump hono&gt;=4.12.25 and langsmith&gt;=0.8.18 ([5dd4178](https://github.com/langwatch/langwatch/commit/5dd41782beee86ce4333c255d0914357a4e9716d))
+* **security:** bump hono&gt;=4.12.25 and langsmith&gt;=0.8.18 (Dependabot [#1500](https://github.com/langwatch/langwatch/issues/1500), [#1516](https://github.com/langwatch/langwatch/issues/1516)) ([#5211](https://github.com/langwatch/langwatch/issues/5211)) ([5dd4178](https://github.com/langwatch/langwatch/commit/5dd41782beee86ce4333c255d0914357a4e9716d))
+* **security:** esbuild, vite and form-data floors across all workspaces ([361b301](https://github.com/langwatch/langwatch/commit/361b3014f62257e7cb2702e60588fc534a271d20))
+* **security:** esbuild, vite and form-data security floors across all workspaces ([#4827](https://github.com/langwatch/langwatch/issues/4827)) ([361b301](https://github.com/langwatch/langwatch/commit/361b3014f62257e7cb2702e60588fc534a271d20))
+
 ## [0.6.1](https://github.com/langwatch/langwatch/compare/skills@v0.6.0...skills@v0.6.1) (2026-06-19)
 
 
