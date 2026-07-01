@@ -17,6 +17,7 @@ import {
 } from "@chakra-ui/react";
 import type {
   DatasetProgressPhase,
+  DatasetProgressView,
   DatasetStatusLike,
 } from "./datasetProgressView";
 import { useDatasetProcessingProgress } from "./useDatasetProcessingProgress";
@@ -58,48 +59,50 @@ function PhaseStepper({ current }: { current: DatasetProgressPhase }) {
   );
 }
 
-export function DatasetProcessingProgress(props: {
-  projectId: string;
-  datasetId: string;
-  status: DatasetStatusLike;
-  statusError?: string | null;
-  onReconcile?: () => void;
+/** Durable-failure state: message + optional Retry (from the caller's getById). */
+function ProcessingFailedAlert({
+  message,
+  onRetry,
+  isRetrying,
+}: {
+  message?: string;
   onRetry?: () => void;
   isRetrying?: boolean;
 }) {
-  const view = useDatasetProcessingProgress(props);
+  return (
+    <Alert.Root status="error" data-testid="dataset-processing-failed">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>We could not prepare your dataset</Alert.Title>
+        <Alert.Description>
+          {message ??
+            "Something went wrong while processing your file. You can retry."}
+        </Alert.Description>
+      </Alert.Content>
+      {onRetry && (
+        <Button
+          size="sm"
+          colorPalette="red"
+          variant="outline"
+          loading={isRetrying}
+          onClick={onRetry}
+        >
+          Retry
+        </Button>
+      )}
+    </Alert.Root>
+  );
+}
 
-  if (view.kind === "hidden") return null;
+type ActiveView = Extract<
+  DatasetProgressView,
+  { kind: "indeterminate" | "determinate" }
+>;
 
-  if (view.kind === "failed") {
-    return (
-      <Alert.Root status="error" data-testid="dataset-processing-failed">
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Title>We could not prepare your dataset</Alert.Title>
-          <Alert.Description>
-            {view.message ??
-              "Something went wrong while processing your file. You can retry."}
-          </Alert.Description>
-        </Alert.Content>
-        {props.onRetry && (
-          <Button
-            size="sm"
-            colorPalette="red"
-            variant="outline"
-            loading={props.isRetrying}
-            onClick={props.onRetry}
-          >
-            Retry
-          </Button>
-        )}
-      </Alert.Root>
-    );
-  }
-
+/** The live bar itself: label (percent · rows · ETA) + stepper + progress. */
+function ProcessingBar({ view }: { view: ActiveView }) {
   const indeterminate = view.kind === "indeterminate";
   const eta = indeterminate ? null : formatEta(view.etaSeconds);
-
   return (
     <Box
       padding={3}
@@ -141,4 +144,28 @@ export function DatasetProcessingProgress(props: {
       </VStack>
     </Box>
   );
+}
+
+export function DatasetProcessingProgress(props: {
+  projectId: string;
+  datasetId: string;
+  status: DatasetStatusLike;
+  statusError?: string | null;
+  onReconcile?: () => void;
+  onRetry?: () => void;
+  isRetrying?: boolean;
+}) {
+  const view = useDatasetProcessingProgress(props);
+
+  if (view.kind === "hidden") return null;
+  if (view.kind === "failed") {
+    return (
+      <ProcessingFailedAlert
+        message={view.message}
+        onRetry={props.onRetry}
+        isRetrying={props.isRetrying}
+      />
+    );
+  }
+  return <ProcessingBar view={view} />;
 }

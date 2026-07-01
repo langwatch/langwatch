@@ -59,7 +59,8 @@ export const estimateEtaSeconds = (
   totalBytes: number | undefined,
   currentBytes: number | undefined,
 ): number | undefined => {
-  if (!totalBytes || currentBytes == null || samples.length < 2) return undefined;
+  if (!totalBytes || currentBytes == null || samples.length < 2)
+    return undefined;
   const first = samples[0]!;
   const last = samples[samples.length - 1]!;
   const elapsedSec = (last.t - first.t) / 1000;
@@ -91,13 +92,21 @@ export const deriveDatasetProgressView = (input: {
     return { kind: "failed", message: statusError ?? undefined };
   }
   if (status === "uploading" || status === "processing") {
-    if (live && live.totalBytes && live.totalBytes > 0 && live.bytesRead != null) {
+    if (
+      live &&
+      live.totalBytes &&
+      live.totalBytes > 0 &&
+      live.bytesRead != null
+    ) {
       return {
         kind: "determinate",
         percent: clampPercent((live.bytesRead / live.totalBytes) * 100),
         rows: live.rows,
         etaSeconds,
-        phase: live.phase ?? "processing",
+        // Fall back to the durable status (uploading/processing), not a hardcoded
+        // "processing" — an uploading dataset that emits bytes before `phase` is
+        // set must not jump the stepper straight to Processing.
+        phase: live.phase ?? status,
       };
     }
     return { kind: "indeterminate", phase: live?.phase ?? status };

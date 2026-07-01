@@ -12,7 +12,12 @@ describe("deriveDatasetProgressView", () => {
     it("hides the bar on ready even with a stale processing tick still in hand", () => {
       const view = deriveDatasetProgressView({
         status: "ready",
-        live: { bytesRead: 450, totalBytes: 1000, rows: 12, phase: "processing" },
+        live: {
+          bytesRead: 450,
+          totalBytes: 1000,
+          rows: 12,
+          phase: "processing",
+        },
       });
       expect(view).toEqual({ kind: "hidden" });
     });
@@ -34,7 +39,12 @@ describe("deriveDatasetProgressView", () => {
     it("is determinate from input bytes once a live tick with a total arrives", () => {
       const view = deriveDatasetProgressView({
         status: "processing",
-        live: { bytesRead: 250, totalBytes: 1000, rows: 30, phase: "processing" },
+        live: {
+          bytesRead: 250,
+          totalBytes: 1000,
+          rows: 30,
+          phase: "processing",
+        },
         etaSeconds: 12,
       });
       expect(view).toEqual({
@@ -46,8 +56,19 @@ describe("deriveDatasetProgressView", () => {
       });
     });
 
+    it("falls back to the uploading status, not processing, when a tick has no phase", () => {
+      const view = deriveDatasetProgressView({
+        status: "uploading",
+        live: { bytesRead: 100, totalBytes: 1000 },
+      });
+      expect(view).toMatchObject({ kind: "determinate", phase: "uploading" });
+    });
+
     it("is honestly indeterminate with no live tick yet (refresh / dead worker)", () => {
-      const view = deriveDatasetProgressView({ status: "processing", live: null });
+      const view = deriveDatasetProgressView({
+        status: "processing",
+        live: null,
+      });
       expect(view).toEqual({ kind: "indeterminate", phase: "processing" });
     });
 

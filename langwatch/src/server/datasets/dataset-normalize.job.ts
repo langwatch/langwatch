@@ -484,7 +484,18 @@ export const createDatasetNormalizeHandler = (deps: DatasetNormalizeDeps) => {
     // a fully-processed dataset. Swallow everything, sync and async.
     const safeEmit = (event: DatasetProgressEvent): void => {
       try {
-        deps.emitProgress?.(projectId, event);
+        const result = deps.emitProgress?.(
+          projectId,
+          event,
+        ) as void | PromiseLike<void>;
+        // An injected emitter may be async; swallow a rejected promise too so it
+        // never surfaces as an unhandled rejection.
+        if (
+          result &&
+          typeof (result as PromiseLike<void>).then === "function"
+        ) {
+          void Promise.resolve(result).catch(() => undefined);
+        }
       } catch {
         // never let a progress broadcast fail (or delete) a normalize
       }

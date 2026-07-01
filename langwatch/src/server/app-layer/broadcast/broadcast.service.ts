@@ -54,7 +54,7 @@ export class BroadcastService {
   private cleanupInterval: NodeJS.Timeout | null = null;
   private readonly EMITTER_CLEANUP_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
   private emitterEmptyTimes = new Map<string, number>(); // tenantId -> timestamp when emitter became empty
-  private active: boolean = false;
+  private active = false;
   private readonly senderRateLimiter = new TenantRateLimiter();
   private readonly subscriberRateLimiter = new TenantRateLimiter();
 
@@ -74,10 +74,16 @@ export class BroadcastService {
     const channels = ALL_EVENT_TYPES.map(redisChannel);
     this.subscriber.subscribe(...channels, (err, count) => {
       if (err) {
-        this.logger.error({ error: err }, "Failed to subscribe to SSE channels");
+        this.logger.error(
+          { error: err },
+          "Failed to subscribe to SSE channels",
+        );
         return;
       }
-      this.logger.debug({ subscriberCount: count, channels }, "Subscribed to SSE channels");
+      this.logger.debug(
+        { subscriberCount: count, channels },
+        "Subscribed to SSE channels",
+      );
     });
 
     this.subscriber.on("message", (channel, message) => {
@@ -296,7 +302,9 @@ export class BroadcastService {
     this.active = false;
 
     // Allow in-flight Redis publishes to drain
-    await new Promise((resolve) => setTimeout(resolve, BroadcastService.DRAIN_DELAY_MS));
+    await new Promise((resolve) =>
+      setTimeout(resolve, BroadcastService.DRAIN_DELAY_MS),
+    );
 
     if (!this.subscriber) return;
 

@@ -28,9 +28,18 @@ export function useDatasetProgressMap({
     {
       enabled: enabled && !!projectId,
       onData: (event: DatasetProgressEvent) => {
-        // Only live ticks update the map; terminal done/error is reconciled by
-        // each row's getById poll, so the last live tick can stay until then.
-        if (event.type !== "progress") return;
+        // On terminal (done/error) drop the cached tick so a later retry of the
+        // same datasetId starts from an honest indeterminate state rather than
+        // reusing a stale percent until the first fresh tick arrives.
+        if (event.type !== "progress") {
+          setMap((prev) => {
+            if (!(event.datasetId in prev)) return prev;
+            const next = { ...prev };
+            delete next[event.datasetId];
+            return next;
+          });
+          return;
+        }
         setMap((prev) => ({
           ...prev,
           [event.datasetId]: {

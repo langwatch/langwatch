@@ -148,7 +148,7 @@ Client: tenant-scoped `onDatasetProgress.useSubscription` (filter by watched `da
 
 ## Open questions
 
-- **ADR-032 amendment for the `runInline` large-file hazard** (Decision 10): a setup-time "configure a worker/Redis for large uploads" error, framed as event-loop starvation, narrowing I-SELFHOST as a formal ADR-032 revision. **Owner: TBD — separate ADR, not blocking 033.**
+- **ADR-032 amendment for the `runInline` large-file hazard** (Decision 10): a setup-time "configure a worker/Redis for large uploads" error, framed as event-loop starvation, narrowing I-SELFHOST as a formal ADR-032 revision. **Owner: TBD — a separate ADR-032 amendment, not blocking this ADR (034).**
 - **`DATASET_PROGRESS_BROADCAST_MIN_INTERVAL_MS`** (1000) and **`DATASET_PROGRESS_STALE_RECONCILE_MS`** (5000) — tune against perceived smoothness vs Redis/refetch load once measured.
 - **Durable line-number failures** — revisit if support sees users stuck on opaque "failed" (deferred).
 

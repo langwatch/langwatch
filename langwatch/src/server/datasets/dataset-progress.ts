@@ -75,7 +75,11 @@ export const makeEmitDatasetProgress =
     const payload = JSON.stringify(event);
     if (event.type === "progress") {
       void broadcast
-        .broadcastToTenantRateLimited(projectId, payload, DATASET_PROGRESS_EVENT)
+        .broadcastToTenantRateLimited(
+          projectId,
+          payload,
+          DATASET_PROGRESS_EVENT,
+        )
         .catch(() => undefined);
     } else {
       void broadcast

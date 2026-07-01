@@ -4,8 +4,11 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
 import { slugify } from "~/utils/slugify";
-import { datasetProgressEventSchema } from "../../datasets/dataset-progress";
 import { DatasetService } from "../../datasets/dataset.service";
+import {
+  DATASET_PROGRESS_EVENT,
+  datasetProgressEventSchema,
+} from "../../datasets/dataset-progress";
 import { datasetErrorHandler } from "../../datasets/middleware";
 import {
   datasetRecordFormSchema,
@@ -152,8 +155,9 @@ export const datasetRouter = createTRPCRouter({
     .subscription(async function* (opts) {
       const { projectId } = opts.input;
       const emitter = getApp().broadcast.getTenantEmitter(projectId);
-      for await (const eventArgs of on(emitter, "dataset_progress", {
-        // @ts-expect-error - signal is not typed on the Node EventEmitter overload
+      for await (const eventArgs of on(emitter, DATASET_PROGRESS_EVENT, {
+        // @ts-expect-error - tRPC's ResolveOptions doesn't expose `signal`, but
+        // the subscription runtime provides it for teardown (mirrors export.ts).
         signal: opts.signal,
       })) {
         const raw = eventArgs[0] as { event: string; timestamp: number };

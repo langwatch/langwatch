@@ -139,6 +139,34 @@ describe("dataset-normalize progress", () => {
         expect.objectContaining({ fromIndex: 0 }),
       );
     });
+
+    it("still commits ready when the emit rejects asynchronously", async () => {
+      const storage = makeStorage(Readable.from(['{"a":"1"}\n']));
+      const repo = {
+        findOne: vi.fn().mockResolvedValue({ id: "d1", status: "processing" }),
+        update: vi.fn().mockResolvedValue({}),
+      };
+      const handler = createDatasetNormalizeHandler({
+        repository: repo as any,
+        getStorage: async () => storage as any,
+        // An async emitter that rejects must be swallowed, not surface as an
+        // unhandled rejection or fail the normalize.
+        emitProgress: async () => {
+          throw new Error("broadcast down (async)");
+        },
+      });
+
+      await expect(handler(basePayload)).resolves.toBeUndefined();
+
+      const statuses = repo.update.mock.calls.map(
+        (c) => (c[0] as { data: { status: string } }).data.status,
+      );
+      expect(statuses).toContain("ready");
+      expect(statuses).not.toContain("failed");
+      expect(storage.deleteChunksFrom).not.toHaveBeenCalledWith(
+        expect.objectContaining({ fromIndex: 0 }),
+      );
+    });
   });
 
   describe("when the file is malformed", () => {

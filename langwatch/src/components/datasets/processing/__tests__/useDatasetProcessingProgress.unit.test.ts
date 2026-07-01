@@ -34,7 +34,11 @@ const { useDatasetProcessingProgress } = await import(
   "../useDatasetProcessingProgress"
 );
 
-const base = { projectId: "p1", datasetId: "d1", status: "processing" as const };
+const base = {
+  projectId: "p1",
+  datasetId: "d1",
+  status: "processing" as const,
+};
 
 beforeEach(() => {
   capturedOnData = undefined;
@@ -70,9 +74,7 @@ describe("useDatasetProcessingProgress", () => {
 
   describe("when a progress tick for this dataset arrives", () => {
     it("becomes determinate from the input bytes", () => {
-      const { result } = renderHook(() =>
-        useDatasetProcessingProgress(base),
-      );
+      const { result } = renderHook(() => useDatasetProcessingProgress(base));
       act(() =>
         capturedOnData?.({
           datasetId: "d1",
@@ -94,9 +96,7 @@ describe("useDatasetProcessingProgress", () => {
   describe("when a terminal done event arrives", () => {
     it("reconciles the durable status via getById", () => {
       const onReconcile = vi.fn();
-      renderHook(() =>
-        useDatasetProcessingProgress({ ...base, onReconcile }),
-      );
+      renderHook(() => useDatasetProcessingProgress({ ...base, onReconcile }));
       act(() =>
         capturedOnData?.({ datasetId: "d1", type: "done", phase: "ready" }),
       );
@@ -108,9 +108,7 @@ describe("useDatasetProcessingProgress", () => {
     it("reconciles via getById on the gap timer", () => {
       vi.useFakeTimers();
       const onReconcile = vi.fn();
-      renderHook(() =>
-        useDatasetProcessingProgress({ ...base, onReconcile }),
-      );
+      renderHook(() => useDatasetProcessingProgress({ ...base, onReconcile }));
       act(() => {
         vi.advanceTimersByTime(2 * DATASET_PROGRESS_STALE_RECONCILE_MS + 100);
       });
