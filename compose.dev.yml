@@ -391,7 +391,6 @@ services:
       - "${AI_SERVER_PORT:-3456}:3456"
     environment:
       <<: *common-env
-      LANGWATCH_ENDPOINT: "http://app:5560/"
       # LANGWATCH_API_KEY comes from langwatch/.env via env_file below
       PINO_CONSOLE_LEVEL: "debug"
       LOG_LEVEL: "debug"
