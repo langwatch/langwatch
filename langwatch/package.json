@@ -117,7 +117,7 @@
     "@paper-design/shaders-react": "^0.0.76",
     "@prisma/client": "5.7.1",
     "@react-email/button": "^0.2.1",
-    "@react-email/components": "^0.0.42",
+    "@react-email/components": "^1.0.12",
     "@react-email/container": "^0.0.16",
     "@react-email/heading": "^0.0.16",
     "@react-email/html": "^0.0.12",
