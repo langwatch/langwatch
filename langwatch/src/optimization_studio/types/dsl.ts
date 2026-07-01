@@ -79,6 +79,16 @@ export interface ExecutionState {
   inputs?: Record<string, any>;
   outputs?: Record<string, any>;
   cost?: number;
+  // Token usage + resolved model surfaced by the engine for LLM nodes. The
+  // engine has no price table, so the cost is derived from these counts at the
+  // canonical model rate (same path the trace-ingest collector uses).
+  metrics?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+    reasoning_tokens?: number;
+    model?: string;
+  };
   timestamps?: {
     started_at?: number;
     finished_at?: number;

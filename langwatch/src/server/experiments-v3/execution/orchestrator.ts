@@ -20,9 +20,14 @@ import type {
 import { isRowEmpty } from "~/experiments-v3/utils/emptyRowDetection";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
+import type { ExecutionState, Workflow } from "~/optimization_studio/types/dsl";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { getApp } from "~/server/app-layer/app";
+import {
+  estimateCost,
+  getMatchingLLMModelCost,
+} from "~/server/background/workers/collector/cost";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
@@ -31,10 +36,13 @@ import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { createLogger } from "~/utils/logger/server";
 import { generateOtelTraceId } from "~/utils/trace";
 import { abortManager } from "./abortManager";
+import { type LoadedWorkflow, workflowLoadKey } from "./dataLoader";
 import { buildStripScoreEvaluatorIds } from "./evaluatorScoreFilter";
 import {
+  extractTargetOutput,
   mapErrorEvent,
   mapNlpEvent,
+  mapWorkflowEvaluatorResult,
   type ResultMapperConfig,
 } from "./resultMapper";
 import { createSemaphore } from "./semaphore";
@@ -69,6 +77,8 @@ export type OrchestratorInput = {
   loadedAgents: Map<string, TypedAgent>;
   /** Evaluators loaded from DB - settings and names are fetched fresh from here */
   loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
+  /** Studio workflows loaded for workflow targets (committed DSL run per row) */
+  loadedWorkflows?: Map<string, LoadedWorkflow>;
   /** Optional run ID - if not provided, a human-readable ID will be generated */
   runId?: string;
   /** Concurrency limit for parallel execution (default 10) */
@@ -609,6 +619,27 @@ export const generatePairwiseCells = (
 };
 
 /**
+ * Prices an LLM node's token usage at the project's canonical model rate.
+ *
+ * The engine surfaces token counts + the resolved model on the execution state
+ * but no cost (it has no price table). This derives the cost the same way the
+ * trace-ingest collector does, so a cell's cost matches its trace's cost.
+ * Returns undefined when there is no model, no tokens, or no known rate.
+ */
+export const priceMetrics = async (
+  projectId: string,
+  metrics: ExecutionState["metrics"] | undefined,
+): Promise<number | undefined> => {
+  if (!metrics?.model) return undefined;
+  const inputTokens = metrics.prompt_tokens ?? 0;
+  const outputTokens = metrics.completion_tokens ?? 0;
+  if (inputTokens === 0 && outputTokens === 0) return undefined;
+  const llmModelCost = await getMatchingLLMModelCost(projectId, metrics.model);
+  if (!llmModelCost) return undefined;
+  return estimateCost({ llmModelCost, inputTokens, outputTokens });
+};
+
+/**
  * Executes a single cell and yields events.
  * @param isAborted - Optional function to check if execution should be aborted
  */
@@ -738,9 +769,22 @@ export async function* executeCell(
           targetNodes,
           cellConfig,
         );
-        if (mappedEvent) {
-          yield mappedEvent;
+        if (!mappedEvent) continue;
+        // The engine reports token usage but no cost (it has no price table),
+        // so price the target's tokens here at the canonical model rate. This
+        // keeps the cell's cost consistent with its trace's cost.
+        if (
+          mappedEvent.type === "target_result" &&
+          mappedEvent.cost == null &&
+          event.type === "component_state_change"
+        ) {
+          const cost = await priceMetrics(
+            projectId,
+            event.payload.execution_state?.metrics,
+          );
+          if (cost != null) mappedEvent.cost = cost;
         }
+        yield mappedEvent;
       }
     }
 
@@ -852,6 +896,168 @@ export async function* executeCell(
     logger.error(
       { error, rowIndex: cell.rowIndex, targetId: cell.targetId },
       "Cell execution failed",
+    );
+    yield mapErrorEvent((error as Error).message, cell.rowIndex, cell.targetId);
+  }
+}
+
+/**
+ * Executes a single cell whose target is a whole studio workflow.
+ *
+ * Runs the committed workflow DSL once for the row via execute_flow (the
+ * run-whole-workflow primitive), then surfaces the workflow's End-node result
+ * as the target output and each of the workflow's own evaluator nodes as an
+ * evaluator result. This replaces the legacy nlpgo execute_evaluation loop,
+ * keeping orchestration (parallelism, abort, storage) in TypeScript.
+ */
+export async function* executeWorkflowCell(
+  cell: ExecutionCell,
+  projectId: string,
+  workflowDsl: Workflow,
+  isAborted?: () => Promise<boolean>,
+): AsyncGenerator<EvaluationV3Event> {
+  yield {
+    type: "cell_started",
+    rowIndex: cell.rowIndex,
+    targetId: cell.targetId,
+  };
+
+  try {
+    const traceId = cell.traceId ?? generateOtelTraceId();
+    const inputs = buildTargetInputs(cell);
+
+    // The workflow's own evaluator nodes carry the scores we surface per row.
+    // Keep each node's display name so results show it (e.g. "Exact Match")
+    // instead of the raw node id; these nodes have no DB evaluator to resolve.
+    const evaluatorNodeNames = new Map(
+      workflowDsl.nodes
+        .filter((n) => n.type === "evaluator")
+        .map((n) => [n.id, n.data?.name]),
+    );
+
+    const rawEvent = {
+      type: "execute_flow" as const,
+      payload: {
+        trace_id: traceId,
+        workflow: {
+          ...workflowDsl,
+          state: { execution: { status: "idle" as const } },
+        },
+        inputs: [inputs],
+        manual_execution_mode: false,
+        do_not_trace: false,
+        run_evaluations: true,
+        origin: "evaluation",
+      },
+    };
+
+    const enrichedEvent = await loadDatasets(
+      await addEnvs(rawEvent, projectId),
+      projectId,
+    );
+
+    const events: StudioServerEvent[] = [];
+    await studioBackendPostEvent({
+      projectId,
+      message: enrichedEvent,
+      isAborted,
+      onEvent: (serverEvent) => {
+        events.push(serverEvent);
+      },
+    });
+
+    let targetOutput: unknown;
+    let totalCost = 0;
+    let sawCost = false;
+    let targetFailed = false;
+    let targetError: string | undefined;
+    let durationMs: number | undefined;
+    let finalTraceId = traceId;
+    const evaluatorEvents: EvaluationV3Event[] = [];
+
+    for (const event of events) {
+      if (event.type === "execution_state_change") {
+        const ex = event.payload.execution_state;
+        if (ex?.result !== undefined) {
+          targetOutput = extractTargetOutput(ex.result);
+        }
+        if (ex?.trace_id) finalTraceId = ex.trace_id;
+        if (
+          ex?.timestamps?.started_at !== undefined &&
+          ex?.timestamps?.finished_at !== undefined
+        ) {
+          durationMs = ex.timestamps.finished_at - ex.timestamps.started_at;
+        }
+        if (ex?.status === "error") {
+          targetFailed = true;
+          targetError = ex.error ?? targetError;
+        }
+        continue;
+      }
+
+      if (event.type !== "component_state_change") continue;
+      const { component_id, execution_state } = event.payload;
+      if (!execution_state) continue;
+
+      if (
+        typeof execution_state.cost === "number" &&
+        execution_state.cost > 0
+      ) {
+        totalCost += execution_state.cost;
+        sawCost = true;
+      } else {
+        // LLM nodes report tokens but no cost (the engine has no price table),
+        // so price them at the canonical model rate, same as executeCell.
+        const cost = await priceMetrics(projectId, execution_state.metrics);
+        if (cost != null) {
+          totalCost += cost;
+          sawCost = true;
+        }
+      }
+
+      if (
+        evaluatorNodeNames.has(component_id) &&
+        (execution_state.status === "success" ||
+          execution_state.status === "error")
+      ) {
+        evaluatorEvents.push(
+          mapWorkflowEvaluatorResult(
+            cell.rowIndex,
+            cell.targetId,
+            component_id,
+            evaluatorNodeNames.get(component_id),
+            {
+              status: execution_state.status,
+              outputs: execution_state.outputs,
+              cost: execution_state.cost,
+              error: execution_state.error,
+            },
+          ),
+        );
+      }
+    }
+
+    // Yield the target result first so storage links evaluator results to it.
+    yield {
+      type: "target_result",
+      rowIndex: cell.rowIndex,
+      targetId: cell.targetId,
+      output: targetOutput,
+      cost: sawCost ? totalCost : undefined,
+      duration: durationMs,
+      traceId: finalTraceId,
+      error: targetFailed
+        ? (targetError ?? "Workflow execution failed")
+        : undefined,
+    };
+
+    for (const evaluatorEvent of evaluatorEvents) {
+      yield evaluatorEvent;
+    }
+  } catch (error) {
+    logger.error(
+      { error, rowIndex: cell.rowIndex, targetId: cell.targetId },
+      "Workflow cell execution failed",
     );
     yield mapErrorEvent((error as Error).message, cell.rowIndex, cell.targetId);
   }
@@ -997,6 +1203,7 @@ export async function* runOrchestrator(
     loadedPrompts,
     loadedAgents,
     loadedEvaluators,
+    loadedWorkflows,
     runId: providedRunId,
     concurrency: requestedConcurrency,
     seedTargetOutputs,
@@ -1094,6 +1301,8 @@ export async function* runOrchestrator(
       name = loadedAgents.get(t.dbAgentId)?.name ?? null;
     } else if (t.type === "evaluator" && t.targetEvaluatorId) {
       name = loadedEvaluators?.get(t.targetEvaluatorId)?.name ?? null;
+    } else if (t.type === "workflow" && t.workflowId) {
+      name = loadedWorkflows?.get(workflowLoadKey(t))?.name ?? null;
     }
 
     return {
@@ -1312,7 +1521,9 @@ export async function* runOrchestrator(
             index: event.rowIndex,
             targetId: event.targetId,
             evaluatorId: event.evaluatorId,
-            evaluatorName: dbEvaluator?.name ?? null,
+            // Workflow evaluator nodes have no DB record, so fall back to the
+            // name the event carries from the DSL node.
+            evaluatorName: dbEvaluator?.name ?? event.evaluatorName ?? null,
             status: result.status,
             score: result.status === "processed" ? result.score : null,
             label: result.status === "processed" ? result.label : null,
@@ -1435,6 +1646,7 @@ export async function* runOrchestrator(
                 cell.targetConfig,
                 loadedPrompts,
                 loadedAgents,
+                loadedWorkflows,
               ),
               evaluators: loadedEvaluators,
             };
@@ -1442,17 +1654,31 @@ export async function* runOrchestrator(
             // Create abort checker bound to this run
             const checkAbort = () => abortManager.isAborted(runId);
 
+            // Pick the executor: a workflow target runs the full studio workflow
+            // once per row via execute_flow; every other target runs a single
+            // component. Both yield the same target_result / evaluator_result
+            // events.
+            const cellEvents =
+              cell.targetConfig.type === "workflow" && loadedData.workflow
+                ? executeWorkflowCell(
+                    cell,
+                    projectId,
+                    loadedData.workflow.dsl,
+                    checkAbort,
+                  )
+                : executeCell(
+                    cell,
+                    projectId,
+                    datasetColumns,
+                    loadedData,
+                    resultMapperConfig,
+                    checkAbort,
+                  );
+
             // Execute cell and collect events
             let cellFailed = false;
             let cellAborted = false;
-            for await (const event of executeCell(
-              cell,
-              projectId,
-              datasetColumns,
-              loadedData,
-              resultMapperConfig,
-              checkAbort,
-            )) {
+            for await (const event of cellEvents) {
               // Check abort during cell processing
               if (await abortManager.isAborted(runId)) {
                 cellAborted = true;
@@ -1737,7 +1963,12 @@ const getLoadedDataForTarget = (
   targetConfig: TargetConfig,
   loadedPrompts: Map<string, VersionedPrompt>,
   loadedAgents: Map<string, TypedAgent>,
-): { prompt?: VersionedPrompt; agent?: TypedAgent } => {
+  loadedWorkflows?: Map<string, LoadedWorkflow>,
+): {
+  prompt?: VersionedPrompt;
+  agent?: TypedAgent;
+  workflow?: LoadedWorkflow;
+} => {
   if (targetConfig.type === "prompt" && targetConfig.promptId) {
     const prompt = loadedPrompts.get(targetConfig.promptId);
     if (prompt) {
@@ -1749,6 +1980,13 @@ const getLoadedDataForTarget = (
     const agent = loadedAgents.get(targetConfig.dbAgentId);
     if (agent) {
       return { agent };
+    }
+  }
+
+  if (targetConfig.type === "workflow" && targetConfig.workflowId) {
+    const workflow = loadedWorkflows?.get(workflowLoadKey(targetConfig));
+    if (workflow) {
+      return { workflow };
     }
   }
 

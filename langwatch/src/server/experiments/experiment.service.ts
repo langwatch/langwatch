@@ -1,9 +1,5 @@
-import type {
-  Experiment,
-  ExperimentType,
-  Prisma,
-  PrismaClient,
-} from "@prisma/client";
+import type { Experiment, Prisma, PrismaClient } from "@prisma/client";
+import { ExperimentType } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { slugify } from "../../utils/slugify";
 import { isUniqueConstraintError } from "../utils/prismaErrors";
@@ -134,6 +130,74 @@ export class ExperimentService {
   }
 
   /**
+   * Finds the EVALUATIONS_V3 experiment that backs a studio workflow, or
+   * creates one. There is exactly one such experiment per workflow, so every
+   * workflow evaluation (studio button or API) lands on the same results page.
+   * The workbenchState is refreshed each call so the page reflects the
+   * evaluated version's dataset and target.
+   */
+  async findOrCreateForWorkflow({
+    projectId,
+    workflowId,
+    name,
+    workbenchState,
+  }: {
+    projectId: string;
+    workflowId: string;
+    name: string;
+    workbenchState: unknown;
+  }): Promise<{ id: string; slug: string }> {
+    const workbenchStateJson = JSON.parse(
+      JSON.stringify(workbenchState),
+    ) as Prisma.InputJsonValue;
+
+    const existing = await this.repository.findFirstActive({
+      where: { projectId, workflowId, type: ExperimentType.EVALUATIONS_V3 },
+      select: { id: true, slug: true },
+    });
+
+    if (existing) {
+      await this.repository.upsert({
+        id: existing.id,
+        projectId,
+        data: { workbenchState: workbenchStateJson },
+      });
+      return existing;
+    }
+
+    const baseSlug = slugify(name) || "workflow-evaluation";
+    const initialSlug = await this.generateUniqueSlug({ baseSlug, projectId });
+    // A deterministic id keeps the create idempotent under concurrent
+    // evaluations: two requests that both miss the lookup above upsert the same
+    // row instead of creating two experiments for one workflow.
+    const id = `experiment_${workflowId}`;
+    const { slug } = await this.saveWithSlugRetry({
+      initialSlug,
+      execute: (candidateSlug) =>
+        this.repository.upsertById({
+          id,
+          projectId,
+          create: {
+            id,
+            name,
+            slug: candidateSlug,
+            projectId,
+            type: ExperimentType.EVALUATIONS_V3,
+            workflowId,
+            workbenchState: workbenchStateJson,
+          },
+          update: {
+            name,
+            slug: candidateSlug,
+            workbenchState: workbenchStateJson,
+          },
+        }),
+      regenerateSlug: () => this.generateUniqueSlug({ baseSlug, projectId }),
+    });
+    return { id, slug };
+  }
+
+  /**
    * Returns `{ id, slug }` for an active experiment, or null. The execution
    * service needs the bare id for ClickHouse keying without paying for the
    * rest of the row.
@@ -258,11 +322,7 @@ export class ExperimentService {
    * filtering is left to the caller because the discriminant lives in a
    * JSON column.
    */
-  async listForEvaluationsBoard({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<
+  async listForEvaluationsBoard({ projectId }: { projectId: string }): Promise<
     Prisma.ExperimentGetPayload<{
       include: { workflow: { include: { currentVersion: true } } };
     }>[]

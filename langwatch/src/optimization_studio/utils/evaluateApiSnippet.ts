@@ -5,7 +5,8 @@ import type { WorkflowField } from "./workflowFields";
  * shows the "data:<mime>;base64,<payload>" structure the endpoint expects,
  * not a usable image. Callers replace it with their own encoded image.
  */
-const IMAGE_EXAMPLE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...";
+export const IMAGE_EXAMPLE =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...";
 
 /**
  * Example scalar value for an entry field type, or undefined when the type is
@@ -61,7 +62,7 @@ export function buildEvaluateParameters({
  * Shown when the dataset already provides every entry field - there is nothing
  * workflow-specific to suggest, so a generic feature flag stands in.
  */
-const PLACEHOLDER_PARAMETERS: Record<string, string> = {
+export const PLACEHOLDER_PARAMETERS: Record<string, string> = {
   feature_flag: "variant-b",
 };
 
