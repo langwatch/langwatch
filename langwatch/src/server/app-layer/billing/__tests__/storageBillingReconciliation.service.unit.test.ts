@@ -32,7 +32,9 @@ function makeService(
   }> = {},
 ) {
   const service = new StorageBillingReconciliationService({
-    listReconcilableOrgs: vi.fn().mockResolvedValue(overrides.orgs ?? ["org-1"]),
+    listReconcilableOrgs: vi
+      .fn()
+      .mockResolvedValue(overrides.orgs ?? ["org-1"]),
     sumReportedMegabytes: vi.fn(async ({ organizationId }) =>
       overrides.reportedByOrg
         ? overrides.reportedByOrg[organizationId]!
@@ -75,7 +77,10 @@ describe("StorageBillingReconciliationService", () => {
 
       expect(result.drifted).toBe(1);
       expect(mockError).toHaveBeenCalledWith(
-        expect.objectContaining({ organizationId: "org-1", billingMonth: "2026-02" }),
+        expect.objectContaining({
+          organizationId: "org-1",
+          billingMonth: "2026-02",
+        }),
         expect.stringContaining("DRIFT"),
       );
     });

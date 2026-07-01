@@ -55,7 +55,11 @@ describe("StorageBillingTripwire", () => {
       const computeReference = vi.fn();
       const tw = makeTripwire({ enabled: false, computeReference });
 
-      await tw.check({ organizationId: "o", sealedHour: SEALED, measuredBytes: 100 });
+      await tw.check({
+        organizationId: "o",
+        sealedHour: SEALED,
+        measuredBytes: 100,
+      });
 
       expect(computeReference).not.toHaveBeenCalled();
       expect(mockWarn).not.toHaveBeenCalled();
@@ -67,7 +71,11 @@ describe("StorageBillingTripwire", () => {
     it("logs nothing when the reference is null", async () => {
       const tw = makeTripwire({ reference: null });
 
-      await tw.check({ organizationId: "o", sealedHour: SEALED, measuredBytes: 100 });
+      await tw.check({
+        organizationId: "o",
+        sealedHour: SEALED,
+        measuredBytes: 100,
+      });
 
       expect(mockWarn).not.toHaveBeenCalled();
     });
@@ -78,7 +86,11 @@ describe("StorageBillingTripwire", () => {
     it("does not warn", async () => {
       const tw = makeTripwire({ reference: 100, toleranceRatio: 0.5 });
 
-      await tw.check({ organizationId: "o", sealedHour: SEALED, measuredBytes: 120 });
+      await tw.check({
+        organizationId: "o",
+        sealedHour: SEALED,
+        measuredBytes: 120,
+      });
 
       expect(mockWarn).not.toHaveBeenCalled();
     });
@@ -89,7 +101,11 @@ describe("StorageBillingTripwire", () => {
     it("warns", async () => {
       const tw = makeTripwire({ reference: 100, toleranceRatio: 0.5 });
 
-      await tw.check({ organizationId: "o", sealedHour: SEALED, measuredBytes: 1000 });
+      await tw.check({
+        organizationId: "o",
+        sealedHour: SEALED,
+        measuredBytes: 1000,
+      });
 
       expect(mockWarn).toHaveBeenCalledTimes(1);
       expect(mockWarn).toHaveBeenCalledWith(
@@ -100,10 +116,18 @@ describe("StorageBillingTripwire", () => {
 
     /** @scenario Divergence logging is capped so a broken reference can't flood logs */
     it("stops logging after the cap", async () => {
-      const tw = makeTripwire({ reference: 100, toleranceRatio: 0.5, maxLogs: 2 });
+      const tw = makeTripwire({
+        reference: 100,
+        toleranceRatio: 0.5,
+        maxLogs: 2,
+      });
 
       for (let i = 0; i < 5; i++) {
-        await tw.check({ organizationId: "o", sealedHour: SEALED, measuredBytes: 1000 });
+        await tw.check({
+          organizationId: "o",
+          sealedHour: SEALED,
+          measuredBytes: 1000,
+        });
       }
 
       expect(mockWarn).toHaveBeenCalledTimes(2);
@@ -118,7 +142,11 @@ describe("StorageBillingTripwire", () => {
       });
 
       await expect(
-        tw.check({ organizationId: "o", sealedHour: SEALED, measuredBytes: 100 }),
+        tw.check({
+          organizationId: "o",
+          sealedHour: SEALED,
+          measuredBytes: 100,
+        }),
       ).resolves.toBeUndefined();
       expect(mockWarn).not.toHaveBeenCalled();
     });

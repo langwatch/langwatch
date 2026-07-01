@@ -47,7 +47,9 @@ function makeService(
     resolveStoragePriceId: vi
       .fn()
       .mockReturnValue(
-        overrides.priceId === undefined ? "price_storage_eur_m" : overrides.priceId,
+        overrides.priceId === undefined
+          ? "price_storage_eur_m"
+          : overrides.priceId,
       ),
     getSubscriptionItemPriceIds,
     attachStorageItem,
@@ -61,7 +63,9 @@ describe("StorageBillingBackfillService", () => {
   describe("given a paid subscription without the storage item", () => {
     /** @scenario The storage item is attached to a paid subscription that lacks it */
     it("attaches the item and counts it", async () => {
-      const { service, attachStorageItem } = makeService({ existingPriceIds: [] });
+      const { service, attachStorageItem } = makeService({
+        existingPriceIds: [],
+      });
 
       const result = await service.run({ dryRun: false });
 
@@ -102,7 +106,9 @@ describe("StorageBillingBackfillService", () => {
   describe("when run as a dry-run", () => {
     /** @scenario A dry-run reports what it would attach without mutating Stripe */
     it("does not call Stripe but counts the attach", async () => {
-      const { service, attachStorageItem } = makeService({ existingPriceIds: [] });
+      const { service, attachStorageItem } = makeService({
+        existingPriceIds: [],
+      });
 
       const result = await service.run({ dryRun: true });
 

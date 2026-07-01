@@ -72,7 +72,12 @@ export class StorageBillingBackfillService {
       if (!priceId) {
         result.noPrice++;
         logger.warn(
-          { organizationId: c.organizationId, plan: c.plan, currency: c.currency, interval: c.interval },
+          {
+            organizationId: c.organizationId,
+            plan: c.plan,
+            currency: c.currency,
+            interval: c.interval,
+          },
           "no STORAGE_GB price for this plan/currency/interval — skipping",
         );
         continue;
@@ -89,7 +94,11 @@ export class StorageBillingBackfillService {
 
         if (dryRun) {
           logger.info(
-            { organizationId: c.organizationId, priceId, subscription: c.stripeSubscriptionId },
+            {
+              organizationId: c.organizationId,
+              priceId,
+              subscription: c.stripeSubscriptionId,
+            },
             "[dry-run] would attach STORAGE_GB item",
           );
           result.attached++;
@@ -104,7 +113,11 @@ export class StorageBillingBackfillService {
       } catch (error) {
         result.failed++;
         logger.error(
-          { organizationId: c.organizationId, subscription: c.stripeSubscriptionId, error },
+          {
+            organizationId: c.organizationId,
+            subscription: c.stripeSubscriptionId,
+            error,
+          },
           "failed to attach STORAGE_GB item — continuing; re-run is idempotent",
         );
       }

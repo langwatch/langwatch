@@ -59,7 +59,10 @@ export class StorageBillingTripwire {
       const ratio = diff / scale;
       const tolerance = this.deps.toleranceRatio ?? DEFAULT_TOLERANCE_RATIO;
 
-      if (ratio > tolerance && this.logs < (this.deps.maxLogs ?? DEFAULT_MAX_LOGS)) {
+      if (
+        ratio > tolerance &&
+        this.logs < (this.deps.maxLogs ?? DEFAULT_MAX_LOGS)
+      ) {
         this.logs++;
         logger.warn(
           {
