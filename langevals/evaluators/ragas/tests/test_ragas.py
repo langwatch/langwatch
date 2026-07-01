@@ -5,7 +5,7 @@ from unittest.mock import patch
 import dotenv
 import pytest
 
-from langevals_core.base_evaluator import EvaluatorSettings
+from langevals_core.base_evaluator import EvaluatorSettings, Money
 from langevals_ragas.bleu_score import RagasBLEUScoreEntry, RagasBLEUScoreEvaluator
 from langevals_ragas.context_f1 import (
     RagasContextF1Entry,
@@ -198,6 +198,65 @@ def test_faithfulness_supports_ragas_0_3_statement_generator_output():
     assert result.status == "processed"
     assert result.score == 0.5
     assert result.details and 'The capital of France is Paris.' in result.details
+
+
+def test_cost_is_reported_as_unknown_when_model_is_not_priced():
+    """When litellm cannot price the judge model (it raises "This model isn't
+    mapped yet"), the cost is genuinely unknown and must be reported as ``None``
+    — not a misleading ``$0``, which silently understates evaluation spend in
+    cost dashboards. Regression for ``capture_cost`` swallowing the
+    unmapped-model case in ``langevals_ragas/lib/common.py``."""
+    with patch(
+        "langevals_ragas.faithfulness.Faithfulness", _FakeFaithfulness
+    ), patch(
+        "langevals_ragas.faithfulness.prepare_llm", return_value=(_DummyLLM(), None)
+    ), patch(
+        "langevals_ragas.faithfulness.check_max_tokens", return_value=None
+    ), patch(
+        "langevals_ragas.lib.common.cost_per_token",
+        side_effect=Exception("This model isn't mapped yet."),
+    ):
+        evaluator = RagasFaithfulnessEvaluator(
+            settings=RagasFaithfulnessSettings(autodetect_dont_know=False)
+        )
+        result = evaluator.evaluate(
+            RagasFaithfulnessEntry(
+                output="The capital of France is Paris.",
+                contexts=["Paris is the capital of France."],
+            )
+        )
+
+    assert result.status == "processed"
+    assert result.cost is None
+
+
+def test_cost_is_reported_as_money_when_model_is_priced():
+    """When litellm can price the model, the cost must be reported as a ``Money``
+    (even ``$0`` for a zero-token run) — never ``None``. Guards the
+    ``capture_cost`` success path against the unmapped-model fix."""
+    with patch(
+        "langevals_ragas.faithfulness.Faithfulness", _FakeFaithfulness
+    ), patch(
+        "langevals_ragas.faithfulness.prepare_llm", return_value=(_DummyLLM(), None)
+    ), patch(
+        "langevals_ragas.faithfulness.check_max_tokens", return_value=None
+    ), patch(
+        "langevals_ragas.lib.common.cost_per_token",
+        return_value=(0.001, 0.002),
+    ):
+        evaluator = RagasFaithfulnessEvaluator(
+            settings=RagasFaithfulnessSettings(autodetect_dont_know=False)
+        )
+        result = evaluator.evaluate(
+            RagasFaithfulnessEntry(
+                output="The capital of France is Paris.",
+                contexts=["Paris is the capital of France."],
+            )
+        )
+
+    assert result.status == "processed"
+    assert isinstance(result.cost, Money)
+    assert result.cost.amount == pytest.approx(0.003)
 
 
 def test_response_relevancy():

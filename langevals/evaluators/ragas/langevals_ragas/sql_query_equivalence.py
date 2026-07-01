@@ -85,7 +85,7 @@ class RagasSQLQueryEquivalenceEvaluator(
 
         return RagasSQLQueryEquivalenceResult(
             passed=score >= 0.5,
-            cost=cost,
+            cost=cost.money,
             details=(
                 f"Response query explaination: {breakdown.response_query_explaination}\nReference query explaination: {breakdown.reference_query_explaination}\nEquivalence: {breakdown.equivalence}"
                 if breakdown
