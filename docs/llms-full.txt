@@ -26209,9 +26209,14 @@ If you are not on ArgoCD, the [Kubernetes (Helm)](/self-hosting/deployment/kuber
 
 ## Quick start
 
-The langwatch chart needs one operator-managed Secret (`langwatch-app-secrets`) in your target namespace before the first sync. It holds the app keys + the AI gateway shared-auth keys; both `langwatch-app` and the gateway pod mount from the same Secret. This is the same pre-create-then-install pattern that the Kubernetes (Helm) [production deployment](/self-hosting/deployment/kubernetes-helm#production-deployment) uses, and it is what makes the ArgoCD path trivial: the chart never renders this Secret, so Argo has nothing to reconcile and nothing rotates on subsequent syncs.
+The langwatch chart needs two operator-managed Secrets in your target namespace before the first sync:
 
-Create the namespace and the Secret:
+- `langwatch-app-secrets` — holds the app keys + the AI gateway shared-auth keys. Both `langwatch-app` and the gateway pod mount from this Secret.
+- A ClickHouse credentials Secret (any name, referenced from values via `clickhouse.auth.existingSecret`) — holds the ClickHouse password and the Keeper inter-node cluster secret. The deployment composes `CLICKHOUSE_URL` at runtime from the password key, so the Secret name must be a non-default name (the chart's render-time validator fails fast if you leave it at the default `<release>-clickhouse` while `autogen.enabled=false`).
+
+This is the same pre-create-then-install pattern that the Kubernetes (Helm) [production deployment](/self-hosting/deployment/kubernetes-helm#production-deployment) uses, and it is what makes the ArgoCD path trivial: the chart never renders these Secrets, so Argo has nothing to reconcile and nothing rotates on subsequent syncs.
+
+Create the namespace and the Secrets:
 
 ```bash
 kubectl create namespace langwatch
@@ -26223,9 +26228,13 @@ kubectl -n langwatch create secret generic langwatch-app-secrets \
   --from-literal=virtualKeyPepper="$(openssl rand -hex 32)" \
   --from-literal=LW_GATEWAY_INTERNAL_SECRET="$(openssl rand -hex 32)" \
   --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"
+
+kubectl -n langwatch create secret generic langwatch-clickhouse-creds \
+  --from-literal=password="$(openssl rand -hex 32)" \
+  --from-literal=clusterSecret="$(openssl rand -hex 24)"
 ```
 
-If you run with `gateway.chartManaged: false` (no AI gateway proxy), skip the two `LW_GATEWAY_*` lines.
+If you run with `gateway.chartManaged: false` (no AI gateway proxy), skip the two `LW_GATEWAY_*` lines. If you run single-replica ClickHouse (`clickhouse.replicas: 1`, the default), the `clusterSecret` key is optional — only replicated ClickHouse uses it for Keeper inter-node auth — but creating both keys upfront keeps `helm upgrade --set clickhouse.replicas=3` a one-line change later.
 
 Then apply the Application manifest:
 
@@ -26243,7 +26252,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.3.0
+    targetRevision: 3.4.1
     helm:
       releaseName: langwatch
       values: |
@@ -26251,6 +26260,9 @@ spec:
           enabled: false
         secrets:
           existingSecret: langwatch-app-secrets
+        clickhouse:
+          auth:
+            existingSecret: langwatch-clickhouse-creds
         # Add your other overrides here. See "Production overrides" below.
   syncPolicy:
     automated:
@@ -26777,6 +26789,17 @@ kubectl -n langwatch create secret generic langwatch-app-secrets \
 
 If you run with `gateway.chartManaged: false` (no AI gateway proxy), skip the two `LW_GATEWAY_*` lines.
 
+For chart-managed ClickHouse (the default), create the credentials Secret too. With `autogen.enabled=false` the chart will not materialise this Secret itself — the deployment composes `CLICKHOUSE_URL` at runtime from the password key:
+
+```bash
+kubectl create secret generic langwatch-clickhouse-creds \
+  --namespace langwatch \
+  --from-literal=password="$(openssl rand -hex 32)" \
+  --from-literal=clusterSecret="$(openssl rand -hex 24)"
+```
+
+The `clusterSecret` key is only used when `clickhouse.replicas > 1` (Keeper inter-node auth), but creating it upfront keeps a future `--set clickhouse.replicas=3` a one-line change. If you run external ClickHouse (`clickhouse.chartManaged: false`), skip this Secret entirely.
+
 For external databases, create additional secrets:
 
 ```bash
@@ -26848,6 +26871,12 @@ clickhouse:
   memory: "8Gi"
   storage:
     size: 100Gi
+  auth:
+    # Operator-owned Secret (created above). With autogen.enabled=false the
+    # chart will not materialise a ClickHouse Secret; point at the one you
+    # created and the deployment composes CLICKHOUSE_URL at runtime from
+    # its password key.
+    existingSecret: langwatch-clickhouse-creds
 
 # Ingress with TLS
 ingress:
