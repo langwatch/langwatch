@@ -1,5 +1,29 @@
 # Changelog
 
+## [3.6.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.5.0...langwatch@v3.6.0) (2026-07-01)
+
+
+### Features
+
+* **api:** add GET /api/me/usage — REST endpoint for personal spend/usage ([#5202](https://github.com/langwatch/langwatch/issues/5202)) ([0c41420](https://github.com/langwatch/langwatch/commit/0c4142053b8faf9a7edd1ff2688dcc8a7ed14adb))
+* **data-retention:** plan-gate the retention menu (paid fixed pair, enterprise full + custom) ([#5247](https://github.com/langwatch/langwatch/issues/5247)) ([f262623](https://github.com/langwatch/langwatch/commit/f262623913de732616a9c4924fb9f586ce9687c2))
+* **evaluations:** unify workflow evaluation onto the evaluations-v3 pipeline ([#4946](https://github.com/langwatch/langwatch/issues/4946)) ([7a1919a](https://github.com/langwatch/langwatch/commit/7a1919a9055551fd20d970df3384ac0142f0bf83))
+* **langy:** ship Langy in-product AI assistant — workers, GitHub PRs, setup ([#4913](https://github.com/langwatch/langwatch/issues/4913)) ([897f039](https://github.com/langwatch/langwatch/commit/897f039b05bb81b08636c3f559488e89910abe79))
+
+
+### Bug Fixes
+
+* **analytics:** tRPC route never returns an empty body ([#5219](https://github.com/langwatch/langwatch/issues/5219)) ([#5220](https://github.com/langwatch/langwatch/issues/5220)) ([00cda70](https://github.com/langwatch/langwatch/commit/00cda7043a8efbf7694ecc09a3b8c68b315c3aa6))
+* **analytics:** tRPC route never returns an empty body for body-carrying responses ([#5219](https://github.com/langwatch/langwatch/issues/5219)) ([00cda70](https://github.com/langwatch/langwatch/commit/00cda7043a8efbf7694ecc09a3b8c68b315c3aa6))
+* **api:** enforce ownership on GET /api/me/usage ([#5222](https://github.com/langwatch/langwatch/issues/5222)) ([b664756](https://github.com/langwatch/langwatch/commit/b6647565d1b0afc1b5bc2ea2481f54af4013714a))
+* **batch-eval:** guard runs query until experiment resolves ([#5201](https://github.com/langwatch/langwatch/issues/5201)) ([5278258](https://github.com/langwatch/langwatch/commit/527825892d11d97e8ca862c55666dc6c9e3dcc74))
+* **dev:** don't fail make quickstart when our own redis is already running ([#5214](https://github.com/langwatch/langwatch/issues/5214)) ([85e4a30](https://github.com/langwatch/langwatch/commit/85e4a307696784a0e4666c5c46aeeb854505a3bc))
+* **experiments-v3:** stop body rows bleeding through sticky header gap on vertical scroll ([#5250](https://github.com/langwatch/langwatch/issues/5250)) ([27b6c0c](https://github.com/langwatch/langwatch/commit/27b6c0cdcdef9f4786906d157012add0f254dec5))
+* **langy:** hoist release_langy_enabled flag hook above early returns (React [#310](https://github.com/langwatch/langwatch/issues/310)) ([897f039](https://github.com/langwatch/langwatch/commit/897f039b05bb81b08636c3f559488e89910abe79))
+* **model-providers:** pin modern Azure api-version + honour deploymentMapping inline ([#5134](https://github.com/langwatch/langwatch/issues/5134)) ([6880556](https://github.com/langwatch/langwatch/commit/688055687b9c5976c90226281721a6b644efd906))
+* **studio:** load the saved library prompt when reopening a workflow node ([#4993](https://github.com/langwatch/langwatch/issues/4993)) ([e84a2f2](https://github.com/langwatch/langwatch/commit/e84a2f2daf910d2e0407d91841547518f92178c6))
+* **translate:** surface typed model errors instead of generic masking ([#5198](https://github.com/langwatch/langwatch/issues/5198)) ([0abb5ae](https://github.com/langwatch/langwatch/commit/0abb5aeb5ad8c7e0c687b54c0baa76fbc802d398))
+
 ## [3.5.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.4.1...langwatch@v3.5.0) (2026-06-29)
 
 
