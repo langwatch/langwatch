@@ -90,7 +90,7 @@ describe("assertRetentionValueAllowedForPlan", () => {
 
     it.each([
       35, 63, 91, 371, 1827,
-    ])("allows the enterprise preset %id", async (days) => {
+    ])("allows the enterprise preset of %i days", async (days) => {
       await expect(
         assertRetentionValueAllowedForPlan(makeCtx(), ORG_SCOPE, days),
       ).resolves.toBeUndefined();

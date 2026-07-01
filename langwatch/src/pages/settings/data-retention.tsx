@@ -48,7 +48,7 @@ import { useAvailableScopes } from "~/hooks/useAvailableScopes";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
 import {
-  DEFAULT_RETENTION_DAYS,
+  PLATFORM_DEFAULT_RETENTION_DAYS,
   RETENTION_CATEGORIES,
   type RetentionCategory,
 } from "~/server/data-retention/retentionPolicy.schema";
@@ -396,7 +396,7 @@ function DataRetentionPage({
                       <EmptyState.Title>No retention policies</EmptyState.Title>
                       <EmptyState.Description>
                         Add a retention policy to override the platform default
-                        of {DEFAULT_RETENTION_DAYS} days.
+                        of {PLATFORM_DEFAULT_RETENTION_DAYS} days.
                       </EmptyState.Description>
                     </VStack>
                     {canWrite && (

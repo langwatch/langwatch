@@ -204,12 +204,15 @@ export function AddOverrideDrawer({
     setCustomAmount("");
     setCustomUnit("weeks");
     setApplyToExisting(false);
-    // Initialize only when the drawer opens or the edit target changes — NOT on
-    // currentProjectId / available.projects reference churn (a background
-    // snapshot refetch would otherwise re-run this and wipe in-progress edits).
-    // The latest scope inputs are read inside, so the next open re-reads them.
+    // Initialize when the drawer opens, the edit target changes, or the plan
+    // tier resolves. `isEnterprise` starts false while `useActivePlan` loads and
+    // flips once when it settles; without it here, opening the drawer on a cold
+    // plan load would strand an enterprise value in the read-only "legacy" state
+    // (paid can't represent it). It's a stable boolean, so it re-inits at most
+    // once. Deliberately NOT keyed on currentProjectId / available.projects
+    // reference churn — a background snapshot refetch would wipe in-progress edits.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, editTarget]);
+  }, [open, editTarget, isEnterprise]);
 
   const resolvedDays = (() => {
     // The legacy option is read-only: it can't be saved, only replaced by

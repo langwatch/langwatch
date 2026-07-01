@@ -197,10 +197,16 @@ export async function assertRetentionPlanForScope(
  * Which retention values a plan tier may persist. Deliberately a standalone
  * map inside the retention module rather than a field on `PlanInfo` /
  * `PLAN_LIMITS` / the signed license: retention packaging owns its own tiering
- * and stays decoupled from billing/license plumbing. Because it reads only
- * existing `PlanInfo` fields (`free`, `type`), a license-resolved org can never
- * crash on a missing field — the gate fails OPEN (uncapped) for any tier it
- * doesn't recognise.
+ * and stays decoupled from billing/license plumbing. It reads only existing
+ * `PlanInfo` fields (`free`, `type`), so a license-resolved org can never crash
+ * on a missing field.
+ *
+ * Tiering is by exclusion: enterprise (`isEnterpriseTier`) and self-hosted
+ * (`!IS_SAAS`) are uncapped; every other non-free SaaS plan is "paid". An
+ * unrecognised SaaS tier therefore fails CLOSED to the restrictive paid menu —
+ * the data-loss-safe default (a mis-tiered org can't set an arbitrary window),
+ * not fail-open. If a new enterprise-like tier is added, extend
+ * `isEnterpriseTier` (the app-wide enterprise check) so it resolves to uncapped.
  *
  * - `fixed`   → paid (non-enterprise SaaS): only the listed presets, no custom.
  * - `uncapped`→ enterprise / self-hosted: any whole-week value ≥ `customMin`,
