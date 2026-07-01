@@ -73,11 +73,11 @@ function initialRetentionState({
   if (match) return { preset: match.value, amount: "", unit: "weeks" };
   // Only enterprise/self-hosted has a custom field, and only for values that
   // clear its floor and align to whole weeks. Anything else is grandfathered.
-  const customEligible =
+  const isCustomEligible =
     isEnterprise &&
     days >= ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS &&
     days % RETENTION_WEEK_DAYS === 0;
-  if (customEligible) {
+  if (isCustomEligible) {
     return {
       preset: CUSTOM_PRESET_VALUE,
       amount: String(days / RETENTION_WEEK_DAYS),
@@ -204,15 +204,17 @@ export function AddOverrideDrawer({
     setCustomAmount("");
     setCustomUnit("weeks");
     setApplyToExisting(false);
-    // Initialize when the drawer opens, the edit target changes, or the plan
-    // tier resolves. `isEnterprise` starts false while `useActivePlan` loads and
-    // flips once when it settles; without it here, opening the drawer on a cold
-    // plan load would strand an enterprise value in the read-only "legacy" state
-    // (paid can't represent it). It's a stable boolean, so it re-inits at most
-    // once. Deliberately NOT keyed on currentProjectId / available.projects
-    // reference churn — a background snapshot refetch would wipe in-progress edits.
+    // Initialize when the drawer opens, the edit target changes, or a plan/admin
+    // flag resolves. `isEnterprise` and `isPlatformAdmin` both start false while
+    // their queries load and flip once when they settle; without them here,
+    // opening the drawer on a cold load would strand a value the not-yet-loaded
+    // tier can't represent in the read-only "legacy" state (an enterprise value
+    // under paid, or a keep-forever value under non-admin). Both are stable
+    // booleans, so this re-inits at most once each. Deliberately NOT keyed on
+    // currentProjectId / available.projects reference churn — a background
+    // snapshot refetch would wipe in-progress edits.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, editTarget, isEnterprise]);
+  }, [open, editTarget, isEnterprise, isPlatformAdmin]);
 
   const resolvedDays = (() => {
     // The legacy option is read-only: it can't be saved, only replaced by

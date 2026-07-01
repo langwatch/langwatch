@@ -23,14 +23,17 @@ vi.mock("../../../src/server/app-layer/app", () => ({
   }),
 }));
 
-import { SubscriptionStatus } from "../planTypes";
+import type { OrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.repository";
+import type {
+  SubscriptionRepository,
+  SubscriptionWithOrg,
+} from "../../../src/server/app-layer/subscription/subscription.repository";
 import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   RETENTION_CATEGORIES,
 } from "../../../src/server/data-retention/retentionPolicy.schema";
+import { SubscriptionStatus } from "../planTypes";
 import { EEWebhookService } from "../services/webhookService";
-import type { SubscriptionRepository, SubscriptionWithOrg } from "../../../src/server/app-layer/subscription/subscription.repository";
-import type { OrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.repository";
 
 const createMockSubscriptionRepository = () => ({
   findLastNonCancelled: vi.fn(),
@@ -86,10 +89,14 @@ const createMockItemCalculator = () => ({
     GROWTH_EVENTS_EUR_ANNUAL: "price_growth_events_eur_annual",
     GROWTH_EVENTS_USD_MONTHLY: "price_growth_events_usd_monthly",
     GROWTH_EVENTS_USD_ANNUAL: "price_growth_events_usd_annual",
-    GROWTH_EVENTS_EUR_MONTHLY_UNTIL_MAR_2026: "price_growth_events_eur_monthly_until_mar_2026",
-    GROWTH_EVENTS_EUR_ANNUAL_UNTIL_MAR_2026: "price_growth_events_eur_annual_until_mar_2026",
-    GROWTH_EVENTS_USD_MONTHLY_UNTIL_MAR_2026: "price_growth_events_usd_monthly_until_mar_2026",
-    GROWTH_EVENTS_USD_ANNUAL_UNTIL_MAR_2026: "price_growth_events_usd_annual_until_mar_2026",
+    GROWTH_EVENTS_EUR_MONTHLY_UNTIL_MAR_2026:
+      "price_growth_events_eur_monthly_until_mar_2026",
+    GROWTH_EVENTS_EUR_ANNUAL_UNTIL_MAR_2026:
+      "price_growth_events_eur_annual_until_mar_2026",
+    GROWTH_EVENTS_USD_MONTHLY_UNTIL_MAR_2026:
+      "price_growth_events_usd_monthly_until_mar_2026",
+    GROWTH_EVENTS_USD_ANNUAL_UNTIL_MAR_2026:
+      "price_growth_events_usd_annual_until_mar_2026",
   },
 });
 
@@ -107,17 +114,25 @@ const makeSubscription = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-const makeSubscriptionWithOrg = (overrides: Record<string, unknown> = {}): SubscriptionWithOrg => {
+const makeSubscriptionWithOrg = (
+  overrides: Record<string, unknown> = {},
+): SubscriptionWithOrg => {
   const { organization, ...subscriptionOverrides } = overrides;
   return {
     ...makeSubscription(subscriptionOverrides),
-    organization: { name: "Acme", license: null, ...(organization as Record<string, unknown>) },
+    organization: {
+      name: "Acme",
+      license: null,
+      ...(organization as Record<string, unknown>),
+    },
   } as unknown as SubscriptionWithOrg;
 };
 
 const createMockStripe = (overrides: Record<string, unknown> = {}) => ({
   subscriptions: {
-    retrieve: vi.fn().mockResolvedValue({ id: "sub_stripe_1", status: "active" }),
+    retrieve: vi
+      .fn()
+      .mockResolvedValue({ id: "sub_stripe_1", status: "active" }),
     cancel: vi.fn().mockResolvedValue({}),
   },
   ...overrides,
@@ -210,7 +225,9 @@ describe("webhookService", () => {
           id: "sub_db_1",
           previousStatus: SubscriptionStatus.PENDING,
         });
-        expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith("org_123");
+        expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith(
+          "org_123",
+        );
       });
 
       /** @scenario Checkout fails when no subscription matches the reference */
@@ -246,13 +263,17 @@ describe("webhookService", () => {
         await promise;
 
         expect(subRepo.activate).toHaveBeenCalled();
-        expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith("org_123");
+        expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith(
+          "org_123",
+        );
       });
 
       /** @scenario Checkout succeeds even when invite approval fails */
       it("continues when invite approval fails", async () => {
         const mockInviteApprover = {
-          approvePaymentPendingInvites: vi.fn().mockRejectedValue(new Error("invite error")),
+          approvePaymentPendingInvites: vi
+            .fn()
+            .mockRejectedValue(new Error("invite error")),
         };
         service = new EEWebhookService({
           subscriptionRepository: subRepo as unknown as SubscriptionRepository,
@@ -279,7 +300,9 @@ describe("webhookService", () => {
         await promise;
 
         expect(subRepo.activate).toHaveBeenCalled();
-        expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith("org_123");
+        expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith(
+          "org_123",
+        );
       });
 
       /** @scenario Checkout succeeds without an invite approval mechanism */
@@ -394,10 +417,16 @@ describe("webhookService", () => {
         });
 
         subRepo.findByStripeId.mockResolvedValue(
-          makeSubscription({ status: SubscriptionStatus.PENDING, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+          makeSubscription({
+            status: SubscriptionStatus.PENDING,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+          }),
         );
         subRepo.activate.mockResolvedValue(
-          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+          makeSubscriptionWithOrg({
+            status: SubscriptionStatus.ACTIVE,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+          }),
         );
         subRepo.migrateToSeatEvent.mockResolvedValue([
           { stripeSubscriptionId: "sub_old_1" },
@@ -415,13 +444,21 @@ describe("webhookService", () => {
           organizationId: "org_123",
           excludeSubscriptionId: "sub_db_1",
         });
-        expect(localStripe.subscriptions.cancel).toHaveBeenCalledWith("sub_old_1", { prorate: true });
-        expect(localStripe.subscriptions.cancel).toHaveBeenCalledWith("sub_old_2", { prorate: true });
+        expect(localStripe.subscriptions.cancel).toHaveBeenCalledWith(
+          "sub_old_1",
+          { prorate: true },
+        );
+        expect(localStripe.subscriptions.cancel).toHaveBeenCalledWith(
+          "sub_old_2",
+          { prorate: true },
+        );
       });
 
       it("logs but does not fail when Stripe cancellation fails", async () => {
         const localStripe = createMockStripe();
-        localStripe.subscriptions.cancel.mockRejectedValue(new Error("Stripe error"));
+        localStripe.subscriptions.cancel.mockRejectedValue(
+          new Error("Stripe error"),
+        );
         service = new EEWebhookService({
           subscriptionRepository: subRepo as unknown as SubscriptionRepository,
           organizationRepository: orgRepo as unknown as OrganizationRepository,
@@ -430,10 +467,16 @@ describe("webhookService", () => {
         });
 
         subRepo.findByStripeId.mockResolvedValue(
-          makeSubscription({ status: SubscriptionStatus.PENDING, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+          makeSubscription({
+            status: SubscriptionStatus.PENDING,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+          }),
         );
         subRepo.activate.mockResolvedValue(
-          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+          makeSubscriptionWithOrg({
+            status: SubscriptionStatus.ACTIVE,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+          }),
         );
         subRepo.migrateToSeatEvent.mockResolvedValue([
           { stripeSubscriptionId: "sub_old_1" },
@@ -453,10 +496,16 @@ describe("webhookService", () => {
       /** @scenario A first paid Growth Seat activation provisions the organization policies */
       it("provisions an organization-scoped retention policy for every category at the platform default", async () => {
         subRepo.findByStripeId.mockResolvedValue(
-          makeSubscription({ status: SubscriptionStatus.PENDING, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+          makeSubscription({
+            status: SubscriptionStatus.PENDING,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+          }),
         );
         subRepo.activate.mockResolvedValue(
-          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+          makeSubscriptionWithOrg({
+            status: SubscriptionStatus.ACTIVE,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+          }),
         );
         subRepo.migrateToSeatEvent.mockResolvedValue([]);
 
@@ -474,16 +523,24 @@ describe("webhookService", () => {
             retentionDays: PLATFORM_DEFAULT_RETENTION_DAYS,
           });
         }
-        expect(mockSetForScope).toHaveBeenCalledTimes(RETENTION_CATEGORIES.length);
+        expect(mockSetForScope).toHaveBeenCalledTimes(
+          RETENTION_CATEGORIES.length,
+        );
       });
 
-      /** @scenario A grandfathered org-level policy survives a seat event (INV-6) */
+      /** @scenario A billing event never overwrites an existing retention policy */
       it("never overwrites an existing org-level policy — only fills missing categories", async () => {
         subRepo.findByStripeId.mockResolvedValue(
-          makeSubscription({ status: SubscriptionStatus.PENDING, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+          makeSubscription({
+            status: SubscriptionStatus.PENDING,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+          }),
         );
         subRepo.activate.mockResolvedValue(
-          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+          makeSubscriptionWithOrg({
+            status: SubscriptionStatus.ACTIVE,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+          }),
         );
         subRepo.migrateToSeatEvent.mockResolvedValue([]);
         // The org already tuned traces retention high; a billing event must NOT
@@ -504,11 +561,9 @@ describe("webhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        // traces is left untouched…
         expect(mockSetForScope).not.toHaveBeenCalledWith(
           expect.objectContaining({ category: "traces" }),
         );
-        // …while the remaining categories are still provisioned.
         expect(mockSetForScope).toHaveBeenCalledTimes(
           RETENTION_CATEGORIES.length - 1,
         );
@@ -517,13 +572,21 @@ describe("webhookService", () => {
       /** @scenario A retention failure never fails the billing webhook */
       it("still activates and notifies when retention provisioning throws", async () => {
         subRepo.findByStripeId.mockResolvedValue(
-          makeSubscription({ status: SubscriptionStatus.PENDING, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+          makeSubscription({
+            status: SubscriptionStatus.PENDING,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+          }),
         );
         subRepo.activate.mockResolvedValue(
-          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+          makeSubscriptionWithOrg({
+            status: SubscriptionStatus.ACTIVE,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+          }),
         );
         subRepo.migrateToSeatEvent.mockResolvedValue([]);
-        mockSetForScope.mockRejectedValueOnce(new Error("retention store down"));
+        mockSetForScope.mockRejectedValueOnce(
+          new Error("retention store down"),
+        );
 
         const promise = service.handleInvoicePaymentSucceeded({
           subscriptionId: "sub_stripe_1",
@@ -534,7 +597,10 @@ describe("webhookService", () => {
         await promise;
 
         expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
-          expect.objectContaining({ type: "confirmed", organizationId: "org_123" }),
+          expect.objectContaining({
+            type: "confirmed",
+            organizationId: "org_123",
+          }),
         );
       });
     });
@@ -543,10 +609,16 @@ describe("webhookService", () => {
       /** @scenario A non-seat plan does not provision a policy */
       it("does not provision a retention policy on first activation", async () => {
         subRepo.findByStripeId.mockResolvedValue(
-          makeSubscription({ status: SubscriptionStatus.PENDING, plan: "LAUNCH" }),
+          makeSubscription({
+            status: SubscriptionStatus.PENDING,
+            plan: "LAUNCH",
+          }),
         );
         subRepo.activate.mockResolvedValue(
-          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE, plan: "LAUNCH" }),
+          makeSubscriptionWithOrg({
+            status: SubscriptionStatus.ACTIVE,
+            plan: "LAUNCH",
+          }),
         );
 
         const promise = service.handleInvoicePaymentSucceeded({
@@ -564,10 +636,16 @@ describe("webhookService", () => {
       /** @scenario A renewal does not re-provision the policy */
       it("does not re-provision the retention policy", async () => {
         subRepo.findByStripeId.mockResolvedValue(
-          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+          makeSubscription({
+            status: SubscriptionStatus.ACTIVE,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+          }),
         );
         subRepo.activate.mockResolvedValue(
-          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+          makeSubscriptionWithOrg({
+            status: SubscriptionStatus.ACTIVE,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+          }),
         );
 
         const promise = service.handleInvoicePaymentSucceeded({
@@ -851,7 +929,10 @@ describe("webhookService", () => {
     describe("when subscription is active and gets cancelled", () => {
       it("sends a cancelled Slack notification", async () => {
         subRepo.findByStripeId.mockResolvedValue(
-          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+          makeSubscription({
+            status: SubscriptionStatus.ACTIVE,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+          }),
         );
         orgRepo.findNameById.mockResolvedValue({ id: "org_123", name: "Acme" });
 
@@ -875,7 +956,10 @@ describe("webhookService", () => {
 
       it("sends notification with cancellation date", async () => {
         subRepo.findByStripeId.mockResolvedValue(
-          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+          makeSubscription({
+            status: SubscriptionStatus.ACTIVE,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+          }),
         );
         orgRepo.findNameById.mockResolvedValue({ id: "org_123", name: "Acme" });
 
@@ -896,7 +980,10 @@ describe("webhookService", () => {
 
       it("still cancels and notifies even when org name lookup fails", async () => {
         subRepo.findByStripeId.mockResolvedValue(
-          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+          makeSubscription({
+            status: SubscriptionStatus.ACTIVE,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+          }),
         );
         orgRepo.findNameById.mockResolvedValue(null);
 
@@ -918,7 +1005,10 @@ describe("webhookService", () => {
 
       it("completes cancellation even when notification throws", async () => {
         subRepo.findByStripeId.mockResolvedValue(
-          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+          makeSubscription({
+            status: SubscriptionStatus.ACTIVE,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+          }),
         );
         orgRepo.findNameById.mockRejectedValue(new Error("DB connection lost"));
 
@@ -940,7 +1030,10 @@ describe("webhookService", () => {
       /** @scenario Cancelling a subscription leaves the retention policies in place */
       it("does not remove the organization retention policies (removal deactivated)", async () => {
         subRepo.findByStripeId.mockResolvedValue(
-          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+          makeSubscription({
+            status: SubscriptionStatus.ACTIVE,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+          }),
         );
         subRepo.findLastNonCancelled.mockResolvedValue(null);
 
@@ -1053,7 +1146,10 @@ describe("webhookService", () => {
       /** @scenario Active subscription update clears a trial license */
       it("recalculates quantities and updates", async () => {
         subRepo.findByStripeId.mockResolvedValue(
-          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "LAUNCH" }),
+          makeSubscription({
+            status: SubscriptionStatus.ACTIVE,
+            plan: "LAUNCH",
+          }),
         );
         itemCalculator.calculateQuantityForPrice
           .mockReturnValueOnce(5) // users
@@ -1094,7 +1190,10 @@ describe("webhookService", () => {
       /** @scenario Transition to active triggers a notification */
       it("notifies when transitioning from non-active to active", async () => {
         subRepo.findByStripeId.mockResolvedValue(
-          makeSubscription({ status: SubscriptionStatus.PENDING, plan: "LAUNCH" }),
+          makeSubscription({
+            status: SubscriptionStatus.PENDING,
+            plan: "LAUNCH",
+          }),
         );
         subRepo.updateQuantities.mockResolvedValue(
           makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
@@ -1124,7 +1223,10 @@ describe("webhookService", () => {
       /** @scenario Already-active subscription does not re-notify */
       it("skips notification when already active", async () => {
         subRepo.findByStripeId.mockResolvedValue(
-          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "LAUNCH" }),
+          makeSubscription({
+            status: SubscriptionStatus.ACTIVE,
+            plan: "LAUNCH",
+          }),
         );
         subRepo.updateQuantities.mockResolvedValue(
           makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
@@ -1153,7 +1255,10 @@ describe("webhookService", () => {
       /** @scenario Cancelling a subscription leaves the retention policies in place */
       it("does not remove the organization retention policies (removal deactivated)", async () => {
         subRepo.findByStripeId.mockResolvedValue(
-          makeSubscription({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+          makeSubscription({
+            status: SubscriptionStatus.ACTIVE,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+          }),
         );
         subRepo.findLastNonCancelled.mockResolvedValue(null);
 

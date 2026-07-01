@@ -1,25 +1,32 @@
 import { Currency, type PrismaClient } from "@prisma/client";
-import type Stripe from "stripe";
 import type { PostHog } from "posthog-node";
-import { createLogger } from "../../../src/utils/logger";
+import type Stripe from "stripe";
 import { getApp } from "../../../src/server/app-layer/app";
+import { PrismaOrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.prisma.repository";
+import type { OrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.repository";
 import type {
   SubscriptionRepository,
   SubscriptionWithOrg,
 } from "../../../src/server/app-layer/subscription/subscription.repository";
-import type { OrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.repository";
-import { PrismaOrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.prisma.repository";
-import { PrismaSubscriptionRepository } from "./subscription.repository";
-import { SubscriptionStatus } from "../planTypes";
-import type { calculateQuantityForPrice, prices } from "./subscriptionItemCalculator";
-import { isGrowthEventsPrice, isGrowthSeatEventPlan, isGrowthSeatPrice } from "../utils/growthSeatEvent";
-import { SubscriptionRecordNotFoundError } from "../errors";
 import { traced } from "../../../src/server/app-layer/tracing";
-import { fireSubscriptionSyncNurturing } from "../nurturing/hooks/subscriptionSync";
 import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   RETENTION_CATEGORIES,
 } from "../../../src/server/data-retention/retentionPolicy.schema";
+import { createLogger } from "../../../src/utils/logger";
+import { SubscriptionRecordNotFoundError } from "../errors";
+import { fireSubscriptionSyncNurturing } from "../nurturing/hooks/subscriptionSync";
+import { SubscriptionStatus } from "../planTypes";
+import {
+  isGrowthEventsPrice,
+  isGrowthSeatEventPlan,
+  isGrowthSeatPrice,
+} from "../utils/growthSeatEvent";
+import { PrismaSubscriptionRepository } from "./subscription.repository";
+import type {
+  calculateQuantityForPrice,
+  prices,
+} from "./subscriptionItemCalculator";
 
 const logger = createLogger("langwatch:billing:webhookService");
 
@@ -59,7 +66,9 @@ export type HandleEventResult =
 const STRIPE_EVENTUAL_CONSISTENCY_DELAY_MS = 2000;
 // TECH-DEBT: This fixed delay should become a retry loop with backoff.
 const waitForStripeConsistency = () =>
-  new Promise((resolve) => setTimeout(resolve, STRIPE_EVENTUAL_CONSISTENCY_DELAY_MS));
+  new Promise((resolve) =>
+    setTimeout(resolve, STRIPE_EVENTUAL_CONSISTENCY_DELAY_MS),
+  );
 
 export type WebhookService = {
   /**
@@ -90,9 +99,7 @@ export type WebhookService = {
     throwOnMissing?: boolean;
   }): Promise<void>;
 
-  handleInvoicePaymentFailed(params: {
-    subscriptionId: string;
-  }): Promise<void>;
+  handleInvoicePaymentFailed(params: { subscriptionId: string }): Promise<void>;
 
   handleSubscriptionDeleted(params: {
     stripeSubscriptionId: string;
@@ -479,9 +486,7 @@ export class EEWebhookService implements WebhookService {
         { subscriptionClientReferenceId },
         "[stripeWebhook] No subscription found for checkout",
       );
-      throw new SubscriptionRecordNotFoundError(
-        subscriptionClientReferenceId,
-      );
+      throw new SubscriptionRecordNotFoundError(subscriptionClientReferenceId);
     }
 
     await this.syncInvoicePaymentSuccess({
@@ -489,7 +494,8 @@ export class EEWebhookService implements WebhookService {
       throwOnMissing: true,
     });
 
-    const subscriptionRecord = await this.subscriptionRepository.findByStripeId(subscriptionId);
+    const subscriptionRecord =
+      await this.subscriptionRepository.findByStripeId(subscriptionId);
 
     const normalizedCurrency = this.normalizeSelectedCurrency(selectedCurrency);
     if (normalizedCurrency && subscriptionRecord) {
@@ -614,9 +620,10 @@ export class EEWebhookService implements WebhookService {
       );
     }
 
-    const remainingActive = await this.subscriptionRepository.findLastNonCancelled(
-      existingSubscription.organizationId,
-    );
+    const remainingActive =
+      await this.subscriptionRepository.findLastNonCancelled(
+        existingSubscription.organizationId,
+      );
     fireSubscriptionSyncNurturing({
       organizationId: existingSubscription.organizationId,
       hasSubscription: !!remainingActive,
@@ -644,10 +651,7 @@ export class EEWebhookService implements WebhookService {
       return;
     }
 
-    if (
-      subscription.status !== "active" ||
-      subscription.ended_at
-    ) {
+    if (subscription.status !== "active" || subscription.ended_at) {
       // Truly cancelled or ended — mark as CANCELLED in DB.
       // Note: canceled_at alone means "scheduled for cancellation at period end"
       // — the sub is still active until then, so we don't cancel in DB yet.
@@ -655,9 +659,10 @@ export class EEWebhookService implements WebhookService {
       // which is handled by handleSubscriptionDeleted.
       await this.subscriptionRepository.cancel({ id: existingSubForUpdate.id });
 
-      const remainingActive = await this.subscriptionRepository.findLastNonCancelled(
-        existingSubForUpdate.organizationId,
-      );
+      const remainingActive =
+        await this.subscriptionRepository.findLastNonCancelled(
+          existingSubForUpdate.organizationId,
+        );
       fireSubscriptionSyncNurturing({
         organizationId: existingSubForUpdate.organizationId,
         hasSubscription: !!remainingActive,
@@ -681,8 +686,7 @@ export class EEWebhookService implements WebhookService {
           item.price.id === this.itemCalculator.prices.LAUNCH_USERS ||
           item.price.id === this.itemCalculator.prices.ACCELERATE_USERS ||
           item.price.id === this.itemCalculator.prices.LAUNCH_ANNUAL_USERS ||
-          item.price.id ===
-            this.itemCalculator.prices.ACCELERATE_ANNUAL_USERS
+          item.price.id === this.itemCalculator.prices.ACCELERATE_ANNUAL_USERS
         ) {
           const calculateQuantity =
             this.itemCalculator.calculateQuantityForPrice({
@@ -692,8 +696,7 @@ export class EEWebhookService implements WebhookService {
             });
           usersQuantity = calculateQuantity;
         } else if (
-          item.price.id ===
-            this.itemCalculator.prices.ACCELERATE_TRACES_100K ||
+          item.price.id === this.itemCalculator.prices.ACCELERATE_TRACES_100K ||
           item.price.id === this.itemCalculator.prices.LAUNCH_TRACES_10K ||
           item.price.id ===
             this.itemCalculator.prices.LAUNCH_ANNUAL_TRACES_10K ||
@@ -710,17 +713,21 @@ export class EEWebhookService implements WebhookService {
         }
       }
 
-      const updatedSubscription = await this.subscriptionRepository.updateQuantities({
-        id: existingSubForUpdate.id,
-        maxMembers: usersQuantity,
-        maxMessagesPerMonth: tracesQuantity,
-      });
+      const updatedSubscription =
+        await this.subscriptionRepository.updateQuantities({
+          id: existingSubForUpdate.id,
+          maxMembers: usersQuantity,
+          maxMessagesPerMonth: tracesQuantity,
+        });
 
       if (!updatedSubscription) {
         return;
       }
 
-      await this.clearTrialLicenseIfPresent(updatedSubscription, "subscription updated to active");
+      await this.clearTrialLicenseIfPresent(
+        updatedSubscription,
+        "subscription updated to active",
+      );
 
       if (shouldNotify) {
         await getApp().notifications.sendSlackSubscriptionEvent({
@@ -802,21 +809,28 @@ export class EEWebhookService implements WebhookService {
     }
 
     if (previousSubscription.status !== SubscriptionStatus.ACTIVE) {
-      await this.clearTrialLicenseIfPresent(updatedSubscription, "subscription activated");
+      await this.clearTrialLicenseIfPresent(
+        updatedSubscription,
+        "subscription activated",
+      );
 
       if (isGrowthSeatEventPlan(updatedSubscription.plan)) {
-        const oldSubscriptions = await this.subscriptionRepository.migrateToSeatEvent({
-          organizationId: updatedSubscription.organizationId,
-          excludeSubscriptionId: updatedSubscription.id,
-        });
+        const oldSubscriptions =
+          await this.subscriptionRepository.migrateToSeatEvent({
+            organizationId: updatedSubscription.organizationId,
+            excludeSubscriptionId: updatedSubscription.id,
+          });
 
         // Cancel in Stripe after DB is consistent (outside transaction)
         for (const oldSub of oldSubscriptions) {
           if (oldSub.stripeSubscriptionId) {
             try {
-              await this.stripe.subscriptions.cancel(oldSub.stripeSubscriptionId, {
-                prorate: true,
-              });
+              await this.stripe.subscriptions.cancel(
+                oldSub.stripeSubscriptionId,
+                {
+                  prorate: true,
+                },
+              );
             } catch (err) {
               logger.error(
                 { stripeSubscriptionId: oldSub.stripeSubscriptionId, err },
@@ -862,13 +876,18 @@ export class EEWebhookService implements WebhookService {
    * deletion windows — free-tier content blurs after 14d but stays recoverable
    * until the 49d policy deletes it. TODO(#4745): the blur layer.
    *
-   * Each category is upserted independently (idempotent on scope + category)
-   * and best-effort: a retention failure must never fail the Stripe webhook —
-   * that would leave the subscription stuck PENDING and trigger Stripe retries —
-   * so we log and continue to the next category, mirroring the surrounding
-   * notification side effects.
+   * Create-if-absent, per category: an org that already has a category's
+   * org-level policy keeps it (never clobbered back to the default — that would
+   * shorten a grandfathered window and delete data). Only missing categories
+   * are provisioned. Best-effort throughout: a retention failure must never fail
+   * the Stripe webhook — that would leave the subscription stuck PENDING and
+   * trigger Stripe retries — so if the current rules can't be read we skip
+   * provisioning entirely, and a per-category write failure is logged and
+   * skipped, mirroring the surrounding notification side effects.
    */
-  private async applySeatRetentionPolicy(organizationId: string): Promise<void> {
+  private async applySeatRetentionPolicy(
+    organizationId: string,
+  ): Promise<void> {
     // Create-if-absent, NOT upsert: a seat/subscription event must never
     // overwrite an existing org-level override. Unconditionally writing the
     // platform default here would clobber a grandfathered high policy (e.g.
