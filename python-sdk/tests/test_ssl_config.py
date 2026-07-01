@@ -98,7 +98,6 @@ class TestGetSslConfigLogging:
             Client._get_ssl_config()
         assert caplog.text.count("SSL certificate") == 1
 
-        # Reset and call again — should warn again
         Client.reset_for_testing()
         caplog.clear()
         with caplog.at_level(logging.INFO):
