@@ -431,4 +431,61 @@ describe("<ScenarioFormDrawer /> mapping gate", () => {
       );
     });
   });
+
+  // These guard the PRE-EXISTING input-only run-gate contract (this PR only corrected a comment in ScenarioFormDrawer.tsx, not its logic).
+  describe("when target is a workflow agent with a valid input mapping and no outputField", () => {
+    beforeEach(() => {
+      // Agent has scenarioMappings that satisfies hasScenarioInputMapping
+      // but has NO scenarioOutputField configured.
+      mocks.mockAgentsGetByIdFetch.mockResolvedValue({
+        id: "workflow-agent-input-only",
+        type: "workflow",
+        name: "Input-Only Workflow Agent",
+        config: {
+          workflow_id: "wf-input-only",
+          scenarioMappings: {
+            userMessage: {
+              type: "source",
+              sourceId: "scenario",
+              path: ["input"],
+            },
+          },
+          // No scenarioOutputField — the user never configured an output
+        },
+      });
+    });
+
+    /** @scenario Run gate passes for workflow agent with input-only mapping */
+    it("proceeds with the run without opening the mapping drawer", async () => {
+      const user = userEvent.setup();
+      renderWithTarget({ type: "workflow", id: "workflow-agent-input-only" });
+
+      await user.click(screen.getByTestId("save-and-run-button"));
+
+      await waitFor(() => {
+        expect(mocks.mockRunScenario).toHaveBeenCalled();
+      });
+
+      expect(mocks.mockOpenDrawer).not.toHaveBeenCalledWith(
+        "agentWorkflowEditor",
+        expect.anything(),
+      );
+    });
+
+    /** @scenario Run gate emits no mapping warning when input is mapped */
+    it("does not show a mapping warning toast", async () => {
+      const user = userEvent.setup();
+      renderWithTarget({ type: "workflow", id: "workflow-agent-input-only" });
+
+      await user.click(screen.getByTestId("save-and-run-button"));
+
+      await waitFor(() => {
+        expect(mocks.mockRunScenario).toHaveBeenCalled();
+      });
+
+      expect(mockToasterCreate).not.toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Configure scenario mappings" }),
+      );
+    });
+  });
 });

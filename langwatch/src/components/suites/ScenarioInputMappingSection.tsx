@@ -129,23 +129,20 @@ export function hasScenarioInputMapping(
 }
 
 /**
- * Checks whether the scenario mappings are valid.
- * - At least one of input or messages must be mapped.
- * - An output must be selected (not cleared).
+ * Whether the scenario mappings are sufficient to save and run an agent.
+ *
+ * Minimum (and only) requirement: a single source mapping whose path is
+ * "input" or "messages". An output mapping is optional — when omitted the run
+ * auto-populates the first output or gracefully stringifies the full result.
+ * Shared by the editor Save gate and the Save-&-Run drawer gate via
+ * hasScenarioInputMapping (the single source of truth).
  */
 export function isScenarioMappingValid({
   mappings,
-  outputs,
-  outputField,
 }: {
   mappings: Record<string, FieldMapping>;
-  outputs?: Variable[];
-  outputField?: string;
 }): boolean {
-  const hasOutputs = (outputs ?? []).length > 0;
-  // outputField === "" means explicitly cleared; undefined means auto-populate
-  const hasOutputMapping = hasOutputs && outputField !== "";
-  return hasScenarioInputMapping(mappings) && hasOutputMapping;
+  return hasScenarioInputMapping(mappings);
 }
 
 export function ScenarioInputMappingSection({

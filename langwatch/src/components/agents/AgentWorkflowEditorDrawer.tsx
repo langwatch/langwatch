@@ -218,8 +218,6 @@ export function AgentWorkflowEditorDrawer(
     workflowOutputs.length > 0 &&
     isScenarioMappingValid({
       mappings: scenarioMappings,
-      outputs: workflowOutputs,
-      outputField: scenarioOutputField,
     });
 
   const handleSave = useCallback(() => {
