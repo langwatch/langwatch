@@ -1035,7 +1035,7 @@ examples = [
     { name = "langchain-community", specifier = ">=0.3.0,<1.0.0" },
     { name = "langchain-google-vertexai", specifier = ">=2.0.0,<4.0.0" },
     { name = "langchain-openai", specifier = ">=0.3.0,<1.0.0" },
-    { name = "langchain-text-splitters", specifier = ">=0.3.0,<1.0.0" },
+    { name = "langchain-text-splitters", specifier = ">=1.1.2,<2.0.0" },
     { name = "langgraph", specifier = ">=1.0.0,<2.0.0" },
     { name = "langsmith", specifier = ">=0.8.0" },
     { name = "litellm", specifier = ">=1.84.0" },
