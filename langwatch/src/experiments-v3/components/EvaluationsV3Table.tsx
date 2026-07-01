@@ -8,7 +8,14 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { nanoid } from "nanoid";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useShallow } from "zustand/react/shallow";
 import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
 import { datasetTableCss } from "~/components/datasets/editor/datasetTableStyles";
@@ -1613,8 +1620,24 @@ export function EvaluationsV3Table({
   // +1 for the spacer column that's always present
   const targetsColSpan = targets.length + 2;
 
-  // Height of the super header row (Dataset/Agents row)
-  const SUPER_HEADER_HEIGHT = 51;
+  // Measure the super header row's actual rendered height so the column
+  // header row's sticky `top` offset matches. A hardcoded constant drifts
+  // from the true <th> box-model height (content + padding + border) in a
+  // border-collapse:separate table, leaving a gap through which body rows
+  // bleed during vertical scroll.
+  const superHeaderRowRef = useRef<HTMLTableRowElement>(null);
+  const [superHeaderHeight, setSuperHeaderHeight] = useState(51);
+  useLayoutEffect(() => {
+    const row = superHeaderRowRef.current;
+    if (!row) return;
+    const measure = () => {
+      setSuperHeaderHeight(row.getBoundingClientRect().height);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(row);
+    return () => observer.disconnect();
+  }, []);
   const MENU_PLUS_PADDING = 56 + 16;
 
   // Calculate total percentage for all resizable columns
@@ -1684,7 +1707,7 @@ export function EvaluationsV3Table({
         // Column header row (second row in thead)
         "& thead tr:nth-of-type(2) th": {
           position: "sticky",
-          top: `${SUPER_HEADER_HEIGHT}px`,
+          top: `${superHeaderHeight}px`,
           zIndex: 10,
           backgroundColor: "var(--chakra-colors-bg-panel)",
         },
@@ -1747,7 +1770,7 @@ export function EvaluationsV3Table({
           <col style={{ width: DRAWER_WIDTH }} />
         </colgroup>
         <thead>
-          <tr>
+          <tr ref={superHeaderRowRef}>
             <DatasetSuperHeader
               colSpan={datasetColSpan}
               activeDataset={activeDataset}
