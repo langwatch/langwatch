@@ -37,6 +37,13 @@ vi.mock("../../../hooks/useTraceFacets", () => ({
   useTraceFacets: () => ({ data: [], isLoading: false }),
 }));
 
+// SearchBar mounts TokenValuePicker, which now calls useFacetSearch at the
+// top level. These tests don't wrap with a tRPC provider, so stub the hook
+// out — server search is covered by its own dedicated suite.
+vi.mock("../../../hooks/useFacetSearch", () => ({
+  useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
+}));
+
 vi.mock("@paper-design/shaders-react", () => ({
   MeshGradient: () => null,
 }));
@@ -112,7 +119,8 @@ describe("<SearchBar /> unified error banner", () => {
   describe("given an AI error with structured details in the store", () => {
     const aiError: AiActionError = {
       code: "provider_error",
-      message: "Failed after 2 attempts. Last error: Cannot connect to provider.",
+      message:
+        "Failed after 2 attempts. Last error: Cannot connect to provider.",
       details: {
         provider: "openai",
         model: "gpt-5-mini",
@@ -228,9 +236,7 @@ describe("<SearchBar /> unified error banner", () => {
   describe("given no errors in the store", () => {
     it("does not render the banner", () => {
       renderSearchBar();
-      expect(
-        screen.queryByLabelText(/dismiss error/i),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/dismiss error/i)).not.toBeInTheDocument();
     });
   });
 

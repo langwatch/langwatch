@@ -1,8 +1,19 @@
-import { Box, Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  HStack,
+  Input,
+  Spinner,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import type React from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Kbd } from "~/components/ops/shared/Kbd";
+import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import { useFacetSearch } from "../../hooks/useFacetSearch";
 import { useFacetLensStore } from "../../stores/facetLensStore";
+import { dedupeByValue } from "../../utils/dedupeByValue";
 import {
   AUTO_EXPAND_THRESHOLD,
   MAX_EXPANDED_FACETS,
@@ -42,6 +53,15 @@ interface FacetSectionProps {
     mode: "range" | "discrete";
     onToggle: () => void;
   };
+  /**
+   * When true, the per-facet value search ALSO reaches the SERVER (queries
+   * `facetValues` with the typed text as a `prefix`) to SUPPLEMENT — not
+   * replace — the client-side filter over `items`, so values beyond the
+   * preloaded top-N surface too. Set only by the categorical render branch;
+   * see {@link useFacetSearch} — server search is categorical-only. The
+   * Enter-to-filter fallback is kept regardless for not-yet-ingested values.
+   */
+  serverValueSearch?: boolean;
   /**
    * Optional per-row extras renderer. Invoked for any row whose value
    * is currently active (i.e. surfaced via `pinnedContent`). The
@@ -100,6 +120,7 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
   renderInactiveRowExtras,
   synthetic,
   modeToggleProps,
+  serverValueSearch,
 }) => {
   const [expandedInactiveRows, setExpandedInactiveRows] = useState<Set<string>>(
     () => new Set(),
@@ -169,9 +190,54 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
   // in the list for one-click filtering; the badge just stops tallying them.
   const presentValueCount = useMemo(() => countPresentValues(items), [items]);
 
+  // Server-side value search. When the per-facet search is open with a
+  // non-empty query, ALSO query `facetValues` with that text as a `prefix` so
+  // the match reaches ALL of this facet's distinct values — not just the
+  // preloaded top-N `items`. The typed text is debounced before it hits the
+  // server: a per-keystroke prefix scan over a high-cardinality facet is a real
+  // ClickHouse round-trip. Gated on `serverValueSearch` — see useFacetSearch
+  // (server search is categorical-only) — AND on BOTH the live and debounced
+  // query: the debounced value drives the fetch (wait for typing to settle),
+  // while the live value disables it the instant the input is cleared so a
+  // stale prefix can't keep firing for the debounce window. The hook is always
+  // called (hooks can't be conditional) but stays disabled until the gate opens.
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 300);
+  const serverSearchActive =
+    !!serverValueSearch &&
+    searchOpen &&
+    searchQuery.trim().length > 0 &&
+    debouncedSearchQuery.trim().length > 0;
+  const serverSearch = useFacetSearch({
+    facetKey: field,
+    prefix: debouncedSearchQuery,
+    enabled: serverSearchActive,
+  });
+  const serverItems = useMemo<FacetItem[]>(
+    () =>
+      serverSearch.values.map((v) => ({
+        value: v.value,
+        label: v.label ?? v.value,
+        count: v.count,
+      })),
+    [serverSearch.values],
+  );
+
+  // SUPPLEMENT, don't replace: while server search is active, feed the UNION of
+  // the preloaded items and the server prefix results (preloaded first so it
+  // wins on a shared value, keeping its dotColor / aggregates). The client-side
+  // substring filter still runs over that union on the LIVE query every
+  // keystroke — a server prefix hit is also a substring match, so it survives,
+  // while a substring living WITHIN a preloaded value (e.g. "gpt-4o" inside
+  // "openai/gpt-4o-mini", which the server's anchored prefix match misses) is
+  // still found locally.
+  const baseItems = useMemo(
+    () =>
+      serverSearchActive ? dedupeByValue([...items, ...serverItems]) : items,
+    [serverSearchActive, items, serverItems],
+  );
   const filtered = useMemo(
-    () => filterAndSortItems({ items, searchQuery }),
-    [items, searchQuery],
+    () => filterAndSortItems({ items: baseItems, searchQuery }),
+    [baseItems, searchQuery],
   );
 
   // Active rows = currently-filtered values (same-field OR values are
@@ -434,7 +500,21 @@ const FacetSectionInner: React.FC<FacetSectionProps> = ({
                 }}
                 textStyle="xs"
               />
+              {serverSearchActive && serverSearch.isFetching && (
+                <HStack
+                  data-testid="facet-search-spinner"
+                  gap={2}
+                  paddingX={1}
+                  paddingY={1}
+                >
+                  <Spinner size="xs" />
+                  <Text textStyle="2xs" color="fg.subtle">
+                    Searching all values…
+                  </Text>
+                </HStack>
+              )}
               {searchQuery.trim() &&
+                !(serverSearchActive && serverSearch.isFetching) &&
                 layout.facetWindow.visible.length === 0 && (
                   <Text textStyle="2xs" color="fg.muted" paddingX={1}>
                     No match. Press <Kbd>Enter</Kbd> to filter by "

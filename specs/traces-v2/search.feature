@@ -1092,10 +1092,18 @@ Rule: Very high-cardinality facets
     Then 30 total values are visible
     And a message reads "And 30 more — use search to filter"
 
+  @integration
   Scenario: Facet search matches against all values
     When the user types "finance" in the Service facet search
     Then values matching "finance" from all 60 services are shown inline
-    And the top-5 list is temporarily replaced with search results
+    And they supplement the preloaded top-5 rather than replacing it
+
+  @integration
+  Scenario: Editing a search-bar value chip searches all values, not just the preloaded set
+    Given the user has a "service:" filter chip in the search bar
+    When the user clicks the chip and edits the value to a prefix
+    Then the matching preloaded values and any matching values beyond the preloaded set both appear in the picker
+    And they supplement the preloaded set rather than replacing it
 
   Scenario: Clearing facet search returns to top-5 view
     Given the user is searching in the Service facet
