@@ -1,5 +1,6 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
+import type { FacetQuery } from "../facet-registry";
 import type { TraceSummaryData } from "../types";
 import type { TraceSummaryFieldsBase } from "./_summary-fields.types";
 import type {
@@ -621,7 +622,7 @@ export class TraceListClickHouseRepository implements TraceListRepository {
 
   async findCategoricalFacetRaw(params: {
     tenantId: string;
-    query: { sql: string; params: Record<string, unknown> };
+    query: FacetQuery;
   }): Promise<CategoricalFacetResult> {
     EventUtils.validateTenantId(
       { tenantId: params.tenantId },
@@ -632,6 +633,11 @@ export class TraceListClickHouseRepository implements TraceListRepository {
     const result = await client.query({
       query: params.query.sql,
       query_params: params.query.params,
+      // Per-query guard (e.g. the key-discovery facets' memory ceiling); absent
+      // for facets that don't set one.
+      ...(params.query.settings
+        ? { clickhouse_settings: params.query.settings }
+        : {}),
       format: "JSONEachRow",
     });
 

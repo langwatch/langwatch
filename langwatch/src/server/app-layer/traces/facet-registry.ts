@@ -30,6 +30,12 @@ export interface FacetQueryContext {
 export interface FacetQuery {
   sql: string;
   params: Record<string, unknown>;
+  /**
+   * Optional per-query ClickHouse settings (e.g. a memory ceiling / external
+   * GROUP BY threshold for the unbounded key-discovery facets). Passed straight
+   * through as `clickhouse_settings` when the query runs.
+   */
+  settings?: Record<string, string>;
 }
 
 interface BaseFacetDef {
