@@ -2481,7 +2481,8 @@ export class ClickHouseTraceService {
             : "";
           const summaryTimeParams = hasSummaryWindow
             ? {
-                sumFromMs: effectiveOccurredAt.from - SUMMARY_PARTITION_WINDOW_MS,
+                sumFromMs:
+                  effectiveOccurredAt.from - SUMMARY_PARTITION_WINDOW_MS,
                 sumToMs: effectiveOccurredAt.to + SUMMARY_PARTITION_WINDOW_MS,
               }
             : {};

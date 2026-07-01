@@ -555,8 +555,12 @@ describe("ClickHouse trace dedup (integration)", () => {
           // A cheap resolve (min/max OccurredAt) runs, then the heavy summary
           // read (ts_ComputedInput columns) is partition-bounded on OccurredAt
           // instead of scanning every weekly part.
-          const resolveQuery = queries.find((q) => q.includes("min(OccurredAt)"));
-          const heavyQuery = queries.find((q) => q.includes("ts_ComputedInput"));
+          const resolveQuery = queries.find((q) =>
+            q.includes("min(OccurredAt)"),
+          );
+          const heavyQuery = queries.find((q) =>
+            q.includes("ts_ComputedInput"),
+          );
           expect(resolveQuery).toBeDefined();
           expect(heavyQuery).toBeDefined();
           expect(heavyQuery!).toContain("OccurredAt >=");
@@ -578,7 +582,9 @@ describe("ClickHouse trace dedup (integration)", () => {
 
           // Resolve found nothing (epoch default), so the heavy summary read
           // keeps its previous unbounded behaviour rather than guessing.
-          const heavyQuery = queries.find((q) => q.includes("ts_ComputedInput"));
+          const heavyQuery = queries.find((q) =>
+            q.includes("ts_ComputedInput"),
+          );
           expect(heavyQuery).toBeDefined();
           expect(heavyQuery!).not.toContain("OccurredAt >=");
         });

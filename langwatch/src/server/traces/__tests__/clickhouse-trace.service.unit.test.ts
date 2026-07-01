@@ -1044,7 +1044,9 @@ describe("ClickHouseTraceService", () => {
           summaryCall.query.match(/OccurredAt >= fromUnixTimestamp64Milli/g) ??
             [],
         ).toHaveLength(2);
-        expect(summaryCall.query_params.sumFromMs).toBe(1_000_000 - TWO_DAYS_MS);
+        expect(summaryCall.query_params.sumFromMs).toBe(
+          1_000_000 - TWO_DAYS_MS,
+        );
         expect(summaryCall.query_params.sumToMs).toBe(2_000_000 + TWO_DAYS_MS);
       });
 
