@@ -73,7 +73,7 @@
     "@opentelemetry/sdk-trace-web": ">=2.0.1",
     "@types/debug": "^4.1.12",
     "@types/js-yaml": "^4.0.9",
-    "@types/node": "^24.1.0",
+    "@types/node": "^26.0.0",
     "@typescript/native-preview": "7.0.0-dev.20260426.1",
     "@vercel/otel": "^1.13.0",
     "@vitest/coverage-v8": "^4.1.0",
