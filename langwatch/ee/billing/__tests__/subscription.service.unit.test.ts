@@ -12,12 +12,19 @@ vi.mock("../../../src/server/app-layer/app", () => ({
 
 import type { PrismaClient } from "@prisma/client";
 import type Stripe from "stripe";
-import { PlanTypes, SubscriptionStatus } from "../planTypes";
-import { EESubscriptionService, RECENT_INVOICES_LIMIT } from "../services/subscription.service";
-import { InvalidPlanError, OrganizationNotFoundError, SeatBillingUnavailableError } from "../errors";
-import type { SeatEventSubscriptionFns } from "../services/seatEventSubscription";
-import type { SubscriptionRepository } from "../../../src/server/app-layer/subscription/subscription.repository";
 import type { OrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.repository";
+import type { SubscriptionRepository } from "../../../src/server/app-layer/subscription/subscription.repository";
+import {
+  InvalidPlanError,
+  OrganizationNotFoundError,
+  SeatBillingUnavailableError,
+} from "../errors";
+import { PlanTypes, SubscriptionStatus } from "../planTypes";
+import type { SeatEventSubscriptionFns } from "../services/seatEventSubscription";
+import {
+  EESubscriptionService,
+  RECENT_INVOICES_LIMIT,
+} from "../services/subscription.service";
 
 const createMockStripe = () => ({
   subscriptions: {
@@ -136,7 +143,9 @@ describe("EESubscriptionService", () => {
   let db: ReturnType<typeof createMockDb>;
   let repository: ReturnType<typeof createMockRepository>;
   let itemCalculator: ReturnType<typeof createMockItemCalculator>;
-  let organizationRepository: ReturnType<typeof createMockOrganizationRepository>;
+  let organizationRepository: ReturnType<
+    typeof createMockOrganizationRepository
+  >;
   let service: EESubscriptionService;
 
   beforeEach(() => {
@@ -151,7 +160,8 @@ describe("EESubscriptionService", () => {
       repository: repository as unknown as SubscriptionRepository,
       stripe: stripe as unknown as Stripe,
       itemCalculator,
-      organizationRepository: organizationRepository as unknown as OrganizationRepository,
+      organizationRepository:
+        organizationRepository as unknown as OrganizationRepository,
     });
   });
 
@@ -321,9 +331,9 @@ describe("EESubscriptionService", () => {
           expect.objectContaining({ invoice_now: true }),
         );
         // prorate stays off so unused licensed (seat) time is not credited.
-        expect(stripe.subscriptions.cancel.mock.calls[0]![1]).not.toHaveProperty(
-          "prorate",
-        );
+        expect(
+          stripe.subscriptions.cancel.mock.calls[0]![1],
+        ).not.toHaveProperty("prorate");
       });
     });
 
@@ -521,8 +531,7 @@ describe("EESubscriptionService", () => {
         const mockSub = { id: "sub_1", status: "ACTIVE" };
         repository.findLastNonCancelled.mockResolvedValue(mockSub);
 
-        const result =
-          await service.getLastNonCancelledSubscription("org_123");
+        const result = await service.getLastNonCancelledSubscription("org_123");
 
         expect(result).toEqual(mockSub);
         expect(repository.findLastNonCancelled).toHaveBeenCalledWith("org_123");

@@ -1,32 +1,45 @@
-import { Currency, type OrganizationUserRole, type PrismaClient } from "@prisma/client";
-import type Stripe from "stripe";
-import type { DisplayInvoice, SubscriptionService } from "../../../src/server/app-layer/subscription/subscription.service";
-import type { SubscriptionRepository } from "../../../src/server/app-layer/subscription/subscription.repository";
-import type { OrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.repository";
-import { PrismaOrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.prisma.repository";
-import { traced } from "../../../src/server/app-layer/tracing";
-import { getApp } from "../../../src/server/app-layer/app";
 import {
-  type PlanTypes as PlanType,
-  PlanTypes,
-  SubscriptionStatus,
-} from "../planTypes";
-import type { StripePriceName } from "../stripe/stripePrices.types";
+  Currency,
+  type OrganizationUserRole,
+  type PrismaClient,
+} from "@prisma/client";
+import type Stripe from "stripe";
+import { getApp } from "../../../src/server/app-layer/app";
+import { PrismaOrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.prisma.repository";
+import type { OrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.repository";
+import type { SubscriptionRepository } from "../../../src/server/app-layer/subscription/subscription.repository";
 import type {
-  createItemsToAdd,
-  getItemsToUpdate,
-  prices,
-} from "./subscriptionItemCalculator";
-import { isStripePriceName, stripePricesFile } from "../stripe/stripePriceCatalog";
+  DisplayInvoice,
+  SubscriptionService,
+} from "../../../src/server/app-layer/subscription/subscription.service";
+import { traced } from "../../../src/server/app-layer/tracing";
 import {
   InvalidPlanError,
   OrganizationNotFoundError,
   SeatBillingUnavailableError,
   SubscriptionCreationFailedError,
 } from "../errors";
-import { isGrowthSeatEventPlan, type BillingInterval } from "../utils/growthSeatEvent";
+import {
+  type PlanTypes as PlanType,
+  PlanTypes,
+  SubscriptionStatus,
+} from "../planTypes";
+import {
+  isStripePriceName,
+  stripePricesFile,
+} from "../stripe/stripePriceCatalog";
+import type { StripePriceName } from "../stripe/stripePrices.types";
+import {
+  type BillingInterval,
+  isGrowthSeatEventPlan,
+} from "../utils/growthSeatEvent";
 import type { SeatEventSubscriptionFns } from "./seatEventSubscription";
 import { PrismaSubscriptionRepository } from "./subscription.repository";
+import type {
+  createItemsToAdd,
+  getItemsToUpdate,
+  prices,
+} from "./subscriptionItemCalculator";
 
 export const RECENT_INVOICES_LIMIT = 4;
 
@@ -140,8 +153,7 @@ export class EESubscriptionService implements SubscriptionService {
       await this.repository.findLastNonCancelled(organizationId);
 
     if (
-      lastSubscription &&
-      lastSubscription.stripeSubscriptionId &&
+      lastSubscription?.stripeSubscriptionId &&
       lastSubscription.status !== SubscriptionStatus.PENDING
     ) {
       const subscription = await this.stripe.subscriptions.retrieve(
@@ -206,8 +218,7 @@ export class EESubscriptionService implements SubscriptionService {
       await this.repository.findLastNonCancelled(organizationId);
 
     if (
-      lastSubscription &&
-      lastSubscription.stripeSubscriptionId &&
+      lastSubscription?.stripeSubscriptionId &&
       lastSubscription.status !== SubscriptionStatus.PENDING
     ) {
       if (plan === PlanTypes.FREE) {
@@ -284,7 +295,10 @@ export class EESubscriptionService implements SubscriptionService {
     if (!this.seatEventFns) {
       throw new SeatBillingUnavailableError();
     }
-    return this.seatEventFns.previewProration({ organizationId, newTotalSeats });
+    return this.seatEventFns.previewProration({
+      organizationId,
+      newTotalSeats,
+    });
   }
 
   async createSubscriptionWithInvites({
@@ -377,7 +391,8 @@ export class EESubscriptionService implements SubscriptionService {
   }: {
     organizationId: string;
   }): Promise<DisplayInvoice[]> {
-    const stripeCustomerId = await this.organizationRepository.getStripeCustomerId(organizationId);
+    const stripeCustomerId =
+      await this.organizationRepository.getStripeCustomerId(organizationId);
 
     if (!stripeCustomerId) {
       return [];
@@ -453,9 +468,8 @@ export class EESubscriptionService implements SubscriptionService {
     membersToAdd: number;
     baseUrl: string;
   }): Promise<{ url: string | null }> {
-    const currentStripeSubscription = await this.stripe.subscriptions.retrieve(
-      stripeSubscriptionId,
-    );
+    const currentStripeSubscription =
+      await this.stripe.subscriptions.retrieve(stripeSubscriptionId);
 
     const itemsToUpdate = this.itemCalculator.getItemsToUpdate({
       currentItems: currentStripeSubscription.items.data,
