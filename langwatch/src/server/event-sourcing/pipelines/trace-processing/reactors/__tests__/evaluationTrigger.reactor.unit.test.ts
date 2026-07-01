@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
 import type { ReactorContext } from "../../../../reactors/reactor.types";
+import { MAX_PROCESSED_SPANS } from "../../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
   createEvaluationTriggerReactor,
@@ -8,8 +10,6 @@ import {
   type EvaluationTriggerReactorDeps,
 } from "../evaluationTrigger.reactor";
 import { DEFERRED_CHECK_DELAY_MS } from "../originGate.reactor";
-import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
-import { MAX_PROCESSED_SPANS } from "../../projections/traceSummary.foldProjection";
 
 function createFoldState(
   overrides: Partial<TraceSummaryData> = {},
@@ -135,7 +135,12 @@ function createDeps(
   return {
     monitors: {
       getEnabledOnMessageMonitors: vi.fn().mockResolvedValue([
-        { id: "mon-1", checkType: "llm/boolean", name: "Test Monitor", evaluator: null },
+        {
+          id: "mon-1",
+          checkType: "llm/boolean",
+          name: "Test Monitor",
+          evaluator: null,
+        },
       ]),
     } as unknown as EvaluationTriggerReactorDeps["monitors"],
     evaluation: vi.fn().mockResolvedValue(undefined),
@@ -175,7 +180,10 @@ describe("detectCausalityLoop (pure)", () => {
   it("accepts depth as a string-valued OTLP attribute", () => {
     const reason = detectCausalityLoop({
       spanAttributes: [
-        { key: "langwatch.reserved.causality_depth", value: { stringValue: "2" } },
+        {
+          key: "langwatch.reserved.causality_depth",
+          value: { stringValue: "2" },
+        },
       ],
     });
     expect(reason).toBe("depth_direct");
@@ -184,7 +192,10 @@ describe("detectCausalityLoop (pure)", () => {
   it("ignores malformed depth values", () => {
     const reason = detectCausalityLoop({
       spanAttributes: [
-        { key: "langwatch.reserved.causality_depth", value: { stringValue: "abc" } },
+        {
+          key: "langwatch.reserved.causality_depth",
+          value: { stringValue: "abc" },
+        },
       ],
     });
     expect(reason).toBeNull();
@@ -212,7 +223,9 @@ describe("evaluationTrigger reactor", () => {
 
       await reactor.handle(createOriginEvent(), createContext(state));
 
-      expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith("tenant-1");
+      expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith(
+        "tenant-1",
+      );
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
   });
@@ -307,7 +320,10 @@ describe("evaluationTrigger reactor", () => {
         attributes: { "langwatch.origin": "evaluation" },
       });
 
-      await reactor.handle(createOriginEvent("evaluation"), createContext(state));
+      await reactor.handle(
+        createOriginEvent("evaluation"),
+        createContext(state),
+      );
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
@@ -397,8 +413,59 @@ describe("evaluationTrigger reactor", () => {
       const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
       expect(options).toBeDefined();
       expect(options!.deduplication).toBeDefined();
-      expect(options!.deduplication!.ttlMs).toBe(DEFERRED_CHECK_DELAY_MS + 60_000);
+      expect(options!.deduplication!.ttlMs).toBe(
+        DEFERRED_CHECK_DELAY_MS + 60_000,
+      );
       expect(options!.delay).toBeUndefined();
+    });
+
+    it("marks the dedup as surviving dispatch so a re-trigger after dispatch is squashed (#3912)", async () => {
+      const deps = createDeps();
+      const reactor = createEvaluationTriggerReactor(deps);
+      const state = createFoldState({
+        attributes: { "langwatch.origin": "application" },
+      });
+
+      await reactor.handle(createOriginEvent(), createContext(state));
+
+      // The reactor can fire a second time after the command was already
+      // dispatched (a late span, then the deferred OriginResolvedEvent). The
+      // dedup key outlives dispatch (6-min TTL), so shouldSurviveDispatch must be set
+      // for that second dispatch to be squashed instead of re-run as a duplicate.
+      const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
+      expect(options!.deduplication!.shouldSurviveDispatch).toBe(true);
+    });
+  });
+
+  describe("when thread-level eval is dispatched", () => {
+    it("also marks the dedup as surviving dispatch (#3912)", async () => {
+      const deps = createDeps({
+        monitors: {
+          getEnabledOnMessageMonitors: vi.fn().mockResolvedValue([
+            {
+              id: "mon-1",
+              checkType: "llm/boolean",
+              name: "Test Monitor",
+              evaluator: null,
+              threadIdleTimeout: 300,
+            },
+          ]),
+        } as unknown as EvaluationTriggerReactorDeps["monitors"],
+      });
+      const reactor = createEvaluationTriggerReactor(deps);
+      const state = createFoldState({
+        attributes: {
+          "langwatch.origin": "application",
+          "gen_ai.conversation.id": "thread-1",
+        },
+      });
+
+      await reactor.handle(createOriginEvent(), createContext(state));
+
+      const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
+      // delay == threadIdleTimeout * 1000 confirms the thread-level branch was taken.
+      expect(options!.delay).toBe(300 * 1000);
+      expect(options!.deduplication!.shouldSurviveDispatch).toBe(true);
     });
   });
 
@@ -457,7 +524,9 @@ describe("evaluationTrigger reactor", () => {
 
       await reactor.handle(event, createContext(state));
 
-      expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith("tenant-1");
+      expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith(
+        "tenant-1",
+      );
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
   });

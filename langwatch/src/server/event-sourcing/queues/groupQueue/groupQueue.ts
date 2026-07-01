@@ -2,8 +2,8 @@ import { performance } from "node:perf_hooks";
 import {
   context as otelContext,
   SpanKind,
-  trace,
   TraceFlags,
+  trace,
 } from "@opentelemetry/api";
 import fastq from "fastq";
 import { Cluster, Redis as IORedis } from "ioredis";
@@ -11,18 +11,17 @@ import { getLangWatchTracer } from "langwatch";
 import type { SemConvAttributes } from "langwatch/observability";
 import { createLogger } from "../../../../utils/logger/server";
 import {
+  createContextFromJobData,
   getJobContextMetadata,
   type JobContextMetadata,
-  createContextFromJobData,
   runWithContext,
 } from "../../../context/asyncContext";
-import { connection } from "../../../redis";
+import { featureFlagService } from "../../../featureFlag";
 import {
-  decodeJobEnvelope,
-  encodeJobEnvelope,
-  readEnvelopeBlobId,
-} from "./jobEnvelope";
-import { RedisJobBlobStore } from "./redisJobBlobStore";
+  TenantRateTracker,
+  tenantIdFromGroupId,
+} from "../../../observability/tenantRateTracker";
+import { connection } from "../../../redis";
 import type {
   DeduplicationConfig,
   EventSourcedQueueDefinition,
@@ -30,38 +29,39 @@ import type {
   QueueSendOptions,
 } from "../../queues";
 import {
-  categorizeError,
   ConfigurationError,
+  categorizeError,
   ErrorCategory,
   QueueError,
 } from "../../services/errorHandling";
-import { JOB_RETRY_CONFIG, getBackoffMs } from "../shared";
+import { getBackoffMs, JOB_RETRY_CONFIG } from "../shared";
 import { GroupQueueDispatcher } from "./dispatcher";
 import {
+  decodeJobEnvelope,
+  encodeJobEnvelope,
+  readEnvelopeBlobId,
+} from "./jobEnvelope";
+import {
   gqGroupsBlockedTotal,
+  gqJobDelayMilliseconds,
+  gqJobDurationMilliseconds,
   gqJobsCompletedTotal,
   gqJobsDedupedTotal,
-  gqJobsExhaustedTotal,
-  gqJobsRetriedTotal,
-  gqJobsNonRetryableTotal,
-  gqJobsStagedTotal,
   gqJobsDelayedTotal,
-  gqJobDelayMilliseconds,
+  gqJobsExhaustedTotal,
+  gqJobsNonRetryableTotal,
+  gqJobsRetriedTotal,
+  gqJobsStagedTotal,
   gqRetryAttempt,
   gqRetryBackoffMilliseconds,
-  gqJobDurationMilliseconds,
 } from "./metrics";
 import { GroupQueueMetricsCollector } from "./metricsCollector";
+import { RedisJobBlobStore } from "./redisJobBlobStore";
 import {
   type DispatchResult,
   type DrainedJob,
   GroupStagingScripts,
 } from "./scripts";
-import {
-  TenantRateTracker,
-  tenantIdFromGroupId,
-} from "../../../observability/tenantRateTracker";
-import { featureFlagService } from "../../../featureFlag";
 
 /**
  * Configuration for the group queue.
@@ -305,11 +305,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
     let dedupTtlMs = 0;
     let shouldExtend = true;
     let shouldReplace = true;
+    let shouldSurviveDispatch = false;
     if (dedup) {
       dedupId = dedup.makeId(payload).replaceAll(":", ".");
       dedupTtlMs = dedup.ttlMs ?? DEFAULT_DEDUPLICATION_TTL_MS;
       shouldExtend = dedup.extend !== false;
       shouldReplace = dedup.replace !== false;
+      shouldSurviveDispatch = dedup.shouldSurviveDispatch === true;
     }
 
     // Attach context metadata to the payload
@@ -340,6 +342,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       }),
       shouldExtend,
       shouldReplace,
+      shouldSurviveDispatch,
     });
 
     // A dedup squash displaced a staged payload; reclaim its offloaded blob so
@@ -402,6 +405,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
 
     const shouldExtend = dedup ? dedup.extend !== false : true;
     const shouldReplace = dedup ? dedup.replace !== false : true;
+    const shouldSurviveDispatch = dedup
+      ? dedup.shouldSurviveDispatch === true
+      : false;
 
     const jobsToStage = await Promise.all(
       payloads.map(async (payload, index) => {
@@ -435,6 +441,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
           }),
           shouldExtend,
           shouldReplace,
+          shouldSurviveDispatch,
         };
       }),
     );
