@@ -22,7 +22,7 @@ export function _resetSubmittedInviteCodesForTests(): void {
 }
 
 type AcceptInviteMutation = ReturnType<
-  typeof api.organization.acceptInvite.useMutation
+  typeof api.invite.acceptInvite.useMutation
 >;
 type AcceptInviteMutationResult = Pick<
   AcceptInviteMutation,
@@ -47,7 +47,7 @@ export interface UseAcceptInviteOnceOptions {
 }
 
 /**
- * Fire `organization.acceptInvite` at most once per invite code and drive the
+ * Fire `invite.acceptInvite` at most once per invite code and drive the
  * page through a small state machine.
  *
  * ## Why a module-scoped `Set` one-shot guard instead of `mutation.isIdle` or `useRef`?
@@ -76,7 +76,7 @@ export function useAcceptInviteOnce({
   inviteCode,
   enabled,
 }: UseAcceptInviteOnceOptions): UseAcceptInviteOnceResult {
-  const mutation = api.organization.acceptInvite.useMutation({
+  const mutation = api.invite.acceptInvite.useMutation({
     onSuccess: (data) => {
       toaster.create({
         title: "Invite Accepted",
