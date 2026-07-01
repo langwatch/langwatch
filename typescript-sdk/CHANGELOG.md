@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.34.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.33.2...typescript-sdk@v0.34.0) (2026-07-01)
+
+
+### Features
+
+* **evaluations:** unify workflow evaluation onto the evaluations-v3 pipeline ([#4946](https://github.com/langwatch/langwatch/issues/4946)) ([7a1919a](https://github.com/langwatch/langwatch/commit/7a1919a9055551fd20d970df3384ac0142f0bf83))
+
+
+### Bug Fixes
+
+* **security:** esbuild, vite and form-data floors across all workspaces ([361b301](https://github.com/langwatch/langwatch/commit/361b3014f62257e7cb2702e60588fc534a271d20))
+* **security:** esbuild, vite and form-data security floors across all workspaces ([#4827](https://github.com/langwatch/langwatch/issues/4827)) ([361b301](https://github.com/langwatch/langwatch/commit/361b3014f62257e7cb2702e60588fc534a271d20))
+
+
+### Miscellaneous
+
+* **main:** release langwatch 3.5.0 ([#4463](https://github.com/langwatch/langwatch/issues/4463)) ([db617c5](https://github.com/langwatch/langwatch/commit/db617c55cbf27de163f067dc5f188c704e5c56e0))
+
 ## [0.33.2](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.33.1...typescript-sdk@v0.33.2) (2026-06-19)
 
 
