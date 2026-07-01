@@ -1,5 +1,5 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { OrganizationUserRole, type PrismaClient } from "@prisma/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LicenseEnforcementRepository } from "../license-enforcement.repository";
 
 /**
@@ -724,6 +724,7 @@ describe("LicenseEnforcementRepository", () => {
   });
 
   describe("getCurrentMonthCost", () => {
+    /** @scenario "getCurrentMonthCost remains available in the repository" */
     it("fetches project IDs and aggregates cost for current month", async () => {
       mockPrisma.project.findMany.mockResolvedValue([
         { id: "proj-1" },
@@ -835,4 +836,3 @@ describe("LicenseEnforcementRepository", () => {
     });
   });
 });
-

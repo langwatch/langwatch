@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   fireIntegrationMethodNurturing,
   mapProductSelectionToIntegrationMethod,
@@ -14,7 +14,7 @@ vi.mock("../../../../src/utils/logger/server", () => ({
 }));
 vi.mock("../../../../src/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 const mockNurturing = {
@@ -36,27 +36,36 @@ vi.mock("../../../../src/server/app-layer/app", () => ({
 
 describe("mapProductSelectionToIntegrationMethod()", () => {
   describe("when given a valid product selection", () => {
+    /** @scenario 'Integration-method selection maps to canonical trait value' */
     it("maps 'via-claude-code' to 'coding_agent'", () => {
-      expect(mapProductSelectionToIntegrationMethod("via-claude-code")).toBe("coding_agent");
+      expect(mapProductSelectionToIntegrationMethod("via-claude-code")).toBe(
+        "coding_agent",
+      );
     });
 
     it("maps 'via-platform' to 'platform'", () => {
-      expect(mapProductSelectionToIntegrationMethod("via-platform")).toBe("platform");
+      expect(mapProductSelectionToIntegrationMethod("via-platform")).toBe(
+        "platform",
+      );
     });
 
     it("maps 'via-claude-desktop' to 'mcp'", () => {
-      expect(mapProductSelectionToIntegrationMethod("via-claude-desktop")).toBe("mcp");
+      expect(mapProductSelectionToIntegrationMethod("via-claude-desktop")).toBe(
+        "mcp",
+      );
     });
 
     it("maps 'manually' to 'manual_sdk'", () => {
-      expect(mapProductSelectionToIntegrationMethod("manually")).toBe("manual_sdk");
+      expect(mapProductSelectionToIntegrationMethod("manually")).toBe(
+        "manual_sdk",
+      );
     });
   });
 
   describe("when given an unknown selection", () => {
     it("throws an error", () => {
       expect(() => mapProductSelectionToIntegrationMethod("unknown")).toThrow(
-        "Unknown product selection: unknown"
+        "Unknown product selection: unknown",
       );
     });
   });
@@ -69,7 +78,7 @@ describe("fireIntegrationMethodNurturing()", () => {
   });
 
   describe("when the user selects an integration method", () => {
-    /** @scenario 'Product interest identify call is fire-and-forget' */
+    /** @scenario 'Integration-method identify call is fire-and-forget' */
     it("sends only integration_method trait via identifyUser", () => {
       fireIntegrationMethodNurturing({
         userId: "user-123",
@@ -104,20 +113,20 @@ describe("fireIntegrationMethodNurturing()", () => {
   });
 
   describe("when Customer.io API is unavailable", () => {
-    /** @scenario 'Product interest identify failure does not break onboarding navigation' */
+    /** @scenario 'Integration-method identify failure does not break onboarding navigation' */
     it("does not throw (fire-and-forget)", async () => {
       const { captureException } = await import(
         "../../../../src/utils/posthogErrorCapture"
       );
       mockNurturing.identifyUser.mockRejectedValueOnce(
-        new Error("CIO unavailable")
+        new Error("CIO unavailable"),
       );
 
       expect(() =>
         fireIntegrationMethodNurturing({
           userId: "user-123",
           integrationMethod: "coding_agent",
-        })
+        }),
       ).not.toThrow();
 
       await vi.waitFor(() => {

@@ -73,26 +73,26 @@ Feature: Saved Views on Traces List
     Then I see an "Origin" filter option
     And it lists the available origin values with counts
 
-  @unit @unimplemented
+  @unit
   Scenario: ClickHouse origin filter for "application" matches absent values
     Given the ClickHouse filter condition builder for "traces.origin"
     When I build a condition for values ["application"]
     Then the SQL checks for empty or null origin attribute
     And it does not use a simple IN clause with "application"
 
-  @unit @unimplemented
+  @unit
   Scenario: ClickHouse origin filter for specific values
     Given the ClickHouse filter condition builder for "traces.origin"
     When I build a condition for values ["evaluation"]
     Then the SQL uses an IN clause matching the attribute value
 
-  @unit @unimplemented
+  @unit
   Scenario: ClickHouse origin filter for mixed values including "application"
     Given the ClickHouse filter condition builder for "traces.origin"
     When I build a condition for values ["application", "evaluation"]
     Then the SQL combines an absence check OR an IN clause
 
-  @unit @unimplemented
+  @unit
   Scenario: ClickHouse origin aggregation labels empty values as "application"
     Given the ClickHouse filter definition for "traces.origin"
     When the aggregation query runs
@@ -116,7 +116,7 @@ Feature: Saved Views on Traces List
     # MessagesTable.tsx:583-598 only renders the badge when `displayOrigin`
     # (raw langwatch.origin) is a non-empty string.
 
-  @unit @unimplemented
+  @unit
   Scenario: Origin colors follow the centralized originColors mapping
     Then the origin color mapping is:
       | origin      | background      | foreground         |
@@ -323,13 +323,13 @@ Feature: Saved Views on Traces List
     When I manually add a model filter in the sidebar
     Then no saved view badge appears selected
 
-  @unit @unimplemented
+  @unit
   Scenario: Re-applying saved view's exact filters re-selects the badge
     Given a saved view "Debug" with filters model=["gpt-4"]
     When I manually set the model filter to ["gpt-4"] via the sidebar
     Then the "Debug" badge appears selected
 
-  @unit @unimplemented
+  @unit
   Scenario: View matching ignores array order
     Given a saved view with model=["gpt-4", "claude-3"]
     When the URL has model=["claude-3", "gpt-4"]
@@ -348,11 +348,11 @@ Feature: Saved Views on Traces List
     When I try to save a view with a name longer than 50 characters
     Then the name is truncated to 50 characters
 
-  @unit @unimplemented
-  Scenario: First-visit projects auto-seed and show All Traces plus 4 seed views
+  @unit
+  Scenario: First-visit projects auto-seed and show All Traces plus 5 seed views
     Given the project has no saved views in the database
     When the bar renders for the first time
-    Then 4 seed views are auto-created (Application, Evaluations, Simulations, Playground)
+    Then 5 seed views are auto-created (Application, Evaluations, Simulations, Playground, Gateway)
     And they are shown alongside "All Traces"
     And the three-dot menu is still visible
     # The "Empty custom views list" wording was removed: saved-view.service.ts
@@ -360,32 +360,32 @@ Feature: Saved Views on Traces List
 
   # ─── Step 6: tRPC Endpoints ─────────────────────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: getAll returns views ordered by position
     Given the project has saved views in the database
     When I call savedViews.getAll with the projectId
     Then I receive all views for that project
     And they are ordered by the "order" field ascending
 
-  @integration @unimplemented
+  @integration
   Scenario: create adds a new view at the end
     When I call savedViews.create with name, filters, and projectId
     Then a new view is created in the database
     And its order is after all existing views
 
-  @integration @unimplemented
+  @integration
   Scenario: delete removes a view
     Given a saved view exists with id "view-1"
     When I call savedViews.delete with id "view-1" and projectId
     Then the view is removed from the database
 
-  @integration @unimplemented
+  @integration
   Scenario: rename updates the view name
     Given a saved view exists with name "Old Name"
     When I call savedViews.rename with the new name "New Name"
     Then the view name is updated in the database
 
-  @integration @unimplemented
+  @integration
   Scenario: reorder updates the order of all views
     Given views exist in order ["view-a", "view-b", "view-c"]
     When I call savedViews.reorder with ["view-c", "view-a", "view-b"]

@@ -6,16 +6,12 @@ Feature: Unified FREE plan experience
   Background:
     Given the platform is running in SaaS mode
 
-  # 6 of 12 scenarios are bound to existing tests in langwatch/ee/billing/__tests__/planProvider.unit.test.ts.
-  # 5 counting-unit scenarios are now bound in
-  # langwatch/src/server/app-layer/usage/__tests__/usage-meter-policy.unit.test.ts
-  # (the "counting unit by organization profile" describe block).
-  #
-  # NoTest gap (1 scenario remains @unimplemented):
-  #   - "Self-hosted free organization is never blocked"
-  #     UsageService.checkLimit has no IS_SAAS short-circuit — it still returns
-  #     exceeded: true on self-hosted when limits are hit. The scenario describes
-  #     behaviour that is not yet implemented in the service layer.
+  # 11 of 12 scenarios bound:
+  #   - 6 to langwatch/ee/billing/__tests__/planProvider.unit.test.ts
+  #   - 5 to langwatch/src/server/app-layer/usage/__tests__/usage-meter-policy.unit.test.ts
+  # 1 @unimplemented remaining (#3458):
+  #   - "Self-hosted free organization is never blocked" — needs IS_SAAS short-circuit
+  #     added to UsageService.checkLimit (a behavior change, not a test gap)
 
   # ============================================================================
   # Event Limits

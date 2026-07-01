@@ -1,11 +1,12 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { UpgradeModal } from "../UpgradeModal";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { UpgradeModalVariant } from "../../stores/upgradeModalStore";
+import { UpgradeModal } from "../UpgradeModal";
 
 // Mock dependencies used by other content variants
 vi.mock("~/utils/compat/next-router", () => ({
@@ -34,9 +35,7 @@ vi.mock("../../utils/tracking", () => ({
 }));
 
 function renderWithProviders(ui: React.ReactElement) {
-  return render(
-    <ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>,
-  );
+  return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
 }
 
 describe("<UpgradeModal />", () => {
@@ -60,6 +59,7 @@ describe("<UpgradeModal />", () => {
       expect(screen.getByText("Feature Not Available")).toBeDefined();
     });
 
+    /** @scenario "Restriction modal uses role-based messaging" */
     it("renders role-based messaging without billing references", () => {
       renderWithProviders(
         <UpgradeModal open={true} onClose={onClose} variant={variant} />,
@@ -86,6 +86,7 @@ describe("<UpgradeModal />", () => {
       expect(screen.queryByRole("button", { name: /manage plan/i })).toBeNull();
     });
 
+    /** @scenario 'Restriction modal offers "Contact Admin" not "Upgrade your plan"' */
     it("renders a Dismiss button that calls onClose", () => {
       renderWithProviders(
         <UpgradeModal open={true} onClose={onClose} variant={variant} />,

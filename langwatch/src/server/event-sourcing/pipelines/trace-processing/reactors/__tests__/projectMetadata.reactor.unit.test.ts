@@ -7,7 +7,6 @@ import {
   type ProjectMetadataReactorDeps,
 } from "../projectMetadata.reactor";
 
-
 function createFoldState(
   overrides: Partial<TraceSummaryData> = {},
 ): TraceSummaryData {
@@ -120,6 +119,7 @@ describe("createProjectMetadataReactor()", () => {
       mockProjects.updateMetadata.mockResolvedValue(undefined);
     });
 
+    /** @scenario "Project marks as integrated after first trace ingestion" */
     it("sets firstMessage to true", async () => {
       const reactor = createProjectMetadataReactor(deps);
       const event = createEvent(tenantId);
@@ -327,8 +327,6 @@ describe("createProjectMetadataReactor()", () => {
       // Must not throw
       await expect(reactor.handle(event, context)).resolves.toBeUndefined();
     });
-
-
   });
 
   it("uses dedup makeJobId based on tenantId", () => {

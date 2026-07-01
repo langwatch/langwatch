@@ -10,6 +10,7 @@ import { translateModelIdForLitellm } from "../modelIdBoundary";
 
 describe("translateModelIdForLitellm", () => {
   describe("Anthropic Claude models with dots", () => {
+    /** @scenario "prepareLitellmParams translates Anthropic model ID" */
     it("translates anthropic/claude-opus-4.5 to anthropic/claude-opus-4-5", () => {
       const result = translateModelIdForLitellm("anthropic/claude-opus-4.5");
       expect(result).toBe("anthropic/claude-opus-4-5");
@@ -41,6 +42,7 @@ describe("translateModelIdForLitellm", () => {
   });
 
   describe("OpenAI models unchanged", () => {
+    /** @scenario "prepareLitellmParams preserves OpenAI model ID" */
     it("preserves openai/gpt-5 unchanged", () => {
       const result = translateModelIdForLitellm("openai/gpt-5");
       expect(result).toBe("openai/gpt-5");

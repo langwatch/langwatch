@@ -5,8 +5,8 @@ import type { ProjectService } from "../../../../../app-layer/projects/project.s
 import type { ReactorContext } from "../../../../reactors/reactor.types";
 import type { EvaluationProcessingEvent } from "../../schemas/events";
 import {
-  createCustomerIoEvaluationSyncReactor,
   type CustomerIoEvaluationSyncReactorDeps,
+  createCustomerIoEvaluationSyncReactor,
 } from "../customerIoEvaluationSync.reactor";
 
 // Suppress logger output
@@ -21,7 +21,7 @@ vi.mock("~/utils/logger/server", () => ({
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 function createFoldState(
@@ -130,10 +130,14 @@ describe("customerIoEvaluationSync reactor", () => {
   });
 
   describe("makeJobId", () => {
+    /** @scenario 'Evaluation sync reactor uses project-and-evaluation-scoped job ID for debouncing' */
     it("returns cio-eval-sync-{projectId}-{evaluationId}", () => {
       const deps = createDeps();
       const reactor = createCustomerIoEvaluationSyncReactor(deps);
-      const event = createEvent({ tenantId: "project-42", aggregateId: "eval-99" });
+      const event = createEvent({
+        tenantId: "project-42",
+        aggregateId: "eval-99",
+      });
 
       const jobId = reactor.options!.makeJobId!({
         event,
@@ -153,10 +157,7 @@ describe("customerIoEvaluationSync reactor", () => {
         });
         const reactor = createCustomerIoEvaluationSyncReactor(deps);
 
-        await reactor.handle(
-          createEvent(),
-          createContext(createFoldState()),
-        );
+        await reactor.handle(createEvent(), createContext(createFoldState()));
 
         expect(deps.nurturing.identifyUser).toHaveBeenCalledWith({
           userId: "user-1",
@@ -251,10 +252,7 @@ describe("customerIoEvaluationSync reactor", () => {
         });
         const reactor = createCustomerIoEvaluationSyncReactor(deps);
 
-        await reactor.handle(
-          createEvent(),
-          createContext(createFoldState()),
-        );
+        await reactor.handle(createEvent(), createContext(createFoldState()));
 
         expect(deps.nurturing.identifyUser).not.toHaveBeenCalled();
         expect(deps.nurturing.trackEvent).not.toHaveBeenCalled();
@@ -275,10 +273,7 @@ describe("customerIoEvaluationSync reactor", () => {
       });
       const reactor = createCustomerIoEvaluationSyncReactor(deps);
 
-      await reactor.handle(
-        createEvent(),
-        createContext(createFoldState()),
-      );
+      await reactor.handle(createEvent(), createContext(createFoldState()));
 
       expect(deps.nurturing.identifyUser).not.toHaveBeenCalled();
       expect(deps.nurturing.trackEvent).not.toHaveBeenCalled();

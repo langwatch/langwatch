@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
 import type { ReactorContext } from "../../../../reactors/reactor.types";
+import { MAX_PROCESSED_SPANS } from "../../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import {
   createEvaluationTriggerReactor,
@@ -8,8 +10,6 @@ import {
   type EvaluationTriggerReactorDeps,
 } from "../evaluationTrigger.reactor";
 import { DEFERRED_CHECK_DELAY_MS } from "../originGate.reactor";
-import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
-import { MAX_PROCESSED_SPANS } from "../../projections/traceSummary.foldProjection";
 
 function createFoldState(
   overrides: Partial<TraceSummaryData> = {},
@@ -135,7 +135,12 @@ function createDeps(
   return {
     monitors: {
       getEnabledOnMessageMonitors: vi.fn().mockResolvedValue([
-        { id: "mon-1", checkType: "llm/boolean", name: "Test Monitor", evaluator: null },
+        {
+          id: "mon-1",
+          checkType: "llm/boolean",
+          name: "Test Monitor",
+          evaluator: null,
+        },
       ]),
     } as unknown as EvaluationTriggerReactorDeps["monitors"],
     evaluation: vi.fn().mockResolvedValue(undefined),
@@ -175,7 +180,10 @@ describe("detectCausalityLoop (pure)", () => {
   it("accepts depth as a string-valued OTLP attribute", () => {
     const reason = detectCausalityLoop({
       spanAttributes: [
-        { key: "langwatch.reserved.causality_depth", value: { stringValue: "2" } },
+        {
+          key: "langwatch.reserved.causality_depth",
+          value: { stringValue: "2" },
+        },
       ],
     });
     expect(reason).toBe("depth_direct");
@@ -184,7 +192,10 @@ describe("detectCausalityLoop (pure)", () => {
   it("ignores malformed depth values", () => {
     const reason = detectCausalityLoop({
       spanAttributes: [
-        { key: "langwatch.reserved.causality_depth", value: { stringValue: "abc" } },
+        {
+          key: "langwatch.reserved.causality_depth",
+          value: { stringValue: "abc" },
+        },
       ],
     });
     expect(reason).toBeNull();
@@ -203,6 +214,7 @@ describe("evaluationTrigger reactor", () => {
   });
 
   describe("when trace has explicit application origin", () => {
+    /** @scenario "Evaluation trigger runs on traces with explicit application origin" */
     it("dispatches evaluation commands", async () => {
       const deps = createDeps();
       const reactor = createEvaluationTriggerReactor(deps);
@@ -212,7 +224,9 @@ describe("evaluationTrigger reactor", () => {
 
       await reactor.handle(createOriginEvent(), createContext(state));
 
-      expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith("tenant-1");
+      expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith(
+        "tenant-1",
+      );
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
   });
@@ -297,6 +311,7 @@ describe("evaluationTrigger reactor", () => {
   });
 
   describe("when trace has origin=evaluation (no longer hardcoded skip)", () => {
+    /** @scenario "Evaluation trigger dispatches for any known origin (preconditions filter)" */
     it("dispatches normally — preconditions filter, not the reactor", async () => {
       // Per user direction post-2026-05-11 plan-mode debate: origin is a
       // user-configurable precondition, not a hardcoded reactor guard.
@@ -307,7 +322,10 @@ describe("evaluationTrigger reactor", () => {
         attributes: { "langwatch.origin": "evaluation" },
       });
 
-      await reactor.handle(createOriginEvent("evaluation"), createContext(state));
+      await reactor.handle(
+        createOriginEvent("evaluation"),
+        createContext(state),
+      );
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
@@ -372,6 +390,7 @@ describe("evaluationTrigger reactor", () => {
   });
 
   describe("when trace has no origin", () => {
+    /** @scenario "Evaluation trigger skips traces with empty origin and no SDK info" */
     it("returns early without dispatching evaluations", async () => {
       const deps = createDeps();
       const reactor = createEvaluationTriggerReactor(deps);
@@ -397,7 +416,9 @@ describe("evaluationTrigger reactor", () => {
       const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
       expect(options).toBeDefined();
       expect(options!.deduplication).toBeDefined();
-      expect(options!.deduplication!.ttlMs).toBe(DEFERRED_CHECK_DELAY_MS + 60_000);
+      expect(options!.deduplication!.ttlMs).toBe(
+        DEFERRED_CHECK_DELAY_MS + 60_000,
+      );
       expect(options!.delay).toBeUndefined();
     });
   });
@@ -457,7 +478,9 @@ describe("evaluationTrigger reactor", () => {
 
       await reactor.handle(event, createContext(state));
 
-      expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith("tenant-1");
+      expect(deps.monitors.getEnabledOnMessageMonitors).toHaveBeenCalledWith(
+        "tenant-1",
+      );
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
     });
   });

@@ -1,13 +1,11 @@
-import { describe, it, expect } from "vitest";
 import { PricingModel } from "@prisma/client";
-import {
-  resolveUsageMeter,
-  normalizeUsageUnit,
-} from "../usage-meter-policy";
+import { describe, expect, it } from "vitest";
+import { normalizeUsageUnit, resolveUsageMeter } from "../usage-meter-policy";
 
 describe("resolveUsageMeter", () => {
   describe("when paid organization (isFree=false)", () => {
     describe("when no license override", () => {
+      /** @scenario "Paid TIERED organization counts each trace as one unit" */
       it("returns traces for TIERED pricing model", () => {
         const decision = resolveUsageMeter({
           pricingModel: PricingModel.TIERED,
@@ -20,6 +18,7 @@ describe("resolveUsageMeter", () => {
         expect(decision.backend).toBe("clickhouse");
       });
 
+      /** @scenario "Paid SEAT_EVENT organization counts each span toward the limit" */
       it("returns events for SEAT_EVENT pricing model", () => {
         const decision = resolveUsageMeter({
           pricingModel: PricingModel.SEAT_EVENT,
@@ -45,6 +44,7 @@ describe("resolveUsageMeter", () => {
     });
 
     describe("when license override is active", () => {
+      /** @scenario "Licensed organization respects its own counting rule" */
       it("uses license usageUnit over pricingModel", () => {
         const decision = resolveUsageMeter({
           pricingModel: PricingModel.TIERED,
@@ -84,6 +84,7 @@ describe("resolveUsageMeter", () => {
   });
 
   describe("when free organization (isFree=true)", () => {
+    /** @scenario "Free TIERED organization counts each span toward the limit" */
     it("returns events for TIERED pricing model", () => {
       const decision = resolveUsageMeter({
         pricingModel: PricingModel.TIERED,
@@ -95,6 +96,7 @@ describe("resolveUsageMeter", () => {
       expect(decision.usageUnit).toBe("events");
     });
 
+    /** @scenario "Free SEAT_EVENT organization counts each span toward the limit" */
     it("returns events for SEAT_EVENT pricing model", () => {
       const decision = resolveUsageMeter({
         pricingModel: PricingModel.SEAT_EVENT,

@@ -54,6 +54,7 @@ describe("SavedViews Endpoints", () => {
       await prisma.savedView.deleteMany({ where: { projectId } });
     });
 
+    /** @scenario "First-visit projects auto-seed and show All Traces plus 5 seed views" */
     it("seeds views on first access for a project", async () => {
       const result = await caller.savedViews.getAll({ projectId });
 
@@ -67,6 +68,7 @@ describe("SavedViews Endpoints", () => {
       ]);
     });
 
+    /** @scenario "getAll returns views ordered by position" */
     it("returns views ordered by order field", async () => {
       const result = await caller.savedViews.getAll({ projectId });
 
@@ -86,6 +88,7 @@ describe("SavedViews Endpoints", () => {
   });
 
   describe("create", () => {
+    /** @scenario "create adds a new view at the end" */
     it("adds a view with correct data and order", async () => {
       const result = await caller.savedViews.create({
         projectId,
@@ -117,6 +120,7 @@ describe("SavedViews Endpoints", () => {
   });
 
   describe("delete", () => {
+    /** @scenario "delete removes a view" */
     it("removes a view", async () => {
       const created = await caller.savedViews.create({
         projectId,
@@ -166,6 +170,7 @@ describe("SavedViews Endpoints", () => {
   });
 
   describe("rename", () => {
+    /** @scenario "rename updates the view name" */
     it("updates the view name", async () => {
       const created = await caller.savedViews.create({
         projectId,
@@ -198,6 +203,7 @@ describe("SavedViews Endpoints", () => {
   });
 
   describe("reorder", () => {
+    /** @scenario "reorder updates the order of all views" */
     it("updates order for all views", async () => {
       // Clean slate
       await prisma.savedView.deleteMany({ where: { projectId } });
@@ -317,9 +323,7 @@ describe("SavedViews Endpoints", () => {
 
       const result = await caller.savedViews.getAll({ projectId });
 
-      const otherUserViews = result.filter(
-        (v) => v.userId === otherUser.id,
-      );
+      const otherUserViews = result.filter((v) => v.userId === otherUser.id);
       expect(otherUserViews).toHaveLength(0);
     });
   });

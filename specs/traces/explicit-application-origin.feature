@@ -90,7 +90,7 @@ Feature: Explicit application origin for race condition prevention
 
   # --- Evaluation trigger reactor guards ---
 
-  @unit @unimplemented
+  @unit
   Scenario: Evaluation trigger skips traces with empty origin and no SDK info
     Given an online evaluation monitor is enabled for the project
     And a trace arrives where the fold state has no langwatch.origin
@@ -99,14 +99,14 @@ Feature: Explicit application origin for race condition prevention
     Then no evaluation commands are dispatched for this trace
     And a deferred check is scheduled for 5 minutes later
 
-  @unit @unimplemented
+  @unit
   Scenario: Evaluation trigger runs on traces with explicit application origin
     Given an online evaluation monitor is enabled for the project
     And a trace arrives where the fold state has langwatch.origin = "application"
     When the evaluation trigger reactor fires at normal debounce
     Then evaluation commands are dispatched for matching monitors
 
-  @unit @unimplemented
+  @unit
   Scenario: Evaluation trigger dispatches for any known origin (preconditions filter)
     Given an online evaluation monitor is enabled for the project
     And a trace arrives where the fold state has langwatch.origin = "evaluation"
@@ -144,7 +144,7 @@ Feature: Explicit application origin for race condition prevention
   # precondition-matchers.ts:223 intentionally defaults empty/undefined origin to
   # "application" (preconditions.unit.test.ts:55-65 documents the OPPOSITE assertion).
 
-  @unit @unimplemented
+  @unit
   Scenario: Precondition matcher matches explicit application origin
     Given a precondition: traces.origin is "application"
     And a trace with langwatch.origin = "application" in the fold state
@@ -159,7 +159,7 @@ Feature: Explicit application origin for race condition prevention
   # These are pure OTEL exporters, third-party integrations, etc.
   # The single reactor handles both phases — no separate deferred reactor.
 
-  @unit @unimplemented
+  @unit
   Scenario: Deferred check treats still-empty origin as "application"
     Given the deferred evaluation check fires for a trace
     And the fold state (re-read from projection store) still has no langwatch.origin
@@ -184,7 +184,7 @@ Feature: Explicit application origin for race condition prevention
     And the fold state (re-read from store) now has langwatch.origin = "application"
     Then evaluation commands are dispatched for matching monitors
 
-  @unit @unimplemented
+  @unit
   Scenario: Deferred check deduplicates per trace
     Given a trace receives multiple span batches with no origin or SDK info
     And each reactor dispatch schedules a deferred check
