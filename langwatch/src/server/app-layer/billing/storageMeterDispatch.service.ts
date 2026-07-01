@@ -40,6 +40,17 @@ export interface StorageMeterDispatchDeps {
     organizationId: string,
     fn: () => Promise<void>,
   ) => Promise<void>;
+  /**
+   * Optional measure-time drift guard (ADR-027 Phase 4.5). Observational only —
+   * its `check` never throws and never alters the billed value.
+   */
+  tripwire?: {
+    check: (params: {
+      organizationId: string;
+      sealedHour: Date;
+      measuredBytes: number;
+    }) => Promise<void>;
+  };
   /** Injectable wall clock for deterministic tests. */
   now?: () => Date;
 }
@@ -127,6 +138,12 @@ export class StorageMeterDispatchService {
       const bytes = await this.deps.measureBytesAt({
         organizationId,
         sealedHour,
+      });
+      // Observational drift guard — never throws, never changes the billed value.
+      await this.deps.tripwire?.check({
+        organizationId,
+        sealedHour,
+        measuredBytes: bytes,
       });
       const megabytes = Math.ceil(bytes / BYTES_PER_MIB);
 
