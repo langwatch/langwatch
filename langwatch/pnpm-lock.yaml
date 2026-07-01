@@ -110,7 +110,7 @@ importers:
         version: 1.8.14(@types/react@19.2.14)(encoding@0.1.13)(graphql@16.13.2)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@copilotkit/runtime':
         specifier: ~1.8.14
-        version: 1.8.14(084513a06e6916ff0b20b6f15f1e585d)
+        version: 1.8.14(9fe484ab4247a15dbddf853bbb48a35f)
       '@copilotkit/runtime-client-gql':
         specifier: 1.8.13
         version: 1.8.13(encoding@0.1.13)(graphql@16.13.2)(react@19.2.5)
@@ -376,8 +376,8 @@ importers:
         specifier: ^6.0.1
         version: 6.0.1
       geoip-country:
-        specifier: ^5.0.202605012358
-        version: 5.0.202605012358
+        specifier: ^5.0.202605270000
+        version: 5.0.202605270000
       handlebars:
         specifier: ^4.7.9
         version: 4.7.9
@@ -1687,8 +1687,8 @@ packages:
     resolution: {integrity: sha512-ctxtJ/eA+t+6q2++vj5j7FYX3nRu311q1wfYH3xjlLOsczhlhxAg2FWNUXhpGvAw3BWo1xBcvOV6/YLc2r5FJw==}
     hasBin: true
 
-  '@browserbasehq/sdk@2.12.0':
-    resolution: {integrity: sha512-bwgVjjYc4O54Cvkc5POfZUv0Gl92n1nNfAPueRLQVFsDoPRTw0FS8wKo9/bQCQuyzAg9+RQUDqvUC241ogLRTQ==}
+  '@browserbasehq/sdk@2.14.0':
+    resolution: {integrity: sha512-DqVfjlgt74vPWfWiCp4VPtiMNJxg2yBZwio2uOfnpV1aJM0OWZR4AJrt/4df+xgQQ/guRpds5do41ycrDaYt3w==}
 
   '@browserbasehq/stagehand@1.14.0':
     resolution: {integrity: sha512-Hi/EzgMFWz+FKyepxHTrqfTPjpsuBS4zRy3e9sbMpBgLPv+9c0R+YZEvS7Bw4mTS66QtvvURRT6zgDGFotthVQ==}
@@ -7567,8 +7567,8 @@ packages:
     resolution: {integrity: sha512-3hN7NaskYvMDLQY55gnW3NQ+mesEAepTqlg+VEbj7zzqEMBVNhzcGYYeqFo/TlYz6eQiFcp1HcsCZO+nGgS8zg==}
     engines: {node: '>=6.9.0'}
 
-  geoip-country@5.0.202605012358:
-    resolution: {integrity: sha512-qjuBxQJZjF8orH2Mk1kEwhjQm9gL4ad+SHvRPd6DJF5R7KKDiV/ws0iCIBG+7roDlQsPzJenzk08PGyqAX8e0A==}
+  geoip-country@5.0.202605270000:
+    resolution: {integrity: sha512-e+vPy8BmgH6vRzGUIv/hWFaKBHiAtU67HFZx0xeHtQaEYjPa7G9EBUknyNCMd4V0L2ETXLP0MzR1MZsMq9VbcA==}
     engines: {node: '>=10.20.0'}
 
   get-caller-file@2.0.5:
@@ -10333,8 +10333,8 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
-  semver@7.8.1:
-    resolution: {integrity: sha512-rkVq3IXh+4FDGch+KwzX3aV9W3kO54GyEgpvBzSyctDA6Xtd7RJQV1xmXbeQp5v7+VzLOfVqiutSE6GICgPFvg==}
+  semver@7.8.4:
+    resolution: {integrity: sha512-rUCObTnP32Q08R2uuIrt7r9PlEonuTmtuXYcW6s5kjdlj3xbnwe+21yXptAUYcMAABLkYYTtnmzb3w3EDZfueA==}
     engines: {node: '>=10'}
     hasBin: true
 
@@ -12882,7 +12882,7 @@ snapshots:
     dependencies:
       css-tree: 3.2.1
 
-  '@browserbasehq/sdk@2.12.0(encoding@0.1.13)':
+  '@browserbasehq/sdk@2.14.0(encoding@0.1.13)':
     dependencies:
       '@types/node': 18.19.130
       '@types/node-fetch': 2.6.13
@@ -12897,7 +12897,7 @@ snapshots:
   '@browserbasehq/stagehand@1.14.0(@playwright/test@1.59.1)(bufferutil@4.1.0)(deepmerge@4.3.1)(dotenv@17.4.2)(encoding@0.1.13)(openai@5.23.2(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76))(zod@3.25.76)':
     dependencies:
       '@anthropic-ai/sdk': 0.27.3(encoding@0.1.13)
-      '@browserbasehq/sdk': 2.12.0(encoding@0.1.13)
+      '@browserbasehq/sdk': 2.14.0(encoding@0.1.13)
       '@playwright/test': 1.59.1
       deepmerge: 4.3.1
       dotenv: 17.4.2
@@ -12991,7 +12991,7 @@ snapshots:
       - encoding
       - graphql
 
-  '@copilotkit/runtime@1.8.14(084513a06e6916ff0b20b6f15f1e585d)':
+  '@copilotkit/runtime@1.8.14(9fe484ab4247a15dbddf853bbb48a35f)':
     dependencies:
       '@ag-ui/client': 0.0.47
       '@ag-ui/core': 0.0.53
@@ -13000,7 +13000,7 @@ snapshots:
       '@anthropic-ai/sdk': 0.27.3(encoding@0.1.13)
       '@copilotkit/shared': 1.8.14(encoding@0.1.13)
       '@graphql-yoga/plugin-defer-stream': 3.21.0(graphql-yoga@5.21.0(graphql@16.13.2))(graphql@16.13.2)
-      '@langchain/community': 0.3.59(49b8803867ad1bb1169fa0ed0e9ad3e9)
+      '@langchain/community': 0.3.59(c656d8332addcd96821741a4115f2ea1)
       '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.217.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.7.1(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.0(bufferutil@4.1.0))
       '@langchain/google-gauth': 0.1.8(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.217.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.7.1(@opentelemetry/api@1.9.1))(openai@5.23.2(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.0(bufferutil@4.1.0)))(encoding@0.1.13)(zod@3.25.76)
       '@langchain/langgraph-sdk': 0.0.70(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.217.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.7.1(@opentelemetry/api@1.9.1))(openai@5.23.2(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.0(bufferutil@4.1.0)))(react@19.2.5)
@@ -13905,7 +13905,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@langchain/community@0.3.59(49b8803867ad1bb1169fa0ed0e9ad3e9)':
+  '@langchain/community@0.3.59(c656d8332addcd96821741a4115f2ea1)':
     dependencies:
       '@browserbasehq/stagehand': 1.14.0(@playwright/test@1.59.1)(bufferutil@4.1.0)(deepmerge@4.3.1)(dotenv@17.4.2)(encoding@0.1.13)(openai@5.23.2(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76))(zod@3.25.76)
       '@ibm-cloud/watsonx-ai': 1.7.9
@@ -13928,7 +13928,7 @@ snapshots:
       '@aws-sdk/client-lambda': 3.1041.0
       '@aws-sdk/client-s3': 3.1041.0
       '@aws-sdk/credential-provider-node': 3.972.39
-      '@browserbasehq/sdk': 2.12.0(encoding@0.1.13)
+      '@browserbasehq/sdk': 2.14.0(encoding@0.1.13)
       '@clickhouse/client': 1.18.3
       '@elastic/elasticsearch': 8.15.3
       '@opensearch-project/opensearch': 2.13.0
@@ -19794,7 +19794,7 @@ snapshots:
 
   gensync@1.0.0-beta.2: {}
 
-  geoip-country@5.0.202605012358:
+  geoip-country@5.0.202605270000:
     dependencies:
       async: 2.6.4
       countries-list: 3.3.0
@@ -20397,7 +20397,7 @@ snapshots:
       '@babel/parser': 7.29.7
       '@istanbuljs/schema': 0.1.6
       istanbul-lib-coverage: 3.2.2
-      semver: 7.8.1
+      semver: 7.8.4
     transitivePeerDependencies:
       - supports-color
 
@@ -20718,7 +20718,7 @@ snapshots:
       jest-util: 29.7.0
       natural-compare: 1.4.0
       pretty-format: 29.7.0
-      semver: 7.8.1
+      semver: 7.8.4
     transitivePeerDependencies:
       - supports-color
 
@@ -23417,7 +23417,7 @@ snapshots:
 
   semver@7.7.4: {}
 
-  semver@7.8.1: {}
+  semver@7.8.4: {}
 
   send@0.19.2:
     dependencies:
