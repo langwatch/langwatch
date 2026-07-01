@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/langwatch/langwatch/compare/sdk-go@v0.3.0...sdk-go@v0.4.0) (2026-07-01)
+
+
+### Features
+
+* **nlpgo:** prompt-span parity across playground, studio, evaluations ([#4094](https://github.com/langwatch/langwatch/issues/4094)) ([6db360a](https://github.com/langwatch/langwatch/commit/6db360a9a4ac073045a1378202848d6a2cae8ffd))
+
 ## [0.3.0](https://github.com/langwatch/langwatch/compare/sdk-go@v0.2.0...sdk-go@v0.3.0) (2026-05-13)
 
 
