@@ -298,6 +298,33 @@ describe("EESubscriptionService", () => {
           status: SubscriptionStatus.CANCELLED,
         });
       });
+
+      it("invoices accrued metered usage on cancel instead of discarding it", async () => {
+        repository.findLastNonCancelled.mockResolvedValue({
+          id: "sub_db_1",
+          stripeSubscriptionId: "sub_stripe_1",
+          status: SubscriptionStatus.ACTIVE,
+        });
+        stripe.subscriptions.cancel.mockResolvedValue({ status: "canceled" });
+
+        await service.createOrUpdateSubscription({
+          organizationId: "org_123",
+          baseUrl: "https://app.test",
+          plan: PlanTypes.FREE,
+          customerId: "cus_123",
+        });
+
+        // ADR-027: without invoice_now, Stripe drops un-invoiced metered usage
+        // (billable events, and STORAGE_GB once attached) on immediate cancel.
+        expect(stripe.subscriptions.cancel).toHaveBeenCalledWith(
+          "sub_stripe_1",
+          expect.objectContaining({ invoice_now: true }),
+        );
+        // prorate stays off so unused licensed (seat) time is not credited.
+        expect(stripe.subscriptions.cancel.mock.calls[0]![1]).not.toHaveProperty(
+          "prorate",
+        );
+      });
     });
 
     describe("when upgrading existing subscription", () => {

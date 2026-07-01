@@ -417,6 +417,15 @@ export class EESubscriptionService implements SubscriptionService {
   }): Promise<{ url: string | null }> {
     const response = await this.stripe.subscriptions.cancel(
       stripeSubscriptionId,
+      {
+        // Invoice accrued-but-un-billed metered usage before cancelling. Stripe
+        // discards un-invoiced metered usage on an immediate cancel, silently
+        // dropping revenue — the billable-events meter today and STORAGE_GB once
+        // its SubscriptionItem is attached (ADR-027). `invoice_now` generates the
+        // final invoice for that usage; we do NOT set `prorate` so unused
+        // licensed (seat) time is not credited — this only bills what was used.
+        invoice_now: true,
+      },
     );
 
     if (response.status === "canceled") {
