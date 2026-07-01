@@ -20,7 +20,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-06-23T06:11:08.493859Z"
+exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
 exclude-newer-span = "P7D"
 
 [manifest]
@@ -6861,7 +6861,7 @@ wheels = [
 
 [[package]]
 name = "python-liquid"
-version = "2.2.0"
+version = "2.2.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "babel" },
@@ -6869,9 +6869,9 @@ dependencies = [
     { name = "python-dateutil" },
     { name = "pytz" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/96/15/f76284f919bd1eda0490b4fc34b416ccb10dcb20628b4afe133bf1c03366/python_liquid-2.2.0.tar.gz", hash = "sha256:ee3cda2ce6e9ef873a9d0e5180ad1de38dc39bf05044d8a6459ca1b999dbe13e", size = 95137, upload-time = "2026-05-06T17:51:28.888Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/00/1d/ae3f6e2f7a2a7faef68811fd16f645fd5a1cf01f8348763c8d0c67a83305/python_liquid-2.2.2.tar.gz", hash = "sha256:20f33d4762e6e0b39597e27ef7c577c07a481670818291526e5e50d2844dc406", size = 95277, upload-time = "2026-06-23T06:49:02.306Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e2/1b/33701a1ee066054a1e6ae1ec27540dd86f63c6138d214985599440c2a0dc/python_liquid-2.2.0-py3-none-any.whl", hash = "sha256:4d71b3f2c0147ffe150ba84e252b8c71e04f12c60a1d770962b0c8c977419f09", size = 140932, upload-time = "2026-05-06T17:51:27.468Z" },
+    { url = "https://files.pythonhosted.org/packages/cd/d4/0d4bb6ac8f13e8cd8afe392c76083e94bb514ef2d918d5b0de95ad0e5446/python_liquid-2.2.2-py3-none-any.whl", hash = "sha256:32d745d4ea48f00f01279cf6e7b93823b7f6e5f401eac29eb658a9b6b560c23c", size = 141053, upload-time = "2026-06-23T06:49:00.877Z" },
 ]
 
 [[package]]
