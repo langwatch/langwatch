@@ -28542,27 +28542,41 @@ spec:
 
 ## Pod Security
 
-The Helm chart applies secure defaults to all pods:
+Every pod, including the bundled PostgreSQL, Redis, and ClickHouse, runs with these defaults:
 
 ```yaml
-# Pod-level (applied via global.podSecurityContext)
+# Pod-level (global.podSecurityContext)
 runAsNonRoot: true
 runAsUser: 1000
 fsGroup: 1000
+seccompProfile:
+  type: RuntimeDefault
 
-# Container-level (applied via global.containerSecurityContext)
+# Container-level (global.containerSecurityContext)
 allowPrivilegeEscalation: false
-capabilities:
-  drop:
-    - ALL
 readOnlyRootFilesystem: true
+capabilities:
+  drop: [ALL]
 ```
 
-These ensure:
-- No containers run as root
-- No privilege escalation is possible
-- Containers cannot modify their own filesystem
-- All Linux capabilities are dropped
+The ServiceAccount token isn't mounted either (`global.automountServiceAccountToken: false`); no LangWatch service talks to the Kubernetes API.
+
+The root filesystem is read-only on every pod. Anything a process writes at runtime (the app's `/tmp` and `.next` cache, ClickHouse logs and `/tmp`, Postgres' socket directory) lands on an `emptyDir` mounted over that path; persistent data stays on its PVC. The image layer is never writable.
+
+### Strict admission control
+
+These defaults pass Pod Security Admission [`restricted`](https://kubernetes.io/docs/concepts/security/pod-security-standards/) and the equivalent Gatekeeper / Kyverno bundles with no extra config: read-only root, non-root, dropped capabilities, `RuntimeDefault` seccomp, no privilege escalation, no automounted token, and CPU + memory requests and limits on every container (init containers included).
+
+Two features need a token or an external API, so turn them off where those policies are enforced:
+
+- **Preflight Secret check** (`preflight.enabled`, only runs with `secrets.existingSecret`) shells out to `kubectl`, so it needs its token. Set `preflight.enabled: false`.
+- **Gateway HPA** (`gateway.autoscaling.enabled`) scales on a custom metric via `prometheus-adapter`. Set it to `false` if you don't run one.
+
+The bundled Prometheus is an upstream subchart LangWatch doesn't harden, so it won't pass: set `prometheus.chartManaged: false` and use your own (or disable metrics). The [`strict-admission` overlay](https://github.com/langwatch/langwatch/blob/main/charts/langwatch/examples/overlays/strict-admission.yaml) bundles these three toggles.
+
+With Prometheus off, app metrics reporting (`app.telemetry.metrics.enabled`) is off by default too, so nothing exposes or scrapes a `/metrics` endpoint; the overlay pins it off to keep the two coupled. Anonymous usage analytics (`app.telemetry.usage.enabled`) is a separate setting, on by default; set it to `false` for an air-gapped or no-egress install.
+
+In-cluster datastores now satisfy read-only-root policies, but managed databases (the `postgres-external`, `redis-external`, and `clickhouse-external` overlays) are still the better production choice: you get backups, HA, and patching, and there are no datastore pods to admit.
 
 ## PII Redaction
 
@@ -28625,7 +28639,8 @@ The `langwatch` npm package is published with [npm provenance attestations](http
 - [ ] ClickHouse backups enabled and tested
 - [ ] Monitoring and alerting configured
 - [ ] Secret rotation procedure documented
-- [ ] Pod security contexts verified (non-root, read-only filesystem)
+- [ ] Pod security contexts verified (non-root, read-only filesystem, `RuntimeDefault` seccomp, no automounted token)
+- [ ] On strict admission clusters: `preflight.enabled: false`, `prometheus.chartManaged: false`, and (without a custom metrics API) `gateway.autoscaling.enabled: false`
 - [ ] Ingress rate limiting configured
 - [ ] Audit logs enabled (Enterprise)
 - [ ] Image signatures verified at pull time (admission controller or `cosign verify` in CI)
