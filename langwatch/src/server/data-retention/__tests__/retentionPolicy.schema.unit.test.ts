@@ -65,6 +65,25 @@ describe("retentionDaysSchema", () => {
     });
   });
 
+  describe("when the value is below the enterprise floor but not a paid preset", () => {
+    // Defense-in-depth: the absolute floor is 35 (paid's short option), but the
+    // ONLY sub-49 value the schema accepts is a fixed paid preset. An arbitrary
+    // 7-aligned value between 35 and 49 (e.g. 42) must not slip through the type
+    // boundary even if a caller skips the plan gate.
+    it("rejects 42 (7-aligned, ≥ floor, but not a paid preset)", () => {
+      expect(retentionDaysSchema.safeParse(42).success).toBe(false);
+    });
+
+    it("still accepts the paid short preset 35", () => {
+      expect(retentionDaysSchema.safeParse(35).success).toBe(true);
+    });
+
+    it("accepts any whole-week value at or above the enterprise floor", () => {
+      expect(retentionDaysSchema.safeParse(49).success).toBe(true);
+      expect(retentionDaysSchema.safeParse(63).success).toBe(true);
+    });
+  });
+
   describe("when the value is not an integer", () => {
     it("rejects it", () => {
       expect(retentionDaysSchema.safeParse(49.5).success).toBe(false);

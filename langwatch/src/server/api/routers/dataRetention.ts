@@ -9,7 +9,7 @@ import {
   assertCanWriteRetentionScope,
   assertRetentionPlan,
   assertRetentionPlanForScope,
-  assertRetentionValueAllowedForPlan,
+  assertRetentionWriteAllowed,
 } from "~/server/data-retention/policy/dataRetentionPolicy.authz";
 import { getRetentionPolicySnapshot } from "~/server/data-retention/policy/dataRetentionPolicy.read";
 import { ScopeTargetNotFoundError } from "~/server/data-retention/policy/dataRetentionPolicy.service";
@@ -89,16 +89,13 @@ export const dataRetentionRouter = createTRPCRouter({
         input.scope,
       );
       // Plan-gate against the scope's owning org, not the caller-supplied
-      // projectId. The two can belong to different organizations.
-      await assertRetentionPlanForScope(
-        { prisma: ctx.prisma, session: ctx.session },
-        input.scope,
-      );
-      // Value-gate: paid plans may persist only their fixed presets; enterprise/
-      // self-hosted keep the full range + custom (≥49). No-ops on the indefinite
-      // sentinel so the platform-admin check below still runs. This is the
-      // write-path prevention — the UI menu is a mirror, not the enforcement.
-      await assertRetentionValueAllowedForPlan(
+      // projectId (the two can belong to different orgs). Resolves the org +
+      // plan once, then applies the free gate AND the value gate: paid plans
+      // may persist only their fixed presets; enterprise/self-hosted keep the
+      // full range + custom (≥49). No-ops on the indefinite sentinel so the
+      // platform-admin check below still runs. The write-path prevention — the
+      // UI menu is a mirror, not the enforcement.
+      await assertRetentionWriteAllowed(
         { prisma: ctx.prisma, session: ctx.session },
         input.scope,
         input.retentionDays,

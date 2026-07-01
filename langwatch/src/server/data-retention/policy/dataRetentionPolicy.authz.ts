@@ -121,6 +121,21 @@ export async function canConfigureRetention(
 }
 
 /**
+ * Throws FORBIDDEN if the plan is free. Pure — the single source of the
+ * free-tier gate, over an already-resolved plan, so a caller that has the plan
+ * in hand doesn't refetch it.
+ */
+export function assertPlanConfigurable(plan: PlanInfo): void {
+  if (!plan.free) return;
+  throw new TRPCError({
+    code: "FORBIDDEN",
+    message:
+      "Configuring data retention is a paid-plan feature. " +
+      "All projects use the platform default until the organization upgrades.",
+  });
+}
+
+/**
  * Throws FORBIDDEN if the org is on a free plan. Retention overrides and
  * retroactive mutations are paid-tier features; free plans use the platform
  * default uniformly. Called from every mutation that writes retention state.
@@ -129,15 +144,11 @@ export async function assertRetentionPlan(
   ctx: RBACContext,
   organizationId: string,
 ): Promise<void> {
-  if (await canConfigureRetention(organizationId, ctx.session?.user ?? null)) {
-    return;
-  }
-  throw new TRPCError({
-    code: "FORBIDDEN",
-    message:
-      "Configuring data retention is a paid-plan feature. " +
-      "All projects use the platform default until the organization upgrades.",
+  const plan = await getApp().planProvider.getActivePlan({
+    organizationId,
+    user: ctx.session?.user ?? undefined,
   });
+  assertPlanConfigurable(plan);
 }
 
 /**
@@ -168,6 +179,31 @@ export async function resolveScopeOrganizationId(
     select: { team: { select: { organizationId: true } } },
   });
   return project?.team?.organizationId ?? null;
+}
+
+/**
+ * Resolve a scope to its owning org's active plan in a single pass — the one
+ * place that touches the DB + plan provider for a scope-targeted write. Both
+ * the free gate and the value gate then operate on this already-resolved plan,
+ * so `setForScope` never resolves the org or fetches the plan twice.
+ * Throws NOT_FOUND if the scope doesn't resolve to an org.
+ */
+export async function resolveScopePlan(
+  ctx: RBACContext,
+  scope: RetentionScope,
+): Promise<{ organizationId: string; plan: PlanInfo }> {
+  const organizationId = await resolveScopeOrganizationId(ctx, scope);
+  if (!organizationId) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: `${scope.scopeType.toLowerCase()} ${scope.scopeId} was not found.`,
+    });
+  }
+  const plan = await getApp().planProvider.getActivePlan({
+    organizationId,
+    user: ctx.session?.user ?? undefined,
+  });
+  return { organizationId, plan };
 }
 
 /**
@@ -230,42 +266,20 @@ function ruleForPlan(plan: PlanInfo): RetentionRule {
 }
 
 /**
- * Throws FORBIDDEN if the plan of the scope's owning org may not persist the
- * requested retention value. This is the write-path prevention that stops a
- * paid org from setting an arbitrary (e.g. custom multi-year) window through
+ * Throws FORBIDDEN if `plan` may not persist `retentionDays`. Pure — operates
+ * on an already-resolved plan and reads only the tier rule, so it is trivially
+ * unit-testable and does no I/O. This is the write-path prevention that stops a
+ * paid org from persisting an arbitrary (e.g. custom multi-year) window through
  * the tRPC surface, independent of what the UI offers.
  *
- * Order matters at the call site: run AFTER the free gate
- * (`assertRetentionPlanForScope`) and it no-ops on the indefinite sentinel so
- * the platform-admin `assertCanDisableRetention` check still runs downstream.
- * Only `setForScope` (the one place a NEW value is chosen) calls this;
- * retroactive apply replays an already-stored value and is NOT value-gated.
+ * No-ops on the indefinite sentinel (keep-forever is authorized separately, by
+ * `assertCanDisableRetention`) and on free plans (blocked by the free gate).
  */
-export async function assertRetentionValueAllowedForPlan(
-  ctx: RBACContext,
-  scope: RetentionScope,
+export function assertPlanAllowsRetentionValue(
+  plan: PlanInfo,
   retentionDays: number,
-): Promise<void> {
-  // Keep-forever (0) is authorized separately (platform-admin only). Returning
-  // here lets that gate run and keeps the value rule from rejecting the
-  // sentinel as "not a preset".
+): void {
   if (retentionDays === INDEFINITE_RETENTION_DAYS) return;
-
-  const organizationId = await resolveScopeOrganizationId(ctx, scope);
-  if (!organizationId) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: `${scope.scopeType.toLowerCase()} ${scope.scopeId} was not found.`,
-    });
-  }
-
-  const plan = await getApp().planProvider.getActivePlan({
-    organizationId,
-    user: ctx.session?.user ?? undefined,
-  });
-
-  // Free orgs are blocked upstream by the free gate; don't double-enforce the
-  // value rule (which would otherwise reject their platform-default resolution).
   if (plan.free) return;
 
   const rule = ruleForPlan(plan);
@@ -296,4 +310,22 @@ export async function assertRetentionValueAllowedForPlan(
         "Choose one of the offered options, or contact us to unlock more.",
     });
   }
+}
+
+/**
+ * The full write gate for `setForScope`: resolve the scope's owning-org plan
+ * ONCE, then apply the free gate and the value gate to it. Replaces calling
+ * `assertRetentionPlanForScope` + a separate value gate, which each re-resolved
+ * the org and refetched the plan. Only `setForScope` (the one place a NEW value
+ * is chosen) uses this; retroactive apply replays an already-stored value and
+ * is deliberately NOT value-gated (it still runs the free gate elsewhere).
+ */
+export async function assertRetentionWriteAllowed(
+  ctx: RBACContext,
+  scope: RetentionScope,
+  retentionDays: number,
+): Promise<void> {
+  const { plan } = await resolveScopePlan(ctx, scope);
+  assertPlanConfigurable(plan);
+  assertPlanAllowsRetentionValue(plan, retentionDays);
 }

@@ -50,7 +50,7 @@ export type RetentionPreset = { value: string; label: string; days: number };
 //   - PAID (non-enterprise SaaS): the fixed pair {35, 63}, no custom.
 //   - ENTERPRISE / self-hosted:   the full list below + a custom field (≥49d).
 // The server re-enforces this at the mutation boundary
-// (`assertRetentionValueAllowedForPlan`); these lists only shape the UI.
+// (`assertPlanAllowsRetentionValue`); these lists only shape the UI.
 
 /** Paid (non-enterprise) menu: "~1 month" / "~2 months" only. */
 export const PAID_RETENTION_PRESETS: RetentionPreset[] = [
@@ -96,7 +96,7 @@ export type RetentionMenuItem = { value: string; label: string };
  *   - keep-forever, platform admins only;
  *   - Custom…, enterprise / self-hosted only.
  * Pure so the gating is unit-testable without rendering the drawer. The server
- * (`assertRetentionValueAllowedForPlan`) is the real enforcement; this only
+ * (`assertPlanAllowsRetentionValue`) is the real enforcement; this only
  * shapes the UI.
  */
 export function buildRetentionMenuItems({

@@ -1,3 +1,4 @@
+import type { PlanInfo } from "@ee/licensing/planInfo";
 import { TRPCError } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -17,140 +18,138 @@ vi.mock("~/server/app-layer/app", () => ({
   }),
 }));
 
-import { assertRetentionValueAllowedForPlan } from "../dataRetentionPolicy.authz";
+import {
+  assertPlanAllowsRetentionValue,
+  assertRetentionWriteAllowed,
+} from "../dataRetentionPolicy.authz";
 
-const ORG_SCOPE = { scopeType: "ORGANIZATION" as const, scopeId: "org_1" };
+const paidPlan = { free: false, type: "GROWTH_SEAT_EUR_MONTHLY" } as PlanInfo;
+const enterprisePlan = { free: false, type: "ENTERPRISE" } as PlanInfo;
+const freePlan = { free: true, type: "FREE" } as PlanInfo;
 
-/** ctx whose prisma resolves the org scope to org_1 (so the gate reaches the
- *  plan lookup). Session carries a user for the plan-provider call. */
-function makeCtx() {
-  return {
-    session: { user: { id: "user_1" } },
-    prisma: {
-      organization: { findUnique: vi.fn().mockResolvedValue({ id: "org_1" }) },
-    },
-  } as any;
-}
+const expectForbidden = (fn: () => void) => {
+  expect(fn).toThrow(TRPCError);
+  expect(fn).toThrow(expect.objectContaining({ code: "FORBIDDEN" }));
+};
 
-function mockPlan(plan: { free: boolean; type: string }) {
-  planMocks.getActivePlan.mockResolvedValue(plan);
-}
-
-async function expectForbidden(promise: Promise<unknown>) {
-  await expect(promise).rejects.toBeInstanceOf(TRPCError);
-  await expect(promise).rejects.toMatchObject({ code: "FORBIDDEN" });
-}
-
-describe("assertRetentionValueAllowedForPlan", () => {
+describe("assertPlanAllowsRetentionValue", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     envMock.IS_SAAS = true;
   });
 
-  describe("given a paid (non-enterprise) SaaS org", () => {
-    beforeEach(() => {
-      mockPlan({ free: false, type: "GROWTH_SEAT_EUR_MONTHLY" });
+  describe("given a paid (non-enterprise) SaaS plan", () => {
+    it.each([35, 63])("allows the fixed preset of %i days", (days) => {
+      expect(() =>
+        assertPlanAllowsRetentionValue(paidPlan, days),
+      ).not.toThrow();
     });
 
-    it("allows the fixed 1-month preset (35d)", async () => {
-      await expect(
-        assertRetentionValueAllowedForPlan(makeCtx(), ORG_SCOPE, 35),
-      ).resolves.toBeUndefined();
+    it("rejects an arbitrary off-menu value (e.g. 364d)", () => {
+      expectForbidden(() => assertPlanAllowsRetentionValue(paidPlan, 364));
     });
 
-    it("allows the fixed 2-month preset (63d)", async () => {
-      await expect(
-        assertRetentionValueAllowedForPlan(makeCtx(), ORG_SCOPE, 63),
-      ).resolves.toBeUndefined();
+    it("rejects an enterprise preset like 1 year (371d)", () => {
+      expectForbidden(() => assertPlanAllowsRetentionValue(paidPlan, 371));
     });
 
-    it("rejects an arbitrary off-menu value (e.g. 364d)", async () => {
-      await expectForbidden(
-        assertRetentionValueAllowedForPlan(makeCtx(), ORG_SCOPE, 364),
-      );
-    });
-
-    it("rejects an enterprise preset like 1 year (371d)", async () => {
-      await expectForbidden(
-        assertRetentionValueAllowedForPlan(makeCtx(), ORG_SCOPE, 371),
-      );
-    });
-
-    it("no-ops on the indefinite sentinel so the admin gate runs downstream", async () => {
-      await expect(
-        assertRetentionValueAllowedForPlan(makeCtx(), ORG_SCOPE, 0),
-      ).resolves.toBeUndefined();
+    it("no-ops on the indefinite sentinel so the admin gate runs downstream", () => {
+      expect(() => assertPlanAllowsRetentionValue(paidPlan, 0)).not.toThrow();
     });
   });
 
-  describe("given an enterprise SaaS org", () => {
-    beforeEach(() => {
-      mockPlan({ free: false, type: "ENTERPRISE" });
-    });
-
+  describe("given an enterprise SaaS plan", () => {
     it.each([
       35, 63, 91, 371, 1827,
-    ])("allows the enterprise preset of %i days", async (days) => {
-      await expect(
-        assertRetentionValueAllowedForPlan(makeCtx(), ORG_SCOPE, days),
-      ).resolves.toBeUndefined();
+    ])("allows the enterprise preset of %i days", (days) => {
+      expect(() =>
+        assertPlanAllowsRetentionValue(enterprisePlan, days),
+      ).not.toThrow();
     });
 
-    it("allows a custom value at or above the 49d floor", async () => {
-      await expect(
-        assertRetentionValueAllowedForPlan(makeCtx(), ORG_SCOPE, 56),
-      ).resolves.toBeUndefined();
+    it("allows a custom value at or above the 49d floor", () => {
+      expect(() =>
+        assertPlanAllowsRetentionValue(enterprisePlan, 56),
+      ).not.toThrow();
     });
 
-    it("rejects a custom value below the 49d floor that isn't a paid preset", async () => {
+    it("rejects a custom value below the 49d floor that isn't a paid preset", () => {
       // 42d is 7-aligned but below the enterprise floor and not 35/63.
-      await expectForbidden(
-        assertRetentionValueAllowedForPlan(makeCtx(), ORG_SCOPE, 42),
-      );
+      expectForbidden(() => assertPlanAllowsRetentionValue(enterprisePlan, 42));
     });
   });
 
   describe("given a self-hosted deployment (IS_SAAS unset)", () => {
     beforeEach(() => {
       envMock.IS_SAAS = undefined;
-      // A self-hosted plan may report any type; the gate must not cap it.
-      mockPlan({ free: false, type: "GROWTH_SEAT_EUR_MONTHLY" });
     });
 
-    it("allows a long custom window (2 years)", async () => {
-      await expect(
-        assertRetentionValueAllowedForPlan(makeCtx(), ORG_SCOPE, 735),
-      ).resolves.toBeUndefined();
+    it("allows a long custom window (2 years) even on a non-enterprise plan type", () => {
+      expect(() => assertPlanAllowsRetentionValue(paidPlan, 735)).not.toThrow();
     });
 
-    it("still enforces the 49d floor for sub-floor non-preset values", async () => {
-      await expectForbidden(
-        assertRetentionValueAllowedForPlan(makeCtx(), ORG_SCOPE, 42),
-      );
+    it("still enforces the 49d floor for sub-floor non-preset values", () => {
+      expectForbidden(() => assertPlanAllowsRetentionValue(paidPlan, 42));
     });
   });
 
-  describe("given a free org (blocked upstream by the free gate)", () => {
-    it("does not additionally reject on the value rule", async () => {
-      mockPlan({ free: true, type: "FREE" });
-      await expect(
-        assertRetentionValueAllowedForPlan(makeCtx(), ORG_SCOPE, 371),
-      ).resolves.toBeUndefined();
+  describe("given a free plan (blocked upstream by the free gate)", () => {
+    it("does not additionally reject on the value rule", () => {
+      expect(() => assertPlanAllowsRetentionValue(freePlan, 371)).not.toThrow();
     });
   });
+});
 
-  describe("given a scope that resolves to no organization", () => {
-    it("throws NOT_FOUND before consulting the plan", async () => {
-      const ctx = {
-        session: { user: { id: "user_1" } },
-        prisma: {
-          organization: { findUnique: vi.fn().mockResolvedValue(null) },
+describe("assertRetentionWriteAllowed", () => {
+  const ORG_SCOPE = { scopeType: "ORGANIZATION" as const, scopeId: "org_1" };
+
+  function makeCtx() {
+    return {
+      session: { user: { id: "user_1" } },
+      prisma: {
+        organization: {
+          findUnique: vi.fn().mockResolvedValue({ id: "org_1" }),
         },
-      } as any;
-      await expect(
-        assertRetentionValueAllowedForPlan(ctx, ORG_SCOPE, 35),
-      ).rejects.toMatchObject({ code: "NOT_FOUND" });
-      expect(planMocks.getActivePlan).not.toHaveBeenCalled();
-    });
+      },
+    } as any;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    envMock.IS_SAAS = true;
+  });
+
+  it("resolves the org and plan exactly once for the whole gate", async () => {
+    planMocks.getActivePlan.mockResolvedValue(paidPlan);
+    const ctx = makeCtx();
+    await assertRetentionWriteAllowed(ctx, ORG_SCOPE, 35);
+    expect(ctx.prisma.organization.findUnique).toHaveBeenCalledTimes(1);
+    expect(planMocks.getActivePlan).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a paid org's off-menu value end-to-end", async () => {
+    planMocks.getActivePlan.mockResolvedValue(paidPlan);
+    await expect(
+      assertRetentionWriteAllowed(makeCtx(), ORG_SCOPE, 371),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("blocks a free org via the free gate before the value rule", async () => {
+    planMocks.getActivePlan.mockResolvedValue(freePlan);
+    await expect(
+      assertRetentionWriteAllowed(makeCtx(), ORG_SCOPE, 35),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("throws NOT_FOUND when the scope resolves to no organization", async () => {
+    const ctx = {
+      session: { user: { id: "user_1" } },
+      prisma: {
+        organization: { findUnique: vi.fn().mockResolvedValue(null) },
+      },
+    } as any;
+    await expect(
+      assertRetentionWriteAllowed(ctx, ORG_SCOPE, 35),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect(planMocks.getActivePlan).not.toHaveBeenCalled();
   });
 });
