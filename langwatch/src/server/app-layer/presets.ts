@@ -76,6 +76,7 @@ import { runEvaluationWorkflow } from "../workflows/runWorkflow";
 import { App, getApp, globalForApp, initializeApp } from "./app";
 import { PrismaBillingCheckpointService } from "./billing/billingCheckpoint.service";
 import { PrismaStorageBillingCheckpointService } from "./billing/storageBillingCheckpoint.service";
+import { StorageBillingTripwire } from "./billing/storageBillingTripwire";
 import { StorageMeterDispatchService } from "./billing/storageMeterDispatch.service";
 import { PrismaStorageUsageHourlyRepository } from "./billing/storageUsageHourly.repository";
 import { BroadcastService } from "./broadcast/broadcast.service";
@@ -634,6 +635,24 @@ export function initializeDefaultApp(options?: {
             }
           }
         : undefined,
+      // ADR-027 Phase 4.5 drift guard. Reference: the previous sealed hour's
+      // recorded bytes — storage changes slowly hour-over-hour, so a gross jump
+      // is anomalous. The precise "reference SUM vs measured" check plugs into
+      // the same module once verified against real ClickHouse.
+      tripwire: new StorageBillingTripwire({
+        isEnabled: (organizationId) =>
+          featureFlagService.isEnabled(
+            "release_storage_billing_metering_tripwire",
+            { distinctId: organizationId, organizationId },
+          ),
+        computeReference: async ({ organizationId, sealedHour }) => {
+          const prev = await storageUsageHourlyRepo.findHour({
+            organizationId,
+            sealedHour: new Date(sealedHour.getTime() - 60 * 60 * 1000),
+          });
+          return prev ? prev.megabytes * 1024 * 1024 : null;
+        },
+      }),
     });
   }
 
