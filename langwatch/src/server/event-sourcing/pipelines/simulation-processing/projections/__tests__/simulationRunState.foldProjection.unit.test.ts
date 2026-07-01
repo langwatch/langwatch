@@ -764,3 +764,68 @@ describe("simulationRunStateFoldProjection", () => {
     });
   });
 });
+
+describe("simulationRunStateFoldProjection finalized-status guard", () => {
+  // Orphaned-run reconciliation writes a terminal `finished` event for a run
+  // whose worker died. If the worker's child process actually outlived its
+  // parent (reparented) and later POSTs a real started/snapshot whose
+  // client-supplied occurredAt is AFTER the reconciliation time, that event
+  // applies in-order (no re-fold, since occurredAt is not strictly less than
+  // LastEventOccurredAt) and would otherwise clobber Status back to a
+  // non-terminal value while FinishedAt stays set — an unrecoverable zombie
+  // the read-time stall path can no longer rescue. Once FinishedAt is set,
+  // Status must stay terminal.
+  describe("given a run that already finished", () => {
+    describe("when a later started event arrives", () => {
+      it("keeps the terminal status instead of resurrecting IN_PROGRESS", () => {
+        const state = foldEvents([
+          createRunFinishedEvent({ status: "ERROR" }, { occurredAt: 3000 }),
+          createRunStartedEvent({}, { occurredAt: 5000 }),
+        ]);
+
+        expect(state.Status).toBe("ERROR");
+        expect(state.FinishedAt).toBe(3000);
+      });
+    });
+
+    describe("when a later message snapshot carrying a status arrives", () => {
+      it("keeps the terminal status", () => {
+        const state = foldEvents([
+          createRunFinishedEvent({ status: "ERROR" }, { occurredAt: 3000 }),
+          createMessageSnapshotEvent(
+            { status: "IN_PROGRESS" },
+            { occurredAt: 5000 },
+          ),
+        ]);
+
+        expect(state.Status).toBe("ERROR");
+        expect(state.FinishedAt).toBe(3000);
+      });
+    });
+
+    describe("when a later text_message_start arrives", () => {
+      it("keeps the terminal status", () => {
+        const state = foldEvents([
+          createRunFinishedEvent({ status: "ERROR" }, { occurredAt: 3000 }),
+          createTextMessageStartEvent({}, { occurredAt: 5000 }),
+        ]);
+
+        expect(state.Status).toBe("ERROR");
+        expect(state.FinishedAt).toBe(3000);
+      });
+    });
+  });
+
+  describe("given a run that has not finished", () => {
+    describe("when a started event arrives", () => {
+      it("still transitions to IN_PROGRESS (guard does not affect the live path)", () => {
+        const state = foldEvents([
+          createRunStartedEvent({}, { occurredAt: 1000 }),
+        ]);
+
+        expect(state.Status).toBe("IN_PROGRESS");
+        expect(state.FinishedAt).toBeNull();
+      });
+    });
+  });
+});

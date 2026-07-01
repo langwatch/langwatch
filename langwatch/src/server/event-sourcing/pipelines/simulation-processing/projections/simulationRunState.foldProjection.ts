@@ -159,6 +159,29 @@ export interface SimulationRunState extends Projection<SimulationRunStateData> {
   data: SimulationRunStateData;
 }
 
+/**
+ * Guards a non-terminal Status transition once a run is already finished.
+ *
+ * Orphaned-run reconciliation writes a terminal `finished` event for a run
+ * whose worker died. If that worker's child process actually outlived its
+ * parent (reparented) and later POSTs a real started/snapshot whose
+ * client-supplied `occurredAt` is AFTER the reconciliation time, the event
+ * applies in-order (the executor only re-folds when occurredAt is STRICTLY
+ * less than what we've already seen) and would otherwise clobber Status back to
+ * a non-terminal value while FinishedAt stays set — an unrecoverable zombie the
+ * read-time stall path can no longer rescue (it only resolves runs with no
+ * FinishedAt). Once FinishedAt is set, Status stays terminal.
+ */
+function statusAfter({
+  state,
+  candidate,
+}: {
+  state: SimulationRunStateData;
+  candidate: string;
+}): string {
+  return state.FinishedAt != null ? state.Status : candidate;
+}
+
 const simulationRunEvents = [
   SimulationRunQueuedEventSchema,
   SimulationRunStartedEventSchema,
@@ -255,7 +278,7 @@ export class SimulationRunStateFoldProjection
       Name: state.Name ?? event.data.name ?? null,
       Description: state.Description ?? event.data.description ?? null,
       Metadata: state.Metadata ?? (event.data.metadata ? JSON.stringify(event.data.metadata) : null),
-      Status: "IN_PROGRESS",
+      Status: statusAfter({ state, candidate: "IN_PROGRESS" }),
       StartedAt: event.occurredAt,
     };
   }
@@ -322,7 +345,10 @@ export class SimulationRunStateFoldProjection
         };
       }),
       TraceIds: Array.isArray(event.data.traceIds) ? event.data.traceIds : [],
-      Status: event.data.status ?? state.Status,
+      Status: statusAfter({
+        state,
+        candidate: event.data.status ?? state.Status,
+      }),
     };
   }
 
@@ -357,7 +383,10 @@ export class SimulationRunStateFoldProjection
     return {
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
-      Status: state.Status === "PENDING" ? "IN_PROGRESS" : state.Status,
+      Status: statusAfter({
+        state,
+        candidate: state.Status === "PENDING" ? "IN_PROGRESS" : state.Status,
+      }),
       StartedAt: state.StartedAt ?? event.occurredAt,
       Messages: messages,
     };
