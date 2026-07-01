@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.10.2](https://github.com/langwatch/langwatch/compare/mcp-server@v0.10.1...mcp-server@v0.10.2) (2026-07-01)
+
+
+### Bug Fixes
+
+* **deps:** bump uuid to &gt;=11.1.1 across the monorepo (closes 7 alerts) ([#4470](https://github.com/langwatch/langwatch/issues/4470)) ([f22706b](https://github.com/langwatch/langwatch/commit/f22706b523526875ecd639d54c1e392d27cbcfae))
+* **deps:** uv security sweep across langevals, mcp-server, python-sdk ([#4687](https://github.com/langwatch/langwatch/issues/4687)) ([7eba1fb](https://github.com/langwatch/langwatch/commit/7eba1fbec1cf01b7929b35529c41f5b089070263))
+* **docs:** replace crashing "@langwatch/mcp-server" JSON snippets with prose ([#3109](https://github.com/langwatch/langwatch/issues/3109)) ([#3995](https://github.com/langwatch/langwatch/issues/3995)) ([49ef059](https://github.com/langwatch/langwatch/commit/49ef05992c412a8ddf121650c6218a19aa9e3922))
+* **security:** bump pyjwt to 2.13.0 in mcp-server and python-sdk ([#4853](https://github.com/langwatch/langwatch/issues/4853)) ([9908168](https://github.com/langwatch/langwatch/commit/990816828a8dbaaafd9fbec2f60fda682080e63b))
+* **security:** bump Python infra deps (cryptography, tornado, python-multipart, aiohttp) ([#4873](https://github.com/langwatch/langwatch/issues/4873)) ([7488bc5](https://github.com/langwatch/langwatch/commit/7488bc5a088ce12c2de13f1a2472afc1b9bdb6a4))
+* **security:** bump starlette to 1.3.1 across uv workspaces ([#5019](https://github.com/langwatch/langwatch/issues/5019)) ([dc03945](https://github.com/langwatch/langwatch/commit/dc0394579b59f2f4a81da283f34a6478a501b1b0))
+* **security:** esbuild, vite and form-data floors across all workspaces ([361b301](https://github.com/langwatch/langwatch/commit/361b3014f62257e7cb2702e60588fc534a271d20))
+* **security:** esbuild, vite and form-data security floors across all workspaces ([#4827](https://github.com/langwatch/langwatch/issues/4827)) ([361b301](https://github.com/langwatch/langwatch/commit/361b3014f62257e7cb2702e60588fc534a271d20))
+* **security:** raise litellm to &gt;=1.84.0 in mcp-server and python-sdk ([cb44747](https://github.com/langwatch/langwatch/commit/cb447477d21feb9448445505bbe088f4b54776dc))
+* **security:** raise litellm to &gt;=1.84.0 in mcp-server and python-sdk (CRITICAL) ([#5230](https://github.com/langwatch/langwatch/issues/5230)) ([cb44747](https://github.com/langwatch/langwatch/commit/cb447477d21feb9448445505bbe088f4b54776dc))
+* **security:** raise protobufjs override floor to &gt;=8.6.0 ([#4852](https://github.com/langwatch/langwatch/issues/4852)) ([77ce842](https://github.com/langwatch/langwatch/commit/77ce84205d28275021b02a5bb0c320b6947dd934))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump @anthropic-ai/claude-code ([acb7ce4](https://github.com/langwatch/langwatch/commit/acb7ce41ac1ec574ed8b1a78aeddd4867246ee5c))
+* **deps-dev:** bump @anthropic-ai/claude-code from 2.1.158 to 2.1.163 in /mcp-server in the npm_and_yarn group across 1 directory ([#4995](https://github.com/langwatch/langwatch/issues/4995)) ([acb7ce4](https://github.com/langwatch/langwatch/commit/acb7ce41ac1ec574ed8b1a78aeddd4867246ee5c))
+* **deps:** bump vitest ([c609e83](https://github.com/langwatch/langwatch/commit/c609e83429ec60da17dac0b69edf09ed9cec99d4))
+* **deps:** bump vitest from 3.2.4 to 4.1.0 in /mcp-server in the npm_and_yarn group across 1 directory ([#4479](https://github.com/langwatch/langwatch/issues/4479)) ([c609e83](https://github.com/langwatch/langwatch/commit/c609e83429ec60da17dac0b69edf09ed9cec99d4))
+
+
+### Code Refactoring
+
+* **types:** make zod the single source of truth, remove ts-to-zod ([#4651](https://github.com/langwatch/langwatch/issues/4651)) ([d583fbe](https://github.com/langwatch/langwatch/commit/d583fbe2ed2ca2ef320695323c17f6c362ea4efa))
+
 ## [0.10.1](https://github.com/langwatch/langwatch/compare/mcp-server@v0.10.0...mcp-server@v0.10.1) (2026-05-31)
 
 
