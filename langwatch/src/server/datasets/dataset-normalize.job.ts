@@ -575,6 +575,9 @@ export const createDatasetNormalizeHandler = (deps: DatasetNormalizeDeps) => {
           totalBytes,
           rows: rowsWritten,
         });
+        // Claim the throttle window so finalize()'s own flush doesn't emit a
+        // late `processing` tick after this — which would flick the stepper back.
+        lastEmitAt = Date.now();
       }
       // I-MEM: finalize returns the aggregated meta built from per-chunk
       // metadata only — the chunk `jsonl` payloads were released at each flush,

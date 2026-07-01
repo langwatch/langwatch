@@ -8,6 +8,11 @@ Feature: Live dataset-processing progress
 
   # Behaviour derived from ADR-034 (dev/docs/adr/034-dataset-processing-progress.md).
   # Progress while running is real-time but ephemeral; the final outcome is durable.
+  #
+  # Scenarios are @unimplemented until a scenario test binds each one: the v1 PR
+  # covers the pieces at the unit level (producer ordering + denominator, the
+  # terminal-authority view logic, and the broadcast wire) but not these
+  # end-to-end flows. Drop @unimplemented on a scenario as its binding test lands.
 
   Background:
     Given I am logged in
@@ -17,7 +22,7 @@ Feature: Live dataset-processing progress
   # Live progress
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: A large dataset shows live progress while it is prepared
     Given I have uploaded a large dataset that is being prepared
     When I watch its progress
@@ -26,7 +31,7 @@ Feature: Live dataset-processing progress
     And I see an estimate of the time remaining
     And the percent never exceeds 100 and only reaches 100 when preparation finishes
 
-  @integration
+  @integration @unimplemented
   Scenario: The progress stepper shows which phase preparation is in
     Given a dataset that is being prepared
     When I watch its progress
@@ -37,14 +42,14 @@ Feature: Live dataset-processing progress
   # The bar always reaches a definite outcome (I-TERMINAL-REACHED)
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: A dataset that finished preparing before I opened it shows ready, not a stuck bar
     Given a dataset whose preparation already finished
     When I open it after preparation has finished
     Then it shows as ready
     And I never see a progress bar stuck partway
 
-  @integration
+  @integration @unimplemented
   Scenario: Preparation that fails is shown as failed with a way to retry
     Given a dataset whose preparation failed
     When I open it
@@ -56,14 +61,14 @@ Feature: Live dataset-processing progress
   # Resilience
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Refreshing mid-preparation shows progress again
     Given a dataset that is being prepared
     When I refresh the page while it is still preparing
     Then I see it is still preparing
     And the live percent reappears as preparation continues
 
-  @integration
+  @integration @unimplemented
   Scenario: Progress for one project's dataset is never shown to another project
     Given a dataset being prepared in my project
     When another project subscribes to progress
@@ -73,7 +78,7 @@ Feature: Live dataset-processing progress
   # Bulk
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Several datasets uploaded together each show their own live progress
     Given I have uploaded several large datasets together
     When I watch the upload drawer
