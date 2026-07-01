@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.27.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.26.0...python-sdk@v0.27.0) (2026-07-01)
+
+
+### Features
+
+* **evaluations:** unify workflow evaluation onto the evaluations-v3 pipeline ([#4946](https://github.com/langwatch/langwatch/issues/4946)) ([7a1919a](https://github.com/langwatch/langwatch/commit/7a1919a9055551fd20d970df3384ac0142f0bf83))
+* **studio+datasets:** customer-call bugfest - datasets makeover, if/else node, entry point redesign, evaluate API ([#4719](https://github.com/langwatch/langwatch/issues/4719)) ([c8a2016](https://github.com/langwatch/langwatch/commit/c8a20168e442ae738e171f6142e4bec797d324f1))
+
+
+### Bug Fixes
+
+* **security:** bump jupyter-server to 2.20.0 (CVE-2026-44727 critical XSS) ([#5210](https://github.com/langwatch/langwatch/issues/5210)) ([d9d92a7](https://github.com/langwatch/langwatch/commit/d9d92a7e4d1a49fb11ce8bc984236790f2fe118f))
+* **security:** bump jupyter-server to 2.20.0 (CVE-2026-44727) ([d9d92a7](https://github.com/langwatch/langwatch/commit/d9d92a7e4d1a49fb11ce8bc984236790f2fe118f))
+* **security:** bump pyjwt to 2.13.0 in mcp-server and python-sdk ([#4853](https://github.com/langwatch/langwatch/issues/4853)) ([9908168](https://github.com/langwatch/langwatch/commit/990816828a8dbaaafd9fbec2f60fda682080e63b))
+* **security:** bump Python infra deps (cryptography, tornado, python-multipart, aiohttp) ([#4873](https://github.com/langwatch/langwatch/issues/4873)) ([7488bc5](https://github.com/langwatch/langwatch/commit/7488bc5a088ce12c2de13f1a2472afc1b9bdb6a4))
+* **security:** bump starlette to 1.3.1 across uv workspaces ([#5019](https://github.com/langwatch/langwatch/issues/5019)) ([dc03945](https://github.com/langwatch/langwatch/commit/dc0394579b59f2f4a81da283f34a6478a501b1b0))
+* **security:** raise litellm to &gt;=1.84.0 in mcp-server and python-sdk ([cb44747](https://github.com/langwatch/langwatch/commit/cb447477d21feb9448445505bbe088f4b54776dc))
+* **security:** raise litellm to &gt;=1.84.0 in mcp-server and python-sdk (CRITICAL) ([#5230](https://github.com/langwatch/langwatch/issues/5230)) ([cb44747](https://github.com/langwatch/langwatch/commit/cb447477d21feb9448445505bbe088f4b54776dc))
+
+
+### Miscellaneous
+
+* **deps-dev:** bump openinference-instrumentation-openai ([3701801](https://github.com/langwatch/langwatch/commit/3701801b9e5bf30ef674ed7dec16ab0e5f10d76c))
+* **deps-dev:** bump openinference-instrumentation-openai from 0.1.45 to 0.1.52 in /python-sdk ([#5042](https://github.com/langwatch/langwatch/issues/5042)) ([3701801](https://github.com/langwatch/langwatch/commit/3701801b9e5bf30ef674ed7dec16ab0e5f10d76c))
+
+
+### Documentation
+
+* **adk:** pin openinference-instrumentation-google-adk&gt;=0.1.11 floor ([#5126](https://github.com/langwatch/langwatch/issues/5126)) ([237777b](https://github.com/langwatch/langwatch/commit/237777bb96449f4d8c5009692dbd14452aa808f0))
+
 ## [0.26.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.25.0...python-sdk@v0.26.0) (2026-06-12)
 
 
