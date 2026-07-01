@@ -3,6 +3,7 @@ import {
   type Tracer,
 } from "@opentelemetry/api";
 import type { LangWatchSpan, LangWatchSpanOptions } from "../span/types";
+import type { AddEvaluationParams } from "../evaluation";
 
 /**
  * Enhanced LangWatch tracer interface that extends OpenTelemetry's Tracer.
@@ -255,4 +256,30 @@ export interface LangWatchTracer extends Tracer {
     context: Context,
     fn: F,
   ): ReturnType<F>;
+
+  /**
+   * Record a manual evaluation result at the trace level.
+   *
+   * **LangWatch Enhancement**: Mirrors the Python SDK's `trace.add_evaluation(...)`.
+   * The evaluation is attached to the currently active span (the trace's
+   * current/root span in the active context). If no span is active, the call is
+   * a no-op.
+   *
+   * Emits the same `langwatch.evaluation.custom` span event as
+   * {@link LangWatchSpan.addEvaluation}, so the LangWatch backend parses both
+   * identically.
+   *
+   * @param params - The evaluation parameters. Only `name` is required; see
+   *   {@link AddEvaluationParams}. `status` defaults to `"processed"`.
+   *
+   * @example
+   * ```typescript
+   * const tracer = getLangWatchTracer("my-service");
+   * tracer.startActiveSpan("root", (span) => {
+   *   tracer.addEvaluation({ name: "response_quality", passed: true, score: 0.95 });
+   *   span.end();
+   * });
+   * ```
+   */
+  addEvaluation(params: AddEvaluationParams): void;
 }
