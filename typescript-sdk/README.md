@@ -95,7 +95,7 @@ span.end();
 
 - **Record an evaluation directly on a span:**
   ```ts
-  span.recordEvaluation({ name: "My Eval", passed: true, score: 1.0 });
+  span.addEvaluation({ name: "My Eval", passed: true, score: 1.0 });
   ```
   > **Note:** This associates evaluation results with a specific span (operation or model call).
 
