@@ -484,7 +484,10 @@ function RowTrailing({
       // an honest "Preparing…" until then (or if the worker is silent).
       const percent =
         live && live.totalBytes && live.totalBytes > 0
-          ? Math.min(100, Math.round(((live.bytesRead ?? 0) / live.totalBytes) * 100))
+          ? Math.min(
+              100,
+              Math.round(((live.bytesRead ?? 0) / live.totalBytes) * 100),
+            )
           : null;
       return (
         <VStack align="end" gap={1} minW="150px">
@@ -819,7 +822,9 @@ export function BulkUploadDrawer({
                   key={file.id}
                   file={file}
                   projectId={projectId ?? ""}
-                  live={file.datasetId ? progressMap[file.datasetId] : undefined}
+                  live={
+                    file.datasetId ? progressMap[file.datasetId] : undefined
+                  }
                   onRemove={() => bulk.removeFile(file.id)}
                   onCancel={() => bulk.cancelFile(file.id)}
                   onRetry={() => void bulk.retryFile(file.id)}
