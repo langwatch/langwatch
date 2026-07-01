@@ -509,6 +509,80 @@ describe("ClickHouse trace dedup (integration)", () => {
           expect(trace.spans[0]!.name).toBe("latest-span-version");
         });
       });
+
+      describe("when no occurredAt window is supplied (thread-view path)", () => {
+        function recordingClient(): {
+          client: ClickHouseClient;
+          queries: string[];
+        } {
+          const queries: string[] = [];
+          const client = new Proxy(ch, {
+            get(target, prop, receiver) {
+              if (prop === "query") {
+                return (args: { query: string; query_params?: unknown }) => {
+                  if (
+                    typeof args?.query === "string" &&
+                    args.query.includes("trace_summaries")
+                  ) {
+                    queries.push(args.query);
+                  }
+                  return (target as ClickHouseClient).query(args as never);
+                };
+              }
+              return Reflect.get(target, prop, receiver);
+            },
+          }) as ClickHouseClient;
+          return { client, queries };
+        }
+
+        it("resolves the OccurredAt span and bounds the heavy summary read", async () => {
+          const { client, queries } = recordingClient();
+          getClickHouseClientForProject.mockResolvedValue(client);
+          try {
+            const traces = await service.getTracesWithSpans(
+              tenantId,
+              [traceId],
+              openProtections,
+            );
+            // Correctness is unchanged: still the latest summary + span version.
+            expect(traces).toHaveLength(1);
+            expect(traces![0]!.trace_id).toBe(traceId);
+            expect(traces![0]!.metrics?.total_time_ms).toBe(300);
+          } finally {
+            getClickHouseClientForProject.mockResolvedValue(ch);
+          }
+
+          // A cheap resolve (min/max OccurredAt) runs, then the heavy summary
+          // read (ts_ComputedInput columns) is partition-bounded on OccurredAt
+          // instead of scanning every weekly part.
+          const resolveQuery = queries.find((q) => q.includes("min(OccurredAt)"));
+          const heavyQuery = queries.find((q) => q.includes("ts_ComputedInput"));
+          expect(resolveQuery).toBeDefined();
+          expect(heavyQuery).toBeDefined();
+          expect(heavyQuery!).toContain("OccurredAt >=");
+        });
+
+        it("stays unbounded when the trace ids resolve to no rows", async () => {
+          const { client, queries } = recordingClient();
+          getClickHouseClientForProject.mockResolvedValue(client);
+          try {
+            const traces = await service.getTracesWithSpans(
+              tenantId,
+              [`missing-${nanoid()}`],
+              openProtections,
+            );
+            expect(traces ?? []).toHaveLength(0);
+          } finally {
+            getClickHouseClientForProject.mockResolvedValue(ch);
+          }
+
+          // Resolve found nothing (epoch default), so the heavy summary read
+          // keeps its previous unbounded behaviour rather than guessing.
+          const heavyQuery = queries.find((q) => q.includes("ts_ComputedInput"));
+          expect(heavyQuery).toBeDefined();
+          expect(heavyQuery!).not.toContain("OccurredAt >=");
+        });
+      });
     });
 
     describe("when multiple traces each have multiple span versions", () => {
