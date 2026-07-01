@@ -147,6 +147,28 @@ export const FEATURE_FLAGS = [
     description:
       "Gates the personal keys, admin oversight, RoutingPolicy, and IngestionSource UI surfaces. Distinct from release_ui_ai_gateway_menu_enabled — the existing gateway product ships unblocked while governance keeps cooking.",
   },
+  // ADR-027 storage billing (Phase 4/4.5). Master gate: OFF → the storage
+  // meter-dispatch reactor runs zero ClickHouse queries, writes zero rows, and
+  // enqueues zero report commands. Given `_size_bytes` aggregation has caused
+  // two prod OOM outages, an operator must be able to kill metering without a
+  // deploy or a Stripe change.
+  {
+    key: "release_storage_billing_metering",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Gates ADR-027 storage-GiB-hours metering: the storageMeterDispatch reactor's measure + enqueue. OFF (default) makes the meter fully inert (no CH, no Postgres rows, no Stripe). Per-organization.",
+  },
+  // Second, independent flag for the measure-time tripwire: shadow-compute a
+  // reference value alongside the billed measurement and log on divergence. Can
+  // be enabled/disabled separately from metering itself.
+  {
+    key: "release_storage_billing_metering_tripwire",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Enables the ADR-027 measure-time tripwire: shadow-compare the billed storage measurement against a reference and log a capped warning on divergence. Never affects the billed value; safe to toggle independently.",
+  },
 ] as const satisfies readonly FeatureFlagDefinition[];
 
 export const FEATURE_FLAG_FAMILIES = [

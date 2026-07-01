@@ -1,12 +1,12 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { SpanKind } from "@opentelemetry/api";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
 import type { ProcessRole } from "~/server/app-layer/config";
-import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import { makeQueueName } from "~/server/background/queues/makeQueueName";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
+import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
 import { createLogger } from "~/utils/logger/server";
 import { DisabledPipeline } from "./disabledPipeline";
 import type { Event, Projection } from "./domain/types";
@@ -22,16 +22,16 @@ import type {
 import { BILLING_REPORTING_PIPELINE_NAME } from "./pipelines/billing-reporting/pipeline";
 import { createBillingMeterDispatchReactor } from "./projections/global/billingMeterDispatch.reactor";
 import { orgBillableEventsMeterProjection } from "./projections/global/orgBillableEventsMeter.mapProjection";
-import type { ReactorDefinition } from "./reactors/reactor.types";
-import { RedisReplayMarkerChecker } from "./projections/replayMarkerCheck";
-import { ConfigurationError } from "./services/errorHandling";
-
 import { projectDailySdkUsageProjection } from "./projections/global/projectDailySdkUsage.foldProjection";
+import { createStorageMeterDispatchReactor } from "./projections/global/storageMeterDispatch.reactor";
 import { ProjectionRegistry } from "./projections/projectionRegistry";
+import { RedisReplayMarkerChecker } from "./projections/replayMarkerCheck";
 import type { EventSourcedQueueProcessor } from "./queues";
 import { GroupQueueProcessor } from "./queues/groupQueue/groupQueue";
 import { EventSourcedQueueProcessorMemory } from "./queues/memory";
+import type { ReactorDefinition } from "./reactors/reactor.types";
 import { EventSourcingPipeline } from "./runtimePipeline";
+import { ConfigurationError } from "./services/errorHandling";
 import type { JobRegistryEntry } from "./services/queues/queueManager";
 import type { EventStore } from "./stores/eventStore.types";
 import { EventStoreClickHouse } from "./stores/eventStoreClickHouse";
@@ -51,6 +51,16 @@ export interface EventSourcingOptions {
   isSaas?: boolean; // defaults to false
   processRole?: ProcessRole;
   retentionPolicyResolver?: RetentionPolicyResolver;
+  /**
+   * ADR-027 Phase 4: lazy accessor for the storage meter dispatch (the
+   * app-layer brain that measures sealed hours and enqueues report commands).
+   * Lazy because the app-layer service is built after EventSourcing. When
+   * provided (SaaS), a storageMeterDispatch reactor is registered alongside the
+   * billing one on the orgBillableEventsMeter projection.
+   */
+  getStorageMeterDispatch?: () => (params: {
+    organizationId: string;
+  }) => Promise<void>;
 }
 
 /**
@@ -133,6 +143,14 @@ export class EventSourcing {
           },
         }),
       );
+      if (options.getStorageMeterDispatch) {
+        this.projectionRegistry.registerMapReactor(
+          "orgBillableEventsMeter",
+          createStorageMeterDispatchReactor({
+            getDispatch: options.getStorageMeterDispatch,
+          }),
+        );
+      }
     }
   }
 
@@ -157,7 +175,10 @@ export class EventSourcing {
       this.projectionRegistry.registerReactor(foldName, reactor);
     } catch (error) {
       // Only suppress "fold not registered" errors — let wiring bugs (duplicates, etc.) fail fast
-      if (error instanceof ConfigurationError && error.message.includes("fold not registered")) {
+      if (
+        error instanceof ConfigurationError &&
+        error.message.includes("fold not registered")
+      ) {
         logger.debug(
           { foldName, reactorName: reactor.name },
           "Skipping global fold reactor — fold not registered",
