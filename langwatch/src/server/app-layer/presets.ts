@@ -618,6 +618,22 @@ export function initializeDefaultApp(options?: {
         es
           .getPipeline(BILLING_REPORTING_PIPELINE_NAME)
           .commands.reportStorageForHour.send(data),
+      // Per-org guard: the reactor dedups per project, so without this an org
+      // with several projects would re-run the heavy measurement per project.
+      // A short-lived Redis lock lets one dispatch win and the rest skip (the
+      // winner covers every sealed hour). No Redis → run unguarded.
+      runExclusivePerOrg: redis
+        ? async (organizationId, fn) => {
+            const key = `storage_dispatch_org:${organizationId}`;
+            const acquired = await redis.set(key, "1", "EX", 120, "NX");
+            if (acquired !== "OK") return;
+            try {
+              await fn();
+            } finally {
+              await redis.del(key);
+            }
+          }
+        : undefined,
     });
   }
 

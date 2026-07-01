@@ -28,6 +28,18 @@ export interface StorageMeterDispatchDeps {
   }) => Promise<number>;
   storageUsageHourly: StorageUsageHourlyRepository;
   enqueueReport: (data: ReportStorageForHourCommandData) => Promise<void>;
+  /**
+   * Runs `fn` at most once per organization at a time. The reactor dedups per
+   * PROJECT, so an org with several active projects would otherwise gap-fill —
+   * and re-run the heavy `byteSize()` measurement (the two-prod-OOM operation) —
+   * once per project for the same hours. This collapses that to one dispatch per
+   * org: if the guard is already held for the org, `fn` is skipped (the holder
+   * covers every sealed hour). When omitted (no Redis), `fn` runs directly.
+   */
+  runExclusivePerOrg?: (
+    organizationId: string,
+    fn: () => Promise<void>,
+  ) => Promise<void>;
   /** Injectable wall clock for deterministic tests. */
   now?: () => Date;
 }
@@ -69,8 +81,17 @@ export class StorageMeterDispatchService {
     const org = await this.deps.getBillableOrg(organizationId);
     if (!org?.stripeCustomerId || org.subscriptions.length === 0) return;
 
-    // 3. Window: catch up to the last COMPLETE wall-clock hour. The triggering
-    //    event is only a wake-up; what we measure is "sealed hours not yet done".
+    // 3. Collapse concurrent per-project dispatches for the same org to one, so
+    //    the heavy measurement isn't re-run per project. The flag + SaaS checks
+    //    above are cheap and run unguarded; only the measurement work is guarded.
+    const runExclusive = this.deps.runExclusivePerOrg ?? ((_org, fn) => fn());
+    await runExclusive(organizationId, () => this.catchUp(organizationId));
+  }
+
+  /** Measures and enqueues every sealed hour not yet done for the org. */
+  private async catchUp(organizationId: string): Promise<void> {
+    // Window: catch up to the last COMPLETE wall-clock hour. The triggering
+    // event is only a wake-up; what we measure is "sealed hours not yet done".
     const now = (this.deps.now ?? (() => new Date()))();
     const sealBoundaryMs = floorToHourMs(now.getTime()) - MS_PER_HOUR;
 

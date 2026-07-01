@@ -39,6 +39,13 @@ Feature: Storage billing — dispatch sealed hours for measurement (ADR-027, Pha
     Then no new hour is measured and no report is enqueued
 
   @unit
+  Scenario: Concurrent dispatches for the same organization are collapsed to one
+    Given a dispatch already in progress for the organization
+    When another of the organization's projects triggers a dispatch
+    Then the second dispatch measures nothing
+    And the heavy measurement is not re-run per project
+
+  @unit
   Scenario: Every sealed hour since the cursor is measured and enqueued once
     Given an organization whose cursor trails the latest sealed hour by several hours
     When the dispatcher runs for the organization
