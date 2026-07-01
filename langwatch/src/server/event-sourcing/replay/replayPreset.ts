@@ -1,7 +1,7 @@
 import IORedis from "ioredis";
 import { getApp } from "../../app-layer/app";
 import { ReplayService } from "./replayService";
-import type { RegisteredFoldProjection } from "./types";
+import type { RegisteredFoldProjection, RegisteredMapProjection } from "./types";
 import { TraceSummaryClickHouseRepository } from "../../app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import { TraceSummaryStore } from "../pipelines/trace-processing/projections/traceSummary.store";
 import { EvaluationRunClickHouseRepository } from "../../app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
@@ -19,8 +19,19 @@ import type { FoldProjectionStore } from "../projections/foldProjection.types";
 export interface ReplayRuntime {
   service: ReplayService;
   projections: RegisteredFoldProjection[];
+  mapProjections: RegisteredMapProjection[];
   close: () => Promise<void>;
 }
+
+/**
+ * Map projection → target ClickHouse table for post-replay `OPTIMIZE TABLE`.
+ * Add entries here as more map projections become replay-able.
+ */
+const MAP_TARGET_TABLE: Record<string, string> = {
+  spanStorage: "stored_spans",
+  logRecordStorage: "stored_log_records",
+  metricRecordStorage: "stored_metric_records",
+};
 
 /**
  * Create a replay runtime using the app's tenant-aware ClickHouse resolver.
@@ -52,6 +63,7 @@ export function createReplayRuntime(config: {
 
   const definitions = getApp().eventSourcing?.definitions ?? [];
   const projections: RegisteredFoldProjection[] = [];
+  const mapProjections: RegisteredMapProjection[] = [];
 
   for (const def of definitions) {
     const { name: pipelineName, aggregateType } = def.metadata;
@@ -69,7 +81,26 @@ export function createReplayRuntime(config: {
         aggregateType,
         source: "pipeline",
         definition: replayDef,
+        // Folds enqueue with `__jobType=projection`; pause middle segment matches.
         pauseKey: `${pipelineName}/projection/${foldDef.name}`,
+        kind: "fold",
+      });
+    }
+
+    for (const [, { definition: mapDef }] of def.mapProjections) {
+      // Map projections use their own AppendStore directly — it writes straight
+      // to ClickHouse with no Redis-cache layer to swap out, unlike folds.
+      mapProjections.push({
+        projectionName: mapDef.name,
+        pipelineName,
+        aggregateType,
+        source: "pipeline",
+        definition: mapDef,
+        // Maps enqueue with `__jobType=handler`; the dispatcher Lua script
+        // checks `{pipeline}/handler/{name}`, so the pauseKey must follow suit.
+        pauseKey: `${pipelineName}/handler/${mapDef.name}`,
+        kind: "map",
+        targetTable: MAP_TARGET_TABLE[mapDef.name],
       });
     }
   }
@@ -79,6 +110,7 @@ export function createReplayRuntime(config: {
   return {
     service,
     projections,
+    mapProjections,
     close: async () => {
       redis.disconnect();
     },

@@ -840,6 +840,7 @@ export interface ProjectionMetadata {
   aggregateType: string;
   source: "pipeline" | "global";
   pauseKey: string;
+  kind: "fold" | "map";
 }
 
 export interface ReactorMetadata {
@@ -865,13 +866,25 @@ function getDefinitions(): ReadonlyArray<
 export function getProjectionMetadata(): ProjectionMetadata[] {
   return getDefinitions().flatMap((def) => {
     const { name: pipelineName, aggregateType } = def.metadata;
-    return Array.from(def.foldProjections.values()).map(({ definition }) => ({
+    const folds = Array.from(def.foldProjections.values()).map(({ definition }) => ({
       projectionName: definition.name,
       pipelineName,
       aggregateType,
       source: "pipeline" as const,
       pauseKey: `${pipelineName}/projection/${definition.name}`,
+      kind: "fold" as const,
     }));
+    const maps = Array.from(def.mapProjections.values()).map(({ definition }) => ({
+      projectionName: definition.name,
+      pipelineName,
+      aggregateType,
+      source: "pipeline" as const,
+      // Maps run as `__jobType=handler` in the GroupQueue, so the pause-set
+      // entry must use the `handler` segment to match the dispatcher's Lua check.
+      pauseKey: `${pipelineName}/handler/${definition.name}`,
+      kind: "map" as const,
+    }));
+    return [...folds, ...maps];
   });
 }
 
