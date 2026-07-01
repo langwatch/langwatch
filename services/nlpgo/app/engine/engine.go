@@ -214,18 +214,18 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*ExecuteResul
 			return nil, fmt.Errorf("engine: execute_component target node %q not in workflow", req.NodeID)
 		}
 		e.runLayer(ctx, req, plan, state, []string{req.NodeID})
-		return finalize(state, traceID, started, nil), nil
+		return finalize(state, traceID, started, nil, requireEndNode(req)), nil
 	}
 	for _, layer := range plan.Layers {
 		if err := ctx.Err(); err != nil {
-			return finalize(state, traceID, started, err), nil
+			return finalize(state, traceID, started, err, requireEndNode(req)), nil
 		}
 		e.runLayer(ctx, req, plan, state, layer)
 		if state.firstError != nil {
-			return finalize(state, traceID, started, nil), nil
+			return finalize(state, traceID, started, nil, requireEndNode(req)), nil
 		}
 	}
-	return finalize(state, traceID, started, nil), nil
+	return finalize(state, traceID, started, nil, requireEndNode(req)), nil
 }
 
 func (e *Engine) runLayer(ctx context.Context, req ExecuteRequest, plan *planner.Plan, state *runState, layer []string) {
@@ -1063,7 +1063,27 @@ func planOptionsFor(req ExecuteRequest) []planner.Option {
 	if req.UntilNodeID != "" {
 		opts = append(opts, planner.WithUntilNode(req.UntilNodeID))
 	}
+	// execute_component dispatches a single node; the End node is
+	// irrelevant, so don't trip the planner's missing-End guard (#3198).
+	if req.NodeID != "" {
+		opts = append(opts, planner.AllowMissingEnd())
+	}
 	return opts
+}
+
+// requireEndNode reports whether a run is expected to terminate at an End
+// node — a full execute_flow, not a single-component run (NodeID) and not
+// a "run until here" partial plan (UntilNodeID). finalize uses it to turn
+// a missing End node into an explicit error instead of a silent empty
+// success (#3198), mirroring the planner's MissingEndNodeError gate (#3198).
+//
+// Invariant: this predicate must remain the boolean dual of planOptionsFor's
+// AllowMissingEnd/WithUntilNode conditions. If a new partial-run shape is
+// ever added, BOTH planOptionsFor (which sets AllowMissingEnd or WithUntilNode)
+// AND this function must be updated together — otherwise the planner guard and
+// the finalize guard will silently disagree about what constitutes a full run.
+func requireEndNode(req ExecuteRequest) bool {
+	return req.NodeID == "" && req.UntilNodeID == ""
 }
 
 // applyManualInputs primes runState with the inbound execute_component
@@ -1277,7 +1297,7 @@ func stripHandlePrefix(handle, prefix string) string {
 	return handle
 }
 
-func finalize(state *runState, traceID string, started time.Time, ctxErr error) *ExecuteResult {
+func finalize(state *runState, traceID string, started time.Time, ctxErr error, requireEnd bool) *ExecuteResult {
 	res := &ExecuteResult{
 		TraceID:    traceID,
 		Nodes:      state.states,
@@ -1292,6 +1312,17 @@ func finalize(state *runState, traceID string, started time.Time, ctxErr error) 
 	if state.firstError != nil {
 		res.Status = "error"
 		res.Error = state.firstError
+		return res
+	}
+	// A full run that never reached an End node finalizes with an empty
+	// result and a misleading success — issue #3198. Turn it into an
+	// explicit error instead, mirroring the planner's MissingEndNodeError
+	// gate (#3198). Partial runs (execute_component, "run until here")
+	// legitimately have no End, so requireEnd is false for them and the
+	// happy path proceeds.
+	if requireEnd && state.endNodeID == "" {
+		res.Status = "error"
+		res.Error = &NodeError{Type: "missing_end_node", Message: planner.MissingEndNodeMessage}
 		return res
 	}
 	res.Status = "success"
