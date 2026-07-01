@@ -27,7 +27,8 @@ const makeStorage = (stream: Readable) => ({
     }: {
       records: unknown[];
       fromIndex?: number;
-    }) => toJsonlChunks(records).map((c) => ({ ...c, index: c.index + fromIndex })),
+    }) =>
+      toJsonlChunks(records).map((c) => ({ ...c, index: c.index + fromIndex })),
   ),
   deleteStaged: vi.fn().mockResolvedValue(undefined),
   deleteChunksFrom: vi.fn().mockResolvedValue(undefined),
@@ -81,9 +82,7 @@ beforeEach(() => vi.clearAllMocks());
 describe("dataset-normalize progress", () => {
   describe("when a dataset normalizes successfully", () => {
     it("emits live progress with the input-side total then a terminal done", async () => {
-      const { emitted } = await run(
-        Readable.from(['{"a":"1"}\n{"a":"2"}\n']),
-      );
+      const { emitted } = await run(Readable.from(['{"a":"1"}\n{"a":"2"}\n']));
 
       const progress = emitted.find((e) => e.type === "progress");
       expect(progress).toBeDefined();
@@ -105,6 +104,40 @@ describe("dataset-normalize progress", () => {
       const doneIdx = sequence.indexOf("emit:done");
       expect(readyIdx).toBeGreaterThanOrEqual(0);
       expect(doneIdx).toBeGreaterThan(readyIdx);
+    });
+  });
+
+  describe("when the progress emit throws", () => {
+    // Regression: the terminal `done` emit runs AFTER the ready commit, inside
+    // the try whose catch deletes every chunk (fromIndex 0). A throwing emit
+    // there must NOT flip ready→failed nor wipe the processed dataset.
+    it("still commits ready and never deletes the processed chunks", async () => {
+      const storage = makeStorage(Readable.from(['{"a":"1"}\n']));
+      const repo = {
+        findOne: vi.fn().mockResolvedValue({ id: "d1", status: "processing" }),
+        update: vi.fn().mockResolvedValue({}),
+      };
+      const handler = createDatasetNormalizeHandler({
+        repository: repo as any,
+        getStorage: async () => storage as any,
+        emitProgress: () => {
+          throw new Error("broadcast down");
+        },
+      });
+
+      await expect(handler(basePayload)).resolves.toBeUndefined();
+
+      const statuses = repo.update.mock.calls.map(
+        (c) => (c[0] as { data: { status: string } }).data.status,
+      );
+      expect(statuses).toContain("ready");
+      expect(statuses).not.toContain("failed");
+      // The catch's chunk reap is `fromIndex: 0` (wipe); the success path trims
+      // orphans at `fromIndex: chunkCount`. A throwing emit must never trigger
+      // the former.
+      expect(storage.deleteChunksFrom).not.toHaveBeenCalledWith(
+        expect.objectContaining({ fromIndex: 0 }),
+      );
     });
   });
 
