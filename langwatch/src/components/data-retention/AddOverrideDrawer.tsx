@@ -18,18 +18,20 @@ import { Drawer } from "~/components/ui/drawer";
 import { Select } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import {
-  DEFAULT_RETENTION_DAYS,
+  ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS,
   INDEFINITE_RETENTION_DAYS,
   MAX_RETENTION_DAYS,
-  MIN_RETENTION_DAYS,
   RETENTION_WEEK_DAYS,
 } from "~/server/data-retention/retentionPolicy.schema";
 import {
+  buildRetentionMenuItems,
   CUSTOM_PRESET_VALUE,
   DAYS_PER_UNIT,
   INDEFINITE_PRESET_VALUE,
-  RETENTION_PRESETS,
+  LEGACY_PRESET_VALUE,
+  type RetentionPreset,
   type RetentionUnit,
+  retentionPresetsForTier,
   retentionUnitCollection,
   SCOPE_ICON,
 } from "./constants";
@@ -42,24 +44,47 @@ export type RetentionEditTarget = {
   retentionDays: number;
 };
 
-/** Map a stored day count back onto the drawer's preset/custom controls. Stored
- *  values are always week-aligned, so the custom fallback round-trips through
- *  whole weeks cleanly; the indefinite sentinel maps to its admin-only preset. */
-function initialRetentionState(days: number): {
+/** Map a stored day count back onto the drawer's controls, given what the
+ *  org's plan can represent. Stored values are always week-aligned, so the
+ *  custom fallback round-trips through whole weeks cleanly. A value the current
+ *  plan can't offer (a grandfathered high paid value, or indefinite for a
+ *  non-admin) maps to the read-only legacy option rather than being coerced. */
+function initialRetentionState({
+  days,
+  presets,
+  isEnterprise,
+  isPlatformAdmin,
+}: {
+  days: number;
+  presets: RetentionPreset[];
+  isEnterprise: boolean;
+  isPlatformAdmin: boolean;
+}): {
   preset: string;
   amount: string;
   unit: RetentionUnit;
 } {
   if (days === INDEFINITE_RETENTION_DAYS) {
-    return { preset: INDEFINITE_PRESET_VALUE, amount: "", unit: "weeks" };
+    return isPlatformAdmin
+      ? { preset: INDEFINITE_PRESET_VALUE, amount: "", unit: "weeks" }
+      : { preset: LEGACY_PRESET_VALUE, amount: "", unit: "weeks" };
   }
-  const match = RETENTION_PRESETS.find((p) => p.days === days);
+  const match = presets.find((p) => p.days === days);
   if (match) return { preset: match.value, amount: "", unit: "weeks" };
-  return {
-    preset: CUSTOM_PRESET_VALUE,
-    amount: String(days / RETENTION_WEEK_DAYS),
-    unit: "weeks",
-  };
+  // Only enterprise/self-hosted has a custom field, and only for values that
+  // clear its floor and align to whole weeks. Anything else is grandfathered.
+  const isCustomEligible =
+    isEnterprise &&
+    days >= ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS &&
+    days % RETENTION_WEEK_DAYS === 0;
+  if (isCustomEligible) {
+    return {
+      preset: CUSTOM_PRESET_VALUE,
+      amount: String(days / RETENTION_WEEK_DAYS),
+      unit: "weeks",
+    };
+  }
+  return { preset: LEGACY_PRESET_VALUE, amount: "", unit: "weeks" };
 }
 
 export function AddOverrideDrawer({
@@ -70,6 +95,7 @@ export function AddOverrideDrawer({
   currentTeamId,
   currentProjectId,
   isPlatformAdmin,
+  isEnterprise,
   isSaving,
   onSave,
   editTarget,
@@ -85,6 +111,9 @@ export function AddOverrideDrawer({
   currentTeamId: string | undefined;
   currentProjectId: string;
   isPlatformAdmin: boolean;
+  /** True for enterprise (and self-hosted, which resolves to enterprise). Paid
+   *  non-enterprise orgs get the fixed short menu with no custom field. */
+  isEnterprise: boolean;
   isSaving: boolean;
   onSave: (params: {
     scopes: ScopeTriadEntry[];
@@ -95,45 +124,73 @@ export function AddOverrideDrawer({
    *  shown read-only, and the retention is prefilled. Absent = add mode. */
   editTarget?: RetentionEditTarget | null;
 }) {
+  // The retention menu is plan-gated: paid orgs get a fixed short pair, while
+  // enterprise/self-hosted get the full list plus a custom field.
+  const presets = useMemo(
+    () => retentionPresetsForTier(isEnterprise),
+    [isEnterprise],
+  );
+  const defaultPreset = presets[0]?.value ?? CUSTOM_PRESET_VALUE;
+
   const [scopes, setScopes] = useState<ScopeTriadEntry[]>([]);
-  const [preset, setPreset] = useState<string>(String(DEFAULT_RETENTION_DAYS));
+  const [preset, setPreset] = useState<string>(defaultPreset);
   const [customAmount, setCustomAmount] = useState<string>("");
   const [customUnit, setCustomUnit] = useState<RetentionUnit>("weeks");
-  const [applyToExisting, setApplyToExisting] = useState<boolean>(true);
+  // Default OFF: a new/edited policy applies to future ingestion only unless the
+  // user explicitly opts in. Applying to existing data triggers a ClickHouse
+  // ALTER … UPDATE rewrite across all of the scope's parts — an expensive,
+  // hard-to-undo operation — so it must be a deliberate choice, not the default.
+  const [applyToExisting, setApplyToExisting] = useState<boolean>(false);
 
-  // Platform admins get an extra "No retention (keep forever)" option. The 0
-  // sentinel is structurally valid input; the route authorizes it admin-only.
+  const isEditing = !!editTarget;
+
+  // When editing a policy whose stored value the current plan can't offer
+  // (a grandfathered paid value, or indefinite for a non-admin), surface it as
+  // a read-only legacy option so the user sees the truth and isn't forced to
+  // coerce it. Absent from Add mode — new policies only pick allowed values.
+  const legacyDays =
+    isEditing &&
+    editTarget &&
+    initialRetentionState({
+      days: editTarget.retentionDays,
+      presets,
+      isEnterprise,
+      isPlatformAdmin,
+    }).preset === LEGACY_PRESET_VALUE
+      ? editTarget.retentionDays
+      : null;
+
+  // Menu = [legacy?] + plan presets + [keep-forever (admin)] + [custom
+  // (enterprise/self-hosted only)]. Paid orgs get neither custom nor
+  // keep-forever, so their entire menu is the fixed short pair. Built by a pure
+  // helper (unit-tested) so the plan gating doesn't depend on rendering.
   const presetCollection = useMemo(
     () =>
       createListCollection({
-        items: [
-          ...RETENTION_PRESETS.map((p) => ({ value: p.value, label: p.label })),
-          ...(isPlatformAdmin
-            ? [
-                {
-                  value: INDEFINITE_PRESET_VALUE,
-                  label: "No retention (keep forever)",
-                },
-              ]
-            : []),
-          { value: CUSTOM_PRESET_VALUE, label: "Custom…" },
-        ],
+        items: buildRetentionMenuItems({
+          isEnterprise,
+          isPlatformAdmin,
+          legacyDays,
+        }),
       }),
-    [isPlatformAdmin],
+    [isEnterprise, isPlatformAdmin, legacyDays],
   );
-
-  const isEditing = !!editTarget;
 
   useEffect(() => {
     if (!open) return;
     if (editTarget) {
       // Edit mode: lock to the policy's scope and prefill its current value.
       setScopes([editTarget.scope]);
-      const init = initialRetentionState(editTarget.retentionDays);
+      const init = initialRetentionState({
+        days: editTarget.retentionDays,
+        presets,
+        isEnterprise,
+        isPlatformAdmin,
+      });
       setPreset(init.preset);
       setCustomAmount(init.amount);
       setCustomUnit(init.unit);
-      setApplyToExisting(true);
+      setApplyToExisting(false);
       return;
     }
     // Add mode: default to the current project so the picker opens on the
@@ -143,18 +200,26 @@ export function AddOverrideDrawer({
         ? [{ scopeType: "PROJECT", scopeId: currentProjectId }]
         : [],
     );
-    setPreset(String(DEFAULT_RETENTION_DAYS));
+    setPreset(defaultPreset);
     setCustomAmount("");
     setCustomUnit("weeks");
-    setApplyToExisting(true);
-    // Initialize only when the drawer opens or the edit target changes — NOT on
-    // currentProjectId / available.projects reference churn (a background
-    // snapshot refetch would otherwise re-run this and wipe in-progress edits).
-    // The latest scope inputs are read inside, so the next open re-reads them.
+    setApplyToExisting(false);
+    // Initialize when the drawer opens, the edit target changes, or a plan/admin
+    // flag resolves. `isEnterprise` and `isPlatformAdmin` both start false while
+    // their queries load and flip once when they settle; without them here,
+    // opening the drawer on a cold load would strand a value the not-yet-loaded
+    // tier can't represent in the read-only "legacy" state (an enterprise value
+    // under paid, or a keep-forever value under non-admin). Both are stable
+    // booleans, so this re-inits at most once each. Deliberately NOT keyed on
+    // currentProjectId / available.projects reference churn — a background
+    // snapshot refetch would wipe in-progress edits.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, editTarget]);
+  }, [open, editTarget, isEnterprise, isPlatformAdmin]);
 
   const resolvedDays = (() => {
+    // The legacy option is read-only: it can't be saved, only replaced by
+    // picking a real option, so it resolves to no valid value.
+    if (preset === LEGACY_PRESET_VALUE) return NaN;
     if (preset === CUSTOM_PRESET_VALUE) {
       const n = Number(customAmount);
       if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) return NaN;
@@ -167,9 +232,14 @@ export function AddOverrideDrawer({
     // Indefinite (0) is only reachable via the admin-only preset; the route
     // re-checks the capability, so the UI just needs to treat it as valid.
     resolvedDays === INDEFINITE_RETENTION_DAYS ||
-    (Number.isFinite(resolvedDays) &&
+    // Any curated preset (the plan menu) is a pre-vetted allowed value — no
+    // range check needed; that's the point of the fixed menu. Only the custom
+    // field (enterprise/self-hosted) needs the ≥49 floor + week alignment.
+    (preset !== CUSTOM_PRESET_VALUE && preset !== LEGACY_PRESET_VALUE) ||
+    (preset === CUSTOM_PRESET_VALUE &&
+      Number.isFinite(resolvedDays) &&
       Number.isInteger(resolvedDays) &&
-      resolvedDays >= MIN_RETENTION_DAYS &&
+      resolvedDays >= ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS &&
       resolvedDays <= MAX_RETENTION_DAYS &&
       resolvedDays % RETENTION_WEEK_DAYS === 0);
 
@@ -277,13 +347,19 @@ export function AddOverrideDrawer({
               <Field.HelperText>
                 {preset === INDEFINITE_PRESET_VALUE
                   ? "Data will be kept indefinitely — exempt from automatic deletion."
-                  : preset === CUSTOM_PRESET_VALUE && customAmount && daysValid
-                    ? `Stored as ${resolvedDays} days.`
+                  : preset === LEGACY_PRESET_VALUE
+                    ? "This length isn't available on your plan. Pick an option above to change it — leaving it keeps the current value."
                     : preset === CUSTOM_PRESET_VALUE &&
                         customAmount &&
-                        !daysValid
-                      ? `Must be between ${MIN_RETENTION_DAYS} and ${MAX_RETENTION_DAYS} days.`
-                      : `Minimum ${MIN_RETENTION_DAYS} days (7 weeks). Retention is partition-aligned and rounded to whole weeks under the hood.`}
+                        daysValid
+                      ? `Stored as ${resolvedDays} days.`
+                      : preset === CUSTOM_PRESET_VALUE &&
+                          customAmount &&
+                          !daysValid
+                        ? `Must be between ${ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS} and ${MAX_RETENTION_DAYS} days, in whole weeks.`
+                        : isEnterprise
+                          ? `Custom values start at ${ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS} days (7 weeks) and round to whole weeks.`
+                          : "Retention length is set by your plan."}
               </Field.HelperText>
             </Field.Root>
 

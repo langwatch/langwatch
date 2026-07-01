@@ -72,6 +72,28 @@ describe("resolveScopeStorageUsage", () => {
       ]);
       expect(result).toEqual({ totalBytes: 200, projectCount: 2 });
     });
+
+    it("excludes archived projects from the enumeration", async () => {
+      prisma.project.findMany.mockResolvedValue([]);
+      rbacMocks.batchScopePermissions.mockResolvedValue({
+        teams: new Map(),
+        projects: new Map(),
+      });
+
+      await resolveScopeStorageUsage(ctx, {
+        projectId: "proj_a",
+        scope: { scopeType: "ORGANIZATION", scopeId: "org_1" },
+      });
+
+      // The projectCount the storage card shows must match what the user sees
+      // in the nav — archived projects are filtered out at the query, so they
+      // never inflate the count.
+      const where = prisma.project.findMany.mock.calls[0]![0].where;
+      expect(where).toEqual({
+        team: { organizationId: "org_1" },
+        archivedAt: null,
+      });
+    });
   });
 
   describe("given a team scope", () => {
@@ -97,6 +119,8 @@ describe("resolveScopeStorageUsage", () => {
       expect(where).toEqual({
         teamId: "team_b",
         team: { organizationId: "org_1" },
+        // Archived projects are excluded — they're hidden everywhere else.
+        archivedAt: null,
       });
       expect(result).toEqual({ totalBytes: 200, projectCount: 2 });
     });

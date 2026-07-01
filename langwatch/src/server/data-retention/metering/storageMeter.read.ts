@@ -53,12 +53,15 @@ export async function resolveScopeStorageUsage(
 
   // Enumerate candidate projects within the caller's org for the chosen scope.
   // The org constraint is what makes a foreign scopeId resolve to nothing.
+  // `archivedAt: null` excludes archived projects — they're hidden from the nav
+  // and every other project listing, so counting them here would inflate the
+  // "N projects" the storage card reports beyond what the user can actually see.
   const where =
     scope.scopeType === "PROJECT"
-      ? { id: scope.scopeId, team: { organizationId } }
+      ? { id: scope.scopeId, team: { organizationId }, archivedAt: null }
       : scope.scopeType === "TEAM"
-        ? { teamId: scope.scopeId, team: { organizationId } }
-        : { team: { organizationId } };
+        ? { teamId: scope.scopeId, team: { organizationId }, archivedAt: null }
+        : { team: { organizationId }, archivedAt: null };
 
   const candidates = await ctx.prisma.project.findMany({
     where,

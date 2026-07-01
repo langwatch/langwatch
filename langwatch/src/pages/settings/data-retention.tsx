@@ -43,11 +43,12 @@ import { ScopeFilter as ScopeFilterComponent } from "~/components/settings/Scope
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { useActivePlan } from "~/hooks/useActivePlan";
 import { useAvailableScopes } from "~/hooks/useAvailableScopes";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
 import {
-  DEFAULT_RETENTION_DAYS,
+  PLATFORM_DEFAULT_RETENTION_DAYS,
   RETENTION_CATEGORIES,
   type RetentionCategory,
 } from "~/server/data-retention/retentionPolicy.schema";
@@ -153,6 +154,9 @@ function DataRetentionPage({
   // disable retention; the route enforces this independently. We use it solely
   // to decide whether to surface the "No retention" option in the drawer.
   const isPlatformAdmin = api.user.isAdmin.useQuery({}).data?.isAdmin ?? false;
+  // Enterprise (and self-hosted, which resolves to enterprise) gets the full
+  // retention menu + custom; paid non-enterprise gets the fixed short pair.
+  const { isEnterprise } = useActivePlan();
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   // When set, the Add drawer opens in edit mode locked to this scope's policy.
@@ -392,7 +396,7 @@ function DataRetentionPage({
                       <EmptyState.Title>No retention policies</EmptyState.Title>
                       <EmptyState.Description>
                         Add a retention policy to override the platform default
-                        of {DEFAULT_RETENTION_DAYS} days.
+                        of {PLATFORM_DEFAULT_RETENTION_DAYS} days.
                       </EmptyState.Description>
                     </VStack>
                     {canWrite && (
@@ -507,6 +511,7 @@ function DataRetentionPage({
             currentTeamId={teamId}
             currentProjectId={projectId}
             isPlatformAdmin={isPlatformAdmin}
+            isEnterprise={isEnterprise}
             isSaving={setForScope.isLoading || triggerUpdate.isLoading}
             onSave={async ({ scopes, retentionDays, applyToExisting }) => {
               const categories: RetentionCategory[] = [...RETENTION_CATEGORIES];
