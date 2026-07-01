@@ -48,6 +48,10 @@ function makeService(
       organizationId: string;
       sealedHour: Date;
     }) => Promise<number>;
+    runExclusivePerOrg: (
+      organizationId: string,
+      fn: () => Promise<void>,
+    ) => Promise<void>;
   }> = {},
 ) {
   const isMeteringEnabled = vi
@@ -80,6 +84,7 @@ function makeService(
       markReported: vi.fn(),
     },
     enqueueReport,
+    runExclusivePerOrg: overrides.runExclusivePerOrg,
     now: () => NOW,
   });
 
@@ -138,6 +143,25 @@ describe("StorageMeterDispatchService", () => {
     it("measures no new hour and enqueues nothing", async () => {
       const { service, measureBytesAt, enqueueReport } = makeService({
         lastMeasured: SEAL_BOUNDARY,
+      });
+
+      await service.dispatchForOrg({ organizationId: "org-1" });
+
+      expect(measureBytesAt).not.toHaveBeenCalled();
+      expect(enqueueReport).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the per-org guard is already held", () => {
+    /** @scenario Concurrent dispatches for the same organization are collapsed to one */
+    it("skips measurement when the guard does not run the work", async () => {
+      // A guard that never invokes fn simulates another project's dispatch
+      // already holding the org lock.
+      const { service, measureBytesAt, enqueueReport } = makeService({
+        lastMeasured: hour("2026-02-15T08:00:00.000Z"), // has a real gap
+        runExclusivePerOrg: async () => {
+          /* lock held elsewhere → do not run */
+        },
       });
 
       await service.dispatchForOrg({ organizationId: "org-1" });
