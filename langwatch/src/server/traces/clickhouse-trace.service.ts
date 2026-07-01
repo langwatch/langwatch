@@ -2366,6 +2366,53 @@ export class ClickHouseTraceService {
   }
 
   /**
+   * Resolve the OccurredAt span of a set of traces from a cheap sort-key seek.
+   *
+   * trace_summaries is ORDER BY (TenantId, TraceId), so filtering on those two
+   * columns and reading only OccurredAt (a light column) lets ClickHouse answer
+   * min/max from the sort-key index without decoding heavy payload columns. The
+   * returned range then bounds the heavy summary read to the traces' weekly
+   * partitions. Returns undefined when no rows match (min/max default to epoch),
+   * so the caller keeps its previous unbounded behaviour rather than guessing.
+   *
+   * @internal
+   */
+  private async resolveOccurredAtRange({
+    client,
+    projectId,
+    traceIds,
+  }: {
+    client: ClickHouseClient;
+    projectId: string;
+    traceIds: string[];
+  }): Promise<OccurredAtRange | undefined> {
+    if (traceIds.length === 0) {
+      return undefined;
+    }
+    const result = await client.query({
+      query: `
+        SELECT
+          toUnixTimestamp64Milli(min(OccurredAt)) AS fromMs,
+          toUnixTimestamp64Milli(max(OccurredAt)) AS toMs
+        FROM trace_summaries
+        WHERE TenantId = {tenantId:String}
+          AND TraceId IN ({traceIds:Array(String)})
+      `,
+      query_params: { tenantId: projectId, traceIds },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Array<{
+      fromMs: number | null;
+      toMs: number | null;
+    }>;
+    const row = rows[0];
+    if (!row || !(Number(row.fromMs) > 0) || !(Number(row.toMs) > 0)) {
+      return undefined;
+    }
+    return { from: Number(row.fromMs), to: Number(row.toMs) };
+  }
+
+  /**
    * Fetch trace summaries with their spans using a JOIN query.
    * This is more efficient than two separate queries.
    *
@@ -2392,6 +2439,34 @@ export class ClickHouseTraceService {
           throw new Error("ClickHouse client not available");
         }
 
+        // Callers that already know the traces' time pass `occurredAt`; the
+        // thread-view paths (getTracesByThreadId / getTracesWithSpansByThreadIds)
+        // only have trace ids. Without a window the summary read below filters on
+        // TraceId alone, which cannot prune partitions (trace_summaries is
+        // partitioned on OccurredAt) and so opens every weekly part incl. cold
+        // S3. Resolve the OccurredAt span from a cheap sort-key seek (light
+        // column only) and reuse it to bound the heavy read. Same resolve-from-
+        // sort-key shape as the single-trace read in the trace-summary repo.
+        const effectiveOccurredAt =
+          occurredAt ??
+          (await this.resolveOccurredAtRange({
+            client: clickHouseClient,
+            projectId,
+            traceIds,
+          }).catch((error) => {
+            // Fail open: the resolve is a pure optimization, so a transient
+            // failure must not break a read that previously succeeded. Fall
+            // back to the unbounded (slower but correct) summary read.
+            this.logger.warn(
+              {
+                projectId,
+                error: error instanceof Error ? error.message : error,
+              },
+              "OccurredAt resolve for batch trace read failed; falling back to unbounded summary read",
+            );
+            return undefined;
+          }));
+
         // The summary + span reads pull heavy columns (ComputedInput/Output,
         // Attributes, SpanAttributes/Events/Links) for the whole trace list, so a
         // large list can exceed the per-query memory cap and fail with
@@ -2411,9 +2486,9 @@ export class ClickHouseTraceService {
           // a hint we keep the original unbounded read.
           const SUMMARY_PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
           const hasSummaryWindow =
-            occurredAt !== undefined &&
-            occurredAt.from > 0 &&
-            occurredAt.to > 0;
+            effectiveOccurredAt !== undefined &&
+            effectiveOccurredAt.from > 0 &&
+            effectiveOccurredAt.to > 0;
           const summaryTimeFilterOuter = hasSummaryWindow
             ? "AND t.OccurredAt >= fromUnixTimestamp64Milli({sumFromMs:Int64}) AND t.OccurredAt <= fromUnixTimestamp64Milli({sumToMs:Int64})"
             : "";
@@ -2422,8 +2497,9 @@ export class ClickHouseTraceService {
             : "";
           const summaryTimeParams = hasSummaryWindow
             ? {
-                sumFromMs: occurredAt.from - SUMMARY_PARTITION_WINDOW_MS,
-                sumToMs: occurredAt.to + SUMMARY_PARTITION_WINDOW_MS,
+                sumFromMs:
+                  effectiveOccurredAt.from - SUMMARY_PARTITION_WINDOW_MS,
+                sumToMs: effectiveOccurredAt.to + SUMMARY_PARTITION_WINDOW_MS,
               }
             : {};
 
