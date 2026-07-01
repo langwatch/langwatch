@@ -46,6 +46,10 @@ type SingleRunTableProps = {
   hiddenColumns?: Set<string>;
   /** Target colors for when X-axis is "target" in charts */
   targetColors?: Record<string, string>;
+  /** Whether to render target output values (default true) */
+  showOutputs?: boolean;
+  /** Whether to render evaluator score chips (default true) */
+  showEvaluations?: boolean;
   /** Disable virtualization (for tests) */
   disableVirtualization?: boolean;
 };
@@ -62,6 +66,8 @@ const buildColumns = (
   aggregatesMap: Map<string, BatchTargetAggregate>,
   rows: BatchResultRow[],
   hiddenColumns: Set<string>,
+  showOutputs: boolean,
+  showEvaluations: boolean,
   targetColors?: Record<string, string>,
 ) => {
   const columns = [];
@@ -139,8 +145,11 @@ const buildColumns = (
     );
   }
 
-  // Target columns with headers that include summary
-  for (const targetCol of targetColumns) {
+  // Target columns with headers that include summary.
+  // Skip them entirely when neither outputs nor evaluations are shown
+  // (the column would otherwise render empty cells).
+  const showTargetColumns = showOutputs || showEvaluations;
+  for (const targetCol of showTargetColumns ? targetColumns : []) {
     const aggregates = aggregatesMap.get(targetCol.id) ?? null;
     const targetColor = targetColors?.[targetCol.id];
 
@@ -165,7 +174,13 @@ const buildColumns = (
               </Text>
             );
           }
-          return <BatchTargetCell targetOutput={targetOutput} />;
+          return (
+            <BatchTargetCell
+              targetOutput={targetOutput}
+              showOutput={showOutputs}
+              showEvaluations={showEvaluations}
+            />
+          );
         },
       }),
     );
@@ -179,6 +194,8 @@ export function SingleRunTable({
   isLoading,
   hiddenColumns = new Set(),
   targetColors = {},
+  showOutputs = true,
+  showEvaluations = true,
   disableVirtualization = false,
 }: SingleRunTableProps) {
   // Check if target colors should be shown (non-empty means X-axis is "target")
@@ -199,9 +216,19 @@ export function SingleRunTable({
       aggregatesMap,
       data.rows,
       hiddenColumns,
+      showOutputs,
+      showEvaluations,
       showTargetColors ? targetColors : undefined,
     );
-  }, [data, aggregatesMap, hiddenColumns, showTargetColors, targetColors]);
+  }, [
+    data,
+    aggregatesMap,
+    hiddenColumns,
+    showOutputs,
+    showEvaluations,
+    showTargetColors,
+    targetColors,
+  ]);
 
   // Memoize getCoreRowModel to prevent React scheduling loops
   const coreRowModel = useMemo(() => getCoreRowModel(), []);
@@ -266,7 +293,8 @@ export function SingleRunTable({
   const datasetColCount = data.datasetColumns.filter(
     (c) => !hiddenColumns.has(c.name),
   ).length;
-  const targetColCount = data.targetColumns.length;
+  const targetColCount =
+    showOutputs || showEvaluations ? data.targetColumns.length : 0;
   const minTableWidth = calculateMinTableWidth(datasetColCount, targetColCount);
 
   const tableStyles = getTableStyles(minTableWidth);
