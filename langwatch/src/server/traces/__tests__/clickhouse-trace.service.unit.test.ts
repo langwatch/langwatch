@@ -968,8 +968,9 @@ describe("ClickHouseTraceService", () => {
         await expect(
           service.getTracesWithSpans("proj_123", ["trace-0"], protections),
         ).rejects.toThrow();
-        // The single failed query is not followed by per-batch retries.
-        expect(mockClickHouseQuery).toHaveBeenCalledTimes(1);
+        // The resolve fails open (call 1), then the summary's non-OOM error
+        // propagates without per-batch retries (call 2) — no retry loop.
+        expect(mockClickHouseQuery).toHaveBeenCalledTimes(2);
       });
     });
 
@@ -1075,6 +1076,35 @@ describe("ClickHouseTraceService", () => {
         expect(summaryCall.query).not.toContain("OccurredAt <=");
         expect(summaryCall.query_params.sumFromMs).toBeUndefined();
         expect(summaryCall.query_params.sumToMs).toBeUndefined();
+      });
+
+      it("fails open to the unbounded read when the resolve query errors", async () => {
+        mockClickHouseQuery
+          // resolve errors (transient ClickHouse failure)
+          .mockRejectedValueOnce(new Error("resolve boom"))
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([makeSummaryRow("trace-0")]),
+          })
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([makeSpanRow("trace-0", "trace-0-s")]),
+          });
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        const traces = await service.getTracesWithSpans(
+          "proj_123",
+          ["trace-0"],
+          protections,
+        );
+
+        // The read still succeeds; the summary just stays unbounded (the
+        // pre-optimization behaviour) rather than propagating the resolve error.
+        expect(traces).toHaveLength(1);
+        const summaryCall = mockClickHouseQuery.mock.calls[1]![0];
+        expect(summaryCall.query).not.toContain("OccurredAt >=");
+        expect(summaryCall.query_params.sumFromMs).toBeUndefined();
       });
     });
   });

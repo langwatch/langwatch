@@ -2377,11 +2377,15 @@ export class ClickHouseTraceService {
    *
    * @internal
    */
-  private async resolveOccurredAtRange(
-    client: ClickHouseClient,
-    projectId: string,
-    traceIds: string[],
-  ): Promise<OccurredAtRange | undefined> {
+  private async resolveOccurredAtRange({
+    client,
+    projectId,
+    traceIds,
+  }: {
+    client: ClickHouseClient;
+    projectId: string;
+    traceIds: string[];
+  }): Promise<OccurredAtRange | undefined> {
     if (traceIds.length === 0) {
       return undefined;
     }
@@ -2445,11 +2449,23 @@ export class ClickHouseTraceService {
         // sort-key shape as the single-trace read in the trace-summary repo.
         const effectiveOccurredAt =
           occurredAt ??
-          (await this.resolveOccurredAtRange(
-            clickHouseClient,
+          (await this.resolveOccurredAtRange({
+            client: clickHouseClient,
             projectId,
             traceIds,
-          ));
+          }).catch((error) => {
+            // Fail open: the resolve is a pure optimization, so a transient
+            // failure must not break a read that previously succeeded. Fall
+            // back to the unbounded (slower but correct) summary read.
+            this.logger.warn(
+              {
+                projectId,
+                error: error instanceof Error ? error.message : error,
+              },
+              "OccurredAt resolve for batch trace read failed; falling back to unbounded summary read",
+            );
+            return undefined;
+          }));
 
         // The summary + span reads pull heavy columns (ComputedInput/Output,
         // Attributes, SpanAttributes/Events/Links) for the whole trace list, so a
