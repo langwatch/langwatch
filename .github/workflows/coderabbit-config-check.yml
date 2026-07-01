@@ -27,7 +27,7 @@ jobs:
     steps:
       # Actions are SHA-pinned (langwatch org policy requires full-SHA pins;
       # tag refs like @v4 fail to start). Same SHAs other repo workflows use.
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v4
         with:
           persist-credentials: false # read-only job, no git ops — don't persist the token
 
