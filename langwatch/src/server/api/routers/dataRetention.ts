@@ -9,6 +9,7 @@ import {
   assertCanWriteRetentionScope,
   assertRetentionPlan,
   assertRetentionPlanForScope,
+  assertRetentionValueAllowedForPlan,
 } from "~/server/data-retention/policy/dataRetentionPolicy.authz";
 import { getRetentionPolicySnapshot } from "~/server/data-retention/policy/dataRetentionPolicy.read";
 import { ScopeTargetNotFoundError } from "~/server/data-retention/policy/dataRetentionPolicy.service";
@@ -92,6 +93,15 @@ export const dataRetentionRouter = createTRPCRouter({
       await assertRetentionPlanForScope(
         { prisma: ctx.prisma, session: ctx.session },
         input.scope,
+      );
+      // Value-gate: paid plans may persist only their fixed presets; enterprise/
+      // self-hosted keep the full range + custom (≥49). No-ops on the indefinite
+      // sentinel so the platform-admin check below still runs. This is the
+      // write-path prevention — the UI menu is a mirror, not the enforcement.
+      await assertRetentionValueAllowedForPlan(
+        { prisma: ctx.prisma, session: ctx.session },
+        input.scope,
+        input.retentionDays,
       );
       // Disabling retention (indefinite/keep-forever) is platform-admin only.
       // The schema accepts the 0 sentinel structurally; this is where the

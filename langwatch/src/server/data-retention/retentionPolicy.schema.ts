@@ -12,10 +12,38 @@ import { z } from "zod";
 export const RETENTION_WEEK_DAYS = 7;
 
 /**
- * The minimum retention any override may set: 7 weeks. Below this, ClickHouse
- * TTL churn stops being worth the storage saved.
+ * The absolute minimum retention any override may persist: 5 weeks (35 days).
+ *
+ * This is the paid tier's short option ("~1 month"). It is deliberately BELOW
+ * the 49-day recovery floor that free and enterprise keep: paid retention is a
+ * packaging lever, and a paid org opts into a shorter (35d) window than free
+ * (49d) — an inverted-recovery trade-off locked in the plan-gated-menu ADR
+ * (v4). The schema alone therefore no longer guarantees ≥49; the 49-day floor
+ * for non-paid (enterprise / self-hosted) CUSTOM values is re-enforced in the
+ * plan gate (`assertRetentionValueAllowedForPlan`), not here. See
+ * `ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS`.
  */
-export const MIN_RETENTION_DAYS = 49;
+export const MIN_RETENTION_DAYS = 35;
+
+/**
+ * The floor for any CUSTOM (free-form) retention value on the enterprise /
+ * self-hosted tiers, and the recovery floor free/enterprise data keeps. Paid's
+ * sub-floor options (`PAID_RETENTION_PRESET_DAYS`) are the only values allowed
+ * below this, and only as fixed presets — never as custom input. Gate-enforced,
+ * not schema-enforced (the schema floor is `MIN_RETENTION_DAYS = 35`).
+ */
+export const ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS = 49;
+
+/**
+ * The fixed retention menu for PAID (non-enterprise SaaS) organizations:
+ * "~1 month" and "~2 months", snapped UP to whole weeks (30→35 = 5wk,
+ * 60→63 = 9wk) so both align to the weekly ClickHouse partition key. Paid orgs
+ * may pick ONLY these two values — no custom, no other presets. Enterprise also
+ * offers these two as its short options, but reaches longer windows via its
+ * full preset list plus custom (≥49). The gate treats membership in this list
+ * as the sole exception to the enterprise 49-day custom floor.
+ */
+export const PAID_RETENTION_PRESET_DAYS = [35, 63] as const;
 
 /**
  * The maximum retention any override may set. Retention is persisted to the
@@ -29,10 +57,11 @@ export const MIN_RETENTION_DAYS = 49;
 export const MAX_RETENTION_DAYS = 65534;
 
 /**
- * The default retention proposed when creating an override: 7 weeks, the same
- * as the minimum. This is only the suggested starting value in the UI; the
- * value actually stamped when no override exists is PLATFORM_DEFAULT_RETENTION_DAYS
- * (see below), not indefinite.
+ * Fallback starting value for the override drawer when a tier-specific default
+ * can't be derived. The drawer itself defaults to the first preset of the
+ * caller's plan menu (paid → 35, enterprise → 35); this constant is only the
+ * floor-aligned backstop. The value actually stamped when no override exists is
+ * PLATFORM_DEFAULT_RETENTION_DAYS (see below), not this.
  */
 export const DEFAULT_RETENTION_DAYS = MIN_RETENTION_DAYS;
 

@@ -869,7 +869,40 @@ export class EEWebhookService implements WebhookService {
    * notification side effects.
    */
   private async applySeatRetentionPolicy(organizationId: string): Promise<void> {
+    // Create-if-absent, NOT upsert: a seat/subscription event must never
+    // overwrite an existing org-level override. Unconditionally writing the
+    // platform default here would clobber a grandfathered high policy (e.g.
+    // ORG-traces = 1827d) down to 49d on any billing event — silently
+    // shortening the retention window and DELETING data the customer never
+    // opted to lose. Mirrors licenseHandler.provisionMissingRetentionPolicies.
+    let covered: Set<string>;
+    try {
+      const existing =
+        await getApp().dataRetention.policy.listOrganizationRules(
+          organizationId,
+        );
+      covered = new Set(
+        existing
+          .filter(
+            (row) =>
+              row.scopeType === "ORGANIZATION" &&
+              row.scopeId === organizationId,
+          )
+          .map((row) => row.category),
+      );
+    } catch (err) {
+      // If we can't read the current rules we can't prove a category is absent,
+      // so skip provisioning rather than risk a clobber. Ingestion still stamps
+      // PLATFORM_DEFAULT_RETENTION_DAYS via the cascade fallback.
+      logger.error(
+        { organizationId, err },
+        "[stripeWebhook] Failed to read retention rules; skipping seat provisioning",
+      );
+      return;
+    }
+
     for (const category of RETENTION_CATEGORIES) {
+      if (covered.has(category)) continue;
       try {
         await getApp().dataRetention.policy.setForScope({
           scope: { scopeType: "ORGANIZATION", scopeId: organizationId },

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS,
   INDEFINITE_RETENTION_DAYS,
   MAX_RETENTION_DAYS,
   MIN_RETENTION_DAYS,
+  PAID_RETENTION_PRESET_DAYS,
   PLATFORM_DEFAULT_RETENTION_DAYS,
   RETENTION_WEEK_DAYS,
   retentionDaysInputSchema,
@@ -11,7 +13,8 @@ import {
 
 describe("retentionDaysSchema", () => {
   describe("given a whole-week value within the allowed range", () => {
-    it("accepts the minimum (7 weeks)", () => {
+    it("accepts the absolute minimum (35 days / 5 weeks, the paid floor)", () => {
+      expect(MIN_RETENTION_DAYS).toBe(35);
       expect(retentionDaysSchema.safeParse(MIN_RETENTION_DAYS).success).toBe(
         true,
       );
@@ -102,6 +105,34 @@ describe("retentionDaysInputSchema", () => {
     it("still rejects a value that isn't a whole number of weeks", () => {
       expect(retentionDaysInputSchema.safeParse(50).success).toBe(false);
     });
+  });
+});
+
+describe("plan-tier retention constants", () => {
+  // The paid menu sits below the 49-day recovery floor free/enterprise keep, so
+  // the absolute schema floor had to drop to 35 (the gate re-enforces 49 for
+  // non-paid custom values). Guard the ordering so the two floors don't drift.
+  it("keeps the absolute floor below the enterprise custom floor", () => {
+    expect(MIN_RETENTION_DAYS).toBeLessThan(
+      ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS,
+    );
+    expect(ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS).toBe(49);
+  });
+
+  it("has both paid presets whole-week aligned and persistable by the schema", () => {
+    expect(PAID_RETENTION_PRESET_DAYS).toEqual([35, 63]);
+    for (const days of PAID_RETENTION_PRESET_DAYS) {
+      expect(days % RETENTION_WEEK_DAYS).toBe(0);
+      expect(retentionDaysSchema.safeParse(days).success).toBe(true);
+    }
+  });
+
+  it("keeps the shorter paid preset below the enterprise custom floor", () => {
+    // This is the whole point of dropping the schema floor: 35 must be a legal
+    // stored value even though it is under the 49-day recovery floor.
+    expect(PAID_RETENTION_PRESET_DAYS[0]).toBeLessThan(
+      ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS,
+    );
   });
 });
 

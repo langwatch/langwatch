@@ -3,6 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mockSendSlackSubscriptionEvent = vi.fn().mockResolvedValue(undefined);
 const mockSetForScope = vi.fn().mockResolvedValue(undefined);
 const mockRemoveForScope = vi.fn().mockResolvedValue(undefined);
+// Seat provisioning is create-if-absent: it reads the org's current rules and
+// only fills the gaps. Default to "no existing rules" so the base case
+// provisions everything.
+const mockListOrganizationRules = vi.fn().mockResolvedValue([]);
 
 vi.mock("../../../src/server/app-layer/app", () => ({
   getApp: () => ({
@@ -13,6 +17,7 @@ vi.mock("../../../src/server/app-layer/app", () => ({
       policy: {
         setForScope: mockSetForScope,
         removeForScope: mockRemoveForScope,
+        listOrganizationRules: mockListOrganizationRules,
       },
     },
   }),
@@ -470,6 +475,43 @@ describe("webhookService", () => {
           });
         }
         expect(mockSetForScope).toHaveBeenCalledTimes(RETENTION_CATEGORIES.length);
+      });
+
+      /** @scenario A grandfathered org-level policy survives a seat event (INV-6) */
+      it("never overwrites an existing org-level policy — only fills missing categories", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE, plan: "GROWTH_SEAT_EUR_MONTHLY" }),
+        );
+        subRepo.migrateToSeatEvent.mockResolvedValue([]);
+        // The org already tuned traces retention high; a billing event must NOT
+        // clobber it back to the platform default (that would shorten the
+        // window and delete data). Only the uncovered categories are filled.
+        mockListOrganizationRules.mockResolvedValueOnce([
+          {
+            scopeType: "ORGANIZATION",
+            scopeId: "org_123",
+            category: "traces",
+            retentionDays: 1827,
+          },
+        ]);
+
+        const promise = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        // traces is left untouched…
+        expect(mockSetForScope).not.toHaveBeenCalledWith(
+          expect.objectContaining({ category: "traces" }),
+        );
+        // …while the remaining categories are still provisioned.
+        expect(mockSetForScope).toHaveBeenCalledTimes(
+          RETENTION_CATEGORIES.length - 1,
+        );
       });
 
       /** @scenario A retention failure never fails the billing webhook */

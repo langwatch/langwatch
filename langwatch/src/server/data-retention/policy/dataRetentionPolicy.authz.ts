@@ -1,6 +1,9 @@
 import { isAdmin } from "@ee/admin/isAdmin";
+import type { PlanInfo } from "@ee/licensing/planInfo";
 import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import { env } from "~/env.mjs";
+import { isEnterpriseTier } from "~/server/api/enterprise";
 import {
   hasOrganizationPermission,
   hasProjectPermission,
@@ -8,6 +11,11 @@ import {
 } from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
+import {
+  ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS,
+  INDEFINITE_RETENTION_DAYS,
+  PAID_RETENTION_PRESET_DAYS,
+} from "~/server/data-retention/retentionPolicy.schema";
 import type { ScopeTier } from "~/server/scopes/scope.types";
 
 type RBACContext = { prisma: PrismaClient; session: Session | null };
@@ -183,4 +191,103 @@ export async function assertRetentionPlanForScope(
     });
   }
   await assertRetentionPlan(ctx, organizationId);
+}
+
+/**
+ * Which retention values a plan tier may persist. Deliberately a standalone
+ * map inside the retention module rather than a field on `PlanInfo` /
+ * `PLAN_LIMITS` / the signed license: retention packaging owns its own tiering
+ * and stays decoupled from billing/license plumbing. Because it reads only
+ * existing `PlanInfo` fields (`free`, `type`), a license-resolved org can never
+ * crash on a missing field — the gate fails OPEN (uncapped) for any tier it
+ * doesn't recognise.
+ *
+ * - `fixed`   → paid (non-enterprise SaaS): only the listed presets, no custom.
+ * - `uncapped`→ enterprise / self-hosted: any whole-week value ≥ `customMin`,
+ *               plus the paid short presets (35/63) as the sole sub-floor
+ *               exceptions.
+ */
+type RetentionRule =
+  | { kind: "fixed"; presetDays: readonly number[] }
+  | { kind: "uncapped"; customMin: number };
+
+function ruleForPlan(plan: PlanInfo): RetentionRule {
+  // Self-hosted / OSS short-circuits to ENTERPRISE upstream, but guard on
+  // IS_SAAS too so a mis-resolved plan on a self-hosted deploy is never capped.
+  if (env.IS_SAAS !== true || isEnterpriseTier(plan.type)) {
+    return {
+      kind: "uncapped",
+      customMin: ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS,
+    };
+  }
+  return { kind: "fixed", presetDays: PAID_RETENTION_PRESET_DAYS };
+}
+
+/**
+ * Throws FORBIDDEN if the plan of the scope's owning org may not persist the
+ * requested retention value. This is the write-path prevention that stops a
+ * paid org from setting an arbitrary (e.g. custom multi-year) window through
+ * the tRPC surface, independent of what the UI offers.
+ *
+ * Order matters at the call site: run AFTER the free gate
+ * (`assertRetentionPlanForScope`) and it no-ops on the indefinite sentinel so
+ * the platform-admin `assertCanDisableRetention` check still runs downstream.
+ * Only `setForScope` (the one place a NEW value is chosen) calls this;
+ * retroactive apply replays an already-stored value and is NOT value-gated.
+ */
+export async function assertRetentionValueAllowedForPlan(
+  ctx: RBACContext,
+  scope: RetentionScope,
+  retentionDays: number,
+): Promise<void> {
+  // Keep-forever (0) is authorized separately (platform-admin only). Returning
+  // here lets that gate run and keeps the value rule from rejecting the
+  // sentinel as "not a preset".
+  if (retentionDays === INDEFINITE_RETENTION_DAYS) return;
+
+  const organizationId = await resolveScopeOrganizationId(ctx, scope);
+  if (!organizationId) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: `${scope.scopeType.toLowerCase()} ${scope.scopeId} was not found.`,
+    });
+  }
+
+  const plan = await getApp().planProvider.getActivePlan({
+    organizationId,
+    user: ctx.session?.user ?? undefined,
+  });
+
+  // Free orgs are blocked upstream by the free gate; don't double-enforce the
+  // value rule (which would otherwise reject their platform-default resolution).
+  if (plan.free) return;
+
+  const rule = ruleForPlan(plan);
+
+  if (rule.kind === "uncapped") {
+    // The paid short presets (35/63) are the only values allowed below the
+    // enterprise custom floor. Everything else must clear the floor; whole-week
+    // alignment is already enforced by `retentionDaysSchema`.
+    if (
+      (PAID_RETENTION_PRESET_DAYS as readonly number[]).includes(retentionDays)
+    ) {
+      return;
+    }
+    if (retentionDays < rule.customMin) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: `Retention must be at least ${rule.customMin} days on your plan.`,
+      });
+    }
+    return;
+  }
+
+  if (!rule.presetDays.includes(retentionDays)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message:
+        "That retention length isn't available on your plan. " +
+        "Choose one of the offered options, or contact us to unlock more.",
+    });
+  }
 }

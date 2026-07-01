@@ -46,6 +46,7 @@ function renderDrawer(
         currentTeamId={undefined}
         currentProjectId="proj-1"
         isPlatformAdmin={false}
+        isEnterprise={true}
         isSaving={false}
         onSave={() => {}}
         {...props}
