@@ -10,17 +10,18 @@
 
 import type { PrismaClient } from "@prisma/client";
 import type { Protections } from "~/server/elasticsearch/protections";
-import type { Trace, Evaluation } from "~/server/tracer/types";
+import type { Evaluation, Trace } from "~/server/tracer/types";
 import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
 import type { TraceService } from "~/server/traces/trace.service";
+import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { createLogger } from "~/utils/logger/server";
 import {
-  serializeTracesToSummaryCsv,
   serializeTracesToFullCsv,
+  serializeTracesToSummaryCsv,
 } from "./serializers/csv-serializer";
 import {
-  serializeTraceToSummaryJson,
   serializeTraceToFullJson,
+  serializeTraceToSummaryJson,
 } from "./serializers/json-serializer";
 import type { ExportProgress, ExportRequest } from "./types";
 
@@ -57,9 +58,13 @@ export class ExportService {
     const { TraceService: TraceServiceImpl } = await import(
       "~/server/traces/trace.service"
     );
-    const resolvedPrisma =
-      prisma ?? (await import("~/server/db")).prisma;
-    const traceService = TraceServiceImpl.create(resolvedPrisma);
+    const resolvedPrisma = prisma ?? (await import("~/server/db")).prisma;
+    // Export is a content-consuming read: wire blob-resolution deps so a full
+    // export reads the whole IO value, not the 64 KB preview (#4991 AC1).
+    const traceService = TraceServiceImpl.create(
+      resolvedPrisma,
+      buildTraceBlobResolutionDeps(),
+    );
     return new ExportService({ traceService });
   }
 
@@ -112,7 +117,11 @@ export class ExportService {
     protections: Protections;
   }): AsyncGenerator<{ chunk: string; progress: ExportProgress }> {
     logger.info(
-      { projectId: request.projectId, mode: request.mode, format: request.format },
+      {
+        projectId: request.projectId,
+        mode: request.mode,
+        format: request.format,
+      },
       "Starting trace export",
     );
 
@@ -145,6 +154,10 @@ export class ExportService {
         {
           downloadMode: true,
           includeSpans,
+          // Full export resolves offloaded IO to the whole value (#4991 AC1).
+          // Summary export (includeSpans=false) reads no span content, so it
+          // stays on the preview and issues zero event_log reads.
+          resolveBlobs: includeSpans,
           scrollId: scrollId ?? null,
         },
       );
@@ -258,7 +271,12 @@ function serializeBatch({
 }): string {
   switch (request.format) {
     case "csv":
-      return serializeCsvBatch({ traces, request, evaluatorNames, includeHeader });
+      return serializeCsvBatch({
+        traces,
+        request,
+        evaluatorNames,
+        includeHeader,
+      });
     case "json":
       return serializeJsonBatch({ traces, request });
     default: {
@@ -304,13 +322,16 @@ function serializeJsonBatch({
 }): string {
   switch (request.mode) {
     case "summary":
-      return traces
-        .map((trace) => serializeTraceToSummaryJson({ trace }))
-        .join("\n") + "\n";
+      return (
+        traces
+          .map((trace) => serializeTraceToSummaryJson({ trace }))
+          .join("\n") + "\n"
+      );
     case "full":
-      return traces
-        .map((trace) => serializeTraceToFullJson({ trace }))
-        .join("\n") + "\n";
+      return (
+        traces.map((trace) => serializeTraceToFullJson({ trace })).join("\n") +
+        "\n"
+      );
     default: {
       const _exhaustive: never = request.mode;
       throw new Error(`Unsupported mode: ${_exhaustive}`);

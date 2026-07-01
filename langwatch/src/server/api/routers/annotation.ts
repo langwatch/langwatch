@@ -5,16 +5,19 @@ import {
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
-import type { Session } from "~/server/auth";
 import { z } from "zod";
 import { AnnotationService } from "~/server/annotations/annotation.service";
-import { TraceService } from "~/server/traces/trace.service";
-import { slugify } from "~/utils/slugify";
 import { getApp } from "~/server/app-layer/app";
+import type { Session } from "~/server/auth";
+import { TraceService } from "~/server/traces/trace.service";
+import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
+import { slugify } from "~/utils/slugify";
 import { createLogger } from "../../../utils/logger/server";
 import type { Protections } from "../../elasticsearch/protections";
-import { checkPermissionOrPubliclyShared } from "../rbac";
-import { checkProjectPermission } from "../rbac";
+import {
+  checkPermissionOrPubliclyShared,
+  checkProjectPermission,
+} from "../rbac";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { getUserProtectionsForProject } from "../utils";
 
@@ -56,12 +59,18 @@ const enrichQueueItemsWithTracesAndAnnotations = async (
     },
   });
 
-  // Get traces for queue items
-  const traceService = TraceService.create(ctx.prisma);
+  // Annotators label trace content — resolve full IO (#4991) so they see the
+  // whole value, not the 64 KB preview.
+  const traceService = TraceService.create(
+    ctx.prisma,
+    buildTraceBlobResolutionDeps(),
+  );
   const traces = await traceService.getTracesWithSpans(
     projectId,
     traceIds,
     protections,
+    undefined,
+    { full: true },
   );
 
   // Create lookup maps for O(1) access
@@ -269,7 +278,11 @@ export const annotationRouter = createTRPCRouter({
         });
       } catch (error) {
         logger.error(
-          { error, traceId: deletedAnnotation.traceId, projectId: input.projectId },
+          {
+            error,
+            traceId: deletedAnnotation.traceId,
+            projectId: input.projectId,
+          },
           "Failed to sync annotation removal to ClickHouse",
         );
       }
@@ -427,11 +440,17 @@ export const annotationRouter = createTRPCRouter({
         projectId: input.projectId,
       });
       const traceIds = [...new Set(queueItems.map((item) => item.traceId))];
-      const traceService = TraceService.create(ctx.prisma);
+      // Annotation queue shows trace content for labeling — resolve full IO (#4991).
+      const traceService = TraceService.create(
+        ctx.prisma,
+        buildTraceBlobResolutionDeps(),
+      );
       const traces = await traceService.getTracesWithSpans(
         input.projectId,
         traceIds,
         protections,
+        undefined,
+        { full: true },
       );
       const traceMap = new Map(traces.map((trace) => [trace.trace_id, trace]));
 
