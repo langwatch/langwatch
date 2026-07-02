@@ -280,6 +280,7 @@ describe("UsageService", () => {
         expect(mockPlanResolver).toHaveBeenCalledWith("org-123");
       });
 
+      /** @scenario Limit checks decide from one active plan snapshot */
       it("uses one active plan snapshot for counting and threshold comparison", async () => {
         const firstPlan = {
           ...FREE_PLAN,
