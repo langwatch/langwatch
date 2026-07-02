@@ -34,6 +34,74 @@ describe("audioPartToMediaData", () => {
         });
       });
     });
+
+    describe("when it carries a container format like wav", () => {
+      it("passes the bytes through unwrapped (must stay playable as-is)", () => {
+        // Guards the browser-QA-proven path: a `wav` turn is already a valid
+        // container, so it must NOT be re-wrapped — the value stays identical.
+        expect(
+          audioPartToMediaData({
+            type: "input_audio",
+            input_audio: { data: "QUJD", format: "wav" },
+          }),
+        ).toEqual({
+          type: "audio",
+          source: { type: "data", value: "QUJD", mimeType: "audio/wav" },
+        });
+      });
+    });
+
+    describe("when it carries raw header-less pcm16 data", () => {
+      it("wraps the raw pcm16 in a WAV container so it is playable", () => {
+        // 4 raw little-endian int16 samples — no RIFF header.
+        const pcm = new Uint8Array([
+          0x00, 0x00, 0x10, 0x20, 0xff, 0x7f, 0x00, 0x80,
+        ]);
+        const result = audioPartToMediaData({
+          type: "input_audio",
+          input_audio: {
+            data: Buffer.from(pcm).toString("base64"),
+            format: "pcm16",
+          },
+        });
+
+        expect(result).not.toBeNull();
+        const source = (
+          result as {
+            source: { type: string; value: string; mimeType?: string };
+          }
+        ).source;
+        expect(source.type).toBe("data");
+        expect(source.mimeType).toBe("audio/wav");
+
+        // The value must now be a real WAV: RIFF/WAVE magic, 24 kHz mono
+        // 16-bit, with the original PCM bytes appended after the 44-byte header.
+        const wav = Buffer.from(source.value, "base64");
+        expect(wav.length).toBe(44 + pcm.length);
+        expect(wav.toString("ascii", 0, 4)).toBe("RIFF");
+        expect(wav.toString("ascii", 8, 12)).toBe("WAVE");
+        expect(wav.readUInt16LE(20)).toBe(1); // audioFormat = PCM
+        expect(wav.readUInt16LE(22)).toBe(1); // mono
+        expect(wav.readUInt32LE(24)).toBe(24000); // sample rate
+        expect(wav.readUInt16LE(34)).toBe(16); // bits per sample
+        expect(Buffer.from(wav.subarray(44)).equals(Buffer.from(pcm))).toBe(
+          true,
+        );
+      });
+    });
+
+    describe("when it carries companded g711 data", () => {
+      it("returns null rather than a silently-broken player", () => {
+        // Raw g711 can't be wrapped inline yet; emitting an <audio> would be a
+        // dead player, so it must fall back (null) to the raw view instead.
+        expect(
+          audioPartToMediaData({
+            type: "input_audio",
+            input_audio: { data: "AAAA", format: "g711_ulaw" },
+          }),
+        ).toBeNull();
+      });
+    });
   });
 
   describe("given an AG-UI audio part", () => {
@@ -47,6 +115,25 @@ describe("audioPartToMediaData", () => {
         },
       };
       expect(audioPartToMediaData(part)).toEqual(part);
+    });
+
+    describe("when it carries an inline data source with no mimeType", () => {
+      it("defaults the data-source mimeType so the data: URI is valid", () => {
+        const result = audioPartToMediaData({
+          type: "audio",
+          source: { type: "data", value: "QUJD" },
+        });
+
+        expect(result).toEqual({
+          type: "audio",
+          source: { type: "data", value: "QUJD", mimeType: "audio/wav" },
+        });
+        // The whole point: without a default this is `data:undefined;base64,…`
+        // — a broken player. The mimeType must be defined, not undefined.
+        const source = (result as { source: { mimeType?: string } }).source;
+        expect(source.mimeType).toBeDefined();
+        expect(source.mimeType).toBe("audio/wav");
+      });
     });
   });
 
@@ -120,6 +207,16 @@ describe("collectAudioParts", () => {
         audioPart,
         { type: "text", text: "hi" },
       ]);
+      expect(parts).toHaveLength(1);
+      expect(parts[0]).toMatchObject({ type: "audio" });
+    });
+  });
+
+  describe("given a bare audio object with no envelope", () => {
+    it("finds an audio part that is the root object itself", () => {
+      // A span whose entire input/output is one audio part, not wrapped in a
+      // messages/content envelope — previously yielded no player.
+      const parts = collectAudioParts(audioPart);
       expect(parts).toHaveLength(1);
       expect(parts[0]).toMatchObject({ type: "audio" });
     });

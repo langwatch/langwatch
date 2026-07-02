@@ -391,10 +391,14 @@ export function parseContentBlocks(
         break;
       }
       case "input_audio":
-      case "audio": {
-        // OpenAI Realtime `input_audio` / AG-UI `audio` parts render as an
-        // inline player, not a raw-JSON dump. Fall back to raw only when the
-        // canonical decoder can't resolve a playable source.
+      case "audio":
+      case "file": {
+        // OpenAI Realtime `input_audio`, AG-UI `audio`, and AI-SDK `file`
+        // audio parts render as an inline player, not a raw-JSON dump. The
+        // canonical decoder routes an audio `file` (mediaType "audio/…") to
+        // the same audio shape the legacy RenderInputOutput path uses, closing
+        // the both-UIs parity gap. A non-audio `file` resolves to null and
+        // falls through to the raw block below, unchanged.
         const media = audioPartToMediaData(obj);
         if (media) {
           out.push({ kind: "media", part: media });

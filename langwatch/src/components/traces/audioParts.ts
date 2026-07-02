@@ -12,6 +12,7 @@
  */
 import type { MediaPartData } from "~/components/simulations/MediaPart";
 import { visitContentPart } from "~/server/stored-objects/visit-content-part";
+import { pcm16ToWavBase64, resolveRawPcmFormat } from "./pcmToWav";
 
 const AUDIO_FORMAT_MIME: Record<string, string> = {
   wav: "audio/wav",
@@ -50,7 +51,11 @@ export function audioPartToMediaData(part: unknown): MediaPartData | null {
             source: {
               type: "data",
               value: p.source.value,
-              mimeType: p.source.mimeType,
+              // The decoder casts `source` from wire data, so `mimeType` can be
+              // undefined at runtime even though the type says string. Default
+              // it — a data: URI built from `undefined` (`data:undefined;…`) is
+              // a silently-broken player with no error badge.
+              mimeType: p.source.mimeType ?? "audio/wav",
             },
           };
     },
@@ -60,6 +65,25 @@ export function audioPartToMediaData(part: unknown): MediaPartData | null {
     imageUrl: () => null,
     bareImage: () => null,
     inputAudio: (p) => {
+      // Raw, header-less realtime formats aren't playable as a bare data: URI.
+      // pcm16 (the primary OpenAI Realtime format) is wrapped into a WAV
+      // container so it actually plays; g711 is companded and can't be wrapped
+      // inline yet, so we return null rather than emit a silently-broken
+      // <audio> — it falls back to the raw view (see the raw-PCM playback
+      // follow-up). Only inline `data` is wrappable; an externalized `url` has
+      // no bytes here and is served as-is.
+      const rawFormat = resolveRawPcmFormat(p.format, p.mimeType);
+      if (p.data && rawFormat) {
+        if (rawFormat === "pcm16") {
+          const wav = pcm16ToWavBase64(p.data);
+          if (wav)
+            return {
+              type: "audio",
+              source: { type: "data", value: wav, mimeType: "audio/wav" },
+            };
+        }
+        return null;
+      }
       const mimeType = p.mimeType ?? audioFormatToMimeType(p.format);
       if (p.url)
         return {
@@ -98,6 +122,11 @@ export function collectAudioParts(value: unknown, depth = 0): MediaPartData[] {
   }
   if (typeof value === "object") {
     const o = value as Record<string, unknown>;
+    // The object may itself be a single audio content part — a span whose
+    // whole input/output is one bare `input_audio`/`audio` part with no
+    // messages/content envelope around it. Surface it directly; non-audio
+    // objects (envelopes) resolve to null here and are walked below.
+    pushPart(value);
     if (Array.isArray(o.content)) o.content.forEach(pushPart);
     for (const key of [
       "value",

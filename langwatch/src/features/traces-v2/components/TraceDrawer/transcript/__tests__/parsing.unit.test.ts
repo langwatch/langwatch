@@ -204,4 +204,32 @@ describe("parseContentBlocks", () => {
       });
     });
   });
+
+  describe("given an AI-SDK file audio content part", () => {
+    it("returns a media block so traces-v2 matches the legacy player path", () => {
+      const blocks = parseContentBlocks([
+        { type: "file", mediaType: "audio/wav", data: "QUJD" },
+      ]);
+
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0]).toMatchObject({
+        kind: "media",
+        part: {
+          type: "audio",
+          source: { type: "data", mimeType: "audio/wav" },
+        },
+      });
+    });
+  });
+
+  describe("given a non-audio file content part", () => {
+    it("falls through to a raw block, unchanged", () => {
+      const blocks = parseContentBlocks([
+        { type: "file", mediaType: "application/pdf", data: "QUJD" },
+      ]);
+
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0]).toMatchObject({ kind: "raw" });
+    });
+  });
 });

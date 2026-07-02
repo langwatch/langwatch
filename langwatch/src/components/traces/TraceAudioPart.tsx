@@ -12,5 +12,11 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
  */
 export function TraceAudioPart({ part }: { part: MediaPartData }) {
   const { project } = useOrganizationTeamProject();
-  return <MediaPart part={part} projectId={project?.id ?? ""} />;
+  // MediaPart needs a real projectId for its stored-object existence probe;
+  // its `enabled` gate requires `!!projectId`, so passing "" permanently
+  // disables the probe — a failed audio URL would then sit as a broken player
+  // forever instead of resolving to the "missing" badge. Wait for the project
+  // to resolve before rendering rather than handing MediaPart an empty id.
+  if (!project?.id) return null;
+  return <MediaPart part={part} projectId={project.id} />;
 }
