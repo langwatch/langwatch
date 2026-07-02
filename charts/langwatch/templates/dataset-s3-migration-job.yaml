@@ -75,9 +75,17 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with (coalesce .Values.datasetS3Migration.affinity .Values.global.scheduling.affinity) }}
+      {{- if (coalesce .Values.datasetS3Migration.affinity .Values.global.scheduling.affinity) }}
       affinity:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml (coalesce .Values.datasetS3Migration.affinity .Values.global.scheduling.affinity) | nindent 8 }}
+      {{- else if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
+      {{/* Default co-location with the app pod: on local-FS the Job writes
+           migrated chunks to the app's RWO stored-objects PVC (mounted below),
+           so off-node scheduling means a multi-attach Pending wedge. The app
+           pod is guaranteed up when this post-install/post-upgrade hook fires.
+           See langwatch.storedObjects.colocationAffinity. */}}
+      affinity:
+        {{- include "langwatch.storedObjects.colocationAffinity" . | nindent 8 }}
       {{- end }}
 
       containers:

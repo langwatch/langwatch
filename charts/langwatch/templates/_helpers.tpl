@@ -176,8 +176,10 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- end }}
   {{- /* Workers mount the SAME RWO PVC as the app, so they are bound by the
          same single-node constraint — guard workers.replicaCount too, else a
-         multi-replica worker pool renders cleanly then crashloops on the volume. */}}
-  {{- if gt (int .Values.workers.replicaCount) 1 }}
+         multi-replica worker pool renders cleanly then crashloops on the volume.
+         Only when workers are actually deployed: a disabled worker pool's
+         leftover replicaCount must not fail the render. */}}
+  {{- if and .Values.workers.enabled (gt (int .Values.workers.replicaCount) 1) }}
     {{- $errors = append $errors "app.storedObjects.localFilesystem.enabled requires workers.replicaCount=1 (workers share the app's local-filesystem PVC). Enable app.dataplane for multi-replica deployments." }}
   {{- end }}
 {{- end }}
@@ -688,6 +690,28 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- if and .Values.app.storedObjects.localFilesystem.enabled (not .Values.app.dataplane.enabled) -}}
 true
 {{- end -}}
+{{- end -}}
+
+{{/*
+  Default podAffinity co-locating a pod with the app pod, for consumers of the
+  app's RWO stored-objects PVC (workers Deployment, dataset-s3-migration Job).
+  An RWO volume attaches to ONE node, so a consumer scheduled on any other node
+  sits Pending on a multi-attach error — and local-FS is the chart DEFAULT, so
+  a vanilla install on a multi-node cluster would wedge without this. Required
+  (not preferred) because landing off-node is never functional. Trivially
+  satisfied on the documented single-node/hobby topology. Consumers render it
+  only when local-FS is active AND no explicit affinity is set — an operator's
+  own workers/datasetS3Migration/global affinity overrides it wholesale (they
+  own scheduling then, same override semantics as the coalesce chain).
+*/}}
+{{- define "langwatch.storedObjects.colocationAffinity" -}}
+podAffinity:
+  requiredDuringSchedulingIgnoredDuringExecution:
+    - labelSelector:
+        matchLabels:
+          app.kubernetes.io/name: {{ .Release.Name }}-app
+          app.kubernetes.io/instance: {{ .Release.Name }}
+      topologyKey: kubernetes.io/hostname
 {{- end -}}
 
 {{/* ClickHouse: Cluster name for the app (only when replicas > 1 or external.cluster set) */}}
