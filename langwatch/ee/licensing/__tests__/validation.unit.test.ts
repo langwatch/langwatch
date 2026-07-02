@@ -334,7 +334,7 @@ describe("backward compatibility: licenses issued before experimentation limits 
     // rather than enforced. If a future change strips those schema fields, Zod
     // would discard them on parse, the re-serialized JSON would differ, and this
     // test would fail — guarding every already-issued customer license.
-    const result = validateLicense(ENTERPRISE_LICENSE_KEY, TEST_PUBLIC_KEY);
+    const result = validateLicense({ licenseKey: ENTERPRISE_LICENSE_KEY, publicKey: TEST_PUBLIC_KEY });
 
     expect(result.valid).toBe(true);
     if (!result.valid) return;

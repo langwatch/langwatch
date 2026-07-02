@@ -4,21 +4,11 @@
  * Integration tests for `monitors.copy` — replicating an online evaluator
  * (monitor) into another project, through the real tRPC + Prisma layer.
  */
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-
-// Mock license enforcement to avoid limits during tests
-vi.mock("../../../license-enforcement", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("../../../license-enforcement")>();
-  return {
-    ...actual,
-    enforceLicenseLimit: vi.fn(),
-  };
-});
 
 describe("monitors.copy", () => {
   const sourceProjectId = "test-project-id";

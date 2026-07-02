@@ -233,8 +233,6 @@ export const monitorsRouter = createTRPCRouter({
         });
       }
 
-      await enforceLicenseLimit(ctx, projectId, "onlineEvaluations");
-
       // Evaluator-backed monitors keep their settings (and, for workflow
       // evaluators, the backing workflow) on a separate Evaluator record scoped
       // to the source project. Copy it across so the replica is self-contained

@@ -36,7 +36,6 @@ import {
 } from "../../experiments/workbenchState";
 import { ExperimentRunService } from "../../experiments-v3/services/experiment-run.service";
 import { getVersionMap } from "../../experiments-v3/services/getVersionMap";
-import { enforceLicenseLimit } from "../../license-enforcement";
 import { coerceMonitorMappings } from "../../tracer/tracesMapping";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import {
