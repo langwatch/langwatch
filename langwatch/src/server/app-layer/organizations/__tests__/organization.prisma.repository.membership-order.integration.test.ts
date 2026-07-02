@@ -115,10 +115,10 @@ describe("PrismaOrganizationRepository — membership order determinism (#5278)"
   });
 
   describe("when a user's membership createdAt is exactly identical across organizations", () => {
-    let tieOrgA: Organization;
-    let tieOrgB: Organization;
+    let tieOrgs: Organization[];
     let tieUser: User;
     const tieNamespace = `membership-order-tie-${nanoid(8)}`;
+    const tieOrgLetters = ["A", "B", "C", "D", "E"] as const;
 
     beforeAll(async () => {
       tieUser = await prisma.user.create({
@@ -128,63 +128,55 @@ describe("PrismaOrganizationRepository — membership order determinism (#5278)"
         },
       });
 
-      // Same trick as above: create orgB's Organization row FIRST (and
-      // orgA's SECOND) so physical/insertion order for the queried table
-      // disagrees with the lexicographically-smaller-id answer; otherwise
-      // the assertion below could pass by accident of Organization row
-      // order rather than because the repository's id-based tie-breaker
-      // is what's actually determining order.
-      tieOrgB = await prisma.organization.create({
-        data: {
-          name: `Tie Org B ${tieNamespace}`,
-          slug: `tie-org-b-${tieNamespace}`,
-        },
-      });
+      // `Organization.id` is generated via Prisma's `@default(nanoid())`
+      // (schema.prisma), which produces a random alphabet with no
+      // relationship whatsoever to insertion/creation order (unlike, say,
+      // cuid). So there's no way to "reverse" insertion order relative to
+      // id order here — the two are independent by construction. Instead,
+      // we create enough tied organizations (5) that the odds of the DB's
+      // incidental/unordered `findMany` result happening to already come
+      // back in fully-sorted-by-id order by pure chance are 1-in-120 —
+      // negligible enough that a passing assertion below is reliable proof
+      // the repository's id-based tie-breaker (not luck) produced the
+      // order.
+      tieOrgs = [];
+      for (const letter of tieOrgLetters) {
+        const org = await prisma.organization.create({
+          data: {
+            name: `Tie Org ${letter} ${tieNamespace}`,
+            slug: `tie-org-${letter.toLowerCase()}-${tieNamespace}`,
+          },
+        });
+        tieOrgs.push(org);
+      }
 
-      tieOrgA = await prisma.organization.create({
-        data: {
-          name: `Tie Org A ${tieNamespace}`,
-          slug: `tie-org-a-${tieNamespace}`,
-        },
-      });
-
-      // Both memberships get the EXACT same createdAt timestamp (not just
+      // All memberships get the EXACT same createdAt timestamp (not just
       // "close" — the identical Date instance), so `createdAt.getTime()`
-      // comparisons in the sort comparator are tied and the id-based
-      // tie-breaker is the only thing that can determine order.
+      // comparisons in the sort comparator are tied for every pair and the
+      // id-based tie-breaker is the only thing that can determine order.
       const sameInstant = new Date("2024-01-01T00:00:00.000Z");
 
-      // Insert orgB's membership FIRST (so naive insertion/physical order
-      // would put orgB first).
-      await prisma.organizationUser.create({
-        data: {
-          userId: tieUser.id,
-          organizationId: tieOrgB.id,
-          role: "ADMIN",
-          createdAt: sameInstant,
-        },
-      });
-
-      // Insert orgA's membership SECOND, with the identical timestamp.
-      await prisma.organizationUser.create({
-        data: {
-          userId: tieUser.id,
-          organizationId: tieOrgA.id,
-          role: "ADMIN",
-          createdAt: sameInstant,
-        },
-      });
+      for (const org of tieOrgs) {
+        await prisma.organizationUser.create({
+          data: {
+            userId: tieUser.id,
+            organizationId: org.id,
+            role: "ADMIN",
+            createdAt: sameInstant,
+          },
+        });
+      }
     });
 
     afterAll(async () => {
       await prisma.organizationUser.deleteMany({
         where: {
           userId: tieUser.id,
-          organizationId: { in: [tieOrgA.id, tieOrgB.id] },
+          organizationId: { in: tieOrgs.map((org) => org.id) },
         },
       });
       await prisma.organization.deleteMany({
-        where: { id: { in: [tieOrgA.id, tieOrgB.id] } },
+        where: { id: { in: tieOrgs.map((org) => org.id) } },
       });
       await prisma.user.delete({ where: { id: tieUser.id } });
     });
@@ -197,10 +189,15 @@ describe("PrismaOrganizationRepository — membership order determinism (#5278)"
         demoProjectId: "",
       });
 
-      expect(result).toHaveLength(2);
-      expect(result[0]?.id).toBeDefined();
-      expect(result[1]?.id).toBeDefined();
-      expect(result[0]!.id < result[1]!.id).toBe(true);
+      const tieOrgIds = new Set(tieOrgs.map((org) => org.id));
+      const actualIds = result
+        .filter((org) => tieOrgIds.has(org.id))
+        .map((org) => org.id);
+
+      expect(actualIds).toHaveLength(tieOrgs.length);
+
+      const expectedSortedIds = [...actualIds].sort();
+      expect(actualIds).toEqual(expectedSortedIds);
     });
   });
 });
