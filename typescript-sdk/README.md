@@ -156,6 +156,7 @@ span.end();
     });
   });
   ```
+
   > **Note:** `addEvaluation` is the canonical API for recording manual evaluations on a span. `recordEvaluation` is a deprecated alias of `addEvaluation` kept for backward compatibility.
 
 ### 4. LangChain Integration
