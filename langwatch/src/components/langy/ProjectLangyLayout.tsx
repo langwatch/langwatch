@@ -118,12 +118,12 @@ function LangyShiftedRoot({
 }
 
 function LangyDrawerConnected() {
-  const { isOpen, setIsOpen, proposalHandlers, experimentSlug } = useLangy();
+  const { isOpen, setIsOpen, proposalHandlersRef, experimentSlug } = useLangy();
   return (
     <LangyDrawer
       isOpen={isOpen}
       onOpenChange={setIsOpen}
-      proposalHandlers={proposalHandlers}
+      proposalHandlersRef={proposalHandlersRef}
       experimentSlug={experimentSlug}
     />
   );

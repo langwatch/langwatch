@@ -1,10 +1,12 @@
 import {
   createContext,
   type ReactNode,
+  type RefObject,
   useCallback,
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type { ProposalHandlers } from "./MessageContent";
@@ -12,7 +14,12 @@ import type { ProposalHandlers } from "./MessageContent";
 interface LangyContextValue {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
-  proposalHandlers: ProposalHandlers;
+  // A ref, not state: pages re-derive their handlers object on most
+  // renders (see useRegisterLangyHandlers), and Langy only ever needs the
+  // latest value at proposal-click time, never during render. Storing it
+  // as state fed registration straight back into a render loop — register
+  // -> setState -> re-render -> new handlers object -> register -> ...
+  proposalHandlersRef: RefObject<ProposalHandlers>;
   experimentSlug: string | undefined;
   registerHandlers: (
     handlers: ProposalHandlers,
@@ -25,21 +32,19 @@ const LangyContext = createContext<LangyContextValue | null>(null);
 
 export function LangyProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [proposalHandlers, setProposalHandlers] = useState<ProposalHandlers>(
-    {},
-  );
+  const proposalHandlersRef = useRef<ProposalHandlers>({});
   const [experimentSlug, setExperimentSlug] = useState<string | undefined>();
 
   const registerHandlers = useCallback(
     (handlers: ProposalHandlers, opts?: { experimentSlug?: string }) => {
-      setProposalHandlers(handlers);
+      proposalHandlersRef.current = handlers;
       setExperimentSlug(opts?.experimentSlug);
     },
     [],
   );
 
   const clearHandlers = useCallback(() => {
-    setProposalHandlers({});
+    proposalHandlersRef.current = {};
     setExperimentSlug(undefined);
   }, []);
 
@@ -47,12 +52,12 @@ export function LangyProvider({ children }: { children: ReactNode }) {
     () => ({
       isOpen,
       setIsOpen,
-      proposalHandlers,
+      proposalHandlersRef,
       experimentSlug,
       registerHandlers,
       clearHandlers,
     }),
-    [isOpen, proposalHandlers, experimentSlug, registerHandlers, clearHandlers],
+    [isOpen, experimentSlug, registerHandlers, clearHandlers],
   );
 
   return (

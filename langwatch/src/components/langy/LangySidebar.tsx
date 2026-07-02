@@ -10,7 +10,14 @@ import {
 } from "@chakra-ui/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { ChevronsRight, Plus, Sparkles, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type RefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { isLangyManagedVk } from "~/components/gateway/langyVk";
 import { allModelOptions } from "~/components/ModelSelector";
 import { Kbd } from "~/components/ops/shared/Kbd";
@@ -65,14 +72,14 @@ export const LANGY_DOCKED_OFFSET = PANEL_WIDTH;
 export const LANGY_TRANSITION = "240ms cubic-bezier(0.32, 0.72, 0, 1)";
 
 interface LangyDrawerProps {
-  proposalHandlers?: ProposalHandlers;
+  proposalHandlersRef?: RefObject<ProposalHandlers>;
   experimentSlug?: string;
   isOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
 }
 
 export function LangyDrawer({
-  proposalHandlers,
+  proposalHandlersRef,
   experimentSlug,
   isOpen: isOpenProp,
   onOpenChange,
@@ -97,7 +104,7 @@ export function LangyDrawer({
       <LangyPanel
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
-        proposalHandlers={proposalHandlers}
+        proposalHandlersRef={proposalHandlersRef}
         experimentSlug={experimentSlug}
       />
     </>
@@ -197,12 +204,12 @@ function LangyHandle({
 function LangyPanel({
   isOpen,
   onClose,
-  proposalHandlers,
+  proposalHandlersRef,
   experimentSlug,
 }: {
   isOpen: boolean;
   onClose: () => void;
-  proposalHandlers?: ProposalHandlers;
+  proposalHandlersRef?: RefObject<ProposalHandlers>;
   experimentSlug?: string;
 }) {
   const { organization, project } = useOrganizationTeamProject();
@@ -448,7 +455,7 @@ function LangyPanel({
     if (applyingProposals.has(proposalId)) return;
     if (proposalId in appliedOutcomes) return;
     if (discardedProposals.has(proposalId)) return;
-    const handler = proposalHandlers?.[proposal.kind];
+    const handler = proposalHandlersRef?.current?.[proposal.kind];
     if (!handler) {
       toaster.create({
         title: "Cannot apply",
