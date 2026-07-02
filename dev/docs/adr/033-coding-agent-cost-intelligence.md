@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-02
 
-**Status:** Proposed
+**Status:** Accepted
 
 > One-line: classify every **content block** of coding-agent CLI traffic at **ingest-time enrichment** into a **12-category taxonomy**, attribute cost per category by **tokenizing blocks and scaling to provider-reported truth with cache-aware pricing**, accumulate into the **existing trace/session folds**, and surface it in the **existing governance dashboards** — analytics only, never billing.
 
