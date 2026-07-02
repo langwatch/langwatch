@@ -1,3 +1,4 @@
+import { audioPartToMediaData } from "~/components/traces/audioParts";
 import type { ChatMessage, ContentBlock } from "./types";
 
 /**
@@ -387,6 +388,19 @@ export function parseContentBlocks(
           content: obj.content,
           isError: obj.is_error === true,
         });
+        break;
+      }
+      case "input_audio":
+      case "audio": {
+        // OpenAI Realtime `input_audio` / AG-UI `audio` parts render as an
+        // inline player, not a raw-JSON dump. Fall back to raw only when the
+        // canonical decoder can't resolve a playable source.
+        const media = audioPartToMediaData(obj);
+        if (media) {
+          out.push({ kind: "media", part: media });
+          break;
+        }
+        out.push({ kind: "raw", data: obj });
         break;
       }
       default:

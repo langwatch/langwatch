@@ -1,6 +1,7 @@
 import { Box, Button, Icon, Text, VStack } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 import { LuChevronDown, LuChevronRight, LuFileText, LuWrench } from "react-icons/lu";
+import { TraceAudioPart } from "~/components/traces/TraceAudioPart";
 import { splitLeadingContextBlocks } from "../../../utils/leadingContext";
 import { RenderedMarkdown } from "../markdownView";
 import { asMarkdownBody, parseContentBlocks } from "./parsing";
@@ -195,6 +196,8 @@ export function BlockStack({
           </Box>
         );
       }
+      case "media":
+        return <TraceAudioPart key={`media-${i}`} part={b.part} />;
       case "raw":
         return (
           <Box

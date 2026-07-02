@@ -1,7 +1,7 @@
-import { Box, Button, type ButtonProps, HStack, Text } from "@chakra-ui/react";
+import { Box, Button, type ButtonProps, HStack, Text, VStack } from "@chakra-ui/react";
 import type { ReactJsonViewProps } from "@microlink/react-json-view";
 import dynamic from "~/utils/compat/next-dynamic";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import type { SpanInputOutput } from "~/server/tracer/types";
 import {
   isPythonRepr,
@@ -11,6 +11,8 @@ import { CopyIcon } from "../icons/Copy";
 import { useColorMode } from "../ui/color-mode";
 import { toaster } from "../ui/toaster";
 import { Tooltip } from "../ui/tooltip";
+import { collectAudioParts } from "./audioParts";
+import { TraceAudioPart } from "./TraceAudioPart";
 
 // Must be outside the component — React.lazy creates a new type on each call,
 // so calling dynamic() inside render causes infinite suspend loops.
@@ -49,6 +51,11 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
   delete propsWithoutValue.value;
 
   const [raw, setRaw] = useState(false);
+
+  // Voice traces carry audio inside the message content. Surface an inline
+  // player at the top so it plays prominently while the JSON stays available
+  // below. Empty (the common case) → nothing extra rendered, no hook cost.
+  const audioParts = useMemo(() => collectAudioParts(json ?? value), [json, value]);
 
   const renderCopyButton = () => {
     return (
@@ -154,6 +161,13 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
 
   return (
     <Box position="relative" width="full">
+      {audioParts.length > 0 && (
+        <VStack align="stretch" gap={2} marginBottom={2}>
+          {audioParts.map((p, i) => (
+            <TraceAudioPart key={`trace-audio-${i}`} part={p} />
+          ))}
+        </VStack>
+      )}
       {typeof document !== "undefined" &&
       (json ?? (typeof value === "string" && isPythonRepr(value))) ? (
         renderJson(json ?? (value as any))

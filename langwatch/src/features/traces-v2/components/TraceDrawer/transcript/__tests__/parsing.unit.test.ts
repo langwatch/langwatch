@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { coerceToChatMessages, extractSystemText } from "../parsing";
+import {
+  coerceToChatMessages,
+  extractSystemText,
+  parseContentBlocks,
+} from "../parsing";
 
 describe("coerceToChatMessages", () => {
   describe("given an explicit chat_messages typed-value envelope", () => {
@@ -151,6 +155,53 @@ describe("extractSystemText", () => {
       expect(extractSystemText(null)).toBe("");
       expect(extractSystemText(undefined)).toBe("");
       expect(extractSystemText("")).toBe("");
+    });
+  });
+});
+
+describe("parseContentBlocks", () => {
+  describe("given an input_audio content part", () => {
+    it("returns a single media block carrying the audio part", () => {
+      const blocks = parseContentBlocks([
+        {
+          type: "input_audio",
+          input_audio: { url: "/api/files/p1/a1", mimeType: "audio/wav" },
+        },
+      ]);
+
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0]).toEqual({
+        kind: "media",
+        part: {
+          type: "audio",
+          source: {
+            type: "url",
+            value: "/api/files/p1/a1",
+            mimeType: "audio/wav",
+          },
+        },
+      });
+    });
+  });
+
+  describe("given an audio source content part", () => {
+    it("returns a single media block carrying the audio part", () => {
+      const blocks = parseContentBlocks([
+        {
+          type: "audio",
+          source: {
+            type: "url",
+            value: "https://cdn.example/a.wav",
+            mimeType: "audio/wav",
+          },
+        },
+      ]);
+
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0]).toMatchObject({
+        kind: "media",
+        part: { type: "audio" },
+      });
     });
   });
 });

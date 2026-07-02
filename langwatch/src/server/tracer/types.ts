@@ -97,6 +97,36 @@ export const chatRichContentSchema = z.union([
     id: z.string().optional(),
     filename: z.string().optional(),
   }),
+  /**
+   * OpenAI Realtime `input_audio` content part. Pre-extraction the payload is
+   * inline base64 (`{ data, format }`); after ingest-side stored-objects
+   * extraction it is rewritten to a reference (`{ url, mimeType }`) pointing at
+   * /api/files/{projectId}/{id}. Every field is optional so this validates both
+   * shapes. Mirrors `inputAudioContentPartSchema` in the scenario event schemas.
+   */
+  z.object({
+    type: z.literal("input_audio"),
+    input_audio: z.object({
+      data: z.string().optional(),
+      format: z.string().optional(),
+      url: z.string().optional(),
+      mimeType: z.string().optional(),
+      id: z.string().optional(),
+    }),
+  }),
+  /**
+   * AG-UI media `audio` content part. A typed `source` carries either an
+   * externalized `url` or inline base64 `data`, with an optional `mimeType`.
+   * Shared shape with image/video/document media parts (see `visitContentPart`).
+   */
+  z.object({
+    type: z.literal("audio"),
+    source: z.object({
+      type: z.union([z.literal("url"), z.literal("data")]),
+      value: z.string(),
+      mimeType: z.string().optional(),
+    }),
+  }),
 ]);
 
 export type ChatRichContent = z.infer<typeof chatRichContentSchema>;
