@@ -66,6 +66,13 @@ Feature: Storage billing — dispatch sealed hours for measurement (ADR-027, Pha
     Then only the most recent hours up to the ceiling are measured
     And an alarm is logged that older hours were dropped
 
+  @unit
+  Scenario: A large catch-up measures at most the per-run cap and defers the rest
+    Given an organization whose cursor trails by more than one run's measurement cap but within the ceiling
+    When the dispatcher runs for the organization
+    Then at most the per-run cap of hours are measured this run
+    And the remaining hours are left for a later run without an alarm
+
   # ---------------------------------------------------------------------------
   # Per-hour contract
   # ---------------------------------------------------------------------------

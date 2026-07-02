@@ -39,6 +39,12 @@ Feature: Storage billing — measure-time tripwire (ADR-027, Phase 4.5)
     Then no more than the capped number of warnings are logged
 
   @unit
+  Scenario: The log cap resets each window so later divergence isn't silenced forever
+    Given the log cap was reached in one window
+    When a divergent measurement is checked after the window elapses
+    Then a warning is logged again
+
+  @unit
   Scenario: The tripwire never throws into the measure path
     Given the reference computation fails
     When a measurement is checked

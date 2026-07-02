@@ -4,8 +4,10 @@ const logger = createLogger("langwatch:billing:storageTripwire");
 
 /** Default relative tolerance before a divergence is logged. */
 const DEFAULT_TOLERANCE_RATIO = 0.5;
-/** Default cap on warnings per process, so a broken reference can't flood logs. */
+/** Default cap on warnings per window, so a broken reference can't flood logs. */
 const DEFAULT_MAX_LOGS = 50;
+/** The cap resets each window so real divergence isn't silenced forever. */
+const LOG_WINDOW_MS = 60 * 60 * 1000;
 
 export interface StorageBillingTripwireDeps {
   /** Gate — the `release_storage_billing_metering_tripwire` flag, per org. */
@@ -22,7 +24,10 @@ export interface StorageBillingTripwireDeps {
   }) => Promise<number | null>;
   /** Relative divergence (|measured − ref| / max) above which to warn. */
   toleranceRatio?: number;
+  /** Max warnings per {@link LOG_WINDOW_MS} window (default 50). */
   maxLogs?: number;
+  /** Injectable clock (epoch ms) for deterministic tests. */
+  now?: () => number;
 }
 
 /**
@@ -37,6 +42,7 @@ export interface StorageBillingTripwireDeps {
  */
 export class StorageBillingTripwire {
   private logs = 0;
+  private windowStartMs = 0;
 
   constructor(private readonly deps: StorageBillingTripwireDeps) {}
 
@@ -58,6 +64,14 @@ export class StorageBillingTripwire {
       const scale = Math.max(params.measuredBytes, reference, 1);
       const ratio = diff / scale;
       const tolerance = this.deps.toleranceRatio ?? DEFAULT_TOLERANCE_RATIO;
+
+      // Reset the per-window cap so a real divergence hours later still logs,
+      // rather than being permanently silenced after the first burst.
+      const nowMs = (this.deps.now ?? Date.now)();
+      if (nowMs - this.windowStartMs >= LOG_WINDOW_MS) {
+        this.windowStartMs = nowMs;
+        this.logs = 0;
+      }
 
       if (
         ratio > tolerance &&

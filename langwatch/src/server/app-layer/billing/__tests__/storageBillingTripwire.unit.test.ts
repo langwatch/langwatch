@@ -34,6 +34,7 @@ function makeTripwire(
     computeReference: () => Promise<number | null>;
     toleranceRatio: number;
     maxLogs: number;
+    now: () => number;
   }> = {},
 ) {
   return new StorageBillingTripwire({
@@ -43,6 +44,7 @@ function makeTripwire(
       vi.fn().mockResolvedValue(overrides.reference ?? null),
     toleranceRatio: overrides.toleranceRatio,
     maxLogs: overrides.maxLogs,
+    now: overrides.now,
   });
 }
 
@@ -130,6 +132,27 @@ describe("StorageBillingTripwire", () => {
         });
       }
 
+      expect(mockWarn).toHaveBeenCalledTimes(2);
+    });
+
+    /** @scenario The log cap resets each window so later divergence isn't silenced forever */
+    it("logs again after the window elapses", async () => {
+      let clock = 1_000_000;
+      const tw = makeTripwire({
+        reference: 100,
+        toleranceRatio: 0.5,
+        maxLogs: 1,
+        now: () => clock,
+      });
+      const check = () =>
+        tw.check({ organizationId: "o", sealedHour: SEALED, measuredBytes: 1000 });
+
+      await check(); // window 1: logs
+      await check(); // window 1: capped
+      expect(mockWarn).toHaveBeenCalledTimes(1);
+
+      clock += 60 * 60 * 1000 + 1; // advance past the window
+      await check(); // window 2: logs again
       expect(mockWarn).toHaveBeenCalledTimes(2);
     });
   });

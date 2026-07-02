@@ -24,6 +24,7 @@ vi.mock("~/utils/logger/server", () => ({
 
 import {
   STORAGE_BACKFILL_MAX_HOURS,
+  STORAGE_MAX_HOURS_PER_RUN,
   StorageMeterDispatchService,
 } from "../storageMeterDispatch.service";
 
@@ -232,8 +233,9 @@ describe("StorageMeterDispatchService", () => {
 
       await service.dispatchForOrg({ organizationId: "org-1" });
 
-      expect(measureBytesAt).toHaveBeenCalledTimes(STORAGE_BACKFILL_MAX_HOURS);
-      // The earliest measured hour is exactly the ceiling back from the boundary.
+      // Truncated start is the ceiling back from the boundary; but only the
+      // per-run cap is measured this run (the rest drains on later events).
+      expect(measureBytesAt).toHaveBeenCalledTimes(STORAGE_MAX_HOURS_PER_RUN);
       expect(measureBytesAt.mock.calls[0]![0].sealedHour.toISOString()).toBe(
         new Date(
           SEAL_BOUNDARY.getTime() -
@@ -244,6 +246,22 @@ describe("StorageMeterDispatchService", () => {
         expect.objectContaining({ organizationId: "org-1" }),
         expect.stringContaining("ALARM"),
       );
+    });
+  });
+
+  describe("given a gap larger than one run's cap but within the ceiling", () => {
+    /** @scenario A large catch-up measures at most the per-run cap and defers the rest */
+    it("measures the per-run cap this run without an alarm", async () => {
+      const behind = new Date(
+        SEAL_BOUNDARY.getTime() -
+          (STORAGE_MAX_HOURS_PER_RUN + 50) * MS_PER_HOUR,
+      );
+      const { service, measureBytesAt } = makeService({ lastMeasured: behind });
+
+      await service.dispatchForOrg({ organizationId: "org-1" });
+
+      expect(measureBytesAt).toHaveBeenCalledTimes(STORAGE_MAX_HOURS_PER_RUN);
+      expect(mockLoggerError).not.toHaveBeenCalled();
     });
   });
 

@@ -213,6 +213,21 @@ export class ReportStorageForHourCommand
       );
       return false;
     }
+    if (hour.megabytes === 0) {
+      // Nothing to bill for a 0-MiB hour (e.g. a default-keep org with no data
+      // older than the free window — every hour is 0). Stamp the cursor so it
+      // never re-dispatches, without a wasted 0-value Stripe call each hour.
+      await this.deps.storageUsageHourly.markReported({
+        organizationId,
+        sealedHour: sealedHourDate,
+        reportedAt: new Date(),
+      });
+      logger.debug(
+        { organizationId, sealedHour },
+        "zero-MiB hour, marked reported without a Stripe call",
+      );
+      return false;
+    }
 
     const usageReportingService = this.deps.getUsageReportingService();
     if (!usageReportingService) {

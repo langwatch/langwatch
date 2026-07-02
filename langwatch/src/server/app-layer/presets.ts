@@ -515,7 +515,17 @@ export function initializeDefaultApp(options?: {
     processRole: config.processRole,
     retentionPolicyResolver: retentionPolicyCache,
     getStorageMeterDispatch: config.isSaas
-      ? () => (params) => storageMeterDispatchService!.dispatchForOrg(params)
+      ? () => (params) => {
+          // Built after registerAll (below), so a reactor firing before that
+          // finishes should fail loud — the reactor catches + logs it — rather
+          // than deref undefined with a cryptic message.
+          if (!storageMeterDispatchService) {
+            throw new Error(
+              "storageMeterDispatchService not yet initialized — dispatch fired before composition finished",
+            );
+          }
+          return storageMeterDispatchService.dispatchForOrg(params);
+        }
       : undefined,
   });
 

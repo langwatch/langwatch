@@ -48,6 +48,13 @@ Feature: Storage billing — report a sealed hour to Stripe (ADR-027, Phase 3)
     And the hour's reported state is left unchanged
 
   @unit
+  Scenario: A zero-megabyte hour is marked reported without a billing call
+    Given a measured hour of zero megabytes that has not yet been reported
+    When the hour is reported
+    Then no meter event is sent
+    And the hour is marked reported so it is not dispatched again
+
+  @unit
   Scenario: A Stripe duplicate is treated as already reported
     Given a measured hour whose meter event already exists on Stripe
     When the hour is reported

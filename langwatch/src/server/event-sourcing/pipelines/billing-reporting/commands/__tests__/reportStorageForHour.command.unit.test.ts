@@ -227,6 +227,23 @@ describe("ReportStorageForHourCommand", () => {
     });
   });
 
+  describe("given a zero-megabyte hour", () => {
+    /** @scenario A zero-megabyte hour is marked reported without a billing call */
+    it("stamps the cursor without calling Stripe", async () => {
+      mockStorageUsageHourly.findHour.mockResolvedValue({
+        megabytes: 0,
+        reportedAt: null,
+      });
+      const handler = await createHandler();
+
+      const result = await handler.handle(makeCommand());
+
+      expect(result).toEqual([]);
+      expect(mockReportUsageDelta).not.toHaveBeenCalled();
+      expect(mockStorageUsageHourly.markReported).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("when the meter event already exists on Stripe", () => {
     /** @scenario A Stripe duplicate is treated as already reported */
     it("treats the duplicate as reported and stamps the cursor without a failure", async () => {
