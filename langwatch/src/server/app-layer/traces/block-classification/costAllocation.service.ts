@@ -203,7 +203,12 @@ function allocatePool(pool: Pool, totals: CategoryTotals): void {
         ? pool.total - allocated
         : (block.tokens * pool.total) / sum;
     allocated += scaled;
-    addTokens({ totals, category: block.category, tokens: scaled, rate: pool.rate });
+    addTokens({
+      totals,
+      category: block.category,
+      tokens: scaled,
+      rate: pool.rate,
+    });
   }
 }
 

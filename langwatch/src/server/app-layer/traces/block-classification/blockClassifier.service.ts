@@ -164,7 +164,11 @@ function classifyInputMessage({
   const role = roleOf(msg);
 
   if (role === "system") {
-    pushString({ acc, category: InputCategory.SYSTEM_PROMPT, content: msg.content });
+    pushString({
+      acc,
+      category: InputCategory.SYSTEM_PROMPT,
+      content: msg.content,
+    });
     return;
   }
 

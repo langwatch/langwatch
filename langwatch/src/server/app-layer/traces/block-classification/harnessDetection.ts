@@ -41,7 +41,8 @@ export function detectCodingAgentHarness({
   const scope = instrumentationScopeName ?? "";
 
   if (scope === CLAUDE_CODE_SCOPE) return "claude";
-  if (scope === CODEX_RUST_SCOPE || scope === CODEX_ROLLOUT_SCOPE) return "codex";
+  if (scope === CODEX_RUST_SCOPE || scope === CODEX_ROLLOUT_SCOPE)
+    return "codex";
 
   if (spanAttributes[GEN_AI_SYSTEM] === CLAUDE_CODE_SYSTEM) return "claude";
 
