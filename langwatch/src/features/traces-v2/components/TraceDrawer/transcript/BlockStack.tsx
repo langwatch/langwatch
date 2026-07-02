@@ -1,6 +1,11 @@
 import { Box, Button, Icon, Text, VStack } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
-import { LuChevronDown, LuChevronRight, LuFileText, LuWrench } from "react-icons/lu";
+import {
+  LuChevronDown,
+  LuChevronRight,
+  LuFileText,
+  LuWrench,
+} from "react-icons/lu";
 import { TraceAudioPart } from "~/components/traces/TraceAudioPart";
 import { splitLeadingContextBlocks } from "../../../utils/leadingContext";
 import { RenderedMarkdown } from "../markdownView";
@@ -17,7 +22,7 @@ import type { ChatMessage, ContentBlock } from "./types";
  * `{"type":"thinking",…}` in the rendered body.
  */
 export function reparseTextBlock(text: string): ContentBlock[] | null {
-  if (!text || !text.includes('"type":"')) return null;
+  if (!text?.includes('"type":"')) return null;
   const reparsed = parseContentBlocks(text);
   if (reparsed.some((b) => b.kind !== "text" && b.kind !== "raw")) {
     return reparsed;

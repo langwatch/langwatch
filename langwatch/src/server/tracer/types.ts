@@ -37,7 +37,11 @@ type ToolCall = z.infer<typeof toolCallSchema>;
 export const rAGChunkSchema = z.object({
   document_id: z.string().optional().nullable(),
   chunk_id: z.string().optional().nullable(),
-  content: z.union([z.string(), z.record(z.string(), z.any()), z.array(z.any())]),
+  content: z.union([
+    z.string(),
+    z.record(z.string(), z.any()),
+    z.array(z.any()),
+  ]),
 });
 
 export type RAGChunk = z.infer<typeof rAGChunkSchema>;
@@ -377,7 +381,11 @@ export const rAGSpanSchema = baseSpanSchema.extend({
 
 export type RAGSpan = z.infer<typeof rAGSpanSchema>;
 
-export const spanSchema = z.union([lLMSpanSchema, rAGSpanSchema, baseSpanSchema]);
+export const spanSchema = z.union([
+  lLMSpanSchema,
+  rAGSpanSchema,
+  baseSpanSchema,
+]);
 
 export type Span = z.infer<typeof spanSchema>;
 

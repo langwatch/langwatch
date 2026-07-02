@@ -1,8 +1,15 @@
-import { Box, Button, type ButtonProps, HStack, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  type ButtonProps,
+  HStack,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import type { ReactJsonViewProps } from "@microlink/react-json-view";
-import dynamic from "~/utils/compat/next-dynamic";
 import React, { useMemo, useState } from "react";
 import type { SpanInputOutput } from "~/server/tracer/types";
+import dynamic from "~/utils/compat/next-dynamic";
 import {
   isPythonRepr,
   parsePythonInsideJson,
@@ -55,7 +62,10 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
   // Voice traces carry audio inside the message content. Surface an inline
   // player at the top so it plays prominently while the JSON stays available
   // below. Empty (the common case) → nothing extra rendered, no hook cost.
-  const audioParts = useMemo(() => collectAudioParts(json ?? value), [json, value]);
+  const audioParts = useMemo(
+    () => collectAudioParts(json ?? value),
+    [json, value],
+  );
 
   const renderCopyButton = () => {
     return (
