@@ -176,14 +176,41 @@ describe("OtlpSpanBlockClassificationService", () => {
     });
   });
 
-  describe("given a span whose input content is ~8 MiB under the block cap", () => {
+  describe("given a span whose input content is ~8 MiB at the block cap", () => {
     describe("when the span is classified", () => {
-      it("completes and keeps the per-block detail within the block cap", async () => {
-        // 100 blocks totalling ~8 MiB — well under MAX_CLASSIFIED_BLOCKS_PER_SPAN.
-        const chunk = "x".repeat(80_000);
+      it("completes within the hot-path budget and keeps detail within the block cap", async () => {
+        // Perf anchor for the ADR-033 hot-path invariant. Exercises the WORST
+        // case our code owns: MAX_CLASSIFIED_BLOCKS_PER_SPAN blocks totalling
+        // ~8 MiB, with a tokenizer whose cost is LINEAR in text length (a real
+        // per-character walk, not O(1)) so the O(blocks × bytes) shape of the
+        // service is genuinely paid. Real tiktoken is deliberately not used
+        // here: its encoder loads over fs/network (flake in unit CI), and the
+        // production hot path already pays equivalent full-text tokenization
+        // in OtlpSpanTokenEstimationService for spans missing usage — the cost
+        // class this test bounds is the same.
+        const linearCostTokenizer = {
+          countTokens: (_model: string, text: string | undefined) => {
+            if (!text) return Promise.resolve(undefined);
+            let tokens = 0;
+            let inWord = false;
+            for (let i = 0; i < text.length; i++) {
+              const ws = text.charCodeAt(i) <= 32;
+              if (!ws && !inWord) tokens++;
+              inWord = !ws;
+            }
+            return Promise.resolve(Math.max(tokens, Math.ceil(text.length / 4)));
+          },
+        };
+        const perfService = new OtlpSpanBlockClassificationService({
+          tokenizer: linearCostTokenizer,
+        });
+
+        // 512 word-shaped blocks totalling ~8 MiB (the cap boundary), plus
+        // overflow blocks that must lump into the catch-all.
+        const chunk = "lorem ipsum dolor sit amet ".repeat(600); // ~16 KiB
         const messages = [
           { role: "system", content: "You are a coding assistant." },
-          ...Array.from({ length: 99 }, () => ({
+          ...Array.from({ length: 520 }, () => ({
             role: "user",
             content: chunk,
           })),
@@ -211,7 +238,7 @@ describe("OtlpSpanBlockClassificationService", () => {
         ]);
 
         const start = Date.now();
-        await service.classifySpanBlocks({
+        await perfService.classifySpanBlocks({
           span,
           instrumentationScope: CLAUDE_SCOPE,
         });
@@ -222,6 +249,11 @@ describe("OtlpSpanBlockClassificationService", () => {
           attrValue(span, SPAN_ATTR_BLOCKS)!.value.stringValue!,
         ) as unknown[];
         expect(detail.length).toBeLessThanOrEqual(512);
+        // The classification attribute payload itself must stay bounded — it
+        // bypasses the ingest value cap (which runs earlier) by design.
+        const blobBytes = attrValue(span, SPAN_ATTR_BLOCKS)!.value.stringValue!
+          .length;
+        expect(blobBytes).toBeLessThan(256 * 1024);
       });
     });
   });

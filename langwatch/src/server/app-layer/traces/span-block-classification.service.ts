@@ -72,9 +72,14 @@ export interface OtlpSpanBlockClassificationServiceDependencies {
  *
  * Runs SERIAL, after PII redaction / cost enrichment / token estimation (it
  * consumes their outputs — per-tier rates and populated usage tokens) and before
- * content drop and the attribute cap. It never throws to the ingestion caller:
- * absent or unparseable content is skipped silently, and the command wraps this
- * in its own try/catch (ADR-033 "Ingestion never fails on classification").
+ * content drop. It runs AFTER the ingest attribute cap by design: that cap
+ * guards against oversized CUSTOMER payloads, while everything this service
+ * pushes is system-generated and self-bounded (MAX_CLASSIFIED_BLOCKS_PER_SPAN
+ * caps the detail blob; category keys are a fixed enum). Absent or unparseable
+ * content is skipped silently; dependency failures (e.g. a tokenizer throw) may
+ * escape this service and are contained by the command's own try/catch — that
+ * command-level guard is what anchors the ADR-033 "Ingestion never fails on
+ * classification" invariant, and it is proven end-to-end at the command level.
  *
  * Analytics only — these numbers never feed billing, quotas, or plan limits.
  */
@@ -191,15 +196,18 @@ export class OtlpSpanBlockClassificationService {
 
     // Per-category running totals — only for categories with a nonzero token
     // allocation, stringified so they ride the existing attribute transport.
+    // Rounded for storage: raw float artifacts (0.0000012340000001) inflate
+    // the attribute payload without adding information — tokens are integral
+    // by nature, USD keeps 10 decimals (sub-nano-dollar precision).
     for (const [category, total] of Object.entries(categoryTotals)) {
       if (!total || total.tokens <= 0) continue;
       pending.push({
         key: blockCategoryTokensAttr(category as Category),
-        value: { stringValue: String(total.tokens) },
+        value: { stringValue: String(Math.round(total.tokens)) },
       });
       pending.push({
         key: blockCategoryCostAttr(category as Category),
-        value: { stringValue: String(total.costUsd) },
+        value: { stringValue: String(Number(total.costUsd.toFixed(10))) },
       });
     }
 
