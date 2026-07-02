@@ -1,3 +1,4 @@
+import { findHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
 import { PersonalUsageService } from "@ee/governance/services/personalUsage.service";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
@@ -7,6 +8,7 @@ import {
   requires,
   type SecuredApp,
 } from "~/server/api/security";
+import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 
 import type { AuthMiddlewareVariables } from "../../middleware/auth";
@@ -85,10 +87,29 @@ export function registerMeRoutes(
           ? { start: new Date(windowStartMs), end: new Date(windowEndMs) }
           : undefined;
 
+      // Ingestion-source ledger rows (Claude Code OTLP, etc.) land under
+      // the org's hidden Governance Project tenant, not the personal
+      // project. Resolve it read-only (never provision on a GET) so the
+      // usage union is scoped to THIS org's tenant — both to prune
+      // ClickHouse partitions and to avoid summing a multi-org user's
+      // spend across every org. Absent when the org never minted an
+      // ingestion source, in which case there is no ledger traffic.
+      const team = await prisma.team.findUnique({
+        where: { id: project.teamId },
+        select: { organizationId: true },
+      });
+      const governanceProject = team
+        ? await findHiddenGovernanceProject({
+            prisma,
+            organizationId: team.organizationId,
+          })
+        : null;
+
       const usage = new PersonalUsageService();
       const input = {
         personalProjectId: project.id,
         userId: project.ownerUserId,
+        ingestionTenantId: governanceProject?.id,
         window,
       };
 
