@@ -11,9 +11,11 @@
       from starting, and the flip is rollout-gated (no old-image pod is present
       when a dataset flips).
     - IDEMPOTENT + SELF-SKIPPING: the task self-skips when no `postgres`-layout
-      datasets remain or when storage isn't S3-configured, and re-runs are no-ops
-      (already-`s3_jsonl` datasets are skipped under the per-dataset advisory
-      lock). So running it on every `helm upgrade` is harmless.
+      datasets remain, and re-runs are no-ops (already-`s3_jsonl` datasets are
+      skipped under the per-dataset advisory lock). So running it on every
+      `helm upgrade` is harmless. There is NO "no S3" skip: each dataset
+      migrates to whatever backend the resolver provides — S3 when configured,
+      else the local filesystem (hence the stored-objects PVC mount below).
     - OPT-OUT: `SKIP_DATASET_S3_MIGRATE` (wired from
       `.Values.datasetS3Migration.skip`) lets an operator disable it entirely.
 

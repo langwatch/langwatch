@@ -728,8 +728,9 @@ workers:
 # `backfillDatasetContentToS3` task — flipping existing datasets whose content
 # still lives in Postgres onto the chunked-JSONL S3 layout. It runs OFF the boot
 # path (after the deploy completes), is idempotent, advisory-locked and
-# self-skipping (no-op when no postgres-layout datasets remain or storage isn't
-# S3-configured), so it is safe to fire on every `helm upgrade`. Image + env
+# self-skipping (no-op when no postgres-layout datasets remain; each dataset
+# migrates to S3 when configured, else to the local-filesystem stored-objects
+# volume), so it is safe to fire on every `helm upgrade`. Image + env
 # mirror the workers Deployment (same app image, same shared env). See
 # templates/dataset-s3-migration-job.yaml.
 #
