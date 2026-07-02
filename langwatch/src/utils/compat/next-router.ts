@@ -293,12 +293,19 @@ export function buildUrl(
  * Mimics Next.js `Router` default export.
  * Must be kept in sync with the current URL state.
  */
+type ImperativeRouter = {
+  navigate: (
+    to: string,
+    opts?: { replace?: boolean; flushSync?: boolean },
+  ) => void;
+};
+
 /**
  * Set by main.tsx after router is created. Enables imperative navigation
  * from module-level code (e.g. navigateToDrawer in useDrawer.ts).
  */
-let _routerInstance: { navigate: (to: string) => void } | null = null;
-export function setRouterInstance(r: { navigate: (to: string) => void }) {
+let _routerInstance: ImperativeRouter | null = null;
+export function setRouterInstance(r: ImperativeRouter) {
   _routerInstance = r;
 }
 
@@ -340,7 +347,10 @@ class RouterSingleton {
   ): Promise<boolean> {
     const target = _as ?? buildUrl(url);
     if (_routerInstance) {
-      _routerInstance.navigate(target);
+      _routerInstance.navigate(target, {
+        replace: false,
+        flushSync: options?.flushSync,
+      });
     } else {
       window.history.pushState({}, "", target);
       window.dispatchEvent(new PopStateEvent("popstate"));
@@ -358,7 +368,10 @@ class RouterSingleton {
   ): Promise<boolean> {
     const target = _as ?? buildUrl(url);
     if (_routerInstance) {
-      _routerInstance.navigate(target);
+      _routerInstance.navigate(target, {
+        replace: true,
+        flushSync: options?.flushSync,
+      });
     } else {
       window.history.replaceState({}, "", target);
       window.dispatchEvent(new PopStateEvent("popstate"));
