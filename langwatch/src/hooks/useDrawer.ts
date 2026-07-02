@@ -347,10 +347,16 @@ export const useDrawer = () => {
         },
       );
 
+      // flushSync: drawers are React.lazy() (see drawerRegistry.ts) and this
+      // update mounts one for the first time in the session more often than
+      // not. Left under React Router's default startTransition wrap, a
+      // first-time Suspense would keep the previously committed UI on
+      // screen instead of showing the fallback — the URL changes but the
+      // drawer never appears until something else forces a re-render.
       void router[options.replace ? "replace" : "push"](
         buildUrl(path, newQuery, hash),
         undefined,
-        { shallow: true },
+        { shallow: true, flushSync: true },
       );
     },
     [router],
@@ -494,8 +500,11 @@ export const useDrawer = () => {
       allowEmptyArrays: true,
     });
 
+    // flushSync: see updateDrawerUrl above — same startTransition/Suspense
+    // interaction can leave the closed-drawer state uncommitted.
     void router.push(buildUrl(path, newQueryString, hash), undefined, {
       shallow: true,
+      flushSync: true,
     });
   }, [router]);
 
