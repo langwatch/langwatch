@@ -60,7 +60,7 @@ jobs:
 
       - name: Login to GHCR
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v3
+        uses: docker/login-action@c99871dec2022cc055c062a10cc1a1310835ceb4 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
