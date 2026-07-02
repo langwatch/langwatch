@@ -259,6 +259,7 @@ describe("classifyBlocks", () => {
       expect(classifyBlocks({ inputMessages: 42 })).toEqual({
         input: [],
         output: [],
+        lastInputCacheBreakpointIndex: null,
       });
     });
 
@@ -269,6 +270,48 @@ describe("classifyBlocks", () => {
         ],
       });
       expect(categoriesOf(input)).toEqual([InputCategory.USER_INPUT]);
+    });
+  });
+
+  describe("given input blocks carrying a cache_control breakpoint", () => {
+    it("reports the index of the last cache_control block on the input axis", () => {
+      const { input, lastInputCacheBreakpointIndex } = classifyBlocks({
+        inputMessages: [
+          { role: "system", content: "sys" },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "earlier context", cache_control: { type: "ephemeral" } },
+            ],
+          },
+          { role: "assistant", content: "ok" },
+          { role: "user", content: "the fresh request" },
+        ],
+      });
+
+      // The last block bearing cache_control is the earlier-context block; the
+      // fresh request that follows it is outside the cached prefix.
+      expect(lastInputCacheBreakpointIndex).toBe(1);
+      expect(input[lastInputCacheBreakpointIndex!]?.category).toBe(
+        InputCategory.PRIOR_CONTEXT,
+      );
+    });
+
+    it("returns a null breakpoint when no block carries cache_control", () => {
+      const { lastInputCacheBreakpointIndex } = classifyBlocks({
+        inputMessages: [{ role: "user", content: "just a question" }],
+      });
+      expect(lastInputCacheBreakpointIndex).toBeNull();
+    });
+  });
+
+  describe("given classified blocks", () => {
+    it("carries each block's flattened text for downstream tokenization", () => {
+      const { input } = classifyBlocks({
+        inputMessages: [{ role: "system", content: "you are helpful" }],
+      });
+      expect(input[0]?.text).toBe("you are helpful");
+      expect(input[0]?.charCount).toBe("you are helpful".length);
     });
   });
 

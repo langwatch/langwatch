@@ -242,6 +242,64 @@ describe("allocateCategoryCosts", () => {
     });
   });
 
+  describe("given input blocks carrying their source idx", () => {
+    it("returns per-block detail with the scaled tokens and cache tier", () => {
+      const { blocks } = allocateCategoryCosts({
+        inputBlocks: [
+          { idx: 0, category: InputCategory.SYSTEM_PROMPT, tokens: 1000 },
+          { idx: 1, category: InputCategory.USER_INPUT, tokens: 40 },
+        ],
+        outputBlocks: [
+          { idx: 0, category: OutputCategory.ASSISTANT_TEXT, tokens: 20 },
+        ],
+        lastCacheBreakpointIndex: 0, // prefix = system prompt only
+        pools: {
+          inputTokens: 40,
+          cacheReadTokens: 1000,
+          cacheCreationTokens: 0,
+          outputTokens: 20,
+        },
+        prices: {
+          inputCostPerToken: 3e-6,
+          cacheReadCostPerToken: 3e-7,
+          outputCostPerToken: 1.5e-5,
+        },
+      });
+
+      const system = blocks.find(
+        (b) => b.category === InputCategory.SYSTEM_PROMPT,
+      );
+      const user = blocks.find((b) => b.category === InputCategory.USER_INPUT);
+      const assistant = blocks.find(
+        (b) => b.category === OutputCategory.ASSISTANT_TEXT,
+      );
+
+      // The system prompt is in the cached prefix, the user input is fresh.
+      expect(system).toMatchObject({ idx: 0, cacheTier: "cache_read", tokens: 1000 });
+      expect(user).toMatchObject({ idx: 1, cacheTier: "fresh", tokens: 40 });
+      expect(assistant).toMatchObject({ idx: 0, cacheTier: "fresh", tokens: 20 });
+    });
+
+    it("omits synthetic catch-all tokens from the per-block detail", () => {
+      const { blocks, categoryTotals } = allocateCategoryCosts({
+        inputBlocks: [],
+        outputBlocks: [],
+        lastCacheBreakpointIndex: null,
+        pools: {
+          inputTokens: 500,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+          outputTokens: 0,
+        },
+        prices: { inputCostPerToken: 3e-6 },
+      });
+
+      // The unattributable usage lands in categoryTotals but has no source block.
+      expect(categoryTotals[InputCategory.OTHER_INPUT]?.tokens).toBe(500);
+      expect(blocks).toHaveLength(0);
+    });
+  });
+
   describe("given a tier with no price", () => {
     it("allocates the tokens but prices that tier at zero", () => {
       const { categoryTotals } = allocateCategoryCosts({

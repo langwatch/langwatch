@@ -34,7 +34,7 @@ Feature: Content-block cost attribution for coding-agent traces
     Then the injected context is not categorised as user input
     And the user's actual request is categorised as user input
 
-  @unit @unimplemented
+  @unit
   Scenario: A span from a non-coding-agent source is not classified
     Given a span with message content that does not come from a coding-agent harness
     When the span is processed
@@ -71,21 +71,21 @@ Feature: Content-block cost attribution for coding-agent traces
 
   # --- Safety invariants -----------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: Classification failure never fails ingestion
     Given a coding-agent span with malformed message content
     When the span is processed
     Then the span is stored without a block classification
     And no error is surfaced to the ingestion caller
 
-  @unit @unimplemented
+  @unit
   Scenario: A span without captured content is skipped silently
     Given a coding-agent span whose payload capture is disabled
     When the span is processed
     Then the span carries no block classification
     And no error is surfaced
 
-  @unit @unimplemented
+  @unit
   Scenario: Customer-supplied classification attributes are discarded at ingestion
     Given an ingested span carrying a forged block classification attribute
     When the span is processed

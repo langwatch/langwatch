@@ -3,14 +3,20 @@
  *
  * Pure, deterministic, synchronous. Takes the parsed message arrays that flow
  * through the pipeline (Anthropic-shaped `{ role, content }` where content is a
- * string or a content-block array) and labels every block with a cost category
- * plus its character count (a lightweight proxy the caller turns into a token
- * estimate downstream).
+ * string or a content-block array) and labels every block with a cost category,
+ * its flattened text, and that text's character count (a lightweight proxy the
+ * caller turns into a per-block token estimate downstream via the tokenizer).
  *
  * No clock, no randomness, no I/O — same content + same code ⇒ identical output
  * (ADR-033 "Deterministic + versioned" invariant). The per-axis block count is
  * bounded by MAX_CLASSIFIED_BLOCKS_PER_SPAN; overflow blocks aggregate into the
  * axis catch-all so category totals stay complete even when detail is truncated.
+ *
+ * The walk also records the last cache_control breakpoint on the INPUT axis
+ * (Anthropic marks the cacheable prefix with `cache_control` on a block). It is
+ * returned as an index into the input blocks array — the same idx space the
+ * cost allocator's `lastCacheBreakpointIndex` addresses — so the two line up by
+ * position without a second tree walk.
  */
 
 import {
@@ -27,16 +33,23 @@ import { splitLeadingMarkers } from "./contextMarkers";
 /** One classified content block. `idx` is the sequential content-part index
  * within the axis walk (input parts and output parts are counted separately),
  * in prompt order (system → tool defs → conversation). This is the same index
- * space the cache-breakpoint index addresses, so the two line up by position. */
+ * space the cache-breakpoint index addresses, so the two line up by position.
+ * `text` is the block's flattened content — the caller tokenizes it to turn
+ * `charCount` (its length) into a real per-block token estimate. */
 export interface ClassifiedBlock {
   idx: number;
   category: Category;
   charCount: number;
+  text: string;
 }
 
 export interface ClassifiedBlocks {
   input: ClassifiedBlock[];
   output: ClassifiedBlock[];
+  /** Index into `input` of the last cache_control breakpoint (the cached prefix
+   * is blocks `0..index`), or `null` when the content carries no effective
+   * breakpoint — in which case all input is treated as fresh downstream. */
+  lastInputCacheBreakpointIndex: number | null;
 }
 
 /** A parsed message; content is a string or an array of content blocks. */
@@ -47,6 +60,14 @@ interface Message {
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   v !== null && typeof v === "object" && !Array.isArray(v);
+
+/** Anthropic marks the cacheable prefix with a `cache_control` object on the
+ * block (or on a system/tool-definition entry). */
+const hasCacheControl = (v: unknown): boolean =>
+  isRecord(v) && v.cache_control != null;
+
+const someCacheControl = (content: unknown): boolean =>
+  Array.isArray(content) && content.some(hasCacheControl);
 
 const asMessageArray = (value: unknown): Message[] => {
   if (Array.isArray(value)) return value.filter(isRecord) as Message[];
@@ -59,7 +80,7 @@ const asMessageArray = (value: unknown): Message[] => {
 const roleOf = (msg: Message): string =>
   typeof msg.role === "string" ? msg.role : "user";
 
-/** Flatten a content block (or string) to its display text for char counting. */
+/** Flatten a content block (or string) to its display text for tokenizing. */
 function blockText(block: unknown): string {
   if (typeof block === "string") return block;
   if (!isRecord(block)) return "";
@@ -108,25 +129,42 @@ const toolCategory = ({
 /**
  * Accumulates classified blocks for one axis, enforcing the block cap: once
  * MAX_CLASSIFIED_BLOCKS_PER_SPAN detailed slots are filled, every further
- * block's char count folds into a single trailing catch-all so totals survive.
+ * block's text folds into a single trailing catch-all so totals survive.
+ * Also tracks the last block marked as a cache_control breakpoint.
  */
 class AxisAccumulator {
   private readonly blocks: ClassifiedBlock[] = [];
+  private readonly overflowTexts: string[] = [];
   private overflowChars = 0;
   private overflowed = false;
+  private lastBreakpointIdx: number | null = null;
 
   constructor(private readonly axis: Axis) {}
 
-  push(category: Category, charCount: number): void {
+  push(category: Category, text: string): void {
+    const charCount = text.length;
     // Reserve the final slot for the overflow aggregate.
     if (this.blocks.length >= MAX_CLASSIFIED_BLOCKS_PER_SPAN - 1) {
       this.overflowed = true;
       this.overflowChars += charCount;
+      this.overflowTexts.push(text);
       return;
     }
     // idx = sequential part index within this axis (position === array length
     // before push), matching the space the cache-breakpoint index addresses.
-    this.blocks.push({ idx: this.blocks.length, category, charCount });
+    this.blocks.push({ idx: this.blocks.length, category, charCount, text });
+  }
+
+  /** Mark the most recently pushed block as carrying a cache_control breakpoint.
+   * Breakpoints live in the cacheable prefix, never in the overflow tail. */
+  markBreakpoint(): void {
+    if (this.overflowed) return;
+    const last = this.blocks[this.blocks.length - 1];
+    if (last) this.lastBreakpointIdx = last.idx;
+  }
+
+  breakpointIndex(): number | null {
+    return this.lastBreakpointIdx;
   }
 
   result(): ClassifiedBlock[] {
@@ -135,6 +173,7 @@ class AxisAccumulator {
         idx: this.blocks.length,
         category: catchAllFor(this.axis),
         charCount: this.overflowChars,
+        text: this.overflowTexts.join(""),
       });
     }
     return this.blocks;
@@ -164,11 +203,8 @@ function classifyInputMessage({
   const role = roleOf(msg);
 
   if (role === "system") {
-    pushString({
-      acc,
-      category: InputCategory.SYSTEM_PROMPT,
-      content: msg.content,
-    });
+    pushString({ acc, category: InputCategory.SYSTEM_PROMPT, content: msg.content });
+    if (someCacheControl(msg.content)) acc.markBreakpoint();
     return;
   }
 
@@ -176,7 +212,7 @@ function classifyInputMessage({
 
   if (typeof content === "string") {
     if (fresh && role === "user") pushFreshUserText(acc, content);
-    else acc.push(InputCategory.PRIOR_CONTEXT, content.length);
+    else acc.push(InputCategory.PRIOR_CONTEXT, content);
     return;
   }
 
@@ -185,7 +221,7 @@ function classifyInputMessage({
   for (const part of content) {
     if (typeof part === "string") {
       if (fresh && role === "user") pushFreshUserText(acc, part);
-      else acc.push(InputCategory.PRIOR_CONTEXT, part.length);
+      else acc.push(InputCategory.PRIOR_CONTEXT, part);
       continue;
     }
     if (!isRecord(part)) continue;
@@ -201,8 +237,9 @@ function classifyInputMessage({
     if (part.type === "text" && fresh && role === "user") {
       pushFreshUserText(acc, blockText(part));
     } else {
-      acc.push(category, blockText(part).length);
+      acc.push(category, blockText(part));
     }
+    if (hasCacheControl(part)) acc.markBreakpoint();
   }
 }
 
@@ -248,8 +285,8 @@ function inputPartCategory({
  * their marker categories, the remaining body is the real user_input. */
 function pushFreshUserText(acc: AxisAccumulator, text: string): void {
   const { markers, body } = splitLeadingMarkers(text);
-  for (const marker of markers) acc.push(marker.category, marker.raw.length);
-  if (body.length > 0) acc.push(InputCategory.USER_INPUT, body.length);
+  for (const marker of markers) acc.push(marker.category, marker.raw);
+  if (body.length > 0) acc.push(InputCategory.USER_INPUT, body);
 }
 
 function pushString({
@@ -262,7 +299,7 @@ function pushString({
   content: unknown;
 }): void {
   const text = typeof content === "string" ? content : contentToText(content);
-  acc.push(category, text.length);
+  acc.push(category, text);
 }
 
 /** Classify one output-axis message (the assistant's current-turn reply). */
@@ -276,18 +313,18 @@ function classifyOutputMessage({
   const content = msg.content;
 
   if (typeof content === "string") {
-    acc.push(OutputCategory.ASSISTANT_TEXT, content.length);
+    acc.push(OutputCategory.ASSISTANT_TEXT, content);
     return;
   }
   if (!Array.isArray(content)) return;
 
   for (const part of content) {
     if (typeof part === "string") {
-      acc.push(OutputCategory.ASSISTANT_TEXT, part.length);
+      acc.push(OutputCategory.ASSISTANT_TEXT, part);
       continue;
     }
     if (!isRecord(part)) continue;
-    acc.push(outputPartCategory(part), blockText(part).length);
+    acc.push(outputPartCategory(part), blockText(part));
   }
 }
 
@@ -318,7 +355,8 @@ function classifyToolDefinitions(tools: unknown, acc: AxisAccumulator): void {
       mcp: InputCategory.MCP_TOOL_DEFINITIONS,
       builtin: InputCategory.TOOL_DEFINITIONS,
     });
-    acc.push(category, safeStringify(tool).length);
+    acc.push(category, safeStringify(tool));
+    if (hasCacheControl(tool)) acc.markBreakpoint();
   }
 }
 
@@ -381,7 +419,11 @@ export function classifyBlocks({
     classifyOutputMessage({ msg, acc: output });
   }
 
-  return { input: input.result(), output: output.result() };
+  return {
+    input: input.result(),
+    output: output.result(),
+    lastInputCacheBreakpointIndex: input.breakpointIndex(),
+  };
 }
 
 function lastIndexOfUser(messages: Message[]): number {

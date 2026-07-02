@@ -190,6 +190,17 @@ export function applySpanToSummary({
     cacheTokens.reasoningTokens,
   );
 
+  // ADR-033: roll each span's per-category block totals into trace-level running
+  // sums under the same reserved keys. A span whose tokens are excluded from
+  // accumulation (codex's redundant usage copy) must also skip its blockcat
+  // totals, or the trace would double-count the categories for that turn.
+  const blockCategoryDeltas = spanCostService.isTokenAccumulationSkipped(span)
+    ? {}
+    : spanCostService.extractBlockCategoryDeltas(span);
+  for (const [key, delta] of Object.entries(blockCategoryDeltas)) {
+    addReservedTokenSum(attributes, key, delta);
+  }
+
   const newModels = spanCostService.extractModelsFromSpan(span);
   const models = mergeModelsMostRecentFirst(state.models, newModels);
 

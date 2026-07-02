@@ -65,3 +65,16 @@ export const CLASSIFIER_VERSION = 1;
 export const SPAN_ATTR_BLOCKS = "langwatch.reserved.blocks.classification";
 export const SPAN_ATTR_CLASSIFIER_VERSION =
   "langwatch.reserved.blocks.classifier_version";
+
+/** Prefix for the per-category running-total span attributes the trace fold
+ * rolls up (`langwatch.reserved.blockcat.<category>.tokens` / `.cost_usd`).
+ * `reserved` prefix required — spoof protection via `stripReservedAttributes`. */
+export const SPAN_ATTR_BLOCKCAT_PREFIX = "langwatch.reserved.blockcat.";
+
+export function blockCategoryTokensAttr(category: Category): string {
+  return `${SPAN_ATTR_BLOCKCAT_PREFIX}${category}.tokens`;
+}
+
+export function blockCategoryCostAttr(category: Category): string {
+  return `${SPAN_ATTR_BLOCKCAT_PREFIX}${category}.cost_usd`;
+}

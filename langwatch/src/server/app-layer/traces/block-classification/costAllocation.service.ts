@@ -21,10 +21,24 @@ import { type Category, catchAllFor } from "./categories";
 
 export type CacheTier = "fresh" | "cache_read" | "cache_creation";
 
-/** A classified block with its (caller-supplied) token estimate. */
+/** A classified block with its (caller-supplied) token estimate. `idx` is the
+ * block's per-axis position — carried through so the returned per-block detail
+ * can be pinned back to the source block. */
 export interface TokenBlock {
+  idx?: number;
   category: Category;
   tokens: number;
+}
+
+/** Per-block allocation detail (ADR-033 Schema, `blocks.classification`): the
+ * block's post-scale token share and the cache tier it was priced at. Synthetic
+ * catch-all tokens (a nonzero pool with no blocks) carry no source block and so
+ * are absent here — they surface only in `categoryTotals`. */
+export interface AllocatedBlock {
+  idx: number;
+  category: Category;
+  tokens: number;
+  cacheTier: CacheTier;
 }
 
 /** Provider-reported usage pools — the ground truth totals per tier. */
@@ -54,6 +68,7 @@ interface Pool {
   total: number;
   rate: number;
   axis: "input" | "output";
+  tier: CacheTier;
   blocks: TokenBlock[];
 }
 
@@ -79,7 +94,7 @@ export function allocateCategoryCosts({
   lastCacheBreakpointIndex: number | null;
   pools: UsagePools;
   prices: TierPrices;
-}): { categoryTotals: CategoryTotals } {
+}): { categoryTotals: CategoryTotals; blocks: AllocatedBlock[] } {
   const { cachePrefix, fresh } = partitionInput({
     inputBlocks,
     lastCacheBreakpointIndex,
@@ -92,31 +107,36 @@ export function allocateCategoryCosts({
       total: pools.cacheReadTokens,
       rate: prices.cacheReadCostPerToken ?? 0,
       axis: "input",
+      tier: "cache_read",
       blocks: cachePrefix.cacheRead,
     },
     {
       total: pools.cacheCreationTokens,
       rate: prices.cacheCreationCostPerToken ?? 0,
       axis: "input",
+      tier: "cache_creation",
       blocks: cachePrefix.cacheCreation,
     },
     {
       total: pools.inputTokens,
       rate: prices.inputCostPerToken ?? 0,
       axis: "input",
+      tier: "fresh",
       blocks: fresh,
     },
     {
       total: pools.outputTokens,
       rate: prices.outputCostPerToken ?? 0,
       axis: "output",
+      tier: "fresh",
       blocks: outputBlocks,
     },
   ];
 
   const totals: CategoryTotals = {};
-  for (const pool of poolList) allocatePool(pool, totals);
-  return { categoryTotals: totals };
+  const blocks: AllocatedBlock[] = [];
+  for (const pool of poolList) allocatePool(pool, totals, blocks);
+  return { categoryTotals: totals, blocks };
 }
 
 /**
@@ -168,7 +188,11 @@ function partitionInput({
  * residual so the pool sums exactly regardless of float drift. A nonzero pool
  * with no blocks (zero-guard) drops its whole total into the axis catch-all.
  */
-function allocatePool(pool: Pool, totals: CategoryTotals): void {
+function allocatePool(
+  pool: Pool,
+  totals: CategoryTotals,
+  blocks: AllocatedBlock[],
+): void {
   if (pool.total <= 0) return;
 
   if (pool.blocks.length === 0) {
@@ -209,6 +233,14 @@ function allocatePool(pool: Pool, totals: CategoryTotals): void {
       tokens: scaled,
       rate: pool.rate,
     });
+    if (block.idx !== undefined) {
+      blocks.push({
+        idx: block.idx,
+        category: block.category,
+        tokens: scaled,
+        cacheTier: pool.tier,
+      });
+    }
   }
 }
 

@@ -1,5 +1,6 @@
 import { coerceToNumber } from "~/utils/coerceToNumber";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import { SPAN_ATTR_BLOCKCAT_PREFIX } from "~/server/app-layer/traces/block-classification/categories";
 import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { NormalizedSpan } from "../../schemas/spans";
@@ -164,6 +165,24 @@ export class SpanCostService {
     return markerIsTrue(
       span.spanAttributes[ATTR_KEYS.LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION],
     );
+  }
+
+  /**
+   * Per-span content-block category totals (ADR-033), read from the reserved
+   * `langwatch.reserved.blockcat.<category>.{tokens,cost_usd}` attributes the
+   * ingest-time classifier stamped. Returned as a key → positive-delta map so the
+   * fold rolls each into a trace-level running sum under the SAME key (the raw
+   * per-span values never reach the merged trace attribute map otherwise). Costs
+   * are small decimals; the values pass through as floats.
+   */
+  extractBlockCategoryDeltas(span: NormalizedSpan): Record<string, number> {
+    const deltas: Record<string, number> = {};
+    for (const [key, value] of Object.entries(span.spanAttributes)) {
+      if (!key.startsWith(SPAN_ATTR_BLOCKCAT_PREFIX)) continue;
+      const n = coerceToNumber(value);
+      if (n !== null && n > 0) deltas[key] = n;
+    }
+    return deltas;
   }
 
   extractTokenTiming(span: NormalizedSpan): {

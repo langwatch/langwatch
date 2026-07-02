@@ -7,8 +7,11 @@ import {
   createCostEnrichmentDeps,
   OtlpSpanCostEnrichmentService,
 } from "~/server/app-layer/traces/span-cost-enrichment.service";
+import { OtlpSpanBlockClassificationService } from "~/server/app-layer/traces/span-block-classification.service";
 import { OtlpSpanPiiRedactionService } from "~/server/app-layer/traces/span-pii-redaction.service";
 import { OtlpSpanTokenEstimationService } from "~/server/app-layer/traces/span-token-estimation.service";
+import { matchModelCostWithFallbacks } from "~/server/background/workers/collector/cost";
+import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
 import {
   applyOtlpSpanContentDrop,
   type SpanContentDropResult,
@@ -34,7 +37,11 @@ import {
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
 } from "../schemas/constants";
 import type { SpanReceivedEvent } from "../schemas/events";
-import type { OtlpResource, OtlpSpan } from "../schemas/otlp";
+import type {
+  OtlpInstrumentationScope,
+  OtlpResource,
+  OtlpSpan,
+} from "../schemas/otlp";
 import { capOversizedAttributes } from "../utils/capOversizedAttributes";
 import { TraceRequestUtils } from "../utils/traceRequest.utils";
 
@@ -91,6 +98,19 @@ export interface RecordSpanCommandDependencies {
     }) => Promise<SpanContentDropResult>;
   };
   /**
+   * ADR-033: Optional ingest-time content-block classifier. When present, it
+   * classifies coding-agent spans and stamps per-category cost attributes.
+   * Non-critical: absence is a no-op, and a throw is caught and logged so
+   * classification never fails ingestion.
+   */
+  blockClassificationService?: {
+    classifySpanBlocks: (args: {
+      span: OtlpSpan;
+      instrumentationScope?: OtlpInstrumentationScope | null;
+      tenantId?: string;
+    }) => Promise<void>;
+  };
+  /**
    * ADR-022: Optional BlobStore for spool fetch (when command carries spoolRef)
    * and post-store spool deletion. When absent, spoolRef commands are rejected.
    */
@@ -111,6 +131,24 @@ function createDefaultDependencies(): RecordSpanCommandDependencies {
       featureFlagService,
     }),
     contentDropService: { dropSpanContent: applyOtlpSpanContentDrop },
+    blockClassificationService: new OtlpSpanBlockClassificationService({
+      tokenizer: new TiktokenClient(),
+      // Registry-backed per-tier rates for standard models (custom rates on the
+      // span win first). Injected here so the classifier service stays decoupled
+      // from the prisma-backed cost module.
+      resolveModelPrices: (model: string) => {
+        const matched = matchModelCostWithFallbacks(model, getStaticModelCosts());
+        if (!matched) return null;
+        const inputRate = matched.inputCostPerToken ?? 0;
+        return {
+          inputCostPerToken: inputRate,
+          outputCostPerToken: matched.outputCostPerToken ?? 0,
+          cacheReadCostPerToken: matched.cacheReadCostPerToken ?? inputRate,
+          cacheCreationCostPerToken:
+            matched.cacheCreationCostPerToken ?? inputRate,
+        };
+      },
+    }),
   };
 }
 
@@ -323,6 +361,26 @@ export class RecordSpanCommand
           throw piiResult.reason instanceof Error
             ? piiResult.reason
             : new Error(String(piiResult.reason));
+        }
+
+        // ADR-033: ingest-time content-block classification. Runs SERIAL after
+        // the parallel enrichment block (it consumes cost + tokenizer outputs)
+        // and BEFORE content drop, on the redacted span. Classification is
+        // non-critical: any throw is caught and logged so it never fails
+        // ingestion (ADR-033 "Ingestion never fails on classification").
+        if (this.deps.blockClassificationService) {
+          try {
+            await this.deps.blockClassificationService.classifySpanBlocks({
+              span: spanToProcess,
+              instrumentationScope: resolvedCommandData.instrumentationScope,
+              tenantId: tenantIdStr,
+            });
+          } catch (error) {
+            this.logger.warn(
+              { error },
+              "Block classification failed, continuing without categories",
+            );
+          }
         }
 
         // Apply the scoped data-privacy DROP at this single span choke point,
