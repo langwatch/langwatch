@@ -6,10 +6,17 @@
   existing datasets whose content still lives in Postgres onto the chunked-JSONL
   S3 layout. Three properties make this safe to fire on every upgrade:
 
-    - OFF THE BOOT PATH: it's a hook Job that runs AFTER the deploy completes —
-      never on the `set -e` app boot — so a migration hiccup can't block pods
-      from starting, and the flip is rollout-gated (no old-image pod is present
-      when a dataset flips).
+    - OFF THE BOOT PATH: it's a hook Job, never on the `set -e` app boot, so a
+      migration hiccup can't block pods from starting. NOTE: post-upgrade hooks
+      fire after resources are SUBMITTED, not after the Deployment rollout
+      completes (hook-weight only orders hooks among themselves) — the flip is
+      rollout-gated only when the release waits on rollout (`helm upgrade
+      --wait` / `--atomic`, Argo, Flux). Without that, upgrading from a
+      pre-ADR-032 image can flip a dataset while an old-image pod still serves:
+      reads stay fine (the PG rows are retained), but an old pod's dataset
+      WRITE after the flip lands only in the PG rows and is invisible to the
+      new layout. Use --wait (or pause dataset writes) when upgrading across
+      the ADR-032 boundary.
     - IDEMPOTENT + SELF-SKIPPING: the task self-skips when no `postgres`-layout
       datasets remain, and re-runs are no-ops (already-`s3_jsonl` datasets are
       skipped under the per-dataset advisory lock). So running it on every
