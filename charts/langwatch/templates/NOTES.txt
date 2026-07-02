@@ -110,10 +110,26 @@ backend for you:
     the SAME chunks (LANGWATCH_LOCAL_STORAGE_PATH), so a fresh install works
     without S3. Because these separate pods share one ReadWriteOnce volume,
     every dataset pod must run on a SINGLE NODE: the chart refuses
-    replicaCount > 1, and on a multi-node cluster the worker / migration Job
-    can fail to schedule against the app's volume. Fine for a hobby /
-    single-node install; bytes survive pod restarts. For anything bigger,
-    enable app.dataplane (S3).
+    replicaCount > 1 and co-locates the worker / migration Job with the app
+    pod via a default podAffinity. Fine for a hobby / single-node install;
+    bytes survive pod restarts. For anything bigger, enable
+    app.dataplane (S3).
+
+    Operational notes for this mode:
+      • The PVC uses the cluster's DEFAULT StorageClass (or
+        app.storedObjects.localFilesystem.storageClassName). On bare-metal
+        clusters with no default StorageClass the PVC — and every pod
+        mounting it — stays Pending: install a provisioner (e.g.
+        local-path-provisioner) or set storageClassName explicitly.
+      • App and worker Deployments default to strategy: Recreate so
+        upgrades release the shared volume before new pods schedule (a
+        surged pod wedges Pending on an RWO multi-attach error on
+        multi-node clusters). Expect a brief downtime per upgrade; set
+        app/workers deployment.strategy explicitly to override.
+      • GitOps (ArgoCD / Flux): the dataset-migration hook maps to a
+        PostSync hook, which already waits for the rollout to be healthy;
+        plain Helm should upgrade with --wait when crossing the ADR-032
+        boundary (see the migration Job template header).
 
   • Production / multi-pod: enable app.dataplane (S3 / MinIO / Azure).
     Then configure these on the bucket and deployment, or uploads and

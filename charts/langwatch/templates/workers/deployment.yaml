@@ -20,6 +20,16 @@ spec:
   {{- if .Values.workers.deployment.strategy }}
   strategy:
     {{- toYaml .Values.workers.deployment.strategy | nindent 8 }}
+  {{- else if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
+  {{/* Default Recreate under local-FS, same rationale as the app Deployment:
+       workers mount the app's RWO stored-objects PVC, and a surged worker pod
+       keeps the volume attached to the old node during an upgrade — which can
+       wedge the app's own replacement pod on a multi-attach error. Recreate on
+       BOTH deployments releases the volume before new pods schedule; the
+       co-location affinity then reunites them on one node. An explicit
+       workers.deployment.strategy overrides this. */}}
+  strategy:
+    type: Recreate
   {{- end }}
   {{- if hasKey (default (dict) .Values.workers.deployment) "revisionHistoryLimit" }}
   revisionHistoryLimit: {{ .Values.workers.deployment.revisionHistoryLimit }}

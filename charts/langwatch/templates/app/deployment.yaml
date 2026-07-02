@@ -17,8 +17,19 @@ metadata:
 spec:
   replicas: {{ .Values.app.replicaCount }}
   {{- if .Values.app.deployment.strategy }}
-  strategy: 
+  strategy:
     {{- toYaml .Values.app.deployment.strategy | nindent 8 }}
+  {{- else if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
+  {{/* Default Recreate under local-FS: the pod holds the RWO stored-objects
+       PVC, and the k8s default RollingUpdate surges the new pod BEFORE the old
+       one releases the volume — on a multi-node cluster the new pod can land
+       on another node and wedge Pending on a multi-attach error (the scheduler
+       does not avoid RWO conflicts for CSI volumes). Recreate tears down every
+       volume consumer first, so upgrades detach cleanly at the cost of a brief
+       downtime — honest for the single-replica local-FS tier. An explicit
+       app.deployment.strategy overrides this. */}}
+  strategy:
+    type: Recreate
   {{- end }}
   {{- if hasKey (default (dict) .Values.app.deployment) "revisionHistoryLimit" }}
   revisionHistoryLimit: {{ .Values.app.deployment.revisionHistoryLimit }}
