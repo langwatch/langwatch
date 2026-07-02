@@ -279,7 +279,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   }): Promise<FullyLoadedOrganization[]> {
     const { userId, isDemo, demoProjectId } = params;
 
-    return this.prisma.organization.findMany({
+    const organizations = (await this.prisma.organization.findMany({
       where: {
         OR: [
           ...(isDemo
@@ -334,7 +334,36 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           },
         },
       },
-    }) as Promise<FullyLoadedOrganization[]>;
+    })) as FullyLoadedOrganization[];
+
+    // Prisma can't express "order this top-level findMany by a nested
+    // to-many relation's scalar field, filtered to one userId" in a single
+    // query (orderBy on a to-many relation only supports _count). Sort here
+    // instead, using each org's `members[0]` (pre-filtered to this userId
+    // above) to read the user's own membership creation time.
+    //
+    // This ordering matters: array index [0] of the result is used as the
+    // fallback "current org" for org-scoped pages like /me and /governance
+    // (see useOrganizationTeamProject.ts:194-198). Without a deterministic
+    // sort, an unordered findMany could land a multi-org user on an
+    // arbitrary org instead of their earliest/primary one.
+    //
+    // `members[0]` may be absent for the demo-org-inclusion branch of the
+    // `where.OR` above; treat that as time 0 so it sorts first without
+    // crashing. That's fine because demo-mode org selection is picked
+    // separately via `.find()` and doesn't rely on array order.
+    return organizations.sort((a, b) => {
+      const aCreatedAt = a.members[0]?.createdAt?.getTime() ?? 0;
+      const bCreatedAt = b.members[0]?.createdAt?.getTime() ?? 0;
+      if (aCreatedAt !== bCreatedAt) {
+        return aCreatedAt - bCreatedAt;
+      }
+      // Tie-breaker: identical membership createdAt timestamps (e.g. bulk
+      // invite, same-transaction seed) would otherwise fall back to the
+      // unordered findMany's arbitrary order via Array.sort's stability.
+      // Compare organization id for a deterministic, unique secondary key.
+      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+    });
   }
 
   async getOrganizationWithMembers(params: {
