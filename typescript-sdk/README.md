@@ -147,15 +147,16 @@ span.end();
   ```
 - **Record a custom evaluation:**
   ```ts
-  import { recordEvaluation } from "langwatch/evaluation";
-  recordEvaluation({
-    name: "Manual Eval",
-    passed: true,
-    score: 0.9,
-    details: "Looks good!"
+  await tracer.withActiveSpan("my-operation", async (span) => {
+    span.addEvaluation({
+      name: "Manual Eval",
+      passed: true,
+      score: 0.9,
+      details: "Looks good!"
+    });
   });
   ```
-  > **Note:** The evaluation APIs (`runEvaluation`, `recordEvaluation`) also create spans and add tracing/evaluation info automatically.
+  > **Note:** `addEvaluation` is the canonical API for recording manual evaluations on a span. `recordEvaluation` is a deprecated alias of `addEvaluation` kept for backward compatibility.
 
 ### 4. LangChain Integration
 

@@ -79,11 +79,19 @@ class LangWatchSpanInternal implements LangWatchSpan {
     return this;
   }
 
+  /**
+   * Records a manual evaluation on this span by emitting the `langwatch.evaluation.custom` span
+   * event. See {@link AddEvaluationParams} for available parameters.
+   */
   addEvaluation(params: AddEvaluationParams): this {
     emitEvaluationEvent(this.span, params);
     return this;
   }
 
+  /**
+   * @deprecated Use {@link addEvaluation} instead. Thin back-compat alias kept for
+   * the earlier documented name.
+   */
   recordEvaluation(params: AddEvaluationParams): this {
     return this.addEvaluation(params);
   }
