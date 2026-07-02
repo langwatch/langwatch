@@ -306,7 +306,9 @@ describe("UsageService", () => {
         expect(result.maxMessagesPerMonth).toBe(1000);
         // "Monthly"/"events" only come from firstPlan (free: false, license
         // override with usageUnit "events"); laterPlan would render "Free"/"traces".
-        expect(result.message).toContain("Monthly limit of 1000 events reached");
+        expect(result.message).toContain(
+          "Monthly limit of 1000 events reached",
+        );
         expect(mockPlanResolver).toHaveBeenCalledTimes(1);
       });
     });
