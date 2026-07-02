@@ -101,6 +101,24 @@ describe("useDrawer", () => {
       expect(mockPush).not.toHaveBeenCalled();
     });
 
+    it("navigates with flushSync so a first-time-lazy drawer actually renders", () => {
+      // Drawers are React.lazy() behind a single Suspense boundary
+      // (CurrentDrawer.tsx). Without flushSync, React Router's default
+      // startTransition wrap hides a first-time suspend behind the
+      // previously committed UI — the URL changes but nothing renders.
+      const { result } = renderHook(() => useDrawer());
+
+      act(() => {
+        result.current.openDrawer("promptList");
+      });
+
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.any(String),
+        undefined,
+        expect.objectContaining({ flushSync: true }),
+      );
+    });
+
     it("builds drawer stack on navigation", () => {
       mockQuery = { "drawer.open": "targetTypeSelector" };
       const { result } = renderHook(() => useDrawer());
@@ -143,6 +161,21 @@ describe("useDrawer", () => {
       expect(mockPush).toHaveBeenCalled();
       const pushCall = mockPush.mock.calls[0]?.[0] as string;
       expect(pushCall).not.toContain("drawer");
+    });
+
+    it("navigates with flushSync so the closed state actually commits", () => {
+      mockQuery = { "drawer.open": "promptList" };
+      const { result } = renderHook(() => useDrawer());
+
+      act(() => {
+        result.current.closeDrawer();
+      });
+
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.any(String),
+        undefined,
+        expect.objectContaining({ flushSync: true }),
+      );
     });
 
     it("clears the drawer stack", () => {
