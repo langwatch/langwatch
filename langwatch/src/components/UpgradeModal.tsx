@@ -192,14 +192,14 @@ function SeatsContent({
     <>
       <Dialog.Header>
         <Crown />
-        <Dialog.Title>Confirm seat update</Dialog.Title>
+        <Dialog.Title>Confirm Seat Update</Dialog.Title>
       </Dialog.Header>
       <Dialog.Body>
         {!subscriptionApi ? (
           <Text>Seat management is not available in this deployment.</Text>
         ) : isLoading ? (
           <HStack justify="center" width="100%" paddingY={6}>
-            <Spinner />
+            <Spinner role="status" aria-label="Loading proration preview" />
           </HStack>
         ) : isError ? (
           <Text color="red.500">{errorMessage}</Text>
