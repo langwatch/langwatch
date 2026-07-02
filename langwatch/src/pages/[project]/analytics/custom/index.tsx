@@ -24,7 +24,6 @@ import {
   Select as MultiSelect,
   type SingleValue,
 } from "chakra-react-select";
-import { useRouter } from "~/utils/compat/next-router";
 import React, {
   type Dispatch,
   type SetStateAction,
@@ -70,6 +69,7 @@ import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
 import { type FilterParam, useFilterParams } from "~/hooks/useFilterParams";
+import { useRouter } from "~/utils/compat/next-router";
 import {
   CustomGraph,
   type CustomGraphInput,
@@ -655,9 +655,7 @@ function CustomGraphForm({
   const series = useWatch({ control: form.control, name: "series" });
   const { showFilters, setShowFilters } = useFilterToggle();
 
-  const joinedSeriesNames = series
-    .map((s) => s.name)
-    .join(", ");
+  const joinedSeriesNames = series.map((s) => s.name).join(", ");
 
   useEffect(() => {
     if (!form.getFieldState("title")?.isTouched || !title) {
@@ -963,27 +961,27 @@ function CustomGraphForm({
           Cancel
         </Button>
         {customId ? (
-            <Button
-              colorPalette="orange"
-              onClick={updateGraph}
-              loading={updateGraphById.isLoading}
-              marginX={2}
-              minWidth="fit-content"
-            >
-              Update
-            </Button>
+          <Button
+            colorPalette="orange"
+            onClick={updateGraph}
+            loading={updateGraphById.isLoading}
+            marginX={2}
+            minWidth="fit-content"
+          >
+            Update
+          </Button>
         ) : (
-            <Button
-              colorPalette="orange"
-              loading={addNewGraph.isLoading}
-              onClick={() => {
-                addGraph();
-              }}
-              marginX={2}
-              minWidth="fit-content"
-            >
-              Save
-            </Button>
+          <Button
+            colorPalette="orange"
+            loading={addNewGraph.isLoading}
+            onClick={() => {
+              addGraph();
+            }}
+            marginX={2}
+            minWidth="fit-content"
+          >
+            Save
+          </Button>
         )}
       </HStack>
     </VStack>
@@ -1005,7 +1003,10 @@ function SeriesFieldItem({
   setExpandedSeries: Dispatch<SetStateAction<string[]>>;
   customId?: string;
 }) {
-  const colorSet = useWatch({ control: form.control, name: `series.${index}.colorSet` });
+  const colorSet = useWatch({
+    control: form.control,
+    name: `series.${index}.colorSet`,
+  });
   const coneColors = rotatingColors[colorSet].map((color, i) => {
     const color_ = getRawColorValue(color.color);
     const len = rotatingColors[colorSet].length;
@@ -1179,16 +1180,31 @@ function SeriesField({
   index: number;
   customId?: string;
 }) {
-  const name = useWatch({ control: form.control, name: `series.${index}.name` });
-  const metric = useWatch({ control: form.control, name: `series.${index}.metric` });
-  const aggregation = useWatch({ control: form.control, name: `series.${index}.aggregation` });
+  const name = useWatch({
+    control: form.control,
+    name: `series.${index}.name`,
+  });
+  const metric = useWatch({
+    control: form.control,
+    name: `series.${index}.metric`,
+  });
+  const aggregation = useWatch({
+    control: form.control,
+    name: `series.${index}.aggregation`,
+  });
   const key = useWatch({ control: form.control, name: `series.${index}.key` });
-  const pipelineField = useWatch({ control: form.control, name: `series.${index}.pipeline.field` });
+  const pipelineField = useWatch({
+    control: form.control,
+    name: `series.${index}.pipeline.field`,
+  });
   const pipelineAggregation = useWatch({
     control: form.control,
     name: `series.${index}.pipeline.aggregation`,
   });
-  const filters = useWatch({ control: form.control, name: `series.${index}.filters` });
+  const filters = useWatch({
+    control: form.control,
+    name: `series.${index}.filters`,
+  });
   const nonEmptyFilters = filterOutEmptyFilters(filters);
 
   const metric_ = metric ? getMetric(metric) : undefined;
@@ -1271,10 +1287,7 @@ function SeriesField({
                   {Object.entries(analyticsMetrics).map(([group, metrics]) => (
                     <optgroup key={group} label={camelCaseToTitleCase(group)}>
                       {Object.entries(metrics).map(([metricKey, m]) => (
-                        <option
-                          key={metricKey}
-                          value={`${group}.${metricKey}`}
-                        >
+                        <option key={metricKey} value={`${group}.${metricKey}`}>
                           {m.label}
                         </option>
                       ))}

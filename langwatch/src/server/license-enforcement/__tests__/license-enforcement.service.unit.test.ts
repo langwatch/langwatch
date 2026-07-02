@@ -1,9 +1,9 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { LicenseEnforcementService } from "../license-enforcement.service";
-import type { ILicenseEnforcementRepository } from "../license-enforcement.repository";
-import type { PlanProvider } from "../../app-layer/subscription/plan-provider";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PlanInfo } from "../../../../ee/licensing/planInfo";
+import type { PlanProvider } from "../../app-layer/subscription/plan-provider";
 import { LimitExceededError } from "../errors";
+import type { ILicenseEnforcementRepository } from "../license-enforcement.repository";
+import { LicenseEnforcementService } from "../license-enforcement.service";
 import type { LimitType } from "../types";
 
 /**
@@ -120,22 +120,31 @@ describe("LicenseEnforcementService", () => {
         repoMethod: keyof ILicenseEnforcementRepository;
         planField: keyof PlanInfo;
       }> = [
-        { type: "members", repoMethod: "getMemberCount", planField: "maxMembers" },
-        { type: "membersLite", repoMethod: "getMembersLiteCount", planField: "maxMembersLite" },
+        {
+          type: "members",
+          repoMethod: "getMemberCount",
+          planField: "maxMembers",
+        },
+        {
+          type: "membersLite",
+          repoMethod: "getMembersLiteCount",
+          planField: "maxMembersLite",
+        },
       ];
 
-      it.each(limitTypeTests)(
-        "checks $type limit using $repoMethod",
-        async ({ type, repoMethod, planField }) => {
-          vi.mocked(mockRepository[repoMethod]).mockResolvedValue(1);
+      it.each(limitTypeTests)("checks $type limit using $repoMethod", async ({
+        type,
+        repoMethod,
+        planField,
+      }) => {
+        vi.mocked(mockRepository[repoMethod]).mockResolvedValue(1);
 
-          const result = await service.checkLimit("org-123", type);
+        const result = await service.checkLimit("org-123", type);
 
-          expect(mockRepository[repoMethod]).toHaveBeenCalledWith("org-123");
-          expect(result.limitType).toBe(type);
-          expect(result.max).toBe(basePlan[planField]);
-        }
-      );
+        expect(mockRepository[repoMethod]).toHaveBeenCalledWith("org-123");
+        expect(result.limitType).toBe(type);
+        expect(result.max).toBe(basePlan[planField]);
+      });
     });
   });
 
@@ -144,7 +153,7 @@ describe("LicenseEnforcementService", () => {
       vi.mocked(mockRepository.getMemberCount).mockResolvedValue(2);
 
       await expect(
-        service.enforceLimit("org-123", "members")
+        service.enforceLimit("org-123", "members"),
       ).resolves.toBeUndefined();
     });
 
@@ -152,7 +161,7 @@ describe("LicenseEnforcementService", () => {
       vi.mocked(mockRepository.getMemberCount).mockResolvedValue(5);
 
       await expect(service.enforceLimit("org-123", "members")).rejects.toThrow(
-        LimitExceededError
+        LimitExceededError,
       );
     });
 
@@ -190,7 +199,7 @@ describe("LicenseEnforcementService", () => {
       vi.mocked(mockRepository.getMemberCount).mockResolvedValue(1000);
 
       await expect(
-        service.enforceLimit("org-123", "members")
+        service.enforceLimit("org-123", "members"),
       ).resolves.toBeUndefined();
     });
   });
@@ -220,7 +229,7 @@ describe("LicenseEnforcementService", () => {
         service.enforceLimitByOrganization({
           organizationId: "org-123",
           limitType: "members",
-        })
+        }),
       ).rejects.toThrow(/maximum number of team members/);
     });
 
@@ -231,7 +240,7 @@ describe("LicenseEnforcementService", () => {
         service.enforceLimitByOrganization({
           organizationId: "org-123",
           limitType: "members",
-        })
+        }),
       ).resolves.toBeUndefined();
     });
 
@@ -242,7 +251,7 @@ describe("LicenseEnforcementService", () => {
         service.enforceLimitByOrganization({
           organizationId: "org-123",
           limitType: "members",
-        })
+        }),
       ).rejects.toThrow(LimitExceededError);
     });
 
@@ -253,7 +262,7 @@ describe("LicenseEnforcementService", () => {
         service.enforceLimitByOrganization({
           organizationId: "org-123",
           limitType: "members",
-        })
+        }),
       ).resolves.toBeUndefined();
     });
   });
