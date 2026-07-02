@@ -281,7 +281,11 @@ describe("classifyBlocks", () => {
           {
             role: "user",
             content: [
-              { type: "text", text: "earlier context", cache_control: { type: "ephemeral" } },
+              {
+                type: "text",
+                text: "earlier context",
+                cache_control: { type: "ephemeral" },
+              },
             ],
           },
           { role: "assistant", content: "ok" },

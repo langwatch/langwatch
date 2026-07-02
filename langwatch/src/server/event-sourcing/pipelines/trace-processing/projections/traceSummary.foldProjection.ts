@@ -6,50 +6,50 @@ import {
 } from "~/server/app-layer/traces/span-normalization.service";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
 import {
   AbstractFoldProjection,
   type FoldEventHandlers,
 } from "~/server/event-sourcing/projections/abstractFoldProjection";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
+import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
 import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "../schemas/constants";
 import type {
+  AnnotationAddedEvent,
+  AnnotationRemovedEvent,
+  AnnotationsBulkSyncedEvent,
   LogRecordReceivedEvent,
   MetricRecordReceivedEvent,
   OriginResolvedEvent,
   SpanReceivedEvent,
   TopicAssignedEvent,
-  AnnotationAddedEvent,
-  AnnotationRemovedEvent,
-  AnnotationsBulkSyncedEvent,
   TraceNameChangedEvent,
 } from "../schemas/events";
 import {
-  spanReceivedEventSchema,
-  topicAssignedEventSchema,
-  logRecordReceivedEventSchema,
-  metricRecordReceivedEventSchema,
-  originResolvedEventSchema,
   annotationAddedEventSchema,
   annotationRemovedEventSchema,
   annotationsBulkSyncedEventSchema,
+  logRecordReceivedEventSchema,
+  metricRecordReceivedEventSchema,
+  originResolvedEventSchema,
+  spanReceivedEventSchema,
+  topicAssignedEventSchema,
   traceNameChangedEventSchema,
 } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
 import {
-  SpanTimingService,
-  SpanStatusService,
-  SpanCostService,
-  NON_BILLABLE_ATTR,
-  TraceOriginService,
-  TraceAttributeAccumulationService,
-  TraceIOAccumulationService,
-  TracePromptAccumulationService,
-  TraceNameResolutionService,
-  shouldOverrideOutput,
   extractIOFromLogRecord,
   liftCanonicalAttributesFromLogRecord,
+  NON_BILLABLE_ATTR,
   OUTPUT_SOURCE,
+  SpanCostService,
+  SpanStatusService,
+  SpanTimingService,
+  shouldOverrideOutput,
+  TraceAttributeAccumulationService,
+  TraceIOAccumulationService,
+  TraceNameResolutionService,
+  TraceOriginService,
+  TracePromptAccumulationService,
 } from "./services";
 
 export type { TraceSummaryData };
@@ -69,8 +69,9 @@ const spanTimingService = new SpanTimingService();
 const spanStatusService = new SpanStatusService();
 const spanCostService = new SpanCostService();
 const traceOriginService = new TraceOriginService();
-const traceAttributeAccumulationService =
-  new TraceAttributeAccumulationService(traceOriginService);
+const traceAttributeAccumulationService = new TraceAttributeAccumulationService(
+  traceOriginService,
+);
 const traceIOExtractionService = new TraceIOExtractionService();
 const traceIOAccumulationService = new TraceIOAccumulationService(
   traceIOExtractionService,
@@ -99,7 +100,8 @@ export const MAX_PROCESSED_SPANS = 512;
  * detail. The drawer reads these first and falls back to the raw per-span
  * key for traces folded before this landed.
  */
-export const RESERVED_CACHE_READ_TOKENS = "langwatch.reserved.cache_read_tokens";
+export const RESERVED_CACHE_READ_TOKENS =
+  "langwatch.reserved.cache_read_tokens";
 export const RESERVED_CACHE_CREATION_TOKENS =
   "langwatch.reserved.cache_creation_tokens";
 export const RESERVED_REASONING_TOKENS = "langwatch.reserved.reasoning_tokens";
@@ -217,7 +219,10 @@ export function applySpanToSummary({
   const spanType = String(span.spanAttributes[ATTR_KEYS.SPAN_TYPE] ?? "");
   const containsAi = state.containsAi || AI_SPAN_TYPES.has(spanType);
 
-  const promptRollup = tracePromptAccumulationService.accumulate({ state, span });
+  const promptRollup = tracePromptAccumulationService.accumulate({
+    state,
+    span,
+  });
 
   return {
     ...state,
@@ -267,7 +272,13 @@ const traceSummaryEvents = [
  * - `updatedAt` is auto-managed by the base class after each handler call (camelCase)
  */
 export class TraceSummaryFoldProjection
-  extends AbstractFoldProjection<TraceSummaryData, typeof traceSummaryEvents, "createdAt", "updatedAt", "LastEventOccurredAt">
+  extends AbstractFoldProjection<
+    TraceSummaryData,
+    typeof traceSummaryEvents,
+    "createdAt",
+    "updatedAt",
+    "LastEventOccurredAt"
+  >
   implements FoldEventHandlers<typeof traceSummaryEvents, TraceSummaryData>
 {
   readonly name = "traceSummary";
@@ -277,7 +288,11 @@ export class TraceSummaryFoldProjection
   protected readonly events = traceSummaryEvents;
 
   constructor(deps: { store: FoldProjectionStore<TraceSummaryData> }) {
-    super({ createdAtKey: "createdAt", updatedAtKey: "updatedAt", LastEventOccurredAtKey: "LastEventOccurredAt" });
+    super({
+      createdAtKey: "createdAt",
+      updatedAtKey: "updatedAt",
+      LastEventOccurredAtKey: "LastEventOccurredAt",
+    });
     this.store = deps.store;
   }
 
@@ -585,9 +600,7 @@ export class TraceSummaryFoldProjection
     const ids = state.annotationIds ?? [];
     return {
       ...state,
-      annotationIds: ids.filter(
-        (id) => id !== event.data.annotationId,
-      ),
+      annotationIds: ids.filter((id) => id !== event.data.annotationId),
     };
   }
 
@@ -595,7 +608,9 @@ export class TraceSummaryFoldProjection
     event: AnnotationsBulkSyncedEvent,
     state: TraceSummaryData,
   ): TraceSummaryData {
-    const merged = [...new Set([...(state.annotationIds ?? []), ...event.data.annotationIds])];
+    const merged = [
+      ...new Set([...(state.annotationIds ?? []), ...event.data.annotationIds]),
+    ];
     return { ...state, annotationIds: merged };
   }
 
@@ -618,5 +633,4 @@ export class TraceSummaryFoldProjection
       traceNameFromFallback: false,
     };
   }
-
 }

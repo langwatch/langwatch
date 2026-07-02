@@ -5,7 +5,10 @@ import {
   InputCategory,
 } from "~/server/app-layer/traces/block-classification/categories";
 import { applySpanToSummary } from "../traceSummary.foldProjection";
-import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
+import {
+  createInitState,
+  createTestSpan,
+} from "./fixtures/trace-summary-test.fixtures";
 
 const SYS_TOKENS = blockCategoryTokensAttr(InputCategory.SYSTEM_PROMPT);
 const SYS_COST = blockCategoryCostAttr(InputCategory.SYSTEM_PROMPT);

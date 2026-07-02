@@ -123,8 +123,7 @@ const toolCategory = ({
   name: string | null;
   mcp: Category;
   builtin: Category;
-}): Category =>
-  name !== null && name.startsWith(MCP_TOOL_PREFIX) ? mcp : builtin;
+}): Category => (name?.startsWith(MCP_TOOL_PREFIX) ? mcp : builtin);
 
 /**
  * Accumulates classified blocks for one axis, enforcing the block cap: once
@@ -203,7 +202,11 @@ function classifyInputMessage({
   const role = roleOf(msg);
 
   if (role === "system") {
-    pushString({ acc, category: InputCategory.SYSTEM_PROMPT, content: msg.content });
+    pushString({
+      acc,
+      category: InputCategory.SYSTEM_PROMPT,
+      content: msg.content,
+    });
     if (someCacheControl(msg.content)) acc.markBreakpoint();
     return;
   }

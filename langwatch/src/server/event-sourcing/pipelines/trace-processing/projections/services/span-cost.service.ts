@@ -1,8 +1,8 @@
-import { coerceToNumber } from "~/utils/coerceToNumber";
-import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import { SPAN_ATTR_BLOCKCAT_PREFIX } from "~/server/app-layer/traces/block-classification/categories";
+import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { coerceToNumber } from "~/utils/coerceToNumber";
 import type { NormalizedSpan } from "../../schemas/spans";
 
 export const FIRST_TOKEN_EVENTS = new Set([

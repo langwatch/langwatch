@@ -3,6 +3,11 @@ import type {
   OtlpInstrumentationScope,
   OtlpSpan,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import type { TokenizerClient } from "../clients/tokenizer/tokenizer.client";
+import {
+  type ClassifiedBlock,
+  classifyBlocks,
+} from "./block-classification/blockClassifier.service";
 import {
   blockCategoryCostAttr,
   blockCategoryTokensAttr,
@@ -12,10 +17,6 @@ import {
   SPAN_ATTR_CLASSIFIER_VERSION,
 } from "./block-classification/categories";
 import {
-  type ClassifiedBlock,
-  classifyBlocks,
-} from "./block-classification/blockClassifier.service";
-import {
   allocateCategoryCosts,
   type TierPrices,
   type TokenBlock,
@@ -23,7 +24,6 @@ import {
 } from "./block-classification/costAllocation.service";
 import { detectCodingAgentHarness } from "./block-classification/harnessDetection";
 import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
-import type { TokenizerClient } from "../clients/tokenizer/tokenizer.client";
 import { extractModelName } from "./utils/spanModel";
 
 /**
@@ -116,7 +116,10 @@ export class OtlpSpanBlockClassificationService {
       ATTR_KEYS.LANGWATCH_OUTPUT,
       ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES,
     ]);
-    const tools = this.parseJsonAttribute(span, ATTR_KEYS.GEN_AI_TOOL_DEFINITIONS);
+    const tools = this.parseJsonAttribute(
+      span,
+      ATTR_KEYS.GEN_AI_TOOL_DEFINITIONS,
+    );
     if (inputMessages === null && outputMessages === null) return;
 
     // 3. Classify content parts into cost categories (pure, deterministic).
@@ -210,7 +213,11 @@ export class OtlpSpanBlockClassificationService {
       if (attr.key in record) continue; // first wins
       const v = attr.value;
       record[attr.key] =
-        v.stringValue ?? v.boolValue ?? v.intValue ?? v.doubleValue ?? undefined;
+        v.stringValue ??
+        v.boolValue ??
+        v.intValue ??
+        v.doubleValue ??
+        undefined;
     }
     return record;
   }
@@ -313,7 +320,8 @@ export class OtlpSpanBlockClassificationService {
         inputCostPerToken: inputRate,
         outputCostPerToken: customOutput ?? 0,
         cacheReadCostPerToken:
-          attr(ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN) ?? inputRate,
+          attr(ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN) ??
+          inputRate,
         cacheCreationCostPerToken:
           attr(ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN) ??
           inputRate,

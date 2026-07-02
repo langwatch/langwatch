@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { OtlpSpan } from "../../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import {
-  SPAN_ATTR_BLOCKS,
-  SPAN_ATTR_CLASSIFIER_VERSION,
   blockCategoryCostAttr,
   blockCategoryTokensAttr,
   InputCategory,
+  SPAN_ATTR_BLOCKS,
+  SPAN_ATTR_CLASSIFIER_VERSION,
 } from "../block-classification/categories";
 import { OtlpSpanBlockClassificationService } from "../span-block-classification.service";
 
@@ -118,7 +118,11 @@ describe("OtlpSpanBlockClassificationService", () => {
         });
 
         const catCosts = span.attributes
-          .filter((a) => a.key.startsWith("langwatch.reserved.blockcat.") && a.key.endsWith(".cost_usd"))
+          .filter(
+            (a) =>
+              a.key.startsWith("langwatch.reserved.blockcat.") &&
+              a.key.endsWith(".cost_usd"),
+          )
           .reduce((n, a) => n + Number(a.value.stringValue), 0);
         // input 300 * 3e-6 + output 20 * 1.5e-5
         const realCost = 300 * 3e-6 + 20 * 1.5e-5;
@@ -160,7 +164,10 @@ describe("OtlpSpanBlockClassificationService", () => {
         const before = span.attributes.length;
 
         await expect(
-          service.classifySpanBlocks({ span, instrumentationScope: CLAUDE_SCOPE }),
+          service.classifySpanBlocks({
+            span,
+            instrumentationScope: CLAUDE_SCOPE,
+          }),
         ).resolves.toBeUndefined();
 
         expect(span.attributes.length).toBe(before);
@@ -204,7 +211,10 @@ describe("OtlpSpanBlockClassificationService", () => {
         ]);
 
         const start = Date.now();
-        await service.classifySpanBlocks({ span, instrumentationScope: CLAUDE_SCOPE });
+        await service.classifySpanBlocks({
+          span,
+          instrumentationScope: CLAUDE_SCOPE,
+        });
         const elapsedMs = Date.now() - start;
 
         expect(elapsedMs).toBeLessThan(5000);

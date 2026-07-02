@@ -275,9 +275,17 @@ describe("allocateCategoryCosts", () => {
       );
 
       // The system prompt is in the cached prefix, the user input is fresh.
-      expect(system).toMatchObject({ idx: 0, cacheTier: "cache_read", tokens: 1000 });
+      expect(system).toMatchObject({
+        idx: 0,
+        cacheTier: "cache_read",
+        tokens: 1000,
+      });
       expect(user).toMatchObject({ idx: 1, cacheTier: "fresh", tokens: 40 });
-      expect(assistant).toMatchObject({ idx: 0, cacheTier: "fresh", tokens: 20 });
+      expect(assistant).toMatchObject({
+        idx: 0,
+        cacheTier: "fresh",
+        tokens: 20,
+      });
     });
 
     it("omits synthetic catch-all tokens from the per-block detail", () => {

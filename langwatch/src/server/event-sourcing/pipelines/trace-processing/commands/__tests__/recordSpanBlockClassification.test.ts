@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createTenantId, type Command } from "../../../../";
-import { OtlpSpanBlockClassificationService } from "~/server/app-layer/traces/span-block-classification.service";
 import { SPAN_ATTR_BLOCKS } from "~/server/app-layer/traces/block-classification/categories";
+import { OtlpSpanBlockClassificationService } from "~/server/app-layer/traces/span-block-classification.service";
+import { type Command, createTenantId } from "../../../../";
 import type { RecordSpanCommandData } from "../../schemas/commands";
 import { RECORD_SPAN_COMMAND_TYPE } from "../../schemas/constants";
 import type { OtlpSpan } from "../../schemas/otlp";
@@ -130,7 +130,9 @@ describe("RecordSpanCommand block classification", () => {
         );
 
         expect(events).toHaveLength(1);
-        expect(attrValue(events[0]!.data.span, SPAN_ATTR_BLOCKS)).toBeUndefined();
+        expect(
+          attrValue(events[0]!.data.span, SPAN_ATTR_BLOCKS),
+        ).toBeUndefined();
       });
     });
   });
@@ -152,7 +154,9 @@ describe("RecordSpanCommand block classification", () => {
         );
 
         expect(events).toHaveLength(1);
-        expect(attrValue(events[0]!.data.span, SPAN_ATTR_BLOCKS)).toBeUndefined();
+        expect(
+          attrValue(events[0]!.data.span, SPAN_ATTR_BLOCKS),
+        ).toBeUndefined();
       });
     });
   });
@@ -164,7 +168,9 @@ describe("RecordSpanCommand block classification", () => {
         // Non-coding-agent scope so the classifier does not overwrite it — this
         // proves the strip, not the classifier, discards the forged value.
         const handler = new RecordSpanCommand(baseDeps());
-        const forged = JSON.stringify([{ idx: 0, category: "system_prompt", tokens: 999999 }]);
+        const forged = JSON.stringify([
+          { idx: 0, category: "system_prompt", tokens: 999999 },
+        ]);
 
         const events = await handler.handle(
           createCommand({

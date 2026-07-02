@@ -3,20 +3,20 @@ import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
+import { OtlpSpanBlockClassificationService } from "~/server/app-layer/traces/span-block-classification.service";
 import {
   createCostEnrichmentDeps,
   OtlpSpanCostEnrichmentService,
 } from "~/server/app-layer/traces/span-cost-enrichment.service";
-import { OtlpSpanBlockClassificationService } from "~/server/app-layer/traces/span-block-classification.service";
 import { OtlpSpanPiiRedactionService } from "~/server/app-layer/traces/span-pii-redaction.service";
 import { OtlpSpanTokenEstimationService } from "~/server/app-layer/traces/span-token-estimation.service";
 import { matchModelCostWithFallbacks } from "~/server/background/workers/collector/cost";
-import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
 import {
   applyOtlpSpanContentDrop,
   type SpanContentDropResult,
 } from "~/server/data-privacy/applyOtlpSpanContentDrop";
 import { featureFlagService } from "~/server/featureFlag";
+import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
 import { createLogger } from "../../../../../utils/logger/server";
 import type { Command, CommandHandler } from "../../../";
 import {
@@ -137,7 +137,10 @@ function createDefaultDependencies(): RecordSpanCommandDependencies {
       // span win first). Injected here so the classifier service stays decoupled
       // from the prisma-backed cost module.
       resolveModelPrices: (model: string) => {
-        const matched = matchModelCostWithFallbacks(model, getStaticModelCosts());
+        const matched = matchModelCostWithFallbacks(
+          model,
+          getStaticModelCosts(),
+        );
         if (!matched) return null;
         const inputRate = matched.inputCostPerToken ?? 0;
         return {
