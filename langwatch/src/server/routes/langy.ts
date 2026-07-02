@@ -199,11 +199,18 @@ const langyRoute = () =>
 
 const AGENT_HEALTH_CHECK_TIMEOUT_MS = 3_000;
 const AGENT_CHAT_TIMEOUT_MS = 120_000;
-const AGENT_CHAT_RETRY_TIMEOUT_MS = 15_000;
 
 // Preflight before reserving a PR permit or calling /chat: a 3s timeout
 // instead of the 120s chat budget, so a fully-down agent fails in seconds
 // and never burns a daily PR permit on a dead backend.
+//
+// Deliberately no retry on the /chat call itself: the agent's worker has
+// no idempotency key, and a POST /chat that fails after the agent already
+// started acting on the prompt (5xx or a reset mid-stream) would, on
+// retry, get replayed as a second independent turn against the same
+// worker — risking a duplicate PR. Fixing that properly needs an
+// idempotency mechanism on the agent side; until then, a mid-task failure
+// surfaces to the user instead of being silently retried.
 async function isAgentHealthy(agentUrl: string): Promise<boolean> {
   try {
     const response = await fetch(`${agentUrl}/health`, {
@@ -213,45 +220,6 @@ async function isAgentHealthy(agentUrl: string): Promise<boolean> {
     return response.ok;
   } catch {
     return false;
-  }
-}
-
-function isAbortTimeoutError(error: unknown): boolean {
-  return error instanceof Error && error.name === "TimeoutError";
-}
-
-// One bounded retry for the actual chat call. Only retries transport
-// failures that fail FAST (connection refused/reset/DNS) or a 5xx from the
-// agent — never a 4xx (the agent is up and deliberately rejected the
-// request; retrying gets the same answer) and never a full-duration
-// timeout (we already waited the whole 120s budget once; doubling that
-// wait is worse than just failing). The retry itself uses a much shorter
-// timeout — if the agent doesn't come back quickly, further waiting won't
-// help either.
-async function fetchAgentChatWithRetry(opts: {
-  agentUrl: string;
-  internalSecret: string;
-  body: unknown;
-}): Promise<Response> {
-  const attempt = (timeoutMs: number) =>
-    fetch(`${opts.agentUrl}/chat`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${opts.internalSecret}`,
-      },
-      body: JSON.stringify(opts.body),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-
-  try {
-    const response = await attempt(AGENT_CHAT_TIMEOUT_MS);
-    if (response.ok || response.status < 500) return response;
-    void response.body?.cancel();
-    return await attempt(AGENT_CHAT_RETRY_TIMEOUT_MS);
-  } catch (error) {
-    if (isAbortTimeoutError(error)) throw error;
-    return await attempt(AGENT_CHAT_RETRY_TIMEOUT_MS);
   }
 }
 
@@ -505,10 +473,13 @@ langyRoute().post("/langy/chat", async (c) => {
 
   let agentResponse: Response;
   try {
-    agentResponse = await fetchAgentChatWithRetry({
-      agentUrl,
-      internalSecret,
-      body: {
+    agentResponse = await fetch(`${agentUrl}/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${internalSecret}`,
+      },
+      body: JSON.stringify({
         conversationId: conversation.id,
         prompt: userText,
         system: capReachedNote
@@ -520,12 +491,15 @@ langyRoute().post("/langy/chat", async (c) => {
         // unrecognized fields, so this is effectively a wire-up that doesn't
         // change behavior — but the user's picker choice rides through.
         ...(modelOverride ? { modelOverride } : {}),
-      },
+      }),
+      signal: AbortSignal.timeout(AGENT_CHAT_TIMEOUT_MS),
     });
   } catch (error) {
-    // Transport failure that survived the retry (DNS, connection refused,
-    // or a full-duration timeout). The agent never accepted the work, so
-    // the permit must be released before we surface the 502.
+    // Transport failure (DNS, connection refused, timeout). The agent
+    // never accepted the work — no idempotency mechanism exists on its
+    // side, so this is deliberately NOT retried (see isAgentHealthy's
+    // comment above). The permit must be released before we surface the
+    // 502.
     await releasePermitIfUnused();
     logger.error({ error }, "opencode agent request transport failure");
     return c.json({ error: "Agent request failed" }, { status: 502 });

@@ -513,38 +513,6 @@ describe("Feature: Langy chat opens PRs as the requesting user", () => {
       });
     });
 
-    describe("when the agent backend hiccups once before responding", () => {
-      /** @scenario "Langy recovers from a brief agent hiccup" */
-      it("retries automatically and still opens the PR", async () => {
-        const opened = "acme/service-x#42";
-        let chatAttempts = 0;
-        fetchMock = vi.fn(async (url: string) => {
-          if (url === "http://agent.test/health") {
-            return new Response(null, { status: 200 });
-          }
-          chatAttempts += 1;
-          if (chatAttempts === 1) {
-            throw new Error("ECONNRESET");
-          }
-          return agentStreamResponse(
-            `[langy:progress:opened:${opened}]\n\n` +
-              `Opened https://github.com/acme/service-x/pull/42`,
-          );
-        });
-        vi.stubGlobal("fetch", fetchMock);
-
-        const res = await postChat("Open a PR on acme/service-x");
-        expect(res.status).toBe(200);
-        await drain(res);
-
-        expect(chatAttempts).toBe(2);
-        const persisted = persistedAssistantText();
-        expect(persisted).toContain(
-          "https://github.com/acme/service-x/pull/42",
-        );
-      });
-    });
-
     describe("when the agent is completely unreachable", () => {
       /** @scenario "Langy fails fast when the agent is completely unreachable" */
       it("fails fast with a clear message and never reserves a PR permit", async () => {
@@ -714,12 +682,15 @@ describe("Feature: Langy chat opens PRs as the requesting user", () => {
       /** @scenario "Permit must be released on every non-PR exit" */
       it("releases the permit when the agent fetch transport fails", async () => {
         // /health must pass (preflight runs BEFORE permit reservation) so this
-        // test exercises the /chat transport failure specifically. The /chat
-        // call fails on every attempt, so it exhausts the one bounded retry too.
+        // test exercises the /chat transport failure specifically. No retry:
+        // the agent has no idempotency key, so a single failed attempt must
+        // surface immediately rather than replaying the prompt.
+        let chatAttempts = 0;
         fetchMock = vi.fn(async (url: string) => {
           if (url === "http://agent.test/health") {
             return new Response(null, { status: 200 });
           }
+          chatAttempts += 1;
           throw new Error("ECONNREFUSED");
         });
         vi.stubGlobal("fetch", fetchMock);
@@ -727,16 +698,22 @@ describe("Feature: Langy chat opens PRs as the requesting user", () => {
         const res = await postChat("Open a PR on acme/service-x");
         expect(res.status).toBe(502);
 
+        expect(chatAttempts).toBe(1);
         expect(reserveLangyGithubPrPermit).toHaveBeenCalledTimes(1);
         expect(releaseLangyGithubPrPermit).toHaveBeenCalledTimes(1);
       });
 
       /** @scenario "Permit must be released on every non-PR exit" */
       it("releases the permit when the agent answers with a non-OK status", async () => {
+        // No retry on the 5xx either — same reasoning as above, and the
+        // agent may have already started acting on the prompt before
+        // returning the error.
+        let chatAttempts = 0;
         fetchMock = vi.fn(async (url: string) => {
           if (url === "http://agent.test/health") {
             return new Response(null, { status: 200 });
           }
+          chatAttempts += 1;
           return new Response("upstream blew up", {
             status: 502,
             headers: { "Content-Type": "text/plain" },
@@ -747,6 +724,7 @@ describe("Feature: Langy chat opens PRs as the requesting user", () => {
         const res = await postChat("Open a PR on acme/service-x");
         expect(res.status).toBe(502);
 
+        expect(chatAttempts).toBe(1);
         expect(reserveLangyGithubPrPermit).toHaveBeenCalledTimes(1);
         expect(releaseLangyGithubPrPermit).toHaveBeenCalledTimes(1);
       });
