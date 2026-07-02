@@ -35,6 +35,17 @@ describe("detectCodingAgentHarness", () => {
     });
   });
 
+  describe("given the Codex rollout-reconstruction scope", () => {
+    it("detects the codex harness", () => {
+      expect(
+        detectCodingAgentHarness({
+          instrumentationScopeName: "langwatch.codex.rollout",
+          spanAttributes: {},
+        }),
+      ).toBe("codex");
+    });
+  });
+
   describe("given a span from a non-coding-agent source", () => {
     it("returns null", () => {
       expect(

@@ -172,7 +172,12 @@ function allocatePool(pool: Pool, totals: CategoryTotals): void {
   if (pool.total <= 0) return;
 
   if (pool.blocks.length === 0) {
-    addTokens(totals, catchAllFor(pool.axis), pool.total, pool.rate);
+    addTokens({
+      totals,
+      category: catchAllFor(pool.axis),
+      tokens: pool.total,
+      rate: pool.rate,
+    });
     return;
   }
 
@@ -181,7 +186,12 @@ function allocatePool(pool: Pool, totals: CategoryTotals): void {
   // Degenerate: blocks present but no token mass (truncated/reconstructed
   // content) — the whole total is unattributable, so it lands in the catch-all.
   if (sum <= 0) {
-    addTokens(totals, catchAllFor(pool.axis), pool.total, pool.rate);
+    addTokens({
+      totals,
+      category: catchAllFor(pool.axis),
+      tokens: pool.total,
+      rate: pool.rate,
+    });
     return;
   }
 
@@ -193,16 +203,21 @@ function allocatePool(pool: Pool, totals: CategoryTotals): void {
         ? pool.total - allocated
         : (block.tokens * pool.total) / sum;
     allocated += scaled;
-    addTokens(totals, block.category, scaled, pool.rate);
+    addTokens({ totals, category: block.category, tokens: scaled, rate: pool.rate });
   }
 }
 
-function addTokens(
-  totals: CategoryTotals,
-  category: Category,
-  tokens: number,
-  rate: number,
-): void {
+function addTokens({
+  totals,
+  category,
+  tokens,
+  rate,
+}: {
+  totals: CategoryTotals;
+  category: Category;
+  tokens: number;
+  rate: number;
+}): void {
   const existing = totals[category] ?? { tokens: 0, costUsd: 0 };
   existing.tokens += tokens;
   existing.costUsd += tokens * rate;

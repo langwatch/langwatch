@@ -42,6 +42,7 @@ function mulberry32(seed: number): () => number {
 
 describe("allocateCategoryCosts", () => {
   describe("given random block sets and provider usage totals", () => {
+    /** @scenario "Per-category costs sum exactly to the span's real cost" */
     it("keeps per-category cost equal to the span's real cost across 100 draws", () => {
       const rng = mulberry32(0x5319);
 
@@ -97,6 +98,7 @@ describe("allocateCategoryCosts", () => {
   });
 
   describe("given the first turn of a session with cache creation and no cache read", () => {
+    /** @scenario "Costs are conserved on the first turn of a session with cache creation" */
     it("conserves cost with the whole prefix priced at the cache-creation rate", () => {
       const inputBlocks: TokenBlock[] = [
         { category: InputCategory.SYSTEM_PROMPT, tokens: 800 },
@@ -140,6 +142,7 @@ describe("allocateCategoryCosts", () => {
   });
 
   describe("given a cached prefix served from cache", () => {
+    /** @scenario "Cached prefix categories are priced at the cache-read rate" */
     it("prices prefix categories at cache-read and post-prefix at the fresh rate", () => {
       const inputBlocks: TokenBlock[] = [
         { category: InputCategory.SYSTEM_PROMPT, tokens: 1000 },
@@ -180,6 +183,7 @@ describe("allocateCategoryCosts", () => {
   });
 
   describe("given usage reported but no attributable blocks", () => {
+    /** @scenario "Usage with no attributable blocks lands in the catch-all category" */
     it("records the unattributable usage under the catch-all and drops nothing", () => {
       const pools: UsagePools = {
         inputTokens: 500,
@@ -205,6 +209,35 @@ describe("allocateCategoryCosts", () => {
       const trueCost =
         pools.inputTokens * prices.inputCostPerToken! +
         pools.outputTokens * prices.outputCostPerToken!;
+      expect(Math.abs(sumCosts(categoryTotals) - trueCost)).toBeLessThan(1e-9);
+    });
+  });
+
+  describe("given blocks present but with zero total token mass", () => {
+    it("routes the pool total to the catch-all instead of dividing by zero", () => {
+      const { categoryTotals } = allocateCategoryCosts({
+        inputBlocks: [
+          { category: InputCategory.SYSTEM_PROMPT, tokens: 0 },
+          { category: InputCategory.USER_INPUT, tokens: 0 },
+        ],
+        outputBlocks: [{ category: OutputCategory.ASSISTANT_TEXT, tokens: 0 }],
+        lastCacheBreakpointIndex: null,
+        pools: {
+          inputTokens: 400,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+          outputTokens: 120,
+        },
+        prices: { inputCostPerToken: 3e-6, outputCostPerToken: 1.5e-5 },
+      });
+
+      // The zero-mass blocks attract nothing; the whole pool total lands in the
+      // axis catch-all so no usage is dropped and the sum still reconciles.
+      expect(categoryTotals[InputCategory.SYSTEM_PROMPT]).toBeUndefined();
+      expect(categoryTotals[InputCategory.USER_INPUT]).toBeUndefined();
+      expect(categoryTotals[InputCategory.OTHER_INPUT]?.tokens).toBe(400);
+      expect(categoryTotals[OutputCategory.OTHER_OUTPUT]?.tokens).toBe(120);
+      const trueCost = 400 * 3e-6 + 120 * 1.5e-5;
       expect(Math.abs(sumCosts(categoryTotals) - trueCost)).toBeLessThan(1e-9);
     });
   });

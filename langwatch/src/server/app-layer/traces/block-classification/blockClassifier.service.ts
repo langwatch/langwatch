@@ -24,8 +24,10 @@ import {
 } from "./categories";
 import { splitLeadingMarkers } from "./contextMarkers";
 
-/** One classified content block. `idx` is its position within the axis
- * sequence, in prompt order (system → tool defs → conversation). */
+/** One classified content block. `idx` is the sequential content-part index
+ * within the axis walk (input parts and output parts are counted separately),
+ * in prompt order (system → tool defs → conversation). This is the same index
+ * space the cache-breakpoint index addresses, so the two line up by position. */
 export interface ClassifiedBlock {
   idx: number;
   category: Category;
@@ -92,11 +94,15 @@ function safeStringify(value: unknown): string {
 const toolNameFromUse = (block: Record<string, unknown>): string | null =>
   typeof block.name === "string" && block.name.length > 0 ? block.name : null;
 
-const toolCategory = (
-  name: string | null,
-  mcp: Category,
-  builtin: Category,
-): Category =>
+const toolCategory = ({
+  name,
+  mcp,
+  builtin,
+}: {
+  name: string | null;
+  mcp: Category;
+  builtin: Category;
+}): Category =>
   name !== null && name.startsWith(MCP_TOOL_PREFIX) ? mcp : builtin;
 
 /**
@@ -118,6 +124,8 @@ class AxisAccumulator {
       this.overflowChars += charCount;
       return;
     }
+    // idx = sequential part index within this axis (position === array length
+    // before push), matching the space the cache-breakpoint index addresses.
     this.blocks.push({ idx: this.blocks.length, category, charCount });
   }
 
@@ -156,7 +164,7 @@ function classifyInputMessage({
   const role = roleOf(msg);
 
   if (role === "system") {
-    pushString(acc, InputCategory.SYSTEM_PROMPT, msg.content);
+    pushString({ acc, category: InputCategory.SYSTEM_PROMPT, content: msg.content });
     return;
   }
 
@@ -210,11 +218,11 @@ function inputPartCategory({
   if (type === "tool_result") {
     const id = typeof part.tool_use_id === "string" ? part.tool_use_id : null;
     const name = id ? (toolNames.get(id) ?? null) : null;
-    return toolCategory(
+    return toolCategory({
       name,
-      InputCategory.TOOL_RESULT_MCP,
-      InputCategory.TOOL_RESULT_BUILTIN,
-    );
+      mcp: InputCategory.TOOL_RESULT_MCP,
+      builtin: InputCategory.TOOL_RESULT_BUILTIN,
+    });
   }
 
   // Prior-turn blocks (non tool_result) collapse to prior_context.
@@ -224,13 +232,10 @@ function inputPartCategory({
   if (type === "image" || type === "image_url") return InputCategory.IMAGE;
   if (type === "file" || type === "document")
     return InputCategory.FILE_ATTACHMENT;
-  if (type === "tool_use") {
-    return toolCategory(
-      toolNameFromUse(part),
-      OutputCategory.TOOL_CALL_MCP,
-      OutputCategory.TOOL_CALL_BUILTIN,
-    );
-  }
+  // A tool_use nested in the fresh user message is malformed shape, but the
+  // input axis must only carry input-axis categories — never leak an output
+  // tool_call_* category here. It lands in the input catch-all.
+  if (type === "tool_use") return InputCategory.OTHER_INPUT;
   if (type === "text") return InputCategory.USER_INPUT;
   return InputCategory.OTHER_INPUT;
 }
@@ -243,17 +248,27 @@ function pushFreshUserText(acc: AxisAccumulator, text: string): void {
   if (body.length > 0) acc.push(InputCategory.USER_INPUT, body.length);
 }
 
-function pushString(
-  acc: AxisAccumulator,
-  category: Category,
-  content: unknown,
-): void {
+function pushString({
+  acc,
+  category,
+  content,
+}: {
+  acc: AxisAccumulator;
+  category: Category;
+  content: unknown;
+}): void {
   const text = typeof content === "string" ? content : contentToText(content);
   acc.push(category, text.length);
 }
 
 /** Classify one output-axis message (the assistant's current-turn reply). */
-function classifyOutputMessage(msg: Message, acc: AxisAccumulator): void {
+function classifyOutputMessage({
+  msg,
+  acc,
+}: {
+  msg: Message;
+  acc: AxisAccumulator;
+}): void {
   const content = msg.content;
 
   if (typeof content === "string") {
@@ -278,11 +293,11 @@ function outputPartCategory(part: Record<string, unknown>): Category {
   if (type === "thinking" || type === "redacted_thinking")
     return OutputCategory.THINKING;
   if (type === "tool_use") {
-    return toolCategory(
-      toolNameFromUse(part),
-      OutputCategory.TOOL_CALL_MCP,
-      OutputCategory.TOOL_CALL_BUILTIN,
-    );
+    return toolCategory({
+      name: toolNameFromUse(part),
+      mcp: OutputCategory.TOOL_CALL_MCP,
+      builtin: OutputCategory.TOOL_CALL_BUILTIN,
+    });
   }
   return OutputCategory.OTHER_OUTPUT;
 }
@@ -294,11 +309,11 @@ function classifyToolDefinitions(tools: unknown, acc: AxisAccumulator): void {
   for (const tool of tools) {
     if (!isRecord(tool)) continue;
     const name = typeof tool.name === "string" ? tool.name : null;
-    const category = toolCategory(
+    const category = toolCategory({
       name,
-      InputCategory.MCP_TOOL_DEFINITIONS,
-      InputCategory.TOOL_DEFINITIONS,
-    );
+      mcp: InputCategory.MCP_TOOL_DEFINITIONS,
+      builtin: InputCategory.TOOL_DEFINITIONS,
+    });
     acc.push(category, safeStringify(tool).length);
   }
 }
@@ -328,7 +343,9 @@ export function classifyBlocks({
 
   // Prompt order: system prefix, then tool definitions, then the conversation —
   // so the emitted input sequence matches the cacheable-prefix layout the cost
-  // allocator reasons about by position.
+  // allocator reasons about by position. This splits out only the LEADING run of
+  // system messages; a system message that appears later keeps its original
+  // position in the conversation phase below.
   let firstNonSystem = 0;
   for (let i = 0; i < messages.length; i++) {
     if (roleOf(messages[i]!) !== "system") {
@@ -357,7 +374,7 @@ export function classifyBlocks({
   }
 
   for (const msg of asMessageArray(outputMessages)) {
-    classifyOutputMessage(msg, output);
+    classifyOutputMessage({ msg, acc: output });
   }
 
   return { input: input.result(), output: output.result() };

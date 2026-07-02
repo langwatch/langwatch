@@ -15,7 +15,7 @@ describe("catchAllFor", () => {
   });
 });
 
-describe("category taxonomy", () => {
+describe("InputCategory and OutputCategory", () => {
   it("has 12 input-axis and 6 output-axis values with no collisions", () => {
     const input = Object.values(InputCategory);
     const output = Object.values(OutputCategory);

@@ -11,6 +11,7 @@ const categoriesOf = (blocks: { category: string }[]): string[] =>
 
 describe("classifyBlocks", () => {
   describe("given a span with a system prompt, a user message, and a tool result", () => {
+    /** @scenario "Content blocks of a coding-agent span are classified into cost categories" */
     it("lists each block with its category", () => {
       const { input } = classifyBlocks({
         inputMessages: [
@@ -40,6 +41,7 @@ describe("classifyBlocks", () => {
   });
 
   describe("given an MCP tool call and a built-in tool call", () => {
+    /** @scenario "MCP tool activity is distinguished from built-in tool activity" */
     it("distinguishes MCP tool activity from built-in tool activity", () => {
       const { output } = classifyBlocks({
         inputMessages: [],
@@ -109,6 +111,7 @@ describe("classifyBlocks", () => {
   });
 
   describe("given a user message that opens with injected context", () => {
+    /** @scenario "Injected context markers are classified separately from real user input" */
     it("classifies the injected context separately from the user's request", () => {
       const { input } = classifyBlocks({
         inputMessages: [
@@ -129,6 +132,28 @@ describe("classifyBlocks", () => {
         (b) => b.category === InputCategory.USER_INPUT,
       );
       expect(userInput?.charCount).toBe("Add a test".length);
+    });
+  });
+
+  describe("given a tool_use nested in the fresh user message", () => {
+    it("keeps it on the input axis instead of leaking an output tool_call category", () => {
+      const { input } = classifyBlocks({
+        inputMessages: [
+          {
+            role: "user",
+            content: [
+              { type: "tool_use", id: "x", name: "mcp__db__query", input: {} },
+              { type: "text", text: "and answer this" },
+            ],
+          },
+        ],
+      });
+      expect(categoriesOf(input)).toEqual([
+        InputCategory.OTHER_INPUT,
+        InputCategory.USER_INPUT,
+      ]);
+      // No output-axis category leaked onto the input axis.
+      expect(categoriesOf(input)).not.toContain(OutputCategory.TOOL_CALL_MCP);
     });
   });
 
@@ -248,6 +273,7 @@ describe("classifyBlocks", () => {
   });
 
   describe("when the same content is classified twice", () => {
+    /** @scenario "Classification is deterministic for replay" */
     it("produces identical output (deterministic for replay)", () => {
       const messages = [
         { role: "system", content: "sys" },

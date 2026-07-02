@@ -104,7 +104,7 @@ No database migrations. All changes are within existing structures:
 // Span attributes (stored_spans, existing table — new reserved keys;
 // reserved prefix = scrubbed from customer SDK input by stripReservedAttributes)
 "langwatch.reserved.blocks.classification": Array<{
-  idx: number;            // block index within the message array
+  idx: number;            // sequential content-part index within the axis walk (input parts and output parts counted separately)
   category: Category;     // CATEGORY_ENUM value
   tokens: number;         // scaled, post-allocation (Decision 2.4)
   cacheTier: "fresh" | "cache_read" | "cache_creation";
