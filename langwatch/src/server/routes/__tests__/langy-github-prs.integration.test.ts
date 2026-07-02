@@ -532,7 +532,7 @@ describe("Feature: Langy chat opens PRs as the requesting user", () => {
     });
 
     describe("when the agent deliberately rejects the request", () => {
-      /** @scenario "Langy does not retry when the agent rejects the request" */
+      /** `@scenario` "Langy does not retry when the agent rejects the request" */
       it("does not retry a 4xx response from the agent", async () => {
         let chatAttempts = 0;
         fetchMock = vi.fn(async (url: string) => {
