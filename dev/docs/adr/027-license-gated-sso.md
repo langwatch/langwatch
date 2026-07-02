@@ -1,112 +1,98 @@
-# ADR-027: SSO is gated on license activeness, enforced at request time, recoverable via an instance license key
+# ADR-027: SSO is gated on license activeness, decided once at startup, recoverable via an instance license key
 
-Date: 2026-06-13
-Status: Accepted (locked 2026-06-15)
-Refines: prior SSO gating analysis (internal design note, 2026-06-08) · Tracking: [#4673](https://github.com/langwatch/langwatch/issues/4673) · Ships on: PR #4830 (stacks on #4480)
+Date: 2026-07-02
+Status: Accepted (v5 — supersedes the v3 Accepted request-time design; red-teamed and locked 2026-07-02)
+Tracking: [#4673](https://github.com/langwatch/langwatch/issues/4673)
 
-> One-line: every **non-email login provider** is a paid feature, gated **binary on license activeness** (`IS_SAAS || validInstanceLicense || anyOrgHasActiveLicense()`), enforced **per-request** (never at provider registration); a denied deployment **coerces to email mode** for sign-up/sign-in while **never allowing a password to be set on an SSO account**, and an SSO-only install with no SMTP recovers by setting an **instance license key env var** — not by password reset.
+> One-line: every **non-email login provider** is a paid feature, gated **binary on license activeness** (`IS_SAAS || validInstanceLicense || anyOrgHasActiveLicense()`), **decided once per process** (restart to change, never per request); a denied deployment **runs in email mode** as if the SSO env vars were unset, and recovers by setting the **`LANGWATCH_LICENSE_KEY` env var** and restarting — with **zero action required** from already-licensed customers, whose in-database org license is honored automatically.
 
 ## Context
 
-LangWatch has three SSO surfaces, none of which consults the license today:
+LangWatch has two SSO surfaces, neither of which consults the license today:
 
-1. **Instance-wide provider via env vars** — `NEXTAUTH_PROVIDER` + provider credentials register an OAuth/OIDC provider at boot (`langwatch/src/server/better-auth/index.ts:49-206`). Four env vars buy Auth0 SSO on a free self-hosted install. This is the bypass that forces the issue.
-2. **Per-org `ssoDomain`/`ssoProvider`** — domain-matched auto-join and provider enforcement in the Better Auth hooks (`langwatch/src/server/better-auth/hooks.ts:114-414`), per-request, ungated.
-3. **Per-org `SsoProvider` (OIDC+SAML plugin)** — PR #4416, still open, not on `main`. Must be gated by this design when it lands.
+1. **Instance-wide provider via env vars** — `NEXTAUTH_PROVIDER` + provider credentials register an OAuth/OIDC provider at module load (`langwatch/src/server/better-auth/index.ts:51-208`). Four env vars buy Auth0 SSO on a free self-hosted install. This is the bypass that forces the issue.
+2. **Per-org `ssoDomain`** — domain-matched auto-join in the Better Auth hooks (`langwatch/src/server/better-auth/hooks.ts`). Writable **only by LangWatch super-admins via the backoffice** (`ee/admin/routes/admin.ts:387-397`, `isAdmin`-gated); customers cannot self-configure it. The formerly-planned self-serve `SsoProvider` plugin (PR #4416) is **closed, unmerged** — that third surface no longer exists.
 
-Forces and constraints (locked in framing):
+Forces and constraints (locked in the v4 framing round, 2026-07-02):
 
-- **Forcing function:** commercial repositioning with PR #4480 — the OSS-lift removed experimentation caps, so Enterprise security (SSO among it) must actually be enforced as the remaining paid surface.
-- **Blast radius: login lockout.** Worst case is a self-hosted org whose users authenticate exclusively via SSO losing all sign-in after upgrade. Max rigor: invariants + test anchors + red-team pass (done — see Revisions v2).
-- **SaaS is never gated at platform level** — `IS_SAAS=true` short-circuits the platform gate; per-org refinement applies (Decision 5).
-- **License signature trap:** `verifySignature` re-serializes the Zod-parsed payload (`ee/licensing/validation.ts:47`), so schema changes are dangerous; this design makes **no schema change at all**.
+- **Forcing function:** commercial repositioning — the OSS-lift (#4480 stack) removed experimentation and workspace caps, so Enterprise security (SSO among Audit Logs, RBAC, custom retention, SLAs) must actually be enforced as the remaining paid surface.
+- **Blast radius: explicitly downgraded.** Licenses target enterprises; a licensed deployment must see zero change, but an *unlicensed* install losing free-riding SSO is acceptable and non-blocking. (v1–v3 treated lockout as max-rigor; the owner re-calibrated.)
+- **Hard constraints re-confirmed:** no license schema change (the `verifySignature` re-serialization trap, `ee/licensing/validation.ts`); SaaS untouched (`IS_SAAS=true` short-circuits everything); all non-email providers gated — *login federation is the paid feature*, one rule.
+- **Deliberately unlocked this round:** "license changes flip SSO without restart" (live flip). It was the assumption that forced the v2/v3 request-time machinery — the three-state gate, route truth table, TTL cache, and mounted-but-guarded password routes. The owner chose startup semantics instead; all of that machinery is deleted from this design.
 
-Facts verified against better-auth 1.6.11 and the current config — these shape the mechanism and were the source of the v2 red-team corrections:
+Facts verified against `main` (2026-07-02) — two of which invalidate v2/v3 premises:
 
-- `genericOAuth` takes a **static** `config: GenericOAuthConfig[]` — no per-request provider resolution. Registration-time gating would require a restart on every license change.
-- `emailAndPassword.enabled` is a **boot-time security gate** (`index.ts:375-381`): password sign-in/up routes are unmounted in SSO mode. A global `before` hook (`index.ts:514-543`) additionally blocks credential-mutation routes (`/set-password`, `/change-password`, `/request-password-reset`, `/reset-password`, `/change-email`, `/send-verification-email`, `/verify-email`) whenever `NEXTAUTH_PROVIDER !== "email"`.
-- **Password reset does not exist in this codebase.** `sendResetPassword` is never configured; `/request-password-reset` returns `RESET_PASSWORD_DISABLED` (`index.ts:404`). There is no forgot-password UI. `requireEmailVerification` is unset. Self-hosted installs frequently have **no SMTP** (`HAS_EMAIL_PROVIDER_KEY` is often false). ⇒ "recover via password reset" is not a usable recovery path; the v1 draft's central safety claim was false.
-- Customer IdP callbacks land on **legacy** `/api/auth/callback/auth0` and `/callback/okta`, which `api-router.ts:74-92` rewrites and re-dispatches to `/api/auth/oauth2/callback/*`. A path-prefix guard on `/oauth2/*` alone misses the inbound legacy path.
-- License is stored **per-organization** (`Organization.license`, TEXT); no/expired/invalid license resolves to `FREE_PLAN` (`licenseHandler.ts:74-94`). There is no deployment-wide license today — Decision 9 adds an optional instance-level one for recovery.
+- `betterAuth({...})` is **one synchronous module-load construction** (`index.ts:236`); providers register from env at import time. A DB read cannot precede config build, so a DB-informed gate must *resolve* lazily even though its *semantics* are per-process.
+- **Password reset now exists** (`index.ts:398-412`): `sendResetPassword` is wired to the transactional mailer, a `/auth/reset-password` page exists, and reset revokes all sessions. The v2 premise "password reset does not exist in this codebase" is stale — installs with SMTP have a working credential recovery.
+- The **credential-mutation block already exists** in the global `before` hook (`index.ts:546-576`): `/set-password`, `/change-password`, `/change-email`, `/request-password-reset`, `/reset-password`, `/send-verification-email`, `/verify-email` are rejected whenever `NEXTAUTH_PROVIDER !== "email"`. This design reuses it unchanged.
+- Customer IdP callbacks land on **legacy** `/api/auth/callback/auth0` and `/callback/okta` (pinned `redirectURI`, `index.ts:163,191`), rewritten to the plugin handler. Any SSO-path blocklist must include the legacy paths.
+- License is stored **per-organization** (`Organization.license`, TEXT); no/expired/invalid resolves to `FREE_PLAN` (`ee/licensing/licenseHandler.ts`). "Valid" everywhere in this ADR means **`validateLicense()` returns `valid`** (signature + non-expired) — never the denormalized `licenseExpiresAt` column, which skips signature checks.
 
 ## Decision
 
-1. **Binary entitlement — no license schema change.** SSO is allowed iff `IS_SAAS === true`, OR a valid **instance license key** is set (Decision 9), OR at least one organization holds a currently-valid license. No `enableSso` field is added to `LicensePlanLimitsSchema`. Why: zero signature risk, zero re-issuance, ships now; the field stays addable later with `absent → true` semantics, exactly backward-compatible with this decision. "Valid" everywhere means **`validateLicense()` returns `valid`** (signature + non-expired) — never the denormalized `licenseExpiresAt` column, which skips signature checks (red-team F6).
+1. **Binary entitlement — no license schema change.** SSO is allowed iff `IS_SAAS === true`, OR the `LANGWATCH_LICENSE_KEY` env var holds a valid license (Decision 5), OR at least one organization row holds a currently-valid license. No `enableSso` field is added to `LicensePlanLimitsSchema`. Why: zero signature risk, zero re-issuance, and the field stays addable later with `absent → true` semantics. Rejects: per-plan/field encoding (schema churn for no v1 gain).
 
-2. **Scope: every non-email provider is gated.** `google`, `github`, `gitlab`, `azure-ad`, `okta`, `cognito`, `auth0` — plus per-org `ssoDomain` auto-join and the future per-org `SsoProvider` CRUD. One rule: *login federation is the paid feature.* Cost owned in Consequences: OSS installs using Google/GitHub sign-in are coerced to email mode on upgrade.
+2. **Scope: every non-email provider is gated.** `google`, `github`, `gitlab`, `azure-ad`, `okta`, `auth0` — everything `NEXTAUTH_PROVIDER ≠ email` registers. One rule: *login federation is the paid feature.* Cost owned in Consequences: unlicensed OSS installs using Google/GitHub sign-in are coerced to email mode on upgrade. Rejects: enterprise-IdPs-only scope (two provider classes, arbitrary boundary).
 
-3. **Enforcement at request time, in the Better Auth `before` hook, never at registration.** Providers stay registered at boot from env. The gate is enforced where requests arrive, via the existing global `before` hook (`index.ts:514-543`) extended to consult the runtime gate, because the single catch-all + legacy-callback rewrite means a path-prefix middleware would miss the legacy paths (red-team F2). The enforced path set is exhaustive (Constants → "Gated auth paths") and **must include the legacy `/callback/auth0` and `/callback/okta`** alongside `/sign-in/social`, `/oauth2/authorize`, `/oauth2/callback/*`. `publicEnv` returns `"email"` for `NEXTAUTH_PROVIDER` when the platform gate denies (`publicEnv.ts:24`), so the sign-in page never auto-redirects to the IdP. Why request-time: better-auth's static config makes registration-time gating restart-bound; this way activating a license flips SSO on **live**, expiry flips it off within the cache TTL.
+3. **The gate is decided once per process — "startup semantics", implemented as a memoized first-request check.** Because `betterAuth()` builds synchronously from env, providers stay registered at boot; the gate resolves on the first auth-relevant request: `platformSSOAllowed() = IS_SAAS || validInstanceLicense() || anyOrgHasActiveLicense()`, then **memoizes for the process lifetime**. License activated in the UI → takes effect on next restart. License expires → SSO survives until next restart (a deliberate, free grace period). Why: deletes the TTL cache, cache invalidation, the three-state gate, and the route truth table wholesale; self-hosted operators restart containers routinely, and the recovery path (Decision 5) already required a restart in the v3 design. Rejects: request-time evaluation (the whole v2/v3 complexity for a "live flip" nobody required); pure boot-time env-only gating (would force every existing licensed customer to add an env var — violates the zero-action constraint).
 
-4. **Denied state = coerce to email mode, but credential mutation on SSO accounts is never allowed.** Driven by a three-state gate (`ALLOW` / `DENY` / `UNKNOWN`-on-error) and a fixed route truth table (Constants). The load-bearing rules:
-   - **SSO routes:** `ALLOW` → open; `DENY` → 403; `UNKNOWN` → 403. (Fail closed for SSO.)
-   - **Email sign-in / sign-up (`/sign-in/email`, `/sign-up/email`):** open **only** on definitive `DENY`; `ALLOW` and `UNKNOWN` → 403. So a transient DB error never opens email login on an entitled deployment (fixes the fail-closed inversion, red-team F3).
-   - **Credential-mutation routes (`/set-password`, `/change-password`, `/request-password-reset`, `/reset-password`, `/change-email`, verify-email):** **blocked whenever the deployment is SSO-capable** (`NEXTAUTH_PROVIDER !== "email"`), in *every* gate state including `DENY`. This is the explicit fix for account-takeover (red-team F4): an attacker must never be able to plant a password on an email that has an SSO-only account during a license lapse. Only a natively email-mode deployment (`NEXTAUTH_PROVIDER === "email"`) allows these.
-   - To make email routes *mountable* for the coercion, `emailAndPassword.enabled` becomes `NEXTAUTH_PROVIDER === "email" || !IS_SAAS`; the truth-table guard then governs them at runtime. SaaS is unchanged (`IS_SAAS=true` ⇒ routes stay unmounted unless email mode).
-   Rejects: hard-block explainer screen (bricks SSO-only installs), grace/nag mode (leaves the bypass open).
+4. **Denied state = email mode, exactly as if the SSO env vars were unset — but email routes are re-blocked on ALLOW.** The `before` hook reads the one memoized gate value and branches **both** directions from it:
+   - **When the gate DENIES** (SSO-capable install, no license): the gated **SSO-initiation and callback paths** (Constants) return 403 — the hook is the only place that sees the legacy `/callback/auth0|okta` rewrite. `emailAndPassword.enabled` is `true` (see below) so the email form is the working coerced door; fresh email **sign-up** is allowed (self-serve path to activating a license, Decision 5b).
+   - **When the gate ALLOWS** on an SSO-capable install (`NEXTAUTH_PROVIDER !== "email"`): the hook 403s `/sign-in/email` and `/sign-up/email`. This preserves `main`'s guarantee that an Auth0/Okta deployment cannot mint password accounts — a guarantee that would otherwise be **lost** by the `enabled` formula change (see Consequences; this is the v5 BLOCKER fix). The email-route block keys off **gate-ALLOW**; the SSO-path block keys off **gate-DENY**; both consult the same memoized value in the same async hook — no truth table.
+   - `publicEnv` reports `NEXTAUTH_PROVIDER` as `"email"` via `resolveAuthProvider()` only when the gate denies, so the sign-in page renders the email form and never auto-redirects to the IdP.
+   - `emailAndPassword.enabled` becomes `env.NEXTAUTH_PROVIDER === "email" || !IS_SAAS` so the email routes are *mountable* for the coerced (denied) mode; the ALLOW-path hook block above is what keeps them from being a bypass when a license is present. SaaS is unchanged (routes stay unmounted unless natively email-mode).
+   - The **existing credential-mutation block stays keyed off `env.NEXTAUTH_PROVIDER !== "email"`** (the *configured* mode, not the gate result): in **every** gate state, no password can be set/changed on an SSO-capable deployment through Better Auth's endpoints (`/set-password`, `/reset-password`, …). `/request-password-reset` is included, so the now-wired reset flow cannot plant a credential on an SSO-only email.
+   Rejects: hard-block explainer screen (bricks the install with no way to reach settings); grace/nag mode (leaves the bypass open).
 
-5. **Two gates that compose, not fold.**
-   - `canPlatformSSO(): Promise<boolean>` — process-wide: `IS_SAAS || validInstanceLicense() || anyOrgHasActiveLicense()`. Cached (Constants), `UNKNOWN`/fail-closed on DB error.
-   - `canOrgSSO(organizationId): Promise<boolean>` — per-org: on SaaS, `getActivePlan(org)` is not free; on self-hosted, that org holds a valid license **or** a valid instance license is set (an instance license entitles the whole deployment). Uncached (primary-key lookup on an existing hot path).
-   Why two: on SaaS, org A paying must not grant org B per-org SSO. Platform-allowed + org-denied = the IdP button may show, but the unpaid org's `ssoDomain` never auto-joins and its SSO config writes reject.
+5. **`LANGWATCH_LICENSE_KEY` (instance license) is the bootstrap and recovery path.** An optional env var holding a signed license, validated by the same synchronous `validateLicense()` — no org row, no DB required. Recovery paths for a denied install, in order: (a) set `LANGWATCH_LICENSE_KEY`, restart — no login, no SMTP needed; (b) sign up a fresh email account, activate an org license in Settings, restart; (c) with SMTP configured, password reset now exists as a working credential path for pre-existing email accounts. Standard self-hosted pattern (Langfuse EE equivalent).
 
-6. **Expiry: no grace period in v1.** A license that expires flips SSO to denied within one cache window. Acceptable because recovery is the instance license key (Decision 9), not a stranded login. Grace (14–30 days + banners) is a tracked follow-up, addable without redoing the gate.
+6. **Gate failure = deny SSO for that request, do not memoize.** If the org-license DB read throws, the gate returns deny *without* freezing the answer; the next request retries. A DB blip during warm-up therefore cannot permanently coerce an entitled deployment to email mode — it self-heals as soon as the DB answers. Fail-closed for SSO; no state machine.
 
-7. **Telemetry: server logs + a PostHog event.** Denied attempts log `logger.warn` with `{ surface: "platform" | "per-org", reason: "no_license" | "free_plan", organizationId? }` **and** emit a PostHog `sso_gate_denied` event with `{ surface, reason }` at 100% sample (these are rare). Two purposes: detect bypass attempts (operator sets SSO env vars on a free deploy) and surface upgrade-intent leads for sales. No org PII beyond IDs already in PostHog. This is a deliberate, low-volume signal — distinct from the high-volume limit-tied `limit_blocked` event PR #4480 removed.
+7. **No per-org *license* gate — but the `ssoDomain` auto-join rides the platform gate.** No per-org license check: `ssoDomain` is writable only by LangWatch staff, who set it exclusively for paying customers, so a per-org *license* evaluation would add code without adding protection. The v3 `canOrgSSO` composition, the denied-`ssoDomain` fallthrough, and the SaaS per-org plan refinement are all **dropped**. **However**, the `afterUserCreate` domain-match auto-join (`hooks.ts:110`) is federation — a login capability — and runs on **email+password** signup too, not just OAuth. In coerced (denied) mode with fresh-signup open, an unverified `POST /sign-up/email {email:"x@customerdomain.com"}` would otherwise auto-join the customer's org with **no IdP round-trip** (v5 MAJOR fix). So the auto-join branch is guarded on `platformSSOAllowed()`: same paid switch as every other provider ("login federation is the paid feature"), one gate read at `hooks.ts:110`, no per-org license logic. Re-introduce a full per-org gate only if customer self-serve SSO configuration ships. Rejects: per-org license check (guards a staff-only surface at the cost of a second gate); email-verification-only fix (the feature is meant to be *off* when denied, not merely slower).
 
-8. **Sessions survive the gate.** The gate guards new authentication attempts only; existing session cookies are provider-independent and keep working through upgrades and expiry. A paying customer's live sessions never break mid-deploy.
+8. **Telemetry: server logs only.** One loud `logger.warn` at gate resolution when SSO env vars are configured but the gate denies (`"SSO is configured but no valid license was found — starting in email mode; set LANGWATCH_LICENSE_KEY or activate an organization license to enable SSO"`), plus a `logger.warn` per blocked SSO request (`{ path, reason: "no_license" }`). No PostHog event: with startup semantics, denial is a deployment state, not an event stream; self-hosted installs frequently block telemetry anyway. Reverses v3. Addable later without redesign.
 
-9. **Instance license key (`LANGWATCH_LICENSE_KEY`) is the credential-less recovery path.** An optional env var holding a signed license, validated by the same `validateLicense()`. It feeds `canPlatformSSO`/`canOrgSSO` directly without any org row. This is what makes the No-lockout invariant *true* for the SSO-only / no-SMTP population (red-team F1): an operator whose org license lapsed sets the env var and restarts → SSO returns with **no login and no email required**. It is also the bootstrap path for a fresh self-hosted install. Standard self-hosted pattern (Langfuse EE does the same). Recovery paths, in priority: (a) set `LANGWATCH_LICENSE_KEY` + restart; (b) on a denied install, sign **up** a fresh email account and activate an org license in Settings (flips SSO on live); (c) password reset is explicitly **not** a path.
+9. **Sessions survive the gate.** The gate guards new authentication attempts only; existing session cookies are provider-independent and keep working through upgrades and gate flips. A licensed customer's live sessions never break mid-deploy.
 
-10. **Self-hosted multi-org: any one org's license enables the instance IdP for all orgs — deliberate.** The instance-wide `NEXTAUTH_PROVIDER` IdP is an operator/deployment-level capability; a single valid license (org-level or instance-level) proves the deployment is paying. Per-org entitlement is what `canOrgSSO` refines (`ssoDomain`, `SsoProvider`). Documented so a multi-org self-hoster doesn't file it as an entitlement bug (red-team F5).
-
-11. **Denied per-org `ssoDomain` signup falls through to regular signup.** When `canOrgSSO` denies, the domain lookup behaves as no-match: the user gets a working (personal/org-less) account rather than an error — denying the free tier to the very users who'd champion the upgrade is worse. Org placement is expected to self-heal on a later login once the license returns; the `sso-orphan-user-linking` machinery is the reuse target and **its self-heal-on-relogin behavior is a required test anchor** (red-team F9, Open Questions).
+10. **Self-hosted multi-org: any one org's valid license enables the instance IdP for all orgs — deliberate.** The instance-wide `NEXTAUTH_PROVIDER` IdP is a deployment-level capability; one valid license (org or instance) proves the deployment is paying. Documented so a multi-org self-hoster doesn't file it as an entitlement bug.
 
 ## Constants
 
 | Name | Value | Purpose |
 |---|---|---|
-| `PLATFORM_SSO_CACHE_TTL_MS` | `60_000` | `canPlatformSSO()` cache window; bounds expired-license propagation to ≤60s |
-| `LANGWATCH_LICENSE_KEY` | env var (optional) | Instance-level signed license; credential-less recovery + bootstrap (Decision 9) |
-| Cache invalidation | on `validateAndStoreLicense` success and `removeLicense` (`licenseHandler.ts:103,294`) | License activation/removal flips SSO immediately |
-| Gate states | `ALLOW` / `DENY` / `UNKNOWN` | `UNKNOWN` = eval threw; not cached, retried next request |
-| Gated providers | `google, github, gitlab, azure-ad, okta, cognito, auth0` (every `NEXTAUTH_PROVIDER` ≠ `email`) | Decision 2 |
-| Gated auth paths | `/sign-in/social`, `/oauth2/authorize`, `/oauth2/callback/*`, **`/callback/auth0`**, **`/callback/okta`** | Decision 3 — legacy callbacks included (F2) |
-| Credential-mutation paths (always blocked when SSO-capable) | `/set-password`, `/change-password`, `/request-password-reset`, `/reset-password`, `/change-email`, `/send-verification-email`, `/verify-email` | Decision 4 (F4) |
-| Gate module | `langwatch/src/server/sso/sso-gate.ts` | Single source of truth; only module that reads `env.NEXTAUTH_PROVIDER` after migration |
-
-**Route truth table** (rows = route class, cells = action by gate state; SSO-capable deployment, i.e. `NEXTAUTH_PROVIDER ≠ email`):
-
-| Route class | `ALLOW` | `DENY` | `UNKNOWN` |
-|---|---|---|---|
-| SSO sign-in / callback (incl. legacy) | open | 403 | 403 |
-| `/sign-in/email`, `/sign-up/email` | 403 | open | 403 |
-| Credential-mutation paths | blocked | blocked | blocked |
-
-(Natively email-mode deployments — `NEXTAUTH_PROVIDER === "email"` — bypass the table entirely: password fully works, no SSO, gate irrelevant.)
+| `LANGWATCH_LICENSE_KEY` | env var (optional, signed license string) | Instance-level entitlement; bootstrap + credential-less recovery (Decision 5) |
+| Gate memoization | once per process; **errors are not memoized** | Startup semantics (Decision 3) + self-healing warm-up (Decision 6) |
+| Gated providers | every `NEXTAUTH_PROVIDER ≠ email` (`google, github, gitlab, azure-ad, okta, auth0`) | Decision 2 |
+| Gated SSO paths (block on gate-DENY) | **initiation**: `/sign-in/social`, `/sign-in/oauth2`, `/link-social`, `/oauth2/link` · **callbacks (pathname-prefix match)**: any path containing `/callback/` or `/oauth2/callback/` | Decision 4. Verified against better-auth 1.6.x + genericOAuth (v5 MAJOR fix): genericOAuth initiates at `/sign-in/oauth2` (NOT the phantom `/oauth2/authorize`); social callbacks are `/callback/:id`, genericOAuth `/oauth2/callback/:id`, legacy rewrites `/callback/auth0\|okta`. `/link-social`+`/oauth2/link` blocked so coerced-mode users can't pre-link a provider that goes live after an allow-flip. Callback match MUST be pathname-prefix (`includes("/callback/")`), not the current `endsWith`/suffix helper — callbacks carry `?code=&state=` + a provider segment |
+| Gated email paths (block on gate-ALLOW, SSO-capable only) | `/sign-in/email`, `/sign-up/email` | Decision 4 BLOCKER fix — preserves `main`'s no-password-account guarantee on licensed Auth0/Okta installs |
+| Credential-mutation paths (block in ALL states, SSO-capable) | `/set-password`, `/change-password`, `/change-email`, `/request-password-reset`, `/reset-password`, `/send-verification-email`, `/verify-email` | Existing block (`index.ts:546-576`), reused unchanged, keyed off configured mode |
+| Gate module | `langwatch/src/server/sso/sso-gate.ts` | Single source of truth for the gate + `resolveAuthProvider()` |
 
 ## Invariants
 
 | Invariant | Meaning | Satisfied by / test anchor |
 |---|---|---|
-| **No lockout** | A denied deployment always has a credential-less way back to SSO | Decision 9 instance license key; integration test: org license expired + no SMTP + SSO-only users → set `LANGWATCH_LICENSE_KEY`, restart, SSO works, zero login |
-| **No SSO-account takeover** | No endpoint attaches/sets a password on an email that has an SSO-only account, in any gate state | Decision 4 credential-mutation row always blocked; unit + integration test attempting `/sign-up/email` and `/set-password` against an existing SSO email while `DENY` |
-| **Fail-closed both sides** | A gate eval error opens *nothing* — not SSO, not email login | `UNKNOWN` column is 403/403/blocked; unit test with throwing repository |
-| **Paying self-hosted: zero change** | ≥1 valid license → SSO works as today, password routes unusable | Decisions 3+4; integration test with seeded license |
-| **SaaS: zero platform change** | `IS_SAAS=true` short-circuits platform gate; password routes stay unmounted | Decision 4 boot formula; unit test |
+| **Licensed = zero action, zero change** | A self-hosted deployment with any valid org license upgrades and SSO keeps working, no new env var, no config step | Decision 3 DB term in the gate; integration test: seeded org license, no `LANGWATCH_LICENSE_KEY` → SSO paths open |
+| **No lockout** | A denied deployment always has a way back: env key + restart (no login, no SMTP), fresh email signup, or password reset when SMTP exists | Decision 5; integration test: denied install → set env key → gate allows |
+| **No SSO-account takeover** | On an SSO-capable deployment, no Better Auth endpoint sets/changes a password, and — when a license is present — no password account can be minted at all | Decision 4. Two anchors: (a) `/set-password` + `/request-password-reset` 403 in every gate state; (b) with a valid license, `/sign-up/email` and `/sign-in/email` 403 (the v5 BLOCKER anchor — not just `/set-password`) |
+| **Denied auto-join is off** | In coerced (denied) mode, an unverified email signup whose domain matches an org `ssoDomain` does NOT auto-join that org | Decision 7 guard at `hooks.ts:110`; test: gate denies → `/sign-up/email` with a matching domain creates a user with no org membership |
+| **Fail closed for SSO, self-healing** | A gate eval error denies SSO for that request and is retried — never memoized, never opens SSO | Decision 6; unit test with throwing repository, second call succeeds |
+| **SaaS: zero change** | `IS_SAAS=true` short-circuits the gate; email routes stay unmounted unless natively email-mode | Decisions 1+4; unit test |
 | **No signature risk** | Already-issued licenses validate byte-identically | No schema change (Decision 1); existing backward-compat test untouched |
-| **Live flip** | License activation/removal changes SSO without restart | Request-time enforcement + cache invalidation; integration test |
-| **Sessions survive** | Gate never invalidates existing sessions | Decision 8; migration test |
+| **Frozen until restart** | The gate answer never changes mid-process (except error-retry before first success) | Decision 3 memoization; unit test: license added to DB after memoization → still denied until "restart" (module reset) |
+| **Sessions survive** | Gate never invalidates existing sessions | Decision 9; migration test |
 
 ## Schema
 
-No database migration. No license payload schema change. One env var, one new module, plus call-site edits:
+No database migration. No license payload schema change. One env var, one new module, three call-site edits:
 
 ```ts
-// langwatch/src/server/sso/sso-gate.ts
-export async function canPlatformSSO(): Promise<boolean>;          // IS_SAAS || validInstanceLicense() || anyOrgHasActiveLicense(); 60s cache; UNKNOWN→false
-export async function canOrgSSO(organizationId: string): Promise<boolean>;
-export async function resolveAuthProvider(): Promise<string>;     // coerces NEXTAUTH_PROVIDER → "email" when platform gate denies
-export function invalidatePlatformSSOCache(): void;               // called by licenseHandler on store/remove
+// langwatch/src/server/sso/sso-gate.ts  (new — single source of truth)
+export async function platformSSOAllowed(): Promise<boolean>;
+//   IS_SAAS || validInstanceLicense(env.LANGWATCH_LICENSE_KEY) || anyOrgHasActiveLicense()
+//   memoized once per process; a thrown DB error returns false and is NOT memoized
+export async function resolveAuthProvider(): Promise<string>;
+//   env.NEXTAUTH_PROVIDER, coerced to "email" when the gate denies
 ```
 
 ```js
@@ -116,61 +102,71 @@ LANGWATCH_LICENSE_KEY: z.string().optional(),
 
 Gate sites (implementation order):
 
-| # | Surface | File | Denied behavior |
+| # | Surface | File | Behavior |
 |---|---|---|---|
-| 1 | `publicEnv` provider exposure | `src/server/api/routers/publicEnv.ts:24` | report `"email"` via `resolveAuthProvider()` |
-| 2 | Better Auth `before` hook — SSO + email-route truth table | `src/server/better-auth/index.ts:514-543` (extend; key off gate, not `env.NEXTAUTH_PROVIDER`) | per truth table; **enumerate legacy `/callback/auth0`,`/callback/okta`** |
-| 3 | `emailAndPassword.enabled` boot flag | `src/server/better-auth/index.ts:375` | `NEXTAUTH_PROVIDER === "email" || !IS_SAAS` |
-| 4 | `ssoDomain` auto-join + provider match | `src/server/better-auth/hooks.ts:115, 253-269, 344` | treat as no-match (Decision 11) |
-| 5 | Backoffice `ssoDomain`/`ssoProvider` writes | backoffice PATCH path | 403 |
-| 6 | `SsoProvider` CRUD (future) | PR #4416 routers | 403 — must land with that PR |
+| 1 | `publicEnv` provider exposure | `src/server/api/routers/publicEnv.ts` | on DENY, report `"email"` via `resolveAuthProvider()` |
+| 2 | Better Auth `before` hook — SSO-path block | `src/server/better-auth/index.ts:546` (extend the existing hook) | on DENY, 403 the gated SSO paths (Constants, pathname-prefix callback match incl. legacy) |
+| 3 | Better Auth `before` hook — email-path block | `src/server/better-auth/index.ts:546` (same hook) | on ALLOW + SSO-capable, 403 `/sign-in/email` + `/sign-up/email` (BLOCKER fix) |
+| 4 | `ssoDomain` auto-join guard | `src/server/better-auth/hooks.ts:110` | skip the domain auto-join unless `platformSSOAllowed()` (MAJOR fix) |
+| 5 | `emailAndPassword.enabled` boot flag | `src/server/better-auth/index.ts:378` | `env.NEXTAUTH_PROVIDER === "email" \|\| !IS_SAAS` (mount routes; site #3 guards them) |
+
+Both hook branches (sites #2, #3) read the **same** memoized gate value in the one async `before` hook. `platformSSOAllowed()` memoizes only a **successful resolution** — a rejected/false promise from a DB blip is evicted, never cached, so concurrent first-requests fail closed and converge to allow on first success (Decisions 3+6; MINOR-5 contract). `anyOrgHasActiveLicense()` MUST call `validateLicense()` per candidate row (signature + expiry) — never filter on the denormalized `licenseExpiresAt` column, which skips the signature check and would open SSO to a forged future-dated license; the whole read is wrapped in try/catch → `false`-without-memoize, and `IS_SAAS` short-circuits **before** it runs (MINOR-4).
+
+Explicitly **not** gate sites: per-org *license* checks (Decision 7 — but note the auto-join platform-gate guard at site #4), backoffice `ssoDomain` writes (already `isAdmin`-gated), `SsoProvider` CRUD (PR #4416 closed).
 
 ## Rejected alternatives
 
-- **`enableSso: z.boolean().optional()` license field, absent=true** — works, stays available later; rejected for v1 (binary needs no schema/generator/template change and sells the same thing now).
-- **`issuedAt`-cutoff default / batch re-issuance** — magic constant / operationally expensive long tail.
-- **Wire `sendResetPassword` + forgot-password UI as the recovery path** — the v1 assumption; rejected because SMTP-less installs still brick and it adds a new auth+email surface to an already-large PR. Instance license key (Decision 9) recovers without SMTP or login.
-- **Grandfather: never deny credential-less installs** — leaves the env-var bypass open for exactly the installs likeliest to abuse it; "works until someone sets a password" is incoherent.
-- **Enterprise-IdPs-only scope (social free)** — market-norm but two provider classes + arbitrary boundary; overruled for one rule.
-- **Registration-time gating (boot check + restart)** — better-auth static config made this restart-bound; request-time strictly dominates.
-- **Hard-block explainer screen / grace-nag denied mode** — bricks SSO-only installs / leaves bypass open.
-- **Path-prefix middleware on `/oauth2/*`** — misses the legacy `/callback/auth0|okta` rewrite (F2); enforce in the `before` hook instead.
-- **Single fail-closed flag** — folding "fail closed for SSO" onto a two-sided guard opens email/password on DB blips (F3); the three-state truth table prevents it.
-- **Server-logs-only telemetry** — considered to avoid re-creating the limit-tied analytics pattern PR #4480 removed; rejected in v3 because a low-volume, deliberate gate signal is worth the sales/abuse visibility, unlike the high-volume `limit_blocked` event.
+- **Request-time enforcement (the v2/v3 design)** — three-state gate, route truth table, 60s TTL cache + invalidation, per-request evaluation. Its sole benefit ("live flip" on license change) was never a requirement; its recovery path already required a restart. Startup semantics deletes ~all of its moving parts.
+- **Env-key-only static gate (pure boot-time, Langfuse model)** — maximally simple, but every existing licensed customer must add `LANGWATCH_LICENSE_KEY` on upgrade: a breaking migration step, rejected against the zero-action constraint.
+- **`enableSso` license field** — stays available later with `absent → true`; not needed for v1.
+- **Per-org `canOrgSSO` composition + denied-`ssoDomain` fallthrough** — guarded a staff-only surface; dropped (Decision 7).
+- **Grandfather credential-less installs / grace-nag denied mode** — leaves the env-var bypass open for exactly the installs likeliest to abuse it.
+- **Hard-block explainer screen** — bricks the install with no path to Settings; email coercion keeps a working door.
+- **PostHog `sso_gate_denied` event (v3 Decision 7)** — denial is now a deployment state, not a stream; logs carry the signal, event addable later.
+- **Path-prefix middleware on `/oauth2/*`** — still misses the legacy `/callback/auth0|okta` rewrite; the `before` hook remains the only correct interception point.
 
 ## Consequences
 
 **Positive**
-- The four-env-var free-SSO bypass is closed with one binary rule; zero signature/compat risk; zero behavior change for every paying customer.
-- License changes take effect live; the instance license key gives a deterministic, SMTP-free, login-free recovery and bootstrap.
-- One module owns the rule; `env.NEXTAUTH_PROVIDER` reads centralized and lintable.
+- The four-env-var free-SSO bypass is closed with one binary rule and **one memoized function** — no cache lifecycle, no truth table, no state machine.
+- Zero action and zero behavior change for every licensed customer (DB license honored); zero signature/compat risk.
+- Expiry is naturally graceful: SSO survives until the operator's next restart.
+- One module owns the rule; `resolveAuthProvider()` centralizes provider exposure.
 
 **Negative**
-- **OSS installs using Google/GitHub sign-in lose that method on upgrade** (coerced to email mode). Needs a loud changelog + release note spelling out the `LANGWATCH_LICENSE_KEY` recovery and the "sign up a fresh admin, activate license" path. Largest user-facing cost; accepted deliberately.
-- SSO is bundled with "any paid plan" until the optional field is added later (a second PR + generator change).
-- Password sign-in/up routes become mounted-but-runtime-guarded on self-hosted SSO deployments; the SSO-bypass protection moves from static (unmounted) to runtime (truth table). Credential-mutation routes stay blocked in all states, so the takeover surface does not open — but the guard is now load-bearing and must be covered by the takeover invariant tests.
-- `usePublicEnv` caches `staleTime: Infinity`: after activating a license, the admin must hard-reload to see the IdP button (stale *grant*, red-team F8). Server guard is authoritative; document "reload after activation" in the release note.
+- **Unlicensed installs using Google/GitHub/Auth0 sign-in lose SSO on upgrade** (coerced to email mode). Needs a loud changelog + release note spelling out `LANGWATCH_LICENSE_KEY` and the fresh-signup path. Accepted deliberately (blast radius re-calibrated: enterprise licenses keep working, free-riders are the target).
+- License activation via the Settings UI requires a **restart** to enable SSO. Needs an explicit hint in the license-activation success state ("restart the server to enable SSO"). Accepted as the price of startup semantics.
+- Password sign-in/up routes become **mounted** on self-hosted SSO deployments (the `enabled` formula change). On their own this is a bypass — a licensed Auth0 install could mint a password account. The **ALLOW-path email-route block (gate site #3) is the load-bearing guard** and its test anchor (`/sign-up/email` 403s with a license) is mandatory, alongside the credential-mutation block. Regression caught in the v5 red-team.
+- `usePublicEnv` caches `staleTime: Infinity` — after a restart-with-license, users with an open tab must reload to see the IdP button. Server gate is authoritative; note in the release note.
 
 **Neutral**
-- Per-org gate adds one primary-key license lookup inside hooks that already query the org row.
-- CI/e2e fixtures that assume an ungated static gate must be updated — beyond the env-var grep, the e2e auth-regression harnesses (`e2e/auth-regression/*`, `*sso-smoketest*`) exercise `/sign-up/email` and SSO flows directly and change behavior under the runtime guard (red-team F10). Audit set: `rg -l 'NEXTAUTH_PROVIDER.*auth0' langwatch/` **plus** the e2e auth harness files.
+- The gate's DB read (`anyOrgHasActiveLicense`) runs once per process — index on `license IS NOT NULL`, then `validateLicense()` (signature + expiry) per candidate row. Do **not** optimize into a `licenseExpiresAt > now` filter: that column skips the signature check.
+- "As if the SSO env vars were unset" is *almost* exact: a denied genericOAuth install can still `POST /sign-in/oauth2` and be redirected to the IdP — the callback-path block is what fails the round-trip closed (login never completes). The initiation redirect happening is cosmetic, not a bypass; documented so the implementer blocks the callback, not just the button.
+- e2e auth harnesses (`e2e/auth-regression/*`, `*sso-smoketest*`) that assume ungated SSO must seed a license or the env key. Audit set: `rg -l 'NEXTAUTH_PROVIDER' e2e/ langwatch/src` + the auth harness files.
+- `specs/licensing/sso-license-gating.feature` (ships in the same PR) must be rewritten against this design — the truth-table scenarios are obsolete; add scenarios for the two v5-fixed anchors (licensed `/sign-up/email` 403; denied-mode auto-join off).
 
 ## Open questions
 
 | Question | Owner | Status |
 |---|---|---|
-| Expiry grace period (14–30d + banners) | Sergio | Deferred — follow-up issue after v1 |
-| `sso-orphan-user-linking` re-heals a denied-state mis-placed signup on later login (Decision 11) | Sergio | **Verify during implementation** — if it does not self-heal, denied-state company-domain signups need explicit re-placement, not silent fallthrough |
-| PR #4416 `SsoProvider` CRUD gate (site #6) | PR #4416 owner + Sergio | Coordination — helpers land here; that PR must call `canOrgSSO` before merge or immediate fast-follow |
-| SaaS support enabling SSO for an org mid-Stripe-webhook-propagation | Sergio | Edge case — existing platform-admin override covers it; verify |
+| Settings UI: show "restart required" after license activation on self-hosted | Sergio | Small UX addition — decide during implementation, non-blocking |
+| Multiple orgs with licenses: is first-valid-wins scan order acceptable for `anyOrgHasActiveLicense`? | Sergio | Trivial — any valid license allows; order irrelevant, confirm in review |
 
 ## Revisions
 
-- **v1 (2026-06-12)** — Initial ADR. Round 1 locked: binary activeness (no `enableSso` field — refines the prior analysis, which rejected the field for lack of a pickable default; deferred instead); all non-email providers gated; coerce-to-email denied UX. Round 2 locked: no expiry grace in v1; SaaS per-org gate requires a paid plan; server-logs-only telemetry; ADR in-repo. Framing: all SSO surfaces under one flag; forcing function = PR #4480 repositioning; blast radius = login lockout (max rigor); constraints = no re-issuance, SaaS untouched, additive-only schema, ships on PR #4480.
-- **v2 (2026-06-13)** — Red-team (devils-advocate) folded in; resolved a BLOCKER and three MAJOR security holes, all verified against the code:
-  - **F1 (BLOCKER):** the v1 "recover via password reset" path does not exist (`sendResetPassword` unconfigured, no forgot-password UI, SMTP optional) — so coerce-to-email *alone* bricked SSO-only installs, violating the No-lockout invariant. **Fix:** added the `LANGWATCH_LICENSE_KEY` instance license key as the credential-less recovery/bootstrap path (new Decision 9; gate formula in Decisions 1/5; No-lockout invariant rewritten).
-  - **F2 (MAJOR):** the legacy `/callback/auth0`,`/callback/okta` rewrite would slip past an `/oauth2/*` guard. **Fix:** enforce in the `before` hook; legacy callbacks added to the gated-paths set (Decision 3, Constants, gate site #2).
-  - **F3 (MAJOR):** a single fail-closed flag opens email/password on any DB blip. **Fix:** three-state gate (`ALLOW`/`DENY`/`UNKNOWN`) + route truth table; email routes open only on definitive `DENY` (Decision 4, Constants, Fail-closed-both-sides invariant).
-  - **F4 (MAJOR):** denied-state password routes could plant a credential on an SSO-only account (takeover). **Fix:** credential-mutation paths blocked in *every* gate state when SSO-capable; the existing `before`-hook block keyed off the runtime gate, not `env.NEXTAUTH_PROVIDER` (Decision 4, No-takeover invariant).
-  - **F5 → Decision 10** (multi-org instance-IdP grant documented as deliberate); **F6 → Decision 1** ("active" = `validateLicense`, never the `licenseExpiresAt` column); **F9 → Decision 11 + Open Questions** (denied `ssoDomain` fallthrough + mandatory self-heal verification); **F8/F10 → Consequences** (stale-grant reload note; e2e fixture audit).
-- **v3 (2026-06-15)** — Reversed the telemetry fork in Decision 7: logs **plus** a 100%-sampled `sso_gate_denied` PostHog event (`{ surface, reason }`), restoring the original analysis's recommendation. Rationale: a low-volume gate-denial signal is worth the abuse-detection + sales-lead visibility, and is materially different from the high-volume limit-tied event PR #4480 removed. No other decision affected.
+- **v1 (2026-06-12)** — Initial ADR: binary activeness, all non-email providers, coerce-to-email, request-time enforcement, no grace, logs-only telemetry.
+- **v2 (2026-06-13)** — Red-team folded in: `LANGWATCH_LICENSE_KEY` recovery (F1 — password reset believed absent), legacy-callback enumeration (F2), three-state gate + route truth table (F3), credential-mutation block in all states (F4), multi-org grant documented (F5), `validateLicense` as the only validity source (F6).
+- **v3 (2026-06-15)** — Telemetry reversed to logs + PostHog `sso_gate_denied`. Locked as Accepted.
+- **v4 (2026-07-02)** — Parc-fermé re-framing with the owner; mechanism fork re-opened and re-locked. What changed and why:
+  - **Startup semantics replace request-time** (owner unlocked the never-confirmed "live flip" assumption): the gate is computed once per process and frozen until restart. Deletes the three-state gate, route truth table, TTL cache, and cache invalidation (v2 F3's machinery is obsolete, not overruled — with one frozen decision there is no per-request state to get wrong).
+  - **Gate source locked as env + DB, once**: existing licensed customers upgrade with zero action; pure-env (Langfuse-style) rejected for the migration cost.
+  - **Per-org gate dropped** (v3 Decisions 5/11): `ssoDomain` is super-admin-only in the backoffice, and PR #4416 (self-serve `SsoProvider`) is closed — the surface it guarded doesn't exist.
+  - **Telemetry back to logs-only** (reverses v3): denial is a deployment state under startup semantics.
+  - **Fact corrections against `main`**: password reset now exists (`sendResetPassword` wired, reset page live) — v2 F1's premise is stale, though the env-key recovery remains the credential-less path; stale references to closed PR #4416 and the "ships on PR" framing removed.
+  - Blast radius re-calibrated by owner: unlicensed-install lockout is acceptable; licensed deployments must see zero change (new leading invariant).
+- **v5 (2026-07-02)** — Red-team (`/challenge`) folded in. The startup-semantics core held; three defects in the *draft's mechanism* (not the locked forks) were fixed:
+  - **BLOCKER — licensed-install credential bypass (regression vs `main`).** The `emailAndPassword.enabled = "email" || !IS_SAAS` change mounts `/sign-in/email` + `/sign-up/email`, and nothing re-blocked them on the ALLOW path → a licensed Auth0 install could mint password accounts (worse than `main`, where they 404). Fixed by a second branch in the same `before` hook: block those two routes when SSO-capable **and** the gate allows (gate site #3). No truth table — one memoized value, branched both ways.
+  - **MAJOR — denied-mode `ssoDomain` org takeover.** `afterUserCreate` auto-joins by email domain on email+password signup with no verification; in coerced mode with fresh-signup open, `POST /sign-up/email` at a customer's domain joins their org with no IdP. Fixed by gating the auto-join on `platformSSOAllowed()` (site #4) — federation rides the paid switch. Nuances Decision 7: still no per-org *license* check, but the auto-join is not license-blind.
+  - **MAJOR — wrong gated-path list.** `/oauth2/authorize` is a phantom (OIDC-provider endpoint, not a client one); real genericOAuth initiation `/sign-in/oauth2` was missing; `/link-social`+`/oauth2/link` were unblocked; the `endsWith` matcher can't match callbacks carrying `?code=&state=`. Constants table corrected + switched to pathname-prefix callback matching.
+  - MINOR — `validateLicense()`-per-row (never `licenseExpiresAt`), `IS_SAAS` short-circuit before the DB read, and memoize-success-only / evict-on-reject written into the Schema contract.
+  - Surfaces judged **sound**: multi-pod skew (denied pod is strictly more restrictive — no partial-auth), error-retry flapping (both directions fail closed), duplicate-email signup (better-auth returns `USER_ALREADY_EXISTS`), and `/request-password-reset` (stays 403 via the mutation block).
