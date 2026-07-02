@@ -17,7 +17,7 @@ import {
   stopTestContainers,
 } from "../../event-sourcing/__tests__/integration/testContainers";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
-import type { Protections } from "../../elasticsearch/protections";
+import { openProtections } from "./open-protections";
 
 const tenantId = `test-field-names-${nanoid()}`;
 const now = Date.now();
@@ -151,12 +151,6 @@ async function insertEvaluationRuns(
     clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
   });
 }
-
-const openProtections: Protections = {
-  canSeeCosts: true,
-  canSeeCapturedInput: true,
-  canSeeCapturedOutput: true,
-};
 
 // A list large enough to blow past the historical 1000 / 200 caps.
 const LARGE_NAME_COUNT = 1500;

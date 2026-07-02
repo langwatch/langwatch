@@ -34,6 +34,7 @@ import {
   type ProjectionFrom,
 } from "../projection";
 import type { GetAllTracesForProjectInput } from "../types";
+import { openProtections } from "./open-protections";
 
 const tenantId = `test-projection-${nanoid()}`;
 const traceId = `trace-projection-${nanoid()}`;
@@ -42,12 +43,6 @@ const traceId = `trace-projection-${nanoid()}`;
 const lateTraceId = `trace-late-${nanoid()}`;
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 const now = Date.now();
-
-const openProtections: Protections = {
-  canSeeCosts: true,
-  canSeeCapturedInput: true,
-  canSeeCapturedOutput: true,
-};
 
 function makeTraceSummaryRow(overrides: Record<string, unknown> = {}) {
   return {
