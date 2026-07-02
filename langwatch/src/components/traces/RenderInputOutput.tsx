@@ -64,7 +64,11 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
   // below. Empty (the common case) → nothing extra rendered, no hook cost.
   const audioParts = useMemo(
     () => collectAudioParts(json ?? value),
-    [json, value],
+    // `json` is derived from `value` (re-created via JSON.parse on every
+    // render), so listing it defeats the memo; `value` alone determines the
+    // result.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [value],
   );
 
   const renderCopyButton = () => {
