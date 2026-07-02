@@ -1,4 +1,4 @@
-import { type Organization, type User } from "@prisma/client";
+import type { Organization, User } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
@@ -93,7 +93,10 @@ describe("PrismaOrganizationRepository — membership order determinism (#5278)"
 
   afterAll(async () => {
     await prisma.organizationUser.deleteMany({
-      where: { userId: testUser.id, organizationId: { in: [orgA.id, orgB.id] } },
+      where: {
+        userId: testUser.id,
+        organizationId: { in: [orgA.id, orgB.id] },
+      },
     });
     await prisma.organization.deleteMany({
       where: { id: { in: [orgA.id, orgB.id] } },
