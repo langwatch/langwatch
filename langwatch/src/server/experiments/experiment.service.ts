@@ -157,7 +157,7 @@ export class ExperimentService {
     });
 
     if (existing) {
-      await this.repository.upsert({
+      await this.repository.updateById({
         id: existing.id,
         projectId,
         data: { workbenchState: workbenchStateJson },

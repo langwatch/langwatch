@@ -182,25 +182,6 @@ export class ExperimentRepository {
     );
   }
 
-  async upsert(
-    input: {
-      id: string;
-      projectId: string;
-      data: Prisma.ExperimentUpdateInput;
-    },
-    options?: { tx?: Prisma.TransactionClient },
-  ): Promise<Experiment> {
-    const client = options?.tx ?? this.prisma;
-    return await client.experiment.upsert({
-      where: { id: input.id, projectId: input.projectId },
-      update: input.data,
-      create: {
-        ...(input.data as Prisma.ExperimentUncheckedCreateInput),
-        id: input.id,
-      },
-    });
-  }
-
   async upsertById(
     input: {
       id: string;

@@ -408,6 +408,30 @@ describe("Workflows REST API", () => {
         expect(body.run_url).toContain(`/experiments/${experiment!.slug}`);
       });
 
+      it("succeeds on a second evaluate call against the same workflow", async () => {
+        await createVersion("1", entryDsl());
+
+        const first = await postEvaluate(
+          `/api/workflows/${workflow.id}/evaluate`,
+        );
+        const firstBody = await expectRunResponse(first);
+
+        const second = await postEvaluate(
+          `/api/workflows/${workflow.id}/evaluate`,
+        );
+        const secondBody = await expectRunResponse(second);
+
+        expect(secondBody.run_id).not.toBe(firstBody.run_id);
+        const experiments = await prisma.experiment.findMany({
+          where: {
+            projectId: testProjectId,
+            workflowId: workflow.id,
+            type: "EVALUATIONS_V3",
+          },
+        });
+        expect(experiments).toHaveLength(1);
+      });
+
       /** @scenario "The response stays backward compatible" */
       it("still returns the evaluated version id and version", async () => {
         const version = await createVersion("1", entryDsl());
