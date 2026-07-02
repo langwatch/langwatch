@@ -507,7 +507,9 @@ langyRoute().post("/langy/chat", async (c) => {
 
   if (!agentResponse.ok) {
     // The agent answered, but with a non-2xx — same shape: no PR was
-    // opened so the permit must come back.
+    // opened so the permit must come back. Cancel the body so the
+    // connection doesn't stay held open (mirrors isAgentHealthy above).
+    void agentResponse.body?.cancel();
     await releasePermitIfUnused();
     logger.error(
       { status: agentResponse.status },
