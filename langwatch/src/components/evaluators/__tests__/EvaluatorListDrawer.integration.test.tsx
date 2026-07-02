@@ -2,13 +2,20 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
 import { EvaluatorListDrawer } from "../EvaluatorListDrawer";
 
-const { mockEvaluator } = vi.hoisted(() => ({
+const { mockEvaluator, deleteMutate } = vi.hoisted(() => ({
   mockEvaluator: {
     id: "evaluator_1",
     name: "Exactness",
@@ -16,6 +23,7 @@ const { mockEvaluator } = vi.hoisted(() => ({
     config: {},
     updatedAt: "2026-01-01T00:00:00.000Z",
   },
+  deleteMutate: vi.fn(),
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -28,7 +36,7 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ isLoading: false, data: [mockEvaluator] }),
       },
       delete: {
-        useMutation: () => ({ mutate: vi.fn() }),
+        useMutation: () => ({ mutate: deleteMutate, isLoading: false }),
       },
     },
   },
@@ -103,6 +111,65 @@ describe("EvaluatorListDrawer", () => {
       expect(onSelect).toHaveBeenCalledWith(
         mockEvaluator as unknown as EvaluatorWithFields,
       );
+    });
+  });
+
+  describe("when deleting an evaluator", () => {
+    it("confirms via the modal dialog instead of window.confirm and deletes on confirm", async () => {
+      const user = userEvent.setup();
+      const confirmSpy = vi.spyOn(window, "confirm");
+      // The component closes the dialog when the mutation settles.
+      deleteMutate.mockImplementation(
+        (_vars: unknown, opts?: { onSettled?: () => void }) =>
+          opts?.onSettled?.(),
+      );
+      renderDrawer();
+
+      await user.click(
+        await screen.findByTestId(`evaluator-menu-${mockEvaluator.id}`),
+      );
+      await user.click(
+        await screen.findByTestId(`evaluator-delete-${mockEvaluator.id}`),
+      );
+
+      // The reusable modal is shown, not the native confirm dialog.
+      await waitFor(() => {
+        expect(screen.getByText("Delete evaluator")).toBeInTheDocument();
+        expect(
+          screen.getByText(`Are you sure you want to delete "Exactness"?`),
+        ).toBeInTheDocument();
+      });
+      expect(confirmSpy).not.toHaveBeenCalled();
+      expect(deleteMutate).not.toHaveBeenCalled();
+
+      await user.click(screen.getByRole("button", { name: "Delete" }));
+
+      expect(deleteMutate).toHaveBeenCalledWith(
+        { id: mockEvaluator.id, projectId: "project-1" },
+        expect.objectContaining({ onSettled: expect.any(Function) }),
+      );
+      // Once the mutation settles the confirmation modal is dismissed.
+      await waitFor(() => {
+        expect(screen.queryByText("Delete evaluator")).not.toBeInTheDocument();
+      });
+
+      confirmSpy.mockRestore();
+    });
+
+    it("does not delete when the modal is cancelled", async () => {
+      const user = userEvent.setup();
+      renderDrawer();
+
+      await user.click(
+        await screen.findByTestId(`evaluator-menu-${mockEvaluator.id}`),
+      );
+      await user.click(
+        await screen.findByTestId(`evaluator-delete-${mockEvaluator.id}`),
+      );
+
+      await user.click(await screen.findByRole("button", { name: "Cancel" }));
+
+      expect(deleteMutate).not.toHaveBeenCalled();
     });
   });
 });

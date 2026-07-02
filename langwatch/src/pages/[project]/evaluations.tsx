@@ -27,6 +27,7 @@ import {
 } from "react-icons/lu";
 import { NewEvaluationMenu } from "~/components/evaluations/NewEvaluationMenu";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
+import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { ListTable } from "~/components/ui/ListTable";
 import { Link } from "~/components/ui/link";
 import { useRouter } from "~/utils/compat/next-router";
@@ -57,6 +58,10 @@ function EvaluationsV2() {
     evaluationName: string;
   } | null>(null);
   const [newEvaluationMenuOpen, setNewEvaluationMenuOpen] = useState(false);
+  const [experimentToDelete, setExperimentToDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   const navigationFooter = useNavigationFooter();
 
@@ -115,16 +120,7 @@ function EvaluationsV2() {
     experimentId: string,
     experimentName: string,
   ) => {
-    if (
-      confirm(
-        `Are you sure you want to delete the evaluation "${experimentName}"? This will also delete the workflow, monitor, and prompts associated with it. Datasets will be kept.`,
-      )
-    ) {
-      deleteExperimentMutation.mutate({
-        projectId: project?.id ?? "",
-        experimentId,
-      });
-    }
+    setExperimentToDelete({ id: experimentId, name: experimentName });
   };
 
   if (!project) return null;
@@ -547,6 +543,29 @@ function EvaluationsV2() {
           evaluationName={copyDialogState.evaluationName}
         />
       )}
+      <ConfirmDialog
+        open={!!experimentToDelete}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setExperimentToDelete(null);
+        }}
+        title="Delete evaluation"
+        message={`Are you sure you want to delete the evaluation "${
+          experimentToDelete?.name ?? ""
+        }"? This will also delete the workflow, monitor, and prompts associated with it. Datasets will be kept.`}
+        confirmLabel="Delete"
+        tone="danger"
+        loading={deleteExperimentMutation.isLoading}
+        onConfirm={() => {
+          if (!experimentToDelete) return;
+          deleteExperimentMutation.mutate(
+            {
+              projectId: project?.id ?? "",
+              experimentId: experimentToDelete.id,
+            },
+            { onSettled: () => setExperimentToDelete(null) },
+          );
+        }}
+      />
     </DashboardLayout>
   );
 }
