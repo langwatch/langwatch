@@ -136,11 +136,4 @@ export const createCheckoutLineItems = ({
   ];
 };
 
-/**
- * Returns the billing_thresholds.usage_gte value for the events
- * subscription item on a Growth seat+event plan.
- *
- * Stripe will generate an immediate invoice when metered usage
- * on the events line item reaches this number of units.
- */
-export { GROWTH_SEAT_INCLUDED_EVENTS, getEventsUsageThreshold } from "./growthSeatConstants";
+export { GROWTH_SEAT_INCLUDED_EVENTS } from "./growthSeatConstants";

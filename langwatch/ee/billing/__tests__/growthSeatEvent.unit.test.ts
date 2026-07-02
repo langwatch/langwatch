@@ -23,7 +23,6 @@ import {
   resolveGrowthSeatPriceId,
   resolveGrowthEventsPriceId,
   createCheckoutLineItems,
-  getEventsUsageThreshold,
 } from "../utils/growthSeatEvent";
 
 describe("growthSeatEvent", () => {
@@ -209,12 +208,6 @@ describe("growthSeatEvent", () => {
           { price: "price_events_eur_annual" },
         ]);
       });
-    });
-  });
-
-  describe("getEventsUsageThreshold()", () => {
-    it("returns the included events allowance", () => {
-      expect(getEventsUsageThreshold()).toBe(200_000);
     });
   });
 });

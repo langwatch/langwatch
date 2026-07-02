@@ -18,7 +18,7 @@ import { SubscriptionRecordNotFoundError } from "../errors";
 import { fireSubscriptionSyncNurturing } from "../nurturing/hooks/subscriptionSync";
 import { SubscriptionStatus } from "../planTypes";
 import {
-  getEventsUsageThreshold,
+  GROWTH_SEAT_INCLUDED_EVENTS,
   isGrowthEventsPrice,
   isGrowthSeatEventPlan,
   isGrowthSeatPrice,
@@ -996,7 +996,7 @@ export class EEWebhookService implements WebhookService {
     subscriptionItemId: string,
     stripeSubscriptionId: string,
   ): Promise<void> {
-    const threshold = getEventsUsageThreshold();
+    const threshold = GROWTH_SEAT_INCLUDED_EVENTS;
     try {
       await this.stripe.subscriptionItems.update(subscriptionItemId, {
         billing_thresholds: { usage_gte: threshold },
