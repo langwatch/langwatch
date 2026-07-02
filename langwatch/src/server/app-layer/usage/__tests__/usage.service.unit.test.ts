@@ -279,6 +279,27 @@ describe("UsageService", () => {
 
         expect(mockPlanResolver).toHaveBeenCalledWith("org-123");
       });
+
+      /** @scenario Limit checks decide from one active plan snapshot */
+      it("uses one active plan snapshot for counting and threshold comparison", async () => {
+        const firstPlan = {
+          ...FREE_PLAN,
+          maxMessagesPerMonth: 1000,
+        };
+        const laterPlan = {
+          ...FREE_PLAN,
+          maxMessagesPerMonth: 2000,
+        };
+        (mockPlanResolver as ReturnType<typeof vi.fn>)
+          .mockResolvedValue(laterPlan)
+          .mockResolvedValueOnce(firstPlan);
+
+        const result = await service.checkLimit({ teamId: "team-123" });
+
+        expect(result.exceeded).toBe(true);
+        expect(result.maxMessagesPerMonth).toBe(1000);
+        expect(mockPlanResolver).toHaveBeenCalledTimes(1);
+      });
     });
 
     describe("when count < maxMessagesPerMonth", () => {
