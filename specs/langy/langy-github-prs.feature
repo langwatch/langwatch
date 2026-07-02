@@ -56,6 +56,14 @@ Feature: Langy opens GitHub PRs as the requesting user
     Then Langy tells me it is temporarily unavailable within a few seconds
     And no daily PR permit is consumed
 
+  @integration
+  Scenario: Langy does not retry when the agent rejects the request
+    Given I have connected my GitHub account
+    And the agent backend rejects the request with a 4xx response
+    When I ask Langy to open a PR on "acme/service-x"
+    Then Langy does not retry the request
+    And Langy reports the failure
+
   @integration @e2e
   Scenario: Tokens never persist in the worker or repo clone
     Given I have connected my GitHub account

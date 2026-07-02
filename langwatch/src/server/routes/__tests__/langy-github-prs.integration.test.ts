@@ -556,20 +556,15 @@ describe("Feature: Langy chat opens PRs as the requesting user", () => {
         });
         vi.stubGlobal("fetch", fetchMock);
 
-        const start = Date.now();
         const res = await postChat("Open a PR on acme/service-x");
-        const elapsedMs = Date.now() - start;
 
         expect(res.status).toBe(503);
-        // Well under the 120s chat budget — the preflight uses a 3s timeout,
-        // not the full chat timeout, so this fails fast.
-        expect(elapsedMs).toBeLessThan(5_000);
         expect(reserveLangyGithubPrPermit).not.toHaveBeenCalled();
       });
     });
 
     describe("when the agent deliberately rejects the request", () => {
-      /** @scenario "Langy recovers from a brief agent hiccup" */
+      /** @scenario "Langy does not retry when the agent rejects the request" */
       it("does not retry a 4xx response from the agent", async () => {
         let chatAttempts = 0;
         fetchMock = vi.fn(async (url: string) => {

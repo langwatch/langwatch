@@ -247,6 +247,7 @@ async function fetchAgentChatWithRetry(opts: {
   try {
     const response = await attempt(AGENT_CHAT_TIMEOUT_MS);
     if (response.ok || response.status < 500) return response;
+    void response.body?.cancel();
     return await attempt(AGENT_CHAT_RETRY_TIMEOUT_MS);
   } catch (error) {
     if (isAbortTimeoutError(error)) throw error;
