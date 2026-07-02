@@ -246,12 +246,15 @@ describe("POST /api/langy/chat — unconnected user asks for a PR", () => {
     expect(res.status).toBe(200);
 
     // (a) The credentials forwarded to the agent carry NO github token. Read
-    // the actual body the route POSTed to the agent /chat endpoint.
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [agentUrl, agentInit] = fetchMock.mock.calls[0] as [
-      string,
-      { body: string },
-    ];
+    // the actual body the route POSTed to the agent /chat endpoint. The route
+    // also preflights a GET to /health before this — same mock, since it
+    // returns 200 for any URL — so pick out the /chat call specifically
+    // rather than assuming call order.
+    const chatCall = fetchMock.mock.calls.find(
+      ([url]) => url === "http://agent.test/chat",
+    ) as [string, { body: string }] | undefined;
+    expect(chatCall).toBeDefined();
+    const [agentUrl, agentInit] = chatCall!;
     expect(agentUrl).toBe("http://agent.test/chat");
     const forwarded = JSON.parse(agentInit.body) as {
       credentials: Record<string, unknown>;

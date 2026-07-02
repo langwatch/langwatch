@@ -40,6 +40,22 @@ Feature: Langy opens GitHub PRs as the requesting user
     And the branch commits are attributed to my GitHub login
     And Langy renders the PR as a card in chat
 
+  @integration
+  Scenario: Langy fails fast when the agent is completely unreachable
+    Given I have connected my GitHub account
+    And the agent backend is completely unreachable
+    When I ask Langy to open a PR on "acme/service-x"
+    Then Langy tells me it is temporarily unavailable within a few seconds
+    And no daily PR permit is consumed
+
+  @integration
+  Scenario: Langy does not retry when the agent rejects the request
+    Given I have connected my GitHub account
+    And the agent backend rejects the request with a 4xx response
+    When I ask Langy to open a PR on "acme/service-x"
+    Then Langy does not retry the request
+    And Langy reports the failure
+
   @integration @e2e
   Scenario: Tokens never persist in the worker or repo clone
     Given I have connected my GitHub account

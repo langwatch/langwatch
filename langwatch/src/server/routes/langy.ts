@@ -197,6 +197,32 @@ secured.hono.use("/langy/*", async (c, next) => {
 const langyRoute = () =>
   secured.access(handlerManagedAuth(LANGY_HANDLER_AUTH_REASON));
 
+const AGENT_HEALTH_CHECK_TIMEOUT_MS = 3_000;
+const AGENT_CHAT_TIMEOUT_MS = 120_000;
+
+// Preflight before reserving a PR permit or calling /chat: a 3s timeout
+// instead of the 120s chat budget, so a fully-down agent fails in seconds
+// and never burns a daily PR permit on a dead backend.
+//
+// Deliberately no retry on the /chat call itself: the agent's worker has
+// no idempotency key, and a POST /chat that fails after the agent already
+// started acting on the prompt (5xx or a reset mid-stream) would, on
+// retry, get replayed as a second independent turn against the same
+// worker — risking a duplicate PR. Fixing that properly needs an
+// idempotency mechanism on the agent side; until then, a mid-task failure
+// surfaces to the user instead of being silently retried.
+async function isAgentHealthy(agentUrl: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${agentUrl}/health`, {
+      signal: AbortSignal.timeout(AGENT_HEALTH_CHECK_TIMEOUT_MS),
+    });
+    void response.body?.cancel();
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 langyRoute().post("/langy/chat", async (c) => {
   const session = await getServerAuthSession({
     req: c.req.raw as NextRequestShim,
@@ -382,6 +408,14 @@ langyRoute().post("/langy/chat", async (c) => {
     }
   }
 
+  if (!(await isAgentHealthy(agentUrl))) {
+    logger.error({ agentUrl }, "opencode agent failed preflight health check");
+    return c.json(
+      { error: "Agent is currently unavailable. Please try again shortly." },
+      { status: 503 },
+    );
+  }
+
   // Per-user daily PR cap, enforced by atomic permit reservation BEFORE we
   // hand the worker a GitHub token. If we're over cap, we strip the token
   // from `credentials` below so the worker physically cannot `gh pr create`
@@ -458,12 +492,14 @@ langyRoute().post("/langy/chat", async (c) => {
         // change behavior — but the user's picker choice rides through.
         ...(modelOverride ? { modelOverride } : {}),
       }),
-      signal: AbortSignal.timeout(120_000),
+      signal: AbortSignal.timeout(AGENT_CHAT_TIMEOUT_MS),
     });
   } catch (error) {
-    // Transport failure (DNS, connection refused, timeout from
-    // AbortSignal.timeout). The agent never accepted the work, so the
-    // permit must be released before we surface the 502.
+    // Transport failure (DNS, connection refused, timeout). The agent
+    // never accepted the work — no idempotency mechanism exists on its
+    // side, so this is deliberately NOT retried (see isAgentHealthy's
+    // comment above). The permit must be released before we surface the
+    // 502.
     await releasePermitIfUnused();
     logger.error({ error }, "opencode agent request transport failure");
     return c.json({ error: "Agent request failed" }, { status: 502 });
@@ -471,7 +507,9 @@ langyRoute().post("/langy/chat", async (c) => {
 
   if (!agentResponse.ok) {
     // The agent answered, but with a non-2xx — same shape: no PR was
-    // opened so the permit must come back.
+    // opened so the permit must come back. Cancel the body so the
+    // connection doesn't stay held open (mirrors isAgentHealthy above).
+    void agentResponse.body?.cancel();
     await releasePermitIfUnused();
     logger.error(
       { status: agentResponse.status },

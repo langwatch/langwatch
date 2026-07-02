@@ -513,6 +513,43 @@ describe("Feature: Langy chat opens PRs as the requesting user", () => {
       });
     });
 
+    describe("when the agent is completely unreachable", () => {
+      /** @scenario "Langy fails fast when the agent is completely unreachable" */
+      it("fails fast with a clear message and never reserves a PR permit", async () => {
+        fetchMock = vi.fn(async (url: string) => {
+          if (url === "http://agent.test/health") {
+            throw new Error("ECONNREFUSED");
+          }
+          throw new Error(`unexpected fetch: ${url}`);
+        });
+        vi.stubGlobal("fetch", fetchMock);
+
+        const res = await postChat("Open a PR on acme/service-x");
+
+        expect(res.status).toBe(503);
+        expect(reserveLangyGithubPrPermit).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the agent deliberately rejects the request", () => {
+      /** @scenario "Langy does not retry when the agent rejects the request" */
+      it("does not retry a 4xx response from the agent", async () => {
+        let chatAttempts = 0;
+        fetchMock = vi.fn(async (url: string) => {
+          if (url === "http://agent.test/health") {
+            return new Response(null, { status: 200 });
+          }
+          chatAttempts += 1;
+          return new Response("bad request", { status: 400 });
+        });
+        vi.stubGlobal("fetch", fetchMock);
+
+        const res = await postChat("Open a PR on acme/service-x");
+        expect(res.status).toBe(502);
+        expect(chatAttempts).toBe(1);
+      });
+    });
+
     describe("when the worker is asked for a repo the App is NOT installed on", () => {
       /*
        * Installation scoping is enforced inside the agent's github.md skill —
@@ -644,7 +681,16 @@ describe("Feature: Langy chat opens PRs as the requesting user", () => {
     describe("when a pre-stream error happens after the permit was reserved", () => {
       /** @scenario "Permit must be released on every non-PR exit" */
       it("releases the permit when the agent fetch transport fails", async () => {
-        fetchMock = vi.fn(async () => {
+        // /health must pass (preflight runs BEFORE permit reservation) so this
+        // test exercises the /chat transport failure specifically. No retry:
+        // the agent has no idempotency key, so a single failed attempt must
+        // surface immediately rather than replaying the prompt.
+        let chatAttempts = 0;
+        fetchMock = vi.fn(async (url: string) => {
+          if (url === "http://agent.test/health") {
+            return new Response(null, { status: 200 });
+          }
+          chatAttempts += 1;
           throw new Error("ECONNREFUSED");
         });
         vi.stubGlobal("fetch", fetchMock);
@@ -652,24 +698,33 @@ describe("Feature: Langy chat opens PRs as the requesting user", () => {
         const res = await postChat("Open a PR on acme/service-x");
         expect(res.status).toBe(502);
 
+        expect(chatAttempts).toBe(1);
         expect(reserveLangyGithubPrPermit).toHaveBeenCalledTimes(1);
         expect(releaseLangyGithubPrPermit).toHaveBeenCalledTimes(1);
       });
 
       /** @scenario "Permit must be released on every non-PR exit" */
       it("releases the permit when the agent answers with a non-OK status", async () => {
-        fetchMock = vi.fn(
-          async () =>
-            new Response("upstream blew up", {
-              status: 502,
-              headers: { "Content-Type": "text/plain" },
-            }),
-        );
+        // No retry on the 5xx either — same reasoning as above, and the
+        // agent may have already started acting on the prompt before
+        // returning the error.
+        let chatAttempts = 0;
+        fetchMock = vi.fn(async (url: string) => {
+          if (url === "http://agent.test/health") {
+            return new Response(null, { status: 200 });
+          }
+          chatAttempts += 1;
+          return new Response("upstream blew up", {
+            status: 502,
+            headers: { "Content-Type": "text/plain" },
+          });
+        });
         vi.stubGlobal("fetch", fetchMock);
 
         const res = await postChat("Open a PR on acme/service-x");
         expect(res.status).toBe(502);
 
+        expect(chatAttempts).toBe(1);
         expect(reserveLangyGithubPrPermit).toHaveBeenCalledTimes(1);
         expect(releaseLangyGithubPrPermit).toHaveBeenCalledTimes(1);
       });
