@@ -122,7 +122,6 @@ describe.skipIf(isTestcontainersOnly)("plan.getActivePlan integration", () => {
         type: "PRO",
         name: "Pro",
         free: false,
-        maxProjects: 10,
         maxMessagesPerMonth: 10_000,
       };
       mockGetActivePlan.mockResolvedValueOnce(expectedPlan);

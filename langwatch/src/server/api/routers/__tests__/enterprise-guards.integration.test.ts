@@ -47,20 +47,16 @@ describe.skipIf(isTestcontainersOnly)(
       ...FREE_PLAN,
       type: "ENTERPRISE",
       overrideAddingLimitations: true,
-      maxTeams: Number.MAX_SAFE_INTEGER,
       maxMembers: Number.MAX_SAFE_INTEGER,
       maxMembersLite: Number.MAX_SAFE_INTEGER,
-      maxProjects: Number.MAX_SAFE_INTEGER,
     };
 
     const freePlan: PlanInfo = {
       ...FREE_PLAN,
       type: "FREE",
       overrideAddingLimitations: true,
-      maxTeams: Number.MAX_SAFE_INTEGER,
       maxMembers: Number.MAX_SAFE_INTEGER,
       maxMembersLite: Number.MAX_SAFE_INTEGER,
-      maxProjects: Number.MAX_SAFE_INTEGER,
     };
 
     beforeAll(async () => {

@@ -72,31 +72,25 @@ Feature: License Enforcement
   # ============================================================================
 
   @e2e @unimplemented
-  Scenario: License details card displays all plan limits
+  Scenario: License details card displays the enforced plan limits
     Given a user is logged in
     And the organization has a valid license
     When the user views the license settings page
     Then the license card should display "Members" with current and max values
     And the license card should display "Members Lite" with current and max values
-    And the license card should display "Projects" with current and max values
-    And the license card should display "Prompts" with current and max values
-    And the license card should display "Workflows" with current and max values
-    And the license card should display "Scenarios" with current and max values
-    And the license card should display "Evaluators" with current and max values
+    And the license card should display "Messages / Month" with current and max values
+    # Projects, teams, and experimentation resources are OSS/uncapped and are
+    # not shown as limits on the license card.
 
   @integration @unimplemented
-  Scenario: License status API returns all limit fields
+  Scenario: License status API returns the enforced limit fields
     Given an organization with a valid license
     When the license status is requested
     Then the response should include currentMembers and maxMembers
     And the response should include currentMembersLite and maxMembersLite
-    And the response should include currentProjects and maxProjects
-    And the response should include currentPrompts and maxPrompts
-    And the response should include currentWorkflows and maxWorkflows
-    And the response should include currentScenarios and maxScenarios
-    And the response should include currentEvaluators and maxEvaluators
     And the response should include currentMessagesPerMonth and maxMessagesPerMonth
-    And the response should include currentEvaluationsCredit and maxEvaluationsCredit
+    # Project, team, and experimentation limit fields are no longer part of the
+    # license status payload — those resources are OSS/uncapped.
 
   @unit
   Scenario: License details card handles Infinity display

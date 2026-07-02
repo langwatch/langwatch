@@ -1,79 +1,42 @@
-Feature: Resource limit enforcement on API endpoints
+Feature: Public REST API does not cap experimentation resources
 
-  # All scenarios in this file describe Hono /public-rest-api enforcement
-  # behavior — read/update/delete passing through, second-create rejected,
-  # notification suppression on self-hosted, deduplicated repeated blocks.
-  # The middleware itself is exercised via Hono integration tests, but
-  # there is no end-to-end fixture covering each resource × API verb
-  # combination yet — all aspirational pending the API integration harness.
+  The Hono /public-rest-api routes for experimentation resources (prompts,
+  evaluators, scenarios, agents, datasets, dashboards, custom graphs,
+  automations, online evaluations, experiments) no longer carry any
+  resource-limit middleware. These resources are OSS (Apache 2.0) and uncapped,
+  matching the dashboard — see oss-experimentation-uncapped.feature. There is
+  therefore no API path to a "limit reached" rejection for them, and no
+  plan-limit notification fires from these routes.
 
   As a platform operator
-  I want the API to enforce the same resource limits as the dashboard
-  So that users cannot bypass plan limits by creating resources via the API directly
+  I want the API to match the dashboard's unlimited experimentation behavior
+  So that there is a single, consistent policy regardless of entry point
 
   Background:
     Given an organization exists with a project
     And the project has a valid API key
-    And the organization has a plan with resource limits
-
-  # ============================================================================
-  # Creating resources is blocked when limits are reached
-  # ============================================================================
-
-  # ============================================================================
-  # Non-create operations are never blocked
-  # ============================================================================
 
   @integration @unimplemented
-  Scenario: Listing prompts succeeds even at limit
-    Given the organization has reached its prompt limit
+  Scenario: Creating many prompts via the API always succeeds
+    Given the organization already has 50 prompts
+    When I create another prompt via the API
+    Then the prompt is created successfully
+    And no plan-limit notification is sent
+
+  @integration @unimplemented
+  Scenario: Creating an evaluator via the API is never blocked by a limit
+    Given the organization already has 50 evaluators
+    When I create another evaluator via the API
+    Then the evaluator is created successfully
+
+  @integration @unimplemented
+  Scenario: Listing prompts succeeds regardless of count
+    Given the organization already has 50 prompts
     When I list prompts via the API
     Then the prompt list is returned
 
   @integration @unimplemented
-  Scenario: Updating an evaluator succeeds even at limit
-    Given the organization has reached its evaluator limit
-    And an evaluator exists
-    When I update the evaluator via the API
-    Then the evaluator is updated
-
-  @integration @unimplemented
-  Scenario: Deleting a scenario succeeds even at limit
-    Given the organization has reached its scenario limit
-    And a scenario exists
-    When I delete the scenario via the API
-    Then the scenario is archived
-
-  # ============================================================================
-  # Customer-facing messages vary by plan source
-  # ============================================================================
-
-  # ============================================================================
-  # Internal notifications when limits are hit
-  # ============================================================================
-
-  @integration @unimplemented
-  Scenario: Notification is suppressed on self-hosted
-    Given the organization is self-hosted
-    And the organization has reached its prompt limit
-    When I create a prompt via the API
-    Then no notification is sent
-
-  @integration @unimplemented
-  Scenario: Repeated blocked requests suppress duplicate notifications
-    Given the organization has reached its prompt limit
-    And a notification was already sent recently
-    When I create a prompt via the API
-    Then no additional notification is sent
-
-  # ============================================================================
-  # Parity with dashboard
-  # ============================================================================
-
-  @integration @unimplemented
-  Scenario: Second create is rejected after reaching limit via API
-    Given the organization allows 3 prompts
-    And the organization has 2 prompts
-    And a prompt was just created via the API
-    When I create another prompt via the API
-    Then the request is rejected as forbidden
+  Scenario: Updating and deleting experimentation resources is never blocked
+    Given an evaluator and a scenario exist
+    When I update the evaluator and delete the scenario via the API
+    Then the evaluator is updated and the scenario is archived

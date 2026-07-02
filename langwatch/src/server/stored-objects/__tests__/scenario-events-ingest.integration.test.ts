@@ -12,8 +12,8 @@
  *
  * The handler mounts authentication via the real authMiddleware (X-Auth-Token),
  * so a real Prisma project is created in beforeAll. Heavy non-auth dependencies
- * (getApp, checkScenarioSetLimitForRunStarted, createStoredObjectsService) are
- * mocked to keep these tests scoped to the storage path.
+ * (getApp, createStoredObjectsService) are mocked to keep these tests scoped to
+ * the storage path.
  */
 import { nanoid } from "nanoid";
 import {
@@ -70,10 +70,6 @@ vi.mock("~/server/app-layer/app", () => ({
       notifyPlanLimitReached: vi.fn().mockResolvedValue(undefined),
     },
   }),
-}));
-
-vi.mock("~/app/api/scenario-events/[[...route]]/scenario-set-limit", () => ({
-  checkScenarioSetLimitForRunStarted: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Mock the auth-middleware module to neutralize requirePermission's RBAC

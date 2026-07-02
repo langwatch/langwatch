@@ -48,13 +48,6 @@ Feature: Dataset REST API
     And the error indicates a dataset with that slug already exists
 
   @integration
-  Scenario: Create a dataset enforces plan limits
-    Given the project has reached its dataset plan limit
-    When I call POST /api/dataset with name "One More"
-    Then the request fails with 403 Forbidden
-    And the error indicates the dataset limit has been reached
-
-  @integration
   Scenario: Create a dataset validates column types
     When I call POST /api/dataset with columnTypes [{"name": "col1", "type": "invalid_type"}]
     Then the request fails with 422 Unprocessable Entity

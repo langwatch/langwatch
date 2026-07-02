@@ -21,20 +21,7 @@ export type PlanInfo = {
   overrideAddingLimitations?: boolean;
   maxMembers: number;
   maxMembersLite: number;
-  maxTeams: number;
-  maxProjects: number;
   maxMessagesPerMonth: number;
-  maxWorkflows: number;
-  maxPrompts: number;
-  maxEvaluators: number;
-  maxScenarios: number;
-  maxAgents: number;
-  maxExperiments: number;
-  maxOnlineEvaluations: number;
-  maxDatasets: number;
-  maxDashboards: number;
-  maxCustomGraphs: number;
-  maxAutomations: number;
   canPublish: boolean;
   usageUnit?: string;
   userPrice?: {

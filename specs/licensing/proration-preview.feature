@@ -28,7 +28,7 @@ Feature: Proration Preview Before Seat Update
   # Upgrade Modal: Limit Mode (Backward Compatibility)
   # ============================================================================
 
-  @integration @unimplemented
+  @integration
   Scenario: Existing limit upgrade modal still works for non-SEAT_EVENT limits
     Given the organization has reached its team member limit
     When the upgrade modal opens for a limit enforcement
@@ -40,24 +40,34 @@ Feature: Proration Preview Before Seat Update
   # Upgrade Modal: Seats Mode (Proration Preview)
   # ============================================================================
 
-  @integration @unimplemented
-  Scenario: Seats mode modal shows proration preview with immediate charge
+  @integration
+  Scenario: Seats mode modal shows the recurring total after a seat update
     Given I have triggered a seat update from 5 to 7 seats
     When the proration preview modal opens
     Then I see "Confirm Seat Update" title
-    And I see current seats as 5 and seats available as 7
-    And I see line items showing credits and charges
-    And I see the prorated amount to be charged immediately
-    And I see the new recurring price per billing period
+    And I see current seats as 5 and new total seats as 7
+    And I see the new recurring billing amount
 
+  # Itemized credits/charges and an explicit "per billing period" label are not
+  # rendered yet — SeatsContent currently shows a single recurring-total line
+  # (`data.formattedRecurringTotal`) with no line-item breakdown, and the
+  # `billingInterval` field returned by previewProration is fetched but unused.
   @integration @unimplemented
+  Scenario: Seats mode modal itemizes prorated credits and charges
+    Given I have triggered a seat update from 5 to 7 seats
+    When the proration preview modal opens
+    Then I see line items showing credits and charges
+    And I see the prorated amount to be charged immediately
+    And the recurring total is labeled with its billing period
+
+  @integration
   Scenario: Seats mode modal shows loading state while fetching preview
     Given I have triggered a seat update
     When the proration preview modal opens
     And the preview data is loading
     Then I see a loading spinner in the modal body
 
-  @integration @unimplemented
+  @integration
   Scenario: Seats mode modal shows error state on preview failure
     Given I have triggered a seat update
     When the proration preview modal opens
@@ -65,7 +75,7 @@ Feature: Proration Preview Before Seat Update
     Then I see an error message in the modal
     And the "Confirm & Update" button is disabled
 
-  @integration @unimplemented
+  @integration
   Scenario: Cancelling proration preview does nothing
     Given I have triggered a seat update from 5 to 7 seats
     And the proration preview modal is open

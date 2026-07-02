@@ -9,6 +9,7 @@ import { LicensePlanLimitsSchema } from "../types";
 import {
   BASE_LICENSE,
   VALID_LICENSE_KEY,
+  ENTERPRISE_LICENSE_KEY,
   EXPIRED_LICENSE_KEY,
   TAMPERED_LICENSE_KEY,
   EMPTY_SIGNATURE_KEY,
@@ -317,6 +318,40 @@ describe("validateLicense", () => {
         expect(result.licenseData.plan.canPublish).toBe(BASE_LICENSE.plan.canPublish);
       }
     });
+  });
+});
+
+describe("backward compatibility: licenses issued before experimentation limits were removed", () => {
+  /** @scenario A pre-existing signed license that still encodes experimentation limits stays valid */
+  it("validates a pre-existing license that still encodes experimentation caps, and drops those caps", () => {
+    // ENTERPRISE_LICENSE_KEY was signed (with TEST_PRIVATE_KEY) with a payload
+    // that still carries maxPrompts/maxWorkflows/maxScenarios/maxAgents/... —
+    // exactly what a self-hosted customer's already-issued license contains.
+    // It MUST keep validating after the experimentation-limit removal:
+    // LicensePlanLimitsSchema intentionally retains those fields so that
+    // verifySignature re-serializes byte-identical JSON and the signature still
+    // verifies (no re-issuance). The caps are then dropped from the active plan
+    // rather than enforced. If a future change strips those schema fields, Zod
+    // would discard them on parse, the re-serialized JSON would differ, and this
+    // test would fail — guarding every already-issued customer license.
+    const result = validateLicense({ licenseKey: ENTERPRISE_LICENSE_KEY, publicKey: TEST_PUBLIC_KEY });
+
+    expect(result.valid).toBe(true);
+    if (!result.valid) return;
+
+    // Tier + seat entitlements still come from the license.
+    expect(result.planInfo.type).toBe("ENTERPRISE");
+    expect(result.planInfo.maxMembers).toBe(100);
+
+    // Experimentation caps AND workspace-structure caps (projects/teams) are no
+    // longer part of the active plan — those resources are OSS/uncapped. The
+    // signed payload still carries them; plan resolution simply does not surface
+    // them, so existing licenses keep validating without re-issuance.
+    expect("maxPrompts" in result.planInfo).toBe(false);
+    expect("maxWorkflows" in result.planInfo).toBe(false);
+    expect("maxScenarios" in result.planInfo).toBe(false);
+    expect("maxProjects" in result.planInfo).toBe(false);
+    expect("maxTeams" in result.planInfo).toBe(false);
   });
 });
 

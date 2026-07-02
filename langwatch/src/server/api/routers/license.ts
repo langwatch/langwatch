@@ -11,19 +11,15 @@ import type { LicenseData } from "../../../../ee/licensing";
 import { signLicense, encodeLicenseKey, generateLicenseId } from "../../../../ee/licensing/signing";
 import { getLicenseHandler } from "~/server/subscriptionHandler";
 
-/** Schema for plan limits input */
+/**
+ * Schema for plan limits input. Licenses encode only the enforced levers
+ * (member seats, messages volume) plus identity; projects, teams, and
+ * experimentation resources are OSS/uncapped and not part of licenses.
+ */
 const planLimitsSchema = z.object({
   maxMembers: z.number().int().positive("Plan limits must be positive numbers"),
   maxMembersLite: z.number().int().positive("Plan limits must be positive numbers"),
-  maxTeams: z.number().int().positive("Plan limits must be positive numbers"),
-  maxProjects: z.number().int().positive("Plan limits must be positive numbers"),
   maxMessagesPerMonth: z.number().int().positive("Plan limits must be positive numbers"),
-  maxWorkflows: z.number().int().positive("Plan limits must be positive numbers"),
-  maxPrompts: z.number().int().positive("Plan limits must be positive numbers"),
-  maxEvaluators: z.number().int().positive("Plan limits must be positive numbers"),
-  maxScenarios: z.number().int().positive("Plan limits must be positive numbers"),
-  maxAgents: z.number().int().positive("Plan limits must be positive numbers"),
-  maxExperiments: z.number().int().positive("Plan limits must be positive numbers"),
   canPublish: z.boolean(),
   usageUnit: z.enum(["traces", "events"]),
 });
@@ -158,21 +154,15 @@ export const licenseRouter = createTRPCRouter({
         email,
         issuedAt: new Date().toISOString(),
         expiresAt: expiresAt.toISOString(),
+        // Keys in LicensePlanLimitsSchema order — signature verification
+        // re-serializes the Zod-parsed payload, which orders keys to schema
+        // order, so sign-time order must match.
         plan: {
           type: planTypeValue,
           name: planName,
           maxMembers: plan.maxMembers,
           maxMembersLite: plan.maxMembersLite,
-          maxTeams: plan.maxTeams,
-          maxProjects: plan.maxProjects,
           maxMessagesPerMonth: plan.maxMessagesPerMonth,
-          evaluationsCredit: 0,
-          maxWorkflows: plan.maxWorkflows,
-          maxPrompts: plan.maxPrompts,
-          maxEvaluators: plan.maxEvaluators,
-          maxScenarios: plan.maxScenarios,
-          maxAgents: plan.maxAgents,
-          maxExperiments: plan.maxExperiments,
           canPublish: plan.canPublish,
           usageUnit: plan.usageUnit,
         },

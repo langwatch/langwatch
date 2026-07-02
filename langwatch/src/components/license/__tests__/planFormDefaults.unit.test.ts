@@ -1,9 +1,13 @@
-import { describe, it, expect } from "vitest";
-import { getPlanDefaults, PLAN_DEFAULTS, type PlanType } from "../planFormDefaults";
+import { describe, expect, it } from "vitest";
 import {
-  PRO_TEMPLATE,
   ENTERPRISE_TEMPLATE,
+  PRO_TEMPLATE,
 } from "../../../../ee/licensing/planTemplates";
+import {
+  getPlanDefaults,
+  PLAN_DEFAULTS,
+  type PlanType,
+} from "../planFormDefaults";
 
 describe("planFormDefaults", () => {
   describe("getPlanDefaults", () => {
@@ -62,10 +66,11 @@ describe("planFormDefaults", () => {
     it("PRO defaults match PRO_TEMPLATE values without fallbacks", () => {
       const proDefaults = PLAN_DEFAULTS.PRO;
 
-      expect(proDefaults.maxPrompts).toBe(PRO_TEMPLATE.maxPrompts);
-      expect(proDefaults.maxEvaluators).toBe(PRO_TEMPLATE.maxEvaluators);
-      expect(proDefaults.maxScenarios).toBe(PRO_TEMPLATE.maxScenarios);
-      expect(proDefaults.maxAgents).toBe(PRO_TEMPLATE.maxAgents);
+      expect(proDefaults.maxMembers).toBe(PRO_TEMPLATE.maxMembers);
+      expect(proDefaults.maxMembersLite).toBe(PRO_TEMPLATE.maxMembersLite);
+      expect(proDefaults.maxMessagesPerMonth).toBe(
+        PRO_TEMPLATE.maxMessagesPerMonth,
+      );
     });
 
     it("includes usageUnit in PRO and ENTERPRISE defaults", () => {
@@ -76,10 +81,15 @@ describe("planFormDefaults", () => {
     it("ENTERPRISE defaults match ENTERPRISE_TEMPLATE values without fallbacks", () => {
       const enterpriseDefaults = PLAN_DEFAULTS.ENTERPRISE;
 
-      expect(enterpriseDefaults.maxPrompts).toBe(ENTERPRISE_TEMPLATE.maxPrompts);
-      expect(enterpriseDefaults.maxEvaluators).toBe(ENTERPRISE_TEMPLATE.maxEvaluators);
-      expect(enterpriseDefaults.maxScenarios).toBe(ENTERPRISE_TEMPLATE.maxScenarios);
-      expect(enterpriseDefaults.maxAgents).toBe(ENTERPRISE_TEMPLATE.maxAgents);
+      expect(enterpriseDefaults.maxMembers).toBe(
+        ENTERPRISE_TEMPLATE.maxMembers,
+      );
+      expect(enterpriseDefaults.maxMembersLite).toBe(
+        ENTERPRISE_TEMPLATE.maxMembersLite,
+      );
+      expect(enterpriseDefaults.maxMessagesPerMonth).toBe(
+        ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
+      );
     });
   });
 });

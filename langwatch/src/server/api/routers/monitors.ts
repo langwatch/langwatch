@@ -11,7 +11,6 @@ import {
   evaluatorsSchema,
 } from "../../evaluations/evaluators";
 import { validatedPreconditionsSchema } from "../../evaluations/preconditionValidation";
-import { enforceLicenseLimit } from "../../license-enforcement";
 import { coerceMonitorMappings } from "../../tracer/tracesMapping";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -155,9 +154,6 @@ export const monitorsRouter = createTRPCRouter({
       } = input;
       const prisma = ctx.prisma;
 
-      // Enforce license limit before creating monitor
-      await enforceLicenseLimit(ctx, projectId, "onlineEvaluations");
-
       // Validate evaluator exists and belongs to project if provided
       if (evaluatorId) {
         const evaluator = await prisma.evaluator.findFirst({
@@ -236,8 +232,6 @@ export const monitorsRouter = createTRPCRouter({
           message: "Monitor not found",
         });
       }
-
-      await enforceLicenseLimit(ctx, projectId, "onlineEvaluations");
 
       // Evaluator-backed monitors keep their settings (and, for workflow
       // evaluators, the backing workflow) on a separate Evaluator record scoped

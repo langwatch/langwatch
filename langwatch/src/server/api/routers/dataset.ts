@@ -8,7 +8,6 @@ import {
   datasetRecordFormSchema,
   datasetRecordInputSchema,
 } from "../../datasets/types";
-import { enforceLicenseLimit } from "../../license-enforcement";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -55,11 +54,6 @@ export const datasetRouter = createTRPCRouter({
     .use(checkProjectPermission("datasets:manage"))
     .use(datasetErrorHandler)
     .mutation(async ({ ctx, input }) => {
-      // Only enforce limit when creating a new dataset (no datasetId provided)
-      const isNewDataset = !("datasetId" in input && input.datasetId);
-      if (isNewDataset) {
-        await enforceLicenseLimit(ctx, input.projectId, "datasets");
-      }
 
       const datasetService = DatasetService.create(ctx.prisma);
 
@@ -237,7 +231,6 @@ export const datasetRouter = createTRPCRouter({
     .use(checkProjectPermission("datasets:create"))
     .use(datasetErrorHandler)
     .mutation(async ({ ctx, input }) => {
-      await enforceLicenseLimit(ctx, input.projectId, "datasets");
 
       // Check that the user has at least datasets:create permission on the source project
       // (having create permission implies you can view/copy from that project)

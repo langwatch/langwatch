@@ -59,15 +59,7 @@ interface FormData {
   planType: PlanType;
   maxMembers: number;
   maxMembersLite: number;
-  maxTeams: number;
-  maxProjects: number;
   maxMessagesPerMonth: number;
-  maxWorkflows: number;
-  maxPrompts: number;
-  maxEvaluators: number;
-  maxScenarios: number;
-  maxAgents: number;
-  maxExperiments: number;
   canPublish: boolean;
   usageUnit: "traces" | "events";
 }
@@ -88,15 +80,7 @@ const defaultFormData: FormData = {
   planType: "ENTERPRISE",
   maxMembers: ENTERPRISE_TEMPLATE.maxMembers,
   maxMembersLite: ENTERPRISE_TEMPLATE.maxMembersLite ?? 50,
-  maxTeams: ENTERPRISE_TEMPLATE.maxTeams ?? 100,
-  maxProjects: ENTERPRISE_TEMPLATE.maxProjects,
   maxMessagesPerMonth: ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
-  maxWorkflows: ENTERPRISE_TEMPLATE.maxWorkflows,
-  maxPrompts: ENTERPRISE_TEMPLATE.maxPrompts ?? 1000,
-  maxEvaluators: ENTERPRISE_TEMPLATE.maxEvaluators ?? 1000,
-  maxScenarios: ENTERPRISE_TEMPLATE.maxScenarios ?? 1000,
-  maxAgents: ENTERPRISE_TEMPLATE.maxAgents ?? 1000,
-  maxExperiments: ENTERPRISE_TEMPLATE.maxExperiments ?? 1000,
   canPublish: ENTERPRISE_TEMPLATE.canPublish,
   usageUnit: (ENTERPRISE_TEMPLATE.usageUnit as "traces" | "events") ?? "events",
 };
@@ -249,15 +233,7 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
         plan: {
           maxMembers: formData.maxMembers,
           maxMembersLite: formData.maxMembersLite,
-          maxTeams: formData.maxTeams,
-          maxProjects: formData.maxProjects,
           maxMessagesPerMonth: formData.maxMessagesPerMonth,
-          maxWorkflows: formData.maxWorkflows,
-          maxPrompts: formData.maxPrompts,
-          maxEvaluators: formData.maxEvaluators,
-          maxScenarios: formData.maxScenarios,
-          maxAgents: formData.maxAgents,
-          maxExperiments: formData.maxExperiments,
           canPublish: formData.canPublish,
           usageUnit: formData.usageUnit,
         },
@@ -546,48 +522,9 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
                 onChange={(value) => handleInputChange("maxMembersLite", value)}
               />
               <NumberField
-                label="Max Projects"
-                value={formData.maxProjects}
-                onChange={(value) => handleInputChange("maxProjects", value)}
-              />
-            </HStack>
-
-            <HStack width="full" gap={4}>
-              <NumberField
                 label="Max Messages/Month"
                 value={formData.maxMessagesPerMonth}
                 onChange={(value) => handleInputChange("maxMessagesPerMonth", value)}
-              />
-              <NumberField
-                label="Max Workflows"
-                value={formData.maxWorkflows}
-                onChange={(value) => handleInputChange("maxWorkflows", value)}
-              />
-            </HStack>
-
-            <HStack width="full" gap={4}>
-              <NumberField
-                label="Max Prompts"
-                value={formData.maxPrompts}
-                onChange={(value) => handleInputChange("maxPrompts", value)}
-              />
-              <NumberField
-                label="Max Evaluators"
-                value={formData.maxEvaluators}
-                onChange={(value) => handleInputChange("maxEvaluators", value)}
-              />
-              <NumberField
-                label="Max Scenarios"
-                value={formData.maxScenarios}
-                onChange={(value) => handleInputChange("maxScenarios", value)}
-              />
-            </HStack>
-
-            <HStack width="full" gap={4}>
-              <NumberField
-                label="Max Agents"
-                value={formData.maxAgents}
-                onChange={(value) => handleInputChange("maxAgents", value)}
               />
             </HStack>
 

@@ -321,9 +321,9 @@ describe("UsageLimitService", () => {
   describe("notifyResourceLimitReached()", () => {
     // Clear all known cooldown keys between tests so cache state doesn't bleed across test cases
     beforeEach(async () => {
-      await resourceLimitCooldown.delete("org_1:workflows");
-      await resourceLimitCooldown.delete("org_1:agents");
-      await resourceLimitCooldown.delete("org_missing:workflows");
+      await resourceLimitCooldown.delete("org_1:members");
+      await resourceLimitCooldown.delete("org_1:membersLite");
+      await resourceLimitCooldown.delete("org_missing:members");
     });
 
     describe("when IS_SAAS is false", () => {
@@ -340,7 +340,7 @@ describe("UsageLimitService", () => {
 
         await service.notifyResourceLimitReached({
           organizationId: "org_1",
-          limitType: "workflows",
+          limitType: "members",
           current: 5,
           max: 5,
         });
@@ -355,11 +355,11 @@ describe("UsageLimitService", () => {
       it("suppresses the notification", async () => {
         const { service, notificationService } = createService();
 
-        await resourceLimitCooldown.set("org_1:workflows", true);
+        await resourceLimitCooldown.set("org_1:members", true);
 
         await service.notifyResourceLimitReached({
           organizationId: "org_1",
-          limitType: "workflows",
+          limitType: "members",
           current: 5,
           max: 5,
         });
@@ -375,10 +375,10 @@ describe("UsageLimitService", () => {
         const { service, organizationService, notificationService } = createService();
         (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue(ORG_WITH_ADMIN);
 
-        // First call sets the cooldown for workflows
+        // First call sets the cooldown for members
         await service.notifyResourceLimitReached({
           organizationId: "org_1",
-          limitType: "workflows",
+          limitType: "members",
           current: 5,
           max: 5,
         });
@@ -392,7 +392,7 @@ describe("UsageLimitService", () => {
         // Second call with different type is NOT suppressed
         await service.notifyResourceLimitReached({
           organizationId: "org_1",
-          limitType: "agents",
+          limitType: "membersLite",
           current: 3,
           max: 3,
         });
@@ -410,7 +410,7 @@ describe("UsageLimitService", () => {
 
         await service.notifyResourceLimitReached({
           organizationId: "org_1",
-          limitType: "workflows",
+          limitType: "members",
           current: 5,
           max: 5,
         });
@@ -423,7 +423,7 @@ describe("UsageLimitService", () => {
           adminName: "Jane Admin",
           adminEmail: "jane@example.com",
           planName: "Launch",
-          limitType: "Workflows",
+          limitType: "Team Members",
           current: 5,
           max: 5,
         });
@@ -438,13 +438,13 @@ describe("UsageLimitService", () => {
         await Promise.all([
           service.notifyResourceLimitReached({
             organizationId: "org_1",
-            limitType: "workflows",
+            limitType: "members",
             current: 5,
             max: 5,
           }),
           service.notifyResourceLimitReached({
             organizationId: "org_1",
-            limitType: "workflows",
+            limitType: "members",
             current: 5,
             max: 5,
           }),
@@ -466,12 +466,12 @@ describe("UsageLimitService", () => {
 
         await service.notifyResourceLimitReached({
           organizationId: "org_missing",
-          limitType: "workflows",
+          limitType: "members",
           current: 5,
           max: 5,
         });
 
-        expect(await resourceLimitCooldown.get("org_missing:workflows")).toBeUndefined();
+        expect(await resourceLimitCooldown.get("org_missing:members")).toBeUndefined();
       });
     });
 
@@ -487,12 +487,12 @@ describe("UsageLimitService", () => {
 
         await service.notifyResourceLimitReached({
           organizationId: "org_1",
-          limitType: "workflows",
+          limitType: "members",
           current: 5,
           max: 5,
         });
 
-        expect(await resourceLimitCooldown.get("org_1:workflows")).toBeUndefined();
+        expect(await resourceLimitCooldown.get("org_1:members")).toBeUndefined();
       });
     });
 
@@ -510,7 +510,7 @@ describe("UsageLimitService", () => {
 
         await service.notifyResourceLimitReached({
           organizationId: "org_1",
-          limitType: "workflows",
+          limitType: "members",
           current: 5,
           max: 5,
         });

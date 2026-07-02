@@ -12,7 +12,6 @@ import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Dialog } from "../../../components/ui/dialog";
 import { toaster } from "../../../components/ui/toaster";
-import { useLicenseEnforcement } from "../../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../utils/api";
 import { isHandledByGlobalHandler } from "../../../utils/trpcError";
@@ -174,9 +173,6 @@ export const NewWorkflowForm = ({
       : getRandomWorkflowIcon(),
   );
 
-  // License enforcement for workflow creation
-  const { checkAndProceed } = useLicenseEnforcement("workflows");
-
   const {
     register,
     handleSubmit,
@@ -208,33 +204,30 @@ export const NewWorkflowForm = ({
       },
     };
 
-    checkAndProceed(() => {
-      createWorkflowMutation.mutate(
-        {
-          projectId: project.id,
-          dsl: newWorkflow,
-          commitMessage: "Workflow creation",
+    createWorkflowMutation.mutate(
+      {
+        projectId: project.id,
+        dsl: newWorkflow,
+        commitMessage: "Workflow creation",
+      },
+      {
+        onSuccess: (createdWorkflow) => {
+          trackEvent("workflow_create", { project_id: project?.id });
+          onClose();
+          void router.push(
+            `/${project.slug}/studio/${createdWorkflow.workflow.id}`,
+          );
         },
-        {
-          onSuccess: (createdWorkflow) => {
-            trackEvent("workflow_create", { project_id: project?.id });
-            onClose();
-            void router.push(
-              `/${project.slug}/studio/${createdWorkflow.workflow.id}`,
-            );
-          },
-          onError: (error) => {
-            // Skip toast if the global license handler already showed the upgrade modal
-            if (isHandledByGlobalHandler(error)) return;
-            toaster.create({
-              title: "Error creating workflow",
-              description: error.message,
-              type: "error",
-            });
-          },
+        onError: (error) => {
+          if (isHandledByGlobalHandler(error)) return;
+          toaster.create({
+            title: "Error creating workflow",
+            description: error.message,
+            type: "error",
+          });
         },
-      );
-    });
+      },
+    );
   };
 
   const nameRef = useRef<HTMLInputElement>(null);

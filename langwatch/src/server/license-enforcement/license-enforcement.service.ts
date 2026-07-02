@@ -27,30 +27,6 @@ type LimitTypeConfig = {
  * No need to modify any switch statements.
  */
 const LIMIT_TYPE_CONFIG: Record<LimitType, LimitTypeConfig> = {
-  workflows: {
-    getCount: (repo, orgId) => repo.getWorkflowCount(orgId),
-    getMax: (plan) => plan.maxWorkflows,
-  },
-  prompts: {
-    getCount: (repo, orgId) => repo.getPromptCount(orgId),
-    getMax: (plan) => plan.maxPrompts,
-  },
-  evaluators: {
-    getCount: (repo, orgId) => repo.getEvaluatorCount(orgId),
-    getMax: (plan) => plan.maxEvaluators,
-  },
-  scenarios: {
-    getCount: (repo, orgId) => repo.getActiveScenarioCount(orgId),
-    getMax: (plan) => plan.maxScenarios,
-  },
-  projects: {
-    getCount: (repo, orgId) => repo.getProjectCount(orgId),
-    getMax: (plan) => plan.maxProjects,
-  },
-  teams: {
-    getCount: (repo, orgId) => repo.getTeamCount(orgId),
-    getMax: (plan) => plan.maxTeams,
-  },
   members: {
     getCount: (repo, orgId) => repo.getMemberCount(orgId),
     getMax: (plan) => plan.maxMembers,
@@ -58,34 +34,6 @@ const LIMIT_TYPE_CONFIG: Record<LimitType, LimitTypeConfig> = {
   membersLite: {
     getCount: (repo, orgId) => repo.getMembersLiteCount(orgId),
     getMax: (plan) => plan.maxMembersLite,
-  },
-  agents: {
-    getCount: (repo, orgId) => repo.getAgentCount(orgId),
-    getMax: (plan) => plan.maxAgents,
-  },
-  experiments: {
-    getCount: (repo, orgId) => repo.getExperimentCount(orgId),
-    getMax: (plan) => plan.maxExperiments,
-  },
-  onlineEvaluations: {
-    getCount: (repo, orgId) => repo.getOnlineEvaluationCount(orgId),
-    getMax: (plan) => plan.maxOnlineEvaluations,
-  },
-  datasets: {
-    getCount: (repo, orgId) => repo.getDatasetCount(orgId),
-    getMax: (plan) => plan.maxDatasets,
-  },
-  dashboards: {
-    getCount: (repo, orgId) => repo.getDashboardCount(orgId),
-    getMax: (plan) => plan.maxDashboards,
-  },
-  customGraphs: {
-    getCount: (repo, orgId) => repo.getCustomGraphCount(orgId),
-    getMax: (plan) => plan.maxCustomGraphs,
-  },
-  automations: {
-    getCount: (repo, orgId) => repo.getAutomationCount(orgId),
-    getMax: (plan) => plan.maxAutomations,
   },
 };
 

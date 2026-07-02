@@ -38,7 +38,6 @@ import {
   useDrawer,
   useDrawerParams,
 } from "~/hooks/useDrawer";
-import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { WorkflowCardDisplay } from "~/optimization_studio/components/workflow/WorkflowCard";
 import {
@@ -162,7 +161,6 @@ export function useEvaluatorEditorController(
   const complexProps = getComplexProps();
   const drawerParams = useDrawerParams();
   const utils = api.useContext();
-  const { checkAndProceed } = useLicenseEnforcement("evaluators");
 
   const onClose = props.onClose ?? closeDrawer;
   const flowCallbacks = getFlowCallbacks("evaluatorEditor");
@@ -509,13 +507,11 @@ export function useEvaluatorEditorController(
         config,
       });
     } else {
-      checkAndProceed(() => {
-        createMutation.mutate({
-          projectId: project.id,
-          name: formValues.name.trim(),
-          type: "evaluator",
-          config,
-        });
+      createMutation.mutate({
+        projectId: project.id,
+        name: formValues.name.trim(),
+        type: "evaluator",
+        config,
       });
     }
   }, [
@@ -527,7 +523,6 @@ export function useEvaluatorEditorController(
     form,
     createMutation,
     updateMutation,
-    checkAndProceed,
     onSave,
     onClose,
     goBack,

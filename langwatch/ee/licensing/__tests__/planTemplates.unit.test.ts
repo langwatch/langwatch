@@ -15,32 +15,12 @@ describe("PRO_TEMPLATE", () => {
     expect(PRO_TEMPLATE.maxMembers).toBe(10);
   });
 
-  it("has maxProjects of 20", () => {
-    expect(PRO_TEMPLATE.maxProjects).toBe(20);
+  it("has maxMembersLite of 5", () => {
+    expect(PRO_TEMPLATE.maxMembersLite).toBe(5);
   });
 
   it("has maxMessagesPerMonth of 100000", () => {
     expect(PRO_TEMPLATE.maxMessagesPerMonth).toBe(100000);
-  });
-
-  it("has maxWorkflows of 50", () => {
-    expect(PRO_TEMPLATE.maxWorkflows).toBe(50);
-  });
-
-  it("has maxPrompts of 50", () => {
-    expect(PRO_TEMPLATE.maxPrompts).toBe(50);
-  });
-
-  it("has maxEvaluators of 50", () => {
-    expect(PRO_TEMPLATE.maxEvaluators).toBe(50);
-  });
-
-  it("has maxScenarios of 50", () => {
-    expect(PRO_TEMPLATE.maxScenarios).toBe(50);
-  });
-
-  it("has maxOnlineEvaluations of 50", () => {
-    expect(PRO_TEMPLATE.maxOnlineEvaluations).toBe(50);
   });
 
   it("has canPublish true", () => {
@@ -65,32 +45,12 @@ describe("ENTERPRISE_TEMPLATE", () => {
     expect(ENTERPRISE_TEMPLATE.maxMembers).toBe(100);
   });
 
-  it("has maxProjects of 500", () => {
-    expect(ENTERPRISE_TEMPLATE.maxProjects).toBe(500);
+  it("has maxMembersLite of 50", () => {
+    expect(ENTERPRISE_TEMPLATE.maxMembersLite).toBe(50);
   });
 
   it("has maxMessagesPerMonth of 10000000", () => {
     expect(ENTERPRISE_TEMPLATE.maxMessagesPerMonth).toBe(10000000);
-  });
-
-  it("has maxWorkflows of 1000", () => {
-    expect(ENTERPRISE_TEMPLATE.maxWorkflows).toBe(1000);
-  });
-
-  it("has maxPrompts of 1000", () => {
-    expect(ENTERPRISE_TEMPLATE.maxPrompts).toBe(1000);
-  });
-
-  it("has maxEvaluators of 1000", () => {
-    expect(ENTERPRISE_TEMPLATE.maxEvaluators).toBe(1000);
-  });
-
-  it("has maxScenarios of 1000", () => {
-    expect(ENTERPRISE_TEMPLATE.maxScenarios).toBe(1000);
-  });
-
-  it("has maxOnlineEvaluations of 1000", () => {
-    expect(ENTERPRISE_TEMPLATE.maxOnlineEvaluations).toBe(1000);
   });
 
   it("has canPublish true", () => {
@@ -117,34 +77,15 @@ describe("GROWTH_TEMPLATE", () => {
     it("does not preset maxMembers", () => {
       expect(GROWTH_TEMPLATE).not.toHaveProperty("maxMembers");
     });
+
+    it("has maxMembersLite of DEFAULT_LIMIT", () => {
+      expect(GROWTH_TEMPLATE.maxMembersLite).toBe(DEFAULT_LIMIT);
+    });
   });
 
   describe("when inspecting feature limits", () => {
-    /** @scenario GROWTH plan includes all features with no artificial limits */
-    it("sets all other limits to unlimited (DEFAULT_LIMIT)", () => {
-      const unlimitedFields = [
-        "maxMembersLite",
-        "maxTeams",
-        "maxProjects",
-        "maxMessagesPerMonth",
-        "maxWorkflows",
-        "maxPrompts",
-        "maxEvaluators",
-        "maxScenarios",
-        "maxAgents",
-        "maxExperiments",
-        "maxOnlineEvaluations",
-        "maxDatasets",
-        "maxDashboards",
-        "maxCustomGraphs",
-        "maxAutomations",
-      ] as const;
-
-      for (const field of unlimitedFields) {
-        expect(GROWTH_TEMPLATE[field], `${field} is not DEFAULT_LIMIT`).toBe(
-          DEFAULT_LIMIT
-        );
-      }
+    it("has maxMessagesPerMonth of DEFAULT_LIMIT", () => {
+      expect(GROWTH_TEMPLATE.maxMessagesPerMonth).toBe(DEFAULT_LIMIT);
     });
 
     it("has canPublish true", () => {

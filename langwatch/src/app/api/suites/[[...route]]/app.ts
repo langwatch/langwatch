@@ -7,7 +7,6 @@ import { createProjectApp, requires } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger/server";
-import { resourceLimitMiddleware } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 import { SuiteService } from "~/server/suites/suite.service";
@@ -192,7 +191,6 @@ secured.access(requires("scenarios:view")).get(
 // ── Create Suite ───────────────────────────────────────────
 secured.access(requires("scenarios:manage")).post(
     "/",
-    resourceLimitMiddleware("experiments"),
     describeRoute({
       description: "Create a new suite (run plan)",
       responses: {

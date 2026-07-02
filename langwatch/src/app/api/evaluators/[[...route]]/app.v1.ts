@@ -15,7 +15,6 @@ import {
   type AuthMiddlewareVariables,
   type OrganizationMiddlewareVariables,
   organizationMiddleware,
-  resourceLimitMiddleware,
 } from "../../middleware";
 import {
   type EvaluatorServiceMiddlewareVariables,
@@ -158,7 +157,6 @@ export function registerEvaluatorRoutes(
     "/",
     organizationMiddleware,
     evaluatorServiceMiddleware,
-    resourceLimitMiddleware("evaluators"),
     describeRoute({
     description: "Create a new evaluator",
     responses: {

@@ -18,8 +18,6 @@ import { LuArrowLeft } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
-import { checkCompoundLimits } from "~/hooks/useCompoundLicenseCheck";
-import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { DEFAULT_MODEL } from "~/utils/constants";
@@ -72,12 +70,6 @@ export function WorkflowSelectorForEvaluatorDrawer(
     flowCallbacks?.onSave ??
     (complexProps.onSave as WorkflowSelectorForEvaluatorDrawerProps["onSave"]);
   const isOpen = props.open !== false && props.open !== undefined;
-
-  // License enforcement for evaluator AND workflow creation
-  // Creating a workflow evaluator requires creating both a workflow AND an evaluator,
-  // so we need to check both limits before proceeding
-  const evaluatorEnforcement = useLicenseEnforcement("evaluators");
-  const workflowEnforcement = useLicenseEnforcement("workflows");
 
   const [defaultIcon] = useState(getRandomWorkflowIcon());
 
@@ -282,11 +274,7 @@ export function WorkflowSelectorForEvaluatorDrawer(
               <Button
                 colorPalette="green"
                 onClick={() => {
-                  // Check both workflows and evaluators limits before proceeding
-                  checkCompoundLimits(
-                    [workflowEnforcement, evaluatorEnforcement],
-                    () => void handleSubmit(onSubmit)()
-                  );
+                  void handleSubmit(onSubmit)();
                 }}
                 disabled={!isValid || isSaving}
                 loading={isSaving}

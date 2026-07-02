@@ -30,7 +30,6 @@ import {
   type AuthMiddlewareVariables,
   type OrganizationMiddlewareVariables,
   organizationMiddleware,
-  resourceLimitMiddleware,
 } from "../../middleware";
 import {
   type PromptServiceMiddlewareVariables,
@@ -679,7 +678,6 @@ export function registerPromptRoutes(
     "/",
     organizationMiddleware,
     promptServiceMiddleware,
-    resourceLimitMiddleware("prompts"),
     describeRoute({
       description: "Create a new prompt with default initial version",
       responses: {

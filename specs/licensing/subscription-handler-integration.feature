@@ -17,10 +17,10 @@ Feature: PlanProvider License Integration
     When I call planProvider.getActivePlan
     Then maxMembers equals FREE_PLAN.maxMembers
 
-  Scenario: Limits projects to FREE_PLAN limit when no license
+  Scenario: Limits lite members to FREE_PLAN limit when no license
     Given the organization has no license
     When I call planProvider.getActivePlan
-    Then maxProjects equals FREE_PLAN.maxProjects
+    Then maxMembersLite equals FREE_PLAN.maxMembersLite
 
   # ============================================================================
   # LicenseHandler Singleton
