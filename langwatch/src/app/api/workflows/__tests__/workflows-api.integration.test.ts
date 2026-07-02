@@ -408,7 +408,6 @@ describe("Workflows REST API", () => {
         expect(body.run_url).toContain(`/experiments/${experiment!.slug}`);
       });
 
-      /** @scenario "Evaluating the same workflow twice reuses the existing experiment" */
       it("succeeds on a second evaluate call against the same workflow", async () => {
         await createVersion("1", entryDsl());
 
