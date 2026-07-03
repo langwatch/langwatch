@@ -1,4 +1,5 @@
 import { SPAN_ATTR_BLOCKCAT_PREFIX } from "~/server/app-layer/traces/block-classification/categories";
+import type { CodingAgentHarness } from "~/server/app-layer/traces/block-classification/harnessDetection";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
@@ -143,15 +144,23 @@ export class SpanCostService {
   }
 
   /**
-   * The step's TOTAL input context size (ADR-033 session tracking): freshly
-   * billed input plus cache-read plus cache-creation tokens. Compaction is a
-   * drop in the whole prompt context, not just the fresh prefix — on a cached
-   * turn the fresh `input_tokens` is tiny while the real context sits in the
-   * cache-read pool, so summing the pools is the only signal that reflects
-   * genuine context re-basing. Returns 0 when the span carries no usage.
+   * The step's TOTAL input context size (ADR-033 session tracking). Compaction
+   * is a drop in the whole prompt context, not just the fresh prefix, so the
+   * measure must include cached context — but HOW cache relates to the reported
+   * input count differs by provider:
+   *
+   *   - Anthropic (claude): `input_tokens` is fresh-only, with cache_read /
+   *     cache_creation reported SEPARATELY. Full context = their sum.
+   *   - OpenAI (codex): `cached_tokens` is a SUBSET of `input_tokens` (already
+   *     counted in it). Full context = `input_tokens` alone; adding cache would
+   *     double-count — inflating the running max and pushing real compactions'
+   *     retain ratio below the subagent floor (events missed).
+   *
+   * Returns 0 when the span carries no usage.
    */
   extractStepInputTokens(
     span: NormalizedSpan,
+    harness: CodingAgentHarness,
     // The fold already extracts cache tokens for this span (RESERVED_CACHE_*
     // sums) — pass them in to avoid a second scan. Prompt tokens are read
     // directly here rather than via extractTokenMetrics: that path also runs
@@ -165,6 +174,8 @@ export class SpanCostService {
         span.spanAttributes[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS],
       ) ?? 0,
     );
+    // Codex: cached tokens are already inside promptTokens — do not re-add.
+    if (harness === "codex") return promptTokens;
     const cache = cacheTokens ?? this.extractCacheTokens(span);
     return promptTokens + cache.cacheReadTokens + cache.cacheCreationTokens;
   }

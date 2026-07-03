@@ -273,7 +273,7 @@ export function applySpanToSummary({
     // first and skip the token sum entirely for everything else. Reuse the
     // cache tokens already extracted above rather than re-scanning the span.
     const stepInputTokens = harness
-      ? spanCostService.extractStepInputTokens(span, cacheTokens)
+      ? spanCostService.extractStepInputTokens(span, harness, cacheTokens)
       : 0;
     if (harness && stepInputTokens > 0) {
       appendSessionStep({

@@ -34,6 +34,26 @@ function makeSpan(overrides: Partial<NormalizedSpan> = {}): NormalizedSpan {
   };
 }
 
+describe("SpanCostService.extractStepInputTokens", () => {
+  const service = new SpanCostService();
+  const span = makeSpan({
+    spanAttributes: { "gen_ai.usage.input_tokens": 1000 },
+  });
+  const cache = { cacheReadTokens: 700, cacheCreationTokens: 200 };
+
+  describe("when the harness is claude (Anthropic cache is separate from input)", () => {
+    it("sums input + cache-read + cache-creation for the full context size", () => {
+      expect(service.extractStepInputTokens(span, "claude", cache)).toBe(1900);
+    });
+  });
+
+  describe("when the harness is codex (OpenAI cache is a subset of input)", () => {
+    it("returns input tokens alone so cache is not double-counted", () => {
+      expect(service.extractStepInputTokens(span, "codex", cache)).toBe(1000);
+    });
+  });
+});
+
 describe("SpanCostService.extractTokenTiming", () => {
   const service = new SpanCostService();
 
