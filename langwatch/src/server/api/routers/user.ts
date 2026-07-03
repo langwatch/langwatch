@@ -607,12 +607,25 @@ export const userRouter = createTRPCRouter({
           // no per-category split). Personal-tenant rows plus, when the org has
           // a governance tenant, this user's ingestion-source rows there —
           // attributed by principal email on the gov trace summaries.
-          usage.breakdownByCategory({
-            personalProjectId: workspace.project.id,
-            window,
-            userEmail: ctx.session.user.email ?? undefined,
-            ingestionTenantId,
-          }),
+          //
+          // Degrade to [] on failure so one category-query error (its ClickHouse
+          // scan is heavier than the others and has OOM'd before) can't 500 the
+          // whole /me payload and take summary / chart / models down with it —
+          // the org-side twin isolates the same query the same way.
+          usage
+            .breakdownByCategory({
+              personalProjectId: workspace.project.id,
+              window,
+              userEmail: ctx.session.user.email ?? undefined,
+              ingestionTenantId,
+            })
+            .catch((error) => {
+              logger.error(
+                { error, userId },
+                "personal usage category breakdown failed; degrading to empty",
+              );
+              return [];
+            }),
         ]);
 
       return {

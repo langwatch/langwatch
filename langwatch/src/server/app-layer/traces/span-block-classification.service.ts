@@ -177,17 +177,27 @@ export class OtlpSpanBlockClassificationService {
       outputMessages: outputMessages ?? [],
       tools: tools ?? undefined,
     });
-    if (input.length === 0 && output.length === 0) return;
 
-    // 4. Per-block token estimate — real tokenizer counts, not byte proxies
+    // 4. Provider-reported usage pools. Extracted BEFORE the empty-blocks guard:
+    //    when content classified to zero blocks but the provider still reported
+    //    usage (e.g. empty/unparseable parts), that usage must not be dropped —
+    //    the zero-guard in allocateCategoryCosts routes it to the axis catch-all
+    //    (ADR-033 "no usage is dropped"). Skip only when there is neither content
+    //    nor usage to attribute.
+    const pools = extractUsagePools(span);
+    const hasUsage =
+      pools.inputTokens > 0 ||
+      pools.cacheReadTokens > 0 ||
+      pools.cacheCreationTokens > 0 ||
+      pools.outputTokens > 0;
+    if (input.length === 0 && output.length === 0 && !hasUsage) return;
+
+    // 5. Per-block token estimate — real tokenizer counts, not byte proxies
     //    (ADR-033 exact-tokens constraint). Pool totals below re-scale these to
     //    provider truth, so within-pool the split is tokenizer-grade.
     const model = extractModelName(span, MODEL_ATTRIBUTE_KEYS) ?? "";
     const inputBlocks = await this.toTokenBlocks({ blocks: input, model });
     const outputBlocks = await this.toTokenBlocks({ blocks: output, model });
-
-    // 5. Provider-reported usage pools + per-tier rates already stamped upstream.
-    const pools = extractUsagePools(span);
     const prices = this.resolveTierPrices({ span, model });
 
     // 6. Allocate cache-tier aware and push the classification attributes.
