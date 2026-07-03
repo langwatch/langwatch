@@ -87,13 +87,15 @@ function RoutingPoliciesPage() {
   );
 
   // Fuel the structured picker on the drawer with the org's actual
-  // ModelProviders (visible at ORG / TEAM / PROJECT scopes via the
-  // standard scope cascade). Returns id + provider for the drawer's
-  // tagged picker.
-  const credentialsQuery = api.modelProvider.getAllForProject.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id, refetchOnWindowFocus: false },
-  );
+  // ModelProviders. Must be the one-entry-per-row org listing:
+  // `getAllForProject` collapses rows by provider key, so two "custom"
+  // providers would surface as a single picker option and every other
+  // row in an existing policy renders as "Unknown credential".
+  const credentialsQuery =
+    api.modelProvider.listAllForOrganizationForFrontend.useQuery(
+      { organizationId: orgId },
+      { enabled: !!orgId, refetchOnWindowFocus: false },
+    );
 
   const [editingId, setEditingId] = useState<string | "new" | null>(null);
   const [policyToDelete, setPolicyToDelete] = useState<Policy | null>(null);
@@ -489,16 +491,16 @@ function RoutingPoliciesPage() {
         }
         availableCredentials={
           credentialsQuery.data
-            ? Object.entries(credentialsQuery.data)
-                .filter(([, mp]) => mp && mp.id)
-                .map(([providerKey, mp]: [string, any]) => ({
-                  id: mp.id as string,
-                  modelProviderName: mp.name ?? providerKey,
+            ? credentialsQuery.data.providers
+                .filter((mp) => !!mp.id)
+                .map((mp) => ({
+                  id: mp.id!,
+                  modelProviderName: mp.name ?? mp.provider,
                   slot: "primary",
                   disabledAt: mp.disabledAt
                     ? new Date(mp.disabledAt).toISOString()
                     : null,
-                  healthStatus: (mp.healthStatus as string) ?? "UNKNOWN",
+                  healthStatus: mp.healthStatus ?? "UNKNOWN",
                 }))
             : []
         }
