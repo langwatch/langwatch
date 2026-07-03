@@ -106,6 +106,42 @@ describe("PersonalUsageService.breakdownByCategory ingestion union", () => {
     });
   });
 
+  describe("given the same category populated on both tenants", () => {
+    // The personal tenant (personalProjectId) and the ingestion/gov tenant
+    // (ingestionTenantId) are DISJOINT by construction: the receiver writes a
+    // trace_summary under exactly one tenant, so a given TraceId lives under one
+    // tenant only. queryCategoryTotals returns a pre-aggregated per-tenant sum
+    // (never trace-level rows), so summing the two tenant aggregates counts each
+    // physical trace exactly once — there is no cross-tenant overlap to dedup.
+    // This pins that the union genuinely ADDS both tenants rather than treating
+    // one as an overwrite/max, so a category active in both isn't undercounted.
+    it("sums both tenants' totals (disjoint tenants, no double-count risk)", async () => {
+      queryMock.mockImplementation(
+        async ({
+          query_params,
+        }: {
+          query_params: Record<string, string | number>;
+        }) =>
+          query_params.tenantId === "gov"
+            ? jsonResult(rowFor({ system_prompt: { cost: 2, tokens: 2000 } }))
+            : jsonResult(rowFor({ system_prompt: { cost: 3, tokens: 3000 } })),
+      );
+
+      const rows = await new PersonalUsageService().breakdownByCategory({
+        personalProjectId: "personal",
+        ingestionTenantId: "gov",
+        userEmail: "me@example.com",
+        window,
+      });
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.category).toBe("system_prompt");
+      // 3 (personal) + 2 (gov) — both summed, neither dropped.
+      expect(rows[0]?.costUsd).toBeCloseTo(5, 10);
+      expect(rows[0]?.tokens).toBe(5000);
+    });
+  });
+
   describe("given the gov-tenant union query fails", () => {
     it("degrades to the personal-tenant rows instead of surfacing the error", async () => {
       queryMock.mockImplementation(
