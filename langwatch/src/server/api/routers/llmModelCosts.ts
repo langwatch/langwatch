@@ -69,7 +69,24 @@ export const llmModelCostsRouter = createTRPCRouter({
           message:
             "Invalid or unsafe regular expression (avoid nested quantifiers like (a+)+)",
         }),
-      }),
+      })
+        // Both-or-neither on the base rates. resolveCustomTierRates treats a row
+        // with ANY rate set as a FULL override of the registry, pricing every
+        // unset tier at $0 — so a row with only inputCostPerToken silently costs
+        // all output tokens at $0 instead of falling back to the registry rate.
+        // The UI marks both required, but that guard is client-side only; this
+        // closes the same hole for direct tRPC/SDK callers. Cache tiers stay
+        // optional — they documented-fall-back to the input rate, not to $0.
+        .refine(
+          (v) =>
+            (v.inputCostPerToken === undefined) ===
+            (v.outputCostPerToken === undefined),
+          {
+            message:
+              "Set both input and output cost per token, or neither — a half-filled custom rate silently prices the missing side at $0 instead of using the registry rate.",
+            path: ["outputCostPerToken"],
+          },
+        ),
     )
     .use(authorizeInResolver)
     .mutation(async ({ input, ctx }) => {

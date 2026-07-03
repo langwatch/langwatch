@@ -219,4 +219,28 @@ describe("llmModelCosts — scope-aware RBAC", () => {
       expect(res.regex).toBe("gpt-5-mini-v2");
     });
   });
+
+  describe("given a half-filled custom base rate", () => {
+    /** @scenario createOrUpdate rejects a base rate with only one side set */
+    it("rejects inputCostPerToken with no outputCostPerToken", async () => {
+      // resolveCustomTierRates treats any set rate as a full registry override,
+      // so a row with only input set silently prices output at $0. An authorized
+      // caller must still be rejected at the input boundary, not just by the UI.
+      const owner = await seedUser(ORG_A, ["project:manage"], {
+        scopeType: PROJECT,
+        scopeId: PROJECT_A,
+      });
+
+      await expect(
+        owner.llmModelCost.createOrUpdate({
+          projectId: PROJECT_A,
+          scopeType: "PROJECT",
+          scopeId: PROJECT_A,
+          model: "gpt-5-mini",
+          inputCostPerToken: 0.000001,
+          regex: "gpt-5-mini",
+        }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    });
+  });
 });
