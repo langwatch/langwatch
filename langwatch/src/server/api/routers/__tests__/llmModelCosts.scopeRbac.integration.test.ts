@@ -221,7 +221,6 @@ describe("llmModelCosts — scope-aware RBAC", () => {
   });
 
   describe("given a half-filled custom base rate", () => {
-    /** @scenario createOrUpdate rejects a base rate with only one side set */
     it("rejects inputCostPerToken with no outputCostPerToken", async () => {
       // resolveCustomTierRates treats any set rate as a full registry override,
       // so a row with only input set silently prices output at $0. An authorized

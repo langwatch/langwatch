@@ -52,24 +52,25 @@ export const llmModelCostsRouter = createTRPCRouter({
 
   createOrUpdate: protectedProcedure
     .input(
-      z.object({
-        id: z.string().optional(),
-        projectId: z.string(),
-        // Optional scope target. Defaults to the page's own project so the
-        // existing project-level flow keeps working unchanged; an org admin
-        // can pass ORGANIZATION/TEAM to push a cost down the cascade.
-        scopeType: z.enum(SCOPE_TIERS).optional(),
-        scopeId: z.string().optional(),
-        model: z.string(),
-        inputCostPerToken: z.number().optional(),
-        outputCostPerToken: z.number().optional(),
-        cacheReadCostPerToken: z.number().optional(),
-        cacheCreationCostPerToken: z.number().optional(),
-        regex: z.string().refine((value) => isSafeRegex(value), {
-          message:
-            "Invalid or unsafe regular expression (avoid nested quantifiers like (a+)+)",
-        }),
-      })
+      z
+        .object({
+          id: z.string().optional(),
+          projectId: z.string(),
+          // Optional scope target. Defaults to the page's own project so the
+          // existing project-level flow keeps working unchanged; an org admin
+          // can pass ORGANIZATION/TEAM to push a cost down the cascade.
+          scopeType: z.enum(SCOPE_TIERS).optional(),
+          scopeId: z.string().optional(),
+          model: z.string(),
+          inputCostPerToken: z.number().optional(),
+          outputCostPerToken: z.number().optional(),
+          cacheReadCostPerToken: z.number().optional(),
+          cacheCreationCostPerToken: z.number().optional(),
+          regex: z.string().refine((value) => isSafeRegex(value), {
+            message:
+              "Invalid or unsafe regular expression (avoid nested quantifiers like (a+)+)",
+          }),
+        })
         // Both-or-neither on the base rates. resolveCustomTierRates treats a row
         // with ANY rate set as a FULL override of the registry, pricing every
         // unset tier at $0 — so a row with only inputCostPerToken silently costs

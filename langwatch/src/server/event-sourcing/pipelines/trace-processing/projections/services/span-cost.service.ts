@@ -161,8 +161,9 @@ export class SpanCostService {
   ): number {
     const promptTokens = Math.max(
       0,
-      coerceToNumber(span.spanAttributes[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]) ??
-        0,
+      coerceToNumber(
+        span.spanAttributes[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS],
+      ) ?? 0,
     );
     const cache = cacheTokens ?? this.extractCacheTokens(span);
     return promptTokens + cache.cacheReadTokens + cache.cacheCreationTokens;
