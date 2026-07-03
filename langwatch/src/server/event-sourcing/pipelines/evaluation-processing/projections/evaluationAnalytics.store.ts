@@ -1,7 +1,5 @@
 import type { EvaluationAnalyticsRepository } from "~/server/app-layer/evaluations/repositories/evaluation-analytics.repository";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
-import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
+import { BaseAnalyticsFoldStore } from "../../shared/analyticsStoreBase";
 import {
   type EvaluationAnalyticsData,
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
@@ -25,75 +23,19 @@ import {
  * `trimAttributesForAnalytics` inside the projection function so
  * payload-shaped keys never reach the wire.
  */
-export class EvaluationAnalyticsStore
-  implements FoldProjectionStore<EvaluationAnalyticsData>
-{
-  constructor(private readonly repo: EvaluationAnalyticsRepository) {}
-
-  async store(
-    state: EvaluationAnalyticsData,
-    context: ProjectionStoreContext,
-  ): Promise<void> {
-    if (!hasPersistableSignal(state)) return;
-    const stateWithId: EvaluationAnalyticsData = state.evaluationId
-      ? state
-      : { ...state, evaluationId: String(context.aggregateId) };
-    const retentionDays =
-      context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
-    const row = projectEvaluationAnalyticsStateToRow({
-      state: stateWithId,
-      tenantId: String(context.tenantId),
-      version: EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
+export class EvaluationAnalyticsStore extends BaseAnalyticsFoldStore<
+  EvaluationAnalyticsData,
+  ReturnType<typeof projectEvaluationAnalyticsStateToRow>
+> {
+  constructor(repo: EvaluationAnalyticsRepository) {
+    super(repo, {
+      hasPersistableSignal,
+      stampAggregateId: (state, aggregateId) =>
+        state.evaluationId ? state : { ...state, evaluationId: aggregateId },
+      retentionCategory: "traces",
+      versionLatest: EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
+      project: projectEvaluationAnalyticsStateToRow,
     });
-    await this.repo.upsert(row, retentionDays);
-  }
-
-  async storeBatch(
-    entries: Array<{
-      state: EvaluationAnalyticsData;
-      context: ProjectionStoreContext;
-    }>,
-  ): Promise<void> {
-    const batchRows = entries
-      .filter(({ state }) => hasPersistableSignal(state))
-      .map(({ state, context }) => {
-        const stateWithId: EvaluationAnalyticsData = state.evaluationId
-          ? state
-          : { ...state, evaluationId: String(context.aggregateId) };
-        return {
-          row: projectEvaluationAnalyticsStateToRow({
-            state: stateWithId,
-            tenantId: String(context.tenantId),
-            version: EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
-          }),
-          retentionDays:
-            context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS,
-        };
-      });
-
-    if (batchRows.length === 0) return;
-
-    if (this.repo.upsertBatch) {
-      await this.repo.upsertBatch(batchRows);
-    } else {
-      await Promise.all(
-        batchRows.map(({ row, retentionDays }) =>
-          this.repo.upsert(row, retentionDays),
-        ),
-      );
-    }
-  }
-
-  /**
-   * Phase 6 has no slim read-back path — the executor always re-folds from
-   * the event log when the slim cache misses, rather than reading slim
-   * back. Same Phase 2/3 contract the trace slim store applies.
-   */
-  async get(
-    _aggregateId: string,
-    _context: ProjectionStoreContext,
-  ): Promise<EvaluationAnalyticsData | null> {
-    return null;
   }
 }
 

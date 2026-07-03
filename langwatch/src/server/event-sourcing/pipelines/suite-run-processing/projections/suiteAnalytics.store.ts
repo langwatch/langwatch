@@ -1,7 +1,6 @@
 import type { SuiteAnalyticsRepository } from "~/server/app-layer/suites/repositories/suite-analytics.repository";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
+import { BaseAnalyticsFoldStore } from "../../shared/analyticsStoreBase";
 import {
   type SuiteAnalyticsData,
   projectSuiteAnalyticsStateToRow,
@@ -19,71 +18,19 @@ import {
  * `scenarios` in `RETENTION_TABLE_CATEGORY_MAP` and `suite_analytics`
  * mirrors that.
  */
-export class SuiteAnalyticsStore
-  implements FoldProjectionStore<SuiteAnalyticsData>
-{
-  constructor(private readonly repo: SuiteAnalyticsRepository) {}
-
-  async store(
-    state: SuiteAnalyticsData,
-    context: ProjectionStoreContext,
-  ): Promise<void> {
-    if (!hasPersistableSignal(state, context)) return;
-    const stateWithId: SuiteAnalyticsData = state.suiteRunId
-      ? state
-      : { ...state, suiteRunId: String(context.aggregateId) };
-    const retentionDays =
-      context.retentionPolicy?.scenarios ?? PLATFORM_DEFAULT_RETENTION_DAYS;
-    const row = projectSuiteAnalyticsStateToRow({
-      state: stateWithId,
-      tenantId: String(context.tenantId),
-      version: SUITE_ANALYTICS_PROJECTION_VERSION_LATEST,
+export class SuiteAnalyticsStore extends BaseAnalyticsFoldStore<
+  SuiteAnalyticsData,
+  ReturnType<typeof projectSuiteAnalyticsStateToRow>
+> {
+  constructor(repo: SuiteAnalyticsRepository) {
+    super(repo, {
+      hasPersistableSignal,
+      stampAggregateId: (state, aggregateId) =>
+        state.suiteRunId ? state : { ...state, suiteRunId: aggregateId },
+      retentionCategory: "scenarios",
+      versionLatest: SUITE_ANALYTICS_PROJECTION_VERSION_LATEST,
+      project: projectSuiteAnalyticsStateToRow,
     });
-    await this.repo.upsert(row, retentionDays);
-  }
-
-  async storeBatch(
-    entries: Array<{
-      state: SuiteAnalyticsData;
-      context: ProjectionStoreContext;
-    }>,
-  ): Promise<void> {
-    const batchRows = entries
-      .filter(({ state, context }) => hasPersistableSignal(state, context))
-      .map(({ state, context }) => {
-        const stateWithId: SuiteAnalyticsData = state.suiteRunId
-          ? state
-          : { ...state, suiteRunId: String(context.aggregateId) };
-        return {
-          row: projectSuiteAnalyticsStateToRow({
-            state: stateWithId,
-            tenantId: String(context.tenantId),
-            version: SUITE_ANALYTICS_PROJECTION_VERSION_LATEST,
-          }),
-          retentionDays:
-            context.retentionPolicy?.scenarios ??
-            PLATFORM_DEFAULT_RETENTION_DAYS,
-        };
-      });
-
-    if (batchRows.length === 0) return;
-
-    if (this.repo.upsertBatch) {
-      await this.repo.upsertBatch(batchRows);
-    } else {
-      await Promise.all(
-        batchRows.map(({ row, retentionDays }) =>
-          this.repo.upsert(row, retentionDays),
-        ),
-      );
-    }
-  }
-
-  async get(
-    _aggregateId: string,
-    _context: ProjectionStoreContext,
-  ): Promise<SuiteAnalyticsData | null> {
-    return null;
   }
 }
 
