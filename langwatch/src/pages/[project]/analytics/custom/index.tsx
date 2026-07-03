@@ -713,16 +713,9 @@ function CustomGraphForm({
       graphJson.height = 300;
     }
 
-    const formData = form.getValues();
-
-    // Get the series label for the alert name
-    let alertName: string | undefined;
-    if (formData.alert?.enabled && formData.series.length > 0) {
-      const selectedSeries = formData.series[0];
-      alertName =
-        selectedSeries?.name ||
-        `${selectedSeries?.metric} (${selectedSeries?.aggregation})`;
-    }
+    // Alert-writing moved to the automations drawer (ADR-034 Phase 5.2 —
+    // the chart-card `Add alert` bell opens `automation` drawer with
+    // `prefilledGraphId`). This graph mutation is graph-shape only.
 
     addNewGraph.mutate(
       {
@@ -730,9 +723,7 @@ function CustomGraphForm({
         name: graphName ?? "",
         graph: JSON.stringify(graphJson),
         filterParams: filterParams,
-        alert: formData.alert?.enabled ? formData.alert : undefined,
         dashboardId: dashboardId,
-        alertName: alertName,
       },
       {
         onSuccess: () => {
@@ -750,16 +741,10 @@ function CustomGraphForm({
   const updateGraph = () => {
     const graphName = form.getValues("title");
     const graphJson = customGraphFormToCustomGraphInput(form.getValues());
-    const formData = form.getValues();
 
-    // Get the series label for the alert name
-    let alertName: string | undefined;
-    if (formData.alert?.enabled && formData.series.length > 0) {
-      const selectedSeries = formData.series[0];
-      alertName =
-        selectedSeries?.name ||
-        `${selectedSeries?.metric} (${selectedSeries?.aggregation})`;
-    }
+    // Alert-writing moved to the automations drawer (ADR-034 Phase 5.2).
+    // This graph mutation is graph-shape only; edits to the alert go
+    // through the bell icon → automation drawer edit path.
 
     updateGraphById.mutate(
       {
@@ -768,8 +753,6 @@ function CustomGraphForm({
         graphId: customId ?? "",
         graph: JSON.stringify(graphJson),
         filterParams: filterParams,
-        alert: formData.alert?.enabled ? formData.alert : undefined,
-        alertName: alertName,
       },
       {
         onSuccess: () => {
