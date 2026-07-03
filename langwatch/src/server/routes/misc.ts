@@ -91,7 +91,6 @@ import { runWorkflow as runWorkflowFn } from "~/server/workflows/runWorkflow";
 import { encrypt } from "~/utils/encryption";
 import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
-import { slugify } from "~/utils/slugify";
 import { validateInternalSecret } from "./_lib/internal-secret";
 
 const logger = createLogger("langwatch:misc");
