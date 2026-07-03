@@ -383,6 +383,35 @@ func TestHandleChat_FallbackOnProviderError(t *testing.T) {
 	assert.Equal(t, 1, result.Meta.FallbackCount)
 }
 
+func TestHandleChat_FallbackOnUpstream404(t *testing.T) {
+	callCount := 0
+	provider := &mockProvider{
+		dispatchFn: func(_ context.Context, _ *domain.Request, cred domain.Credential) (*domain.Response, error) {
+			callCount++
+			if cred.ID == "cred-1" {
+				return nil, &domain.UpstreamError{StatusCode: 404, Message: "model not found"}
+			}
+			return successResponse(), nil
+		},
+	}
+
+	bundle := testBundle(
+		domain.Credential{ID: "cred-1", ProviderID: domain.ProviderOpenAI, APIKey: "sk-1"},
+		domain.Credential{ID: "cred-2", ProviderID: domain.ProviderOpenAI, APIKey: "sk-2"},
+	)
+	bundle.Config.Fallback.MaxAttempts = 2
+
+	application := New(
+		WithProviders(provider),
+		WithLogger(zap.NewNop()),
+	)
+
+	result, err := application.HandleChat(context.Background(), bundle, bytes.NewReader(testBody()), "gpt-4")
+	require.NoError(t, err)
+	assert.Equal(t, 2, callCount)
+	assert.Equal(t, 1, result.Meta.FallbackCount)
+}
+
 func TestHandleChat_EmitsTraceAfterSuccess(t *testing.T) {
 	provider := &mockProvider{
 		dispatchFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (*domain.Response, error) {
@@ -567,8 +596,8 @@ func TestPeekStream(t *testing.T) {
 // A forwarded upstream error must drive credential fallback by its real HTTP
 // status: terminal 4xx (e.g. an Anthropic "credit balance too low" 400) is
 // non-retryable so the gateway stops instead of burning the next key on a
-// pointless retry; 429 and 5xx stay retryable so the fallback chain still
-// kicks in.
+// pointless retry; 404 ("model not served here"), 429 and 5xx stay retryable
+// so the fallback chain still kicks in.
 func TestClassifyProviderError_UpstreamError(t *testing.T) {
 	cases := []struct {
 		status int
@@ -578,7 +607,7 @@ func TestClassifyProviderError_UpstreamError(t *testing.T) {
 		{401, retry.ReasonNonRetryable},
 		{402, retry.ReasonNonRetryable},
 		{403, retry.ReasonNonRetryable},
-		{404, retry.ReasonNonRetryable},
+		{404, retry.ReasonNotFound},
 		{422, retry.ReasonNonRetryable},
 		{429, retry.ReasonRateLimit},
 		{500, retry.ReasonRetryable5xx},
