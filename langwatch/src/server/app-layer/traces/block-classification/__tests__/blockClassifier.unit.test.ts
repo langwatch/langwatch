@@ -307,6 +307,53 @@ describe("classifyBlocks", () => {
       });
       expect(lastInputCacheBreakpointIndex).toBeNull();
     });
+
+    it("marks the previous block when an empty text part carries cache_control", () => {
+      // Regression: an empty-string text part bearing cache_control pushes no
+      // block, so gating the mark on "did this part append a block" dropped the
+      // breakpoint entirely (null) — later dumping the whole cache pool into the
+      // input catch-all. The boundary is the previous real block.
+      const { lastInputCacheBreakpointIndex } = classifyBlocks({
+        inputMessages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "real content" },
+              { type: "text", text: "", cache_control: { type: "ephemeral" } },
+            ],
+          },
+        ],
+      });
+      expect(lastInputCacheBreakpointIndex).toBe(0);
+    });
+
+    it("keeps a breakpoint when cache_control lands past the block cap", () => {
+      // Regression: a cache_control marker past MAX_CLASSIFIED_BLOCKS_PER_SPAN
+      // (long agent turn, forward-most Anthropic breakpoint near the end) used
+      // to no-op the mark once overflowed, collapsing the breakpoint to null and
+      // dumping the entire provider cache pool into other_input. It must instead
+      // point at the overflow aggregate's slot so the whole retained prefix
+      // counts as cached.
+      const overCap = MAX_CLASSIFIED_BLOCKS_PER_SPAN + 5;
+      const parts = Array.from({ length: overCap }, (_, i) => ({
+        type: "text",
+        text: `p${i}`,
+        ...(i === overCap - 1
+          ? { cache_control: { type: "ephemeral" } }
+          : {}),
+      }));
+
+      const { input, lastInputCacheBreakpointIndex } = classifyBlocks({
+        inputMessages: [{ role: "user", content: parts }],
+      });
+
+      expect(input).toHaveLength(MAX_CLASSIFIED_BLOCKS_PER_SPAN);
+      // The overflow aggregate occupies the last slot; the breakpoint points at
+      // it, so partitionInput treats every retained block as the cached prefix.
+      expect(lastInputCacheBreakpointIndex).toBe(
+        MAX_CLASSIFIED_BLOCKS_PER_SPAN - 1,
+      );
+    });
   });
 
   describe("given classified blocks", () => {

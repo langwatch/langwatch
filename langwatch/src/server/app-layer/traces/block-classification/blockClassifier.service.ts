@@ -173,10 +173,23 @@ class AxisAccumulator {
     return this.blocks.length;
   }
 
-  /** Mark the most recently pushed block as carrying a cache_control breakpoint.
-   * Breakpoints live in the cacheable prefix, never in the overflow tail. */
+  /** Record that the cacheable prefix extends through the current frontier — the
+   * position a `cache_control` marker sits at. Normally that's the last pushed
+   * block. Two edge cases must NOT collapse the breakpoint to "none", or the
+   * whole provider cache pool is later dumped into the axis catch-all:
+   *   - Once overflowed, further parts no longer append detail blocks, so the
+   *     exact position past the cap is unrecoverable — but a breakpoint DID
+   *     occur. Point it at the overflow aggregate's slot (its idx at `result()`
+   *     time === current `blocks.length`) so the entire RETAINED prefix counts
+   *     as cached. Over-includes at worst; pool totals still reconcile.
+   *   - An empty-text part carrying `cache_control` pushes no block; the boundary
+   *     is then the previous block (everything before this point is cached), so
+   *     mark the last existing block rather than skip. */
   markBreakpoint(): void {
-    if (this.overflowed) return;
+    if (this.overflowed) {
+      this.lastBreakpointIdx = this.blocks.length;
+      return;
+    }
     const last = this.blocks[this.blocks.length - 1];
     if (last) this.lastBreakpointIdx = last.idx;
   }
@@ -267,7 +280,6 @@ function classifyInputMessage({
       if (id && name && !toolNames.has(id)) toolNames.set(id, name);
     }
 
-    const before = acc.size();
     const category = inputPartCategory({ part, fresh, role, toolNames });
     if (part.type === "text" && fresh && role === "user") {
       pushFreshUserOrMarkers({
@@ -279,9 +291,13 @@ function classifyInputMessage({
     } else {
       acc.push(category, blockText(part));
     }
-    // Mark the breakpoint only if THIS part actually appended a block — else the
-    // mark lands on a prior part's block and the cached-prefix boundary is wrong.
-    if (hasCacheControl(part) && acc.size() > before) acc.markBreakpoint();
+    // Mark the breakpoint whenever THIS part carries cache_control. markBreakpoint
+    // resolves the frontier itself (last block, or the overflow slot past the
+    // cap, or the previous block when this part appended nothing) — gating on
+    // "did this part append a block" here would silently lose the breakpoint for
+    // an empty cache_control part or one past the detail cap, dumping the whole
+    // cache pool into the catch-all.
+    if (hasCacheControl(part)) acc.markBreakpoint();
   }
 }
 
