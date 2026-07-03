@@ -200,7 +200,7 @@ import {
 import { PrismaTriggerRepository } from "./triggers/repositories/trigger.prisma.repository";
 import { NullTriggerRepository } from "./triggers/repositories/trigger.repository";
 import { TriggerService } from "./triggers/trigger.service";
-import { TriggerTemplateService } from "./triggers/trigger-template.service";
+import { testFireTrigger } from "./triggers/trigger-template.service";
 import { UsageService } from "./usage/usage.service";
 
 /**
@@ -486,10 +486,14 @@ export function initializeDefaultApp(options?: {
     new PrismaEmailSuppressionRepository(prisma),
     new PrismaEmailSuppressionNameLookupRepository(prisma),
   );
-  const triggerTemplates = new TriggerTemplateService({
+  const triggerTemplateDeps = {
     baseHost: config.baseHost ?? env.BASE_HOST,
     notifier: liveTriggerNotifier,
-  });
+  };
+  const triggerTemplates = {
+    testFire: (input: Parameters<typeof testFireTrigger>[1]) =>
+      testFireTrigger(triggerTemplateDeps, input),
+  };
   const tokenizer = new TokenizerService(
     config.disableTokenization
       ? new NullTokenizerClient()
@@ -1051,17 +1055,23 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       new NullEmailSuppressionRepository(),
       new NullEmailSuppressionNameLookupRepository(),
     ),
-    triggerTemplates: new TriggerTemplateService({
-      baseHost: config.baseHost ?? env.BASE_HOST,
-      notifier: {
-        sendEmail: async () => {
-          /* test no-op */
+    triggerTemplates: (() => {
+      const testDeps = {
+        baseHost: config.baseHost ?? env.BASE_HOST,
+        notifier: {
+          sendEmail: async () => {
+            /* test no-op */
+          },
+          sendSlack: async () => {
+            /* test no-op */
+          },
         },
-        sendSlack: async () => {
-          /* test no-op */
-        },
-      },
-    }),
+      };
+      return {
+        testFire: (input: Parameters<typeof testFireTrigger>[1]) =>
+          testFireTrigger(testDeps, input),
+      };
+    })(),
     simulations: { runs: SimulationRunService.create(null) },
     suiteRuns: {
       runs: SuiteRunService.create({

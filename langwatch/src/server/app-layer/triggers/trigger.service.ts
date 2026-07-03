@@ -7,56 +7,47 @@ import type {
 export class TriggerService {
   private static readonly TTL_MS = 60_000;
 
+  /**
+   * ONE cache over the FULL active-triggers-per-project result. Trace vs
+   * graph filters happen on read (both `getActive…` methods delegate to
+   * this loader). The prior two-cache design (simp5013 double-cache
+   * finding) issued 2× Redis GETs per project using both surfaces and
+   * doubled the DB cost on cold start — the underlying `findActiveForProject`
+   * is the same call either way, so warming one WAS warming the other.
+   */
   private readonly cache = new TtlCache<TriggerSummary[]>(
     TriggerService.TTL_MS,
     "triggers:",
   );
 
-  /**
-   * Separate cache namespace for graph triggers so the trace-trigger
-   * cache (used hot by the outbox `handleSettle` path) stays untouched
-   * when the heartbeat / graph-eval reactor refreshes its own list.
-   */
-  private readonly graphCache = new TtlCache<TriggerSummary[]>(
-    TriggerService.TTL_MS,
-    "graph-triggers:",
-  );
-
   constructor(private readonly repo: TriggerRepository) {}
+
+  private async loadAll(projectId: string): Promise<TriggerSummary[]> {
+    const cached = await this.cache.get(projectId);
+    if (cached) return cached;
+    const all = await this.repo.findActiveForProject(projectId);
+    await this.cache.set(projectId, all);
+    return all;
+  }
 
   async getActiveTraceTriggersForProject(
     projectId: string,
   ): Promise<TriggerSummary[]> {
-    const cached = await this.cache.get(projectId);
-    if (cached) return cached;
-
-    const all = await this.repo.findActiveForProject(projectId);
-    const traceOnly = all.filter((t) => !t.customGraphId);
-
-    await this.cache.set(projectId, traceOnly);
-
-    return traceOnly;
+    const all = await this.loadAll(projectId);
+    return all.filter((t) => !t.customGraphId);
   }
 
   /**
    * Active custom-graph triggers for a project (ADR-034 Phase 5).
    * Counterpart to `getActiveTraceTriggersForProject`: filters the
    * SAME `findActiveForProject` read down to rows with `customGraphId`,
-   * which is the cron's definition of a graph trigger
-   * (cron.ts:421 `triggers.filter((t) => t.customGraphId)`).
+   * which is the cron's definition of a graph trigger.
    */
   async getActiveGraphTriggersForProject(
     projectId: string,
   ): Promise<TriggerSummary[]> {
-    const cached = await this.graphCache.get(projectId);
-    if (cached) return cached;
-
-    const all = await this.repo.findActiveForProject(projectId);
-    const graphOnly = all.filter((t) => t.customGraphId != null);
-
-    await this.graphCache.set(projectId, graphOnly);
-
-    return graphOnly;
+    const all = await this.loadAll(projectId);
+    return all.filter((t) => t.customGraphId != null);
   }
 
   /**
@@ -93,6 +84,5 @@ export class TriggerService {
 
   async invalidate(projectId: string): Promise<void> {
     await this.cache.delete(projectId);
-    await this.graphCache.delete(projectId);
   }
 }

@@ -8,8 +8,9 @@ import { TemplateValidationError, TestFireUnavailableError } from "../errors";
 import {
   type DraftIdentity,
   type DraftProject,
+  testFireTrigger,
+  type TestFireTriggerInput,
   type TriggerNotifier,
-  TriggerTemplateService,
   validateTemplateDraft,
 } from "../trigger-template.service";
 
@@ -41,7 +42,10 @@ function makeNotifier() {
 }
 
 function makeService(notifier: TriggerNotifier) {
-  return new TriggerTemplateService({ baseHost: BASE_HOST, notifier });
+  const deps = { baseHost: BASE_HOST, notifier };
+  return {
+    testFire: (input: TestFireTriggerInput) => testFireTrigger(deps, input),
+  };
 }
 
 describe("validateTemplateDraft", () => {
@@ -92,7 +96,7 @@ describe("validateTemplateDraft", () => {
   });
 });
 
-describe("TriggerTemplateService", () => {
+describe("testFireTrigger", () => {
   describe("testFire", () => {
     describe("when the channel is email and recipients are configured", () => {
       it("sends a banner-marked email to the recipients", async () => {

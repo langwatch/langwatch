@@ -39,7 +39,10 @@ import type { TraceRequestCollectionService } from "./traces/trace-request-colle
 import type { TraceSummaryService } from "./traces/trace-summary.service";
 import type { EmailSuppressionService } from "./triggers/emailSuppression.service";
 import type { TriggerService } from "./triggers/trigger.service";
-import type { TriggerTemplateService } from "./triggers/trigger-template.service";
+import type {
+  TestFireTriggerInput,
+  TestFireResult,
+} from "./triggers/trigger-template.service";
 import type { UsageService } from "./usage/usage.service";
 
 export interface DataRetentionDependencies {
@@ -87,7 +90,12 @@ export interface AppDependencies {
   };
   experiments: ExperimentService;
   triggers: TriggerService;
-  triggerTemplates: TriggerTemplateService;
+  /** Wraps `testFireTrigger(deps, input)` with the composition-time
+   *  `{baseHost, notifier}` bag already bound — the router only needs
+   *  to pass the per-call input. */
+  triggerTemplates: {
+    testFire: (input: TestFireTriggerInput) => Promise<TestFireResult>;
+  };
   emailSuppressions: EmailSuppressionService;
   organizations: OrganizationService;
   projects: ProjectService;

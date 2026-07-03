@@ -135,108 +135,109 @@ export function validateTemplateDraft(draft: TemplateDraft): void {
  * templating module — the renderers below are imported from
  * `~/shared/templating/*` so both sides see identical output for any given
  * draft.
+ *
+ * Was a class holding two immutable fields (`baseHost`, `notifier`); the
+ * class shape earned nothing over a plain function so simp-011 collapsed
+ * it. `TestFireTrigger` is the dependency-bag; `testFireTrigger` is the
+ * call. Callers pass the two composition-time deps alongside the per-call
+ * inputs.
  */
-export class TriggerTemplateService {
-  private readonly baseHost: string;
-  private readonly notifier: TriggerNotifier;
+export interface TestFireTriggerDeps {
+  baseHost: string;
+  notifier: TriggerNotifier;
+}
 
-  constructor(deps: { baseHost: string; notifier: TriggerNotifier }) {
-    this.baseHost = deps.baseHost;
-    this.notifier = deps.notifier;
-  }
+export interface TestFireTriggerInput {
+  channel: TemplateChannel;
+  trigger: DraftIdentity;
+  project: DraftProject;
+  draft: TemplateDraft;
+  recipients: string[];
+  webhook: string | null;
+}
 
-  async testFire({
-    channel,
-    trigger,
+function buildTestFireContext(
+  identity: DraftIdentity,
+  project: DraftProject,
+  baseHost: string,
+): TemplateContext {
+  return buildTemplateContext({
+    trigger: {
+      id: "preview",
+      name: identity.name,
+      alertType: identity.alertType,
+    },
     project,
-    draft,
-    recipients,
-    webhook,
-  }: {
-    channel: TemplateChannel;
-    trigger: DraftIdentity;
-    project: DraftProject;
-    draft: TemplateDraft;
-    recipients: string[];
-    webhook: string | null;
-  }): Promise<TestFireResult> {
-    const context = this.context(trigger, project);
+    baseHost,
+    matches: EXAMPLE_MATCHES,
+  });
+}
 
-    // Run the same validation save uses so a Test Fire can't bypass the
-    // discriminator contract — without this, a draft with `slackTemplate`
-    // set but `slackTemplateType` unset would have `normalizeSlackType`
-    // collapse to null and quietly render the framework default while
-    // (from the operator's POV) "testing" their template. Validate first,
-    // dispatch second.
-    validateTemplateDraft(draft);
+export async function testFireTrigger(
+  deps: TestFireTriggerDeps,
+  input: TestFireTriggerInput,
+): Promise<TestFireResult> {
+  const { channel, trigger, project, draft, recipients, webhook } = input;
+  const context = buildTestFireContext(trigger, project, deps.baseHost);
 
-    if (channel === "email") {
-      if (recipients.length === 0) {
-        throw new TestFireUnavailableError(
-          "email",
-          "This automation has no email recipients to test-fire to.",
-        );
-      }
-      const rendered = await renderTriggerEmail({
-        subjectTemplate: draft.emailSubjectTemplate ?? null,
-        bodyTemplate: draft.emailBodyTemplate ?? null,
-        context,
-        testFire: true,
-      });
-      const noReplyTo = buildTriggerNoReplyAddress({
-        defaultFrom: computeDefaultFrom(),
-        triggerId: TEST_FIRE_TRIGGER_ID_SENTINEL,
-      });
-      await this.notifier.sendEmail({
-        to: noReplyTo,
-        bcc: recipients,
-        subject: rendered.subject,
-        html: rendered.html,
-      });
-      return {
-        channel: "email",
-        recipientCount: recipients.length,
-        usedDefault: rendered.usedDefault,
-        missingVariables: rendered.missingVariables,
-        errors: rendered.errors,
-      };
-    }
+  // Run the same validation save uses so a Test Fire can't bypass the
+  // discriminator contract — without this, a draft with `slackTemplate`
+  // set but `slackTemplateType` unset would have `normalizeSlackType`
+  // collapse to null and quietly render the framework default while
+  // (from the operator's POV) "testing" their template. Validate first,
+  // dispatch second.
+  validateTemplateDraft(draft);
 
-    if (!webhook) {
+  if (channel === "email") {
+    if (recipients.length === 0) {
       throw new TestFireUnavailableError(
-        "slack",
-        "This automation has no Slack webhook to test-fire to.",
+        "email",
+        "This automation has no email recipients to test-fire to.",
       );
     }
-    const rendered = await renderTriggerSlack({
-      templateType: normalizeSlackType(draft.slackTemplateType),
-      template: draft.slackTemplate ?? null,
+    const rendered = await renderTriggerEmail({
+      subjectTemplate: draft.emailSubjectTemplate ?? null,
+      bodyTemplate: draft.emailBodyTemplate ?? null,
       context,
       testFire: true,
     });
-    await this.notifier.sendSlack({ webhook, payload: rendered.payload });
+    const noReplyTo = buildTriggerNoReplyAddress({
+      defaultFrom: computeDefaultFrom(),
+      triggerId: TEST_FIRE_TRIGGER_ID_SENTINEL,
+    });
+    await deps.notifier.sendEmail({
+      to: noReplyTo,
+      bcc: recipients,
+      subject: rendered.subject,
+      html: rendered.html,
+    });
     return {
-      channel: "slack",
-      recipientCount: 1,
+      channel: "email",
+      recipientCount: recipients.length,
       usedDefault: rendered.usedDefault,
       missingVariables: rendered.missingVariables,
       errors: rendered.errors,
     };
   }
 
-  private context(
-    identity: DraftIdentity,
-    project: DraftProject,
-  ): TemplateContext {
-    return buildTemplateContext({
-      trigger: {
-        id: "preview",
-        name: identity.name,
-        alertType: identity.alertType,
-      },
-      project,
-      baseHost: this.baseHost,
-      matches: EXAMPLE_MATCHES,
-    });
+  if (!webhook) {
+    throw new TestFireUnavailableError(
+      "slack",
+      "This automation has no Slack webhook to test-fire to.",
+    );
   }
+  const rendered = await renderTriggerSlack({
+    templateType: normalizeSlackType(draft.slackTemplateType),
+    template: draft.slackTemplate ?? null,
+    context,
+    testFire: true,
+  });
+  await deps.notifier.sendSlack({ webhook, payload: rendered.payload });
+  return {
+    channel: "slack",
+    recipientCount: 1,
+    usedDefault: rendered.usedDefault,
+    missingVariables: rendered.missingVariables,
+    errors: rendered.errors,
+  };
 }

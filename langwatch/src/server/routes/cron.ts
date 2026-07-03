@@ -421,20 +421,32 @@ secured.access(cronPolicy()).get("/cron/triggers", async (c) => {
   // reactively by the alertTrigger reactor on the trace-processing pipeline.
   const graphTriggers = triggers.filter((t) => t.customGraphId);
 
+  // ADR-034 Phase 5: skip triggers whose project has flipped onto the
+  // event-sourced graph-trigger path (real-time outbox reactor + 30s
+  // heartbeat handle them there). The flag is a PROJECT-level decision;
+  // resolve it once per distinct projectId per tick instead of once per
+  // trigger — N graph triggers in the same project would otherwise fan
+  // out to N flag lookups, all with the same answer. Cache-warm case is
+  // in-process; cold case is one Redis GET per project either way.
+  const distinctProjectIds = Array.from(
+    new Set(graphTriggers.map((t) => t.projectId)),
+  );
+  const esFlaggedProjectIds = new Set<string>();
+  await Promise.all(
+    distinctProjectIds.map(async (projectId) => {
+      const onEsPath = await featureFlagService.isEnabled(
+        "release_es_graph_triggers_firing",
+        { distinctId: projectId, projectId },
+      );
+      if (onEsPath) esFlaggedProjectIds.add(projectId);
+    }),
+  );
+
   const results = [];
 
   for (const trigger of graphTriggers) {
     try {
-      // ADR-034 Phase 5: when this project is flagged onto the
-      // event-sourced graph-trigger path, the real-time outbox reactor
-      // (on `traceAnalytics`) + the 30s heartbeat handle this trigger.
-      // The cron must skip it to avoid double-fire. The two paths
-      // coexist per-project — never both for the same trigger.
-      const onEsPath = await featureFlagService.isEnabled(
-        "release_es_graph_triggers_firing",
-        { distinctId: trigger.projectId, projectId: trigger.projectId },
-      );
-      if (onEsPath) {
+      if (esFlaggedProjectIds.has(trigger.projectId)) {
         logger.info(
           { triggerId: trigger.id, projectId: trigger.projectId },
           "[graph-trigger] skipping in cron — project on event-sourced path",
