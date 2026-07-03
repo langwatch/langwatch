@@ -1,10 +1,16 @@
 /**
- * ADR-033 invariant "Never feeds billing": no billing or plan-limit code path
- * may read category classification data. This static check walks the billing
- * (`ee/billing`) and plan-limit (`src/server/license-enforcement`) source trees
- * and asserts none of them import the block-classification module or reference
- * the reserved `blockcat` category attributes. A behavioural companion lives in
+ * ADR-033 invariant "Never feeds billing": no billing, licensing, plan-limit,
+ * or budget-enforcement code path may read category classification data. This
+ * static check walks those source trees and asserts none of them import the
+ * block-classification module or reference the reserved `blockcat` category
+ * attributes. A behavioural companion lives in
  * categoryBillingBoundary.integration.test.ts.
+ *
+ * `ee/governance` is scanned too — its budget/anomaly enforcement lives there —
+ * but the two DASHBOARD read paths (personalUsage, activity-monitor) plus their
+ * routers/tests are allowlisted: they are the analytics display surface the
+ * ADR explicitly permits, and allowlisting by exact path keeps any NEW
+ * governance file that touches blockcat failing this test by default.
  *
  * Grep-based rather than a full import-graph walk (no such util exists in the
  * repo, ADR anchor permits it): direct imports are what a reviewer would add by
@@ -15,15 +21,31 @@
  * Spec: specs/ai-gateway/governance/cost-breakdown-dashboard.feature
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 
 // Repo-relative roots. __dirname is <repo>/langwatch/ee/billing/services/__tests__.
 const REPO_LANGWATCH = join(__dirname, "..", "..", "..", "..");
 const SCAN_ROOTS = [
   join(REPO_LANGWATCH, "ee", "billing"),
+  join(REPO_LANGWATCH, "ee", "licensing"),
+  join(REPO_LANGWATCH, "ee", "saas"),
+  join(REPO_LANGWATCH, "ee", "governance"),
   join(REPO_LANGWATCH, "src", "server", "license-enforcement"),
 ];
+
+// The permitted analytics display surface (ADR-033 Decision 9) — exact paths.
+const ALLOWLISTED_READ_PATHS = [
+  join("ee", "governance", "services", "personalUsage.service.ts"),
+  join(
+    "ee",
+    "governance",
+    "services",
+    "activity-monitor",
+    "activityMonitor.service.ts",
+  ),
+  join("ee", "governance", "routers", "activityMonitor.ts"),
+].map((p) => sep + p);
 
 // Anything that would tie billing to the category classifier.
 const FORBIDDEN = ["block-classification", "blockcat", "blockClassifier"];
@@ -38,8 +60,11 @@ function collectSourceFiles(dir: string): string[] {
       continue;
     }
     if (!/\.(ts|tsx)$/.test(entry)) continue;
-    // The boundary tests themselves reference the forbidden tokens on purpose.
+    // The boundary tests themselves reference the forbidden tokens on purpose,
+    // and governance __tests__ fixtures exercise the dashboard read paths.
     if (/categoryBillingBoundary\./.test(entry)) continue;
+    if (full.includes(`${sep}__tests__${sep}`)) continue;
+    if (ALLOWLISTED_READ_PATHS.some((p) => full.endsWith(p))) continue;
     out.push(full);
   }
   return out;

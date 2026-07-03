@@ -566,8 +566,16 @@ export class ActivityMonitorService {
       query_params[`k${i}`] = blockCategoryTokensAttr(category);
     });
 
-    const result = await ch.query({
-      query: `
+    // Resource-guarded: 36 sum(Attributes[...]) over the whole org window is
+    // the aggregation shape that has OOM'd ClickHouse before. Bounded threads,
+    // hard time cap, external group-by spill — and any failure degrades to []
+    // (the dashboard's "nothing captured" state) rather than surfacing a 500.
+    // Analytics display only, so degrade-to-empty is safe; never used for
+    // billing.
+    let row: Record<string, number | null> | undefined;
+    try {
+      const result = await ch.query({
+        query: `
         SELECT
           ${selects}
         FROM trace_summaries ts
@@ -581,11 +589,16 @@ export class ActivityMonitorService {
               AND OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
             GROUP BY TenantId, TraceId
           )
+        SETTINGS max_threads = 2, max_execution_time = 45,
+          max_bytes_before_external_group_by = 500000000
       `,
-      query_params,
-      format: "JSONEachRow",
-    });
-    const [row] = (await result.json()) as Array<Record<string, number | null>>;
+        query_params,
+        format: "JSONEachRow",
+      });
+      [row] = (await result.json()) as Array<Record<string, number | null>>;
+    } catch {
+      return [];
+    }
     if (!row) return [];
 
     const breakdown: CategoryBreakdownRow[] = [];
