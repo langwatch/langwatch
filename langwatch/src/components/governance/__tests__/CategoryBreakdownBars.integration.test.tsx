@@ -68,7 +68,9 @@ describe("<CategoryBreakdownBars/>", () => {
       });
 
       expect(
-        screen.getByText(/turn on payload capture to see where your tokens go/i),
+        screen.getByText(
+          /turn on payload capture to see where your tokens go/i,
+        ),
       ).toBeInTheDocument();
       const link = screen.getByRole("link", {
         name: /enable payload capture/i,
