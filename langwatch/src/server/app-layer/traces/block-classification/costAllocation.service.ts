@@ -22,8 +22,9 @@ import { type Category, catchAllFor } from "./categories";
 export type CacheTier = "fresh" | "cache_read" | "cache_creation";
 
 /** A classified block with its (caller-supplied) token estimate. `idx` is the
- * block's per-axis position — carried through so the returned per-block detail
- * can be pinned back to the source block. */
+ * block's position within its OWN axis (input parts and output parts are counted
+ * separately), so it is unique only together with the block's axis — which its
+ * `category` already identifies (input and output categories are disjoint sets). */
 export interface TokenBlock {
   idx?: number;
   category: Category;
@@ -33,7 +34,10 @@ export interface TokenBlock {
 /** Per-block allocation detail (ADR-033 Schema, `blocks.classification`): the
  * block's post-scale token share and the cache tier it was priced at. Synthetic
  * catch-all tokens (a nonzero pool with no blocks) carry no source block and so
- * are absent here — they surface only in `categoryTotals`. */
+ * are absent here — they surface only in `categoryTotals`.
+ *
+ * `idx` is axis-local (see TokenBlock): a `blocks` array can hold an input entry
+ * and an output entry that share `idx: 0`; disambiguate by the entry's category. */
 export interface AllocatedBlock {
   idx: number;
   category: Category;
@@ -237,7 +241,11 @@ function allocatePool(
       blocks.push({
         idx: block.idx,
         category: block.category,
-        tokens: scaled,
+        // Rounded for the stored detail blob: tokens are integral by nature and
+        // raw float artifacts (42.857142…) only bloat the payload. The exact
+        // `scaled` value still feeds `addTokens` above, so category totals — the
+        // numbers that get priced — stay precise.
+        tokens: Math.round(scaled),
         cacheTier: pool.tier,
       });
     }
