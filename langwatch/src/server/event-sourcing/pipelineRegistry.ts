@@ -824,7 +824,6 @@ export type AppCommands = ReturnType<PipelineRegistry["registerAll"]>;
 // ============================================================================
 
 import { getApp } from "../app-layer/app";
-import type { StaticPipelineDefinition } from "./pipeline/staticBuilder.types";
 
 export interface ProjectionMetadata {
   projectionName: string;
