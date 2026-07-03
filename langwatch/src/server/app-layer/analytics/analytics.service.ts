@@ -64,13 +64,10 @@ import {
   ClickHouseLegacyEvaluationRunsShim,
   type LegacyEvaluationRunsShim,
 } from "./repositories/legacy-evaluation-runs.shim";
+import { adjustTimeScaleForBucketCap } from "./query-builders/_shared";
 import { compareForTripwire } from "./tripwire/divergence-compare";
 
 const TIMESERIES_CACHE_TTL_MS = 30_000 as const;
-/** Bucket-count safety net (same as the legacy CH service). */
-const MAX_TIMESERIES_BUCKETS = 1000;
-const MINUTES_PER_DAY = 24 * 60;
-const MS_PER_MINUTE = 1000 * 60;
 
 export interface AnalyticsServiceDependencies {
   prisma: PrismaClient;
@@ -268,17 +265,11 @@ export class AnalyticsService {
         typeof input.timeScale === "number" ? input.timeScale : undefined,
       );
 
-    let adjustedTimeScale = input.timeScale;
-    if (typeof input.timeScale === "number") {
-      const totalMinutes =
-        (endDate.getTime() - startDate.getTime()) / MS_PER_MINUTE;
-      const estimatedBuckets = totalMinutes / input.timeScale;
-      if (estimatedBuckets > MAX_TIMESERIES_BUCKETS) {
-        adjustedTimeScale = MINUTES_PER_DAY;
-      }
-    } else if (input.timeScale === undefined) {
-      adjustedTimeScale = MINUTES_PER_DAY;
-    }
+    const adjustedTimeScale = adjustTimeScaleForBucketCap({
+      timeScale: input.timeScale,
+      startDate,
+      endDate,
+    });
 
     const builderInput = {
       projectId: input.projectId,

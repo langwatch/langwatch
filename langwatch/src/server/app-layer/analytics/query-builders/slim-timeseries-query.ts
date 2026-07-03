@@ -37,6 +37,8 @@ import {
   collectStringValues,
   dateTrunc,
   hasFilterValues,
+  isPercentile,
+  percentileFor,
 } from "./_shared";
 
 const SLIM_TABLE = "trace_analytics" as const;
@@ -155,24 +157,8 @@ function slimGroupByExpression(groupBy?: string): string | null {
   }
 }
 
-function isPercentile(agg: AggregationTypes): boolean {
-  return agg === "median" || agg === "p90" || agg === "p95" || agg === "p99";
-}
-
-function percentileFor(agg: AggregationTypes): number {
-  switch (agg) {
-    case "median":
-      return 0.5;
-    case "p90":
-      return 0.9;
-    case "p95":
-      return 0.95;
-    case "p99":
-      return 0.99;
-    default:
-      throw new Error(`Not a percentile aggregation: ${agg}`);
-  }
-}
+// isPercentile + percentileFor are shared with eval-slim-timeseries-query.ts
+// via ~/analytics/query-builders/_shared.
 
 /**
  * Slim aggregation expression. Slim has typed columns, so percentiles use

@@ -24,16 +24,12 @@ import type { TimeseriesInputType } from "~/server/analytics/registry";
 import type { TimeseriesResult } from "~/server/analytics/types";
 import { createLogger } from "~/utils/logger/server";
 import { AnalyticsClientUnavailableError } from "../errors";
+import { adjustTimeScaleForBucketCap } from "../query-builders/_shared";
 import { parseTimeseriesRows } from "./_timeseries-row-parser";
 
 const logger = createLogger(
   "langwatch:app-layer:analytics:legacy-trace-summaries-shim",
 );
-
-/** Maximum number of timeseries buckets before auto-adjusting to daily granularity. */
-const MAX_TIMESERIES_BUCKETS = 1000;
-const MINUTES_PER_DAY = 24 * 60;
-const MS_PER_MINUTE = 1000 * 60;
 
 export interface LegacyTraceSummariesShim {
   runTraceSummariesTimeseries(
@@ -64,19 +60,11 @@ export class ClickHouseLegacyTraceSummariesShim
         typeof input.timeScale === "number" ? input.timeScale : undefined,
       );
 
-    // Mirror the legacy bucket-count guard so behaviour stays identical.
-    let adjustedTimeScale = input.timeScale;
-    if (typeof input.timeScale === "number") {
-      const totalMinutes =
-        (endDate.getTime() - startDate.getTime()) / MS_PER_MINUTE;
-      const estimatedBuckets = totalMinutes / input.timeScale;
-      if (estimatedBuckets > MAX_TIMESERIES_BUCKETS) {
-        adjustedTimeScale = MINUTES_PER_DAY;
-      }
-    } else if (input.timeScale === undefined) {
-      // Match the legacy default (daily granularity ⇔ ES 1d interval).
-      adjustedTimeScale = MINUTES_PER_DAY;
-    }
+    const adjustedTimeScale = adjustTimeScaleForBucketCap({
+      timeScale: input.timeScale,
+      startDate,
+      endDate,
+    });
 
     const { sql, params } = buildTimeseriesQuery({
       projectId: input.projectId,

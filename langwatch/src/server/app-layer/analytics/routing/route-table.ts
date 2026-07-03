@@ -44,6 +44,10 @@ import type { SeriesInputType } from "~/server/analytics/registry";
 import type { AggregationTypes } from "~/server/analytics/types";
 import type { FilterField } from "~/server/filters/types";
 import {
+  collectStringValues,
+  hasFilterValues,
+} from "../query-builders/_shared";
+import {
   type AnalyticsMetricSource,
   getMetricSource,
 } from "./field-availability";
@@ -608,51 +612,10 @@ function isBlocklisted(key: string): boolean {
   return false;
 }
 
-function hasAnyFilterValue(
-  value:
-    | string[]
-    | Record<string, string[]>
-    | Record<string, Record<string, string[]>>
-    | undefined,
-): boolean {
-  if (value === undefined) return false;
-  if (Array.isArray(value)) return value.length > 0;
-  if (typeof value !== "object") return false;
-  for (const inner of Object.values(value)) {
-    if (Array.isArray(inner)) {
-      if (inner.length > 0) return true;
-      continue;
-    }
-    if (typeof inner === "object" && inner !== null) {
-      for (const v of Object.values(inner)) {
-        if (Array.isArray(v) && v.length > 0) return true;
-      }
-    }
-  }
-  return false;
-}
-
-function collectStringValues(
-  value:
-    | string[]
-    | Record<string, string[]>
-    | Record<string, Record<string, string[]>>,
-): string[] {
-  if (Array.isArray(value)) return value;
-  const out: string[] = [];
-  for (const inner of Object.values(value)) {
-    if (Array.isArray(inner)) {
-      out.push(...inner);
-      continue;
-    }
-    if (typeof inner === "object" && inner !== null) {
-      for (const v of Object.values(inner)) {
-        if (Array.isArray(v)) out.push(...v);
-      }
-    }
-  }
-  return out;
-}
+// hasAnyFilterValue + collectStringValues moved to query-builders/_shared.ts
+// (used by both slim + rollup builders too). Aliased below to preserve
+// the local name at call sites.
+const hasAnyFilterValue = hasFilterValues;
 
 /** Test-only helper to export the per-source sets for inspection. */
 export const __testOnly__ = {
