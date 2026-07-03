@@ -175,6 +175,28 @@ export const activityMonitorRouter = createTRPCRouter({
     }),
 
   /**
+   * Aggregate cost breakdown by content category (ADR-033 PR D) across the
+   * org's governance-origin coding-agent traffic. Same RBAC + enterprise gate
+   * as the rest of the Activity Monitor — analytics only, never billing.
+   */
+  categoryBreakdown: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        windowDays: z.number().int().min(1).max(365).default(30),
+      }),
+    )
+    .use(checkOrganizationPermission("activityMonitor:view"))
+    .use(enterpriseGate)
+    .query(async ({ ctx, input }) => {
+      const service = ActivityMonitorService.create(ctx.prisma);
+      return await service.categoryBreakdown({
+        organizationId: input.organizationId,
+        windowDays: input.windowDays,
+      });
+    }),
+
+  /**
    * Per-source health metrics for the dashboard's source strip.
    */
   ingestionSourcesHealth: protectedProcedure

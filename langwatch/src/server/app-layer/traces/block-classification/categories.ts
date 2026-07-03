@@ -41,6 +41,45 @@ export type Category = InputCategory | OutputCategory;
 
 export type Axis = "input" | "output";
 
+/** Every taxonomy value, input axis first then output axis. Single source for
+ * callers that must iterate the whole enum (fold rollups, dashboard queries) —
+ * order is stable so derived column/alias lists stay deterministic. */
+export const CATEGORIES: readonly Category[] = [
+  ...Object.values(InputCategory),
+  ...Object.values(OutputCategory),
+];
+
+/** Human-readable dashboard labels. Copy says what the lane means to the
+ * customer, never the raw wire enum (dev/docs/best_practices/copywriting.md).
+ * Pinned to the enum by the categories unit test so a new category can't ship
+ * without a label. */
+export const CATEGORY_LABELS: Record<Category, string> = {
+  [InputCategory.SYSTEM_PROMPT]: "System prompt",
+  [InputCategory.USER_INPUT]: "User input",
+  [InputCategory.PRIOR_CONTEXT]: "Prior context",
+  [InputCategory.TOOL_RESULT_BUILTIN]: "Built-in tool results",
+  [InputCategory.TOOL_RESULT_MCP]: "MCP tool results",
+  [InputCategory.TOOL_DEFINITIONS]: "Tool definitions",
+  [InputCategory.MCP_TOOL_DEFINITIONS]: "MCP tool definitions",
+  [InputCategory.SKILL_CONTENT]: "Skill content",
+  [InputCategory.MEMORY_CONTEXT]: "Memory context",
+  [InputCategory.FILE_ATTACHMENT]: "File attachments",
+  [InputCategory.IMAGE]: "Images",
+  [InputCategory.OTHER_INPUT]: "Other input",
+  [OutputCategory.ASSISTANT_TEXT]: "Assistant text",
+  [OutputCategory.TOOL_CALL_BUILTIN]: "Built-in tool calls",
+  [OutputCategory.TOOL_CALL_MCP]: "MCP tool calls",
+  [OutputCategory.SKILL_INVOCATION]: "Skill invocations",
+  [OutputCategory.THINKING]: "Thinking",
+  [OutputCategory.OTHER_OUTPUT]: "Other output",
+};
+
+/** Dashboard label for a category, falling back to the raw value if an
+ * unmapped one ever reaches the UI (never in practice — the test guards it). */
+export function categoryLabel(category: Category): string {
+  return CATEGORY_LABELS[category] ?? category;
+}
+
 /** The catch-all category for an axis — receives unattributable tokens so
  * per-category totals always reconcile to provider truth (ADR-033 Decision 2.4). */
 export function catchAllFor(axis: Axis): Category {

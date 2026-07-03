@@ -105,22 +105,46 @@ export function registerMeRoutes(
           })
         : null;
 
+      // The category union attributes gov-tenant trace summaries by the
+      // principal EMAIL (Attributes['langwatch.user_id']), not the userId the
+      // ledger paths key on — so resolve the owner's email from ownerUserId.
+      const owner = await prisma.user.findUnique({
+        where: { id: project.ownerUserId },
+        select: { email: true },
+      });
+
       const usage = new PersonalUsageService();
       const input = {
         personalProjectId: project.id,
         userId: project.ownerUserId,
+        userEmail: owner?.email ?? undefined,
         ingestionTenantId: governanceProject?.id,
         window,
       };
 
       // Independent rollups — CH multiplexes them happily.
-      const [summary, dailyBuckets, breakdownByModel] = await Promise.all([
-        usage.summary(input),
-        usage.dailyBuckets(input),
-        usage.breakdownByModel(input),
-      ]);
+      const [summary, dailyBuckets, breakdownByModel, breakdownByCategory] =
+        await Promise.all([
+          usage.summary(input),
+          usage.dailyBuckets(input),
+          usage.breakdownByModel(input),
+          // Category totals live on trace summaries: personal-tenant rows plus
+          // this user's ingestion-source rows on the gov tenant (attributed by
+          // principal email), when both are available.
+          usage.breakdownByCategory({
+            personalProjectId: input.personalProjectId,
+            window: input.window,
+            userEmail: input.userEmail,
+            ingestionTenantId: input.ingestionTenantId,
+          }),
+        ]);
 
-      return c.json({ summary, dailyBuckets, breakdownByModel });
+      return c.json({
+        summary,
+        dailyBuckets,
+        breakdownByModel,
+        breakdownByCategory,
+      });
     },
   );
 }

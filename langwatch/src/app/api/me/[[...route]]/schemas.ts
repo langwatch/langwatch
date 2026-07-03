@@ -64,8 +64,15 @@ const breakdownSchema = z.object({
   requests: z.number(),
 });
 
+const categoryBreakdownSchema = z.object({
+  category: z.string(),
+  costUsd: z.number(),
+  tokens: z.number(),
+});
+
 export const meUsageResponseSchema = z.object({
   summary: summarySchema,
   dailyBuckets: z.array(bucketSchema),
   breakdownByModel: z.array(breakdownSchema),
+  breakdownByCategory: z.array(categoryBreakdownSchema),
 });

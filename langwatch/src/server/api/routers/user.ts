@@ -551,6 +551,7 @@ export const userRouter = createTRPCRouter({
           },
           dailyBuckets: [],
           breakdownByModel: [],
+          breakdownByCategory: [],
         };
       }
 
@@ -582,31 +583,43 @@ export const userRouter = createTRPCRouter({
       // personal project tenant by the /me table (tracesV2.list), so it
       // isn't fetched here.
       const ingestionTenantId = governanceProject?.id;
-      const [summary, dailyBuckets, breakdownByModel] = await Promise.all([
-        usage.summary({
-          personalProjectId: workspace.project.id,
-          window,
-          userId,
-          ingestionTenantId,
-        }),
-        usage.dailyBuckets({
-          personalProjectId: workspace.project.id,
-          window,
-          userId,
-          ingestionTenantId,
-        }),
-        usage.breakdownByModel({
-          personalProjectId: workspace.project.id,
-          window,
-          userId,
-          ingestionTenantId,
-        }),
-      ]);
+      const [summary, dailyBuckets, breakdownByModel, breakdownByCategory] =
+        await Promise.all([
+          usage.summary({
+            personalProjectId: workspace.project.id,
+            window,
+            userId,
+            ingestionTenantId,
+          }),
+          usage.dailyBuckets({
+            personalProjectId: workspace.project.id,
+            window,
+            userId,
+            ingestionTenantId,
+          }),
+          usage.breakdownByModel({
+            personalProjectId: workspace.project.id,
+            window,
+            userId,
+            ingestionTenantId,
+          }),
+          // Category totals live on trace summaries (the gateway ledger carries
+          // no per-category split). Personal-tenant rows plus, when the org has
+          // a governance tenant, this user's ingestion-source rows there —
+          // attributed by principal email on the gov trace summaries.
+          usage.breakdownByCategory({
+            personalProjectId: workspace.project.id,
+            window,
+            userEmail: ctx.session.user.email ?? undefined,
+            ingestionTenantId,
+          }),
+        ]);
 
       return {
         summary,
         dailyBuckets,
         breakdownByModel,
+        breakdownByCategory,
       };
     }),
 

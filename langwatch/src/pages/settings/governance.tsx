@@ -19,6 +19,10 @@ import {
 } from "lucide-react";
 import numeral from "numeral";
 import { useEffect, useState } from "react";
+import {
+  CategoryBreakdownBars,
+  CategoryBreakdownEnablementHint,
+} from "~/components/governance/CategoryBreakdownBars";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { QuarantineFillAlert } from "~/components/governance/QuarantineFillAlert";
 import { SpendByTeamBar } from "~/components/governance/SpendByTeamBar";
@@ -32,6 +36,7 @@ import { toaster } from "~/components/ui/toaster";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { categoryLabel } from "~/server/app-layer/traces/block-classification/categories";
 import { api, type RouterOutputs } from "~/utils/api";
 import { getHexColorForString } from "~/utils/rotatingColors";
 
@@ -128,6 +133,10 @@ function GovernanceOverviewPage() {
     { organizationId: orgId, windowDays: 30, groupBy: chartGroupBy },
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
+  const categoryBreakdownQuery = api.activityMonitor.categoryBreakdown.useQuery(
+    { organizationId: orgId, windowDays: 30 },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
 
   const sources = sourcesQuery.data ?? [];
   const policies = policiesQuery.data ?? [];
@@ -139,6 +148,16 @@ function GovernanceOverviewPage() {
   const anomalies = anomaliesQuery.data ?? [];
   const anomalyRules = anomalyRulesQuery.data ?? [];
   const catalogTiles = catalogQuery.data ?? [];
+
+  const categoryRows = categoryBreakdownQuery.data ?? [];
+  const categoryTotal = categoryRows.reduce((sum, r) => sum + r.costUsd, 0);
+  const categoryBars = categoryRows.map((r) => ({
+    category: r.category,
+    label: categoryLabel(r.category),
+    costUsd: r.costUsd,
+    tokens: r.tokens,
+    sharePct: categoryTotal > 0 ? (r.costUsd / categoryTotal) * 100 : 0,
+  }));
 
   const hasSources = sources.length > 0;
   const hasPolicies = policies.length > 0;
@@ -405,6 +424,17 @@ function GovernanceOverviewPage() {
                 />
               ))}
             </VStack>
+          )}
+        </SectionCard>
+
+        <SectionCard
+          title="Cost breakdown by category"
+          subline="Coding-agent spend split by content category — system prompt, MCP tools, skills, thinking, and more (last 30 days). Analytics only; never affects billing."
+        >
+          {categoryBars.length === 0 ? (
+            <CategoryBreakdownEnablementHint settingsHref="/settings/governance" />
+          ) : (
+            <CategoryBreakdownBars rows={categoryBars} />
           )}
         </SectionCard>
 

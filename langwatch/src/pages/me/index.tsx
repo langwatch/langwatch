@@ -9,11 +9,11 @@ import {
 } from "@chakra-ui/react";
 import numeral from "numeral";
 import { useState } from "react";
-import Head from "~/utils/compat/next-head";
-
-import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
-import { Tooltip } from "~/components/ui/tooltip";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
+import {
+  CategoryBreakdownBars,
+  CategoryBreakdownEnablementHint,
+} from "~/components/governance/CategoryBreakdownBars";
 import { AiToolsPortal } from "~/components/me/AiToolsPortal";
 import { BudgetExceededBanner } from "~/components/me/BudgetExceededBanner";
 import MyLayout from "~/components/me/MyLayout";
@@ -24,6 +24,9 @@ import {
 } from "~/components/me/PersonalTracesEmptyState";
 import { TraceIngestSection } from "~/components/me/TraceIngestSection";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
+import { Tooltip } from "~/components/ui/tooltip";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
+import Head from "~/utils/compat/next-head";
 
 // /me/usage frequently surfaces sub-cent spend; defer to the shared
 // gateway formatter so values like $0.000165 don't render as $0.00.
@@ -41,6 +44,7 @@ function MyUsagePage() {
     budget,
     spendByDay,
     spendByTool,
+    spendByCategory,
     personalProjectId,
     personalProjectSlug,
     organizationName,
@@ -327,6 +331,14 @@ function MyUsagePage() {
                 );
               })}
             </VStack>
+          )}
+        </SectionCard>
+
+        <SectionCard title="Usage breakdown">
+          {spendByCategory.length === 0 ? (
+            <CategoryBreakdownEnablementHint settingsHref="/me/configure" />
+          ) : (
+            <CategoryBreakdownBars rows={spendByCategory} />
           )}
         </SectionCard>
 
