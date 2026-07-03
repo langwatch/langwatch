@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { ActivityMonitorService } from "@ee/governance/services/activity-monitor/activityMonitor.service";
 /**
  * tRPC router for the Activity Monitor read-side queries that power
  * the /governance admin dashboard. Replaces Alexis's MOCK_* fixtures
@@ -16,6 +15,8 @@ import { ActivityMonitorService } from "@ee/governance/services/activity-monitor
  * Spec: specs/ai-gateway/governance/activity-monitor.feature
  */
 import { z } from "zod";
+
+import { ActivityMonitorService } from "@ee/governance/services/activity-monitor/activityMonitor.service";
 
 import {
   ENTERPRISE_FEATURE_ERRORS,
@@ -64,7 +65,9 @@ export const activityMonitorRouter = createTRPCRouter({
         windowDays: z.number().int().min(1).max(365).default(30),
         limit: z.number().int().min(1).max(500).default(50),
         offset: z.number().int().min(0).default(0),
-        sortBy: z.enum(["spend", "requests", "lastActivity"]).default("spend"),
+        sortBy: z
+          .enum(["spend", "requests", "lastActivity"])
+          .default("spend"),
         sortDir: z.enum(["asc", "desc"]).default("desc"),
       }),
     )
@@ -97,7 +100,9 @@ export const activityMonitorRouter = createTRPCRouter({
         windowDays: z.number().int().min(1).max(365).default(30),
         limit: z.number().int().min(1).max(500).default(50),
         offset: z.number().int().min(0).default(0),
-        sortBy: z.enum(["spend", "requests", "lastActivity"]).default("spend"),
+        sortBy: z
+          .enum(["spend", "requests", "lastActivity"])
+          .default("spend"),
         sortDir: z.enum(["asc", "desc"]).default("desc"),
       }),
     )

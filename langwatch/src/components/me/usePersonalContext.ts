@@ -141,8 +141,8 @@ export function usePersonalContext(): PersonalContext {
       period: raw.period ?? "",
       scope: raw.scope ?? "",
       requestIncreaseUrl:
-        "requestIncreaseUrl" in raw ? (raw.requestIncreaseUrl ?? null) : null,
-      adminEmail: "adminEmail" in raw ? (raw.adminEmail ?? null) : null,
+        "requestIncreaseUrl" in raw ? raw.requestIncreaseUrl ?? null : null,
+      adminEmail: "adminEmail" in raw ? raw.adminEmail ?? null : null,
     };
   }, [personalBudgetQuery.data]);
 

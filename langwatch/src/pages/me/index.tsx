@@ -243,11 +243,7 @@ function MyUsagePage() {
                   );
                 })}
               </HStack>
-              <HStack
-                justifyContent="space-between"
-                fontSize="xs"
-                color="fg.muted"
-              >
+              <HStack justifyContent="space-between" fontSize="xs" color="fg.muted">
                 <Text>{spendByDay[0]?.day}</Text>
                 <Text>{spendByDay[spendByDay.length - 1]?.day}</Text>
               </HStack>
@@ -316,8 +312,15 @@ function MyUsagePage() {
                         )}
                       </Box>
                     </Tooltip>
-                    <VStack gap={0} align="end" minWidth="90px" fontSize="sm">
-                      {showBilled && <Text>{fmtUsd(tool.billedUsd)}</Text>}
+                    <VStack
+                      gap={0}
+                      align="end"
+                      minWidth="90px"
+                      fontSize="sm"
+                    >
+                      {showBilled && (
+                        <Text>{fmtUsd(tool.billedUsd)}</Text>
+                      )}
                       {showTheoretical && tool.usd - tool.billedUsd > 1e-6 && (
                         <Text color="fg.subtle" fontSize="xs">
                           {fmtUsd(tool.usd - tool.billedUsd)} bundled
@@ -373,12 +376,7 @@ function SummaryCard({
       padding={4}
       backgroundColor="bg.subtle"
     >
-      <Text
-        fontSize="xs"
-        color="fg.muted"
-        textTransform="uppercase"
-        letterSpacing="wider"
-      >
+      <Text fontSize="xs" color="fg.muted" textTransform="uppercase" letterSpacing="wider">
         {title}
       </Text>
       <Text
@@ -389,11 +387,7 @@ function SummaryCard({
       >
         {value}
       </Text>
-      <Text
-        fontSize="sm"
-        color={tone === "red" ? "red.500" : "fg.muted"}
-        marginTop={1}
-      >
+      <Text fontSize="sm" color={tone === "red" ? "red.500" : "fg.muted"} marginTop={1}>
         {subline}
       </Text>
     </Box>
@@ -463,12 +457,7 @@ function BudgetBanner({
   const colors =
     tone === "red"
       ? { bg: "red.50", border: "red.200", title: "red.700", text: "red.700" }
-      : {
-          bg: "yellow.50",
-          border: "yellow.200",
-          title: "yellow.800",
-          text: "yellow.800",
-        };
+      : { bg: "yellow.50", border: "yellow.200", title: "yellow.800", text: "yellow.800" };
 
   return (
     <Box
@@ -555,12 +544,7 @@ function LegendChip({
       _hover={{ opacity: active ? 0.8 : 0.65 }}
       title={active ? `Hide ${label}` : `Show ${label}`}
     >
-      <Box
-        width="10px"
-        height="10px"
-        borderRadius="sm"
-        backgroundColor={color}
-      />
+      <Box width="10px" height="10px" borderRadius="sm" backgroundColor={color} />
       <Text
         color="fg.muted"
         textDecoration={active ? undefined : "line-through"}

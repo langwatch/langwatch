@@ -25,6 +25,7 @@ import {
   cleanupTestData,
   getTestClickHouseClient,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { GOVERNANCE_ATTR } from "../governanceAttributeKeys";
 import { PersonalUsageService } from "../personalUsage.service";
 
 async function insertTrace(
@@ -175,6 +176,115 @@ describe("PersonalUsageService.breakdownByCategory", () => {
       expect(rows[0]?.category).toBe("system_prompt");
       // Categories with no attributes never surface.
       expect(byCat.has("image")).toBe(false);
+    });
+  });
+
+  describe("given ingestion-source category traffic on the org's governance tenant", () => {
+    // The gov tenant carries coding-agent traffic that never lands in the
+    // personal project. Its trace summaries hold both the blockcat attrs and
+    // the acting principal on Attributes['langwatch.user_id'] (an email).
+    const principalEmail = `owner-${ns}@example.com`;
+    const otherEmail = `other-${ns}@example.com`;
+    let govOrgId = "";
+    let govTenantId = "";
+
+    beforeAll(async () => {
+      if (!ch) return;
+      const govOrg = await prisma.organization.create({
+        data: { name: `${ns}-gov`, slug: `org-${ns}-gov` },
+      });
+      govOrgId = govOrg.id;
+      const govTeam = await prisma.team.create({
+        data: {
+          name: `team-${ns}-gov`,
+          slug: `team-${ns}-gov`,
+          organizationId: govOrg.id,
+        },
+      });
+      const govProject = await prisma.project.create({
+        data: {
+          name: `gov-${ns}`,
+          slug: `gov-${ns}`,
+          teamId: govTeam.id,
+          language: "en",
+          framework: "openai",
+          apiKey: `key-${ns}-gov`,
+        },
+      });
+      govTenantId = govProject.id;
+
+      // This principal's ingestion row: system_prompt 0.5 / 500.
+      await insertTrace(ch, govTenantId, {
+        traceId: `g-mine-${nanoid(6)}`,
+        occurredAt,
+        totalCost: 0.5,
+        attrs: {
+          [GOVERNANCE_ATTR.USER_ID]: principalEmail,
+          [blockCategoryCostAttr("system_prompt")]: "0.5",
+          [blockCategoryTokensAttr("system_prompt")]: "500",
+        },
+      });
+      // Another user's ingestion row under the SAME gov tenant — must be
+      // excluded by the principal-email filter, never summed into /me.
+      await insertTrace(ch, govTenantId, {
+        traceId: `g-other-${nanoid(6)}`,
+        occurredAt,
+        totalCost: 9.0,
+        attrs: {
+          [GOVERNANCE_ATTR.USER_ID]: otherEmail,
+          [blockCategoryCostAttr("system_prompt")]: "9.0",
+          [blockCategoryTokensAttr("system_prompt")]: "9000",
+        },
+      });
+    });
+
+    afterAll(async () => {
+      if (!ch) return;
+      await cleanupTestData(govTenantId);
+      await prisma.project
+        .deleteMany({ where: { team: { organizationId: govOrgId } } })
+        .catch(() => undefined);
+      await prisma.team
+        .deleteMany({ where: { organizationId: govOrgId } })
+        .catch(() => undefined);
+      await prisma.organization
+        .deleteMany({ where: { id: govOrgId } })
+        .catch(() => undefined);
+    });
+
+    describe("when userEmail + ingestionTenantId are supplied", () => {
+      it("unions the principal's gov-tenant category totals into the personal rows", async () => {
+        if (!ch) return;
+        const rows = await new PersonalUsageService().breakdownByCategory({
+          personalProjectId: tenantId,
+          ingestionTenantId: govTenantId,
+          userEmail: principalEmail,
+          window,
+        });
+
+        const byCat = new Map(rows.map((r) => [r.category, r]));
+        // system_prompt: personal 0.8 + this principal's gov 0.5 = 1.3.
+        // The other user's 9.0 is filtered out by the user_id predicate.
+        expect(byCat.get("system_prompt")?.costUsd).toBeCloseTo(1.3, 5);
+        expect(byCat.get("system_prompt")?.tokens).toBeCloseTo(1300, 5);
+        // mcp_tool_definitions is personal-only (0.6) — untouched by the union.
+        expect(byCat.get("mcp_tool_definitions")?.costUsd).toBeCloseTo(0.6, 5);
+      });
+    });
+
+    describe("when userEmail / ingestionTenantId are absent", () => {
+      it("returns personal-tenant rows only — no gov-tenant union", async () => {
+        if (!ch) return;
+        const rows = await new PersonalUsageService().breakdownByCategory({
+          personalProjectId: tenantId,
+          window,
+        });
+
+        const byCat = new Map(rows.map((r) => [r.category, r]));
+        // Personal-only: system_prompt stays 0.8 (gov 0.5 NOT merged).
+        expect(byCat.get("system_prompt")?.costUsd).toBeCloseTo(0.8, 5);
+        expect(byCat.get("system_prompt")?.tokens).toBeCloseTo(800, 5);
+      });
     });
   });
 

@@ -98,8 +98,9 @@ export function CategoryBreakdownEnablementHint({
   return (
     <VStack align="start" gap={1} paddingY={2}>
       <Text fontSize="sm" color="fg.muted">
-        Turn on payload capture to see where your tokens go — which share is
-        system prompt, MCP tools, skills, thinking, and more.
+        Your coding-agent traffic may not be captured with content yet, so
+        there's nothing to break down. Turn on payload capture to see where your
+        tokens go — system prompt, MCP tools, skills, thinking, and more.
       </Text>
       <Link href={settingsHref} color="blue.600" fontSize="sm">
         Enable payload capture →

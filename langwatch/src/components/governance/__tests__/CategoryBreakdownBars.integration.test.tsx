@@ -62,14 +62,14 @@ describe("<CategoryBreakdownBars/>", () => {
 
   describe("given no captured content", () => {
     /** @scenario "The breakdown shows an enablement hint when no content was captured" */
-    it("explains payload capture must be enabled and links to the settings", () => {
+    it("explains coding-agent traffic may not be captured and links to enabling payload capture", () => {
       render(<CategoryBreakdownEnablementHint settingsHref="/me/configure" />, {
         wrapper: Wrapper,
       });
 
       expect(
         screen.getByText(
-          /turn on payload capture to see where your tokens go/i,
+          /your coding-agent traffic may not be captured.*turn on payload capture to see where your tokens go/i,
         ),
       ).toBeInTheDocument();
       const link = screen.getByRole("link", {

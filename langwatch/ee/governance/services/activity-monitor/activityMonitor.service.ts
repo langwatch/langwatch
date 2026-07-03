@@ -334,9 +334,7 @@ export class ActivityMonitorService {
       input.organizationId,
     );
     const openAnomalyCount =
-      anomalyBreakdown.critical +
-      anomalyBreakdown.warning +
-      anomalyBreakdown.info;
+      anomalyBreakdown.critical + anomalyBreakdown.warning + anomalyBreakdown.info;
 
     const govProjectId = await this.resolveGovProjectId(input.organizationId);
     if (!govProjectId) {
@@ -636,10 +634,7 @@ export class ActivityMonitorService {
     windowDays: number;
   }): Promise<SpendByDepartmentRow[]> {
     const projects = await this.prisma.project.findMany({
-      where: {
-        team: { organizationId: input.organizationId },
-        archivedAt: null,
-      },
+      where: { team: { organizationId: input.organizationId }, archivedAt: null },
       select: { id: true, departmentId: true },
     });
     if (projects.length === 0) return [];
@@ -723,10 +718,7 @@ export class ActivityMonitorService {
       acc.set(key, {
         spendUsd: prior.spendUsd + Number(r.spendUsdStr),
         requestCount: prior.requestCount + Number(r.requests),
-        lastActivityMs: Math.max(
-          prior.lastActivityMs,
-          Number(r.lastActivityMs),
-        ),
+        lastActivityMs: Math.max(prior.lastActivityMs, Number(r.lastActivityMs)),
       });
     }
 
@@ -894,9 +886,7 @@ export class ActivityMonitorService {
     }>;
     if (sourceRows.length === 0) return [];
 
-    const sourceIds = sourceRows
-      .map((r) => r.sourceId)
-      .filter((id) => id !== "");
+    const sourceIds = sourceRows.map((r) => r.sourceId).filter((id) => id !== "");
     const sources = await this.prisma.ingestionSource.findMany({
       where: { id: { in: sourceIds }, organizationId: input.organizationId },
       select: {
@@ -905,7 +895,9 @@ export class ActivityMonitorService {
         team: { select: { id: true, name: true } },
       },
     });
-    const teamBySource = new Map(sources.map((s) => [s.id, s.team] as const));
+    const teamBySource = new Map(
+      sources.map((s) => [s.id, s.team] as const),
+    );
 
     const ORG_WIDE_KEY = "__org_wide__";
     const byTeam = new Map<
@@ -935,10 +927,7 @@ export class ActivityMonitorService {
         existing.prevSpend += prevSpend;
         existing.requestCount += requestCount;
         existing.sourceCount += 1;
-        existing.lastActivityMs = Math.max(
-          existing.lastActivityMs,
-          lastActivityMs,
-        );
+        existing.lastActivityMs = Math.max(existing.lastActivityMs, lastActivityMs);
       } else {
         byTeam.set(key, {
           teamId,
@@ -1311,9 +1300,7 @@ export class ActivityMonitorService {
     if (!ch) return [];
 
     const limit = input.limit ?? 50;
-    const beforeMs = input.beforeIso
-      ? new Date(input.beforeIso).getTime()
-      : Date.now();
+    const beforeMs = input.beforeIso ? new Date(input.beforeIso).getTime() : Date.now();
 
     // Pull recent traces for the source. Webhook log_records are out of
     // scope for this endpoint (the per-source detail page renders trace

@@ -603,12 +603,15 @@ export const userRouter = createTRPCRouter({
             userId,
             ingestionTenantId,
           }),
-          // Category totals live only on the personal-project trace summaries
-          // (the gateway ledger carries no per-category split), so this reads
-          // the personal tenant without the ingestion-ledger union.
+          // Category totals live on trace summaries (the gateway ledger carries
+          // no per-category split). Personal-tenant rows plus, when the org has
+          // a governance tenant, this user's ingestion-source rows there —
+          // attributed by principal email on the gov trace summaries.
           usage.breakdownByCategory({
             personalProjectId: workspace.project.id,
             window,
+            userEmail: ctx.session.user.email ?? undefined,
+            ingestionTenantId,
           }),
         ]);
 
