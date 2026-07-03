@@ -199,35 +199,60 @@ describe("allocateCategoryCosts", () => {
     });
   });
 
-  describe("given a single cached-prefix block straddling the read→creation boundary", () => {
-    it("splits the block across both tiers instead of dumping half into the catch-all", () => {
-      // Regression: a 1000-token system_prompt with cacheRead=500 / creation=500
-      // used to assign the whole block to cache_read, leaving the creation pool
-      // blockless — the zero-guard then dumped its 500 tokens into other_input,
-      // so the customer saw half their system prompt as "Other input"
-      // (conservation still held, so the totals-only tests missed it).
+  describe("given a cached prefix whose estimate does not match the provider cache split", () => {
+    // The prefix block estimate and the provider's cache_read/creation counts are
+    // on different scales. In every case below the WHOLE cached prefix must stay
+    // its real category (system_prompt) across both tiers — the non-empty
+    // cache_creation pool must never be dumped into other_input.
+    const runPrefix = (
+      cacheReadTokens: number,
+      cacheCreationTokens: number,
+    ) => {
       const inputBlocks: TokenBlock[] = [
         { idx: 0, category: InputCategory.SYSTEM_PROMPT, tokens: 1000 },
       ];
       const pools: UsagePools = {
         inputTokens: 0,
-        cacheReadTokens: 500,
-        cacheCreationTokens: 500,
+        cacheReadTokens,
+        cacheCreationTokens,
         outputTokens: 0,
       };
-
-      const { categoryTotals } = allocateCategoryCosts({
+      return allocateCategoryCosts({
         inputBlocks,
         outputBlocks: [],
         lastCacheBreakpointIndex: 0,
         pools,
         prices: {},
-      });
+      }).categoryTotals;
+    };
 
-      // Whole block stays system_prompt across both cache tiers; nothing leaks
-      // into the input catch-all.
-      expect(categoryTotals[InputCategory.SYSTEM_PROMPT]?.tokens).toBe(1000);
-      expect(categoryTotals[InputCategory.OTHER_INPUT]).toBeUndefined();
+    it("splits at an interior boundary (read=500, creation=500)", () => {
+      const totals = runPrefix(500, 500);
+      expect(totals[InputCategory.SYSTEM_PROMPT]?.tokens).toBe(1000);
+      expect(totals[InputCategory.OTHER_INPUT]).toBeUndefined();
+    });
+
+    it("keeps creation attributed when read equals the whole estimate (boundary-at-end)", () => {
+      // read (1000) == the block estimate (1000): the old positional split put
+      // the whole block in cache_read, leaving creation (500) blockless → dumped
+      // to other_input. Proportional split keeps both pools populated.
+      const totals = runPrefix(1000, 500);
+      expect(totals[InputCategory.SYSTEM_PROMPT]?.tokens).toBe(1500);
+      expect(totals[InputCategory.OTHER_INPUT]).toBeUndefined();
+    });
+
+    it("keeps creation attributed when read exceeds the estimate (undercount)", () => {
+      // Estimate (1000) undercounts the provider's read (1200): the boundary is
+      // past the block, so the old code left creation (500) blockless.
+      const totals = runPrefix(1200, 500);
+      expect(totals[InputCategory.SYSTEM_PROMPT]?.tokens).toBe(1700);
+      expect(totals[InputCategory.OTHER_INPUT]).toBeUndefined();
+    });
+
+    it("attributes an all-creation prefix (read=0) to the real category", () => {
+      const totals = runPrefix(0, 500);
+      expect(totals[InputCategory.SYSTEM_PROMPT]?.tokens).toBe(500);
+      expect(totals[InputCategory.OTHER_INPUT]).toBeUndefined();
     });
   });
 

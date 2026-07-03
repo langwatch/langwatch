@@ -227,14 +227,25 @@ function reconcileCosts(totals: CategoryTotals, target: number): void {
 }
 
 /**
- * Split input blocks into the cached prefix (cache_read then cache_creation) and
- * the fresh remainder. The prefix fills the cache_read pool by cumulative token
- * estimate, then the rest of the prefix overflows to cache_creation. A block
- * that STRADDLES the read→creation boundary is split at it, keeping its idx and
- * category on both slices: assigning it wholly to one tier would leave the other
- * pool blockless, and allocatePool's zero-guard then dumps that pool's whole
- * total into the axis catch-all (e.g. half a system_prompt shown as other_input)
- * even though conservation still holds. When neither cache pool has capacity, the
+ * Split the cached prefix across the cache_read and cache_creation pools, and
+ * return the fresh remainder.
+ *
+ * SCALE HAZARD: `block.tokens` are local ESTIMATES; `cacheReadTokens` /
+ * `cacheCreationTokens` are PROVIDER truth on a different scale (allocatePool
+ * rescales each pool's blocks to its provider total afterwards). Comparing the
+ * estimate cursor directly against the absolute `cacheReadTokens` mis-scales:
+ * whenever the provider's read count reaches or exceeds the prefix's TOTAL
+ * estimate, every block lands in cache_read, cache_creation is left blockless,
+ * and allocatePool's zero-guard dumps that whole (non-empty) pool into the axis
+ * catch-all — surfacing as an inflated `other_input`.
+ *
+ * Instead, split at the boundary PROPORTIONAL to the provider's read share,
+ * measured in estimate space: `readBoundary = read/(read+creation) * estPrefix`.
+ * A block straddling that boundary is split at it, keeping idx + category on both
+ * slices. This guarantees every pool with a positive provider total keeps at
+ * least one prefix block (so its tokens attribute to the real categories, not
+ * the catch-all), while conservation still holds because allocatePool rescales
+ * each pool to its provider total. When neither cache pool has capacity, the
  * breakpoint is irrelevant and everything is fresh.
  */
 function partitionInput({
@@ -270,13 +281,25 @@ function partitionInput({
   const prefix = inputBlocks.slice(0, prefixEnd);
   const fresh = inputBlocks.slice(prefixEnd);
 
+  // The read/creation split point in ESTIMATE space, proportional to the
+  // provider's read share (see the SCALE HAZARD note above). When creation is 0
+  // the boundary is the whole prefix (all read); when read is 0 it is 0 (all
+  // creation) — a blockless pool then has a 0 provider total and is skipped, so
+  // nothing dumps to the catch-all.
+  const cacheTotalTokens = cacheReadTokens + cacheCreationTokens;
+  const estPrefixTokens = prefix.reduce((sum, b) => sum + b.tokens, 0);
+  const readBoundary =
+    cacheTotalTokens > 0
+      ? (cacheReadTokens / cacheTotalTokens) * estPrefixTokens
+      : estPrefixTokens;
+
   let running = 0;
   for (const block of prefix) {
     const blockEnd = running + block.tokens;
-    if (blockEnd <= cacheReadTokens) {
-      // Entirely within the cache_read budget.
+    if (blockEnd <= readBoundary) {
+      // Entirely within the cache_read share.
       cacheRead.push(block);
-    } else if (running >= cacheReadTokens) {
+    } else if (running >= readBoundary) {
       // Starts at/after the boundary — entirely cache_creation.
       cacheCreation.push(block);
     } else {
@@ -284,7 +307,7 @@ function partitionInput({
       // Both slices keep idx + category; allocatePool rescales each pool to its
       // provider total, so the estimate-based split point only sets the tier
       // proportions, never the final token totals.
-      const readPortion = cacheReadTokens - running;
+      const readPortion = readBoundary - running;
       cacheRead.push({ ...block, tokens: readPortion });
       cacheCreation.push({ ...block, tokens: block.tokens - readPortion });
     }
