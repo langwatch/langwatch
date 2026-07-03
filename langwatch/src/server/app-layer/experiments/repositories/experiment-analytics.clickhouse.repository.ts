@@ -1,16 +1,7 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
+import { BaseAnalyticsSlimClickHouseRepository } from "~/server/app-layer/analytics/repositories/analyticsWriteBase";
 import type { ExperimentAnalyticsRow } from "~/server/event-sourcing/pipelines/experiment-run-processing/projections/experimentAnalytics.foldProjection";
-import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
-import { createLogger } from "~/utils/logger/server";
 import type { ExperimentAnalyticsRepository } from "./experiment-analytics.repository";
-
-const TABLE_NAME = "experiment_analytics" as const;
-
-const logger = createLogger(
-  "langwatch:app-layer:experiments:experiment-analytics-repository",
-);
 
 /**
  * ClickHouse write shape for the slim `experiment_analytics` table
@@ -68,7 +59,9 @@ function toClickHouseRecord(
     FailedCount: row.failedCount,
     TotalCost: row.totalCost,
     TotalDurationMs:
-      row.totalDurationMs == null ? null : String(Math.round(row.totalDurationMs)),
+      row.totalDurationMs == null
+        ? null
+        : String(Math.round(row.totalDurationMs)),
     AvgScoreBps: row.avgScoreBps,
     PassRateBps: row.passRateBps,
 
@@ -79,84 +72,19 @@ function toClickHouseRecord(
 }
 
 export class ExperimentAnalyticsClickHouseRepository
+  extends BaseAnalyticsSlimClickHouseRepository<
+    ExperimentAnalyticsRow,
+    ClickHouseExperimentAnalyticsWriteRecord
+  >
   implements ExperimentAnalyticsRepository
 {
-  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
-
-  async upsert(
-    row: ExperimentAnalyticsRow,
-    retentionDays: number = PLATFORM_DEFAULT_RETENTION_DAYS,
-  ): Promise<void> {
-    EventUtils.validateTenantId(
-      { tenantId: row.tenantId },
-      "ExperimentAnalyticsClickHouseRepository.upsert",
-    );
-
-    try {
-      const client = await this.resolveClient(row.tenantId);
-      await client.insert({
-        table: TABLE_NAME,
-        values: [toClickHouseRecord(row, retentionDays)],
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
-      });
-    } catch (error) {
-      logger.error(
-        {
-          tenantId: row.tenantId,
-          runId: row.runId,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "Failed to upsert experiment_analytics row into ClickHouse",
-      );
-      throw error;
-    }
-  }
-
-  async upsertBatch(
-    entries: Array<{ row: ExperimentAnalyticsRow; retentionDays?: number }>,
-  ): Promise<void> {
-    if (entries.length === 0) return;
-
-    const tenantId = entries[0]!.row.tenantId;
-    EventUtils.validateTenantId(
-      { tenantId },
-      "ExperimentAnalyticsClickHouseRepository.upsertBatch",
-    );
-    for (const { row } of entries) {
-      if (row.tenantId !== tenantId) {
-        throw new SecurityError(
-          "ExperimentAnalyticsClickHouseRepository.upsertBatch",
-          "all rows in a single batch must share the same tenantId",
-          tenantId,
-          { mismatchedTenantId: row.tenantId },
-        );
-      }
-    }
-
-    try {
-      const client = await this.resolveClient(tenantId);
-      await client.insert({
-        table: TABLE_NAME,
-        values: entries.map(({ row, retentionDays }) =>
-          toClickHouseRecord(
-            row,
-            retentionDays ?? PLATFORM_DEFAULT_RETENTION_DAYS,
-          ),
-        ),
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
-      });
-    } catch (error) {
-      logger.error(
-        {
-          tenantId,
-          count: entries.length,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "Failed to batch upsert experiment_analytics rows into ClickHouse",
-      );
-      throw error;
-    }
+  constructor(resolveClient: ClickHouseClientResolver) {
+    super(resolveClient, {
+      tableName: "experiment_analytics",
+      loggerName:
+        "langwatch:app-layer:experiments:experiment-analytics-repository",
+      entityIdOf: (row) => ({ runId: row.runId }),
+      toRecord: toClickHouseRecord,
+    });
   }
 }

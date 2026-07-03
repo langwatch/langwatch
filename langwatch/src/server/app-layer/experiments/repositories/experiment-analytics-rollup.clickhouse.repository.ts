@@ -1,16 +1,7 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
-import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
+import { BaseAnalyticsRollupClickHouseRepository } from "~/server/app-layer/analytics/repositories/analyticsWriteBase";
 import type { ExperimentAnalyticsRollupRow } from "~/server/event-sourcing/pipelines/experiment-run-processing/projections/experimentAnalyticsRollup.mapProjection";
-import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
-import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
-import { createLogger } from "~/utils/logger/server";
 import type { ExperimentAnalyticsRollupRepository } from "./experiment-analytics-rollup.repository";
-
-const TABLE_NAME = "experiment_analytics_rollup" as const;
-
-const logger = createLogger(
-  "langwatch:app-layer:experiments:experiment-analytics-rollup-repository",
-);
 
 /**
  * ADR-034 Phase 7 — write-side CH repository for the experiments rollup.
@@ -47,81 +38,19 @@ function toClickHouseRecord(
 }
 
 export class ExperimentAnalyticsRollupClickHouseRepository
+  extends BaseAnalyticsRollupClickHouseRepository<
+    ExperimentAnalyticsRollupRow,
+    ClickHouseExperimentRollupWriteRecord
+  >
   implements ExperimentAnalyticsRollupRepository
 {
-  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
-
-  async insertRow(
-    row: ExperimentAnalyticsRollupRow,
-    retentionDays: number = PLATFORM_DEFAULT_RETENTION_DAYS,
-  ): Promise<void> {
-    EventUtils.validateTenantId(
-      { tenantId: row.tenantId },
-      "ExperimentAnalyticsRollupClickHouseRepository.insertRow",
-    );
-
-    try {
-      const client = await this.resolveClient(row.tenantId);
-      await client.insert({
-        table: TABLE_NAME,
-        values: [toClickHouseRecord(row, retentionDays)],
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
-      });
-    } catch (error) {
-      logger.error(
-        {
-          tenantId: row.tenantId,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "Failed to insert experiment_analytics_rollup row into ClickHouse",
-      );
-      throw error;
-    }
-  }
-
-  async insertRows(
-    rows: ExperimentAnalyticsRollupRow[],
-    retentionDays: number = PLATFORM_DEFAULT_RETENTION_DAYS,
-  ): Promise<void> {
-    if (rows.length === 0) return;
-
-    for (const row of rows) {
-      EventUtils.validateTenantId(
-        { tenantId: row.tenantId },
-        "ExperimentAnalyticsRollupClickHouseRepository.insertRows",
-      );
-    }
-
-    const tenantId = rows[0]!.tenantId;
-    for (const row of rows) {
-      if (row.tenantId !== tenantId) {
-        throw new SecurityError(
-          "ExperimentAnalyticsRollupClickHouseRepository.insertRows",
-          "all rows in a single batch must share the same tenantId",
-          tenantId,
-          { mismatchedTenantId: row.tenantId },
-        );
-      }
-    }
-
-    try {
-      const client = await this.resolveClient(tenantId);
-      await client.insert({
-        table: TABLE_NAME,
-        values: rows.map((row) => toClickHouseRecord(row, retentionDays)),
-        format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
-      });
-    } catch (error) {
-      logger.error(
-        {
-          count: rows.length,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "Failed to bulk insert experiment_analytics_rollup rows into ClickHouse",
-      );
-      throw error;
-    }
+  constructor(resolveClient: ClickHouseClientResolver) {
+    super(resolveClient, {
+      tableName: "experiment_analytics_rollup",
+      loggerName:
+        "langwatch:app-layer:experiments:experiment-analytics-rollup-repository",
+      entityIdOf: () => ({}),
+      toRecord: toClickHouseRecord,
+    });
   }
 }
