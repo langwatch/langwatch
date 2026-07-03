@@ -50,6 +50,8 @@ describe("usePostHog", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   describe("when publicEnv has not loaded yet", () => {
@@ -235,6 +237,55 @@ describe("usePostHog", () => {
           expect.objectContaining({ timeout: expect.any(Number) }),
         );
       });
+
+      describe("when the hook unmounts before the idle callback fires", () => {
+        it("cancels the pending idle callback via cancelIdleCallback", () => {
+          let idleCallback: (() => void) | undefined;
+          const cancelIdleCallback = vi.fn();
+          vi.stubGlobal(
+            "requestIdleCallback",
+            vi.fn((cb: () => void) => {
+              idleCallback = cb;
+              return 42;
+            }),
+          );
+          vi.stubGlobal("cancelIdleCallback", cancelIdleCallback);
+
+          const { unmount } = renderHook(() => usePostHog());
+          fireLoadedCallback();
+
+          unmount();
+
+          expect(cancelIdleCallback).toHaveBeenCalledWith(42);
+
+          // Even if something still invokes the stale callback, the
+          // cancelled-flag guard must stop it from starting recording.
+          idleCallback?.();
+
+          expect(mockStartSessionRecording).not.toHaveBeenCalled();
+        });
+
+        it("does not throw when cancelIdleCallback is unavailable", () => {
+          let idleCallback: (() => void) | undefined;
+          vi.stubGlobal(
+            "requestIdleCallback",
+            vi.fn((cb: () => void) => {
+              idleCallback = cb;
+              return 1;
+            }),
+          );
+          vi.stubGlobal("cancelIdleCallback", undefined);
+
+          const { unmount } = renderHook(() => usePostHog());
+          fireLoadedCallback();
+
+          expect(() => unmount()).not.toThrow();
+
+          idleCallback?.();
+
+          expect(mockStartSessionRecording).not.toHaveBeenCalled();
+        });
+      });
     });
 
     describe("when requestIdleCallback is unavailable (Safari)", () => {
@@ -252,8 +303,20 @@ describe("usePostHog", () => {
           vi.runAllTimers();
 
           expect(mockStartSessionRecording).toHaveBeenCalledTimes(1);
+        });
 
-          vi.useRealTimers();
+        it("cancels the pending timeout if unmounted first", () => {
+          vi.stubGlobal("requestIdleCallback", undefined);
+          vi.spyOn(document, "readyState", "get").mockReturnValue("complete");
+          vi.useFakeTimers();
+
+          const { unmount } = renderHook(() => usePostHog());
+          fireLoadedCallback();
+
+          unmount();
+          vi.runAllTimers();
+
+          expect(mockStartSessionRecording).not.toHaveBeenCalled();
         });
       });
 
@@ -272,8 +335,21 @@ describe("usePostHog", () => {
           vi.runAllTimers();
 
           expect(mockStartSessionRecording).toHaveBeenCalledTimes(1);
+        });
 
-          vi.useRealTimers();
+        it("removes the pending 'load' listener if unmounted first", () => {
+          vi.stubGlobal("requestIdleCallback", undefined);
+          vi.spyOn(document, "readyState", "get").mockReturnValue("loading");
+          vi.useFakeTimers();
+
+          const { unmount } = renderHook(() => usePostHog());
+          fireLoadedCallback();
+
+          unmount();
+          window.dispatchEvent(new Event("load"));
+          vi.runAllTimers();
+
+          expect(mockStartSessionRecording).not.toHaveBeenCalled();
         });
       });
     });

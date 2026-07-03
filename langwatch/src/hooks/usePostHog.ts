@@ -1,28 +1,46 @@
 import posthog from "posthog-js";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { usePublicEnv } from "./usePublicEnv";
 
-function startSessionRecordingWhenIdle() {
+// Returns a cancel function so callers can drop pending work if the effect
+// tears down (or re-runs) before the idle/load callback fires — otherwise a
+// stale callback from a previous render/session could call
+// startSessionRecording() after the component believes recording was never
+// started, silently re-enabling it out from under later state.
+function startSessionRecordingWhenIdle(): () => void {
+  let cancelled = false;
+  const guarded = () => {
+    if (!cancelled) posthog.startSessionRecording();
+  };
+
   if (typeof window.requestIdleCallback === "function") {
-    window.requestIdleCallback(() => posthog.startSessionRecording(), {
-      timeout: 4000,
-    });
-    return;
+    const handle = window.requestIdleCallback(guarded, { timeout: 4000 });
+    return () => {
+      cancelled = true;
+      window.cancelIdleCallback?.(handle);
+    };
   }
+
   // Safari has no requestIdleCallback — fall back to load + timeout.
   if (document.readyState === "complete") {
-    setTimeout(() => posthog.startSessionRecording(), 0);
-  } else {
-    window.addEventListener(
-      "load",
-      () => setTimeout(() => posthog.startSessionRecording(), 0),
-      { once: true },
-    );
+    const timeoutId = setTimeout(guarded, 0);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
   }
+
+  const onLoad = () => setTimeout(guarded, 0);
+  window.addEventListener("load", onLoad, { once: true });
+  return () => {
+    cancelled = true;
+    window.removeEventListener("load", onLoad);
+  };
 }
 
 export function usePostHog() {
   const publicEnv = usePublicEnv();
+  const cancelStartSessionRecordingRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!publicEnv.data) return;
@@ -75,10 +93,16 @@ export function usePostHog() {
               posthog;
           }
           if (publicEnv.data?.NODE_ENV === "development") posthog.debug();
-          startSessionRecordingWhenIdle();
+          cancelStartSessionRecordingRef.current =
+            startSessionRecordingWhenIdle();
         },
       });
     }
+
+    return () => {
+      cancelStartSessionRecordingRef.current?.();
+      cancelStartSessionRecordingRef.current = null;
+    };
   }, [publicEnv.data]);
 
   return publicEnv.data?.POSTHOG_KEY ? posthog : undefined;
