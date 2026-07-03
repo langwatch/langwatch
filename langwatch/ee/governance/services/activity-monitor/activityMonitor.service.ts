@@ -469,7 +469,9 @@ export class ActivityMonitorService {
           toString(sum(spendUsd)) AS spendUsdStr,
           toString(count()) AS requests,
           toString(toUnixTimestamp64Milli(max(occurredAt))) AS lastActivityMs,
-          any(model) AS mostUsedTarget
+          -- The actual most-frequent model, not an arbitrary any() pick, so a
+          -- user hitting haiku 1000x and opus once reads as haiku.
+          topK(1)(model)[1] AS mostUsedTarget
         FROM (
           SELECT
             ts.Attributes[{userKey:String}] AS actor,
@@ -561,6 +563,7 @@ export class ActivityMonitorService {
     const query_params: Record<string, string | number> = {
       tenantId: govProjectId,
       windowStart: now - windowMs,
+      windowEnd: now,
       originKey: GOVERNANCE_ATTR.ORIGIN_KIND,
       originValue: GOVERNANCE_ORIGIN_KIND_VALUE,
     };
@@ -584,12 +587,14 @@ export class ActivityMonitorService {
         FROM trace_summaries ts
         WHERE ts.TenantId = {tenantId:String}
           AND ts.OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
+          AND ts.OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
           AND ts.Attributes[{originKey:String}] = {originValue:String}
           AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM trace_summaries
             WHERE TenantId = {tenantId:String}
               AND OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
+              AND OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
               AND Attributes[{originKey:String}] = {originValue:String}
             GROUP BY TenantId, TraceId
           )
