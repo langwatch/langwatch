@@ -190,14 +190,23 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
     });
   });
 
-  describe("given an evaluation metric", () => {
-    it("routes to evaluation_analytics_rollup (ADR-034 Phase 6 — eval fast-path)", () => {
+  describe("given an evaluation metric with a per-evaluator key", () => {
+    it("falls back to evaluation_runs (rt5014-001: eval slim has no EvaluatorId column; rt5014-002: rollup would silently drop the key)", () => {
       const table = pickAnalyticsTable({
         series: [
           series("evaluations.evaluation_score", "avg", {
             key: "evaluator-x",
           }),
         ],
+      });
+      expect(table).toBe("evaluation_runs");
+    });
+  });
+
+  describe("given an evaluation metric with NO key (aggregate over all evaluators)", () => {
+    it("routes to evaluation_analytics_rollup (ADR-034 Phase 6 — eval fast-path)", () => {
+      const table = pickAnalyticsTable({
+        series: [series("evaluations.evaluation_runs", "cardinality")],
       });
       expect(table).toBe("evaluation_analytics_rollup");
     });

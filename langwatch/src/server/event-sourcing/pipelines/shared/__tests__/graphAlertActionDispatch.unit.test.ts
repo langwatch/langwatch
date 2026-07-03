@@ -248,20 +248,20 @@ describe("dispatchGraphAlertAction", () => {
   });
 
   describe("given a trigger with a non-notify action", () => {
-    it("no-ops and reports channel=none", async () => {
+    it("throws a non-retryable DispatchError so the row dead-letters (dispatch5015-002)", async () => {
       const { deps, sendEmail, sendSlack } = makeDeps();
-      const result = await dispatchGraphAlertAction({
-        deps,
-        input: {
-          trigger: makeTrigger({ action: TriggerAction.ADD_TO_DATASET }),
-          project: makeProject(),
-          context: makeContext(),
-          recipients: [],
-          slackWebhook: null,
-        },
-      });
-      expect(result.channel).toBe("none");
-      expect(result.didSend).toBe(false);
+      await expect(
+        dispatchGraphAlertAction({
+          deps,
+          input: {
+            trigger: makeTrigger({ action: TriggerAction.ADD_TO_DATASET }),
+            project: makeProject(),
+            context: makeContext(),
+            recipients: [],
+            slackWebhook: null,
+          },
+        }),
+      ).rejects.toThrow(/not supported/);
       expect(sendEmail).not.toHaveBeenCalled();
       expect(sendSlack).not.toHaveBeenCalled();
     });

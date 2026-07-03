@@ -36,7 +36,7 @@ describe("filterBlockKit", () => {
   });
 
   describe("when a section carries an image accessory", () => {
-    it("keeps the image accessory", () => {
+    it("strips the image accessory (tpl-001 — image blocks/accessories are tracking-pixel vectors)", () => {
       const [block] = filterBlockKit([
         {
           type: "section",
@@ -48,7 +48,43 @@ describe("filterBlockKit", () => {
           },
         },
       ]);
-      expect((block?.accessory as { type: string }).type).toBe("image");
+      expect(block?.type).toBe("section");
+      expect(block?.accessory).toBeUndefined();
+    });
+  });
+
+  describe("when a top-level image block is present", () => {
+    it("drops it entirely (tpl-001 tracking-pixel vector)", () => {
+      const blocks = filterBlockKit([
+        {
+          type: "image",
+          image_url: "https://tracker.example/pixel.png",
+          alt_text: "hi",
+        },
+        { type: "section", text: { type: "mrkdwn", text: "keep me" } },
+      ]);
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0]?.type).toBe("section");
+    });
+  });
+
+  describe("when a context block carries an image element", () => {
+    it("strips the image element but keeps text elements (tpl-002 recursive sanitize)", () => {
+      const [block] = filterBlockKit([
+        {
+          type: "context",
+          elements: [
+            { type: "mrkdwn", text: "keep-me" },
+            { type: "image", image_url: "https://tracker/", alt_text: "z" },
+            { type: "plain_text", text: "keep-me-too" },
+          ],
+        },
+      ]);
+      expect(block?.type).toBe("context");
+      expect(block?.elements).toEqual([
+        { type: "mrkdwn", text: "keep-me" },
+        { type: "plain_text", text: "keep-me-too" },
+      ]);
     });
   });
 
