@@ -338,9 +338,7 @@ describe("classifyBlocks", () => {
       const parts = Array.from({ length: overCap }, (_, i) => ({
         type: "text",
         text: `p${i}`,
-        ...(i === overCap - 1
-          ? { cache_control: { type: "ephemeral" } }
-          : {}),
+        ...(i === overCap - 1 ? { cache_control: { type: "ephemeral" } } : {}),
       }));
 
       const { input, lastInputCacheBreakpointIndex } = classifyBlocks({

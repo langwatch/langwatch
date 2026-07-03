@@ -122,7 +122,9 @@ describe("OtlpSpanCostEnrichmentService", () => {
         await service.enrichSpan(span, "project-1");
 
         const cacheKeys = span.attributes.map((a) => a.key);
-        expect(cacheKeys).not.toContain("langwatch.model.cacheReadCostPerToken");
+        expect(cacheKeys).not.toContain(
+          "langwatch.model.cacheReadCostPerToken",
+        );
         expect(cacheKeys).not.toContain(
           "langwatch.model.cacheCreationCostPerToken",
         );
