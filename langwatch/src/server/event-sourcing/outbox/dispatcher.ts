@@ -60,7 +60,7 @@ export interface OutboxDispatcherDeps {
   triggers: TriggerService;
   projects: ProjectService;
   /** Base host for building trace/automation deep links inside rendered
-   *  customer templates (ADR-028). Injected, not read from env, so the
+   *  customer templates (ADR-036). Injected, not read from env, so the
    *  dispatcher stays testable. */
   baseHost: string;
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
@@ -73,7 +73,7 @@ export interface OutboxDispatcherDeps {
   }) => Promise<DerivedTraceEvent[]>;
   traceById: (projectId: string, traceId: string) => Promise<Trace | undefined>;
   /**
-   * ADR-032: persist-class dispatch dependencies. Persist actions
+   * ADR-035: persist-class dispatch dependencies. Persist actions
    * (ADD_TO_DATASET / ADD_TO_ANNOTATION_QUEUE) now ride the same
    * settle/cadence outbox as notify, so the cadence handler calls
    * `dispatchTriggerAction` for them — which needs these two side-effect
@@ -178,7 +178,7 @@ export interface OutboxDispatcherDeps {
  * operator's two knobs (`traceDebounceMs`, `notificationCadence`) still
  * independently tunable. Both action classes ride this path now: notify
  * (email / Slack, digest-coalesced) and persist (dataset / annotation,
- * immediate per-match — ADR-032). `handleCadenceBatch` picks the branch
+ * immediate per-match — ADR-035). `handleCadenceBatch` picks the branch
  * from the payload's `actionClass`.
  *
  * `process(payload)` is invoked by the GroupQueue for single-job
@@ -243,9 +243,9 @@ async function handleGraphEval(
 }
 
 /**
- * Resolves the dispatch class for a settle/cadence payload (ADR-032).
+ * Resolves the dispatch class for a settle/cadence payload (ADR-035).
  * Prefers the marker the reactor stamped; falls back to deriving it from
- * `trigger.action` for rows enqueued before ADR-032 (which carried no
+ * `trigger.action` for rows enqueued before ADR-035 (which carried no
  * marker and were always notify-class — persist rode the inline reactor
  * back then). Deriving from the live trigger is safe because the
  * notify/persist split is a fixed partition of `TriggerAction`.
@@ -263,7 +263,7 @@ function resolveActionClass(
  * the fold, re-run filters against the now-settled state, and
  * re-enqueue as cadence. For notify the cadence delay snaps to the next
  * digest boundary so the window can coalesce; for persist it is an
- * immediate same-tick hand-off (ADR-032) — `computeScheduledFor`
+ * immediate same-tick hand-off (ADR-035) — `computeScheduledFor`
  * already returns `now` for persist actions.
  *
  * The `TriggerSent` at-most-once gate is owned entirely by
@@ -330,7 +330,7 @@ async function handleSettle(
     }
   }
 
-  // ADR-032: both notify and persist ride this path now. The cadence
+  // ADR-035: both notify and persist ride this path now. The cadence
   // payload carries the action class forward so `handleCadenceBatch`
   // picks the right dispatch branch without re-reading `trigger.action`.
   const actionClass = resolveActionClass(payload, trigger.action);
@@ -371,7 +371,7 @@ async function handleSettle(
  * the same wall-clock cadence boundary.
  *
  * For NOTIFY triggers this renders one digest and sends (email / Slack).
- * For PERSIST triggers (ADR-032) it dispatches each match individually
+ * For PERSIST triggers (ADR-035) it dispatches each match individually
  * via `dispatchTriggerAction` — persist never digest-batches, so the
  * batch is just the same-tick collection of immediate cadences for one
  * trigger. The `actionClass` carried on the payload picks the branch.
@@ -408,7 +408,7 @@ async function handleCadenceBatch(
     return;
   }
 
-  // ADR-032: persist-class triggers branch off here. They run
+  // ADR-035: persist-class triggers branch off here. They run
   // `dispatchTriggerAction` per match (no digest, no template render, no
   // email caps) so the rest of this function — which is the notify
   // digest path — is reached only for notify triggers.
@@ -479,7 +479,7 @@ async function handleCadenceBatch(
     }),
   );
 
-  // ADR-028: a trigger with customer-authored templates renders them here;
+  // ADR-036: a trigger with customer-authored templates renders them here;
   // a NULL template keeps the legacy framework senders byte-for-byte. The
   // template-vs-legacy decision is per-channel and made BEFORE the legacy
   // switch so the legacy path is reached only when no custom template exists.
@@ -519,7 +519,7 @@ async function handleCadenceBatch(
   // (we return normally, never throw) but must be visible as drops, not sends.
   let dropReason: string | undefined;
   // Render-health diagnostics from a custom email/Slack template render
-  // (ADR-028 / ADR-029): the variables the template referenced but the render
+  // (ADR-036 / ADR-037): the variables the template referenced but the render
   // context did not supply. Captured from whichever channel rendered (a
   // dispatch is email XOR slack, so this is effectively one render's
   // `missingVariables`); accumulated as a Set so the wiring stays correct if a
@@ -746,7 +746,7 @@ async function handleCadenceBatch(
 
   // Stamp render-health diagnostics onto every payload so the PG audit
   // adapter's `onDispatched` hook persists them to the row's
-  // `renderDiagnostics` (ADR-028 / ADR-029). Mirrors the `dropReason` wiring
+  // `renderDiagnostics` (ADR-036 / ADR-037). Mirrors the `dropReason` wiring
   // below: only set when a custom template render surfaced missing variables;
   // `null` otherwise so a clean render is distinguishable from "never
   // computed". `payloads` (not just `candidatePayloads`) so the shared audit
@@ -859,7 +859,7 @@ async function handleCadenceBatch(
 }
 
 /**
- * Persist-class cadence dispatch (ADR-032). Runs each matched
+ * Persist-class cadence dispatch (ADR-035). Runs each matched
  * (trigger, trace) pair through `dispatchTriggerAction` — the dataset
  * write / annotation-queue add the operator configured — instead of
  * rendering a notification digest. Persist never coalesces into a

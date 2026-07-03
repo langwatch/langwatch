@@ -1,4 +1,4 @@
-# ADR-033: Outbox heartbeat primitive
+# ADR-038: Outbox heartbeat primitive
 
 - **Status:** Accepted
 - **Date:** 2026-06-20
