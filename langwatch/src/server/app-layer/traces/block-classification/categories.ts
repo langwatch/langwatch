@@ -56,6 +56,12 @@ export const MCP_TOOL_PREFIX = "mcp__";
  * axis catch-all so category totals stay complete even when detail is truncated. */
 export const MAX_CLASSIFIED_BLOCKS_PER_SPAN = 512;
 
+/** Per-block tokenizer input cap (chars). The block-count cap alone does not
+ * bound a SINGLE adversarial multi-MB block, and spool-reconstituted spans
+ * bypass the ingest value cap — tokenize a slice this long and extrapolate
+ * linearly (≈64k chars ≈ 16k tokens; far beyond any honest content block). */
+export const MAX_TOKENIZED_CHARS_PER_BLOCK = 64_000;
+
 /** Which heuristic set produced these categories — replay/audit (ADR-015). */
 export const CLASSIFIER_VERSION = 1;
 

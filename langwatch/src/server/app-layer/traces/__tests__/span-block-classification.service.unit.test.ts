@@ -259,4 +259,64 @@ describe("OtlpSpanBlockClassificationService", () => {
       });
     });
   });
+
+  describe("given one adversarial multi-megabyte block", () => {
+    describe("when the span is classified", () => {
+      it("caps the tokenizer input per block and extrapolates the count", async () => {
+        // Spool-reconstituted spans bypass the ingest value cap, so a single
+        // giant block must never reach the tokenizer whole (DoS guard).
+        let maxSeenChars = 0;
+        const spyTokenizer = {
+          countTokens: (_model: string, text: string | undefined) => {
+            maxSeenChars = Math.max(maxSeenChars, text?.length ?? 0);
+            return Promise.resolve(
+              text ? Math.ceil(text.length / 4) : undefined,
+            );
+          },
+        };
+        const guardedService = new OtlpSpanBlockClassificationService({
+          tokenizer: spyTokenizer,
+        });
+
+        const giant = "y".repeat(5 * 1024 * 1024); // 5 MiB single block
+        const span = createSpan([
+          { key: "langwatch.span.type", value: { stringValue: "llm" } },
+          {
+            key: "gen_ai.request.model",
+            value: { stringValue: "claude-sonnet-4" },
+          },
+          {
+            key: "langwatch.input",
+            value: {
+              stringValue: JSON.stringify({
+                type: "chat_messages",
+                value: [{ role: "user", content: giant }],
+              }),
+            },
+          },
+          {
+            key: "gen_ai.usage.input_tokens",
+            value: { intValue: 1_000_000 },
+          },
+          {
+            key: "langwatch.model.inputCostPerToken",
+            value: { doubleValue: 3e-6 },
+          },
+        ]);
+
+        await guardedService.classifySpanBlocks({
+          span,
+          instrumentationScope: CLAUDE_SCOPE,
+        });
+
+        expect(maxSeenChars).toBeLessThanOrEqual(64_000);
+        // Conservation still holds: the pool total is provider truth.
+        const detail = JSON.parse(
+          attrValue(span, SPAN_ATTR_BLOCKS)!.value.stringValue!,
+        ) as Array<{ tokens: number }>;
+        const totalTokens = detail.reduce((sum, b) => sum + b.tokens, 0);
+        expect(totalTokens).toBe(1_000_000);
+      });
+    });
+  });
 });

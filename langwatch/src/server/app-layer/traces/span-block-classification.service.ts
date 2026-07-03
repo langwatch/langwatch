@@ -13,6 +13,7 @@ import {
   blockCategoryTokensAttr,
   type Category,
   CLASSIFIER_VERSION,
+  MAX_TOKENIZED_CHARS_PER_BLOCK,
   SPAN_ATTR_BLOCKS,
   SPAN_ATTR_CLASSIFIER_VERSION,
 } from "./block-classification/categories";
@@ -167,8 +168,20 @@ export class OtlpSpanBlockClassificationService {
   }): Promise<TokenBlock[]> {
     const out: TokenBlock[] = [];
     for (const block of blocks) {
-      const tokens =
-        (await this.deps.tokenizer.countTokens(model, block.text)) ?? 0;
+      // DoS guard: the 512-block cap bounds block COUNT but not the size of
+      // any single block, and spool-reconstituted spans bypass the ingest
+      // value cap entirely — one adversarial multi-MB block must not hold the
+      // tokenizer (synchronous ingestion path) hostage. Tokenize a capped
+      // slice and extrapolate linearly: within-pool proportions shift only
+      // for pathological blocks, and pool totals stay exact via scaling.
+      const text =
+        block.text.length > MAX_TOKENIZED_CHARS_PER_BLOCK
+          ? block.text.slice(0, MAX_TOKENIZED_CHARS_PER_BLOCK)
+          : block.text;
+      let tokens = (await this.deps.tokenizer.countTokens(model, text)) ?? 0;
+      if (text.length < block.text.length && text.length > 0) {
+        tokens = Math.round((tokens * block.text.length) / text.length);
+      }
       out.push({ idx: block.idx, category: block.category, tokens });
     }
     return out;
