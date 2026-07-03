@@ -196,6 +196,34 @@ describe("rollupSessions", () => {
     });
   });
 
+  describe("given codex traces sharing a session but with per-turn conversation ids", () => {
+    it("re-joins them into one session by the stable thread id, not the per-turn id", () => {
+      // Codex stamps gen_ai.conversation.id with a fresh PER-TURN id and the
+      // stable session id onto langwatch.thread.id. Preferring the conversation
+      // id (as the Claude path does) would fragment the codex session into one
+      // bucket per turn, defeating the rollup. So codex must key on thread.id.
+      const codexTurn = (
+        turnId: string,
+        step: number,
+      ): SessionRollupTraceInput => ({
+        attributes: {
+          [SESSION_HARNESS_ATTR]: "codex",
+          "langwatch.thread.id": "codex-session-1",
+          "gen_ai.conversation.id": turnId,
+          [SESSION_STEPS_ATTR]: JSON.stringify(stepsOf(step)),
+        },
+      });
+
+      const views = rollupSessions({
+        traces: [codexTurn("turn-a", 1000), codexTurn("turn-b", 2000)],
+      });
+
+      expect(views).toHaveLength(1);
+      expect(views[0]!.threadId).toBe("codex-session-1");
+      expect(views[0]!.stepCount).toBe(2);
+    });
+  });
+
   describe("given a trace with no harness marker or thread id", () => {
     describe("when it is rolled up", () => {
       it("is skipped and produces no session view", () => {
@@ -360,6 +388,28 @@ describe("detectCompactionEvents", () => {
         detectCompactionEvents({
           steps: stepsOf(200_000, 8_000, 10_000, 12_000, 14_000, 190_000),
         }).events,
+      ).toBe(0);
+    });
+
+    it("counts no event when a real candidate is confirmed only by sub-floor subagent steps", () => {
+      // 100k IS a measurement-grade candidate (above the subagent floor), but the
+      // only steps before the main thread resumes at 200k are sub-floor subagent
+      // calls (8k, 8.5k) — not context measurements. The context was never
+      // re-based, so the confirmation window must skip them and read a recovery.
+      expect(
+        detectCompactionEvents({
+          steps: stepsOf(200_000, 100_000, 8_000, 8_500, 200_000),
+        }).events,
+      ).toBe(0);
+    });
+
+    it("counts no event when a candidate is followed only by one sub-floor step at end of session", () => {
+      // A candidate (100k) then a lone subagent step (8k), then the session ends
+      // — the end-of-session rule must require at least one measurement-grade
+      // confirmer, which a sub-floor step is not.
+      expect(
+        detectCompactionEvents({ steps: stepsOf(200_000, 100_000, 8_000) })
+          .events,
       ).toBe(0);
     });
   });

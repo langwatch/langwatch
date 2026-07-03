@@ -101,25 +101,39 @@ export interface SessionRollupTraceInput {
  */
 /**
  * A candidate drop at `candidateIdx` (already below `threshold`) is a confirmed
- * re-base iff the next `confirmationSteps` steps stay below the drop threshold,
- * OR the session ends still-compacted with at least one confirming step (an
- * end-of-session compaction that just ran out of runway). A step climbing back
- * to/above the threshold means the context returned — not a re-base.
+ * re-base iff the next `confirmationSteps` MEASUREMENT-GRADE steps stay below the
+ * drop threshold, OR the session ends still-compacted with at least one such
+ * step (an end-of-session compaction that just ran out of runway). A step
+ * climbing back to/above the threshold means the context returned — not a re-base.
+ *
+ * Sub-floor steps (`< COMPACTION_MIN_RETAIN_RATIO × runningMax`) inside the
+ * confirmation window are subagent / parallel calls — the same non-measurements
+ * the outer walk skips as candidates — so they neither confirm the re-base nor
+ * count as a recovery; they are skipped. Without this, the pattern
+ * `[200k, 100k, 8k, 8.5k, 200k]` (main thread resumes after two subagent steps)
+ * and `[200k, 100k, 8k]` (one subagent step then the session ends) both
+ * false-fire a phantom compaction.
  */
 function isConfirmedCompaction(
   steps: SessionStep[],
   candidateIdx: number,
   threshold: number,
   confirmationSteps: number,
+  runningMax: number,
 ): boolean {
+  const floor = COMPACTION_MIN_RETAIN_RATIO * runningMax;
   let confirmed = 0;
   let j = candidateIdx + 1;
   for (; j < steps.length && confirmed < confirmationSteps; j++) {
-    if (steps[j]!.inputTokens >= threshold) return false; // recovered
+    const tokens = steps[j]!.inputTokens;
+    if (tokens < floor) continue; // subagent step — not a measurement
+    if (tokens >= threshold) return false; // recovered to the pre-drop context
     confirmed++;
   }
   if (confirmed === confirmationSteps) return true;
-  return j >= steps.length && confirmed >= 1; // ended still-compacted
+  // End of session: confirm only if at least one measurement-grade step stayed
+  // compacted — a lone subagent step is not evidence of a re-base.
+  return j >= steps.length && confirmed >= 1;
 }
 
 export function detectCompactionEvents({
@@ -168,7 +182,15 @@ export function detectCompactionEvents({
     // Candidate compaction: a significant-but-not-total drop. Only a confirmed
     // re-base fires an event and resets the max; unconfirmed candidates are
     // noise (the confirmation steps are re-visited by the outer loop).
-    if (isConfirmedCompaction(positiveSteps, i, threshold, confirmationSteps)) {
+    if (
+      isConfirmedCompaction(
+        positiveSteps,
+        i,
+        threshold,
+        confirmationSteps,
+        runningMax,
+      )
+    ) {
       events++;
       runningMax = cur; // subsequent growth is measured from the compacted level
     }
@@ -186,21 +208,32 @@ function readHarness(
 }
 
 /**
- * Read the session/thread id off a trace summary. The span path maps thread id
- * onto `gen_ai.conversation.id` (accumulation allowlist); the Path B log path
- * merges the raw lifted `langwatch.thread.id`. Prefer the semconv-stable
- * `gen_ai.conversation.id` and fall back to `langwatch.thread.id` only when it
- * is absent — a trace carrying both with disagreeing values must key ONE
- * session, not silently split into two buckets. Whitespace-only ids are treated
- * as absent so they can't collapse every mis-tagged trace into one phantom
- * mega-session.
+ * Read the session/thread id off a trace summary, keyed by harness because the
+ * two emitters populate the id attributes differently:
+ *
+ *   - Claude: `gen_ai.conversation.id` IS the stable session id (semconv-stable);
+ *     prefer it, fall back to `langwatch.thread.id`.
+ *   - Codex: the extractor stamps `gen_ai.conversation.id` with the PER-TURN
+ *     `turn.id` (a fresh UUID every model call) and the stable session id onto
+ *     `langwatch.thread.id` (from the rollout `conversation.id`). Preferring
+ *     `gen_ai.conversation.id` here would give every codex turn its own key and
+ *     the fragmented session would never re-join — the whole point of the rollup
+ *     for codex. So prefer `langwatch.thread.id` for codex.
+ *
+ * A trace carrying both with disagreeing values must still key ONE session, not
+ * split into two buckets. Whitespace-only ids are treated as absent so they
+ * can't collapse every mis-tagged trace into one phantom mega-session.
  */
-function readThreadId(attributes: Record<string, string>): string | null {
+function readThreadId(
+  attributes: Record<string, string>,
+  harness: CodingAgentHarness,
+): string | null {
   const conversation = attributes[ATTR_KEYS.GEN_AI_CONVERSATION_ID]?.trim();
-  if (conversation) return conversation;
   const thread = attributes[ATTR_KEYS.LANGWATCH_THREAD_ID]?.trim();
-  if (thread) return thread;
-  return null;
+  if (harness === "codex") {
+    return thread || conversation || null;
+  }
+  return conversation || thread || null;
 }
 
 /** Closed set of taxonomy values, so an unknown blockcat suffix is skipped
@@ -262,8 +295,9 @@ export function rollupSessions({
   for (const trace of traces) {
     const { attributes } = trace;
     const harness = readHarness(attributes);
-    const threadId = readThreadId(attributes);
-    if (!harness || !threadId) continue;
+    if (!harness) continue;
+    const threadId = readThreadId(attributes, harness);
+    if (!threadId) continue;
 
     // ':' is collision-safe: harness is a closed enum with no ':' in any value.
     const key = `${harness}:${threadId}`;
