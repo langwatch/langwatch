@@ -8,7 +8,12 @@ import { RedisJobBlobStore } from "../redisJobBlobStore";
 // dedicated hash-tagged prefix so it never touches the shared dev stack's keys.
 const QUEUE_NAME = "{test/blobstore}";
 const BLOB_PREFIX = `${QUEUE_NAME}:gq:blob:`;
-const THREE_DAYS_SECONDS = 3 * 24 * 60 * 60;
+// GQ1 has no refcount, so a staged-but-not-yet-dispatched job (long retry
+// backoff, paused pipeline, delayed schedule) sees no read between put and TTL
+// tick-down — the backstop must comfortably outlive that residence, so it's
+// 7 days, not 3. GQ2 (content-addressed, refcounted) uses the shorter 3-day
+// number.
+const GQ1_SEVEN_DAYS_SECONDS = 7 * 24 * 60 * 60;
 
 let redis: Redis;
 let store: RedisJobBlobStore;
@@ -54,15 +59,15 @@ describe("RedisJobBlobStore", () => {
 
         const ttl = await redis.ttl(`${BLOB_PREFIX}proj/ttl`);
         expect(ttl).toBeGreaterThan(100);
-        expect(ttl).toBeLessThanOrEqual(THREE_DAYS_SECONDS);
+        expect(ttl).toBeLessThanOrEqual(GQ1_SEVEN_DAYS_SECONDS);
       });
 
       it("sets the backstop TTL on put", async () => {
         await store.put({ id: "proj/fresh", data: Buffer.from("x") });
 
         const ttl = await redis.ttl(`${BLOB_PREFIX}proj/fresh`);
-        expect(ttl).toBeGreaterThan(THREE_DAYS_SECONDS - 60);
-        expect(ttl).toBeLessThanOrEqual(THREE_DAYS_SECONDS);
+        expect(ttl).toBeGreaterThan(GQ1_SEVEN_DAYS_SECONDS - 60);
+        expect(ttl).toBeLessThanOrEqual(GQ1_SEVEN_DAYS_SECONDS);
       });
     });
   });
