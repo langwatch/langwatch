@@ -14,7 +14,7 @@
  * replace leadingContext's core in a later PR without behavioural drift.
  */
 
-import { InputCategory } from "./categories";
+import { InputCategory, MAX_LEADING_MARKERS } from "./categories";
 
 /** A leading `<tag>…</tag>` block peeled off the front of a user string. */
 export interface LeadingMarkerBlock {
@@ -33,10 +33,13 @@ export interface LeadingMarkerSplit {
   body: string;
 }
 
-// Matches a leading (whitespace-allowed) opening tag, capturing leading
-// whitespace (group 1) and the tag name (group 2). Same shape as the UI util's
-// LEADING_OPEN_TAG so the two loops stay behaviourally identical.
-const LEADING_OPEN_TAG = /^(\s*)<([a-zA-Z][\w-]*)(?:\s[^>]*)?>/;
+// Matches a (whitespace-allowed) opening tag, capturing leading whitespace
+// (group 1) and the tag name (group 2). Same shape as the UI util's
+// LEADING_OPEN_TAG, but STICKY (`y`) rather than `^`-anchored so the peel loop
+// can advance a cursor via `lastIndex` instead of re-slicing the remaining
+// string each iteration — the sticky flag pins each match to the cursor, which
+// keeps the whole peel linear in input length (see splitLeadingMarkers).
+const LEADING_OPEN_TAG = /(\s*)<([a-zA-Z][\w-]*)(?:\s[^>]*)?>/y;
 
 /**
  * Tags that map to skill content. Claude Code injects skill instructions under
@@ -72,27 +75,32 @@ export function categoryForMarkerTag(tagName: string): InputCategory {
  * no clock, no randomness, no I/O.
  */
 export function splitLeadingMarkers(text: string): LeadingMarkerSplit {
-  let rest = text;
   const markers: LeadingMarkerBlock[] = [];
 
-  while (true) {
-    const open = LEADING_OPEN_TAG.exec(rest);
+  // Advance a cursor over `text` — never re-slice the tail (that would make the
+  // peel O(n²) on adversarial leading-tag spam, on the synchronous ingest path).
+  // Sticky `LEADING_OPEN_TAG.lastIndex = pos` pins each match to the cursor, and
+  // we slice out only the small `raw` block, so the whole loop is linear.
+  let pos = 0;
+  while (markers.length < MAX_LEADING_MARKERS) {
+    LEADING_OPEN_TAG.lastIndex = pos;
+    const open = LEADING_OPEN_TAG.exec(text);
     if (!open) break;
     const leadingWhitespace = open[1] ?? "";
     const tagName = open[2]!;
     const closeTag = `</${tagName}>`;
-    const closeIdx = rest.indexOf(closeTag, open[0].length);
+    const closeIdx = text.indexOf(closeTag, pos + open[0].length);
     if (closeIdx === -1) break;
     const blockEnd = closeIdx + closeTag.length;
-    const raw = rest.slice(leadingWhitespace.length, blockEnd);
+    const raw = text.slice(pos + leadingWhitespace.length, blockEnd);
     markers.push({
       tagName: tagName.toLowerCase(),
       raw,
       category: categoryForMarkerTag(tagName),
     });
-    rest = rest.slice(blockEnd);
+    pos = blockEnd;
   }
 
   if (markers.length === 0) return { markers: [], body: text };
-  return { markers, body: rest.replace(/^\s+/, "") };
+  return { markers, body: text.slice(pos).replace(/^\s+/, "") };
 }

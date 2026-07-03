@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { InputCategory } from "../categories";
+import { InputCategory, MAX_LEADING_MARKERS } from "../categories";
 import { categoryForMarkerTag, splitLeadingMarkers } from "../contextMarkers";
 
 describe("categoryForMarkerTag", () => {
@@ -87,6 +87,37 @@ describe("splitLeadingMarkers", () => {
       );
       expect(markers).toHaveLength(0);
       expect(body).toBe("hello <system-reminder>x</system-reminder>");
+    });
+  });
+
+  describe("when the text is many small leading tags (adversarial)", () => {
+    it("bounds the peel at the marker cap without losing the body", () => {
+      // Adversarial leading-tag spam used to drive an O(n^2) tail-reslice on the
+      // synchronous ingest path. The cursor rewrite is linear and the cap bounds
+      // the marker array; the untouched remainder (further tags + prose) stays
+      // as body, so the real content is never dropped.
+      const n = 20_000;
+      const { markers, body } = splitLeadingMarkers(
+        `${"<a></a>".repeat(n)}the real question`,
+      );
+
+      expect(markers.length).toBe(MAX_LEADING_MARKERS);
+      expect(body.endsWith("the real question")).toBe(true);
+    });
+  });
+
+  describe("when leading tags exceed the marker cap", () => {
+    it("stops at MAX_LEADING_MARKERS and leaves the rest as the body", () => {
+      const overCap = MAX_LEADING_MARKERS + 5;
+      const { markers, body } = splitLeadingMarkers(
+        `${"<system-reminder>x</system-reminder>".repeat(overCap)}tail`,
+      );
+      expect(markers).toHaveLength(MAX_LEADING_MARKERS);
+      // The un-peeled markers remain at the head of the body, untouched.
+      expect(body.startsWith("<system-reminder>x</system-reminder>")).toBe(
+        true,
+      );
+      expect(body.endsWith("tail")).toBe(true);
     });
   });
 });

@@ -101,6 +101,13 @@ export const MAX_CLASSIFIED_BLOCKS_PER_SPAN = 512;
  * linearly (≈64k chars ≈ 16k tokens; far beyond any honest content block). */
 export const MAX_TOKENIZED_CHARS_PER_BLOCK = 64_000;
 
+/** Backstop on how many leading `<tag>…</tag>` context blocks the marker peeler
+ * will split off one message. The peel is already linear in input length, so
+ * this is a second line of defense (not the primary DoS guard) that bounds the
+ * emitted marker array on pathological input — real harnesses inject a handful.
+ * Well above any honest count; overflow leaves the rest as the message body. */
+export const MAX_LEADING_MARKERS = 256;
+
 /** Which heuristic set produced these categories — replay/audit (ADR-015). */
 export const CLASSIFIER_VERSION = 1;
 
