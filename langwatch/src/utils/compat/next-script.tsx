@@ -18,19 +18,40 @@ interface ScriptProps {
   [key: string]: any;
 }
 
-function runWhenIdle(callback: () => void) {
+// Returns a cancel function so callers can drop pending work if the
+// component unmounts before the callback fires — otherwise a script whose
+// content closes over per-user/org state (e.g. Pendo's identify payload)
+// could inject stale data after the user who requested it has navigated
+// away or logged out.
+function runWhenIdle(callback: () => void): () => void {
+  let cancelled = false;
+  const guarded = () => {
+    if (!cancelled) callback();
+  };
+
   if (typeof window.requestIdleCallback === "function") {
-    window.requestIdleCallback(callback, { timeout: 4000 });
-    return;
+    const handle = window.requestIdleCallback(guarded, { timeout: 4000 });
+    return () => {
+      cancelled = true;
+      window.cancelIdleCallback?.(handle);
+    };
   }
+
   // Safari has no requestIdleCallback — fall back to load + timeout.
   if (document.readyState === "complete") {
-    setTimeout(callback, 0);
-  } else {
-    window.addEventListener("load", () => setTimeout(callback, 0), {
-      once: true,
-    });
+    const timeoutId = setTimeout(guarded, 0);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
   }
+
+  const onLoad = () => setTimeout(guarded, 0);
+  window.addEventListener("load", onLoad, { once: true });
+  return () => {
+    cancelled = true;
+    window.removeEventListener("load", onLoad);
+  };
 }
 
 export default function Script({
@@ -72,13 +93,11 @@ export default function Script({
 
     if (strategy === "beforeInteractive") {
       inject();
-    } else {
-      runWhenIdle(inject);
+      return;
     }
 
-    return () => {
-      // Don't remove on unmount — 3rd party scripts should persist
-    };
+    const cancel = runWhenIdle(inject);
+    return cancel;
   }, []);
 
   return null; // Scripts are injected into <head>, not rendered inline

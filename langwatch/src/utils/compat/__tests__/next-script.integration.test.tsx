@@ -1,5 +1,8 @@
 /**
  * @vitest-environment jsdom
+ *
+ * Renders the real Script component tree via @testing-library/react, so
+ * this is an integration test rather than a pure-logic unit test.
  */
 import { cleanup, render } from "@testing-library/react";
 import { StrictMode } from "react";
@@ -13,12 +16,13 @@ function getScript(id: string): HTMLScriptElement | null {
 
 describe("Script", () => {
   beforeEach(() => {
-    document.querySelectorAll("script[id]").forEach((node) => node.remove());
+    document.querySelectorAll("script").forEach((node) => node.remove());
   });
 
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   describe("given strategy='beforeInteractive'", () => {
@@ -94,6 +98,61 @@ describe("Script", () => {
           expect.objectContaining({ timeout: expect.any(Number) }),
         );
       });
+
+      describe("when the component unmounts before the idle callback fires", () => {
+        it("cancels the pending idle callback via cancelIdleCallback", () => {
+          let idleCallback: (() => void) | undefined;
+          const cancelIdleCallback = vi.fn();
+          vi.stubGlobal(
+            "requestIdleCallback",
+            vi.fn((cb: () => void) => {
+              idleCallback = cb;
+              return 42;
+            }),
+          );
+          vi.stubGlobal("cancelIdleCallback", cancelIdleCallback);
+
+          const { unmount } = render(
+            <Script id="gtm-init" strategy="afterInteractive">
+              {`window.dataLayer = window.dataLayer || [];`}
+            </Script>,
+          );
+
+          unmount();
+
+          expect(cancelIdleCallback).toHaveBeenCalledWith(42);
+
+          // Even if something still invokes the stale callback, the
+          // cancelled-flag guard must stop it from injecting.
+          idleCallback?.();
+
+          expect(getScript("gtm-init")).toBeNull();
+        });
+
+        it("does not throw when cancelIdleCallback is unavailable", () => {
+          let idleCallback: (() => void) | undefined;
+          vi.stubGlobal(
+            "requestIdleCallback",
+            vi.fn((cb: () => void) => {
+              idleCallback = cb;
+              return 1;
+            }),
+          );
+          vi.stubGlobal("cancelIdleCallback", undefined);
+
+          const { unmount } = render(
+            <Script id="gtm-init" strategy="afterInteractive">
+              {`window.dataLayer = window.dataLayer || [];`}
+            </Script>,
+          );
+
+          expect(() => unmount()).not.toThrow();
+
+          idleCallback?.();
+
+          expect(getScript("gtm-init")).toBeNull();
+        });
+      });
     });
 
     describe("when requestIdleCallback is unavailable (Safari)", () => {
@@ -110,8 +169,21 @@ describe("Script", () => {
           vi.runAllTimers();
 
           expect(getScript("pendo")).not.toBeNull();
+        });
 
-          vi.useRealTimers();
+        it("cancels the pending timeout if unmounted first", () => {
+          vi.stubGlobal("requestIdleCallback", undefined);
+          vi.spyOn(document, "readyState", "get").mockReturnValue("complete");
+          vi.useFakeTimers();
+
+          const { unmount } = render(
+            <Script id="pendo">{`window.pendo = {};`}</Script>,
+          );
+
+          unmount();
+          vi.runAllTimers();
+
+          expect(getScript("pendo")).toBeNull();
         });
       });
 
@@ -129,8 +201,6 @@ describe("Script", () => {
           vi.runAllTimers();
 
           expect(getScript("pendo")).not.toBeNull();
-
-          vi.useRealTimers();
         });
 
         it("only listens for 'load' once", () => {
@@ -151,8 +221,22 @@ describe("Script", () => {
           expect(document.querySelectorAll("#pendo").length).toBe(
             scriptCountAfterFirstLoad,
           );
+        });
 
-          vi.useRealTimers();
+        it("removes the pending 'load' listener if unmounted first", () => {
+          vi.stubGlobal("requestIdleCallback", undefined);
+          vi.spyOn(document, "readyState", "get").mockReturnValue("loading");
+          vi.useFakeTimers();
+
+          const { unmount } = render(
+            <Script id="pendo">{`window.pendo = {};`}</Script>,
+          );
+
+          unmount();
+          window.dispatchEvent(new Event("load"));
+          vi.runAllTimers();
+
+          expect(getScript("pendo")).toBeNull();
         });
       });
     });
@@ -346,11 +430,6 @@ describe("Script", () => {
 
   describe("given React StrictMode double-invokes effects", () => {
     it("injects the script only once, not twice", () => {
-      vi.stubGlobal(
-        "requestIdleCallback",
-        vi.fn(() => 1),
-      );
-
       render(
         <StrictMode>
           <Script id="strict" strategy="beforeInteractive">
