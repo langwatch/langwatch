@@ -25,7 +25,10 @@ import {
   cleanupTestData,
   getTestClickHouseClient,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { GOVERNANCE_ATTR } from "../governanceAttributeKeys";
+import {
+  GOVERNANCE_ATTR,
+  GOVERNANCE_ORIGIN_KIND_VALUE,
+} from "../governanceAttributeKeys";
 import { PersonalUsageService } from "../personalUsage.service";
 
 async function insertTrace(
@@ -216,6 +219,7 @@ describe("PersonalUsageService.breakdownByCategory", () => {
         occurredAt,
         totalCost: 0.5,
         attrs: {
+          [GOVERNANCE_ATTR.ORIGIN_KIND]: GOVERNANCE_ORIGIN_KIND_VALUE,
           [GOVERNANCE_ATTR.USER_ID]: principalEmail,
           [blockCategoryCostAttr("system_prompt")]: "0.5",
           [blockCategoryTokensAttr("system_prompt")]: "500",
@@ -228,6 +232,7 @@ describe("PersonalUsageService.breakdownByCategory", () => {
         occurredAt,
         totalCost: 9.0,
         attrs: {
+          [GOVERNANCE_ATTR.ORIGIN_KIND]: GOVERNANCE_ORIGIN_KIND_VALUE,
           [GOVERNANCE_ATTR.USER_ID]: otherEmail,
           [blockCategoryCostAttr("system_prompt")]: "9.0",
           [blockCategoryTokensAttr("system_prompt")]: "9000",
