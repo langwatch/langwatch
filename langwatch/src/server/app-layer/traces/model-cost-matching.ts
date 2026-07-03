@@ -46,6 +46,27 @@ export function resolveCustomTierRates(
 }
 
 /**
+ * Registry-backed per-tier rates for a model (`computeSpanCost` Priority 3),
+ * or `null` when the model is unknown. A missing cache rate falls back to the
+ * input rate (counted, not discounted). Co-located with `computeSpanCost` so the
+ * app-layer block classifier can source registry rates from here instead of
+ * reaching into `background/workers/collector` directly (ADR-018 hygiene).
+ */
+export function resolveRegistryTierRates(
+  model: string,
+): CustomTierRates | null {
+  const matched = matchModelCostWithFallbacks(model, getStaticModelCosts());
+  if (!matched) return null;
+  const inputRate = matched.inputCostPerToken ?? 0;
+  return {
+    inputCostPerToken: inputRate,
+    outputCostPerToken: matched.outputCostPerToken ?? 0,
+    cacheReadCostPerToken: matched.cacheReadCostPerToken ?? inputRate,
+    cacheCreationCostPerToken: matched.cacheCreationCostPerToken ?? inputRate,
+  };
+}
+
+/**
  * Computes per-span cost using a priority cascade:
  * 1. Custom cost rates from enrichment attributes (per-token override policy)
  * 2. Explicit / provider-reported total cost (langwatch.span.cost)

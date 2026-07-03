@@ -1,4 +1,5 @@
 import { coerceToNumber } from "~/utils/coerceToNumber";
+import { createLogger } from "~/utils/logger/server";
 import type {
   OtlpInstrumentationScope,
   OtlpSpan,
@@ -16,6 +17,7 @@ import {
   type Category,
   CLASSIFIER_VERSION,
   MAX_TOKENIZED_CHARS_PER_BLOCK,
+  SPAN_ATTR_BLOCKCAT_PREFIX,
   SPAN_ATTR_BLOCKS,
   SPAN_ATTR_CLASSIFIER_VERSION,
 } from "./block-classification/categories";
@@ -97,6 +99,9 @@ export interface OtlpSpanBlockClassificationServiceDependencies {
  */
 export class OtlpSpanBlockClassificationService {
   private readonly deps: OtlpSpanBlockClassificationServiceDependencies;
+  private readonly logger = createLogger(
+    "langwatch:traces:block-classification",
+  );
 
   constructor(deps: OtlpSpanBlockClassificationServiceDependencies) {
     this.deps = deps;
@@ -128,6 +133,22 @@ export class OtlpSpanBlockClassificationService {
     // so the (cached) flag lookup never runs for non-coding-agent spans.
     if (await this.isDisabledByKillSwitch({ tenantId })) return;
 
+    // Enforce the ADR-033 "ingestion never fails on classification" invariant
+    // HERE, not just at the caller: any tokenizer / classifier / allocator throw
+    // is contained, logged, and swallowed so the span still ingests unclassified.
+    // The command-level try/catch remains as a second belt.
+    try {
+      await this.classifyInner({ span });
+    } catch (error) {
+      this.logger.warn(
+        { error, spanId: span.spanId, traceId: span.traceId },
+        "block classification failed; span ingested unclassified",
+      );
+    }
+  }
+
+  /** The classification work proper — see classifySpanBlocks for the guards. */
+  private async classifyInner({ span }: { span: OtlpSpan }): Promise<void> {
     // 2. Content extraction — the same attribute surface token estimation reads.
     const inputMessages = this.parseMessages(span, [
       ATTR_KEYS.LANGWATCH_INPUT,
@@ -248,7 +269,17 @@ export class OtlpSpanBlockClassificationService {
       });
     }
 
-    span.attributes.push(...pending);
+    // Idempotent write: drop any prior classification attributes first, so a
+    // replay / retry / re-enrichment REPLACES them instead of appending
+    // duplicates the fold would double-count (or first-win silently drop).
+    const kept = span.attributes.filter(
+      (a) =>
+        a.key !== SPAN_ATTR_BLOCKS &&
+        a.key !== SPAN_ATTR_CLASSIFIER_VERSION &&
+        !a.key.startsWith(SPAN_ATTR_BLOCKCAT_PREFIX),
+    );
+    span.attributes.length = 0;
+    span.attributes.push(...kept, ...pending);
   }
 
   /** Flattens span attributes into a primitive-valued map for harness detection. */

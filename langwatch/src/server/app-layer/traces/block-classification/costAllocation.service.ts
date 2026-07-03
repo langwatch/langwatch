@@ -166,11 +166,21 @@ export function allocateCategoryCosts({
     },
   ];
 
-  const totals: CategoryTotals = {};
+  // Null-prototype so a category key (a bare string union) can never reach
+  // Object.prototype — a stray `__proto__` from a future boundary would
+  // otherwise mutate the global prototype via the bracket writes in addTokens.
+  const totals: CategoryTotals = Object.create(null) as CategoryTotals;
   const blocks: AllocatedBlock[] = [];
   for (const pool of poolList) allocatePool(pool, totals, blocks);
 
-  if (reconcileToTotalCost != null && reconcileToTotalCost > 0) {
+  // `> 0` alone accepts Infinity (an upstream div-by-zero) — which would scale
+  // every category cost to Infinity, then serialise to null and silently zero
+  // the span out of analytics. Require a finite positive total.
+  if (
+    reconcileToTotalCost != null &&
+    Number.isFinite(reconcileToTotalCost) &&
+    reconcileToTotalCost > 0
+  ) {
     reconcileCosts(totals, reconcileToTotalCost);
   }
 
@@ -240,8 +250,15 @@ function partitionInput({
   const cacheRead: TokenBlock[] = [];
   const cacheCreation: TokenBlock[] = [];
 
+  // A negative breakpoint is not a real prefix boundary: `slice(0, index + 1)`
+  // with e.g. index = -2 becomes `slice(0, -1)`, silently dropping the last
+  // block off the prefix. Treat any negative index as "no breakpoint".
   const hasCache = cacheReadTokens > 0 || cacheCreationTokens > 0;
-  if (lastCacheBreakpointIndex === null || !hasCache) {
+  if (
+    lastCacheBreakpointIndex === null ||
+    lastCacheBreakpointIndex < 0 ||
+    !hasCache
+  ) {
     return { cachePrefix: { cacheRead, cacheCreation }, fresh: inputBlocks };
   }
 

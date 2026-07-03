@@ -178,7 +178,13 @@ function addReservedTokenSum(
 ): void {
   if (delta <= 0) return;
   const prior = Number(attributes[key] ?? "0");
-  attributes[key] = String((Number.isFinite(prior) ? prior : 0) + delta);
+  const sum = (Number.isFinite(prior) ? prior : 0) + delta;
+  // Cost sums keep 10 decimals; re-round each accumulation so binary-float noise
+  // (0.0004780000000000037 after 400 spans) doesn't accrete over a long trace.
+  // Token sums are integral, so they need no rounding.
+  attributes[key] = key.endsWith(".cost_usd")
+    ? String(Number(sum.toFixed(10)))
+    : String(sum);
 }
 
 /** @internal Exported for unit testing */

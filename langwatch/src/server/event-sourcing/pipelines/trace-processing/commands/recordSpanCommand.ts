@@ -3,6 +3,7 @@ import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
+import { resolveRegistryTierRates } from "~/server/app-layer/traces/model-cost-matching";
 import { OtlpSpanBlockClassificationService } from "~/server/app-layer/traces/span-block-classification.service";
 import {
   createCostEnrichmentDeps,
@@ -10,13 +11,11 @@ import {
 } from "~/server/app-layer/traces/span-cost-enrichment.service";
 import { OtlpSpanPiiRedactionService } from "~/server/app-layer/traces/span-pii-redaction.service";
 import { OtlpSpanTokenEstimationService } from "~/server/app-layer/traces/span-token-estimation.service";
-import { matchModelCostWithFallbacks } from "~/server/background/workers/collector/cost";
 import {
   applyOtlpSpanContentDrop,
   type SpanContentDropResult,
 } from "~/server/data-privacy/applyOtlpSpanContentDrop";
 import { featureFlagService } from "~/server/featureFlag";
-import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
 import { createLogger } from "../../../../../utils/logger/server";
 import type { Command, CommandHandler } from "../../../";
 import {
@@ -137,23 +136,9 @@ function createDefaultDependencies(): RecordSpanCommandDependencies {
       // operable off-ramp for a misbehaving tenant or a fleet-wide pause.
       featureFlagService,
       // Registry-backed per-tier rates for standard models (custom rates on the
-      // span win first). Injected here so the classifier service stays decoupled
-      // from the prisma-backed cost module.
-      resolveModelPrices: (model: string) => {
-        const matched = matchModelCostWithFallbacks(
-          model,
-          getStaticModelCosts(),
-        );
-        if (!matched) return null;
-        const inputRate = matched.inputCostPerToken ?? 0;
-        return {
-          inputCostPerToken: inputRate,
-          outputCostPerToken: matched.outputCostPerToken ?? 0,
-          cacheReadCostPerToken: matched.cacheReadCostPerToken ?? inputRate,
-          cacheCreationCostPerToken:
-            matched.cacheCreationCostPerToken ?? inputRate,
-        };
-      },
+      // span win first). Sourced from model-cost-matching so this composition
+      // root doesn't reach into background/workers/collector directly.
+      resolveModelPrices: resolveRegistryTierRates,
     }),
   };
 }
