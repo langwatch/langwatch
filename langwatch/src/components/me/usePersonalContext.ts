@@ -1,7 +1,7 @@
 import { useMemo } from "react";
-
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
+import { categoryLabel } from "~/server/app-layer/traces/block-classification/categories";
 import { api } from "~/utils/api";
 
 import { useWorkspaceData } from "../useWorkspaceData";
@@ -65,6 +65,14 @@ export type PersonalContext = {
   budget: PersonalBudgetState;
   spendByDay: Array<{ day: string; usd: number; billedUsd: number }>;
   spendByTool: Array<{ tool: string; usd: number; billedUsd: number }>;
+  /** Cost split by content category (ADR-033). Empty when no payload captured. */
+  spendByCategory: Array<{
+    category: string;
+    label: string;
+    costUsd: number;
+    tokens: number;
+    sharePct: number;
+  }>;
   /** Personal project the /me recent-activity table reads from + deep-links into. */
   personalProjectId: string | null;
   personalProjectSlug: string | null;
@@ -133,8 +141,8 @@ export function usePersonalContext(): PersonalContext {
       period: raw.period ?? "",
       scope: raw.scope ?? "",
       requestIncreaseUrl:
-        "requestIncreaseUrl" in raw ? raw.requestIncreaseUrl ?? null : null,
-      adminEmail: "adminEmail" in raw ? raw.adminEmail ?? null : null,
+        "requestIncreaseUrl" in raw ? (raw.requestIncreaseUrl ?? null) : null,
+      adminEmail: "adminEmail" in raw ? (raw.adminEmail ?? null) : null,
     };
   }, [personalBudgetQuery.data]);
 
@@ -204,6 +212,17 @@ export function usePersonalContext(): PersonalContext {
         usd: row.spentUsd,
         billedUsd: row.billedUsd,
       })) ?? [],
+    spendByCategory: (() => {
+      const rows = personalUsageQuery.data?.breakdownByCategory ?? [];
+      const total = rows.reduce((sum, r) => sum + r.costUsd, 0);
+      return rows.map((r) => ({
+        category: r.category,
+        label: categoryLabel(r.category),
+        costUsd: r.costUsd,
+        tokens: r.tokens,
+        sharePct: total > 0 ? (r.costUsd / total) * 100 : 0,
+      }));
+    })(),
     personalProjectId: personalContextQuery.data?.workspace.project.id ?? null,
     personalProjectSlug:
       personalContextQuery.data?.workspace.project.slug ?? null,
