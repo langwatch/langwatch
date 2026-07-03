@@ -246,26 +246,45 @@ function classifyInputMessage({
 
   const content = msg.content;
 
+  // Injected context markers live in USER messages of any turn; the body carries
+  // this turn's category (user_input for the fresh turn, prior_context earlier).
+  const isUser = role === "user";
+  const userBodyCategory = fresh
+    ? InputCategory.USER_INPUT
+    : InputCategory.PRIOR_CONTEXT;
+
   if (typeof content === "string") {
     // A whole-message string is the leading (and only) part — peel markers.
-    if (fresh && role === "user")
-      pushFreshUserOrMarkers({ acc, text: content, peel: true });
-    else acc.push(InputCategory.PRIOR_CONTEXT, content);
+    if (isUser) {
+      pushUserTextOrMarkers({
+        acc,
+        text: content,
+        peel: true,
+        bodyCategory: userBodyCategory,
+      });
+    } else {
+      acc.push(InputCategory.PRIOR_CONTEXT, content);
+    }
     return;
   }
 
   if (!Array.isArray(content)) return;
 
   // Injected context (system-reminder / skill / mcp-instructions markers) is
-  // prepended only to the FIRST text part of the fresh user message. Peel
-  // markers off that part alone; a later text part carrying a `<tag>` is real
-  // user content, not injected context, so it stays whole as user_input.
-  let leadingTextPending = fresh && role === "user";
+  // prepended only to the FIRST text part of a user message. Peel markers off
+  // that part alone; a later text part carrying a `<tag>` is real content, not
+  // injected context, so it keeps this turn's body category.
+  let leadingTextPending = isUser;
 
   for (const part of content) {
     if (typeof part === "string") {
-      if (fresh && role === "user") {
-        pushFreshUserOrMarkers({ acc, text: part, peel: leadingTextPending });
+      if (isUser) {
+        pushUserTextOrMarkers({
+          acc,
+          text: part,
+          peel: leadingTextPending,
+          bodyCategory: userBodyCategory,
+        });
         leadingTextPending = false;
       } else acc.push(InputCategory.PRIOR_CONTEXT, part);
       continue;
@@ -282,11 +301,12 @@ function classifyInputMessage({
     }
 
     const category = inputPartCategory({ part, fresh, role, toolNames });
-    if (part.type === "text" && fresh && role === "user") {
-      pushFreshUserOrMarkers({
+    if (part.type === "text" && isUser) {
+      pushUserTextOrMarkers({
         acc,
         text: blockText(part),
         peel: leadingTextPending,
+        bodyCategory: userBodyCategory,
       });
       leadingTextPending = false;
     } else {
@@ -340,27 +360,34 @@ function inputPartCategory({
   return InputCategory.OTHER_INPUT;
 }
 
-/** Push a fresh-user text part. On the LEADING part (`peel`), split leading
- * injected-context markers off — the markers get their marker categories, the
- * remaining body is real user_input. On any later part, the whole text is
- * user_input: injected context only ever prefixes the first part, so peeling a
- * later part would mislabel a `<tag>` in real user prose as prior_context. */
-function pushFreshUserOrMarkers({
+/** Push a user text part, splitting leading injected-context markers off when
+ * `peel`. The markers get their marker categories (skill_content,
+ * mcp_tool_definitions, prior_context, …); the remaining body gets `bodyCategory`
+ * — `user_input` for the fresh turn, `prior_context` for an earlier turn. Both
+ * harnesses inject these blocks (Claude prepends them to the fresh turn; codex
+ * relays them verbatim in its rollout as their own earlier user messages), so
+ * peeling is applied to any turn — the marker's real category is recovered
+ * wherever it sits, instead of collapsing an injected `<skill>` into
+ * prior_context. Only the LEADING part peels: a later part carrying a `<tag>` is
+ * real content, not injected context. */
+function pushUserTextOrMarkers({
   acc,
   text,
   peel,
+  bodyCategory,
 }: {
   acc: AxisAccumulator;
   text: string;
   peel: boolean;
+  bodyCategory: Category;
 }): void {
   if (!peel) {
-    if (text.length > 0) acc.push(InputCategory.USER_INPUT, text);
+    if (text.length > 0) acc.push(bodyCategory, text);
     return;
   }
   const { markers, body } = splitLeadingMarkers(text);
   for (const marker of markers) acc.push(marker.category, marker.raw);
-  if (body.length > 0) acc.push(InputCategory.USER_INPUT, body);
+  if (body.length > 0) acc.push(bodyCategory, body);
 }
 
 function pushString({

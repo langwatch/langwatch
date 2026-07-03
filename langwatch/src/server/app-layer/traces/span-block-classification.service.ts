@@ -35,6 +35,7 @@ import {
   getNumericAttribute,
   parseJsonAttribute,
   parseMessages,
+  parseOutputMessages,
   spanAttributesRecord,
 } from "./span-block-classification.readers";
 import { extractModelName } from "./utils/spanModel";
@@ -164,10 +165,7 @@ export class OtlpSpanBlockClassificationService {
       ATTR_KEYS.LANGWATCH_INPUT,
       ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
     ]);
-    const outputMessages = parseMessages(span, [
-      ATTR_KEYS.LANGWATCH_OUTPUT,
-      ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES,
-    ]);
+    const outputMessages = parseOutputMessages(span);
     const tools = parseJsonAttribute(span, ATTR_KEYS.GEN_AI_TOOL_DEFINITIONS);
     if (inputMessages === null && outputMessages === null) return;
 

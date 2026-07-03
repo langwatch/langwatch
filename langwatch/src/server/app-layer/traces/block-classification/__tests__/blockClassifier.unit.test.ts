@@ -197,6 +197,29 @@ describe("classifyBlocks", () => {
     });
   });
 
+  describe("given an injected skill marker in a prior (non-fresh) user turn", () => {
+    /** @scenario "An injected skill block is classified as skill content wherever it appears" */
+    it("classifies it as skill_content, not prior_context", () => {
+      // Codex relays its skill injections verbatim in the rollout as their own
+      // earlier user messages (not prepended to the fresh turn like Claude), so
+      // the marker must be peeled in any user turn or the skill collapses into
+      // prior_context and is unfindable in the breakdown.
+      const { input } = classifyBlocks({
+        inputMessages: [
+          {
+            role: "user",
+            content: "<skill>\n<name>review</name>\n<path>/x</path>\n</skill>",
+          },
+          { role: "assistant", content: "ok" },
+          { role: "user", content: "lets invoke it" },
+        ],
+      });
+      expect(categoriesOf(input)).toContain(InputCategory.SKILL_CONTENT);
+      // The fresh user body is still user_input.
+      expect(categoriesOf(input)).toContain(InputCategory.USER_INPUT);
+    });
+  });
+
   describe("given assistant thinking and image blocks", () => {
     it("classifies thinking on the output axis", () => {
       const { output } = classifyBlocks({

@@ -78,6 +78,31 @@ export function parseMessages(
   return null;
 }
 
+/**
+ * Resolve the OUTPUT message array. Output arrives EITHER as structured messages
+ * (`langwatch.output` chat_messages envelope, `gen_ai.output.messages`) OR as a
+ * flat assistant string — codex sets `langwatch.output` to the reply text, and
+ * the Claude Code log→span converter emits the reply on `gen_ai.completion`,
+ * neither of which parses as a message array. When no structured messages are
+ * present, wrap the flat string as a single assistant message so the reply
+ * classifies as `assistant_text` instead of dumping to the output catch-all.
+ */
+export function parseOutputMessages(span: OtlpSpan): unknown[] | null {
+  const structured = parseMessages(span, [
+    ATTR_KEYS.LANGWATCH_OUTPUT,
+    ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES,
+  ]);
+  if (structured !== null) return structured;
+
+  const text =
+    getStringAttribute(span, ATTR_KEYS.LANGWATCH_OUTPUT) ??
+    getStringAttribute(span, ATTR_KEYS.GEN_AI_COMPLETION);
+  if (text && text.trim().length > 0) {
+    return [{ role: "assistant", content: text }];
+  }
+  return null;
+}
+
 /** Parse a single JSON string attribute, or null when absent / unparseable. */
 export function parseJsonAttribute(
   span: OtlpSpan,

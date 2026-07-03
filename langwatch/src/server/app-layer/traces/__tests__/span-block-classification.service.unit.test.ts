@@ -4,6 +4,7 @@ import {
   blockCategoryCostAttr,
   blockCategoryTokensAttr,
   InputCategory,
+  OutputCategory,
   SPAN_ATTR_BLOCKS,
   SPAN_ATTR_CLASSIFIER_VERSION,
 } from "../block-classification/categories";
@@ -128,6 +129,57 @@ describe("OtlpSpanBlockClassificationService", () => {
         const realCost = 300 * 3e-6 + 20 * 1.5e-5;
         expect(Math.abs(catCosts - realCost)).toBeLessThan(1e-9);
       });
+    });
+  });
+
+  describe("given a span whose output is a flat assistant string (codex / gen_ai.completion shape)", () => {
+    it("classifies the flat output as assistant_text, not the output catch-all", async () => {
+      // Codex sets langwatch.output to the reply TEXT (not a chat_messages
+      // envelope), and the Claude Code converter emits it on gen_ai.completion —
+      // neither parses as a message array. It must still classify as
+      // assistant_text rather than dumping the whole output pool to other_output.
+      const span = createSpan([
+        { key: "langwatch.span.type", value: { stringValue: "llm" } },
+        {
+          key: "gen_ai.request.model",
+          value: { stringValue: "claude-sonnet-4" },
+        },
+        {
+          key: "langwatch.input",
+          value: {
+            stringValue: JSON.stringify({
+              type: "chat_messages",
+              value: [{ role: "user", content: "do the thing" }],
+            }),
+          },
+        },
+        {
+          key: "langwatch.output",
+          value: { stringValue: "I'm using the review skill." },
+        },
+        { key: "gen_ai.usage.input_tokens", value: { intValue: 100 } },
+        { key: "gen_ai.usage.output_tokens", value: { intValue: 40 } },
+        {
+          key: "langwatch.model.inputCostPerToken",
+          value: { doubleValue: 3e-6 },
+        },
+        {
+          key: "langwatch.model.outputCostPerToken",
+          value: { doubleValue: 1.5e-5 },
+        },
+      ]);
+
+      await service.classifySpanBlocks({
+        span,
+        instrumentationScope: CLAUDE_SCOPE,
+      });
+
+      expect(
+        attrValue(span, blockCategoryTokensAttr(OutputCategory.ASSISTANT_TEXT)),
+      ).toBeDefined();
+      expect(
+        attrValue(span, blockCategoryTokensAttr(OutputCategory.OTHER_OUTPUT)),
+      ).toBeUndefined();
     });
   });
 
