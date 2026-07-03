@@ -25,12 +25,6 @@ export {
   type SlimEligibleMetricKey,
 } from "./routing/route-table";
 
-export {
-  FIELD_AVAILABILITY,
-  getFieldAvailability,
-  type FieldAvailability,
-} from "./routing/field-availability";
-
 export { compareForTripwire } from "./tripwire/divergence-compare";
 
 export { AnalyticsClientUnavailableError } from "./errors";

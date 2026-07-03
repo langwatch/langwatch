@@ -13,9 +13,10 @@ import {
 import { isNotifyEntry } from "~/automations/providers/types";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import type { FilterField } from "~/server/filters/types";
-import type {
-  GraphAlertOperator,
-  GraphAlertTimePeriod,
+import {
+  extractGraphAlertFromTriggerRow as parseGraphAlertRow,
+  type GraphAlertOperator,
+  type GraphAlertTimePeriod,
 } from "~/server/app-layer/triggers/graph-alert.builder";
 
 /**
@@ -294,35 +295,20 @@ export function isNotifyAction(draft: AutomationDraft): boolean {
 export function extractGraphAlertFromTriggerRow(
   actionParams: unknown,
 ): GraphAlertDraft {
-  if (!actionParams || typeof actionParams !== "object") {
-    return INITIAL_GRAPH_ALERT_DRAFT;
-  }
-  const raw = actionParams as Record<string, unknown>;
-  const operator =
-    raw.operator === "gt" ||
-    raw.operator === "lt" ||
-    raw.operator === "gte" ||
-    raw.operator === "lte" ||
-    raw.operator === "eq"
-      ? (raw.operator as GraphAlertOperator)
-      : INITIAL_GRAPH_ALERT_DRAFT.operator;
-  const timePeriod =
-    raw.timePeriod === 5 ||
-    raw.timePeriod === 15 ||
-    raw.timePeriod === 30 ||
-    raw.timePeriod === 60 ||
-    raw.timePeriod === 1440
-      ? (raw.timePeriod as GraphAlertTimePeriod)
-      : INITIAL_GRAPH_ALERT_DRAFT.timePeriod;
-  const threshold =
-    typeof raw.threshold === "number" && Number.isFinite(raw.threshold)
-      ? raw.threshold
-      : INITIAL_GRAPH_ALERT_DRAFT.threshold;
-  const seriesName =
-    typeof raw.seriesName === "string"
-      ? raw.seriesName
-      : INITIAL_GRAPH_ALERT_DRAFT.seriesName;
-  return { operator, timePeriod, threshold, seriesName };
+  // Delegate to the SSOT parser on the server side. `parseGraphAlertRow`
+  // uses the same Zod schema the writer produces (`graphAlertActionParamsSchema`),
+  // so the drawer's edit-hydration path can never drift from the row shape.
+  // Falls back to the seeded defaults on any parse failure (legacy /
+  // hand-edited rows) — the drawer's contract needs a filled draft, never
+  // a null.
+  const parsed = parseGraphAlertRow(actionParams);
+  if (!parsed) return INITIAL_GRAPH_ALERT_DRAFT;
+  return {
+    operator: parsed.operator,
+    timePeriod: parsed.timePeriod,
+    threshold: parsed.threshold,
+    seriesName: parsed.seriesName,
+  };
 }
 
 /** One-line summary of the cadence + settle window, shown on the cadence

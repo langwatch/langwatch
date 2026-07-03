@@ -10,6 +10,7 @@ import {
 import { AlertType } from "@prisma/client";
 import type { Monaco } from "@monaco-editor/react";
 import { useEffect, useMemo, useState } from "react";
+import { deriveSeriesIdentifier } from "~/components/analytics/seriesIdentifier";
 import { FieldsFilters } from "~/components/filters/FieldsFilters";
 import { Switch } from "~/components/ui/switch";
 import type { FilterParam } from "~/hooks/useFilterParams";
@@ -82,22 +83,18 @@ function deriveSeriesOptionsFromGraph(graph: unknown): GraphSeriesOption[] {
   if (!graph || typeof graph !== "object") return [];
   const candidate = (graph as { series?: unknown }).series;
   if (!Array.isArray(candidate)) return [];
-  return candidate.map((entry, index): GraphSeriesOption => {
-    const s = (entry ?? {}) as Record<string, unknown>;
-    const keyPart =
-      typeof s.key === "string" && s.key.length > 0
-        ? s.key
-        : typeof s.metric === "string"
-          ? s.metric
-          : "value";
-    const aggregationPart =
-      typeof s.aggregation === "string" ? s.aggregation : "count";
-    const seriesKey = `${index}/${keyPart}/${aggregationPart}`;
-    const label =
-      (typeof s.name === "string" && s.name.length > 0 ? s.name : null) ??
-      `Series ${index + 1}: ${keyPart} (${aggregationPart})`;
-    return { key: seriesKey, label };
-  });
+  return candidate
+    .map((entry, index): GraphSeriesOption | null => {
+      const seriesKey = deriveSeriesIdentifier(graph, index);
+      if (!seriesKey) return null;
+      const s = (entry ?? {}) as Record<string, unknown>;
+      const tail = seriesKey.split("/").slice(1).join(" / ");
+      const label =
+        (typeof s.name === "string" && s.name.length > 0 ? s.name : null) ??
+        `Series ${index + 1}: ${tail}`;
+      return { key: seriesKey, label };
+    })
+    .filter((o): o is GraphSeriesOption => o !== null);
 }
 
 /**

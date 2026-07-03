@@ -2,7 +2,7 @@ import type { Project, Trigger } from "@prisma/client";
 import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
-import { pickTriggerDefaults } from "~/shared/templating/defaults";
+import { ALERT_TRIGGER_DEFAULTS } from "~/shared/templating/defaults";
 import { renderTriggerEmail } from "~/shared/templating/renderEmail";
 import {
   renderTriggerSlack,
@@ -95,7 +95,7 @@ export async function dispatchGraphAlertAction({
   input: GraphAlertDispatchInput;
 }): Promise<GraphAlertDispatchResult> {
   const { trigger, project, context, recipients, slackWebhook } = input;
-  const defaults = pickTriggerDefaults({ hasCustomGraph: true });
+  const defaults = ALERT_TRIGGER_DEFAULTS;
 
   if (trigger.action === "SEND_EMAIL") {
     if (recipients.length === 0) {

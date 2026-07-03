@@ -224,19 +224,3 @@ export const TRACE_TRIGGER_DEFAULTS: TriggerTemplateDefaults = {
   slackString: DEFAULT_SLACK_TEMPLATE,
   slackBlockKit: DEFAULT_SLACK_BLOCK_KIT_TEMPLATE,
 };
-
-/**
- * ADR-034 Phase 5: pick the trace-shape or alert-shape default set.
- * Selection by `hasCustomGraph` matches the cron's discriminator (a
- * trigger with `customGraphId != null` IS the graph-alert path, full
- * stop). A per-trigger custom Liquid template STILL overrides whichever
- * default set this returns — the dispatcher checks `hasCustomEmail` /
- * `hasCustomSlack` before reaching for any default.
- */
-export function pickTriggerDefaults({
-  hasCustomGraph,
-}: {
-  hasCustomGraph: boolean;
-}): TriggerTemplateDefaults {
-  return hasCustomGraph ? ALERT_TRIGGER_DEFAULTS : TRACE_TRIGGER_DEFAULTS;
-}
