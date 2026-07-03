@@ -81,7 +81,8 @@ export interface GraphAlertTriggerData {
 /**
  * Shape the `Trigger` row inserted/updated for a graph-threshold alert.
  * Prefixes the user-facing name with `Alert:` to keep parity with the
- * legacy dashboard path.
+ * legacy dashboard path — case-insensitive prefix detection so
+ * `Alert: cost spike` and `alert: cost spike` don't produce a double-prefix.
  */
 export function buildGraphAlertTriggerData({
   id,
@@ -92,21 +93,44 @@ export function buildGraphAlertTriggerData({
   customGraphId,
   actionParams,
 }: BuildGraphAlertTriggerDataInput): GraphAlertTriggerData {
+  const trimmed = name.replace(/^\s*[Aa]lert:\s*/, "");
   return {
     id,
-    name: name.startsWith("Alert: ") ? name : `Alert: ${name}`,
+    name: `Alert: ${trimmed}`,
     projectId,
     action,
-    actionParams: {
-      ...actionParams,
-      threshold: actionParams.threshold,
-      operator: actionParams.operator,
-      timePeriod: actionParams.timePeriod,
-      seriesName: actionParams.seriesName,
-    } as Prisma.InputJsonValue,
+    actionParams: { ...actionParams } as Prisma.InputJsonValue,
     filters: {} as Prisma.InputJsonValue,
     alertType,
     active: true,
     customGraphId,
+  };
+}
+
+/**
+ * Inverse of `buildGraphAlertTriggerData` — reads the graph-alert-shaped
+ * `actionParams` off a persisted `Trigger` row. Fills the gap the SSOT
+ * writer left open (builder5015-004): both writers (create + update) go
+ * through the builder, both readers (dashboard edit hydration + drawer
+ * hydration) should now go through this parser instead of ad-hoc casts.
+ *
+ * Returns `null` if the row's `actionParams` doesn't parse — callers can
+ * treat that as "not a graph alert" or fall back to the legacy shape.
+ * Unknown keys ARE preserved (destination keys like `members` /
+ * `slackWebhook` travel through) so the caller doesn't have to re-read
+ * the row for the other action-params bits.
+ */
+export function extractGraphAlertFromTriggerRow(
+  actionParams: unknown,
+): (GraphAlertActionParams & Record<string, unknown>) | null {
+  if (typeof actionParams !== "object" || actionParams === null) return null;
+  const parsed = graphAlertActionParamsSchema.safeParse(actionParams);
+  if (!parsed.success) return null;
+  // Preserve destination keys (members, slackWebhook, etc.) alongside the
+  // typed threshold rule. Zod's `.safeParse` strips unknowns; we merge them
+  // back so callers don't lose the send-side context.
+  return {
+    ...(actionParams as Record<string, unknown>),
+    ...parsed.data,
   };
 }

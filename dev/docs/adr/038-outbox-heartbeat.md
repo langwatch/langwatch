@@ -45,18 +45,22 @@ Runtime constraints:
 - **Errors are non-fatal.** A throwing `decide` is logged + captured; the lock releases either way; the next tick still fires.
 - **Process-singleton registry.** A second `register(...)` for the same `name` throws, so accidental double-registration is loud.
 
-The graph-trigger heartbeat (ADR-034 Phase 5) is the first consumer:
-- 30s cadence.
-- Two `decide`-time predicates: active triggers with the no-data operator/threshold combination, and active triggers with an unresolved `TriggerSent` row.
-- **Source-aware pre-filter** (Phase 6 extension): per candidate trigger, look up the metric's source (`trace` | `evaluation`) via `field-availability`. Group candidates per `(project, source)` and issue ONE batched recency query per source per project per tick — `trace_analytics` for trace-source candidates, `evaluation_analytics` for eval-source candidates. If the project has any qualifying event newer than a candidate's window, the real-time outbox reactor is already firing for that trigger; skip.
-- Surviving candidates enqueue `graphEval`-stage payloads. The shared handler `evaluateGraphTrigger` picks up — same handler the real-time reactor's payloads land at, regardless of source pipeline.
-
 ## Consequences
 
 - One canonical handler for any given trigger type, regardless of whether an event or a tick woke it up. Test it once, reason about it once.
 - The dispatch path's invariants (debounce TTL collapse, at-most-once via `TriggerSent`, retries, audit projection where applicable) apply to heartbeat-sourced enqueues for free.
-- A heartbeat consumer must keep `decide` cheap. The pre-filter pattern (one batched query per project bounded by `max(window)`) is the discipline we hold to for the analytics consumer; future consumers should follow the same shape.
+- A heartbeat consumer must keep `decide` cheap. The recommended discipline (one batched query per project bounded by `max(window)`) is documented in the first consumer's implementation notes below; future consumers should follow the same shape.
 - The heartbeat does NOT replace the event-driven path. It supplements it for cases the event path structurally cannot reach. Any consumer tempted to "just re-enqueue everything every tick" should use `.withOutbox(...)` on the reactor side instead — it's cheaper, lower-latency, and avoids tick-quantised reaction delays.
+- **Lock-TTL blast radius on crash.** A worker that crashes mid-tick blocks that heartbeat's next tick for up to the TTL window (`max(intervalMs * 2, 30s)`). For a 30 s consumer that's up to ~60 s of missed window under crash. Accepted — the alternative (shorter TTLs) creates split-lock risk under heavy `decide` work, which is a worse operational surprise.
+
+## First consumer — graph-trigger heartbeat (ADR-034 Phase 5)
+
+This ADR is framework-primitive; the first consumer's specifics live here as implementation notes rather than in the framework's Decision, so a future reader can re-read the Decision independently as "what is the heartbeat primitive."
+
+- 30 s cadence.
+- Two `decide`-time predicates: active triggers with the no-data operator/threshold combination, and active triggers with an unresolved `TriggerSent` row.
+- **Source-aware pre-filter** (Phase 6 extension): per candidate trigger, look up the metric's source (`trace` | `evaluation`) via `field-availability`. Group candidates per `(project, source)` and issue ONE batched recency query per source per project per tick — `trace_analytics` for trace-source candidates, `evaluation_analytics` for eval-source candidates. If the project has any qualifying event newer than a candidate's window, the real-time outbox reactor is already firing for that trigger; skip.
+- Surviving candidates enqueue `graphEval`-stage payloads. The shared handler `evaluateGraphTrigger` picks up — same handler the real-time reactor's payloads land at, regardless of source pipeline.
 
 ## Implementation
 

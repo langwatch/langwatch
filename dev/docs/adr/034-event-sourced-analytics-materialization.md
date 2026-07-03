@@ -17,11 +17,17 @@ Two ClickHouse projections off the event log, per aggregate.
 
 ### 1. Slim table — `<x>_analytics` (the per-aggregate truth)
 
-A **fold projection** writes the latest state per aggregate into a slim, time-sorted `ReplacingMergeTree(Version)`. **Idempotent and replay-safe by construction** (re-fold → same canonical state → dedup by version) — the platform's required contract, and identical to how `trace_summaries` already behaves. Holds **every dimension** (including the late/derived ones — topic, origin, user, conversation, model, …) and every metric scalar. Serves **percentiles, min/max, any dim-grouped query, arbitrary filters** — ~10–50× cheaper to scan than `trace_summaries` (slim rows, time-leading sort).
+A **fold projection** writes the latest state per aggregate into a slim, time-sorted `ReplacingMergeTree(UpdatedAt)`.
+> **Shipped divergence:** the sketch called this `ReplacingMergeTree(Version)`; the shipped engine dedups on `UpdatedAt` (ClickHouse rejects `LowCardinality(String)` as a version column, and `UpdatedAt` matches `trace_summaries`'s convention). See Implementation status for details.
+
+**Idempotent and replay-safe by construction** (re-fold → same canonical state → dedup by `UpdatedAt`) — the platform's required contract, and identical to how `trace_summaries` already behaves. Holds **every dimension** (including the late/derived ones — topic, origin, user, conversation, model, …) and every metric scalar. Serves **percentiles, min/max, any dim-grouped query, arbitrary filters** — ~10–50× cheaper to scan than `trace_summaries` (slim rows, time-leading sort).
 
 ### 2. Rollup — `<x>_analytics_rollup` (the additive fast-path)
 
-An `AggregatingMergeTree` fed by **per-span increments** — `sumState`/`uniqState`. Each span contributes its own metric value; trace count = `uniqState(TraceId)` (every span shares the trace id, so it collapses to one); trace duration = the root span's value, 0 on the rest. **No signs, no collapsing, no settle.**
+An `AggregatingMergeTree` fed by **per-span increments** — `SimpleAggregateFunction(sum, …)`.
+> **Shipped divergence:** the sketch called for `sumState`/`uniqState`; the shipped rollup uses `SimpleAggregateFunction(sum, …)` so the app inserts plain numbers and reads plain `sum(…)` (no `sumMerge`, no binary state on the wire). As a consequence, `uniq`-shaped columns (`TraceUniq`, `UserUniq`, `ConversationUniq`) and `FirstTokenSum` (root-span-only, not derivable per-span) were dropped from the rollup; distinct-trace and percentile queries route to the slim table per the read-routing predicate instead.
+
+Each span contributes its own metric value; trace duration = the root span's value, 0 on the rest. **No signs, no collapsing, no settle.**
 
 **Why per-span (not per-trace).** A per-trace source *mutates* — a trace becomes N versions as spans land, an MV over it fires N times → every trace N×-wrong (systematic). A **span is a single immutable event**, processed once; the only repeat is a rare crash/retry re-delivery → a fraction-of-a-percent of buckets, transient, non-systematic. **We accept that** (explicitly — it's negligible). Replay re-fires everything, so **replay = truncate the rollup and rebuild**, a deliberate op, not steady-state.
 
@@ -29,10 +35,12 @@ An `AggregatingMergeTree` fed by **per-span increments** — `sumState`/`uniqSta
 
 ### Read routing (`getTimeseries`)
 
-- additive (sum/count/avg/distinct) **and** group-by ∈ {none, `Model`, `SpanType`} **and** no exotic filter → **rollup**
+- additive (sum/count/avg) **and** group-by ∈ {none, `Model`, `SpanType`} **and** no exotic filter → **rollup**
 - percentiles, min/max, any other group-by (topic/origin/user/…), arbitrary filters → **slim table**
-- else → `trace_summaries` (the drawer's table, untouched)
+- else → `trace_summaries` (the drawer's table, untouched) or `evaluation_runs` for eval-source metrics
 - default to slim/raw on any doubt.
+
+> **Shipped divergence:** the routing union is 6-way, not 3-way — both trace and eval sources ship with rollup + slim + legacy fallback. Cross-source series mix falls back to `trace_summaries`. Live in `pickAnalyticsTable` (see `routing/route-table.ts`); details in Implementation status.
 
 ### Shared fleet
 
@@ -40,23 +48,23 @@ Generic fold + per-span-increment + read-routing machinery, parameterised per pi
 
 ## Trace fields
 
-**`trace_analytics`** — `ReplacingMergeTree(Version)`, `ORDER BY (TenantId, OccurredAt, TraceId)`:
+**`trace_analytics`** — `ReplacingMergeTree(UpdatedAt)`, `ORDER BY (TenantId, OccurredAt, TraceId)`:
 ```
-keys:   TenantId, TraceId, OccurredAt, Version
+keys:   TenantId, TraceId, OccurredAt, UpdatedAt (dedup), Version (schema tag)
 dims:   TraceName, TopicId, SubTopicId, UserId, ConversationId, CustomerId, Origin, Models[], Labels[]
 values: TotalCost, NonBilledCost, TotalDurationMs, TimeToFirstTokenMs,
         PromptTokens, CompletionTokens, CacheReadTokens, CacheWriteTokens, ReasoningTokens,
         TokensPerSecond, HasError, HasAnnotation
 ```
 
-**`trace_analytics_rollup`** — `AggregatingMergeTree`, `ORDER BY (TenantId, BucketStart, Model, SpanType)`, fed per-span:
+**`trace_analytics_rollup`** — `AggregatingMergeTree`, `ORDER BY (TenantId, BucketStart, Model, SpanType)`, fed per-span via an app-side map projection:
 ```
-counts:  TraceUniq = uniqState(TraceId), SpanCount, ErrorCount (root span)
-sums:    CostSum, NonBilledCostSum, DurationSum (root span), FirstTokenSum (root span),
+counts:  SpanCount, ErrorCount (root span)  — SimpleAggregateFunction(sum, UInt64)
+sums:    CostSum, NonBilledCostSum, DurationSum (root span),
          PromptTokensSum, CompletionTokensSum, CacheReadTokensSum, CacheWriteTokensSum, ReasoningTokensSum
-distinct: UserUniq, ConversationUniq   (uniqState)
 ```
-Averages derived at read (`CostSum / TraceUniq`, …).
+`TraceUniq`/`UserUniq`/`ConversationUniq`/`FirstTokenSum` were dropped from the rollup (see Implementation status); distinct-trace and time-to-first-token queries route to the slim table.
+Averages derived at read from the sums (`avg(CostSum) / avg(SpanCount)` for per-span cost, `SUM/COUNT` variants for per-bucket).
 
 ## Consequences
 
