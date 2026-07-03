@@ -81,7 +81,15 @@ const roleOf = (msg: Message): string =>
   typeof msg.role === "string" ? msg.role : "user";
 
 /** Flatten a content block (or string) to its display text for tokenizing. */
-function blockText(block: unknown): string {
+/** Depth ceiling for the blockText↔contentToText mutual recursion. A malformed
+ * or adversarial deeply-nested `tool_result` (thousands of levels) would blow
+ * the stack on the SYNCHRONOUS ingest path; honest content nests a handful deep.
+ * Past the ceiling the walk yields empty text (the block still classifies, it
+ * just contributes no token mass — the pool scaler absorbs the rest). */
+const MAX_BLOCK_TEXT_DEPTH = 16;
+
+function blockText(block: unknown, depth = 0): string {
+  if (depth > MAX_BLOCK_TEXT_DEPTH) return "";
   if (typeof block === "string") return block;
   if (!isRecord(block)) return "";
   const b = block;
@@ -93,15 +101,19 @@ function blockText(block: unknown): string {
       b.input !== undefined && b.input !== null ? safeStringify(b.input) : "";
     return `${name}${input}`;
   }
-  if (b.type === "tool_result") return contentToText(b.content);
+  if (b.type === "tool_result") return contentToText(b.content, depth + 1);
   if (typeof b.content === "string") return b.content;
   return "";
 }
 
-function contentToText(content: unknown): string {
+function contentToText(content: unknown, depth = 0): string {
+  if (depth > MAX_BLOCK_TEXT_DEPTH) return "";
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
-  return content.map(blockText).filter(Boolean).join("\n");
+  return content
+    .map((block) => blockText(block, depth + 1))
+    .filter(Boolean)
+    .join("\n");
 }
 
 function safeStringify(value: unknown): string {
@@ -152,6 +164,13 @@ class AxisAccumulator {
     // idx = sequential part index within this axis (position === array length
     // before push), matching the space the cache-breakpoint index addresses.
     this.blocks.push({ idx: this.blocks.length, category, charCount, text });
+  }
+
+  /** Count of detail blocks pushed so far (excludes the overflow aggregate).
+   * Callers compare it across a push to tell whether a part actually appended a
+   * block before marking a breakpoint on it. */
+  size(): number {
+    return this.blocks.length;
   }
 
   /** Mark the most recently pushed block as carrying a cache_control breakpoint.
@@ -214,35 +233,50 @@ function classifyInputMessage({
   const content = msg.content;
 
   if (typeof content === "string") {
-    if (fresh && role === "user") pushFreshUserText(acc, content);
+    // A whole-message string is the leading (and only) part — peel markers.
+    if (fresh && role === "user") pushFreshUserOrMarkers(acc, content, true);
     else acc.push(InputCategory.PRIOR_CONTEXT, content);
     return;
   }
 
   if (!Array.isArray(content)) return;
 
+  // Injected context (system-reminder / skill / mcp-instructions markers) is
+  // prepended only to the FIRST text part of the fresh user message. Peel
+  // markers off that part alone; a later text part carrying a `<tag>` is real
+  // user content, not injected context, so it stays whole as user_input.
+  let leadingTextPending = fresh && role === "user";
+
   for (const part of content) {
     if (typeof part === "string") {
-      if (fresh && role === "user") pushFreshUserText(acc, part);
-      else acc.push(InputCategory.PRIOR_CONTEXT, part);
+      if (fresh && role === "user") {
+        pushFreshUserOrMarkers(acc, part, leadingTextPending);
+        leadingTextPending = false;
+      } else acc.push(InputCategory.PRIOR_CONTEXT, part);
       continue;
     }
     if (!isRecord(part)) continue;
 
     // Record tool_use → name even in prior turns so later tool_results resolve.
+    // First-write-wins: a duplicate id keeps the EARLIER tool (temporal order),
+    // so an earlier tool_result resolves to the tool it actually belongs to.
     if (part.type === "tool_use") {
       const id = typeof part.id === "string" ? part.id : null;
       const name = toolNameFromUse(part);
-      if (id && name) toolNames.set(id, name);
+      if (id && name && !toolNames.has(id)) toolNames.set(id, name);
     }
 
+    const before = acc.size();
     const category = inputPartCategory({ part, fresh, role, toolNames });
     if (part.type === "text" && fresh && role === "user") {
-      pushFreshUserText(acc, blockText(part));
+      pushFreshUserOrMarkers(acc, blockText(part), leadingTextPending);
+      leadingTextPending = false;
     } else {
       acc.push(category, blockText(part));
     }
-    if (hasCacheControl(part)) acc.markBreakpoint();
+    // Mark the breakpoint only if THIS part actually appended a block — else the
+    // mark lands on a prior part's block and the cached-prefix boundary is wrong.
+    if (hasCacheControl(part) && acc.size() > before) acc.markBreakpoint();
   }
 }
 
@@ -284,9 +318,20 @@ function inputPartCategory({
   return InputCategory.OTHER_INPUT;
 }
 
-/** Split leading injected-context markers off fresh user text; the markers get
- * their marker categories, the remaining body is the real user_input. */
-function pushFreshUserText(acc: AxisAccumulator, text: string): void {
+/** Push a fresh-user text part. On the LEADING part (`peel`), split leading
+ * injected-context markers off — the markers get their marker categories, the
+ * remaining body is real user_input. On any later part, the whole text is
+ * user_input: injected context only ever prefixes the first part, so peeling a
+ * later part would mislabel a `<tag>` in real user prose as prior_context. */
+function pushFreshUserOrMarkers(
+  acc: AxisAccumulator,
+  text: string,
+  peel: boolean,
+): void {
+  if (!peel) {
+    if (text.length > 0) acc.push(InputCategory.USER_INPUT, text);
+    return;
+  }
   const { markers, body } = splitLeadingMarkers(text);
   for (const marker of markers) acc.push(marker.category, marker.raw);
   if (body.length > 0) acc.push(InputCategory.USER_INPUT, body);

@@ -106,6 +106,33 @@ describe("splitLeadingMarkers", () => {
     });
   });
 
+  describe("when a leading tag nests another of the same name", () => {
+    it("matches the OUTER close, not the first inner one", () => {
+      // Naive first-indexOf closes at the inner </skill>, leaking `tail</skill>`
+      // into the body where it mis-classifies as user_input. Depth-matching
+      // peels the whole outer block and leaves only the real prose.
+      const { markers, body } = splitLeadingMarkers(
+        "<skill>outer<skill>inner</skill>tail</skill>the question",
+      );
+      expect(markers).toHaveLength(1);
+      expect(markers[0]?.category).toBe(InputCategory.SKILL_CONTENT);
+      expect(markers[0]?.raw).toBe(
+        "<skill>outer<skill>inner</skill>tail</skill>",
+      );
+      expect(body).toBe("the question");
+    });
+
+    it("leaves the text as body when the nested tags are unbalanced", () => {
+      const { markers, body } = splitLeadingMarkers(
+        "<skill>outer<skill>inner</skill>only one close question",
+      );
+      expect(markers).toHaveLength(0);
+      expect(body).toBe(
+        "<skill>outer<skill>inner</skill>only one close question",
+      );
+    });
+  });
+
   describe("when leading tags exceed the marker cap", () => {
     it("stops at MAX_LEADING_MARKERS and leaves the rest as the body", () => {
       const overCap = MAX_LEADING_MARKERS + 5;

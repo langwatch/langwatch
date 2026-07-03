@@ -74,6 +74,52 @@ export function categoryForMarkerTag(tagName: string): InputCategory {
  * left untouched — only prepended context is separated. Pure and deterministic:
  * no clock, no randomness, no I/O.
  */
+/** True when the char at `idx` ends an opening tag name (`>`, whitespace, or a
+ * self-close `/`), so `<skill` matches `<skill>`/`<skill attr>` but not
+ * `<skills-list>`. */
+function endsTagName(text: string, idx: number): boolean {
+  const c = text[idx];
+  return (
+    c === ">" ||
+    c === "/" ||
+    c === " " ||
+    c === "\t" ||
+    c === "\n" ||
+    c === "\r"
+  );
+}
+
+/**
+ * Return the index just past the close tag that MATCHES the opening tag at
+ * `from` (which is positioned just after the `<tagName…>` open), accounting for
+ * nested same-name tags — a naive first-`indexOf` closes at the inner tag and
+ * leaks a dangling `</tag>` into the body. Returns -1 when unbalanced. Tag names
+ * are `[A-Za-z][\w-]*` (no regex-special chars), so plain `indexOf` is safe.
+ */
+function matchingCloseEnd(text: string, tagName: string, from: number): number {
+  const openLt = `<${tagName}`;
+  const closeTag = `</${tagName}>`;
+  let depth = 1;
+  let i = from;
+  while (depth > 0) {
+    const closeIdx = text.indexOf(closeTag, i);
+    if (closeIdx === -1) return -1; // unbalanced — bail, leave as body
+    let openIdx = text.indexOf(openLt, i);
+    // Only a real nested open (proper tag-name boundary) before the close counts.
+    while (openIdx !== -1 && !endsTagName(text, openIdx + openLt.length)) {
+      openIdx = text.indexOf(openLt, openIdx + openLt.length);
+    }
+    if (openIdx !== -1 && openIdx < closeIdx) {
+      depth++;
+      i = openIdx + openLt.length;
+    } else {
+      depth--;
+      i = closeIdx + closeTag.length;
+    }
+  }
+  return i;
+}
+
 export function splitLeadingMarkers(text: string): LeadingMarkerSplit {
   const markers: LeadingMarkerBlock[] = [];
 
@@ -88,10 +134,8 @@ export function splitLeadingMarkers(text: string): LeadingMarkerSplit {
     if (!open) break;
     const leadingWhitespace = open[1] ?? "";
     const tagName = open[2]!;
-    const closeTag = `</${tagName}>`;
-    const closeIdx = text.indexOf(closeTag, pos + open[0].length);
-    if (closeIdx === -1) break;
-    const blockEnd = closeIdx + closeTag.length;
+    const blockEnd = matchingCloseEnd(text, tagName, pos + open[0].length);
+    if (blockEnd === -1) break;
     const raw = text.slice(pos + leadingWhitespace.length, blockEnd);
     markers.push({
       tagName: tagName.toLowerCase(),

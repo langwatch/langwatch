@@ -65,4 +65,27 @@ describe("detectCodingAgentHarness", () => {
       ).toBeNull();
     });
   });
+
+  describe("given a scope name with drift (whitespace, case, version suffix)", () => {
+    it("still resolves the harness rather than silently disabling the feature", () => {
+      expect(
+        detectCodingAgentHarness({
+          instrumentationScopeName: "  com.anthropic.claude_code.events\n",
+          spanAttributes: {},
+        }),
+      ).toBe("claude");
+      expect(
+        detectCodingAgentHarness({
+          instrumentationScopeName: "com.anthropic.claude_code.events.v2",
+          spanAttributes: {},
+        }),
+      ).toBe("claude");
+      expect(
+        detectCodingAgentHarness({
+          instrumentationScopeName: "Codex_Cli_Rs",
+          spanAttributes: {},
+        }),
+      ).toBe("codex");
+    });
+  });
 });

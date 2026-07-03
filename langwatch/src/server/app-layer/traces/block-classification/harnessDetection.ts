@@ -38,13 +38,24 @@ export function detectCodingAgentHarness({
   instrumentationScopeName?: string | null;
   spanAttributes: Record<string, unknown>;
 }): CodingAgentHarness | null {
-  const scope = instrumentationScopeName ?? "";
+  // Normalise before matching: exact-string comparison on the raw scope gates
+  // the whole feature, so a trailing newline (OTLP-HTTP quirk), case drift (a
+  // collector processor upper-casing), or a version bump would silently disable
+  // classification fleet-wide. Trim + lowercase, and PREFIX-match the Claude
+  // scope so `com.anthropic.claude_code.events.v2` still resolves.
+  const scope = (instrumentationScopeName ?? "").trim().toLowerCase();
 
-  if (scope === CLAUDE_CODE_SCOPE) return "claude";
+  if (scope.startsWith(CLAUDE_CODE_SCOPE)) return "claude";
   if (scope === CODEX_RUST_SCOPE || scope === CODEX_ROLLOUT_SCOPE)
     return "codex";
 
-  if (spanAttributes[GEN_AI_SYSTEM] === CLAUDE_CODE_SYSTEM) return "claude";
+  const genAiSystem = spanAttributes[GEN_AI_SYSTEM];
+  if (
+    typeof genAiSystem === "string" &&
+    genAiSystem.trim().toLowerCase() === CLAUDE_CODE_SYSTEM
+  ) {
+    return "claude";
+  }
 
   return null;
 }
