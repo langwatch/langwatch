@@ -4,7 +4,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { UpgradeModal } from "../UpgradeModal";
+import { UpgradeModal } from "../UpgradeModalContent";
 import type { UpgradeModalVariant } from "../../stores/upgradeModalStore";
 
 // Mock dependencies used by other content variants
