@@ -51,8 +51,13 @@ jobs:
         with:
           app-id: ${{ secrets.CODEOWNERS_REFRESH_APP_ID }}
           private-key: ${{ secrets.CODEOWNERS_REFRESH_APP_PRIVATE_KEY }}
-          # Needed for `orgs/langwatch/members` (repo scope alone is not enough).
+          # `owner` scopes the token to the langwatch org installation (needed
+          # for orgs/langwatch/members). `repositories` narrows the *repo*
+          # permissions (contents/pull-requests write) to this one repo — even
+          # if the App is later installed on more repos, this token can't touch
+          # them. Org-level permissions still apply installation-wide.
           owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
 
       - name: Checkout (full history)
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
