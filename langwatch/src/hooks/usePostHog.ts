@@ -65,6 +65,11 @@ export function usePostHog() {
           // bundlers and strict-mode wrappers can sometimes strip the
           // implicit global; the assignment is best-effort and has no
           // downside in environments where it's already set.
+          // SSR-safety guard: unreachable in this Vite SPA (never
+          // server-rendered) and `window`/`document` are used
+          // unconditionally elsewhere in this same callback anyway, so the
+          // false branch can't be meaningfully exercised in a browser test.
+          /* v8 ignore next */
           if (typeof window !== "undefined") {
             (window as unknown as { posthog: typeof posthog }).posthog =
               posthog;
