@@ -63,13 +63,20 @@ export default function Script({
   onError,
   ...rest
 }: ScriptProps) {
-  const loaded = useRef(false);
+  // Tracks whether inject() has actually run — not whether it's merely
+  // scheduled. React StrictMode's dev-only setup→cleanup→setup cycle
+  // cancels a pending deferred inject on the synthetic "cleanup", then
+  // re-runs the effect; if this flag were set at schedule time instead of
+  // at actual-injection time, that remount would see it already true and
+  // skip rescheduling, so the script would never inject under StrictMode.
+  const injected = useRef(false);
 
   useEffect(() => {
-    if (loaded.current) return;
-    loaded.current = true;
+    if (injected.current) return;
 
     const inject = () => {
+      injected.current = true;
+
       const script = document.createElement("script");
       if (id) script.id = id;
 
