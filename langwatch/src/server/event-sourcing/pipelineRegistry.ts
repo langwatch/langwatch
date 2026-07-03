@@ -26,6 +26,7 @@ import {
 import { registerDatasetNormalizeEnqueue } from "~/server/datasets/dataset-normalize.queue";
 import { getDatasetStorage } from "~/server/datasets/dataset-storage";
 import { TraceService } from "~/server/traces/trace.service";
+import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { createLogger } from "~/utils/logger/server";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";
@@ -258,7 +259,7 @@ export interface PipelineRegistryDeps {
    * so oversized commands (> 256 KB) are fetched from S3 and the spool is
    * best-effort DELETEd after event_log INSERT succeeds.
    */
-  blobStore?: import("~/server/app-layer/traces/blob-store.service").BlobStore;
+  blobStore?: BlobStore;
   governanceKpisSync?: GovernanceKpisSyncReactorDeps;
   governanceOcsfEventsSync?: GovernanceOcsfEventsSyncReactorDeps;
   /**

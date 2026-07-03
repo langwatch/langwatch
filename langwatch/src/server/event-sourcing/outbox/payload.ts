@@ -212,18 +212,6 @@ export function graphEvalGroupKey(params: {
 }
 
 /**
- * Per-(trigger, project) audit row identity for graphEval. Mirrors
- * `auditDedupKey`'s shape but uses `:graph:` so it never collides with
- * trace-based dispatches' rows.
- */
-export function graphEvalAuditDedupKey(params: {
-  projectId: string;
-  triggerId: string;
-}): string {
-  return `${params.projectId}/${params.triggerId}:graph`;
-}
-
-/**
  * Per-(trigger, trace) dedup key for the settle stage. Identity for
  * the GroupQueue Debounce Mode entry — repeat sends within the TTL
  * collapse onto the existing pending job.

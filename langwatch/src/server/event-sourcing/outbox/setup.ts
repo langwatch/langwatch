@@ -34,7 +34,6 @@ import {
 import {
   type CadenceStagePayload,
   type GraphEvalStagePayload,
-  graphEvalDedupId,
   type SettleStagePayload,
   settleDedupId,
 } from "./payload";
@@ -318,11 +317,6 @@ export function buildOutboxRuntime({
       });
     },
     async enqueueGraphEval(payload, { ttlMs, makeDedupId }) {
-      // Avoid the unused-import warning on `graphEvalDedupId` here even
-      // though the caller is what produces the dedupKey — we expose the
-      // helper at the payload layer for any future caller that wants
-      // the canonical shape without going through `OutboxEnqueueRequest`.
-      void graphEvalDedupId;
       if (!queueHolder.current) {
         throw new Error(
           "Outbox runtime queue not attached — enqueueGraphEval called before attachQueue",

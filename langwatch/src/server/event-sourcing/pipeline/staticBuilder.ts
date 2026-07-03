@@ -283,7 +283,7 @@ export class StaticPipelineBuilderWithNameAndType<
    * and posts a single wakeup per request. The actual dispatch
    * (HTTP call, mailer, dataset write) is performed by an
    * `OutboxDispatcher` registered against the same `reactorName` on
-   * the OutboxDrainer.
+   * the dispatcher (ADR-030 revision 3 rides the main event-sourcing queue).
    */
   withOutbox(
     projectionName: FoldNames | MapNames,

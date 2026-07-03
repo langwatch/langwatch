@@ -8,7 +8,6 @@ import type {
 } from "../../../outbox/outboxReactor.types";
 import {
   GRAPH_TRIGGER_EVAL_REACTOR_NAME,
-  graphEvalAuditDedupKey,
   graphEvalDedupId,
   graphEvalGroupKey,
   type GraphEvalStagePayload,
@@ -118,11 +117,6 @@ export function createGraphTriggerEvaluationOutboxReactor(
         },
         "graphTriggerEvaluation reactor decided enqueues",
       );
-
-      // Carry the audit key on the reactor's logs so an operator
-      // grepping for one is one query away — even though we don't
-      // currently persist a `ReactorOutbox` row for graphEval.
-      void graphEvalAuditDedupKey;
 
       return requests;
     },
