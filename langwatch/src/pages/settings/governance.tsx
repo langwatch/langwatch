@@ -23,6 +23,7 @@ import {
   CategoryBreakdownBars,
   CategoryBreakdownCaption,
   CategoryBreakdownEnablementHint,
+  CategoryBreakdownErrorHint,
   toCategoryBarRows,
 } from "~/components/governance/CategoryBreakdownBars";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
@@ -424,8 +425,9 @@ function GovernanceOverviewPage() {
           subline="Coding-agent spend split by content category (last 30 days). Analytics only; it never affects billing."
         >
           <CategoryBreakdownCaption />
-          {categoryBreakdownQuery.isLoading ? null : categoryBars.length ===
-            0 ? (
+          {categoryBreakdownQuery.isLoading ? null : categoryBreakdownQuery.isError ? (
+            <CategoryBreakdownErrorHint />
+          ) : categoryBars.length === 0 ? (
             <CategoryBreakdownEnablementHint />
           ) : (
             <CategoryBreakdownBars rows={categoryBars} />

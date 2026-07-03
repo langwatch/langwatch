@@ -17,6 +17,7 @@ import {
   CategoryBreakdownBars,
   CategoryBreakdownCaption,
   CategoryBreakdownEnablementHint,
+  CategoryBreakdownErrorHint,
 } from "../CategoryBreakdownBars";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -60,6 +61,56 @@ describe("<CategoryBreakdownBars/>", () => {
       // Share percentages surface.
       expect(screen.getByText("60%")).toBeInTheDocument();
       expect(screen.getByText("40%")).toBeInTheDocument();
+    });
+  });
+
+  describe("given an all-zero-cost set (only free/bundled traffic)", () => {
+    it("renders every lane without a NaN width via the maxCost floor", () => {
+      // maxCost = Math.max(...costs, 0.000001) keeps widthPct finite when every
+      // lane is $0 — the guard the pre-baked-rows test above never exercises.
+      render(
+        <CategoryBreakdownBars
+          rows={[
+            {
+              category: "system_prompt",
+              label: "System prompt",
+              costUsd: 0,
+              tokens: 500,
+              sharePct: 0,
+            },
+            {
+              category: "user_input",
+              label: "User input",
+              costUsd: 0,
+              tokens: 300,
+              sharePct: 0,
+            },
+          ]}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      expect(screen.getByText("System prompt")).toBeInTheDocument();
+      // A NaN width would serialize into the style string; assert none leaked.
+      for (const bar of document.querySelectorAll<HTMLElement>("[style]")) {
+        expect(bar.getAttribute("style") ?? "").not.toContain("NaN");
+      }
+    });
+  });
+
+  describe("given the breakdown fetch failed", () => {
+    it("shows a neutral error state, not the 'no usage' hint", () => {
+      render(<CategoryBreakdownErrorHint />, { wrapper: Wrapper });
+
+      expect(
+        screen.getByText(
+          /couldn’t load the usage breakdown\. try again shortly\./i,
+        ),
+      ).toBeInTheDocument();
+      // Must NOT claim there was no usage — that's a false statement on error.
+      expect(
+        screen.queryByText(/no categorized usage/i),
+      ).not.toBeInTheDocument();
     });
   });
 

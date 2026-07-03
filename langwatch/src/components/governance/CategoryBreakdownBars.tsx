@@ -177,3 +177,18 @@ export function CategoryBreakdownEnablementHint() {
     </Text>
   );
 }
+
+/**
+ * Error-state for the category breakdown when the fetch itself failed. Kept
+ * distinct from the enablement hint so a transport error never masquerades as
+ * "no usage" (a false claim). Neutral, non-alarming copy in the same muted style
+ * — the services already degrade ClickHouse failures to empty, so only rare
+ * transport/500s reach here (dev/docs/best_practices/copywriting.md).
+ */
+export function CategoryBreakdownErrorHint() {
+  return (
+    <Text fontSize="sm" color="fg.muted" paddingY={2}>
+      Couldn’t load the usage breakdown. Try again shortly.
+    </Text>
+  );
+}

@@ -76,6 +76,10 @@ export type PersonalContext = {
   /** True while the usage rollup is still loading — gate the category
    * empty-state on it so the enablement hint doesn't flash during load. */
   spendByCategoryLoading: boolean;
+  /** True when the usage rollup fetch failed — so the category section can show
+   * an error state instead of the "no categorized usage" hint (a false claim on
+   * a fetch failure). */
+  spendByCategoryError: boolean;
   /** Personal project the /me recent-activity table reads from + deep-links into. */
   personalProjectId: string | null;
   personalProjectSlug: string | null;
@@ -219,6 +223,7 @@ export function usePersonalContext(): PersonalContext {
       personalUsageQuery.data?.breakdownByCategory ?? [],
     ),
     spendByCategoryLoading: personalUsageQuery.isLoading,
+    spendByCategoryError: personalUsageQuery.isError,
     personalProjectId: personalContextQuery.data?.workspace.project.id ?? null,
     personalProjectSlug:
       personalContextQuery.data?.workspace.project.slug ?? null,

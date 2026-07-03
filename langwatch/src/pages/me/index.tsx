@@ -14,6 +14,7 @@ import {
   CategoryBreakdownBars,
   CategoryBreakdownCaption,
   CategoryBreakdownEnablementHint,
+  CategoryBreakdownErrorHint,
 } from "~/components/governance/CategoryBreakdownBars";
 import { AiToolsPortal } from "~/components/me/AiToolsPortal";
 import { BudgetExceededBanner } from "~/components/me/BudgetExceededBanner";
@@ -47,6 +48,7 @@ function MyUsagePage() {
     spendByTool,
     spendByCategory,
     spendByCategoryLoading,
+    spendByCategoryError,
     personalProjectId,
     personalProjectSlug,
     organizationName,
@@ -335,7 +337,9 @@ function MyUsagePage() {
 
         <SectionCard title="Usage breakdown">
           <CategoryBreakdownCaption />
-          {spendByCategoryLoading ? null : spendByCategory.length === 0 ? (
+          {spendByCategoryLoading ? null : spendByCategoryError ? (
+            <CategoryBreakdownErrorHint />
+          ) : spendByCategory.length === 0 ? (
             <CategoryBreakdownEnablementHint />
           ) : (
             <CategoryBreakdownBars rows={spendByCategory} />
