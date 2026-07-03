@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useUpgradeModalStore, type UpgradeModalVariant } from "../upgradeModalStore";
+import {
+  type UpgradeModalVariant,
+  useUpgradeModalStore,
+} from "../upgradeModalStore";
 
 describe("upgradeModalStore", () => {
   beforeEach(() => {

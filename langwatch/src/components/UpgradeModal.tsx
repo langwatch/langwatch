@@ -3,11 +3,12 @@ import { useUpgradeModalStore } from "../stores/upgradeModalStore";
 
 /**
  * The heavy modal body (dialog UI plus the tRPC-driven limit / seats /
- * lite-member content) lives in its own chunk in `UpgradeModalContent`.
- * It is only fetched when a modal is actually opened — i.e. when the
- * store's `variant` becomes non-null — so ~130 KiB stays off the critical
- * first-load path for the (almost all) users who never hit a plan limit
- * during a session.
+ * lite-member content) lives in its own chunk in `UpgradeModalContent`
+ * and is fetched only when a modal is actually opened — i.e. when the
+ * store's `variant` becomes non-null. This defers the modal's own code
+ * (~6 kB raw / ~2.4 kB gzip, measured) off the initial load. The shared
+ * UI chunk it depends on stays eager (used app-wide), so this is a small
+ * structural win, not a fix for the Lighthouse bundle finding.
  */
 const LazyUpgradeModal = lazy(() =>
   import("./UpgradeModalContent").then((m) => ({ default: m.UpgradeModal })),
