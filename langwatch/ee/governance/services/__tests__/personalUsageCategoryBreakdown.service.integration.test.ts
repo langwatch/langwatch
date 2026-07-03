@@ -87,13 +87,13 @@ describe("PersonalUsageService.breakdownByCategory", () => {
     start: new Date(Date.UTC(2026, 0, 1)),
     end: new Date(Date.UTC(2026, 0, 31)),
   };
-  let ch: ClickHouseClient | null = null;
+  let ch: ClickHouseClient;
   let orgId = "";
   let tenantId = "";
 
   beforeAll(async () => {
     const maybe = getTestClickHouseClient();
-    if (!maybe) return;
+    if (!maybe) throw new Error("ClickHouse test container not available");
     ch = maybe;
 
     const org = await prisma.organization.create({
@@ -144,7 +144,6 @@ describe("PersonalUsageService.breakdownByCategory", () => {
   });
 
   afterAll(async () => {
-    if (!ch) return;
     await cleanupTestData(tenantId);
     await prisma.project
       .deleteMany({ where: { team: { organizationId: orgId } } })
@@ -160,7 +159,6 @@ describe("PersonalUsageService.breakdownByCategory", () => {
   describe("given a user whose coding-agent traffic produced classified category totals", () => {
     /** @scenario "The personal usage view shows the user's cost breakdown by category" */
     it("returns per-category cost + token totals summed across the window, sorted by cost desc", async () => {
-      if (!ch) return;
       const rows = await new PersonalUsageService().breakdownByCategory({
         personalProjectId: tenantId,
         window,
@@ -189,7 +187,6 @@ describe("PersonalUsageService.breakdownByCategory", () => {
     let govTenantId = "";
 
     beforeAll(async () => {
-      if (!ch) return;
       const govOrg = await prisma.organization.create({
         data: { name: `${ns}-gov`, slug: `org-${ns}-gov` },
       });
@@ -239,7 +236,6 @@ describe("PersonalUsageService.breakdownByCategory", () => {
     });
 
     afterAll(async () => {
-      if (!ch) return;
       await cleanupTestData(govTenantId);
       await prisma.project
         .deleteMany({ where: { team: { organizationId: govOrgId } } })
@@ -254,7 +250,6 @@ describe("PersonalUsageService.breakdownByCategory", () => {
 
     describe("when userEmail + ingestionTenantId are supplied", () => {
       it("unions the principal's gov-tenant category totals into the personal rows", async () => {
-        if (!ch) return;
         const rows = await new PersonalUsageService().breakdownByCategory({
           personalProjectId: tenantId,
           ingestionTenantId: govTenantId,
@@ -274,7 +269,6 @@ describe("PersonalUsageService.breakdownByCategory", () => {
 
     describe("when userEmail / ingestionTenantId are absent", () => {
       it("returns personal-tenant rows only — no gov-tenant union", async () => {
-        if (!ch) return;
         const rows = await new PersonalUsageService().breakdownByCategory({
           personalProjectId: tenantId,
           window,
@@ -290,7 +284,6 @@ describe("PersonalUsageService.breakdownByCategory", () => {
 
   describe("given a user whose traffic produced no category totals", () => {
     it("returns an empty array so the UI can render the enablement hint", async () => {
-      if (!ch) return;
       const emptyOrg = await prisma.organization.create({
         data: { name: `${ns}-empty`, slug: `org-${ns}-empty` },
       });

@@ -79,14 +79,14 @@ async function insertTrace(
 
 describe("ADR-033 billing boundary: usage count ignores category attributes", () => {
   const ns = `cbb-${nanoid(8)}`;
-  let ch: ClickHouseClient | null = null;
+  let ch: ClickHouseClient;
   let orgId = "";
   let classifiedProjectId = "";
   let plainProjectId = "";
 
   beforeAll(async () => {
     const maybe = getTestClickHouseClient();
-    if (!maybe) return;
+    if (!maybe) throw new Error("ClickHouse test container not available");
     ch = maybe;
 
     const org = await prisma.organization.create({
@@ -122,7 +122,6 @@ describe("ADR-033 billing boundary: usage count ignores category attributes", ()
     // Three traces per tenant. The classified tenant carries category attrs;
     // the plain tenant carries none. Everything else is identical.
     for (let i = 0; i < 3; i++) {
-      if (!ch) break;
       await insertTrace(ch, classifiedProjectId, {
         [blockCategoryCostAttr("system_prompt")]: "0.4",
         [blockCategoryTokensAttr("system_prompt")]: "400",
@@ -134,7 +133,6 @@ describe("ADR-033 billing boundary: usage count ignores category attributes", ()
   });
 
   afterAll(async () => {
-    if (!ch) return;
     await cleanupTestData(classifiedProjectId);
     await cleanupTestData(plainProjectId);
     await prisma.project
@@ -150,7 +148,6 @@ describe("ADR-033 billing boundary: usage count ignores category attributes", ()
 
   describe("given one project with blockcat attrs and one without, otherwise identical", () => {
     it("meters the same billable trace count for both", async () => {
-      if (!ch) return;
       const classifiedCount = await queryTraceSummariesTotalUniq({
         projectIds: [classifiedProjectId],
         billingMonth: BILLING_MONTH,
