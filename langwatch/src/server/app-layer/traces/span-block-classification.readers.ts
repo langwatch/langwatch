@@ -1,0 +1,122 @@
+/**
+ * OTLP span attribute readers for the block-classification service (ADR-033).
+ *
+ * Pure, span-in / value-out helpers extracted from the service so it keeps to
+ * classification orchestration. No `this`, no state — each reads the span's
+ * attribute array directly.
+ */
+import { coerceToNumber } from "~/utils/coerceToNumber";
+import type { OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import type { UsagePools } from "./block-classification/costAllocation.service";
+import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
+
+/** First string-valued attribute for `key`, or null. */
+export function getStringAttribute(span: OtlpSpan, key: string): string | null {
+  for (const attr of span.attributes) {
+    if (attr.key === key && typeof attr.value.stringValue === "string") {
+      return attr.value.stringValue;
+    }
+  }
+  return null;
+}
+
+/** First numeric-ish attribute for `key` (int/double/string), or null. */
+export function getNumericAttribute(span: OtlpSpan, key: string): unknown {
+  for (const attr of span.attributes) {
+    if (attr.key !== key) continue;
+    const v = attr.value;
+    return v.intValue ?? v.doubleValue ?? v.stringValue ?? null;
+  }
+  return null;
+}
+
+/** Flattens span attributes into a primitive-valued map for harness detection. */
+export function spanAttributesRecord(span: OtlpSpan): Record<string, unknown> {
+  const record: Record<string, unknown> = {};
+  for (const attr of span.attributes) {
+    if (attr.key in record) continue; // first wins
+    const v = attr.value;
+    record[attr.key] =
+      v.stringValue ?? v.boolValue ?? v.intValue ?? v.doubleValue ?? undefined;
+  }
+  return record;
+}
+
+/** Parse a JSON message payload into a message array. Handles the
+ * `{ type: "chat_messages", value: [...] }` wrapper, `{ messages: [...] }`, and
+ * bare arrays. Returns null when it doesn't parse to a message array. */
+export function messagesFromJson(jsonStr: string): unknown[] | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonStr);
+  } catch {
+    return null;
+  }
+  if (Array.isArray(parsed)) return parsed;
+  if (parsed !== null && typeof parsed === "object") {
+    const obj = parsed as Record<string, unknown>;
+    if (obj.type === "chat_messages" && Array.isArray(obj.value)) {
+      return obj.value;
+    }
+    if (Array.isArray(obj.messages)) return obj.messages;
+  }
+  return null;
+}
+
+/** First present message attribute (priority order) parsed into a message
+ * array, or null when none is present / parseable. */
+export function parseMessages(
+  span: OtlpSpan,
+  keys: readonly string[],
+): unknown[] | null {
+  for (const key of keys) {
+    const raw = getStringAttribute(span, key);
+    if (!raw) continue;
+    const messages = messagesFromJson(raw);
+    if (messages !== null) return messages;
+  }
+  return null;
+}
+
+/** Parse a single JSON string attribute, or null when absent / unparseable. */
+export function parseJsonAttribute(
+  span: OtlpSpan,
+  key: string,
+): unknown | null {
+  const raw = getStringAttribute(span, key);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+/** Provider-reported usage pools (fresh / cache-read / cache-creation / output),
+ * reading the first positive value across each key's aliases. */
+export function extractUsagePools(span: OtlpSpan): UsagePools {
+  const num = (...keys: string[]): number => {
+    for (const key of keys) {
+      const n = coerceToNumber(getNumericAttribute(span, key));
+      if (n !== null && n > 0) return n;
+    }
+    return 0;
+  };
+  return {
+    inputTokens: num(
+      ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS,
+      ATTR_KEYS.GEN_AI_USAGE_PROMPT_TOKENS,
+    ),
+    outputTokens: num(
+      ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS,
+      ATTR_KEYS.GEN_AI_USAGE_COMPLETION_TOKENS,
+    ),
+    cacheReadTokens: num(
+      ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+      "gen_ai.usage.cached_tokens",
+    ),
+    cacheCreationTokens: num(
+      ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
+    ),
+  };
+}

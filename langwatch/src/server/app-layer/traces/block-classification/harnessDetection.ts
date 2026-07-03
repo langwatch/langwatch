@@ -45,7 +45,11 @@ export function detectCodingAgentHarness({
   // scope so `com.anthropic.claude_code.events.v2` still resolves.
   const scope = (instrumentationScopeName ?? "").trim().toLowerCase();
 
-  if (scope.startsWith(CLAUDE_CODE_SCOPE)) return "claude";
+  // Prefix match on a dot boundary: exact, or a version suffix like `…events.v2`
+  // — but NOT `…eventsX`, which would be an unrelated scope that merely shares
+  // the prefix.
+  if (scope === CLAUDE_CODE_SCOPE || scope.startsWith(`${CLAUDE_CODE_SCOPE}.`))
+    return "claude";
   if (scope === CODEX_RUST_SCOPE || scope === CODEX_ROLLOUT_SCOPE)
     return "codex";
 

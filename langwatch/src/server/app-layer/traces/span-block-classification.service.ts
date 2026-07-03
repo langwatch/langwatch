@@ -30,6 +30,13 @@ import {
 import { detectCodingAgentHarness } from "./block-classification/harnessDetection";
 import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
 import { resolveCustomTierRates } from "./model-cost-matching";
+import {
+  extractUsagePools,
+  getNumericAttribute,
+  parseJsonAttribute,
+  parseMessages,
+  spanAttributesRecord,
+} from "./span-block-classification.readers";
 import { extractModelName } from "./utils/spanModel";
 
 /**
@@ -125,7 +132,7 @@ export class OtlpSpanBlockClassificationService {
     // 1. Harness gate — classification only runs on coding-agent CLI traffic.
     const harness = detectCodingAgentHarness({
       instrumentationScopeName: instrumentationScope?.name ?? null,
-      spanAttributes: this.spanAttributesRecord(span),
+      spanAttributes: spanAttributesRecord(span),
     });
     if (!harness) return;
 
@@ -150,18 +157,15 @@ export class OtlpSpanBlockClassificationService {
   /** The classification work proper — see classifySpanBlocks for the guards. */
   private async classifyInner({ span }: { span: OtlpSpan }): Promise<void> {
     // 2. Content extraction — the same attribute surface token estimation reads.
-    const inputMessages = this.parseMessages(span, [
+    const inputMessages = parseMessages(span, [
       ATTR_KEYS.LANGWATCH_INPUT,
       ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
     ]);
-    const outputMessages = this.parseMessages(span, [
+    const outputMessages = parseMessages(span, [
       ATTR_KEYS.LANGWATCH_OUTPUT,
       ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES,
     ]);
-    const tools = this.parseJsonAttribute(
-      span,
-      ATTR_KEYS.GEN_AI_TOOL_DEFINITIONS,
-    );
+    const tools = parseJsonAttribute(span, ATTR_KEYS.GEN_AI_TOOL_DEFINITIONS);
     if (inputMessages === null && outputMessages === null) return;
 
     // 3. Classify content parts into cost categories (pure, deterministic).
@@ -180,7 +184,7 @@ export class OtlpSpanBlockClassificationService {
     const outputBlocks = await this.toTokenBlocks({ blocks: output, model });
 
     // 5. Provider-reported usage pools + per-tier rates already stamped upstream.
-    const pools = this.extractUsagePools(span);
+    const pools = extractUsagePools(span);
     const prices = this.resolveTierPrices({ span, model });
 
     // 6. Allocate cache-tier aware and push the classification attributes.
@@ -282,103 +286,6 @@ export class OtlpSpanBlockClassificationService {
     span.attributes.push(...kept, ...pending);
   }
 
-  /** Flattens span attributes into a primitive-valued map for harness detection. */
-  private spanAttributesRecord(span: OtlpSpan): Record<string, unknown> {
-    const record: Record<string, unknown> = {};
-    for (const attr of span.attributes) {
-      if (attr.key in record) continue; // first wins
-      const v = attr.value;
-      record[attr.key] =
-        v.stringValue ??
-        v.boolValue ??
-        v.intValue ??
-        v.doubleValue ??
-        undefined;
-    }
-    return record;
-  }
-
-  /**
-   * Parses the first present message attribute (priority order) into a message
-   * array. Handles the `{ type: "chat_messages", value: [...] }` structured
-   * wrapper and bare arrays. Returns null when no attribute is present or none
-   * parses — the caller then skips classification silently.
-   */
-  private parseMessages(
-    span: OtlpSpan,
-    keys: readonly string[],
-  ): unknown[] | null {
-    for (const key of keys) {
-      const raw = this.getStringAttribute(span, key);
-      if (!raw) continue;
-      const messages = this.messagesFromJson(raw);
-      if (messages !== null) return messages;
-    }
-    return null;
-  }
-
-  private messagesFromJson(jsonStr: string): unknown[] | null {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(jsonStr);
-    } catch {
-      return null;
-    }
-    if (Array.isArray(parsed)) return parsed;
-    if (parsed !== null && typeof parsed === "object") {
-      const obj = parsed as Record<string, unknown>;
-      if (obj.type === "chat_messages" && Array.isArray(obj.value)) {
-        return obj.value;
-      }
-      if (Array.isArray(obj.messages)) return obj.messages;
-    }
-    return null;
-  }
-
-  private parseJsonAttribute(span: OtlpSpan, key: string): unknown | null {
-    const raw = this.getStringAttribute(span, key);
-    if (!raw) return null;
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return null;
-    }
-  }
-
-  private extractUsagePools(span: OtlpSpan): UsagePools {
-    const num = (...keys: string[]): number => {
-      for (const key of keys) {
-        const n = coerceToNumber(this.getNumericAttribute(span, key));
-        if (n !== null && n > 0) return n;
-      }
-      return 0;
-    };
-    return {
-      inputTokens: num(
-        ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS,
-        ATTR_KEYS.GEN_AI_USAGE_PROMPT_TOKENS,
-      ),
-      outputTokens: num(
-        ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS,
-        ATTR_KEYS.GEN_AI_USAGE_COMPLETION_TOKENS,
-      ),
-      cacheReadTokens: num(
-        ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
-        "gen_ai.usage.cached_tokens",
-      ),
-      cacheCreationTokens: num(
-        ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
-      ),
-    };
-  }
-
-  /**
-   * Resolves per-tier rates the same way `computeSpanCost` does, so Σ per-category
-   * cost reconciles to the span's real (token×rate) cost: custom enrichment rates
-   * first (`langwatch.model.*`), then the injected registry resolver. The custom
-   * (Priority 1) cascade is the SHARED `resolveCustomTierRates` — the same helper
-   * `computeSpanCost` uses — so the two cannot drift.
-   */
   private resolveTierPrices({
     span,
     model,
@@ -387,7 +294,7 @@ export class OtlpSpanBlockClassificationService {
     model: string;
   }): TierPrices {
     const customRates = resolveCustomTierRates((key) =>
-      coerceToNumber(this.getNumericAttribute(span, key)),
+      coerceToNumber(getNumericAttribute(span, key)),
     );
     if (customRates) return customRates;
 
@@ -456,38 +363,19 @@ export class OtlpSpanBlockClassificationService {
   }: {
     span: OtlpSpan;
   }): number | null {
+    // Use the SAME resolver as resolveTierPrices / computeSpanCost so the two
+    // can't drift: a present-but-non-coercible rate (e.g. stringValue "auto")
+    // must NOT count as a custom rate here, or reconciliation is skipped while
+    // pricing quietly falls through to the registry — leaving Σ un-reconciled.
     const hasCustomRates =
-      this.getNumericAttribute(
-        span,
-        ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN,
-      ) !== null ||
-      this.getNumericAttribute(
-        span,
-        ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN,
+      resolveCustomTierRates((key) =>
+        coerceToNumber(getNumericAttribute(span, key)),
       ) !== null;
     if (hasCustomRates) return null;
 
     const explicit = coerceToNumber(
-      this.getNumericAttribute(span, ATTR_KEYS.LANGWATCH_SPAN_COST),
+      getNumericAttribute(span, ATTR_KEYS.LANGWATCH_SPAN_COST),
     );
     return explicit !== null && explicit > 0 ? explicit : null;
-  }
-
-  private getStringAttribute(span: OtlpSpan, key: string): string | null {
-    for (const attr of span.attributes) {
-      if (attr.key === key && typeof attr.value.stringValue === "string") {
-        return attr.value.stringValue;
-      }
-    }
-    return null;
-  }
-
-  private getNumericAttribute(span: OtlpSpan, key: string): unknown {
-    for (const attr of span.attributes) {
-      if (attr.key !== key) continue;
-      const v = attr.value;
-      return v.intValue ?? v.doubleValue ?? v.stringValue ?? null;
-    }
-    return null;
   }
 }
