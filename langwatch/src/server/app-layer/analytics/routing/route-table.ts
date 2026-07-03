@@ -245,7 +245,12 @@ const ROLLUP_TRACE_GROUP_BY_KEYS: ReadonlySet<string> = new Set([
  *   {none, EvaluatorType, Status}.
  */
 const ROLLUP_EVAL_GROUP_BY_KEYS: ReadonlySet<string> = new Set([
-  "evaluations.evaluator_type",
+  // eval5014-002: `evaluations.evaluator_type` is DELIBERATELY excluded.
+  // The rollup's map projection emits `evaluatorType: ''` on the two-event
+  // (scheduled → completed) path because it has no fold-state access to
+  // lift the identity — grouping by EvaluatorType on the rollup would pile
+  // every two-event evaluation into a phantom "unknown" bucket. Route
+  // EvaluatorType-grouped queries to slim/legacy instead.
   "evaluations.evaluation_status",
 ]);
 

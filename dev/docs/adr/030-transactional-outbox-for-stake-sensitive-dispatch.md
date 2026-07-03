@@ -130,8 +130,7 @@ src/server/event-sourcing/
 The framework wrapper invoked by `.withOutbox` is responsible for:
 
 1. Wrapping `match` in `_originGuardedReactor` guards.
-2. Gating queue enqueue on `TriggerSent.claimSend` (or equivalent reactor-defined claim).
-3. Calling `outboxDispatchQueue.send(payload, { delay: cadenceWindowMs, deduplication: { makeId: dedupKey } })`.
+2. Calling `outboxDispatchQueue.send(payload, { delay: cadenceWindowMs, deduplication: { makeId: dedupKey } })` **unconditionally** — the at-most-once `TriggerSent` gate lives on the cadence dispatcher (post-dispatch), not here. See **ADR-035** for the flip and why.
 
 The queue's `PgOutboxAuditAdapter` writes the `ReactorOutbox` row via its `onEnqueue` hook. There is **no** separate `createMany skipDuplicates` step in the wrapper — the queue's dedup config is the replay-safety mechanism, and the adapter mirrors the resulting transition to PG.
 
@@ -203,9 +202,13 @@ Adapter writes are still best-effort relative to dispatch: a PG outage logs and 
 - **Mirrors `TriggerSent`.** Both tables have the same per-match grain. Operator queries can join them on `(triggerId, traceId)` or `(triggerId, customGraphId)`.
 - **Cost of more rows is negligible.** Outbox rows live ~minutes (until the worker drains the digest), then transition to `dispatched` and live ~30 days for audit, then prune.
 
-### Why outbox insert is gated on `TriggerSent` claim
+### Why the `TriggerSent` claim moved post-dispatch (ADR-035)
 
-If we insert outbox rows unconditionally, an out-of-order replay could insert a new `queued` outbox row for a `(triggerId, subjectId)` whose digest has already been dispatched. The drainer would happily re-notify. Gating insertion on the `TriggerSent` claim means: if a match has already been claimed by either pipeline, no new outbox row is created. `TriggerSent` is the durable "we've already considered this match" anchor; `ReactorOutbox` is the durable "what's the dispatch's life-cycle state" anchor.
+**Original design (this ADR, pre-2026-06-something):** gate outbox INSERT on `TriggerSent.claimSend`. Rationale was that an out-of-order replay could insert a new `queued` outbox row for a `(triggerId, subjectId)` whose digest had already been dispatched, and the drainer would happily re-notify.
+
+**Current design (ADR-035):** enqueue unconditionally, claim `TriggerSent` in the cadence dispatcher **after** a successful send. Rationale: mid-dispatch crash + retry semantics require the claim to bind to the successful send, not to enqueue. Under the original design, a worker that crashed between claim and dispatch left `TriggerSent` claimed but no email/Slack ever went out — the retry saw an already-claimed row and silently dropped. ADR-035's post-dispatch claim inverts that: a crashed dispatch leaves `TriggerSent` unclaimed so the retry re-sends; only a successful send marks the row.
+
+`TriggerSent` is now the durable "we've successfully dispatched this match" anchor (was: "we've already considered this match"). `ReactorOutbox` remains the durable "what's the dispatch's life-cycle state" anchor.
 
 ### Why GroupQueue and not BullMQ
 

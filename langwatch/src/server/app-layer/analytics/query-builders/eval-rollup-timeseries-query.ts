@@ -191,16 +191,11 @@ export function buildEvalRollupTimeseriesQuery(
     selectExprs.push(`${groupByColumn} AS group_key`);
   }
 
-  // Track all evaluator-id `requiresKey` values to pass as a single
-  // EvaluatorType-keyed WHERE — the eval rollup is keyed on EvaluatorType
-  // (not EvaluatorId), and the registry's eval-metrics use the evaluator
-  // id as the registry key. For the rollup we filter on EvaluatorType
-  // when the caller has supplied an explicit type key; an EvaluatorId
-  // value would not match EvaluatorType, so the rollup branch only
-  // accepts `key` values when they correspond to a type. (Operators
-  // wanting per-evaluator-id filtering should route to slim.)
-  void buildMetricAlias;
-
+  // rt5014-002 fix: the router refuses key-bearing series for eval rollup
+  // (the rollup is keyed on EvaluatorType, has no EvaluatorId column, and
+  // ignoring `s.key` would silently return cross-evaluator aggregates).
+  // The builder throws loud below if a key ever reaches it, matching the
+  // slim builder's contract.
   for (let i = 0; i < input.series.length; i++) {
     const s = input.series[i]!;
     if (!isEvalRollupMetricKey(s.metric)) {
@@ -211,6 +206,11 @@ export function buildEvalRollupTimeseriesQuery(
     if (!isEvalRollupAggregation(s.aggregation)) {
       throw new Error(
         `Eval rollup builder cannot serve aggregation "${s.aggregation}". Percentiles + uniq go to slim.`,
+      );
+    }
+    if (s.key !== undefined) {
+      throw new Error(
+        `Eval rollup builder cannot serve series with key="${s.key}" — the router should have routed this to slim or evaluation_runs (no EvaluatorId column on evaluation_analytics_rollup; see migration 00039).`,
       );
     }
     const alias = buildMetricAlias(i, s.metric, s.aggregation, s.key, s.subkey);

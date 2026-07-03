@@ -31,13 +31,13 @@ describe("pickAnalyticsTable — eval-source routing (Phase 6)", () => {
       ).toBe("evaluation_analytics_rollup");
     });
 
-    it("routes a group-by-evaluator-type query to evaluation_analytics_rollup", () => {
+    it("routes a group-by-evaluator-type query to slim, NOT rollup (eval5014-002: the rollup map projection emits EvaluatorType='' on the two-event path so group-by-EvaluatorType would pile into a phantom 'unknown' bucket)", () => {
       expect(
         pickAnalyticsTable({
           series: [series("evaluations.evaluation_score", "avg")],
           groupBy: "evaluations.evaluator_type",
         }),
-      ).toBe("evaluation_analytics_rollup");
+      ).toBe("evaluation_analytics");
     });
   });
 

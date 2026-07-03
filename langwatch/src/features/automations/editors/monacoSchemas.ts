@@ -50,9 +50,13 @@ export const CONDITIONS_JSON_SCHEMA = {
   },
 } as const;
 
-/** Slack Block Kit subset matching the server-side allowlist (ADR-036):
- *  section, divider, context, header, image. Liquid expressions inside string
- *  values are not validated by JSON Schema — that is intentional. */
+/** Slack Block Kit subset matching the server-side allowlist (ADR-028):
+ *  section, divider, context, header, markdown. `image` blocks and section
+ *  `image` accessories are deliberately excluded — the server strips them
+ *  (blockKitAllowlist.ts: tracking-pixel vector) so Monaco must reject them
+ *  at author time or authors ship blocks that silently disappear on dispatch.
+ *  Liquid expressions inside string values are not validated by JSON Schema —
+ *  that is intentional. */
 export const SLACK_BLOCK_KIT_JSON_SCHEMA = {
   $schema: "http://json-schema.org/draft-07/schema#",
   title: "Slack Block Kit (allowlisted subset)",
@@ -87,15 +91,9 @@ export const SLACK_BLOCK_KIT_JSON_SCHEMA = {
               },
             },
           },
-          accessory: {
-            type: "object",
-            required: ["type"],
-            properties: {
-              type: { const: "image" },
-              image_url: { type: "string" },
-              alt_text: { type: "string" },
-            },
-          },
+          // Server allowlist strips ALL section accessories (image included)
+          // to close the tracking-pixel vector. Deliberately omit here so
+          // Monaco rejects any accessory the user writes.
         },
       },
       {
@@ -148,25 +146,9 @@ export const SLACK_BLOCK_KIT_JSON_SCHEMA = {
           },
         },
       },
-      {
-        title: "image",
-        type: "object",
-        required: ["type", "image_url", "alt_text"],
-        additionalProperties: false,
-        properties: {
-          type: { const: "image" },
-          block_id: { type: "string" },
-          image_url: { type: "string" },
-          alt_text: { type: "string" },
-          title: {
-            type: "object",
-            properties: {
-              type: { const: "plain_text" },
-              text: { type: "string" },
-            },
-          },
-        },
-      },
+      // `image` top-level blocks were removed to match server-side allowlist
+      // (blockKitAllowlist.ts: tracking-pixel vector). Do NOT add back without
+      // also loosening the server-side filter.
       {
         // ui-001: bundled Slack templates emit `{ "type": "markdown", "text": "…" }`
         // blocks; the schema must allow them or Monaco fires false-positive

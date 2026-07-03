@@ -242,8 +242,10 @@ function buildEvalSlimFilterClauses(
 /**
  * Build a slim query for `evaluation_analytics`.
  *
- * `evaluatorIdFilter` carries the `requiresKey` value from the registry
- * (per-evaluator queries) — emitted as a WHERE on `EvaluatorId` when set.
+ * Key-bearing series (registry `requiresKey`, e.g. per-evaluator queries)
+ * are refused by the router (rt5014-001: no `EvaluatorId` column on the
+ * slim table) and the builder throws loud if one slips through — see the
+ * `s.key !== undefined` guard below.
  */
 export function buildEvalSlimTimeseriesQuery(
   input: AnalyticsTimeseriesBuilderInput,

@@ -371,4 +371,68 @@ describe("OutboxHeartbeatScheduler", () => {
       });
     });
   });
+
+  // hb-restart-no-test (deep-review): lock in the hb-001 fix so a regression
+  // that made `abortController` readonly again (or dropped the reset in
+  // `start()`) would fail this test rather than silently ship.
+  describe("given a scheduler that was started, stopped, and started again", () => {
+    describe("when the restarted scheduler ticks", () => {
+      it("provides a fresh, non-aborted signal to decide", async () => {
+        const registry = new OutboxHeartbeatRegistry();
+        const redis = new FakeRedis();
+        const signalsSeen: boolean[] = [];
+        const decide = vi.fn(async (ctx) => {
+          signalsSeen.push(ctx.abortSignal.aborted);
+          return [];
+        });
+        registry.register({ name: "hb-restart", intervalMs: 1_000, decide });
+        const { dispatch } = makeDispatch();
+        const scheduler = makeScheduler({ registry, redis, dispatch });
+
+        scheduler.start();
+        await vi.advanceTimersByTimeAsync(1_000);
+        expect(signalsSeen).toEqual([false]);
+
+        await scheduler.stop();
+
+        scheduler.start();
+        await vi.advanceTimersByTimeAsync(1_000);
+        expect(signalsSeen).toEqual([false, false]);
+
+        await scheduler.stop();
+      });
+    });
+  });
+
+  // hb-shutdown-hang (deep-review): a decide() that ignores abortSignal
+  // must not hang stop() forever. Bounded by SHUTDOWN_MAX_WAIT_MS.
+  describe("given a decide that ignores abortSignal and never resolves", () => {
+    describe("when stop() is called", () => {
+      it("returns within the shutdown-max-wait window rather than hanging", async () => {
+        const registry = new OutboxHeartbeatRegistry();
+        const redis = new FakeRedis();
+        // `decide` returns a never-resolving promise regardless of abort.
+        const decide = vi.fn(async () => {
+          await new Promise(() => {
+            /* never */
+          });
+          return [];
+        });
+        registry.register({ name: "hb-stuck", intervalMs: 1_000, decide });
+        const { dispatch } = makeDispatch();
+        const scheduler = makeScheduler({ registry, redis, dispatch });
+
+        scheduler.start();
+        // Fire one tick — decide starts but never resolves.
+        await vi.advanceTimersByTimeAsync(1_000);
+        expect(decide).toHaveBeenCalledTimes(1);
+
+        // stop() should complete after the SHUTDOWN_MAX_WAIT_MS timeout
+        // (10_000ms in module scope) — not hang indefinitely.
+        const stopPromise = scheduler.stop();
+        await vi.advanceTimersByTimeAsync(10_000);
+        await expect(stopPromise).resolves.toBeUndefined();
+      });
+    });
+  });
 });

@@ -93,7 +93,7 @@ export function buildGraphAlertTriggerData({
   customGraphId,
   actionParams,
 }: BuildGraphAlertTriggerDataInput): GraphAlertTriggerData {
-  const trimmed = name.replace(/^\s*[Aa]lert:\s*/, "");
+  const trimmed = name.replace(/^\s*alert:\s*/i, "");
   return {
     id,
     name: `Alert: ${trimmed}`,
