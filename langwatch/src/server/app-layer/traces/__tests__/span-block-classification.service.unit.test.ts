@@ -198,7 +198,9 @@ describe("OtlpSpanBlockClassificationService", () => {
               if (!ws && !inWord) tokens++;
               inWord = !ws;
             }
-            return Promise.resolve(Math.max(tokens, Math.ceil(text.length / 4)));
+            return Promise.resolve(
+              Math.max(tokens, Math.ceil(text.length / 4)),
+            );
           },
         };
         const perfService = new OtlpSpanBlockClassificationService({
