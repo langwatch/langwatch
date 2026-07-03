@@ -433,3 +433,144 @@ func init() {
 	// Force errors.Is on string comparisons to surface as comparable in test failures.
 	_ = fmt.Sprintf
 }
+
+// --- ConfigTTL refresh --------------------------------------------------------
+
+// fakeConfigFetcher returns a programmable config, counting calls.
+type fakeConfigFetcher struct {
+	fakeResolver
+	cfg     domain.BundleConfig
+	cfgErr  error
+	fetches atomic.Int64
+}
+
+func (f *fakeConfigFetcher) FetchConfig(_ context.Context, _ string) (domain.BundleConfig, error) {
+	f.fetches.Add(1)
+	return f.cfg, f.cfgErr
+}
+
+// backdateConfig makes the L1 entry's config look older than the TTL.
+func backdateConfig(t *testing.T, svc *Service, rawKey string, age time.Duration) *entry {
+	t.Helper()
+	e, ok := svc.l1.Get(hashKey(rawKey))
+	if !ok {
+		t.Fatal("expected L1 entry")
+	}
+	e.mu.Lock()
+	e.configFetchedAt = time.Now().Add(-age)
+	e.mu.Unlock()
+	return e
+}
+
+func TestResolve_FreshEntry_ConfigPastTTL_RefreshesConfigInBackground(t *testing.T) {
+	fetcher := &fakeConfigFetcher{
+		cfg: domain.BundleConfig{Credentials: []domain.Credential{{ID: "cred-new"}}},
+	}
+	svc, _ := newService(t, Options{
+		Resolver:         &fetcher.fakeResolver,
+		ConfigFetcher:    fetcher,
+		ConfigTTL:        60 * time.Second,
+		RefreshThreshold: time.Second, // keep near-soft-expiry path out of the way
+	})
+
+	rawKey := "vk-lw-cfgttl_001"
+	bundle := freshBundle("vk_cfg_001", time.Now().Add(1*time.Hour))
+	bundle.Credentials = []domain.Credential{{ID: "cred-old"}}
+	svc.storeL1(hashKey(rawKey), bundle)
+	backdateConfig(t, svc, rawKey, 2*time.Minute)
+
+	got, err := svc.Resolve(context.Background(), rawKey)
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	// The triggering request still serves the (stale-config) bundle.
+	if got.Credentials[0].ID != "cred-old" {
+		t.Fatalf("expected triggering request to serve stale config, got %q", got.Credentials[0].ID)
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if e, ok := svc.l1.Get(hashKey(rawKey)); ok {
+			b, _, _ := e.snapshot()
+			if len(b.Credentials) == 1 && b.Credentials[0].ID == "cred-new" {
+				return // refreshed
+			}
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("expected background config refresh to replace credentials within 2s")
+}
+
+func TestResolve_FreshEntry_ConfigTTLDisabled_NeverRefreshes(t *testing.T) {
+	fetcher := &fakeConfigFetcher{}
+	svc, _ := newService(t, Options{
+		Resolver:         &fetcher.fakeResolver,
+		ConfigFetcher:    fetcher,
+		ConfigTTL:        -1, // disabled
+		RefreshThreshold: time.Second,
+	})
+
+	rawKey := "vk-lw-cfgttl_002"
+	svc.storeL1(hashKey(rawKey), freshBundle("vk_cfg_002", time.Now().Add(1*time.Hour)))
+	backdateConfig(t, svc, rawKey, 10*time.Minute)
+
+	if _, err := svc.Resolve(context.Background(), rawKey); err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	time.Sleep(50 * time.Millisecond)
+	if n := fetcher.fetches.Load(); n != 0 {
+		t.Fatalf("expected no config fetches with TTL disabled, got %d", n)
+	}
+}
+
+func TestResolve_FreshEntry_ConfigRefreshFailure_KeepsStaleAndWaitsFullTTL(t *testing.T) {
+	fetcher := &fakeConfigFetcher{cfgErr: errors.New("control plane down")}
+	svc, _ := newService(t, Options{
+		Resolver:         &fetcher.fakeResolver,
+		ConfigFetcher:    fetcher,
+		ConfigTTL:        60 * time.Second,
+		RefreshThreshold: time.Second,
+	})
+
+	rawKey := "vk-lw-cfgttl_003"
+	bundle := freshBundle("vk_cfg_003", time.Now().Add(1*time.Hour))
+	bundle.Credentials = []domain.Credential{{ID: "cred-old"}}
+	svc.storeL1(hashKey(rawKey), bundle)
+	e := backdateConfig(t, svc, rawKey, 2*time.Minute)
+
+	if _, err := svc.Resolve(context.Background(), rawKey); err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) && fetcher.fetches.Load() == 0 {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if fetcher.fetches.Load() == 0 {
+		t.Fatal("expected one config fetch attempt")
+	}
+	// Wait for endConfigRefresh to release the slot and stamp fetchedAt.
+	for time.Now().Before(deadline) {
+		e.mu.Lock()
+		refreshing := e.configRefreshing
+		e.mu.Unlock()
+		if !refreshing {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	// Stale config keeps serving and the failed attempt stamped
+	// configFetchedAt, so the next request must NOT re-fetch.
+	got, err := svc.Resolve(context.Background(), rawKey)
+	if err != nil {
+		t.Fatalf("Resolve after failure: %v", err)
+	}
+	if got.Credentials[0].ID != "cred-old" {
+		t.Fatalf("expected stale config to keep serving, got %q", got.Credentials[0].ID)
+	}
+	time.Sleep(50 * time.Millisecond)
+	if n := fetcher.fetches.Load(); n != 1 {
+		t.Fatalf("expected exactly one fetch until next TTL, got %d", n)
+	}
+}
