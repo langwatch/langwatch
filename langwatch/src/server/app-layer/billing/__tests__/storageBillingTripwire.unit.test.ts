@@ -145,7 +145,11 @@ describe("StorageBillingTripwire", () => {
         now: () => clock,
       });
       const check = () =>
-        tw.check({ organizationId: "o", sealedHour: SEALED, measuredBytes: 1000 });
+        tw.check({
+          organizationId: "o",
+          sealedHour: SEALED,
+          measuredBytes: 1000,
+        });
 
       await check(); // window 1: logs
       await check(); // window 1: capped
