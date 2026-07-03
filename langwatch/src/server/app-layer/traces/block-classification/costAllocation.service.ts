@@ -19,8 +19,12 @@
  * figure such as Claude Code's `cost_usd` (`computeSpanCost` Priority 2) — the
  * rate-derived Σ would drift from the number the user sees. `reconcileToTotalCost`
  * closes that gap: after pricing, the per-category costs are scaled so their sum
- * equals that authoritative total, preserving the tier-weighted split while
- * keeping conservation against the DISPLAYED cost.
+ * equals that authoritative total, keeping conservation against the DISPLAYED
+ * cost. When rates priced the span (the normal case) the scale is uniform, so
+ * the tier-weighted split is preserved; when NO rate was available at all (an
+ * unknown model with only an explicit cost) there is no tier signal to preserve,
+ * so the total is distributed by flat token share — accepted degradation on that
+ * fully rate-less path, not cache-aware precision (see reconcileCosts).
  *
  * Pure and deterministic — no clock, no randomness, no I/O.
  */
@@ -93,6 +97,14 @@ interface Pool {
  *   cache_control breakpoint — the cached prefix is blocks `0..index`. `null`
  *   means no effective breakpoint, so all input is fresh; any reported
  *   cache pool with no blocks then degrades to the catch-all (zero-guard).
+ *
+ *   CONTRACT: this is used as an array POSITION (`inputBlocks.slice(0, index+1)`),
+ *   so `inputBlocks` MUST be the classifier's `input` array 1:1 in emission
+ *   order — the position/idx correspondence the classifier guarantees. A caller
+ *   that filters or reorders blocks between classification and allocation would
+ *   misalign the breakpoint and corrupt the cache-tier split silently (pool
+ *   totals stay exact, so conservation would NOT catch it). Do not reshape
+ *   `inputBlocks` on the way in.
  */
 export function allocateCategoryCosts({
   inputBlocks,
@@ -174,7 +186,12 @@ export function allocateCategoryCosts({
  *     preserves the tier-weighted relative split (cache reads stay cheaper).
  *   - Rates produced Σ = 0 (no registry match, no custom rates) but the span
  *     still reported a real cost → distribute `target` across categories by
- *     token share, so the authoritative cost is attributed rather than dropped.
+ *     FLAT token share. This is NOT tier-weighted: with no rate signal there is
+ *     nothing to weight by, so a cheap cached prefix can absorb most of the cost
+ *     simply for having the most tokens. Accepted degradation on the fully
+ *     rate-less path (unknown model + explicit cost) — the alternative is to
+ *     invent per-tier discount constants we can't substantiate. Cost is
+ *     attributed rather than dropped; conservation (Σ = target) still holds.
  */
 function reconcileCosts(totals: CategoryTotals, target: number): void {
   const entries = Object.values(totals).filter(
@@ -188,6 +205,10 @@ function reconcileCosts(totals: CategoryTotals, target: number): void {
     return;
   }
 
+  // Accepted inherent limit: a span reporting a cost with zero usage tokens in
+  // every pool has no category to attribute it to, so the cost is left off. Not
+  // reachable for a real LLM call (cost implies tokens); no synthetic category
+  // is manufactured for it.
   const totalTokens = entries.reduce((sum, t) => sum + t.tokens, 0);
   if (totalTokens <= 0) return;
   for (const total of entries) {

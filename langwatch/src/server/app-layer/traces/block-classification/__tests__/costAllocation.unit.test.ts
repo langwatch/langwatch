@@ -67,12 +67,19 @@ describe("allocateCategoryCosts", () => {
             ? Math.floor(rng() * inputBlocks.length)
             : null;
 
+        // On ~half the draws, supply an authoritative total the display trusts
+        // over the rates — the reconcile path must land Σ EXACTLY on it, giving
+        // the reconciliation branch the same randomized exhaustiveness as the
+        // base allocation.
+        const reconcileTarget = rng() > 0.5 ? rng() * 0.5 : null;
+
         const { categoryTotals } = allocateCategoryCosts({
           inputBlocks,
           outputBlocks,
           lastCacheBreakpointIndex: breakpoint,
           pools,
           prices,
+          reconcileToTotalCost: reconcileTarget,
         });
 
         const trueCost =
@@ -81,7 +88,17 @@ describe("allocateCategoryCosts", () => {
           pools.cacheCreationTokens * (prices.cacheCreationCostPerToken ?? 0) +
           pools.outputTokens * (prices.outputCostPerToken ?? 0);
 
-        expect(Math.abs(sumCosts(categoryTotals) - trueCost)).toBeLessThan(
+        // With a reconcile target, Σ cost must equal it exactly (unless there
+        // were no tokens at all to attribute to — the accepted zero-token limit).
+        const hasTokens =
+          pools.inputTokens +
+            pools.cacheReadTokens +
+            pools.cacheCreationTokens +
+            pools.outputTokens >
+          0;
+        const expectedCost =
+          reconcileTarget !== null && hasTokens ? reconcileTarget : trueCost;
+        expect(Math.abs(sumCosts(categoryTotals) - expectedCost)).toBeLessThan(
           1e-9,
         );
 
@@ -408,6 +425,49 @@ describe("allocateCategoryCosts", () => {
         100 * 1e-6,
         12,
       );
+    });
+
+    it("treats a zero reconcile target as no-op, keeping rate-derived costs", () => {
+      // The guard is `!= null && > 0`, so 0 must not wipe the rate estimate.
+      const { categoryTotals } = allocateCategoryCosts({
+        inputBlocks: [{ category: InputCategory.SYSTEM_PROMPT, tokens: 100 }],
+        outputBlocks: [],
+        lastCacheBreakpointIndex: null,
+        pools: {
+          inputTokens: 100,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+          outputTokens: 0,
+        },
+        prices: { inputCostPerToken: 1e-6 },
+        reconcileToTotalCost: 0,
+      });
+
+      expect(categoryTotals[InputCategory.SYSTEM_PROMPT]?.costUsd).toBeCloseTo(
+        100 * 1e-6,
+        12,
+      );
+    });
+
+    it("drops an authoritative cost that has no tokens to attribute it to (accepted limit)", () => {
+      // A span reporting a cost with zero usage in every pool has no category to
+      // carry it — the accepted zero-token limit. No synthetic category, no throw.
+      const { categoryTotals } = allocateCategoryCosts({
+        inputBlocks: [],
+        outputBlocks: [],
+        lastCacheBreakpointIndex: null,
+        pools: {
+          inputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+          outputTokens: 0,
+        },
+        prices: {},
+        reconcileToTotalCost: 0.02,
+      });
+
+      expect(sumCosts(categoryTotals)).toBe(0);
+      expect(Object.keys(categoryTotals)).toHaveLength(0);
     });
   });
 });
