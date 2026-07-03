@@ -7,13 +7,20 @@ name: Refresh CODEOWNERS
 # assignments track who is actually working where without anyone maintaining the
 # list by hand.
 #
-# TOKEN: the generator reads org membership, and langwatch has no public
-# members, so the default GITHUB_TOKEN returns an empty list and the generator
-# hard-fails. Provide a CODEOWNERS_REFRESH_TOKEN secret — a PAT with `read:org`
-# plus `contents:write` + `pull-requests:write` (classic: `repo` + `read:org`).
-# It also makes the refresh PR run CI (GITHUB_TOKEN-authored PRs don't). The
-# workflow falls back to github.token so a missing secret fails loudly in the
-# generator step rather than silently skipping.
+# AUTH: uses a GitHub App installation token — not the default GITHUB_TOKEN and
+# not a personal PAT. The App needs org "Members: read" (to list members;
+# langwatch has no public members so the default token sees none) plus repo
+# "Contents: write" + "Pull requests: write". PRs it opens run CI, unlike
+# GITHUB_TOKEN-authored PRs, and no human account is tied to the automation.
+# Configure with two repo/org secrets:
+#   CODEOWNERS_REFRESH_APP_ID           — the App's numeric ID
+#   CODEOWNERS_REFRESH_APP_PRIVATE_KEY  — the App's PEM private key
+# Setup recipe:
+#   1. https://github.com/organizations/langwatch/settings/apps → New GitHub App
+#   2. Permissions: Organization > Members = Read; Repository > Contents = Read
+#      & write, Pull requests = Read & write, Metadata = Read
+#   3. Install on `langwatch/langwatch`
+#   4. Copy the App ID; generate a private key; paste both into the secrets above
 
 on:
   schedule:
@@ -22,7 +29,8 @@ on:
   workflow_dispatch:
 
 # Least privilege: no permissions at the workflow level; the refresh job
-# escalates only the scopes it needs.
+# escalates only the scopes it needs. (Job-scoped permissions still apply to
+# the fallback GITHUB_TOKEN, though nothing here uses it.)
 permissions: {}
 
 concurrency:
@@ -35,25 +43,32 @@ jobs:
     if: github.repository == 'langwatch/langwatch'
     runs-on: ubuntu-latest
     permissions:
-      contents: write # push the chore/codeowners-refresh branch
-      pull-requests: write # open / update the refresh PR
+      contents: read
     steps:
+      - name: Mint GitHub App installation token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.CODEOWNERS_REFRESH_APP_ID }}
+          private-key: ${{ secrets.CODEOWNERS_REFRESH_APP_PRIVATE_KEY }}
+          # Needed for `orgs/langwatch/members` (repo scope alone is not enough).
+          owner: ${{ github.repository_owner }}
+
       - name: Checkout (full history)
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
-          # Push with the PAT (if set) so the refresh PR triggers CI.
-          token: ${{ secrets.CODEOWNERS_REFRESH_TOKEN || github.token }}
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Regenerate CODEOWNERS
         env:
-          # Needs read:org to list members (langwatch has no public members).
-          GH_TOKEN: ${{ secrets.CODEOWNERS_REFRESH_TOKEN || github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: bash .github/scripts/generate-codeowners.sh
 
       - name: Open or update PR if CODEOWNERS changed
         env:
-          GH_TOKEN: ${{ secrets.CODEOWNERS_REFRESH_TOKEN || github.token }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
         run: |
           set -euo pipefail
 
@@ -63,8 +78,9 @@ jobs:
           fi
 
           BRANCH="chore/codeowners-refresh"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Commits from the App show up as "<slug>[bot]" in the UI.
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${APP_SLUG}[bot]@users.noreply.github.com"
 
           git checkout -B "$BRANCH"
           git add .github/CODEOWNERS
