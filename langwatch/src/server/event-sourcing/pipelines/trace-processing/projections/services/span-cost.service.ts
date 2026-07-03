@@ -143,6 +143,22 @@ export class SpanCostService {
   }
 
   /**
+   * The step's TOTAL input context size (ADR-033 session tracking): freshly
+   * billed input plus cache-read plus cache-creation tokens. Compaction is a
+   * drop in the whole prompt context, not just the fresh prefix — on a cached
+   * turn the fresh `input_tokens` is tiny while the real context sits in the
+   * cache-read pool, so summing the pools is the only signal that reflects
+   * genuine context re-basing. Returns 0 when the span carries no usage.
+   */
+  extractStepInputTokens(span: NormalizedSpan): number {
+    const metrics = this.extractTokenMetrics(span);
+    const cache = this.extractCacheTokens(span);
+    return (
+      metrics.promptTokens + cache.cacheReadTokens + cache.cacheCreationTokens
+    );
+  }
+
+  /**
    * Whether this span's cost is bundled (not billed per token). A span-level
    * marker wins over the resource-level default the receiver stamps, so a
    * single trace can carry a mix of billed and bundled spans.

@@ -1,5 +1,7 @@
+import { detectCodingAgentHarness } from "~/server/app-layer/traces/block-classification/harnessDetection";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
+import { appendSessionStep } from "~/server/app-layer/traces/session-rollup/sessionSteps";
 import {
   enrichRagContextIds,
   SpanNormalizationPipelineService,
@@ -125,6 +127,36 @@ export function mergeModelsMostRecentFirst(
   return [...fresh, ...rest];
 }
 
+/**
+ * Harness for a Path B log turn (ADR-033 session tracking). Reads the canonical
+ * scope + lifted attributes first; falls back to `codex` when the record lifted
+ * a thread id and input usage. The fallback is sound because the only
+ * usage-bearing log-canonical path is Codex — Claude Code's usage-bearing
+ * events (`api_request`) are trapped upstream and converted to gen_ai SPANS
+ * (claude-code-log-to-span.ts), so they take the span path, never this one.
+ * Codex, by contrast, does not pin its log scope name across releases, so the
+ * lifted markers are the stable signal.
+ */
+function detectLogTurnHarness({
+  scopeName,
+  liftedAttrs,
+  liftedThreadId,
+  liftedInputTokens,
+}: {
+  scopeName: string;
+  liftedAttrs: Record<string, unknown>;
+  liftedThreadId: string | undefined;
+  liftedInputTokens: number;
+}): "claude" | "codex" | null {
+  const detected = detectCodingAgentHarness({
+    instrumentationScopeName: scopeName,
+    spanAttributes: liftedAttrs,
+  });
+  if (detected) return detected;
+  if (liftedThreadId && liftedInputTokens > 0) return "codex";
+  return null;
+}
+
 /** Add a positive per-span delta onto a reserved running-sum attribute. */
 function addReservedTokenSum(
   attributes: Record<string, string>,
@@ -201,6 +233,30 @@ export function applySpanToSummary({
     : spanCostService.extractBlockCategoryDeltas(span);
   for (const [key, delta] of Object.entries(blockCategoryDeltas)) {
     addReservedTokenSum(attributes, key, delta);
+  }
+
+  // ADR-033 session tracking: append this step's context size to the trace's
+  // step series when the span is a coding-agent LLM step — either it already
+  // carries per-category block totals (PR B classified it) or it is coding-agent
+  // harness traffic with input usage. The read-time session rollup groups these
+  // by thread id to reconstruct context growth and detect compaction. A span
+  // whose tokens are excluded from accumulation (codex's redundant usage copy)
+  // is skipped so a session step is counted exactly once per turn.
+  if (!spanCostService.isTokenAccumulationSkipped(span)) {
+    const harness = detectCodingAgentHarness({
+      instrumentationScopeName: span.instrumentationScope?.name ?? null,
+      spanAttributes: span.spanAttributes,
+    });
+    const stepInputTokens = spanCostService.extractStepInputTokens(span);
+    const hasBlockCategories = Object.keys(blockCategoryDeltas).length > 0;
+    if (harness && (hasBlockCategories || stepInputTokens > 0)) {
+      appendSessionStep({
+        attributes,
+        harness,
+        startMs: span.startTimeUnixMs,
+        inputTokens: stepInputTokens,
+      });
+    }
   }
 
   const newModels = spanCostService.extractModelsFromSpan(span);
@@ -510,6 +566,36 @@ export class TraceSummaryFoldProjection
     const liftedOut = Number(liftedAttrs["langwatch.output_tokens"]);
     if (Number.isFinite(liftedOut) && liftedOut > 0) {
       totalCompletionTokenCount = (totalCompletionTokenCount ?? 0) + liftedOut;
+    }
+
+    // ADR-033 session tracking: a Path B log turn that carries a coding-agent
+    // thread id and input usage is one session step. Codex fragments a session
+    // across traces, so its step series lives on each trace summary and the
+    // read-time rollup re-joins them by thread id. Step context size sums the
+    // fresh input and the cache-read pool (Codex lifts cache_read separately) —
+    // the whole prompt context, not just the freshly-billed prefix.
+    const liftedThreadId =
+      typeof liftedAttrs["langwatch.thread.id"] === "string"
+        ? (liftedAttrs["langwatch.thread.id"] as string)
+        : undefined;
+    const positive = (value: number): number =>
+      Number.isFinite(value) && value > 0 ? value : 0;
+    const stepInputTokens =
+      positive(liftedIn) +
+      positive(Number(liftedAttrs["langwatch.cache_read_tokens"]));
+    const logHarness = detectLogTurnHarness({
+      scopeName: event.data.scopeName,
+      liftedAttrs,
+      liftedThreadId,
+      liftedInputTokens: stepInputTokens,
+    });
+    if (logHarness && stepInputTokens > 0) {
+      appendSessionStep({
+        attributes: mergedAttributes,
+        harness: logHarness,
+        startMs: event.data.timeUnixMs,
+        inputTokens: stepInputTokens,
+      });
     }
 
     return {
