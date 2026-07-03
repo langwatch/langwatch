@@ -96,6 +96,37 @@ describe("appendSessionStep", () => {
       });
     });
   });
+
+  describe("given out-of-order arrivals that trip the merge at the cap", () => {
+    describe("when the merge runs", () => {
+      it("sorts by start time before pairing so the sawtooth is not corrupted", () => {
+        const attributes: Record<string, string> = {};
+        // Append MAX+1 steps in DESCENDING start time (out of order). Sawtooth
+        // is defined by TIME index: even startMs index → 100, odd → 200.
+        for (let i = MAX_SESSION_STEPS; i >= 0; i--) {
+          appendSessionStep({
+            attributes,
+            harness: "claude",
+            startMs: i * 1000,
+            inputTokens: i % 2 === 0 ? 100 : 200,
+          });
+        }
+
+        const merged = parseSessionSteps(attributes[SESSION_STEPS_ATTR]);
+        // 513 entries → ceil(513 / 2) = 257 after pairwise merge.
+        expect(merged).toHaveLength(Math.ceil((MAX_SESSION_STEPS + 1) / 2));
+        // Output is chronologically ordered despite descending arrival.
+        for (let i = 1; i < merged.length; i++) {
+          expect(merged[i]!.startMs).toBeGreaterThan(merged[i - 1]!.startMs);
+        }
+        // Each chronological pair kept its 200 peak — merging by append order
+        // (unsorted) would have paired non-adjacent times and lost peaks.
+        expect(merged.slice(0, 256).every((s) => s.inputTokens === 200)).toBe(
+          true,
+        );
+      });
+    });
+  });
 });
 
 describe("parseSessionSteps", () => {

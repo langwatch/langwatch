@@ -20,6 +20,7 @@
  */
 
 import {
+  CATEGORIES,
   type Category,
   SPAN_ATTR_BLOCKCAT_PREFIX,
 } from "../block-classification/categories";
@@ -94,13 +95,19 @@ export function detectCompactionEvents({
   dropRatio?: number;
   confirmationSteps?: number;
 }): { events: number; runningMax: number } {
-  if (steps.length === 0) return { events: 0, runningMax: 0 };
+  // Defensive: a zero-token step is never a real context measurement (the fold
+  // only appends steps with positive input), but stored history folded before
+  // that guard can still carry them, and a 0 is always below any drop threshold
+  // — so an unfiltered 0 reads as a phantom compaction candidate. Drop them
+  // before the walk so the sawtooth is built from genuine measurements only.
+  const positiveSteps = steps.filter((s) => s.inputTokens > 0);
+  if (positiveSteps.length === 0) return { events: 0, runningMax: 0 };
 
   let events = 0;
-  let runningMax = steps[0]!.inputTokens;
+  let runningMax = positiveSteps[0]!.inputTokens;
 
-  for (let i = 1; i < steps.length; i++) {
-    const cur = steps[i]!.inputTokens;
+  for (let i = 1; i < positiveSteps.length; i++) {
+    const cur = positiveSteps[i]!.inputTokens;
     const threshold = (1 - dropRatio) * runningMax;
 
     if (cur >= threshold) {
@@ -115,10 +122,10 @@ export function detectCompactionEvents({
     let confirmed = 0;
     for (
       let j = i + 1;
-      j < steps.length && confirmed < confirmationSteps;
+      j < positiveSteps.length && confirmed < confirmationSteps;
       j++
     ) {
-      if (steps[j]!.inputTokens >= runningMax) break;
+      if (positiveSteps[j]!.inputTokens >= runningMax) break;
       confirmed++;
     }
 
@@ -156,6 +163,10 @@ function readThreadId(attributes: Record<string, string>): string | null {
   );
 }
 
+/** Closed set of taxonomy values, so an unknown blockcat suffix is skipped
+ * rather than blindly coerced into a category the rest of the app can't map. */
+const CATEGORY_SET = new Set<string>(CATEGORIES);
+
 /** Sum this trace's per-category blockcat totals into the running session map. */
 function accumulateCategoryTotals(
   into: SessionCategoryTotals,
@@ -166,7 +177,9 @@ function accumulateCategoryTotals(
     const suffix = key.slice(SPAN_ATTR_BLOCKCAT_PREFIX.length);
     const dotIdx = suffix.lastIndexOf(".");
     if (dotIdx <= 0) continue;
-    const category = suffix.slice(0, dotIdx) as Category;
+    const rawCategory = suffix.slice(0, dotIdx);
+    if (!CATEGORY_SET.has(rawCategory)) continue;
+    const category = rawCategory as Category;
     const field = suffix.slice(dotIdx + 1);
     const value = Number(raw);
     if (!Number.isFinite(value)) continue;

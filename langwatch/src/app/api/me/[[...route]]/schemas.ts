@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  CATEGORIES,
+  type Category,
+} from "~/server/app-layer/traces/block-classification/categories";
 
 /**
  * Wire schemas for GET /api/me/usage. Fields mirror the
@@ -64,8 +68,10 @@ const breakdownSchema = z.object({
   requests: z.number(),
 });
 
+// Single source of truth for the wire category: the ADR-033 taxonomy enum, so
+// the API contract can't drift from the categories the fold actually emits.
 const categoryBreakdownSchema = z.object({
-  category: z.string(),
+  category: z.enum(CATEGORIES as unknown as [Category, ...Category[]]),
   costUsd: z.number(),
   tokens: z.number(),
 });

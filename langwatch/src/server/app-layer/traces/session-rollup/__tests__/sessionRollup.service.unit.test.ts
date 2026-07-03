@@ -299,4 +299,53 @@ describe("detectCompactionEvents", () => {
       ).toBe(0);
     });
   });
+
+  describe("given a plateaued session with zero-token steps mixed in", () => {
+    it("skips the zeros and records no event", () => {
+      // Without the defensive zero-skip, each 0 is below every drop threshold
+      // and the trailing zeros confirm it — a phantom compaction. Filtering
+      // zero-input steps leaves a flat 100k plateau: no drop, no event.
+      expect(
+        detectCompactionEvents({
+          steps: stepsOf(100_000, 0, 0, 0),
+        }).events,
+      ).toBe(0);
+      expect(
+        detectCompactionEvents({
+          steps: stepsOf(100_000, 100_000, 0, 100_000, 100_000),
+        }).events,
+      ).toBe(0);
+    });
+  });
+});
+
+describe("accumulateCategoryTotals (via rollupSessions)", () => {
+  describe("given a trace carrying an unknown blockcat category suffix", () => {
+    it("skips the unknown category and keeps the known ones", () => {
+      const traces: SessionRollupTraceInput[] = [
+        {
+          attributes: {
+            [SESSION_HARNESS_ATTR]: "claude",
+            "langwatch.thread.id": "sess-cats",
+            [SESSION_STEPS_ATTR]: JSON.stringify(stepsOf(1000)),
+            [blockCategoryTokensAttr(InputCategory.SYSTEM_PROMPT)]: "100",
+            [blockCategoryCostAttr(InputCategory.SYSTEM_PROMPT)]: "0.001",
+            // Not a member of the CATEGORIES enum — must be ignored.
+            "langwatch.reserved.blockcat.bogus_category.tokens": "999",
+            "langwatch.reserved.blockcat.bogus_category.cost_usd": "9.99",
+          },
+        },
+      ];
+
+      const [view] = rollupSessions({ traces });
+
+      expect(view!.categoryTotals[InputCategory.SYSTEM_PROMPT]).toEqual({
+        tokens: 100,
+        costUsd: expect.closeTo(0.001, 9),
+      });
+      expect(
+        (view!.categoryTotals as Record<string, unknown>).bogus_category,
+      ).toBeUndefined();
+    });
+  });
 });

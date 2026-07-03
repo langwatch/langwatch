@@ -128,14 +128,23 @@ export function mergeModelsMostRecentFirst(
 }
 
 /**
+ * Codex lifts the principal email onto this canonical key from its
+ * `codex.sse_event` / `codex.conversation_starts` log records (see the codex
+ * extractor). No other log extractor emits it, so it is the positive
+ * codex-specific marker the fallback below keys on.
+ */
+const CODEX_PRINCIPAL_EMAIL_ATTR = "langwatch.principal.email";
+
+/**
  * Harness for a Path B log turn (ADR-033 session tracking). Reads the canonical
- * scope + lifted attributes first; falls back to `codex` when the record lifted
- * a thread id and input usage. The fallback is sound because the only
- * usage-bearing log-canonical path is Codex — Claude Code's usage-bearing
- * events (`api_request`) are trapped upstream and converted to gen_ai SPANS
- * (claude-code-log-to-span.ts), so they take the span path, never this one.
- * Codex, by contrast, does not pin its log scope name across releases, so the
- * lifted markers are the stable signal.
+ * scope first; falls back to `codex` only when the record carries a thread id,
+ * input usage, AND the codex-specific principal-email lift. Codex does not pin
+ * its log scope name across releases, so the scope check alone misses its
+ * usage-bearing `sse_event` logs — but the fallback must stay codex-specific:
+ * the generic gen_ai log extractor lifts a thread id + input usage for any
+ * OTel-genai emitter (gemini CLI, custom emitters), so keying the fallback on
+ * thread-id-plus-usage alone would sweep that traffic into session tracking.
+ * Requiring the codex-only principal-email lift keeps it scoped to codex.
  */
 function detectLogTurnHarness({
   scopeName,
@@ -153,7 +162,11 @@ function detectLogTurnHarness({
     spanAttributes: liftedAttrs,
   });
   if (detected) return detected;
-  if (liftedThreadId && liftedInputTokens > 0) return "codex";
+  const hasCodexPrincipal =
+    typeof liftedAttrs[CODEX_PRINCIPAL_EMAIL_ATTR] === "string" &&
+    (liftedAttrs[CODEX_PRINCIPAL_EMAIL_ATTR] as string).length > 0;
+  if (liftedThreadId && liftedInputTokens > 0 && hasCodexPrincipal)
+    return "codex";
   return null;
 }
 
@@ -236,20 +249,22 @@ export function applySpanToSummary({
   }
 
   // ADR-033 session tracking: append this step's context size to the trace's
-  // step series when the span is a coding-agent LLM step — either it already
-  // carries per-category block totals (PR B classified it) or it is coding-agent
-  // harness traffic with input usage. The read-time session rollup groups these
-  // by thread id to reconstruct context growth and detect compaction. A span
-  // whose tokens are excluded from accumulation (codex's redundant usage copy)
-  // is skipped so a session step is counted exactly once per turn.
+  // step series when the span is a coding-agent LLM step with positive input
+  // usage. The read-time session rollup groups these by thread id to
+  // reconstruct context growth and detect compaction. Two exclusions keep a
+  // step counted exactly once and free of phantom measurements:
+  //   - a span whose tokens are excluded from accumulation (codex's redundant
+  //     usage copy) is skipped so a turn is not double-counted;
+  //   - a zero-input span is skipped — it carries no context measurement, and
+  //     a 0 always reads as a compaction candidate downstream (a classified
+  //     span can have block totals yet zero input tokens).
   if (!spanCostService.isTokenAccumulationSkipped(span)) {
     const harness = detectCodingAgentHarness({
       instrumentationScopeName: span.instrumentationScope?.name ?? null,
       spanAttributes: span.spanAttributes,
     });
     const stepInputTokens = spanCostService.extractStepInputTokens(span);
-    const hasBlockCategories = Object.keys(blockCategoryDeltas).length > 0;
-    if (harness && (hasBlockCategories || stepInputTokens > 0)) {
+    if (harness && stepInputTokens > 0) {
       appendSessionStep({
         attributes,
         harness,

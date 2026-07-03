@@ -36,6 +36,7 @@ import {
   type Category,
 } from "~/server/app-layer/traces/block-classification/categories";
 import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
+import { createLogger } from "~/utils/logger/server";
 import {
   resolveTraceDepartmentId,
   UNASSIGNED_DEPARTMENT,
@@ -249,6 +250,8 @@ const EMPTY_SUMMARY: SummaryResult = {
   anomalyBreakdown: { critical: 0, warning: 0, info: 0 },
 };
 
+const logger = createLogger("langwatch:activity-monitor");
+
 const ATTR_ORIGIN_KIND = GOVERNANCE_ATTR.ORIGIN_KIND;
 const ATTR_INGESTION_SOURCE_ID = GOVERNANCE_ATTR.INGESTION_SOURCE_ID;
 const ATTR_USER_ID = GOVERNANCE_ATTR.USER_ID;
@@ -334,7 +337,9 @@ export class ActivityMonitorService {
       input.organizationId,
     );
     const openAnomalyCount =
-      anomalyBreakdown.critical + anomalyBreakdown.warning + anomalyBreakdown.info;
+      anomalyBreakdown.critical +
+      anomalyBreakdown.warning +
+      anomalyBreakdown.info;
 
     const govProjectId = await this.resolveGovProjectId(input.organizationId);
     if (!govProjectId) {
@@ -585,6 +590,7 @@ export class ActivityMonitorService {
             FROM trace_summaries
             WHERE TenantId = {tenantId:String}
               AND OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
+              AND Attributes[{originKey:String}] = {originValue:String}
             GROUP BY TenantId, TraceId
           )
         SETTINGS max_threads = 2, max_execution_time = 45,
@@ -594,7 +600,14 @@ export class ActivityMonitorService {
         format: "JSONEachRow",
       });
       [row] = (await result.json()) as Array<Record<string, number | null>>;
-    } catch {
+    } catch (error) {
+      // Degrade to the dashboard's "nothing captured" state, but warn so a
+      // silently-empty breakdown is diagnosable rather than mistaken for an org
+      // with no captured coding-agent content.
+      logger.warn(
+        { error, organizationId: input.organizationId },
+        "activity-monitor category breakdown query failed; returning empty breakdown",
+      );
       return [];
     }
     if (!row) return [];
@@ -634,7 +647,10 @@ export class ActivityMonitorService {
     windowDays: number;
   }): Promise<SpendByDepartmentRow[]> {
     const projects = await this.prisma.project.findMany({
-      where: { team: { organizationId: input.organizationId }, archivedAt: null },
+      where: {
+        team: { organizationId: input.organizationId },
+        archivedAt: null,
+      },
       select: { id: true, departmentId: true },
     });
     if (projects.length === 0) return [];
@@ -718,7 +734,10 @@ export class ActivityMonitorService {
       acc.set(key, {
         spendUsd: prior.spendUsd + Number(r.spendUsdStr),
         requestCount: prior.requestCount + Number(r.requests),
-        lastActivityMs: Math.max(prior.lastActivityMs, Number(r.lastActivityMs)),
+        lastActivityMs: Math.max(
+          prior.lastActivityMs,
+          Number(r.lastActivityMs),
+        ),
       });
     }
 
@@ -886,7 +905,9 @@ export class ActivityMonitorService {
     }>;
     if (sourceRows.length === 0) return [];
 
-    const sourceIds = sourceRows.map((r) => r.sourceId).filter((id) => id !== "");
+    const sourceIds = sourceRows
+      .map((r) => r.sourceId)
+      .filter((id) => id !== "");
     const sources = await this.prisma.ingestionSource.findMany({
       where: { id: { in: sourceIds }, organizationId: input.organizationId },
       select: {
@@ -895,9 +916,7 @@ export class ActivityMonitorService {
         team: { select: { id: true, name: true } },
       },
     });
-    const teamBySource = new Map(
-      sources.map((s) => [s.id, s.team] as const),
-    );
+    const teamBySource = new Map(sources.map((s) => [s.id, s.team] as const));
 
     const ORG_WIDE_KEY = "__org_wide__";
     const byTeam = new Map<
@@ -927,7 +946,10 @@ export class ActivityMonitorService {
         existing.prevSpend += prevSpend;
         existing.requestCount += requestCount;
         existing.sourceCount += 1;
-        existing.lastActivityMs = Math.max(existing.lastActivityMs, lastActivityMs);
+        existing.lastActivityMs = Math.max(
+          existing.lastActivityMs,
+          lastActivityMs,
+        );
       } else {
         byTeam.set(key, {
           teamId,
@@ -1300,7 +1322,9 @@ export class ActivityMonitorService {
     if (!ch) return [];
 
     const limit = input.limit ?? 50;
-    const beforeMs = input.beforeIso ? new Date(input.beforeIso).getTime() : Date.now();
+    const beforeMs = input.beforeIso
+      ? new Date(input.beforeIso).getTime()
+      : Date.now();
 
     // Pull recent traces for the source. Webhook log_records are out of
     // scope for this endpoint (the per-source detail page renders trace

@@ -78,8 +78,15 @@ export function parseSessionSteps(raw: string | undefined): SessionStep[] {
  * keeping the larger input size — preserving the sawtooth peaks that carry the
  * compaction signal. The earlier `startMs` of each pair is kept so ordering
  * survives the merge. A trailing odd element is carried through unmerged.
+ *
+ * Steps are sorted by `startMs` first: OTLP spans and log turns can arrive
+ * out of chronological order, so pairing raw append-order neighbours could
+ * merge a late-arriving early step with a distant one and corrupt the
+ * preserved sawtooth. Sorting first makes each merged pair two chronological
+ * neighbours, so the halved-resolution curve still tracks real context growth.
  */
-function mergeAdjacentKeepMax(steps: SessionStep[]): SessionStep[] {
+function mergeAdjacentKeepMax(input: SessionStep[]): SessionStep[] {
+  const steps = [...input].sort((a, b) => a.startMs - b.startMs);
   const merged: SessionStep[] = [];
   for (let i = 0; i < steps.length; i += 2) {
     const a = steps[i]!;

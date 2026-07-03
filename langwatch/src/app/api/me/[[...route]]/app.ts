@@ -1,4 +1,4 @@
-import { findHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
+import { resolvePersonalUsageIngestionScope } from "@ee/governance/services/governanceProject.service";
 import { PersonalUsageService } from "@ee/governance/services/personalUsage.service";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
@@ -87,38 +87,27 @@ export function registerMeRoutes(
           ? { start: new Date(windowStartMs), end: new Date(windowEndMs) }
           : undefined;
 
-      // Ingestion-source ledger rows (Claude Code OTLP, etc.) land under
-      // the org's hidden Governance Project tenant, not the personal
-      // project. Resolve it read-only (never provision on a GET) so the
-      // usage union is scoped to THIS org's tenant — both to prune
-      // ClickHouse partitions and to avoid summing a multi-org user's
-      // spend across every org. Absent when the org never minted an
-      // ingestion source, in which case there is no ledger traffic.
-      const team = await prisma.team.findUnique({
-        where: { id: project.teamId },
-        select: { organizationId: true },
-      });
-      const governanceProject = team
-        ? await findHiddenGovernanceProject({
-            prisma,
-            organizationId: team.organizationId,
-          })
-        : null;
-
-      // The category union attributes gov-tenant trace summaries by the
-      // principal EMAIL (Attributes['langwatch.user_id']), not the userId the
-      // ledger paths key on — so resolve the owner's email from ownerUserId.
-      const owner = await prisma.user.findUnique({
-        where: { id: project.ownerUserId },
-        select: { email: true },
-      });
+      // Ingestion-source ledger rows (Claude Code OTLP, etc.) land under the
+      // org's hidden Governance Project tenant, not the personal project. The
+      // category union additionally attributes gov-tenant trace summaries by the
+      // owner's principal EMAIL. Both are resolved read-only (never provision on
+      // a GET) by the shared governance composition — scoped to THIS org's
+      // tenant so the union prunes ClickHouse partitions and never sums a
+      // multi-org user's spend across every org. Absent when the org never
+      // minted an ingestion source, in which case there is no ledger traffic.
+      const { ingestionTenantId, userEmail } =
+        await resolvePersonalUsageIngestionScope({
+          prisma,
+          teamId: project.teamId,
+          ownerUserId: project.ownerUserId,
+        });
 
       const usage = new PersonalUsageService();
       const input = {
         personalProjectId: project.id,
         userId: project.ownerUserId,
-        userEmail: owner?.email ?? undefined,
-        ingestionTenantId: governanceProject?.id,
+        userEmail,
+        ingestionTenantId,
         window,
       };
 

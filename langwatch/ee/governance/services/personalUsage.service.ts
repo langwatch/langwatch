@@ -38,7 +38,10 @@ import {
   getClickHouseClientForProject,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
+import { createLogger } from "~/utils/logger/server";
 import { GOVERNANCE_ATTR } from "./governanceAttributeKeys";
+
+const logger = createLogger("langwatch:personal-usage");
 
 export interface PersonalUsageWindow {
   /** Inclusive UTC start of the rollup window. */
@@ -539,8 +542,18 @@ export class PersonalUsageService {
           existing.tokens += v.tokens;
           totals.set(category, existing);
         }
-      } catch {
-        // no-union: `totals` already holds the personal-tenant rows.
+      } catch (error) {
+        // no-union: `totals` already holds the personal-tenant rows. Warn so a
+        // silently-degraded category breakdown is diagnosable rather than
+        // looking like the user simply has no ingestion-source traffic.
+        logger.warn(
+          {
+            error,
+            personalProjectId: input.personalProjectId,
+            ingestionTenantId: input.ingestionTenantId,
+          },
+          "personal-usage category ingestion union failed; returning personal-tenant rows only",
+        );
       }
     }
 
@@ -555,17 +568,20 @@ export class PersonalUsageService {
   }
 
   /**
-   * One category-totals query over a single tenant's trace summaries: one
-   * argMax-per-trace column per (category, metric), summed in the outer query.
-   * Aliases are index-based (disjoint from any inner name) to avoid the
-   * ClickHouse alias-shadowing trap where an outer aggregate resolves a bare
-   * name back to itself. Returns every category (including zeros) keyed by enum
-   * value; the caller merges, filters zeros, and sorts.
+   * One category-totals query over a single tenant's trace summaries, summing
+   * the reserved blockcat attributes across the window. Uses the compliant
+   * IN-tuple dedup shape (same as the org Activity Monitor variant): the inner
+   * subquery reads only the light dedup keys (`TenantId, TraceId, max(UpdatedAt)`),
+   * and the outer query sums the heavy `Attributes[...]` map only for the
+   * surviving latest-version rows — never materialising the Attributes blob (now
+   * carrying the session_steps series) inside the dedup subquery. Returns every
+   * category (including zeros) keyed by enum value; the caller merges, filters
+   * zeros, and sorts.
    *
-   * `userEmail` (ingestion-source union only): the argMax dedup pattern has a
-   * single WHERE (in the per-trace subquery), so the principal-attribution
-   * filter `Attributes['langwatch.user_id'] = {userEmail}` is applied there —
-   * dedup + aggregation happen above it, so one WHERE fully scopes the result.
+   * `userEmail` (ingestion-source union only): the principal-attribution filter
+   * `Attributes['langwatch.user_id'] = {userEmail}` is applied in BOTH the outer
+   * WHERE and the dedup subquery so the row set is scoped to this user before
+   * dedup and again on the summed rows.
    *
    * Resource-guarded like the org variant (`max_threads`/`max_execution_time`
    * merged with the analytics external-group-by spill) — the per-category
@@ -579,14 +595,10 @@ export class PersonalUsageService {
       userEmail?: string;
     },
   ): Promise<Map<Category, { costUsd: number; tokens: number }>> {
-    const inner = CATEGORIES.map(
-      (_category, i) =>
-        `argMax(toFloat64OrZero(Attributes[{c${i}:String}]), UpdatedAt) AS cost_${i},\n` +
-        `argMax(toFloat64OrZero(Attributes[{k${i}:String}]), UpdatedAt) AS tok_${i}`,
-    ).join(",\n");
     const outer = CATEGORIES.map(
       (_category, i) =>
-        `sum(cost_${i}) AS scost_${i}, sum(tok_${i}) AS stok_${i}`,
+        `sum(toFloat64OrZero(ts.Attributes[{c${i}:String}])) AS scost_${i},\n` +
+        `sum(toFloat64OrZero(ts.Attributes[{k${i}:String}])) AS stok_${i}`,
     ).join(",\n");
 
     const query_params: Record<string, string | number> = {
@@ -599,7 +611,12 @@ export class PersonalUsageService {
       query_params[`k${i}`] = blockCategoryTokensAttr(category);
     });
 
-    const userFilter = params.userEmail
+    // The principal filter must scope BOTH the summed rows (outer, ts-aliased)
+    // and the dedup key set (inner subquery, unaliased single table).
+    const outerUserFilter = params.userEmail
+      ? "AND ts.Attributes[{userKey:String}] = {userEmail:String}"
+      : "";
+    const innerUserFilter = params.userEmail
       ? "AND Attributes[{userKey:String}] = {userEmail:String}"
       : "";
     if (params.userEmail) {
@@ -611,17 +628,20 @@ export class PersonalUsageService {
       query: `
         SELECT
           ${outer}
-        FROM (
-          SELECT
-            TraceId,
-            ${inner}
-          FROM trace_summaries
-          WHERE TenantId = {tenantId:String}
-            AND OccurredAt >= {fromMs:DateTime64(3, 'UTC')}
-            AND OccurredAt <  {toMs:DateTime64(3, 'UTC')}
-            ${userFilter}
-          GROUP BY TraceId
-        )
+        FROM trace_summaries ts
+        WHERE ts.TenantId = {tenantId:String}
+          AND ts.OccurredAt >= {fromMs:DateTime64(3, 'UTC')}
+          AND ts.OccurredAt <  {toMs:DateTime64(3, 'UTC')}
+          ${outerUserFilter}
+          AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM trace_summaries
+            WHERE TenantId = {tenantId:String}
+              AND OccurredAt >= {fromMs:DateTime64(3, 'UTC')}
+              AND OccurredAt <  {toMs:DateTime64(3, 'UTC')}
+              ${innerUserFilter}
+            GROUP BY TenantId, TraceId
+          )
         SETTINGS max_threads = 2, max_execution_time = 45, ${formatSettings(
           ANALYTICS_CLICKHOUSE_SETTINGS,
         )}

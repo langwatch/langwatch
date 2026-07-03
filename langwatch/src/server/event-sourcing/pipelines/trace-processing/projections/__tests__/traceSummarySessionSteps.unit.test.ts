@@ -82,9 +82,9 @@ describe("applySpanToSummary session-step accumulation", () => {
     });
   });
 
-  describe("given a claude-code span carrying only per-category block totals", () => {
+  describe("given a claude-code span with block totals but zero input tokens", () => {
     describe("when it is folded", () => {
-      it("appends a step even with zero fresh input tokens", () => {
+      it("appends no step (a zero-input step is a phantom compaction candidate)", () => {
         const span = createTestSpan({
           startTimeUnixMs: 7000,
           spanAttributes: {
@@ -96,8 +96,29 @@ describe("applySpanToSummary session-step accumulation", () => {
 
         const state = applySpanToSummary({ state: createInitState(), span });
 
+        expect(state.attributes[SESSION_STEPS_ATTR]).toBeUndefined();
+        expect(state.attributes[SESSION_HARNESS_ATTR]).toBeUndefined();
+      });
+    });
+  });
+
+  describe("given a claude-code span with block totals AND positive input tokens", () => {
+    describe("when it is folded", () => {
+      it("appends the step", () => {
+        const span = createTestSpan({
+          startTimeUnixMs: 8000,
+          spanAttributes: {
+            "gen_ai.system": "claude_code",
+            "gen_ai.usage.input_tokens": 1200,
+            [blockCategoryTokensAttr(InputCategory.SYSTEM_PROMPT)]: "100",
+            [blockCategoryCostAttr(InputCategory.SYSTEM_PROMPT)]: "0.001",
+          },
+        });
+
+        const state = applySpanToSummary({ state: createInitState(), span });
+
         expect(parseSessionSteps(state.attributes[SESSION_STEPS_ATTR])).toEqual(
-          [{ startMs: 7000, inputTokens: 0 }],
+          [{ startMs: 8000, inputTokens: 1200 }],
         );
         expect(state.attributes[SESSION_HARNESS_ATTR]).toBe("claude");
       });
@@ -202,6 +223,10 @@ describe("handleTraceLogRecordReceived session-step accumulation", () => {
               output_token_count: "50",
               cached_token_count: "12000",
               "conversation.id": "codex-thread-1",
+              // Codex sse_events carry the acting user's email; the extractor
+              // lifts it onto langwatch.principal.email — the codex-specific
+              // marker the fold's fallback keys on.
+              "user.email": "dev@example.com",
             },
             1_700_000_000_000,
           ),
@@ -233,6 +258,57 @@ describe("handleTraceLogRecordReceived session-step accumulation", () => {
         );
 
         expect(state.attributes[SESSION_STEPS_ATTR]).toBeUndefined();
+      });
+    });
+  });
+
+  describe("given a generic gen_ai log turn (thread id + usage, not codex)", () => {
+    describe("when it is folded", () => {
+      it("appends no step — the codex-specific principal marker is absent", () => {
+        const projection = new TraceSummaryFoldProjection({
+          store: { store: async () => {}, get: async () => null },
+        });
+
+        // A gemini-CLI / generic OTel-genai emitter: gen_ai.* semconv on the
+        // log record. The gen_ai extractor lifts a thread id + input tokens,
+        // but nothing lifts langwatch.principal.email, so the fold must NOT
+        // treat this as a codex session step.
+        const event: LogRecordReceivedEvent = {
+          id: "evt-genai",
+          type: LOG_RECORD_RECEIVED_EVENT_TYPE,
+          version: LOG_RECORD_RECEIVED_EVENT_VERSION_LATEST,
+          aggregateType: "trace",
+          aggregateId: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+          tenantId: createTenantId("tenant-1"),
+          createdAt: 1_700_000_000_000,
+          occurredAt: 1_700_000_000_000,
+          data: {
+            traceId: "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
+            spanId: "1122334455667788",
+            timeUnixMs: 1_700_000_000_000,
+            severityNumber: 9,
+            severityText: "INFO",
+            body: "gen_ai turn",
+            attributes: {
+              "gen_ai.request.model": "gemini-2.0-flash",
+              "gen_ai.usage.input_tokens": "4000",
+              "gen_ai.conversation.id": "gemini-thread-1",
+            },
+            resourceAttributes: { "service.name": "gemini-cli" },
+            scopeName: "gemini",
+            scopeVersion: null,
+            piiRedactionLevel: "ESSENTIAL",
+          },
+          metadata: {},
+        };
+
+        const state = projection.handleTraceLogRecordReceived(
+          event,
+          createInitState(),
+        );
+
+        expect(state.attributes[SESSION_STEPS_ATTR]).toBeUndefined();
+        expect(state.attributes[SESSION_HARNESS_ATTR]).toBeUndefined();
       });
     });
   });
