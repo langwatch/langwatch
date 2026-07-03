@@ -1,4 +1,4 @@
-import { findHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
+import { resolvePersonalUsageIngestionScope } from "@ee/governance/services/governanceProject.service";
 import { PersonalUsageService } from "@ee/governance/services/personalUsage.service";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
@@ -87,40 +87,53 @@ export function registerMeRoutes(
           ? { start: new Date(windowStartMs), end: new Date(windowEndMs) }
           : undefined;
 
-      // Ingestion-source ledger rows (Claude Code OTLP, etc.) land under
-      // the org's hidden Governance Project tenant, not the personal
-      // project. Resolve it read-only (never provision on a GET) so the
-      // usage union is scoped to THIS org's tenant — both to prune
-      // ClickHouse partitions and to avoid summing a multi-org user's
-      // spend across every org. Absent when the org never minted an
-      // ingestion source, in which case there is no ledger traffic.
-      const team = await prisma.team.findUnique({
-        where: { id: project.teamId },
-        select: { organizationId: true },
-      });
-      const governanceProject = team
-        ? await findHiddenGovernanceProject({
-            prisma,
-            organizationId: team.organizationId,
-          })
-        : null;
+      // Ingestion-source ledger rows (Claude Code OTLP, etc.) land under the
+      // org's hidden Governance Project tenant, not the personal project. The
+      // category union additionally attributes gov-tenant trace summaries by the
+      // owner's principal EMAIL. Both are resolved read-only (never provision on
+      // a GET) by the shared governance composition — scoped to THIS org's
+      // tenant so the union prunes ClickHouse partitions and never sums a
+      // multi-org user's spend across every org. Absent when the org never
+      // minted an ingestion source, in which case there is no ledger traffic.
+      const { ingestionTenantId, userEmail } =
+        await resolvePersonalUsageIngestionScope({
+          prisma,
+          teamId: project.teamId,
+          ownerUserId: project.ownerUserId,
+        });
 
       const usage = new PersonalUsageService();
       const input = {
         personalProjectId: project.id,
         userId: project.ownerUserId,
-        ingestionTenantId: governanceProject?.id,
+        userEmail,
+        ingestionTenantId,
         window,
       };
 
       // Independent rollups — CH multiplexes them happily.
-      const [summary, dailyBuckets, breakdownByModel] = await Promise.all([
-        usage.summary(input),
-        usage.dailyBuckets(input),
-        usage.breakdownByModel(input),
-      ]);
+      const [summary, dailyBuckets, breakdownByModel, breakdownByCategory] =
+        await Promise.all([
+          usage.summary(input),
+          usage.dailyBuckets(input),
+          usage.breakdownByModel(input),
+          // Category totals live on trace summaries: personal-tenant rows plus
+          // this user's ingestion-source rows on the gov tenant (attributed by
+          // principal email), when both are available.
+          usage.breakdownByCategory({
+            personalProjectId: input.personalProjectId,
+            window: input.window,
+            userEmail: input.userEmail,
+            ingestionTenantId: input.ingestionTenantId,
+          }),
+        ]);
 
-      return c.json({ summary, dailyBuckets, breakdownByModel });
+      return c.json({
+        summary,
+        dailyBuckets,
+        breakdownByModel,
+        breakdownByCategory,
+      });
     },
   );
 }

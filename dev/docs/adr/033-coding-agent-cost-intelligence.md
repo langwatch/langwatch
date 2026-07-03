@@ -114,18 +114,33 @@ No database migrations. All changes are within existing structures:
 // TraceSummary fold (existing projection — new field)
 categoryTotals?: Partial<Record<Category, { tokens: number; costUsd: number }>>;
 
-// Session fold (new fold in the existing fold-projection framework — not a new store)
-{
-  sessionId: string;          // claude: X-Claude-Code-Session-Id | codex: rollout session id (transcript meta)
+// Session view (v3: NOT a session-keyed fold — see Revisions v3). Realised as
+// a bounded per-trace step series on the trace summary + a pure read-time rollup.
+//
+// (a) Per-trace step series — bounded reserved attribute on the TRACE summary,
+//     appended by the trace fold for each coding-agent LLM step (span path and
+//     Path B log turns). `inputTokens` is the step's TOTAL input context
+//     (fresh + cache-read + cache-creation), the only signal that reflects
+//     genuine context re-basing (a cached turn's fresh input is tiny).
+"langwatch.reserved.session_steps": Array<{ startMs: number; inputTokens: number }>;
+                                   // ordered by span startTime; bounded: past 512 entries,
+                                   // adjacent pairs merge (keep max) — halves resolution,
+                                   // preserves the sawtooth shape and ADR-021 limits
+"langwatch.reserved.session.harness": "claude" | "codex";
+
+// (b) Read-time rollup (sessionRollup.service.ts) over lean trace SUMMARIES,
+//     grouped by (harness, threadId). threadId reads langwatch.thread.id
+//     (log path) or gen_ai.conversation.id (span path). Claude sessions live in
+//     one summary; Codex's are fragmented across traces and re-joined here.
+type SessionView = {
   harness: "claude" | "codex";
-  stepCount: number;               // LLM API spans in session
-  inputTokensBySteps: number[];    // ordered by span startTime; bounded: past 512 entries,
-                                   // pairs merge (keep max) — halves resolution, preserves the
-                                   // sawtooth shape and ADR-021 fold-size pressure limits
+  threadId: string;                // claude: session id | codex: rollout/conversation id
+  stepCount: number;               // LLM API steps across the session's traces
+  steps: Array<{ startMs; inputTokens }>; // concatenated, sorted by startMs
   runningMaxInputTokens: number;   // compaction baseline (Decision 5)
-  compactionEvents: number;
+  compactionEvents: number;        // detectCompactionEvents(): running-max + confirmation
   categoryTotals: Partial<Record<Category, { tokens: number; costUsd: number }>>;
-}
+};
 ```
 
 ## Rejected alternatives
@@ -178,3 +193,4 @@ categoryTotals?: Partial<Record<Category, { tokens: number; costUsd: number }>>;
 
 - **v1 (2026-07-02)** — Initial draft. Framing round locked: full-feature scope, competitive-window forcing function, analytics-only blast radius, constraints (no parallel infra / exact tokens / no new CH table). Fork round 1 locked: ingest-time enrichment; cache-aware token split (user escalated from flat split); 12-category two-axis taxonomy; CLI-only v1 scope (user override of classify-everything recommendation). Fork round 2 locked: span-attrs + fold storage; full turn/compaction tracking in v1; recommendations deferred entirely (user override of 3-template-rules recommendation); extend governance dashboards. Fork round 3 locked: skip-silently content policy; both harnesses in v1 (user override of Claude-first phasing); gating follows host pages.
 - **v2 (2026-07-03)** — Red-team pass (devils-advocate), 9 findings folded in; no locked fork reopened. Blockers fixed: (1) three-tier cache binning — v1's two-tier rule left `cache_creation` blocks unassigned, breaking conservation-of-cost on every session's first turn; (2) attribute namespace moved to `langwatch.reserved.blocks.*` — the bare `langwatch.blocks.*` prefix was customer-spoofable because only `reserved.*` is scrubbed at ingest. Must-fixes: classification declared serial-after-enrichment (it consumes cost/tokenizer outputs; v1 wrongly implied parallel) and its per-block tokenization cost stated honestly; breakpoint-fidelity caveat added (gateway captures post-middleware bodies; OTel path truncates at ~60 KB); turn/compaction redefined on start-time-ordered steps against a running max with confirmation steps (consecutive-step comparison false-fires on subagent interleaving); Codex session key corrected to rollout transcript id (`prompt_cache_key` is gateway-only and observed null). Notes: `leadingContext.ts` reframed as seed heuristic extracted to a shared module (not a "move"); tiktoken-on-Anthropic split error acknowledged in Consequences; `Σ pool_block_tokens = 0` zero-guard specified (pool total → axis catch-all).
+- **v3 (2026-07-03)** — Implementation revision (PR C): Decision 4's "session-level fold" is realised as per-trace step series in the existing trace fold + a pure read-time session rollup over lean trace summaries grouped by thread id, NOT a session-keyed fold projection. The fold framework keys strictly by traceId; a session-keyed fold would need a second event per span (rejected in Decision 1) or a new aggregate pipeline. For Claude Code, turns already fold into one summary (trace ≈ session); the rollup only merges Codex's fragmented traces. Rollup input is trace SUMMARIES (lean rows), not stored spans — the read-time pattern rejected in Decision 1 concerned span scans, which this does not do.

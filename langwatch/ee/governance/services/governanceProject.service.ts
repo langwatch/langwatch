@@ -66,6 +66,49 @@ export async function findHiddenGovernanceProject({
 }
 
 /**
+ * Resolve the ingestion-source union scope for a personal project's usage
+ * rollups: the org's hidden Governance Project tenant (where ingestion-source
+ * ledger + trace rows land) and the owner's principal email (how those gov-tenant
+ * trace summaries attribute per-user category totals). Both are read-only
+ * lookups keyed off the personal project's team + owner — kept here, next to the
+ * governance-project resolution the /me surfaces already depend on, so the API
+ * route and the tRPC procedure don't each reach into prisma for the owner email.
+ */
+export async function resolvePersonalUsageIngestionScope({
+  prisma,
+  teamId,
+  ownerUserId,
+}: {
+  prisma: PrismaClient;
+  teamId: string;
+  ownerUserId: string;
+}): Promise<{
+  ingestionTenantId: string | undefined;
+  userEmail: string | undefined;
+}> {
+  const team = await prisma.team.findUnique({
+    where: { id: teamId },
+    select: { organizationId: true },
+  });
+  const [governanceProject, owner] = await Promise.all([
+    team
+      ? findHiddenGovernanceProject({
+          prisma,
+          organizationId: team.organizationId,
+        })
+      : Promise.resolve(null),
+    prisma.user.findUnique({
+      where: { id: ownerUserId },
+      select: { email: true },
+    }),
+  ]);
+  return {
+    ingestionTenantId: governanceProject?.id,
+    userEmail: owner?.email ?? undefined,
+  };
+}
+
+/**
  * Resolve the org's hidden Governance Project, creating one on first
  * call. Idempotent — concurrent callers may briefly race; the
  * org-scoped composite-unique guard on (teamId, kind) collapses the

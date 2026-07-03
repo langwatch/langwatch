@@ -19,6 +19,12 @@ import {
 } from "lucide-react";
 import numeral from "numeral";
 import { useEffect, useState } from "react";
+import {
+  CategoryBreakdownBars,
+  CategoryBreakdownCaption,
+  CategoryBreakdownEnablementHint,
+  toCategoryBarRows,
+} from "~/components/governance/CategoryBreakdownBars";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { QuarantineFillAlert } from "~/components/governance/QuarantineFillAlert";
 import { SpendByTeamBar } from "~/components/governance/SpendByTeamBar";
@@ -47,7 +53,6 @@ import { getHexColorForString } from "~/utils/rotatingColors";
  * Spec: specs/ai-gateway/governance/admin-oversight.feature
  */
 
-type Source = RouterOutputs["ingestionSources"]["list"][number];
 type SourceHealth =
   RouterOutputs["activityMonitor"]["ingestionSourcesHealth"][number];
 type SpendByUser = RouterOutputs["activityMonitor"]["spendByUser"][number];
@@ -128,6 +133,10 @@ function GovernanceOverviewPage() {
     { organizationId: orgId, windowDays: 30, groupBy: chartGroupBy },
     { enabled: !!orgId, refetchOnWindowFocus: false },
   );
+  const categoryBreakdownQuery = api.activityMonitor.categoryBreakdown.useQuery(
+    { organizationId: orgId, windowDays: 30 },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
 
   const sources = sourcesQuery.data ?? [];
   const policies = policiesQuery.data ?? [];
@@ -139,6 +148,8 @@ function GovernanceOverviewPage() {
   const anomalies = anomaliesQuery.data ?? [];
   const anomalyRules = anomalyRulesQuery.data ?? [];
   const catalogTiles = catalogQuery.data ?? [];
+
+  const categoryBars = toCategoryBarRows(categoryBreakdownQuery.data ?? []);
 
   const hasSources = sources.length > 0;
   const hasPolicies = policies.length > 0;
@@ -405,6 +416,19 @@ function GovernanceOverviewPage() {
                 />
               ))}
             </VStack>
+          )}
+        </SectionCard>
+
+        <SectionCard
+          title="Usage breakdown"
+          subline="Coding-agent spend split by content category (last 30 days). Analytics only; it never affects billing."
+        >
+          <CategoryBreakdownCaption />
+          {categoryBreakdownQuery.isLoading ? null : categoryBars.length ===
+            0 ? (
+            <CategoryBreakdownEnablementHint />
+          ) : (
+            <CategoryBreakdownBars rows={categoryBars} />
           )}
         </SectionCard>
 
