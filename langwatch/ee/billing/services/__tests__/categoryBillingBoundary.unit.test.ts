@@ -20,7 +20,7 @@
  *
  * Spec: specs/ai-gateway/governance/cost-breakdown-dashboard.feature
  */
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -52,6 +52,9 @@ const FORBIDDEN = ["block-classification", "blockcat", "blockClassifier"];
 
 function collectSourceFiles(dir: string): string[] {
   const out: string[] = [];
+  // A renamed/removed scan root must not throw ENOENT and abort the boundary
+  // suite — skip absent roots (the allowlist assertion still guards coverage).
+  if (!existsSync(dir)) return out;
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) {

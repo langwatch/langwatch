@@ -1,5 +1,8 @@
 import { useMemo } from "react";
-import { toCategoryBarRows } from "~/components/governance/CategoryBreakdownBars";
+import {
+  type CategoryBreakdownBarRow,
+  toCategoryBarRows,
+} from "~/components/governance/CategoryBreakdownBars";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
@@ -66,13 +69,7 @@ export type PersonalContext = {
   spendByDay: Array<{ day: string; usd: number; billedUsd: number }>;
   spendByTool: Array<{ tool: string; usd: number; billedUsd: number }>;
   /** Cost split by content category (ADR-033). Empty when nothing categorized. */
-  spendByCategory: Array<{
-    category: string;
-    label: string;
-    costUsd: number;
-    tokens: number;
-    sharePct: number;
-  }>;
+  spendByCategory: CategoryBreakdownBarRow[];
   /** True while the usage rollup is still loading — gate the category
    * empty-state on it so the enablement hint doesn't flash during load. */
   spendByCategoryLoading: boolean;
