@@ -2,6 +2,25 @@ import posthog from "posthog-js";
 import { useEffect } from "react";
 import { usePublicEnv } from "./usePublicEnv";
 
+function startSessionRecordingWhenIdle() {
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(() => posthog.startSessionRecording(), {
+      timeout: 4000,
+    });
+    return;
+  }
+  // Safari has no requestIdleCallback — fall back to load + timeout.
+  if (document.readyState === "complete") {
+    setTimeout(() => posthog.startSessionRecording(), 0);
+  } else {
+    window.addEventListener(
+      "load",
+      () => setTimeout(() => posthog.startSessionRecording(), 0),
+      { once: true },
+    );
+  }
+}
+
 export function usePostHog() {
   const publicEnv = usePublicEnv();
 
@@ -28,9 +47,16 @@ export function usePostHog() {
         autocapture: true,
         capture_pageview: "history_change",
         capture_exceptions: true,
+        // Recording options stay configured, but recording itself starts
+        // disabled — the recorder chunk (rrweb + replay extensions) is
+        // 50KB+ and was loading eagerly as part of init, competing with
+        // first paint. Core capture (autocapture/pageview/identify) stays
+        // eager below; only the recorder's own fetch is deferred to idle
+        // via startSessionRecordingWhenIdle(), so no events are dropped.
         session_recording: {
           recordCrossOriginIframes: true,
         },
+        disable_session_recording: true,
         loaded: (posthog) => {
           // Explicitly expose `window.posthog` so the PostHog toolbar
           // (launched from the PostHog dashboard's "Toolbar" button)
@@ -44,6 +70,7 @@ export function usePostHog() {
               posthog;
           }
           if (publicEnv.data?.NODE_ENV === "development") posthog.debug();
+          startSessionRecordingWhenIdle();
         },
       });
     }
