@@ -298,10 +298,9 @@ export function FiltersSecondaryDrawer({
         <VStack align="stretch" gap={4}>
           <Field.Root invalid={customGraphMissing}>
             <Field.Label>Custom graph</Field.Label>
-            <NativeSelect.Root>
+            <NativeSelect.Root disabled={isPrefilled}>
               <NativeSelect.Field
                 value={localCustomGraphId ?? ""}
-                disabled={isPrefilled}
                 onChange={(e) => {
                   const id = e.target.value || null;
                   setLocalCustomGraphId(id);
@@ -332,14 +331,15 @@ export function FiltersSecondaryDrawer({
 
           <Field.Root invalid={seriesMissing}>
             <Field.Label>Series</Field.Label>
-            <NativeSelect.Root>
+            <NativeSelect.Root
+              disabled={
+                isPrefilled ||
+                !localCustomGraphId ||
+                seriesOptions.length === 0
+              }
+            >
               <NativeSelect.Field
                 value={localGraphAlert.seriesName}
-                disabled={
-                  isPrefilled ||
-                  !localCustomGraphId ||
-                  seriesOptions.length === 0
-                }
                 onChange={(e) =>
                   setLocalGraphAlert((prev) => ({
                     ...prev,

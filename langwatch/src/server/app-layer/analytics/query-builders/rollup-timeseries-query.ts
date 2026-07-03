@@ -24,8 +24,8 @@
 import { buildMetricAlias } from "~/server/analytics/clickhouse/metric-translator";
 import type { AggregationTypes } from "~/server/analytics/types";
 import {
-  isRollupRollableMetricKey,
-  type RollupRollableMetricKey,
+  isRollupRollableTraceMetricKey,
+  type TraceRollupMetricKey,
 } from "../routing/route-table";
 import type {
   AnalyticsTimeseriesBuilderInput,
@@ -48,12 +48,12 @@ export type RollupGroupByKey = "metadata.model" | "metadata.span_type";
 /**
  * Map an additive registry metric to its rollup column expression.
  *
- * Narrowed to `RollupRollableMetricKey` so the compiler enforces the
+ * Narrowed to `TraceRollupMetricKey` so the compiler enforces the
  * complete switch — no chance of a typo silently throwing at runtime.
  * The caller (`buildRollupTimeseriesQuery`) validates each metric via
- * `isRollupRollableMetricKey` before dispatching.
+ * `isRollupRollableTraceMetricKey` before dispatching.
  */
-function rollupColumnFor(metric: RollupRollableMetricKey): string {
+function rollupColumnFor(metric: TraceRollupMetricKey): string {
   switch (metric) {
     case "performance.total_cost":
       return `${ra}.CostSum`;
@@ -80,7 +80,7 @@ function rollupColumnFor(metric: RollupRollableMetricKey): string {
       return `(${ra}.PromptTokensSum + ${ra}.CompletionTokensSum + ${ra}.CacheReadTokensSum + ${ra}.CacheWriteTokensSum)`;
     default: {
       // Exhaustiveness: `metric` should narrow to `never` here. If a new
-      // entry is added to RollupRollableMetricKey, this assignment fails
+      // entry is added to TraceRollupMetricKey, this assignment fails
       // at compile time.
       const _exhaustive: never = metric;
       throw new Error(
@@ -192,7 +192,7 @@ export function buildRollupTimeseriesQuery(
 
   for (let i = 0; i < input.series.length; i++) {
     const s = input.series[i]!;
-    if (!isRollupRollableMetricKey(s.metric)) {
+    if (!isRollupRollableTraceMetricKey(s.metric)) {
       throw new Error(
         `Rollup builder cannot serve metric "${s.metric}". The router should have routed this to slim or trace_summaries.`,
       );

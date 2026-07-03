@@ -13,6 +13,7 @@ import { OutboxHeartbeatRegistry } from "../heartbeat.registry";
 import {
   type DispatchOutboxEnqueues,
   OutboxHeartbeatScheduler,
+  type OutboxHeartbeatSchedulerDeps,
 } from "../heartbeat.scheduler";
 import type { HeartbeatDefinition } from "../heartbeat.types";
 
@@ -97,9 +98,7 @@ const silentLogger = {
   fatal: vi.fn(),
   trace: vi.fn(),
   child: () => silentLogger,
-} as unknown as Parameters<
-  typeof OutboxHeartbeatScheduler.prototype.constructor
->[0]["logger"];
+} as unknown as OutboxHeartbeatSchedulerDeps["logger"];
 
 function makeRequest(name: string): OutboxEnqueueRequest {
   return {

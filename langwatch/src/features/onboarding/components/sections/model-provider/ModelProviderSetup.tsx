@@ -374,8 +374,8 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
             <Field.Root>
               <Switch
                 checked={state.useApiGateway}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                  actions.setUseApiGateway(e.target.checked)
+                onCheckedChange={({ checked }) =>
+                  actions.setUseApiGateway(checked)
                 }
               >
                 Use API Gateway

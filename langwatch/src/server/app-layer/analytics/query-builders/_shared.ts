@@ -114,10 +114,10 @@ export const MAX_TIMESERIES_BUCKETS = 1000;
 const MS_PER_MINUTE = 1000 * 60;
 
 export function adjustTimeScaleForBucketCap(params: {
-  timeScale: number | undefined;
+  timeScale: number | "full" | undefined;
   startDate: Date;
   endDate: Date;
-}): number | undefined {
+}): number | "full" | undefined {
   const { timeScale, startDate, endDate } = params;
   if (typeof timeScale === "number") {
     const totalMinutes =

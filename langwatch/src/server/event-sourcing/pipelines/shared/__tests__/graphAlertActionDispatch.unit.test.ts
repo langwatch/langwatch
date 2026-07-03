@@ -55,8 +55,12 @@ function makeContext() {
 }
 
 function makeDeps() {
-  const sendEmail = vi.fn(async () => undefined);
-  const sendSlack = vi.fn(async () => undefined);
+  const sendEmail = vi.fn<(payload: unknown) => Promise<void>>(
+    async () => undefined,
+  );
+  const sendSlack = vi.fn<(payload: unknown) => Promise<void>>(
+    async () => undefined,
+  );
   return {
     deps: { sendEmail, sendSlack } as unknown as Parameters<
       typeof dispatchGraphAlertAction

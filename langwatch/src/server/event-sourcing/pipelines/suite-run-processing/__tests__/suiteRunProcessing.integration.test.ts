@@ -20,6 +20,9 @@ import {
   type SuiteRunState,
   type SuiteRunStateData,
 } from "../projections/suiteRunState.foldProjection";
+import type { SuiteAnalyticsData } from "../projections/suiteAnalytics.foldProjection";
+import type { SuiteAnalyticsRollupRow } from "../projections/suiteAnalyticsRollup.mapProjection";
+import type { AppendStore } from "../../../projections/mapProjection.types";
 import { createSuiteRunProcessingPipeline } from "../pipeline";
 
 const logger = createLogger(
@@ -81,6 +84,48 @@ class InMemorySuiteRunStateStore
 }
 
 /**
+ * In-memory fold store for suite analytics — the pipeline requires it, but
+ * these tests only assert on suite-run state, so a plumbing stub is enough.
+ */
+class InMemorySuiteAnalyticsStore
+  implements FoldProjectionStore<SuiteAnalyticsData>
+{
+  private data = new Map<string, SuiteAnalyticsData>();
+
+  async get(
+    _aggregateId: string,
+    context: ProjectionStoreContext,
+  ): Promise<SuiteAnalyticsData | null> {
+    const key = `${String(context.tenantId)}:${context.aggregateId}`;
+    return this.data.get(key) ?? null;
+  }
+
+  async store(
+    state: SuiteAnalyticsData,
+    context: ProjectionStoreContext,
+  ): Promise<void> {
+    const key = `${String(context.tenantId)}:${context.aggregateId}`;
+    this.data.set(key, state);
+  }
+}
+
+/**
+ * In-memory append store for the per-item suite-run analytics rollup —
+ * satisfies the pipeline's projection wiring; the assertions in this
+ * suite only touch state, so records are silently discarded.
+ */
+class InMemorySuiteAnalyticsRollupStore
+  implements AppendStore<SuiteAnalyticsRollupRow>
+{
+  async append(
+    _record: SuiteAnalyticsRollupRow,
+    _context: ProjectionStoreContext,
+  ): Promise<void> {
+    // no-op — tests don't read the rollup
+  }
+}
+
+/**
  * Creates a test pipeline for suite run processing using real ClickHouse and Redis,
  * with an in-memory fold projection store.
  */
@@ -131,6 +176,8 @@ function createSuiteRunTestPipeline(): PipelineWithCommandHandlers<
   const pipeline = eventSourcing.register(
     createSuiteRunProcessingPipeline({
       suiteRunStateFoldStore: suiteRunStateStore,
+      suiteAnalyticsStore: new InMemorySuiteAnalyticsStore(),
+      suiteAnalyticsRollupAppendStore: new InMemorySuiteAnalyticsRollupStore(),
     }),
   );
 

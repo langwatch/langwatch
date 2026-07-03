@@ -131,8 +131,14 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-const renderDrawer = (props: { automationId?: string; source?: string } = {}) =>
-  render(<AutomationDrawer {...props} />, { wrapper: Wrapper });
+const renderDrawer = (
+  props: {
+    automationId?: string;
+    source?: string;
+    prefilledGraphId?: string;
+    prefilledSeriesName?: string;
+  } = {},
+) => render(<AutomationDrawer {...props} />, { wrapper: Wrapper });
 
 function savedRow(overrides: Record<string, unknown> = {}) {
   return {

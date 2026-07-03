@@ -164,8 +164,7 @@ function makeHarness({
   series: TimeseriesResult;
 }): Harness {
   const dispatch = vi.fn<
-    [unknown],
-    Promise<GraphAlertDispatchResult>
+    (input: unknown) => Promise<GraphAlertDispatchResult>
   >(async () => ({
     channel: "email",
     didSend: true,

@@ -34,6 +34,7 @@ import {
 import { buildTimeseriesQuery } from "~/server/analytics/clickhouse/aggregation-builder";
 import { buildRollupTimeseriesQuery } from "../query-builders/rollup-timeseries-query";
 import { buildSlimTimeseriesQuery } from "../query-builders/slim-timeseries-query";
+import type { AnalyticsTimeseriesBuilderInput } from "../types";
 
 const tenantId = `test-router-${nanoid()}`;
 
@@ -178,7 +179,7 @@ async function runQuery(sql: string, params: Record<string, unknown>) {
 
 describe("Phase 3 read routing — SQL builder against real CH", () => {
   describe("given a sum(total_cost) query over the seeded bucket", () => {
-    const baseInput = {
+    const baseInput: AnalyticsTimeseriesBuilderInput = {
       projectId: tenantId,
       startDate: dayWindow.startDate,
       endDate: dayWindow.endDate,

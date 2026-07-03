@@ -1,5 +1,5 @@
 import { generate as ksuid } from "@langwatch/ksuid";
-import { AlertType, TriggerAction } from "@prisma/client";
+import { AlertType, Prisma, TriggerAction } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
@@ -641,7 +641,7 @@ export const automationRouter = createTRPCRouter({
       // hand-rolling the row). The dispatcher only knows one shape; drift
       // between the two writers silently breaks dispatch for whichever
       // format loses.
-      let data: Record<string, unknown>;
+      let data: Omit<Prisma.TriggerUncheckedCreateInput, "projectId">;
       if (isGraphAlert && input.graphAlert && input.customGraphId) {
         const graphAlert: GraphAlertActionParams = input.graphAlert;
         const builderInput = {
@@ -676,7 +676,7 @@ export const automationRouter = createTRPCRouter({
           alertType: input.alertType ?? null,
           filters: JSON.stringify(input.filters),
           customGraphId: input.customGraphId ?? null,
-          actionParams,
+          actionParams: actionParams as Prisma.InputJsonValue,
           slackTemplateType: input.templates.slackTemplateType ?? null,
           slackTemplate: input.templates.slackTemplate ?? null,
           emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,

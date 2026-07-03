@@ -142,6 +142,8 @@ function evalSlimAggExpression(
     case "cardinality":
     case "terms":
       return `uniq(${column})`;
+    default:
+      throw new Error(`Unhandled eval slim aggregation: ${String(agg)}`);
   }
 }
 

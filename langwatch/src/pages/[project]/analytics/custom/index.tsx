@@ -1440,7 +1440,7 @@ function SeriesField({
                     {...field}
                     checked={!!field.value}
                     value="on"
-                    onChange={(e) => field.onChange(e.target.checked)}
+                    onCheckedChange={({ checked }) => field.onChange(checked)}
                   />
                   <Field.Label flexShrink={0}>
                     Show in percentage (%)

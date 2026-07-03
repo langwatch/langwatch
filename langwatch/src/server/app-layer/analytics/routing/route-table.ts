@@ -172,6 +172,23 @@ const ROLLUP_ROLLABLE_EVAL_METRIC_KEYS: ReadonlySet<string> = new Set<string>(
   ROLLUP_ROLLABLE_EVAL_METRIC_KEYS_LIST,
 );
 
+/**
+ * Narrower guards for callers that only want trace- or eval-scoped rollable
+ * keys — used by the per-source SQL builders so their exhaustive switches
+ * type-narrow correctly.
+ */
+export function isRollupRollableTraceMetricKey(
+  metric: string,
+): metric is TraceRollupMetricKey {
+  return ROLLUP_ROLLABLE_TRACE_METRIC_KEYS.has(metric);
+}
+
+export function isSlimEligibleTraceMetricKey(
+  metric: string,
+): metric is SlimTraceMetricKey {
+  return SLIM_ELIGIBLE_TRACE_METRIC_KEYS.has(metric);
+}
+
 // ─── Slim eligibility ────────────────────────────────────────────────
 
 /**
