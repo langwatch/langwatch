@@ -355,11 +355,8 @@ function Automations() {
                           <Table.Cell textAlign="center">
                             <Switch
                               checked={trigger.active}
-                              onChange={() => {
-                                handleToggleTrigger(
-                                  trigger.id,
-                                  !trigger.active,
-                                );
+                              onCheckedChange={({ checked }) => {
+                                handleToggleTrigger(trigger.id, checked);
                               }}
                             />
                           </Table.Cell>

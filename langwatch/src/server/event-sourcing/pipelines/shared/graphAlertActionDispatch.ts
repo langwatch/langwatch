@@ -1,4 +1,5 @@
 import type { Project, Trigger } from "@prisma/client";
+import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
 import { pickTriggerDefaults } from "~/shared/templating/defaults";
@@ -192,21 +193,19 @@ export async function dispatchGraphAlertAction({
 
   // Persist actions (ADD_TO_DATASET / ADD_TO_ANNOTATION_QUEUE) and any
   // future TriggerAction value never apply to graph alerts — the cron's
-  // routing only ever dispatches email / Slack here. Defensive: log and
-  // no-op rather than throw, so a misconfigured action doesn't block the
-  // outbox reactor.
-  logger.warn(
+  // routing only ever dispatches email / Slack here. Fail loud so a
+  // misconfigured trigger dead-letters with an actionable operator signal
+  // rather than silently no-op every fire (dispatch5015-002).
+  logger.error(
     {
       triggerId: trigger.id,
       projectId: project.id,
       action: trigger.action,
     },
-    "Graph alert action is neither SEND_EMAIL nor SEND_SLACK_MESSAGE — skipping",
+    "Graph alert action is neither SEND_EMAIL nor SEND_SLACK_MESSAGE — dead-lettering",
   );
-  return {
-    channel: "none",
-    didSend: false,
-    missingVariables: [],
-    renderErrors: [],
-  };
+  throw new DispatchError({
+    message: `Graph alert action "${trigger.action}" is not supported — only SEND_EMAIL and SEND_SLACK_MESSAGE apply to graph alerts.`,
+    retryable: false,
+  });
 }

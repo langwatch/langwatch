@@ -127,7 +127,7 @@ ORDER BY (TenantId, BucketStart, EvaluatorType, Status)
 -- retention applies cleanly. `BucketStart` is DateTime64(3), so the TTL
 -- expression wraps it in `toDateTime` (CH rejects DateTime64 directly in TTL
 -- arithmetic). Mirrors trace_analytics_rollup (00035) exactly.
-TTL toDateTime(BucketStart) + INTERVAL _retention_days DAY DELETE
+TTL IF(_retention_days > 0, toDateTime(BucketStart) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE
 SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 

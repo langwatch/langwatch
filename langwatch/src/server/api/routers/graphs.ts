@@ -344,19 +344,31 @@ export const graphsRouter = createTRPCRouter({
       if (input.alert?.enabled && input.alert.action && input.alert.type) {
         const triggerName = input.alertName ?? input.name;
         if (existingTrigger) {
-          // Update existing trigger
+          // Update via the SSOT builder so the row shape stays byte-identical
+          // to the create path (builder5015-001). The builder is the single
+          // source of truth for graph-alert Trigger row shape; hand-rolling
+          // the update payload defeats the invariant.
+          const triggerData = buildAlertTriggerForGraph(
+            existingTrigger.id,
+            triggerName,
+            input.projectId,
+            input.alert.action,
+            {
+              ...input.alert.actionParams,
+              threshold: input.alert.threshold!,
+              operator: input.alert.operator!,
+              timePeriod: input.alert.timePeriod!,
+            },
+            input.alert.type,
+            input.graphId,
+          );
           await prisma.trigger.update({
             where: { id: existingTrigger.id, projectId: input.projectId },
             data: {
-              name: `Alert: ${triggerName}`,
-              action: input.alert.action,
-              actionParams: {
-                ...input.alert.actionParams,
-                threshold: input.alert.threshold!,
-                operator: input.alert.operator!,
-                timePeriod: input.alert.timePeriod!,
-              } as Prisma.InputJsonValue,
-              alertType: input.alert.type,
+              name: triggerData.name,
+              action: triggerData.action,
+              actionParams: triggerData.actionParams,
+              alertType: triggerData.alertType,
               active: true,
               deleted: false,
             },

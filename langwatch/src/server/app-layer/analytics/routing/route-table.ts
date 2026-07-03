@@ -460,13 +460,11 @@ function rollupHandlesSeries(
       : ROLLUP_EVAL_AGGREGATIONS;
   if (!allowedAggs.has(s.aggregation)) return false;
   if (s.key !== undefined || s.subkey !== undefined) {
-    // `requiresKey` metrics in the eval domain (every entry in
-    // `evaluations.*`) carry a key — they STILL route to the rollup as long
-    // as the key is a single evaluator-id filter the rollup's EvaluatorType
-    // column can serve via WHERE. We accept `key` for eval-source metrics
-    // only; trace-source rollup metrics reject `key` (none of them
-    // requireKey today).
-    if (source !== "evaluation") return false;
+    // Neither rollup carries a column that identifies an individual
+    // evaluator/user/thread within its group-by tuple, so any `key` filter
+    // would silently return cross-key aggregates (rt5014-002). Route to
+    // slim/legacy where per-key filtering is real.
+    return false;
   }
   const keys =
     source === "trace"
@@ -524,8 +522,11 @@ function slimHandlesSeries(
   // fallback, which computes the two-level aggregation correctly.
   if (s.pipeline) return false;
   if (s.key !== undefined || s.subkey !== undefined) {
-    // Same eval-domain `requiresKey` allowance as the rollup branch.
-    if (source !== "evaluation") return false;
+    // Trace slim rejects `key`; eval slim would try to WHERE on `EvaluatorId`
+    // but that column does not exist on the eval slim table (migration 00040
+    // — rt5014-001). Route key-bearing queries to legacy `evaluation_runs`
+    // until the slim gains an EvaluatorId column.
+    return false;
   }
   const keys =
     source === "trace"

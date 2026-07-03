@@ -88,7 +88,13 @@ export class OutboxHeartbeatScheduler {
   private readonly logger: Logger;
   private readonly workerId = randomUUID();
   private readonly timers = new Map<string, NodeJS.Timeout>();
-  private readonly abortController = new AbortController();
+  /**
+   * Reset on every `start()` so a stop/start cycle produces a fresh
+   * signal (hb-001). Consumers must re-read `abortSignal` on each tick.
+   */
+  private abortController = new AbortController();
+  /** In-flight `runTick` promises awaited by `stop()` (hb-002). */
+  private readonly inFlightTicks = new Set<Promise<void>>();
   private started = false;
 
   constructor(deps: OutboxHeartbeatSchedulerDeps) {
@@ -116,6 +122,11 @@ export class OutboxHeartbeatScheduler {
     }
     if (this.started) return;
     this.started = true;
+    // hb-001: reset the abort controller so restart-after-stop produces a
+    // fresh signal (the previous stop() cycle aborted it).
+    if (this.abortController.signal.aborted) {
+      this.abortController = new AbortController();
+    }
 
     const heartbeats = this.registry.getAll();
     for (const heartbeat of heartbeats) {
@@ -139,6 +150,13 @@ export class OutboxHeartbeatScheduler {
       clearInterval(timer);
     }
     this.timers.clear();
+    // hb-002: wait for any in-flight tick to finish (lock release, logging,
+    // dispatch, etc.) so callers awaiting stop() can safely tear down Redis /
+    // logger / dispatcher afterwards. `allSettled` — a tick that rejects has
+    // already logged its error via the outer `.catch` on line 152.
+    if (this.inFlightTicks.size > 0) {
+      await Promise.allSettled(Array.from(this.inFlightTicks));
+    }
     this.logger.info(
       { workerId: this.workerId },
       "OutboxHeartbeatScheduler stopped",
@@ -149,7 +167,8 @@ export class OutboxHeartbeatScheduler {
     const intervalMs = Math.max(MIN_INTERVAL_MS, heartbeat.intervalMs);
     const lockTtlMs = Math.max(MIN_LOCK_TTL_MS, intervalMs * 2);
     const timer = setInterval(() => {
-      void this.runTick({ heartbeat, lockTtlMs }).catch((error) => {
+      // hb-002: track the in-flight promise so stop() can await it.
+      const promise = this.runTick({ heartbeat, lockTtlMs }).catch((error) => {
         // Belt-and-braces: runTick already catches `decide`/dispatch
         // errors internally, so reaching here means the lock-acquire
         // path itself threw (Redis blip). Log + capture; the next tick
@@ -165,6 +184,8 @@ export class OutboxHeartbeatScheduler {
           extra: { heartbeat: heartbeat.name, phase: "tick-outer" },
         });
       });
+      this.inFlightTicks.add(promise);
+      void promise.finally(() => this.inFlightTicks.delete(promise));
     }, intervalMs);
     // `unref()` so the timer never holds the process open on shutdown.
     timer.unref();

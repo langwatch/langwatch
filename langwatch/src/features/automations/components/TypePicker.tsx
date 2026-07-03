@@ -134,9 +134,13 @@ function TypeCard({
       padding={3}
       borderRadius="md"
       border="1px solid"
-      borderColor={active && !disabled ? "orange.400" : "border"}
-      bg={active && !disabled ? "orange.50" : "bg"}
-      _dark={{ bg: active && !disabled ? "orange.900" : "bg" }}
+      // ui5015-001: semantic colorPalette tokens — mirrors SourceCard;
+      // avoids raw scale + `_dark` gymnastics (memory feedback_no_hex_colours).
+      colorPalette="orange"
+      borderColor={
+        active && !disabled ? "colorPalette.emphasized" : "border"
+      }
+      bg={active && !disabled ? "colorPalette.subtle" : "bg"}
       opacity={disabled ? 0.4 : 1}
       cursor={disabled ? "not-allowed" : "pointer"}
       aria-disabled={disabled || undefined}

@@ -90,7 +90,9 @@ const triggerIdentitySchema = z.object({
 });
 
 const actionParamsSchema = z.object({
-  createdByUserId: z.string().optional(),
+  // createdByUserId is server-stamped from ctx.session.user.id — the wire
+  // MUST NOT carry it or a hostile client can forge audit attribution
+  // (builder5015-002 / applyr-002).
   members: z.string().array().optional(),
   slackWebhook: z.string().optional(),
   datasetId: z.string().optional(),
@@ -183,7 +185,8 @@ export const automationRouter = createTRPCRouter({
         filters: triggerFiltersSchema,
         notificationCadence: notificationCadenceSchema.optional(),
         actionParams: z.object({
-          createdByUserId: z.string().optional(),
+          // createdByUserId is server-stamped — do not accept from wire
+          // (builder5015-002 / applyr-002).
           members: z.string().array().optional(),
           slackWebhook: z.string().optional(),
           datasetId: z.string().optional(),
@@ -222,7 +225,10 @@ export const automationRouter = createTRPCRouter({
       }
 
       if (input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE) {
-        input.actionParams.createdByUserId = ctx.session?.user.id;
+        // Server-stamp the creator — the schema does not expose this to the
+        // wire (builder5015-002), so we widen locally to mutate.
+        (input.actionParams as Record<string, unknown>).createdByUserId =
+          ctx.session?.user.id;
 
         if (!input.actionParams.annotators) {
           throw new TRPCError({
@@ -617,12 +623,14 @@ export const automationRouter = createTRPCRouter({
       // provider slice doesn't carry it, so stamp the caller here — same as
       // the legacy create mutation — or an edit would silently strip it and
       // disable dispatch for the trigger.
+      // Force createdByUserId to the session user — never trust the client
+      // (builder5015-002). The schema strips it from the wire; we stamp
+      // unconditionally on the annotation-queue branch below.
       let actionParams: Record<string, unknown> =
         input.action === TriggerAction.ADD_TO_ANNOTATION_QUEUE
           ? {
               ...input.actionParams,
-              createdByUserId:
-                input.actionParams.createdByUserId ?? ctx.session?.user.id,
+              createdByUserId: ctx.session?.user.id,
             }
           : { ...input.actionParams };
 

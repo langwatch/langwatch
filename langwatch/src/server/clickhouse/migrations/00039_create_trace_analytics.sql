@@ -190,7 +190,7 @@ ORDER BY (TenantId, OccurredAt, TraceId)
 -- Mirrors the rollup's pattern (00035) and the semantics ttlReconciler applies
 -- to trace_summaries at runtime. OccurredAt is DateTime64(3); CH rejects
 -- DateTime64 directly in TTL arithmetic, so wrap in toDateTime first.
-TTL toDateTime(OccurredAt) + INTERVAL _retention_days DAY DELETE
+TTL IF(_retention_days > 0, toDateTime(OccurredAt) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE
 SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 

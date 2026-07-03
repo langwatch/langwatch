@@ -167,6 +167,21 @@ export const SLACK_BLOCK_KIT_JSON_SCHEMA = {
           },
         },
       },
+      {
+        // ui-001: bundled Slack templates emit `{ "type": "markdown", "text": "…" }`
+        // blocks; the schema must allow them or Monaco fires false-positive
+        // red squiggles on the default presets. Slack's newer markdown block
+        // is non-interactive so it fits the same allow-list criteria.
+        title: "markdown",
+        type: "object",
+        required: ["type", "text"],
+        additionalProperties: false,
+        properties: {
+          type: { const: "markdown" },
+          block_id: { type: "string" },
+          text: { type: "string" },
+        },
+      },
     ],
   },
 } as const;

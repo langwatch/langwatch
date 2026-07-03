@@ -55,7 +55,7 @@ These stay as **two separate tables** with distinct roles:
 
   The `${projectId}/` prefix mirrors the `groupKey` convention (see queue section) and makes tenant scoping structural in the key itself. The `:trace:` / `:graph:` discriminator keeps the two subject types in separate namespaces so a future trigger type cannot collide.
 
-Outbox **queue enqueue** is **gated on `TriggerSent` claim succeeding**: the reactor's match phase first calls `TriggerSent.claimSend`; only on a successful claim does it call `outboxQueue.send(...)`, which then writes the corresponding `ReactorOutbox` audit row via the adapter's `onEnqueue` hook.
+Outbox **queue enqueue** is **not gated on `TriggerSent` claim** — the reactor's match phase calls `outboxQueue.send(...)` unconditionally and the `ReactorOutbox` audit row is written via the adapter's `onEnqueue` hook. The at-most-once `TriggerSent.claimSend` gate has moved to the **cadence dispatcher**, after a successful send, per **ADR-035** (persist-class debounce). This flip means retries after a mid-dispatch crash see `TriggerSent` still unclaimed and re-attempt the send — correct at-most-once semantics require the claim to bind to the successful dispatch, not to enqueue.
 
 ### GroupQueue as the dispatch substrate
 

@@ -656,6 +656,15 @@ export function initializeDefaultApp(options?: {
         })
       : undefined;
 
+  // Wire the outbox runtime into EventSourcing BEFORE any pipeline registers —
+  // `register()` snapshots `_outbox` via `buildServiceOptions(...)`. Without this,
+  // `EventSourcing.queue`'s outbox-payload handler fails-closed at
+  // `eventSourcing.ts:508` and every settle / cadence / graphEval enqueue
+  // stays retryable forever (found by /review-pr reg5014-001 + dispatch5015-001).
+  if (outbox) {
+    es.attachOutbox(outbox);
+  }
+
   // Heartbeat scheduler (ADR-034 Phase 4): worker-only periodic source of
   // outbox enqueues for the cases the event-driven outbox path
   // STRUCTURALLY cannot reach (no-data detection, resolve-when-traffic-stops).

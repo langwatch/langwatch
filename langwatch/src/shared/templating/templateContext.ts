@@ -216,6 +216,17 @@ function timePeriodLabel(minutes: number): string {
  * — same path `matchUrl` produces for graph-shaped trace matches, kept
  * in sync here so chrome / template URLs agree.
  */
+/**
+ * Neutralise CR/LF and NUL that could enable header injection when a value
+ * flows into an email subject or a Slack payload string. Applied to
+ * user-controlled fields (metric.label, trigger.name display strings, etc.)
+ * that lack per-callsite escaping. Not a substitute for context-specific
+ * escaping (mrkdwn, HTML) — this only closes the header-injection vector.
+ */
+function stripHeaderInjection(input: string): string {
+  return input.replace(/[\r\n\0]+/g, " ");
+}
+
 export function buildGraphAlertTemplateContext({
   trigger,
   graph,
@@ -260,7 +271,10 @@ export function buildGraphAlertTemplateContext({
       url: graphUrl,
     },
     metric: {
-      label: metric.label,
+      // tpl5015-001: metric.label is derived from user-set series display
+      // names and lands verbatim in the email subject. Strip CR/LF so a
+      // hostile label can't inject an extra header via the SMTP subject line.
+      label: stripHeaderInjection(metric.label),
       seriesName: metric.seriesName,
     },
     condition: {

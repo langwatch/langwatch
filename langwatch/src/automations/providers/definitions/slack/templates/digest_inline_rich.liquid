@@ -15,25 +15,25 @@
   {%- for g in _groups -%}
   ,{ "type": "divider" }
   {%- capture _grp -%}
-*{{ g.name | default: "Other" | replace: "&", "&amp;" | replace: "<", "&lt;" | replace: ">", "&gt;" }}* · {{ g.items.size }} match{% if g.items.size != 1 %}es{% endif %}
+*{{ g.name | default: "Other" }}* · {{ g.items.size }} match{% if g.items.size != 1 %}es{% endif %}
   {%- endcapture -%}
   ,{ "type": "context", "elements": [{ "type": "mrkdwn", "text": {{ _grp | json }} }] }
     {%- for m in g.items -%}
     {%- capture _title -%}
-{% if m.evaluation.score != null %}`{{ m.evaluation.score }}` {% endif %}*{{ m.trace.metadata.model | default: "trace" | replace: "&", "&amp;" | replace: "<", "&lt;" | replace: ">", "&gt;" }}* · <{{ m.trace.url }}|`{{ m.trace.id | truncate: 12 }}` ↗>
+{% if m.evaluation.score != null %}`{{ m.evaluation.score }}` {% endif %}*{{ m.trace.metadata.model | default: "trace" }}* · <{{ m.trace.url }}|`{{ m.trace.id | truncate: 12 }}` ↗>
     {%- endcapture -%}
     ,{ "type": "section", "text": { "type": "mrkdwn", "text": {{ _title | json }} } }
       {%- if m.trace.input != "" -%}
       {%- capture _md_i -%}
 ## User
-{{ m.trace.input | truncate: 600 | replace: "&", "&amp;" | replace: "<", "&lt;" | replace: ">", "&gt;" }}
+{{ m.trace.input | truncate: 600 }}
       {%- endcapture -%}
       ,{ "type": "markdown", "text": {{ _md_i | json }} }
       {%- endif -%}
       {%- if m.trace.output != "" -%}
       {%- capture _md_o -%}
 ## Assistant
-{{ m.trace.output | truncate: 600 | replace: "&", "&amp;" | replace: "<", "&lt;" | replace: ">", "&gt;" }}
+{{ m.trace.output | truncate: 600 }}
       {%- endcapture -%}
       ,{ "type": "markdown", "text": {{ _md_o | json }} }
       {%- endif -%}

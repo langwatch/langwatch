@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.suite_analytics
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}UpdatedAt)
 PARTITION BY toYearWeek(OccurredAt)
 ORDER BY (TenantId, OccurredAt, SuiteRunId)
-TTL toDateTime(OccurredAt) + INTERVAL _retention_days DAY DELETE
+TTL IF(_retention_days > 0, toDateTime(OccurredAt) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE
 SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 

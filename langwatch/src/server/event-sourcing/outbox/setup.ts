@@ -118,6 +118,18 @@ export function buildOutboxRuntime({
 }): OutboxRuntime {
   const auditAdapter = new PgOutboxAuditAdapter(prisma);
 
+  // dispatch5015-003: fail loud if BASE_HOST is missing. Every graph-alert
+  // and trace-alert dispatch interpolates baseHost into deep links
+  // (project.url, graph.url, editUrl, unsubscribe URL). An empty baseHost
+  // silently produces broken links for customers — detect at composition-root
+  // rather than a warn buried in a hot path.
+  const baseHost = env.BASE_HOST;
+  if (!baseHost) {
+    throw new Error(
+      "BASE_HOST is unset — the outbox runtime cannot render deep links (email + Slack alert templates interpolate baseHost). Set env.BASE_HOST before booting the worker.",
+    );
+  }
+
   // Shared trace fold store — settle stage cross-reads it to drive the
   // post-settle filter check against fresh state.
   // RedisCachedFoldStore takes a standalone `Redis` client; a Cluster
@@ -198,14 +210,14 @@ export function buildOutboxRuntime({
           input,
         }),
     },
-    baseHost: env.BASE_HOST ?? "",
+    baseHost,
     now: () => new Date(),
   };
 
   const dispatcher = createOutboxDispatcher({
     triggers,
     projects,
-    baseHost: env.BASE_HOST ?? "",
+    baseHost,
     traceSummaryStore,
     evaluationRuns: evaluations.runs,
     deriveEvents: (params) => traceReadDerivation.deriveEvents(params),

@@ -270,8 +270,6 @@ export function buildEvalSlimTimeseriesQuery(
     );
   }
 
-  const evaluatorKeyParams: Record<string, unknown> = {};
-
   for (let i = 0; i < input.series.length; i++) {
     const s = input.series[i]!;
     if (!isEvalSlimMetricKey(s.metric)) {
@@ -279,17 +277,17 @@ export function buildEvalSlimTimeseriesQuery(
         `Eval slim builder cannot serve metric "${s.metric}". The router should have routed this to evaluation_runs.`,
       );
     }
+    // Router refuses key-bearing series for eval slim (rt5014-001): the slim
+    // table has no EvaluatorId column, so per-evaluator filtering can't be
+    // served here. Fail loud if the router breaks.
+    if (s.key !== undefined) {
+      throw new Error(
+        `Eval slim builder cannot serve series with key="${s.key}" — the router should have routed this to evaluation_runs (no EvaluatorId column on evaluation_analytics; see migration 00040).`,
+      );
+    }
     const alias = buildMetricAlias(i, s.metric, s.aggregation, s.key, s.subkey);
     const expr = evalSlimAggExpression(s.aggregation, evalSlimColumnFor(s.metric));
     selectExprs.push(`${expr} AS ${alias}`);
-    // Stamp evaluator-id filter parameters when a `requiresKey` value is
-    // present on the series. The WHERE-fragment below ANDs them via a
-    // single-key IN-clause so multiple series sharing the same key share
-    // one parameter (we deduplicate via the key string itself).
-    if (s.key !== undefined && s.key !== "") {
-      const paramName = `evaluatorKey_${i}`;
-      evaluatorKeyParams[paramName] = s.key;
-    }
   }
 
   const groupByExprs: string[] = ["period"];
@@ -298,23 +296,6 @@ export function buildEvalSlimTimeseriesQuery(
 
   const { whereClause: filterWhere, params: filterParams } =
     buildEvalSlimFilterClauses(input.filters);
-
-  const evaluatorIdClauses = Object.keys(evaluatorKeyParams)
-    .map((p) => `${ea}.EvaluatorType IS NOT NULL AND ${ea}.EvaluatorId = ANY(?)`)
-    .join("");
-  // Use a single `EvaluatorId IN (...)` predicate built from the union of
-  // all series' keys. (Each series targets a single evaluator; the union
-  // covers the common multi-series-with-same-evaluator case.)
-  const evaluatorIds = Array.from(
-    new Set(Object.values(evaluatorKeyParams) as string[]),
-  );
-  const evaluatorIdWhere =
-    evaluatorIds.length > 0
-      ? `AND ${ea}.EvaluatorId IN ({evaluatorKeys:Array(String)})`
-      : "";
-
-  // `evaluatorIdClauses` is no-op join; keep linter happy.
-  void evaluatorIdClauses;
 
   const havingClause = groupByColumn ? `HAVING group_key != ''` : "";
 
@@ -328,7 +309,6 @@ export function buildEvalSlimTimeseriesQuery(
         OR
         (${ea}.OccurredAt >= {previousStart:DateTime64(3)} AND ${ea}.OccurredAt < {previousEnd:DateTime64(3)})
       )
-      ${evaluatorIdWhere}
       ${filterWhere}
     GROUP BY ${groupByExprs.join(", ")}
     ${havingClause}
@@ -343,7 +323,6 @@ export function buildEvalSlimTimeseriesQuery(
       currentEnd: input.endDate,
       previousStart: input.previousPeriodStartDate,
       previousEnd: input.startDate,
-      ...(evaluatorIds.length > 0 ? { evaluatorKeys: evaluatorIds } : {}),
       ...filterParams,
     },
   };

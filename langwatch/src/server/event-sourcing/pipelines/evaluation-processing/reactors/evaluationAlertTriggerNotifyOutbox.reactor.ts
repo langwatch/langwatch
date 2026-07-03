@@ -115,6 +115,10 @@ export function createEvaluationAlertTriggerNotifyOutboxReactor(
       for (const trigger of candidates) {
         const payload: SettleStagePayload = {
           stage: "settle",
+          // reactor-001: stamp actionClass so the dispatcher routes without
+          // falling back to reading trigger.action; the trace pair + the
+          // eval persist reactor all set this — this one was missing.
+          actionClass: "notify",
           projectId: tenantId,
           triggerId: trigger.id,
           traceId,

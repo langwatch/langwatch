@@ -84,7 +84,7 @@ ENGINE = AggregatingMergeTree()
 PARTITION BY toYearWeek(toDate(BucketStart))
 ORDER BY (TenantId, BucketStart, ExperimentId, CompletionMode)
 -- Inline retention TTL: drop a row `_retention_days` days after its bucket.
-TTL toDateTime(BucketStart) + INTERVAL _retention_days DAY DELETE
+TTL IF(_retention_days > 0, toDateTime(BucketStart) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE
 SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 
