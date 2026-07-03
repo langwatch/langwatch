@@ -15,9 +15,12 @@
 # the Go surface by standing arrangement.
 #
 # AUTH: langwatch has no public members, so a plain repo-scoped GITHUB_TOKEN
-# returns an empty member list. Run with a token that has `read:org` (locally:
-# your `gh auth`; in CI: the CODEOWNERS_REFRESH_TOKEN secret). If no members
-# come back the script hard-fails rather than writing an empty-ownership file.
+# returns an empty member list. Run with a token that can read org membership:
+# locally, `gh auth login` with the `read:org` scope; in CI, an installation
+# token from the CODEOWNERS_REFRESH_APP_ID / CODEOWNERS_REFRESH_APP_PRIVATE_KEY
+# GitHub App (see .github/workflows/codeowners-refresh.yml). If no members come
+# back — or the commit-attribution sample below is empty — the script hard-fails
+# rather than writing a wrong-owner file.
 #
 # Run from anywhere in the repo with full history (CI: fetch-depth: 0). The
 # weekly .github/workflows/codeowners-refresh.yml runs this and opens a PR
@@ -58,9 +61,15 @@ if [ "$member_count" -eq 0 ]; then
 fi
 echo "Eligible owners ($member_count org members): $(tr '\n' ' ' < "$MEMBER_FILE")" >&2
 
+# Policy owners are hard-coded into every rule (fallback + Go co-owner), so if
+# either leaves the org the whole file would violate the "org members only"
+# invariant. Fail closed rather than emit a non-member.
 for required in "$DEFAULT_OWNER" "$GO_COOWNER"; do
-  grep -qix "$required" "$MEMBER_FILE" \
-    || echo "WARNING: configured policy owner '$required' is not an org member." >&2
+  grep -qix "$required" "$MEMBER_FILE" || {
+    echo "ERROR: configured policy owner '$required' is not an org member of $ORG." >&2
+    echo "       Update DEFAULT_OWNER / GO_COOWNER at the top of this script." >&2
+    exit 1
+  }
 done
 
 # --- 2. email -> GitHub login, from a recent-commit sample (GitHub attributes
@@ -71,6 +80,18 @@ for p in $(seq 1 "$pages"); do
     --jq '.[] | select(.author.login != null) | [.commit.author.email, .author.login] | @tsv' \
     2>/dev/null || true
 done | sort -u > "$MAP_FILE"
+
+# If the commits API failed (rate limit, transient error, bad token) the map is
+# empty, no author gets attributed to an org member, and every rule collapses
+# to DEFAULT_OWNER — producing a large and wrong CODEOWNERS diff. Fail closed,
+# matching the empty-members check.
+map_size="$(wc -l < "$MAP_FILE" | tr -d ' ')"
+if [ "$map_size" -eq 0 ]; then
+  echo "ERROR: commit email->login sample is empty (no rows from" >&2
+  echo "       repos/$REPO/commits). Likely a token, rate-limit, or network issue." >&2
+  echo "       Refusing to generate a CODEOWNERS with no attribution." >&2
+  exit 1
+fi
 
 # owners_for <pathspec...> — top (max 2) org-member owners for the given paths,
 # as space-separated bare logins, or empty if none.
@@ -158,7 +179,7 @@ generate() {
 # to specific (bottom). Owners must have write access to the repo.
 
 # ===========================================================================
-# Global fallback — overall top contributor across the repo.
+# Global fallback — overall top contributors across the repo (up to 2).
 # ===========================================================================
 HEADER
   emit "*" "."
