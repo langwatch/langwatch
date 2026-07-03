@@ -248,7 +248,11 @@ export function extractAssistantOutputFromResponseBody(
         block.input !== undefined && block.input !== null
           ? safeStringify(block.input)
           : "";
-      parts.push(args ? `[tool_use: ${block.name}]\n${args}` : `[tool_use: ${block.name}]`);
+      parts.push(
+        args
+          ? `[tool_use: ${block.name}]\n${args}`
+          : `[tool_use: ${block.name}]`,
+      );
     }
   }
   if (parts.length === 0) return null;
@@ -305,7 +309,11 @@ function collectToolResultBlocks(
   if (!Array.isArray(content)) return;
   for (const block of content) {
     if (!block || typeof block !== "object") continue;
-    const b = block as { type?: unknown; tool_use_id?: unknown; content?: unknown };
+    const b = block as {
+      type?: unknown;
+      tool_use_id?: unknown;
+      content?: unknown;
+    };
     if (b.type !== "tool_result") continue;
     if (typeof b.tool_use_id !== "string" || b.tool_use_id.length === 0) {
       continue;
@@ -355,7 +363,11 @@ function scanToolResultsFromTruncatedBody(
         continue;
       }
       if (!obj || typeof obj !== "object") continue;
-      const b = obj as { type?: unknown; tool_use_id?: unknown; content?: unknown };
+      const b = obj as {
+        type?: unknown;
+        tool_use_id?: unknown;
+        content?: unknown;
+      };
       if (b.type !== "tool_result") continue;
       if (typeof b.tool_use_id !== "string" || b.tool_use_id.length === 0) {
         continue;
@@ -450,15 +462,26 @@ export function buildInputMessagesFromRequestBody(
   raw: unknown,
 ): Array<{ role: string; content: string }> | null {
   if (raw === null || raw === undefined) return null;
-  let parsed: unknown = raw;
-  if (typeof raw === "string") {
-    if (raw.length === 0) return null;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      return null;
-    }
+  if (typeof raw === "object") return buildFromParsedRequestBody(raw);
+  if (typeof raw !== "string" || raw.length === 0) return null;
+  try {
+    return buildFromParsedRequestBody(JSON.parse(raw));
+  } catch {
+    // claude truncates large request bodies INLINE at ~60KB, so a real
+    // coding-agent turn (system + tools + history) does NOT JSON.parse. Rather
+    // than falling back to just the latest user turn — which strands the whole
+    // cached prefix (system prompt + tool defs), leaving the cost classifier to
+    // dump those tokens into `other_input` — recover what survived the cut.
+    // Truncation always removes the TAIL, so the front-loaded system prompt and
+    // the complete leading turns are intact.
+    return recoverInputMessagesFromTruncatedBody(raw);
   }
+}
+
+/** Build the canonical input-message array from an already-parsed request body. */
+function buildFromParsedRequestBody(
+  parsed: unknown,
+): Array<{ role: string; content: string }> | null {
   if (!parsed || typeof parsed !== "object") return null;
   const obj = parsed as { system?: unknown; messages?: unknown };
   if (!Array.isArray(obj.messages)) return null;
@@ -482,6 +505,155 @@ export function buildInputMessagesFromRequestBody(
   }
 
   return out.length > 0 ? out : null;
+}
+
+/**
+ * Recover input messages from a body claude truncated inline (invalid JSON).
+ * Best-effort, string-aware: pulls the `system` value (string or content-block
+ * array) plus every COMPLETE `{ role, content }` message object present before
+ * the truncation point. An incompletely-written trailing object never balances,
+ * so it is simply skipped. Returns null when nothing usable survives (caller
+ * then falls back to the clean co-located `user_prompt`).
+ *
+ * @internal exported for unit testing only
+ */
+export function recoverInputMessagesFromTruncatedBody(
+  raw: string,
+): Array<{ role: string; content: string }> | null {
+  const out: Array<{ role: string; content: string }> = [];
+
+  const systemText = recoverSystemText(raw);
+  if (systemText && systemText.length > 0) {
+    out.push({ role: "system", content: systemText });
+  }
+
+  const messagesKey = raw.indexOf('"messages"');
+  if (messagesKey >= 0) {
+    const arrayStart = raw.indexOf("[", messagesKey);
+    if (arrayStart >= 0) {
+      for (const slice of completeObjectSlices(raw, arrayStart + 1)) {
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(slice);
+        } catch {
+          continue;
+        }
+        if (!parsed || typeof parsed !== "object") continue;
+        const message = parsed as { role?: unknown; content?: unknown };
+        const role = typeof message.role === "string" ? message.role : "user";
+        const content = contentToText(message.content);
+        if (content.length === 0) continue;
+        out.push({ role, content });
+      }
+    }
+  }
+
+  return out.length > 0 ? out : null;
+}
+
+/**
+ * Recover the `system` field's text from a truncated body. Anthropic sends
+ * `system` as a string OR an array of `{ type: "text", text }` blocks (with
+ * cache_control); both shapes are handled. When the value is an array, complete
+ * blocks are flattened even if the array itself was cut off before its closing
+ * `]`. Returns null when no `system` value is present or nothing parses.
+ */
+function recoverSystemText(raw: string): string | null {
+  const key = raw.indexOf('"system"');
+  if (key < 0) return null;
+  let i = raw.indexOf(":", key);
+  if (i < 0) return null;
+  i++;
+  while (i < raw.length && /\s/.test(raw[i]!)) i++;
+  if (i >= raw.length) return null;
+
+  if (raw[i] === '"') {
+    return readJsonStringAt(raw, i);
+  }
+  if (raw[i] === "[") {
+    const parts: string[] = [];
+    for (const slice of completeObjectSlices(raw, i + 1)) {
+      try {
+        const block = JSON.parse(slice);
+        const text = contentToText([block]);
+        if (text.length > 0) parts.push(text);
+      } catch {
+        // skip a block that didn't parse
+      }
+    }
+    return parts.length > 0 ? parts.join("\n\n") : null;
+  }
+  return null;
+}
+
+/**
+ * Read a complete JSON string literal starting at `quoteIndex` (which must point
+ * at the opening `"`), honouring escapes. Returns the unescaped value, or null
+ * when the string was cut off by truncation (no closing quote).
+ */
+function readJsonStringAt(raw: string, quoteIndex: number): string | null {
+  let esc = false;
+  for (let i = quoteIndex + 1; i < raw.length; i++) {
+    const ch = raw[i];
+    if (esc) {
+      esc = false;
+      continue;
+    }
+    if (ch === "\\") {
+      esc = true;
+      continue;
+    }
+    if (ch === '"') {
+      try {
+        return JSON.parse(raw.slice(quoteIndex, i + 1)) as string;
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Yield every COMPLETE, balanced top-level `{…}` object slice at/after
+ * `fromIndex`, tracking string/escape state so braces inside string values do
+ * not corrupt the depth count. Stops at the first depth-0 `]` (the end of the
+ * enclosing array) so a scan seeded at a `messages`/`system` array does not
+ * bleed into sibling fields. A trailing object cut off by truncation never
+ * balances and is never yielded.
+ */
+function* completeObjectSlices(
+  raw: string,
+  fromIndex: number,
+): Generator<string> {
+  let depth = 0;
+  let start = -1;
+  let inStr = false;
+  let esc = false;
+  for (let i = fromIndex; i < raw.length; i++) {
+    const ch = raw[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === "\\") esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') inStr = true;
+    else if (ch === "{") {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (ch === "}") {
+      if (depth > 0) {
+        depth--;
+        if (depth === 0 && start >= 0) {
+          yield raw.slice(start, i + 1);
+          start = -1;
+        }
+      }
+    } else if (ch === "]" && depth === 0) {
+      return;
+    }
+  }
 }
 
 export function extractUserTextFromRequestBody(raw: unknown): string | null {

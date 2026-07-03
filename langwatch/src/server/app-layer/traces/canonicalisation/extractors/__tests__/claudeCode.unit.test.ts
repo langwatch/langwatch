@@ -8,6 +8,7 @@ import {
   extractAssistantTextFromResponseBody,
   extractUserTextFromRequestBody,
   isConversationalQuerySource,
+  recoverInputMessagesFromTruncatedBody,
 } from "../claudeCode";
 import { createLogExtractorContext } from "./_testHelpers";
 
@@ -287,19 +288,92 @@ describe("buildInputMessagesFromRequestBody (exported helper)", () => {
     ]);
   });
 
-  it("returns null for truncated / malformed / message-less bodies", () => {
+  it("returns null for empty / message-less bodies", () => {
     expect(buildInputMessagesFromRequestBody(undefined)).toBeNull();
     expect(buildInputMessagesFromRequestBody("")).toBeNull();
-    // claude truncates large request bodies inline -> invalid JSON tail.
-    expect(
-      buildInputMessagesFromRequestBody('{"model":"x","messages":[{"role":"u'),
-    ).toBeNull();
     expect(buildInputMessagesFromRequestBody(JSON.stringify({}))).toBeNull();
     // messages present but every turn flattens to empty -> null.
     expect(
       buildInputMessagesFromRequestBody(
         JSON.stringify({ messages: [{ role: "user", content: [] }] }),
       ),
+    ).toBeNull();
+    // Truncated before any complete turn and no system -> nothing to recover.
+    expect(
+      buildInputMessagesFromRequestBody('{"model":"x","messages":[{"role":"u'),
+    ).toBeNull();
+  });
+
+  it("recovers system + complete leading turns from a body truncated in the last turn", () => {
+    // The real failure mode: claude cut the ~60KB body inside the newest turn.
+    // The front-loaded system prompt and the earlier complete turns survive and
+    // must be recovered so the cost classifier does not strand the cached prefix
+    // in other_input.
+    const full = JSON.stringify({
+      model: "claude-fable-5",
+      system: [
+        {
+          type: "text",
+          text: "You are helpful",
+          cache_control: { type: "ephemeral" },
+        },
+      ],
+      messages: [
+        { role: "user", content: "first question" },
+        {
+          role: "assistant",
+          content: [{ type: "text", text: "first answer" }],
+        },
+        { role: "user", content: "second question, now cut off partway" },
+      ],
+    });
+    const truncated = full.slice(0, full.indexOf("second question") + 6);
+
+    expect(buildInputMessagesFromRequestBody(truncated)).toEqual([
+      { role: "system", content: "You are helpful" },
+      { role: "user", content: "first question" },
+      { role: "assistant", content: "first answer" },
+      // the truncated third turn never balances and is dropped
+    ]);
+  });
+});
+
+describe("recoverInputMessagesFromTruncatedBody (exported helper)", () => {
+  it("recovers complete leading system blocks when the system array itself is cut", () => {
+    const full = JSON.stringify({
+      system: [
+        { type: "text", text: "block one" },
+        { type: "text", text: "block two, cut here somewhere long" },
+      ],
+      messages: [{ role: "user", content: "go" }],
+    });
+    // Cut inside the SECOND system block's text (before it closes).
+    const truncated = full.slice(0, full.indexOf("cut here"));
+
+    expect(recoverInputMessagesFromTruncatedBody(truncated)).toEqual([
+      { role: "system", content: "block one" },
+    ]);
+  });
+
+  it("keeps brace/quote characters inside content from corrupting the scan", () => {
+    const full = JSON.stringify({
+      messages: [
+        { role: "user", content: 'a message with { braces } and a "quote"' },
+        { role: "assistant", content: "clean reply" },
+        { role: "user", content: "cut here" },
+      ],
+    });
+    const truncated = full.slice(0, full.indexOf("cut here") + 3);
+
+    expect(recoverInputMessagesFromTruncatedBody(truncated)).toEqual([
+      { role: "user", content: 'a message with { braces } and a "quote"' },
+      { role: "assistant", content: "clean reply" },
+    ]);
+  });
+
+  it("returns null when nothing complete survives", () => {
+    expect(
+      recoverInputMessagesFromTruncatedBody('{"messages":[{"role":"u'),
     ).toBeNull();
   });
 });
@@ -309,7 +383,12 @@ describe("extractAssistantOutputFromResponseBody", () => {
     const body = JSON.stringify({
       content: [
         { type: "text", text: "Let me check." },
-        { type: "tool_use", id: "toolu_1", name: "Bash", input: { command: "ls /tmp" } },
+        {
+          type: "tool_use",
+          id: "toolu_1",
+          name: "Bash",
+          input: { command: "ls /tmp" },
+        },
       ],
     });
     const out = extractAssistantOutputFromResponseBody(body) ?? "";
@@ -319,7 +398,9 @@ describe("extractAssistantOutputFromResponseBody", () => {
   });
 
   it("matches the text-only extractor for a plain text reply", () => {
-    const body = JSON.stringify({ content: [{ type: "text", text: "PONG-Z" }] });
+    const body = JSON.stringify({
+      content: [{ type: "text", text: "PONG-Z" }],
+    });
     expect(extractAssistantOutputFromResponseBody(body)).toBe("PONG-Z");
     expect(extractAssistantTextFromResponseBody(body)).toBe("PONG-Z");
   });
@@ -347,7 +428,9 @@ describe("collectToolResultsFromRequestBody", () => {
       messages: [
         {
           role: "assistant",
-          content: [{ type: "tool_use", id: "toolu_a", name: "Bash", input: {} }],
+          content: [
+            { type: "tool_use", id: "toolu_a", name: "Bash", input: {} },
+          ],
         },
         { role: "user", content: [bashResult("toolu_a", "       0")] },
       ],
@@ -385,14 +468,21 @@ describe("collectToolResultsFromRequestBody", () => {
       messages: [
         {
           role: "assistant",
-          content: [{ type: "tool_use", id: "toolu_first", name: "Bash", input: {} }],
+          content: [
+            { type: "tool_use", id: "toolu_first", name: "Bash", input: {} },
+          ],
         },
         { role: "user", content: [bashResult("toolu_first", "first-result")] },
         {
           role: "assistant",
-          content: [{ type: "tool_use", id: "toolu_last", name: "Bash", input: {} }],
+          content: [
+            { type: "tool_use", id: "toolu_last", name: "Bash", input: {} },
+          ],
         },
-        { role: "user", content: [bashResult("toolu_last", "SECOND_RESULT_CUT_HERE")] },
+        {
+          role: "user",
+          content: [bashResult("toolu_last", "SECOND_RESULT_CUT_HERE")],
+        },
       ],
     });
     const truncated = full.slice(0, full.indexOf("SECOND_RESULT_CUT_HERE") + 6);
