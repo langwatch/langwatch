@@ -199,6 +199,38 @@ describe("allocateCategoryCosts", () => {
     });
   });
 
+  describe("given a single cached-prefix block straddling the read→creation boundary", () => {
+    it("splits the block across both tiers instead of dumping half into the catch-all", () => {
+      // Regression: a 1000-token system_prompt with cacheRead=500 / creation=500
+      // used to assign the whole block to cache_read, leaving the creation pool
+      // blockless — the zero-guard then dumped its 500 tokens into other_input,
+      // so the customer saw half their system prompt as "Other input"
+      // (conservation still held, so the totals-only tests missed it).
+      const inputBlocks: TokenBlock[] = [
+        { idx: 0, category: InputCategory.SYSTEM_PROMPT, tokens: 1000 },
+      ];
+      const pools: UsagePools = {
+        inputTokens: 0,
+        cacheReadTokens: 500,
+        cacheCreationTokens: 500,
+        outputTokens: 0,
+      };
+
+      const { categoryTotals } = allocateCategoryCosts({
+        inputBlocks,
+        outputBlocks: [],
+        lastCacheBreakpointIndex: 0,
+        pools,
+        prices: {},
+      });
+
+      // Whole block stays system_prompt across both cache tiers; nothing leaks
+      // into the input catch-all.
+      expect(categoryTotals[InputCategory.SYSTEM_PROMPT]?.tokens).toBe(1000);
+      expect(categoryTotals[InputCategory.OTHER_INPUT]).toBeUndefined();
+    });
+  });
+
   describe("given usage reported but no attributable blocks", () => {
     /** @scenario "Usage with no attributable blocks lands in the catch-all category" */
     it("records the unattributable usage under the catch-all and drops nothing", () => {

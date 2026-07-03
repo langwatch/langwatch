@@ -228,9 +228,13 @@ function reconcileCosts(totals: CategoryTotals, target: number): void {
 
 /**
  * Split input blocks into the cached prefix (cache_read then cache_creation) and
- * the fresh remainder. Blocks are assigned whole — the prefix fills the
- * cache_read pool by cumulative token estimate, then the rest of the prefix
- * overflows to cache_creation. When neither cache pool has capacity, the
+ * the fresh remainder. The prefix fills the cache_read pool by cumulative token
+ * estimate, then the rest of the prefix overflows to cache_creation. A block
+ * that STRADDLES the read→creation boundary is split at it, keeping its idx and
+ * category on both slices: assigning it wholly to one tier would leave the other
+ * pool blockless, and allocatePool's zero-guard then dumps that pool's whole
+ * total into the axis catch-all (e.g. half a system_prompt shown as other_input)
+ * even though conservation still holds. When neither cache pool has capacity, the
  * breakpoint is irrelevant and everything is fresh.
  */
 function partitionInput({
@@ -268,9 +272,23 @@ function partitionInput({
 
   let running = 0;
   for (const block of prefix) {
-    if (running < cacheReadTokens) cacheRead.push(block);
-    else cacheCreation.push(block);
-    running += block.tokens;
+    const blockEnd = running + block.tokens;
+    if (blockEnd <= cacheReadTokens) {
+      // Entirely within the cache_read budget.
+      cacheRead.push(block);
+    } else if (running >= cacheReadTokens) {
+      // Starts at/after the boundary — entirely cache_creation.
+      cacheCreation.push(block);
+    } else {
+      // Straddles the boundary: split at it so neither pool is left blockless.
+      // Both slices keep idx + category; allocatePool rescales each pool to its
+      // provider total, so the estimate-based split point only sets the tier
+      // proportions, never the final token totals.
+      const readPortion = cacheReadTokens - running;
+      cacheRead.push({ ...block, tokens: readPortion });
+      cacheCreation.push({ ...block, tokens: block.tokens - readPortion });
+    }
+    running = blockEnd;
   }
 
   return { cachePrefix: { cacheRead, cacheCreation }, fresh };
