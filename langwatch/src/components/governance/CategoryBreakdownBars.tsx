@@ -144,9 +144,7 @@ export function CategoryBreakdownCaption({
       : "Where your tokens go";
   return (
     <HStack gap={1} color="fg.muted" fontSize="sm" marginBottom={3}>
-      <Text>
-        {lead}: system prompt, MCP tools, skills, thinking, and more.
-      </Text>
+      <Text>{lead}: system prompt, MCP tools, skills, thinking, and more.</Text>
       <Tooltip
         openDelay={100}
         content={

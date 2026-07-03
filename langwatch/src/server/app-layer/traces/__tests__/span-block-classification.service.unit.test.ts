@@ -217,10 +217,7 @@ describe("OtlpSpanBlockClassificationService", () => {
         const gated = new OtlpSpanBlockClassificationService({
           tokenizer: fakeTokenizer,
           featureFlagService: {
-            isEnabled: async (
-              key: string,
-              opts?: { projectId?: string },
-            ) =>
+            isEnabled: async (key: string, opts?: { projectId?: string }) =>
               key === "block-classification-project-killswitch" &&
               opts?.projectId === "proj-bad",
           } as never,
