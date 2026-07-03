@@ -14,7 +14,7 @@ import { Check, Clock, Copy } from "lucide-react";
 import type React from "react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { Popover } from "../../../../components/ui/popover";
-import { TriggerAnchor } from "../../../../components/ui/TriggerAnchor";
+import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { Tooltip } from "../../../../components/ui/tooltip";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import type { TimeRange } from "../../stores/filterStore";
