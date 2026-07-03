@@ -68,18 +68,23 @@ export const TimeRangePicker: React.FC<{ compact?: boolean }> = ({
         content={`Time range: ${triggerLabel}`}
         positioning={{ placement: "bottom" }}
       >
-        <Popover.Trigger asChild>
-          <Button
-            size="xs"
-            variant="outline"
-            fontWeight="medium"
-            gap={compact ? 0 : 1.5}
-            aria-label={`Time range: ${triggerLabel}`}
-          >
-            <Clock size={14} />
-            {!compact && triggerLabel}
-          </Button>
-        </Popover.Trigger>
+        {/* Intermediate span keeps Tooltip's asChild clone off the
+            Popover.Trigger's DOM node — see GroupingSelector.tsx for why
+            nesting two asChild triggers directly breaks anchor positioning. */}
+        <Box as="span" display="inline-flex">
+          <Popover.Trigger asChild>
+            <Button
+              size="xs"
+              variant="outline"
+              fontWeight="medium"
+              gap={compact ? 0 : 1.5}
+              aria-label={`Time range: ${triggerLabel}`}
+            >
+              <Clock size={14} />
+              {!compact && triggerLabel}
+            </Button>
+          </Popover.Trigger>
+        </Box>
       </Tooltip>
       <Popover.Content width="auto" minWidth="420px">
         <Popover.Body padding={0}>

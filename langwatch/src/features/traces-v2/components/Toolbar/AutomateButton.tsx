@@ -40,22 +40,27 @@ export const AutomateButton: React.FC<{ compact?: boolean }> = ({
         content="Automations from a filter. Coming soon."
         positioning={{ placement: "bottom" }}
       >
-        <PopoverTrigger asChild>
-          <Button
-            size="xs"
-            variant="ghost"
-            aria-label="Create an automation from the current filter"
-            // Read as gated, not missing — same pattern as the AskAi
-            // primer state. Keeps the affordance discoverable.
-            opacity={0.7}
-            filter="saturate(0.7)"
-          >
-            <Icon boxSize={3.5}>
-              <Zap />
-            </Icon>
-            {!compact && "Automate"}
-          </Button>
-        </PopoverTrigger>
+        {/* Intermediate span keeps Tooltip's asChild clone off the
+            PopoverTrigger's DOM node — see GroupingSelector.tsx for why
+            nesting two asChild triggers directly breaks anchor positioning. */}
+        <Box as="span" display="inline-flex">
+          <PopoverTrigger asChild>
+            <Button
+              size="xs"
+              variant="ghost"
+              aria-label="Create an automation from the current filter"
+              // Read as gated, not missing — same pattern as the AskAi
+              // primer state. Keeps the affordance discoverable.
+              opacity={0.7}
+              filter="saturate(0.7)"
+            >
+              <Icon boxSize={3.5}>
+                <Zap />
+              </Icon>
+              {!compact && "Automate"}
+            </Button>
+          </PopoverTrigger>
+        </Box>
       </Tooltip>
       <PopoverContent width="320px">
         <PopoverArrow />

@@ -53,16 +53,21 @@ export function RecentChatsMenu({
       positioning={{ placement: "bottom-end" }}
     >
       <Tooltip content="Recent chats" showArrow>
-        <Menu.Trigger asChild>
-          <IconButton
-            size="xs"
-            variant="ghost"
-            aria-label="Recent chats"
-            color="fg.muted"
-          >
-            <History size={15} />
-          </IconButton>
-        </Menu.Trigger>
+        {/* Intermediate span keeps Tooltip's asChild clone off the
+            Menu.Trigger's DOM node — see GroupingSelector.tsx for why
+            nesting two asChild triggers directly breaks anchor positioning. */}
+        <Box as="span" display="inline-flex">
+          <Menu.Trigger asChild>
+            <IconButton
+              size="xs"
+              variant="ghost"
+              aria-label="Recent chats"
+              color="fg.muted"
+            >
+              <History size={15} />
+            </IconButton>
+          </Menu.Trigger>
+        </Box>
       </Tooltip>
       <Menu.Content
         minWidth="280px"

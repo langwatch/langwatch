@@ -84,26 +84,31 @@ export function LangyGitHubMenu({
         content={`GitHub connected — acting as @${connection.data.githubLogin}`}
         showArrow
       >
-        <Menu.Trigger asChild>
-          <IconButton
-            size="xs"
-            variant="ghost"
-            aria-label={`GitHub: acting as @${connection.data.githubLogin}`}
-            color="fg.muted"
-            position="relative"
-          >
-            <GitHub size={14} />
-            <Box
-              position="absolute"
-              top="4px"
-              right="4px"
-              width="6px"
-              height="6px"
-              borderRadius="full"
-              background="green.solid"
-            />
-          </IconButton>
-        </Menu.Trigger>
+        {/* Intermediate span keeps Tooltip's asChild clone off the
+            Menu.Trigger's DOM node — see GroupingSelector.tsx for why
+            nesting two asChild triggers directly breaks anchor positioning. */}
+        <Box as="span" display="inline-flex">
+          <Menu.Trigger asChild>
+            <IconButton
+              size="xs"
+              variant="ghost"
+              aria-label={`GitHub: acting as @${connection.data.githubLogin}`}
+              color="fg.muted"
+              position="relative"
+            >
+              <GitHub size={14} />
+              <Box
+                position="absolute"
+                top="4px"
+                right="4px"
+                width="6px"
+                height="6px"
+                borderRadius="full"
+                background="green.solid"
+              />
+            </IconButton>
+          </Menu.Trigger>
+        </Box>
       </Tooltip>
       <Menu.Content
         minWidth="220px"

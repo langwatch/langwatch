@@ -437,20 +437,25 @@ const ExampleRow: React.FC<{
 const CopyTrigger: React.FC<{ value: string }> = ({ value }) => (
   <Clipboard.Root value={value}>
     <Tooltip content="Copy" openDelay={200}>
-      <Clipboard.Trigger asChild>
-        <IconButton
-          aria-label="Copy query"
-          size="2xs"
-          variant="ghost"
-          color="fg.subtle"
-          opacity={0}
-          _groupHover={{ opacity: 1 }}
-        >
-          <Clipboard.Indicator copied={<Check size={11} />}>
-            <Copy size={11} />
-          </Clipboard.Indicator>
-        </IconButton>
-      </Clipboard.Trigger>
+      {/* Intermediate span keeps Tooltip's asChild clone off the
+          Clipboard.Trigger's DOM node — see GroupingSelector.tsx for why
+          nesting two asChild triggers directly clobbers the inner one's id. */}
+      <Box as="span" display="inline-flex">
+        <Clipboard.Trigger asChild>
+          <IconButton
+            aria-label="Copy query"
+            size="2xs"
+            variant="ghost"
+            color="fg.subtle"
+            opacity={0}
+            _groupHover={{ opacity: 1 }}
+          >
+            <Clipboard.Indicator copied={<Check size={11} />}>
+              <Copy size={11} />
+            </Clipboard.Indicator>
+          </IconButton>
+        </Clipboard.Trigger>
+      </Box>
     </Tooltip>
   </Clipboard.Root>
 );

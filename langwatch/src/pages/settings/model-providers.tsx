@@ -330,14 +330,21 @@ export default function ModelsPage() {
                             content="You need model provider manage permissions to edit or delete providers."
                             disabled={hasModelProvidersManagePermission}
                           >
-                            <Menu.Trigger asChild>
-                              <Button
-                                variant="ghost"
-                                disabled={!hasModelProvidersManagePermission}
-                              >
-                                <MoreVertical />
-                              </Button>
-                            </Menu.Trigger>
+                            {/* Intermediate span keeps Tooltip's asChild clone
+                                off the Menu.Trigger's DOM node — see
+                                GroupingSelector.tsx for why nesting two
+                                asChild triggers directly breaks anchor
+                                positioning. */}
+                            <Box as="span" display="inline-flex">
+                              <Menu.Trigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  disabled={!hasModelProvidersManagePermission}
+                                >
+                                  <MoreVertical />
+                                </Button>
+                              </Menu.Trigger>
+                            </Box>
                           </Tooltip>
                           <Menu.Content>
                             <Menu.Item
@@ -503,7 +510,12 @@ function AddModelProviderMenu({
   return (
     <Menu.Root>
       <Tooltip content={disabledReason} disabled={!disabled}>
-        <Menu.Trigger asChild>{children}</Menu.Trigger>
+        {/* Intermediate span keeps Tooltip's asChild clone off the
+            Menu.Trigger's DOM node — see GroupingSelector.tsx for why
+            nesting two asChild triggers directly breaks anchor positioning. */}
+        <Box as="span" display="inline-flex">
+          <Menu.Trigger asChild>{children}</Menu.Trigger>
+        </Box>
       </Tooltip>
       <Menu.Content>
         {addableProviders.map((provider) => (

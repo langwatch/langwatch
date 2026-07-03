@@ -31,12 +31,7 @@ interface AnnotationPopoverProps {
   annotationId?: string;
   /** The button that opens the popover. */
   trigger: React.ReactNode;
-  /**
-   * Hover hint for the trigger. Wired here (not in the trigger itself) so
-   * the Tooltip can wrap `Popover.Trigger` directly — nesting `<Tooltip>`
-   * inside the trigger meant two `asChild` layers tried to forward refs to
-   * the same Button, and Zag fell back to (0,0) for the tooltip anchor.
-   */
+  /** Hover hint for the trigger. */
   triggerTooltip?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -88,7 +83,14 @@ export function AnnotationPopover(props: AnnotationPopoverProps) {
           content={props.triggerTooltip}
           positioning={{ placement: "top" }}
         >
-          <Popover.Trigger asChild>{props.trigger}</Popover.Trigger>
+          {/* Intermediate span keeps Tooltip's asChild clone off the
+              Popover.Trigger's DOM node — nesting two asChild triggers
+              directly makes Tooltip's `id` clobber the one Zag's popover
+              machine assigned, breaking its id-based anchor lookup and
+              pinning the popover at the page origin. */}
+          <Box as="span" display="inline-flex">
+            <Popover.Trigger asChild>{props.trigger}</Popover.Trigger>
+          </Box>
         </Tooltip>
       ) : (
         <Popover.Trigger asChild>{props.trigger}</Popover.Trigger>

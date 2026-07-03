@@ -36,18 +36,25 @@ export const GroupingSelector: React.FC<{ compact?: boolean }> = ({
         }
         positioning={{ placement: "bottom" }}
       >
-        <MenuTrigger asChild>
-          <Button
-            size="xs"
-            variant={grouping === "flat" ? "outline" : "subtle"}
-            aria-label={`Group rows. Currently ${GROUPING_OPTIONS[grouping]}.`}
-            gap={1}
-            paddingX={2}
-          >
-            <Layers size={14} />
-            {!compact && <ChevronDown size={12} />}
-          </Button>
-        </MenuTrigger>
+        {/* The intermediate span keeps Tooltip's own asChild clone off the
+            MenuTrigger's DOM node — nesting two asChild triggers directly
+            (Tooltip > MenuTrigger) makes Tooltip's `id` clobber the one
+            Zag's menu machine assigned to the button, breaking its
+            id-based anchor lookup and pinning the menu at the page origin. */}
+        <Box as="span" display="inline-flex">
+          <MenuTrigger asChild>
+            <Button
+              size="xs"
+              variant={grouping === "flat" ? "outline" : "subtle"}
+              aria-label={`Group rows. Currently ${GROUPING_OPTIONS[grouping]}.`}
+              gap={1}
+              paddingX={2}
+            >
+              <Layers size={14} />
+              {!compact && <ChevronDown size={12} />}
+            </Button>
+          </MenuTrigger>
+        </Box>
       </Tooltip>
       <MenuContent minWidth="160px" textStyle="xs" paddingY={1}>
         <Box
