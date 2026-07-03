@@ -29,7 +29,7 @@ const grammarFile = (lang: string) => aliasToFile.get(lang) ?? lang;
 const viteConfig = readFileSync(join(process.cwd(), "vite.config.ts"), "utf8");
 const alternations = [
   ...viteConfig.matchAll(/\(([a-z0-9-|]+)\)\\\.m\?js\$/g),
-].map((m) => m[1].split("|"));
+].map((m) => m[1]?.split("|") ?? []);
 const eagerLangFiles = new Set(
   alternations.find((a) => a.includes("shellscript")) ?? [],
 );
