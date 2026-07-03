@@ -29,6 +29,12 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { ANALYTICS_CLICKHOUSE_SETTINGS } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import {
+  blockCategoryCostAttr,
+  blockCategoryTokensAttr,
+  CATEGORIES,
+  type Category,
+} from "~/server/app-layer/traces/block-classification/categories";
+import {
   getClickHouseClientForProject,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
@@ -76,6 +82,15 @@ export interface PersonalUsageBreakdown {
   /** Portion actually billed per token (excludes bundled spend). */
   billedUsd: number;
   requests: number;
+}
+
+export interface PersonalUsageCategoryBreakdown {
+  /** Wire taxonomy value (ADR-033 CATEGORY_ENUM) — the stable key for labels. */
+  category: Category;
+  /** Cost attributed to this content category over the window. */
+  costUsd: number;
+  /** Tokens attributed to this content category over the window. */
+  tokens: number;
 }
 
 export interface PersonalUsageQueryInput {
@@ -458,6 +473,90 @@ export class PersonalUsageService {
     return Array.from(aggregated.values())
       .sort((a, b) => b.spentUsd - a.spentUsd)
       .slice(0, limit);
+  }
+
+  /**
+   * Per-content-category cost + token breakdown (ADR-033 PR D). Powers the
+   * "Usage breakdown" lanes on /me. Category totals ride the reserved
+   * `langwatch.reserved.blockcat.<category>.{cost_usd,tokens}` attributes the
+   * trace fold accumulates onto trace_summaries, so this reads the personal
+   * project tenant directly — the same dedup-per-trace pattern as the sibling
+   * spend queries (argMax by UpdatedAt) so a replayed/re-folded trace counts
+   * once. Analytics only: these numbers never feed billing (ADR-033 invariant).
+   *
+   * Categories with zero cost AND zero tokens are dropped, so an all-zero
+   * result is an empty array — the /me view reads that as "nothing captured"
+   * and renders the payload-capture enablement hint.
+   *
+   * Ingestion-source ledger traffic is NOT unioned here: the gateway ledger
+   * carries no per-category totals (categories live only on trace summaries),
+   * so there is nothing to merge.
+   */
+  async breakdownByCategory(
+    input: PersonalUsageQueryInput,
+  ): Promise<PersonalUsageCategoryBreakdown[]> {
+    const window = input.window ?? defaultMonthWindow();
+    const client = await getClickHouseClientForProject(input.personalProjectId);
+    if (!client) return [];
+
+    // One argMax-per-trace column per (category, metric), summed in the outer
+    // query. Aliases are index-based (disjoint from any inner name) to avoid the
+    // ClickHouse alias-shadowing trap where an outer aggregate resolves a bare
+    // name back to itself.
+    const inner = CATEGORIES.map((category, i) => {
+      const costKey = `cost_${i}`;
+      const tokKey = `tok_${i}`;
+      return (
+        `argMax(toFloat64OrZero(Attributes[{c${i}:String}]), UpdatedAt) AS ${costKey},\n` +
+        `argMax(toFloat64OrZero(Attributes[{k${i}:String}]), UpdatedAt) AS ${tokKey}`
+      );
+    }).join(",\n");
+    const outer = CATEGORIES.map(
+      (_category, i) =>
+        `sum(cost_${i}) AS scost_${i}, sum(tok_${i}) AS stok_${i}`,
+    ).join(",\n");
+
+    const query_params: Record<string, string | number> = {
+      tenantId: input.personalProjectId,
+      fromMs: window.start.getTime(),
+      toMs: window.end.getTime(),
+    };
+    CATEGORIES.forEach((category, i) => {
+      query_params[`c${i}`] = blockCategoryCostAttr(category);
+      query_params[`k${i}`] = blockCategoryTokensAttr(category);
+    });
+
+    const result = await client.query({
+      query: `
+        SELECT
+          ${outer}
+        FROM (
+          SELECT
+            TraceId,
+            ${inner}
+          FROM trace_summaries
+          WHERE TenantId = {tenantId:String}
+            AND OccurredAt >= {fromMs:DateTime64(3, 'UTC')}
+            AND OccurredAt <  {toMs:DateTime64(3, 'UTC')}
+          GROUP BY TraceId
+        )
+        SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
+      `,
+      query_params,
+      format: "JSONEachRow",
+    });
+
+    const [row] = (await result.json()) as Array<Record<string, number | null>>;
+    if (!row) return [];
+
+    const breakdown: PersonalUsageCategoryBreakdown[] = [];
+    CATEGORIES.forEach((category, i) => {
+      const costUsd = Number(row[`scost_${i}`]) || 0;
+      const tokens = Number(row[`stok_${i}`]) || 0;
+      if (costUsd <= 0 && tokens <= 0) return;
+      breakdown.push({ category, costUsd, tokens });
+    });
+    return breakdown.sort((a, b) => b.costUsd - a.costUsd);
   }
 
   private async queryIngestionPrincipalBreakdown(

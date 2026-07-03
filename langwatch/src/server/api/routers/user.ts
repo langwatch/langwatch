@@ -551,6 +551,7 @@ export const userRouter = createTRPCRouter({
           },
           dailyBuckets: [],
           breakdownByModel: [],
+          breakdownByCategory: [],
         };
       }
 
@@ -582,31 +583,40 @@ export const userRouter = createTRPCRouter({
       // personal project tenant by the /me table (tracesV2.list), so it
       // isn't fetched here.
       const ingestionTenantId = governanceProject?.id;
-      const [summary, dailyBuckets, breakdownByModel] = await Promise.all([
-        usage.summary({
-          personalProjectId: workspace.project.id,
-          window,
-          userId,
-          ingestionTenantId,
-        }),
-        usage.dailyBuckets({
-          personalProjectId: workspace.project.id,
-          window,
-          userId,
-          ingestionTenantId,
-        }),
-        usage.breakdownByModel({
-          personalProjectId: workspace.project.id,
-          window,
-          userId,
-          ingestionTenantId,
-        }),
-      ]);
+      const [summary, dailyBuckets, breakdownByModel, breakdownByCategory] =
+        await Promise.all([
+          usage.summary({
+            personalProjectId: workspace.project.id,
+            window,
+            userId,
+            ingestionTenantId,
+          }),
+          usage.dailyBuckets({
+            personalProjectId: workspace.project.id,
+            window,
+            userId,
+            ingestionTenantId,
+          }),
+          usage.breakdownByModel({
+            personalProjectId: workspace.project.id,
+            window,
+            userId,
+            ingestionTenantId,
+          }),
+          // Category totals live only on the personal-project trace summaries
+          // (the gateway ledger carries no per-category split), so this reads
+          // the personal tenant without the ingestion-ledger union.
+          usage.breakdownByCategory({
+            personalProjectId: workspace.project.id,
+            window,
+          }),
+        ]);
 
       return {
         summary,
         dailyBuckets,
         breakdownByModel,
+        breakdownByCategory,
       };
     }),
 

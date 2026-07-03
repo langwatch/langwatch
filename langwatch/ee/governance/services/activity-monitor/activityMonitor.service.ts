@@ -29,17 +29,22 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { PrismaClient } from "@prisma/client";
-
+import {
+  blockCategoryCostAttr,
+  blockCategoryTokensAttr,
+  CATEGORIES,
+  type Category,
+} from "~/server/app-layer/traces/block-classification/categories";
 import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
-import { PROJECT_KIND } from "../governanceProject.service";
+import {
+  resolveTraceDepartmentId,
+  UNASSIGNED_DEPARTMENT,
+} from "../department/departmentAttribution";
 import {
   GOVERNANCE_ATTR,
   GOVERNANCE_ORIGIN_KIND_VALUE,
 } from "../governanceAttributeKeys";
-import {
-  UNASSIGNED_DEPARTMENT,
-  resolveTraceDepartmentId,
-} from "../department/departmentAttribution";
+import { PROJECT_KIND } from "../governanceProject.service";
 
 export interface SummaryResult {
   spentThisWindowUsd: number;
@@ -55,6 +60,15 @@ export interface SummaryResult {
   newUsersThisWindow: number;
   openAnomalyCount: number;
   anomalyBreakdown: { critical: number; warning: number; info: number };
+}
+
+export interface CategoryBreakdownRow {
+  /** Wire taxonomy value (ADR-033 CATEGORY_ENUM) — the stable key for labels. */
+  category: Category;
+  /** Cost attributed to this content category across the org in the window. */
+  costUsd: number;
+  /** Tokens attributed to this content category across the org in the window. */
+  tokens: number;
 }
 
 export interface SpendByUserRow {
@@ -320,7 +334,9 @@ export class ActivityMonitorService {
       input.organizationId,
     );
     const openAnomalyCount =
-      anomalyBreakdown.critical + anomalyBreakdown.warning + anomalyBreakdown.info;
+      anomalyBreakdown.critical +
+      anomalyBreakdown.warning +
+      anomalyBreakdown.info;
 
     const govProjectId = await this.resolveGovProjectId(input.organizationId);
     if (!govProjectId) {
@@ -500,8 +516,86 @@ export class ActivityMonitorService {
       // Trend-vs-previous needs a windowed CTE comparison; deferred to 3b.
       trendVsPreviousPct: 0,
       hasPriorBaseline: false,
-      mostUsedTarget: r.mostUsedTarget && r.mostUsedTarget !== "" ? r.mostUsedTarget : null,
+      mostUsedTarget:
+        r.mostUsedTarget && r.mostUsedTarget !== "" ? r.mostUsedTarget : null,
     }));
+  }
+
+  /**
+   * Per-content-category cost + token breakdown across the org's governance-
+   * origin coding-agent traffic (ADR-033 PR D). Powers the Activity Monitor's
+   * aggregate "Cost breakdown by category" section. Category totals ride the
+   * reserved `langwatch.reserved.blockcat.<category>.{cost_usd,tokens}`
+   * attributes the trace fold accumulates onto trace_summaries.
+   *
+   * Same tenancy + origin filter + latest-version dedup as `spendByUser`: pin
+   * `TenantId = govProjectId`, keep only `origin.kind = ingestion_source`, and
+   * dedup to the latest version per trace via the IN-tuple pattern (so summing
+   * the surviving rows counts each trace once). Analytics only — never billing.
+   *
+   * Empty result (all categories zero) → [], which the dashboard reads as
+   * "nothing captured" and renders the payload-capture enablement hint.
+   */
+  async categoryBreakdown(input: {
+    organizationId: string;
+    windowDays: number;
+  }): Promise<CategoryBreakdownRow[]> {
+    const govProjectId = await this.resolveGovProjectId(input.organizationId);
+    if (!govProjectId) return [];
+
+    const ch = await this.getClickhouse(input.organizationId);
+    if (!ch) return [];
+
+    const now = Date.now();
+    const windowMs = input.windowDays * 24 * 60 * 60 * 1000;
+
+    const selects = CATEGORIES.map(
+      (_category, i) =>
+        `sum(toFloat64OrZero(ts.Attributes[{c${i}:String}])) AS cost_${i},\n` +
+        `sum(toFloat64OrZero(ts.Attributes[{k${i}:String}])) AS tok_${i}`,
+    ).join(",\n");
+
+    const query_params: Record<string, string | number> = {
+      tenantId: govProjectId,
+      windowStart: now - windowMs,
+      originKey: GOVERNANCE_ATTR.ORIGIN_KIND,
+      originValue: GOVERNANCE_ORIGIN_KIND_VALUE,
+    };
+    CATEGORIES.forEach((category, i) => {
+      query_params[`c${i}`] = blockCategoryCostAttr(category);
+      query_params[`k${i}`] = blockCategoryTokensAttr(category);
+    });
+
+    const result = await ch.query({
+      query: `
+        SELECT
+          ${selects}
+        FROM trace_summaries ts
+        WHERE ts.TenantId = {tenantId:String}
+          AND ts.OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
+          AND ts.Attributes[{originKey:String}] = {originValue:String}
+          AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM trace_summaries
+            WHERE TenantId = {tenantId:String}
+              AND OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
+            GROUP BY TenantId, TraceId
+          )
+      `,
+      query_params,
+      format: "JSONEachRow",
+    });
+    const [row] = (await result.json()) as Array<Record<string, number | null>>;
+    if (!row) return [];
+
+    const breakdown: CategoryBreakdownRow[] = [];
+    CATEGORIES.forEach((category, i) => {
+      const costUsd = Number(row[`cost_${i}`]) || 0;
+      const tokens = Number(row[`tok_${i}`]) || 0;
+      if (costUsd <= 0 && tokens <= 0) return;
+      breakdown.push({ category, costUsd, tokens });
+    });
+    return breakdown.sort((a, b) => b.costUsd - a.costUsd);
   }
 
   /**
@@ -529,7 +623,10 @@ export class ActivityMonitorService {
     windowDays: number;
   }): Promise<SpendByDepartmentRow[]> {
     const projects = await this.prisma.project.findMany({
-      where: { team: { organizationId: input.organizationId }, archivedAt: null },
+      where: {
+        team: { organizationId: input.organizationId },
+        archivedAt: null,
+      },
       select: { id: true, departmentId: true },
     });
     if (projects.length === 0) return [];
@@ -613,7 +710,10 @@ export class ActivityMonitorService {
       acc.set(key, {
         spendUsd: prior.spendUsd + Number(r.spendUsdStr),
         requestCount: prior.requestCount + Number(r.requests),
-        lastActivityMs: Math.max(prior.lastActivityMs, Number(r.lastActivityMs)),
+        lastActivityMs: Math.max(
+          prior.lastActivityMs,
+          Number(r.lastActivityMs),
+        ),
       });
     }
 
@@ -781,7 +881,9 @@ export class ActivityMonitorService {
     }>;
     if (sourceRows.length === 0) return [];
 
-    const sourceIds = sourceRows.map((r) => r.sourceId).filter((id) => id !== "");
+    const sourceIds = sourceRows
+      .map((r) => r.sourceId)
+      .filter((id) => id !== "");
     const sources = await this.prisma.ingestionSource.findMany({
       where: { id: { in: sourceIds }, organizationId: input.organizationId },
       select: {
@@ -790,9 +892,7 @@ export class ActivityMonitorService {
         team: { select: { id: true, name: true } },
       },
     });
-    const teamBySource = new Map(
-      sources.map((s) => [s.id, s.team] as const),
-    );
+    const teamBySource = new Map(sources.map((s) => [s.id, s.team] as const));
 
     const ORG_WIDE_KEY = "__org_wide__";
     const byTeam = new Map<
@@ -822,7 +922,10 @@ export class ActivityMonitorService {
         existing.prevSpend += prevSpend;
         existing.requestCount += requestCount;
         existing.sourceCount += 1;
-        existing.lastActivityMs = Math.max(existing.lastActivityMs, lastActivityMs);
+        existing.lastActivityMs = Math.max(
+          existing.lastActivityMs,
+          lastActivityMs,
+        );
       } else {
         byTeam.set(key, {
           teamId,
@@ -1195,7 +1298,9 @@ export class ActivityMonitorService {
     if (!ch) return [];
 
     const limit = input.limit ?? 50;
-    const beforeMs = input.beforeIso ? new Date(input.beforeIso).getTime() : Date.now();
+    const beforeMs = input.beforeIso
+      ? new Date(input.beforeIso).getTime()
+      : Date.now();
 
     // Pull recent traces for the source. Webhook log_records are out of
     // scope for this endpoint (the per-source detail page renders trace

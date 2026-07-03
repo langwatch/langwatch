@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { catchAllFor, InputCategory, OutputCategory } from "../categories";
+import {
+  CATEGORIES,
+  CATEGORY_LABELS,
+  catchAllFor,
+  categoryLabel,
+  InputCategory,
+  OutputCategory,
+} from "../categories";
 
 describe("catchAllFor", () => {
   describe("when the axis is input", () => {
@@ -22,5 +29,26 @@ describe("InputCategory and OutputCategory", () => {
     expect(input).toHaveLength(12);
     expect(output).toHaveLength(6);
     expect(new Set([...input, ...output]).size).toBe(18);
+  });
+});
+
+describe("CATEGORIES and CATEGORY_LABELS", () => {
+  const allValues = [
+    ...Object.values(InputCategory),
+    ...Object.values(OutputCategory),
+  ];
+
+  it("lists every enum value in CATEGORIES exactly once", () => {
+    expect([...CATEGORIES].sort()).toEqual([...allValues].sort());
+    expect(CATEGORIES).toHaveLength(18);
+  });
+
+  it("maps every category to a human label distinct from its wire value", () => {
+    for (const category of allValues) {
+      const label = CATEGORY_LABELS[category];
+      expect(label).toBeTruthy();
+      expect(label).not.toBe(category);
+      expect(categoryLabel(category)).toBe(label);
+    }
   });
 });

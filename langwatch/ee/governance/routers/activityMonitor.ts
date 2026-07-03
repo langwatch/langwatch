@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { ActivityMonitorService } from "@ee/governance/services/activity-monitor/activityMonitor.service";
 /**
  * tRPC router for the Activity Monitor read-side queries that power
  * the /governance admin dashboard. Replaces Alexis's MOCK_* fixtures
@@ -15,8 +16,6 @@
  * Spec: specs/ai-gateway/governance/activity-monitor.feature
  */
 import { z } from "zod";
-
-import { ActivityMonitorService } from "@ee/governance/services/activity-monitor/activityMonitor.service";
 
 import {
   ENTERPRISE_FEATURE_ERRORS,
@@ -65,9 +64,7 @@ export const activityMonitorRouter = createTRPCRouter({
         windowDays: z.number().int().min(1).max(365).default(30),
         limit: z.number().int().min(1).max(500).default(50),
         offset: z.number().int().min(0).default(0),
-        sortBy: z
-          .enum(["spend", "requests", "lastActivity"])
-          .default("spend"),
+        sortBy: z.enum(["spend", "requests", "lastActivity"]).default("spend"),
         sortDir: z.enum(["asc", "desc"]).default("desc"),
       }),
     )
@@ -100,9 +97,7 @@ export const activityMonitorRouter = createTRPCRouter({
         windowDays: z.number().int().min(1).max(365).default(30),
         limit: z.number().int().min(1).max(500).default(50),
         offset: z.number().int().min(0).default(0),
-        sortBy: z
-          .enum(["spend", "requests", "lastActivity"])
-          .default("spend"),
+        sortBy: z.enum(["spend", "requests", "lastActivity"]).default("spend"),
         sortDir: z.enum(["asc", "desc"]).default("desc"),
       }),
     )
@@ -171,6 +166,28 @@ export const activityMonitorRouter = createTRPCRouter({
         organizationId: input.organizationId,
         windowDays: input.windowDays,
         groupBy: input.groupBy,
+      });
+    }),
+
+  /**
+   * Aggregate cost breakdown by content category (ADR-033 PR D) across the
+   * org's governance-origin coding-agent traffic. Same RBAC + enterprise gate
+   * as the rest of the Activity Monitor — analytics only, never billing.
+   */
+  categoryBreakdown: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        windowDays: z.number().int().min(1).max(365).default(30),
+      }),
+    )
+    .use(checkOrganizationPermission("activityMonitor:view"))
+    .use(enterpriseGate)
+    .query(async ({ ctx, input }) => {
+      const service = ActivityMonitorService.create(ctx.prisma);
+      return await service.categoryBreakdown({
+        organizationId: input.organizationId,
+        windowDays: input.windowDays,
       });
     }),
 

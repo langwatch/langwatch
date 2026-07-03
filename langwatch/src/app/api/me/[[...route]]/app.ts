@@ -114,13 +114,24 @@ export function registerMeRoutes(
       };
 
       // Independent rollups — CH multiplexes them happily.
-      const [summary, dailyBuckets, breakdownByModel] = await Promise.all([
-        usage.summary(input),
-        usage.dailyBuckets(input),
-        usage.breakdownByModel(input),
-      ]);
+      const [summary, dailyBuckets, breakdownByModel, breakdownByCategory] =
+        await Promise.all([
+          usage.summary(input),
+          usage.dailyBuckets(input),
+          usage.breakdownByModel(input),
+          // Category totals live only on trace summaries — no ledger union.
+          usage.breakdownByCategory({
+            personalProjectId: input.personalProjectId,
+            window: input.window,
+          }),
+        ]);
 
-      return c.json({ summary, dailyBuckets, breakdownByModel });
+      return c.json({
+        summary,
+        dailyBuckets,
+        breakdownByModel,
+        breakdownByCategory,
+      });
     },
   );
 }
