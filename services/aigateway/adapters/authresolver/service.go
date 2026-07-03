@@ -81,6 +81,7 @@ type Service struct {
 	refreshThreshold time.Duration
 	softBump         time.Duration
 	hardGrace        time.Duration
+	configTTL        time.Duration
 
 	// Active orgs whose bundles are currently in L1. Populated on every
 	// storeL1, never cleared explicitly — entries that drop out of L1 via
@@ -107,6 +108,44 @@ type entry struct {
 	bundle        *domain.Bundle
 	softExpiresAt time.Time
 	hardExpiresAt time.Time
+	// configFetchedAt drives the config-staleness refresh: the bundle's
+	// auth (JWT exp) can outlive its config (credentials, base URLs,
+	// routing chain) by many minutes, and not every config mutation emits
+	// a change-feed event (e.g. direct DB writes). configRefreshing is the
+	// in-flight guard so at most one background config fetch runs per entry.
+	configFetchedAt  time.Time
+	configRefreshing bool
+}
+
+// configStale reports whether the entry's config is older than ttl.
+// ttl <= 0 disables staleness (never stale).
+func (e *entry) configStale(ttl time.Duration) bool {
+	if ttl <= 0 {
+		return false
+	}
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return time.Since(e.configFetchedAt) > ttl
+}
+
+// tryBeginConfigRefresh claims the per-entry config-refresh slot.
+func (e *entry) tryBeginConfigRefresh() bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.configRefreshing {
+		return false
+	}
+	e.configRefreshing = true
+	return true
+}
+
+// endConfigRefresh releases the slot and stamps configFetchedAt so a
+// failed fetch retries only after the next full TTL, not on every request.
+func (e *entry) endConfigRefresh() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.configRefreshing = false
+	e.configFetchedAt = time.Now()
 }
 
 func (e *entry) softExpired() bool {
@@ -206,6 +245,13 @@ type Options struct {
 	L2            L2Store // optional, nil = skip L2
 	Resolver      KeyResolver
 	ConfigFetcher ConfigFetcher
+	// ConfigTTL is the max age of a cached bundle's config (credentials,
+	// base URLs, routing chain) before a background re-fetch. The change
+	// feed already evicts on admin mutations that emit events, but not
+	// every config change does (direct DB writes, mutations without a
+	// change-event kind) — this TTL is the safety net that bounds config
+	// staleness without a process restart. Default 60s. Negative disables.
+	ConfigTTL time.Duration
 	// ChangePoller is the optional control-plane /changes subscriber.
 	// When non-nil, the service spawns a per-org poll loop on Start that
 	// evicts L1 entries whose cached config has been invalidated by an
@@ -233,6 +279,12 @@ func New(opts Options) (*Service, error) {
 	if opts.HardGrace == 0 {
 		opts.HardGrace = 6 * time.Hour
 	}
+	if opts.ConfigTTL == 0 {
+		opts.ConfigTTL = 60 * time.Second
+	}
+	if opts.ConfigTTL < 0 {
+		opts.ConfigTTL = 0 // disabled
+	}
 
 	l1, err := lru.New[[64]byte, *entry](opts.LRUSize)
 	if err != nil {
@@ -254,6 +306,7 @@ func New(opts Options) (*Service, error) {
 		refreshThreshold: opts.RefreshThreshold,
 		softBump:         opts.SoftBump,
 		hardGrace:        opts.HardGrace,
+		configTTL:        opts.ConfigTTL,
 		stopCh:           make(chan struct{}),
 	}, nil
 }
@@ -278,6 +331,8 @@ func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, e
 			// Fresh: serve, maybe trigger background refresh on near-expiry.
 			if e.nearSoftExpiry(s.refreshThreshold) {
 				go s.refreshBackground(rawKey, h) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
+			} else if e.configStale(s.configTTL) && e.tryBeginConfigRefresh() {
+				go s.refreshConfigBackground(h, e) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
 			}
 			return e.bundle, nil
 
@@ -420,9 +475,10 @@ func (s *Service) Stop() {
 
 func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle) {
 	s.l1.Add(h, &entry{
-		bundle:        bundle,
-		softExpiresAt: bundle.ExpiresAt,
-		hardExpiresAt: bundle.ExpiresAt.Add(s.hardGrace),
+		bundle:          bundle,
+		softExpiresAt:   bundle.ExpiresAt,
+		hardExpiresAt:   bundle.ExpiresAt.Add(s.hardGrace),
+		configFetchedAt: time.Now(),
 	})
 	// Record the bundle's org so the change-feed loop knows which orgs
 	// to subscribe to. LoadOrStore is the first-write-wins shape — if
@@ -606,6 +662,38 @@ func (s *Service) refreshBackground(rawKey string, h [64]byte) {
 			zap.Error(err),
 		)
 	}
+}
+
+// refreshConfigBackground re-fetches only the bundle's config (not auth)
+// when it crosses ConfigTTL. On success the entry is replaced with a
+// shallow bundle copy carrying the fresh config — the entry's bundle
+// pointer stays immutable, so in-flight requests holding the old bundle
+// are unaffected. On failure the stale config keeps serving and the next
+// attempt waits a full TTL (endConfigRefresh stamps configFetchedAt).
+func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
+	defer e.endConfigRefresh()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	stale, _, _ := e.snapshot()
+	cfg, err := s.configFetcher.FetchConfig(ctx, stale.VirtualKeyID)
+	if err != nil {
+		s.logger.Warn("config_ttl_refresh_failed",
+			zap.String("vk_id", stale.VirtualKeyID),
+			zap.Error(err),
+		)
+		return
+	}
+
+	fresh := *stale
+	fresh.Config = cfg
+	fresh.Credentials = cfg.Credentials
+	s.storeL1(h, &fresh)
+	if s.l2 != nil {
+		s.l2.Set(ctx, string(h[:]), &fresh)
+	}
+	s.logger.Debug("config_ttl_refresh_success", zap.String("vk_id", stale.VirtualKeyID))
 }
 
 func (s *Service) loop(ctx context.Context) {
