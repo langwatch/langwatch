@@ -7,6 +7,65 @@ import type { NormalizedAttributes } from "~/server/event-sourcing/pipelines/tra
 import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
 import { coerceToNumber } from "~/utils/coerceToNumber";
 
+/** Per-tier custom rates read off the `langwatch.model.*` enrichment attributes. */
+export interface CustomTierRates {
+  inputCostPerToken: number;
+  outputCostPerToken: number;
+  cacheReadCostPerToken: number;
+  cacheCreationCostPerToken: number;
+}
+
+/**
+ * Resolve the custom per-token rate override (`computeSpanCost` Priority 1) from
+ * a rate accessor, or `null` when the span carries no custom rate. A missing
+ * cache rate falls back to the input rate (counted, not discounted).
+ *
+ * Single source of the P1 cascade so the two consumers — `computeSpanCost`
+ * (which multiplies these by usage to get the span cost) and the block-cost
+ * allocator's per-tier pricing (which reconciles Σ per-category cost to that
+ * same span cost) — cannot drift. The accessor abstracts over the caller's
+ * attribute shape (`NormalizedAttributes` map vs an OTLP span lookup).
+ */
+export function resolveCustomTierRates(
+  getRate: (key: string) => number | null,
+): CustomTierRates | null {
+  const customInput = getRate(ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN);
+  const customOutput = getRate(ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN);
+  if (customInput === null && customOutput === null) return null;
+
+  const inputRate = customInput ?? 0;
+  return {
+    inputCostPerToken: inputRate,
+    outputCostPerToken: customOutput ?? 0,
+    cacheReadCostPerToken:
+      getRate(ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN) ?? inputRate,
+    cacheCreationCostPerToken:
+      getRate(ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN) ??
+      inputRate,
+  };
+}
+
+/**
+ * Registry-backed per-tier rates for a model (`computeSpanCost` Priority 3),
+ * or `null` when the model is unknown. A missing cache rate falls back to the
+ * input rate (counted, not discounted). Co-located with `computeSpanCost` so the
+ * app-layer block classifier can source registry rates from here instead of
+ * reaching into `background/workers/collector` directly (ADR-018 hygiene).
+ */
+export function resolveRegistryTierRates(
+  model: string,
+): CustomTierRates | null {
+  const matched = matchModelCostWithFallbacks(model, getStaticModelCosts());
+  if (!matched) return null;
+  const inputRate = matched.inputCostPerToken ?? 0;
+  return {
+    inputCostPerToken: inputRate,
+    outputCostPerToken: matched.outputCostPerToken ?? 0,
+    cacheReadCostPerToken: matched.cacheReadCostPerToken ?? inputRate,
+    cacheCreationCostPerToken: matched.cacheCreationCostPerToken ?? inputRate,
+  };
+}
+
 /**
  * Computes per-span cost using a priority cascade:
  * 1. Custom cost rates from enrichment attributes (per-token override policy)
@@ -54,27 +113,15 @@ export function computeSpanCost({
   // Priority 1: Custom cost rates from enrichment. A custom cost may carry
   // its own cache rates (customer override); when it does not, cache tokens
   // fall back to the input rate (counted, just not discounted).
-  const numInputRate = coerceToNumber(
-    attrs[ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN],
+  const customRates = resolveCustomTierRates((key) =>
+    coerceToNumber(attrs[key]),
   );
-  const numOutputRate = coerceToNumber(
-    attrs[ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN],
-  );
-  if (numInputRate !== null || numOutputRate !== null) {
-    const inputRate = numInputRate ?? 0;
-    const cacheReadRate =
-      coerceToNumber(
-        attrs[ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN],
-      ) ?? inputRate;
-    const cacheCreationRate =
-      coerceToNumber(
-        attrs[ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN],
-      ) ?? inputRate;
+  if (customRates) {
     return (
-      inputTokens * inputRate +
-      outputTokens * (numOutputRate ?? 0) +
-      cacheReadTokens * cacheReadRate +
-      cacheCreationTokens * cacheCreationRate
+      inputTokens * customRates.inputCostPerToken +
+      outputTokens * customRates.outputCostPerToken +
+      cacheReadTokens * customRates.cacheReadCostPerToken +
+      cacheCreationTokens * customRates.cacheCreationCostPerToken
     );
   }
 

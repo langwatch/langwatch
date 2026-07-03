@@ -30,7 +30,7 @@
 
 ## Decision
 
-1. **Classification runs at ingest-time enrichment.** A new pure-synchronous step in the `recordSpanCommand.ts` enrichment chain — **serial, after** the parallel `Promise.allSettled` block (PII redaction, cost enrichment, token estimation) because it consumes their outputs (per-tier rates `langwatch.model.*`, tokenizer), and before content drop and attribute cap. Why: categories are stamped once, flow into folds and ClickHouse, are queryable and indexable forever, and replay via ADR-015. Cost honesty: this is not a free string match — it tokenizes every content block (N per-block tokenizer calls, real CPU on an 8 MiB body), which is why the hot-path invariant carries an explicit block cap and a perf test, not a hand-wave. Rejects read-time classification (re-scans millions of span rows per dashboard load — the exact heavy-column pattern `clickhouse-queries.md` bans) and an async reactor (2× event volume and eventual-consistency lag for a bounded synchronous CPU task).
+1. **Classification runs at ingest-time enrichment.** A new pure-synchronous step in the `recordSpanCommand.ts` enrichment chain — **serial, after** the parallel `Promise.allSettled` block (PII redaction, cost enrichment, token estimation) because it consumes their outputs (per-tier rates `langwatch.model.*`, tokenizer), and before content drop. It runs **AFTER** the ingest attribute cap, not before: the cap exists to bound oversized *customer* payloads, whereas everything classification writes is system-generated and self-bounded (`MAX_CLASSIFIED_BLOCKS_PER_SPAN` caps the detail array, category keys are a fixed enum), so its reserved output is exempt from the cap by design. Accepted consequence: a span whose `langwatch.input` was truncated by the cap classifies on the truncated content (or degrades to the empty state if nothing survives) — consistent with the content-availability policy (Decision 7). Why: categories are stamped once, flow into folds and ClickHouse, are queryable and indexable forever, and replay via ADR-015. Cost honesty: this is not a free string match — it tokenizes every content block (N per-block tokenizer calls, real CPU on an 8 MiB body), which is why the hot-path invariant carries an explicit block cap and a perf test, not a hand-wave. Rejects read-time classification (re-scans millions of span rows per dashboard load — the exact heavy-column pattern `clickhouse-queries.md` bans) and an async reactor (2× event volume and eventual-consistency lag for a bounded synchronous CPU task).
    - Ordering note: classification runs on the span content **after** PII redaction. Redaction replaces entity values but preserves message/block structure, and all detectors match structure and stable markers (roles, block types, tool-name prefixes, tag openers), never PII-bearing values — so redaction does not change classification results.
 
 2. **Cost attribution is cache-aware exact-token allocation.** For each span with content:
@@ -51,7 +51,7 @@
    - Rejects copying the researched tool's 23 categories verbatim (half are Claude-Code-internal artifacts that won't aggregate meaningfully) and a minimal-6 taxonomy (visibly poorer than the competing product; splitting later forces reclassifying history).
 
 4. **Storage: per-block detail on span attributes; aggregates in existing folds.**
-   - Span: `langwatch.reserved.blocks.classification` — bounded array of `{idx, category, tokens, cacheTier}` — plus `langwatch.reserved.blocks.classifier_version`. The `langwatch.reserved.*` prefix is mandatory, not stylistic: it is the only namespace `stripReservedAttributes` scrubs from customer-supplied SDK spans (`recordSpanCommand.ts` `RESERVED_PREFIX`), so system-computed classifications cannot be spoofed by ingested attributes — the same protection `langwatch.reserved.cache_read_tokens` already relies on. Rides existing `stored_spans` storage; subject to the existing attribute cap.
+   - Span: `langwatch.reserved.blocks.classification` — bounded array of `{idx, category, tokens, cacheTier}` — plus `langwatch.reserved.blocks.classifier_version`. The `langwatch.reserved.*` prefix is mandatory, not stylistic: it is the only namespace `stripReservedAttributes` scrubs from customer-supplied SDK spans (`recordSpanCommand.ts` `RESERVED_PREFIX`), so system-computed classifications cannot be spoofed by ingested attributes — the same protection `langwatch.reserved.cache_read_tokens` already relies on. Rides existing `stored_spans` storage; its reserved output is exempt from the ingest attribute cap (system-generated + self-bounded — see Decision 1), which is why classification runs after the cap.
    - Trace: `TraceSummaryFoldProjection` extended with `categoryTotals: Record<Category, {tokens, costUsd}>` following the exact pattern of today's token/cost accumulation (`traceSummary.foldProjection.ts:154-195`).
    - Session: a session-level fold keyed by the captured session id (Claude: `X-Claude-Code-Session-Id`; Codex: the rollout session id from the transcript metadata — `prompt_cache_key` is the gateway-path convention only and is observed `null` on real traffic, so it is not the v1 transcript-path key) accumulating step/turn counts, per-step input-token sizes, `compactionEvents`, and per-category totals.
    - Rejects span-attrs-only (query-time scans) and fold-only (loses drill-down and the audit trail for any classification dispute).
@@ -59,7 +59,7 @@
 5. **Turn and compaction tracking ships in v1 — defined on steps ordered by start time, detected against the running maximum.** Precision matters here because the naive version is noise:
    - A **step** is one LLM API span. Steps within a session are ordered by span **start time**, never by arrival order (OTLP delivery is unordered and retried).
    - One conversational **turn** spans multiple steps (tool loops), and Claude Code subagents interleave small steps under the same session id. So consecutive-step comparison is unsound: a small subagent step after a big main-thread step is a >40% drop that means nothing.
-   - A **compaction event** is therefore detected against the session's **running maximum** input size, with confirmation: a step whose input tokens fall below `(1 − COMPACTION_DROP_RATIO) × runningMax`, followed by `COMPACTION_CONFIRMATION_STEPS` further steps that stay below the old max (i.e., the session genuinely re-based, it wasn't one small parallel request). Only then does the running max reset. Small subagent steps never reset the max, so they cannot fire events.
+   - A **compaction event** is detected against the session's **running maximum** input size. A step is a candidate when its input tokens fall between `COMPACTION_MIN_RETAIN_RATIO × runningMax` and `(1 − COMPACTION_DROP_RATIO) × runningMax`: a *significant* drop that still retains a real working set (system prompt + recent context). Two guards keep subagent bursts out: (a) a step below the min-retain floor is a subagent/parallel call (minimal sub-task context) and is skipped entirely — it neither fires nor moves the max; (b) a candidate is confirmed only when the next `COMPACTION_CONFIRMATION_STEPS` steps stay below the **drop threshold** (not merely below the old max — a step climbing back toward the old max means the context *returned*, so it was a transient dip, not a re-base), or the session ends still-compacted with ≥1 confirming step. Only a confirmed candidate resets the running max. The below-old-max rule this replaces false-fired on the dominant pattern — a big main turn, several tiny subagent steps, then the main thread resuming — because the tiny steps were all below the old max and confirmed each other.
    
    This powers the context-growth chart and, later, the `/compact` recommendation — the recommendation itself is deferred (Decision 8), the data is not, because retrofitting session folds later would orphan all v1 history.
 
@@ -78,8 +78,10 @@
 | `CATEGORY_ENUM` | 18 values (12 input-axis + 6 output-axis incl. catch-alls), exact strings in Decision 3 | Fold keys, span attribute values, dashboard lanes. Additive growth only; never rename a shipped value. |
 | `SPAN_ATTR_BLOCKS` | `langwatch.reserved.blocks.classification` | Per-block detail attribute on spans. `reserved` prefix required — spoof protection via `stripReservedAttributes`. |
 | `SPAN_ATTR_CLASSIFIER_VERSION` | `langwatch.reserved.blocks.classifier_version` (integer, starts at `1`) | Replay/audit: which heuristic set produced these categories. |
+| `SPAN_ATTR_BLOCKCAT_PREFIX` | `langwatch.reserved.blockcat.` | Prefix for the flat per-category running-total keys the trace fold rolls up (`…blockcat.<category>.tokens` / `.cost_usd`). `reserved` prefix required — spoof protection. |
+| `COMPACTION_MIN_RETAIN_RATIO` | `0.1` (a step retaining <10% of the running max is a subagent/parallel call, not a compaction) | Filters multi-step subagent bursts out of compaction detection (Decision 5). |
 | `COMPACTION_DROP_RATIO` | `0.4` (step input tokens < 60% of session running max) | Compaction-event detection threshold. Tunable constant, not org-configurable in v1. |
-| `COMPACTION_CONFIRMATION_STEPS` | `2` (subsequent steps that must stay below the old max before the event is confirmed and the running max resets) | Filters false positives from small subagent/parallel steps. |
+| `COMPACTION_CONFIRMATION_STEPS` | `2` (subsequent steps that must stay below the drop threshold — not merely the old max — before the event is confirmed and the running max resets) | Filters false positives from subagent/parallel steps (with `COMPACTION_MIN_RETAIN_RATIO`). |
 | `MAX_CLASSIFIED_BLOCKS_PER_SPAN` | `512` | Hard bound on detail-array size; overflow blocks aggregate into the axis catch-all so category **totals stay complete** even when per-block detail is truncated. |
 | `MCP_TOOL_PREFIX` | `mcp__` | Built-in vs MCP discrimination on tool names (Claude Code wire convention). |
 | Allocation formula | `category_tokens = Σ block_tokens × (pool_total / Σ pool_block_tokens)` per cache-tier pool | Guarantees per-category tokens sum exactly to provider-reported usage. |
@@ -104,28 +106,50 @@ No database migrations. All changes are within existing structures:
 // Span attributes (stored_spans, existing table — new reserved keys;
 // reserved prefix = scrubbed from customer SDK input by stripReservedAttributes)
 "langwatch.reserved.blocks.classification": Array<{
-  idx: number;            // block index within the message array
+  idx: number;            // sequential content-part index within the axis walk (input parts and output parts counted separately)
   category: Category;     // CATEGORY_ENUM value
   tokens: number;         // scaled, post-allocation (Decision 2.4)
   cacheTier: "fresh" | "cache_read" | "cache_creation";
 }>;
 "langwatch.reserved.blocks.classifier_version": number;
 
-// TraceSummary fold (existing projection — new field)
-categoryTotals?: Partial<Record<Category, { tokens: number; costUsd: number }>>;
+// TraceSummary fold (existing projection): per-category totals are NOT stored
+// as a nested object. They ride FLAT reserved attributes on the trace summary,
+// one { tokens, cost_usd } pair per category, under SPAN_ATTR_BLOCKCAT_PREFIX —
+// the same additive reserved-key transport the fold already uses for token sums
+// (a nested field would need a schema/migration; a flat key does not). The
+// structured `Partial<Record<Category, { tokens, costUsd }>>` shape is rebuilt
+// at READ time by the rollup (SessionView.categoryTotals, below).
+"langwatch.reserved.blockcat.<category>.tokens": number;    // e.g. …blockcat.system_prompt.tokens
+"langwatch.reserved.blockcat.<category>.cost_usd": number;  // 10-decimal string
 
-// Session fold (new fold in the existing fold-projection framework — not a new store)
-{
-  sessionId: string;          // claude: X-Claude-Code-Session-Id | codex: rollout session id (transcript meta)
+// Session view (v3: NOT a session-keyed fold — see Revisions v3). Realised as
+// a bounded per-trace step series on the trace summary + a pure read-time rollup.
+//
+// (a) Per-trace step series — bounded reserved attribute on the TRACE summary,
+//     appended by the trace fold for each coding-agent LLM step (span path and
+//     Path B log turns). `inputTokens` is the step's TOTAL input context
+//     (fresh + cache-read + cache-creation), the only signal that reflects
+//     genuine context re-basing (a cached turn's fresh input is tiny).
+"langwatch.reserved.session_steps": Array<{ startMs: number; inputTokens: number }>;
+                                   // ordered by span startTime; bounded: past 512 entries,
+                                   // adjacent pairs merge (keep max) — halves resolution,
+                                   // preserves the sawtooth shape and ADR-021 limits
+"langwatch.reserved.session.harness": "claude" | "codex";
+
+// (b) Read-time rollup (sessionRollup.service.ts) over lean trace SUMMARIES,
+//     grouped by (harness, threadId). threadId reads langwatch.thread.id
+//     (log path) or gen_ai.conversation.id (span path). Claude sessions live in
+//     one summary; Codex's are fragmented across traces and re-joined here.
+type SessionView = {
   harness: "claude" | "codex";
-  stepCount: number;               // LLM API spans in session
-  inputTokensBySteps: number[];    // ordered by span startTime; bounded: past 512 entries,
-                                   // pairs merge (keep max) — halves resolution, preserves the
-                                   // sawtooth shape and ADR-021 fold-size pressure limits
+  threadId: string;                // claude: session id | codex: rollout/conversation id
+  stepCount: number;               // LLM API steps across the session's traces
+  steps: Array<{ startMs; inputTokens }>; // concatenated, sorted by startMs
   runningMaxInputTokens: number;   // compaction baseline (Decision 5)
-  compactionEvents: number;
+  compactionEvents: number;        // detectCompactionEvents(): running-max + confirmation
   categoryTotals: Partial<Record<Category, { tokens: number; costUsd: number }>>;
-}
+};
 ```
 
 ## Rejected alternatives
@@ -178,3 +202,5 @@ categoryTotals?: Partial<Record<Category, { tokens: number; costUsd: number }>>;
 
 - **v1 (2026-07-02)** — Initial draft. Framing round locked: full-feature scope, competitive-window forcing function, analytics-only blast radius, constraints (no parallel infra / exact tokens / no new CH table). Fork round 1 locked: ingest-time enrichment; cache-aware token split (user escalated from flat split); 12-category two-axis taxonomy; CLI-only v1 scope (user override of classify-everything recommendation). Fork round 2 locked: span-attrs + fold storage; full turn/compaction tracking in v1; recommendations deferred entirely (user override of 3-template-rules recommendation); extend governance dashboards. Fork round 3 locked: skip-silently content policy; both harnesses in v1 (user override of Claude-first phasing); gating follows host pages.
 - **v2 (2026-07-03)** — Red-team pass (devils-advocate), 9 findings folded in; no locked fork reopened. Blockers fixed: (1) three-tier cache binning — v1's two-tier rule left `cache_creation` blocks unassigned, breaking conservation-of-cost on every session's first turn; (2) attribute namespace moved to `langwatch.reserved.blocks.*` — the bare `langwatch.blocks.*` prefix was customer-spoofable because only `reserved.*` is scrubbed at ingest. Must-fixes: classification declared serial-after-enrichment (it consumes cost/tokenizer outputs; v1 wrongly implied parallel) and its per-block tokenization cost stated honestly; breakpoint-fidelity caveat added (gateway captures post-middleware bodies; OTel path truncates at ~60 KB); turn/compaction redefined on start-time-ordered steps against a running max with confirmation steps (consecutive-step comparison false-fires on subagent interleaving); Codex session key corrected to rollout transcript id (`prompt_cache_key` is gateway-only and observed null). Notes: `leadingContext.ts` reframed as seed heuristic extracted to a shared module (not a "move"); tiktoken-on-Anthropic split error acknowledged in Consequences; `Σ pool_block_tokens = 0` zero-guard specified (pool total → axis catch-all).
+- **v3 (2026-07-03)** — Implementation revision (PR C): Decision 4's "session-level fold" is realised as per-trace step series in the existing trace fold + a pure read-time session rollup over lean trace summaries grouped by thread id, NOT a session-keyed fold projection. The fold framework keys strictly by traceId; a session-keyed fold would need a second event per span (rejected in Decision 1) or a new aggregate pipeline. For Claude Code, turns already fold into one summary (trace ≈ session); the rollup only merges Codex's fragmented traces. Rollup input is trace SUMMARIES (lean rows), not stored spans — the read-time pattern rejected in Decision 1 concerned span scans, which this does not do.
+- **v4 (2026-07-03)** — Second review pass (2 reviewers, ~30 findings), folded in without reopening a locked fork. Compaction detection corrected: the "confirm N steps below the **old max**" rule (Decision 5) false-fired on the dominant coding-agent pattern (a big main turn, several tiny subagent steps, then the main thread resuming); replaced with a `COMPACTION_MIN_RETAIN_RATIO` floor (subagent-tiny steps skipped) + confirmation against the **drop threshold** + an end-of-session count. Ingest ordering reconciled: classification runs **after** the attribute cap (its reserved output is self-bounded and cap-exempt), correcting the v1 "before the cap" wording. `categoryTotals` documented as the flat `blockcat.<category>.{tokens,cost_usd}` reserved keys it actually is (not a nested field); `SPAN_ATTR_BLOCKCAT_PREFIX` added to Constants. Robustness fixes across the classifier (depth-capped block-text recursion, first-write-wins tool ids, markers peeled only on the leading fresh-user part, breakpoint marked only on an appended block, normalised harness-scope matching, depth-matched nested marker tags), the allocator (finite/positive reconcile, negative-breakpoint guard, null-prototype totals), the rollup (semconv-stable thread-id preference, whitespace-id guard, negative-total floor), and the queries (personal-usage governance union scoped to `origin.kind = ingestion_source`; category breakdown upper-bounded on `OccurredAt`). A global + per-project kill switch was added to the classifier (parity with token estimation), and the in-file "ingestion never fails" try/catch made real.

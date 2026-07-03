@@ -3,6 +3,8 @@ import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
+import { resolveRegistryTierRates } from "~/server/app-layer/traces/model-cost-matching";
+import { OtlpSpanBlockClassificationService } from "~/server/app-layer/traces/span-block-classification.service";
 import {
   createCostEnrichmentDeps,
   OtlpSpanCostEnrichmentService,
@@ -34,7 +36,11 @@ import {
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
 } from "../schemas/constants";
 import type { SpanReceivedEvent } from "../schemas/events";
-import type { OtlpResource, OtlpSpan } from "../schemas/otlp";
+import type {
+  OtlpInstrumentationScope,
+  OtlpResource,
+  OtlpSpan,
+} from "../schemas/otlp";
 import { capOversizedAttributes } from "../utils/capOversizedAttributes";
 import { TraceRequestUtils } from "../utils/traceRequest.utils";
 
@@ -91,6 +97,19 @@ export interface RecordSpanCommandDependencies {
     }) => Promise<SpanContentDropResult>;
   };
   /**
+   * ADR-033: Optional ingest-time content-block classifier. When present, it
+   * classifies coding-agent spans and stamps per-category cost attributes.
+   * Non-critical: absence is a no-op, and a throw is caught and logged so
+   * classification never fails ingestion.
+   */
+  blockClassificationService?: {
+    classifySpanBlocks: (args: {
+      span: OtlpSpan;
+      instrumentationScope?: OtlpInstrumentationScope | null;
+      tenantId?: string;
+    }) => Promise<void>;
+  };
+  /**
    * ADR-022: Optional BlobStore for spool fetch (when command carries spoolRef)
    * and post-store spool deletion. When absent, spoolRef commands are rejected.
    */
@@ -111,6 +130,16 @@ function createDefaultDependencies(): RecordSpanCommandDependencies {
       featureFlagService,
     }),
     contentDropService: { dropSpanContent: applyOtlpSpanContentDrop },
+    blockClassificationService: new OtlpSpanBlockClassificationService({
+      tokenizer: new TiktokenClient(),
+      // Global + per-project kill switch (parity with token estimation) — the
+      // operable off-ramp for a misbehaving tenant or a fleet-wide pause.
+      featureFlagService,
+      // Registry-backed per-tier rates for standard models (custom rates on the
+      // span win first). Sourced from model-cost-matching so this composition
+      // root doesn't reach into background/workers/collector directly.
+      resolveModelPrices: resolveRegistryTierRates,
+    }),
   };
 }
 
@@ -323,6 +352,26 @@ export class RecordSpanCommand
           throw piiResult.reason instanceof Error
             ? piiResult.reason
             : new Error(String(piiResult.reason));
+        }
+
+        // ADR-033: ingest-time content-block classification. Runs SERIAL after
+        // the parallel enrichment block (it consumes cost + tokenizer outputs)
+        // and BEFORE content drop, on the redacted span. Classification is
+        // non-critical: any throw is caught and logged so it never fails
+        // ingestion (ADR-033 "Ingestion never fails on classification").
+        if (this.deps.blockClassificationService) {
+          try {
+            await this.deps.blockClassificationService.classifySpanBlocks({
+              span: spanToProcess,
+              instrumentationScope: resolvedCommandData.instrumentationScope,
+              tenantId: tenantIdStr,
+            });
+          } catch (error) {
+            this.logger.warn(
+              { error },
+              "Block classification failed, continuing without categories",
+            );
+          }
         }
 
         // Apply the scoped data-privacy DROP at this single span choke point,

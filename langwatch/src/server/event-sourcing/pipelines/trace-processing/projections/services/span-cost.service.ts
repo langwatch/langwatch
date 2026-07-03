@@ -1,7 +1,8 @@
-import { coerceToNumber } from "~/utils/coerceToNumber";
+import { SPAN_ATTR_BLOCKCAT_PREFIX } from "~/server/app-layer/traces/block-classification/categories";
 import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import { coerceToNumber } from "~/utils/coerceToNumber";
 import type { NormalizedSpan } from "../../schemas/spans";
 
 export const FIRST_TOKEN_EVENTS = new Set([
@@ -142,6 +143,22 @@ export class SpanCostService {
   }
 
   /**
+   * The step's TOTAL input context size (ADR-033 session tracking): freshly
+   * billed input plus cache-read plus cache-creation tokens. Compaction is a
+   * drop in the whole prompt context, not just the fresh prefix — on a cached
+   * turn the fresh `input_tokens` is tiny while the real context sits in the
+   * cache-read pool, so summing the pools is the only signal that reflects
+   * genuine context re-basing. Returns 0 when the span carries no usage.
+   */
+  extractStepInputTokens(span: NormalizedSpan): number {
+    const metrics = this.extractTokenMetrics(span);
+    const cache = this.extractCacheTokens(span);
+    return (
+      metrics.promptTokens + cache.cacheReadTokens + cache.cacheCreationTokens
+    );
+  }
+
+  /**
    * Whether this span's cost is bundled (not billed per token). A span-level
    * marker wins over the resource-level default the receiver stamps, so a
    * single trace can carry a mix of billed and bundled spans.
@@ -164,6 +181,24 @@ export class SpanCostService {
     return markerIsTrue(
       span.spanAttributes[ATTR_KEYS.LANGWATCH_RESERVED_SKIP_TOKEN_ACCUMULATION],
     );
+  }
+
+  /**
+   * Per-span content-block category totals (ADR-033), read from the reserved
+   * `langwatch.reserved.blockcat.<category>.{tokens,cost_usd}` attributes the
+   * ingest-time classifier stamped. Returned as a key → positive-delta map so the
+   * fold rolls each into a trace-level running sum under the SAME key (the raw
+   * per-span values never reach the merged trace attribute map otherwise). Costs
+   * are small decimals; the values pass through as floats.
+   */
+  extractBlockCategoryDeltas(span: NormalizedSpan): Record<string, number> {
+    const deltas: Record<string, number> = {};
+    for (const [key, value] of Object.entries(span.spanAttributes)) {
+      if (!key.startsWith(SPAN_ATTR_BLOCKCAT_PREFIX)) continue;
+      const n = coerceToNumber(value);
+      if (n !== null && n > 0) deltas[key] = n;
+    }
+    return deltas;
   }
 
   extractTokenTiming(span: NormalizedSpan): {

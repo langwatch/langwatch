@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-
+import { toCategoryBarRows } from "~/components/governance/CategoryBreakdownBars";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
@@ -65,6 +65,21 @@ export type PersonalContext = {
   budget: PersonalBudgetState;
   spendByDay: Array<{ day: string; usd: number; billedUsd: number }>;
   spendByTool: Array<{ tool: string; usd: number; billedUsd: number }>;
+  /** Cost split by content category (ADR-033). Empty when nothing categorized. */
+  spendByCategory: Array<{
+    category: string;
+    label: string;
+    costUsd: number;
+    tokens: number;
+    sharePct: number;
+  }>;
+  /** True while the usage rollup is still loading — gate the category
+   * empty-state on it so the enablement hint doesn't flash during load. */
+  spendByCategoryLoading: boolean;
+  /** True when the usage rollup fetch failed — so the category section can show
+   * an error state instead of the "no categorized usage" hint (a false claim on
+   * a fetch failure). */
+  spendByCategoryError: boolean;
   /** Personal project the /me recent-activity table reads from + deep-links into. */
   personalProjectId: string | null;
   personalProjectSlug: string | null;
@@ -133,8 +148,8 @@ export function usePersonalContext(): PersonalContext {
       period: raw.period ?? "",
       scope: raw.scope ?? "",
       requestIncreaseUrl:
-        "requestIncreaseUrl" in raw ? raw.requestIncreaseUrl ?? null : null,
-      adminEmail: "adminEmail" in raw ? raw.adminEmail ?? null : null,
+        "requestIncreaseUrl" in raw ? (raw.requestIncreaseUrl ?? null) : null,
+      adminEmail: "adminEmail" in raw ? (raw.adminEmail ?? null) : null,
     };
   }, [personalBudgetQuery.data]);
 
@@ -204,6 +219,11 @@ export function usePersonalContext(): PersonalContext {
         usd: row.spentUsd,
         billedUsd: row.billedUsd,
       })) ?? [],
+    spendByCategory: toCategoryBarRows(
+      personalUsageQuery.data?.breakdownByCategory ?? [],
+    ),
+    spendByCategoryLoading: personalUsageQuery.isLoading,
+    spendByCategoryError: personalUsageQuery.isError,
     personalProjectId: personalContextQuery.data?.workspace.project.id ?? null,
     personalProjectSlug:
       personalContextQuery.data?.workspace.project.slug ?? null,

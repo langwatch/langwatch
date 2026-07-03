@@ -29,9 +29,22 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { ANALYTICS_CLICKHOUSE_SETTINGS } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import {
+  blockCategoryCostAttr,
+  blockCategoryTokensAttr,
+  CATEGORIES,
+  type Category,
+} from "~/server/app-layer/traces/block-classification/categories";
+import {
   getClickHouseClientForProject,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
+import { createLogger } from "~/utils/logger/server";
+import {
+  GOVERNANCE_ATTR,
+  GOVERNANCE_ORIGIN_KIND_VALUE,
+} from "./governanceAttributeKeys";
+
+const logger = createLogger("langwatch:personal-usage");
 
 export interface PersonalUsageWindow {
   /** Inclusive UTC start of the rollup window. */
@@ -78,6 +91,15 @@ export interface PersonalUsageBreakdown {
   requests: number;
 }
 
+export interface PersonalUsageCategoryBreakdown {
+  /** Wire taxonomy value (ADR-033 CATEGORY_ENUM) — the stable key for labels. */
+  category: Category;
+  /** Cost attributed to this content category over the window. */
+  costUsd: number;
+  /** Tokens attributed to this content category over the window. */
+  tokens: number;
+}
+
 export interface PersonalUsageQueryInput {
   personalProjectId: string;
   /** Defaults to start-of-current-month → now if omitted. */
@@ -92,6 +114,16 @@ export interface PersonalUsageQueryInput {
    * traffic.
    */
   userId?: string;
+  /**
+   * Owner's principal EMAIL. Used only by `breakdownByCategory` to
+   * attribute ingestion-source traffic on the org's Governance Project
+   * trace summaries: those rows carry the acting user on
+   * `Attributes['langwatch.user_id']` (an email, per GOVERNANCE_ATTR.USER_ID),
+   * so the category union filters on it. Distinct from `userId`, which keys
+   * the gateway_budget_ledger PRINCIPAL paths (summary / buckets / models).
+   * Requires `ingestionTenantId` to take effect; omitted → no category union.
+   */
+  userEmail?: string;
   /**
    * The org's hidden Governance Project tenant id. Ingestion-source
    * ledger rows are written under THIS tenant (ingestionRoutes.ts writes
@@ -458,6 +490,189 @@ export class PersonalUsageService {
     return Array.from(aggregated.values())
       .sort((a, b) => b.spentUsd - a.spentUsd)
       .slice(0, limit);
+  }
+
+  /**
+   * Per-content-category cost + token breakdown (ADR-033 PR D). Powers the
+   * "Usage breakdown" lanes on /me. Category totals ride the reserved
+   * `langwatch.reserved.blockcat.<category>.{cost_usd,tokens}` attributes the
+   * trace fold accumulates onto trace_summaries, so this reads the personal
+   * project tenant directly — the same dedup-per-trace pattern as the sibling
+   * spend queries (argMax by UpdatedAt) so a replayed/re-folded trace counts
+   * once. Analytics only: these numbers never feed billing (ADR-033 invariant).
+   *
+   * Categories with zero cost AND zero tokens are dropped, so an all-zero
+   * result is an empty array — the /me view reads that as "nothing captured"
+   * and renders the payload-capture enablement hint.
+   *
+   * Ingestion-source union: unlike the gateway_budget_ledger (which carries no
+   * per-category split), the org's Governance Project trace summaries DO carry
+   * the blockcat attrs plus per-user attribution on
+   * `Attributes['langwatch.user_id']` (the principal EMAIL). So when
+   * `userEmail` + `ingestionTenantId` are supplied, a second query over that
+   * gov tenant — filtered to this user's rows — is unioned in, picking up
+   * coding-agent traffic that lands under the governance tenant rather than the
+   * personal project. That union degrades to no-union on failure so a CH hiccup
+   * never blanks the personal rows.
+   */
+  async breakdownByCategory(
+    input: PersonalUsageQueryInput,
+  ): Promise<PersonalUsageCategoryBreakdown[]> {
+    const window = input.window ?? defaultMonthWindow();
+    const client = await getClickHouseClientForProject(input.personalProjectId);
+    if (!client) return [];
+
+    // Personal-tenant totals. Left un-guarded on purpose: a throw here is a real
+    // query regression the integration test must catch, not a degrade path.
+    const totals = await this.queryCategoryTotals(client, {
+      tenantId: input.personalProjectId,
+      window,
+    });
+
+    // Ingestion-source union over the gov tenant, scoped to this principal's
+    // rows via the user_id (email) attribute. Best-effort: on failure keep the
+    // personal rows rather than surfacing a 500 for an analytics-only view.
+    if (input.userEmail && input.ingestionTenantId) {
+      try {
+        const ingestion = await this.queryCategoryTotals(client, {
+          tenantId: input.ingestionTenantId,
+          window,
+          userEmail: input.userEmail,
+        });
+        for (const [category, v] of ingestion) {
+          const existing = totals.get(category) ?? { costUsd: 0, tokens: 0 };
+          existing.costUsd += v.costUsd;
+          existing.tokens += v.tokens;
+          totals.set(category, existing);
+        }
+      } catch (error) {
+        // no-union: `totals` already holds the personal-tenant rows. Warn so a
+        // silently-degraded category breakdown is diagnosable rather than
+        // looking like the user simply has no ingestion-source traffic.
+        logger.warn(
+          {
+            error,
+            personalProjectId: input.personalProjectId,
+            ingestionTenantId: input.ingestionTenantId,
+          },
+          "personal-usage category ingestion union failed; returning personal-tenant rows only",
+        );
+      }
+    }
+
+    const breakdown: PersonalUsageCategoryBreakdown[] = [];
+    for (const category of CATEGORIES) {
+      const v = totals.get(category);
+      if (!v) continue;
+      if (v.costUsd <= 0 && v.tokens <= 0) continue;
+      breakdown.push({ category, costUsd: v.costUsd, tokens: v.tokens });
+    }
+    return breakdown.sort((a, b) => b.costUsd - a.costUsd);
+  }
+
+  /**
+   * One category-totals query over a single tenant's trace summaries, summing
+   * the reserved blockcat attributes across the window. Uses the compliant
+   * IN-tuple dedup shape (same as the org Activity Monitor variant): the inner
+   * subquery reads only the light dedup keys (`TenantId, TraceId, max(UpdatedAt)`),
+   * and the outer query sums the heavy `Attributes[...]` map only for the
+   * surviving latest-version rows — never materialising the Attributes blob (now
+   * carrying the session_steps series) inside the dedup subquery. Returns every
+   * category (including zeros) keyed by enum value; the caller merges, filters
+   * zeros, and sorts.
+   *
+   * `userEmail` (ingestion-source union only): the principal-attribution filter
+   * `Attributes['langwatch.user_id'] = {userEmail}` is applied in BOTH the outer
+   * WHERE and the dedup subquery so the row set is scoped to this user before
+   * dedup and again on the summed rows.
+   *
+   * Resource-guarded like the org variant (`max_threads`/`max_execution_time`
+   * merged with the analytics external-group-by spill) — the per-category
+   * sum-over-attributes shape has OOM'd ClickHouse before.
+   */
+  private async queryCategoryTotals(
+    client: ClickHouseClient,
+    params: {
+      tenantId: string;
+      window: PersonalUsageWindow;
+      userEmail?: string;
+    },
+  ): Promise<Map<Category, { costUsd: number; tokens: number }>> {
+    const outer = CATEGORIES.map(
+      (_category, i) =>
+        `sum(toFloat64OrZero(ts.Attributes[{c${i}:String}])) AS scost_${i},\n` +
+        `sum(toFloat64OrZero(ts.Attributes[{k${i}:String}])) AS stok_${i}`,
+    ).join(",\n");
+
+    const query_params: Record<string, string | number> = {
+      tenantId: params.tenantId,
+      fromMs: params.window.start.getTime(),
+      toMs: params.window.end.getTime(),
+    };
+    CATEGORIES.forEach((category, i) => {
+      query_params[`c${i}`] = blockCategoryCostAttr(category);
+      query_params[`k${i}`] = blockCategoryTokensAttr(category);
+    });
+
+    // The principal filter must scope BOTH the summed rows (outer, ts-aliased)
+    // and the dedup key set (inner subquery, unaliased single table).
+    //
+    // userEmail is set ONLY on the governance-tenant union (see docstring), and
+    // that tenant carries traffic from other origins too. Scope to the
+    // ingestion-source origin the same way every other governance-tenant reader
+    // does (activityMonitor.categoryBreakdown, the KPI/OCSF reactors) — without
+    // it a principal's personal breakdown would sum non-ingestion rows.
+    const outerUserFilter = params.userEmail
+      ? "AND ts.Attributes[{userKey:String}] = {userEmail:String}" +
+        " AND ts.Attributes[{originKey:String}] = {originValue:String}"
+      : "";
+    const innerUserFilter = params.userEmail
+      ? "AND Attributes[{userKey:String}] = {userEmail:String}" +
+        " AND Attributes[{originKey:String}] = {originValue:String}"
+      : "";
+    if (params.userEmail) {
+      query_params.userKey = GOVERNANCE_ATTR.USER_ID;
+      query_params.userEmail = params.userEmail;
+      query_params.originKey = GOVERNANCE_ATTR.ORIGIN_KIND;
+      query_params.originValue = GOVERNANCE_ORIGIN_KIND_VALUE;
+    }
+
+    const result = await client.query({
+      query: `
+        SELECT
+          ${outer}
+        FROM trace_summaries ts
+        WHERE ts.TenantId = {tenantId:String}
+          AND ts.OccurredAt >= {fromMs:DateTime64(3, 'UTC')}
+          AND ts.OccurredAt <  {toMs:DateTime64(3, 'UTC')}
+          ${outerUserFilter}
+          AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM trace_summaries
+            WHERE TenantId = {tenantId:String}
+              AND OccurredAt >= {fromMs:DateTime64(3, 'UTC')}
+              AND OccurredAt <  {toMs:DateTime64(3, 'UTC')}
+              ${innerUserFilter}
+            GROUP BY TenantId, TraceId
+          )
+        SETTINGS max_threads = 2, max_execution_time = 45, ${formatSettings(
+          ANALYTICS_CLICKHOUSE_SETTINGS,
+        )}
+      `,
+      query_params,
+      format: "JSONEachRow",
+    });
+
+    const [row] = (await result.json()) as Array<Record<string, number | null>>;
+    const totals = new Map<Category, { costUsd: number; tokens: number }>();
+    if (!row) return totals;
+    CATEGORIES.forEach((category, i) => {
+      totals.set(category, {
+        costUsd: Number(row[`scost_${i}`]) || 0,
+        tokens: Number(row[`stok_${i}`]) || 0,
+      });
+    });
+    return totals;
   }
 
   private async queryIngestionPrincipalBreakdown(

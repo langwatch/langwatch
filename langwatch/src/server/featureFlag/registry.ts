@@ -113,6 +113,22 @@ export const FEATURE_FLAGS = [
       "Per-project (distinctId = project id) disable for OTLP span token estimation. Operators can opt a single tenant out before reaching for the global switch.",
     family: "Collector",
   },
+  {
+    key: "block-classification-killswitch",
+    scope: "SYSTEM",
+    defaultValue: false,
+    description:
+      "Globally disables ADR-033 content-block cost classification in the collector. Emergency operator override; enabling skips ingest-time block classification for coding-agent spans (analytics only, never billing).",
+    family: "Collector",
+  },
+  {
+    key: "block-classification-project-killswitch",
+    scope: "SYSTEM",
+    defaultValue: false,
+    description:
+      "Per-project (distinctId = project id) disable for ADR-033 content-block cost classification. Operators can opt a single tenant out before reaching for the global switch.",
+    family: "Collector",
+  },
 
   // ----- PRODUCT -----
   {
