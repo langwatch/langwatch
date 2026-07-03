@@ -522,41 +522,47 @@ export class PersonalUsageService {
     const client = await getClickHouseClientForProject(input.personalProjectId);
     if (!client) return [];
 
-    // Personal-tenant totals. Left un-guarded on purpose: a throw here is a real
-    // query regression the integration test must catch, not a degrade path.
-    const totals = await this.queryCategoryTotals(client, {
-      tenantId: input.personalProjectId,
-      window,
-    });
+    // The personal-tenant and ingestion-union queries are independent — fire
+    // both concurrently rather than back-to-back (each is a full ClickHouse
+    // round-trip on the /me load path). Their error semantics differ, so they
+    // are NOT one Promise.all reject:
+    //   - personal totals are un-guarded (a throw is a real query regression the
+    //     integration test must catch — it propagates out of the Promise.all);
+    //   - the ingestion union is best-effort (catches internally → null), so a
+    //     failure keeps the personal rows rather than 500-ing an analytics view.
+    const wantsUnion = Boolean(input.userEmail && input.ingestionTenantId);
+    const [totals, ingestion] = await Promise.all([
+      this.queryCategoryTotals(client, {
+        tenantId: input.personalProjectId,
+        window,
+      }),
+      wantsUnion
+        ? this.queryCategoryTotals(client, {
+            tenantId: input.ingestionTenantId!,
+            window,
+            userEmail: input.userEmail,
+          }).catch((error) => {
+            // no-union: warn so a silently-degraded breakdown is diagnosable
+            // rather than looking like the user has no ingestion-source traffic.
+            logger.warn(
+              {
+                error,
+                personalProjectId: input.personalProjectId,
+                ingestionTenantId: input.ingestionTenantId,
+              },
+              "personal-usage category ingestion union failed; returning personal-tenant rows only",
+            );
+            return null;
+          })
+        : Promise.resolve(null),
+    ]);
 
-    // Ingestion-source union over the gov tenant, scoped to this principal's
-    // rows via the user_id (email) attribute. Best-effort: on failure keep the
-    // personal rows rather than surfacing a 500 for an analytics-only view.
-    if (input.userEmail && input.ingestionTenantId) {
-      try {
-        const ingestion = await this.queryCategoryTotals(client, {
-          tenantId: input.ingestionTenantId,
-          window,
-          userEmail: input.userEmail,
-        });
-        for (const [category, v] of ingestion) {
-          const existing = totals.get(category) ?? { costUsd: 0, tokens: 0 };
-          existing.costUsd += v.costUsd;
-          existing.tokens += v.tokens;
-          totals.set(category, existing);
-        }
-      } catch (error) {
-        // no-union: `totals` already holds the personal-tenant rows. Warn so a
-        // silently-degraded category breakdown is diagnosable rather than
-        // looking like the user simply has no ingestion-source traffic.
-        logger.warn(
-          {
-            error,
-            personalProjectId: input.personalProjectId,
-            ingestionTenantId: input.ingestionTenantId,
-          },
-          "personal-usage category ingestion union failed; returning personal-tenant rows only",
-        );
+    if (ingestion) {
+      for (const [category, v] of ingestion) {
+        const existing = totals.get(category) ?? { costUsd: 0, tokens: 0 };
+        existing.costUsd += v.costUsd;
+        existing.tokens += v.tokens;
+        totals.set(category, existing);
       }
     }
 

@@ -93,7 +93,11 @@ export function CategoryBreakdownBars({
                   left={0}
                   top={0}
                   height="full"
-                  width={`${Math.max(row.costUsd > 0 ? 2 : 0, widthPct)}%`}
+                  // Min visible width when the lane has DATA (tokens), not just
+                  // cost — an unpriced/custom model has tokens but cost 0, which
+                  // would otherwise render a 0-width bar that looks broken (the
+                  // token count still shows in the tooltip + row).
+                  width={`${Math.max(row.tokens > 0 || row.costUsd > 0 ? 2 : 0, widthPct)}%`}
                   backgroundColor="purple.400"
                 />
               </Box>
