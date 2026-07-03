@@ -11,7 +11,7 @@ endpoint at it, run a session, and read it back.
 
 Related: ADR `dev/docs/adr/033-coding-agent-cost-intelligence.md` · spec
 `specs/trace-processing/content-block-cost-attribution.feature` · known-gaps
-issue #5332 (`memory_context` / `skill_invocation` lanes are empty by design).
+issue #5332 (`memory_context` lane is empty by design).
 
 ---
 
@@ -94,12 +94,15 @@ Read it back three ways:
 
 ## What to expect
 
-- ~13 lanes populate: `system_prompt`, `tool_definitions`, `mcp_tool_definitions`,
-  `skill_content`, `prior_context`, `tool_result_builtin/mcp`, `assistant_text`,
-  `tool_call_builtin/mcp`, `thinking`, `user_input`, `other_input`.
-- `memory_context` and `skill_invocation` stay **empty by design** — no v1
-  heuristic emits them (issue #5332). CLAUDE.md rides inside `<system-reminder>` →
-  `prior_context`; a skill run is a `tool_use` → `tool_call_*`.
+- ~14 lanes populate: `system_prompt`, `tool_definitions`, `mcp_tool_definitions`,
+  `skill_content`, `skill_invocation`, `prior_context`, `tool_result_builtin/mcp`,
+  `assistant_text`, `tool_call_builtin/mcp`, `thinking`, `user_input`, `other_input`.
+- `skill_content` is the loaded skill INSTRUCTIONS (leading `<skill>`/`<skills-list>`
+  markers); `skill_invocation` is a skill RUN (a `tool_use` named `Skill`). The
+  invocation lane only populates when a session actually runs a skill — loading the
+  skills-list alone shows `skill_content` but no `skill_invocation`.
+- `memory_context` stays **empty by design** — no v1 heuristic emits it (issue
+  #5332). CLAUDE.md rides inside `<system-reminder>` → `prior_context`.
 - **Σ per-category cost == the trace's real cost** (the conservation invariant).
   Real Claude Code spans carry their own `cost_usd`, which the display trusts
   over the token×registry estimate — the reconciliation logic that keeps the
