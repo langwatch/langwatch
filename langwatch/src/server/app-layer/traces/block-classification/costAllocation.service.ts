@@ -171,7 +171,7 @@ export function allocateCategoryCosts({
   // otherwise mutate the global prototype via the bracket writes in addTokens.
   const totals: CategoryTotals = Object.create(null) as CategoryTotals;
   const blocks: AllocatedBlock[] = [];
-  for (const pool of poolList) allocatePool(pool, totals, blocks);
+  for (const pool of poolList) allocatePool({ pool, totals, blocks });
 
   // `> 0` alone accepts Infinity (an upstream div-by-zero) — which would scale
   // every category cost to Infinity, then serialise to null and silently zero
@@ -282,11 +282,15 @@ function partitionInput({
  * residual so the pool sums exactly regardless of float drift. A nonzero pool
  * with no blocks (zero-guard) drops its whole total into the axis catch-all.
  */
-function allocatePool(
-  pool: Pool,
-  totals: CategoryTotals,
-  blocks: AllocatedBlock[],
-): void {
+function allocatePool({
+  pool,
+  totals,
+  blocks,
+}: {
+  pool: Pool;
+  totals: CategoryTotals;
+  blocks: AllocatedBlock[];
+}): void {
   // Skip empty, negative, OR non-finite pools. `pool.total <= 0` alone lets a
   // NaN through (`NaN <= 0` is false), which would then poison every category
   // cost via `block.tokens * NaN`. The only caller pre-sanitises to `> 0` today,

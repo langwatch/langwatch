@@ -234,7 +234,8 @@ function classifyInputMessage({
 
   if (typeof content === "string") {
     // A whole-message string is the leading (and only) part — peel markers.
-    if (fresh && role === "user") pushFreshUserOrMarkers(acc, content, true);
+    if (fresh && role === "user")
+      pushFreshUserOrMarkers({ acc, text: content, peel: true });
     else acc.push(InputCategory.PRIOR_CONTEXT, content);
     return;
   }
@@ -250,7 +251,7 @@ function classifyInputMessage({
   for (const part of content) {
     if (typeof part === "string") {
       if (fresh && role === "user") {
-        pushFreshUserOrMarkers(acc, part, leadingTextPending);
+        pushFreshUserOrMarkers({ acc, text: part, peel: leadingTextPending });
         leadingTextPending = false;
       } else acc.push(InputCategory.PRIOR_CONTEXT, part);
       continue;
@@ -269,7 +270,11 @@ function classifyInputMessage({
     const before = acc.size();
     const category = inputPartCategory({ part, fresh, role, toolNames });
     if (part.type === "text" && fresh && role === "user") {
-      pushFreshUserOrMarkers(acc, blockText(part), leadingTextPending);
+      pushFreshUserOrMarkers({
+        acc,
+        text: blockText(part),
+        peel: leadingTextPending,
+      });
       leadingTextPending = false;
     } else {
       acc.push(category, blockText(part));
@@ -323,11 +328,15 @@ function inputPartCategory({
  * remaining body is real user_input. On any later part, the whole text is
  * user_input: injected context only ever prefixes the first part, so peeling a
  * later part would mislabel a `<tag>` in real user prose as prior_context. */
-function pushFreshUserOrMarkers(
-  acc: AxisAccumulator,
-  text: string,
-  peel: boolean,
-): void {
+function pushFreshUserOrMarkers({
+  acc,
+  text,
+  peel,
+}: {
+  acc: AxisAccumulator;
+  text: string;
+  peel: boolean;
+}): void {
   if (!peel) {
     if (text.length > 0) acc.push(InputCategory.USER_INPUT, text);
     return;

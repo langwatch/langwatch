@@ -25,6 +25,7 @@ import {
   SPAN_ATTR_BLOCKCAT_PREFIX,
 } from "../block-classification/categories";
 import type { CodingAgentHarness } from "../block-classification/harnessDetection";
+import { ATTR_KEYS } from "../canonicalisation/extractors/_constants";
 import {
   parseSessionSteps,
   SESSION_HARNESS_ATTR,
@@ -195,9 +196,9 @@ function readHarness(
  * mega-session.
  */
 function readThreadId(attributes: Record<string, string>): string | null {
-  const conversation = attributes["gen_ai.conversation.id"]?.trim();
+  const conversation = attributes[ATTR_KEYS.GEN_AI_CONVERSATION_ID]?.trim();
   if (conversation) return conversation;
-  const thread = attributes["langwatch.thread.id"]?.trim();
+  const thread = attributes[ATTR_KEYS.LANGWATCH_THREAD_ID]?.trim();
   if (thread) return thread;
   return null;
 }
