@@ -7,12 +7,12 @@
 {{ match.trace.output | truncate: 1500 }}
 {%- endcapture -%}
 {%- capture _ctx_header -%}
-{%- if match.evaluation %}*{{ match.evaluation.evaluatorName | default: "Evaluation" }}*{% if match.evaluation.score != null %} `{{ match.evaluation.score }}`{% endif %}{% if match.evaluation.label %} · {{ match.evaluation.label }}{% endif %}{%- endif -%}
+{%- if match.evaluation %}*{{ match.evaluation.evaluatorName | default: "Evaluation"  | mrkdwn_escape }}*{% if match.evaluation.score != null %} `{{ match.evaluation.score }}`{% endif %}{% if match.evaluation.label %} · {{ match.evaluation.label | mrkdwn_escape }}{% endif %}{%- endif -%}
 {%- if match.evaluation and trigger.alertType %} · {% endif -%}
 {%- if trigger.alertType %}_{{ trigger.alertType }}_{%- endif -%}
 {%- endcapture -%}
 {%- capture _footer -%}
-`{{ match.trace.id | truncate: 12 }}`{% if match.trace.metadata.model %} · {{ match.trace.metadata.model }}{% endif %}{% if match.trace.metadata.duration_ms %} · {{ match.trace.metadata.duration_ms }}ms{% endif %}{% if match.trace.metadata.cost %} · ${{ match.trace.metadata.cost }}{% endif %} · <{{ match.trace.url }}|View in LangWatch ↗>
+`{{ match.trace.id | truncate: 12 }}`{% if match.trace.metadata.model %} · {{ match.trace.metadata.model | mrkdwn_escape }}{% endif %}{% if match.trace.metadata.duration_ms %} · {{ match.trace.metadata.duration_ms }}ms{% endif %}{% if match.trace.metadata.cost %} · ${{ match.trace.metadata.cost }}{% endif %} · <{{ match.trace.url }}|View in LangWatch ↗>
 {%- endcapture -%}
 [
   { "type": "header", "text": { "type": "plain_text", "text": {{ trigger.name | truncate: 140 | json }}, "emoji": true } }

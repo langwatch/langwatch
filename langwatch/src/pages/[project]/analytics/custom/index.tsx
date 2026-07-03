@@ -831,7 +831,10 @@ function CustomGraphForm({
             name="connected"
             defaultValue={false}
             render={({ field: { onChange, value } }) => (
-              <Switch onChange={onChange} checked={value}>
+              <Switch
+                onCheckedChange={({ checked }) => onChange(checked)}
+                checked={value}
+              >
                 Connect dots
               </Switch>
             )}
@@ -956,7 +959,11 @@ function CustomGraphForm({
             name="includePrevious"
             defaultValue={false}
             render={({ field: { onChange, value } }) => (
-              <Switch onChange={onChange} checked={value} colorPalette="orange">
+              <Switch
+                onCheckedChange={({ checked }) => onChange(checked)}
+                checked={value}
+                colorPalette="orange"
+              >
                 Include previous period
               </Switch>
             )}

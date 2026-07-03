@@ -1,5 +1,5 @@
 {%- capture _line -%}
-🔔 *{{ trigger.name }}*{% if match.evaluation %} · {{ match.evaluation.evaluatorName | default: "eval" }} `{{ match.evaluation.score | default: "—" }}`{% endif %} · _{{ match.trace.input | truncate: 140 }}_ · <{{ match.trace.url }}|View ↗>
+🔔 *{{ trigger.name }}*{% if match.evaluation %} · {{ match.evaluation.evaluatorName | default: "eval"  | mrkdwn_escape }} `{{ match.evaluation.score | default: "—" }}`{% endif %} · _{{ match.trace.input | truncate: 140 }}_ · <{{ match.trace.url }}|View ↗>
 {%- endcapture -%}
 [
   { "type": "section", "text": { "type": "mrkdwn", "text": {{ _line | json }} } }

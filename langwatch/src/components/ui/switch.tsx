@@ -1,12 +1,23 @@
 import { Switch as ChakraSwitch } from "@chakra-ui/react";
 import * as React from "react";
 
-export interface SwitchProps extends Omit<ChakraSwitch.RootProps, "onChange"> {
+/**
+ * Chakra v3 Switch wrapper.
+ *
+ * N.B. `onChange` is deliberately NOT accepted here — Chakra v3's `Root`
+ * exposes state via `onCheckedChange({ checked })`, not a DOM ChangeEvent.
+ * A previous version of this file declared an `onChange` prop that only
+ * spread into `...rest` and was silently discarded by `ChakraSwitch.Root`,
+ * so callers who wrote `<Switch onChange={…}>` got a compile-clean but
+ * runtime-dead toggle. Callers MUST use `onCheckedChange` — leaving
+ * `onChange` off the type surface forces TypeScript to catch mis-wired
+ * consumers instead of silently no-op'ing them.
+ */
+export interface SwitchProps extends ChakraSwitch.RootProps {
   inputProps?: React.InputHTMLAttributes<HTMLInputElement>;
   rootRef?: React.Ref<HTMLLabelElement>;
   trackLabel?: { on: React.ReactNode; off: React.ReactNode };
   thumbLabel?: { on: React.ReactNode; off: React.ReactNode };
-  onChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 export const Switch = React.forwardRef<HTMLInputElement, SwitchProps>(
@@ -17,7 +28,7 @@ export const Switch = React.forwardRef<HTMLInputElement, SwitchProps>(
     return (
       <ChakraSwitch.Root
         ref={rootRef}
-        {...(rest as ChakraSwitch.RootProps)}
+        {...rest}
         colorPalette={rest.colorPalette ?? "blue"}
       >
         <ChakraSwitch.HiddenInput ref={ref} {...inputProps} />
