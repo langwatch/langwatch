@@ -345,6 +345,16 @@ describe("license-gate on governance backend", () => {
       expect(result).toBeDefined();
     });
 
+    it("ADMIN can fetch activityMonitor.categoryBreakdown (RBAC + license gate + resolver)", async () => {
+      // The happy path the reject-only tests missed: an enterprise ADMIN clears
+      // both guards and reaches the resolver, which returns an array (empty on a
+      // fresh org — the query degrades to [] rather than throwing without data).
+      const result = await callerFor(
+        adminUserId,
+      ).activityMonitor.categoryBreakdown({ organizationId, windowDays: 30 });
+      expect(Array.isArray(result)).toBe(true);
+    });
+
     it("service-layer createSource succeeds when plan is Enterprise", async () => {
       const service = IngestionSourceService.create(prisma);
       const { source, ingestSecret } = await service.createSource({

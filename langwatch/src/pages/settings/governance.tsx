@@ -424,7 +424,7 @@ function GovernanceOverviewPage() {
           title="Usage breakdown"
           subline="Coding-agent spend split by content category (last 30 days). Analytics only; it never affects billing."
         >
-          <CategoryBreakdownCaption />
+          <CategoryBreakdownCaption scope="organization" />
           {categoryBreakdownQuery.isLoading ? null : categoryBreakdownQuery.isError ? (
             <CategoryBreakdownErrorHint />
           ) : categoryBars.length === 0 ? (

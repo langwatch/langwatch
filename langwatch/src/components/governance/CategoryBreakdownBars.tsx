@@ -131,12 +131,21 @@ export const CATEGORY_BREAKDOWN_TOOLTIP_LABELS: string[] =
  * headline categories with a (?) tooltip carrying the complete list. Shared by
  * both surfaces so the summary phrasing stays identical.
  */
-export function CategoryBreakdownCaption() {
+export function CategoryBreakdownCaption({
+  scope = "personal",
+}: {
+  /** Whose usage this caption describes. The org Activity Monitor shows
+   * aggregate org/team spend, so "your tokens" would be factually wrong there. */
+  scope?: "personal" | "organization";
+} = {}) {
+  const lead =
+    scope === "organization"
+      ? "Where the organization’s tokens go"
+      : "Where your tokens go";
   return (
     <HStack gap={1} color="fg.muted" fontSize="sm" marginBottom={3}>
       <Text>
-        Where your tokens go: system prompt, MCP tools, skills, thinking, and
-        more.
+        {lead}: system prompt, MCP tools, skills, thinking, and more.
       </Text>
       <Tooltip
         openDelay={100}
