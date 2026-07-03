@@ -1,5 +1,5 @@
 import type { OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
-import { KILL_SWITCH_CACHE_TTL_MS } from "../../featureFlag/constants";
+import { isDisabledByKillSwitch } from "../../featureFlag/killSwitch";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { TokenizerClient } from "../clients/tokenizer/tokenizer.client";
 import { extractModelName } from "./utils/spanModel";
@@ -138,42 +138,17 @@ export class OtlpSpanTokenEstimationService {
     }
   }
 
-  private async isDisabledByKillSwitch({
+  private isDisabledByKillSwitch({
     tenantId,
   }: {
     tenantId?: string;
   }): Promise<boolean> {
-    if (!this.deps.featureFlagService) return false;
-
-    // Global kill switch — disables for all projects.
-    // Both checks pass cacheTtlMs to widen the cache window beyond the
-    // 5s frontend-flag default, since this method runs on the per-span
-    // hot path and a cache miss = one billable PostHog /flags request.
-    const globalDisabled = await this.deps.featureFlagService.isEnabled(
-      GLOBAL_KILL_SWITCH_KEY,
-      {
-        distinctId: "global",
-        defaultValue: false,
-        cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS,
-      },
-    );
-    if (globalDisabled) return true;
-
-    // Per-project kill switch
-    if (tenantId) {
-      const projectDisabled = await this.deps.featureFlagService.isEnabled(
-        PROJECT_KILL_SWITCH_KEY,
-        {
-          distinctId: tenantId,
-          defaultValue: false,
-          projectId: tenantId,
-          cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS,
-        },
-      );
-      if (projectDisabled) return true;
-    }
-
-    return false;
+    return isDisabledByKillSwitch({
+      featureFlagService: this.deps.featureFlagService,
+      globalKey: GLOBAL_KILL_SWITCH_KEY,
+      projectKey: PROJECT_KILL_SWITCH_KEY,
+      tenantId,
+    });
   }
 
   private isLlmSpan(span: OtlpSpan): boolean {

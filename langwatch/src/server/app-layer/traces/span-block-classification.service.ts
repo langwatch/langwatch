@@ -4,7 +4,7 @@ import type {
   OtlpInstrumentationScope,
   OtlpSpan,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
-import { KILL_SWITCH_CACHE_TTL_MS } from "../../featureFlag/constants";
+import { isDisabledByKillSwitch } from "../../featureFlag/killSwitch";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { TokenizerClient } from "../clients/tokenizer/tokenizer.client";
 import {
@@ -308,43 +308,17 @@ export class OtlpSpanBlockClassificationService {
     return {};
   }
 
-  /**
-   * Global + per-project kill switch, identical in shape to
-   * OtlpSpanTokenEstimationService. Runs on the per-span hot path, so both
-   * lookups widen the cache window past the 5s frontend-flag default (a cache
-   * miss = one billable flags request). No featureFlagService (unit tests) → on.
-   */
-  private async isDisabledByKillSwitch({
+  private isDisabledByKillSwitch({
     tenantId,
   }: {
     tenantId?: string;
   }): Promise<boolean> {
-    if (!this.deps.featureFlagService) return false;
-
-    const globalDisabled = await this.deps.featureFlagService.isEnabled(
-      GLOBAL_KILL_SWITCH_KEY,
-      {
-        distinctId: "global",
-        defaultValue: false,
-        cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS,
-      },
-    );
-    if (globalDisabled) return true;
-
-    if (tenantId) {
-      const projectDisabled = await this.deps.featureFlagService.isEnabled(
-        PROJECT_KILL_SWITCH_KEY,
-        {
-          distinctId: tenantId,
-          defaultValue: false,
-          projectId: tenantId,
-          cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS,
-        },
-      );
-      if (projectDisabled) return true;
-    }
-
-    return false;
+    return isDisabledByKillSwitch({
+      featureFlagService: this.deps.featureFlagService,
+      globalKey: GLOBAL_KILL_SWITCH_KEY,
+      projectKey: PROJECT_KILL_SWITCH_KEY,
+      tenantId,
+    });
   }
 
   /**
