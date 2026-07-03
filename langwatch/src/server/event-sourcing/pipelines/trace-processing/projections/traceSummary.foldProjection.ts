@@ -269,7 +269,12 @@ export function applySpanToSummary({
       instrumentationScopeName: span.instrumentationScope?.name ?? null,
       spanAttributes: span.spanAttributes,
     });
-    const stepInputTokens = spanCostService.extractStepInputTokens(span);
+    // Only coding-agent spans feed the session series, so resolve the harness
+    // first and skip the token sum entirely for everything else. Reuse the
+    // cache tokens already extracted above rather than re-scanning the span.
+    const stepInputTokens = harness
+      ? spanCostService.extractStepInputTokens(span, cacheTokens)
+      : 0;
     if (harness && stepInputTokens > 0) {
       appendSessionStep({
         attributes,

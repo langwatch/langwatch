@@ -150,12 +150,22 @@ export class SpanCostService {
    * cache-read pool, so summing the pools is the only signal that reflects
    * genuine context re-basing. Returns 0 when the span carries no usage.
    */
-  extractStepInputTokens(span: NormalizedSpan): number {
-    const metrics = this.extractTokenMetrics(span);
-    const cache = this.extractCacheTokens(span);
-    return (
-      metrics.promptTokens + cache.cacheReadTokens + cache.cacheCreationTokens
+  extractStepInputTokens(
+    span: NormalizedSpan,
+    // The fold already extracts cache tokens for this span (RESERVED_CACHE_*
+    // sums) — pass them in to avoid a second scan. Prompt tokens are read
+    // directly here rather than via extractTokenMetrics: that path also runs
+    // computeSpanCost (model matching) whose cost result this never uses, and
+    // the fold priced the span moments earlier in the same pass.
+    cacheTokens?: { cacheReadTokens: number; cacheCreationTokens: number },
+  ): number {
+    const promptTokens = Math.max(
+      0,
+      coerceToNumber(span.spanAttributes[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS]) ??
+        0,
     );
+    const cache = cacheTokens ?? this.extractCacheTokens(span);
+    return promptTokens + cache.cacheReadTokens + cache.cacheCreationTokens;
   }
 
   /**
