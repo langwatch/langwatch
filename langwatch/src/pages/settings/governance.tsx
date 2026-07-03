@@ -53,7 +53,6 @@ import { getHexColorForString } from "~/utils/rotatingColors";
  * Spec: specs/ai-gateway/governance/admin-oversight.feature
  */
 
-type Source = RouterOutputs["ingestionSources"]["list"][number];
 type SourceHealth =
   RouterOutputs["activityMonitor"]["ingestionSourcesHealth"][number];
 type SpendByUser = RouterOutputs["activityMonitor"]["spendByUser"][number];

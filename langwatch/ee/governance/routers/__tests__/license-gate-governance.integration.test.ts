@@ -130,8 +130,8 @@ afterAll(async () => {
     .catch(() => {});
 });
 
-function configureApp(plan: PlanInfo) {
-  resetApp();
+async function configureApp(plan: PlanInfo) {
+  await resetApp();
   globalForApp.__langwatch_app = createTestApp({
     planProvider: PlanProviderService.create({
       getActivePlan: async () => plan,

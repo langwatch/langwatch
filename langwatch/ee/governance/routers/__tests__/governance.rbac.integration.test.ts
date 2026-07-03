@@ -21,7 +21,7 @@
  *   - governance.ocsfExport  — `complianceExport:view`
  *   - ingestionSources.list/create  — `ingestionSources:view/manage`
  *   - anomalyRules.list/create  — `anomalyRules:view/manage`
- *   - activityMonitor.summary  — `activityMonitor:view`
+ *   - activityMonitor.*  — every procedure gates on `activityMonitor:view`
  *
  * Not covered here (already gated correctly elsewhere):
  *   - governance.resolveHome  — `organization:view` (identity routing
@@ -45,6 +45,7 @@ import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { ACTIVITY_MONITOR_PROCEDURES } from "./activityMonitorProcedures.fixtures";
 
 // The new requireEnterprisePlan middleware (Phase 4b-4/5) 403s every
 // gated governance procedure for non-enterprise plans. This test pins
@@ -64,7 +65,7 @@ describe("governance routers — RBAC enforcement", () => {
     // resolveHome touches UsageStatsService which expects the app
     // singleton initialised. Other procedures don't need it but
     // initialising once keeps the test simple.
-    resetApp();
+    await resetApp();
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
         getActivePlan: async () => enterprisePlan,
@@ -239,20 +240,15 @@ describe("governance routers — RBAC enforcement", () => {
       ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
 
-    it("rejects activityMonitor.summary with UNAUTHORIZED", async () => {
-      const caller = callerFor(memberUserId);
+    // Every activityMonitor procedure gates on `activityMonitor:view`, so a
+    // MEMBER (who lacks it) is rejected before the resolver runs. Looping over
+    // the full procedure list closes the whole-router gap: a new procedure that
+    // forgets the permission guard fails here.
+    it.each(
+      ACTIVITY_MONITOR_PROCEDURES,
+    )("rejects activityMonitor.%s with UNAUTHORIZED", async (_name, invoke) => {
       await expect(
-        caller.activityMonitor.summary({ organizationId, windowDays: 7 }),
-      ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
-    });
-
-    it("rejects activityMonitor.categoryBreakdown with UNAUTHORIZED", async () => {
-      const caller = callerFor(memberUserId);
-      await expect(
-        caller.activityMonitor.categoryBreakdown({
-          organizationId,
-          windowDays: 7,
-        }),
+        invoke(callerFor(memberUserId), organizationId),
       ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
 
