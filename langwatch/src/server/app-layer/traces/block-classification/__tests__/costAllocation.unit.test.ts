@@ -242,6 +242,72 @@ describe("allocateCategoryCosts", () => {
     });
   });
 
+  describe("given input blocks carrying their source idx", () => {
+    it("returns per-block detail with the scaled tokens and cache tier", () => {
+      const { blocks } = allocateCategoryCosts({
+        inputBlocks: [
+          { idx: 0, category: InputCategory.SYSTEM_PROMPT, tokens: 1000 },
+          { idx: 1, category: InputCategory.USER_INPUT, tokens: 40 },
+        ],
+        outputBlocks: [
+          { idx: 0, category: OutputCategory.ASSISTANT_TEXT, tokens: 20 },
+        ],
+        lastCacheBreakpointIndex: 0, // prefix = system prompt only
+        pools: {
+          inputTokens: 40,
+          cacheReadTokens: 1000,
+          cacheCreationTokens: 0,
+          outputTokens: 20,
+        },
+        prices: {
+          inputCostPerToken: 3e-6,
+          cacheReadCostPerToken: 3e-7,
+          outputCostPerToken: 1.5e-5,
+        },
+      });
+
+      const system = blocks.find(
+        (b) => b.category === InputCategory.SYSTEM_PROMPT,
+      );
+      const user = blocks.find((b) => b.category === InputCategory.USER_INPUT);
+      const assistant = blocks.find(
+        (b) => b.category === OutputCategory.ASSISTANT_TEXT,
+      );
+
+      // The system prompt is in the cached prefix, the user input is fresh.
+      expect(system).toMatchObject({
+        idx: 0,
+        cacheTier: "cache_read",
+        tokens: 1000,
+      });
+      expect(user).toMatchObject({ idx: 1, cacheTier: "fresh", tokens: 40 });
+      expect(assistant).toMatchObject({
+        idx: 0,
+        cacheTier: "fresh",
+        tokens: 20,
+      });
+    });
+
+    it("omits synthetic catch-all tokens from the per-block detail", () => {
+      const { blocks, categoryTotals } = allocateCategoryCosts({
+        inputBlocks: [],
+        outputBlocks: [],
+        lastCacheBreakpointIndex: null,
+        pools: {
+          inputTokens: 500,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+          outputTokens: 0,
+        },
+        prices: { inputCostPerToken: 3e-6 },
+      });
+
+      // The unattributable usage lands in categoryTotals but has no source block.
+      expect(categoryTotals[InputCategory.OTHER_INPUT]?.tokens).toBe(500);
+      expect(blocks).toHaveLength(0);
+    });
+  });
+
   describe("given a tier with no price", () => {
     it("allocates the tokens but prices that tier at zero", () => {
       const { categoryTotals } = allocateCategoryCosts({
@@ -262,6 +328,86 @@ describe("allocateCategoryCosts", () => {
       expect(
         categoryTotals[OutputCategory.ASSISTANT_TEXT]?.costUsd,
       ).toBeCloseTo(50 * 1e-5, 12);
+    });
+  });
+
+  describe("given an authoritative span cost the display trusts over the rates", () => {
+    it("rescales per-category costs so their sum equals that cost, tokens untouched", () => {
+      // Registry rates would price this span at 100*1e-6 + 50*1e-5 = 6e-4, but
+      // the provider billed 0.02 (e.g. Claude Code cost_usd). Categories must
+      // reconcile to the displayed 0.02, not the estimate.
+      const { categoryTotals } = allocateCategoryCosts({
+        inputBlocks: [{ category: InputCategory.SYSTEM_PROMPT, tokens: 100 }],
+        outputBlocks: [{ category: OutputCategory.ASSISTANT_TEXT, tokens: 50 }],
+        lastCacheBreakpointIndex: null,
+        pools: {
+          inputTokens: 100,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+          outputTokens: 50,
+        },
+        prices: { inputCostPerToken: 1e-6, outputCostPerToken: 1e-5 },
+        reconcileToTotalCost: 0.02,
+      });
+
+      expect(sumCosts(categoryTotals)).toBeCloseTo(0.02, 12);
+      // Tokens are never rescaled — only cost is reconciled.
+      expect(sumTokens(categoryTotals)).toBe(150);
+      // The tier-weighted split is preserved: output (5e-4) carried 5/6 of the
+      // provisional 6e-4, so it keeps 5/6 of the reconciled total.
+      expect(
+        categoryTotals[OutputCategory.ASSISTANT_TEXT]?.costUsd,
+      ).toBeCloseTo(0.02 * (5 / 6), 10);
+    });
+
+    it("distributes the cost by token share when no rate produced any cost", () => {
+      // No rates and no registry match → provisional Σ is 0, but the span still
+      // reported a real cost. It must be attributed by token share, not dropped.
+      const { categoryTotals } = allocateCategoryCosts({
+        inputBlocks: [{ category: InputCategory.SYSTEM_PROMPT, tokens: 300 }],
+        outputBlocks: [
+          { category: OutputCategory.ASSISTANT_TEXT, tokens: 100 },
+        ],
+        lastCacheBreakpointIndex: null,
+        pools: {
+          inputTokens: 300,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+          outputTokens: 100,
+        },
+        prices: {},
+        reconcileToTotalCost: 0.04,
+      });
+
+      expect(sumCosts(categoryTotals)).toBeCloseTo(0.04, 12);
+      expect(categoryTotals[InputCategory.SYSTEM_PROMPT]?.costUsd).toBeCloseTo(
+        0.04 * (300 / 400),
+        12,
+      );
+      expect(
+        categoryTotals[OutputCategory.ASSISTANT_TEXT]?.costUsd,
+      ).toBeCloseTo(0.04 * (100 / 400), 12);
+    });
+
+    it("leaves rate-derived costs untouched when the reconcile target is absent", () => {
+      const { categoryTotals } = allocateCategoryCosts({
+        inputBlocks: [{ category: InputCategory.SYSTEM_PROMPT, tokens: 100 }],
+        outputBlocks: [],
+        lastCacheBreakpointIndex: null,
+        pools: {
+          inputTokens: 100,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+          outputTokens: 0,
+        },
+        prices: { inputCostPerToken: 1e-6 },
+        reconcileToTotalCost: null,
+      });
+
+      expect(categoryTotals[InputCategory.SYSTEM_PROMPT]?.costUsd).toBeCloseTo(
+        100 * 1e-6,
+        12,
+      );
     });
   });
 });

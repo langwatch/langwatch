@@ -22,6 +22,11 @@
  *
  * Spec: specs/ai-gateway/license-gate-governance.feature
  */
+
+import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "@ee/governance/services/activity-monitor/ingestionSource.constants";
+import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
+import { FREE_PLAN } from "@ee/licensing/constants";
+import type { PlanInfo } from "@ee/licensing/planInfo";
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
@@ -29,19 +34,12 @@ import {
 } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-
-import { FREE_PLAN } from "@ee/licensing/constants";
-import type { PlanInfo } from "@ee/licensing/planInfo";
-
-import { prisma } from "~/server/db";
-import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
-import { NON_ENTERPRISE_INGESTION_SOURCE_CAP } from "@ee/governance/services/activity-monitor/ingestionSource.constants";
+import { appRouter } from "~/server/api/root";
+import { createInnerTRPCContext } from "~/server/api/trpc";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
-
-import { appRouter } from "~/server/api/root";
-import { createInnerTRPCContext } from "~/server/api/trpc";
+import { prisma } from "~/server/db";
 
 const ns = `lic-gate-${nanoid(8)}`;
 
@@ -73,7 +71,11 @@ beforeAll(async () => {
   });
   adminUserId = admin.id;
   await prisma.organizationUser.create({
-    data: { userId: admin.id, organizationId, role: OrganizationUserRole.ADMIN },
+    data: {
+      userId: admin.id,
+      organizationId,
+      role: OrganizationUserRole.ADMIN,
+    },
   });
   await prisma.teamUser.create({
     data: { userId: admin.id, teamId, role: TeamUserRole.ADMIN },
@@ -102,13 +104,21 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await prisma.roleBinding.deleteMany({ where: { organizationId } }).catch(() => {});
+  await prisma.roleBinding
+    .deleteMany({ where: { organizationId } })
+    .catch(() => {});
   await prisma.teamUser
     .deleteMany({ where: { team: { slug: { startsWith: `--lic-team-` } } } })
     .catch(() => {});
-  await prisma.organizationUser.deleteMany({ where: { organizationId } }).catch(() => {});
-  await prisma.team.deleteMany({ where: { slug: { startsWith: `--lic-team-` } } }).catch(() => {});
-  await prisma.organization.deleteMany({ where: { slug: `--lic-${ns}` } }).catch(() => {});
+  await prisma.organizationUser
+    .deleteMany({ where: { organizationId } })
+    .catch(() => {});
+  await prisma.team
+    .deleteMany({ where: { slug: { startsWith: `--lic-team-` } } })
+    .catch(() => {});
+  await prisma.organization
+    .deleteMany({ where: { slug: `--lic-${ns}` } })
+    .catch(() => {});
   await prisma.user
     .deleteMany({
       where: {
@@ -120,8 +130,8 @@ afterAll(async () => {
     .catch(() => {});
 });
 
-function configureApp(plan: PlanInfo) {
-  resetApp();
+async function configureApp(plan: PlanInfo) {
+  await resetApp();
   globalForApp.__langwatch_app = createTestApp({
     planProvider: PlanProviderService.create({
       getActivePlan: async () => plan,
@@ -181,6 +191,15 @@ describe("license-gate on governance backend", () => {
             organizationId,
             windowDays: 30,
             limit: 10,
+          }),
+        ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      });
+
+      it("forbids activityMonitor.categoryBreakdown", async () => {
+        await expect(
+          callerFor(adminUserId).activityMonitor.categoryBreakdown({
+            organizationId,
+            windowDays: 30,
           }),
         ).rejects.toMatchObject({ code: "FORBIDDEN" });
       });

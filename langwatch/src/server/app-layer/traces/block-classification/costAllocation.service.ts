@@ -14,6 +14,14 @@
  * pool with no blocks lands its whole total in the axis catch-all, never dropped,
  * never divided by zero.
  *
+ * Per-tier rates cost the tokens; but when the span carries an authoritative
+ * total cost the display trusts OVER the rate estimate — a provider's own billed
+ * figure such as Claude Code's `cost_usd` (`computeSpanCost` Priority 2) — the
+ * rate-derived Σ would drift from the number the user sees. `reconcileToTotalCost`
+ * closes that gap: after pricing, the per-category costs are scaled so their sum
+ * equals that authoritative total, preserving the tier-weighted split while
+ * keeping conservation against the DISPLAYED cost.
+ *
  * Pure and deterministic — no clock, no randomness, no I/O.
  */
 
@@ -21,10 +29,28 @@ import { type Category, catchAllFor } from "./categories";
 
 export type CacheTier = "fresh" | "cache_read" | "cache_creation";
 
-/** A classified block with its (caller-supplied) token estimate. */
+/** A classified block with its (caller-supplied) token estimate. `idx` is the
+ * block's position within its OWN axis (input parts and output parts are counted
+ * separately), so it is unique only together with the block's axis — which its
+ * `category` already identifies (input and output categories are disjoint sets). */
 export interface TokenBlock {
+  idx?: number;
   category: Category;
   tokens: number;
+}
+
+/** Per-block allocation detail (ADR-033 Schema, `blocks.classification`): the
+ * block's post-scale token share and the cache tier it was priced at. Synthetic
+ * catch-all tokens (a nonzero pool with no blocks) carry no source block and so
+ * are absent here — they surface only in `categoryTotals`.
+ *
+ * `idx` is axis-local (see TokenBlock): a `blocks` array can hold an input entry
+ * and an output entry that share `idx: 0`; disambiguate by the entry's category. */
+export interface AllocatedBlock {
+  idx: number;
+  category: Category;
+  tokens: number;
+  cacheTier: CacheTier;
 }
 
 /** Provider-reported usage pools — the ground truth totals per tier. */
@@ -54,6 +80,7 @@ interface Pool {
   total: number;
   rate: number;
   axis: "input" | "output";
+  tier: CacheTier;
   blocks: TokenBlock[];
 }
 
@@ -73,13 +100,22 @@ export function allocateCategoryCosts({
   lastCacheBreakpointIndex,
   pools,
   prices,
+  reconcileToTotalCost,
 }: {
   inputBlocks: TokenBlock[];
   outputBlocks: TokenBlock[];
   lastCacheBreakpointIndex: number | null;
   pools: UsagePools;
   prices: TierPrices;
-}): { categoryTotals: CategoryTotals } {
+  /**
+   * An authoritative span-total cost the display trusts over the rate estimate
+   * (e.g. Claude Code's `cost_usd`). When set (> 0), the per-category costs are
+   * rescaled so Σ equals it, so conservation holds against the DISPLAYED cost.
+   * `null`/absent leaves rate-derived costs untouched (the rates already match
+   * what the display shows — custom-rate or registry path).
+   */
+  reconcileToTotalCost?: number | null;
+}): { categoryTotals: CategoryTotals; blocks: AllocatedBlock[] } {
   const { cachePrefix, fresh } = partitionInput({
     inputBlocks,
     lastCacheBreakpointIndex,
@@ -92,31 +128,71 @@ export function allocateCategoryCosts({
       total: pools.cacheReadTokens,
       rate: prices.cacheReadCostPerToken ?? 0,
       axis: "input",
+      tier: "cache_read",
       blocks: cachePrefix.cacheRead,
     },
     {
       total: pools.cacheCreationTokens,
       rate: prices.cacheCreationCostPerToken ?? 0,
       axis: "input",
+      tier: "cache_creation",
       blocks: cachePrefix.cacheCreation,
     },
     {
       total: pools.inputTokens,
       rate: prices.inputCostPerToken ?? 0,
       axis: "input",
+      tier: "fresh",
       blocks: fresh,
     },
     {
       total: pools.outputTokens,
       rate: prices.outputCostPerToken ?? 0,
       axis: "output",
+      tier: "fresh",
       blocks: outputBlocks,
     },
   ];
 
   const totals: CategoryTotals = {};
-  for (const pool of poolList) allocatePool(pool, totals);
-  return { categoryTotals: totals };
+  const blocks: AllocatedBlock[] = [];
+  for (const pool of poolList) allocatePool(pool, totals, blocks);
+
+  if (reconcileToTotalCost != null && reconcileToTotalCost > 0) {
+    reconcileCosts(totals, reconcileToTotalCost);
+  }
+
+  return { categoryTotals: totals, blocks };
+}
+
+/**
+ * Rescale per-category costs so their sum equals an authoritative span total the
+ * display trusts over the rate estimate (`computeSpanCost` Priority 2). Tokens
+ * are untouched — only cost is reconciled. Two cases:
+ *
+ *   - Rates produced a nonzero Σ → scale every category by `target / Σ`, which
+ *     preserves the tier-weighted relative split (cache reads stay cheaper).
+ *   - Rates produced Σ = 0 (no registry match, no custom rates) but the span
+ *     still reported a real cost → distribute `target` across categories by
+ *     token share, so the authoritative cost is attributed rather than dropped.
+ */
+function reconcileCosts(totals: CategoryTotals, target: number): void {
+  const entries = Object.values(totals).filter(
+    (t): t is CategoryTotal => t !== undefined,
+  );
+  const provisional = entries.reduce((sum, t) => sum + t.costUsd, 0);
+
+  if (provisional > 0) {
+    const factor = target / provisional;
+    for (const total of entries) total.costUsd *= factor;
+    return;
+  }
+
+  const totalTokens = entries.reduce((sum, t) => sum + t.tokens, 0);
+  if (totalTokens <= 0) return;
+  for (const total of entries) {
+    total.costUsd = (target * total.tokens) / totalTokens;
+  }
 }
 
 /**
@@ -168,7 +244,11 @@ function partitionInput({
  * residual so the pool sums exactly regardless of float drift. A nonzero pool
  * with no blocks (zero-guard) drops its whole total into the axis catch-all.
  */
-function allocatePool(pool: Pool, totals: CategoryTotals): void {
+function allocatePool(
+  pool: Pool,
+  totals: CategoryTotals,
+  blocks: AllocatedBlock[],
+): void {
   if (pool.total <= 0) return;
 
   if (pool.blocks.length === 0) {
@@ -209,6 +289,18 @@ function allocatePool(pool: Pool, totals: CategoryTotals): void {
       tokens: scaled,
       rate: pool.rate,
     });
+    if (block.idx !== undefined) {
+      blocks.push({
+        idx: block.idx,
+        category: block.category,
+        // Rounded for the stored detail blob: tokens are integral by nature and
+        // raw float artifacts (42.857142…) only bloat the payload. The exact
+        // `scaled` value still feeds `addTokens` above, so category totals — the
+        // numbers that get priced — stay precise.
+        tokens: Math.round(scaled),
+        cacheTier: pool.tier,
+      });
+    }
   }
 }
 
