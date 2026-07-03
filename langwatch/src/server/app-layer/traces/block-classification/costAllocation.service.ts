@@ -14,6 +14,14 @@
  * pool with no blocks lands its whole total in the axis catch-all, never dropped,
  * never divided by zero.
  *
+ * Per-tier rates cost the tokens; but when the span carries an authoritative
+ * total cost the display trusts OVER the rate estimate — a provider's own billed
+ * figure such as Claude Code's `cost_usd` (`computeSpanCost` Priority 2) — the
+ * rate-derived Σ would drift from the number the user sees. `reconcileToTotalCost`
+ * closes that gap: after pricing, the per-category costs are scaled so their sum
+ * equals that authoritative total, preserving the tier-weighted split while
+ * keeping conservation against the DISPLAYED cost.
+ *
  * Pure and deterministic — no clock, no randomness, no I/O.
  */
 
@@ -92,12 +100,21 @@ export function allocateCategoryCosts({
   lastCacheBreakpointIndex,
   pools,
   prices,
+  reconcileToTotalCost,
 }: {
   inputBlocks: TokenBlock[];
   outputBlocks: TokenBlock[];
   lastCacheBreakpointIndex: number | null;
   pools: UsagePools;
   prices: TierPrices;
+  /**
+   * An authoritative span-total cost the display trusts over the rate estimate
+   * (e.g. Claude Code's `cost_usd`). When set (> 0), the per-category costs are
+   * rescaled so Σ equals it, so conservation holds against the DISPLAYED cost.
+   * `null`/absent leaves rate-derived costs untouched (the rates already match
+   * what the display shows — custom-rate or registry path).
+   */
+  reconcileToTotalCost?: number | null;
 }): { categoryTotals: CategoryTotals; blocks: AllocatedBlock[] } {
   const { cachePrefix, fresh } = partitionInput({
     inputBlocks,
@@ -140,7 +157,42 @@ export function allocateCategoryCosts({
   const totals: CategoryTotals = {};
   const blocks: AllocatedBlock[] = [];
   for (const pool of poolList) allocatePool(pool, totals, blocks);
+
+  if (reconcileToTotalCost != null && reconcileToTotalCost > 0) {
+    reconcileCosts(totals, reconcileToTotalCost);
+  }
+
   return { categoryTotals: totals, blocks };
+}
+
+/**
+ * Rescale per-category costs so their sum equals an authoritative span total the
+ * display trusts over the rate estimate (`computeSpanCost` Priority 2). Tokens
+ * are untouched — only cost is reconciled. Two cases:
+ *
+ *   - Rates produced a nonzero Σ → scale every category by `target / Σ`, which
+ *     preserves the tier-weighted relative split (cache reads stay cheaper).
+ *   - Rates produced Σ = 0 (no registry match, no custom rates) but the span
+ *     still reported a real cost → distribute `target` across categories by
+ *     token share, so the authoritative cost is attributed rather than dropped.
+ */
+function reconcileCosts(totals: CategoryTotals, target: number): void {
+  const entries = Object.values(totals).filter(
+    (t): t is CategoryTotal => t !== undefined,
+  );
+  const provisional = entries.reduce((sum, t) => sum + t.costUsd, 0);
+
+  if (provisional > 0) {
+    const factor = target / provisional;
+    for (const total of entries) total.costUsd *= factor;
+    return;
+  }
+
+  const totalTokens = entries.reduce((sum, t) => sum + t.tokens, 0);
+  if (totalTokens <= 0) return;
+  for (const total of entries) {
+    total.costUsd = (target * total.tokens) / totalTokens;
+  }
 }
 
 /**

@@ -148,12 +148,16 @@ export class OtlpSpanBlockClassificationService {
     const prices = this.resolveTierPrices({ span, model });
 
     // 6. Allocate cache-tier aware and push the classification attributes.
+    //    Reconcile Σ to the authoritative displayed cost when the span carries a
+    //    provider-billed total (Claude Code's cost_usd) that `computeSpanCost`
+    //    trusts over the rate estimate — see resolveReconciliationCost.
     const { categoryTotals, blocks } = allocateCategoryCosts({
       inputBlocks,
       outputBlocks,
       lastCacheBreakpointIndex: lastInputCacheBreakpointIndex,
       pools,
       prices,
+      reconcileToTotalCost: this.resolveReconciliationCost({ span }),
     });
 
     this.pushClassificationAttributes({ span, blocks, categoryTotals });
@@ -354,6 +358,42 @@ export class OtlpSpanBlockClassificationService {
     }
 
     return {};
+  }
+
+  /**
+   * The authoritative span cost the display trusts OVER the rate estimate, or
+   * `null` when the rate-derived Σ already matches what the display shows.
+   *
+   * Mirrors `computeSpanCost`'s cascade precedence so per-category costs
+   * reconcile to the SAME number the span renders:
+   *   - Custom per-token rates present (Priority 1) → the display costs with
+   *     those rates and so does our allocation → already conserved, no reconcile.
+   *   - Else an explicit provider-billed total (Priority 2 — `langwatch.span.cost`,
+   *     e.g. Claude Code's `cost_usd`) wins over the token×registry estimate our
+   *     allocation used, so reconcile Σ to it.
+   *   - Else the registry (Priority 3) prices both display and allocation
+   *     identically → already conserved, no reconcile.
+   */
+  private resolveReconciliationCost({
+    span,
+  }: {
+    span: OtlpSpan;
+  }): number | null {
+    const hasCustomRates =
+      this.getNumericAttribute(
+        span,
+        ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN,
+      ) !== null ||
+      this.getNumericAttribute(
+        span,
+        ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN,
+      ) !== null;
+    if (hasCustomRates) return null;
+
+    const explicit = coerceToNumber(
+      this.getNumericAttribute(span, ATTR_KEYS.LANGWATCH_SPAN_COST),
+    );
+    return explicit !== null && explicit > 0 ? explicit : null;
   }
 
   private getStringAttribute(span: OtlpSpan, key: string): string | null {

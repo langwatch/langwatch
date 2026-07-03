@@ -330,6 +330,86 @@ describe("allocateCategoryCosts", () => {
       ).toBeCloseTo(50 * 1e-5, 12);
     });
   });
+
+  describe("given an authoritative span cost the display trusts over the rates", () => {
+    it("rescales per-category costs so their sum equals that cost, tokens untouched", () => {
+      // Registry rates would price this span at 100*1e-6 + 50*1e-5 = 6e-4, but
+      // the provider billed 0.02 (e.g. Claude Code cost_usd). Categories must
+      // reconcile to the displayed 0.02, not the estimate.
+      const { categoryTotals } = allocateCategoryCosts({
+        inputBlocks: [{ category: InputCategory.SYSTEM_PROMPT, tokens: 100 }],
+        outputBlocks: [{ category: OutputCategory.ASSISTANT_TEXT, tokens: 50 }],
+        lastCacheBreakpointIndex: null,
+        pools: {
+          inputTokens: 100,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+          outputTokens: 50,
+        },
+        prices: { inputCostPerToken: 1e-6, outputCostPerToken: 1e-5 },
+        reconcileToTotalCost: 0.02,
+      });
+
+      expect(sumCosts(categoryTotals)).toBeCloseTo(0.02, 12);
+      // Tokens are never rescaled — only cost is reconciled.
+      expect(sumTokens(categoryTotals)).toBe(150);
+      // The tier-weighted split is preserved: output (5e-4) carried 5/6 of the
+      // provisional 6e-4, so it keeps 5/6 of the reconciled total.
+      expect(
+        categoryTotals[OutputCategory.ASSISTANT_TEXT]?.costUsd,
+      ).toBeCloseTo(0.02 * (5 / 6), 10);
+    });
+
+    it("distributes the cost by token share when no rate produced any cost", () => {
+      // No rates and no registry match → provisional Σ is 0, but the span still
+      // reported a real cost. It must be attributed by token share, not dropped.
+      const { categoryTotals } = allocateCategoryCosts({
+        inputBlocks: [{ category: InputCategory.SYSTEM_PROMPT, tokens: 300 }],
+        outputBlocks: [
+          { category: OutputCategory.ASSISTANT_TEXT, tokens: 100 },
+        ],
+        lastCacheBreakpointIndex: null,
+        pools: {
+          inputTokens: 300,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+          outputTokens: 100,
+        },
+        prices: {},
+        reconcileToTotalCost: 0.04,
+      });
+
+      expect(sumCosts(categoryTotals)).toBeCloseTo(0.04, 12);
+      expect(categoryTotals[InputCategory.SYSTEM_PROMPT]?.costUsd).toBeCloseTo(
+        0.04 * (300 / 400),
+        12,
+      );
+      expect(
+        categoryTotals[OutputCategory.ASSISTANT_TEXT]?.costUsd,
+      ).toBeCloseTo(0.04 * (100 / 400), 12);
+    });
+
+    it("leaves rate-derived costs untouched when the reconcile target is absent", () => {
+      const { categoryTotals } = allocateCategoryCosts({
+        inputBlocks: [{ category: InputCategory.SYSTEM_PROMPT, tokens: 100 }],
+        outputBlocks: [],
+        lastCacheBreakpointIndex: null,
+        pools: {
+          inputTokens: 100,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+          outputTokens: 0,
+        },
+        prices: { inputCostPerToken: 1e-6 },
+        reconcileToTotalCost: null,
+      });
+
+      expect(categoryTotals[InputCategory.SYSTEM_PROMPT]?.costUsd).toBeCloseTo(
+        100 * 1e-6,
+        12,
+      );
+    });
+  });
 });
 
 function randomBlocks(rng: () => number, categories: Category[]): TokenBlock[] {

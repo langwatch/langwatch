@@ -131,6 +131,64 @@ describe("OtlpSpanBlockClassificationService", () => {
     });
   });
 
+  describe("given a coding-agent span carrying an explicit provider cost", () => {
+    describe("when the span is classified", () => {
+      it("reconciles per-category costs to the displayed cost_usd, not the registry estimate", async () => {
+        // Claude Code stamps its own billed cost_usd onto langwatch.span.cost,
+        // which computeSpanCost returns as the DISPLAYED cost (Priority 2) ahead
+        // of the token×registry estimate. With no custom per-token rates and no
+        // registry resolver, the rate estimate is 0 — so Σ per-category cost
+        // must reconcile to the authoritative span cost, else it drifts from the
+        // number the user sees.
+        const span = createSpan([
+          { key: "langwatch.span.type", value: { stringValue: "llm" } },
+          {
+            key: "gen_ai.request.model",
+            value: { stringValue: "claude-sonnet-4" },
+          },
+          {
+            key: "langwatch.input",
+            value: {
+              stringValue: JSON.stringify({
+                type: "chat_messages",
+                value: [
+                  { role: "system", content: "You are a coding assistant." },
+                  { role: "user", content: "fix the failing test" },
+                ],
+              }),
+            },
+          },
+          {
+            key: "langwatch.output",
+            value: {
+              stringValue: JSON.stringify([
+                { role: "assistant", content: "Here is the fix." },
+              ]),
+            },
+          },
+          { key: "gen_ai.usage.input_tokens", value: { intValue: 300 } },
+          { key: "gen_ai.usage.output_tokens", value: { intValue: 20 } },
+          // Authoritative provider cost, no custom rates.
+          { key: "langwatch.span.cost", value: { doubleValue: 0.1234 } },
+        ]);
+
+        await service.classifySpanBlocks({
+          span,
+          instrumentationScope: CLAUDE_SCOPE,
+        });
+
+        const catCosts = span.attributes
+          .filter(
+            (a) =>
+              a.key.startsWith("langwatch.reserved.blockcat.") &&
+              a.key.endsWith(".cost_usd"),
+          )
+          .reduce((n, a) => n + Number(a.value.stringValue), 0);
+        expect(catCosts).toBeCloseTo(0.1234, 8);
+      });
+    });
+  });
+
   describe("given a span that is not coding-agent traffic", () => {
     describe("when the span is processed", () => {
       /** @scenario "A span from a non-coding-agent source is not classified" */
