@@ -39,7 +39,10 @@ import {
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
 import { createLogger } from "~/utils/logger/server";
-import { GOVERNANCE_ATTR } from "./governanceAttributeKeys";
+import {
+  GOVERNANCE_ATTR,
+  GOVERNANCE_ORIGIN_KIND_VALUE,
+} from "./governanceAttributeKeys";
 
 const logger = createLogger("langwatch:personal-usage");
 
@@ -613,15 +616,25 @@ export class PersonalUsageService {
 
     // The principal filter must scope BOTH the summed rows (outer, ts-aliased)
     // and the dedup key set (inner subquery, unaliased single table).
+    //
+    // userEmail is set ONLY on the governance-tenant union (see docstring), and
+    // that tenant carries traffic from other origins too. Scope to the
+    // ingestion-source origin the same way every other governance-tenant reader
+    // does (activityMonitor.categoryBreakdown, the KPI/OCSF reactors) — without
+    // it a principal's personal breakdown would sum non-ingestion rows.
     const outerUserFilter = params.userEmail
-      ? "AND ts.Attributes[{userKey:String}] = {userEmail:String}"
+      ? "AND ts.Attributes[{userKey:String}] = {userEmail:String}" +
+        " AND ts.Attributes[{originKey:String}] = {originValue:String}"
       : "";
     const innerUserFilter = params.userEmail
-      ? "AND Attributes[{userKey:String}] = {userEmail:String}"
+      ? "AND Attributes[{userKey:String}] = {userEmail:String}" +
+        " AND Attributes[{originKey:String}] = {originValue:String}"
       : "";
     if (params.userEmail) {
       query_params.userKey = GOVERNANCE_ATTR.USER_ID;
       query_params.userEmail = params.userEmail;
+      query_params.originKey = GOVERNANCE_ATTR.ORIGIN_KIND;
+      query_params.originValue = GOVERNANCE_ORIGIN_KIND_VALUE;
     }
 
     const result = await client.query({
