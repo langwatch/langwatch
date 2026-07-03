@@ -3,6 +3,8 @@ import type {
   OtlpInstrumentationScope,
   OtlpSpan,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import { KILL_SWITCH_CACHE_TTL_MS } from "../../featureFlag/constants";
+import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { TokenizerClient } from "../clients/tokenizer/tokenizer.client";
 import {
   type ClassifiedBlock,
@@ -25,6 +27,7 @@ import {
 } from "./block-classification/costAllocation.service";
 import { detectCodingAgentHarness } from "./block-classification/harnessDetection";
 import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
+import { resolveCustomTierRates } from "./model-cost-matching";
 import { extractModelName } from "./utils/spanModel";
 
 /**
@@ -44,8 +47,16 @@ const MODEL_ATTRIBUTE_KEYS = [
  * testing. Mirrors OtlpSpanTokenEstimationService: a `countTokens`-only slice of
  * the tokenizer, so the hot path stays a pure-CPU tokenize with no other I/O.
  */
+/** Kill-switch flags, mirroring OtlpSpanTokenEstimationService so classification
+ * is operable the same way its sibling is: a global switch disables it fleet-wide
+ * and a per-project switch disables it for one misbehaving tenant. */
+const GLOBAL_KILL_SWITCH_KEY = "block-classification-killswitch";
+const PROJECT_KILL_SWITCH_KEY = "block-classification-project-killswitch";
+
 export interface OtlpSpanBlockClassificationServiceDependencies {
   tokenizer: Pick<TokenizerClient, "countTokens">;
+  /** Global + per-project kill switch. Omitted in unit tests (no switch). */
+  featureFlagService?: FeatureFlagServiceInterface;
   /**
    * Resolves per-tier rates for a model from the static cost registry, used only
    * when the span carries no custom `langwatch.model.*` rates. Injected (rather
@@ -99,11 +110,11 @@ export class OtlpSpanBlockClassificationService {
   async classifySpanBlocks({
     span,
     instrumentationScope,
-    tenantId: _tenantId,
+    tenantId,
   }: {
     span: OtlpSpan;
     instrumentationScope?: OtlpInstrumentationScope | null;
-    /** Reserved for future per-project kill-switch parity with token estimation. */
+    /** Project id, for the per-project kill switch (parity with token estimation). */
     tenantId?: string;
   }): Promise<void> {
     // 1. Harness gate — classification only runs on coding-agent CLI traffic.
@@ -112,6 +123,10 @@ export class OtlpSpanBlockClassificationService {
       spanAttributes: this.spanAttributesRecord(span),
     });
     if (!harness) return;
+
+    // Kill switch — global or per-project. Checked only after the harness gate
+    // so the (cached) flag lookup never runs for non-coding-agent spans.
+    if (await this.isDisabledByKillSwitch({ tenantId })) return;
 
     // 2. Content extraction — the same attribute surface token estimation reads.
     const inputMessages = this.parseMessages(span, [
@@ -170,25 +185,30 @@ export class OtlpSpanBlockClassificationService {
     blocks: ClassifiedBlock[];
     model: string;
   }): Promise<TokenBlock[]> {
-    const out: TokenBlock[] = [];
-    for (const block of blocks) {
-      // DoS guard: the 512-block cap bounds block COUNT but not the size of
-      // any single block, and spool-reconstituted spans bypass the ingest
-      // value cap entirely — one adversarial multi-MB block must not hold the
-      // tokenizer (synchronous ingestion path) hostage. Tokenize a capped
-      // slice and extrapolate linearly: within-pool proportions shift only
-      // for pathological blocks, and pool totals stay exact via scaling.
-      const text =
-        block.text.length > MAX_TOKENIZED_CHARS_PER_BLOCK
-          ? block.text.slice(0, MAX_TOKENIZED_CHARS_PER_BLOCK)
-          : block.text;
-      let tokens = (await this.deps.tokenizer.countTokens(model, text)) ?? 0;
-      if (text.length < block.text.length && text.length > 0) {
-        tokens = Math.round((tokens * block.text.length) / text.length);
-      }
-      out.push({ idx: block.idx, category: block.category, tokens });
-    }
-    return out;
+    // Per-block tokenization is independent, so fan out with Promise.all rather
+    // than awaiting each block serially — a span with N blocks paid N sequential
+    // tokenizer round-trips otherwise. Promise.all preserves order, so idx/axis
+    // alignment with the classifier walk is unchanged. Block count is bounded by
+    // MAX_CLASSIFIED_BLOCKS_PER_SPAN, so the fan-out width is bounded too.
+    return Promise.all(
+      blocks.map(async (block) => {
+        // DoS guard: the 512-block cap bounds block COUNT but not the size of
+        // any single block, and spool-reconstituted spans bypass the ingest
+        // value cap entirely — one adversarial multi-MB block must not hold the
+        // tokenizer hostage. Tokenize a capped slice and extrapolate linearly:
+        // within-pool proportions shift only for pathological blocks, and pool
+        // totals stay exact via scaling.
+        const text =
+          block.text.length > MAX_TOKENIZED_CHARS_PER_BLOCK
+            ? block.text.slice(0, MAX_TOKENIZED_CHARS_PER_BLOCK)
+            : block.text;
+        let tokens = (await this.deps.tokenizer.countTokens(model, text)) ?? 0;
+        if (text.length < block.text.length && text.length > 0) {
+          tokens = Math.round((tokens * block.text.length) / text.length);
+        }
+        return { idx: block.idx, category: block.category, tokens };
+      }),
+    );
   }
 
   private pushClassificationAttributes({
@@ -324,8 +344,9 @@ export class OtlpSpanBlockClassificationService {
   /**
    * Resolves per-tier rates the same way `computeSpanCost` does, so Σ per-category
    * cost reconciles to the span's real (token×rate) cost: custom enrichment rates
-   * first (`langwatch.model.*`), then the injected registry resolver. A cache rate
-   * that is absent falls back to the input rate (counted, not discounted).
+   * first (`langwatch.model.*`), then the injected registry resolver. The custom
+   * (Priority 1) cascade is the SHARED `resolveCustomTierRates` — the same helper
+   * `computeSpanCost` uses — so the two cannot drift.
    */
   private resolveTierPrices({
     span,
@@ -334,30 +355,55 @@ export class OtlpSpanBlockClassificationService {
     span: OtlpSpan;
     model: string;
   }): TierPrices {
-    const attr = (key: string): number | null =>
-      coerceToNumber(this.getNumericAttribute(span, key));
-
-    const customInput = attr(ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN);
-    const customOutput = attr(ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN);
-    if (customInput !== null || customOutput !== null) {
-      const inputRate = customInput ?? 0;
-      return {
-        inputCostPerToken: inputRate,
-        outputCostPerToken: customOutput ?? 0,
-        cacheReadCostPerToken:
-          attr(ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN) ??
-          inputRate,
-        cacheCreationCostPerToken:
-          attr(ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN) ??
-          inputRate,
-      };
-    }
+    const customRates = resolveCustomTierRates((key) =>
+      coerceToNumber(this.getNumericAttribute(span, key)),
+    );
+    if (customRates) return customRates;
 
     if (model && this.deps.resolveModelPrices) {
       return this.deps.resolveModelPrices(model) ?? {};
     }
 
     return {};
+  }
+
+  /**
+   * Global + per-project kill switch, identical in shape to
+   * OtlpSpanTokenEstimationService. Runs on the per-span hot path, so both
+   * lookups widen the cache window past the 5s frontend-flag default (a cache
+   * miss = one billable flags request). No featureFlagService (unit tests) → on.
+   */
+  private async isDisabledByKillSwitch({
+    tenantId,
+  }: {
+    tenantId?: string;
+  }): Promise<boolean> {
+    if (!this.deps.featureFlagService) return false;
+
+    const globalDisabled = await this.deps.featureFlagService.isEnabled(
+      GLOBAL_KILL_SWITCH_KEY,
+      {
+        distinctId: "global",
+        defaultValue: false,
+        cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS,
+      },
+    );
+    if (globalDisabled) return true;
+
+    if (tenantId) {
+      const projectDisabled = await this.deps.featureFlagService.isEnabled(
+        PROJECT_KILL_SWITCH_KEY,
+        {
+          distinctId: tenantId,
+          defaultValue: false,
+          projectId: tenantId,
+          cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS,
+        },
+      );
+      if (projectDisabled) return true;
+    }
+
+    return false;
   }
 
   /**

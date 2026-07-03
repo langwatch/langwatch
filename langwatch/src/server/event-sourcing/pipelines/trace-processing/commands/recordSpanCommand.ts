@@ -133,6 +133,9 @@ function createDefaultDependencies(): RecordSpanCommandDependencies {
     contentDropService: { dropSpanContent: applyOtlpSpanContentDrop },
     blockClassificationService: new OtlpSpanBlockClassificationService({
       tokenizer: new TiktokenClient(),
+      // Global + per-project kill switch (parity with token estimation) — the
+      // operable off-ramp for a misbehaving tenant or a fleet-wide pause.
+      featureFlagService,
       // Registry-backed per-tier rates for standard models (custom rates on the
       // span win first). Injected here so the classifier service stays decoupled
       // from the prisma-backed cost module.

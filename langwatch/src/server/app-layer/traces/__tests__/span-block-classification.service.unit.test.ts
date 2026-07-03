@@ -189,6 +189,57 @@ describe("OtlpSpanBlockClassificationService", () => {
     });
   });
 
+  describe("given the kill switch is enabled", () => {
+    describe("when a coding-agent span is classified", () => {
+      it("produces no classification — the switch disables the feature", async () => {
+        // Parity with OtlpSpanTokenEstimationService: a global (or per-project)
+        // kill switch is the operable off-ramp for the live ingest path.
+        const gated = new OtlpSpanBlockClassificationService({
+          tokenizer: fakeTokenizer,
+          featureFlagService: {
+            isEnabled: async (key: string) =>
+              key === "block-classification-killswitch",
+          } as never,
+        });
+        const span = createSpan(codingAgentSpanAttributes());
+        const before = span.attributes.length;
+
+        await gated.classifySpanBlocks({
+          span,
+          instrumentationScope: CLAUDE_SCOPE,
+        });
+
+        expect(span.attributes.length).toBe(before);
+        expect(attrValue(span, SPAN_ATTR_BLOCKS)).toBeUndefined();
+      });
+
+      it("disables classification for one project via the per-project switch", async () => {
+        const gated = new OtlpSpanBlockClassificationService({
+          tokenizer: fakeTokenizer,
+          featureFlagService: {
+            isEnabled: async (
+              key: string,
+              opts?: { projectId?: string },
+            ) =>
+              key === "block-classification-project-killswitch" &&
+              opts?.projectId === "proj-bad",
+          } as never,
+        });
+        const span = createSpan(codingAgentSpanAttributes());
+        const before = span.attributes.length;
+
+        await gated.classifySpanBlocks({
+          span,
+          instrumentationScope: CLAUDE_SCOPE,
+          tenantId: "proj-bad",
+        });
+
+        expect(span.attributes.length).toBe(before);
+        expect(attrValue(span, SPAN_ATTR_BLOCKS)).toBeUndefined();
+      });
+    });
+  });
+
   describe("given a span that is not coding-agent traffic", () => {
     describe("when the span is processed", () => {
       /** @scenario "A span from a non-coding-agent source is not classified" */
