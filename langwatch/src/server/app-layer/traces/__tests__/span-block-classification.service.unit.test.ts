@@ -186,6 +186,54 @@ describe("OtlpSpanBlockClassificationService", () => {
           .reduce((n, a) => n + Number(a.value.stringValue), 0);
         expect(catCosts).toBeCloseTo(0.1234, 8);
       });
+
+      it("still reconciles when a custom-rate attribute is present but non-numeric", async () => {
+        // Regression: `hasCustomRates` must use the same coerced resolver the
+        // pricing cascade uses. A malformed rate ("not-a-number") is NOT a real
+        // custom rate — pricing falls through to the (absent) registry, so
+        // reconciliation to the explicit cost_usd must still fire. The old raw
+        // presence check saw the attribute, skipped reconciliation, and Σ read 0.
+        const span = createSpan([
+          { key: "langwatch.span.type", value: { stringValue: "llm" } },
+          {
+            key: "gen_ai.request.model",
+            value: { stringValue: "claude-sonnet-4" },
+          },
+          {
+            key: "langwatch.input",
+            value: {
+              stringValue: JSON.stringify({
+                type: "chat_messages",
+                value: [
+                  { role: "system", content: "You are a coding assistant." },
+                  { role: "user", content: "fix the failing test" },
+                ],
+              }),
+            },
+          },
+          { key: "gen_ai.usage.input_tokens", value: { intValue: 300 } },
+          { key: "langwatch.span.cost", value: { doubleValue: 0.1234 } },
+          // Malformed custom rate — present, but not numeric-coercible.
+          {
+            key: "langwatch.model.inputCostPerToken",
+            value: { stringValue: "not-a-number" },
+          },
+        ]);
+
+        await service.classifySpanBlocks({
+          span,
+          instrumentationScope: CLAUDE_SCOPE,
+        });
+
+        const catCosts = span.attributes
+          .filter(
+            (a) =>
+              a.key.startsWith("langwatch.reserved.blockcat.") &&
+              a.key.endsWith(".cost_usd"),
+          )
+          .reduce((n, a) => n + Number(a.value.stringValue), 0);
+        expect(catCosts).toBeCloseTo(0.1234, 8);
+      });
     });
   });
 
