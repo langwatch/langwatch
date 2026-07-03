@@ -183,8 +183,9 @@ export function CategoryBreakdownCaption({
 export function CategoryBreakdownEnablementHint() {
   return (
     <Text fontSize="sm" color="fg.muted" paddingY={2}>
-      No categorized usage in this window yet. Cost categories appear for
-      coding-agent traffic captured with content.
+      No categorized coding-agent usage in this window yet. This view covers only
+      coding-agent traffic captured with content, so it can stay empty even when
+      your total AI spend is not.
     </Text>
   );
 }

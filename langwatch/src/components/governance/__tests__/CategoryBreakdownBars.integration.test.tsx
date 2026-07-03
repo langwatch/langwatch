@@ -121,7 +121,7 @@ describe("<CategoryBreakdownBars/>", () => {
 
       expect(
         screen.getByText(
-          /no categorized usage in this window yet\. cost categories appear for coding-agent traffic captured with content\./i,
+          /no categorized coding-agent usage in this window yet\. this view covers only coding-agent traffic captured with content, so it can stay empty even when your total ai spend is not\./i,
         ),
       ).toBeInTheDocument();
       // Neutral copy points at no setting — "payload capture" is internal
