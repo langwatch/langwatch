@@ -40,13 +40,16 @@ import {
 import { extractModelName } from "./utils/spanModel";
 
 /**
- * Attribute keys checked for model name (priority order) — shared with cost
- * enrichment and token estimation so the tokenizer and the price registry see
- * the same model this span was costed against.
+ * Attribute keys checked for model name (priority order). MUST match the order
+ * OtlpSpanTokenEstimationService and computeSpanCost use — response.model FIRST —
+ * so the tokenizer, the price registry, and this classifier all resolve the SAME
+ * model on a span whose request/response models differ. Otherwise the classifier
+ * would tokenize against a different model than the span was costed against,
+ * skewing the exact-token category split.
  */
 const MODEL_ATTRIBUTE_KEYS = [
-  "gen_ai.request.model",
   "gen_ai.response.model",
+  "gen_ai.request.model",
   "llm.model_name",
   "ai.model",
 ] as const;

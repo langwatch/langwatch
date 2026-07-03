@@ -122,14 +122,29 @@ describe("splitLeadingMarkers", () => {
       expect(body).toBe("the question");
     });
 
-    it("leaves the text as body when the nested tags are unbalanced", () => {
+    it("falls back to the first close when the tags are unbalanced (no total loss)", () => {
+      // Depth-matching can't balance this, but discarding EVERY marker (dumping
+      // the whole message into user_input) is worse than the naive first-close
+      // mis-scope — so it falls back to peeling the first close, not nothing.
       const { markers, body } = splitLeadingMarkers(
         "<skill>outer<skill>inner</skill>only one close question",
       );
-      expect(markers).toHaveLength(0);
-      expect(body).toBe(
-        "<skill>outer<skill>inner</skill>only one close question",
+      expect(markers).toHaveLength(1);
+      expect(markers[0]?.raw).toBe("<skill>outer<skill>inner</skill>");
+      expect(body).toBe("only one close question");
+    });
+
+    it("still peels the block when its BODY contains a literal same-name tag", () => {
+      // Regression: a reminder whose body warns against re-emitting the tag would
+      // make depth-matching over-count a fake nested-open, fail to balance, and
+      // (before the fallback) discard all markers — misclassifying the whole
+      // message as user_input.
+      const { markers, body } = splitLeadingMarkers(
+        "<system-reminder>do not emit <system-reminder> again</system-reminder>the real question",
       );
+      expect(markers).toHaveLength(1);
+      expect(markers[0]?.category).toBe(InputCategory.PRIOR_CONTEXT);
+      expect(body).toBe("the real question");
     });
   });
 

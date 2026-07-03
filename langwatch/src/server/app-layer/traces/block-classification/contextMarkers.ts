@@ -96,7 +96,15 @@ function endsTagName(text: string, idx: number): boolean {
  * leaks a dangling `</tag>` into the body. Returns -1 when unbalanced. Tag names
  * are `[A-Za-z][\w-]*` (no regex-special chars), so plain `indexOf` is safe.
  */
-function matchingCloseEnd(text: string, tagName: string, from: number): number {
+function matchingCloseEnd({
+  text,
+  tagName,
+  from,
+}: {
+  text: string;
+  tagName: string;
+  from: number;
+}): number {
   const openLt = `<${tagName}`;
   const closeTag = `</${tagName}>`;
   let depth = 1;
@@ -134,8 +142,23 @@ export function splitLeadingMarkers(text: string): LeadingMarkerSplit {
     if (!open) break;
     const leadingWhitespace = open[1] ?? "";
     const tagName = open[2]!;
-    const blockEnd = matchingCloseEnd(text, tagName, pos + open[0].length);
-    if (blockEnd === -1) break;
+    let blockEnd = matchingCloseEnd({
+      text,
+      tagName,
+      from: pos + open[0].length,
+    });
+    if (blockEnd === -1) {
+      // Depth-matching hit an imbalance — almost always because the block BODY
+      // contains a literal `<tag` (e.g. a reminder telling the model NOT to
+      // re-emit `<system-reminder>`), not a truly unbalanced document. Fall back
+      // to the first close so we peel THIS block instead of discarding every
+      // marker and dumping the whole message into user_input. Worst case is the
+      // naive matcher's mis-scope, not total marker loss.
+      const closeTag = `</${tagName}>`;
+      const firstClose = text.indexOf(closeTag, pos + open[0].length);
+      if (firstClose === -1) break;
+      blockEnd = firstClose + closeTag.length;
+    }
     const raw = text.slice(pos + leadingWhitespace.length, blockEnd);
     markers.push({
       tagName: tagName.toLowerCase(),
