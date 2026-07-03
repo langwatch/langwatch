@@ -1,0 +1,12 @@
+name: hml
+on:
+  push:
+    branches: [deploy/hml]
+
+jobs:
+  build:
+    runs-on: [self-hosted, hml]
+    steps:
+      - uses: actions/checkout@v4
+      - name: run pipeline
+        run: bash "$HOME/.deploy/run.sh" "$GITHUB_WORKSPACE" "$GITHUB_SHA"
