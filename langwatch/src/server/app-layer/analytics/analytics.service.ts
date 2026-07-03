@@ -41,29 +41,16 @@ import {
   pickAnalyticsTable,
 } from "./routing/route-table";
 import {
-  TraceAnalyticsClickHouseReadRepository,
-  type TraceAnalyticsReadRepository,
-} from "./repositories/trace-analytics.clickhouse.repository";
+  type AnalyticsTimeseriesReadRepository,
+  createEvalRollupReadRepo,
+  createEvalSlimReadRepo,
+  createTraceRollupReadRepo,
+  createTraceSlimReadRepo,
+} from "./repositories/analyticsTimeseriesRead.repository";
 import {
-  TraceAnalyticsRollupClickHouseReadRepository,
-  type TraceAnalyticsRollupReadRepository,
-} from "./repositories/trace-analytics-rollup.clickhouse.repository";
-import {
-  EvaluationAnalyticsClickHouseReadRepository,
-  type EvaluationAnalyticsReadRepository,
-} from "./repositories/evaluation-analytics.clickhouse.repository";
-import {
-  EvaluationAnalyticsRollupClickHouseReadRepository,
-  type EvaluationAnalyticsRollupReadRepository,
-} from "./repositories/evaluation-analytics-rollup.clickhouse.repository";
-import {
-  ClickHouseLegacyTraceSummariesShim,
-  type LegacyTraceSummariesShim,
-} from "./repositories/legacy-trace-summaries.shim";
-import {
-  ClickHouseLegacyEvaluationRunsShim,
-  type LegacyEvaluationRunsShim,
-} from "./repositories/legacy-evaluation-runs.shim";
+  ClickHouseLegacyAnalyticsShim,
+  type LegacyAnalyticsShim,
+} from "./repositories/legacy.shim";
 import { adjustTimeScaleForBucketCap } from "./query-builders/_shared";
 import { compareForTripwire } from "./tripwire/divergence-compare";
 
@@ -71,13 +58,17 @@ const TIMESERIES_CACHE_TTL_MS = 30_000 as const;
 
 export interface AnalyticsServiceDependencies {
   prisma: PrismaClient;
-  rollupRepository: TraceAnalyticsRollupReadRepository;
-  slimRepository: TraceAnalyticsReadRepository;
-  legacyShim: LegacyTraceSummariesShim;
+  rollupRepository: AnalyticsTimeseriesReadRepository;
+  slimRepository: AnalyticsTimeseriesReadRepository;
+  /**
+   * Legacy shim for trace_summaries + evaluation_runs. One shim (both
+   * legacy tables dispatch through the same `buildTimeseriesQuery` — the
+   * builder handles both source registries internally).
+   */
+  legacyShim: LegacyAnalyticsShim;
   /** ADR-034 Phase 6: eval analytics fast-path repositories. */
-  evalRollupRepository: EvaluationAnalyticsRollupReadRepository;
-  evalSlimRepository: EvaluationAnalyticsReadRepository;
-  evalLegacyShim: LegacyEvaluationRunsShim;
+  evalRollupRepository: AnalyticsTimeseriesReadRepository;
+  evalSlimRepository: AnalyticsTimeseriesReadRepository;
   /**
    * Backend used for the non-routed read paths (`getFeedbacks`,
    * `getTopUsedDocuments`). Those queries have no ADR-034 routing — they
@@ -126,29 +117,18 @@ export class AnalyticsService {
         const table = await this.resolveAnalyticsTable(input);
 
         // OFF (legacy) or routed → a legacy table: single call, no overhead.
-        if (table === "trace_summaries") {
-          const result =
-            await this.deps.legacyShim.runTraceSummariesTimeseries(input);
-          await this.timeseriesCache.set(cacheKey, result);
-          return result;
-        }
-        if (table === "evaluation_runs") {
-          const result =
-            await this.deps.evalLegacyShim.runEvaluationRunsTimeseries(input);
+        // Both `trace_summaries` and `evaluation_runs` dispatch through the
+        // same legacy shim — `buildTimeseriesQuery` handles both registries.
+        if (table === "trace_summaries" || table === "evaluation_runs") {
+          const result = await this.deps.legacyShim.run(input);
           await this.timeseriesCache.set(cacheKey, result);
           return result;
         }
 
         const tripwireEnabled = await isTripwireEnabled(input.projectId);
-        const legacyForTripwire =
-          table === "evaluation_analytics_rollup" ||
-          table === "evaluation_analytics"
-            ? this.deps.evalLegacyShim.runEvaluationRunsTimeseries.bind(
-                this.deps.evalLegacyShim,
-              )
-            : this.deps.legacyShim.runTraceSummariesTimeseries.bind(
-                this.deps.legacyShim,
-              );
+        const legacyForTripwire = this.deps.legacyShim.run.bind(
+          this.deps.legacyShim,
+        );
 
         if (!tripwireEnabled) {
           const result = await this.runRouted(table, input);
@@ -285,7 +265,7 @@ export class AnalyticsService {
     };
 
     if (table === "trace_analytics_rollup") {
-      return this.deps.rollupRepository.runRollupTimeseries({
+      return this.deps.rollupRepository.run({
         tenantId: input.projectId,
         builderInput,
         series: input.series,
@@ -294,7 +274,7 @@ export class AnalyticsService {
       });
     }
     if (table === "trace_analytics") {
-      return this.deps.slimRepository.runSlimTimeseries({
+      return this.deps.slimRepository.run({
         tenantId: input.projectId,
         builderInput,
         series: input.series,
@@ -303,7 +283,7 @@ export class AnalyticsService {
       });
     }
     if (table === "evaluation_analytics_rollup") {
-      return this.deps.evalRollupRepository.runRollupTimeseries({
+      return this.deps.evalRollupRepository.run({
         tenantId: input.projectId,
         builderInput,
         series: input.series,
@@ -312,7 +292,7 @@ export class AnalyticsService {
       });
     }
     if (table === "evaluation_analytics") {
-      return this.deps.evalSlimRepository.runSlimTimeseries({
+      return this.deps.evalSlimRepository.run({
         tenantId: input.projectId,
         builderInput,
         series: input.series,
@@ -362,18 +342,11 @@ export function createAnalyticsService(
 ): AnalyticsService {
   return new AnalyticsService({
     prisma,
-    rollupRepository: new TraceAnalyticsRollupClickHouseReadRepository(
-      resolveClient,
-    ),
-    slimRepository: new TraceAnalyticsClickHouseReadRepository(resolveClient),
-    legacyShim: new ClickHouseLegacyTraceSummariesShim(resolveClient),
-    evalRollupRepository: new EvaluationAnalyticsRollupClickHouseReadRepository(
-      resolveClient,
-    ),
-    evalSlimRepository: new EvaluationAnalyticsClickHouseReadRepository(
-      resolveClient,
-    ),
-    evalLegacyShim: new ClickHouseLegacyEvaluationRunsShim(resolveClient),
+    rollupRepository: createTraceRollupReadRepo(resolveClient),
+    slimRepository: createTraceSlimReadRepo(resolveClient),
+    legacyShim: new ClickHouseLegacyAnalyticsShim(resolveClient),
+    evalRollupRepository: createEvalRollupReadRepo(resolveClient),
+    evalSlimRepository: createEvalSlimReadRepo(resolveClient),
     legacyBackend: getClickHouseAnalyticsService(),
   });
 }

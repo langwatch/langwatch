@@ -40,15 +40,17 @@ function makeDeps(overrides?: {
   const rollupResult = overrides?.rollupResult ?? fakeResult(50);
   const slimResult = overrides?.slimResult ?? fakeResult(60);
 
-  const runTraceSummariesTimeseries = vi.fn().mockResolvedValue(shimResult);
+  // Both legacy tables (trace_summaries + evaluation_runs) share one shim
+  // now (simp5012-002), so the fixture exposes ONE `runLegacy` spy.
+  const runLegacy = vi.fn().mockResolvedValue(shimResult);
   const runRollupTimeseries = vi.fn().mockResolvedValue(rollupResult);
   const runSlimTimeseries = vi.fn().mockResolvedValue(slimResult);
   // Phase 6 — eval analytics deps. Not exercised by the existing tests
   // (which use trace metrics), but the AnalyticsService constructor now
-  // requires them.
+  // requires them. All 4 read repos share the same unified interface (a
+  // single `run(...)` method) after simp5012-004 consolidated the shape.
   const runEvalRollupTimeseries = vi.fn().mockResolvedValue(rollupResult);
   const runEvalSlimTimeseries = vi.fn().mockResolvedValue(slimResult);
-  const runEvaluationRunsTimeseries = vi.fn().mockResolvedValue(shimResult);
   const getFeedbacks = vi.fn().mockResolvedValue({
     events: [{ event_id: "event-1", event_type: "thumbs_up_down" }],
   });
@@ -60,12 +62,11 @@ function makeDeps(overrides?: {
   return {
     deps: {
       prisma: {} as never,
-      rollupRepository: { runRollupTimeseries },
-      slimRepository: { runSlimTimeseries },
-      legacyShim: { runTraceSummariesTimeseries },
-      evalRollupRepository: { runRollupTimeseries: runEvalRollupTimeseries },
-      evalSlimRepository: { runSlimTimeseries: runEvalSlimTimeseries },
-      evalLegacyShim: { runEvaluationRunsTimeseries },
+      rollupRepository: { run: runRollupTimeseries },
+      slimRepository: { run: runSlimTimeseries },
+      legacyShim: { run: runLegacy },
+      evalRollupRepository: { run: runEvalRollupTimeseries },
+      evalSlimRepository: { run: runEvalSlimTimeseries },
       legacyBackend: {
         getTimeseries: vi.fn(),
         getDataForFilter: vi.fn(),
@@ -75,12 +76,11 @@ function makeDeps(overrides?: {
       },
     },
     spies: {
-      runTraceSummariesTimeseries,
+      runLegacy,
       runRollupTimeseries,
       runSlimTimeseries,
       runEvalRollupTimeseries,
       runEvalSlimTimeseries,
-      runEvaluationRunsTimeseries,
       getFeedbacks,
       getTopUsedDocuments,
     },
@@ -110,7 +110,7 @@ describe("AnalyticsService", () => {
       const result = await service.getTimeseries(input);
 
       expect(result.currentPeriod).toHaveLength(1);
-      expect(spies.runTraceSummariesTimeseries).toHaveBeenCalledTimes(1);
+      expect(spies.runLegacy).toHaveBeenCalledTimes(1);
       expect(spies.runRollupTimeseries).not.toHaveBeenCalled();
       expect(spies.runSlimTimeseries).not.toHaveBeenCalled();
     });

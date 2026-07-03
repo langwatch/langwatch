@@ -1,23 +1,27 @@
 /**
- * Bridge into the legacy `evaluation_runs` SQL path (ADR-034 Phase 6
- * fallback). Eval mirror of `legacy-trace-summaries.shim.ts`.
+ * Bridge into the legacy `trace_summaries` / `evaluation_runs` SQL path
+ * (ADR-034 Phase 3/6 fallback).
  *
- * For eval-source queries the legacy builder reads from `evaluation_runs`
- * directly (via its JOIN-aware aggregation builder — already exists and is
- * out-of-scope for ADR-034). When `pickAnalyticsTable` returns
- * `"evaluation_runs"` for an eval-source query, this shim builds + executes
- * the legacy query and returns the parsed timeseries.
+ * For queries the routing module returns as `"trace_summaries"` OR
+ * `"evaluation_runs"`, this shim builds + executes the legacy query and
+ * returns the parsed timeseries. Both routes dispatch to the SAME
+ * `buildTimeseriesQuery` — the eval registry entries emit ES Painless
+ * scripts today and the trace-summaries CH builder translates them into
+ * the `evaluation_runs` JOIN internally.
+ *
+ * The prior code shipped two 120-LOC classes that differed only by method
+ * name, logger tag, and doc string; consolidated here into one class with
+ * ONE `run(input)` method (simp5012-002). Both the trace-summaries and
+ * evaluation-runs dispatch branches in analytics.service.ts now call
+ * `legacyShim.run(input)` — the underlying builder already handles both
+ * source registries.
  *
  * No business logic here. No SQL templating here. Pure forwarding:
  *
  *   builder (legacy) → CH client → parser (shared with slim/rollup).
  *
- * The current implementation delegates to the SAME `buildTimeseriesQuery`
- * the trace legacy shim uses — that builder handles both trace + eval
- * registry metrics (the registry's eval entries emit ES Painless scripts
- * today; the trace-summaries CH builder translates them into the
- * `evaluation_runs` JOIN). Preserves the legacy behaviour bit-for-bit for
- * unflagged-eval-metric queries.
+ * Preserves the legacy behaviour bit-for-bit for unflagged projects and
+ * for eval-source queries the eval slim/rollup can't serve.
  */
 
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
@@ -32,26 +36,20 @@ import { adjustTimeScaleForBucketCap } from "../query-builders/_shared";
 import { parseTimeseriesRows } from "./_timeseries-row-parser";
 
 const logger = createLogger(
-  "langwatch:app-layer:analytics:legacy-evaluation-runs-shim",
+  "langwatch:app-layer:analytics:legacy-analytics-shim",
 );
 
-export interface LegacyEvaluationRunsShim {
-  runEvaluationRunsTimeseries(
-    input: TimeseriesInputType,
-  ): Promise<TimeseriesResult>;
+export interface LegacyAnalyticsShim {
+  run(input: TimeseriesInputType): Promise<TimeseriesResult>;
 }
 
-export class ClickHouseLegacyEvaluationRunsShim
-  implements LegacyEvaluationRunsShim
-{
+export class ClickHouseLegacyAnalyticsShim implements LegacyAnalyticsShim {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
-  async runEvaluationRunsTimeseries(
-    input: TimeseriesInputType,
-  ): Promise<TimeseriesResult> {
+  async run(input: TimeseriesInputType): Promise<TimeseriesResult> {
     if (!input.projectId) {
       throw new Error(
-        "LegacyEvaluationRunsShim.runEvaluationRunsTimeseries: projectId is required",
+        "ClickHouseLegacyAnalyticsShim.run: projectId is required",
       );
     }
 
@@ -103,7 +101,7 @@ export class ClickHouseLegacyEvaluationRunsShim
           tenantId: input.projectId,
           error: error instanceof Error ? error.message : String(error),
         },
-        "Failed to execute legacy evaluation_runs timeseries query",
+        "Failed to execute legacy analytics timeseries query",
       );
       throw error;
     }
