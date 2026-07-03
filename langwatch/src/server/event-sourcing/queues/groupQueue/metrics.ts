@@ -146,12 +146,45 @@ export const gqJobDurationMilliseconds = new Histogram({
   name: "gq_job_duration_milliseconds",
   help: "Duration of individual job processing in milliseconds",
   labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
-  buckets: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000, 120000],
+  buckets: [
+    1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000, 60000,
+    120000,
+  ],
 });
 
 // --- Oldest pending age gauge ---
 export const gqOldestPendingAgeMilliseconds = new Gauge({
   name: "gq_oldest_pending_age_milliseconds",
   help: "Age of the oldest pending job in the ready sorted set (milliseconds)",
+  labelNames: ["queue_name"] as const,
+});
+
+// --- Blob lifecycle observability (ADR-030 hardening + review 2026-06-24) ---
+
+/** S3-tier reclaim throw (network / 5xx). Warn-only; TTL / bucket-lifecycle backstop. */
+export const gqBlobReclaimS3FailuresTotal = new Counter({
+  name: "gq_blob_reclaim_s3_failures_total",
+  help: "Blob s3-tier reclaim failures (relies on TTL / bucket-lifecycle backstop)",
+  labelNames: ["queue_name"] as const,
+});
+
+/** A stored blob exceeded the decode cap — possible tamper / zip-bomb. Distinct from a missing blob. */
+export const gqBlobDecodeCapExceededTotal = new Counter({
+  name: "gq_blob_decode_cap_exceeded_total",
+  help: "Blob read exceeded the decode byte cap — treated as missing (possible tamper / zip-bomb)",
+  labelNames: ["queue_name"] as const,
+});
+
+/** GQ2 encode fell back to GQ1 because tenant / tiered-store wiring was absent. */
+export const gqEnvelopeGQ2DowngradeTotal = new Counter({
+  name: "gq_envelope_gq2_downgrade_total",
+  help: "GQ2 encode downgraded to GQ1 (tenant or tiered store missing at the composition root)",
+  labelNames: ["queue_name"] as const,
+});
+
+/** Producer rejected a payload at the encode cap — bounds worker memory (ADR-030 §1). */
+export const gqPayloadTooLargeTotal = new Counter({
+  name: "gq_payload_too_large_total",
+  help: "Payload rejected at the encode cap",
   labelNames: ["queue_name"] as const,
 });

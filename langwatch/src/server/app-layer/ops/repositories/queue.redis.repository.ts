@@ -1,26 +1,26 @@
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import type { GroupInfo, QueueInfo, ErrorCluster } from "../types";
-import type {
-  QueueRepository,
-  BlockedSummary,
-  DlqGroupInfo,
-  DrainPreview,
-  JobEntry,
-  ReconcileResult,
-} from "./queue.repository";
-import { normalizeErrorMessage } from "../normalize-error-message";
-import { createLogger } from "~/utils/logger/server";
-import {
-  GROUP_QUEUE_REGISTRY_KEY,
-  TTL_HELPER_LUA,
-  PARK_HELPER_LUA,
-} from "~/server/event-sourcing/queues/groupQueue/scripts";
 import {
   decodeJobEnvelope,
   readJobRoutingMeta,
 } from "~/server/event-sourcing/queues/groupQueue/jobEnvelope";
 import { RedisJobBlobStore } from "~/server/event-sourcing/queues/groupQueue/redisJobBlobStore";
+import {
+  GROUP_QUEUE_REGISTRY_KEY,
+  PARK_HELPER_LUA,
+  TTL_HELPER_LUA,
+} from "~/server/event-sourcing/queues/groupQueue/scripts";
+import { createLogger } from "~/utils/logger/server";
+import { normalizeErrorMessage } from "../normalize-error-message";
+import type { ErrorCluster, GroupInfo, QueueInfo } from "../types";
+import type {
+  BlockedSummary,
+  DlqGroupInfo,
+  DrainPreview,
+  JobEntry,
+  QueueRepository,
+  ReconcileResult,
+} from "./queue.repository";
 
 const logger = createLogger("langwatch:ops:queue-redis-repository");
 
@@ -412,7 +412,7 @@ export class QueueRedisRepository implements QueueRepository {
     >();
     for (let i = 0; i < allGroupIds.length; i++) {
       const errorHash = errorResults?.[i]?.[1] as Record<string, string> | null;
-      if (errorHash && errorHash.message) {
+      if (errorHash?.message) {
         groupErrors.set(allGroupIds[i]!, {
           message: errorHash.message,
           stack: errorHash.stack ?? "",
@@ -556,7 +556,14 @@ export class QueueRedisRepository implements QueueRepository {
           const raw = dataResults?.[i]?.[1] as string | null;
           if (raw) {
             try {
-              jobs[i]!.data = await decodeJobEnvelope({ value: raw, blobs });
+              // Ops-dashboard inspection: DO NOT refresh the blob TTL on read
+              // (2026-06-24 review). A repeatedly-viewed blocked group would
+              // otherwise keep its orphan blobs alive indefinitely.
+              jobs[i]!.data = await decodeJobEnvelope({
+                value: raw,
+                blobs,
+                readMode: "peek",
+              });
             } catch {
               // ignore undecodable values
             }

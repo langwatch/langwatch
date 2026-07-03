@@ -659,16 +659,35 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         drainedSiblings = [];
       }
       if (drainedSiblings.length > 0) {
-        const parsedSiblings = await Promise.all(
-          drainedSiblings.map((sibling) =>
-            this.parseDrainedPayload({ sibling, groupId }),
-          ),
-        );
-        const siblingPayloads = parsedSiblings.filter(
-          (parsed) => parsed !== null,
-        ) as Payload[];
-        if (siblingPayloads.length > 0) {
-          batchPayloads = [payload, ...siblingPayloads];
+        try {
+          const parsedSiblings = await Promise.all(
+            drainedSiblings.map((sibling) =>
+              this.parseDrainedPayload({ sibling, groupId }),
+            ),
+          );
+          const siblingPayloads = parsedSiblings.filter(
+            (parsed) => parsed !== null,
+          ) as Payload[];
+          if (siblingPayloads.length > 0) {
+            batchPayloads = [payload, ...siblingPayloads];
+          }
+        } catch (err) {
+          if (err instanceof TransientBlobStoreError) {
+            // A transient blob-store failure on any drained sibling MUST
+            // re-stage the whole batch, not silently drop the siblings. Re-stage
+            // the siblings via the normal path and route the dispatched job
+            // through the same handleTransientDecode as the direct decode
+            // failure — the body is unreachable, not gone (ADR-030 §2).
+            await this.restageDrainedSiblings(groupId, drainedSiblings);
+            await this.handleTransientDecode({
+              groupId,
+              stagedJobId,
+              jobDataJson,
+              err,
+            });
+            return;
+          }
+          throw err;
         }
       }
     }
@@ -798,14 +817,49 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 gqRetryAttempt.observe(routingLabels, attempt);
                 gqRetryBackoffMilliseconds.observe(routingLabels, backoffMs);
                 const newStagedJobId = `${stagedJobId}/r/${attempt}`;
-                const retryJobData = await this.blobLifecycle.encode({
-                  jobData: {
-                    ...(payload as Record<string, unknown>),
-                    __context: contextMetadata,
-                    __attempt: attempt + 1,
-                  },
-                  groupId,
-                });
+                // If the retry re-encode fails (transient blob-store down,
+                // payload-too-large from a state-bloat regression), the retry
+                // can't proceed. Release the OLD hold explicitly and fall
+                // through to the non-retryable fail-safe (complete the slot,
+                // recover via event replay) — otherwise the old hold token
+                // stays in the holder set until the 3-day TTL backstop reclaims
+                // it, leaking the blob for that whole window.
+                let retryJobData: string;
+                try {
+                  retryJobData = await this.blobLifecycle.encode({
+                    jobData: {
+                      ...(payload as Record<string, unknown>),
+                      __context: contextMetadata,
+                      __attempt: attempt + 1,
+                    },
+                    groupId,
+                  });
+                } catch (encodeErr) {
+                  this.logger.error(
+                    {
+                      queueName: this.queueName,
+                      groupId,
+                      stagedJobId,
+                      attempt,
+                      err:
+                        encodeErr instanceof Error
+                          ? encodeErr.message
+                          : String(encodeErr),
+                    },
+                    "Retry re-encode failed; releasing old hold and falling through to fail-safe",
+                  );
+                  this.blobLifecycle.release({
+                    values: [jobDataJson],
+                    groupId,
+                  });
+                  await this.scripts.complete({
+                    groupId,
+                    stagedJobId,
+                    jobName,
+                  });
+                  gqJobsNonRetryableTotal.inc(routingLabels);
+                  return;
+                }
 
                 await this.scripts.retryRestage({
                   groupId,
@@ -935,7 +989,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
         groupId,
       });
       return this.stripInternalFields(jobData);
-    } catch {
+    } catch (err) {
+      // A transient blob-store error on a sibling MUST NOT drop it to replay —
+      // the dispatched job's decode routes transient errors through
+      // `handleTransientDecode` so the whole batch can retry (ADR-030 §2).
+      // Rethrow so the caller (Promise.all in the batch drain) can bubble it up
+      // and re-stage every sibling together, rather than silently dropping
+      // hundreds of siblings on a brief S3 blip (2026-06-24 review).
+      if (err instanceof TransientBlobStoreError) {
+        throw err;
+      }
       this.logger.error(
         {
           queueName: this.queueName,

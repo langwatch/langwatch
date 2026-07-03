@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 import type { Readable } from "node:stream";
 
+import type { Logger } from "pino";
+
+import { COMMAND_INLINE_THRESHOLD } from "~/server/app-layer/traces/lean-for-projection";
 import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { ProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import { mintFileUri, mintS3Uri } from "~/server/stored-objects/uri";
@@ -8,6 +11,7 @@ import { mintFileUri, mintS3Uri } from "~/server/stored-objects/uri";
 import { MAX_BLOB_BYTES } from "./blobConstants";
 import { blobNamespaceId } from "./blobKeys";
 import type { JobBlobStore } from "./jobEnvelope";
+import { gqBlobDecodeCapExceededTotal } from "./metrics";
 
 /**
  * Minimal object-store surface the durable (s3/file) tier needs. Structurally
@@ -23,10 +27,12 @@ export interface ObjectStore {
 
 /**
  * Above this serialized size a blob lives in the durable object store; at or
- * below it, in Redis. Aligned with ADR-022's COMMAND_INLINE_THRESHOLD. The
- * inline tier (≤ a few KiB) is handled by the envelope, not this store.
+ * below it, in Redis. Derived from `COMMAND_INLINE_THRESHOLD` (ADR-022's
+ * edge-spool boundary) so a retune on that constant moves both sides in
+ * lockstep. The inline tier (≤ a few KiB) is handled by the envelope, not
+ * this store.
  */
-export const S3_TIER_THRESHOLD_BYTES = 256 * 1024;
+export const S3_TIER_THRESHOLD_BYTES = COMMAND_INLINE_THRESHOLD;
 
 /**
  * A content-addressed reference to an offloaded blob; travels inside the job
@@ -70,7 +76,10 @@ export class TransientBlobStoreError extends Error {
  * probability is negligible; identical bytes always hash identically, which is
  * what collapses a fan-out's N copies to a single stored blob.
  */
-export function contentHash(bytes: Buffer): string {
+export function contentHash(bytes: Buffer | string): string {
+  // `update(string)` handles UTF-8 encoding internally without allocating a
+  // full-payload Buffer — for a 4 MiB fan-out payload the caller passing the
+  // string directly saves 4 MiB of throw-away allocation on the encode hot path.
   return createHash("sha256")
     .update(bytes)
     .digest()
@@ -140,6 +149,8 @@ export class TieredBlobStore {
     projectId: string,
   ) => Promise<ProjectStorageDestination>;
   private readonly s3ThresholdBytes: number;
+  private readonly queueName?: string;
+  private readonly logger?: Logger;
   // Per-project storage destination, cached for the process lifetime. BYOC
   // bucket changes are rare deliberate migrations, picked up on the next worker
   // restart (deploys are frequent); a failed resolve is not cached.
@@ -155,11 +166,17 @@ export class TieredBlobStore {
       projectId: string,
     ) => Promise<ProjectStorageDestination>;
     s3ThresholdBytes?: number;
+    /** Optional queue name for the decode-cap-exceeded counter. */
+    queueName?: string;
+    /** Optional logger for the decode-cap-exceeded warn. */
+    logger?: Logger;
   }) {
     this.redisBlobs = deps.redisBlobs;
     this.objectStoreFor = deps.objectStoreFor;
     this.resolveDestination = deps.resolveDestination;
     this.s3ThresholdBytes = deps.s3ThresholdBytes ?? S3_TIER_THRESHOLD_BYTES;
+    this.queueName = deps.queueName;
+    this.logger = deps.logger;
   }
 
   private resolveDestinationCached(
@@ -215,7 +232,7 @@ export class TieredBlobStore {
      * doesn't depend on gzip determinism (zlib version/level). Defaults to
      * `data`, i.e. hash exactly what is stored.
      */
-    hashSource?: Buffer;
+    hashSource?: Buffer | string;
   }): Promise<BlobRef> {
     const hash = contentHash(hashSource ?? data);
     if (data.length > this.s3ThresholdBytes) {
@@ -260,8 +277,26 @@ export class TieredBlobStore {
     } catch (err) {
       // A genuinely-absent or oversized/corrupt object is a missing blob → null
       // → decode fail-safe (recover via replay). Anything else (network/5xx) is
-      // transient and must retry, not drop the job (ADR-030 §2).
-      if (isObjectMissingError(err) || err instanceof BlobTooLargeError) {
+      // transient and must retry, not drop the job (ADR-030 §2). Oversize is
+      // an OBSERVABLE fail-safe — split from "just missing" so oncall can see a
+      // real tamper / zip-bomb event distinct from "TTL reclaimed the blob".
+      if (err instanceof BlobTooLargeError) {
+        if (this.queueName) {
+          gqBlobDecodeCapExceededTotal.inc({ queue_name: this.queueName });
+        }
+        if (this.logger) {
+          this.logger.warn(
+            {
+              projectId: ref.projectId,
+              blobHash: ref.hash,
+              cap: MAX_BLOB_BYTES,
+            },
+            "Blob exceeds decode cap — possible tamper / zip-bomb; treating as missing",
+          );
+        }
+        return null;
+      }
+      if (isObjectMissingError(err)) {
         return null;
       }
       throw new TransientBlobStoreError({

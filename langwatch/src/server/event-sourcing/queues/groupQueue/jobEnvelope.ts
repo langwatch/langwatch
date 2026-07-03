@@ -2,9 +2,12 @@ import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
 import { gunzip, gzip } from "node:zlib";
 
+import type { Logger } from "pino";
+
 import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
 
 import { MAX_BLOB_BYTES } from "./blobConstants";
+import { gqEnvelopeGQ2DowngradeTotal, gqPayloadTooLargeTotal } from "./metrics";
 import type { BlobRef, TieredBlobStore } from "./tieredBlobStore";
 
 const gzipAsync = promisify(gzip);
@@ -73,7 +76,10 @@ function envelopeWritesEnabled(): boolean {
  */
 export interface JobBlobStore {
   put(params: { id: string; data: Buffer }): Promise<void>;
+  /** Read the blob AND refresh its backstop TTL. Worker hot path only. */
   get(params: { id: string }): Promise<Buffer | null>;
+  /** Read the blob WITHOUT refreshing its TTL. Non-worker / ops-dashboard inspection path. */
+  peek(params: { id: string }): Promise<Buffer | null>;
   delete(params: { id: string }): Promise<void>;
 }
 
@@ -85,7 +91,7 @@ export interface JobRoutingMeta {
 
 type BodyEncoding = "j" | "gz" | "ref" | "redis" | "s3";
 
-interface EnvelopeHeader {
+export interface EnvelopeHeader {
   v: number;
   e: BodyEncoding;
   /** GQ1 offloaded blob id. */
@@ -217,9 +223,25 @@ export class PayloadTooLargeError extends Error {
   }
 }
 
-/** Guards the payload-size ceiling (ADR-030 §1). */
-export function assertPayloadWithinCap(jsonBytes: number): void {
+/** Guards the payload-size ceiling (ADR-030 §1). Emits a tenant-attributed warn before rejecting. */
+export function assertPayloadWithinCap(
+  jsonBytes: number,
+  ctx?: { projectId?: TenantId; queueName?: string; logger?: Logger },
+): void {
   if (jsonBytes > MAX_BLOB_BYTES) {
+    if (ctx?.logger) {
+      ctx.logger.warn(
+        {
+          projectId: ctx.projectId,
+          byteLength: jsonBytes,
+          cap: MAX_BLOB_BYTES,
+        },
+        "Job payload over MAX_BLOB_BYTES — rejecting at encode",
+      );
+    }
+    if (ctx?.queueName) {
+      gqPayloadTooLargeTotal.inc({ queue_name: ctx.queueName });
+    }
     throw new PayloadTooLargeError(jsonBytes);
   }
 }
@@ -229,21 +251,39 @@ export async function encodeJobEnvelope({
   blobs,
   tieredBlobs,
   projectId,
+  writesEnabled,
+  queueName,
+  logger,
 }: {
   jobData: Record<string, unknown>;
   blobs?: JobBlobStore;
   tieredBlobs?: TieredBlobStore;
   projectId?: TenantId;
+  /**
+   * Explicit override of the format-rollout gate. When omitted, the encoder
+   * falls back to the `GROUP_QUEUE_ENVELOPE_WRITES_ENABLED` env var (call-time
+   * read, so tests can toggle without module reload). Composition roots should
+   * thread this through explicitly so a partial fleet rollout doesn't put
+   * mixed GQ1/GQ2 values in the same group's hash space until every pod cycles.
+   */
+  writesEnabled?: boolean;
+  /** Optional queue name for observability labels. */
+  queueName?: string;
+  /** Optional logger for tenant-attributed warn on cap / downgrade. */
+  logger?: Logger;
 }): Promise<string> {
   const json = JSON.stringify(jobData);
-  if (!envelopeWritesEnabled()) {
+  const enabled = writesEnabled ?? envelopeWritesEnabled();
+  if (!enabled) {
     return json;
   }
   const jsonBytes = Buffer.byteLength(json);
-  assertPayloadWithinCap(jsonBytes);
+  assertPayloadWithinCap(jsonBytes, { projectId, queueName, logger });
 
   // GQ2: content-addressed, tenant-namespaced, tiered offload. Active only once
-  // the composition root supplies a tiered store and the job's tenant.
+  // the composition root supplies a tiered store and the job's tenant. If
+  // either is missing we fall back to GQ1 — noisy so a regression in the
+  // composition root can't ship a silently-downgraded pipeline.
   if (tieredBlobs && projectId) {
     const header = routingHeader(jobData, 2);
     // Lift queue machinery into the header so it doesn't perturb the content
@@ -266,9 +306,11 @@ export async function encodeJobEnvelope({
       const ref = await tieredBlobs.put({
         projectId,
         data: await gzipAsync(payloadJson),
-        // Hash the RAW payload json, not the gzip output, so the dedup key is
-        // independent of gzip determinism (zlib version/level) — ADR-030 §1.
-        hashSource: Buffer.from(payloadJson, "utf8"),
+        // Hash the RAW payload json string directly, not the gzip output — the
+        // dedup key is independent of gzip determinism (zlib version/level;
+        // ADR-030 §1). `contentHash` accepts strings and lets crypto handle the
+        // UTF-8 conversion internally so we don't allocate a full-payload Buffer.
+        hashSource: payloadJson,
       });
       header.e = ref.tier;
       header.ref = ref;
@@ -285,7 +327,22 @@ export async function encodeJobEnvelope({
     );
   }
 
-  // GQ1: legacy randomUUID offload (unchanged).
+  // GQ1 fallback path: reached when the caller opted into writes but didn't
+  // supply BOTH a tiered store and a projectId. Loud so a composition-root
+  // regression can't silently ship a pipeline without dedup / holder refcount /
+  // tenant namespacing (2026-06-24 review).
+  if (queueName) gqEnvelopeGQ2DowngradeTotal.inc({ queue_name: queueName });
+  if (logger) {
+    logger.warn(
+      {
+        projectId,
+        hasTieredBlobs: Boolean(tieredBlobs),
+        hasProjectId: Boolean(projectId),
+        queueName,
+      },
+      "GQ2 encode downgraded to GQ1 (tenant or tiered store missing at composition root)",
+    );
+  }
   const header = routingHeader(jobData, 1);
   if (blobs && jsonBytes > BLOB_OFFLOAD_THRESHOLD_BYTES) {
     const id = randomUUID();
@@ -305,16 +362,28 @@ export async function decodeJobEnvelope({
   value,
   blobs,
   tieredBlobs,
+  readMode = "get",
+  parsed,
 }: {
   value: string;
   blobs?: JobBlobStore;
   tieredBlobs?: TieredBlobStore;
+  /**
+   * `"get"` = worker hot path, refreshes the blob's backstop TTL. `"peek"` =
+   * non-worker inspection (ops dashboard), does NOT refresh — so a repeatedly-
+   * viewed blocked group can't keep its orphan blobs alive.
+   */
+  readMode?: "get" | "peek";
+  /** Pre-parsed (header, body) tuple from {@link splitEnvelope}, so callers that
+   * have already parsed the envelope (e.g. `EnvelopeBlobLifecycle.decode`) don't
+   * pay for a second `Buffer.from` + `JSON.parse` on the hot path. */
+  parsed?: { header: EnvelopeHeader; body: string };
 }): Promise<Record<string, unknown>> {
   if (!isEnvelope(value)) {
     return JSON.parse(value) as Record<string, unknown>;
   }
 
-  const { header, body } = splitEnvelope(value);
+  const { header, body } = parsed ?? splitEnvelope(value);
 
   // GQ2: content-addressed tiered blob.
   if (header.e === "redis" || header.e === "s3") {
@@ -332,10 +401,10 @@ export async function decodeJobEnvelope({
         "Job envelope tiered blob is missing (deleted or expired)",
       );
     }
-    const parsed = JSON.parse(
+    const parsedBody = JSON.parse(
       (await gunzipAsync(data, DECODE_GUNZIP_OPTS)).toString("utf8"),
     ) as Record<string, unknown>;
-    return mergeMachinery(parsed, header);
+    return mergeMachinery(parsedBody, header);
   }
 
   // GQ1: randomUUID offloaded blob.
@@ -348,7 +417,10 @@ export async function decodeJobEnvelope({
         "Job envelope references an offloaded blob but no blob store was provided",
       );
     }
-    const data = await blobs.get({ id: header.r });
+    const data =
+      readMode === "peek"
+        ? await blobs.peek({ id: header.r })
+        : await blobs.get({ id: header.r });
     if (!data) {
       throw new Error(
         `Job envelope blob ${header.r} is missing (deleted or expired)`,
@@ -365,9 +437,9 @@ export async function decodeJobEnvelope({
           await gunzipAsync(Buffer.from(body, "base64"), DECODE_GUNZIP_OPTS)
         ).toString("utf8")
       : body;
-  const parsed = JSON.parse(json) as Record<string, unknown>;
+  const parsedBody = JSON.parse(json) as Record<string, unknown>;
   // GQ2 inline lifted machinery into header.m too; GQ1 (v=1) never did.
-  return header.v === 2 ? mergeMachinery(parsed, header) : parsed;
+  return header.v === 2 ? mergeMachinery(parsedBody, header) : parsedBody;
 }
 
 /**
@@ -399,6 +471,16 @@ export function readJobRoutingMeta(value: string): JobRoutingMeta {
 }
 
 /**
+ * Header-taking variant of {@link readEnvelopeBlobId} — for callers that have
+ * already parsed the envelope and don't want a second `Buffer.from + JSON.parse`.
+ */
+export function readEnvelopeBlobIdFromHeader(
+  header: EnvelopeHeader,
+): string | null {
+  return header.e === "ref" && typeof header.r === "string" ? header.r : null;
+}
+
+/**
  * Returns the GQ1 offloaded-blob id of an envelope value, or null for inline
  * bodies, GQ2 tiered refs, legacy JSON, and unreadable values. Used by the
  * completion and restage paths to delete blobs whose staged value is retired.
@@ -407,10 +489,27 @@ export function readEnvelopeBlobId(value: string): string | null {
   try {
     if (!isEnvelope(value)) return null;
     const { header } = splitEnvelope(value);
-    return header.e === "ref" && typeof header.r === "string" ? header.r : null;
+    return readEnvelopeBlobIdFromHeader(header);
   } catch {
     return null;
   }
+}
+
+/**
+ * Header-taking variant of {@link readEnvelopeHold} — for callers that have
+ * already parsed the envelope and don't want a second `Buffer.from + JSON.parse`.
+ */
+export function readEnvelopeHoldFromHeader(
+  header: EnvelopeHeader,
+): { ref: BlobRef; token: string } | null {
+  if (
+    (header.e === "redis" || header.e === "s3") &&
+    header.ref &&
+    typeof header.h === "string"
+  ) {
+    return { ref: header.ref, token: header.h };
+  }
+  return null;
 }
 
 /**
@@ -425,26 +524,41 @@ export function readEnvelopeHold(
   try {
     if (!isEnvelope(value)) return null;
     const { header } = splitEnvelope(value);
-    if (
-      (header.e === "redis" || header.e === "s3") &&
-      header.ref &&
-      typeof header.h === "string"
-    ) {
-      return { ref: header.ref, token: header.h };
-    }
-    return null;
+    return readEnvelopeHoldFromHeader(header);
   } catch {
     return null;
   }
 }
 
-function isEnvelope(value: string): boolean {
+/**
+ * Single parse for retirement: given a staged value, return the GQ2 hold and/or
+ * GQ1 blob id from ONE `splitEnvelope`. Prefer over calling `readEnvelopeHold`
+ * + `readEnvelopeBlobId` in sequence on the completion / restage hot path
+ * (2026-06-24 review).
+ */
+export function readEnvelopeRetirement(value: string): {
+  hold: { ref: BlobRef; token: string } | null;
+  blobId: string | null;
+} {
+  try {
+    if (!isEnvelope(value)) return { hold: null, blobId: null };
+    const { header } = splitEnvelope(value);
+    return {
+      hold: readEnvelopeHoldFromHeader(header),
+      blobId: readEnvelopeBlobIdFromHeader(header),
+    };
+  } catch {
+    return { hold: null, blobId: null };
+  }
+}
+
+export function isEnvelope(value: string): boolean {
   return (
     value.startsWith(ENVELOPE_PREFIX_V1) || value.startsWith(ENVELOPE_PREFIX_V2)
   );
 }
 
-function splitEnvelope(value: string): {
+export function splitEnvelope(value: string): {
   header: EnvelopeHeader;
   body: string;
 } {

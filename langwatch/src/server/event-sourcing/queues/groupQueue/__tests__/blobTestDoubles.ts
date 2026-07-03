@@ -13,6 +13,10 @@ export class InMemoryJobBlobStore implements JobBlobStore {
   async get({ id }: { id: string }): Promise<Buffer | null> {
     return this.store.get(id) ?? null;
   }
+  /** In-memory doubles have no TTL so peek and get behave identically. */
+  async peek({ id }: { id: string }): Promise<Buffer | null> {
+    return this.store.get(id) ?? null;
+  }
   async delete({ id }: { id: string }): Promise<void> {
     this.store.delete(id);
   }
