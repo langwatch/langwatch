@@ -572,8 +572,11 @@ export class TraceSummaryFoldProjection
     // thread id and input usage is one session step. Codex fragments a session
     // across traces, so its step series lives on each trace summary and the
     // read-time rollup re-joins them by thread id. Step context size sums the
-    // fresh input and the cache-read pool (Codex lifts cache_read separately) —
-    // the whole prompt context, not just the freshly-billed prefix.
+    // whole prompt context (fresh + cache-read + cache-creation), mirroring
+    // the span path's extractStepInputTokens. No extractor lifts
+    // langwatch.cache_creation_tokens today, so that term is 0 on this path —
+    // it is included so the two paths stay definitionally identical if an
+    // extractor ever starts lifting it.
     const liftedThreadId =
       typeof liftedAttrs["langwatch.thread.id"] === "string"
         ? (liftedAttrs["langwatch.thread.id"] as string)
@@ -582,7 +585,8 @@ export class TraceSummaryFoldProjection
       Number.isFinite(value) && value > 0 ? value : 0;
     const stepInputTokens =
       positive(liftedIn) +
-      positive(Number(liftedAttrs["langwatch.cache_read_tokens"]));
+      positive(Number(liftedAttrs["langwatch.cache_read_tokens"])) +
+      positive(Number(liftedAttrs["langwatch.cache_creation_tokens"]));
     const logHarness = detectLogTurnHarness({
       scopeName: event.data.scopeName,
       liftedAttrs,

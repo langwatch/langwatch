@@ -54,7 +54,6 @@ const stepsOf = (...inputs: number[]): SessionStep[] =>
 describe("rollupSessions", () => {
   describe("given multiple coding-agent traces sharing one session id", () => {
     describe("when they are rolled up", () => {
-      /** @scenario "Steps of a session are accumulated into a session view" */
       it("counts every step and sums the per-category cost totals", () => {
         const traces = [
           makeTrace({
@@ -117,7 +116,6 @@ describe("rollupSessions", () => {
 
   describe("given a session that grows, drops sharply, then grows from the lower base", () => {
     describe("when it is rolled up", () => {
-      /** @scenario "A compaction event is detected when the session context re-bases" */
       it("records one compaction event", () => {
         const traces = [
           makeTrace({
@@ -145,7 +143,6 @@ describe("rollupSessions", () => {
 
   describe("given large main-thread steps with one small interleaved subagent step", () => {
     describe("when it is rolled up", () => {
-      /** @scenario "A small parallel step does not fire a compaction event" */
       it("records no compaction event", () => {
         const traces = [
           makeTrace({
@@ -233,8 +230,10 @@ describe("rollupSessions", () => {
 describe("detectCompactionEvents", () => {
   describe("given an empty or single-step series", () => {
     it("returns zero events", () => {
-      expect(detectCompactionEvents({ steps: [] })).toBe(0);
-      expect(detectCompactionEvents({ steps: stepsOf(100_000) })).toBe(0);
+      expect(detectCompactionEvents({ steps: [] }).events).toBe(0);
+      expect(detectCompactionEvents({ steps: stepsOf(100_000) }).events).toBe(
+        0,
+      );
     });
   });
 
@@ -243,7 +242,7 @@ describe("detectCompactionEvents", () => {
       expect(
         detectCompactionEvents({
           steps: stepsOf(10_000, 40_000, 90_000, 150_000, 200_000),
-        }),
+        }).events,
       ).toBe(0);
     });
   });
@@ -253,7 +252,7 @@ describe("detectCompactionEvents", () => {
       expect(
         detectCompactionEvents({
           steps: stepsOf(200_000, 60_000, 65_000, 70_000),
-        }),
+        }).events,
       ).toBe(1);
     });
   });
@@ -263,7 +262,7 @@ describe("detectCompactionEvents", () => {
       expect(
         detectCompactionEvents({
           steps: stepsOf(200_000, 60_000, 210_000),
-        }),
+        }).events,
       ).toBe(0);
     });
   });
@@ -284,7 +283,7 @@ describe("detectCompactionEvents", () => {
             45_000,
             50_000,
           ),
-        }),
+        }).events,
       ).toBe(2);
     });
   });
@@ -296,7 +295,7 @@ describe("detectCompactionEvents", () => {
       expect(
         detectCompactionEvents({
           steps: stepsOf(200_000, 130_000, 125_000, 122_000),
-        }),
+        }).events,
       ).toBe(0);
     });
   });
