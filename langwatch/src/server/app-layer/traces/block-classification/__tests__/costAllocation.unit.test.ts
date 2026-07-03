@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { type Category, InputCategory, OutputCategory } from "../categories";
 import {
   allocateCategoryCosts,
+  inferCacheBreakpointFromPools,
   type TierPrices,
   type TokenBlock,
   type UsagePools,
@@ -253,6 +254,81 @@ describe("allocateCategoryCosts", () => {
       const totals = runPrefix(0, 500);
       expect(totals[InputCategory.SYSTEM_PROMPT]?.tokens).toBe(500);
       expect(totals[InputCategory.OTHER_INPUT]).toBeUndefined();
+    });
+  });
+
+  describe("inferCacheBreakpointFromPools", () => {
+    it("places the boundary at the front by the cached fraction of input", () => {
+      // cached = 900, fresh input = 100 → 90% of the input is the cached prefix,
+      // so the boundary falls after the system_prompt block (the front), leaving
+      // the trailing user block fresh.
+      const inputBlocks: TokenBlock[] = [
+        { idx: 0, category: InputCategory.SYSTEM_PROMPT, tokens: 900 },
+        { idx: 1, category: InputCategory.USER_INPUT, tokens: 100 },
+      ];
+      const pools: UsagePools = {
+        inputTokens: 100,
+        cacheReadTokens: 900,
+        cacheCreationTokens: 0,
+        outputTokens: 0,
+      };
+      expect(inferCacheBreakpointFromPools({ inputBlocks, pools })).toBe(0);
+    });
+
+    it("returns null when the provider reports no cached tokens", () => {
+      const inputBlocks: TokenBlock[] = [
+        { idx: 0, category: InputCategory.SYSTEM_PROMPT, tokens: 900 },
+      ];
+      const pools: UsagePools = {
+        inputTokens: 900,
+        cacheReadTokens: 0,
+        cacheCreationTokens: 0,
+        outputTokens: 0,
+      };
+      expect(inferCacheBreakpointFromPools({ inputBlocks, pools })).toBeNull();
+    });
+
+    it("returns null when blocks carry no token mass", () => {
+      const inputBlocks: TokenBlock[] = [
+        { idx: 0, category: InputCategory.SYSTEM_PROMPT, tokens: 0 },
+      ];
+      const pools: UsagePools = {
+        inputTokens: 0,
+        cacheReadTokens: 500,
+        cacheCreationTokens: 0,
+        outputTokens: 0,
+      };
+      expect(inferCacheBreakpointFromPools({ inputBlocks, pools })).toBeNull();
+    });
+
+    it("keeps cache tokens out of the catch-all when composed with allocation (flattened-path regression)", () => {
+      // The Claude Code log path: content flattened to text, so no cache_control
+      // marker survived (breakpoint would be null), yet the provider reports a
+      // large cache pool. Without the inferred breakpoint the whole cache pool
+      // dumps to other_input; with it, system_prompt absorbs the cached prefix.
+      const inputBlocks: TokenBlock[] = [
+        { idx: 0, category: InputCategory.SYSTEM_PROMPT, tokens: 900 },
+        { idx: 1, category: InputCategory.USER_INPUT, tokens: 100 },
+      ];
+      const pools: UsagePools = {
+        inputTokens: 100,
+        cacheReadTokens: 700,
+        cacheCreationTokens: 200,
+        outputTokens: 0,
+      };
+      const breakpoint = inferCacheBreakpointFromPools({ inputBlocks, pools });
+
+      const { categoryTotals } = allocateCategoryCosts({
+        inputBlocks,
+        outputBlocks: [],
+        lastCacheBreakpointIndex: breakpoint,
+        pools,
+        prices: {},
+      });
+
+      expect(categoryTotals[InputCategory.SYSTEM_PROMPT]?.tokens).toBe(900);
+      expect(categoryTotals[InputCategory.USER_INPUT]?.tokens).toBe(100);
+      expect(categoryTotals[InputCategory.OTHER_INPUT]).toBeUndefined();
     });
   });
 

@@ -227,6 +227,48 @@ function reconcileCosts(totals: CategoryTotals, target: number): void {
 }
 
 /**
+ * Infer the cached-prefix boundary from the usage pools when the content carried
+ * NO `cache_control` marker but the provider reports cached tokens.
+ *
+ * The Claude Code log path flattens each message's content-block array to a
+ * plain string, which strips the `cache_control` markers the classifier reads to
+ * locate the boundary — so `classifyBlocks` returns a null breakpoint and, left
+ * uncorrected, the whole cache pool (often ~85% of a cached turn's input) dumps
+ * into the axis catch-all (`other_input`).
+ *
+ * The cached prefix is ALWAYS the front of the input, and its size is exactly
+ * `cacheRead + cacheCreation` provider tokens. Block token counts are local
+ * estimates on a different scale, so the boundary is placed by cumulative
+ * estimate proportional to the cached fraction of the input: the returned index
+ * is the last block whose cumulative estimate falls within that fraction, so
+ * `partitionInput` splits the cached prefix (→ cache tiers) from the fresh tail.
+ *
+ * Returns null when there is nothing to infer (no cached tokens, or no block
+ * mass) — the caller then leaves the breakpoint null (all-fresh), unchanged.
+ */
+export function inferCacheBreakpointFromPools({
+  inputBlocks,
+  pools,
+}: {
+  inputBlocks: TokenBlock[];
+  pools: UsagePools;
+}): number | null {
+  const cached = pools.cacheReadTokens + pools.cacheCreationTokens;
+  const total = cached + pools.inputTokens;
+  if (cached <= 0 || total <= 0) return null;
+  const estTotal = inputBlocks.reduce((sum, b) => sum + b.tokens, 0);
+  if (estTotal <= 0) return null;
+
+  const cachedEstTokens = (cached / total) * estTotal;
+  let running = 0;
+  for (let i = 0; i < inputBlocks.length; i++) {
+    running += inputBlocks[i]!.tokens;
+    if (running >= cachedEstTokens) return i;
+  }
+  return inputBlocks.length - 1;
+}
+
+/**
  * Split the cached prefix across the cache_read and cache_creation pools, and
  * return the fresh remainder.
  *

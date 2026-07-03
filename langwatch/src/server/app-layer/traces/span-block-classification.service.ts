@@ -23,6 +23,7 @@ import {
 } from "./block-classification/categories";
 import {
   allocateCategoryCosts,
+  inferCacheBreakpointFromPools,
   type TierPrices,
   type TokenBlock,
   type UsagePools,
@@ -198,14 +199,24 @@ export class OtlpSpanBlockClassificationService {
     const outputBlocks = await this.toTokenBlocks({ blocks: output, model });
     const prices = this.resolveTierPrices({ span, model });
 
-    // 6. Allocate cache-tier aware and push the classification attributes.
+    // 6. Cached-prefix boundary. The Claude Code log path flattens message
+    //    content to plain text, stripping the cache_control markers the
+    //    classifier reads — so `classifyBlocks` returns a null breakpoint even on
+    //    a cached turn. When the provider still reports cached tokens, infer the
+    //    boundary from the usage pools so those tokens attribute to the real
+    //    prefix categories instead of the axis catch-all (other_input).
+    const cacheBreakpoint =
+      lastInputCacheBreakpointIndex ??
+      inferCacheBreakpointFromPools({ inputBlocks, pools });
+
+    // 7. Allocate cache-tier aware and push the classification attributes.
     //    Reconcile Σ to the authoritative displayed cost when the span carries a
     //    provider-billed total (Claude Code's cost_usd) that `computeSpanCost`
     //    trusts over the rate estimate — see resolveReconciliationCost.
     const { categoryTotals, blocks } = allocateCategoryCosts({
       inputBlocks,
       outputBlocks,
-      lastCacheBreakpointIndex: lastInputCacheBreakpointIndex,
+      lastCacheBreakpointIndex: cacheBreakpoint,
       pools,
       prices,
       reconcileToTotalCost: this.resolveReconciliationCost({ span }),
