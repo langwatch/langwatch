@@ -133,6 +133,11 @@ export function appendSessionStep({
 }): void {
   const steps = parseSessionSteps(attributes[SESSION_STEPS_ATTR]);
   steps.push({ startMs, inputTokens });
+  // OTLP delivery is unordered/retried, so keep the stored series sorted by
+  // startMs on every append — the ADR Schema promises a start-time-ordered
+  // series, and consumers other than the rollup (which sorts defensively) read
+  // it directly. Bounded at MAX_SESSION_STEPS, so the sort stays cheap.
+  steps.sort((a, b) => a.startMs - b.startMs);
   const bounded =
     steps.length > MAX_SESSION_STEPS ? mergeAdjacentKeepMax(steps) : steps;
   attributes[SESSION_STEPS_ATTR] = JSON.stringify(bounded);

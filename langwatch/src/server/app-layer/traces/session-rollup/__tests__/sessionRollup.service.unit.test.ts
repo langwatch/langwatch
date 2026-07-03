@@ -225,6 +225,72 @@ describe("rollupSessions", () => {
       });
     });
   });
+
+  describe("given a trace carrying both thread ids with disagreeing values", () => {
+    describe("when it is rolled up", () => {
+      it("keys by the semconv-stable gen_ai.conversation.id, not langwatch.thread.id", () => {
+        // A disagreement must resolve to ONE session, not split into two buckets.
+        const [view] = rollupSessions({
+          traces: [
+            {
+              attributes: {
+                [SESSION_HARNESS_ATTR]: "claude",
+                "gen_ai.conversation.id": "conv-canonical",
+                "langwatch.thread.id": "thread-other",
+                [SESSION_STEPS_ATTR]: JSON.stringify(stepsOf(5000)),
+              },
+            },
+          ],
+        });
+        expect(view!.threadId).toBe("conv-canonical");
+      });
+    });
+  });
+
+  describe("given a whitespace-only thread id", () => {
+    describe("when it is rolled up", () => {
+      it("is treated as absent — no phantom mega-session", () => {
+        expect(
+          rollupSessions({
+            traces: [
+              {
+                attributes: {
+                  [SESSION_HARNESS_ATTR]: "claude",
+                  "langwatch.thread.id": "   ",
+                  [SESSION_STEPS_ATTR]: JSON.stringify(stepsOf(5000)),
+                },
+              },
+            ],
+          }),
+        ).toHaveLength(0);
+      });
+    });
+  });
+
+  describe("given a trace whose blockcat totals carry a negative value", () => {
+    describe("when it is rolled up", () => {
+      it("drops the negative rather than subtracting it from the session total", () => {
+        const [view] = rollupSessions({
+          traces: [
+            makeTrace({
+              harness: "claude",
+              threadId: "s1",
+              steps: stepsOf(1000),
+              categoryTotals: {
+                system_prompt: { tokens: -50, costUsd: -0.01 },
+                user_input: { tokens: 100, costUsd: 0.02 },
+              },
+            }),
+          ],
+        });
+        expect(view!.categoryTotals.system_prompt).toBeUndefined();
+        expect(view!.categoryTotals.user_input).toEqual({
+          tokens: 100,
+          costUsd: 0.02,
+        });
+      });
+    });
+  });
 });
 
 describe("detectCompactionEvents", () => {
@@ -264,6 +330,49 @@ describe("detectCompactionEvents", () => {
           steps: stepsOf(200_000, 60_000, 210_000),
         }).events,
       ).toBe(0);
+    });
+  });
+
+  describe("given a main-thread turn interleaved with subagent steps then resumed", () => {
+    // The dominant coding-agent pattern (ADR-033 Decision 5): a big main-thread
+    // turn, several tiny subagent steps under the same session id, then the main
+    // thread resuming near its original size. None is a compaction — the context
+    // was never re-based. The old below-old-max confirmation false-fired on all
+    // three; the near-the-compacted-floor confirmation must read them as 0.
+    it("counts no event when the resume is two steps out", () => {
+      expect(
+        detectCompactionEvents({
+          steps: stepsOf(200_000, 8_000, 10_000, 190_000),
+        }).events,
+      ).toBe(0);
+    });
+
+    it("counts no event when the resume is three steps out", () => {
+      expect(
+        detectCompactionEvents({
+          steps: stepsOf(200_000, 8_000, 10_000, 12_000, 190_000),
+        }).events,
+      ).toBe(0);
+    });
+
+    it("counts no event when the resume is four steps out", () => {
+      expect(
+        detectCompactionEvents({
+          steps: stepsOf(200_000, 8_000, 10_000, 12_000, 14_000, 190_000),
+        }).events,
+      ).toBe(0);
+    });
+  });
+
+  describe("given a genuine compaction at the very end of a session", () => {
+    it("counts the event even with fewer than the full confirmation window left", () => {
+      // User compacts (200k → 40k), checks the summary (45k), closes the
+      // terminal. A real event that must not be dropped just for running out of
+      // confirmation runway — one confirming step that stays compacted is enough.
+      expect(
+        detectCompactionEvents({ steps: stepsOf(200_000, 40_000, 45_000) })
+          .events,
+      ).toBe(1);
     });
   });
 

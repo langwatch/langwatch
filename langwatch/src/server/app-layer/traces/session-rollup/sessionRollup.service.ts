@@ -35,6 +35,12 @@ import {
 /** ADR-033 Constants: compaction-event detection thresholds. */
 export const COMPACTION_DROP_RATIO = 0.4;
 export const COMPACTION_CONFIRMATION_STEPS = 2;
+/** A step retaining less than this fraction of the running max is a subagent /
+ * parallel call (minimal sub-task context), not a compaction of the main thread
+ * — it is skipped so a burst of tiny subagent steps can't confirm each other
+ * into a phantom re-base. A real compaction keeps the system prompt + recent
+ * context, well above this floor. */
+export const COMPACTION_MIN_RETAIN_RATIO = 0.1;
 
 /** Per-category token + cost totals, summed across a session's traces. */
 export type SessionCategoryTotals = Partial<
@@ -105,8 +111,9 @@ export function detectCompactionEvents({
 
   let events = 0;
   let runningMax = positiveSteps[0]!.inputTokens;
+  const n = positiveSteps.length;
 
-  for (let i = 1; i < positiveSteps.length; i++) {
+  for (let i = 1; i < n; i++) {
     const cur = positiveSteps[i]!.inputTokens;
     const threshold = (1 - dropRatio) * runningMax;
 
@@ -116,20 +123,41 @@ export function detectCompactionEvents({
       continue;
     }
 
-    // Candidate drop: confirm the next `confirmationSteps` steps stay below the
-    // OLD max. A single step climbing back to (or above) the old max means this
-    // was a small parallel step, not a compaction — the max never resets.
+    // A step far below the running max is a SUBAGENT / parallel call (minimal
+    // context of a focused sub-task), not a compaction of the main thread. Skip
+    // it entirely: it neither fires an event nor moves the running max, so the
+    // main thread resuming later reads against the unchanged max. This is what
+    // the old below-old-max confirmation missed — the dominant pattern is a big
+    // main turn (200k), SEVERAL small subagent steps (8k/10k/12k/14k), then the
+    // main thread resuming (190k); those tiny steps confirmed each other under
+    // the old rule and re-based the max to ~8k, so the resume read as growth.
+    // A real compaction retains the system prompt + recent context (a meaningful
+    // fraction of the max); a subagent step retains almost nothing. (Decision 5.)
+    if (cur < COMPACTION_MIN_RETAIN_RATIO * runningMax) continue;
+
+    // Candidate compaction: a significant-but-not-total drop. Confirm it re-based
+    // by checking the next `confirmationSteps` steps stay below the DROP
+    // THRESHOLD (not merely below the old max — a step climbing back toward the
+    // old max means the context returned, so it was noise, not a re-base).
     let confirmed = 0;
-    for (
-      let j = i + 1;
-      j < positiveSteps.length && confirmed < confirmationSteps;
-      j++
-    ) {
-      if (positiveSteps[j]!.inputTokens >= runningMax) break;
+    let recovered = false;
+    let j = i + 1;
+    for (; j < n && confirmed < confirmationSteps; j++) {
+      if (positiveSteps[j]!.inputTokens >= threshold) {
+        recovered = true;
+        break;
+      }
       confirmed++;
     }
 
-    if (confirmed === confirmationSteps) {
+    // Confirmed when the full window holds, OR the session ends still-compacted
+    // with at least one confirming step (an end-of-session compaction the user
+    // never grows back from must still count — it just ran out of runway).
+    const endedStillCompacted = j >= n && !recovered;
+    if (
+      confirmed === confirmationSteps ||
+      (endedStillCompacted && confirmed >= 1)
+    ) {
       events++;
       // Re-base to the compacted level; subsequent growth is measured from here.
       runningMax = cur;
@@ -152,15 +180,19 @@ function readHarness(
 /**
  * Read the session/thread id off a trace summary. The span path maps thread id
  * onto `gen_ai.conversation.id` (accumulation allowlist); the Path B log path
- * merges the raw lifted `langwatch.thread.id`. Read both so either origin keys
- * the same session.
+ * merges the raw lifted `langwatch.thread.id`. Prefer the semconv-stable
+ * `gen_ai.conversation.id` and fall back to `langwatch.thread.id` only when it
+ * is absent — a trace carrying both with disagreeing values must key ONE
+ * session, not silently split into two buckets. Whitespace-only ids are treated
+ * as absent so they can't collapse every mis-tagged trace into one phantom
+ * mega-session.
  */
 function readThreadId(attributes: Record<string, string>): string | null {
-  return (
-    attributes["langwatch.thread.id"] ||
-    attributes["gen_ai.conversation.id"] ||
-    null
-  );
+  const conversation = attributes["gen_ai.conversation.id"]?.trim();
+  if (conversation) return conversation;
+  const thread = attributes["langwatch.thread.id"]?.trim();
+  if (thread) return thread;
+  return null;
 }
 
 /** Closed set of taxonomy values, so an unknown blockcat suffix is skipped
@@ -182,7 +214,10 @@ function accumulateCategoryTotals(
     const category = rawCategory as Category;
     const field = suffix.slice(dotIdx + 1);
     const value = Number(raw);
-    if (!Number.isFinite(value)) continue;
+    // Floor at 0: tokens and cost are non-negative by construction, so a
+    // negative (a classifier regression, a corrupt attr) is dropped rather than
+    // subtracted out of a session's rollup totals.
+    if (!Number.isFinite(value) || value < 0) continue;
     const bucket = (into[category] ??= { tokens: 0, costUsd: 0 });
     if (field === "tokens") bucket.tokens += value;
     else if (field === "cost_usd") bucket.costUsd += value;
