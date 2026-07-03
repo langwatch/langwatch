@@ -843,7 +843,7 @@ func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProv
 		// may legitimately be empty (unauthenticated self-hosted server).
 		k.Value = envVar(cred.APIKey)
 		k.VLLMKeyConfig = &bfschemas.VLLMKeyConfig{
-			URL: envVar(credBaseURL(cred)),
+			URL: envVar(normalizeOpenAICompatBaseURL(credBaseURL(cred))),
 		}
 
 	default:
@@ -898,6 +898,17 @@ func mapProvider(cred domain.Credential) bfschemas.ModelProvider {
 // it "api_base" — accept both.
 func credBaseURL(cred domain.Credential) string {
 	return credExtra(cred, "base_url", "api_base")
+}
+
+// normalizeOpenAICompatBaseURL strips a trailing "/v1" (and trailing
+// slashes) from a customer-configured base URL. OpenAI-compatible
+// endpoints are conventionally configured as "http://host:8000/v1", but
+// Bifrost's vLLM provider appends the full "/v1/chat/completions" path
+// itself — forwarding the URL verbatim would produce ".../v1/v1/...".
+func normalizeOpenAICompatBaseURL(u string) string {
+	u = strings.TrimRight(u, "/")
+	u = strings.TrimSuffix(u, "/v1")
+	return strings.TrimRight(u, "/")
 }
 
 // --- Error classification ---

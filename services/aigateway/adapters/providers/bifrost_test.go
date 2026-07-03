@@ -492,10 +492,28 @@ func TestCredentialToBifrostKey_VLLM(t *testing.T) {
 	if key.VLLMKeyConfig == nil {
 		t.Fatal("VLLMKeyConfig is nil — vLLM keys require a per-key URL")
 	}
-	if got := key.VLLMKeyConfig.URL.Val; got != "http://llm-server:8000/v1" {
-		t.Fatalf("VLLMKeyConfig.URL = %q, want the configured base URL", got)
+	// Bifrost's vLLM provider appends "/v1/chat/completions" itself, so
+	// the conventional "/v1" suffix must be stripped or requests land on
+	// ".../v1/v1/chat/completions" (404).
+	if got := key.VLLMKeyConfig.URL.Val; got != "http://llm-server:8000" {
+		t.Fatalf("VLLMKeyConfig.URL = %q, want base URL without /v1 suffix", got)
 	}
 	if key.Value.Val != "" {
 		t.Fatalf("key.Value = %q, want empty for unauthenticated server", key.Value.Val)
+	}
+}
+
+func TestNormalizeOpenAICompatBaseURL(t *testing.T) {
+	cases := map[string]string{
+		"http://h:8000/v1":  "http://h:8000",
+		"http://h:8000/v1/": "http://h:8000",
+		"http://h:8000":     "http://h:8000",
+		"http://h:8000/":    "http://h:8000",
+		"":                  "",
+	}
+	for in, want := range cases {
+		if got := normalizeOpenAICompatBaseURL(in); got != want {
+			t.Errorf("normalizeOpenAICompatBaseURL(%q) = %q, want %q", in, got, want)
+		}
 	}
 }
