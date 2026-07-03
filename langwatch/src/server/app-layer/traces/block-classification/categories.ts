@@ -91,6 +91,14 @@ export function catchAllFor(axis: Axis): Category {
 /** Built-in vs MCP discrimination on tool names (Claude Code wire convention). */
 export const MCP_TOOL_PREFIX = "mcp__";
 
+/** The built-in tool Claude Code emits to RUN a skill (`tool_use` name). The
+ * loaded skill instruction text is separate — it arrives as leading
+ * `<skill>`/`<skills-list>` markers on the input axis (→ SKILL_CONTENT). This
+ * constant identifies the INVOCATION on the output axis so a skill run is not
+ * folded into the generic built-in tool-call lane. Slash commands surface as
+ * `<command-*>` input markers, not this tool, so they stay SKILL_CONTENT. */
+export const SKILL_TOOL_NAME = "Skill";
+
 /** Hard bound on the per-span detail array; overflow blocks aggregate into the
  * axis catch-all so category totals stay complete even when detail is truncated. */
 export const MAX_CLASSIFIED_BLOCKS_PER_SPAN = 512;

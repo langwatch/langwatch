@@ -67,6 +67,29 @@ describe("classifyBlocks", () => {
       ]);
     });
 
+    it("classifies a Skill tool_use as a skill invocation, not a built-in call", () => {
+      // Running a skill is a `tool_use` named `Skill` (Claude Code convention);
+      // it must land in skill_invocation, not fold into the built-in tool-call
+      // lane. A sibling non-skill built-in call stays built-in.
+      const { output } = classifyBlocks({
+        inputMessages: [],
+        outputMessages: [
+          {
+            role: "assistant",
+            content: [
+              { type: "tool_use", id: "s", name: "Skill", input: {} },
+              { type: "tool_use", id: "b", name: "Bash", input: {} },
+            ],
+          },
+        ],
+      });
+
+      expect(categoriesOf(output)).toEqual([
+        OutputCategory.SKILL_INVOCATION,
+        OutputCategory.TOOL_CALL_BUILTIN,
+      ]);
+    });
+
     it("distinguishes MCP tool results from built-in tool results", () => {
       const { input } = classifyBlocks({
         inputMessages: [

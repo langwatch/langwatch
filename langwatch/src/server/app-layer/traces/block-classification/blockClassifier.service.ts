@@ -27,6 +27,7 @@ import {
   MAX_CLASSIFIED_BLOCKS_PER_SPAN,
   MCP_TOOL_PREFIX,
   OutputCategory,
+  SKILL_TOOL_NAME,
 } from "./categories";
 import { splitLeadingMarkers } from "./contextMarkers";
 
@@ -407,8 +408,14 @@ function outputPartCategory(part: Record<string, unknown>): Category {
   if (type === "thinking" || type === "redacted_thinking")
     return OutputCategory.THINKING;
   if (type === "tool_use") {
+    const name = toolNameFromUse(part);
+    // A skill run is a `tool_use` named `Skill` — classify it as a skill
+    // invocation rather than folding it into the generic built-in tool-call
+    // lane (the loaded skill INSTRUCTIONS are separate: they arrive as
+    // `<skill>`/`<skills-list>` input markers → SKILL_CONTENT).
+    if (name === SKILL_TOOL_NAME) return OutputCategory.SKILL_INVOCATION;
     return toolCategory({
-      name: toolNameFromUse(part),
+      name,
       mcp: OutputCategory.TOOL_CALL_MCP,
       builtin: OutputCategory.TOOL_CALL_BUILTIN,
     });
