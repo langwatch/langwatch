@@ -28,7 +28,7 @@ import { getApp } from "~/server/app-layer/app";
 import {
   estimateCost,
   getMatchingLLMModelCost,
-} from "~/server/background/workers/collector/cost";
+} from "~/server/tracer/collector/cost";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
