@@ -116,6 +116,50 @@ function LimitBreakdownList({
   );
 }
 
+function LimitContentBody({
+  variant,
+  breakdown,
+  featureKey,
+  goToResource,
+}: {
+  variant: Extract<UpgradeModalVariant, { mode: "limit" }>;
+  breakdown: LimitBreakdownProject[] | undefined;
+  featureKey: FeatureKey | undefined;
+  goToResource: (args: { projectSlug: string; resourceId: string }) => void;
+}) {
+  return (
+    <Dialog.Body>
+      <VStack gap={4} align="start">
+        {typeof variant.max === "number" ? (
+          <>
+            <Text>
+              You've reached the limit of {variant.max}{" "}
+              {LIMIT_TYPE_LABELS[variant.limitType]} on your current plan.
+            </Text>
+            <Text color="gray.500">
+              Current usage: {variant.current} / {variant.max}
+            </Text>
+          </>
+        ) : (
+          <Text>
+            You've reached the limit of {LIMIT_TYPE_LABELS[variant.limitType]}{" "}
+            on your current plan.
+          </Text>
+        )}
+
+        {breakdown && breakdown.length > 0 && (
+          <LimitBreakdownList
+            breakdown={breakdown}
+            featureKey={featureKey}
+            limitType={variant.limitType}
+            goToResource={goToResource}
+          />
+        )}
+      </VStack>
+    </Dialog.Body>
+  );
+}
+
 export function LimitContent({
   variant,
   onClose,
@@ -165,35 +209,12 @@ export function LimitContent({
         <Crown />
         <Dialog.Title>Upgrade Required</Dialog.Title>
       </Dialog.Header>
-      <Dialog.Body>
-        <VStack gap={4} align="start">
-          {typeof variant.max === "number" ? (
-            <>
-              <Text>
-                You've reached the limit of {variant.max}{" "}
-                {LIMIT_TYPE_LABELS[variant.limitType]} on your current plan.
-              </Text>
-              <Text color="gray.500">
-                Current usage: {variant.current} / {variant.max}
-              </Text>
-            </>
-          ) : (
-            <Text>
-              You've reached the limit of {LIMIT_TYPE_LABELS[variant.limitType]}{" "}
-              on your current plan.
-            </Text>
-          )}
-
-          {breakdown.data && breakdown.data.length > 0 && (
-            <LimitBreakdownList
-              breakdown={breakdown.data}
-              featureKey={featureKey}
-              limitType={variant.limitType}
-              goToResource={goToResource}
-            />
-          )}
-        </VStack>
-      </Dialog.Body>
+      <LimitContentBody
+        variant={variant}
+        breakdown={breakdown.data}
+        featureKey={featureKey}
+        goToResource={goToResource}
+      />
       <Dialog.Footer>
         <Button variant="ghost" onClick={onClose}>
           Cancel
