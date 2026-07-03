@@ -13,6 +13,91 @@ import { api } from "../../utils/api";
 import { Dialog } from "../ui/dialog";
 import { toaster } from "../ui/toaster";
 
+type ProrationQueryResult =
+  | {
+      data?: {
+        formattedRecurringTotal: string;
+        billingInterval: string;
+      };
+      isLoading: boolean;
+      isError: boolean;
+      error?: { message: string };
+    }
+  | undefined;
+
+function SeatsProrationPreview({
+  hasSubscriptionApi,
+  prorationQuery,
+  currentSeats,
+  newSeats,
+}: {
+  hasSubscriptionApi: boolean;
+  prorationQuery: ProrationQueryResult;
+  currentSeats: number;
+  newSeats: number;
+}) {
+  const isLoading = prorationQuery?.isLoading ?? false;
+  const isError = prorationQuery?.isError ?? false;
+  const errorMessage =
+    prorationQuery?.error?.message ?? "Failed to load proration preview";
+  const data = prorationQuery?.data;
+
+  if (!hasSubscriptionApi) {
+    return <Text>Seat management is not available in this deployment.</Text>;
+  }
+
+  if (isLoading) {
+    return (
+      <HStack justify="center" width="100%" paddingY={6}>
+        <Spinner />
+      </HStack>
+    );
+  }
+
+  if (isError) {
+    return <Text color="red.500">{errorMessage}</Text>;
+  }
+
+  return (
+    <VStack gap={6} align="stretch" paddingY={2}>
+      <HStack justify="space-between" paddingX={2}>
+        <VStack align="start" gap={1}>
+          <Text fontSize="sm" color="gray.500">
+            Current seats
+          </Text>
+          <Text fontSize="2xl" fontWeight="bold">
+            {currentSeats}
+          </Text>
+        </VStack>
+        <Text fontSize="xl" color="gray.400" alignSelf="center">
+          →
+        </Text>
+        <VStack align="end" gap={1}>
+          <Text fontSize="sm" color="gray.500">
+            New total seats
+          </Text>
+          <Text fontSize="2xl" fontWeight="bold">
+            {newSeats}
+          </Text>
+        </VStack>
+      </HStack>
+
+      <Separator />
+
+      {data && (
+        <HStack justify="space-between" paddingX={2}>
+          <Text fontWeight="normal" fontSize="md" color="gray.500">
+            New billing amount
+          </Text>
+          <Text fontWeight="normal" fontSize="md" color="gray.500">
+            {data.formattedRecurringTotal}
+          </Text>
+        </HStack>
+      )}
+    </VStack>
+  );
+}
+
 export function SeatsContent({
   variant,
   onClose,
@@ -36,23 +121,7 @@ export function SeatsContent({
       newTotalSeats: variant.newSeats,
     },
     { enabled: open && hasSubscriptionApi },
-  ) as
-    | {
-        data?: {
-          formattedRecurringTotal: string;
-          billingInterval: string;
-        };
-        isLoading: boolean;
-        isError: boolean;
-        error?: { message: string };
-      }
-    | undefined;
-
-  const isLoading = prorationQuery?.isLoading ?? false;
-  const isError = prorationQuery?.isError ?? false;
-  const errorMessage =
-    prorationQuery?.error?.message ?? "Failed to load proration preview";
-  const data = prorationQuery?.data;
+  ) as ProrationQueryResult;
 
   const handleConfirm = async () => {
     setIsConfirming(true);
@@ -79,54 +148,12 @@ export function SeatsContent({
         <Dialog.Title>Confirm seat update</Dialog.Title>
       </Dialog.Header>
       <Dialog.Body>
-        {!subscriptionApi ? (
-          <Text>Seat management is not available in this deployment.</Text>
-        ) : isLoading ? (
-          <HStack justify="center" width="100%" paddingY={6}>
-            <Spinner />
-          </HStack>
-        ) : isError ? (
-          <Text color="red.500">{errorMessage}</Text>
-        ) : (
-          <VStack gap={6} align="stretch" paddingY={2}>
-            <HStack justify="space-between" paddingX={2}>
-              <VStack align="start" gap={1}>
-                <Text fontSize="sm" color="gray.500">
-                  Current seats
-                </Text>
-                <Text fontSize="2xl" fontWeight="bold">
-                  {variant.currentSeats}
-                </Text>
-              </VStack>
-              <Text fontSize="xl" color="gray.400" alignSelf="center">
-                →
-              </Text>
-              <VStack align="end" gap={1}>
-                <Text fontSize="sm" color="gray.500">
-                  New total seats
-                </Text>
-                <Text fontSize="2xl" fontWeight="bold">
-                  {variant.newSeats}
-                </Text>
-              </VStack>
-            </HStack>
-
-            <Separator />
-
-            {data && (
-              <>
-                <HStack justify="space-between" paddingX={2}>
-                  <Text fontWeight="normal" fontSize="md" color="gray.500">
-                    New billing amount
-                  </Text>
-                  <Text fontWeight="normal" fontSize="md" color="gray.500">
-                    {data.formattedRecurringTotal}
-                  </Text>
-                </HStack>
-              </>
-            )}
-          </VStack>
-        )}
+        <SeatsProrationPreview
+          hasSubscriptionApi={hasSubscriptionApi}
+          prorationQuery={prorationQuery}
+          currentSeats={variant.currentSeats}
+          newSeats={variant.newSeats}
+        />
       </Dialog.Body>
       <Dialog.Footer>
         <Button variant="ghost" onClick={onClose} disabled={isConfirming}>
@@ -136,7 +163,11 @@ export function SeatsContent({
           colorPalette="blue"
           onClick={() => void handleConfirm()}
           loading={isConfirming}
-          disabled={isLoading || isError || !subscriptionApi}
+          disabled={
+            prorationQuery?.isLoading ||
+            prorationQuery?.isError ||
+            !subscriptionApi
+          }
         >
           Confirm & Update
         </Button>
