@@ -80,10 +80,7 @@ describe("shikiManualChunk (vite.config eager Shiki allow-list)", () => {
         "/repo/node_modules/@shikijs/engine-oniguruma/dist/index.mjs",
       ],
       ["shiki", "/repo/node_modules/shiki/dist/index.mjs"],
-      [
-        "oniguruma-to-es",
-        "/repo/node_modules/oniguruma-to-es/dist/index.mjs",
-      ],
+      ["oniguruma-to-es", "/repo/node_modules/oniguruma-to-es/dist/index.mjs"],
       [
         "oniguruma-parser",
         "/repo/node_modules/oniguruma-parser/dist/index.mjs",
