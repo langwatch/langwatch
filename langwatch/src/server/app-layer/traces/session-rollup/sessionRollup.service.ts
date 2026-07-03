@@ -92,6 +92,29 @@ export interface SessionRollupTraceInput {
  * duplicating this loop (the subtlest logic in session tracking) and letting
  * the two copies drift.
  */
+/**
+ * A candidate drop at `candidateIdx` (already below `threshold`) is a confirmed
+ * re-base iff the next `confirmationSteps` steps stay below the drop threshold,
+ * OR the session ends still-compacted with at least one confirming step (an
+ * end-of-session compaction that just ran out of runway). A step climbing back
+ * to/above the threshold means the context returned — not a re-base.
+ */
+function isConfirmedCompaction(
+  steps: SessionStep[],
+  candidateIdx: number,
+  threshold: number,
+  confirmationSteps: number,
+): boolean {
+  let confirmed = 0;
+  let j = candidateIdx + 1;
+  for (; j < steps.length && confirmed < confirmationSteps; j++) {
+    if (steps[j]!.inputTokens >= threshold) return false; // recovered
+    confirmed++;
+  }
+  if (confirmed === confirmationSteps) return true;
+  return j >= steps.length && confirmed >= 1; // ended still-compacted
+}
+
 export function detectCompactionEvents({
   steps,
   dropRatio = COMPACTION_DROP_RATIO,
@@ -135,35 +158,13 @@ export function detectCompactionEvents({
     // fraction of the max); a subagent step retains almost nothing. (Decision 5.)
     if (cur < COMPACTION_MIN_RETAIN_RATIO * runningMax) continue;
 
-    // Candidate compaction: a significant-but-not-total drop. Confirm it re-based
-    // by checking the next `confirmationSteps` steps stay below the DROP
-    // THRESHOLD (not merely below the old max — a step climbing back toward the
-    // old max means the context returned, so it was noise, not a re-base).
-    let confirmed = 0;
-    let recovered = false;
-    let j = i + 1;
-    for (; j < n && confirmed < confirmationSteps; j++) {
-      if (positiveSteps[j]!.inputTokens >= threshold) {
-        recovered = true;
-        break;
-      }
-      confirmed++;
-    }
-
-    // Confirmed when the full window holds, OR the session ends still-compacted
-    // with at least one confirming step (an end-of-session compaction the user
-    // never grows back from must still count — it just ran out of runway).
-    const endedStillCompacted = j >= n && !recovered;
-    if (
-      confirmed === confirmationSteps ||
-      (endedStillCompacted && confirmed >= 1)
-    ) {
+    // Candidate compaction: a significant-but-not-total drop. Only a confirmed
+    // re-base fires an event and resets the max; unconfirmed candidates are
+    // noise (the confirmation steps are re-visited by the outer loop).
+    if (isConfirmedCompaction(positiveSteps, i, threshold, confirmationSteps)) {
       events++;
-      // Re-base to the compacted level; subsequent growth is measured from here.
-      runningMax = cur;
+      runningMax = cur; // subsequent growth is measured from the compacted level
     }
-    // Unconfirmed candidates are noise: no event, no reset. The confirmation
-    // steps are re-visited by the outer loop and rebuild the max normally.
   }
 
   return { events, runningMax };
