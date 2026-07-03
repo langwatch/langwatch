@@ -50,6 +50,8 @@ const EVALUATOR_NOT_GUARDRAIL_ID = `eval-mat-nongr-${suffix}`;
 const MONITOR_ID = `mon-mat-${suffix}`;
 const MONITOR_NOT_GUARDRAIL_ID = `mon-mat-nongr-${suffix}`;
 const MP_ID = `mp-mat-${suffix}`;
+const MP_CUSTOM_ID = `mp-mat-custom-${suffix}`;
+const CUSTOM_BASE_URL = "http://llm-server:8000/v1";
 const RP_ID = `rp-mat-${suffix}`;
 const GUARDRAIL_ID = `gr-mat-${suffix}`;
 const VK_ID = `vk-mat-${suffix}`;
@@ -149,6 +151,24 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
         },
       },
     });
+    // Custom (OpenAI-compatible) provider: base URL required, API key
+    // legitimately empty (unauthenticated self-hosted vLLM/LiteLLM).
+    await prisma.modelProvider.create({
+      data: {
+        id: MP_CUSTOM_ID,
+        name: "custom",
+        provider: "custom",
+        enabled: true,
+        organizationId: ORG_ID,
+        customKeys: {
+          CUSTOM_API_KEY: "",
+          CUSTOM_BASE_URL,
+        },
+        scopes: {
+          create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+        },
+      },
+    });
     await prisma.routingPolicy.create({
       data: {
         id: RP_ID,
@@ -157,7 +177,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
           create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
         },
         name: `mat-rp-${suffix}`,
-        modelProviderIds: [MP_ID],
+        modelProviderIds: [MP_ID, MP_CUSTOM_ID],
         modelAliases: { "gpt-5": "gpt-5-mini" },
         policyRules: {
           tools: { deny: ["^shell_.*$"], allow: null },
@@ -261,9 +281,11 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     });
     await prisma.routingPolicy.deleteMany({ where: { id: RP_ID } });
     await prisma.modelProviderScope.deleteMany({
-      where: { modelProviderId: MP_ID },
+      where: { modelProviderId: { in: [MP_ID, MP_CUSTOM_ID] } },
     });
-    await prisma.modelProvider.deleteMany({ where: { id: MP_ID } });
+    await prisma.modelProvider.deleteMany({
+      where: { id: { in: [MP_ID, MP_CUSTOM_ID] } },
+    });
     await prisma.evaluator.deleteMany({
       where: { id: { in: [EVALUATOR_ID, EVALUATOR_NOT_GUARDRAIL_ID] } },
     });
@@ -297,6 +319,18 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
       expect(bundle.organization_id).toBe(ORG_ID);
       expect(bundle.project_id).toBe(PROJECT_ID);
       expect(bundle.providers.length).toBeGreaterThan(0);
+    });
+
+    it("materialises the custom provider slot with its base_url and empty api_key", async () => {
+      const repo = new VirtualKeyRepository(prisma);
+      const vk = await repo.findById(VK_ID, ORG_ID);
+      const mat = new GatewayConfigMaterialiser(prisma, null);
+      const bundle = await mat.materialise(vk!);
+      const slot = bundle.providers.find((p) => p.id === MP_CUSTOM_ID);
+      expect(slot).toBeDefined();
+      expect(slot!.type).toBe("custom");
+      expect(slot!.base_url).toBe(CUSTOM_BASE_URL);
+      expect(slot!.credentials.api_key).toBe("");
     });
 
     it("hydrates model_aliases + policy_rules from the linked RoutingPolicy", async () => {

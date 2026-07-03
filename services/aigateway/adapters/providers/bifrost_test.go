@@ -441,3 +441,61 @@ func TestCredentialToBifrostKey_BedrockHonorsAWSStyleKeys(t *testing.T) {
 		t.Errorf("Region not honored: %+v", k.BedrockKeyConfig.Region)
 	}
 }
+
+// mapProvider routes customer-hosted OpenAI-compatible endpoints (provider
+// "custom", or "openai" with a base-URL override) through Bifrost's vLLM
+// provider, which carries the URL per-key. Without this, base URLs are
+// silently dropped and traffic goes to api.openai.com.
+//
+// Spec: specs/ai-gateway/custom-provider-base-url.feature
+func TestMapProvider_CustomAndBaseURLOverrides(t *testing.T) {
+	cases := []struct {
+		name string
+		cred domain.Credential
+		want bfschemas.ModelProvider
+	}{
+		{"custom provider maps to vllm", domain.Credential{ProviderID: domain.ProviderCustom}, bfschemas.VLLM},
+		{"openai with base_url maps to vllm", domain.Credential{
+			ProviderID: domain.ProviderOpenAI,
+			Extra:      map[string]string{"base_url": "http://llm-server:8000/v1"},
+		}, bfschemas.VLLM},
+		{"openai with litellm-style api_base maps to vllm", domain.Credential{
+			ProviderID: domain.ProviderOpenAI,
+			Extra:      map[string]string{"api_base": "http://llm-server:8000/v1"},
+		}, bfschemas.VLLM},
+		{"openai without base_url keeps openai", domain.Credential{ProviderID: domain.ProviderOpenAI}, bfschemas.OpenAI},
+		{"anthropic is unaffected", domain.Credential{ProviderID: domain.ProviderAnthropic}, bfschemas.Anthropic},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := mapProvider(tc.cred); got != tc.want {
+				t.Fatalf("mapProvider(%v) = %q, want %q", tc.cred.ProviderID, got, tc.want)
+			}
+		})
+	}
+}
+
+// credentialToBifrostKey must carry the endpoint on VLLMKeyConfig.URL —
+// Bifrost's vLLM provider has no provider-level URL fallback, so a key
+// without it fails dispatch. An empty API key stays allowed: self-hosted
+// servers commonly run unauthenticated.
+//
+// Spec: specs/ai-gateway/custom-provider-base-url.feature
+func TestCredentialToBifrostKey_VLLM(t *testing.T) {
+	cred := domain.Credential{
+		ID:         "mp-1",
+		ProviderID: domain.ProviderCustom,
+		Extra:      map[string]string{"base_url": "http://llm-server:8000/v1"},
+	}
+	key := credentialToBifrostKey(cred, bfschemas.VLLM)
+
+	if key.VLLMKeyConfig == nil {
+		t.Fatal("VLLMKeyConfig is nil — vLLM keys require a per-key URL")
+	}
+	if got := key.VLLMKeyConfig.URL.Val; got != "http://llm-server:8000/v1" {
+		t.Fatalf("VLLMKeyConfig.URL = %q, want the configured base URL", got)
+	}
+	if key.Value.Val != "" {
+		t.Fatalf("key.Value = %q, want empty for unauthenticated server", key.Value.Val)
+	}
+}

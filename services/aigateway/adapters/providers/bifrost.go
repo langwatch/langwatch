@@ -113,7 +113,7 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 		return r.dispatchVoyageDirect(ctx, req, model, cred)
 	}
 
-	provider := mapProvider(cred.ProviderID)
+	provider := mapProvider(cred)
 
 	if req.Type == domain.RequestTypeResponses {
 		return r.dispatchResponses(ctx, req, provider, model, cred)
@@ -391,7 +391,7 @@ func (r *BifrostRouter) dispatchVoyageDirect(
 //   - RequestTypePassthrough: dedicated dispatchPassthroughStream (Gemini
 //     /v1beta/...:streamGenerateContent).
 func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request, cred domain.Credential) (domain.StreamIterator, error) {
-	provider := mapProvider(cred.ProviderID)
+	provider := mapProvider(cred)
 	model := req.Model
 	if req.Resolved != nil {
 		model = req.Resolved.ModelID
@@ -836,6 +836,16 @@ func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProv
 			AuthCredentials: envVar(cred.Extra["auth_credentials"]),
 		}
 
+	case bfschemas.VLLM:
+		// OpenAI-compatible endpoint hosted by the customer (vLLM,
+		// LiteLLM proxy, ...). The base URL rides on the key — Bifrost's
+		// vLLM provider has no provider-level URL fallback. The API key
+		// may legitimately be empty (unauthenticated self-hosted server).
+		k.Value = envVar(cred.APIKey)
+		k.VLLMKeyConfig = &bfschemas.VLLMKeyConfig{
+			URL: envVar(credBaseURL(cred)),
+		}
+
 	default:
 		// OpenAI, Anthropic, Gemini, etc. — plain API key.
 		k.Value = envVar(cred.APIKey)
@@ -850,8 +860,8 @@ func envVar(v string) bfschemas.EnvVar {
 
 // --- Provider mapping ---
 
-func mapProvider(id domain.ProviderID) bfschemas.ModelProvider {
-	switch id {
+func mapProvider(cred domain.Credential) bfschemas.ModelProvider {
+	switch cred.ProviderID {
 	case domain.ProviderAzure:
 		return bfschemas.Azure
 	case domain.ProviderBedrock:
@@ -862,9 +872,32 @@ func mapProvider(id domain.ProviderID) bfschemas.ModelProvider {
 		return bfschemas.Gemini
 	case domain.ProviderAnthropic:
 		return bfschemas.Anthropic
+	case domain.ProviderCustom:
+		// Customer-hosted OpenAI-compatible endpoint. Bifrost's vLLM
+		// provider is its generic OpenAI-compat adapter with a per-key
+		// base URL — exactly the shape a custom provider needs.
+		return bfschemas.VLLM
+	case domain.ProviderOpenAI:
+		// OpenAI with a base-URL override (self-hosted vLLM / LiteLLM
+		// arriving via the custom→openai translation in the nlpgo proxy
+		// path) must not hit api.openai.com. Bifrost's OpenAI key has no
+		// per-key URL slot, so route through the vLLM provider, which
+		// speaks the same wire format and carries the URL on the key.
+		if credBaseURL(cred) != "" {
+			return bfschemas.VLLM
+		}
+		return bfschemas.OpenAI
 	default:
-		return bfschemas.ModelProvider(string(id))
+		return bfschemas.ModelProvider(string(cred.ProviderID))
 	}
+}
+
+// credBaseURL returns the customer-configured endpoint override for
+// OpenAI-compatible credentials. The control-plane wire names it
+// "base_url" (config.materialiser.ts), the litellm-era nlpgo paths name
+// it "api_base" — accept both.
+func credBaseURL(cred domain.Credential) string {
+	return credExtra(cred, "base_url", "api_base")
 }
 
 // --- Error classification ---
