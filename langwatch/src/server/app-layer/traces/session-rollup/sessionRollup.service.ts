@@ -35,11 +35,17 @@ import {
 /** ADR-033 Constants: compaction-event detection thresholds. */
 export const COMPACTION_DROP_RATIO = 0.4;
 export const COMPACTION_CONFIRMATION_STEPS = 2;
-/** A step retaining less than this fraction of the running max is a subagent /
- * parallel call (minimal sub-task context), not a compaction of the main thread
- * — it is skipped so a burst of tiny subagent steps can't confirm each other
- * into a phantom re-base. A real compaction keeps the system prompt + recent
- * context, well above this floor. */
+/** A step retaining less than this fraction of the running max is treated as a
+ * subagent / parallel call (minimal sub-task context) and skipped, so a burst
+ * of tiny subagent steps can't confirm each other into a phantom re-base.
+ *
+ * Accepted tradeoff: an AGGRESSIVE real compaction that re-bases below this floor
+ * (e.g. 200k → 15k) is missed — counted conservatively as a subagent step. This
+ * is the deliberate safe direction (ADR-033 Decision 5: "the naive version is
+ * noise" — under-count over phantom events). No clean floor separates the two
+ * cases: real subagent steps (~4% of max) and sub-10% compactions overlap, so
+ * lowering the floor re-admits false positives. Tunable; a data-backed refinement
+ * is a v1.1 candidate. */
 export const COMPACTION_MIN_RETAIN_RATIO = 0.1;
 
 /** Per-category token + cost totals, summed across a session's traces. */
