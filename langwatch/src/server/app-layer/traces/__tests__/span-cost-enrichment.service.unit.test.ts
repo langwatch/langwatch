@@ -234,6 +234,40 @@ describe("OtlpSpanCostEnrichmentService", () => {
       });
     });
 
+    describe("when request and response models differ", () => {
+      it("resolves the response model, matching the tokenizer and classifier", async () => {
+        // Regression: cost-enrichment used to check request.model first while
+        // token-estimation, block-classification, and computeSpanCost resolve
+        // response-first. A span with differing models then got costed against a
+        // different model than it was tokenized for. Only the response model has
+        // a custom rate here, so a request-first resolution would find no match
+        // and stamp nothing.
+        const customCost: MaybeStoredLLMModelCost = {
+          projectId: "project-1",
+          model: "gpt-4o-2024-08-06",
+          regex: "^gpt-4o-2024-08-06$",
+          inputCostPerToken: 0.000003,
+          outputCostPerToken: 0.00001,
+        };
+        const deps = createMockDeps([customCost]);
+        const service = new OtlpSpanCostEnrichmentService(deps);
+        const span = createTestSpan([
+          { key: "gen_ai.request.model", value: { stringValue: "gpt-4o" } },
+          {
+            key: "gen_ai.response.model",
+            value: { stringValue: "gpt-4o-2024-08-06" },
+          },
+        ]);
+
+        await service.enrichSpan(span, "project-1");
+
+        expect(span.attributes).toContainEqual({
+          key: "langwatch.model.inputCostPerToken",
+          value: { doubleValue: 0.000003 },
+        });
+      });
+    });
+
     describe("when model has provider subtype prefix", () => {
       it("falls back to base provider match", async () => {
         const customCost: MaybeStoredLLMModelCost = {

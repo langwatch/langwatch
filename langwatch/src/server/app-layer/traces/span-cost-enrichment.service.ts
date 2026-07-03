@@ -10,10 +10,18 @@ import { extractModelName } from "./utils/spanModel";
 
 /**
  * Attribute keys that may contain model names (checked in priority order).
+ *
+ * Response-model-first, matching OtlpSpanTokenEstimationService,
+ * span-block-classification, and computeSpanCost's own fallback
+ * (`extractModelsFromSpan`). A span carrying differing request/response models
+ * must resolve the SAME model in all of them: cost-enrichment picks which
+ * custom-cost row to stamp, and the tokenizer/classifier price against it — a
+ * split here would cost the span against a different model than it was tokenized
+ * for.
  */
 const MODEL_ATTRIBUTE_KEYS = [
-  "gen_ai.request.model",
   "gen_ai.response.model",
+  "gen_ai.request.model",
   "llm.model_name",
   "ai.model",
 ] as const;
