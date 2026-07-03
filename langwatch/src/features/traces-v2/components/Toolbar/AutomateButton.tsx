@@ -7,6 +7,7 @@ import {
   PopoverRoot,
   PopoverTrigger,
 } from "~/components/ui/popover";
+import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import NextLink from "~/utils/compat/next-link";
@@ -40,10 +41,7 @@ export const AutomateButton: React.FC<{ compact?: boolean }> = ({
         content="Automations from a filter. Coming soon."
         positioning={{ placement: "bottom" }}
       >
-        {/* Intermediate span keeps Tooltip's asChild clone off the
-            PopoverTrigger's DOM node — see GroupingSelector.tsx for why
-            nesting two asChild triggers directly breaks anchor positioning. */}
-        <Box as="span" display="inline-flex">
+        <TriggerAnchor>
           <PopoverTrigger asChild>
             <Button
               size="xs"
@@ -60,7 +58,7 @@ export const AutomateButton: React.FC<{ compact?: boolean }> = ({
               {!compact && "Automate"}
             </Button>
           </PopoverTrigger>
-        </Box>
+        </TriggerAnchor>
       </Tooltip>
       <PopoverContent width="320px">
         <PopoverArrow />

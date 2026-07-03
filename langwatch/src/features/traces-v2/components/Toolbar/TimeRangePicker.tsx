@@ -14,6 +14,7 @@ import { Check, Clock, Copy } from "lucide-react";
 import type React from "react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { Popover } from "../../../../components/ui/popover";
+import { TriggerAnchor } from "../../../../components/ui/TriggerAnchor";
 import { Tooltip } from "../../../../components/ui/tooltip";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import type { TimeRange } from "../../stores/filterStore";
@@ -68,10 +69,7 @@ export const TimeRangePicker: React.FC<{ compact?: boolean }> = ({
         content={`Time range: ${triggerLabel}`}
         positioning={{ placement: "bottom" }}
       >
-        {/* Intermediate span keeps Tooltip's asChild clone off the
-            Popover.Trigger's DOM node — see GroupingSelector.tsx for why
-            nesting two asChild triggers directly breaks anchor positioning. */}
-        <Box as="span" display="inline-flex">
+        <TriggerAnchor>
           <Popover.Trigger asChild>
             <Button
               size="xs"
@@ -84,7 +82,7 @@ export const TimeRangePicker: React.FC<{ compact?: boolean }> = ({
               {!compact && triggerLabel}
             </Button>
           </Popover.Trigger>
-        </Box>
+        </TriggerAnchor>
       </Tooltip>
       <Popover.Content width="auto" minWidth="420px">
         <Popover.Body padding={0}>

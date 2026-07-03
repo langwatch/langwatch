@@ -21,6 +21,7 @@ import {
 import { History, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Menu } from "~/components/ui/menu";
+import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { LangyConversationSummary } from "./useLangyConversations";
 
@@ -53,10 +54,7 @@ export function RecentChatsMenu({
       positioning={{ placement: "bottom-end" }}
     >
       <Tooltip content="Recent chats" showArrow>
-        {/* Intermediate span keeps Tooltip's asChild clone off the
-            Menu.Trigger's DOM node — see GroupingSelector.tsx for why
-            nesting two asChild triggers directly breaks anchor positioning. */}
-        <Box as="span" display="inline-flex">
+        <TriggerAnchor>
           <Menu.Trigger asChild>
             <IconButton
               size="xs"
@@ -67,7 +65,7 @@ export function RecentChatsMenu({
               <History size={15} />
             </IconButton>
           </Menu.Trigger>
-        </Box>
+        </TriggerAnchor>
       </Tooltip>
       <Menu.Content
         minWidth="280px"

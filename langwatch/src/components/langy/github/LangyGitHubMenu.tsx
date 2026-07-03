@@ -25,6 +25,7 @@ import { useState } from "react";
 import { GitHub } from "react-feather";
 
 import { Menu } from "~/components/ui/menu";
+import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { api } from "~/utils/api";
@@ -84,10 +85,7 @@ export function LangyGitHubMenu({
         content={`GitHub connected — acting as @${connection.data.githubLogin}`}
         showArrow
       >
-        {/* Intermediate span keeps Tooltip's asChild clone off the
-            Menu.Trigger's DOM node — see GroupingSelector.tsx for why
-            nesting two asChild triggers directly breaks anchor positioning. */}
-        <Box as="span" display="inline-flex">
+        <TriggerAnchor>
           <Menu.Trigger asChild>
             <IconButton
               size="xs"
@@ -108,7 +106,7 @@ export function LangyGitHubMenu({
               />
             </IconButton>
           </Menu.Trigger>
-        </Box>
+        </TriggerAnchor>
       </Tooltip>
       <Menu.Content
         minWidth="220px"

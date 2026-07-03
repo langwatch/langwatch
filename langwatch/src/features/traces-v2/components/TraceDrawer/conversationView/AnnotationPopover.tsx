@@ -13,6 +13,7 @@ import { diffWordsWithSpace } from "diff";
 import { Check, MessageSquareText, RotateCcw, Trash2 } from "lucide-react";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Popover } from "~/components/ui/popover";
+import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -83,14 +84,9 @@ export function AnnotationPopover(props: AnnotationPopoverProps) {
           content={props.triggerTooltip}
           positioning={{ placement: "top" }}
         >
-          {/* Intermediate span keeps Tooltip's asChild clone off the
-              Popover.Trigger's DOM node — nesting two asChild triggers
-              directly makes Tooltip's `id` clobber the one Zag's popover
-              machine assigned, breaking its id-based anchor lookup and
-              pinning the popover at the page origin. */}
-          <Box as="span" display="inline-flex">
+          <TriggerAnchor>
             <Popover.Trigger asChild>{props.trigger}</Popover.Trigger>
-          </Box>
+          </TriggerAnchor>
         </Tooltip>
       ) : (
         <Popover.Trigger asChild>{props.trigger}</Popover.Trigger>

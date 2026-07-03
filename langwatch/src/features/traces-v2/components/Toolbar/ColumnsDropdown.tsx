@@ -1,6 +1,7 @@
-import { Box, Button } from "@chakra-ui/react";
+import { Button } from "@chakra-ui/react";
 import { ChevronDown, Columns3 } from "lucide-react";
 import type React from "react";
+import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { Tooltip } from "~/components/ui/tooltip";
 import { Popover } from "../../../../components/ui/popover";
 import { ColumnPickerContent } from "./ColumnPickerContent";
@@ -22,10 +23,7 @@ export const ColumnsDropdown: React.FC<{ compact?: boolean }> = ({
         content="Show or hide columns"
         positioning={{ placement: "bottom" }}
       >
-        {/* Intermediate span keeps Tooltip's asChild clone off the
-            Popover.Trigger's DOM node — see GroupingSelector.tsx for why
-            nesting two asChild triggers directly breaks anchor positioning. */}
-        <Box as="span" display="inline-flex">
+        <TriggerAnchor>
           <Popover.Trigger asChild>
             <Button
               size="xs"
@@ -38,7 +36,7 @@ export const ColumnsDropdown: React.FC<{ compact?: boolean }> = ({
               {!compact && <ChevronDown size={12} />}
             </Button>
           </Popover.Trigger>
-        </Box>
+        </TriggerAnchor>
       </Tooltip>
       <Popover.Content width="auto" padding={0}>
         <ColumnPickerContent />

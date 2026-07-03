@@ -1,6 +1,7 @@
 import { Box, Button, Text } from "@chakra-ui/react";
 import { ChevronDown, Layers } from "lucide-react";
 import type React from "react";
+import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
   MenuContent,
@@ -36,12 +37,7 @@ export const GroupingSelector: React.FC<{ compact?: boolean }> = ({
         }
         positioning={{ placement: "bottom" }}
       >
-        {/* The intermediate span keeps Tooltip's own asChild clone off the
-            MenuTrigger's DOM node — nesting two asChild triggers directly
-            (Tooltip > MenuTrigger) makes Tooltip's `id` clobber the one
-            Zag's menu machine assigned to the button, breaking its
-            id-based anchor lookup and pinning the menu at the page origin. */}
-        <Box as="span" display="inline-flex">
+        <TriggerAnchor>
           <MenuTrigger asChild>
             <Button
               size="xs"
@@ -54,7 +50,7 @@ export const GroupingSelector: React.FC<{ compact?: boolean }> = ({
               {!compact && <ChevronDown size={12} />}
             </Button>
           </MenuTrigger>
-        </Box>
+        </TriggerAnchor>
       </Tooltip>
       <MenuContent minWidth="160px" textStyle="xs" paddingY={1}>
         <Box

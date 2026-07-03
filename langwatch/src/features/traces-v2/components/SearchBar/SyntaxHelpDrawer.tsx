@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { Drawer } from "~/components/ui/drawer";
+import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
   FIELD_VALUES,
@@ -437,10 +438,7 @@ const ExampleRow: React.FC<{
 const CopyTrigger: React.FC<{ value: string }> = ({ value }) => (
   <Clipboard.Root value={value}>
     <Tooltip content="Copy" openDelay={200}>
-      {/* Intermediate span keeps Tooltip's asChild clone off the
-          Clipboard.Trigger's DOM node — see GroupingSelector.tsx for why
-          nesting two asChild triggers directly clobbers the inner one's id. */}
-      <Box as="span" display="inline-flex">
+      <TriggerAnchor>
         <Clipboard.Trigger asChild>
           <IconButton
             aria-label="Copy query"
@@ -455,7 +453,7 @@ const CopyTrigger: React.FC<{ value: string }> = ({ value }) => (
             </Clipboard.Indicator>
           </IconButton>
         </Clipboard.Trigger>
-      </Box>
+      </TriggerAnchor>
     </Tooltip>
   </Clipboard.Root>
 );

@@ -25,6 +25,7 @@ import {
   MenuItem,
   MenuRoot,
 } from "~/components/ui/menu";
+import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { TracePresenceAvatars } from "~/features/presence/components/TracePresenceAvatars";
@@ -923,11 +924,7 @@ export const DrawerHeader = memo(function DrawerHeader({
                 }
                 positioning={{ placement: "bottom" }}
               >
-                {/* Intermediate span keeps Tooltip's asChild clone off the
-                    MenuContextTrigger's DOM node — see GroupingSelector.tsx
-                    for why nesting two asChild triggers directly clobbers
-                    the inner one's id. */}
-                <Box as="span" display="inline-flex">
+                <TriggerAnchor>
                   <MenuContextTrigger asChild>
                     <Button
                       size="xs"
@@ -939,7 +936,7 @@ export const DrawerHeader = memo(function DrawerHeader({
                       <Icon as={LuArrowLeft} boxSize={3.5} />
                     </Button>
                   </MenuContextTrigger>
-                </Box>
+                </TriggerAnchor>
               </Tooltip>
               <MenuContent minWidth="240px">
                 {/* Most-recent first so the visual order matches the

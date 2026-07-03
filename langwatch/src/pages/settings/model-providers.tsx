@@ -24,6 +24,7 @@ import { ProviderScopeChips } from "../../components/settings/ProviderScopeChips
 import { ScopeFilter as ScopeFilterComponent } from "../../components/settings/ScopeFilter";
 import { Dialog } from "../../components/ui/dialog";
 import { Menu } from "../../components/ui/menu";
+import { TriggerAnchor } from "../../components/ui/TriggerAnchor";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
@@ -329,12 +330,7 @@ export default function ModelsPage() {
                                 content="You need model provider manage permissions to edit or delete providers."
                                 disabled={hasModelProvidersManagePermission}
                               >
-                                {/* Intermediate span keeps Tooltip's asChild clone
-                                off the Menu.Trigger's DOM node — see
-                                GroupingSelector.tsx for why nesting two
-                                asChild triggers directly breaks anchor
-                                positioning. */}
-                                <Box as="span" display="inline-flex">
+                                <TriggerAnchor>
                                   <Menu.Trigger asChild>
                                     <Button
                                       variant="ghost"
@@ -345,7 +341,7 @@ export default function ModelsPage() {
                                       <MoreVertical />
                                     </Button>
                                   </Menu.Trigger>
-                                </Box>
+                                </TriggerAnchor>
                               </Tooltip>
                               <Menu.Content>
                                 <Menu.Item
@@ -519,12 +515,9 @@ function AddModelProviderMenu({
   return (
     <Menu.Root>
       <Tooltip content={disabledReason} disabled={!disabled}>
-        {/* Intermediate span keeps Tooltip's asChild clone off the
-            Menu.Trigger's DOM node — see GroupingSelector.tsx for why
-            nesting two asChild triggers directly breaks anchor positioning. */}
-        <Box as="span" display="inline-flex">
+        <TriggerAnchor>
           <Menu.Trigger asChild>{children}</Menu.Trigger>
-        </Box>
+        </TriggerAnchor>
       </Tooltip>
       <Menu.Content>
         {addableProviders.map((provider) => (
