@@ -50,7 +50,7 @@ export const CONDITIONS_JSON_SCHEMA = {
   },
 } as const;
 
-/** Slack Block Kit subset matching the server-side allowlist (ADR-028):
+/** Slack Block Kit subset matching the server-side allowlist (ADR-036):
  *  section, divider, context, header, markdown. `image` blocks and section
  *  `image` accessories are deliberately excluded — the server strips them
  *  (blockKitAllowlist.ts: tracking-pixel vector) so Monaco must reject them

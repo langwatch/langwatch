@@ -26,7 +26,7 @@ Document **important technical and architectural decisions** — context, trade-
 | [030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) | Transactional outbox for stake-sensitive reactor dispatch | Accepted |
 | [031](./031-trigger-email-abuse-protections.md) | Trigger email abuse protections — per-trigger cap, per-project daily cap, unsubscribe | Accepted |
 | [032](./032-datasets-s3-jsonl.md) | Datasets stored as S3 JSONL chunks | Accepted |
-| [033](./033-outbox-heartbeat.md) | Outbox heartbeat primitive for absent-detection rollups | Accepted |
+| [038](./038-outbox-heartbeat.md) | Outbox heartbeat primitive for absent-detection rollups | Accepted |
 | [034](./034-event-sourced-analytics-materialization.md) | Event-sourced analytics materialization — slim + rollup ClickHouse tables | Accepted |
 | [035](./035-persist-class-debounce.md) | Persist-class actions ride the settle → cadence outbox path | Accepted |
 

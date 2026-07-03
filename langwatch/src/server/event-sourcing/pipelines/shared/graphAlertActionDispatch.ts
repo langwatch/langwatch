@@ -54,7 +54,7 @@ export interface GraphAlertDispatchResult {
    *  NOT treat as an error. */
   didSend: boolean;
   /** Variables a custom template referenced but the render context did
-   *  not supply (ADR-028 / ADR-029). Aggregated across whichever
+   *  not supply (ADR-036 / ADR-037). Aggregated across whichever
    *  channel rendered. */
   missingVariables: string[];
   /** Render errors from custom templates that fell back, for operator

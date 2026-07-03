@@ -1,4 +1,4 @@
-# PR #5013 testing guide — outbox heartbeat + graph triggers via outbox (ADR-033 + ADR-034 Phase 5)
+# PR #5013 testing guide — outbox heartbeat + graph triggers via outbox (ADR-038 + ADR-034 Phase 5)
 
 Branch: `pr/04-heartbeat-graph-triggers`.
 Stacked on PR #5012 — merge PR #5012 first.
@@ -8,7 +8,7 @@ Stacked on PR #5012 — merge PR #5012 first.
 Custom-graph threshold alerts can now fire from the event-sourced
 path instead of the 3-minute K8s cron. Two pieces move together:
 
-1. **ADR-033 outbox heartbeat primitive.** A framework-level Redis-locked,
+1. **ADR-038 outbox heartbeat primitive.** A framework-level Redis-locked,
    worker-only, leader-elected timer. Registered entries return
    `OutboxEnqueueRequest[]` and get dispatched through the same helper
    `dispatchOutboxEnqueues` that event-driven reactors use, so
@@ -150,7 +150,7 @@ pnpm dev                            # from langwatch/
   is the ONE dispatch handler regardless of whether the event
   pipeline or the heartbeat woke it. If you see two versions of the
   handler (one for real-time, one for heartbeat), that's the exact
-  duplication ADR-033 was designed to prevent.
+  duplication ADR-038 was designed to prevent.
 
 ## Rollback plan
 
