@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { render, cleanup } from "@testing-library/react";
+import { cleanup, render } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -195,7 +195,11 @@ describe("Script", () => {
   describe("given a src prop (external script)", () => {
     it("sets src and async on the injected script", () => {
       render(
-        <Script id="ext" src="https://example.com/a.js" strategy="beforeInteractive" />,
+        <Script
+          id="ext"
+          src="https://example.com/a.js"
+          strategy="beforeInteractive"
+        />,
       );
 
       const script = getScript("ext");
@@ -236,7 +240,11 @@ describe("Script", () => {
 
     it("does not set onload when onLoad is not provided", () => {
       render(
-        <Script id="ext" src="https://example.com/a.js" strategy="beforeInteractive" />,
+        <Script
+          id="ext"
+          src="https://example.com/a.js"
+          strategy="beforeInteractive"
+        />,
       );
 
       expect(getScript("ext")?.onload).toBeNull();
@@ -261,7 +269,11 @@ describe("Script", () => {
 
     it("does not set onerror when onError is not provided", () => {
       render(
-        <Script id="ext" src="https://example.com/a.js" strategy="beforeInteractive" />,
+        <Script
+          id="ext"
+          src="https://example.com/a.js"
+          strategy="beforeInteractive"
+        />,
       );
 
       expect(getScript("ext")?.onerror).toBeNull();
