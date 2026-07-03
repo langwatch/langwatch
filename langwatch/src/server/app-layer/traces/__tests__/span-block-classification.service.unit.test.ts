@@ -183,6 +183,76 @@ describe("OtlpSpanBlockClassificationService", () => {
     });
   });
 
+  describe("given a Claude Code span with a raw request body (cache_control intact)", () => {
+    it("classifies from the raw body so cache tokens attribute to the cached prefix, not other_input", async () => {
+      // The flattened langwatch.input strips cache_control (breakpoint would be
+      // null → cache pool inferred/dumped). The raw body keeps it, so the cached
+      // system prefix takes the cache_read pool and nothing lands in other_input.
+      const span = createSpan([
+        { key: "langwatch.span.type", value: { stringValue: "llm" } },
+        {
+          key: "gen_ai.request.model",
+          value: { stringValue: "claude-fable-5" },
+        },
+        {
+          key: "langwatch.claude_code.request_body",
+          value: {
+            stringValue: JSON.stringify({
+              system: [
+                {
+                  type: "text",
+                  text: "You are a coding assistant.",
+                  cache_control: { type: "ephemeral" },
+                },
+              ],
+              messages: [{ role: "user", content: "fix the test" }],
+            }),
+          },
+        },
+        // The flattened field is present too, but the raw body must win.
+        {
+          key: "langwatch.input",
+          value: {
+            stringValue: JSON.stringify({
+              type: "chat_messages",
+              value: [{ role: "user", content: "fix the test" }],
+            }),
+          },
+        },
+        { key: "gen_ai.usage.input_tokens", value: { intValue: 5 } },
+        {
+          key: "gen_ai.usage.cache_read.input_tokens",
+          value: { intValue: 500 },
+        },
+        { key: "gen_ai.usage.output_tokens", value: { intValue: 10 } },
+        {
+          key: "langwatch.model.inputCostPerToken",
+          value: { doubleValue: 3e-6 },
+        },
+        {
+          key: "langwatch.model.outputCostPerToken",
+          value: { doubleValue: 1.5e-5 },
+        },
+        {
+          key: "langwatch.model.cacheReadCostPerToken",
+          value: { doubleValue: 3e-7 },
+        },
+      ]);
+
+      await service.classifySpanBlocks({
+        span,
+        instrumentationScope: CLAUDE_SCOPE,
+      });
+
+      expect(
+        attrValue(span, blockCategoryTokensAttr(InputCategory.SYSTEM_PROMPT)),
+      ).toBeDefined();
+      expect(
+        attrValue(span, blockCategoryTokensAttr(InputCategory.OTHER_INPUT)),
+      ).toBeUndefined();
+    });
+  });
+
   describe("given a coding-agent span carrying an explicit provider cost", () => {
     describe("when the span is classified", () => {
       it("reconciles per-category costs to the displayed cost_usd, not the registry estimate", async () => {

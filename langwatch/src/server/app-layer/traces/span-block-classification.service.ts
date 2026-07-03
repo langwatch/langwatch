@@ -12,6 +12,10 @@ import {
   classifyBlocks,
 } from "./block-classification/blockClassifier.service";
 import {
+  parseClaudeCodeRequestBody,
+  parseClaudeCodeResponseBody,
+} from "./block-classification/claudeCodeBody";
+import {
   blockCategoryCostAttr,
   blockCategoryTokensAttr,
   type Category,
@@ -34,6 +38,7 @@ import { resolveCustomTierRates } from "./model-cost-matching";
 import {
   extractUsagePools,
   getNumericAttribute,
+  getStringAttribute,
   parseJsonAttribute,
   parseMessages,
   parseOutputMessages,
@@ -161,13 +166,28 @@ export class OtlpSpanBlockClassificationService {
 
   /** The classification work proper — see classifySpanBlocks for the guards. */
   private async classifyInner({ span }: { span: OtlpSpan }): Promise<void> {
-    // 2. Content extraction — the same attribute surface token estimation reads.
-    const inputMessages = parseMessages(span, [
-      ATTR_KEYS.LANGWATCH_INPUT,
-      ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
-    ]);
-    const outputMessages = parseOutputMessages(span);
-    const tools = parseJsonAttribute(span, ATTR_KEYS.GEN_AI_TOOL_DEFINITIONS);
+    // 2. Content extraction. PREFER the raw Claude Code request/response bodies
+    //    (full fidelity: content-block structure + cache_control intact), so the
+    //    cache breakpoint is REAL (not pool-inferred), tool_results keep their
+    //    type, and output thinking/tool_use blocks classify correctly. Fall back
+    //    to the lifted/flattened fields for non-Claude-Code paths (codex, gateway)
+    //    or when the raw body is absent.
+    const structuredInput = parseClaudeCodeRequestBody(
+      getStringAttribute(span, ATTR_KEYS.CLAUDE_CODE_REQUEST_BODY),
+    );
+    const inputMessages =
+      structuredInput?.messages ??
+      parseMessages(span, [
+        ATTR_KEYS.LANGWATCH_INPUT,
+        ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
+      ]);
+    const outputMessages =
+      parseClaudeCodeResponseBody(
+        getStringAttribute(span, ATTR_KEYS.CLAUDE_CODE_RESPONSE_BODY),
+      ) ?? parseOutputMessages(span);
+    const tools =
+      structuredInput?.tools ??
+      parseJsonAttribute(span, ATTR_KEYS.GEN_AI_TOOL_DEFINITIONS);
     if (inputMessages === null && outputMessages === null) return;
 
     // 3. Classify content parts into cost categories (pure, deterministic).
