@@ -174,17 +174,21 @@ export const FEATURE_FLAGS = [
   // ADR-034 Phase 5 — moves custom-graph threshold-alert firing off the K8s
   // cron onto the event-sourced path (real-time outbox reactor on
   // trace-processing + 30s heartbeat for no-data / firing-resolve absence
-  // cases). OFF (default) = cron handles the project's graph triggers as
-  // today. ON = cron skips that project's graph triggers; the
-  // event-sourced path takes over. The cron loop and the new path
-  // coexist per-project — graph triggers either fire from one OR the
-  // other for a given project, never both.
+  // cases). SYSTEM scope: self-hosted (env + /ops/feature-flags store),
+  // never consults PostHog — the rollout is operator-driven per project
+  // rather than %-targeted, and we don't want PostHog outages or quota
+  // to flip trigger delivery. OFF (default) = cron handles the project's
+  // graph triggers as today. ON = cron skips that project's graph
+  // triggers; the event-sourced path takes over. The cron loop and the
+  // new path coexist per-project — graph triggers either fire from one
+  // OR the other for a given project, never both.
   {
     key: "release_es_graph_triggers_firing",
-    scope: "PRODUCT",
+    scope: "SYSTEM",
     defaultValue: false,
     description:
-      "Moves custom-graph threshold-alert firing off the K8s cron onto the event-sourced path (ADR-034 Phase 5). On = cron skips this project's graph triggers; real-time outbox reactor + heartbeat fire them. Off = cron handles as today.",
+      "Moves custom-graph threshold-alert firing off the K8s cron onto the event-sourced path (ADR-034 Phase 5). Self-hosted flag; toggle globally via RELEASE_ES_GRAPH_TRIGGERS_FIRING=1 or per-project from /ops/feature-flags. On = cron skips this project's graph triggers; real-time outbox reactor + heartbeat fire them. Off = cron handles as today.",
+    family: "Event sourcing",
   },
 ] as const satisfies readonly FeatureFlagDefinition[];
 
