@@ -1,67 +1,80 @@
 /**
  * @vitest-environment jsdom
  *
- * Guard: the Vite `manualChunks` eager-Shiki allow-list (langwatch/vite.config.ts)
- * must stay in sync with the canonical SHIKI_BASE_LANGS / SHIKI_THEMES owned by
- * shikiAdapter.ts. If they drift, a base grammar silently drops to a lazy chunk
- * and its first highlight stalls on a network fetch. This test fails loudly if
- * a base language/theme is no longer force-kept in the eager `shiki` chunk.
+ * Drift guard: exercises the REAL `shikiManualChunk()` that vite.config's
+ * `manualChunks` delegates to. Every canonical base language / theme
+ * (SHIKI_BASE_LANGS / SHIKI_THEMES, owned by shikiAdapter.ts) must be
+ * force-kept in the eager "shiki" chunk, and a non-base grammar must NOT be.
+ * If the eager allow-list in shikiChunking.ts drifts from the canonical lists,
+ * this fails loudly — without depending on the config's source formatting.
  */
-import { readFileSync } from "fs";
-import { join } from "path";
 import { bundledLanguagesInfo } from "shiki";
 import { describe, expect, it } from "vitest";
 import { SHIKI_BASE_LANGS, SHIKI_THEMES } from "../shikiAdapter";
+import { shikiManualChunk } from "../shikiChunking";
 
-// SHIKI_BASE_LANGS holds Shiki aliases (e.g. "bash"); the vite.config regex
-// matches grammar FILE names (e.g. "shellscript"). Resolve alias -> file name
-// using Shiki's own registry so the mapping can't itself drift.
+// Resolve a Shiki lang alias (e.g. "bash") to its grammar FILE name
+// (e.g. "shellscript") using Shiki's own registry, so the mapping can't drift.
 const aliasToFile = new Map<string, string>();
 for (const info of bundledLanguagesInfo) {
   aliasToFile.set(info.id, info.id);
   for (const alias of info.aliases ?? []) aliasToFile.set(alias, info.id);
 }
-const grammarFile = (lang: string) => aliasToFile.get(lang) ?? lang;
+const langFile = (lang: string): string => aliasToFile.get(lang) ?? lang;
 
-// Pull the two eager allow-list alternations out of vite.config.ts. Both look
-// like `(a|b|c)\.m?js$`; pick the language one by "shellscript", the theme one
-// by "github-dark".
-const viteConfig = readFileSync(join(process.cwd(), "vite.config.ts"), "utf8");
-const alternations = [
-  ...viteConfig.matchAll(/\(([a-z0-9-|]+)\)\\\.m\?js\$/g),
-].map((m) => m[1]?.split("|") ?? []);
-const eagerLangFiles = new Set(
-  alternations.find((a) => a.includes("shellscript")) ?? [],
-);
-const eagerThemes = new Set(
-  alternations.find((a) => a.includes("github-dark")) ?? [],
-);
+// Synthetic module ids of the shape Rollup passes to manualChunks.
+const langPath = (lang: string) =>
+  `/repo/node_modules/.pnpm/@shikijs+langs@3.23.0/node_modules/@shikijs/langs/dist/${langFile(
+    lang,
+  )}.mjs`;
+const themePath = (theme: string) =>
+  `/repo/node_modules/.pnpm/@shikijs+themes@3.23.0/node_modules/@shikijs/themes/dist/${theme}.mjs`;
 
-describe("Shiki eager-chunk allow-list in vite.config", () => {
-  describe("given the manualChunks eager regexes are parsed from vite.config", () => {
-    it("finds a non-empty eager language and theme set", () => {
-      expect(eagerLangFiles.size).toBeGreaterThan(0);
-      expect(eagerThemes.size).toBeGreaterThan(0);
-    });
+const baseFiles = new Set(SHIKI_BASE_LANGS.map(langFile));
 
-    it("keeps every canonical base language eager", () => {
+describe("shikiManualChunk (vite.config eager Shiki allow-list)", () => {
+  describe("given a canonical base language", () => {
+    it("force-keeps every SHIKI_BASE_LANGS grammar in the eager chunk", () => {
       for (const lang of SHIKI_BASE_LANGS) {
         expect(
-          eagerLangFiles.has(grammarFile(lang)),
-          `SHIKI_BASE_LANGS includes "${lang}" (grammar file "${grammarFile(
+          shikiManualChunk(langPath(lang)),
+          `base language "${lang}" (grammar file "${langFile(
             lang,
-          )}") but vite.config manualChunks would lazy-load it. Add it to the eager language regex.`,
-        ).toBe(true);
+          )}") must stay eager — update shikiChunking.ts`,
+        ).toBe("shiki");
       }
     });
+  });
 
-    it("keeps every base theme eager", () => {
+  describe("given a canonical base theme", () => {
+    it("force-keeps every SHIKI_THEMES file in the eager chunk", () => {
       for (const theme of SHIKI_THEMES) {
         expect(
-          eagerThemes.has(theme),
-          `SHIKI_THEMES includes "${theme}" but vite.config manualChunks would lazy-load it. Add it to the eager theme regex.`,
-        ).toBe(true);
+          shikiManualChunk(themePath(theme)),
+          `base theme "${theme}" must stay eager — update shikiChunking.ts`,
+        ).toBe("shiki");
       }
+    });
+  });
+
+  describe("given a grammar that is not a base language", () => {
+    it("leaves it to split into its own lazy chunk", () => {
+      const nonBase = bundledLanguagesInfo.find((i) => !baseFiles.has(i.id));
+      expect(
+        nonBase,
+        "expected at least one non-base bundled grammar",
+      ).toBeDefined();
+      expect(shikiManualChunk(langPath(nonBase!.id))).toBeUndefined();
+    });
+  });
+
+  describe("given a Shiki core module", () => {
+    it("keeps the engine eager", () => {
+      expect(
+        shikiManualChunk(
+          "/repo/node_modules/.pnpm/@shikijs+core@3.23.0/node_modules/@shikijs/core/dist/index.mjs",
+        ),
+      ).toBe("shiki");
     });
   });
 });

@@ -4,6 +4,7 @@ import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { generate as generateSelfsigned } from "selfsigned";
+import { shikiManualChunk } from "./src/features/traces-v2/components/TraceDrawer/markdownView/shikiChunking";
 
 // Load `.env` into the Vite config's process environment. Vite normally
 // only exposes `VITE_*` vars to client code — but this config itself
@@ -171,42 +172,13 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id: string) {
-          // Keep Shiki's CORE (engine + oniguruma + the singleton factory) and
-          // only the base grammars/themes the app highlights on first paint in
-          // one eager chunk. Every OTHER bundled grammar (~340 of them) is left
-          // to split into its own lazy chunk, loaded on demand by
-          // shikiAdapter.ts (`ensureShikiLangLoaded`). Forcing all grammars in
-          // here ballooned the eager chunk to ~9.5 MB raw / 1.66 MB gzip on
-          // every page load.
-          //
-          // Boot-cycle note: under the rolldown bundler the default split hoists
-          // Shiki's singleton factory into the entry chunk and leaves the Shiki
-          // chunk calling back into it at module top level. Because the entry
-          // eagerly loads Shiki, that call runs before the entry has initialized
-          // the export, throwing "undefined is not a function" at boot and
-          // white-screening the app. Keeping the core in one chunk removes the
-          // cross-chunk cycle; splitting only the leaf grammar/theme files
-          // (which have no such back-reference) is safe.
-          if (/[\\/]@shikijs[\\/+](langs|themes)[\\/]/.test(id)) {
-            // Base grammars (see SHIKI_BASE_LANGS) and base themes stay eager;
-            // all other leaf grammar/theme files fall through to lazy chunks.
-            if (
-              /[\\/](json|markdown|shellscript|bash|typescript|python|ini)\.m?js$/.test(
-                id,
-              ) ||
-              /[\\/](github-dark|github-light)\.m?js$/.test(id)
-            ) {
-              return "shiki";
-            }
-            return undefined;
-          }
-          if (
-            /[\\/]node_modules[\\/](\.pnpm[\\/])?(@shikijs[\\/+]|shiki[\\/@]|oniguruma-to-es|oniguruma-parser|hast-util-to-html)/.test(
-              id,
-            )
-          ) {
-            return "shiki";
-          }
+          // Shiki chunk-splitting lives in shikiChunking.ts (dependency-free) so
+          // its guard test can exercise the real logic. It keeps the core + base
+          // grammars/themes eager and splits the other ~340 grammars into lazy
+          // chunks — removing the ~9.5 MB raw / 1.66 MB gzip eager Shiki chunk
+          // that used to load on every page. See that file for the boot-cycle
+          // rationale.
+          return shikiManualChunk(id);
         },
       },
     },
