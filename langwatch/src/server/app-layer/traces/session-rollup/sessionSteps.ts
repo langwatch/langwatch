@@ -109,6 +109,16 @@ function mergeAdjacentKeepMax(input: SessionStep[]): SessionStep[] {
  * {@link MAX_SESSION_STEPS} by merging adjacent pairs (keep-max) once it would
  * overflow. Pure aside from mutating the passed `attributes` object, which the
  * fold already treats as a fresh per-step copy.
+ *
+ * Cost note: this parses + re-serialises the series each call, which the fold
+ * deliberately avoided for its UNBOUNDED collections (events/spanCosts — see the
+ * comment in traceSummary.foldProjection.ts). The difference that makes it safe
+ * here is the {@link MAX_SESSION_STEPS} cap: the array never exceeds 512 tiny
+ * `{startMs, inputTokens}` entries, so per-step work is O(min(steps, 512)) and
+ * total folding is bounded — never the multi-MB-per-span blob those collections
+ * grew into. A serialise-once rewrite would need a fold-framework finalize hook
+ * (the attribute map is the per-step persisted snapshot); that's disproportionate
+ * for a bounded cost, so it's an infra follow-up, not done here.
  */
 export function appendSessionStep({
   attributes,

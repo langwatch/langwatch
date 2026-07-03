@@ -270,7 +270,11 @@ function allocatePool(
   totals: CategoryTotals,
   blocks: AllocatedBlock[],
 ): void {
-  if (pool.total <= 0) return;
+  // Skip empty, negative, OR non-finite pools. `pool.total <= 0` alone lets a
+  // NaN through (`NaN <= 0` is false), which would then poison every category
+  // cost via `block.tokens * NaN`. The only caller pre-sanitises to `> 0` today,
+  // but this pure module must not silently corrupt on bad input.
+  if (!(pool.total > 0)) return;
 
   if (pool.blocks.length === 0) {
     addTokens({
