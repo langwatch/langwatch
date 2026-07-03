@@ -20,6 +20,7 @@ import {
   ProjectNotFoundError,
 } from "~/server/app-layer/triggers/errors";
 import {
+  buildGraphAlertTriggerData,
   graphAlertActionParamsSchema,
   type GraphAlertActionParams,
 } from "~/server/app-layer/triggers/graph-alert.builder";
@@ -634,39 +635,54 @@ export const automationRouter = createTRPCRouter({
             }
           : { ...input.actionParams };
 
-      // Graph alerts merge the threshold rule into actionParams so the
-      // persisted row matches what `buildGraphAlertTriggerData` writes
-      // through the dashboard path. The dispatcher only knows one shape.
-      if (isGraphAlert && input.graphAlert) {
+      // Graph alerts: route the row shape through the SSOT builder so it's
+      // byte-identical to what `graphs.updateById` writes on the dashboard
+      // path (N1 — the sweep fixed graphs.ts but automations.ts was still
+      // hand-rolling the row). The dispatcher only knows one shape; drift
+      // between the two writers silently breaks dispatch for whichever
+      // format loses.
+      let data: Record<string, unknown>;
+      if (isGraphAlert && input.graphAlert && input.customGraphId) {
         const graphAlert: GraphAlertActionParams = input.graphAlert;
-        actionParams = {
-          ...actionParams,
-          threshold: graphAlert.threshold,
-          operator: graphAlert.operator,
-          timePeriod: graphAlert.timePeriod,
-          seriesName: graphAlert.seriesName,
+        const builderInput = {
+          id: input.triggerId ?? ksuid(KSUID_RESOURCES.TRIGGER).toString(),
+          name: input.name,
+          projectId: input.projectId,
+          action: input.action,
+          alertType: input.alertType ?? AlertType.INFO,
+          customGraphId: input.customGraphId,
+          actionParams: {
+            ...actionParams,
+            ...graphAlert,
+          },
+        };
+        const built = buildGraphAlertTriggerData(builderInput);
+        data = {
+          name: built.name,
+          action: built.action,
+          alertType: built.alertType,
+          filters: built.filters,
+          customGraphId: built.customGraphId,
+          actionParams: built.actionParams,
+          slackTemplateType: input.templates.slackTemplateType ?? null,
+          slackTemplate: input.templates.slackTemplate ?? null,
+          emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,
+          emailBodyTemplate: input.templates.emailBodyTemplate ?? null,
+        };
+      } else {
+        data = {
+          name: input.name,
+          action: input.action,
+          alertType: input.alertType ?? null,
+          filters: JSON.stringify(input.filters),
+          customGraphId: input.customGraphId ?? null,
+          actionParams,
+          slackTemplateType: input.templates.slackTemplateType ?? null,
+          slackTemplate: input.templates.slackTemplate ?? null,
+          emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,
+          emailBodyTemplate: input.templates.emailBodyTemplate ?? null,
         };
       }
-
-      const data = {
-        // Match the dashboard "Add Alert" path so the same trigger appears
-        // identically whether it was created on the chart card or in the
-        // automations drawer.
-        name: isGraphAlert
-          ? input.name.startsWith("Alert: ")
-            ? input.name
-            : `Alert: ${input.name}`
-          : input.name,
-        action: input.action,
-        alertType: input.alertType ?? null,
-        filters: isGraphAlert ? JSON.stringify({}) : JSON.stringify(input.filters),
-        customGraphId: input.customGraphId ?? null,
-        actionParams,
-        slackTemplateType: input.templates.slackTemplateType ?? null,
-        slackTemplate: input.templates.slackTemplate ?? null,
-        emailSubjectTemplate: input.templates.emailSubjectTemplate ?? null,
-        emailBodyTemplate: input.templates.emailBodyTemplate ?? null,
-      };
 
       let trigger;
       if (input.triggerId) {

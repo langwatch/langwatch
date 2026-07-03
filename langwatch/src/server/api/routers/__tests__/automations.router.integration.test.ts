@@ -173,9 +173,10 @@ describe("automationRouter", () => {
           expect(createArgs.data.customGraphId).toBe("graph_1");
           expect(createArgs.data.action).toBe(TriggerAction.SEND_SLACK_MESSAGE);
           expect(createArgs.data.alertType).toBe("WARNING");
-          // Filters are forced to {} on graph alerts — the conditions live on
-          // the graph itself, not on the trigger.
-          expect(createArgs.data.filters).toBe(JSON.stringify({}));
+          // Filters are forced to {} on graph alerts (SSOT builder writes an
+          // object, not a JSON string) — the conditions live on the graph
+          // itself, not on the trigger.
+          expect(createArgs.data.filters).toEqual({});
           // Threshold rule is merged into actionParams so the dispatcher
           // sees ONE shape regardless of which creation path was used.
           expect(createArgs.data.actionParams).toMatchObject({
