@@ -62,29 +62,46 @@ export const llmModelCostsRouter = createTRPCRouter({
           scopeType: z.enum(SCOPE_TIERS).optional(),
           scopeId: z.string().optional(),
           model: z.string(),
-          inputCostPerToken: z.number().optional(),
-          outputCostPerToken: z.number().optional(),
-          cacheReadCostPerToken: z.number().optional(),
-          cacheCreationCostPerToken: z.number().optional(),
+          // Non-negative + finite: a negative or Infinite rate poisons spend
+          // aggregation downstream (the sibling previewMatchingSpans guards the
+          // same way).
+          inputCostPerToken: z.number().nonnegative().finite().optional(),
+          outputCostPerToken: z.number().nonnegative().finite().optional(),
+          cacheReadCostPerToken: z.number().nonnegative().finite().optional(),
+          cacheCreationCostPerToken: z
+            .number()
+            .nonnegative()
+            .finite()
+            .optional(),
           regex: z.string().refine((value) => isSafeRegex(value), {
             message:
               "Invalid or unsafe regular expression (avoid nested quantifiers like (a+)+)",
           }),
         })
-        // Both-or-neither on the base rates. resolveCustomTierRates treats a row
-        // with ANY rate set as a FULL override of the registry, pricing every
-        // unset tier at $0 — so a row with only inputCostPerToken silently costs
-        // all output tokens at $0 instead of falling back to the registry rate.
-        // The UI marks both required, but that guard is client-side only; this
-        // closes the same hole for direct tRPC/SDK callers. Cache tiers stay
-        // optional — they documented-fall-back to the input rate, not to $0.
+        // resolveCustomTierRates treats a row with ANY rate set as a FULL
+        // override of the registry, pricing every unset tier at $0. So the moment
+        // any rate is configured, the base input+output pair MUST both be set —
+        // otherwise a cache-only (or input-only) row silently prices the unset
+        // base tier at $0 instead of falling back to the registry rate. A fully
+        // rate-less row is allowed (it configures no override). The UI marks the
+        // base rates required, but that guard is client-side only; this closes
+        // the same hole for direct tRPC/SDK callers.
         .refine(
-          (v) =>
-            (v.inputCostPerToken === undefined) ===
-            (v.outputCostPerToken === undefined),
+          (v) => {
+            const anyRateSet =
+              v.inputCostPerToken !== undefined ||
+              v.outputCostPerToken !== undefined ||
+              v.cacheReadCostPerToken !== undefined ||
+              v.cacheCreationCostPerToken !== undefined;
+            return (
+              !anyRateSet ||
+              (v.inputCostPerToken !== undefined &&
+                v.outputCostPerToken !== undefined)
+            );
+          },
           {
             message:
-              "Set both input and output cost per token, or neither — a half-filled custom rate silently prices the missing side at $0 instead of using the registry rate.",
+              "Set both input and output cost per token when configuring any custom rate — a partial rate silently prices the unset base tier at $0 instead of using the registry rate.",
             path: ["outputCostPerToken"],
           },
         ),

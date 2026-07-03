@@ -241,5 +241,44 @@ describe("llmModelCosts — scope-aware RBAC", () => {
         }),
       ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     });
+
+    it("rejects a cache-only rate row (no input/output base rates)", async () => {
+      // A cache-only row also overrides the registry entirely, zeroing the unset
+      // base tiers — so any rate set requires the input+output pair.
+      const owner = await seedUser(ORG_A, ["project:manage"], {
+        scopeType: PROJECT,
+        scopeId: PROJECT_A,
+      });
+
+      await expect(
+        owner.llmModelCost.createOrUpdate({
+          projectId: PROJECT_A,
+          scopeType: "PROJECT",
+          scopeId: PROJECT_A,
+          model: "gpt-5-mini",
+          cacheReadCostPerToken: 0.0000001,
+          regex: "gpt-5-mini",
+        }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    });
+
+    it("rejects a negative rate", async () => {
+      const owner = await seedUser(ORG_A, ["project:manage"], {
+        scopeType: PROJECT,
+        scopeId: PROJECT_A,
+      });
+
+      await expect(
+        owner.llmModelCost.createOrUpdate({
+          projectId: PROJECT_A,
+          scopeType: "PROJECT",
+          scopeId: PROJECT_A,
+          model: "gpt-5-mini",
+          inputCostPerToken: -0.01,
+          outputCostPerToken: 0.02,
+          regex: "gpt-5-mini",
+        }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    });
   });
 });

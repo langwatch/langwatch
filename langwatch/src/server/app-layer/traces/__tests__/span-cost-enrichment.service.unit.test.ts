@@ -198,6 +198,30 @@ describe("OtlpSpanCostEnrichmentService", () => {
       });
     });
 
+    describe("when the matched custom cost defines no base rates", () => {
+      it("stamps neither input nor output so the registry rate still applies", async () => {
+        // A rate-less matched row must NOT be coerced to a $0 override: leaving
+        // both base rates unstamped lets computeSpanCost fall back to the
+        // registry instead of pricing every token at $0.
+        const customCost: MaybeStoredLLMModelCost = {
+          projectId: "project-1",
+          model: "gpt-4o",
+          regex: "^gpt-4o$",
+        };
+        const deps = createMockDeps([customCost]);
+        const service = new OtlpSpanCostEnrichmentService(deps);
+        const span = createTestSpan([
+          { key: "gen_ai.request.model", value: { stringValue: "gpt-4o" } },
+        ]);
+
+        await service.enrichSpan(span, "project-1");
+
+        const keys = span.attributes.map((a) => a.key);
+        expect(keys).not.toContain("langwatch.model.inputCostPerToken");
+        expect(keys).not.toContain("langwatch.model.outputCostPerToken");
+      });
+    });
+
     describe("when project has no custom costs", () => {
       it("does not set cost rate attributes", async () => {
         const deps = createMockDeps([]);

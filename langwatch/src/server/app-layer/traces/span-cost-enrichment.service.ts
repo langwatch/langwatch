@@ -86,16 +86,25 @@ export class OtlpSpanCostEnrichmentService {
     const matched = matchModelCostWithFallbacks(modelName, customCosts);
     if (!matched) return;
 
-    span.attributes.push(
-      {
+    // Stamp base rates only when the matched row actually defines them. Coercing
+    // a null rate to 0 (the old `?? 0`) turned a rate-less matched row into an
+    // explicit $0 override downstream — resolveCustomTierRates reads the stamped
+    // 0 as "set" and prices the tier at $0 instead of falling back to the
+    // registry. A row that sets NEITHER base rate now leaves both unstamped, so
+    // the registry rate applies. (The write layer already rejects a partial
+    // rate; this is the read-side defense for pre-existing / edge rows.)
+    if (matched.inputCostPerToken != null) {
+      span.attributes.push({
         key: ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN,
-        value: { doubleValue: matched.inputCostPerToken ?? 0 },
-      },
-      {
+        value: { doubleValue: matched.inputCostPerToken },
+      });
+    }
+    if (matched.outputCostPerToken != null) {
+      span.attributes.push({
         key: ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN,
-        value: { doubleValue: matched.outputCostPerToken ?? 0 },
-      },
-    );
+        value: { doubleValue: matched.outputCostPerToken },
+      });
+    }
 
     // Only emit cache-rate overrides when the custom cost defines them, so a
     // model without an explicit cache rate keeps falling back to the input
