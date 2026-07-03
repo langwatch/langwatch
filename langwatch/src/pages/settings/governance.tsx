@@ -21,7 +21,9 @@ import numeral from "numeral";
 import { useEffect, useState } from "react";
 import {
   CategoryBreakdownBars,
+  CategoryBreakdownCaption,
   CategoryBreakdownEnablementHint,
+  toCategoryBarRows,
 } from "~/components/governance/CategoryBreakdownBars";
 import GovernanceLayout from "~/components/governance/GovernanceLayout";
 import { QuarantineFillAlert } from "~/components/governance/QuarantineFillAlert";
@@ -36,7 +38,6 @@ import { toaster } from "~/components/ui/toaster";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { categoryLabel } from "~/server/app-layer/traces/block-classification/categories";
 import { api, type RouterOutputs } from "~/utils/api";
 import { getHexColorForString } from "~/utils/rotatingColors";
 
@@ -149,15 +150,7 @@ function GovernanceOverviewPage() {
   const anomalyRules = anomalyRulesQuery.data ?? [];
   const catalogTiles = catalogQuery.data ?? [];
 
-  const categoryRows = categoryBreakdownQuery.data ?? [];
-  const categoryTotal = categoryRows.reduce((sum, r) => sum + r.costUsd, 0);
-  const categoryBars = categoryRows.map((r) => ({
-    category: r.category,
-    label: categoryLabel(r.category),
-    costUsd: r.costUsd,
-    tokens: r.tokens,
-    sharePct: categoryTotal > 0 ? (r.costUsd / categoryTotal) * 100 : 0,
-  }));
+  const categoryBars = toCategoryBarRows(categoryBreakdownQuery.data ?? []);
 
   const hasSources = sources.length > 0;
   const hasPolicies = policies.length > 0;
@@ -428,11 +421,13 @@ function GovernanceOverviewPage() {
         </SectionCard>
 
         <SectionCard
-          title="Cost breakdown by category"
-          subline="Coding-agent spend split by content category — system prompt, MCP tools, skills, thinking, and more (last 30 days). Analytics only; never affects billing."
+          title="Usage breakdown"
+          subline="Coding-agent spend split by content category (last 30 days). Analytics only; it never affects billing."
         >
-          {categoryBars.length === 0 ? (
-            <CategoryBreakdownEnablementHint settingsHref="/settings/governance" />
+          <CategoryBreakdownCaption />
+          {categoryBreakdownQuery.isLoading ? null : categoryBars.length ===
+            0 ? (
+            <CategoryBreakdownEnablementHint />
           ) : (
             <CategoryBreakdownBars rows={categoryBars} />
           )}

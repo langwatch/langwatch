@@ -1,6 +1,12 @@
-import { Box, HStack, Link, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { HelpCircle } from "lucide-react";
 import { formatBudgetUsd } from "~/components/gateway/formatBudgetUsd";
 import { Tooltip } from "~/components/ui/tooltip";
+import {
+  CATEGORIES,
+  type Category,
+  categoryLabel,
+} from "~/server/app-layer/traces/block-classification/categories";
 
 /**
  * Shared cost-breakdown-by-content-category lanes (ADR-033 PR D), rendered on
@@ -20,6 +26,24 @@ export interface CategoryBreakdownBarRow {
   tokens: number;
   /** Share of total category cost, 0–100. */
   sharePct: number;
+}
+
+/**
+ * Turn raw per-category totals into bar rows: attach the human label and each
+ * lane's share of the total cost. Single source for both surfaces so the /me
+ * view and the Activity Monitor derive shares identically.
+ */
+export function toCategoryBarRows(
+  rows: Array<{ category: string; costUsd: number; tokens: number }>,
+): CategoryBreakdownBarRow[] {
+  const total = rows.reduce((sum, r) => sum + r.costUsd, 0);
+  return rows.map((r) => ({
+    category: r.category,
+    label: categoryLabel(r.category as Category),
+    costUsd: r.costUsd,
+    tokens: r.tokens,
+    sharePct: total > 0 ? (r.costUsd / total) * 100 : 0,
+  }));
 }
 
 export function CategoryBreakdownBars({
@@ -55,7 +79,14 @@ export function CategoryBreakdownBars({
                 borderRadius="sm"
                 overflow="hidden"
                 position="relative"
+                // Keyboard-focusable so the token count in the tooltip is
+                // reachable without a pointer (the row shows cost + share
+                // inline; tokens live only in the tooltip).
+                tabIndex={0}
                 cursor="default"
+                aria-label={`${row.label}: ${formatBudgetUsd(
+                  row.costUsd,
+                )}, ${row.tokens.toLocaleString()} tokens`}
               >
                 <Box
                   position="absolute"
@@ -86,25 +117,63 @@ export function CategoryBreakdownBars({
 }
 
 /**
- * Empty-state for the category breakdown when no content was captured
- * (ADR-033 Decision 7). Category numbers only exist when payload capture is on,
- * so the hint says what the customer must do and links to the settings.
+ * Every category label, in taxonomy order, for the "Usage breakdown" caption's
+ * (?) tooltip. Derived from the taxonomy so it can never drift; pinned to
+ * CATEGORY_LABELS by the CategoryBreakdownBars test so a new category can't ship
+ * without appearing in the tooltip (dev/docs/best_practices/copywriting.md — a
+ * summarised list must be complete).
  */
-export function CategoryBreakdownEnablementHint({
-  settingsHref,
-}: {
-  settingsHref: string;
-}) {
+export const CATEGORY_BREAKDOWN_TOOLTIP_LABELS: string[] =
+  CATEGORIES.map(categoryLabel);
+
+/**
+ * One-line caption for the Usage breakdown section: a short summary of the
+ * headline categories with a (?) tooltip carrying the complete list. Shared by
+ * both surfaces so the summary phrasing stays identical.
+ */
+export function CategoryBreakdownCaption() {
   return (
-    <VStack align="start" gap={1} paddingY={2}>
-      <Text fontSize="sm" color="fg.muted">
-        Your coding-agent traffic may not be captured with content yet, so
-        there's nothing to break down. Turn on payload capture to see where your
-        tokens go — system prompt, MCP tools, skills, thinking, and more.
+    <HStack gap={1} color="fg.muted" fontSize="sm" marginBottom={3}>
+      <Text>
+        Where your tokens go: system prompt, MCP tools, skills, thinking, and
+        more.
       </Text>
-      <Link href={settingsHref} color="blue.600" fontSize="sm">
-        Enable payload capture →
-      </Link>
-    </VStack>
+      <Tooltip
+        openDelay={100}
+        content={
+          <VStack gap={0.5} align="start">
+            {CATEGORY_BREAKDOWN_TOOLTIP_LABELS.map((label) => (
+              <Text key={label}>{label}</Text>
+            ))}
+          </VStack>
+        }
+      >
+        <Box
+          as="span"
+          display="inline-flex"
+          tabIndex={0}
+          cursor="help"
+          color="fg.subtle"
+          aria-label="All content categories"
+        >
+          <HelpCircle size={14} />
+        </Box>
+      </Tooltip>
+    </HStack>
+  );
+}
+
+/**
+ * Empty-state for the category breakdown when nothing was categorized in the
+ * window. Neutral copy: it says what the customer would see here and when,
+ * without pointing at a setting (categorization follows from content capture,
+ * configured elsewhere per project) (dev/docs/best_practices/copywriting.md).
+ */
+export function CategoryBreakdownEnablementHint() {
+  return (
+    <Text fontSize="sm" color="fg.muted" paddingY={2}>
+      No categorized usage in this window yet. Cost categories appear for
+      coding-agent traffic captured with content.
+    </Text>
   );
 }

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
+import { toCategoryBarRows } from "~/components/governance/CategoryBreakdownBars";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
-import { categoryLabel } from "~/server/app-layer/traces/block-classification/categories";
 import { api } from "~/utils/api";
 
 import { useWorkspaceData } from "../useWorkspaceData";
@@ -65,7 +65,7 @@ export type PersonalContext = {
   budget: PersonalBudgetState;
   spendByDay: Array<{ day: string; usd: number; billedUsd: number }>;
   spendByTool: Array<{ tool: string; usd: number; billedUsd: number }>;
-  /** Cost split by content category (ADR-033). Empty when no payload captured. */
+  /** Cost split by content category (ADR-033). Empty when nothing categorized. */
   spendByCategory: Array<{
     category: string;
     label: string;
@@ -73,6 +73,9 @@ export type PersonalContext = {
     tokens: number;
     sharePct: number;
   }>;
+  /** True while the usage rollup is still loading — gate the category
+   * empty-state on it so the enablement hint doesn't flash during load. */
+  spendByCategoryLoading: boolean;
   /** Personal project the /me recent-activity table reads from + deep-links into. */
   personalProjectId: string | null;
   personalProjectSlug: string | null;
@@ -141,8 +144,8 @@ export function usePersonalContext(): PersonalContext {
       period: raw.period ?? "",
       scope: raw.scope ?? "",
       requestIncreaseUrl:
-        "requestIncreaseUrl" in raw ? raw.requestIncreaseUrl ?? null : null,
-      adminEmail: "adminEmail" in raw ? raw.adminEmail ?? null : null,
+        "requestIncreaseUrl" in raw ? (raw.requestIncreaseUrl ?? null) : null,
+      adminEmail: "adminEmail" in raw ? (raw.adminEmail ?? null) : null,
     };
   }, [personalBudgetQuery.data]);
 
@@ -212,17 +215,10 @@ export function usePersonalContext(): PersonalContext {
         usd: row.spentUsd,
         billedUsd: row.billedUsd,
       })) ?? [],
-    spendByCategory: (() => {
-      const rows = personalUsageQuery.data?.breakdownByCategory ?? [];
-      const total = rows.reduce((sum, r) => sum + r.costUsd, 0);
-      return rows.map((r) => ({
-        category: r.category,
-        label: categoryLabel(r.category),
-        costUsd: r.costUsd,
-        tokens: r.tokens,
-        sharePct: total > 0 ? (r.costUsd / total) * 100 : 0,
-      }));
-    })(),
+    spendByCategory: toCategoryBarRows(
+      personalUsageQuery.data?.breakdownByCategory ?? [],
+    ),
+    spendByCategoryLoading: personalUsageQuery.isLoading,
     personalProjectId: personalContextQuery.data?.workspace.project.id ?? null,
     personalProjectSlug:
       personalContextQuery.data?.workspace.project.slug ?? null,

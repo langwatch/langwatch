@@ -11,8 +11,11 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { CATEGORY_LABELS } from "~/server/app-layer/traces/block-classification/categories";
 import {
+  CATEGORY_BREAKDOWN_TOOLTIP_LABELS,
   CategoryBreakdownBars,
+  CategoryBreakdownCaption,
   CategoryBreakdownEnablementHint,
 } from "../CategoryBreakdownBars";
 
@@ -60,22 +63,43 @@ describe("<CategoryBreakdownBars/>", () => {
     });
   });
 
-  describe("given no captured content", () => {
+  describe("given no categorized usage", () => {
     /** @scenario "The breakdown shows an enablement hint when no content was captured" */
-    it("explains coding-agent traffic may not be captured and links to enabling payload capture", () => {
-      render(<CategoryBreakdownEnablementHint settingsHref="/me/configure" />, {
-        wrapper: Wrapper,
-      });
+    it("explains why the breakdown is empty in neutral terms with no link", () => {
+      render(<CategoryBreakdownEnablementHint />, { wrapper: Wrapper });
 
       expect(
         screen.getByText(
-          /your coding-agent traffic may not be captured.*turn on payload capture to see where your tokens go/i,
+          /no categorized usage in this window yet\. cost categories appear for coding-agent traffic captured with content\./i,
         ),
       ).toBeInTheDocument();
-      const link = screen.getByRole("link", {
-        name: /enable payload capture/i,
-      });
-      expect(link).toHaveAttribute("href", "/me/configure");
+      // Neutral copy points at no setting — "payload capture" is internal
+      // jargon and there is no such control in the product.
+      expect(screen.queryByRole("link")).not.toBeInTheDocument();
+      expect(screen.queryByText(/payload capture/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("<CategoryBreakdownCaption/>", () => {
+    it("renders the summary with a keyboard-focusable (?) trigger", () => {
+      render(<CategoryBreakdownCaption />, { wrapper: Wrapper });
+
+      expect(
+        screen.getByText(
+          /where your tokens go: system prompt, mcp tools, skills, thinking, and more/i,
+        ),
+      ).toBeInTheDocument();
+      // The (?) tooltip trigger is reachable by keyboard (tabIndex=0).
+      const trigger = screen.getByLabelText("All content categories");
+      expect(trigger).toHaveAttribute("tabindex", "0");
+    });
+
+    it("carries the complete taxonomy in the tooltip list, pinned to CATEGORY_LABELS", () => {
+      // The tooltip list is derived from the taxonomy, so it can never drop a
+      // category. This pins that: every human label the fold can emit is present.
+      expect([...CATEGORY_BREAKDOWN_TOOLTIP_LABELS].sort()).toEqual(
+        Object.values(CATEGORY_LABELS).sort(),
+      );
     });
   });
 });
