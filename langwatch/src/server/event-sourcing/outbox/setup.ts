@@ -65,7 +65,7 @@ export interface OutboxRuntime {
    *  this once the main queue has been constructed. */
   attachQueue(queue: EventSourcedQueueProcessor<Record<string, unknown>>): void;
   /** Producer entry point for the trigger reactors (both notify and
-   *  persist classes — ADR-032). Sends a settle payload onto the attached
+   *  persist classes — ADR-035). Sends a settle payload onto the attached
    *  queue with the per-trigger debounce TTL as the Debounce Mode
    *  override. */
   enqueueSettle(
@@ -185,7 +185,7 @@ export function buildOutboxRuntime({
       const protections = await getProtectionsDeduped(projectId);
       return traceService.getById(projectId, traceId, protections);
     },
-    // ADR-032: persist-class side-effect sinks for the cadence stage's
+    // ADR-035: persist-class side-effect sinks for the cadence stage's
     // `dispatchTriggerAction`. Same wiring the inline reactor used before
     // persist moved onto the outbox (see PipelineRegistry).
     addToAnnotationQueue: async (params) => {

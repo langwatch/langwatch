@@ -20,7 +20,7 @@ export interface EmailFrameFooter {
  * Wraps a rendered (sanitized) email body in the LangWatch frame: logo header,
  * bordered container, and a footer with the LangWatch attribution + a link
  * back to the producing automation. Authors edit the body in the middle —
- * the chrome is non-template (see ADR-028), so every email has a consistent
+ * the chrome is non-template (see ADR-036), so every email has a consistent
  * header/footer regardless of what the customer template does.
  *
  * `prefixHtml` is reserved for backend-injected, non-template content such

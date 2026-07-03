@@ -1,4 +1,4 @@
-# ADR-032: Persist-class actions ride the settle stage (trace-readiness debounce)
+# ADR-035: Persist-class actions ride the settle stage (trace-readiness debounce)
 
 **Date:** 2026-06-19
 

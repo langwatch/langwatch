@@ -81,7 +81,7 @@ function saveDisabledReason(
 }
 
 /**
- * Orchestrator for the staged automation authoring drawer (ADR-028).
+ * Orchestrator for the staged automation authoring drawer (ADR-036).
  *
  * - Holds no UI of its own beyond the drawer chrome + footer.
  * - Owns the data-loading lifecycle: scaffold (synchronous client),

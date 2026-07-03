@@ -223,7 +223,7 @@ export interface PipelineRegistryDeps {
    * Wired by the worker composition root (`presets.ts`) and `undefined`
    * on the web process. When set, all four trigger reactors route their
    * matches into the unified outbox queue's settle stage (ADR-030 +
-   * ADR-026 + ADR-032) — both NOTIFY (email / Slack) and PERSIST
+   * ADR-026 + ADR-035) — both NOTIFY (email / Slack) and PERSIST
    * (dataset / annotation) classes now ride settle → cadence; nothing
    * dispatches inline.
    */
@@ -311,7 +311,7 @@ export class PipelineRegistry {
 
     const esSyncReactor = createEvaluationEsSyncReactor(this.deps.esSync);
 
-    // ADR-032: the persist branch is now an outbox reactor that only
+    // ADR-035: the persist branch is now an outbox reactor that only
     // enqueues settle payloads. Filter evaluation + dispatch (traceById /
     // addToDataset / addToAnnotationQueue) moved to the outbox dispatcher
     // (see buildOutboxRuntime), so this reactor needs just the trigger
@@ -374,7 +374,7 @@ export class PipelineRegistry {
       evaluation: evalCommands.executeEvaluation,
     });
 
-    // ADR-032: the persist branch is now an outbox reactor that only
+    // ADR-035: the persist branch is now an outbox reactor that only
     // enqueues settle payloads; dispatch deps live on the outbox
     // dispatcher (see buildOutboxRuntime), so this reactor needs just the
     // trigger service.

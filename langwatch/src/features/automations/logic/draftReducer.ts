@@ -15,7 +15,7 @@ import type { FilterParam } from "~/hooks/useFilterParams";
 import type { FilterField } from "~/server/filters/types";
 
 /**
- * Pure state machine for the staged automation drawer (ADR-028). Lives
+ * Pure state machine for the staged automation drawer (ADR-036). Lives
  * outside any React component so it can be unit-tested as a normal
  * function. The drawer is just a view onto this state plus a few async
  * effects (preview, test-fire, save) — every other interaction goes

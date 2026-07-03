@@ -244,7 +244,7 @@ A single `.withReactor(..., { durable: true })` flag would force the API to acce
 - **`QueueAuditAdapter` interface** on `GroupQueueProcessor` — a reusable hook that any queue can opt into for PG-backed audit. The `PgOutboxAuditAdapter` is the first implementation; future queues (e.g., a future stake-sensitive command queue) can wire their own.
 - **Phase-0 outbox primitives (`OutboxDrainer`, `OutboxRepository.leaseNext` / `markDispatched` / `markRetry` / `recoverExpiredLeases`, `wakeupQueue`) are deprecated but still present.** Removed in a follow-up cleanup PR once no reactor is registered on them.
 - **Two reactor classes now exist** in the system: best-effort (`.withReactor`) and stake-sensitive (`.withOutbox`). Authors and reviewers must choose at definition time. The default for new reactors should be `.withReactor` unless the side effect is auditable.
-- **Operator surfaces** (activity tab, retry buttons, Grafana alarms on stuck-queue depth) become possible and necessary. Without them the outbox is just an extra hop. ADR-029 places them on the settings page.
+- **Operator surfaces** (activity tab, retry buttons, Grafana alarms on stuck-queue depth) become possible and necessary. Without them the outbox is just an extra hop. ADR-037 places them on the settings page.
 - **`evaluationTrigger.reactor` stays on `.withReactor`.** It dispatches commands (event-sourced, in-band), not side effects.
 - **The per-subject dedupKey is trace-path-only by design.** Aggregate-driven triggers — anything that fires on "metric crossed threshold over window" without a single owning row — don't have such a subject. When those land the natural dedupKey is `${projectId}/${triggerId}:${groupByLabelsHash}:${windowBucket}`, not per-subject. That's a new namespace in the same constraint, not a schema change.
 - **Customer-supplied destinations are out of scope for v1, but the `dispatch` handler is endpoint-agnostic by design.** The moment a customer-defined webhook URL lands as a trigger destination, the framework needs SSRF blocking, HMAC request signing, payload size caps, per-destination secret encryption at rest. These are framework concerns — every future customer-webhook-like dispatch should share one outbound utility rather than each `dispatch` reinventing them.
@@ -257,9 +257,9 @@ A single `.withReactor(..., { durable: true })` flag would force the API to acce
 
 - ADR-007 — Event sourcing architecture (the framework this extends)
 - [ADR-026](./026-per-trigger-dispatch-timing.md) — Per-trigger cadence + trace-readiness debounce (timing knobs that ride this substrate)
-- [ADR-028](./028-liquid-templates-for-trigger-notifications.md) — Liquid templates (what `dispatch` renders for notify reactors)
+- [ADR-036](./036-liquid-templates-for-trigger-notifications.md) — Liquid templates (what `dispatch` renders for notify reactors)
 - [ADR-027](./027-typed-dispatcherror-contract.md) — `DispatchError` contract dispatch handlers throw
-- [ADR-029](./029-automation-operator-surfaces.md) — Authoring drawer + dispatch-health view that operators see
+- [ADR-037](./037-automation-operator-surfaces.md) — Authoring drawer + dispatch-health view that operators see
 - [ADR-014 (Skynet BullMQ removal)](./014-skynet-bullmq-removal.md) — why we're not reintroducing it
 - `src/server/event-sourcing/queues/groupQueue/` — the queue implementation
 - `src/server/event-sourcing/queues/queue.types.ts` — `EventSourcedQueueDefinition`, `DeduplicationConfig`

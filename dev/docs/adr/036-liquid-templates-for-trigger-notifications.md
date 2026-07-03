@@ -1,4 +1,4 @@
-# ADR-028: Liquid templates for user-customizable trigger notifications
+# ADR-036: Liquid templates for user-customizable trigger notifications
 
 **Date:** 2026-05-28
 
@@ -61,7 +61,7 @@ Subject is Liquid → string, single line, clipped to 200 chars with `…` on ov
 Explicit type discriminator: `slackTemplateType: 'string' | 'block_kit'`.
 
 - `'string'`: Liquid output sent as a plain `text` payload.
-- `'block_kit'`: Liquid output is parsed as JSON and sent as a `blocks` payload. JSON parse failure → fall back to default template, log, surface in operator activity tab (ADR-029).
+- `'block_kit'`: Liquid output is parsed as JSON and sent as a `blocks` payload. JSON parse failure → fall back to default template, log, surface in operator activity tab (ADR-037).
 
 Block Kit allowlist v1: `section | divider | context | header | image`. Interactive elements (`button`, `actions`, `input`, etc.) are stripped before sending — Slack accepts callbacks on interactive elements, and we do not want customer-authored Block Kit posting back to LangWatch.
 
@@ -86,7 +86,7 @@ Templates always iterate `{% for m in matches %}`. Immediate dispatches set `mat
 ### Validation
 
 - On `Trigger` save (Hono + tRPC): run `validateLiquid` on every non-null template column. Reject save with a syntax error message.
-- On render: try/catch the Liquid call. On failure, render the default template, log + capture, surface "rendered with the default template due to template error" in the operator activity tab (ADR-029).
+- On render: try/catch the Liquid call. On failure, render the default template, log + capture, surface "rendered with the default template due to template error" in the operator activity tab (ADR-037).
 - On Block Kit JSON parse failure: same fall-back-to-default semantics.
 
 ### Test fire banner
@@ -139,19 +139,19 @@ Both server-side dispatch (renders the actual notification) and the UI (renders 
 - **Four new nullable `Trigger` columns.** Single `ALTER TABLE`; trivial migration.
 - **New module at `src/shared/templating/`** wrapping engine setup, render, validation, and the Block Kit allowlist. The rendering surface — sandboxed user templates with a digest `matches[]` shape — is reusable by any future outbox reactor that needs customer-customizable output.
 - **Default templates extracted from current hardcoded output.** Existing customers see no change.
-- **Operator-facing surfaces** (ADR-029):
+- **Operator-facing surfaces** (ADR-037):
   - Split-pane editor with live preview (Monaco + Liquid mode).
   - Email preview: Liquid → Markdown → HTML rendered with the same wrapper as production.
   - Slack preview: in-app renderer for the allowlist + "Open in Slack Block Kit Builder" deep-link.
   - Preview uses real recent-match data when available, synthetic stub otherwise.
 - **Performance budget.** 100-match digest × Liquid render × Markdown render × sanitize is ~50–200ms in Node. Acceptable for a worker. `p-limit` 10 prevents a slow render from starving siblings.
-- **`strictVariables: false` trade-off.** Missing variables render silently. Mitigation: the operator activity tab (ADR-029) surfaces "rendered with N missing variables: [list]" so authors learn about typos without dispatch failures.
+- **`strictVariables: false` trade-off.** Missing variables render silently. Mitigation: the operator activity tab (ADR-037) surfaces "rendered with N missing variables: [list]" so authors learn about typos without dispatch failures.
 - **Future work, deferred until customer ask**: template versioning, partials/includes (`{% include %}`), per-project default templates, interactive Block Kit support, daily/weekly digest cadences.
 
 ## References
 
 - [ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) — outbox dispatch is the renderer's caller
 - [ADR-026](./026-per-trigger-dispatch-timing.md) — cadence model that produces `matches[]` of varying length
-- [ADR-029](./029-automation-operator-surfaces.md) — drawer that surfaces the live preview and template-health warnings
+- [ADR-037](./037-automation-operator-surfaces.md) — drawer that surfaces the live preview and template-health warnings
 - `liquidjs` — https://liquidjs.com (engine choice)
 - `marked` — Markdown → HTML for email body

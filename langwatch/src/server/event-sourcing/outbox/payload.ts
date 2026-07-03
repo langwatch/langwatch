@@ -40,7 +40,7 @@
 export const TRIGGER_NOTIFY_REACTOR_NAME = "triggerNotify" as const;
 
 /**
- * Which dispatch class a settle/cadence payload belongs to (ADR-032).
+ * Which dispatch class a settle/cadence payload belongs to (ADR-035).
  * Both action classes now ride the same settle → cadence outbox path,
  * so the marker is what lets `handleSettle` / `handleCadenceBatch`
  * branch on dispatch shape without re-classifying `trigger.action`:
@@ -69,10 +69,10 @@ interface CommonStagePayload {
   reactorName: typeof TRIGGER_NOTIFY_REACTOR_NAME;
   auditDedupKey: string;
   /**
-   * Dispatch class of the underlying trigger action (ADR-032). Carried
+   * Dispatch class of the underlying trigger action (ADR-035). Carried
    * on the payload so the cadence handler routes persist vs notify
    * without re-reading `trigger.action`. Optional for backwards
-   * compatibility with rows enqueued before ADR-032: a missing marker
+   * compatibility with rows enqueued before ADR-035: a missing marker
    * is treated as `notify` by the dispatcher (the only class that rode
    * the outbox in v1).
    */
@@ -116,7 +116,7 @@ export interface CadenceStagePayload
   dropReason?: string;
   /**
    * Set by the dispatcher after rendering a custom email/Slack template
-   * (ADR-028 / ADR-029). Carries the render-health diagnostics
+   * (ADR-036 / ADR-037). Carries the render-health diagnostics
    * `renderTriggerEmail` / `renderTriggerSlack` compute — currently the
    * `missingVariables` the template referenced but the render context did not
    * supply. The PG audit adapter reads this in `onDispatched` and writes it to

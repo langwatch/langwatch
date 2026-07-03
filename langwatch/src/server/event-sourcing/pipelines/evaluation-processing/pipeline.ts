@@ -20,7 +20,7 @@ export interface EvaluationProcessingPipelineDeps {
     EvaluationRunData
   >;
   /** PERSIST-class branch of the evaluation alert trigger, routed
-   *  through the framework's `.withOutbox` plumbing (ADR-030 + ADR-032).
+   *  through the framework's `.withOutbox` plumbing (ADR-030 + ADR-035).
    *  Emits settle payloads stamped `actionClass: "persist"`. */
   evaluationAlertTriggerReactor: OutboxReactorDefinition<
     EvaluationProcessingEvent,

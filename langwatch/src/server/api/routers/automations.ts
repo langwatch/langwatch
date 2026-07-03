@@ -126,7 +126,7 @@ function httpStatusToTRPCCode(httpStatus: number): TRPCErrorCode {
  * value is a `DomainError`. The shared `errorFormatter` in `trpc.ts` serialises
  * that cause as `error.data.domainError = { kind, meta, telemetry, … }` so the
  * client gets the full structured payload — that is the "incredibly good error
- * handling" surface (see ADR-028 follow-up).
+ * handling" surface (see ADR-036 follow-up).
  */
 function toTemplateTRPCError(err: unknown): TRPCError {
   if (err instanceof TRPCError) return err;

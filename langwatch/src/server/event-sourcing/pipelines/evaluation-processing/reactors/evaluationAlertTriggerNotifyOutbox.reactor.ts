@@ -43,7 +43,7 @@ export interface EvaluationAlertTriggerNotifyOutboxReactorDeps {
  *
  * Persist-class actions (ADD_TO_DATASET, etc.) ride the same
  * settle/cadence outbox via `evaluationAlertTrigger.reactor.ts`
- * (ADR-032), stamped `actionClass: "persist"`; this reactor only emits
+ * (ADR-035), stamped `actionClass: "persist"`; this reactor only emits
  * the notify class.
  */
 export function createEvaluationAlertTriggerNotifyOutboxReactor(

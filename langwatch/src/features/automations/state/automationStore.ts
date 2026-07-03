@@ -9,7 +9,7 @@ import {
 export const MAX_TEST_HISTORY = 5;
 
 /** A single test-fire press, held in-session. Cross-session history would
- *  come from the outbox-backed health view (ADR-029, separate stack). */
+ *  come from the outbox-backed health view (ADR-037, separate stack). */
 export interface TestFireAttempt {
   at: number;
   channel: "email" | "slack";

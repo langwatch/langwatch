@@ -1,5 +1,5 @@
 /**
- * Block Kit allowlist v1 (see ADR-028).
+ * Block Kit allowlist v1 (see ADR-036).
  *
  * Customer-authored Block Kit can post interactive callbacks back to LangWatch.
  * We do not want to receive arbitrary customer-defined interactions, so only

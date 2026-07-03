@@ -49,7 +49,7 @@ function makePrismaStub() {
   };
 }
 
-describe("PgOutboxAuditAdapter.onDispatched render-diagnostics (ADR-029)", () => {
+describe("PgOutboxAuditAdapter.onDispatched render-diagnostics (ADR-037)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });

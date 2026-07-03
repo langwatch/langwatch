@@ -192,7 +192,7 @@ export class PgOutboxAuditAdapter implements QueueAuditAdapter<OutboxJob> {
       // operators can tell a drop from a delivery. A real delivery has no
       // `dropReason` and clears `lastError` to null.
       const lastError = p.dropReason ?? null;
-      // Template render-health diagnostics (ADR-028 / ADR-029): the dispatcher
+      // Template render-health diagnostics (ADR-036 / ADR-037): the dispatcher
       // stamps `{ missingVariables }` onto the payload when a custom template
       // referenced variables the render context didn't supply (`null` on a
       // clean render). Persist it to the row so the operator surface can show

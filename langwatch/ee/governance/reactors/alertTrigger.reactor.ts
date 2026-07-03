@@ -23,7 +23,7 @@ export interface AlertTriggerReactorDeps {
 
 /**
  * Persist-class branch of the trace-pipeline alert trigger reactor,
- * registered via `.withOutbox` (ADR-030 + ADR-032).
+ * registered via `.withOutbox` (ADR-030 + ADR-035).
  *
  * Fires on every trace event (via the traceSummary fold). For each
  * active trace-only trigger whose action is PERSIST (dataset write,
@@ -34,7 +34,7 @@ export interface AlertTriggerReactorDeps {
  * re-enqueues an immediate cadence that claims `TriggerSent` and runs
  * `dispatchTriggerAction`.
  *
- * Before ADR-032 this reactor dispatched persist actions inline against
+ * Before ADR-035 this reactor dispatched persist actions inline against
  * the (possibly half-formed) fold. It now rides the same settle/cadence
  * outbox as notify so `traceDebounceMs` (ADR-026) applies before the
  * claim and the side effect — the dataset row no longer diverges from

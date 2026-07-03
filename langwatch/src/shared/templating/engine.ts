@@ -4,7 +4,7 @@ import { Liquid, type Template } from "liquidjs";
  * Per-template wall-clock budget. A render that exceeds it is abandoned and
  * the caller falls back to the framework default. This is a best-effort guard
  * against runaway templates — it bounds wall-clock time but cannot interrupt a
- * synchronous CPU-bound loop mid-iteration (see ADR-028).
+ * synchronous CPU-bound loop mid-iteration (see ADR-036).
  */
 export const RENDER_TIMEOUT_MS = 500;
 

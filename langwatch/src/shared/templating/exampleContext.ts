@@ -2,7 +2,7 @@ import type { TemplateMatchInput } from "./templateContext";
 
 /**
  * A single representative example trace that the editor preview, the test
- * fire, and the editor autocomplete all agree on (see ADR-028). Both
+ * fire, and the editor autocomplete all agree on (see ADR-036). Both
  * `matches[]` (canonical iteration surface, exposed at every cadence) and
  * `match.*` (singular shortcut, `matches[0]`) are available to templates;
  * an immediate fire simply has `matches.length === 1`.
@@ -32,7 +32,7 @@ export const EXAMPLE_MATCHES: TemplateMatchInput[] = [EXAMPLE_MATCH];
  *
  * Both `match.*` (singular handle for immediate dispatches) and `matches[]`
  * (iterable for both immediate and digest) are surfaced in the variable
- * panel. ADR-028 picks the digest-friendly default — authors writing
+ * panel. ADR-036 picks the digest-friendly default — authors writing
  * `{% for m in matches %}` get correct behavior in both modes from one
  * template, while `{{ match.field }}` stays a convenient shortcut for
  * single-match cases.

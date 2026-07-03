@@ -99,7 +99,7 @@ export function validateTemplateDraft(draft: TemplateDraft): void {
       `Invalid Slack template type "${draft.slackTemplateType}". Allowed: ${SLACK_TEMPLATE_TYPES.join(", ")}.`,
     );
   }
-  // ADR-028 makes the Slack type discriminator explicit so a Block Kit JSON
+  // ADR-036 makes the Slack type discriminator explicit so a Block Kit JSON
   // template can't silently dispatch as plain text. Reject a Slack source
   // without a type instead of falling back to "string", which is the kind of
   // silent mis-send the discriminator exists to prevent.

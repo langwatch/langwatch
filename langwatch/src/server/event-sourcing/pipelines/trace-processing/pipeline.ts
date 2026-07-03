@@ -59,7 +59,7 @@ export interface TraceProcessingPipelineDeps {
     TraceSummaryData
   >;
   /** PERSIST-class branch of the alert trigger, routed through the
-   *  framework's `.withOutbox` plumbing (ADR-030 + ADR-032). Emits settle
+   *  framework's `.withOutbox` plumbing (ADR-030 + ADR-035). Emits settle
    *  payloads stamped `actionClass: "persist"`; the dispatcher's cadence
    *  stage runs `dispatchTriggerAction` for them. */
   alertTriggerReactor: OutboxReactorDefinition<

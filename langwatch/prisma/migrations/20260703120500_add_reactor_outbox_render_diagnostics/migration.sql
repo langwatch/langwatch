@@ -1,5 +1,5 @@
 -- Template render-health diagnostics on the dispatched outbox row
--- (ADR-028 / ADR-029). `renderTriggerEmail` / `renderTriggerSlack` already
+-- (ADR-036 / ADR-037). `renderTriggerEmail` / `renderTriggerSlack` already
 -- compute `missingVariables` (the variables a custom template referenced but
 -- the render context did not supply); the dispatcher previously dropped them.
 -- This column persists them per dispatch — currently shaped as

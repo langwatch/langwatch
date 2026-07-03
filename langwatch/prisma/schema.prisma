@@ -744,7 +744,7 @@ model Trigger {
   message       String?
   deleted       Boolean       @default(false)
   alertType     AlertType?
-  // Customer-authored Liquid notification templates (see ADR-028). NULL on any
+  // Customer-authored Liquid notification templates (see ADR-036). NULL on any
   // column means "render with the framework default", so existing triggers are
   // unchanged. slackTemplateType discriminates 'string' | 'block_kit'.
   slackTemplateType    String?
@@ -2848,7 +2848,7 @@ model ReactorOutbox {
     lastError      String?
     lastErrorAt    DateTime?
     // Template render-health diagnostics captured at dispatch time
-    // (ADR-028 / ADR-029). Currently `{ missingVariables: string[] }` —
+    // (ADR-036 / ADR-037). Currently `{ missingVariables: string[] }` —
     // the variables a custom email/Slack template referenced but the
     // render context did not supply. NULL on a clean render (no missing
     // variables) and on dispatches that never rendered a custom template.

@@ -13,7 +13,7 @@ Feature: Liquid templates for trigger notifications
   because every template iterates over a `matches` collection that holds one
   entry for an immediate dispatch and N entries for a digest.
 
-  See dev/docs/adr/028-liquid-templates-for-trigger-notifications.md.
+  See dev/docs/adr/036-liquid-templates-for-trigger-notifications.md.
 
   Background:
     Given a trigger that matched one or more traces

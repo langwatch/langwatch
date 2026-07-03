@@ -50,7 +50,7 @@ export const CONDITIONS_JSON_SCHEMA = {
   },
 } as const;
 
-/** Slack Block Kit subset matching the server-side allowlist (ADR-028):
+/** Slack Block Kit subset matching the server-side allowlist (ADR-036):
  *  section, divider, context, header, image. Liquid expressions inside string
  *  values are not validated by JSON Schema — that is intentional. */
 export const SLACK_BLOCK_KIT_JSON_SCHEMA = {

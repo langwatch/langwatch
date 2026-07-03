@@ -174,12 +174,12 @@ The two reactors (`alertTrigger`, `evaluationAlertTrigger`) keep doing the pre-f
 
 ### UI surface
 
-Both knobs are surfaced in the staged authoring drawer (ADR-029):
+Both knobs are surfaced in the staged authoring drawer (ADR-037):
 
 - `notificationCadence`: dropdown, visible only when the action is in `NOTIFY_TRIGGER_ACTIONS`. Persist-action triggers don't see the field.
 - `traceDebounceMs`: integer-seconds field with bounds `[0, 600]`, visible for every action class — persist triggers benefit even more than notify, because a dataset row captured before the trace settles diverges from the trace UI permanently.
 
-Both fields collapse into a single "Cadence" stage on the drawer (the secondary drawer pattern from ADR-029). The current values appear on the automations settings list as columns so an operator scanning the list can see at a glance which triggers are trading latency for completeness.
+Both fields collapse into a single "Cadence" stage on the drawer (the secondary drawer pattern from ADR-037). The current values appear on the automations settings list as columns so an operator scanning the list can see at a glance which triggers are trading latency for completeness.
 
 ## Rationale
 
@@ -240,7 +240,7 @@ A trigger configured `traceDebounceMs: 60000` + `notificationCadence: 5min_diges
 - **Two new `Trigger` columns.** Single `ALTER TABLE`s with defaults; instant on PG ≥ 11.
 - **Existing triggers default to `immediate` cadence and 30s debounce.** Cadence preserves current behavior; debounce is a one-time change to the half-formed-dispatch default. Operators who were depending on eager evaluation see a one-time change — flip `traceDebounceMs` to 0 if needed. A migration banner / changelog notes both.
 - **Operator default for new notify triggers is `5min_digest` cadence**, which is a behavior change vs today's implicit immediate. Existing triggers don't change.
-- **Dispatcher rendering must handle `payloads[]`.** When `length === 1` (immediate or single-match digest), render as a single message; when `length > 1`, render as a digest with N occurrences. Templates (ADR-028) iterate `{% for m in matches %}` regardless of length.
+- **Dispatcher rendering must handle `payloads[]`.** When `length === 1` (immediate or single-match digest), render as a single message; when `length > 1`, render as a digest with N occurrences. Templates (ADR-036) iterate `{% for m in matches %}` regardless of length.
 - **Reactor shape changes.** `alertTrigger` / `evaluationAlertTrigger` no longer evaluate filters; they emit `outboxQueue.send({ stage: "settle", … })`. The unit tests for those reactors collapse to "the right number of enqueues for the right triggers" — the heavy filter-matching tests move onto the new `evaluateAndDispatchTrigger` function.
 - **Worker-only.** The settle stage runs on the unified outbox queue, part of the outbox-adjacent worker stack. Web is unaffected.
 - **The classification is the contract** for the outbox layer. `computeScheduledFor(action, cadence)` is the single function called by `.withOutbox`-registered reactors' `cadenceWindowMs` resolvers.
@@ -253,8 +253,8 @@ A trigger configured `traceDebounceMs: 60000` + `notificationCadence: 5min_diges
 ## References
 
 - [ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) — outbox queue these knobs ride
-- [ADR-028](./028-liquid-templates-for-trigger-notifications.md) — template engine that consumes the digest `matches[]` payload
-- [ADR-029](./029-automation-operator-surfaces.md) — authoring drawer that exposes both fields
+- [ADR-036](./036-liquid-templates-for-trigger-notifications.md) — template engine that consumes the digest `matches[]` payload
+- [ADR-037](./037-automation-operator-surfaces.md) — authoring drawer that exposes both fields
 - `src/automations/cadences.ts` — where the constants live (shared client/server)
 - `src/server/event-sourcing/pipelines/shared/triggerActionDispatch.ts` — `computeScheduledFor`
 - `src/server/event-sourcing/queues/queue.types.ts` — `DeduplicationConfig` + Debounce Mode

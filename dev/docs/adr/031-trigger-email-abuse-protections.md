@@ -180,7 +180,7 @@ get. Removing the input eliminates the vector instead of throttling it.
   trigger misses real alerts after the storm passes.
 - **Drop + error log** is the simplest mechanism with self-healing semantics:
   the cap resets on the hour, the error log feeds the operator-facing
-  automation health surface (ADR-029), and the trigger's configuration is
+  automation health surface (ADR-037), and the trigger's configuration is
   never mutated behind the operator's back.
 
 The matches a dropped email would have announced still exist as traces in the
@@ -208,7 +208,7 @@ model is forward-compatible with it (`reason` column).
 
 ### Why the footer is appended outside the Liquid template
 
-ADR-028 gives customers full control of the email body. If the unsubscribe
+ADR-036 gives customers full control of the email body. If the unsubscribe
 footer lived inside the template, a customer could remove it — turning the
 compliance feature back off. Appending it in the renderer wrapper after
 template rendering makes it structurally unstrippable, like the no-reply
@@ -239,7 +239,7 @@ price, bounded by the hourly cap.
   (recipient in BCC, hashed no-reply in From/To) so recipients never see each
   other.
 - **Dropped sends are visible, not silent.** `logger.error` + a counter the
-  ADR-029 health surface can read. Operators of high-volume immediate
+  ADR-037 health surface can read. Operators of high-volume immediate
   triggers should switch to a digest cadence — the error message says so.
 - **Two caps: per-trigger hourly + per-project daily.** The hourly cap
   (§2) bounds a single noisy trigger; the daily cap (§2b,
@@ -260,8 +260,8 @@ price, bounded by the hourly cap.
 ## References
 
 - [ADR-026](./026-per-trigger-dispatch-timing.md) — cadence/digest mechanics the cap composes with
-- [ADR-028](./028-liquid-templates-for-trigger-notifications.md) — template rendering the footer wraps
-- [ADR-029](./029-automation-operator-surfaces.md) — health surface that displays cap drops
+- [ADR-036](./036-liquid-templates-for-trigger-notifications.md) — template rendering the footer wraps
+- [ADR-037](./037-automation-operator-surfaces.md) — health surface that displays cap drops
 - [ADR-030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) — dispatcher stage carrying the cap check
 - `src/server/rateLimit.ts` — sliding-window limiter reused for test fire
 - `src/server/mailer/triggerNoReply.ts` — existing HMAC keyed-hash pattern the unsubscribe token follows

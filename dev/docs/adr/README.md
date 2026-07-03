@@ -21,8 +21,8 @@ Document **important technical and architectural decisions** — context, trade-
 | [025](./025-remove-orphan-sweep.md) | Remove the PG orphan sweep entirely | Accepted |
 | [026](./026-per-trigger-dispatch-timing.md) | Per-trigger dispatch timing — cadence and trace-readiness debounce | Accepted |
 | [027](./027-typed-dispatcherror-contract.md) | Typed `DispatchError` contract for dispatch endpoints | Accepted |
-| [028](./028-liquid-templates-for-trigger-notifications.md) | Liquid templates for user-customizable trigger notifications | Accepted |
-| [029](./029-automation-operator-surfaces.md) | Automation operator surfaces — authoring drawer & dispatch-health view | Accepted |
+| [036](./036-liquid-templates-for-trigger-notifications.md) | Liquid templates for user-customizable trigger notifications | Accepted |
+| [037](./037-automation-operator-surfaces.md) | Automation operator surfaces — authoring drawer & dispatch-health view | Accepted |
 | [030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) | Transactional outbox for stake-sensitive reactor dispatch | Accepted |
 
 ## When to Write an ADR

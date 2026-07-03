@@ -12,7 +12,7 @@ Feature: Staged automation authoring drawer
   test fire) is reachable inside the Configuration secondary drawer for
   notification types.
 
-  See dev/docs/adr/029-automation-operator-surfaces.md.
+  See dev/docs/adr/037-automation-operator-surfaces.md.
 
   Background:
     Given a user authoring an automation in a project

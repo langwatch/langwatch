@@ -148,7 +148,7 @@ export const sendSlackWebhook = async ({
 };
 
 /**
- * Sends a pre-rendered (customer-authored, ADR-028) Slack payload. Mirrors the
+ * Sends a pre-rendered (customer-authored, ADR-036) Slack payload. Mirrors the
  * guards and DispatchError classification of `sendSlackWebhook` exactly — same
  * non-retryable host guard (`assertSlackWebhookUrl`) and the same
  * toDispatchError wrap around the send — but takes the Block Kit / text payload

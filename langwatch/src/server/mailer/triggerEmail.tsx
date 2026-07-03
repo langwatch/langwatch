@@ -272,7 +272,7 @@ async function sendPerRecipient({
 }
 
 /**
- * Sends a pre-rendered (customer-authored, ADR-028) trigger email. Mirrors the
+ * Sends a pre-rendered (customer-authored, ADR-036) trigger email. Mirrors the
  * send block of `sendTriggerEmail` exactly — same no-reply `to`, `bcc`
  * recipients, and DispatchError classification — but takes the subject/html as
  * already-rendered strings instead of building the legacy React tree.

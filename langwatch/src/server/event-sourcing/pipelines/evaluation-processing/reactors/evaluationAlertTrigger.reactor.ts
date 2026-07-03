@@ -34,7 +34,7 @@ export interface EvaluationAlertTriggerReactorDeps {
 
 /**
  * Persist-class branch of the evaluation-pipeline alert trigger reactor,
- * registered via `.withOutbox` (ADR-030 + ADR-032).
+ * registered via `.withOutbox` (ADR-030 + ADR-035).
  *
  * Fires after a terminal evaluation event. For every active trigger
  * with evaluation filters whose action is PERSIST (dataset write,
@@ -45,7 +45,7 @@ export interface EvaluationAlertTriggerReactorDeps {
  * re-enqueues an immediate cadence that claims `TriggerSent` and runs
  * `dispatchTriggerAction`.
  *
- * Before ADR-032 this reactor dispatched persist actions inline against
+ * Before ADR-035 this reactor dispatched persist actions inline against
  * the (possibly half-formed) fold. It now rides the same settle/cadence
  * outbox as the notify class, so the expensive cross-pipeline evaluation
  * load + events derivation is deferred to the settle dispatcher and

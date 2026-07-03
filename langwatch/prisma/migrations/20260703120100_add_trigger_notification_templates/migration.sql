@@ -1,6 +1,6 @@
 -- Customer-customizable Liquid notification templates for triggers.
 --
--- See dev/docs/adr/028-liquid-templates-for-trigger-notifications.md. Four
+-- See dev/docs/adr/036-liquid-templates-for-trigger-notifications.md. Four
 -- nullable columns: NULL means "render with the framework default", so every
 -- existing trigger sees no change. slackTemplateType discriminates how the
 -- Slack template output is sent ('string' plain text vs 'block_kit' JSON).

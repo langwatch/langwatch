@@ -16,7 +16,7 @@ export interface TriggerSummary {
   /** Per-trigger trace-readiness debounce in ms (ADR-026). Always populated by
    *  the repository — the column is `NOT NULL DEFAULT 30000`. */
   traceDebounceMs: number;
-  /** Customer-authored notification templates (ADR-028). NULL means "this
+  /** Customer-authored notification templates (ADR-036). NULL means "this
    *  channel uses the legacy framework renderer". */
   templates: {
     slackTemplateType: string | null;

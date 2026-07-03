@@ -124,7 +124,7 @@ In all cases the **enforcement** lives in the outbox state machine, not the prov
 - **Existing in-line callers see no behavior change.** They already catch all `Error` subclasses; `DispatchError` inherits from `Error` and logs the same way.
 - **New testing convention.** Dispatch-endpoint tests must assert thrown error type *and* `retryable` flag: `expect(err).toBeInstanceOf(DispatchError); expect(err.retryable).toBe(false);`.
 - **Worker retry policy is per-error-type.** `DispatchError({ retryable: false })` transitions immediately to `dead`. `DispatchError({ retryable: true })` and unknown errors use the registered `retryPolicy.backoffMs(attempt)` until `maxAttempts`.
-- **Slack double-send risk** in the rare "dispatch succeeded but status update failed" case is accepted. Surfaced in operator activity tab (ADR-029) as a "possibly-duplicate-dispatched" badge if the row has `attemptCount > 1` AND `status='dispatched'`. Cheap to detect; cheap to surface.
+- **Slack double-send risk** in the rare "dispatch succeeded but status update failed" case is accepted. Surfaced in operator activity tab (ADR-037) as a "possibly-duplicate-dispatched" badge if the row has `attemptCount > 1` AND `status='dispatched'`. Cheap to detect; cheap to surface.
 - **Future dispatch endpoints** added for new outbox reactors (e.g., `customerIoTraceSync`, `addToDataset` after migration) must follow the same contract. A unit-test convention enforces it.
 
 ## References

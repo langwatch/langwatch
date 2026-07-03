@@ -116,7 +116,7 @@ function makeDeps(trigger: TriggerSummary = makeTrigger()) {
     evaluationRuns: { findByTraceId: vi.fn().mockResolvedValue([]) } as any,
     deriveEvents: vi.fn().mockResolvedValue([]),
     traceById: vi.fn().mockResolvedValue(undefined),
-    // ADR-032: persist-class side-effect sinks. Notify dispatch never
+    // ADR-035: persist-class side-effect sinks. Notify dispatch never
     // touches them; persist cadence (ADD_TO_DATASET /
     // ADD_TO_ANNOTATION_QUEUE) calls them via dispatchTriggerAction.
     addToAnnotationQueue: vi.fn().mockResolvedValue(undefined),
@@ -321,7 +321,7 @@ describe("createOutboxDispatcher cadence stage", () => {
     });
   });
 
-  describe("given template render-diagnostics (ADR-028 / ADR-029)", () => {
+  describe("given template render-diagnostics (ADR-036 / ADR-037)", () => {
     describe("when a custom email template references variables the context does not supply", () => {
       it("stamps the missing variables onto the payload's renderDiagnostics", async () => {
         const trigger = makeTrigger({
@@ -714,7 +714,7 @@ describe("createOutboxDispatcher cadence stage", () => {
   });
 });
 
-// ADR-032: persist-class actions ride the same settle → cadence outbox
+// ADR-035: persist-class actions ride the same settle → cadence outbox
 // path as notify. These exercise the persist branches of handleSettle
 // and handleCadenceBatch and confirm they never touch the notify senders.
 function makePersistTrigger(
@@ -790,7 +790,7 @@ function makePersistCadencePayload(
   return makeCadencePayload({ actionClass: "persist", ...overrides });
 }
 
-describe("createOutboxDispatcher persist class (ADR-032)", () => {
+describe("createOutboxDispatcher persist class (ADR-035)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
