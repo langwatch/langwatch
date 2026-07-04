@@ -58,9 +58,33 @@ describe("applySpanToSummary session-step accumulation", () => {
     });
   });
 
-  describe("given a coding-agent span with cache-read usage", () => {
+  describe("given a claude-code span with cache-read usage", () => {
     describe("when it is folded", () => {
-      it("counts the whole prompt context (fresh + cache-read + cache-creation)", () => {
+      it("counts the whole prompt context — Anthropic cache is separate (fresh + cache-read + cache-creation)", () => {
+        const span = createTestSpan({
+          startTimeUnixMs: 1000,
+          spanAttributes: {
+            "gen_ai.system": "claude_code",
+            "gen_ai.request.model": "claude-sonnet-4",
+            "gen_ai.usage.input_tokens": 2000,
+            "gen_ai.usage.cache_read.input_tokens": 30_000,
+            "gen_ai.usage.cache_creation.input_tokens": 8000,
+            "gen_ai.usage.output_tokens": 20,
+          },
+        });
+
+        const state = applySpanToSummary({ state: createInitState(), span });
+
+        expect(parseSessionSteps(state.attributes[SESSION_STEPS_ATTR])).toEqual(
+          [{ startMs: 1000, inputTokens: 40_000 }],
+        );
+      });
+    });
+  });
+
+  describe("given a codex span with cache-read usage", () => {
+    describe("when it is folded", () => {
+      it("counts input_tokens alone — OpenAI cached tokens are a subset, not additive", () => {
         const span = createTestSpan({
           startTimeUnixMs: 1000,
           instrumentationScope: CODEX_SCOPE,
@@ -76,7 +100,7 @@ describe("applySpanToSummary session-step accumulation", () => {
         const state = applySpanToSummary({ state: createInitState(), span });
 
         expect(parseSessionSteps(state.attributes[SESSION_STEPS_ATTR])).toEqual(
-          [{ startMs: 1000, inputTokens: 40_000 }],
+          [{ startMs: 1000, inputTokens: 2000 }],
         );
       });
     });

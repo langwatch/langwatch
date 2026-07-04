@@ -12,10 +12,6 @@ import {
   classifyBlocks,
 } from "./block-classification/blockClassifier.service";
 import {
-  parseClaudeCodeRequestBody,
-  parseClaudeCodeResponseBody,
-} from "./block-classification/claudeCodeBody";
-import {
   blockCategoryCostAttr,
   blockCategoryTokensAttr,
   type Category,
@@ -25,6 +21,10 @@ import {
   SPAN_ATTR_BLOCKS,
   SPAN_ATTR_CLASSIFIER_VERSION,
 } from "./block-classification/categories";
+import {
+  parseClaudeCodeRequestBody,
+  parseClaudeCodeResponseBody,
+} from "./block-classification/claudeCodeBody";
 import {
   allocateCategoryCosts,
   inferCacheBreakpointFromPools,
