@@ -5,7 +5,10 @@ import {
   InputCategory,
   OutputCategory,
 } from "~/server/app-layer/traces/block-classification/categories";
-import { traceContentBreakdownRows } from "../contentBreakdown";
+import {
+  spanContentBreakdownRows,
+  traceContentBreakdownRows,
+} from "../contentBreakdown";
 
 describe("traceContentBreakdownRows", () => {
   describe("given trace attributes carrying reserved blockcat totals", () => {
@@ -62,6 +65,56 @@ describe("traceContentBreakdownRows", () => {
       expect(
         traceContentBreakdownRows({ "gen_ai.usage.input_tokens": "1000" }),
       ).toEqual([]);
+    });
+  });
+});
+
+describe("spanContentBreakdownRows", () => {
+  describe("given a span's unflattened params carrying nested blockcat", () => {
+    it("reads the nested langwatch.reserved.blockcat totals into rows", () => {
+      // The span mapper unflattens dotted attribute keys, so blockcat lands at
+      // params.langwatch.reserved.blockcat.<category>.{tokens,cost_usd}.
+      const params = {
+        langwatch: {
+          reserved: {
+            blockcat: {
+              [InputCategory.SYSTEM_PROMPT]: {
+                tokens: "3997",
+                cost_usd: "0.02",
+              },
+              [InputCategory.SKILL_CONTENT]: {
+                tokens: "279",
+                cost_usd: "0.0013953165",
+              },
+            },
+          },
+        },
+        // A sibling attribute that must not be mistaken for a category.
+        "gen_ai.usage.input_tokens": "4408",
+      };
+
+      const rows = spanContentBreakdownRows(params);
+
+      expect(rows.map((r) => r.category)).toEqual([
+        InputCategory.SYSTEM_PROMPT,
+        InputCategory.SKILL_CONTENT,
+      ]);
+      const skill = rows.find(
+        (r) => r.category === InputCategory.SKILL_CONTENT,
+      );
+      expect(skill?.tokens).toBe(279);
+      expect(skill?.label).toBe("Skill content");
+    });
+  });
+
+  describe("given a span with no classified content", () => {
+    it("returns an empty array", () => {
+      expect(spanContentBreakdownRows(undefined)).toEqual([]);
+      expect(spanContentBreakdownRows(null)).toEqual([]);
+      expect(spanContentBreakdownRows({})).toEqual([]);
+      expect(spanContentBreakdownRows({ langwatch: { reserved: {} } })).toEqual(
+        [],
+      );
     });
   });
 });

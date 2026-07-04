@@ -9,6 +9,7 @@ import {
 } from "@chakra-ui/react";
 import { useMemo, useRef } from "react";
 import { LuCircleX } from "react-icons/lu";
+import { CategoryBreakdownBars } from "~/components/governance/CategoryBreakdownBars";
 import {
   ContentPrivacyMarkers,
   PiiIncompleteNotice,
@@ -17,6 +18,7 @@ import { RedactedField } from "~/components/ui/RedactedField";
 import type { SpanTreeNode } from "~/server/api/routers/tracesV2.schemas";
 import { useSpanDetail } from "../../../hooks/useSpanDetail";
 import { useTraceResources } from "../../../hooks/useTraceResources";
+import { spanContentBreakdownRows } from "../../../utils/contentBreakdown";
 import { AttributeTable } from "../AttributeTable";
 import { IOViewer } from "../IOViewer";
 import { hasPromptMetadata, PromptAccordion } from "../PromptAccordion";
@@ -71,11 +73,22 @@ export function SpanAccordions({
   const hasError = span.status === "error" || !!detail?.error;
   const hasEvents = !!detail?.events && detail.events.length > 0;
 
+  // This span's own content-category split (ADR-033), read from the reserved
+  // blockcat totals the classifier stamped on it. Present only for a classified
+  // coding-agent span (e.g. a codex turn) — the place a codex skill shows up,
+  // since it never becomes a waterfall tool span.
+  const contentRows = useMemo(
+    () => spanContentBreakdownRows(detail?.params),
+    [detail?.params],
+  );
+  const hasContentBreakdown = contentRows.length > 0;
+
   const sections = useMemo(() => {
     const list: string[] = [];
     if (hasError && !hasIO) list.push("exceptions");
     list.push("io");
     if (hasError && hasIO) list.push("exceptions");
+    if (hasContentBreakdown) list.push("content");
     if (hasPrompt) list.push("prompt");
     list.push("attributes");
     // Instrumentation scope used to be a chip pinned to the right of
@@ -87,7 +100,7 @@ export function SpanAccordions({
     if (hasScope) list.push("scope");
     list.push("events");
     return list;
-  }, [hasError, hasIO, hasPrompt, hasScope]);
+  }, [hasError, hasIO, hasContentBreakdown, hasPrompt, hasScope]);
 
   // Same rule as the trace summary view: only auto-expand Attributes when
   // the span itself has attributes (resource-only is rarely interesting
@@ -96,6 +109,7 @@ export function SpanAccordions({
   const [openSections, setOpenSections] = useAutoOpenSections(span.spanId, {
     exceptions: hasError,
     io: hasIO || hasPrivacyMarkers,
+    content: hasContentBreakdown,
     prompt: hasPrompt,
     attributes: hasSpanAttrs || !!detail?.costSuggestion,
     scope: hasScope,
@@ -215,6 +229,26 @@ export function SpanAccordions({
                       </RedactedField>
                     </VStack>
                   )}
+                </Section>
+              );
+            }
+            if (id === "content") {
+              return (
+                <Section
+                  key="content"
+                  value="content"
+                  title="Content breakdown"
+                  count={contentRows.length}
+                  isFirst={isFirst}
+                  open={isOpen}
+                >
+                  <VStack align="stretch" gap={3}>
+                    <Text textStyle="xs" color="fg.muted">
+                      Where this span’s tokens and cost went, by content type
+                      (system prompt, tools, skills, thinking, and more).
+                    </Text>
+                    <CategoryBreakdownBars rows={contentRows} />
+                  </VStack>
                 </Section>
               );
             }
