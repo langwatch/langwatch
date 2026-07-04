@@ -1,6 +1,7 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { useMemo, useRef } from "react";
 import { LuCalendarClock, LuFileText, LuFlaskConical } from "react-icons/lu";
+import { CategoryBreakdownBars } from "~/components/governance/CategoryBreakdownBars";
 import { PrivacyDroppedNotice } from "~/components/ui/PrivacyDroppedNotice";
 import { RedactedField } from "~/components/ui/RedactedField";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -12,6 +13,7 @@ import { useTraceEvaluations } from "../../../hooks/useTraceEvaluations";
 import { useTraceEvents } from "../../../hooks/useTraceEvents";
 import { useTraceResources } from "../../../hooks/useTraceResources";
 import { useFocusSectionStore } from "../../../stores/focusSectionStore";
+import { traceContentBreakdownRows } from "../../../utils/contentBreakdown";
 import { rankedErrorSpans } from "../../../utils/errorSpans";
 import { AttributeTable } from "../AttributeTable";
 import { ExceptionsContent } from "../ExceptionsContent";
@@ -55,6 +57,16 @@ export function TraceSummaryAccordions({
   const hasTraceAttributes = Object.keys(traceAttributes).length > 0;
   const hasAttributes = hasTraceAttributes || hasResourceAttributes;
   const hasScope = !!resources.scope?.name;
+
+  // Per-content-category cost/token split (ADR-033), derived from the reserved
+  // blockcat totals the fold rolled onto this trace's summary attributes. Only
+  // coding-agent traffic captured with content produces these, so the section
+  // is absent for everything else.
+  const contentRows = useMemo(
+    () => traceContentBreakdownRows(trace.attributes),
+    [trace.attributes],
+  );
+  const hasContentBreakdown = contentRows.length > 0;
 
   const {
     rich: richEvals,
@@ -118,6 +130,7 @@ export function TraceSummaryAccordions({
   const sections = useMemo(() => {
     const list: Array<
       | "io"
+      | "content"
       | "prompts"
       | "attributes"
       | "scope"
@@ -129,6 +142,11 @@ export function TraceSummaryAccordions({
     if (hasError && !hasIO) list.push("exceptions");
     list.push("io");
     if (hasError && hasIO) list.push("exceptions");
+    // Content-category breakdown sits right under I/O — it explains where this
+    // trace's tokens/cost went by content type, so it reads best next to the
+    // input/output it is decomposing. Only present for classified coding-agent
+    // traffic.
+    if (hasContentBreakdown) list.push("content");
     // Prompts the trace used — the span-level Prompt accordion only shows
     // when a span is selected, so the trace summary surfaced no prompt
     // info even when spans carried managed prompts. `containsPrompt` is
@@ -147,6 +165,7 @@ export function TraceSummaryAccordions({
     return list;
   }, [
     hasIO,
+    hasContentBreakdown,
     hasError,
     trace.containsPrompt,
     hasEvalsContent,
@@ -161,6 +180,7 @@ export function TraceSummaryAccordions({
   const [openSections, setOpenSections] = useAutoOpenSections(trace.traceId, {
     exceptions: hasError,
     io: hasIO || hasRedactedIO,
+    content: hasContentBreakdown,
     prompts: trace.containsPrompt,
     attributes: hasTraceAttributes,
     scope: hasScope,
@@ -253,6 +273,26 @@ export function TraceSummaryAccordions({
                       <MissingIORow label="Output" mode="output" />
                     )}
                   </RedactedField>
+                </VStack>
+              </Section>
+            );
+          }
+          if (id === "content") {
+            return (
+              <Section
+                key="content"
+                value="content"
+                title="Content breakdown"
+                count={contentRows.length}
+                isFirst={isFirst}
+                open={isOpen}
+              >
+                <VStack align="stretch" gap={3}>
+                  <Text textStyle="xs" color="fg.muted">
+                    Where this trace’s tokens and cost went, by content type
+                    (system prompt, tools, skills, thinking, and more).
+                  </Text>
+                  <CategoryBreakdownBars rows={contentRows} />
                 </VStack>
               </Section>
             );
