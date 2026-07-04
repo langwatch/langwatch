@@ -17,31 +17,55 @@ export interface CustomTierRates {
 
 /**
  * Resolve the custom per-token rate override (`computeSpanCost` Priority 1) from
- * a rate accessor, or `null` when the span carries no custom rate. A missing
- * cache rate falls back to the input rate (counted, not discounted).
+ * a rate accessor, or `null` when the span carries no custom rate.
+ *
+ * A custom override is often ONE-SIDED — a customer prices, say, only their
+ * input rate and leaves output unset. Zeroing the unset tiers would silently
+ * make those tokens free (under-billing on display AND in the block-cost split),
+ * so an unset tier falls back per-tier: to the registry rate for the model when
+ * one is known (`registryFallback`), else to the input rate for the cache tiers
+ * (counted, not discounted), else 0. The registry fallback is computed lazily
+ * and only when a tier is actually missing.
  *
  * Single source of the P1 cascade so the two consumers — `computeSpanCost`
  * (which multiplies these by usage to get the span cost) and the block-cost
  * allocator's per-tier pricing (which reconciles Σ per-category cost to that
- * same span cost) — cannot drift. The accessor abstracts over the caller's
- * attribute shape (`NormalizedAttributes` map vs an OTLP span lookup).
+ * same span cost) — cannot drift. BOTH must pass the SAME `registryFallback`, or
+ * the display and the allocation would price the unset tiers differently and
+ * break conservation. The accessor abstracts over the caller's attribute shape
+ * (`NormalizedAttributes` map vs an OTLP span lookup).
  */
 export function resolveCustomTierRates(
   getRate: (key: string) => number | null,
+  registryFallback?: () => Partial<CustomTierRates> | null,
 ): CustomTierRates | null {
   const customInput = getRate(ATTR_KEYS.LANGWATCH_MODEL_INPUT_COST_PER_TOKEN);
   const customOutput = getRate(ATTR_KEYS.LANGWATCH_MODEL_OUTPUT_COST_PER_TOKEN);
   if (customInput === null && customOutput === null) return null;
 
-  const inputRate = customInput ?? 0;
+  const customCacheRead = getRate(
+    ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN,
+  );
+  const customCacheCreation = getRate(
+    ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN,
+  );
+
+  // Compute the registry rates once, and only if some tier is actually unset.
+  const needsFallback =
+    customInput === null ||
+    customOutput === null ||
+    customCacheRead === null ||
+    customCacheCreation === null;
+  const fb = needsFallback ? (registryFallback?.() ?? null) : null;
+
+  const inputRate = customInput ?? fb?.inputCostPerToken ?? 0;
   return {
     inputCostPerToken: inputRate,
-    outputCostPerToken: customOutput ?? 0,
+    outputCostPerToken: customOutput ?? fb?.outputCostPerToken ?? 0,
     cacheReadCostPerToken:
-      getRate(ATTR_KEYS.LANGWATCH_MODEL_CACHE_READ_COST_PER_TOKEN) ?? inputRate,
+      customCacheRead ?? fb?.cacheReadCostPerToken ?? inputRate,
     cacheCreationCostPerToken:
-      getRate(ATTR_KEYS.LANGWATCH_MODEL_CACHE_CREATION_COST_PER_TOKEN) ??
-      inputRate,
+      customCacheCreation ?? fb?.cacheCreationCostPerToken ?? inputRate,
   };
 }
 
@@ -110,11 +134,22 @@ export function computeSpanCost({
       0,
   );
 
-  // Priority 1: Custom cost rates from enrichment. A custom cost may carry
-  // its own cache rates (customer override); when it does not, cache tokens
-  // fall back to the input rate (counted, just not discounted).
-  const customRates = resolveCustomTierRates((key) =>
-    coerceToNumber(attrs[key]),
+  const resolvedModel =
+    model ??
+    (typeof attrs[ATTR_KEYS.GEN_AI_RESPONSE_MODEL] === "string"
+      ? (attrs[ATTR_KEYS.GEN_AI_RESPONSE_MODEL] as string)
+      : undefined) ??
+    (typeof attrs[ATTR_KEYS.GEN_AI_REQUEST_MODEL] === "string"
+      ? (attrs[ATTR_KEYS.GEN_AI_REQUEST_MODEL] as string)
+      : undefined);
+
+  // Priority 1: Custom cost rates from enrichment. A one-sided override fills
+  // its unset tiers from the registry rate for this model (see
+  // resolveCustomTierRates) rather than zeroing them — the SAME fallback the
+  // block-cost allocator passes, so display and per-category cost stay conserved.
+  const customRates = resolveCustomTierRates(
+    (key) => coerceToNumber(attrs[key]),
+    resolvedModel ? () => resolveRegistryTierRates(resolvedModel) : undefined,
   );
   if (customRates) {
     return (
@@ -135,15 +170,6 @@ export function computeSpanCost({
   if (numSpanCost !== null && numSpanCost > 0) return numSpanCost;
 
   // Priority 3: Static model registry with fallbacks
-  const resolvedModel =
-    model ??
-    (typeof attrs[ATTR_KEYS.GEN_AI_RESPONSE_MODEL] === "string"
-      ? (attrs[ATTR_KEYS.GEN_AI_RESPONSE_MODEL] as string)
-      : undefined) ??
-    (typeof attrs[ATTR_KEYS.GEN_AI_REQUEST_MODEL] === "string"
-      ? (attrs[ATTR_KEYS.GEN_AI_REQUEST_MODEL] as string)
-      : undefined);
-
   if (
     resolvedModel &&
     (inputTokens > 0 ||

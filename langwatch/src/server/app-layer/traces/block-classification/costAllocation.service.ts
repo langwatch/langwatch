@@ -110,6 +110,7 @@ export function allocateCategoryCosts({
   inputBlocks,
   outputBlocks,
   lastCacheBreakpointIndex,
+  inferredCachedPrefixEstTokens = null,
   pools,
   prices,
   reconcileToTotalCost,
@@ -117,6 +118,9 @@ export function allocateCategoryCosts({
   inputBlocks: TokenBlock[];
   outputBlocks: TokenBlock[];
   lastCacheBreakpointIndex: number | null;
+  /** Fractional cached-prefix size (estimate space) from `inferCachedPrefixEstTokens`,
+   * used only when `lastCacheBreakpointIndex` is null (no real marker survived). */
+  inferredCachedPrefixEstTokens?: number | null;
   pools: UsagePools;
   prices: TierPrices;
   /**
@@ -131,6 +135,7 @@ export function allocateCategoryCosts({
   const { cachePrefix, fresh } = partitionInput({
     inputBlocks,
     lastCacheBreakpointIndex,
+    inferredCachedPrefixEstTokens,
     cacheReadTokens: pools.cacheReadTokens,
     cacheCreationTokens: pools.cacheCreationTokens,
   });
@@ -238,15 +243,18 @@ function reconcileCosts(totals: CategoryTotals, target: number): void {
  *
  * The cached prefix is ALWAYS the front of the input, and its size is exactly
  * `cacheRead + cacheCreation` provider tokens. Block token counts are local
- * estimates on a different scale, so the boundary is placed by cumulative
- * estimate proportional to the cached fraction of the input: the returned index
- * is the last block whose cumulative estimate falls within that fraction, so
- * `partitionInput` splits the cached prefix (→ cache tiers) from the fresh tail.
+ * estimates on a different scale, so the boundary is placed by the cumulative
+ * estimate proportional to the cached fraction of the input. Returns the
+ * boundary as a FRACTIONAL position in estimate space (not a whole-block index)
+ * so `partitionInput` can split the block that straddles the cached/fresh
+ * boundary — a whole-block boundary would swallow the straddling block's fresh
+ * portion into the cached prefix, leaving the fresh pool blockless and dumping
+ * its tokens into `other_input` (and zeroing `user_input`).
  *
  * Returns null when there is nothing to infer (no cached tokens, or no block
  * mass) — the caller then leaves the breakpoint null (all-fresh), unchanged.
  */
-export function inferCacheBreakpointFromPools({
+export function inferCachedPrefixEstTokens({
   inputBlocks,
   pools,
 }: {
@@ -258,14 +266,36 @@ export function inferCacheBreakpointFromPools({
   if (cached <= 0 || total <= 0) return null;
   const estTotal = inputBlocks.reduce((sum, b) => sum + b.tokens, 0);
   if (estTotal <= 0) return null;
+  return (cached / total) * estTotal;
+}
 
-  const cachedEstTokens = (cached / total) * estTotal;
+/**
+ * Split an ordered block list at a FRACTIONAL boundary in estimate space,
+ * dividing the straddling block between the two sides (keeping idx + category on
+ * both slices). `allocatePool` later rescales each pool to its provider total, so
+ * the estimate-based split point only sets proportions, never the token totals.
+ */
+function splitBlocksAtEstBoundary(
+  blocks: TokenBlock[],
+  boundaryEst: number,
+): { before: TokenBlock[]; after: TokenBlock[] } {
+  const before: TokenBlock[] = [];
+  const after: TokenBlock[] = [];
   let running = 0;
-  for (let i = 0; i < inputBlocks.length; i++) {
-    running += inputBlocks[i]!.tokens;
-    if (running >= cachedEstTokens) return i;
+  for (const block of blocks) {
+    const blockEnd = running + block.tokens;
+    if (blockEnd <= boundaryEst) {
+      before.push(block);
+    } else if (running >= boundaryEst) {
+      after.push(block);
+    } else {
+      const beforePortion = boundaryEst - running;
+      before.push({ ...block, tokens: beforePortion });
+      after.push({ ...block, tokens: block.tokens - beforePortion });
+    }
+    running = blockEnd;
   }
-  return inputBlocks.length - 1;
+  return { before, after };
 }
 
 /**
@@ -293,68 +323,74 @@ export function inferCacheBreakpointFromPools({
 function partitionInput({
   inputBlocks,
   lastCacheBreakpointIndex,
+  inferredCachedPrefixEstTokens,
   cacheReadTokens,
   cacheCreationTokens,
 }: {
   inputBlocks: TokenBlock[];
   lastCacheBreakpointIndex: number | null;
+  /** Fractional cached-prefix size (estimate space) inferred from the pools when
+   * no real cache_control marker survived. Used only when there is no marker. */
+  inferredCachedPrefixEstTokens: number | null;
   cacheReadTokens: number;
   cacheCreationTokens: number;
 }): {
   cachePrefix: { cacheRead: TokenBlock[]; cacheCreation: TokenBlock[] };
   fresh: TokenBlock[];
 } {
-  const cacheRead: TokenBlock[] = [];
-  const cacheCreation: TokenBlock[] = [];
+  const noPrefix = () => ({
+    cachePrefix: {
+      cacheRead: [] as TokenBlock[],
+      cacheCreation: [] as TokenBlock[],
+    },
+    fresh: inputBlocks,
+  });
 
-  // A negative breakpoint is not a real prefix boundary: `slice(0, index + 1)`
-  // with e.g. index = -2 becomes `slice(0, -1)`, silently dropping the last
-  // block off the prefix. Treat any negative index as "no breakpoint".
   const hasCache = cacheReadTokens > 0 || cacheCreationTokens > 0;
-  if (
-    lastCacheBreakpointIndex === null ||
-    lastCacheBreakpointIndex < 0 ||
-    !hasCache
+  if (!hasCache) return noPrefix();
+
+  let prefix: TokenBlock[];
+  let fresh: TokenBlock[];
+  if (lastCacheBreakpointIndex !== null && lastCacheBreakpointIndex >= 0) {
+    // A REAL cache_control marker sits on a block edge, so the cached prefix is
+    // whole blocks 0..index (`slice(0, index + 1)`).
+    const prefixEnd = Math.min(
+      lastCacheBreakpointIndex + 1,
+      inputBlocks.length,
+    );
+    prefix = inputBlocks.slice(0, prefixEnd);
+    fresh = inputBlocks.slice(prefixEnd);
+  } else if (
+    inferredCachedPrefixEstTokens !== null &&
+    inferredCachedPrefixEstTokens > 0
   ) {
-    return { cachePrefix: { cacheRead, cacheCreation }, fresh: inputBlocks };
+    // No marker survived: the cached/fresh boundary is a FRACTIONAL token
+    // position, so split the straddling block between the cached prefix and the
+    // fresh tail — a whole-block boundary would swallow the block's fresh portion
+    // and leave the fresh pool blockless (→ other_input, user_input = 0 fresh).
+    const split = splitBlocksAtEstBoundary(
+      inputBlocks,
+      inferredCachedPrefixEstTokens,
+    );
+    prefix = split.before;
+    fresh = split.after;
+  } else {
+    return noPrefix();
   }
 
-  const prefixEnd = Math.min(lastCacheBreakpointIndex + 1, inputBlocks.length);
-  const prefix = inputBlocks.slice(0, prefixEnd);
-  const fresh = inputBlocks.slice(prefixEnd);
-
-  // The read/creation split point in ESTIMATE space, proportional to the
-  // provider's read share (see the SCALE HAZARD note above). When creation is 0
-  // the boundary is the whole prefix (all read); when read is 0 it is 0 (all
-  // creation) — a blockless pool then has a 0 provider total and is skipped, so
-  // nothing dumps to the catch-all.
+  // Within the cached prefix, split read/creation by the provider's read share
+  // (see the SCALE HAZARD note above). When creation is 0 the boundary is the
+  // whole prefix (all read); when read is 0 it is 0 (all creation).
   const cacheTotalTokens = cacheReadTokens + cacheCreationTokens;
   const estPrefixTokens = prefix.reduce((sum, b) => sum + b.tokens, 0);
   const readBoundary =
     cacheTotalTokens > 0
       ? (cacheReadTokens / cacheTotalTokens) * estPrefixTokens
       : estPrefixTokens;
-
-  let running = 0;
-  for (const block of prefix) {
-    const blockEnd = running + block.tokens;
-    if (blockEnd <= readBoundary) {
-      // Entirely within the cache_read share.
-      cacheRead.push(block);
-    } else if (running >= readBoundary) {
-      // Starts at/after the boundary — entirely cache_creation.
-      cacheCreation.push(block);
-    } else {
-      // Straddles the boundary: split at it so neither pool is left blockless.
-      // Both slices keep idx + category; allocatePool rescales each pool to its
-      // provider total, so the estimate-based split point only sets the tier
-      // proportions, never the final token totals.
-      const readPortion = readBoundary - running;
-      cacheRead.push({ ...block, tokens: readPortion });
-      cacheCreation.push({ ...block, tokens: block.tokens - readPortion });
-    }
-    running = blockEnd;
-  }
+  const { before: cacheRead, after: cacheCreation } = splitBlocksAtEstBoundary(
+    prefix,
+    readBoundary,
+  );
 
   return { cachePrefix: { cacheRead, cacheCreation }, fresh };
 }

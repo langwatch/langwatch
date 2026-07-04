@@ -455,12 +455,24 @@ function resolveInputMessages(
   promptTextById: ReadonlyMap<string, string>,
 ): string | null {
   const parsed = buildInputMessagesFromRequestBody(body.attrs.body);
+  const freshPrompt = asNonEmpty(
+    promptTextById.get(body.attrs["prompt.id"] ?? ""),
+  );
   let messages: Array<{ role: string; content: string }> | null = parsed;
   if (!messages) {
-    const fallback = asNonEmpty(
-      promptTextById.get(body.attrs["prompt.id"] ?? ""),
+    messages = freshPrompt ? [{ role: "user", content: freshPrompt }] : null;
+  } else if (freshPrompt && body.attrs.body_truncated === "true") {
+    // Truncation drops the TAIL, so a recovered conversation is missing the
+    // newest (current) user turn. Reinstate the clean co-located user_prompt as
+    // that final turn — but only when it did not already survive in the prefix
+    // (a mid-turn call keeps the prompt as early prior context and truncated
+    // only the trailing tool_results), so we never duplicate the human prompt.
+    const alreadyPresent = messages.some(
+      (m) => m.role === "user" && m.content.includes(freshPrompt),
     );
-    messages = fallback ? [{ role: "user", content: fallback }] : null;
+    if (!alreadyPresent) {
+      messages = [...messages, { role: "user", content: freshPrompt }];
+    }
   }
   if (!messages) return null;
   const capped = messages.map((m) => ({

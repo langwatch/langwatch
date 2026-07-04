@@ -45,10 +45,10 @@ export const SESSION_STEPS_ATTR = "langwatch.reserved.session_steps";
 export const SESSION_HARNESS_ATTR = "langwatch.reserved.session.harness";
 
 /**
- * Hard bound on the per-trace step array. Past the cap, adjacent pairs merge
- * keeping the larger input size (ADR-033 Schema, session-fold block): resolution
- * halves but the sawtooth shape — the growth/compaction signal — is preserved,
- * and fold-size pressure stays within ADR-021 limits.
+ * Hard bound on the per-trace step array. Past the cap, the series is halved by
+ * min/max decimation (ADR-033 Schema, session-fold block): resolution halves but
+ * BOTH the sawtooth peaks AND valleys — the growth AND compaction signal — are
+ * preserved, and fold-size pressure stays within ADR-021 limits.
  */
 export const MAX_SESSION_STEPS = 512;
 
@@ -74,41 +74,55 @@ export function parseSessionSteps(raw: string | undefined): SessionStep[] {
 }
 
 /**
- * Collapse a step array to half its length by merging adjacent pairs and
- * keeping the larger input size — preserving the sawtooth peaks that carry the
- * compaction signal. The earlier `startMs` of each pair is kept so ordering
- * survives the merge. A trailing odd element is carried through unmerged.
+ * Halve a step array while preserving BOTH local extrema — peaks AND valleys —
+ * via min/max decimation, so the compaction signal survives past the cap.
  *
- * Steps are sorted by `startMs` first: OTLP spans and log turns can arrive
- * out of chronological order, so pairing raw append-order neighbours could
- * merge a late-arriving early step with a distant one and corrupt the
- * preserved sawtooth. Sorting first makes each merged pair two chronological
- * neighbours, so the halved-resolution curve still tracks real context growth.
+ * The earlier keep-max merge kept only the larger of each adjacent pair, which
+ * systematically ERASED the valleys: the post-compaction low points are exactly
+ * what `detectCompactionEvents` reads a context re-base by, so a marathon session
+ * past the cap lost its compaction events (the drops were merged away into the
+ * neighbouring peaks). Min/max decimation instead buckets consecutive steps in
+ * FOURS and emits each bucket's min and max in start-time order: the peaks keep
+ * the running-max reference high and the valleys keep the drops, so the halved
+ * series still traces the sawtooth the detector walks.
+ *
+ * Steps are start-time sorted first (OTLP spans and log turns arrive out of
+ * chronological order), so each bucket is four chronological neighbours. A bucket
+ * whose min and max coincide (a flat run, or a trailing partial bucket of one)
+ * emits a single point. Output length ≤ ⌈N/2⌉, so one pass clears the cap.
+ *
+ * Residual limit: the two interior points of a four-step bucket are dropped, so
+ * a second peak+valley pair inside one bucket loses resolution — an accepted
+ * trade at the >512-step tail, and strictly better than erasing every valley.
  */
-function mergeAdjacentKeepMax(input: SessionStep[]): SessionStep[] {
+function downsampleKeepExtrema(input: SessionStep[]): SessionStep[] {
   const steps = [...input].sort((a, b) => a.startMs - b.startMs);
-  const merged: SessionStep[] = [];
-  for (let i = 0; i < steps.length; i += 2) {
-    const a = steps[i]!;
-    const b = steps[i + 1];
-    if (!b) {
-      merged.push(a);
-      continue;
+  const out: SessionStep[] = [];
+  for (let i = 0; i < steps.length; i += 4) {
+    let min = steps[i]!;
+    let max = steps[i]!;
+    for (let j = i + 1; j < i + 4 && j < steps.length; j++) {
+      const s = steps[j]!;
+      if (s.inputTokens < min.inputTokens) min = s;
+      if (s.inputTokens > max.inputTokens) max = s;
     }
-    merged.push({
-      startMs: Math.min(a.startMs, b.startMs),
-      inputTokens: Math.max(a.inputTokens, b.inputTokens),
-    });
+    if (min === max) {
+      out.push(min);
+    } else if (min.startMs <= max.startMs) {
+      out.push(min, max);
+    } else {
+      out.push(max, min);
+    }
   }
-  return merged;
+  return out;
 }
 
 /**
  * Append one coding-agent step to a trace's step series on the (mutable)
  * attribute map, stamping the harness marker. Keeps the array bounded at
- * {@link MAX_SESSION_STEPS} by merging adjacent pairs (keep-max) once it would
- * overflow. Pure aside from mutating the passed `attributes` object, which the
- * fold already treats as a fresh per-step copy.
+ * {@link MAX_SESSION_STEPS} by min/max decimation (peaks AND valleys survive)
+ * once it would overflow. Pure aside from mutating the passed `attributes`
+ * object, which the fold already treats as a fresh per-step copy.
  *
  * Cost note: this parses + re-serialises the series each call, which the fold
  * deliberately avoided for its UNBOUNDED collections (events/spanCosts — see the
@@ -139,7 +153,7 @@ export function appendSessionStep({
   // it directly. Bounded at MAX_SESSION_STEPS, so the sort stays cheap.
   steps.sort((a, b) => a.startMs - b.startMs);
   const bounded =
-    steps.length > MAX_SESSION_STEPS ? mergeAdjacentKeepMax(steps) : steps;
+    steps.length > MAX_SESSION_STEPS ? downsampleKeepExtrema(steps) : steps;
   attributes[SESSION_STEPS_ATTR] = JSON.stringify(bounded);
   attributes[SESSION_HARNESS_ATTR] = harness;
 }

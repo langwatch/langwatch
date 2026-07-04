@@ -129,6 +129,57 @@ describe("OtlpSpanBlockClassificationService", () => {
         const realCost = 300 * 3e-6 + 20 * 1.5e-5;
         expect(Math.abs(catCosts - realCost)).toBeLessThan(1e-9);
       });
+
+      it("conserves stored tokens — per-axis category tokens sum to the provider pool exactly (largest-remainder, no drift)", async () => {
+        // Three equal input blocks (system + prior + fresh) share a 10-token
+        // fresh pool: each scales to ~3.33, and rounding them independently
+        // would store 3+3+3 = 9, drifting a token off the provider's 10. The
+        // largest-remainder rounding must keep the stored sum at exactly 10.
+        const span = createSpan([
+          { key: "langwatch.span.type", value: { stringValue: "llm" } },
+          {
+            key: "gen_ai.request.model",
+            value: { stringValue: "claude-fable-5" },
+          },
+          {
+            key: "langwatch.claude_code.request_body",
+            value: {
+              stringValue: JSON.stringify({
+                system: [
+                  { type: "text", text: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+                ],
+                messages: [
+                  { role: "user", content: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+                  { role: "user", content: "cccccccccccccccccccccccccccccccc" },
+                ],
+              }),
+            },
+          },
+          { key: "gen_ai.usage.input_tokens", value: { intValue: 10 } },
+          { key: "gen_ai.usage.output_tokens", value: { intValue: 4 } },
+          {
+            key: "langwatch.model.inputCostPerToken",
+            value: { doubleValue: 3e-6 },
+          },
+          {
+            key: "langwatch.model.outputCostPerToken",
+            value: { doubleValue: 1.5e-5 },
+          },
+        ]);
+
+        await service.classifySpanBlocks({
+          span,
+          instrumentationScope: CLAUDE_SCOPE,
+        });
+
+        const inputTokenKeys = new Set(
+          Object.values(InputCategory).map((c) => blockCategoryTokensAttr(c)),
+        );
+        const inputTokenSum = span.attributes
+          .filter((a) => inputTokenKeys.has(a.key))
+          .reduce((n, a) => n + Number(a.value.stringValue), 0);
+        expect(inputTokenSum).toBe(10);
+      });
     });
   });
 
@@ -246,6 +297,80 @@ describe("OtlpSpanBlockClassificationService", () => {
 
       expect(
         attrValue(span, blockCategoryTokensAttr(InputCategory.SYSTEM_PROMPT)),
+      ).toBeDefined();
+      expect(
+        attrValue(span, blockCategoryTokensAttr(InputCategory.OTHER_INPUT)),
+      ).toBeUndefined();
+    });
+  });
+
+  describe("given a Claude Code span whose raw body was truncated past the newest turn", () => {
+    it("reinstates the current user prompt from the flattened side-channel so fresh input is not lost", async () => {
+      // Inline truncation drops the tail — the newest user turn — so the raw body
+      // recovers only the system prefix. The clean flattened langwatch.input still
+      // carries the current prompt; without reinstating it the fresh input_tokens
+      // pool has no user block and dumps into other_input.
+      const full = JSON.stringify({
+        system: [{ type: "text", text: "You are a coding assistant." }],
+        messages: [
+          {
+            role: "user",
+            content: "the current prompt, cut off by truncation",
+          },
+        ],
+      });
+      const truncatedBody = full.slice(0, full.indexOf("cut off"));
+
+      const span = createSpan([
+        { key: "langwatch.span.type", value: { stringValue: "llm" } },
+        {
+          key: "gen_ai.request.model",
+          value: { stringValue: "claude-fable-5" },
+        },
+        {
+          key: "langwatch.claude_code.request_body",
+          value: { stringValue: truncatedBody },
+        },
+        // The clean flattened side-channel (log-to-span fills this from the
+        // co-located user_prompt) carries the current turn.
+        {
+          key: "langwatch.input",
+          value: {
+            stringValue: JSON.stringify({
+              type: "chat_messages",
+              value: [{ role: "user", content: "the current prompt" }],
+            }),
+          },
+        },
+        { key: "gen_ai.usage.input_tokens", value: { intValue: 40 } },
+        {
+          key: "gen_ai.usage.cache_read.input_tokens",
+          value: { intValue: 500 },
+        },
+        { key: "gen_ai.usage.output_tokens", value: { intValue: 10 } },
+        {
+          key: "langwatch.model.inputCostPerToken",
+          value: { doubleValue: 3e-6 },
+        },
+        {
+          key: "langwatch.model.outputCostPerToken",
+          value: { doubleValue: 1.5e-5 },
+        },
+        {
+          key: "langwatch.model.cacheReadCostPerToken",
+          value: { doubleValue: 3e-7 },
+        },
+      ]);
+
+      await service.classifySpanBlocks({
+        span,
+        instrumentationScope: CLAUDE_SCOPE,
+      });
+
+      // The reinstated current turn is the fresh user_input block; the fresh
+      // input_tokens pool attributes to it instead of the catch-all.
+      expect(
+        attrValue(span, blockCategoryTokensAttr(InputCategory.USER_INPUT)),
       ).toBeDefined();
       expect(
         attrValue(span, blockCategoryTokensAttr(InputCategory.OTHER_INPUT)),

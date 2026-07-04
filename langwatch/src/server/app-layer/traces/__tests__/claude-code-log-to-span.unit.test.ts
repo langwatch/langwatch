@@ -153,14 +153,18 @@ describe("convertClaudeCodeLogsToSpans", () => {
       expect(strVal(span, "langwatch.span.type")).toBe("llm");
       expect(strVal(span, "gen_ai.request.model")).toBe("claude-opus-4-7");
       // Tokens + cache + cost (cache_read ~0.1x vs cache_creation ~1.25x stay distinct).
-      expect(attr(span, "gen_ai.usage.input_tokens")).toEqual({ intValue: 120 });
+      expect(attr(span, "gen_ai.usage.input_tokens")).toEqual({
+        intValue: 120,
+      });
       expect(attr(span, "gen_ai.usage.cache_read.input_tokens")).toEqual({
         intValue: 63429,
       });
       expect(attr(span, "gen_ai.usage.cache_creation.input_tokens")).toEqual({
         intValue: 1024,
       });
-      expect(attr(span, "langwatch.span.cost")).toEqual({ doubleValue: 0.0875 });
+      expect(attr(span, "langwatch.span.cost")).toEqual({
+        doubleValue: 0.0875,
+      });
       // Input from the earlier-batch body, output from the response.
       expect(strVal(span, "gen_ai.input.messages")).toBe(
         JSON.stringify([{ role: "user", content: "Reply with PONG-Z" }]),
@@ -217,7 +221,9 @@ describe("convertClaudeCodeLogsToSpans", () => {
       // The verbatim bodies are surfaced for full-fidelity debugging (the system
       // prompt, tool/skill schemas, and message history behind the cache tokens).
       expect(strVal(span, "langwatch.claude_code.request_body")).toBe(reqBody);
-      expect(strVal(span, "langwatch.claude_code.response_body")).toBe(respBody);
+      expect(strVal(span, "langwatch.claude_code.response_body")).toBe(
+        respBody,
+      );
       // The light readable view is unchanged.
       expect(strVal(span, "gen_ai.input.messages")).toBe(
         JSON.stringify([{ role: "user", content: "Reply with PONG-Z" }]),
@@ -349,8 +355,12 @@ describe("convertClaudeCodeLogsToSpans", () => {
         }),
       ]);
       expect(spans).toHaveLength(2);
-      const first = spans.find((s) => s.span.spanId === "a1a1a1a1a1a1a1a1")!.span;
-      const second = spans.find((s) => s.span.spanId === "a2a2a2a2a2a2a2a2")!.span;
+      const first = spans.find(
+        (s) => s.span.spanId === "a1a1a1a1a1a1a1a1",
+      )!.span;
+      const second = spans.find(
+        (s) => s.span.spanId === "a2a2a2a2a2a2a2a2",
+      )!.span;
       expect(strVal(first, "gen_ai.input.messages")).toBe(
         JSON.stringify([{ role: "user", content: "first question" }]),
       );
@@ -456,8 +466,11 @@ describe("convertClaudeCodeLogsToSpans", () => {
       // Fold 1: anchor + response only (body still missing) — one missing part.
       const partial = convertClaudeCodeLogsToSpans([anchor, response])[0]!.span;
       // Fold 2: the body lands — the SAME span, now complete.
-      const complete = convertClaudeCodeLogsToSpans([anchor, response, body])[0]!
-        .span;
+      const complete = convertClaudeCodeLogsToSpans([
+        anchor,
+        response,
+        body,
+      ])[0]!.span;
 
       expect(partial.spanId).toBe("a0a0a0a0a0a0a0a0");
       expect(complete.spanId).toBe(partial.spanId);
@@ -491,7 +504,9 @@ describe("convertClaudeCodeLogsToSpans", () => {
       expect(spans).toHaveLength(1);
       const { span } = spans[0]!;
       expect(attr(span, "langwatch.span.cost")).toEqual({ doubleValue: 0.39 });
-      expect(attr(span, "gen_ai.usage.output_tokens")).toEqual({ intValue: 24 });
+      expect(attr(span, "gen_ai.usage.output_tokens")).toEqual({
+        intValue: 24,
+      });
       expect(strVal(span, "gen_ai.input.messages")).toBeUndefined();
       expect(strVal(span, "gen_ai.completion")).toBeUndefined();
     });
@@ -528,7 +543,9 @@ describe("convertClaudeCodeLogsToSpans", () => {
       expect(attr(span, "langwatch.span.cost")).toEqual({
         doubleValue: 0.000512,
       });
-      expect(attr(span, "gen_ai.usage.input_tokens")).toEqual({ intValue: 457 });
+      expect(attr(span, "gen_ai.usage.input_tokens")).toEqual({
+        intValue: 457,
+      });
       expect(strVal(span, "gen_ai.completion")).toBe(
         '{"title": "List temporary directory"}',
       );
@@ -617,7 +634,10 @@ describe("convertClaudeCodeLogsToSpans", () => {
       )[0]!;
       expect(strVal(span, "gen_ai.input.messages")).toBe(
         JSON.stringify([
-          { role: "user", content: "Turn 2: reply with exactly PONG-CLAUDE-B2." },
+          {
+            role: "user",
+            content: "Turn 2: reply with exactly PONG-CLAUDE-B2.",
+          },
         ]),
       );
     });
@@ -630,7 +650,99 @@ describe("convertClaudeCodeLogsToSpans", () => {
       // ...but the verbatim request body still carries what we DO have: the
       // first ~60KB holds the system prompt + tool schemas that drive the cache
       // tokens, confined to its own raw debugging attribute.
-      expect(strVal(span, "langwatch.claude_code.request_body")).toBe(truncated);
+      expect(strVal(span, "langwatch.claude_code.request_body")).toBe(
+        truncated,
+      );
+    });
+  });
+
+  describe("a truncated api_request_body whose leading turns survived but the newest was cut", () => {
+    // system + first turn + a reply survive; the trailing (current) user turn is
+    // cut mid-write, so recovery yields the prefix without the current prompt.
+    const truncated =
+      '{"system":[{"type":"text","text":"sys"}],"messages":[{"role":"user","content":"earlier turn"},{"role":"assistant","content":"ok"},{"role":"user","content":"the current pro';
+
+    const build = (promptTextById: Map<string, string>) =>
+      convertClaudeCodeLogsToSpans(
+        [
+          rec({
+            eventName: "api_request",
+            spanId: "cccccccccccccccc",
+            attrs: {
+              "event.name": "api_request",
+              model: "claude-opus-4-8",
+              request_id: "req_c",
+              query_source: "repl_main_thread",
+              "prompt.id": "p_77",
+            },
+          }),
+          rec({
+            eventName: "api_request_body",
+            spanId: "dddddddddddddddd",
+            attrs: {
+              "event.name": "api_request_body",
+              model: "claude-opus-4-8",
+              query_source: "repl_main_thread",
+              "prompt.id": "p_77",
+              body_truncated: "true",
+              body: truncated,
+            },
+          }),
+        ],
+        promptTextById,
+      );
+
+    it("reinstates the clean current prompt as the final turn, keeping the recovered prefix", () => {
+      const { span } = build(new Map([["p_77", "the current prompt"]]))[0]!;
+      expect(strVal(span, "gen_ai.input.messages")).toBe(
+        JSON.stringify([
+          { role: "system", content: "sys" },
+          { role: "user", content: "earlier turn" },
+          { role: "assistant", content: "ok" },
+          { role: "user", content: "the current prompt" },
+        ]),
+      );
+    });
+
+    it("does not duplicate the prompt when it already survived in the recovered prefix (mid-turn call)", () => {
+      // The human prompt is the earlier turn that survived; only trailing
+      // tool_results were truncated. Re-appending it would duplicate + mislabel.
+      const midTurn =
+        '{"messages":[{"role":"user","content":"earlier turn"},{"role":"assistant","content":"ok"},{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"outp';
+      const { span } = convertClaudeCodeLogsToSpans(
+        [
+          rec({
+            eventName: "api_request",
+            spanId: "cccccccccccccccc",
+            attrs: {
+              "event.name": "api_request",
+              model: "claude-opus-4-8",
+              request_id: "req_m",
+              query_source: "repl_main_thread",
+              "prompt.id": "p_88",
+            },
+          }),
+          rec({
+            eventName: "api_request_body",
+            spanId: "dddddddddddddddd",
+            attrs: {
+              "event.name": "api_request_body",
+              model: "claude-opus-4-8",
+              query_source: "repl_main_thread",
+              "prompt.id": "p_88",
+              body_truncated: "true",
+              body: midTurn,
+            },
+          }),
+        ],
+        new Map([["p_88", "earlier turn"]]),
+      )[0]!;
+      expect(strVal(span, "gen_ai.input.messages")).toBe(
+        JSON.stringify([
+          { role: "user", content: "earlier turn" },
+          { role: "assistant", content: "ok" },
+        ]),
+      );
     });
   });
 
@@ -751,7 +863,10 @@ describe("convertClaudeCodeToolLogsToSpans", () => {
 
     it("derives a deterministic span id from tool_use_id, order-independent", () => {
       const a = build();
-      const b = convertClaudeCodeToolLogsToSpans([toolResult(), toolDecision()]);
+      const b = convertClaudeCodeToolLogsToSpans([
+        toolResult(),
+        toolDecision(),
+      ]);
       expect(a[0]!.span.spanId).toBe(b[0]!.span.spanId);
       expect(a[0]!.span.spanId).not.toBe("d1d1d1d1d1d1d1d1");
     });
@@ -863,7 +978,9 @@ describe("convertClaudeCodeTurnToSpans (turn hierarchy)", () => {
     )!.span;
     expect(attr(model, "langwatch.span.cost")).toEqual({ doubleValue: 0.05 });
     expect(attr(model, "gen_ai.usage.input_tokens")).toEqual({ intValue: 100 });
-    expect(strVal(tool, "langwatch.input")).toBe('{"command":"ls /tmp | wc -l"}');
+    expect(strVal(tool, "langwatch.input")).toBe(
+      '{"command":"ls /tmp | wc -l"}',
+    );
 
     // The root envelopes the children in time (starts at/before, ends at/after).
     expect(startNano(root)).toBeLessThanOrEqual(startNano(model));
@@ -921,7 +1038,9 @@ describe("convertClaudeCodeTurnToSpans (tool output recovery)", () => {
   });
 
   it("nudges the output-less tool span earlier so the recovered version wins", () => {
-    const withoutOutput = toolSpanOf(convertClaudeCodeTurnToSpans([toolResult]));
+    const withoutOutput = toolSpanOf(
+      convertClaudeCodeTurnToSpans([toolResult]),
+    );
     const withOutput = toolSpanOf(
       convertClaudeCodeTurnToSpans([toolResult, nextModelBody]),
     );

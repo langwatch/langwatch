@@ -234,7 +234,7 @@ function makeCodexSseLogEvent(
 describe("handleTraceLogRecordReceived session-step accumulation", () => {
   describe("given a codex sse log turn with a thread id and input usage", () => {
     describe("when it is folded", () => {
-      it("appends a step summing fresh + cache-read input tokens", () => {
+      it("counts input_token_count alone — codex cached tokens are a subset, not additive (matches the span path)", () => {
         const projection = new TraceSummaryFoldProjection({
           store: { store: async () => {}, get: async () => null },
         });
@@ -243,7 +243,11 @@ describe("handleTraceLogRecordReceived session-step accumulation", () => {
           makeCodexSseLogEvent(
             {
               model: "gpt-5-mini",
-              input_token_count: "3000",
+              // OpenAI/codex input_token_count already INCLUDES the cached
+              // tokens (cached_token_count is a subset), so the step context is
+              // input alone; adding cache would double-count and inflate the
+              // running max, mirroring extractStepInputTokens on the span path.
+              input_token_count: "15000",
               output_token_count: "50",
               cached_token_count: "12000",
               "conversation.id": "codex-thread-1",

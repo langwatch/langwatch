@@ -12,6 +12,8 @@ import {
   classifyBlocks,
 } from "./block-classification/blockClassifier.service";
 import {
+  type Axis,
+  axisOf,
   blockCategoryCostAttr,
   blockCategoryTokensAttr,
   type Category,
@@ -27,7 +29,8 @@ import {
 } from "./block-classification/claudeCodeBody";
 import {
   allocateCategoryCosts,
-  inferCacheBreakpointFromPools,
+  type CategoryTotals,
+  inferCachedPrefixEstTokens,
   type TierPrices,
   type TokenBlock,
   type UsagePools,
@@ -175,12 +178,22 @@ export class OtlpSpanBlockClassificationService {
     const structuredInput = parseClaudeCodeRequestBody(
       getStringAttribute(span, ATTR_KEYS.CLAUDE_CODE_REQUEST_BODY),
     );
-    const inputMessages =
-      structuredInput?.messages ??
-      parseMessages(span, [
-        ATTR_KEYS.LANGWATCH_INPUT,
-        ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
-      ]);
+    const flattenedMessages = parseMessages(span, [
+      ATTR_KEYS.LANGWATCH_INPUT,
+      ATTR_KEYS.GEN_AI_INPUT_MESSAGES,
+    ]);
+    const inputMessages = structuredInput
+      ? // The raw body is preferred for its intact block structure, but inline
+        // truncation drops the NEWEST turn (the tail). When it did, reinstate the
+        // current user turn from the clean flattened side-channel (which the
+        // log-to-span converter fills from the co-located user_prompt), so the
+        // fresh user input is classified instead of lost to other_input.
+        appendFreshTurnIfTruncated({
+          structured: structuredInput.messages,
+          newestTurnComplete: structuredInput.newestTurnComplete,
+          flattened: flattenedMessages,
+        })
+      : flattenedMessages;
     const outputMessages =
       parseClaudeCodeResponseBody(
         getStringAttribute(span, ATTR_KEYS.CLAUDE_CODE_RESPONSE_BODY),
@@ -219,15 +232,18 @@ export class OtlpSpanBlockClassificationService {
     const outputBlocks = await this.toTokenBlocks({ blocks: output, model });
     const prices = this.resolveTierPrices({ span, model });
 
-    // 6. Cached-prefix boundary. The Claude Code log path flattens message
-    //    content to plain text, stripping the cache_control markers the
-    //    classifier reads — so `classifyBlocks` returns a null breakpoint even on
-    //    a cached turn. When the provider still reports cached tokens, infer the
-    //    boundary from the usage pools so those tokens attribute to the real
-    //    prefix categories instead of the axis catch-all (other_input).
-    const cacheBreakpoint =
-      lastInputCacheBreakpointIndex ??
-      inferCacheBreakpointFromPools({ inputBlocks, pools });
+    // 6. Cached-prefix boundary. When the content carried a real cache_control
+    //    marker, `lastInputCacheBreakpointIndex` is a whole-block index. When it
+    //    did not (the Claude Code log path flattens content to plain text,
+    //    stripping cache_control) but the provider still reports cached tokens,
+    //    infer the boundary as a FRACTIONAL estimate-space position from the pools
+    //    so those tokens attribute to the real prefix categories instead of the
+    //    axis catch-all (other_input), and the straddling block is split between
+    //    the cached prefix and the fresh tail.
+    const inferredCachedPrefixEstTokens =
+      lastInputCacheBreakpointIndex === null
+        ? inferCachedPrefixEstTokens({ inputBlocks, pools })
+        : null;
 
     // 7. Allocate cache-tier aware and push the classification attributes.
     //    Reconcile Σ to the authoritative displayed cost when the span carries a
@@ -236,7 +252,8 @@ export class OtlpSpanBlockClassificationService {
     const { categoryTotals, blocks } = allocateCategoryCosts({
       inputBlocks,
       outputBlocks,
-      lastCacheBreakpointIndex: cacheBreakpoint,
+      lastCacheBreakpointIndex: lastInputCacheBreakpointIndex,
+      inferredCachedPrefixEstTokens,
       pools,
       prices,
       reconcileToTotalCost: this.resolveReconciliationCost({ span }),
@@ -303,11 +320,22 @@ export class OtlpSpanBlockClassificationService {
     // Rounded for storage: raw float artifacts (0.0000012340000001) inflate
     // the attribute payload without adding information — tokens are integral
     // by nature, USD keeps 10 decimals (sub-nano-dollar precision).
+    //
+    // Tokens are rounded with the largest-remainder method PER AXIS, not
+    // independently: the exact per-category floats sum to the provider's per-axis
+    // pool total, and rounding each on its own drifts that sum by up to one token
+    // per category. Largest-remainder distributes the rounding residual to the
+    // categories with the biggest fractional parts, so the STORED integers still
+    // sum to the provider total (the same conservation the allocator guarantees
+    // in float space). Costs are floats, so they need no such reconciliation.
+    const roundedTokens = roundCategoryTokensPerAxis(categoryTotals);
     for (const [category, total] of Object.entries(categoryTotals)) {
-      if (!total || total.tokens <= 0) continue;
+      if (!total) continue;
+      const tokens = roundedTokens.get(category as Category) ?? 0;
+      if (tokens <= 0) continue;
       pending.push({
         key: blockCategoryTokensAttr(category as Category),
-        value: { stringValue: String(Math.round(total.tokens)) },
+        value: { stringValue: String(tokens) },
       });
       pending.push({
         key: blockCategoryCostAttr(category as Category),
@@ -335,8 +363,17 @@ export class OtlpSpanBlockClassificationService {
     span: OtlpSpan;
     model: string;
   }): TierPrices {
-    const customRates = resolveCustomTierRates((key) =>
-      coerceToNumber(getNumericAttribute(span, key)),
+    // A one-sided custom override fills its unset tiers from the registry rate
+    // for this model — the SAME fallback computeSpanCost passes, so the span's
+    // displayed cost and the per-category allocation price every tier identically
+    // (conservation holds without reconciliation).
+    const registryFallback =
+      model && this.deps.resolveModelPrices
+        ? () => this.deps.resolveModelPrices?.(model) ?? null
+        : undefined;
+    const customRates = resolveCustomTierRates(
+      (key) => coerceToNumber(getNumericAttribute(span, key)),
+      registryFallback,
     );
     if (customRates) return customRates;
 
@@ -394,4 +431,137 @@ export class OtlpSpanBlockClassificationService {
     );
     return explicit !== null && explicit > 0 ? explicit : null;
   }
+}
+
+/**
+ * Reinstate the newest user turn when the raw Claude Code body was truncated.
+ *
+ * Inline truncation always drops the TAIL, so the structured recovery is the
+ * leading prefix (system + complete early turns) MINUS the current turn. The
+ * clean flattened side-channel (`gen_ai.input.messages` / `langwatch.input`,
+ * which the log-to-span converter fills from the co-located `user_prompt`) still
+ * carries the current turn as its last user message — append it so the fresh
+ * input classifies as `user_input` instead of vanishing into `other_input`.
+ *
+ * Guarded against re-adding a turn that already survived: on a mid-turn model
+ * call the human prompt sits early in the conversation (as prior context) and
+ * only the trailing tool_results were truncated, so the recovery already holds
+ * the prompt. Re-appending it there would both duplicate the block AND mislabel
+ * it as the fresh `user_input` turn. We therefore append only when the prompt
+ * text is not already present in the recovered messages — the first model call
+ * of a turn (whose dropped tail IS the human prompt) is the case that needs it.
+ *
+ * No-op when the body parsed whole (`newestTurnComplete`) or no user turn is
+ * recoverable from the side-channel.
+ */
+function appendFreshTurnIfTruncated({
+  structured,
+  newestTurnComplete,
+  flattened,
+}: {
+  structured: Array<{ role: string; content: unknown }>;
+  newestTurnComplete: boolean;
+  flattened: unknown[] | null;
+}): Array<{ role: string; content: unknown }> {
+  if (newestTurnComplete) return structured;
+  const freshTurn = lastUserMessage(flattened);
+  if (!freshTurn) return structured;
+  const freshText = contentText(freshTurn.content);
+  if (freshText && messagesContainUserText(structured, freshText)) {
+    return structured;
+  }
+  return [...structured, freshTurn];
+}
+
+/** The last `role: "user"` message in a flattened message array, or null. */
+function lastUserMessage(
+  messages: unknown[] | null,
+): { role: string; content: unknown } | null {
+  if (!messages) return null;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (!m || typeof m !== "object") continue;
+    const msg = m as { role?: unknown; content?: unknown };
+    if (msg.role !== "user") continue;
+    if (msg.content === undefined || msg.content === null) return null;
+    return { role: "user", content: msg.content };
+  }
+  return null;
+}
+
+/** True when any user message's flattened text contains `text`. */
+function messagesContainUserText(
+  messages: Array<{ role: string; content: unknown }>,
+  text: string,
+): boolean {
+  return messages.some(
+    (m) => m.role === "user" && contentText(m.content).includes(text),
+  );
+}
+
+/** Flatten a message `content` (string or block array) to plain text. */
+function contentText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  const parts: string[] = [];
+  for (const block of content) {
+    if (!block || typeof block !== "object") continue;
+    const text = (block as { text?: unknown }).text;
+    if (typeof text === "string" && text.length > 0) parts.push(text);
+  }
+  return parts.join("\n");
+}
+
+/**
+ * Round each category's fractional token count to an integer for storage while
+ * preserving the per-axis sum (largest-remainder / Hamilton). The exact floats
+ * already sum to the provider's per-axis pool total; rounding each in isolation
+ * drifts that sum, so this reconciles WITHIN each axis. Returns a category →
+ * integer-tokens map (categories with no positive allocation are omitted).
+ */
+function roundCategoryTokensPerAxis(
+  categoryTotals: CategoryTotals,
+): Map<Category, number> {
+  const byAxis: Record<Axis, Array<{ category: Category; tokens: number }>> = {
+    input: [],
+    output: [],
+  };
+  for (const [category, total] of Object.entries(categoryTotals)) {
+    if (!total || total.tokens <= 0) continue;
+    byAxis[axisOf(category as Category)].push({
+      category: category as Category,
+      tokens: total.tokens,
+    });
+  }
+
+  const rounded = new Map<Category, number>();
+  for (const axis of ["input", "output"] as const) {
+    const entries = byAxis[axis];
+    const target = Math.round(entries.reduce((sum, e) => sum + e.tokens, 0));
+    const counts = largestRemainderRound(
+      entries.map((e) => e.tokens),
+      target,
+    );
+    entries.forEach((e, i) => rounded.set(e.category, counts[i] ?? 0));
+  }
+  return rounded;
+}
+
+/**
+ * Round `values` to non-negative integers summing EXACTLY to `target`
+ * (largest-remainder): floor everything, then hand the leftover +1s to the
+ * entries with the largest fractional parts. `target` is `round(Σ values)`, so
+ * the leftover count is in `[0, values.length]`.
+ */
+function largestRemainderRound(values: number[], target: number): number[] {
+  const result = values.map((v) => Math.floor(v));
+  let remainder = target - result.reduce((sum, f) => sum + f, 0);
+  const byFracDesc = values
+    .map((v, i) => ({ i, frac: v - Math.floor(v) }))
+    .sort((a, b) => b.frac - a.frac);
+  for (let k = 0; k < byFracDesc.length && remainder > 0; k++) {
+    result[byFracDesc[k]!.i]! += 1;
+    remainder -= 1;
+  }
+  return result;
 }

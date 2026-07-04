@@ -62,6 +62,42 @@ describe("computeSpanCost", () => {
       });
       expect(result).toBe(0);
     });
+
+    it("fills an unset output rate from the registry instead of zeroing it (one-sided override)", () => {
+      // A customer overrides only their input rate. Output must not become free
+      // — it falls back to the registry rate for the model.
+      const registryOutputOnly = computeSpanCost({
+        attrs: { "gen_ai.request.model": "gpt-5-mini" },
+        promptTokens: 0,
+        completionTokens: 500,
+      });
+      expect(registryOutputOnly).toBeGreaterThan(0);
+
+      const oneSided = computeSpanCost({
+        attrs: {
+          "langwatch.model.inputCostPerToken": 1e-6,
+          "gen_ai.request.model": "gpt-5-mini",
+        },
+        promptTokens: 100,
+        completionTokens: 500,
+      });
+      // custom input rate + registry output rate, not custom input + zero output.
+      expect(oneSided).toBeCloseTo(100 * 1e-6 + registryOutputOnly, 10);
+    });
+
+    it("leaves the unset tier at zero when the model is unknown to the registry", () => {
+      // No registry match → nothing to fall back to, so the historical behaviour
+      // (unset output rate = 0) is preserved rather than inventing a rate.
+      const result = computeSpanCost({
+        attrs: {
+          "langwatch.model.inputCostPerToken": 1e-6,
+          "gen_ai.request.model": "totally-unknown-model-xyz",
+        },
+        promptTokens: 100,
+        completionTokens: 500,
+      });
+      expect(result).toBeCloseTo(100 * 1e-6, 10);
+    });
   });
 
   describe("when span has prompt-cache tokens", () => {

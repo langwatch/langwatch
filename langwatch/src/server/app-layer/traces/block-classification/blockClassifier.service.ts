@@ -490,11 +490,13 @@ export function classifyBlocks({
   const lastUserIdx = lastIndexOfUser(messages);
   const toolNames = new Map<string, string>();
 
-  // Prompt order: system prefix, then tool definitions, then the conversation —
-  // so the emitted input sequence matches the cacheable-prefix layout the cost
-  // allocator reasons about by position. This splits out only the LEADING run of
-  // system messages; a system message that appears later keeps its original
-  // position in the conversation phase below.
+  // Prompt order: tool definitions, then the system prefix, then the conversation
+  // — Anthropic builds the cacheable prefix as `tools → system → messages`, so the
+  // emitted input sequence must match that layout for the cost allocator's
+  // position-based cache-tier split to line up with where the provider actually
+  // placed the cache boundary. This splits out only the LEADING run of system
+  // messages; a system message that appears later keeps its original position in
+  // the conversation phase below.
   let firstNonSystem = 0;
   for (let i = 0; i < messages.length; i++) {
     if (roleOf(messages[i]!) !== "system") {
@@ -504,6 +506,7 @@ export function classifyBlocks({
     firstNonSystem = i + 1;
   }
 
+  classifyToolDefinitions(tools, input);
   for (let i = 0; i < firstNonSystem; i++) {
     classifyInputMessage({
       msg: messages[i]!,
@@ -512,7 +515,6 @@ export function classifyBlocks({
       toolNames,
     });
   }
-  classifyToolDefinitions(tools, input);
   for (let i = firstNonSystem; i < messages.length; i++) {
     classifyInputMessage({
       msg: messages[i]!,

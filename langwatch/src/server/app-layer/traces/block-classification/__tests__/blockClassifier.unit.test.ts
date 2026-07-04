@@ -268,10 +268,12 @@ describe("classifyBlocks", () => {
           { name: "mcp__linear__list_issues", description: "list" },
         ],
       });
+      // Tool definitions lead the cacheable prefix (Anthropic order:
+      // tools → system → messages), so they classify ahead of the system prompt.
       expect(categoriesOf(input)).toEqual([
-        InputCategory.SYSTEM_PROMPT,
         InputCategory.TOOL_DEFINITIONS,
         InputCategory.MCP_TOOL_DEFINITIONS,
+        InputCategory.SYSTEM_PROMPT,
       ]);
     });
   });

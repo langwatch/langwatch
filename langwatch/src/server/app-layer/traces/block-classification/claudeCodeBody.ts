@@ -23,6 +23,15 @@
 export interface ClaudeCodeStructuredInput {
   messages: Array<{ role: string; content: unknown }>;
   tools: unknown;
+  /**
+   * False when the body was truncated inline, so the recovered `messages` are
+   * only the surviving leading prefix and the NEWEST turn (the tail, always the
+   * first thing truncation drops) is missing. The caller then reinstates the
+   * current turn from a clean side-channel (the co-located `user_prompt` /
+   * `gen_ai.input.messages`) so the fresh user input is not lost. True on the
+   * clean-parse path, where every turn — including the newest — survived.
+   */
+  newestTurnComplete: boolean;
 }
 
 /**
@@ -63,15 +72,20 @@ export function parseClaudeCodeRequestBody(
       }
     }
     if (messages.length === 0) return null;
-    return { messages, tools: obj.tools };
+    // Clean parse: the whole body (including the newest turn) survived.
+    return { messages, tools: obj.tools, newestTurnComplete: true };
   }
 
   // Truncated body: recover complete leading message objects + system blocks,
   // structure intact. `tools` typically sit past the truncation point, so they
   // are usually unrecoverable — acceptable (the fold has no tools content
-  // regardless); the cached prefix (system + early turns) is what matters.
+  // regardless); the cached prefix (system + early turns) is what matters. The
+  // newest turn is the tail truncation drops, so newestTurnComplete is false and
+  // the caller reinstates the current prompt from the clean side-channel.
   const messages = recoverStructuredMessages(raw);
-  return messages ? { messages, tools: undefined } : null;
+  return messages
+    ? { messages, tools: undefined, newestTurnComplete: false }
+    : null;
 }
 
 /**

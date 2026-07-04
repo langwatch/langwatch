@@ -36,6 +36,8 @@ describe("parseClaudeCodeRequestBody", () => {
       },
     ]);
     expect(result?.tools).toEqual([{ name: "Bash" }]);
+    // A clean parse kept every turn, including the newest.
+    expect(result?.newestTurnComplete).toBe(true);
   });
 
   it("preserves cache_control so classifyBlocks finds a REAL breakpoint (no inference needed)", () => {
@@ -81,6 +83,9 @@ describe("parseClaudeCodeRequestBody", () => {
     ]);
     // content kept as a block array, not flattened to a string.
     expect(Array.isArray(result.messages[1]?.content)).toBe(true);
+    // truncation dropped the tail, so the newest turn is flagged incomplete —
+    // the caller reinstates the current prompt from the clean side-channel.
+    expect(result.newestTurnComplete).toBe(false);
   });
 
   it("returns null for an absent or empty body", () => {

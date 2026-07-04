@@ -47,6 +47,7 @@ import {
   SpanStatusService,
   SpanTimingService,
   shouldOverrideOutput,
+  sumStepContext,
   TraceAttributeAccumulationService,
   TraceIOAccumulationService,
   TraceNameResolutionService,
@@ -598,27 +599,40 @@ export class TraceSummaryFoldProjection
     // thread id and input usage is one session step. Codex fragments a session
     // across traces, so its step series lives on each trace summary and the
     // read-time rollup re-joins them by thread id. Step context size sums the
-    // whole prompt context (fresh + cache-read + cache-creation), mirroring
-    // the span path's extractStepInputTokens. No extractor lifts
-    // langwatch.cache_creation_tokens today, so that term is 0 on this path —
-    // it is included so the two paths stay definitionally identical if an
-    // extractor ever starts lifting it.
+    // whole prompt context provider-aware (fresh + cache for claude, fresh
+    // alone for codex whose cached_tokens are a subset of input) via the SAME
+    // sumStepContext the span path uses, so a codex turn measures identically
+    // whether it arrived as a span or a lifted log. No extractor lifts
+    // langwatch.cache_creation_tokens today, so that term is 0 on this path.
     const liftedThreadId =
       typeof liftedAttrs["langwatch.thread.id"] === "string"
         ? (liftedAttrs["langwatch.thread.id"] as string)
         : undefined;
     const positive = (value: number): number =>
       Number.isFinite(value) && value > 0 ? value : 0;
-    const stepInputTokens =
-      positive(liftedIn) +
-      positive(Number(liftedAttrs["langwatch.cache_read_tokens"])) +
-      positive(Number(liftedAttrs["langwatch.cache_creation_tokens"]));
+    const freshInput = positive(liftedIn);
+    // Detect the harness on the fresh input (the positivity gate only cares
+    // that the turn carries usage), THEN size the context provider-aware — the
+    // sum must not be additive before we know the provider, or codex would
+    // double-count its cached tokens (subset of input).
     const logHarness = detectLogTurnHarness({
       scopeName: event.data.scopeName,
       liftedAttrs,
       liftedThreadId,
-      liftedInputTokens: stepInputTokens,
+      liftedInputTokens: freshInput,
     });
+    const stepInputTokens = logHarness
+      ? sumStepContext({
+          harness: logHarness,
+          input: freshInput,
+          cacheRead: positive(
+            Number(liftedAttrs["langwatch.cache_read_tokens"]),
+          ),
+          cacheCreation: positive(
+            Number(liftedAttrs["langwatch.cache_creation_tokens"]),
+          ),
+        })
+      : 0;
     if (logHarness && stepInputTokens > 0) {
       appendSessionStep({
         attributes: mergedAttributes,

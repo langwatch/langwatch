@@ -88,6 +88,16 @@ export function catchAllFor(axis: Axis): Category {
     : OutputCategory.OTHER_OUTPUT;
 }
 
+const OUTPUT_CATEGORY_VALUES: ReadonlySet<string> = new Set(
+  Object.values(OutputCategory),
+);
+
+/** The axis a category belongs to (input and output category values are
+ * disjoint). Used to reconcile per-category token rounding within an axis. */
+export function axisOf(category: Category): Axis {
+  return OUTPUT_CATEGORY_VALUES.has(category) ? "output" : "input";
+}
+
 /** Built-in vs MCP discrimination on tool names (Claude Code wire convention). */
 export const MCP_TOOL_PREFIX = "mcp__";
 

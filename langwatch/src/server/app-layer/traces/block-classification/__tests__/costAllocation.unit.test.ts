@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { type Category, InputCategory, OutputCategory } from "../categories";
 import {
   allocateCategoryCosts,
-  inferCacheBreakpointFromPools,
+  inferCachedPrefixEstTokens,
   type TierPrices,
   type TokenBlock,
   type UsagePools,
@@ -257,11 +257,11 @@ describe("allocateCategoryCosts", () => {
     });
   });
 
-  describe("inferCacheBreakpointFromPools", () => {
-    it("places the boundary at the front by the cached fraction of input", () => {
-      // cached = 900, fresh input = 100 → 90% of the input is the cached prefix,
-      // so the boundary falls after the system_prompt block (the front), leaving
-      // the trailing user block fresh.
+  describe("inferCachedPrefixEstTokens", () => {
+    it("places the boundary by the cached fraction of the input estimate", () => {
+      // cached = 900, fresh input = 100 → 90% of the 1000-token estimate is the
+      // cached prefix, so the boundary sits at 900 (estimate space): the whole
+      // system_prompt block is cached and the trailing user block stays fresh.
       const inputBlocks: TokenBlock[] = [
         { idx: 0, category: InputCategory.SYSTEM_PROMPT, tokens: 900 },
         { idx: 1, category: InputCategory.USER_INPUT, tokens: 100 },
@@ -272,7 +272,7 @@ describe("allocateCategoryCosts", () => {
         cacheCreationTokens: 0,
         outputTokens: 0,
       };
-      expect(inferCacheBreakpointFromPools({ inputBlocks, pools })).toBe(0);
+      expect(inferCachedPrefixEstTokens({ inputBlocks, pools })).toBe(900);
     });
 
     it("returns null when the provider reports no cached tokens", () => {
@@ -285,7 +285,7 @@ describe("allocateCategoryCosts", () => {
         cacheCreationTokens: 0,
         outputTokens: 0,
       };
-      expect(inferCacheBreakpointFromPools({ inputBlocks, pools })).toBeNull();
+      expect(inferCachedPrefixEstTokens({ inputBlocks, pools })).toBeNull();
     });
 
     it("returns null when blocks carry no token mass", () => {
@@ -298,13 +298,13 @@ describe("allocateCategoryCosts", () => {
         cacheCreationTokens: 0,
         outputTokens: 0,
       };
-      expect(inferCacheBreakpointFromPools({ inputBlocks, pools })).toBeNull();
+      expect(inferCachedPrefixEstTokens({ inputBlocks, pools })).toBeNull();
     });
 
     it("keeps cache tokens out of the catch-all when composed with allocation (flattened-path regression)", () => {
       // The Claude Code log path: content flattened to text, so no cache_control
       // marker survived (breakpoint would be null), yet the provider reports a
-      // large cache pool. Without the inferred breakpoint the whole cache pool
+      // large cache pool. Without the inferred boundary the whole cache pool
       // dumps to other_input; with it, system_prompt absorbs the cached prefix.
       const inputBlocks: TokenBlock[] = [
         { idx: 0, category: InputCategory.SYSTEM_PROMPT, tokens: 900 },
@@ -316,16 +316,53 @@ describe("allocateCategoryCosts", () => {
         cacheCreationTokens: 200,
         outputTokens: 0,
       };
-      const breakpoint = inferCacheBreakpointFromPools({ inputBlocks, pools });
-
       const { categoryTotals } = allocateCategoryCosts({
         inputBlocks,
         outputBlocks: [],
-        lastCacheBreakpointIndex: breakpoint,
+        lastCacheBreakpointIndex: null,
+        inferredCachedPrefixEstTokens: inferCachedPrefixEstTokens({
+          inputBlocks,
+          pools,
+        }),
         pools,
         prices: {},
       });
 
+      expect(categoryTotals[InputCategory.SYSTEM_PROMPT]?.tokens).toBe(900);
+      expect(categoryTotals[InputCategory.USER_INPUT]?.tokens).toBe(100);
+      expect(categoryTotals[InputCategory.OTHER_INPUT]).toBeUndefined();
+    });
+
+    it("splits the straddling block so its fresh portion never leaks to the catch-all (A1/C2 regression)", () => {
+      // Nearly the whole input is cached (950 of 1000), so the inferred boundary
+      // (950 in estimate space) falls INSIDE the trailing user block: 50 of its
+      // 100 tokens are cached, 50 are fresh. A whole-block boundary would swallow
+      // the block into the cached prefix, leave the fresh pool blockless, and dump
+      // its 50 tokens into other_input (zeroing user_input's fresh share). The
+      // fractional split keeps the fresh 50 on user_input.
+      const inputBlocks: TokenBlock[] = [
+        { idx: 0, category: InputCategory.SYSTEM_PROMPT, tokens: 900 },
+        { idx: 1, category: InputCategory.USER_INPUT, tokens: 100 },
+      ];
+      const pools: UsagePools = {
+        inputTokens: 50,
+        cacheReadTokens: 950,
+        cacheCreationTokens: 0,
+        outputTokens: 0,
+      };
+      const { categoryTotals } = allocateCategoryCosts({
+        inputBlocks,
+        outputBlocks: [],
+        lastCacheBreakpointIndex: null,
+        inferredCachedPrefixEstTokens: inferCachedPrefixEstTokens({
+          inputBlocks,
+          pools,
+        }),
+        pools,
+        prices: {},
+      });
+
+      // user_input = 50 cached (from the straddle) + 50 fresh = 100; nothing lost.
       expect(categoryTotals[InputCategory.SYSTEM_PROMPT]?.tokens).toBe(900);
       expect(categoryTotals[InputCategory.USER_INPUT]?.tokens).toBe(100);
       expect(categoryTotals[InputCategory.OTHER_INPUT]).toBeUndefined();

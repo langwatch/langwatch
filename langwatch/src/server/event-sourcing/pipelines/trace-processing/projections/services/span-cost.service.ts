@@ -6,6 +6,40 @@ import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { coerceToNumber } from "~/utils/coerceToNumber";
 import type { NormalizedSpan } from "../../schemas/spans";
 
+/**
+ * The step's TOTAL input context size for one coding-agent turn (ADR-033 session
+ * tracking), provider-aware. Compaction is a drop in the whole prompt context,
+ * not just the fresh prefix, so the measure must include cached context — but HOW
+ * cache relates to the reported input count differs by provider:
+ *
+ *   - Anthropic (claude): `input` (input_tokens) is fresh-only, with cache_read /
+ *     cache_creation reported SEPARATELY → full context = their sum.
+ *   - OpenAI (codex): `cached_tokens` is a SUBSET of `input` (already counted in
+ *     it) → full context = `input` alone; adding cache double-counts, inflating
+ *     the running max and pushing real compactions' retain ratio below the
+ *     subagent floor (events missed).
+ *
+ * Shared by the span path (`extractStepInputTokens`) and the log-record path so
+ * the two stay definitionally identical — a codex turn measured the same whether
+ * it arrived as a span or a lifted log.
+ */
+export function sumStepContext({
+  harness,
+  input,
+  cacheRead,
+  cacheCreation,
+}: {
+  harness: CodingAgentHarness;
+  input: number;
+  cacheRead: number;
+  cacheCreation: number;
+}): number {
+  const fresh = Math.max(0, input);
+  // Codex: cached tokens are already inside `input` — do not re-add.
+  if (harness === "codex") return fresh;
+  return fresh + Math.max(0, cacheRead) + Math.max(0, cacheCreation);
+}
+
 export const FIRST_TOKEN_EVENTS = new Set([
   "gen_ai.content.chunk",
   "llm.content.completion.chunk",
@@ -144,19 +178,10 @@ export class SpanCostService {
   }
 
   /**
-   * The step's TOTAL input context size (ADR-033 session tracking). Compaction
-   * is a drop in the whole prompt context, not just the fresh prefix, so the
-   * measure must include cached context — but HOW cache relates to the reported
-   * input count differs by provider:
-   *
-   *   - Anthropic (claude): `input_tokens` is fresh-only, with cache_read /
-   *     cache_creation reported SEPARATELY. Full context = their sum.
-   *   - OpenAI (codex): `cached_tokens` is a SUBSET of `input_tokens` (already
-   *     counted in it). Full context = `input_tokens` alone; adding cache would
-   *     double-count — inflating the running max and pushing real compactions'
-   *     retain ratio below the subagent floor (events missed).
-   *
-   * Returns 0 when the span carries no usage.
+   * The span's TOTAL input context size for one coding-agent turn (ADR-033
+   * session tracking), delegating the provider-aware cache math to
+   * {@link sumStepContext} so the span and log paths cannot drift. Returns 0
+   * when the span carries no usage.
    */
   extractStepInputTokens(
     span: NormalizedSpan,
@@ -174,10 +199,13 @@ export class SpanCostService {
         span.spanAttributes[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS],
       ) ?? 0,
     );
-    // Codex: cached tokens are already inside promptTokens — do not re-add.
-    if (harness === "codex") return promptTokens;
     const cache = cacheTokens ?? this.extractCacheTokens(span);
-    return promptTokens + cache.cacheReadTokens + cache.cacheCreationTokens;
+    return sumStepContext({
+      harness,
+      input: promptTokens,
+      cacheRead: cache.cacheReadTokens,
+      cacheCreation: cache.cacheCreationTokens,
+    });
   }
 
   /**
