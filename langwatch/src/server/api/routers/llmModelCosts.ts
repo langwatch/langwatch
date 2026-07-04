@@ -242,10 +242,10 @@ export const llmModelCostsRouter = createTRPCRouter({
             message:
               "Invalid or unsafe regular expression (avoid nested quantifiers like (a+)+)",
           }),
-        inputCostPerToken: z.number().nonnegative().optional(),
-        outputCostPerToken: z.number().nonnegative().optional(),
-        cacheReadCostPerToken: z.number().nonnegative().optional(),
-        cacheCreationCostPerToken: z.number().nonnegative().optional(),
+        inputCostPerToken: z.number().finite().nonnegative().optional(),
+        outputCostPerToken: z.number().finite().nonnegative().optional(),
+        cacheReadCostPerToken: z.number().finite().nonnegative().optional(),
+        cacheCreationCostPerToken: z.number().finite().nonnegative().optional(),
       }),
     )
     .use(checkProjectPermission("traces:view"))

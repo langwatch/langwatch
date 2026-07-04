@@ -178,21 +178,28 @@ describe("ActivityMonitorService.categoryBreakdown", () => {
   });
 
   afterAll(async () => {
+    // beforeAll may have thrown before the gov projects were created — an
+    // unconditional .id deref here would mask the root-cause failure.
+    const govProjectIds = [primaryGovProject, crossGovProject]
+      .filter(Boolean)
+      .map((p) => p.id);
     await prisma.project
       .deleteMany({
-        where: { id: { in: [primaryGovProject.id, crossGovProject.id] } },
+        where: { id: { in: govProjectIds } },
       })
       .catch(() => undefined);
+    const orgIds = [primaryOrg, crossOrg].filter(Boolean).map((o) => o.id);
     await prisma.team
       .deleteMany({
-        where: { organizationId: { in: [primaryOrg.id, crossOrg.id] } },
+        where: { organizationId: { in: orgIds } },
       })
       .catch(() => undefined);
     await prisma.organization
-      .deleteMany({ where: { id: { in: [primaryOrg.id, crossOrg.id] } } })
+      .deleteMany({ where: { id: { in: orgIds } } })
       .catch(() => undefined);
-    await cleanupTestData(primaryGovProject.id);
-    await cleanupTestData(crossGovProject.id);
+    for (const tenantId of govProjectIds) {
+      await cleanupTestData(tenantId);
+    }
   });
 
   describe("given an organization with classified coding-agent traffic from several users", () => {

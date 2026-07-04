@@ -158,6 +158,41 @@ describe("classifyBlocks", () => {
     });
   });
 
+  describe("given multiple leading injected-context text parts on the fresh turn", () => {
+    /** @scenario "Injected context markers are classified separately from real user input" */
+    it("keeps peeling markers until real user text appears", () => {
+      // Claude Code emits EACH injected reminder as its own text part; only
+      // the part that finally carries a real body ends the peel window.
+      const { input } = classifyBlocks({
+        inputMessages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "<system-reminder>reminder A</system-reminder>",
+              },
+              {
+                type: "text",
+                text: "<system-reminder>reminder B (claudeMd)</system-reminder>",
+              },
+              { type: "text", text: "fix the bug" },
+            ],
+          },
+        ],
+      });
+      expect(categoriesOf(input)).toEqual([
+        InputCategory.PRIOR_CONTEXT,
+        InputCategory.PRIOR_CONTEXT,
+        InputCategory.USER_INPUT,
+      ]);
+      const userInput = input.find(
+        (b) => b.category === InputCategory.USER_INPUT,
+      );
+      expect(userInput?.charCount).toBe("fix the bug".length);
+    });
+  });
+
   describe("given a tool_use nested in the fresh user message", () => {
     it("keeps it on the input axis instead of leaking an output tool_call category", () => {
       const { input } = classifyBlocks({
@@ -198,7 +233,7 @@ describe("classifyBlocks", () => {
   });
 
   describe("given an injected skill marker in a prior (non-fresh) user turn", () => {
-    /** @scenario "An injected skill block is classified as skill content wherever it appears" */
+    /** @scenario "Injected context markers are classified separately from real user input" */
     it("classifies it as skill_content, not prior_context", () => {
       // Codex relays its skill injections verbatim in the rollout as their own
       // earlier user messages (not prepended to the fresh turn like Claude), so

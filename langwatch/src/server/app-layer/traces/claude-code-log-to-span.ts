@@ -67,9 +67,10 @@ import type {
   OtlpResource,
   OtlpSpan,
 } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import { textContainsPromptLineAligned } from "./block-classification/freshTurnPresence";
 import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
 import {
-  buildInputMessagesFromRequestBody,
+  buildInputMessagesFromRequestBodyDetailed,
   collectToolResultsFromRequestBody,
   extractAssistantOutputFromResponseBody,
   isConversationalQuerySource,
@@ -454,21 +455,29 @@ function resolveInputMessages(
   body: ClaudeCodeLogRecordInput,
   promptTextById: ReadonlyMap<string, string>,
 ): string | null {
-  const parsed = buildInputMessagesFromRequestBody(body.attrs.body);
+  // Gate reinstatement on the recovery path actually running, not the
+  // `body_truncated` attribute: a body over LangWatch's own oversize cap fails
+  // JSON.parse the same way but claude never stamped the attribute.
+  const { messages: parsed, recovered } =
+    buildInputMessagesFromRequestBodyDetailed(body.attrs.body);
   const freshPrompt = asNonEmpty(
     promptTextById.get(body.attrs["prompt.id"] ?? ""),
   );
   let messages: Array<{ role: string; content: string }> | null = parsed;
   if (!messages) {
     messages = freshPrompt ? [{ role: "user", content: freshPrompt }] : null;
-  } else if (freshPrompt && body.attrs.body_truncated === "true") {
+  } else if (freshPrompt && recovered) {
     // Truncation drops the TAIL, so a recovered conversation is missing the
     // newest (current) user turn. Reinstate the clean co-located user_prompt as
     // that final turn — but only when it did not already survive in the prefix
     // (a mid-turn call keeps the prompt as early prior context and truncated
     // only the trailing tool_results), so we never duplicate the human prompt.
+    // Presence must be LINE-ALIGNED: a bare substring check suppressed short
+    // prompts ("ok", "continue") that appear inside recovered file dumps.
     const alreadyPresent = messages.some(
-      (m) => m.role === "user" && m.content.includes(freshPrompt),
+      (m) =>
+        m.role === "user" &&
+        textContainsPromptLineAligned(m.content, freshPrompt),
     );
     if (!alreadyPresent) {
       messages = [...messages, { role: "user", content: freshPrompt }];

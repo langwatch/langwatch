@@ -124,7 +124,7 @@ function recoverStructuredMessages(
   const system = recoverSystemValue(raw);
   if (system !== null) out.push({ role: "system", content: system });
 
-  const messagesKey = raw.indexOf('"messages"');
+  const messagesKey = topLevelKeyIndex(raw, "messages");
   if (messagesKey >= 0) {
     const arrayStart = raw.indexOf("[", messagesKey);
     if (arrayStart >= 0) {
@@ -155,7 +155,7 @@ function recoverStructuredMessages(
  * Returns null when there is no system value or nothing parses.
  */
 function recoverSystemValue(raw: string): unknown | null {
-  const key = raw.indexOf('"system"');
+  const key = topLevelKeyIndex(raw, "system");
   if (key < 0) return null;
   let i = raw.indexOf(":", key);
   if (i < 0) return null;
@@ -178,6 +178,45 @@ function recoverSystemValue(raw: string): unknown | null {
     return blocks.length > 0 ? blocks : null;
   }
   return null;
+}
+
+/**
+ * Index of `"key"` occurring as a KEY of the TOP-LEVEL object (depth 1,
+ * outside strings, followed by `:`), or -1. A bare `indexOf('"system"')` can
+ * be hijacked by the same key inside a `tool_use.input` payload — that input
+ * is embedded as real unescaped JSON, so it false-matches before the real
+ * top-level key. String/escape aware, same conventions as
+ * {@link completeObjectSlices}.
+ *
+ * @internal exported for the truncation-recovery twin in
+ * canonicalisation/extractors/claudeCode.ts + unit testing
+ */
+export function topLevelKeyIndex(raw: string, key: string): number {
+  const needle = `"${key}"`;
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === "\\") esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') {
+      if (depth === 1 && raw.startsWith(needle, i)) {
+        let j = i + needle.length;
+        while (j < raw.length && /\s/.test(raw[j]!)) j++;
+        if (raw[j] === ":") return i;
+      }
+      inStr = true;
+      continue;
+    }
+    if (ch === "{" || ch === "[") depth++;
+    else if (ch === "}" || ch === "]") depth--;
+  }
+  return -1;
 }
 
 /** Read a complete JSON string literal at `quoteIndex`, or null if truncated. */

@@ -271,21 +271,23 @@ function classifyInputMessage({
   if (!Array.isArray(content)) return;
 
   // Injected context (system-reminder / skill / mcp-instructions markers) is
-  // prepended only to the FIRST text part of a user message. Peel markers off
-  // that part alone; a later text part carrying a `<tag>` is real content, not
-  // injected context, so it keeps this turn's body category.
+  // prepended ahead of the user's real text. Claude Code may emit EACH injected
+  // reminder as its own text part, so keep peeling leading parts until one
+  // produces a real (non-marker) body; from there on a text part carrying a
+  // `<tag>` is real content, not injected context, and keeps this turn's body
+  // category.
   let leadingTextPending = isUser;
 
   for (const part of content) {
     if (typeof part === "string") {
       if (isUser) {
-        pushUserTextOrMarkers({
+        const pushedBody = pushUserTextOrMarkers({
           acc,
           text: part,
           peel: leadingTextPending,
           bodyCategory: userBodyCategory,
         });
-        leadingTextPending = false;
+        if (pushedBody) leadingTextPending = false;
       } else acc.push(InputCategory.PRIOR_CONTEXT, part);
       continue;
     }
@@ -302,13 +304,13 @@ function classifyInputMessage({
 
     const category = inputPartCategory({ part, fresh, role, toolNames });
     if (part.type === "text" && isUser) {
-      pushUserTextOrMarkers({
+      const pushedBody = pushUserTextOrMarkers({
         acc,
         text: blockText(part),
         peel: leadingTextPending,
         bodyCategory: userBodyCategory,
       });
-      leadingTextPending = false;
+      if (pushedBody) leadingTextPending = false;
     } else {
       acc.push(category, blockText(part));
     }
@@ -370,6 +372,10 @@ function inputPartCategory({
  * wherever it sits, instead of collapsing an injected `<skill>` into
  * prior_context. Only the LEADING part peels: a later part carrying a `<tag>` is
  * real content, not injected context. */
+/**
+ * Returns whether a real (non-marker) body was pushed — the caller uses this
+ * to keep peeling markers off subsequent parts until actual user text appears.
+ */
 function pushUserTextOrMarkers({
   acc,
   text,
@@ -380,14 +386,15 @@ function pushUserTextOrMarkers({
   text: string;
   peel: boolean;
   bodyCategory: Category;
-}): void {
+}): boolean {
   if (!peel) {
     if (text.length > 0) acc.push(bodyCategory, text);
-    return;
+    return text.length > 0;
   }
   const { markers, body } = splitLeadingMarkers(text);
   for (const marker of markers) acc.push(marker.category, marker.raw);
   if (body.length > 0) acc.push(bodyCategory, body);
+  return body.length > 0;
 }
 
 function pushString({

@@ -8,6 +8,7 @@
 import { coerceToNumber } from "~/utils/coerceToNumber";
 import type { OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import type { UsagePools } from "./block-classification/costAllocation.service";
+import type { CodingAgentHarness } from "./block-classification/harnessDetection";
 import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
 
 /** First string-valued attribute for `key`, or null. */
@@ -119,7 +120,10 @@ export function parseJsonAttribute(
 
 /** Provider-reported usage pools (fresh / cache-read / cache-creation / output),
  * reading the first positive value across each key's aliases. */
-export function extractUsagePools(span: OtlpSpan): UsagePools {
+export function extractUsagePools(
+  span: OtlpSpan,
+  harness: CodingAgentHarness,
+): UsagePools {
   const num = (...keys: string[]): number => {
     for (const key of keys) {
       const n = coerceToNumber(getNumericAttribute(span, key));
@@ -127,19 +131,28 @@ export function extractUsagePools(span: OtlpSpan): UsagePools {
     }
     return 0;
   };
+  const inputTokens = num(
+    ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS,
+    ATTR_KEYS.GEN_AI_USAGE_PROMPT_TOKENS,
+  );
+  const cacheReadTokens = num(
+    ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
+    "gen_ai.usage.cached_tokens",
+  );
   return {
-    inputTokens: num(
-      ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS,
-      ATTR_KEYS.GEN_AI_USAGE_PROMPT_TOKENS,
-    ),
+    // The pools are EXCLUSIVE (Anthropic convention). Codex reports
+    // OpenAI-style usage where cached tokens are a SUBSET of input_tokens —
+    // subtract them out of the fresh pool or input-axis allocation
+    // double-counts the cached prefix (mirrors `sumStepContext`).
+    inputTokens:
+      harness === "codex"
+        ? Math.max(0, inputTokens - cacheReadTokens)
+        : inputTokens,
     outputTokens: num(
       ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS,
       ATTR_KEYS.GEN_AI_USAGE_COMPLETION_TOKENS,
     ),
-    cacheReadTokens: num(
-      ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS,
-      "gen_ai.usage.cached_tokens",
-    ),
+    cacheReadTokens,
     cacheCreationTokens: num(
       ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS,
     ),

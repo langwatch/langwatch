@@ -1,6 +1,9 @@
 import { CliBootstrapService } from "@ee/governance/services/cliBootstrap.service";
 import { findHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
-import { PersonalUsageService } from "@ee/governance/services/personalUsage.service";
+import {
+  MAX_WINDOW_SPAN_MS,
+  PersonalUsageService,
+} from "@ee/governance/services/personalUsage.service";
 import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
 import { RoutingPolicyService } from "@ee/governance/services/routingPolicy.service";
@@ -508,12 +511,23 @@ export const userRouter = createTRPCRouter({
    */
   personalUsage: protectedProcedure
     .input(
-      z.object({
-        organizationId: z.string(),
-        /** Defaults to start-of-current-month → now if omitted. */
-        windowStartMs: z.number().optional(),
-        windowEndMs: z.number().optional(),
-      }),
+      z
+        .object({
+          organizationId: z.string(),
+          /** Defaults to start-of-current-month → now if omitted. */
+          windowStartMs: z.number().optional(),
+          windowEndMs: z.number().optional(),
+        })
+        // dailyBuckets allocates one bucket object per day of the window on
+        // the app server, so an unbounded span is an event-loop hang.
+        .refine(
+          (q) =>
+            q.windowStartMs === undefined ||
+            q.windowEndMs === undefined ||
+            (q.windowEndMs > q.windowStartMs &&
+              q.windowEndMs - q.windowStartMs <= MAX_WINDOW_SPAN_MS),
+          { message: "window span must be positive and at most 400 days." },
+        ),
     )
     .use(checkOrganizationPermission("organization:view"))
     .query(async ({ ctx, input }) => {

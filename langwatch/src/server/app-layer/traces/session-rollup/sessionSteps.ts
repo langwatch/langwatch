@@ -8,11 +8,12 @@
  * curve and detect compaction events.
  *
  * Why on the trace summary and not a session-keyed fold: the fold framework
- * keys strictly by traceId. For Claude Code, a whole session's turns already
- * fold into one trace summary (log records are additive per trace); Codex
- * fragments a session across traces, which the read-time rollup re-joins by
- * thread id. A session-keyed fold would need a second event per span (rejected
- * in ADR-033 Decision 1). See the ADR Revisions v3 note.
+ * keys strictly by traceId, and both harnesses fragment a session across
+ * traces (the Claude Code reactor derives one trace per turn via
+ * sha256(session:prompt); Codex fragments per rollout), so the read-time
+ * rollup re-joins them by thread id. A session-keyed fold would need a second
+ * event per span (rejected in ADR-033 Decision 1). See the ADR Revisions v3
+ * note.
  *
  * `inputTokens` is the step's **total input context** — fresh input plus
  * cache-read plus cache-creation tokens — not just the freshly-billed prefix.

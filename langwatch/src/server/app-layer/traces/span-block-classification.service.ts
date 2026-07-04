@@ -35,7 +35,11 @@ import {
   type TokenBlock,
   type UsagePools,
 } from "./block-classification/costAllocation.service";
-import { detectCodingAgentHarness } from "./block-classification/harnessDetection";
+import { textContainsPromptLineAligned } from "./block-classification/freshTurnPresence";
+import {
+  type CodingAgentHarness,
+  detectCodingAgentHarness,
+} from "./block-classification/harnessDetection";
 import { ATTR_KEYS } from "./canonicalisation/extractors/_constants";
 import { resolveCustomTierRates } from "./model-cost-matching";
 import {
@@ -158,7 +162,7 @@ export class OtlpSpanBlockClassificationService {
     // is contained, logged, and swallowed so the span still ingests unclassified.
     // The command-level try/catch remains as a second belt.
     try {
-      await this.classifyInner({ span });
+      await this.classifyInner({ span, harness });
     } catch (error) {
       this.logger.warn(
         { error, spanId: span.spanId, traceId: span.traceId },
@@ -168,7 +172,13 @@ export class OtlpSpanBlockClassificationService {
   }
 
   /** The classification work proper — see classifySpanBlocks for the guards. */
-  private async classifyInner({ span }: { span: OtlpSpan }): Promise<void> {
+  private async classifyInner({
+    span,
+    harness,
+  }: {
+    span: OtlpSpan;
+    harness: CodingAgentHarness;
+  }): Promise<void> {
     // 2. Content extraction. PREFER the raw Claude Code request/response bodies
     //    (full fidelity: content-block structure + cache_control intact), so the
     //    cache breakpoint is REAL (not pool-inferred), tool_results keep their
@@ -216,7 +226,7 @@ export class OtlpSpanBlockClassificationService {
     //    the zero-guard in allocateCategoryCosts routes it to the axis catch-all
     //    (ADR-033 "no usage is dropped"). Skip only when there is neither content
     //    nor usage to attribute.
-    const pools = extractUsagePools(span);
+    const pools = extractUsagePools(span, harness);
     const hasUsage =
       pools.inputTokens > 0 ||
       pools.cacheReadTokens > 0 ||
@@ -489,13 +499,20 @@ function lastUserMessage(
   return null;
 }
 
-/** True when any user message's flattened text contains `text`. */
+/**
+ * True when any user message's flattened text contains `text` LINE-ALIGNED.
+ * A bare substring check suppressed short prompts ("ok", "continue") that
+ * appear inside recovered reminder prose or file dumps, silently dropping the
+ * fresh turn and mislabelling a stale prior user message as fresh.
+ */
 function messagesContainUserText(
   messages: Array<{ role: string; content: unknown }>,
   text: string,
 ): boolean {
   return messages.some(
-    (m) => m.role === "user" && contentText(m.content).includes(text),
+    (m) =>
+      m.role === "user" &&
+      textContainsPromptLineAligned(contentText(m.content), text),
   );
 }
 

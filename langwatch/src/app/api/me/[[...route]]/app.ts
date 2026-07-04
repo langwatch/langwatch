@@ -10,12 +10,15 @@ import {
 } from "~/server/api/security";
 import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { createLogger } from "~/utils/logger/server";
 
 import type { AuthMiddlewareVariables } from "../../middleware/auth";
 import { baseResponses } from "../../shared/base-responses";
 import { meUsageQuerySchema, meUsageResponseSchema } from "./schemas";
 
 patchZodOpenapi();
+
+const logger = createLogger("langwatch:api:me");
 
 /**
  * Hono app for /api/me — the personal-developer surface. Today it
@@ -120,12 +123,24 @@ export function registerMeRoutes(
           // Category totals live on trace summaries: personal-tenant rows plus
           // this user's ingestion-source rows on the gov tenant (attributed by
           // principal email), when both are available.
-          usage.breakdownByCategory({
-            personalProjectId: input.personalProjectId,
-            window: input.window,
-            userEmail: input.userEmail,
-            ingestionTenantId: input.ingestionTenantId,
-          }),
+          //
+          // Degrade to [] on failure so one category-query error (its ClickHouse
+          // scan is heavier than the others and has OOM'd before) can't 500 the
+          // whole payload — mirrors the tRPC twin in user.ts.
+          usage
+            .breakdownByCategory({
+              personalProjectId: input.personalProjectId,
+              window: input.window,
+              userEmail: input.userEmail,
+              ingestionTenantId: input.ingestionTenantId,
+            })
+            .catch((error) => {
+              logger.error(
+                { error, projectId: project.id },
+                "personal usage category breakdown failed; degrading to empty",
+              );
+              return [];
+            }),
         ]);
 
       return c.json({

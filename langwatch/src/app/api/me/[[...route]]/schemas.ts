@@ -1,3 +1,4 @@
+import { MAX_WINDOW_SPAN_MS } from "@ee/governance/services/personalUsage.service";
 import { z } from "zod";
 import {
   CATEGORIES,
@@ -39,6 +40,15 @@ export const meUsageQuerySchema = z
       q.windowEndMs === undefined ||
       q.windowStartMs < q.windowEndMs,
     { message: "windowStartMs must be before windowEndMs." },
+  )
+  // dailyBuckets allocates one bucket object per day in the window on the
+  // app server, so an unbounded span is a self-inflicted event-loop hang.
+  .refine(
+    (q) =>
+      q.windowStartMs === undefined ||
+      q.windowEndMs === undefined ||
+      q.windowEndMs - q.windowStartMs <= MAX_WINDOW_SPAN_MS,
+    { message: "window span must not exceed 400 days." },
   );
 
 const mostUsedModelSchema = z

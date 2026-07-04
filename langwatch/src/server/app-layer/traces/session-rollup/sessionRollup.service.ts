@@ -272,6 +272,11 @@ function accumulateCategoryTotals(
  * are concatenated then sorted by start time before compaction detection, so
  * out-of-order OTLP delivery and Codex's fragmentation across traces are both
  * handled.
+ *
+ * Contract for future readers: `traces` MUST be deduplicated trace-summary
+ * rows (one row per traceId). ClickHouse's ReplacingMergeTree can return
+ * multiple versions of the same trace before merges settle; feeding
+ * duplicates here double-counts both steps and categoryTotals.
  */
 export function rollupSessions({
   traces,

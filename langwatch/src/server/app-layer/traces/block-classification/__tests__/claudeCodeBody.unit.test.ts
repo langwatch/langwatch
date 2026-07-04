@@ -92,6 +92,41 @@ describe("parseClaudeCodeRequestBody", () => {
     expect(parseClaudeCodeRequestBody(undefined)).toBeNull();
     expect(parseClaudeCodeRequestBody("")).toBeNull();
   });
+
+  it("ignores a 'system'/'messages' key nested inside tool_use input during truncation recovery", () => {
+    // tool_use.input is embedded as real unescaped JSON — a naive indexOf
+    // scan latched onto the nested key and recovered a bogus system value.
+    const full = JSON.stringify({
+      messages: [
+        {
+          role: "assistant",
+          content: [
+            {
+              type: "tool_use",
+              id: "t1",
+              name: "Write",
+              input: { system: "decoy", messages: ["decoy"] },
+            },
+          ],
+        },
+        { role: "user", content: [{ type: "text", text: "real turn" }] },
+      ],
+      system: [{ type: "text", text: "real sys" }],
+      metadata: { tail: "cut off here, a long tail" },
+    });
+    const truncated = full.slice(0, full.indexOf("cut off"));
+
+    const result = parseClaudeCodeRequestBody(truncated)!;
+
+    const system = result.messages.find((m) => m.role === "system");
+    expect(system?.content).toEqual([{ type: "text", text: "real sys" }]);
+    // The decoy nested 'messages' array did not hijack turn recovery.
+    expect(result.messages.map((m) => m.role)).toEqual([
+      "system",
+      "assistant",
+      "user",
+    ]);
+  });
 });
 
 describe("parseClaudeCodeResponseBody", () => {

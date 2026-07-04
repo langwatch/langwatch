@@ -17,7 +17,7 @@ Feature: Cost breakdown by content category on governance dashboards
   Scenario: The breakdown shows an enablement hint when no content was captured
     Given a user whose traffic produced no category totals because payload capture is off
     When the user opens their personal usage view
-    Then the breakdown section explains that payload capture must be enabled to see it
+    Then the breakdown section explains why the breakdown can be empty
 
   @integration
   Scenario: The org activity monitor aggregates category totals across users

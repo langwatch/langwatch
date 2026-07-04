@@ -45,6 +45,7 @@ import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { activityMonitorRouter } from "../activityMonitor";
 import { ACTIVITY_MONITOR_PROCEDURES } from "./activityMonitorProcedures.fixtures";
 
 // The new requireEnterprisePlan middleware (Phase 4b-4/5) 403s every
@@ -238,6 +239,19 @@ describe("governance routers — RBAC enforcement", () => {
           scopeId: organizationId,
         }),
       ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    });
+
+    // The guard-probe loop below only closes the whole-router gap if the
+    // fixture actually lists every procedure — pin the two in lockstep so a
+    // new procedure that isn't added to the fixture fails here first.
+    it("keeps the guard-probe fixture exhaustive over the router's procedures", () => {
+      const routerProcedures = Object.keys(
+        activityMonitorRouter._def.procedures,
+      ).sort();
+      const fixtureProcedures = ACTIVITY_MONITOR_PROCEDURES.map(
+        ([name]) => name,
+      ).sort();
+      expect(fixtureProcedures).toEqual(routerProcedures);
     });
 
     // Every activityMonitor procedure gates on `activityMonitor:view`, so a

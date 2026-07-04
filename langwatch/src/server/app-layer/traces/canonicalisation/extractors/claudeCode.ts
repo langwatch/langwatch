@@ -36,6 +36,7 @@
  */
 
 import { capPayloadString } from "~/server/event-sourcing/pipelines/trace-processing/utils/capOversizedLogRecord";
+import { topLevelKeyIndex } from "../../block-classification/claudeCodeBody";
 
 import type {
   CanonicalAttributesExtractor,
@@ -461,11 +462,34 @@ function contentToText(content: unknown): string {
 export function buildInputMessagesFromRequestBody(
   raw: unknown,
 ): Array<{ role: string; content: string }> | null {
-  if (raw === null || raw === undefined) return null;
-  if (typeof raw === "object") return buildFromParsedRequestBody(raw);
-  if (typeof raw !== "string" || raw.length === 0) return null;
+  return buildInputMessagesFromRequestBodyDetailed(raw).messages;
+}
+
+/**
+ * Like {@link buildInputMessagesFromRequestBody}, but also reports whether the
+ * truncation-recovery path was taken (`recovered`). Callers that reinstate the
+ * fresh user turn must gate on THIS rather than the `body_truncated` attribute:
+ * a body over LangWatch's own oversize cap fails JSON.parse the same way, but
+ * claude never stamped `body_truncated` on it.
+ */
+export function buildInputMessagesFromRequestBodyDetailed(raw: unknown): {
+  messages: Array<{ role: string; content: string }> | null;
+  recovered: boolean;
+} {
+  if (raw === null || raw === undefined) {
+    return { messages: null, recovered: false };
+  }
+  if (typeof raw === "object") {
+    return { messages: buildFromParsedRequestBody(raw), recovered: false };
+  }
+  if (typeof raw !== "string" || raw.length === 0) {
+    return { messages: null, recovered: false };
+  }
   try {
-    return buildFromParsedRequestBody(JSON.parse(raw));
+    return {
+      messages: buildFromParsedRequestBody(JSON.parse(raw)),
+      recovered: false,
+    };
   } catch {
     // claude truncates large request bodies INLINE at ~60KB, so a real
     // coding-agent turn (system + tools + history) does NOT JSON.parse. Rather
@@ -474,7 +498,10 @@ export function buildInputMessagesFromRequestBody(
     // dump those tokens into `other_input` — recover what survived the cut.
     // Truncation always removes the TAIL, so the front-loaded system prompt and
     // the complete leading turns are intact.
-    return recoverInputMessagesFromTruncatedBody(raw);
+    return {
+      messages: recoverInputMessagesFromTruncatedBody(raw),
+      recovered: true,
+    };
   }
 }
 
@@ -527,7 +554,7 @@ export function recoverInputMessagesFromTruncatedBody(
     out.push({ role: "system", content: systemText });
   }
 
-  const messagesKey = raw.indexOf('"messages"');
+  const messagesKey = topLevelKeyIndex(raw, "messages");
   if (messagesKey >= 0) {
     const arrayStart = raw.indexOf("[", messagesKey);
     if (arrayStart >= 0) {
@@ -559,7 +586,7 @@ export function recoverInputMessagesFromTruncatedBody(
  * `]`. Returns null when no `system` value is present or nothing parses.
  */
 function recoverSystemText(raw: string): string | null {
-  const key = raw.indexOf('"system"');
+  const key = topLevelKeyIndex(raw, "system");
   if (key < 0) return null;
   let i = raw.indexOf(":", key);
   if (i < 0) return null;

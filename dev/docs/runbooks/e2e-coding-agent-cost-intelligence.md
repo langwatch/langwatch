@@ -109,6 +109,15 @@ Read it back three ways:
   category sum equal to that displayed cost is exactly what this end-to-end run
   exercises.
 
+## Kill-switch scope
+
+`block-classification-killswitch` (global) / `block-classification-project-killswitch`
+(per-project) stop the ingest-time block classifier only. They do NOT stop
+session-step tracking: the trace fold keeps appending `session_steps` /
+`session.thread_id` from usage attributes on every coding-agent span. There is
+currently no runtime off-ramp for session tracking — disabling it requires a
+deploy.
+
 ## No classification? Check in order
 
 1. Flag not set in the **worker** env → put it in `langwatch/.env`, restart.

@@ -46,6 +46,15 @@ import {
 
 const logger = createLogger("langwatch:personal-usage");
 
+/**
+ * Hard cap on the rollup window span. `dailyBuckets` materializes one bucket
+ * object per day of the window synchronously on the app server, so an
+ * unbounded caller-supplied window is an event-loop hang, not just a slow
+ * query. Both entrypoints (tRPC personalUsage, GET /api/me/usage) must reject
+ * wider windows before calling into this service.
+ */
+export const MAX_WINDOW_SPAN_MS = 400 * 24 * 60 * 60 * 1000;
+
 export interface PersonalUsageWindow {
   /** Inclusive UTC start of the rollup window. */
   start: Date;

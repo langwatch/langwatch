@@ -51,6 +51,7 @@ import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/r
 import {
   PROJECT_KIND,
   ensureHiddenGovernanceProject,
+  resolvePersonalUsageIngestionScope,
 } from "../governanceProject.service";
 
 describe("ensureHiddenGovernanceProject — lazy-ensure invariants for the hidden Governance Project", () => {
@@ -278,6 +279,106 @@ describe("ensureHiddenGovernanceProject — lazy-ensure invariants for the hidde
     it("slug is org-scoped + stable (governance-${organizationId})", async () => {
       const project = await ensureHiddenGovernanceProject(prisma, primaryOrg.id);
       expect(project.slug).toBe(`governance-${primaryOrg.id}`);
+    });
+  });
+
+  // resolvePersonalUsageIngestionScope decides which tenant + principal email
+  // the /me cross-tenant category union runs under — the multi-tenancy seam
+  // both /api/me/usage and the tRPC personalUsage procedure depend on.
+  describe("resolvePersonalUsageIngestionScope", () => {
+    describe("given the org has a Governance Project", () => {
+      it("returns that org's gov tenant id and the owner's email", async () => {
+        const governanceProject = await ensureHiddenGovernanceProject(
+          prisma,
+          primaryOrg.id,
+        );
+        createdProjectIds.add(governanceProject.id);
+        const primaryTeam = await prisma.team.findFirst({
+          where: { organizationId: primaryOrg.id },
+        });
+
+        const scope = await resolvePersonalUsageIngestionScope({
+          prisma,
+          teamId: primaryTeam!.id,
+          ownerUserId: primaryUser.id,
+        });
+
+        expect(scope.ingestionTenantId).toBe(governanceProject.id);
+        expect(scope.userEmail).toBe(
+          `gov-helper-test-${testNamespace}@example.com`,
+        );
+      });
+    });
+
+    describe("given the org has no Governance Project", () => {
+      it("returns an absent tenant and never provisions one on read", async () => {
+        const freshOrg = await prisma.organization.create({
+          data: {
+            name: `Scope Org ${testNamespace}`,
+            slug: `scope-org-${testNamespace}`,
+          },
+        });
+        const freshTeam = await prisma.team.create({
+          data: {
+            name: `Scope Team ${testNamespace}`,
+            slug: `scope-team-${testNamespace}`,
+            organizationId: freshOrg.id,
+          },
+        });
+        createdTeamIds.add(freshTeam.id);
+
+        try {
+          const scope = await resolvePersonalUsageIngestionScope({
+            prisma,
+            teamId: freshTeam.id,
+            ownerUserId: primaryUser.id,
+          });
+
+          expect(scope.ingestionTenantId).toBeUndefined();
+          expect(scope.userEmail).toBe(
+            `gov-helper-test-${testNamespace}@example.com`,
+          );
+
+          const provisioned = await prisma.project.count({
+            where: {
+              kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+              team: { organizationId: freshOrg.id },
+            },
+          });
+          expect(provisioned).toBe(0);
+        } finally {
+          await prisma.team
+            .deleteMany({ where: { organizationId: freshOrg.id } })
+            .catch(() => undefined);
+          await prisma.organization
+            .delete({ where: { id: freshOrg.id } })
+            .catch(() => undefined);
+        }
+      });
+    });
+
+    describe("given an unknown team or owner", () => {
+      it("degrades each field to undefined instead of throwing", async () => {
+        const unknownTeam = await resolvePersonalUsageIngestionScope({
+          prisma,
+          teamId: `missing-team-${testNamespace}`,
+          ownerUserId: primaryUser.id,
+        });
+        expect(unknownTeam.ingestionTenantId).toBeUndefined();
+        expect(unknownTeam.userEmail).toBe(
+          `gov-helper-test-${testNamespace}@example.com`,
+        );
+
+        const primaryTeam = await prisma.team.findFirst({
+          where: { organizationId: primaryOrg.id },
+        });
+        const unknownOwner = await resolvePersonalUsageIngestionScope({
+          prisma,
+          teamId: primaryTeam!.id,
+          ownerUserId: `missing-user-${testNamespace}`,
+        });
+        expect(unknownOwner.userEmail).toBeUndefined();
+      });
     });
   });
 });
