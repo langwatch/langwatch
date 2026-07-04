@@ -1194,7 +1194,7 @@
       "anchors": [
         {
           "anchor": "Sign In to LangWatch",
-          "href": "https://app.langwatch.ai",
+          "href": "https://app.langwatch.ai/?utm_source=docs&utm_medium=docs&utm_campaign=sidebar-signin",
           "icon": "house"
         },
         {
@@ -1218,7 +1218,7 @@
       },
       {
         "label": "Sign In",
-        "href": "https://app.langwatch.ai"
+        "href": "https://app.langwatch.ai/?utm_source=docs&utm_medium=docs&utm_campaign=navbar-signin"
       }
     ],
     "primary": {
