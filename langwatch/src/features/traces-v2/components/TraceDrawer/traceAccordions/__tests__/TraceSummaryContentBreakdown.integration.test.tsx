@@ -59,9 +59,15 @@ vi.mock("../useSectionFocusGlow", () => ({
 }));
 
 // Force the Content-breakdown section open so its (lazy-mounted) children render.
+// `useSectionPresenceStore` MUST be stubbed too: every AccordionShell `Section`
+// reads it unconditionally (traceId/tab → trackPresence), so a partial mock that
+// omits it makes the export `undefined` and crashes the render.
 vi.mock("../sectionPresence", () => ({
   useAutoOpenSections: () => [["io", "content"], () => undefined],
   useSyncSectionPresence: () => undefined,
+  useSectionPresenceStore: (
+    selector: (s: { traceId: string | null; tab: string | null }) => unknown,
+  ) => selector({ traceId: null, tab: null }),
 }));
 
 function traceWith(attributes: Record<string, string>): TraceHeader {

@@ -262,6 +262,11 @@ export function inferCachedPrefixEstTokens({
   pools: UsagePools;
 }): number | null {
   const cached = pools.cacheReadTokens + pools.cacheCreationTokens;
+  // `pools.inputTokens` is the FRESH pool, provider-normalized upstream: for
+  // OpenAI/codex — whose reported input already INCLUDES the cached tokens —
+  // `extractUsagePools` subtracts the cached count, so `cached + inputTokens`
+  // here is the total context, not a double-count. Anthropic reports fresh
+  // input separately, so nothing is subtracted there.
   const total = cached + pools.inputTokens;
   if (cached <= 0 || total <= 0) return null;
   const estTotal = inputBlocks.reduce((sum, b) => sum + b.tokens, 0);
