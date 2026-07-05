@@ -20,6 +20,11 @@ type VirtualKeySecretRevealProps = {
   onClose: () => void;
   keyName: string;
   secret: string;
+  // Model string for the copy-paste usage example. Threaded from the
+  // create/rotate surface (which knows the key's eligible providers) so a
+  // self-hosted / custom key shows a model it can actually serve instead of
+  // the OpenAI-only default.
+  model?: string;
   // Distinguishes the initial-mint flow from a rotation. Rotations
   // also carry a grace-window banner (previous secret stays valid
   // for 24h so clients can roll over without a cliff).
@@ -36,6 +41,7 @@ export function VirtualKeySecretReveal({
   onClose,
   keyName,
   secret,
+  model,
   kind = "create",
 }: VirtualKeySecretRevealProps) {
   const [revealed, setRevealed] = useState(false);
@@ -150,7 +156,7 @@ export function VirtualKeySecretReveal({
               </VStack>
 
               <Separator />
-              <VirtualKeyUsageSnippet secret={secret} />
+              <VirtualKeyUsageSnippet secret={secret} model={model} />
             </VStack>
           </Dialog.Body>
           <Dialog.Footer>

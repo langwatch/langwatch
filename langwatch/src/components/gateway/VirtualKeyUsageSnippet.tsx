@@ -31,11 +31,11 @@ export type VirtualKeyUsageSnippetProps = {
   /** Heading shown above the language selector. */
   title?: string;
   /**
-   * Model string embedded in every snippet's chat-completions call.
-   * Defaults to the bare OpenAI-SDK drop-in (`gpt-5-mini`); pass
-   * `${vendor}/${model}` to disambiguate when the VK fans out across
-   * multiple providers. The VK detail page rewrites this when the
-   * user clicks an eligible-MP row.
+   * Model string embedded in every snippet's chat-completions call, in
+   * resolver-safe `vendor/model` form (e.g. `custom/Qwen2.5-0.5B-Instruct`).
+   * Callers thread the key's first eligible provider so the example names a
+   * model the key can actually serve. Falls back to `gpt-5-mini` only as a
+   * placeholder when the caller has no provider context.
    */
   model?: string;
 };
@@ -59,14 +59,12 @@ interface TabItem {
  * the post-create secret-reveal dialog + the VK detail page so the
  * copy-secret → first-request path has no dead ends.
  */
-// Snippets default to the bare model name (`gpt-5-mini`) — matches
-// the OpenAI-SDK drop-in replacement story that's the primary value
-// prop for the gateway. `provider/model` form is still accepted at
-// dispatch time as the explicit disambiguator for multi-provider VKs
-// (see ai-gateway/model-aliases docs) but isn't what we want a new
-// user to copy-paste, because single-provider VKs would forward the
-// prefix upstream and get 4xx. Closes @ariana #63/#64/#66, @rchaves
-// hands-on dogfood finding.
+// `gpt-5-mini` is only the fallback placeholder for callers that pass no
+// model. The real default is threaded in by the create / reveal / detail
+// surfaces as the key's first eligible provider in `vendor/model` form. The
+// gateway resolver strips the `vendor/` prefix before dispatch (it only
+// selects the provider, then forwards the bare model), so the prefixed form
+// is always safe, including for single-provider keys.
 export function VirtualKeyUsageSnippet({
   secret,
   gatewayBaseUrl,
