@@ -486,19 +486,22 @@ function buildCredentials(mp: ModelProvider): Record<string, unknown> {
 function buildProviderSlot(mp: ModelProvider, index: number): ProviderSlot {
   const credentials = buildCredentials(mp);
   const customKeys = decryptCustomKeys(mp.customKeys);
-  // Base-URL overrides live under the provider's registry endpointKey
-  // (custom -> CUSTOM_BASE_URL, openai -> OPENAI_BASE_URL, ...). Structured-
-  // endpoint providers (Azure, Vertex) resolve theirs into
-  // credentials.endpoint and their Bifrost adapters route by that, so skip
-  // the top-level base_url for them to avoid emitting the same endpoint
-  // twice. This is what lets an "openai" provider with OPENAI_BASE_URL reach
-  // a self-hosted proxy instead of api.openai.com.
-  const endpointKey =
-    modelProviders[mp.provider as keyof typeof modelProviders]?.endpointKey;
-  const registryBaseURL =
-    endpointKey && !pickString(credentials, "endpoint")
-      ? pickString(customKeys, endpointKey)
-      : undefined;
+  // Only "custom" and "openai" route a base-URL override to Bifrost's VLLM
+  // adapter (see mapProvider in bifrost.go) — the sole consumer of the
+  // per-slot base_url. Other providers with an endpointKey resolve their
+  // endpoint elsewhere (Azure/Vertex via credentials.endpoint, Anthropic via
+  // Bifrost's provider-level network_config), so emitting a per-slot base_url
+  // for them would be a dead field. Scope the override to what's consumed;
+  // this is what lets an "openai" provider with OPENAI_BASE_URL reach a
+  // self-hosted proxy instead of api.openai.com.
+  const supportsBaseURLOverride =
+    mp.provider === "custom" || mp.provider === "openai";
+  const endpointKey = supportsBaseURLOverride
+    ? modelProviders[mp.provider as keyof typeof modelProviders]?.endpointKey
+    : undefined;
+  const registryBaseURL = endpointKey
+    ? pickString(customKeys, endpointKey)
+    : undefined;
   const baseURL =
     pickString(customKeys, "base_url") ??
     pickString(customKeys, "BASE_URL") ??
