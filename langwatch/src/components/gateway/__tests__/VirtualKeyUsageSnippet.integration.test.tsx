@@ -27,6 +27,7 @@ describe("given a VirtualKeyUsageSnippet", () => {
   afterEach(() => cleanup());
 
   describe("when a custom-provider model is passed", () => {
+    /** @scenario Usage example defaults to a model the key can serve */
     it("embeds custom/<model> in the copy-paste example, not gpt-5-mini", async () => {
       const { container } = render(
         <VirtualKeyUsageSnippet
@@ -44,6 +45,7 @@ describe("given a VirtualKeyUsageSnippet", () => {
   });
 
   describe("when no model is passed", () => {
+    /** @scenario Usage example falls back to a safe placeholder when no provider is resolvable */
     it("falls back to the gpt-5-mini placeholder", async () => {
       const { container } = render(
         <VirtualKeyUsageSnippet secret="vk-lw-testsecret" />,

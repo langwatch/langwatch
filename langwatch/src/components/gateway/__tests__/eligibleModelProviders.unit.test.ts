@@ -69,6 +69,7 @@ describe("firstEligibleDefaultModel", () => {
   };
 
   describe("when a custom provider is eligible at the key's scope", () => {
+    /** @scenario Usage example on the key detail page matches the key's provider */
     it("returns custom/<model> so the usage example is servable", () => {
       expect(
         firstEligibleDefaultModel({
