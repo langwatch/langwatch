@@ -334,13 +334,21 @@ const ROLLUP_TRACE_AGGREGATIONS: ReadonlySet<AggregationTypes> =
   new Set<AggregationTypes>(["sum"]);
 
 /**
- * Aggregations the eval rollup can compute. `cardinality` is additive on
- * the eval rollup (every terminal eval contributes EvalCount = 1; distinct
- * eval-id count is `sum(EvalCount)`), so it's safe here even though the
- * trace rollup can't serve it.
+ * Aggregations the eval rollup can compute CORRECTLY. `avg` is safe because
+ * the eval rollup carries the (ScoreSum, ScoreCount) pair, so the builder
+ * computes a true weighted mean `sum(ScoreSum)/nullIf(sum(ScoreCount),0)`
+ * rather than an average-of-averages. `cardinality` is additive (every
+ * terminal eval contributes EvalCount = 1; distinct eval-id count is
+ * `sum(EvalCount)`).
+ *
+ * `min`/`max` are DELIBERATELY excluded: the builder computes them as
+ * `min/max(ScoreSum / ScoreCount)` per rollup ROW, i.e. the min/max of
+ * per-bucket AVERAGES — merge-state-dependent and not the true worst/best
+ * score. They fall through to the eval slim table, one row per evaluation,
+ * where `min/max(Score)` is the real per-eval extremum (eval5014-P1).
  */
 const ROLLUP_EVAL_AGGREGATIONS: ReadonlySet<AggregationTypes> =
-  new Set<AggregationTypes>(["sum", "avg", "min", "max", "cardinality"]);
+  new Set<AggregationTypes>(["sum", "avg", "cardinality"]);
 
 /**
  * Input shape for the routing decision. Mirrors the relevant subset of

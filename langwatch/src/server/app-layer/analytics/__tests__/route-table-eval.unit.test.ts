@@ -49,6 +49,26 @@ describe("pickAnalyticsTable — eval-source routing (Phase 6)", () => {
         }),
       ).toBe("evaluation_analytics");
     });
+
+    // Regression (eval5014-P1): min/max on the eval rollup compute
+    // min/max(ScoreSum / ScoreCount) per ROW — the min/max of per-bucket
+    // AVERAGES, which is merge-state dependent and not the true worst/best
+    // score. They must route to the slim per-eval table instead.
+    it("routes a min / score query to evaluation_analytics (slim), not rollup", () => {
+      expect(
+        pickAnalyticsTable({
+          series: [series("evaluations.evaluation_score", "min")],
+        }),
+      ).toBe("evaluation_analytics");
+    });
+
+    it("routes a max / score query to evaluation_analytics (slim), not rollup", () => {
+      expect(
+        pickAnalyticsTable({
+          series: [series("evaluations.evaluation_score", "max")],
+        }),
+      ).toBe("evaluation_analytics");
+    });
   });
 
   describe("when the series is an eval metric but the filter is unsupported", () => {
