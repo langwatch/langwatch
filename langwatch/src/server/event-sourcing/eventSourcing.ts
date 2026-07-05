@@ -482,13 +482,21 @@ export class EventSourcing {
         return result.entry.groupKeyFn(result.clean);
       },
       score: (payload: Record<string, unknown>) => {
-        // Outbox jobs participate in the same per-tenant fairness budget
-        // as projection / reactor work — a baseline score of 0 keeps them
-        // in the default lane unless a future revision wants to weight
-        // them explicitly.
-        if (isOutboxPayload(payload)) return 0;
+        // The queue treats `score` as a millisecond wall-clock TIMESTAMP:
+        // `dispatchAfterMs = score + delay` (groupQueue.send), and the
+        // default when unset is `Date.now()`. Regular jobs return
+        // `occurredAt` here for exactly this reason. Outbox payloads MUST
+        // do the same — returning 0 made `dispatchAfterMs = 0 + delay`,
+        // i.e. a 1970 timestamp that is always already-due, so the cadence
+        // digest delay collapsed and a windowed digest fanned out to one
+        // email per match instead of one batched digest (ADR-026). Using
+        // the enqueue-time now makes `dispatchAfterMs = now + delayMs =
+        // scheduledFor`, restoring both the digest delay and any future
+        // delayed outbox stage. No-delay stages (settle/graphEval) are
+        // unaffected — now + 0 is immediately due, same as before.
+        if (isOutboxPayload(payload)) return Date.now();
         const result = this.lookupEntry(payload);
-        if (!result) return 0;
+        if (!result) return Date.now();
         return result.entry.scoreFn(result.clean);
       },
       spanAttributes: (payload: Record<string, unknown>) => {
