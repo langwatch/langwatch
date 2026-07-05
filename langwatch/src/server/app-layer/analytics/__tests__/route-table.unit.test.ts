@@ -45,13 +45,32 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
       });
     });
 
-    describe("when grouped by span_type and the aggregation is avg", () => {
-      it("routes to trace_analytics_rollup", () => {
+    describe("when the aggregation is avg", () => {
+      // Regression (trace5012-P0): avg over the rollup's SimpleAggregateFunction(sum)
+      // columns is the mean of per-bucket sums, not the per-trace mean — so avg must
+      // NEVER route to trace_analytics_rollup. With a slim-eligible group-by it goes
+      // to slim; with a rollup-only group-by (span_type, not on slim) it falls to legacy.
+      it("routes to trace_analytics (slim) when grouped by a slim-eligible dim", () => {
+        const table = pickAnalyticsTable({
+          series: [series("performance.total_cost", "avg")],
+          groupBy: "metadata.user_id",
+        });
+        expect(table).toBe("trace_analytics");
+      });
+
+      it("falls back to trace_summaries when grouped by span_type (not on slim, avg not on rollup)", () => {
         const table = pickAnalyticsTable({
           series: [series("performance.total_cost", "avg")],
           groupBy: "metadata.span_type",
         });
-        expect(table).toBe("trace_analytics_rollup");
+        expect(table).toBe("trace_summaries");
+      });
+
+      it("routes to trace_analytics (slim) with no group-by", () => {
+        const table = pickAnalyticsTable({
+          series: [series("performance.total_cost", "avg")],
+        });
+        expect(table).toBe("trace_analytics");
       });
     });
 
@@ -209,7 +228,11 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
   });
 
   describe("given a pipeline aggregation (per-user)", () => {
-    it("never routes to the rollup (per-user is not a rollup key)", () => {
+    // Regression (trace5012-P0): the slim builder does not implement the outer
+    // pipeline re-aggregation, so a pipeline series must route to the legacy
+    // fallback — never rollup (no per-user key) and never slim (would silently
+    // return the flat inner aggregation).
+    it("routes to trace_summaries (legacy), not rollup and not slim", () => {
       const table = pickAnalyticsTable({
         series: [
           series("performance.total_cost", "sum", {
@@ -217,7 +240,7 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
           }),
         ],
       });
-      expect(table).not.toBe("trace_analytics_rollup");
+      expect(table).toBe("trace_summaries");
     });
   });
 

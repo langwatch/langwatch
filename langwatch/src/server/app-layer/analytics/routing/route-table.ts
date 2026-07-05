@@ -188,12 +188,23 @@ const SLIM_FILTER_FIELDS: ReadonlySet<FilterField> = new Set<FilterField>([
   "traces.name",
 ]);
 
-/** Aggregations the rollup can compute additively from its sum columns. */
+/**
+ * Aggregations the rollup can compute CORRECTLY from its columns. The rollup
+ * carries `SimpleAggregateFunction(sum, …)` columns only — one summed value per
+ * (bucket, model, span_type). Only `sum` is well-defined:
+ *
+ *   - `sum(col)`     → the additive total. Correct.
+ *   - `avg(col)`     → mean of per-bucket SUMS, not the per-trace mean the
+ *                      legacy path returns (no count column to divide by). Wrong.
+ *   - `min/max(col)` → min/max of per-bucket sums, which also changes value
+ *                      across background merges. Non-deterministic + wrong.
+ *
+ * So avg/min/max are DELIBERATELY excluded — they fall through to the slim
+ * table, whose one-row-per-trace shape computes them correctly per trace
+ * (trace5012-P0).
+ */
 const ROLLUP_AGGREGATIONS: ReadonlySet<AggregationTypes> = new Set<AggregationTypes>([
   "sum",
-  "avg",
-  "min",
-  "max",
 ]);
 
 /**
@@ -304,16 +315,13 @@ function slimHandlesAllSeries(series: SeriesInputType[]): boolean {
 
 function slimHandlesSeries(s: SeriesInputType): boolean {
   // Pipeline aggregations (per-user / per-thread / per-customer / per-trace)
-  // group + re-aggregate. Slim carries the dim columns to do that, so allow
-  // them as long as the inner metric and pipeline field are slim-eligible.
-  if (s.pipeline) {
-    const pipelineFieldOk =
-      s.pipeline.field === "trace_id" ||
-      s.pipeline.field === "user_id" ||
-      s.pipeline.field === "thread_id" ||
-      s.pipeline.field === "customer_id";
-    if (!pipelineFieldOk) return false;
-  }
+  // group by a dim then re-aggregate the groups. The slim builder does NOT
+  // implement the outer re-aggregation — it only ever emits the flat inner
+  // aggregation, silently returning e.g. the total distinct trace count for
+  // an "average traces per user" query (trace5012-P0). Until the slim builder
+  // grows real pipeline support, route ALL pipeline series to the legacy
+  // fallback, which computes the two-level aggregation correctly.
+  if (s.pipeline) return false;
   if (s.key !== undefined || s.subkey !== undefined) return false;
   return SLIM_ELIGIBLE_METRIC_KEYS.has(s.metric);
 }
