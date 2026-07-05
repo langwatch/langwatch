@@ -28,6 +28,17 @@ export const publicEnvRouter = publicProcedure
       HAS_EMAIL_PROVIDER_KEY:
         !!env.SENDGRID_API_KEY || !!(env.USE_AWS_SES && env.AWS_REGION),
       IS_SAAS: env.IS_SAAS,
+      // AI Gateway public base URL (no /v1 suffix) for the copy-paste SDK
+      // snippets in VirtualKeyUsageSnippet. Self-hosted deployments must see
+      // their own ingress, not the SaaS default. Mirrors the resolution in
+      // ee/governance/services/gatewayUrl.ts (resolveGatewayBaseUrl); kept
+      // inline to avoid a core -> ee import, so the two must stay in sync.
+      GATEWAY_BASE_URL:
+        env.LW_GATEWAY_PUBLIC_URL ??
+        env.LW_GATEWAY_BASE_URL ??
+        (env.IS_SAAS
+          ? "https://gateway.langwatch.ai"
+          : "http://localhost:5563"),
       SHOW_OPS_IN_MAIN_SIDEBAR: isOpsSidebarEmail(ctx.session?.user?.email),
       POSTHOG_KEY: env.POSTHOG_KEY,
       POSTHOG_HOST: env.POSTHOG_HOST,

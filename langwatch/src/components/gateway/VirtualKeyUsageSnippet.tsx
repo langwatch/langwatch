@@ -12,19 +12,8 @@ import {
 import { useMemo } from "react";
 import type { HighlighterGeneric } from "shiki";
 import { useColorMode } from "~/components/ui/color-mode";
-
-const HOSTED_GATEWAY_URL = "https://gateway.langwatch.ai/v1";
-const LOCAL_GATEWAY_URL = "http://localhost:5563/v1";
-
-function resolveGatewayBaseUrl(override?: string): string {
-  if (override) return override;
-  if (typeof window === "undefined") return HOSTED_GATEWAY_URL;
-  // Local dev: gateway runs on :5563 alongside the app on :5560. Docker-
-  // Compose + helm ingress use the same port. Any other hostname assumes
-  // the hosted SaaS URL — self-hosters can override via the prop.
-  if (window.location.hostname === "localhost") return LOCAL_GATEWAY_URL;
-  return HOSTED_GATEWAY_URL;
-}
+import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { resolveSnippetGatewayBaseUrl } from "./gatewaySnippetUrl";
 
 export type VirtualKeyUsageSnippetProps = {
   /**
@@ -85,8 +74,12 @@ export function VirtualKeyUsageSnippet({
   model = "gpt-5-mini",
 }: VirtualKeyUsageSnippetProps) {
   const { colorMode } = useColorMode();
+  const publicEnv = usePublicEnv();
   const credential = secret ?? "$LANGWATCH_VK_SECRET";
-  const resolvedBaseUrl = resolveGatewayBaseUrl(gatewayBaseUrl);
+  const resolvedBaseUrl = resolveSnippetGatewayBaseUrl(
+    gatewayBaseUrl,
+    publicEnv.data?.GATEWAY_BASE_URL,
+  );
   const showRetrievalHint = !secret;
 
   const tabItems: TabItem[] = useMemo(() => {
