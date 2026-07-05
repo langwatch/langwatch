@@ -11,6 +11,7 @@ import type {
 import type { TriggerService } from "../trigger.service";
 import {
   decideGraphTriggerHeartbeat,
+  defaultCandidateSources,
   type GraphTriggerHeartbeatDeps,
   type HeartbeatCandidateSources,
 } from "../graph-trigger-heartbeat";
@@ -326,6 +327,80 @@ describe("decideGraphTriggerHeartbeat", () => {
       expect(result).toHaveLength(2);
       expect(chStub.callsByProject[PROJECT_A]).toBe(1);
       expect(chStub.callsByProject[PROJECT_B]).toBe(1);
+    });
+  });
+});
+
+describe("defaultCandidateSources", () => {
+  // Regression: Trigger / TriggerSent are project-scoped models, so the
+  // multitenancy middleware rejects a bare cross-project findMany. These
+  // scans must enumerate project ids from the global Project model first and
+  // scope with projectId: { in }, or the heartbeat throws every tick.
+  type FindManyArgs = { where?: { projectId?: unknown } };
+  function makePrismaStub() {
+    return {
+      project: {
+        findMany: vi.fn(async (_args?: FindManyArgs) => [
+          { id: PROJECT_A },
+          { id: PROJECT_B },
+        ]),
+      },
+      trigger: {
+        findMany: vi.fn(async (_args?: FindManyArgs) => [
+          { projectId: PROJECT_A },
+        ]),
+      },
+      triggerSent: {
+        findMany: vi.fn(async (_args?: FindManyArgs) => [
+          { projectId: PROJECT_B },
+        ]),
+      },
+    };
+  }
+
+  describe("when loading projects with graph triggers", () => {
+    it("scopes the Trigger scan with projectId in the enumerated project ids", async () => {
+      const prismaStub = makePrismaStub();
+      const sources = defaultCandidateSources(
+        prismaStub as unknown as GraphTriggerHeartbeatDeps["prisma"],
+      );
+
+      const projects = await sources.loadProjectsWithGraphTriggers();
+
+      expect(prismaStub.project.findMany).toHaveBeenCalledTimes(1);
+      const triggerWhere = prismaStub.trigger.findMany.mock.calls[0]?.[0]?.where;
+      expect(triggerWhere?.projectId).toEqual({ in: [PROJECT_A, PROJECT_B] });
+      expect(projects).toEqual([PROJECT_A]);
+    });
+  });
+
+  describe("when loading projects with open graph TriggerSent", () => {
+    it("scopes the TriggerSent scan with projectId in the enumerated project ids", async () => {
+      const prismaStub = makePrismaStub();
+      const sources = defaultCandidateSources(
+        prismaStub as unknown as GraphTriggerHeartbeatDeps["prisma"],
+      );
+
+      const projects = await sources.loadProjectsWithOpenGraphTriggerSent();
+
+      const sentWhere = prismaStub.triggerSent.findMany.mock.calls[0]?.[0]?.where;
+      expect(sentWhere?.projectId).toEqual({ in: [PROJECT_A, PROJECT_B] });
+      expect(projects).toEqual(new Set([PROJECT_B]));
+    });
+  });
+
+  describe("when there are no candidate projects", () => {
+    it("returns empty without issuing an unscoped Trigger scan", async () => {
+      const prismaStub = makePrismaStub();
+      prismaStub.project.findMany = vi.fn(async () => []);
+      const sources = defaultCandidateSources(
+        prismaStub as unknown as GraphTriggerHeartbeatDeps["prisma"],
+      );
+
+      const projects = await sources.loadProjectsWithGraphTriggers();
+
+      expect(projects).toEqual([]);
+      expect(prismaStub.trigger.findMany).not.toHaveBeenCalled();
     });
   });
 });

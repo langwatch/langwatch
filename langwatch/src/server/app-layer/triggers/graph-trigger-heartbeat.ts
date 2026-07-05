@@ -125,17 +125,36 @@ export function registerGraphTriggerHeartbeat(deps: GraphTriggerHeartbeatDeps): 
 /**
  * Default candidate-source implementation reading Prisma directly.
  * Exposed for tests via dependency injection at decide time.
+ *
+ * `Trigger` and `TriggerSent` are project-scoped models, so the
+ * multitenancy middleware (`guardProjectId`) rejects a bare cross-project
+ * `findMany` — it demands `projectId` or `projectId.in`. This is a genuine
+ * cluster-wide discovery scan, so we mirror the cron (routes/cron.ts):
+ * enumerate candidate project ids from `Project` (a GLOBAL_MODEL, queryable
+ * without a projectId filter) first, then scope the scans with
+ * `projectId: { in }`. Without this the heartbeat throws on its first query
+ * every tick and no absence/resolve alert ever fires.
  */
-function defaultCandidateSources(
+export function defaultCandidateSources(
   prisma: PrismaClient,
 ): HeartbeatCandidateSources {
+  const loadCandidateProjectIds = async (): Promise<string[]> => {
+    const projects = await prisma.project.findMany({
+      where: { firstMessage: true, archivedAt: null },
+      select: { id: true },
+    });
+    return projects.map((p) => p.id);
+  };
   return {
     loadProjectsWithGraphTriggers: async () => {
+      const projectIds = await loadCandidateProjectIds();
+      if (projectIds.length === 0) return [];
       const rows = await prisma.trigger.findMany({
         where: {
           active: true,
           deleted: false,
           customGraphId: { not: null },
+          projectId: { in: projectIds },
         },
         select: { projectId: true },
         distinct: ["projectId"],
@@ -143,10 +162,13 @@ function defaultCandidateSources(
       return rows.map((r) => r.projectId);
     },
     loadProjectsWithOpenGraphTriggerSent: async () => {
+      const projectIds = await loadCandidateProjectIds();
+      if (projectIds.length === 0) return new Set<string>();
       const rows = await prisma.triggerSent.findMany({
         where: {
           resolvedAt: null,
           customGraphId: { not: null },
+          projectId: { in: projectIds },
         },
         select: { projectId: true },
         distinct: ["projectId"],
