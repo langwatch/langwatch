@@ -101,8 +101,8 @@ export function VirtualKeySecretReveal({
                   <Alert.Title>24-hour grace window active.</Alert.Title>
                   <Alert.Description>
                     The previous secret keeps working for 24 hours so clients
-                    can roll over gradually. After that it hard- fails with a
-                    401 even though this key stays active.
+                    can roll over gradually. After that it hard-fails with a 401
+                    even though this key stays active.
                   </Alert.Description>
                 </Alert.Content>
               </Alert.Root>

@@ -115,30 +115,40 @@ export function resolveEligible(
     return false;
   };
 
+  // Rank the VK scope tiers so a provider admitted at several scopes shows the
+  // broadest one (ORG > TEAM > PROJECT) in its "inheritedFrom" badge.
+  const scopeBreadth = { ORGANIZATION: 0, TEAM: 1, PROJECT: 2 } as const;
   const result = new Map<string, EligibleModelProvider>();
   for (const provider of providers) {
     if (!provider.id) continue;
+    let bestWinner: VirtualKeyScopeEntry | undefined;
     for (const mpScope of provider.scopes) {
       const winner = scopes.find((vkScope) => matchesScope(mpScope, vkScope));
       if (!winner) continue;
-      if (result.has(provider.id)) continue;
-      const chatModels = provider.models ?? [];
-      const customCount = provider.customModels?.length ?? 0;
-      const label = provider.name ?? provider.provider;
-      result.set(provider.id, {
-        id: provider.id,
-        provider: provider.provider,
-        label,
-        modelCount: chatModels.length + customCount,
-        inheritedFrom: winner,
-        defaultModel: resolveProviderDefaultModel(
-          provider.provider,
-          label,
-          chatModels,
-          provider.customModels,
-        ),
-      });
+      if (
+        !bestWinner ||
+        scopeBreadth[winner.scopeType] < scopeBreadth[bestWinner.scopeType]
+      ) {
+        bestWinner = winner;
+      }
     }
+    if (!bestWinner) continue;
+    const chatModels = provider.models ?? [];
+    const customCount = provider.customModels?.length ?? 0;
+    const label = provider.name ?? provider.provider;
+    result.set(provider.id, {
+      id: provider.id,
+      provider: provider.provider,
+      label,
+      modelCount: chatModels.length + customCount,
+      inheritedFrom: bestWinner,
+      defaultModel: resolveProviderDefaultModel(
+        provider.provider,
+        label,
+        chatModels,
+        provider.customModels,
+      ),
+    });
   }
   return Array.from(result.values()).sort((a, b) =>
     a.label.localeCompare(b.label),
