@@ -19,6 +19,12 @@
  * Pure: span-in / plain-object-out, no I/O.
  */
 
+import {
+  completeObjectSlices,
+  readJsonStringAt,
+  topLevelKeyIndex,
+} from "../truncated-json-scan";
+
 /** The classifier's input shape: Anthropic-style messages + the request tools. */
 export interface ClaudeCodeStructuredInput {
   messages: Array<{ role: string; content: unknown }>;
@@ -178,107 +184,4 @@ function recoverSystemValue(raw: string): unknown | null {
     return blocks.length > 0 ? blocks : null;
   }
   return null;
-}
-
-/**
- * Index of `"key"` occurring as a KEY of the TOP-LEVEL object (depth 1,
- * outside strings, followed by `:`), or -1. A bare `indexOf('"system"')` can
- * be hijacked by the same key inside a `tool_use.input` payload — that input
- * is embedded as real unescaped JSON, so it false-matches before the real
- * top-level key. String/escape aware, same conventions as
- * {@link completeObjectSlices}.
- *
- * @internal exported for the truncation-recovery twin in
- * canonicalisation/extractors/claudeCode.ts + unit testing
- */
-export function topLevelKeyIndex(raw: string, key: string): number {
-  const needle = `"${key}"`;
-  let depth = 0;
-  let inStr = false;
-  let esc = false;
-  for (let i = 0; i < raw.length; i++) {
-    const ch = raw[i];
-    if (inStr) {
-      if (esc) esc = false;
-      else if (ch === "\\") esc = true;
-      else if (ch === '"') inStr = false;
-      continue;
-    }
-    if (ch === '"') {
-      if (depth === 1 && raw.startsWith(needle, i)) {
-        let j = i + needle.length;
-        while (j < raw.length && /\s/.test(raw[j]!)) j++;
-        if (raw[j] === ":") return i;
-      }
-      inStr = true;
-      continue;
-    }
-    if (ch === "{" || ch === "[") depth++;
-    else if (ch === "}" || ch === "]") depth--;
-  }
-  return -1;
-}
-
-/** Read a complete JSON string literal at `quoteIndex`, or null if truncated. */
-function readJsonStringAt(raw: string, quoteIndex: number): string | null {
-  let esc = false;
-  for (let i = quoteIndex + 1; i < raw.length; i++) {
-    const ch = raw[i];
-    if (esc) {
-      esc = false;
-      continue;
-    }
-    if (ch === "\\") {
-      esc = true;
-      continue;
-    }
-    if (ch === '"') {
-      try {
-        return JSON.parse(raw.slice(quoteIndex, i + 1)) as string;
-      } catch {
-        return null;
-      }
-    }
-  }
-  return null;
-}
-
-/**
- * Yield every complete, balanced top-level `{…}` object slice at/after
- * `fromIndex`, string/escape aware, stopping at the first depth-0 `]` so a scan
- * seeded at an array does not bleed into sibling fields. A trailing object cut
- * off by truncation never balances and is never yielded.
- */
-function* completeObjectSlices(
-  raw: string,
-  fromIndex: number,
-): Generator<string> {
-  let depth = 0;
-  let start = -1;
-  let inStr = false;
-  let esc = false;
-  for (let i = fromIndex; i < raw.length; i++) {
-    const ch = raw[i];
-    if (inStr) {
-      if (esc) esc = false;
-      else if (ch === "\\") esc = true;
-      else if (ch === '"') inStr = false;
-      continue;
-    }
-    if (ch === '"') inStr = true;
-    else if (ch === "{") {
-      if (depth === 0) start = i;
-      depth++;
-    } else if (ch === "}") {
-      if (depth > 0) {
-        depth--;
-        if (depth === 0 && start >= 0) {
-          yield raw.slice(start, i + 1);
-          start = -1;
-        }
-      }
-    } else if (ch === "]" && depth === 0) {
-      return;
-    }
-  }
 }

@@ -569,8 +569,10 @@ export const userRouter = createTRPCRouter({
         };
       }
 
+      // `!== undefined`, not truthiness: 0 is a valid epoch start bound (the
+      // /me Hono route treats it the same way).
       const window =
-        input.windowStartMs && input.windowEndMs
+        input.windowStartMs !== undefined && input.windowEndMs !== undefined
           ? {
               start: new Date(input.windowStartMs),
               end: new Date(input.windowEndMs),
