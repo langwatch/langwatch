@@ -52,6 +52,8 @@ const MONITOR_NOT_GUARDRAIL_ID = `mon-mat-nongr-${suffix}`;
 const MP_ID = `mp-mat-${suffix}`;
 const MP_CUSTOM_ID = `mp-mat-custom-${suffix}`;
 const CUSTOM_BASE_URL = "http://llm-server:8000/v1";
+const MP_OPENAI_BASE_ID = `mp-mat-openai-base-${suffix}`;
+const OPENAI_BASE_URL_OVERRIDE = "https://proxy.example.com/v1";
 const RP_ID = `rp-mat-${suffix}`;
 const GUARDRAIL_ID = `gr-mat-${suffix}`;
 const VK_ID = `vk-mat-${suffix}`;
@@ -169,6 +171,25 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
         },
       },
     });
+    // OpenAI provider pointed at a self-hosted proxy via OPENAI_BASE_URL.
+    // The materialiser must surface it as the slot base_url (from the
+    // registry endpointKey), otherwise gateway traffic hits api.openai.com.
+    await prisma.modelProvider.create({
+      data: {
+        id: MP_OPENAI_BASE_ID,
+        name: "openai-proxy",
+        provider: "openai",
+        enabled: true,
+        organizationId: ORG_ID,
+        customKeys: {
+          OPENAI_API_KEY: "sk-proxy-test",
+          OPENAI_BASE_URL: OPENAI_BASE_URL_OVERRIDE,
+        },
+        scopes: {
+          create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
+        },
+      },
+    });
     await prisma.routingPolicy.create({
       data: {
         id: RP_ID,
@@ -177,7 +198,7 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
           create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }],
         },
         name: `mat-rp-${suffix}`,
-        modelProviderIds: [MP_ID, MP_CUSTOM_ID],
+        modelProviderIds: [MP_ID, MP_CUSTOM_ID, MP_OPENAI_BASE_ID],
         modelAliases: { "gpt-5": "gpt-5-mini" },
         policyRules: {
           tools: { deny: ["^shell_.*$"], allow: null },
@@ -281,10 +302,12 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
     });
     await prisma.routingPolicy.deleteMany({ where: { id: RP_ID } });
     await prisma.modelProviderScope.deleteMany({
-      where: { modelProviderId: { in: [MP_ID, MP_CUSTOM_ID] } },
+      where: {
+        modelProviderId: { in: [MP_ID, MP_CUSTOM_ID, MP_OPENAI_BASE_ID] },
+      },
     });
     await prisma.modelProvider.deleteMany({
-      where: { id: { in: [MP_ID, MP_CUSTOM_ID] } },
+      where: { id: { in: [MP_ID, MP_CUSTOM_ID, MP_OPENAI_BASE_ID] } },
     });
     await prisma.evaluator.deleteMany({
       where: { id: { in: [EVALUATOR_ID, EVALUATOR_NOT_GUARDRAIL_ID] } },
@@ -331,6 +354,17 @@ describe("GatewayConfigMaterialiser — real PG end-to-end", () => {
       expect(slot!.type).toBe("custom");
       expect(slot!.base_url).toBe(CUSTOM_BASE_URL);
       expect(slot!.credentials.api_key).toBe("");
+    });
+
+    it("materialises an openai provider slot with OPENAI_BASE_URL as its base_url", async () => {
+      const repo = new VirtualKeyRepository(prisma);
+      const vk = await repo.findById(VK_ID, ORG_ID);
+      const mat = new GatewayConfigMaterialiser(prisma, null);
+      const bundle = await mat.materialise(vk!);
+      const slot = bundle.providers.find((p) => p.id === MP_OPENAI_BASE_ID);
+      expect(slot).toBeDefined();
+      expect(slot!.type).toBe("openai");
+      expect(slot!.base_url).toBe(OPENAI_BASE_URL_OVERRIDE);
     });
 
     it("hydrates model_aliases + policy_rules from the linked RoutingPolicy", async () => {

@@ -517,3 +517,48 @@ func TestNormalizeOpenAICompatBaseURL(t *testing.T) {
 		}
 	}
 }
+
+// isOpenAICompatibleProvider gates two behaviors the custom/vLLM path both
+// depend on: buildChatRequest raw-forwards the body byte-for-byte (so vendor
+// sampling params survive) and DispatchStream injects
+// stream_options.include_usage (so streamed token usage still reaches
+// billing/traces). VLLM — Bifrost's generic OpenAI-compatible adapter, the
+// destination for provider "custom" and "openai"+base_url — must be
+// recognized here alongside OpenAI and Azure.
+//
+// Spec: specs/ai-gateway/custom-provider-base-url.feature
+func TestIsOpenAICompatibleProvider(t *testing.T) {
+	for _, p := range []bfschemas.ModelProvider{bfschemas.OpenAI, bfschemas.Azure, bfschemas.VLLM} {
+		if !isOpenAICompatibleProvider(p) {
+			t.Errorf("isOpenAICompatibleProvider(%q) = false, want true", p)
+		}
+	}
+	for _, p := range []bfschemas.ModelProvider{bfschemas.Anthropic, bfschemas.Gemini, bfschemas.Bedrock} {
+		if isOpenAICompatibleProvider(p) {
+			t.Errorf("isOpenAICompatibleProvider(%q) = true, want false", p)
+		}
+	}
+}
+
+// A custom / self-hosted vLLM provider (bfschemas.VLLM) raw-forwards the
+// inbound chat body byte-for-byte, exactly like OpenAI/Azure — never through
+// the structured parse that would drop vendor sampling params. This is the
+// gateway-side guarantee that top_k / repetition_penalty /
+// chat_template_kwargs / guided_json reach the customer's endpoint unchanged.
+//
+// Spec: specs/ai-gateway/custom-provider-base-url.feature
+func TestBuildChatRequest_VLLMRawForwardsBody(t *testing.T) {
+	body := []byte(`{"model":"Qwen/Qwen2.5-32B-Instruct","messages":[{"role":"user","content":"hi"}],"top_k":5,"repetition_penalty":1.1,"chat_template_kwargs":{"enable_thinking":false}}`)
+	req := &domain.Request{Type: domain.RequestTypeChat, Body: body}
+
+	bfReq, _, err := buildChatRequest(context.Background(), req, bfschemas.VLLM, "Qwen/Qwen2.5-32B-Instruct")
+	if err != nil {
+		t.Fatalf("buildChatRequest returned error: %v", err)
+	}
+	if !bytes.Equal(bfReq.RawRequestBody, body) {
+		t.Fatalf("VLLM must raw-forward the inbound body byte-for-byte;\n got: %s\nwant: %s", bfReq.RawRequestBody, body)
+	}
+	if len(bfReq.Input) != 0 {
+		t.Fatalf("raw-forward must not populate Input via structured parse, got %d messages", len(bfReq.Input))
+	}
+}

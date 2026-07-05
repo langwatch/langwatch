@@ -187,9 +187,18 @@ func buildChatRequest(
 // gateway raw-forwards the inbound body rather than parse+re-marshal,
 // preserving byte-for-byte identity so OpenAI prompt-prefix auto-cache
 // continues to hit between repeated calls.
+//
+// VLLM is included: it is Bifrost's generic OpenAI-compatible adapter,
+// the destination for customer-hosted endpoints (self-hosted vLLM,
+// LiteLLM proxies) mapped from provider "custom" and from "openai" with
+// a base-URL override. Raw-forwarding them preserves the provider-specific
+// sampling params the structured parse would otherwise drop (top_k,
+// repetition_penalty, chat_template_kwargs, guided_json, ...) and lets
+// DispatchStream inject stream_options.include_usage so streamed token
+// usage still reaches billing/traces.
 func isOpenAICompatibleProvider(p bfschemas.ModelProvider) bool {
 	switch p {
-	case bfschemas.OpenAI, bfschemas.Azure:
+	case bfschemas.OpenAI, bfschemas.Azure, bfschemas.VLLM:
 		return true
 	default:
 		return false
@@ -271,9 +280,10 @@ var chatExtensionKeys = []string{
 //   - the body has no "stream":true (non-stream dispatch),
 //   - the body already carries stream_options.include_usage (caller decided).
 //
-// Only call on raw-forward paths for OpenAI / Azure. Anthropic / Gemini /
-// Vertex / Bedrock emit usage natively in their stream deltas and this flag
-// is meaningless on their wire formats.
+// Only call on raw-forward paths for OpenAI / Azure / VLLM (self-hosted
+// OpenAI-compatible). Anthropic / Gemini / Vertex / Bedrock emit usage
+// natively in their stream deltas and this flag is meaningless on their
+// wire formats.
 func ensureStreamIncludeUsage(body []byte) []byte {
 	if len(body) == 0 {
 		return body
