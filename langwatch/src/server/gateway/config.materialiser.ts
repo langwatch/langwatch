@@ -487,7 +487,7 @@ function buildProviderSlot(mp: ModelProvider, index: number): ProviderSlot {
   const credentials = buildCredentials(mp);
   const customKeys = decryptCustomKeys(mp.customKeys);
   // Only "custom" and "openai" route a base-URL override to Bifrost's VLLM
-  // adapter (see mapProvider in bifrost.go) — the sole consumer of the
+  // adapter (see mapProvider in bifrost.go), the sole consumer of the
   // per-slot base_url. Other providers with an endpointKey resolve their
   // endpoint elsewhere (Azure/Vertex via credentials.endpoint, Anthropic via
   // Bifrost's provider-level network_config), so emitting a per-slot base_url

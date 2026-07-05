@@ -1,9 +1,9 @@
 Feature: Custom (OpenAI-compatible) provider routing to customer endpoints
   Customers who self-host OpenAI-compatible model servers (vLLM, LiteLLM
   proxy, ...) configure them in LangWatch as the "Custom (OpenAI-compatible)"
-  provider with a base URL and an optional API key. Every dispatch path —
+  provider with a base URL and an optional API key. Every dispatch path,
   virtual-key gateway traffic and in-app features (playground, workflows,
-  evaluations) — must send requests to the customer's endpoint, never to
+  evaluations), must send requests to the customer's endpoint, never to
   api.openai.com.
 
   Background:

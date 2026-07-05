@@ -475,8 +475,8 @@ func TestMapProvider_CustomAndBaseURLOverrides(t *testing.T) {
 	}
 }
 
-// credentialToBifrostKey must carry the endpoint on VLLMKeyConfig.URL —
-// Bifrost's vLLM provider has no provider-level URL fallback, so a key
+// credentialToBifrostKey must carry the endpoint on VLLMKeyConfig.URL
+// because Bifrost's vLLM provider has no provider-level URL fallback, so a key
 // without it fails dispatch. An empty API key stays allowed: self-hosted
 // servers commonly run unauthenticated.
 //
@@ -490,7 +490,7 @@ func TestCredentialToBifrostKey_VLLM(t *testing.T) {
 	key := credentialToBifrostKey(cred, bfschemas.VLLM)
 
 	if key.VLLMKeyConfig == nil {
-		t.Fatal("VLLMKeyConfig is nil — vLLM keys require a per-key URL")
+		t.Fatal("VLLMKeyConfig is nil: vLLM keys require a per-key URL")
 	}
 	// Bifrost's vLLM provider appends "/v1/chat/completions" itself, so
 	// the conventional "/v1" suffix must be stripped or requests land on
@@ -522,8 +522,8 @@ func TestNormalizeOpenAICompatBaseURL(t *testing.T) {
 // depend on: buildChatRequest raw-forwards the body byte-for-byte (so vendor
 // sampling params survive) and DispatchStream injects
 // stream_options.include_usage (so streamed token usage still reaches
-// billing/traces). VLLM — Bifrost's generic OpenAI-compatible adapter, the
-// destination for provider "custom" and "openai"+base_url — must be
+// billing/traces). VLLM, Bifrost's generic OpenAI-compatible adapter and
+// the destination for provider "custom" and "openai"+base_url, must be
 // recognized here alongside OpenAI and Azure.
 //
 // Spec: specs/ai-gateway/custom-provider-base-url.feature
@@ -541,7 +541,7 @@ func TestIsOpenAICompatibleProvider(t *testing.T) {
 }
 
 // A custom / self-hosted vLLM provider (bfschemas.VLLM) raw-forwards the
-// inbound chat body byte-for-byte, exactly like OpenAI/Azure — never through
+// inbound chat body byte-for-byte, exactly like OpenAI/Azure, never through
 // the structured parse that would drop vendor sampling params. This is the
 // gateway-side guarantee that top_k / repetition_penalty /
 // chat_template_kwargs / guided_json reach the customer's endpoint unchanged.
