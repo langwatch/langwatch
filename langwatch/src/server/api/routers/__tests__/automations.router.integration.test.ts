@@ -12,12 +12,14 @@ const {
   mockEnforceLicenseLimit,
   mockTriggerUpdate,
   mockTriggerCreate,
+  mockTriggerFindFirst,
   mockCustomGraphFindUnique,
   mockTriggersInvalidate,
 } = vi.hoisted(() => ({
   mockEnforceLicenseLimit: vi.fn().mockResolvedValue(undefined),
   mockTriggerUpdate: vi.fn(),
   mockTriggerCreate: vi.fn(),
+  mockTriggerFindFirst: vi.fn(),
   mockCustomGraphFindUnique: vi.fn(),
   mockTriggersInvalidate: vi.fn().mockResolvedValue(undefined),
 }));
@@ -62,6 +64,7 @@ function createTestCaller() {
       trigger: {
         update: mockTriggerUpdate,
         create: mockTriggerCreate,
+        findFirst: mockTriggerFindFirst,
       },
       customGraph: {
         findUnique: mockCustomGraphFindUnique,
@@ -189,6 +192,37 @@ describe("automationRouter", () => {
           // Name is prefixed to match the dashboard "Add Alert" path so the
           // same trigger appears identically through both creators.
           expect(createArgs.data.name).toBe("Alert: p95 latency");
+        });
+      });
+
+      describe("on create when a soft-deleted alert already occupies the graph", () => {
+        it("reactivates the existing row instead of hitting the unique constraint", async () => {
+          mockCustomGraphFindUnique.mockResolvedValueOnce({ id: "graph_1" });
+          // deleteById soft-deletes: the row stays and keeps customGraphId's
+          // @unique slot. A fresh create would throw P2002 → 500.
+          mockTriggerFindFirst.mockResolvedValueOnce({
+            id: "trigger_soft_deleted",
+            projectId: "proj_123",
+            customGraphId: "graph_1",
+            deleted: true,
+          });
+          mockTriggerUpdate.mockResolvedValueOnce({ id: "trigger_soft_deleted" });
+
+          await caller.upsert(baseGraphAlertInput as any);
+
+          expect(mockTriggerCreate).not.toHaveBeenCalled();
+          expect(mockTriggerFindFirst).toHaveBeenCalledWith({
+            where: { projectId: "proj_123", customGraphId: "graph_1" },
+          });
+          expect(mockTriggerUpdate).toHaveBeenCalledTimes(1);
+          const updateArgs = mockTriggerUpdate.mock.calls[0]![0];
+          expect(updateArgs.where).toEqual({
+            id: "trigger_soft_deleted",
+            projectId: "proj_123",
+          });
+          expect(updateArgs.data.deleted).toBe(false);
+          expect(updateArgs.data.active).toBe(true);
+          expect(updateArgs.data.customGraphId).toBe("graph_1");
         });
       });
     });

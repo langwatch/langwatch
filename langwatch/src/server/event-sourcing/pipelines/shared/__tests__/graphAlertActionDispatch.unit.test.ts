@@ -61,12 +61,18 @@ function makeDeps() {
   const sendSlack = vi.fn<(payload: unknown) => Promise<void>>(
     async () => undefined,
   );
+  // Pass-through suppression by default — individual tests override to
+  // exercise the ADR-031 unsubscribe gate.
+  const filterSuppressedRecipients = vi.fn(
+    async ({ emails }: { emails: string[] }) => emails,
+  );
   return {
-    deps: { sendEmail, sendSlack } as unknown as Parameters<
+    deps: { sendEmail, sendSlack, filterSuppressedRecipients } as unknown as Parameters<
       typeof dispatchGraphAlertAction
     >[0]["deps"],
     sendEmail,
     sendSlack,
+    filterSuppressedRecipients,
   };
 }
 
@@ -104,6 +110,57 @@ describe("dispatchGraphAlertAction", () => {
       );
       expect(call.html).toContain("Latency p95");
       expect(call.html).toContain("712");
+    });
+
+    // Regression (dispatch5015-P1): the event-sourced path must honour the
+    // ADR-031 suppression list — the SAME one-click-unsubscribe the emails it
+    // sends advertise. Before the fix it called sendEmail with the raw
+    // recipient list, so unsubscribed recipients kept receiving alerts.
+    describe("when some recipients are on the suppression list", () => {
+      it("only sends to the recipients that survive suppression", async () => {
+        const { deps, sendEmail, filterSuppressedRecipients } = makeDeps();
+        filterSuppressedRecipients.mockResolvedValueOnce(["a@example.com"]);
+
+        await dispatchGraphAlertAction({
+          deps,
+          input: {
+            trigger: makeTrigger(),
+            project: makeProject(),
+            context: makeContext(),
+            recipients: ["a@example.com", "unsubscribed@example.com"],
+            slackWebhook: null,
+          },
+        });
+
+        expect(filterSuppressedRecipients).toHaveBeenCalledWith({
+          projectId: "proj_1",
+          triggerId: "trg_1",
+          emails: ["a@example.com", "unsubscribed@example.com"],
+        });
+        const call = sendEmail.mock.calls[0]?.[0] as { triggerEmails: string[] };
+        expect(call.triggerEmails).toEqual(["a@example.com"]);
+      });
+    });
+
+    describe("when every recipient is suppressed", () => {
+      it("does not send at all", async () => {
+        const { deps, sendEmail, filterSuppressedRecipients } = makeDeps();
+        filterSuppressedRecipients.mockResolvedValueOnce([]);
+
+        const result = await dispatchGraphAlertAction({
+          deps,
+          input: {
+            trigger: makeTrigger(),
+            project: makeProject(),
+            context: makeContext(),
+            recipients: ["unsubscribed@example.com"],
+            slackWebhook: null,
+          },
+        });
+
+        expect(sendEmail).not.toHaveBeenCalled();
+        expect(result.didSend).toBe(false);
+      });
     });
 
     describe("when the trigger overrides emailSubjectTemplate", () => {

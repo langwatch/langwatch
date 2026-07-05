@@ -205,6 +205,15 @@ export function buildOutboxRuntime({
           deps: {
             sendEmail: sendRenderedTriggerEmail,
             sendSlack: sendRenderedSlackMessage,
+            // ADR-031: honour the same email suppression list the cron path
+            // does, so one-click unsubscribes are respected on the
+            // event-sourced graph-alert path too.
+            filterSuppressedRecipients: ({ projectId, triggerId, emails }) =>
+              emailSuppressions.filterSuppressed({
+                projectId,
+                triggerId,
+                emails,
+              }),
           },
           input,
         }),

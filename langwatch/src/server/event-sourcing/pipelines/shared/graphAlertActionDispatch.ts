@@ -45,6 +45,20 @@ export interface GraphAlertDispatchDeps {
   /** Slack sender — same `sendRenderedSlackMessage` the trace cadence
    *  dispatcher uses. */
   sendSlack: typeof sendRenderedSlackMessage;
+  /**
+   * ADR-031 email suppression gate. The event-sourced graph-alert path
+   * renders the SAME one-click-unsubscribe footer + `List-Unsubscribe`
+   * headers the cron path does, so it MUST honour the same suppression
+   * list — otherwise a recipient who one-click-unsubscribed keeps receiving
+   * alerts (RFC 8058 compliance regression). Returns the recipients that
+   * survive suppression. Mirrors `getApp().emailSuppressions.filterSuppressed`
+   * used by the cron's `handleSendEmail`.
+   */
+  filterSuppressedRecipients: (params: {
+    projectId: string;
+    triggerId: string;
+    emails: string[];
+  }) => Promise<string[]>;
 }
 
 export interface GraphAlertDispatchResult {
@@ -110,6 +124,26 @@ export async function dispatchGraphAlertAction({
         renderErrors: [],
       };
     }
+    // ADR-031: drop suppressed (unsubscribed) recipients BEFORE rendering /
+    // sending, exactly as the cron's handleSendEmail does. Without this the
+    // event-sourced path silently ignores one-click unsubscribes.
+    const allowedRecipients = await deps.filterSuppressedRecipients({
+      projectId: project.id,
+      triggerId: trigger.id,
+      emails: recipients,
+    });
+    if (allowedRecipients.length === 0) {
+      logger.info(
+        { triggerId: trigger.id, projectId: project.id },
+        "All graph-alert email recipients are suppressed — skipping send",
+      );
+      return {
+        channel: "email",
+        didSend: false,
+        missingVariables: [],
+        renderErrors: [],
+      };
+    }
     const rendered = await renderTriggerEmail({
       subjectTemplate: trigger.emailSubjectTemplate,
       bodyTemplate: trigger.emailBodyTemplate,
@@ -130,7 +164,7 @@ export async function dispatchGraphAlertAction({
       );
     }
     await deps.sendEmail({
-      triggerEmails: recipients,
+      triggerEmails: allowedRecipients,
       triggerId: trigger.id,
       projectId: project.id,
       subject: rendered.subject,

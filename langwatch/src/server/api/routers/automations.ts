@@ -704,19 +704,54 @@ export const automationRouter = createTRPCRouter({
         });
       } else {
         await enforceLicenseLimit(ctx, input.projectId, "automations");
-        trigger = await ctx.prisma.trigger.create({
-          data: {
-            id: ksuid(KSUID_RESOURCES.TRIGGER).toString(),
-            projectId: input.projectId,
-            lastRunAt: new Date().getTime(),
-            notificationCadence: resolveCadenceForCreate(
-              input.action,
-              input.notificationCadence,
-            ),
-            traceDebounceMs: input.traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
-            ...data,
-          },
-        });
+        // A graph alert owns its custom-graph's unique `customGraphId` slot.
+        // `deleteById` soft-deletes (keeps the row and its @unique
+        // customGraphId occupied), so a fresh `create` for a graph that ever
+        // had an alert would violate the unique index — an unhandled P2002 →
+        // 500, with no UI path to recover since the soft-deleted row is hidden.
+        // Reactivate the existing row instead, matching the legacy
+        // graphs.updateById upsert-by-customGraphId behaviour.
+        const existingForGraph =
+          isGraphAlert && input.customGraphId
+            ? await ctx.prisma.trigger.findFirst({
+                where: {
+                  projectId: input.projectId,
+                  customGraphId: input.customGraphId,
+                },
+              })
+            : null;
+        if (existingForGraph) {
+          trigger = await ctx.prisma.trigger.update({
+            where: { id: existingForGraph.id, projectId: input.projectId },
+            data: {
+              ...data,
+              deleted: false,
+              active: true,
+              lastRunAt: new Date().getTime(),
+              notificationCadence: resolveCadenceForCreate(
+                input.action,
+                input.notificationCadence,
+              ),
+              traceDebounceMs:
+                input.traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
+            },
+          });
+        } else {
+          trigger = await ctx.prisma.trigger.create({
+            data: {
+              id: ksuid(KSUID_RESOURCES.TRIGGER).toString(),
+              projectId: input.projectId,
+              lastRunAt: new Date().getTime(),
+              notificationCadence: resolveCadenceForCreate(
+                input.action,
+                input.notificationCadence,
+              ),
+              traceDebounceMs:
+                input.traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
+              ...data,
+            },
+          });
+        }
       }
 
       await getApp().triggers.invalidate(input.projectId);
