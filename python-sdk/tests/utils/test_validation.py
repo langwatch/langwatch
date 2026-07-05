@@ -1,7 +1,6 @@
 """Unit tests for langwatch.utils.validation."""
 
 import warnings
-import pytest
 from langwatch.utils.validation import validate_list_param, validate_metadata
 
 
@@ -58,6 +57,13 @@ class TestValidateListParam:
             result = validate_list_param("contexts", ({"content": "chunk"},))
         assert result is None
         assert len(caught) == 1
+
+    def test_warning_points_at_caller_outside_sdk(self):
+        """The warning is attributed to the caller's file, not SDK internals."""
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            validate_list_param("contexts", "bad")
+        assert caught[0].filename == __file__
 
 
 class TestValidateMetadata:
@@ -126,3 +132,6 @@ class TestValidateMetadata:
                 {"user_id": "u-1", "customer_id": "c-1", "labels": "bad"}
             )
         assert result == {"user_id": "u-1", "customer_id": "c-1"}
+        assert len(caught) == 1
+        assert issubclass(caught[0].category, UserWarning)
+        assert "labels" in str(caught[0].message)
