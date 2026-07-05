@@ -1,3 +1,4 @@
+import { resolveGatewayBaseUrl } from "@ee/governance/services/gatewayUrl";
 import { z } from "zod";
 
 import { env } from "../../../env.mjs";
@@ -30,15 +31,14 @@ export const publicEnvRouter = publicProcedure
       IS_SAAS: env.IS_SAAS,
       // AI Gateway public base URL (no /v1 suffix) for the copy-paste SDK
       // snippets in VirtualKeyUsageSnippet. Self-hosted deployments must see
-      // their own ingress, not the SaaS default. Mirrors the resolution in
-      // ee/governance/services/gatewayUrl.ts (resolveGatewayBaseUrl); kept
-      // inline to avoid a core -> ee import, so the two must stay in sync.
-      GATEWAY_BASE_URL:
-        env.LW_GATEWAY_PUBLIC_URL ??
-        env.LW_GATEWAY_BASE_URL ??
-        (env.IS_SAAS
-          ? "https://gateway.langwatch.ai"
-          : "http://localhost:5563"),
+      // their own ingress, not the SaaS default. Shares the single resolver
+      // used by the CLI surfaces (login ceremony, personal-VK reveal) so the
+      // public SDK URL and CLI URL can't drift.
+      GATEWAY_BASE_URL: resolveGatewayBaseUrl({
+        publicUrl: env.LW_GATEWAY_PUBLIC_URL,
+        baseUrl: env.LW_GATEWAY_BASE_URL,
+        isSaas: env.IS_SAAS,
+      }),
       SHOW_OPS_IN_MAIN_SIDEBAR: isOpsSidebarEmail(ctx.session?.user?.email),
       POSTHOG_KEY: env.POSTHOG_KEY,
       POSTHOG_HOST: env.POSTHOG_HOST,
