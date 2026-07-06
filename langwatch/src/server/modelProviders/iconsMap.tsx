@@ -42,9 +42,12 @@ export const modelProviderIcons: Record<
  * Cerebras orange) are left alone — they're brand-coloured marks that
  * read well in both modes already.
  */
-export const MONOCHROME_PROVIDER_ICONS = new Set<
-  keyof typeof modelProviders
->(["openai", "anthropic", "voyage", "custom"]);
+export const MONOCHROME_PROVIDER_ICONS = new Set<keyof typeof modelProviders>([
+  "openai",
+  "anthropic",
+  "voyage",
+  "custom",
+]);
 
 /**
  * Wraps a `modelProviderIcons[provider]` glyph so it stays legible in dark
@@ -76,7 +79,9 @@ export function ProviderIconGlyph({
       // transparent; rotating hue afterwards would tint the result away
       // from neutral. brightness(0.92) tones the result to off-white so
       // it doesn't hard-burn against the dark surface.
-      _dark={isMonochrome ? { filter: "invert(1) brightness(0.92)" } : undefined}
+      _dark={
+        isMonochrome ? { filter: "invert(1) brightness(0.92)" } : undefined
+      }
       aria-hidden="true"
     >
       {icon}

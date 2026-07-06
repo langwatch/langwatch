@@ -901,7 +901,11 @@ async function handleEvaluatorCall(
         evaluatorDefinition.name,
       );
       logger.warn(
-        { kind: domainError.kind, meta: domainError.meta, projectId: project.id },
+        {
+          kind: domainError.kind,
+          meta: domainError.meta,
+          projectId: project.id,
+        },
         "missing required field for evaluator",
       );
       return c.json(

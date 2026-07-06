@@ -259,9 +259,7 @@ export const ModelSelector = React.memo(function ModelSelector({
       {selectedItem?.icon && (
         <ProviderIconGlyph
           provider={
-            selectedItem.value.split(
-              "/",
-            )[0] as keyof typeof modelProviderIcons
+            selectedItem.value.split("/")[0] as keyof typeof modelProviderIcons
           }
           size={size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}
         />
