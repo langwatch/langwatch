@@ -103,6 +103,13 @@ jobs:
           echo "version=$pkg_version" >> "$GITHUB_OUTPUT"
           echo "npm_tag=$npm_tag" >> "$GITHUB_OUTPUT"
 
+      # The single-workspace root install builds node-pty (a direct dep of
+      # mcp-server/skills, in root onlyBuiltDependencies). node-pty ships no
+      # linux prebuild, so it compiles via node-gyp, which isn't on PATH under
+      # Node-24 + npm-11.
+      - name: Install node-gyp (for node-pty)
+        run: npm install -g node-gyp@12.3.0
+
       - name: Install pnpm dependencies (workspace)
         run: pnpm install --frozen-lockfile
 
@@ -199,6 +206,13 @@ jobs:
           required=(
             "package/packages/server/dist/cli.cjs"
             "package/langwatch/package.json"
+            # Derived by scripts/pack-npm.sh at pack time. The whole repo is one
+            # pnpm workspace; the tarball needs a self-contained langwatch
+            # workspace + lockfile so first-boot `pnpm -C langwatch install
+            # --frozen-lockfile` (node-deps.ts) works. If the derivation ever
+            # breaks, first boot hard-fails for every npx user — assert both ship.
+            "package/langwatch/pnpm-workspace.yaml"
+            "package/langwatch/pnpm-lock.yaml"
             "package/langwatch/dist/client/index.html"
             "package/langwatch/dist/scenario-child-process.js"
             "package/langevals/pyproject.toml"

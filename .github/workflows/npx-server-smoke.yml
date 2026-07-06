@@ -31,6 +31,9 @@ on:
       - "package.json"
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
+      # The smoke boots the packed tarball — the only end-to-end check that the
+      # pack-time-derived langwatch workspace + lockfile actually installs.
+      - "scripts/pack-npm.sh"
       - "packages/server/**"
       - "langevals/pyproject.toml"
       - "langevals/uv.lock"

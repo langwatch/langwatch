@@ -39,12 +39,21 @@ echo "→ deriving standalone langwatch workspace + lockfile for the tarball"
 # The langwatch tarball workspace = langwatch itself + its sibling mcp-server
 # (langwatch depends on @langwatch/mcp-server via workspace:*). langwatch's own
 # packages/* are .npmignore'd out of the tarball, so they are NOT members here.
-# Everything after `packages:` in the root workspace (overrides,
-# onlyBuiltDependencies, packageExtensions, minimumReleaseAge) is copied so the
-# derived lockfile resolves the SAME versions the workspace was tested against.
+# We replace ONLY the root workspace's `packages:` list and keep every other
+# top-level block verbatim (overrides, onlyBuiltDependencies, packageExtensions,
+# minimumReleaseAge) so the derived lockfile resolves the SAME versions the
+# workspace was tested against — regardless of key order or which keys exist.
 {
   printf 'packages:\n  - .\n  - ../mcp-server\n\n'
-  awk '/^minimumReleaseAge:/{f=1} f{print}' "$ROOT/pnpm-workspace.yaml"
+  # Drop the `packages:` block (the `packages:` line plus its indented/comment
+  # body) and emit all remaining top-level blocks unchanged. A new block starts
+  # at any line beginning with a non-space, non-`#` character.
+  awk '
+    BEGIN { skip = 1 }
+    /^packages:/ { skip = 1; next }
+    /^[^[:space:]#]/ { skip = 0 }
+    !skip { print }
+  ' "$ROOT/pnpm-workspace.yaml"
 } > "$LW_WS"
 
 # --lockfile-only: resolve + write langwatch/pnpm-lock.yaml without linking.

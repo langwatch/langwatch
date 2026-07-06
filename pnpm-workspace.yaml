@@ -69,9 +69,12 @@ overrides:
   # declares its OTel deps exactly in its own package.json, within these ranges.
   "@opentelemetry/sdk-node": ">=0.217.0"
   "@opentelemetry/exporter-prometheus": ">=0.217.0"
-  # Framework/runtime pins the app depends on (no other member uses these, so
-  # globalizing is a no-op for them).
-  ai: "^6.0.161"
+  # Framework/runtime pins the app depends on. react/kysely/pino/etc. are
+  # app-only, so globalizing is a no-op. `ai` is scoped to the app: the SDK's
+  # vercel-ai / evaluation / metadata examples deliberately run on ai@^5 +
+  # @ai-sdk@^2, and an unscoped `ai: ^6` would force them onto an incompatible
+  # ai@6 + @ai-sdk@2 tree.
+  "@langwatch/app>ai": "^6.0.161"
   react: "^19.2.5"
   react-dom: "^19.2.5"
   react-is: "^19.2.5"
@@ -114,6 +117,17 @@ overrides:
   "@aws-sdk/xml-builder>fast-xml-parser": "^5.7.0"
   "@langchain/community>fast-xml-parser": "^5.7.0"
   fast-xml-builder@<1.1.7: "1.1.7"
+  # CVE floors ported from the former langwatch workspace (defense-in-depth):
+  # the tree resolves to safe versions today, but these guard against a
+  # transitive/Dependabot shift silently reintroducing a vulnerable version.
+  "minimatch@<3.1.4": "3.1.4"
+  "minimatch@>=5.0.0 <5.1.8": "5.1.8"
+  "minimatch@>=9.0.0 <9.0.7": "9.0.7"
+  "validator@<13.15.22": "13.15.22"
+  "express-rate-limit@>=8.2.0 <8.2.2": "8.2.2"
+  "@modelcontextprotocol/sdk@>=1.10.0 <=1.25.3": "1.26.0"
+  "fast-xml-parser@>=4.1.3 <4.5.4": "4.5.4"
+  "fast-xml-parser@>=5.0.0 <5.3.6": "5.3.6"
   # vite — unified so both the app (v8) and the SDK/mcp/skills (v7) stay
   # patched without forcing a v7->v8 major bump on the v7 consumers.
   vite@<7.3.5: ">=7.3.5 <8"

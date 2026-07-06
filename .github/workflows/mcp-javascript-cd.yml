@@ -30,6 +30,11 @@ jobs:
           cache-dependency-path: "pnpm-lock.yaml"
           registry-url: "https://registry.npmjs.org"
 
+      # node-pty (mcp-server's direct dep) ships no linux prebuild and compiles
+      # via node-gyp, which isn't on PATH under Node-24 + npm-11.
+      - name: Install node-gyp (for node-pty)
+        run: npm install -g node-gyp@12.3.0
+
       # Single root workspace: scope the install to mcp-server's own dependency
       # closure (reproduces the pre-consolidation per-package install scope).
       - name: Install dependencies

@@ -4,6 +4,9 @@ FROM node:24-alpine
 RUN apk add --no-cache python3 make g++
 
 RUN corepack enable && corepack prepare pnpm@10 --activate
+# node-pty ships no linux prebuild and compiles via node-gyp (not on PATH under
+# Node-24 + npm-11); the mcp-server install closure includes it.
+RUN npm install -g node-gyp
 
 WORKDIR /app
 
