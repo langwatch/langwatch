@@ -584,20 +584,15 @@ const EXEMPT_MODELS = new Set<string>([
 ]);
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
-  // Raw operations ($queryRaw / $executeRaw) have no model — they are not
-  // project-scoped and cannot be auto-guarded (the SQL author owns tenancy).
-  // Mirrors the sibling guardOrganizationId, which already exempts no-model ops.
-  if (!params.model) return;
-  if (params.model && EXEMPT_MODELS.has(params.model)) return;
-
   const action = params.action;
-  const model = params.model;
 
   // Raw queries (`$queryRaw`, `$executeRaw`) carry their tenancy scope
   // inside the SQL string itself, where the structural guard cannot see
   // it. Two cheap structural defences still apply: require the SQL text
   // to mention a tenancy column, or accept an explicit grep-able
   // `-- @tenancy: <reason>` opt-out for genuinely cross-tenant queries.
+  // This must run BEFORE the no-model exemption below: raw ops have no
+  // `params.model`, so an earlier `!params.model` return would skip it.
   if (action === "queryRaw" || action === "executeRaw") {
     const sql = extractRawSql(params.args);
     if (!sql) return;
@@ -612,6 +607,14 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
     }
     return;
   }
+
+  // Other model-less operations (e.g. $transaction bookkeeping) are not
+  // project-scoped and cannot be auto-guarded. Mirrors the sibling
+  // guardOrganizationId, which already exempts no-model ops.
+  if (!params.model) return;
+  if (EXEMPT_MODELS.has(params.model)) return;
+
+  const model = params.model;
 
   // Scoped models opt in to a stricter check than EXEMPT_MODELS:
   // SOMETHING tenancy-shaped (row id, scope predicate, parent FK,
