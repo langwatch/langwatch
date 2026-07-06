@@ -201,4 +201,22 @@ describe("better-auth before-hook (ADR-027 gate sites #2 and #3)", () => {
       ).resolves.toBeUndefined();
     });
   });
+
+  describe("given a signed-in user when the gate state changes", () => {
+    /** @scenario Existing sessions keep working across a gate change */
+    it("never intercepts session reads or sign-out in either gate state", async () => {
+      for (const allowed of [true, false]) {
+        vi.mocked(platformSSOAllowed).mockResolvedValue(allowed);
+        await expect(
+          before(ctxFor("https://host/api/auth/get-session")),
+        ).resolves.toBeUndefined();
+        await expect(
+          before(ctxFor("https://host/api/auth/sign-out")),
+        ).resolves.toBeUndefined();
+        await expect(
+          before(ctxFor("https://host/api/auth/list-sessions")),
+        ).resolves.toBeUndefined();
+      }
+    });
+  });
 });

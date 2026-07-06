@@ -1,9 +1,7 @@
 Feature: License-Gated SSO
 
   # Decision of record: dev/docs/adr/027-license-gated-sso.md (Accepted, v6).
-  # Implemented in PR #4830; the two remaining @unimplemented scenarios are
-  # tracked in the ADR's open questions (restart-required UI hint) and the
-  # session-survival migration test.
+  # Implemented in PR #4830.
   #
   # Behavior, not internals: scenarios describe what an operator / user / admin
   # observes, never gate function names or config field values.
@@ -68,7 +66,7 @@ Feature: License-Gated SSO
     Then the request is refused
     And this holds for the legacy provider callback paths as well
 
-  @unimplemented
+  @integration
   Scenario: Activating a license takes effect at the next restart
     Given an unlicensed self-hosted deployment running in email mode
     When an admin activates a genuine organization license in settings
@@ -140,7 +138,7 @@ Feature: License-Gated SSO
     Then the next sign-in attempt through the identity provider succeeds
     And no restart was required
 
-  @unimplemented
+  @unit
   Scenario: Existing sessions keep working across a gate change
     Given a signed-in user on a deployment that loses its license and restarts
     Then their existing session continues to work
