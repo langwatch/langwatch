@@ -122,14 +122,13 @@ jobs:
           --health-timeout 30s
           --health-retries 3
 
-      langwatch_nlp:
-        image: langwatch/langwatch_nlp:latest
-        ports:
-          - 5563:5561
-        env:
-          LANGWATCH_ENDPOINT: http://host.docker.internal:5570
-        options: >-
-          --add-host host.docker.internal:host-gateway
+      # NOTE: langwatch_nlp is intentionally NOT a service container here.
+      # The langwatch app auto-starts its own nlpgo binary on :5563
+      # (visible as "✓ nlpgo: auto-start on :5563" in startup logs).
+      # Adding a Docker service container on port 5563 causes an
+      # "address already in use" conflict that crash-loops the app.
+      # LANGWATCH_NLP_SERVICE=http://localhost:5563 is set in the env
+      # section above and the app's own nlpgo binary satisfies it.
 
       langevals:
         image: langwatch/langevals:latest
@@ -213,21 +212,6 @@ jobs:
       - name: Build app
         working-directory: langwatch
         run: NODE_ENV=test pnpm build
-
-      # langwatch_nlp uses a distroless base image (no shell), so Docker
-      # --health-cmd cannot run. Poll from the runner instead.
-      - name: Wait for NLP service
-        run: |
-          echo "Waiting for langwatch_nlp on localhost:5563/healthz ..."
-          for i in $(seq 1 40); do
-            if curl -sf http://localhost:5563/healthz > /dev/null 2>&1; then
-              echo "NLP service is ready (attempt $i)"
-              break
-            fi
-            echo "Attempt $i/40: not ready, waiting 10s..."
-            sleep 10
-          done
-          curl -sf http://localhost:5563/healthz || (echo "NLP service failed to start" && exit 1)
 
       - name: Run E2E tests
         env:
