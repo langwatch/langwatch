@@ -130,11 +130,6 @@ jobs:
           LANGWATCH_ENDPOINT: http://host.docker.internal:5570
         options: >-
           --add-host host.docker.internal:host-gateway
-          --health-cmd "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5561/healthz')\" || exit 1"
-          --health-interval 15s
-          --health-timeout 10s
-          --health-retries 12
-          --health-start-period 30s
 
       langevals:
         image: langwatch/langevals:latest
@@ -218,6 +213,21 @@ jobs:
       - name: Build app
         working-directory: langwatch
         run: NODE_ENV=test pnpm build
+
+      # langwatch_nlp uses a distroless base image (no shell), so Docker
+      # --health-cmd cannot run. Poll from the runner instead.
+      - name: Wait for NLP service
+        run: |
+          echo "Waiting for langwatch_nlp on localhost:5563/healthz ..."
+          for i in $(seq 1 40); do
+            if curl -sf http://localhost:5563/healthz > /dev/null 2>&1; then
+              echo "NLP service is ready (attempt $i)"
+              break
+            fi
+            echo "Attempt $i/40: not ready, waiting 10s..."
+            sleep 10
+          done
+          curl -sf http://localhost:5563/healthz || (echo "NLP service failed to start" && exit 1)
 
       - name: Run E2E tests
         env:
