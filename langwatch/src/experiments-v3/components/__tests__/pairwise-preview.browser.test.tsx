@@ -60,6 +60,7 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
             value={{
               variantA: "variant_a",
               variantB: "variant_b",
+              hasGoldenAnswer: true,
               goldenField: "expected_output",
               includeMetrics: ["cost", "duration"],
             }}
@@ -152,6 +153,7 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
       pairwise: {
         variantA: "variant_a",
         variantB: "variant_b",
+        hasGoldenAnswer: true,
         goldenField: "expected_output",
         includeMetrics: [],
       },
