@@ -8,6 +8,7 @@ import {
 } from "@opentelemetry/api";
 import { createLangWatchSpan } from "../span";
 import { type LangWatchTracer } from "./types";
+import { emitEvaluationEvent, type AddEvaluationParams } from "../evaluation";
 
 /**
  * Get a LangWatch tracer from the global OpenTelemetry tracer provider.
@@ -205,6 +206,13 @@ export function getLangWatchTracerFromProvider(
         case "startSpan":
           return (name: string, options?: SpanOptions, context?: Context) =>
             createLangWatchSpan(target.startSpan(name, withDefaultOrigin(options), context));
+
+        case "addEvaluation":
+          return (params: AddEvaluationParams) => {
+            const activeSpan = trace.getActiveSpan();
+            if (!activeSpan) return;
+            emitEvaluationEvent(activeSpan, params);
+          };
 
         default: {
           const value = (target as any)[prop];

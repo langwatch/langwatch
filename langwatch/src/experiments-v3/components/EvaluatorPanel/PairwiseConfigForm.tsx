@@ -1,0 +1,336 @@
+import { Box, Button, Field, HStack, Text, VStack } from "@chakra-ui/react";
+import { ChevronDown } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useFormContext, useWatch } from "react-hook-form";
+
+import { Menu } from "~/components/ui/menu";
+import { Switch } from "~/components/ui/switch";
+
+import { useTargetName } from "../../hooks/useTargetName";
+import type { PairwiseEvaluatorConfig, TargetConfig } from "../../types";
+
+type Metric = "cost" | "duration";
+
+/**
+ * Configuration form for the langevals/pairwise_compare evaluator
+ * (#5100). Three required selects:
+ *
+ *   1. Variant A   — id of an existing TargetConfig
+ *   2. Variant B   — id of a different existing TargetConfig
+ *   3. Golden      — name of a dataset column whose value is the
+ *                    reference answer
+ *
+ * Per-candidate metrics (cost / duration) are configured in the
+ * settings section above via the schema-driven `include_metrics`
+ * toggles — that's the single source of truth the judge prompt reads.
+ *
+ * Pickers use the project's Menu-button pattern (see FieldTypeSelect
+ * for the canonical reference) so the drawer reads as a peer of the
+ * other LangWatch surfaces instead of a browser-native control.
+ *
+ * Variant labels come from `useTargetName`, the same reactive hook the
+ * column header uses — so the dropdown shows the prompt/agent name
+ * ("say-hi"), not the internal target_NNNN id.
+ */
+
+export type DatasetColumn = { id: string; name: string };
+
+export type PairwiseConfigFormProps = {
+  value: PairwiseEvaluatorConfig;
+  onChange: (next: PairwiseEvaluatorConfig) => void;
+  /** All targets the user has configured (excluding evaluator-as-target). */
+  targets: TargetConfig[];
+  /** Active dataset columns the user can pick the golden field from. */
+  datasetColumns: DatasetColumn[];
+};
+
+/**
+ * One row inside a Variant A/B menu. Lives in its own component so each
+ * row owns its own `useTargetName` hook call — calling the hook inside
+ * a .map() over `targets` would break the rules of hooks when the list
+ * grows or shrinks between renders.
+ */
+const VariantMenuItem = ({
+  target,
+  onSelect,
+  testId,
+}: {
+  target: TargetConfig;
+  onSelect: (id: string) => void;
+  testId?: string;
+}) => {
+  const name = useTargetName(target);
+  const label = name || target.id;
+  return (
+    <Menu.Item
+      value={target.id}
+      onClick={() => onSelect(target.id)}
+      data-testid={testId}
+    >
+      <Text fontSize="13px">{label}</Text>
+    </Menu.Item>
+  );
+};
+
+/**
+ * Inline label for the selected variant inside the picker trigger. Same
+ * reactive name resolution as VariantMenuItem.
+ */
+const SelectedVariantLabel = ({ target }: { target: TargetConfig }) => {
+  const name = useTargetName(target);
+  return <>{name || target.id}</>;
+};
+
+type PickerProps = {
+  label: string;
+  selectedDisplay: React.ReactNode;
+  placeholder: string;
+  isEmpty: boolean;
+  testId?: string;
+  children: React.ReactNode;
+};
+
+const Picker = ({
+  label,
+  selectedDisplay,
+  placeholder,
+  isEmpty,
+  testId,
+  children,
+}: PickerProps) => (
+  <Field.Root required flex="1">
+    <Field.Label fontSize="13px" color="fg.muted" marginBottom={1}>
+      {label}
+    </Field.Label>
+    <Menu.Root>
+      <Menu.Trigger asChild>
+        <Button
+          variant="outline"
+          colorPalette="gray"
+          size="sm"
+          fontWeight="normal"
+          justifyContent="space-between"
+          width="full"
+          data-testid={testId}
+        >
+          <Text fontSize="13px" color={isEmpty ? "fg.subtle" : "fg"} truncate>
+            {isEmpty ? placeholder : selectedDisplay}
+          </Text>
+          <ChevronDown size={14} color="var(--chakra-colors-fg-muted)" />
+        </Button>
+      </Menu.Trigger>
+      <Menu.Content portalled={true} maxHeight="240px" overflowY="auto">
+        {children}
+      </Menu.Content>
+    </Menu.Root>
+  </Field.Root>
+);
+
+const EmptyMenuItem = () => (
+  <Menu.Item value="__empty__" disabled>
+    <Text fontSize="13px" color="fg.subtle">
+      No options available
+    </Text>
+  </Menu.Item>
+);
+
+export function PairwiseConfigForm({
+  value,
+  onChange,
+  targets,
+  datasetColumns,
+}: PairwiseConfigFormProps) {
+  // Track the latest config locally so rapid successive picks (e.g. user
+  // selects Variant A, then Variant B before the parent re-renders with the
+  // new value prop) don't stomp on each other. Without this each `update`
+  // spread off the stale `value` prop and only the last pick stuck. We sync
+  // back to `value` when the parent intentionally pushes new state in.
+  const [draft, setDraft] = useState<PairwiseEvaluatorConfig>(value);
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  // Mirror `draft` into a ref so `update` can compute `next` from the
+  // freshest value without putting a side-effect inside `setDraft`'s updater
+  // function (which React 18 StrictMode invokes twice for purity checks —
+  // double-firing the `onChange` callback against the parent).
+  const draftRef = useRef(draft);
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
+
+  const update = (patch: Partial<PairwiseEvaluatorConfig>) => {
+    const next = { ...draftRef.current, ...patch };
+    draftRef.current = next;
+    setDraft(next);
+    onChange(next);
+  };
+
+  // Variant B options exclude variant A so the user can't pick the same
+  // target twice (a pairwise comparison of X vs X is always a tie).
+  const variantBOptions = targets.filter((t) => t.id !== draft.variantA);
+
+  const selectedA = targets.find((t) => t.id === draft.variantA);
+  const selectedB = targets.find((t) => t.id === draft.variantB);
+
+  return (
+    <VStack align="stretch" gap={3} padding={4}>
+      <HStack align="end" gap={3}>
+        <Picker
+          label="Variant A"
+          placeholder="Select a target…"
+          isEmpty={!selectedA}
+          selectedDisplay={
+            selectedA ? <SelectedVariantLabel target={selectedA} /> : null
+          }
+          testId="pairwise-variant-a"
+        >
+          {targets.length === 0 ? (
+            <EmptyMenuItem />
+          ) : (
+            targets.map((t) => (
+              <VariantMenuItem
+                key={t.id}
+                target={t}
+                onSelect={(id) => update({ variantA: id })}
+                testId={`pairwise-variant-a-option-${t.id}`}
+              />
+            ))
+          )}
+        </Picker>
+
+        <Picker
+          label="Variant B"
+          placeholder="Select a target…"
+          isEmpty={!selectedB}
+          selectedDisplay={
+            selectedB ? <SelectedVariantLabel target={selectedB} /> : null
+          }
+          testId="pairwise-variant-b"
+        >
+          {variantBOptions.length === 0 ? (
+            <EmptyMenuItem />
+          ) : (
+            variantBOptions.map((t) => (
+              <VariantMenuItem
+                key={t.id}
+                target={t}
+                onSelect={(id) => update({ variantB: id })}
+                testId={`pairwise-variant-b-option-${t.id}`}
+              />
+            ))
+          )}
+        </Picker>
+
+        <Picker
+          label="Golden field"
+          placeholder="Select a dataset column…"
+          isEmpty={!draft.goldenField}
+          selectedDisplay={<>{draft.goldenField}</>}
+          testId="pairwise-golden-field"
+        >
+          {datasetColumns.length === 0 ? (
+            <EmptyMenuItem />
+          ) : (
+            datasetColumns.map((c) => (
+              <Menu.Item
+                key={c.id}
+                value={c.name}
+                onClick={() => update({ goldenField: c.name })}
+                data-testid={`pairwise-golden-field-option-${c.name}`}
+              >
+                <Text fontSize="13px">{c.name}</Text>
+              </Menu.Item>
+            ))
+          )}
+        </Picker>
+      </HStack>
+
+      <Text fontSize="xs" color="fg.muted">
+        Pick the dataset column that holds the{" "}
+        <Text as="span" fontWeight="medium" color="fg">
+          ground-truth answer
+        </Text>{" "}
+        — usually{" "}
+        <Text as="span" fontFamily="mono">
+          expected_output
+        </Text>
+        . The judge compares each candidate against it and prefers the one
+        closest in correctness, completeness, and style. Pick{" "}
+        <Text as="span" fontFamily="mono">
+          input
+        </Text>{" "}
+        only if your dataset has no reference answer and you want the judge to
+        compare candidates against the question itself (rarely useful).
+      </Text>
+
+      <MetricsSection draft={draft} update={update} />
+    </VStack>
+  );
+}
+
+/**
+ * Inline Switches for the include_metrics setting. Source of truth is the
+ * parent form's `settings.include_metrics` (the field the judge reads); the
+ * legacy `pairwise.includeMetrics` is mirrored on every write so any
+ * orchestrator path still reading from it keeps working. EvaluatorEditorShared
+ * suppresses DynamicZodForm's array-of-literals renderer for pairwise so the
+ * user doesn't see two UIs for the same setting.
+ */
+function MetricsSection({
+  draft,
+  update,
+}: {
+  draft: PairwiseEvaluatorConfig;
+  update: (patch: Partial<PairwiseEvaluatorConfig>) => void;
+}) {
+  const formContext = useFormContext<{
+    settings?: { include_metrics?: Metric[] };
+  }>();
+  const watchedMetrics = useWatch({
+    control: formContext?.control,
+    name: "settings.include_metrics",
+  }) as Metric[] | undefined;
+  const current = (watchedMetrics ?? draft.includeMetrics ?? []) as Metric[];
+
+  const toggle = (metric: Metric, on: boolean) => {
+    const next = on
+      ? Array.from(new Set([...current, metric]))
+      : current.filter((m) => m !== metric);
+    formContext?.setValue("settings.include_metrics", next, {
+      shouldDirty: true,
+      shouldTouch: true,
+    });
+    update({ includeMetrics: next });
+  };
+
+  return (
+    <Box paddingTop={2}>
+      <Text fontSize="13px" fontWeight="medium" marginBottom={2}>
+        Include metrics
+      </Text>
+      <VStack align="stretch" gap={2}>
+        <HStack justify="space-between">
+          <Text fontSize="13px">Include cost</Text>
+          <Switch
+            checked={current.includes("cost")}
+            onCheckedChange={({ checked }) => toggle("cost", checked)}
+            data-testid="pairwise-include-cost"
+          />
+        </HStack>
+        <HStack justify="space-between">
+          <Text fontSize="13px">Include duration</Text>
+          <Switch
+            checked={current.includes("duration")}
+            onCheckedChange={({ checked }) => toggle("duration", checked)}
+            data-testid="pairwise-include-duration"
+          />
+        </HStack>
+      </VStack>
+      <Text fontSize="xs" color="fg.muted" marginTop={2}>
+        Inject per-candidate cost / latency into the judge prompt so it can
+        prefer the cheaper / faster variant when quality is comparable.
+      </Text>
+    </Box>
+  );
+}

@@ -59,7 +59,16 @@ write_dev_overrides() {
 
   case "$preset" in
     frontend-only)
-      # No compose. Operator's .env points at dev infra; no overrides needed.
+      # No app/DB/CH compose — DB / CH / NLP / S3 all come from the operator's
+      # .env (shared dev). The one exception is Redis: `pnpm dev` runs the
+      # BullMQ workers in-process by default, and the dev.sh launcher brings up
+      # a local `redis` compose service for them (sharing dev Redis would
+      # collide with other developers' jobs — same reasoning as dev-infra).
+      # Pin REDIS_URL to host-side localhost because `pnpm dev` runs on the
+      # HOST, not inside the docker network.
+      cat >> "$out" <<'EOF'
+REDIS_URL=redis://localhost:6379
+EOF
       return 0
       ;;
     migration)

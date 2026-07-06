@@ -96,3 +96,6 @@ screenshot-*.png
 
 # Vitest browser-mode auto-captured test screenshots (regenerated on each run)
 **/__screenshots__/
+
+# Langy scenario-test transcripts (regenerated per run; never commit)
+/src/tests/langy/scenario-logs/

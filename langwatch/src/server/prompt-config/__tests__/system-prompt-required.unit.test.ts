@@ -28,61 +28,71 @@ import { PromptVersionService } from "~/server/prompt-config/prompt-version.serv
 vi.mock("~/server/prompt-config/repositories");
 
 describe("PromptService.createPrompt — missing system prompt (Issue #3196 regression)", () => {
-  /** @scenario "prompts.create returns 400 BAD_REQUEST when both prompt and system message are missing" */
-  it("throws a DomainError with httpStatus 400 and kind 'system_prompt_required' when no prompt and no system message are supplied", async () => {
-    const service = new PromptService({} as any);
-    (service as any).repository = {
-      createConfigWithInitialVersion: vi.fn(),
-    };
-    (service as any).versionService = {
-      assertNoSystemPromptConflict: vi.fn(),
-    };
-    (service as any).getOrganizationIdFromProjectId = vi
-      .fn()
-      .mockResolvedValue("org-1");
+  describe("given a PromptService", () => {
+    describe("when creating a prompt with neither a prompt nor a system message", () => {
+      /** @scenario "prompts.create returns 400 BAD_REQUEST when both prompt and system message are missing" */
+      it("throws a DomainError with httpStatus 400 and kind 'system_prompt_required' when no prompt and no system message are supplied", async () => {
+        const service = new PromptService({} as any);
+        (service as any).repository = {
+          createConfigWithInitialVersion: vi.fn(),
+        };
+        (service as any).versionService = {
+          assertNoSystemPromptConflict: vi.fn(),
+        };
+        (service as any).getOrganizationIdFromProjectId = vi
+          .fn()
+          .mockResolvedValue("org-1");
 
-    const error = await captureError(() =>
-      service.createPrompt({
-        projectId: "project-1",
-        handle: "missing-system-prompt",
-        messages: [{ role: "user", content: "{{input}}" }],
-      }),
-    );
+        const error = await captureError(() =>
+          service.createPrompt({
+            projectId: "project-1",
+            handle: "missing-system-prompt",
+            messages: [{ role: "user", content: "{{input}}" }],
+          }),
+        );
 
-    expect(error).toBeInstanceOf(DomainError);
-    expect((error as DomainError).kind).toBe("system_prompt_required");
-    expect((error as DomainError).httpStatus).toBe(400);
-    expect((error as Error).message).toMatch(/system prompt is required/i);
-    expect((error as Error).message).not.toMatch(/SystemPromptConflictError/);
-  });
+        expect(error).toBeInstanceOf(DomainError);
+        expect((error as DomainError).kind).toBe("system_prompt_required");
+        expect((error as DomainError).httpStatus).toBe(400);
+        expect((error as Error).message).toMatch(/system prompt is required/i);
+        expect((error as Error).message).not.toMatch(
+          /SystemPromptConflictError/,
+        );
+      });
+    });
 
-  /** @scenario "prompts.create still rejects when both prompt and a system message are provided (existing conflict preserved)" */
-  it("still throws a DomainError with httpStatus 409 when both prompt and a system message are provided (no regression on AC 5)", async () => {
-    const service = new PromptService({} as any);
-    (service as any).repository = {
-      createConfigWithInitialVersion: vi.fn(),
-    };
-    // Use the real PromptVersionService so we exercise the real conflict
-    // error class, not a synthetic mock. This guards against regression on
-    // AC 5 — both prompt + system message together must still throw the
-    // existing 409 conflict error.
-    (service as any).versionService = new PromptVersionService({} as any);
-    (service as any).getOrganizationIdFromProjectId = vi
-      .fn()
-      .mockResolvedValue("org-1");
+    describe("when creating a prompt with both a prompt and a system message", () => {
+      /** @scenario "prompts.create still rejects when both prompt and a system message are provided (existing conflict preserved)" */
+      it("still throws a DomainError with httpStatus 409 when both prompt and a system message are provided (no regression on AC 5)", async () => {
+        const service = new PromptService({} as any);
+        (service as any).repository = {
+          createConfigWithInitialVersion: vi.fn(),
+        };
+        // Use the real PromptVersionService so we exercise the real conflict
+        // error class, not a synthetic mock. This guards against regression on
+        // AC 5 — both prompt + system message together must still throw the
+        // existing 409 conflict error.
+        (service as any).versionService = new PromptVersionService({} as any);
+        (service as any).getOrganizationIdFromProjectId = vi
+          .fn()
+          .mockResolvedValue("org-1");
 
-    const error = await captureError(() =>
-      service.createPrompt({
-        projectId: "project-1",
-        handle: "conflicting-prompt",
-        prompt: "You are a helpful assistant.",
-        messages: [{ role: "system", content: "You are a helpful assistant." }],
-      }),
-    );
+        const error = await captureError(() =>
+          service.createPrompt({
+            projectId: "project-1",
+            handle: "conflicting-prompt",
+            prompt: "You are a helpful assistant.",
+            messages: [
+              { role: "system", content: "You are a helpful assistant." },
+            ],
+          }),
+        );
 
-    expect(error).toBeInstanceOf(DomainError);
-    expect((error as DomainError).kind).toBe("system_prompt_conflict");
-    expect((error as DomainError).httpStatus).toBe(409);
+        expect(error).toBeInstanceOf(DomainError);
+        expect((error as DomainError).kind).toBe("system_prompt_conflict");
+        expect((error as DomainError).httpStatus).toBe(409);
+      });
+    });
   });
 });
 

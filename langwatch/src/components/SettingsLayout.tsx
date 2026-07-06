@@ -172,6 +172,7 @@ export default function SettingsLayout({
               "/settings/topic-clustering",
               "/settings/data-retention",
               "/settings/email-suppressions",
+              "/settings/integrations",
               "/settings/data-privacy",
             ]}
           >
@@ -195,6 +196,7 @@ export default function SettingsLayout({
                 Topic Clustering
               </MenuLink>
             )}
+            <MenuLink href="/settings/integrations">Integrations</MenuLink>
           </NavSection>
 
           {!isLiteMember && (

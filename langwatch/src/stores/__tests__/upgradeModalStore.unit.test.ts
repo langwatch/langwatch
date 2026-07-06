@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { useUpgradeModalStore, type UpgradeModalVariant } from "../upgradeModalStore";
+import {
+  type UpgradeModalVariant,
+  useUpgradeModalStore,
+} from "../upgradeModalStore";
 
 describe("upgradeModalStore", () => {
   beforeEach(() => {
@@ -190,7 +193,9 @@ describe("upgradeModalStore", () => {
 
   describe("MODAL_CONTENT map", () => {
     it("has an entry for every variant mode", async () => {
-      const { MODAL_CONTENT } = await import("../../components/UpgradeModal");
+      const { MODAL_CONTENT } = await import(
+        "../../components/UpgradeModalContent"
+      );
       const expectedModes: Array<UpgradeModalVariant["mode"]> = [
         "limit",
         "seats",

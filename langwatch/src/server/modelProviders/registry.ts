@@ -303,13 +303,17 @@ export const modelProviders = {
       .object({
         AZURE_OPENAI_API_KEY: z.string().nullable().optional(),
         AZURE_OPENAI_ENDPOINT: z.string().nullable().optional(),
+        AZURE_OPENAI_API_VERSION: z.string().nullable().optional(),
         AZURE_API_GATEWAY_BASE_URL: z.string().nullable().optional(),
         AZURE_API_GATEWAY_VERSION: z.string().nullable().optional(),
       })
       .passthrough(),
-    // Direct-mode and gateway-mode each need both of their two fields;
-    // the useApiGateway toggle in the UI swaps which pair is visible.
-    optionalKeys: [],
+    // Direct-mode and gateway-mode each require their endpoint/base-url +
+    // api-key; the useApiGateway toggle in the UI swaps which set is visible.
+    // The api-version fields are optional — prepareLitellmParams falls back to
+    // a sensible default for each (DEFAULT_AZURE_API_VERSION for direct mode,
+    // 2024-05-01-preview for the gateway) when left blank.
+    optionalKeys: ["AZURE_OPENAI_API_VERSION", "AZURE_API_GATEWAY_VERSION"],
     enabledSince: new Date("2023-01-01"),
   },
   bedrock: {
@@ -422,9 +426,9 @@ export function getParameterConstraints(
   const provider = modelId.split("/")[0];
   if (!provider) return undefined;
 
-  const providerDef = modelProviders[
-    provider as keyof typeof modelProviders
-  ] as ModelProviderDefinition | undefined;
+  const providerDef = modelProviders[provider as keyof typeof modelProviders] as
+    | ModelProviderDefinition
+    | undefined;
   return providerDef?.parameterConstraints;
 }
 

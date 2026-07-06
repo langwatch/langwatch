@@ -15,8 +15,8 @@ import {
   stopTestContainers,
 } from "../../event-sourcing/__tests__/integration/testContainers";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
-import type { Protections } from "../../elasticsearch/protections";
 import type { GetAllTracesForProjectInput } from "../types";
+import { openProtections } from "./open-protections";
 
 const tenantId = `test-trace-dedup-${nanoid()}`;
 const now = Date.now();
@@ -125,15 +125,6 @@ async function insertSpan(
     clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
   });
 }
-
-/**
- * Permissive protections that allow all fields to be visible.
- */
-const openProtections: Protections = {
-  canSeeCosts: true,
-  canSeeCapturedInput: true,
-  canSeeCapturedOutput: true,
-};
 
 /**
  * Helper to build a valid GetAllTracesForProjectInput with defaults.

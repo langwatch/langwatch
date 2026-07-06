@@ -84,6 +84,7 @@ func TestSync_CodeBlock_StdlibHeavyComputation(t *testing.T) {
 // DSL → engine.runCode → codeblock.Request → runner.py namespace — that
 // was previously broken (the Go engine dropped secrets on the floor for
 // code nodes, so `secrets.NAME` raised NameError).
+/** @scenario "a configured project secret is readable as secrets.NAME" */
 func TestSync_CodeBlock_SecretsNamespaceFromWorkflow(t *testing.T) {
 	if _, err := exec.LookPath("python3"); err != nil {
 		t.Skip("python3 not installed")
@@ -195,6 +196,7 @@ func TestSync_CodeBlock_ThirdPartyImportSkipsCleanly(t *testing.T) {
 // today does not block egress (matching today's Python NLP behavior;
 // future hardening is tracked separately). Customer workflows that
 // fetch external data from a code block keep working.
+/** @scenario "the bundled Python interpreter does not have network access by default" */
 func TestSync_CodeBlock_NetworkAccessViaUrllib(t *testing.T) {
 	if _, err := exec.LookPath("python3"); err != nil {
 		t.Skip("python3 not installed")

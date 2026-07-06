@@ -17,6 +17,7 @@ vi.mock("../../api/routers/datasetRecord.utils", async (importOriginal) => {
 
 import { createManyDatasetRecords } from "../../api/routers/datasetRecord.utils";
 import { DatasetService } from "../dataset.service";
+import { toJsonlChunks } from "../dataset-chunking";
 import { getDatasetStorage } from "../dataset-storage";
 import { DatasetChunkCountMissingError } from "../errors";
 
@@ -405,28 +406,185 @@ describe("DatasetService", () => {
     });
   });
 
-  describe("upsertDataset() changing column types on a ready s3_jsonl dataset", () => {
-    it("refuses with a typed ColumnTypeChangeNotSupportedError (a 4xx, not a 500)", async () => {
-      // s3_jsonl column migration is a deferred rung; the edit must surface a
-      // typed, user-actionable error the router maps to a 4xx — not a plain
-      // Error that collapses into a generic 500.
-      const repository = {
-        findOne: vi.fn().mockResolvedValue({ ...baseS3Dataset }), // ready, cols [a]
-        findBySlug: vi.fn().mockResolvedValue(null),
-      };
-      const prisma = {
-        $transaction: async (fn: (tx: unknown) => unknown) => fn({}),
-      };
+  describe("upsertDataset() changing column types on a ready s3_jsonl dataset (ADR-032 v19)", () => {
+    // s3_jsonl column changes are no longer refused — they rewrite the chunks
+    // under the advisory lock, converting values to the new types.
+    const twoColDataset = {
+      ...baseS3Dataset,
+      columnTypes: [
+        { name: "score", type: "string" },
+        { name: "img", type: "string" },
+      ],
+    };
 
-      await expect(
-        makeService({ repository, prisma }).upsertDataset({
-          projectId: "p1",
-          datasetId: "dataset_1",
-          name: "DS",
-          columnTypes: [{ name: "b", type: "string" }], // changed columns
-        }),
-      ).rejects.toMatchObject({
-        name: "ColumnTypeChangeNotSupportedError",
+    /** Stub storage whose readChunk returns `stored`, writeChunks chunks the
+     *  lines (so the rewritten {id,entry} lines are observable), deleteChunksFrom
+     *  is a spy. Mirrors the normalize-job test's storage. */
+    const mockRewriteStorage = (stored: unknown[]) => {
+      const readChunk = vi.fn().mockResolvedValue(stored);
+      const writeChunks = vi.fn(
+        async ({
+          records,
+          fromIndex = 0,
+        }: {
+          records: unknown[];
+          fromIndex?: number;
+        }) =>
+          toJsonlChunks(records).map((c) => ({
+            ...c,
+            index: c.index + fromIndex,
+          })),
+      );
+      const deleteChunksFrom = vi.fn().mockResolvedValue(undefined);
+      vi.mocked(getDatasetStorage).mockResolvedValue({
+        readChunk,
+        writeChunks,
+        deleteChunksFrom,
+      } as never);
+      return { writeChunks, deleteChunksFrom };
+    };
+
+    const rewriteRepo = () => ({
+      findOne: vi.fn().mockResolvedValue({ ...twoColDataset }),
+      findBySlug: vi.fn().mockResolvedValue(null),
+      findOneOrThrow: vi.fn().mockResolvedValue({ ...twoColDataset }),
+      update: vi
+        .fn()
+        .mockImplementation(
+          async ({ data }: { data: Record<string, unknown> }) => ({
+            ...twoColDataset,
+            ...data,
+          }),
+        ),
+    });
+
+    describe("given confirmed columns differ from the stored schema", () => {
+      describe("when a text column becomes a number", () => {
+        /** @scenario Changing a column's type re-converts the stored values */
+        it("rewrites chunks (ids preserved), reaps orphan chunks, and updates the metadata", async () => {
+          const { writeChunks, deleteChunksFrom } = mockRewriteStorage([
+            { id: "record_1", entry: { score: "1", img: "x" } },
+            { id: "record_2", entry: { score: "2", img: "y" } },
+          ]);
+          const repository = rewriteRepo();
+
+          await makeService({
+            repository,
+            prisma: makeLockPrisma(twoColDataset),
+          }).upsertDataset({
+            projectId: "p1",
+            datasetId: "dataset_1",
+            name: "DS",
+            columnTypes: [
+              { name: "score", type: "number" },
+              { name: "img", type: "string" },
+            ],
+          });
+
+          const written = writeChunks.mock.calls.flatMap(
+            (c: any) => c[0].records as Array<{ id: string; entry: unknown }>,
+          );
+          expect(written.map((l) => l.entry)).toEqual([
+            { score: 1, img: "x" },
+            { score: 2, img: "y" },
+          ]);
+          expect(written.map((l) => l.id)).toEqual(["record_1", "record_2"]);
+          // Orphan chunks past the new (smaller-or-equal) count are reaped.
+          expect(deleteChunksFrom).toHaveBeenCalledWith({
+            projectId: "p1",
+            datasetId: "dataset_1",
+            fromIndex: 1,
+          });
+          // The metadata is rewritten alongside columnTypes.
+          const update = repository.update.mock.calls.at(-1)![0];
+          expect(update.data.columnTypes).toEqual([
+            { name: "score", type: "number" },
+            { name: "img", type: "string" },
+          ]);
+          expect(update.data.chunkCount).toBe(1);
+          expect(update.data.chunkOffsets).toHaveLength(1);
+          expect(typeof update.data.sizeBytes).toBe("bigint");
+        });
+      });
+
+      describe("when a text column becomes an image (URL)", () => {
+        /** @scenario Retyping a text column to an image URL keeps the value */
+        it("keeps the base64 data URL verbatim and updates only the type", async () => {
+          // A base64 PNG data URL stored as text, retyped to `image`. `image` is a
+          // URL string, so the value must survive byte-for-byte.
+          const dataUrl =
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAAXNSR0IArs4c6QAAAARnQU1B";
+          const { writeChunks } = mockRewriteStorage([
+            { id: "record_1", entry: { score: "1", img: dataUrl } },
+          ]);
+          const repository = rewriteRepo();
+
+          await makeService({
+            repository,
+            prisma: makeLockPrisma(twoColDataset),
+          }).upsertDataset({
+            projectId: "p1",
+            datasetId: "dataset_1",
+            name: "DS",
+            columnTypes: [
+              { name: "score", type: "string" },
+              { name: "img", type: "image" },
+            ],
+          });
+
+          const written = writeChunks.mock.calls.flatMap(
+            (c: any) => c[0].records as Array<{ id: string; entry: any }>,
+          );
+          expect(written[0]!.entry.img).toBe(dataUrl);
+          const update = repository.update.mock.calls.at(-1)![0];
+          expect(update.data.columnTypes).toEqual([
+            { name: "score", type: "string" },
+            { name: "img", type: "image" },
+          ]);
+        });
+      });
+    });
+
+    describe("given the stored schema changed since the editor was opened", () => {
+      describe("when the migration acquires the lock", () => {
+        it("aborts with a conflict instead of rewriting rows with the stale schema", async () => {
+          // findOne (pre-lock) sees schema A; under the lock findOneOrThrow sees a
+          // DIFFERENT schema B (a concurrent edit landed) — the migration must bail
+          // before any chunk write rather than remap B-shaped rows as if still A.
+          const { writeChunks } = mockRewriteStorage([
+            { id: "record_1", entry: { score: "1", img: "x" } },
+          ]);
+          const repository = {
+            findOne: vi.fn().mockResolvedValue({ ...twoColDataset }), // schema A
+            findBySlug: vi.fn().mockResolvedValue(null),
+            findOneOrThrow: vi.fn().mockResolvedValue({
+              ...twoColDataset,
+              columnTypes: [
+                { name: "score", type: "number" }, // schema B (already changed)
+                { name: "img", type: "string" },
+              ],
+            }),
+            update: vi.fn(),
+          };
+
+          await expect(
+            makeService({
+              repository,
+              prisma: makeLockPrisma(twoColDataset),
+            }).upsertDataset({
+              projectId: "p1",
+              datasetId: "dataset_1",
+              name: "DS",
+              columnTypes: [
+                { name: "score", type: "string" },
+                { name: "img", type: "image" },
+              ],
+            }),
+          ).rejects.toMatchObject({ name: "DatasetConflictError" });
+
+          expect(writeChunks).not.toHaveBeenCalled();
+          expect(repository.update).not.toHaveBeenCalled();
+        });
       });
     });
   });

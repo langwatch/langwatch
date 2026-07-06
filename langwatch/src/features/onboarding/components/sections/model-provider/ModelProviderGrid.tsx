@@ -8,17 +8,20 @@ import type { ModelProviderKey } from "~/features/onboarding/regions/model-provi
 import { SelectableIconCard } from "../shared/SelectableIconCard";
 
 interface ModelProviderGridProps {
-  variant: "evaluations" | "prompts";
+  variant: "evaluations" | "prompts" | "langy";
   modelProviderKey: ModelProviderKey;
   onSelectModelProvider: (modelProvider: ModelProviderKey) => void;
 }
 
-const variantDescriptions: Record<"evaluations" | "prompts", string> = {
-  evaluations:
-    "We'll use this model to run your evaluations, and show you where your interactions shines, and where it doesn't.",
-  prompts:
-    "We'll use this model when you run evaluations on your datasets, in your traces, or analyze responses after they happen.",
-};
+const variantDescriptions: Record<"evaluations" | "prompts" | "langy", string> =
+  {
+    evaluations:
+      "We'll use this model to run your evaluations, and show you where your interactions shines, and where it doesn't.",
+    prompts:
+      "We'll use this model when you run evaluations on your datasets, in your traces, or analyze responses after they happen.",
+    langy:
+      "Langy uses this model to chat with you and help you work across the platform. Pick a provider and add your key to get started.",
+  };
 
 export function ModelProviderGrid({
   variant,

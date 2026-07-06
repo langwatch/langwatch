@@ -12,18 +12,19 @@ import { app as eventsApp } from "../app/api/events/[[...route]]/app";
 import { app as gatewayPlatformApp } from "../app/api/gateway-platform/[[...route]]/app";
 import { app as governanceApp } from "../app/api/governance/[[...route]]/app";
 import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
+import { app as meApp } from "../app/api/me/[[...route]]/app";
+import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
+import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
+import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
 import currentSpec from "../app/api/openapiLangWatch.json";
 import { app as llmConfigsApp } from "../app/api/prompts/[[...route]]/app";
 import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
 import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
-import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
-import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
-import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
-import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
+import { app as secretsApp } from "../app/api/secrets/[[...route]]/app";
 import { app as simulationRunsApp } from "../app/api/simulation-runs/[[...route]]/app";
 import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
-import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
-import { app as secretsApp } from "../app/api/secrets/[[...route]]/app";
+import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
+import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
 import { app as workflowsApp } from "../app/api/workflows/[[...route]]/app";
 
 const overwriteMerge = (_destinationArray: any[], sourceArray: any[]) =>
@@ -65,6 +66,8 @@ export default async function execute() {
   const governanceSpec = await generateSpecs(governanceApp);
   console.log("Building graphs spec...");
   const graphsSpec = await generateSpecs(graphsApp);
+  console.log("Building me spec...");
+  const meSpec = await generateSpecs(meApp);
   console.log("Building llm configs spec...");
   const llmConfigsSpec = await generateSpecs(llmConfigsApp);
   console.log("Building scenario events spec...");
@@ -103,6 +106,7 @@ export default async function execute() {
       gatewayPlatformSpec,
       governanceSpec,
       graphsSpec,
+      meSpec,
       llmConfigsSpec,
       modelDefaultsSpec,
       modelProvidersSpec,
@@ -131,6 +135,7 @@ export default async function execute() {
           key.includes("/api/gateway/v1") ||
           key.includes("/api/governance") ||
           key.includes("/api/graphs") ||
+          key.includes("/api/me") ||
           key.includes("/api/prompts") ||
           key.includes("/api/dataset") ||
           key.includes("/api/model-providers") ||

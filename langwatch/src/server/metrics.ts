@@ -1,5 +1,11 @@
 import { performance } from "node:perf_hooks";
-import { Counter, Gauge, Histogram, register, collectDefaultMetrics } from "prom-client";
+import {
+  Counter,
+  collectDefaultMetrics,
+  Gauge,
+  Histogram,
+  register,
+} from "prom-client";
 
 // Enable default metrics collection (heap, stack, GC, etc.)
 if (!register.getSingleMetric("process_cpu_user_seconds_total")) {
@@ -74,7 +80,6 @@ export const traceSpanCountHistogram = new Histogram({
   ],
 });
 
-
 type JobType =
   | "collector"
   | "collector_check_and_adjust"
@@ -85,7 +90,8 @@ type JobType =
   | "usage_reporting"
   | "event_sourcing"
   | "scenario"
-  | "anomaly_detection";
+  | "anomaly_detection"
+  | "orphan_sweep_chain";
 
 type JobStatus = "processing" | "completed" | "failed";
 
@@ -263,7 +269,6 @@ export const getBullMQJobStalledCounter = (queueName: string) =>
 // ============================================================================
 // Event Sourcing Metrics
 // ============================================================================
-
 
 // Counter for events stored (tracks throughput at event level, not job level)
 register.removeSingleMetric("event_sourcing_events_stored_total");
@@ -516,14 +521,14 @@ const storedObjectSizeBytesHistogram = new Histogram({
   help: "Size of stored object payloads in bytes",
   labelNames: ["purpose"] as const,
   buckets: [
-    128,      // 0.125 KB
-    1024,     // 1 KB
-    4096,     // 4 KB
-    16384,    // 16 KB
-    65536,    // 64 KB
-    262144,   // 256 KB
-    1048576,  // 1 MB
-    4194304,  // 4 MB
+    128, // 0.125 KB
+    1024, // 1 KB
+    4096, // 4 KB
+    16384, // 16 KB
+    65536, // 64 KB
+    262144, // 256 KB
+    1048576, // 1 MB
+    4194304, // 4 MB
     16777216, // 16 MB
   ],
 });

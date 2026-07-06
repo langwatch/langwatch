@@ -53,6 +53,7 @@ export function getDisplayKeysForProvider(
     return {
       AZURE_OPENAI_API_KEY: schemaShape.AZURE_OPENAI_API_KEY,
       AZURE_OPENAI_ENDPOINT: schemaShape.AZURE_OPENAI_ENDPOINT,
+      AZURE_OPENAI_API_VERSION: schemaShape.AZURE_OPENAI_API_VERSION,
     };
   }
 

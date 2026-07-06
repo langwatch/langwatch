@@ -103,6 +103,55 @@ export const scenarioRunFinishedSchema = baseScenarioEventSchema.extend({
 });
 
 /**
+ * Voice scenario `input_audio` content part — the missing WIRE leg of #4138
+ * (tracked as #5149).
+ *
+ * Voice turns arrive as a mixed content array, e.g.
+ *   `[ { type: "text", text }, { type: "input_audio", input_audio: { data, format } } ]`
+ * — the shape the langwatch python-sdk emits, and the shape the typescript-sdk's
+ * `convert-core-messages-to-agui-messages` translates AI-SDK audio parts to.
+ *
+ * Neither the AG-UI `MessageSchema` nor the tracer `chatMessageSchema` content
+ * unions accept an `input_audio` part, so a voice MESSAGE_SNAPSHOT was
+ * 400-rejected at the route validator (`zValidator("json", scenarioEventSchema)`
+ * in `app/api/scenario-events/[[...route]]/app.ts`) BEFORE
+ * `extractInlineMediaFromEvent` — which already externalizes `input_audio`
+ * (`server/stored-objects/content-extractor.ts` `inputAudio`) — ever ran.
+ * Accepting it here lets the payload reach that extractor so the UI render leg
+ * shipped in #4138 finally has data to paint.
+ *
+ * Every `input_audio` field is optional so this validates BOTH the inbound
+ * pre-extraction shape (`{ data, format }`) and the post-extraction rewrite
+ * (`{ url, mimeType, data: undefined }`).
+ */
+const inputAudioContentPartSchema = z.object({
+  type: z.literal("input_audio"),
+  input_audio: z.object({
+    data: z.string().optional(),
+    format: z.string().optional(),
+    mimeType: z.string().optional(),
+    url: z.string().optional(),
+    id: z.string().optional(),
+  }),
+});
+
+/**
+ * A message whose `content` array mixes plain text with `input_audio` parts.
+ * Added as a third member of the message union below so existing text / image /
+ * tool / binary messages keep validating via `MessageSchema` / `chatMessageSchema`
+ * — this is purely additive and rejects no previously-accepted shape.
+ */
+const scenarioAudioMessageSchema = z.object({
+  role: z.string().optional(),
+  content: z.array(
+    z.union([
+      z.object({ type: z.literal("text"), text: z.string() }),
+      inputAudioContentPartSchema,
+    ]),
+  ),
+});
+
+/**
  * Scenario Message Snapshot Event Schema
  * Captures the conversation state at a specific point during scenario execution.
  * Includes searchable_content and payload for full message functionality.
@@ -112,7 +161,7 @@ export const scenarioMessageSnapshotSchema = MessagesSnapshotEventSchema.merge(
     type: z.literal(ScenarioEventType.MESSAGE_SNAPSHOT),
     messages: z.array(
       z.intersection(
-        z.union([MessageSchema, chatMessageSchema]),
+        z.union([MessageSchema, chatMessageSchema, scenarioAudioMessageSchema]),
         z.object({
           id: z.string().optional(),
           trace_id: z.string().optional(),

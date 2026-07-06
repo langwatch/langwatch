@@ -26,6 +26,7 @@ import {
 import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
 import { api } from "~/utils/api";
 import { evaluatorTempNameMap } from "../checks/EvaluatorSelection";
+import { ConfirmDialog } from "../gateway/ConfirmDialog";
 import { Menu } from "../ui/menu";
 import { EvaluatorApiUsageDialog } from "./EvaluatorApiUsageDialog";
 
@@ -99,18 +100,13 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
   };
 
   const handleDeleteEvaluator = (evaluator: EvaluatorWithFields) => {
-    if (
-      window.confirm(`Are you sure you want to delete "${evaluator.name}"?`)
-    ) {
-      deleteMutation.mutate({
-        id: evaluator.id,
-        projectId: project?.id ?? "",
-      });
-    }
+    setEvaluatorToDelete(evaluator);
   };
 
   // State for API usage dialog
   const [apiDialogEvaluator, setApiDialogEvaluator] =
+    useState<EvaluatorWithFields | null>(null);
+  const [evaluatorToDelete, setEvaluatorToDelete] =
     useState<EvaluatorWithFields | null>(null);
 
   const handleUseFromApi = (evaluator: EvaluatorWithFields) => {
@@ -189,6 +185,27 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
         evaluator={apiDialogEvaluator}
         open={!!apiDialogEvaluator}
         onClose={() => setApiDialogEvaluator(null)}
+      />
+
+      <ConfirmDialog
+        open={!!evaluatorToDelete}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setEvaluatorToDelete(null);
+        }}
+        title="Delete evaluator"
+        message={`Are you sure you want to delete "${
+          evaluatorToDelete?.name ?? ""
+        }"?`}
+        confirmLabel="Delete"
+        tone="danger"
+        loading={deleteMutation.isLoading}
+        onConfirm={() => {
+          if (!evaluatorToDelete) return;
+          deleteMutation.mutate(
+            { id: evaluatorToDelete.id, projectId: project?.id ?? "" },
+            { onSettled: () => setEvaluatorToDelete(null) },
+          );
+        }}
       />
     </Drawer.Root>
   );
