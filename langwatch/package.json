@@ -245,7 +245,7 @@
     "tiktoken": "^1.0.22",
     "ts-pattern": "^5.9.0",
     "tsx": "^4.21.0",
-    "undici": "^7.28.0",
+    "undici": "^8.5.0",
     "use-debounce": "^10.1.1",
     "usehooks-ts": "^3.1.1",
     "ws": "^8.20.1",
