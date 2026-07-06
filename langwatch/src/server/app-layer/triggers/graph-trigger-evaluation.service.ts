@@ -33,6 +33,8 @@ import type {
   Trigger,
 } from "@prisma/client";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
+import { sumMetricAcrossGroups } from "~/pages/api/cron/triggers/customGraphTrigger";
+import type { ActionParams } from "~/pages/api/cron/triggers/types";
 import type {
   SeriesInputType,
   TimeseriesInputType,
@@ -41,8 +43,6 @@ import type {
   TimeseriesBucket,
   TimeseriesResult,
 } from "~/server/analytics/types";
-import { sumMetricAcrossGroups } from "~/pages/api/cron/triggers/customGraphTrigger";
-import type { ActionParams } from "~/pages/api/cron/triggers/types";
 import type {
   GraphAlertDispatchInput,
   GraphAlertDispatchResult,
@@ -198,11 +198,7 @@ export async function evaluateGraphTrigger({
   }
 
   const graphData = customGraph.graph as unknown as StoredGraphConfig | null;
-  if (
-    !graphData ||
-    !graphData.series ||
-    graphData.series.length === 0
-  ) {
+  if (!graphData?.series || graphData.series.length === 0) {
     return skipped({
       triggerId,
       projectId,
@@ -227,7 +223,7 @@ export async function evaluateGraphTrigger({
     });
   }
   const series = graphData.series[seriesIndex];
-  if (!series || !series.name || !series.metric || !series.aggregation) {
+  if (!series?.name || !series.metric || !series.aggregation) {
     return skipped({
       triggerId,
       projectId,
@@ -253,10 +249,10 @@ export async function evaluateGraphTrigger({
     projectId,
     startDate: startDate.getTime(),
     endDate: endDate.getTime(),
-    filters: ((customGraph.filters ?? {}) as Record<
+    filters: (customGraph.filters ?? {}) as Record<
       string,
       unknown
-    >) as TimeseriesInputType["filters"],
+    > as TimeseriesInputType["filters"],
     series: [seriesInput],
     groupBy: graphData.groupBy as TimeseriesInputType["groupBy"],
     timeScale: graphData.timeScale ?? 60,

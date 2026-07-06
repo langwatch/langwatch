@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
-import {
-  projectSuiteAnalyticsStateToRow,
-  SuiteAnalyticsFoldProjection,
-  SUITE_ANALYTICS_PROJECTION_VERSION_LATEST,
-} from "../suiteAnalytics.foldProjection";
 import type {
   SuiteRunItemCompletedEvent,
   SuiteRunItemStartedEvent,
   SuiteRunStartedEvent,
 } from "../../schemas/events";
+import {
+  projectSuiteAnalyticsStateToRow,
+  SUITE_ANALYTICS_PROJECTION_VERSION_LATEST,
+  SuiteAnalyticsFoldProjection,
+} from "../suiteAnalytics.foldProjection";
 
 const TENANT = "proj-suite";
 

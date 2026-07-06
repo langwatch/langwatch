@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { ExperimentAnalyticsFoldProjection } from "../experimentAnalytics.foldProjection";
-import { ExperimentRunStateFoldProjection } from "../experimentRunState.foldProjection";
 import type {
   EvaluatorResultEvent,
   ExperimentRunCompletedEvent,
@@ -8,6 +6,8 @@ import type {
   TargetResultEvent,
   TraceMetricsComputedEvent,
 } from "../../schemas/events";
+import { ExperimentAnalyticsFoldProjection } from "../experimentAnalytics.foldProjection";
+import { ExperimentRunStateFoldProjection } from "../experimentRunState.foldProjection";
 
 /**
  * ADR-034 Phase 7 parity contract — slim fold reuses the same per-event
@@ -147,8 +147,14 @@ describe("experimentAnalytics fold — parity vs experimentRunState fold", () =>
           runState = runFold.handleExperimentRunEvaluatorResult(e, runState);
           break;
         case "lw.experiment_run.trace_metrics_computed":
-          slimState = slim.handleExperimentRunTraceMetricsComputed(e, slimState);
-          runState = runFold.handleExperimentRunTraceMetricsComputed(e, runState);
+          slimState = slim.handleExperimentRunTraceMetricsComputed(
+            e,
+            slimState,
+          );
+          runState = runFold.handleExperimentRunTraceMetricsComputed(
+            e,
+            runState,
+          );
           break;
         case "lw.experiment_run.completed":
           slimState = slim.handleExperimentRunCompleted(e, slimState);

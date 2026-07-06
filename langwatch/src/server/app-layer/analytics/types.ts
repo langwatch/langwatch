@@ -8,8 +8,8 @@
  * (repository contracts, builder I/O) goes here.
  */
 
-import type { FilterField } from "~/server/filters/types";
 import type { SeriesInputType } from "~/server/analytics/registry";
+import type { FilterField } from "~/server/filters/types";
 
 /**
  * Built ClickHouse query — mirrors the legacy `BuiltQuery` shape so the shim

@@ -1,7 +1,16 @@
-import { Button, Field, HStack, NativeSelect, Spinner, Text, VStack } from "@chakra-ui/react";
+import {
+  Button,
+  Field,
+  HStack,
+  NativeSelect,
+  Spinner,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
+import { CustomModelInputSection } from "../../../../../components/settings/ModelProviderCustomModelInput";
 import { Switch } from "../../../../../components/ui/switch";
 import { useModelProviderApiKeyValidation } from "../../../../../hooks/useModelProviderApiKeyValidation";
 import { useModelProviderFields } from "../../../../../hooks/useModelProviderFields";
@@ -30,7 +39,6 @@ import {
 import type { ModelProviderKey } from "../../../regions/model-providers/types";
 import { DocsLinks } from "../observability/DocsLinks";
 import { ModelProviderCredentialFields } from "./ModelProviderCredentialFields";
-import { CustomModelInputSection } from "../../../../../components/settings/ModelProviderCustomModelInput";
 import { ModelProviderExtraHeaders } from "./ModelProviderExtraHeaders";
 
 const logger = createLogger("ModelProviderSetup");
@@ -49,17 +57,28 @@ const PROVIDERS_WITH_WELL_KNOWN_MODELS = new Set([
 
 interface ModelProviderSetupProps {
   modelProviderKey: ModelProviderKey;
-  variant: "evaluations" | "prompts";
+  variant: "evaluations" | "prompts" | "langy";
+  /**
+   * When provided, called after a successful save instead of the default
+   * redirect. Lets the screen be embedded in a surface that stays put (e.g.
+   * the Langy panel) and just re-resolves the model.
+   */
+  onComplete?: () => void;
 }
 
-const variantToDocsMapping: Record<"evaluations" | "prompts", string> = {
+const variantToDocsMapping: Record<
+  "evaluations" | "prompts" | "langy",
+  string
+> = {
   evaluations: "/llm-evaluation/overview",
   prompts: "/prompt-management/overview",
+  langy: "/introduction",
 };
 
 export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
   modelProviderKey,
   variant,
+  onComplete,
 }) => {
   const fallbackProviderMeta = useMemo(
     () =>
@@ -107,12 +126,6 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
 
-  // Cascade-resolved model for onboarding "default chat model" seed value.
-  const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
-    { projectId: projectId ?? "", featureKey: "prompt.create_default" },
-    { enabled: !!projectId },
-  );
-
   const backendModelProviderKey = useMemo(() => {
     if (meta?.backendModelProviderKey) {
       return meta.backendModelProviderKey;
@@ -152,21 +165,16 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     (!provider.customKeys ||
       Object.keys(provider.customKeys as Record<string, unknown>).length === 0);
 
-  const projectForForm = useMemo(
-    () => ({
-      defaultModel: meta?.defaultModel ?? resolvedDefault.data?.model ?? null,
-      topicClusteringModel: null,
-      embeddingsModel: null,
-    }),
-    [meta?.defaultModel, resolvedDefault.data?.model],
-  );
-
   const [state, actions] = useModelProviderForm({
     provider,
     projectId,
     enabledProvidersCount: 1, // Onboarding always sets up the first provider
     isUsingEnvVars,
     onSuccess: () => {
+      if (onComplete) {
+        onComplete();
+        return;
+      }
       if (variant === "evaluations") {
         window.location.href = "/@project/evaluations";
       } else if (variant === "prompts") {
@@ -418,9 +426,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
                 <NativeSelect.Field
                   value={state.projectDefaultModel ?? ""}
                   onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
-                    actions.setProjectDefaultModel(
-                      event.target.value || null,
-                    )
+                    actions.setProjectDefaultModel(event.target.value || null)
                   }
                 >
                   <option value="">Select default model...</option>
@@ -451,12 +457,8 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
                 <NativeSelect.Root size="sm" bg="bg.muted/40">
                   <NativeSelect.Field
                     value={state.projectDefaultModel ?? ""}
-                    onChange={(
-                      event: React.ChangeEvent<HTMLSelectElement>,
-                    ) =>
-                      actions.setProjectDefaultModel(
-                        event.target.value || null,
-                      )
+                    onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
+                      actions.setProjectDefaultModel(event.target.value || null)
                     }
                   >
                     <option value="">Select default model...</option>
@@ -469,8 +471,8 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
                   <NativeSelect.Indicator />
                 </NativeSelect.Root>
                 <Field.HelperText>
-                  This model will be used for evaluations, prompt
-                  optimization, and dataset generation.
+                  This model will be used for evaluations, prompt optimization,
+                  and dataset generation.
                 </Field.HelperText>
               </Field.Root>
             </VStack>

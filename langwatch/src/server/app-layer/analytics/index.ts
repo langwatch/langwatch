@@ -7,27 +7,14 @@
 
 export {
   AnalyticsService,
+  type AnalyticsServiceDependencies,
   createAnalyticsService,
   getAnalyticsService,
   resetAnalyticsService,
-  type AnalyticsServiceDependencies,
 } from "./analytics.service";
-
-export {
-  isRollupRollableMetricKey,
-  isSlimEligibleMetricKey,
-  pickAnalyticsTable,
-  ROLLUP_ROLLABLE_METRIC_KEYS,
-  SLIM_ELIGIBLE_METRIC_KEYS,
-  type AnalyticsTable,
-  type PickAnalyticsTableInput,
-  type RollupRollableMetricKey,
-  type SlimEligibleMetricKey,
-} from "./routing/route-table";
+export { AnalyticsClientUnavailableError } from "./errors";
 
 export { compareForTripwire } from "./tripwire/divergence-compare";
-
-export { AnalyticsClientUnavailableError } from "./errors";
 export type {
   AnalyticsTimeseriesBuilderInput,
   BuiltAnalyticsQuery,

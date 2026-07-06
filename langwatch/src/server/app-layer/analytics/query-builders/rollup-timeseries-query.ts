@@ -127,10 +127,7 @@ function isRollupAggregation(agg: AggregationTypes): agg is RollupAggregation {
  * `avg(col)` = arithmetic mean of bucket-summed values, etc. NO `*Merge`
  * combinator — the simple variant takes plain `sum(col)`/`avg(col)`.
  */
-function rollupAggExpression(
-  agg: RollupAggregation,
-  column: string,
-): string {
+function rollupAggExpression(agg: RollupAggregation, column: string): string {
   switch (agg) {
     case "sum":
       return `coalesce(sum(${column}), 0)`;

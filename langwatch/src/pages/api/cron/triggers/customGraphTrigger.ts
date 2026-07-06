@@ -9,11 +9,11 @@ import type {
   SeriesInputType,
   TimeseriesInputType,
 } from "~/server/analytics/registry";
-import { getAnalyticsService } from "~/server/app-layer/analytics";
 import type {
   TimeseriesBucket,
   TimeseriesResult,
 } from "~/server/analytics/types";
+import { getAnalyticsService } from "~/server/app-layer/analytics";
 import { prisma } from "~/server/db";
 import type { Trace } from "~/server/tracer/types";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -161,7 +161,8 @@ export const processCustomGraphTrigger = async (
 
     // Get analytics data
     const analyticsService = getAnalyticsService();
-    const timeseriesResult = await analyticsService.getTimeseries(timeseriesInput);
+    const timeseriesResult =
+      await analyticsService.getTimeseries(timeseriesInput);
 
     // Calculate current value (sum or average of the last period)
     // Use seriesName as the key to find the value in timeseries results
@@ -282,16 +283,13 @@ export const processCustomGraphTrigger = async (
       };
     }
   } catch (error) {
-    captureException(
-      toError(error),
-      {
-        extra: {
-          triggerId,
-          projectId,
-          type: "customGraphAlert",
-        },
+    captureException(toError(error), {
+      extra: {
+        triggerId,
+        projectId,
+        type: "customGraphAlert",
       },
-    );
+    });
 
     return {
       triggerId,

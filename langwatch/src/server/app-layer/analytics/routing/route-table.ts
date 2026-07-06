@@ -36,12 +36,12 @@
  * it.
  */
 
+import type { SeriesInputType } from "~/server/analytics/registry";
+import type { AggregationTypes } from "~/server/analytics/types";
 import {
   PAYLOAD_BLOCKLIST_EXACT,
   PAYLOAD_BLOCKLIST_PREFIXES,
 } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/analytics-attribute-trim.service";
-import type { SeriesInputType } from "~/server/analytics/registry";
-import type { AggregationTypes } from "~/server/analytics/types";
 import type { FilterField } from "~/server/filters/types";
 import {
   collectStringValues,
@@ -154,10 +154,12 @@ export type RollupRollableMetricKey =
   | TraceRollupMetricKey
   | EvalRollupMetricKey;
 
-export const ROLLUP_ROLLABLE_METRIC_KEYS: ReadonlySet<string> = new Set<string>([
-  ...ROLLUP_ROLLABLE_TRACE_METRIC_KEYS_LIST,
-  ...ROLLUP_ROLLABLE_EVAL_METRIC_KEYS_LIST,
-]);
+export const ROLLUP_ROLLABLE_METRIC_KEYS: ReadonlySet<string> = new Set<string>(
+  [
+    ...ROLLUP_ROLLABLE_TRACE_METRIC_KEYS_LIST,
+    ...ROLLUP_ROLLABLE_EVAL_METRIC_KEYS_LIST,
+  ],
+);
 
 export function isRollupRollableMetricKey(
   metric: string,
@@ -334,12 +336,10 @@ const SLIM_TRACE_FILTER_FIELDS: ReadonlySet<FilterField> = new Set<FilterField>(
 );
 
 /** Slim-eval filter fields — typed columns on the slim row. */
-const SLIM_EVAL_FILTER_FIELDS: ReadonlySet<FilterField> = new Set<FilterField>(
-  [
-    "metadata.key",
-    "metadata.value",
-  ],
-);
+const SLIM_EVAL_FILTER_FIELDS: ReadonlySet<FilterField> = new Set<FilterField>([
+  "metadata.key",
+  "metadata.value",
+]);
 
 /**
  * Aggregations the trace rollup can compute CORRECTLY from its columns. The
@@ -481,9 +481,7 @@ function rollupHandlesSeries(
   source: AnalyticsMetricSource,
 ): boolean {
   const allowedAggs =
-    source === "trace"
-      ? ROLLUP_TRACE_AGGREGATIONS
-      : ROLLUP_EVAL_AGGREGATIONS;
+    source === "trace" ? ROLLUP_TRACE_AGGREGATIONS : ROLLUP_EVAL_AGGREGATIONS;
   if (!allowedAggs.has(s.aggregation)) return false;
   if (s.key !== undefined || s.subkey !== undefined) {
     // Neither rollup carries a column that identifies an individual
@@ -505,9 +503,7 @@ function rollupHandlesGroupBy(
 ): boolean {
   if (!groupBy) return true;
   const keys =
-    source === "trace"
-      ? ROLLUP_TRACE_GROUP_BY_KEYS
-      : ROLLUP_EVAL_GROUP_BY_KEYS;
+    source === "trace" ? ROLLUP_TRACE_GROUP_BY_KEYS : ROLLUP_EVAL_GROUP_BY_KEYS;
   return keys.has(groupBy);
 }
 

@@ -1,4 +1,5 @@
 import { UNLIMITED_MESSAGES } from "../../../../ee/billing/planLimits";
+import type { PlanInfo } from "../../../../ee/licensing/planInfo";
 import type { OrganizationRepository } from "../../repositories/organization.repository";
 import type { EventUsageService } from "../../traces/event-usage.service";
 import type { TraceUsageService } from "../../traces/trace-usage.service";
@@ -72,10 +73,8 @@ export class UsageService {
       throw new OrganizationNotFoundForTeamError(teamId);
     }
 
-    const [count, plan] = await Promise.all([
-      this.getCurrentMonthCount({ organizationId }),
-      this.planResolver(organizationId),
-    ]);
+    const plan = await this.planResolver(organizationId);
+    const count = await this.getCurrentMonthCount({ organizationId, plan });
 
     if (count === "unlimited") {
       return { exceeded: false };
@@ -83,7 +82,7 @@ export class UsageService {
 
     if (count >= plan.maxMessagesPerMonth) {
       // getCurrentMonthCount already warmed the decision cache, so this is a map lookup
-      const decision = await this.getCachedMeterDecision(organizationId);
+      const decision = await this.getCachedMeterDecision(organizationId, plan);
       return {
         exceeded: true,
         message: buildLimitMessage({
@@ -182,20 +181,22 @@ export class UsageService {
 
   async getCurrentMonthCount({
     organizationId,
+    plan,
   }: {
     organizationId: string;
+    plan?: PlanInfo;
   }): Promise<number | "unlimited"> {
     // Skip the heavy ClickHouse query for unlimited plans (e.g. seat-based pricing).
     // The count would never exceed the limit, so querying is wasted work for
     // ENFORCEMENT. Returns "unlimited" so callers can distinguish from actual 0
     // usage. Display callers that need the real volume regardless of the cap use
     // getCurrentMonthCountForDisplay instead.
-    const plan = await this.planResolver(organizationId);
-    if (plan.maxMessagesPerMonth >= UNLIMITED_MESSAGES) {
+    const activePlan = plan ?? (await this.planResolver(organizationId));
+    if (activePlan.maxMessagesPerMonth >= UNLIMITED_MESSAGES) {
       return "unlimited";
     }
 
-    return this.computeCurrentMonthCount({ organizationId });
+    return this.computeCurrentMonthCount({ organizationId, plan: activePlan });
   }
 
   /**
@@ -218,10 +219,12 @@ export class UsageService {
 
   private async computeCurrentMonthCount({
     organizationId,
+    plan,
   }: {
     organizationId: string;
+    plan?: PlanInfo;
   }): Promise<number> {
-    const decision = await this.getCachedMeterDecision(organizationId);
+    const decision = await this.getCachedMeterDecision(organizationId, plan);
     const cacheKey = `${organizationId}:${decision.usageUnit}`;
 
     const cached = await this.countCache.get(cacheKey);
@@ -286,22 +289,24 @@ export class UsageService {
 
   private async getCachedMeterDecision(
     organizationId: string,
+    plan?: PlanInfo,
   ): Promise<MeterDecision> {
     const cached = await this.decisionCache.get(organizationId);
     if (cached) return cached;
 
-    const decision = await this.resolveMeterDecision(organizationId);
+    const decision = await this.resolveMeterDecision(organizationId, plan);
     await this.decisionCache.set(organizationId, decision);
     return decision;
   }
 
   private async resolveMeterDecision(
     organizationId: string,
+    resolvedPlan?: PlanInfo,
   ): Promise<MeterDecision> {
     const pricingModel =
       (await this.organizationRepository?.getPricingModel(organizationId)) ??
       null;
-    const plan = await this.planResolver(organizationId);
+    const plan = resolvedPlan ?? (await this.planResolver(organizationId));
     const hasValidLicenseOverride = plan.planSource === "license";
 
     const decision = resolveUsageMeter({

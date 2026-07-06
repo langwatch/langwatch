@@ -6,7 +6,8 @@
 # **Use `make quickstart` — not direct compose.** ADR-004 (2026-05, #3860)
 # established `make quickstart` as the single entry point for local dev. It
 # sets VOLUME_PREFIX via scripts/dev.sh so per-worktree volumes (goose_bin,
-# app_modules, bullboard_modules, see line ~360) get isolated names; running
+# app_modules, bullboard_modules, mcp_server_modules, see the volumes block)
+# get isolated names; running
 # `docker compose -f compose.dev.yml up` directly collapses every worktree
 # onto the same volumes.
 #
@@ -84,10 +85,12 @@ services:
   # own. Compose treats this as belonging to the first project that brings it
   # up; subsequent `quickstart`s detect the running container and reuse it.
   #
-  # Prerequisite: no host-side redis-server may be holding 6379. `make
-  # quickstart` calls `check_host_redis_collision` (scripts/dev.sh) which
-  # detects this case and prints a clear hint. On macOS:
-  # `brew services stop redis`. On Linux: `sudo systemctl stop redis-server`.
+  # Prerequisite: no NON-Docker process (e.g. a host redis-server) may be
+  # holding 6379. `make quickstart` calls `check_host_redis_collision`
+  # (scripts/dev.sh), which exempts this project's own already-running redis
+  # container (idempotent reuse) and only errors on a foreign listener it cannot
+  # rebind over. To free a host redis — macOS: `brew services stop redis`;
+  # Linux: `sudo systemctl stop redis-server`.
   redis:
     image: redis:alpine
     ports:
@@ -145,6 +148,7 @@ services:
       - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
       - ./package.json:/package.json:ro
       - ./mcp-server:/mcp-server
+      - mcp_server_modules:/mcp-server/node_modules
       - ./langevals:/langevals
       - ./typescript-sdk:/typescript-sdk:ro
       - ./python-sdk:/python-sdk:ro
@@ -187,6 +191,7 @@ services:
       - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
       - ./package.json:/package.json:ro
       - ./mcp-server:/mcp-server
+      - mcp_server_modules:/mcp-server/node_modules
       - ./langevals:/langevals
       - ./typescript-sdk:/typescript-sdk:ro
       - ./python-sdk:/python-sdk:ro
@@ -255,6 +260,7 @@ services:
       - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
       - ./package.json:/package.json:ro
       - ./mcp-server:/mcp-server
+      - mcp_server_modules:/mcp-server/node_modules
       - ./langevals:/langevals
       - ./typescript-sdk:/typescript-sdk:ro
       - ./python-sdk:/python-sdk:ro
@@ -293,7 +299,14 @@ services:
   # dial http://langwatch_nlp:5561 (LANGWATCH_NLP_SERVICE) unchanged.
 
   langwatch_nlp:
-    image: langwatch/langwatch_nlp:latest
+    # Build from local services/nlpgo source (via Dockerfile.langwatch_nlp)
+    # instead of the published langwatch/langwatch_nlp:latest image, which
+    # lags the source. Building from source keeps the engine in lockstep with
+    # this checkout, so evaluator output (e.g. the `details`/reasoning
+    # envelope) matches the code here. See #5151.
+    build:
+      context: .
+      dockerfile: Dockerfile.langwatch_nlp
     profiles: [nlp, scenarios, full]
     # No host port - accessed via docker network as "langwatch_nlp:5561"
     environment:
@@ -307,7 +320,14 @@ services:
           cpus: "0.5"
 
   langevals:
-    image: langwatch/langevals:latest
+    # Build from local ./langevals source (via Dockerfile.langevals) instead
+    # of the published langwatch/langevals:latest image, which lags the
+    # source. Newer evaluators present in this checkout 404 against :latest;
+    # building from source guarantees the container serves exactly the
+    # evaluators in this checkout. See #5151.
+    build:
+      context: .
+      dockerfile: Dockerfile.langevals
     profiles: [nlp, full]
     # No host port - accessed via docker network as "langevals:5562"
     environment:
@@ -315,7 +335,11 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256m
+          # langevals imports ragas/langchain at boot and OOM-kills at 256m
+          # before it can serve a single request — even with preload disabled.
+          # Production (charts/langwatch) requests 6Gi/limits 8Gi; 4g is enough
+          # for the dev import footprint plus LLM-judge evaluators.
+          memory: 4g
           cpus: "0.5"
 
   # =============================================================================
@@ -357,6 +381,7 @@ services:
       - ./pnpm-workspace.yaml:/pnpm-workspace.yaml:ro
       - ./package.json:/package.json:ro
       - ./mcp-server:/mcp-server
+      - mcp_server_modules:/mcp-server/node_modules
       - ./langevals:/langevals
       - ./typescript-sdk:/typescript-sdk:ro
       - ./python-sdk:/python-sdk:ro
@@ -403,6 +428,13 @@ volumes:
     name: ${VOLUME_PREFIX:-langwatch}-app-modules
   bullboard_modules:
     name: ${VOLUME_PREFIX:-langwatch}-bullboard-modules
+  # mcp-server is a standalone pnpm workspace whose install + build run in the
+  # `init` container against the `./mcp-server` bind mount. Without isolation
+  # the container install writes container-shaped pnpm symlinks into the host
+  # tree, which then dangle and break a host-side build (#5144). Isolating
+  # node_modules in a named volume keeps the host tree untouched.
+  mcp_server_modules:
+    name: ${VOLUME_PREFIX:-langwatch}-mcp-server-modules
   # Always shared (cache only).
   pnpm_store:
     name: langwatch-pnpm-store

@@ -1,9 +1,9 @@
 import { TriggerAction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { EvaluationAnalyticsData } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
-import type { GraphEvalStagePayload } from "~/server/event-sourcing/outbox/payload";
 import type { TriggerSummary } from "~/server/app-layer/triggers/repositories/trigger.repository";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
+import type { GraphEvalStagePayload } from "~/server/event-sourcing/outbox/payload";
+import type { EvaluationAnalyticsData } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
 import type { ReactorContext } from "../../../../reactors/reactor.types";
 import type { EvaluationProcessingEvent } from "../../schemas/events";
 import { createEvaluationGraphTriggerEvaluationOutboxReactor } from "../graphTriggerEvaluation.outboxReactor";
@@ -13,6 +13,7 @@ vi.mock("~/server/featureFlag", () => ({
     isEnabled: vi.fn(),
   },
 }));
+
 // eslint-disable-next-line import/order
 import { featureFlagService } from "~/server/featureFlag";
 

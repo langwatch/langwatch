@@ -3,10 +3,10 @@ import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
-import { getAnalyticsService } from "~/server/app-layer/analytics";
 import { timeseriesSeriesInput } from "~/server/analytics/registry";
 import { sharedFiltersInputSchema } from "~/server/analytics/types";
 import { type createProjectApp, requires } from "~/server/api/security";
+import { getAnalyticsService } from "~/server/app-layer/analytics";
 import { createLogger } from "~/utils/logger/server";
 import { baseResponses } from "../../shared/base-responses";
 import { coerceToEpoch, flexibleDateSchema } from "../../shared/schemas";
@@ -31,50 +31,50 @@ export function registerAnalyticsRoutes(
   secured.access(requires("analytics:view")).post(
     "/timeseries",
     describeRoute({
-    description:
-      "Query analytics timeseries data with metrics, aggregations, and filters",
-    responses: {
-      ...baseResponses,
-      200: {
-        description:
-          "Timeseries analytics data with current and previous periods",
-        content: {
-          "application/json": {
-            schema: resolver(
-              z.object({
-                currentPeriod: z.array(z.record(z.string(), z.any())),
-                previousPeriod: z.array(z.record(z.string(), z.any())),
-              }),
-            ),
+      description:
+        "Query analytics timeseries data with metrics, aggregations, and filters",
+      responses: {
+        ...baseResponses,
+        200: {
+          description:
+            "Timeseries analytics data with current and previous periods",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.object({
+                  currentPeriod: z.array(z.record(z.string(), z.any())),
+                  previousPeriod: z.array(z.record(z.string(), z.any())),
+                }),
+              ),
+            },
           },
         },
       },
-    },
-  }),
-  zValidator("json", analyticsBodySchema),
-  async (c) => {
-    const project = c.get("project");
-    const params = c.req.valid("json");
+    }),
+    zValidator("json", analyticsBodySchema),
+    async (c) => {
+      const project = c.get("project");
+      const params = c.req.valid("json");
 
-    logger.info({ projectId: project.id }, "Querying analytics timeseries");
+      logger.info({ projectId: project.id }, "Querying analytics timeseries");
 
-    const input = {
-      ...params,
-      projectId: project.id,
-      startDate: coerceToEpoch(params.startDate),
-      endDate: coerceToEpoch(params.endDate),
-    };
+      const input = {
+        ...params,
+        projectId: project.id,
+        startDate: coerceToEpoch(params.startDate),
+        endDate: coerceToEpoch(params.endDate),
+      };
 
-    try {
-      const analyticsService = getAnalyticsService();
-      const timeseriesResult = await analyticsService.getTimeseries(input);
-      return c.json(timeseriesResult);
-    } catch (e) {
-      if (e instanceof TRPCError && e.code === "BAD_REQUEST") {
-        throw new HTTPException(400, { message: e.message });
+      try {
+        const analyticsService = getAnalyticsService();
+        const timeseriesResult = await analyticsService.getTimeseries(input);
+        return c.json(timeseriesResult);
+      } catch (e) {
+        if (e instanceof TRPCError && e.code === "BAD_REQUEST") {
+          throw new HTTPException(400, { message: e.message });
+        }
+        throw e;
       }
-      throw e;
-    }
-  },
+    },
   );
 }

@@ -1,11 +1,25 @@
 import os from "node:os";
 import path from "node:path";
 import "@testing-library/jest-dom/vitest";
+import { cleanup } from "@testing-library/react";
 import dotenv from "dotenv";
-import { afterAll, vi } from "vitest";
+import { afterAll, afterEach, vi } from "vitest";
 import { TEST_PUBLIC_KEY } from "./ee/licensing/__tests__/fixtures/testKeys";
 
 dotenv.config({ path: ".env" });
+
+// Register React Testing Library's per-test unmount globally. vitest.config.ts
+// runs without `globals: true`, so RTL's automatic afterEach(cleanup) never
+// self-registers; component tests that render portaled Chakra dialogs/modals
+// then leak every render into document.body, where accumulated dialogs get
+// marked aria-hidden by focus management and make role-based queries
+// (getByRole/getAllByRole) flake in CI. Registering cleanup once here fixes the
+// whole class (current and future test files) at the root instead of per file
+// (#4469, the CI-only flake first seen in #4467). cleanup() no-ops when a test
+// rendered nothing, so node-environment (non-jsdom) tests are unaffected.
+afterEach(() => {
+  cleanup();
+});
 
 // Born-on-storage (ADR-032): every dataset create writes chunk objects to the
 // resolved storage backend. Tests run without S3, so the resolver falls back to
@@ -108,6 +122,27 @@ afterAll(async () => {
     }
   }
 });
+
+// Polyfill the Web Streams API for jsdom — Node 18+ exposes these via
+// `node:stream/web` but jsdom doesn't expose them as globals. Several
+// transitive deps (eventsource-parser via @ai-sdk/react, etc.) crash at
+// module-load with `ReferenceError: TransformStream is not defined`,
+// which then takes down every test that touches code importing them
+// (or that vitest coverage-instruments).
+import {
+  ReadableStream as NodeReadableStream,
+  TransformStream as NodeTransformStream,
+  WritableStream as NodeWritableStream,
+} from "node:stream/web";
+if (typeof globalThis.TransformStream === "undefined") {
+  globalThis.TransformStream = NodeTransformStream as unknown as typeof TransformStream;
+}
+if (typeof globalThis.ReadableStream === "undefined") {
+  globalThis.ReadableStream = NodeReadableStream as unknown as typeof ReadableStream;
+}
+if (typeof globalThis.WritableStream === "undefined") {
+  globalThis.WritableStream = NodeWritableStream as unknown as typeof WritableStream;
+}
 
 // Mock recharts to avoid ESM/CJS compatibility issues with @reduxjs/toolkit in vmThreads pool.
 // Tests don't need actual chart rendering - we're testing our logic, not recharts itself.
@@ -313,3 +348,15 @@ globalThis.ResizeObserver = class ResizeObserver {
   // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op for test mock
   disconnect() {}
 };
+
+// Polyfill Element scroll methods for jsdom (not implemented). Zag.js/Ark
+// components (Chakra Select/Menu/Combobox) call `scrollTo` / `scrollIntoView`
+// on open to keep the active option in view; jsdom throws "not a function"
+// without this, crashing any test that opens such a control.
+if (typeof Element !== "undefined") {
+  // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op for test mock
+  Element.prototype.scrollTo = Element.prototype.scrollTo ?? function () {};
+  Element.prototype.scrollIntoView =
+    // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op for test mock
+    Element.prototype.scrollIntoView ?? function () {};
+}

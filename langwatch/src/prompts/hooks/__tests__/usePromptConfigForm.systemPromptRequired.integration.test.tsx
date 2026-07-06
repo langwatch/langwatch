@@ -111,69 +111,71 @@ describe("usePromptConfigForm — system-prompt-required save flow (Issue #3196)
     cleanup();
   });
 
-  describe("when the system message is empty on initial render", () => {
-    /** @scenario "Save is disabled when the workflow prompt's system message is empty" */
-    it("disables the Save button, renders the inline required-field error, and blocks the mutation", async () => {
-      const calls: MutationCall[] = [];
-      render(
-        <PromptSaveHarness
-          initialMessages={[
-            { role: "system", content: "" },
-            { role: "user", content: "{{input}}" },
-          ]}
-          onMutationFire={(call) => calls.push(call)}
-        />,
-      );
+  describe("given a form rendered with an empty system message", () => {
+    describe("when the system message is empty on initial render", () => {
+      /** @scenario "Save is disabled when the workflow prompt's system message is empty" */
+      it("disables the Save button, renders the inline required-field error, and blocks the mutation", async () => {
+        const calls: MutationCall[] = [];
+        render(
+          <PromptSaveHarness
+            initialMessages={[
+              { role: "system", content: "" },
+              { role: "user", content: "{{input}}" },
+            ]}
+            onMutationFire={(call) => calls.push(call)}
+          />,
+        );
 
-      const saveButton = screen.getByRole("button", { name: "Save" });
-      await waitFor(() => expect(saveButton).toBeDisabled());
+        const saveButton = screen.getByRole("button", { name: "Save" });
+        await waitFor(() => expect(saveButton).toBeDisabled());
 
-      const alert = await screen.findByRole("alert");
-      expect(alert.textContent).toMatch(/system prompt is required/i);
+        const alert = await screen.findByRole("alert");
+        expect(alert.textContent).toMatch(/system prompt is required/i);
 
-      // Even if the disabled attribute is bypassed (e.g. via the keyboard or
-      // a programmatic submit), the click handler must still bail on the
-      // failed `methods.trigger()` — no mutation should fire.
-      await act(async () => {
-        saveButton.removeAttribute("disabled");
-        saveButton.click();
+        // Even if the disabled attribute is bypassed (e.g. via the keyboard or
+        // a programmatic submit), the click handler must still bail on the
+        // failed `methods.trigger()` — no mutation should fire.
+        await act(async () => {
+          saveButton.removeAttribute("disabled");
+          saveButton.click();
+        });
+        expect(calls).toHaveLength(0);
       });
-      expect(calls).toHaveLength(0);
     });
-  });
 
-  describe("when the user types a non-empty system message into the empty form", () => {
-    // The @e2e happy-path binding covers AC 4 at integration scope —
-    // the save handler firing with the supplied system content is
-    // the regression surface.  Browser-level e2e queued as follow-up.
-    /** @scenario "Save becomes enabled once the user fills in a system prompt" */
-    /** @scenario "Workflow with a valid system prompt saves successfully (happy-path regression)" */
-    it("clears the inline error, re-enables Save, and fires the mutation with the typed content", async () => {
-      const calls: MutationCall[] = [];
-      const user = userEvent.setup();
-      render(
-        <PromptSaveHarness
-          initialMessages={[
-            { role: "system", content: "" },
-            { role: "user", content: "{{input}}" },
-          ]}
-          onMutationFire={(call) => calls.push(call)}
-        />,
-      );
+    describe("when the user types a non-empty system message into the empty form", () => {
+      // The @e2e happy-path binding covers AC 4 at integration scope —
+      // the save handler firing with the supplied system content is
+      // the regression surface.  Browser-level e2e queued as follow-up.
+      /** @scenario "Save becomes enabled once the user fills in a system prompt" */
+      /** @scenario "Workflow with a valid system prompt saves successfully (happy-path regression)" */
+      it("clears the inline error, re-enables Save, and fires the mutation with the typed content", async () => {
+        const calls: MutationCall[] = [];
+        const user = userEvent.setup();
+        render(
+          <PromptSaveHarness
+            initialMessages={[
+              { role: "system", content: "" },
+              { role: "user", content: "{{input}}" },
+            ]}
+            onMutationFire={(call) => calls.push(call)}
+          />,
+        );
 
-      const saveButton = screen.getByRole("button", { name: "Save" });
-      await waitFor(() => expect(saveButton).toBeDisabled());
-      await screen.findByRole("alert");
+        const saveButton = screen.getByRole("button", { name: "Save" });
+        await waitFor(() => expect(saveButton).toBeDisabled());
+        await screen.findByRole("alert");
 
-      const textarea = screen.getByLabelText("system-content");
-      await user.type(textarea, "You are a helpful assistant.");
+        const textarea = screen.getByLabelText("system-content");
+        await user.type(textarea, "You are a helpful assistant.");
 
-      await waitFor(() => expect(saveButton).not.toBeDisabled());
-      expect(screen.queryByRole("alert")).toBeNull();
+        await waitFor(() => expect(saveButton).not.toBeDisabled());
+        expect(screen.queryByRole("alert")).toBeNull();
 
-      await user.click(saveButton);
-      await waitFor(() => expect(calls).toHaveLength(1));
-      expect(calls[0]?.systemContent).toBe("You are a helpful assistant.");
+        await user.click(saveButton);
+        await waitFor(() => expect(calls).toHaveLength(1));
+        expect(calls[0]?.systemContent).toBe("You are a helpful assistant.");
+      });
     });
   });
 });

@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { SimulationAnalyticsFoldProjection } from "../simulationAnalytics.foldProjection";
-import { SimulationRunStateFoldProjection } from "../simulationRunState.foldProjection";
 import type {
   SimulationRunFinishedEvent,
   SimulationRunMetricsComputedEvent,
   SimulationRunQueuedEvent,
   SimulationRunStartedEvent,
 } from "../../schemas/events";
+import { SimulationAnalyticsFoldProjection } from "../simulationAnalytics.foldProjection";
+import { SimulationRunStateFoldProjection } from "../simulationRunState.foldProjection";
 
 /**
  * ADR-034 Phase 7 parity contract — slim fold reuses the same per-event

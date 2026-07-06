@@ -91,6 +91,17 @@ const batchesSchema = z.object({
 });
 
 /**
+ * Archive operation response schema
+ * Returned by the DELETE /api/scenario-events endpoint after archiving runs for a scenario set
+ */
+export const archiveResponseSchema = z.object({
+  archived: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+  scenarioSetId: z.string(),
+  hasMore: z.boolean(),
+});
+
+/**
  * Consolidated response schemas object
  * Maps response types to their corresponding Zod schemas for validation
  */
@@ -101,4 +112,5 @@ export const responseSchemas = {
   events: eventsSchema,
   batches: batchesSchema,
   runData: runDataSchema,
+  archive: archiveResponseSchema,
 };

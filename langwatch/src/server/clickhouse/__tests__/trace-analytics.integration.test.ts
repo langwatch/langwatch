@@ -30,17 +30,17 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TraceAnalyticsClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-analytics.clickhouse.repository";
 import { TraceSummaryClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-summary.clickhouse.repository";
-import {
-  projectAnalyticsStateToRow,
-  type TraceAnalyticsData,
-  TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
-  type TraceAnalyticsRow,
-} from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import {
+  projectAnalyticsStateToRow,
+  TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
+  type TraceAnalyticsData,
+  type TraceAnalyticsRow,
+} from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalytics.foldProjection";
 
 let ch: ClickHouseClient;
 let analyticsRepo: TraceAnalyticsClickHouseRepository;
@@ -48,7 +48,9 @@ let summaryRepo: TraceSummaryClickHouseRepository;
 
 const baseMs = new Date("2026-06-15T12:00:00.000Z").getTime();
 
-function makeAnalyticsRow(overrides: Partial<TraceAnalyticsRow> = {}): TraceAnalyticsRow {
+function makeAnalyticsRow(
+  overrides: Partial<TraceAnalyticsRow> = {},
+): TraceAnalyticsRow {
   return {
     tenantId: "tenant-default",
     traceId: "trace-default",
@@ -427,9 +429,7 @@ describe("trace_analytics slim fold (integration)", () => {
         expect(slim.TimeToFirstTokenMs).toBe(summary!.timeToFirstTokenMs);
         expect(slim.Models).toEqual(summary!.models);
         expect(slim.TopicId).toBe(summary!.topicId);
-        expect(slim.Origin).toBe(
-          summary!.attributes["langwatch.origin"] ?? "",
-        );
+        expect(slim.Origin).toBe(summary!.attributes["langwatch.origin"] ?? "");
         expect(slim.UserId).toBe(summary!.attributes["langwatch.user_id"]);
         expect(slim.ConversationId).toBe(
           summary!.attributes["gen_ai.conversation.id"],

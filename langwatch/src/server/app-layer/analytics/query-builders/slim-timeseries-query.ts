@@ -165,10 +165,7 @@ function slimGroupByExpression(groupBy?: string): string | null {
  * `quantileExact` directly (matches the legacy builder's behaviour to keep
  * parity).
  */
-function slimAggExpression(
-  agg: AggregationTypes,
-  column: string,
-): string {
+function slimAggExpression(agg: AggregationTypes, column: string): string {
   if (isPercentile(agg)) {
     return `quantileExact(${percentileFor(agg)})(${column})`;
   }

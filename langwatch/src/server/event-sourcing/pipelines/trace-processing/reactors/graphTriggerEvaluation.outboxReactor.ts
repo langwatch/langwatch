@@ -8,9 +8,9 @@ import type {
 } from "../../../outbox/outboxReactor.types";
 import {
   GRAPH_TRIGGER_EVAL_REACTOR_NAME,
+  type GraphEvalStagePayload,
   graphEvalDedupId,
   graphEvalGroupKey,
-  type GraphEvalStagePayload,
 } from "../../../outbox/payload";
 import type { ReactorContext } from "../../../reactors/reactor.types";
 import type { TraceProcessingEvent } from "../schemas/events";

@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { EvaluationAnalyticsFoldProjection } from "../evaluationAnalytics.foldProjection";
-import { EvaluationRunFoldProjection } from "../evaluationRun.foldProjection";
 import type {
   EvaluationCompletedEvent,
   EvaluationReportedEvent,
   EvaluationScheduledEvent,
   EvaluationStartedEvent,
 } from "../../schemas/events";
+import { EvaluationAnalyticsFoldProjection } from "../evaluationAnalytics.foldProjection";
+import { EvaluationRunFoldProjection } from "../evaluationRun.foldProjection";
 
 /**
  * ADR-034 Phase 6 parity contract.
@@ -147,7 +147,10 @@ describe("evaluationAnalytics fold — parity vs evaluationRun fold", () => {
 
       const reported = makeReported();
       const slimState = slim.handleEvaluationReported(reported, slim.init());
-      const runState = runFold.handleEvaluationReported(reported, runFold.init());
+      const runState = runFold.handleEvaluationReported(
+        reported,
+        runFold.init(),
+      );
 
       expect(slimState.evaluationId).toBe(runState.evaluationId);
       expect(slimState.evaluatorId).toBe(runState.evaluatorId);

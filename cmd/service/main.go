@@ -12,6 +12,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/contexts"
 	aigateway "github.com/langwatch/langwatch/services/aigateway/cmd"
+	langyagent "github.com/langwatch/langwatch/services/langy-agent/cmd"
 	nlpgo "github.com/langwatch/langwatch/services/nlpgo/cmd"
 )
 
@@ -22,8 +23,9 @@ var Version = "dev"
 type ServiceBoot func(ctx context.Context, args []string) error
 
 var services = map[string]ServiceBoot{
-	"aigateway": aigateway.Root,
-	"nlpgo":     nlpgo.Root,
+	"aigateway":   aigateway.Root,
+	"langy-agent": langyagent.Root,
+	"nlpgo":       nlpgo.Root,
 }
 
 func main() {

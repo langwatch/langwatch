@@ -1,0 +1,17 @@
+apiVersion: v2
+name: langwatch-langy-agent
+description: >-
+  Langy agent pod. Runs the OpenCode "manager" (Go, services/langy-agent) that spawns one
+  isolated OpenCode subprocess per conversation, with per-request credential
+  injection. Internal-only service consumed by the LangWatch control plane.
+type: application
+version: 3.3.0
+appVersion: 3.3.0
+keywords:
+  - langwatch
+  - langy
+  - opencode
+  - in-product-assistant
+maintainers:
+  - name: LangWatch
+    url: https://langwatch.ai

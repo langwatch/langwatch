@@ -13,6 +13,8 @@ overrides:
   "esbuild@<0.28.1": ">=0.28.1"
   # Security: vite dev-server file read / middleware path bypass
   "vite@>=7.0.0 <7.3.5": ">=7.3.5 <8"
+  # Security: hono request smuggling / path confusion
+  "hono@<4.12.25": ">=4.12.25"
   # Security: fast-uri path traversal + host confusion
   "fast-uri@<3.1.2": "3.1.2"
   liquidjs: ">=10.26.0"

@@ -1,0 +1,107 @@
+{{- if .Values.networkPolicy.enabled }}
+# NetworkPolicy for the Langy agent. Deny-by-default; only the rules below
+# reach the pod.
+#
+# Ingress (who may talk TO the agent):
+#   - ONLY the LangWatch control plane (langwatch-app) on the manager port.
+#     Unlike the gateway, the agent has no public surface — there is no LB
+#     or ingress-controller allow rule on purpose.
+#
+# Egress (what the agent may talk to):
+#   - DNS (kube-system:53).
+#   - Control plane (langwatch-app) — the per-session MCP server calls the
+#     LangWatch API at LANGWATCH_ENDPOINT.
+#   - AI gateway (langwatch-gateway) — OpenCode's LLM traffic goes out via
+#     OPENAI_BASE_URL pointed at the gateway, not direct to providers.
+#   - 443 to anywhere (optional, default on) — OpenCode may reach external
+#     hosts (e.g. its own update/telemetry). Tighten by setting
+#     networkPolicy.allowExternalHttps=false once egress needs are pinned.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "langy-agent.fullname" . }}
+  labels: {{- include "langy-agent.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- include "langy-agent.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        {{- with .Values.networkPolicy.ingressFrom }}
+        {{- toYaml . | nindent 8 }}
+        {{- else }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ .Release.Name }}-app
+              app.kubernetes.io/instance: {{ .Release.Name }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.manager.port }}
+  egress:
+    # DNS — must resolve before anything else.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Control plane (LangWatch app) — MCP -> LangWatch API.
+    - to:
+        {{- with .Values.networkPolicy.egressToControlPlane }}
+        {{- toYaml . | nindent 8 }}
+        {{- else }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ .Release.Name }}-app
+              app.kubernetes.io/instance: {{ .Release.Name }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.networkPolicy.controlPlanePort }}
+    # AI gateway — OpenCode LLM traffic (OPENAI_BASE_URL).
+    - to:
+        {{- with .Values.networkPolicy.egressToGateway }}
+        {{- toYaml . | nindent 8 }}
+        {{- else }}
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: gateway
+              app.kubernetes.io/instance: {{ .Release.Name }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.networkPolicy.gatewayPort }}
+    {{- if .Values.networkPolicy.allowExternalHttps }}
+    # External HTTPS (OpenCode update/telemetry, etc.). Loosen/tighten here.
+    #
+    # ipBlock `except` denies the standard private ranges so a compromised
+    # OpenCode subprocess (RCE via prompt injection, supply-chain, etc.)
+    # cannot use this public-egress rule to reach internal services on :443
+    # — the kube apiserver, sidecar containers on the same node, neighbor
+    # pods, or the cloud metadata service (169.254.169.254, classic SSRF
+    # target for IAM credential theft). Legitimate cluster-internal traffic
+    # (the gateway, DNS) is allowed via explicit podSelector rules above.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 169.254.0.0/16
+        - ipBlock:
+            cidr: ::/0
+            except:
+              - fd00::/8
+              - fe80::/10
+      ports:
+        - protocol: TCP
+          port: 443
+    {{- end }}
+{{- end }}

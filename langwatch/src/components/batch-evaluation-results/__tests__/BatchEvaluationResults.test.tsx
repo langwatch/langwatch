@@ -62,6 +62,24 @@ vi.mock("~/utils/compat/next-router", () => ({
   }),
 }));
 
+// Mock the multi-run comparison hook so the focused query-guard tests below can
+// render the component far enough to invoke its useQuery hooks without pulling in
+// the comparison data-fetching machinery.
+vi.mock("../useMultiRunData", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../useMultiRunData")>();
+  return {
+    ...actual,
+    useMultiRunData: vi.fn().mockReturnValue({ runs: [] }),
+  };
+});
+
+// Mock the lite-member guard. It runs (via useOrganizationTeamProject) before the
+// runs query and would otherwise call an unmocked tRPC hook, crashing render
+// before the query under test is ever invoked.
+vi.mock("~/hooks/useLiteMemberGuard", () => ({
+  useLiteMemberGuard: vi.fn().mockReturnValue({ isLiteMember: false }),
+}));
+
 // Import the mocked api
 import { api } from "~/utils/api";
 
@@ -875,6 +893,155 @@ describe.skip("BatchEvaluationResults Integration", () => {
       // (Charts button appears when comparison data is available)
       await waitFor(() => {
         expect(screen.getByTestId("exit-compare-button")).toBeInTheDocument();
+      });
+    });
+  });
+});
+
+/**
+ * Regression guard for issue #5196.
+ *
+ * Both batch-evaluation queries must NOT fire until `project` and `experiment`
+ * are resolved. Without an `enabled` guard they fire with an empty
+ * experimentId before the experiment loads, and the backend returns 404
+ * NOT_FOUND ("Experiment not found: "). Two sibling call-sites already guard
+ * the runs query the same way (BatchEvaluationV2.tsx and experiments-v3
+ * HistoryButton.tsx).
+ *
+ *   - getExperimentBatchEvaluationRuns (plural, "runs query"): guarded by
+ *     `!!project && !!experiment`.
+ *   - getExperimentBatchEvaluationRun (singular, "run-data query"): on a
+ *     deep-link (?runId=X) the selected run id resolves from the router/prop
+ *     BEFORE `experiment` loads, so `!!selectedRunId` alone is not enough — it
+ *     must also require `!!project && !!experiment`.
+ *
+ * These tests assert on the OPTIONS argument each query receives rather than on
+ * rendered output: both queries are invoked early in render (before any child
+ * renders), so their recorded call args are available even though the full
+ * integration suite above is skipped due to an unrelated jsdom render crash.
+ * The hooks that run ahead of them (useLiteMemberGuard, the router,
+ * useMultiRunData) are mocked above so render reaches both query call-sites.
+ */
+describe("given the BatchEvaluationResults batch-evaluation queries (#5196)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Benign loading state so the component does not depend on query data.
+    vi.mocked(
+      api.experiments.getExperimentBatchEvaluationRuns.useQuery,
+    ).mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      error: null,
+    } as unknown as ReturnType<
+      typeof api.experiments.getExperimentBatchEvaluationRuns.useQuery
+    >);
+    vi.mocked(
+      api.experiments.getExperimentBatchEvaluationRun.useQuery,
+    ).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<
+      typeof api.experiments.getExperimentBatchEvaluationRun.useQuery
+    >);
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  /** Options object passed to the runs (plural) query on its first invocation. */
+  const runsQueryOptions = () => {
+    const mock = vi.mocked(
+      api.experiments.getExperimentBatchEvaluationRuns.useQuery,
+    );
+    expect(mock).toHaveBeenCalled();
+    return mock.mock.calls[0]?.[1] as { enabled?: boolean } | undefined;
+  };
+
+  /** Options object passed to the run-data (singular) query on first invocation. */
+  const runDataQueryOptions = () => {
+    const mock = vi.mocked(
+      api.experiments.getExperimentBatchEvaluationRun.useQuery,
+    );
+    expect(mock).toHaveBeenCalled();
+    return mock.mock.calls[0]?.[1] as { enabled?: boolean } | undefined;
+  };
+
+  describe("the runs query (getExperimentBatchEvaluationRuns, plural)", () => {
+    describe("when experiment is undefined", () => {
+      it("is disabled", () => {
+        render(
+          <BatchEvaluationResults
+            project={mockProject}
+            experiment={undefined}
+          />,
+          { wrapper: Wrapper },
+        );
+
+        expect(runsQueryOptions()?.enabled).toBeFalsy();
+      });
+    });
+
+    describe("when project is undefined", () => {
+      it("is disabled", () => {
+        render(
+          <BatchEvaluationResults
+            project={undefined}
+            experiment={mockExperiment}
+          />,
+          { wrapper: Wrapper },
+        );
+
+        expect(runsQueryOptions()?.enabled).toBeFalsy();
+      });
+    });
+
+    describe("when both project and experiment are set", () => {
+      it("is enabled", () => {
+        render(
+          <BatchEvaluationResults
+            project={mockProject}
+            experiment={mockExperiment}
+          />,
+          { wrapper: Wrapper },
+        );
+
+        expect(runsQueryOptions()?.enabled).toBe(true);
+      });
+    });
+  });
+
+  describe("the run-data query (getExperimentBatchEvaluationRun, singular)", () => {
+    describe("when deep-linked to a run before the experiment loads (experiment undefined, selectedRunId present)", () => {
+      it("is disabled", () => {
+        // Simulate ?runId=X resolving via the external prop before `experiment`
+        // is available: selectedRunId is truthy yet experiment is undefined.
+        render(
+          <BatchEvaluationResults
+            project={mockProject}
+            experiment={undefined}
+            selectedRunId="deep-linked-run"
+          />,
+          { wrapper: Wrapper },
+        );
+
+        expect(runDataQueryOptions()?.enabled).toBeFalsy();
+      });
+    });
+
+    describe("when project, experiment, and a selected run are all set", () => {
+      it("is enabled", () => {
+        render(
+          <BatchEvaluationResults
+            project={mockProject}
+            experiment={mockExperiment}
+            selectedRunId="swift-bright-fox"
+          />,
+          { wrapper: Wrapper },
+        );
+
+        expect(runDataQueryOptions()?.enabled).toBe(true);
       });
     });
   });

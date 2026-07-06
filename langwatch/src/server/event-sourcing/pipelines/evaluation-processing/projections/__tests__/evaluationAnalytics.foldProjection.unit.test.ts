@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
-import {
-  EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
-  EvaluationAnalyticsFoldProjection,
-  type EvaluationAnalyticsData,
-  projectEvaluationAnalyticsStateToRow,
-} from "../evaluationAnalytics.foldProjection";
 import type {
   EvaluationCompletedEvent,
   EvaluationReportedEvent,
   EvaluationScheduledEvent,
   EvaluationStartedEvent,
 } from "../../schemas/events";
+import {
+  EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
+  type EvaluationAnalyticsData,
+  EvaluationAnalyticsFoldProjection,
+  projectEvaluationAnalyticsStateToRow,
+} from "../evaluationAnalytics.foldProjection";
 
 const TENANT = "proj-eval";
 

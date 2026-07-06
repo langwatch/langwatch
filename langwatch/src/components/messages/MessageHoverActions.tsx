@@ -14,6 +14,7 @@ import { getExtractedInput } from "../../utils/traceExtraction";
 
 import { toaster } from "../ui/toaster";
 import { Tooltip } from "../ui/tooltip";
+import { shouldShowGenericTranslateError } from "./translationError";
 
 export const useTranslationState = () => {
   const [translatedTextInput, setTranslatedTextInput] = useState<string | null>(
@@ -108,16 +109,23 @@ export const MessageHoverActions = ({
         setTranslatedTextInput(inputData.translation);
         setTranslatedTextOutput(outputData.translation);
       })
-      .catch(() => {
-        toaster.create({
-          title: "Error translating",
-          description:
-            "There was an error translating the message, please try again.",
-          type: "error",
-          meta: {
-            closable: true,
-          },
-        });
+      .catch((error: unknown) => {
+        // Revert the optimistic toggle. The typed-error toasts (missing
+        // model / provider disabled / AI call failed) are raised by the
+        // global tRPC error handler in utils/api.tsx, so we only fall back
+        // to a generic toast when none of those matched — otherwise a
+        // non-typed failure (e.g. "Project not found", a DB error) would
+        // leave the user with no feedback at all.
+        setTranslationActive(false);
+        if (shouldShowGenericTranslateError(error)) {
+          toaster.create({
+            title: "Error translating",
+            description:
+              "There was an error translating the message, please try again.",
+            type: "error",
+            meta: { closable: true },
+          });
+        }
       });
   };
 

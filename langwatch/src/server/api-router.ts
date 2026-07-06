@@ -20,6 +20,7 @@ import { app as filesApp } from "../app/api/files/[[...route]]/app";
 import { app as gatewayPlatformApp } from "../app/api/gateway-platform/[[...route]]/app";
 import { app as governanceApp } from "../app/api/governance/[[...route]]/app";
 import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
+import { app as meApp } from "../app/api/me/[[...route]]/app";
 import { app as modelDefaultsApp } from "../app/api/model-defaults/[[...route]]/app";
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
@@ -46,9 +47,11 @@ import {
   legacyAliasApp as experimentsV3LegacyAliasApp,
 } from "./routes/experiments-v3";
 import { app as gatewayInternalApp } from "./routes/gateway-internal";
+import { app as githubLangyApp } from "./routes/github-langy";
 import { app as healthApp } from "./routes/health";
 import { app as healthChecksApp } from "./routes/health-checks";
 import { app as ingestionRoutesApp } from "./routes/ingest/ingestionRoutes";
+import { app as langyApp } from "./routes/langy";
 import { app as miscApp } from "./routes/misc";
 import { app as opsApp } from "./routes/ops";
 import { app as otelApp } from "./routes/otel";
@@ -121,6 +124,7 @@ export function createApiRouter() {
   api.route("/", gatewayPlatformApp);
   api.route("/", governanceApp);
   api.route("/", graphsApp);
+  api.route("/", meApp); // /api/me/usage — personal spend/usage
   api.route("/", modelDefaultsApp);
   api.route("/", modelProvidersApp);
   api.route("/", monitorsApp);
@@ -140,6 +144,8 @@ export function createApiRouter() {
   api.route("/", gatewayInternalApp);
   api.route("/", otelApp);
   api.route("/", playgroundApp);
+  api.route("/", langyApp);
+  api.route("/", githubLangyApp);
   api.route("/", scenarioGenerateApp);
   api.route("/", scimApp);
   api.route("/", webhooksApp);

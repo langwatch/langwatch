@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import langwatch.evaluations as evaluations
     import langwatch.experiment as experiment
+    import langwatch.workflow as workflow
     import langwatch.evaluation as evaluation  # Deprecated, use experiment
     import langwatch.dataset as dataset
     import langwatch.dspy as dspy
@@ -71,6 +72,7 @@ def _api_key():
 _LAZY_MODULES = {
     "evaluations": "langwatch.evaluations",
     "experiment": "langwatch.experiment",
+    "workflow": "langwatch.workflow",
     "evaluation": "langwatch.evaluation",  # Deprecated, use experiment
     "dataset": "langwatch.dataset",
     "dspy": "langwatch.dspy",  # Special handling
@@ -203,6 +205,7 @@ __all__ = [
     "get_current_trace",
     "get_current_span",
     "experiment",
+    "workflow",
     "evaluation",  # Deprecated, use experiment
     "dataset",
     "evaluations",

@@ -1,8 +1,8 @@
 import type { ExperimentAnalyticsRepository } from "~/server/app-layer/experiments/repositories/experiment-analytics.repository";
 import { BaseAnalyticsFoldStore } from "../../shared/analyticsStoreBase";
 import {
-  type ExperimentAnalyticsData,
   EXPERIMENT_ANALYTICS_PROJECTION_VERSION_LATEST,
+  type ExperimentAnalyticsData,
   projectExperimentAnalyticsStateToRow,
 } from "./experimentAnalytics.foldProjection";
 

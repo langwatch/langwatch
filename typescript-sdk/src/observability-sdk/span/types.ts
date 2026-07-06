@@ -8,6 +8,7 @@ import {
   type ChatMessage,
 } from "../../internal/generated/types/tracer";
 import { type Prompt } from "@/client-sdk/services/prompts";
+import { type AddEvaluationParams } from "../evaluation";
 
 
 /**
@@ -140,17 +141,38 @@ export interface LangWatchSpanOptions extends SpanOptions {
  *   .addGenAIAssistantMessageEvent({ content: 'Hi!' });
  */
 export interface LangWatchSpan extends Span {
-  // /**
-  //  * Record the evaluation result for the span.
-  //  *
-  //  * @param details - The evaluation details
-  //  * @param attributes - Additional attributes to add to the evaluation span.
-  //  * @returns this
-  //  */
-  // recordEvaluation(
-  //   details: RecordedEvaluationDetails,
-  //   attributes?: Attributes,
-  // ): this;
+  /**
+   * Record a manual evaluation result on this span.
+   *
+   * This emits a `langwatch.evaluation.custom` OpenTelemetry span event whose
+   * `json_encoded_event` attribute carries the evaluation payload. It matches
+   * the Python SDK's `span.add_evaluation(...)` exactly, so the LangWatch
+   * backend parses both identically.
+   *
+   * @param params - The evaluation parameters. Only `name` is required; see
+   *   {@link AddEvaluationParams}. `status` defaults to `"processed"`.
+   * @returns this
+   *
+   * @example
+   * ```typescript
+   * span.addEvaluation({
+   *   name: "response_quality",
+   *   passed: true,
+   *   score: 0.95,
+   *   details: "High quality response",
+   * });
+   * ```
+   */
+  addEvaluation(params: AddEvaluationParams): this;
+
+  /**
+   * @deprecated Use {@link LangWatchSpan.addEvaluation} instead. Alias kept for
+   * backward compatibility with earlier documentation.
+   *
+   * @param params - The evaluation parameters. See {@link AddEvaluationParams}.
+   * @returns this
+   */
+  recordEvaluation(params: AddEvaluationParams): this;
 
   /**
    * Set multiple attributes for the span.

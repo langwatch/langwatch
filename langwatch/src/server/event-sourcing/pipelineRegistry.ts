@@ -1,6 +1,5 @@
 import { createAlertTriggerReactor } from "@ee/governance/reactors/alertTrigger.reactor";
 import { createAlertTriggerNotifyOutboxReactor } from "@ee/governance/reactors/alertTriggerNotifyOutbox.reactor";
-import { createGraphTriggerEvaluationOutboxReactor } from "./pipelines/trace-processing/reactors/graphTriggerEvaluation.outboxReactor";
 import {
   createGatewayBudgetSyncReactor,
   type GatewayBudgetSyncReactorDeps,
@@ -35,18 +34,18 @@ import type { BroadcastService } from "../app-layer/broadcast/broadcast.service"
 import { getAzureSafetyEnvFromProject } from "../app-layer/evaluations/azure-safety-env.server";
 import type { EvaluationCostRecorder } from "../app-layer/evaluations/evaluation-cost.recorder";
 import type { EvaluationExecutionService } from "../app-layer/evaluations/evaluation-execution.service";
+import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
 import type { EvaluationAnalyticsRepository } from "../app-layer/evaluations/repositories/evaluation-analytics.repository";
 import type { EvaluationAnalyticsRollupRepository } from "../app-layer/evaluations/repositories/evaluation-analytics-rollup.repository";
-import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
 import type { ExperimentAnalyticsRepository } from "../app-layer/experiments/repositories/experiment-analytics.repository";
 import type { ExperimentAnalyticsRollupRepository } from "../app-layer/experiments/repositories/experiment-analytics-rollup.repository";
+import type { MonitorService } from "../app-layer/monitors/monitor.service";
+import type { OrganizationService } from "../app-layer/organizations/organization.service";
+import type { ProjectService } from "../app-layer/projects/project.service";
 import type { SimulationAnalyticsRepository } from "../app-layer/scenarios/repositories/simulation-analytics.repository";
 import type { SimulationAnalyticsRollupRepository } from "../app-layer/scenarios/repositories/simulation-analytics-rollup.repository";
 import type { SuiteAnalyticsRepository } from "../app-layer/suites/repositories/suite-analytics.repository";
 import type { SuiteAnalyticsRollupRepository } from "../app-layer/suites/repositories/suite-analytics-rollup.repository";
-import type { MonitorService } from "../app-layer/monitors/monitor.service";
-import type { OrganizationService } from "../app-layer/organizations/organization.service";
-import type { ProjectService } from "../app-layer/projects/project.service";
 import type { LogRecordStorageRepository } from "../app-layer/traces/repositories/log-record-storage.repository";
 import type { MetricRecordStorageRepository } from "../app-layer/traces/repositories/metric-record-storage.repository";
 import type { TraceAnalyticsRepository } from "../app-layer/traces/repositories/trace-analytics.repository";
@@ -126,6 +125,7 @@ import { createClaudeCodeSpanSyncReactor } from "./pipelines/trace-processing/re
 import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
 import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
 import { createExperimentMetricsSyncReactor } from "./pipelines/trace-processing/reactors/experimentMetricsSync.reactor";
+import { createGraphTriggerEvaluationOutboxReactor } from "./pipelines/trace-processing/reactors/graphTriggerEvaluation.outboxReactor";
 import {
   createDeferredOriginHandler,
   createOriginGateReactor,

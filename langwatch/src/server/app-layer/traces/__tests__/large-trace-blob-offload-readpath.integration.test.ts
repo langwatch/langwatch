@@ -47,10 +47,17 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  AGGREGATE_TYPE,
+  assertOverThreshold,
+  extractSpanAttrs,
+  insertEventLogRow,
+  LARGE_VALUE,
+  UNIQUE_TAIL,
+} from "~/server/app-layer/traces/__tests__/blob-offload-test-helpers";
 import { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import {
   EVENTREF_ATTR_PREFIX,
-  IO_PREVIEW_BYTES,
   leanForProjection,
 } from "~/server/app-layer/traces/lean-for-projection";
 import { NullSpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
@@ -84,72 +91,6 @@ import {
 const hasTestcontainers = !!(
   process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL
 );
-
-const AGGREGATE_TYPE = "trace";
-
-/**
- * A 200 KB deterministic payload whose final bytes only exist past the 64 KB
- * preview boundary. The preview is `value.slice(0, 64KB) + "…"`, so it can NEVER
- * contain UNIQUE_TAIL — a preview-only read fails the tail assertion.
- */
-const UNIQUE_TAIL = "__OFFLOAD_FULL_VALUE_TAIL_MARKER__";
-const LARGE_VALUE = "x".repeat(200_000) + UNIQUE_TAIL;
-
-/** Sanity: the payload genuinely exceeds the offload threshold. */
-function assertOverThreshold(value: string): void {
-  expect(Buffer.byteLength(value, "utf-8")).toBeGreaterThan(IO_PREVIEW_BYTES);
-}
-
-/**
- * Inserts ONE full event_log row, exactly as the production write path stores
- * it (`EventPayload` IS `event.data`). Mirrors the
- * eventLogDurability.integration.test.ts idiom — JSONEachRow with a stringified
- * payload — and stamps `_retention_days: 0` (never-expire sentinel, test-only)
- * so a merge-cycle TTL can never evict the fixture mid-run.
- */
-async function insertEventLogRow({
-  client,
-  tenantId,
-  aggregateId,
-  eventId,
-  eventType,
-  eventVersion,
-  eventData,
-}: {
-  client: ClickHouseClient;
-  tenantId: string;
-  aggregateId: string;
-  eventId: string;
-  eventType: string;
-  eventVersion: string;
-  eventData: unknown;
-}): Promise<void> {
-  const ts = Date.now();
-  await client.insert({
-    table: "event_log",
-    values: [
-      {
-        TenantId: tenantId,
-        AggregateType: AGGREGATE_TYPE,
-        AggregateId: aggregateId,
-        EventId: eventId,
-        EventType: eventType,
-        EventVersion: eventVersion,
-        EventTimestamp: ts,
-        EventOccurredAt: ts,
-        // Production stores event.data as the EventPayload; the CH client
-        // serializes it to the `EventPayload String` column. We stringify here
-        // to match the canonical event_log test idiom byte-for-byte.
-        EventPayload: JSON.stringify(eventData),
-        IdempotencyKey: eventId,
-        _retention_days: 0,
-      },
-    ],
-    format: "JSONEachRow",
-    // Sync insert so the read-back in the same test sees the row immediately.
-    clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
-  });
-}
 
 /**
  * Builds a SpanReceived domain Event whose `langwatch.input` carries `value`.
@@ -242,22 +183,6 @@ function makeLogRecordReceivedEvent({
       attributes: {},
     },
   } as unknown as Event;
-}
-
-/** Reads span attributes out of a leaned SpanReceived event into a string map. */
-function extractSpanAttrs(event: Event): Record<string, string> {
-  const data = event.data as {
-    span?: {
-      attributes?: Array<{ key: string; value: { stringValue?: string } }>;
-    };
-  };
-  const attrs: Record<string, string> = {};
-  for (const attr of data?.span?.attributes ?? []) {
-    if (typeof attr.value.stringValue === "string") {
-      attrs[attr.key] = attr.value.stringValue;
-    }
-  }
-  return attrs;
 }
 
 /** Builds a NormalizedSpan carrying the supplied (leaned) attribute map. */

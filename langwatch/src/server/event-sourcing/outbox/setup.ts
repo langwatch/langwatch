@@ -1,9 +1,12 @@
 import type { PrismaClient } from "@prisma/client";
 import { Cluster, type Redis } from "ioredis";
 import { env } from "~/env.mjs";
+import { handleSendEmail } from "~/pages/api/cron/triggers/actions/sendEmail";
+import { handleSendSlackMessage } from "~/pages/api/cron/triggers/actions/sendSlackMessage";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
 import { getProtectionsForProject } from "~/server/api/utils";
+import { getAnalyticsService } from "~/server/app-layer/analytics";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import type { TraceSummaryRepository } from "~/server/app-layer/traces/repositories/trace-summary.repository";
@@ -17,7 +20,6 @@ import {
 } from "~/server/app-layer/triggers/graph-trigger-evaluation.service";
 import { PrismaGraphTriggerSentRepository } from "~/server/app-layer/triggers/repositories/trigger.prisma.repository";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
-import { getAnalyticsService } from "~/server/app-layer/analytics";
 import { dispatchGraphAlertAction } from "~/server/event-sourcing/pipelines/shared/graphAlertActionDispatch";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { TraceService } from "~/server/traces/trace.service";
@@ -195,7 +197,8 @@ export function buildOutboxRuntime({
       }),
     loadProject: async (projectId) =>
       prisma.project.findUnique({ where: { id: projectId } }),
-    getTimeseries: async (input) => getAnalyticsService(prisma).getTimeseries(input),
+    getTimeseries: async (input) =>
+      getAnalyticsService(prisma).getTimeseries(input),
     triggerSent: graphTriggerSentRepo,
     updateLastRunAt: async ({ triggerId, projectId }) =>
       triggers.updateLastRunAt(triggerId, projectId),

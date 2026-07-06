@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createLogger } from "~/utils/logger/server";
-import { createTenantId } from "../../../";
+import type { createTenantId } from "../../../";
 import {
   getTestClickHouseClient,
   getTestRedisConnection,
@@ -13,17 +13,17 @@ import {
 import { EventSourcing } from "../../../eventSourcing";
 import type { PipelineWithCommandHandlers } from "../../../pipeline/types";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
+import type { AppendStore } from "../../../projections/mapProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import { EventStoreClickHouse } from "../../../stores/eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "../../../stores/repositories/eventRepositoryClickHouse";
-import {
-  type SuiteRunState,
-  type SuiteRunStateData,
-} from "../projections/suiteRunState.foldProjection";
+import { createSuiteRunProcessingPipeline } from "../pipeline";
 import type { SuiteAnalyticsData } from "../projections/suiteAnalytics.foldProjection";
 import type { SuiteAnalyticsRollupRow } from "../projections/suiteAnalyticsRollup.mapProjection";
-import type { AppendStore } from "../../../projections/mapProjection.types";
-import { createSuiteRunProcessingPipeline } from "../pipeline";
+import type {
+  SuiteRunState,
+  SuiteRunStateData,
+} from "../projections/suiteRunState.foldProjection";
 
 const logger = createLogger(
   "langwatch:event-sourcing:tests:suite-run-processing:integration",
@@ -291,369 +291,345 @@ const hasTestcontainers = !!(
 );
 
 // Skipped: chronic async-event-handler timeout flake — see langwatch/langwatch#3240.
-describe.skip(
-  "Suite Run Processing Pipeline - Integration Tests",
-  () => {
-    let pipeline: ReturnType<typeof createSuiteRunTestPipeline>;
-    let tenantId: ReturnType<typeof createTestTenantId>;
-    let tenantIdString: string;
+describe.skip("Suite Run Processing Pipeline - Integration Tests", () => {
+  let pipeline: ReturnType<typeof createSuiteRunTestPipeline>;
+  let tenantId: ReturnType<typeof createTestTenantId>;
+  let tenantIdString: string;
 
-    beforeEach(async () => {
-      pipeline = createSuiteRunTestPipeline();
-      tenantId = createTestTenantId();
-      tenantIdString = getTenantIdString(tenantId);
-      // Wait for BullMQ workers to initialize before running tests
-      await pipeline.ready();
+  beforeEach(async () => {
+    pipeline = createSuiteRunTestPipeline();
+    tenantId = createTestTenantId();
+    tenantIdString = getTenantIdString(tenantId);
+    // Wait for BullMQ workers to initialize before running tests
+    await pipeline.ready();
+  });
+
+  afterEach(async () => {
+    // Gracefully close EventSourcing (including global queue dispatcher)
+    await pipeline.eventSourcing.close();
+    // Wait for BullMQ workers to fully shut down and release Redis connections
+    // Using 1000ms to ensure all async operations complete
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    // Clean up test data
+    await cleanupTestDataForTenant(tenantIdString);
+  });
+
+  describe("Full Lifecycle Tests", () => {
+    it("processes complete suite run lifecycle: start -> items -> complete", async () => {
+      const batchRunId = generateTestBatchRunId();
+      const suiteId = generateTestSuiteId();
+      const scenarioRunId1 = generateTestScenarioRunId();
+      const scenarioRunId2 = generateTestScenarioRunId();
+
+      // Start suite run with total=2
+      await pipeline.commands.startSuiteRun.send({
+        tenantId: tenantIdString,
+        batchRunId,
+        scenarioSetId: "scenario-set-1",
+        suiteId,
+        total: 2,
+        scenarioIds: ["scenario-1", "scenario-2"],
+        targetIds: ["target-1"],
+        idempotencyKey: `idem-${batchRunId}`,
+        occurredAt: Date.now(),
+      });
+      await waitForClickHouseConsistency();
+
+      // Verify IN_PROGRESS after start
+      await waitForSuiteRunState(pipeline, batchRunId, tenantId, "IN_PROGRESS");
+
+      // Record item 1 started
+      await pipeline.commands.recordSuiteRunItemStarted.send({
+        tenantId: tenantIdString,
+        batchRunId,
+        scenarioRunId: scenarioRunId1,
+        scenarioId: "scenario-1",
+        occurredAt: Date.now(),
+      });
+      await waitForClickHouseConsistency();
+
+      // Complete item 1 as SUCCESS with verdict
+      await pipeline.commands.completeSuiteRunItem.send({
+        tenantId: tenantIdString,
+        batchRunId,
+        scenarioRunId: scenarioRunId1,
+        scenarioId: "scenario-1",
+        status: "SUCCESS",
+        verdict: "success",
+        durationMs: 1500,
+        occurredAt: Date.now(),
+      });
+      await waitForClickHouseConsistency();
+
+      // Record item 2 started
+      await pipeline.commands.recordSuiteRunItemStarted.send({
+        tenantId: tenantIdString,
+        batchRunId,
+        scenarioRunId: scenarioRunId2,
+        scenarioId: "scenario-2",
+        occurredAt: Date.now(),
+      });
+      await waitForClickHouseConsistency();
+
+      // Complete item 2 as SUCCESS with verdict
+      await pipeline.commands.completeSuiteRunItem.send({
+        tenantId: tenantIdString,
+        batchRunId,
+        scenarioRunId: scenarioRunId2,
+        scenarioId: "scenario-2",
+        status: "SUCCESS",
+        verdict: "success",
+        durationMs: 2000,
+        occurredAt: Date.now(),
+      });
+
+      // Wait for fold projection to reach final status
+      await waitForSuiteRunState(pipeline, batchRunId, tenantId, "SUCCESS");
+
+      // Verify final projection state
+      const projection = (await pipeline.service.getProjectionByName(
+        "suiteRunState",
+        batchRunId,
+        { tenantId },
+      )) as SuiteRunState | null;
+
+      expect(projection).toBeDefined();
+      expect(projection?.data.Status).toBe("SUCCESS");
+      expect(projection?.data.SuiteId).toBe(suiteId);
+      expect(projection?.data.Total).toBe(2);
+      expect(projection?.data.CompletedCount).toBe(2);
+      expect(projection?.data.FailedCount).toBe(0);
+      expect(projection?.data.StartedCount).toBe(2);
+      expect(projection?.data.Progress).toBe(2);
+      expect(projection?.data.PassRateBps).toBe(10000);
+      expect(projection?.data.StartedAt).not.toBeNull();
+      expect(projection?.data.FinishedAt).not.toBeNull();
     });
 
-    afterEach(async () => {
-      // Gracefully close EventSourcing (including global queue dispatcher)
-      await pipeline.eventSourcing.close();
-      // Wait for BullMQ workers to fully shut down and release Redis connections
-      // Using 1000ms to ensure all async operations complete
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      // Clean up test data
-      await cleanupTestDataForTenant(tenantIdString);
+    it("derives FAILURE status when any item fails", async () => {
+      const batchRunId = generateTestBatchRunId();
+      const suiteId = generateTestSuiteId();
+      const scenarioRunId1 = generateTestScenarioRunId();
+      const scenarioRunId2 = generateTestScenarioRunId();
+
+      // Start suite run with total=2
+      await pipeline.commands.startSuiteRun.send({
+        tenantId: tenantIdString,
+        batchRunId,
+        scenarioSetId: "scenario-set-1",
+        suiteId,
+        total: 2,
+        scenarioIds: ["scenario-1", "scenario-2"],
+        targetIds: ["target-1"],
+        idempotencyKey: `idem-${batchRunId}`,
+        occurredAt: Date.now(),
+      });
+      await waitForClickHouseConsistency();
+
+      // Record and complete item 1 as SUCCESS
+      await pipeline.commands.recordSuiteRunItemStarted.send({
+        tenantId: tenantIdString,
+        batchRunId,
+        scenarioRunId: scenarioRunId1,
+        scenarioId: "scenario-1",
+        occurredAt: Date.now(),
+      });
+      await waitForClickHouseConsistency();
+
+      await pipeline.commands.completeSuiteRunItem.send({
+        tenantId: tenantIdString,
+        batchRunId,
+        scenarioRunId: scenarioRunId1,
+        scenarioId: "scenario-1",
+        status: "SUCCESS",
+        verdict: "success",
+        durationMs: 1200,
+        occurredAt: Date.now(),
+      });
+      await waitForClickHouseConsistency();
+
+      // Record and complete item 2 as FAILURE
+      await pipeline.commands.recordSuiteRunItemStarted.send({
+        tenantId: tenantIdString,
+        batchRunId,
+        scenarioRunId: scenarioRunId2,
+        scenarioId: "scenario-2",
+        occurredAt: Date.now(),
+      });
+      await waitForClickHouseConsistency();
+
+      await pipeline.commands.completeSuiteRunItem.send({
+        tenantId: tenantIdString,
+        batchRunId,
+        scenarioRunId: scenarioRunId2,
+        scenarioId: "scenario-2",
+        status: "FAILURE",
+        verdict: "failure",
+        error: "Assertion failed",
+        durationMs: 800,
+        occurredAt: Date.now(),
+      });
+
+      // Wait for fold projection to reach final status
+      await waitForSuiteRunState(pipeline, batchRunId, tenantId, "FAILURE");
+
+      // Verify final state
+      const projection = (await pipeline.service.getProjectionByName(
+        "suiteRunState",
+        batchRunId,
+        { tenantId },
+      )) as SuiteRunState | null;
+
+      expect(projection?.data.Status).toBe("FAILURE");
+      expect(projection?.data.CompletedCount).toBe(1);
+      expect(projection?.data.FailedCount).toBe(1);
+      expect(projection?.data.Progress).toBe(2);
+      expect(projection?.data.FinishedAt).not.toBeNull();
     });
+  });
 
-    describe("Full Lifecycle Tests", () => {
-      it("processes complete suite run lifecycle: start -> items -> complete", async () => {
-        const batchRunId = generateTestBatchRunId();
-        const suiteId = generateTestSuiteId();
-        const scenarioRunId1 = generateTestScenarioRunId();
-        const scenarioRunId2 = generateTestScenarioRunId();
+  describe("Concurrent Suite Runs Tests", () => {
+    it("processes multiple suite runs concurrently without interference", async () => {
+      const batchRunId1 = generateTestBatchRunId();
+      const batchRunId2 = generateTestBatchRunId();
+      const suiteId1 = generateTestSuiteId();
+      const suiteId2 = generateTestSuiteId();
+      const scenarioRunId1 = generateTestScenarioRunId();
+      const scenarioRunId2 = generateTestScenarioRunId();
 
-        // Start suite run with total=2
-        await pipeline.commands.startSuiteRun.send({
+      // Start both suite runs concurrently
+      await Promise.all([
+        pipeline.commands.startSuiteRun.send({
           tenantId: tenantIdString,
-          batchRunId,
+          batchRunId: batchRunId1,
           scenarioSetId: "scenario-set-1",
-          suiteId,
-          total: 2,
-          scenarioIds: ["scenario-1", "scenario-2"],
+          suiteId: suiteId1,
+          total: 1,
+          scenarioIds: ["scenario-1"],
           targetIds: ["target-1"],
-          idempotencyKey: `idem-${batchRunId}`,
+          idempotencyKey: `idem-${batchRunId1}`,
           occurredAt: Date.now(),
-        });
-        await waitForClickHouseConsistency();
-
-        // Verify IN_PROGRESS after start
-        await waitForSuiteRunState(
-          pipeline,
-          batchRunId,
-          tenantId,
-          "IN_PROGRESS",
-        );
-
-        // Record item 1 started
-        await pipeline.commands.recordSuiteRunItemStarted.send({
+        }),
+        pipeline.commands.startSuiteRun.send({
           tenantId: tenantIdString,
-          batchRunId,
+          batchRunId: batchRunId2,
+          scenarioSetId: "scenario-set-2",
+          suiteId: suiteId2,
+          total: 1,
+          scenarioIds: ["scenario-2"],
+          targetIds: ["target-2"],
+          idempotencyKey: `idem-${batchRunId2}`,
+          occurredAt: Date.now(),
+        }),
+      ]);
+
+      // Wait for both to reach IN_PROGRESS
+      await Promise.all([
+        waitForSuiteRunState(pipeline, batchRunId1, tenantId, "IN_PROGRESS"),
+        waitForSuiteRunState(pipeline, batchRunId2, tenantId, "IN_PROGRESS"),
+      ]);
+
+      // Record and complete items for both runs
+      await Promise.all([
+        pipeline.commands.recordSuiteRunItemStarted.send({
+          tenantId: tenantIdString,
+          batchRunId: batchRunId1,
           scenarioRunId: scenarioRunId1,
           scenarioId: "scenario-1",
           occurredAt: Date.now(),
-        });
-        await waitForClickHouseConsistency();
-
-        // Complete item 1 as SUCCESS with verdict
-        await pipeline.commands.completeSuiteRunItem.send({
+        }),
+        pipeline.commands.recordSuiteRunItemStarted.send({
           tenantId: tenantIdString,
-          batchRunId,
+          batchRunId: batchRunId2,
+          scenarioRunId: scenarioRunId2,
+          scenarioId: "scenario-2",
+          occurredAt: Date.now(),
+        }),
+      ]);
+      await waitForClickHouseConsistency();
+
+      await Promise.all([
+        pipeline.commands.completeSuiteRunItem.send({
+          tenantId: tenantIdString,
+          batchRunId: batchRunId1,
           scenarioRunId: scenarioRunId1,
           scenarioId: "scenario-1",
           status: "SUCCESS",
           verdict: "success",
-          durationMs: 1500,
           occurredAt: Date.now(),
-        });
-        await waitForClickHouseConsistency();
-
-        // Record item 2 started
-        await pipeline.commands.recordSuiteRunItemStarted.send({
+        }),
+        pipeline.commands.completeSuiteRunItem.send({
           tenantId: tenantIdString,
-          batchRunId,
-          scenarioRunId: scenarioRunId2,
-          scenarioId: "scenario-2",
-          occurredAt: Date.now(),
-        });
-        await waitForClickHouseConsistency();
-
-        // Complete item 2 as SUCCESS with verdict
-        await pipeline.commands.completeSuiteRunItem.send({
-          tenantId: tenantIdString,
-          batchRunId,
+          batchRunId: batchRunId2,
           scenarioRunId: scenarioRunId2,
           scenarioId: "scenario-2",
           status: "SUCCESS",
           verdict: "success",
-          durationMs: 2000,
           occurredAt: Date.now(),
-        });
+        }),
+      ]);
 
-        // Wait for fold projection to reach final status
-        await waitForSuiteRunState(
-          pipeline,
-          batchRunId,
+      // Wait for both to complete
+      await Promise.all([
+        waitForSuiteRunState(pipeline, batchRunId1, tenantId, "SUCCESS"),
+        waitForSuiteRunState(pipeline, batchRunId2, tenantId, "SUCCESS"),
+      ]);
+
+      // Verify each has its own projection state
+      const [projection1, projection2] = (await Promise.all([
+        pipeline.service.getProjectionByName("suiteRunState", batchRunId1, {
           tenantId,
-          "SUCCESS",
-        );
-
-        // Verify final projection state
-        const projection = (await pipeline.service.getProjectionByName(
-          "suiteRunState",
-          batchRunId,
-          { tenantId },
-        )) as SuiteRunState | null;
-
-        expect(projection).toBeDefined();
-        expect(projection?.data.Status).toBe("SUCCESS");
-        expect(projection?.data.SuiteId).toBe(suiteId);
-        expect(projection?.data.Total).toBe(2);
-        expect(projection?.data.CompletedCount).toBe(2);
-        expect(projection?.data.FailedCount).toBe(0);
-        expect(projection?.data.StartedCount).toBe(2);
-        expect(projection?.data.Progress).toBe(2);
-        expect(projection?.data.PassRateBps).toBe(10000);
-        expect(projection?.data.StartedAt).not.toBeNull();
-        expect(projection?.data.FinishedAt).not.toBeNull();
-      });
-
-      it("derives FAILURE status when any item fails", async () => {
-        const batchRunId = generateTestBatchRunId();
-        const suiteId = generateTestSuiteId();
-        const scenarioRunId1 = generateTestScenarioRunId();
-        const scenarioRunId2 = generateTestScenarioRunId();
-
-        // Start suite run with total=2
-        await pipeline.commands.startSuiteRun.send({
-          tenantId: tenantIdString,
-          batchRunId,
-          scenarioSetId: "scenario-set-1",
-          suiteId,
-          total: 2,
-          scenarioIds: ["scenario-1", "scenario-2"],
-          targetIds: ["target-1"],
-          idempotencyKey: `idem-${batchRunId}`,
-          occurredAt: Date.now(),
-        });
-        await waitForClickHouseConsistency();
-
-        // Record and complete item 1 as SUCCESS
-        await pipeline.commands.recordSuiteRunItemStarted.send({
-          tenantId: tenantIdString,
-          batchRunId,
-          scenarioRunId: scenarioRunId1,
-          scenarioId: "scenario-1",
-          occurredAt: Date.now(),
-        });
-        await waitForClickHouseConsistency();
-
-        await pipeline.commands.completeSuiteRunItem.send({
-          tenantId: tenantIdString,
-          batchRunId,
-          scenarioRunId: scenarioRunId1,
-          scenarioId: "scenario-1",
-          status: "SUCCESS",
-          verdict: "success",
-          durationMs: 1200,
-          occurredAt: Date.now(),
-        });
-        await waitForClickHouseConsistency();
-
-        // Record and complete item 2 as FAILURE
-        await pipeline.commands.recordSuiteRunItemStarted.send({
-          tenantId: tenantIdString,
-          batchRunId,
-          scenarioRunId: scenarioRunId2,
-          scenarioId: "scenario-2",
-          occurredAt: Date.now(),
-        });
-        await waitForClickHouseConsistency();
-
-        await pipeline.commands.completeSuiteRunItem.send({
-          tenantId: tenantIdString,
-          batchRunId,
-          scenarioRunId: scenarioRunId2,
-          scenarioId: "scenario-2",
-          status: "FAILURE",
-          verdict: "failure",
-          error: "Assertion failed",
-          durationMs: 800,
-          occurredAt: Date.now(),
-        });
-
-        // Wait for fold projection to reach final status
-        await waitForSuiteRunState(
-          pipeline,
-          batchRunId,
+        }),
+        pipeline.service.getProjectionByName("suiteRunState", batchRunId2, {
           tenantId,
-          "FAILURE",
-        );
+        }),
+      ])) as [SuiteRunState | null, SuiteRunState | null];
 
-        // Verify final state
-        const projection = (await pipeline.service.getProjectionByName(
-          "suiteRunState",
-          batchRunId,
-          { tenantId },
-        )) as SuiteRunState | null;
-
-        expect(projection?.data.Status).toBe("FAILURE");
-        expect(projection?.data.CompletedCount).toBe(1);
-        expect(projection?.data.FailedCount).toBe(1);
-        expect(projection?.data.Progress).toBe(2);
-        expect(projection?.data.FinishedAt).not.toBeNull();
-      });
+      expect(projection1?.data.SuiteId).toBe(suiteId1);
+      expect(projection2?.data.SuiteId).toBe(suiteId2);
+      expect(projection1?.data.Status).toBe("SUCCESS");
+      expect(projection2?.data.Status).toBe("SUCCESS");
+      expect(projection1?.data.BatchRunId).toBe(batchRunId1);
+      expect(projection2?.data.BatchRunId).toBe(batchRunId2);
     });
+  });
 
-    describe("Concurrent Suite Runs Tests", () => {
-      it("processes multiple suite runs concurrently without interference", async () => {
-        const batchRunId1 = generateTestBatchRunId();
-        const batchRunId2 = generateTestBatchRunId();
-        const suiteId1 = generateTestSuiteId();
-        const suiteId2 = generateTestSuiteId();
-        const scenarioRunId1 = generateTestScenarioRunId();
-        const scenarioRunId2 = generateTestScenarioRunId();
+  describe("State Transitions Tests", () => {
+    it("reaches IN_PROGRESS status after start event", async () => {
+      const batchRunId = generateTestBatchRunId();
+      const suiteId = generateTestSuiteId();
 
-        // Start both suite runs concurrently
-        await Promise.all([
-          pipeline.commands.startSuiteRun.send({
-            tenantId: tenantIdString,
-            batchRunId: batchRunId1,
-            scenarioSetId: "scenario-set-1",
-            suiteId: suiteId1,
-            total: 1,
-            scenarioIds: ["scenario-1"],
-            targetIds: ["target-1"],
-            idempotencyKey: `idem-${batchRunId1}`,
-            occurredAt: Date.now(),
-          }),
-          pipeline.commands.startSuiteRun.send({
-            tenantId: tenantIdString,
-            batchRunId: batchRunId2,
-            scenarioSetId: "scenario-set-2",
-            suiteId: suiteId2,
-            total: 1,
-            scenarioIds: ["scenario-2"],
-            targetIds: ["target-2"],
-            idempotencyKey: `idem-${batchRunId2}`,
-            occurredAt: Date.now(),
-          }),
-        ]);
-
-        // Wait for both to reach IN_PROGRESS
-        await Promise.all([
-          waitForSuiteRunState(pipeline, batchRunId1, tenantId, "IN_PROGRESS"),
-          waitForSuiteRunState(pipeline, batchRunId2, tenantId, "IN_PROGRESS"),
-        ]);
-
-        // Record and complete items for both runs
-        await Promise.all([
-          pipeline.commands.recordSuiteRunItemStarted.send({
-            tenantId: tenantIdString,
-            batchRunId: batchRunId1,
-            scenarioRunId: scenarioRunId1,
-            scenarioId: "scenario-1",
-            occurredAt: Date.now(),
-          }),
-          pipeline.commands.recordSuiteRunItemStarted.send({
-            tenantId: tenantIdString,
-            batchRunId: batchRunId2,
-            scenarioRunId: scenarioRunId2,
-            scenarioId: "scenario-2",
-            occurredAt: Date.now(),
-          }),
-        ]);
-        await waitForClickHouseConsistency();
-
-        await Promise.all([
-          pipeline.commands.completeSuiteRunItem.send({
-            tenantId: tenantIdString,
-            batchRunId: batchRunId1,
-            scenarioRunId: scenarioRunId1,
-            scenarioId: "scenario-1",
-            status: "SUCCESS",
-            verdict: "success",
-            occurredAt: Date.now(),
-          }),
-          pipeline.commands.completeSuiteRunItem.send({
-            tenantId: tenantIdString,
-            batchRunId: batchRunId2,
-            scenarioRunId: scenarioRunId2,
-            scenarioId: "scenario-2",
-            status: "SUCCESS",
-            verdict: "success",
-            occurredAt: Date.now(),
-          }),
-        ]);
-
-        // Wait for both to complete
-        await Promise.all([
-          waitForSuiteRunState(pipeline, batchRunId1, tenantId, "SUCCESS"),
-          waitForSuiteRunState(pipeline, batchRunId2, tenantId, "SUCCESS"),
-        ]);
-
-        // Verify each has its own projection state
-        const [projection1, projection2] = (await Promise.all([
-          pipeline.service.getProjectionByName("suiteRunState", batchRunId1, {
-            tenantId,
-          }),
-          pipeline.service.getProjectionByName("suiteRunState", batchRunId2, {
-            tenantId,
-          }),
-        ])) as [SuiteRunState | null, SuiteRunState | null];
-
-        expect(projection1?.data.SuiteId).toBe(suiteId1);
-        expect(projection2?.data.SuiteId).toBe(suiteId2);
-        expect(projection1?.data.Status).toBe("SUCCESS");
-        expect(projection2?.data.Status).toBe("SUCCESS");
-        expect(projection1?.data.BatchRunId).toBe(batchRunId1);
-        expect(projection2?.data.BatchRunId).toBe(batchRunId2);
+      await pipeline.commands.startSuiteRun.send({
+        tenantId: tenantIdString,
+        batchRunId,
+        scenarioSetId: "scenario-set-1",
+        suiteId,
+        total: 3,
+        scenarioIds: ["scenario-1", "scenario-2", "scenario-3"],
+        targetIds: ["target-1"],
+        idempotencyKey: `idem-${batchRunId}`,
+        occurredAt: Date.now(),
       });
+
+      await waitForSuiteRunState(pipeline, batchRunId, tenantId, "IN_PROGRESS");
+
+      // Verify projection populated from start event
+      const projection = (await pipeline.service.getProjectionByName(
+        "suiteRunState",
+        batchRunId,
+        { tenantId },
+      )) as SuiteRunState | null;
+
+      expect(projection?.data.Status).toBe("IN_PROGRESS");
+      expect(projection?.data.SuiteId).toBe(suiteId);
+      expect(projection?.data.Total).toBe(3);
+      expect(projection?.data.ScenarioSetId).toBe("scenario-set-1");
+      expect(projection?.data.BatchRunId).toBe(batchRunId);
+      expect(projection?.data.StartedAt).not.toBeNull();
+      expect(projection?.data.CompletedCount).toBe(0);
+      expect(projection?.data.FailedCount).toBe(0);
+      expect(projection?.data.Progress).toBe(0);
+      expect(projection?.data.FinishedAt).toBeNull();
     });
-
-    describe("State Transitions Tests", () => {
-      it("reaches IN_PROGRESS status after start event", async () => {
-        const batchRunId = generateTestBatchRunId();
-        const suiteId = generateTestSuiteId();
-
-        await pipeline.commands.startSuiteRun.send({
-          tenantId: tenantIdString,
-          batchRunId,
-          scenarioSetId: "scenario-set-1",
-          suiteId,
-          total: 3,
-          scenarioIds: ["scenario-1", "scenario-2", "scenario-3"],
-          targetIds: ["target-1"],
-          idempotencyKey: `idem-${batchRunId}`,
-          occurredAt: Date.now(),
-        });
-
-        await waitForSuiteRunState(
-          pipeline,
-          batchRunId,
-          tenantId,
-          "IN_PROGRESS",
-        );
-
-        // Verify projection populated from start event
-        const projection = (await pipeline.service.getProjectionByName(
-          "suiteRunState",
-          batchRunId,
-          { tenantId },
-        )) as SuiteRunState | null;
-
-        expect(projection?.data.Status).toBe("IN_PROGRESS");
-        expect(projection?.data.SuiteId).toBe(suiteId);
-        expect(projection?.data.Total).toBe(3);
-        expect(projection?.data.ScenarioSetId).toBe("scenario-set-1");
-        expect(projection?.data.BatchRunId).toBe(batchRunId);
-        expect(projection?.data.StartedAt).not.toBeNull();
-        expect(projection?.data.CompletedCount).toBe(0);
-        expect(projection?.data.FailedCount).toBe(0);
-        expect(projection?.data.Progress).toBe(0);
-        expect(projection?.data.FinishedAt).toBeNull();
-      });
-    });
-  },
-  60000,
-); // 60 second timeout for integration tests
+  });
+}, 60000); // 60 second timeout for integration tests

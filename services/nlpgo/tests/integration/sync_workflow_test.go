@@ -163,9 +163,10 @@ func (a executorAdapter) Execute(ctx context.Context, req app.WorkflowRequest) (
 	}
 	if res.Error != nil {
 		out.Error = &app.WorkflowError{
-			NodeID:  res.Error.NodeID,
-			Type:    res.Error.Type,
-			Message: res.Error.Message,
+			NodeID:    res.Error.NodeID,
+			Type:      res.Error.Type,
+			Message:   res.Error.Message,
+			Traceback: res.Error.Traceback,
 		}
 	}
 	if len(res.Nodes) > 0 {

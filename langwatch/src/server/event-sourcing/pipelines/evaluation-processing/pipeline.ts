@@ -15,8 +15,8 @@ import {
   EvaluationAnalyticsFoldProjection,
 } from "./projections/evaluationAnalytics.foldProjection";
 import {
-  type EvaluationAnalyticsRollupRow,
   EvaluationAnalyticsRollupMapProjection,
+  type EvaluationAnalyticsRollupRow,
 } from "./projections/evaluationAnalyticsRollup.mapProjection";
 import { EvaluationRunFoldProjection } from "./projections/evaluationRun.foldProjection";
 import type { EvaluationProcessingEvent } from "./schemas/events";

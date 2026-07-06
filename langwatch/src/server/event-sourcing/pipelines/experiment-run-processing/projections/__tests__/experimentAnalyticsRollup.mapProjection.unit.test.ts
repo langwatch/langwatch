@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ExperimentAnalyticsRollupMapProjection } from "../experimentAnalyticsRollup.mapProjection";
 import type { ExperimentRunCompletedEvent } from "../../schemas/events";
+import { ExperimentAnalyticsRollupMapProjection } from "../experimentAnalyticsRollup.mapProjection";
 
 const TENANT = "proj-exp-rollup";
 

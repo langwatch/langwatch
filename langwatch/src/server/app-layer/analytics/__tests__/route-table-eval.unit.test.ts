@@ -6,10 +6,13 @@
 
 import { describe, expect, it } from "vitest";
 import type { SeriesInputType } from "~/server/analytics/registry";
-import { pickAnalyticsTable } from "../routing/route-table";
 import { getMetricSource } from "../routing/field-availability";
+import { pickAnalyticsTable } from "../routing/route-table";
 
-function series(metric: string, agg: SeriesInputType["aggregation"]): SeriesInputType {
+function series(
+  metric: string,
+  agg: SeriesInputType["aggregation"],
+): SeriesInputType {
   return { metric, aggregation: agg } as SeriesInputType;
 }
 
@@ -99,7 +102,9 @@ describe("pickAnalyticsTable — eval-source routing (Phase 6)", () => {
 describe("getMetricSource — eval-domain coverage", () => {
   it("returns 'evaluation' for the three core eval metrics", () => {
     expect(getMetricSource("evaluations.evaluation_score")).toBe("evaluation");
-    expect(getMetricSource("evaluations.evaluation_pass_rate")).toBe("evaluation");
+    expect(getMetricSource("evaluations.evaluation_pass_rate")).toBe(
+      "evaluation",
+    );
     expect(getMetricSource("evaluations.evaluation_runs")).toBe("evaluation");
   });
 

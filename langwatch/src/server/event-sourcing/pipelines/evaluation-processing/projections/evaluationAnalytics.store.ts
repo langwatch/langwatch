@@ -1,8 +1,8 @@
 import type { EvaluationAnalyticsRepository } from "~/server/app-layer/evaluations/repositories/evaluation-analytics.repository";
 import { BaseAnalyticsFoldStore } from "../../shared/analyticsStoreBase";
 import {
-  type EvaluationAnalyticsData,
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
+  type EvaluationAnalyticsData,
   projectEvaluationAnalyticsStateToRow,
 } from "./evaluationAnalytics.foldProjection";
 

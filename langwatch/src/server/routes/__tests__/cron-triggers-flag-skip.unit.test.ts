@@ -6,13 +6,21 @@
  * event-sourced real-time reactor + heartbeat. When OFF, cron continues
  * processing as today. This test verifies the per-trigger flag check.
  */
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 // Mock the cron's processCustomGraphTrigger so we observe call sites.
 vi.mock("~/pages/api/cron/triggers/customGraphTrigger", async () => {
-  const actual = await vi.importActual<typeof import("~/pages/api/cron/triggers/customGraphTrigger")>(
-    "~/pages/api/cron/triggers/customGraphTrigger",
-  );
+  const actual = await vi.importActual<
+    typeof import("~/pages/api/cron/triggers/customGraphTrigger")
+  >("~/pages/api/cron/triggers/customGraphTrigger");
   return {
     ...actual,
     processCustomGraphTrigger: vi.fn(async (trigger: { id: string }) => ({
@@ -31,9 +39,19 @@ vi.mock("~/server/db", () => ({
         // Project p-on: flag-ON, has a graph trigger → cron must skip it.
         { id: "t-on", projectId: "p-on", customGraphId: "g-on", active: true },
         // Project p-off: flag-OFF, has a graph trigger → cron must process it.
-        { id: "t-off", projectId: "p-off", customGraphId: "g-off", active: true },
+        {
+          id: "t-off",
+          projectId: "p-off",
+          customGraphId: "g-off",
+          active: true,
+        },
         // A trace trigger (no customGraphId) → never enters this loop branch.
-        { id: "t-trace", projectId: "p-off", customGraphId: null, active: true },
+        {
+          id: "t-trace",
+          projectId: "p-off",
+          customGraphId: null,
+          active: true,
+        },
       ]),
     },
   },
@@ -42,8 +60,9 @@ vi.mock("~/server/db", () => ({
 // Mock the feature flag service so we control per-project answers.
 vi.mock("~/server/featureFlag", () => ({
   featureFlagService: {
-    isEnabled: vi.fn(async (_key: string, opts: { projectId: string }) =>
-      opts.projectId === "p-on",
+    isEnabled: vi.fn(
+      async (_key: string, opts: { projectId: string }) =>
+        opts.projectId === "p-on",
     ),
   },
 }));
@@ -59,11 +78,15 @@ describe("cron flag-skip for event-sourced graph triggers", () => {
   beforeAll(async () => {
     const cronMod = await import("../cron");
     app = cronMod.app;
-    const graphMod = await import("~/pages/api/cron/triggers/customGraphTrigger");
+    const graphMod = await import(
+      "~/pages/api/cron/triggers/customGraphTrigger"
+    );
     processCustomGraphTriggerMock =
       graphMod.processCustomGraphTrigger as unknown as ReturnType<typeof vi.fn>;
     const ffMod = await import("~/server/featureFlag");
-    isEnabledMock = ffMod.featureFlagService.isEnabled as unknown as ReturnType<typeof vi.fn>;
+    isEnabledMock = ffMod.featureFlagService.isEnabled as unknown as ReturnType<
+      typeof vi.fn
+    >;
   }, 30_000);
 
   beforeEach(() => {

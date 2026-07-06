@@ -54,10 +54,6 @@ import {
   outboxHeartbeatRegistry,
 } from "../event-sourcing/outbox/heartbeat";
 import { buildOutboxRuntime } from "../event-sourcing/outbox/setup";
-import {
-  defaultGraphTriggerHeartbeatDeps,
-  registerGraphTriggerHeartbeat,
-} from "./triggers/graph-trigger-heartbeat";
 import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
 import {
   type AppCommands,
@@ -110,8 +106,16 @@ import { PrismaEvaluationCostRecorder } from "./evaluations/evaluation-cost.reco
 import { createDefaultModelEnvResolver } from "./evaluations/evaluation-execution.factories";
 import { EvaluationExecutionService } from "./evaluations/evaluation-execution.service";
 import { EvaluationRunService } from "./evaluations/evaluation-run.service";
+import { EvaluationAnalyticsClickHouseRepository } from "./evaluations/repositories/evaluation-analytics.clickhouse.repository";
+import { NullEvaluationAnalyticsRepository } from "./evaluations/repositories/evaluation-analytics.repository";
+import { EvaluationAnalyticsRollupClickHouseRepository } from "./evaluations/repositories/evaluation-analytics-rollup.clickhouse.repository";
+import { NullEvaluationAnalyticsRollupRepository } from "./evaluations/repositories/evaluation-analytics-rollup.repository";
 import { EvaluationRunClickHouseRepository } from "./evaluations/repositories/evaluation-run.clickhouse.repository";
 import { NullEvaluationRunRepository } from "./evaluations/repositories/evaluation-run.repository";
+import { ExperimentAnalyticsClickHouseRepository } from "./experiments/repositories/experiment-analytics.clickhouse.repository";
+import { NullExperimentAnalyticsRepository } from "./experiments/repositories/experiment-analytics.repository";
+import { ExperimentAnalyticsRollupClickHouseRepository } from "./experiments/repositories/experiment-analytics-rollup.clickhouse.repository";
+import { NullExperimentAnalyticsRollupRepository } from "./experiments/repositories/experiment-analytics-rollup.repository";
 import { MonitorService } from "./monitors/monitor.service";
 import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.repository";
 import { EventExplorerService } from "./ops/event-explorer.service";
@@ -133,12 +137,20 @@ import { RedisPresenceRepository } from "./presence/repositories/presence.redis.
 import { ProjectService } from "./projects/project.service";
 import { PrismaProjectRepository } from "./projects/repositories/project.prisma.repository";
 import { NullProjectRepository } from "./projects/repositories/project.repository";
+import { SimulationAnalyticsClickHouseRepository } from "./scenarios/repositories/simulation-analytics.clickhouse.repository";
+import { NullSimulationAnalyticsRepository } from "./scenarios/repositories/simulation-analytics.repository";
+import { SimulationAnalyticsRollupClickHouseRepository } from "./scenarios/repositories/simulation-analytics-rollup.clickhouse.repository";
+import { NullSimulationAnalyticsRollupRepository } from "./scenarios/repositories/simulation-analytics-rollup.repository";
 import { PrismaShareRepository } from "./share/repositories/share.prisma.repository";
 import { ShareService } from "./share/share.service";
 import { SimulationRunService } from "./simulations/simulation-run.service";
 import { createCompositePlanProvider } from "./subscription/composite-plan-provider";
 import { PlanProviderService } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
+import { SuiteAnalyticsClickHouseRepository } from "./suites/repositories/suite-analytics.clickhouse.repository";
+import { NullSuiteAnalyticsRepository } from "./suites/repositories/suite-analytics.repository";
+import { SuiteAnalyticsRollupClickHouseRepository } from "./suites/repositories/suite-analytics-rollup.clickhouse.repository";
+import { NullSuiteAnalyticsRollupRepository } from "./suites/repositories/suite-analytics-rollup.repository";
 import { SuiteRunService } from "./suites/suite-run.service";
 import { NullTopicRepository } from "./topics/null-topic.repository";
 import { PrismaTopicRepository } from "./topics/topic.prisma.repository";
@@ -152,28 +164,12 @@ import { LogRecordStorageClickHouseRepository } from "./traces/repositories/log-
 import { NullLogRecordStorageRepository } from "./traces/repositories/log-record-storage.repository";
 import { MetricRecordStorageClickHouseRepository } from "./traces/repositories/metric-record-storage.clickhouse.repository";
 import { NullMetricRecordStorageRepository } from "./traces/repositories/metric-record-storage.repository";
-import { EvaluationAnalyticsClickHouseRepository } from "./evaluations/repositories/evaluation-analytics.clickhouse.repository";
-import { NullEvaluationAnalyticsRepository } from "./evaluations/repositories/evaluation-analytics.repository";
-import { EvaluationAnalyticsRollupClickHouseRepository } from "./evaluations/repositories/evaluation-analytics-rollup.clickhouse.repository";
-import { NullEvaluationAnalyticsRollupRepository } from "./evaluations/repositories/evaluation-analytics-rollup.repository";
-import { ExperimentAnalyticsClickHouseRepository } from "./experiments/repositories/experiment-analytics.clickhouse.repository";
-import { NullExperimentAnalyticsRepository } from "./experiments/repositories/experiment-analytics.repository";
-import { ExperimentAnalyticsRollupClickHouseRepository } from "./experiments/repositories/experiment-analytics-rollup.clickhouse.repository";
-import { NullExperimentAnalyticsRollupRepository } from "./experiments/repositories/experiment-analytics-rollup.repository";
-import { SimulationAnalyticsClickHouseRepository } from "./scenarios/repositories/simulation-analytics.clickhouse.repository";
-import { NullSimulationAnalyticsRepository } from "./scenarios/repositories/simulation-analytics.repository";
-import { SimulationAnalyticsRollupClickHouseRepository } from "./scenarios/repositories/simulation-analytics-rollup.clickhouse.repository";
-import { NullSimulationAnalyticsRollupRepository } from "./scenarios/repositories/simulation-analytics-rollup.repository";
-import { SuiteAnalyticsClickHouseRepository } from "./suites/repositories/suite-analytics.clickhouse.repository";
-import { NullSuiteAnalyticsRepository } from "./suites/repositories/suite-analytics.repository";
-import { SuiteAnalyticsRollupClickHouseRepository } from "./suites/repositories/suite-analytics-rollup.clickhouse.repository";
-import { NullSuiteAnalyticsRollupRepository } from "./suites/repositories/suite-analytics-rollup.repository";
+import { SpanStorageClickHouseRepository } from "./traces/repositories/span-storage.clickhouse.repository";
+import { NullSpanStorageRepository } from "./traces/repositories/span-storage.repository";
 import { TraceAnalyticsClickHouseRepository } from "./traces/repositories/trace-analytics.clickhouse.repository";
 import { NullTraceAnalyticsRepository } from "./traces/repositories/trace-analytics.repository";
 import { TraceAnalyticsRollupClickHouseRepository } from "./traces/repositories/trace-analytics-rollup.clickhouse.repository";
 import { NullTraceAnalyticsRollupRepository } from "./traces/repositories/trace-analytics-rollup.repository";
-import { SpanStorageClickHouseRepository } from "./traces/repositories/span-storage.clickhouse.repository";
-import { NullSpanStorageRepository } from "./traces/repositories/span-storage.repository";
 import { TraceListClickHouseRepository } from "./traces/repositories/trace-list.clickhouse.repository";
 import { NullTraceListRepository } from "./traces/repositories/trace-list.repository";
 import { TraceSummaryClickHouseRepository } from "./traces/repositories/trace-summary.clickhouse.repository";
@@ -189,6 +185,10 @@ import { TraceRequestCollectionService } from "./traces/trace-request-collection
 import { TraceSummaryService } from "./traces/trace-summary.service";
 import { traced } from "./tracing";
 import { EmailSuppressionService } from "./triggers/emailSuppression.service";
+import {
+  defaultGraphTriggerHeartbeatDeps,
+  registerGraphTriggerHeartbeat,
+} from "./triggers/graph-trigger-heartbeat";
 import {
   PrismaEmailSuppressionNameLookupRepository,
   PrismaEmailSuppressionRepository,
@@ -533,9 +533,9 @@ export function initializeDefaultApp(options?: {
   const retroactiveUpdateService = new RetroactiveUpdateService(
     clickhouseEnabled ? resolveClickHouseClient : null,
   );
-  const storageMeterService = new StorageMeterService(
-    clickhouseEnabled ? resolveClickHouseClient : null,
-  );
+  const storageMeterService = new StorageMeterService({
+    resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
+  });
   const dataRetention: DataRetentionDependencies = {
     policy: dataRetentionPolicyService,
     pinning: pinnedTraceService,
@@ -1172,7 +1172,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       ),
       pinning: testPinnedTraceService,
       retroactive: new RetroactiveUpdateService(null),
-      metering: new StorageMeterService(null),
+      metering: new StorageMeterService({ resolveClickHouseClient: null }),
     },
     share: new ShareService(
       new PrismaShareRepository(testPrisma),

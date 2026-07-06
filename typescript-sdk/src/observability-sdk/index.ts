@@ -35,6 +35,13 @@ export {
 } from "./span";
 
 export {
+  emitEvaluationEvent,
+  type AddEvaluationParams,
+  type EvaluationStatus,
+  type EvaluationTimestamps,
+} from "./evaluation";
+
+export {
   getLangWatchLogger,
   getLangWatchLoggerFromProvider,
   type LangWatchLogger,

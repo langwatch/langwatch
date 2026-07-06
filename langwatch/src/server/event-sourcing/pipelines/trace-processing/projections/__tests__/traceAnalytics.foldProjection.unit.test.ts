@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   applySpanToAnalytics,
   projectAnalyticsStateToRow,
-  TraceAnalyticsFoldProjection,
-  type TraceAnalyticsData,
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
+  type TraceAnalyticsData,
+  TraceAnalyticsFoldProjection,
 } from "../traceAnalytics.foldProjection";
 import { createTestSpan } from "./fixtures/trace-summary-test.fixtures";
 

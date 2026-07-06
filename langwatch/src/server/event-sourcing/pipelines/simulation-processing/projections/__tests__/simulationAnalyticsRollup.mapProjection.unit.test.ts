@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { SimulationAnalyticsRollupMapProjection } from "../simulationAnalyticsRollup.mapProjection";
 import type { SimulationRunFinishedEvent } from "../../schemas/events";
+import { SimulationAnalyticsRollupMapProjection } from "../simulationAnalyticsRollup.mapProjection";
 
 const TENANT = "proj-sim-rollup";
 

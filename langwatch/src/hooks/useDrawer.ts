@@ -133,10 +133,13 @@ export const navigateToDrawer = (
     "drawer.open": drawer,
   };
 
+  // flushSync: same startTransition/Suspense interaction as updateDrawerUrl
+  // in useDrawer() below — this is the module-level equivalent, used to open
+  // a drawer from code that isn't necessarily mounted (flow callbacks).
   void Router.push(
     "?" + qs.stringify(newQuery, { allowDots: true, arrayFormat: "comma" }),
     undefined,
-    { shallow: true },
+    { shallow: true, flushSync: true },
   );
 };
 
@@ -187,7 +190,15 @@ export const useUpdateDrawerParams = () => {
         allowEmptyArrays: true,
       });
       const url = buildUrl(path, newQs, hash);
-      void router[push ? "push" : "replace"](url, undefined, { shallow: true });
+      // flushSync: same startTransition/Suspense interaction as
+      // updateDrawerUrl — this doesn't usually mount a new lazy drawer
+      // (drawer.open is untouched), but keep it consistent with the rest
+      // of the drawer navigation surface rather than leave a third,
+      // differently-behaved push/replace pattern in this file.
+      void router[push ? "push" : "replace"](url, undefined, {
+        shallow: true,
+        flushSync: true,
+      });
     },
     [router],
   );
@@ -347,10 +358,16 @@ export const useDrawer = () => {
         },
       );
 
+      // flushSync: drawers are React.lazy() (see drawerRegistry.ts) and this
+      // update mounts one for the first time in the session more often than
+      // not. Left under React Router's default startTransition wrap, a
+      // first-time Suspense would keep the previously committed UI on
+      // screen instead of showing the fallback — the URL changes but the
+      // drawer never appears until something else forces a re-render.
       void router[options.replace ? "replace" : "push"](
         buildUrl(path, newQuery, hash),
         undefined,
-        { shallow: true },
+        { shallow: true, flushSync: true },
       );
     },
     [router],
@@ -494,8 +511,11 @@ export const useDrawer = () => {
       allowEmptyArrays: true,
     });
 
+    // flushSync: see updateDrawerUrl above — same startTransition/Suspense
+    // interaction can leave the closed-drawer state uncommitted.
     void router.push(buildUrl(path, newQueryString, hash), undefined, {
       shallow: true,
+      flushSync: true,
     });
   }, [router]);
 

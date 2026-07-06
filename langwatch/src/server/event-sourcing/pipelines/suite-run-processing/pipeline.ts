@@ -2,19 +2,22 @@ import { definePipeline } from "../../";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
 import {
-  StartSuiteRunCommand,
-  RecordSuiteRunItemStartedCommand,
   CompleteSuiteRunItemCommand,
+  RecordSuiteRunItemStartedCommand,
+  StartSuiteRunCommand,
 } from "./commands";
 import {
-  SuiteAnalyticsFoldProjection,
   type SuiteAnalyticsData,
+  SuiteAnalyticsFoldProjection,
 } from "./projections/suiteAnalytics.foldProjection";
 import {
   SuiteAnalyticsRollupMapProjection,
   type SuiteAnalyticsRollupRow,
 } from "./projections/suiteAnalyticsRollup.mapProjection";
-import { SuiteRunStateFoldProjection, type SuiteRunStateData } from "./projections/suiteRunState.foldProjection";
+import {
+  type SuiteRunStateData,
+  SuiteRunStateFoldProjection,
+} from "./projections/suiteRunState.foldProjection";
 import type { SuiteRunProcessingEvent } from "./schemas/events";
 
 export interface SuiteRunProcessingPipelineDeps {
@@ -43,13 +46,18 @@ export interface SuiteRunProcessingPipelineDeps {
  *
  * No reactor on this pipeline — cross-pipeline reactors live on the simulation pipeline.
  */
-export function createSuiteRunProcessingPipeline(deps: SuiteRunProcessingPipelineDeps) {
+export function createSuiteRunProcessingPipeline(
+  deps: SuiteRunProcessingPipelineDeps,
+) {
   return definePipeline<SuiteRunProcessingEvent>()
     .withName("suite_run_processing")
     .withAggregateType("suite_run")
-    .withFoldProjection("suiteRunState", new SuiteRunStateFoldProjection({
-      store: deps.suiteRunStateFoldStore,
-    }))
+    .withFoldProjection(
+      "suiteRunState",
+      new SuiteRunStateFoldProjection({
+        store: deps.suiteRunStateFoldStore,
+      }),
+    )
     .withFoldProjection(
       "suiteAnalytics",
       new SuiteAnalyticsFoldProjection({ store: deps.suiteAnalyticsStore }),

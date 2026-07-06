@@ -11,7 +11,7 @@
  * BDD structure: given/when nested describes, action-based it() names.
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 // Passthrough mock for langwatch tracer used by TraceIOExtractionService.
 vi.mock("langwatch", () => ({
@@ -19,7 +19,10 @@ vi.mock("langwatch", () => ({
     withActiveSpan: (
       _name: string,
       _opts: unknown,
-      fn: (span: { setAttribute: () => void; setAttributes: () => void }) => unknown,
+      fn: (span: {
+        setAttribute: () => void;
+        setAttributes: () => void;
+      }) => unknown,
     ) => fn({ setAttribute: () => {}, setAttributes: () => {} }),
   }),
 }));
@@ -33,18 +36,18 @@ vi.mock("~/utils/logger/server", () => ({
   }),
 }));
 
-import {
-  NormalizedSpanKind,
-  NormalizedStatusCode,
-  type NormalizedSpan,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
-import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
-import { NullSpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
+import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
 import type { SpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
+import { NullSpanStorageRepository } from "~/server/app-layer/traces/repositories/span-storage.repository";
+import { SpanStorageService } from "~/server/app-layer/traces/span-storage.service";
+import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import {
+  type NormalizedSpan,
+  NormalizedSpanKind,
+  NormalizedStatusCode,
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -94,7 +97,9 @@ function makeNormalizedSpan(
  * to the NullSpanStorageRepository (return empty/null) so any resolved result
  * must come from the resolution path, not the raw-Span path.
  */
-function makeStubRepository(normalizedSpans: NormalizedSpan[]): SpanStorageRepository {
+function makeStubRepository(
+  normalizedSpans: NormalizedSpan[],
+): SpanStorageRepository {
   const nullRepo = new NullSpanStorageRepository();
   return {
     ...nullRepo,
@@ -107,12 +112,10 @@ function makeStubRepository(normalizedSpans: NormalizedSpan[]): SpanStorageRepos
 
 function makeBlobStore(resolvedValues: Record<string, string>): BlobStore {
   return {
-    getFromEventLog: vi.fn(
-      async ({ field }: { field: string }) => {
-        if (field in resolvedValues) return resolvedValues[field]!;
-        throw new BlobNotFoundError("evt-test", field, "proj-1");
-      },
-    ),
+    getFromEventLog: vi.fn(async ({ field }: { field: string }) => {
+      if (field in resolvedValues) return resolvedValues[field]!;
+      throw new BlobNotFoundError("evt-test", field, "proj-1");
+    }),
     putSpool: vi.fn(),
     getSpool: vi.fn(),
     deleteSpool: vi.fn(),
@@ -158,7 +161,9 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
         // mapNormalizedSpanToSpan extracts langwatch.output as SpanInputOutput.
         // The full value must be present somewhere in the serialized output.
         const outputStr =
-          outputValue?.type === "text" ? outputValue.value : JSON.stringify(outputValue);
+          outputValue?.type === "text"
+            ? outputValue.value
+            : JSON.stringify(outputValue);
         expect(outputStr).toContain(FULL_OUTPUT);
         expect(outputStr).not.toBe(PREVIEW_OUTPUT);
       });
@@ -203,7 +208,9 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
         const outputValue = span?.output;
         expect(outputValue).not.toBeNull();
         const outputStr =
-          outputValue?.type === "text" ? outputValue.value : JSON.stringify(outputValue);
+          outputValue?.type === "text"
+            ? outputValue.value
+            : JSON.stringify(outputValue);
         expect(outputStr).toContain(FULL_OUTPUT);
         expect(outputStr).not.toBe(PREVIEW_OUTPUT);
       });
@@ -260,7 +267,9 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
         // Output is unchanged — the non-offloaded value passes through.
         const outputValue = spans[0]?.output;
         const outputStr =
-          outputValue?.type === "text" ? outputValue.value : JSON.stringify(outputValue);
+          outputValue?.type === "text"
+            ? outputValue.value
+            : JSON.stringify(outputValue);
         expect(outputStr).toBe("A short non-offloaded output value");
         // Fast-path: BlobStore is never called when there are no eventref attrs.
         expect(getFromEventLogSpy).not.toHaveBeenCalled();
@@ -295,7 +304,8 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
         expect(spans).toHaveLength(0);
         // getNormalizedSpansByTraceId must NOT have been called (no resolution).
         expect(
-          (repo.getNormalizedSpansByTraceId as ReturnType<typeof vi.fn>).mock.calls,
+          (repo.getNormalizedSpansByTraceId as ReturnType<typeof vi.fn>).mock
+            .calls,
         ).toHaveLength(0);
       });
     });
@@ -324,7 +334,10 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
         });
 
         await expect(
-          service.getSpansByTraceId({ tenantId: "proj-1", traceId: "trace-stale" }),
+          service.getSpansByTraceId({
+            tenantId: "proj-1",
+            traceId: "trace-stale",
+          }),
         ).resolves.not.toThrow();
 
         const spans = await service.getSpansByTraceId({
@@ -333,7 +346,9 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
         });
         const outputValue = spans[0]?.output;
         const outputStr =
-          outputValue?.type === "text" ? outputValue.value : JSON.stringify(outputValue);
+          outputValue?.type === "text"
+            ? outputValue.value
+            : JSON.stringify(outputValue);
         // Falls back to preview value when event_log row is missing.
         expect(outputStr).toBe(PREVIEW_OUTPUT);
       });

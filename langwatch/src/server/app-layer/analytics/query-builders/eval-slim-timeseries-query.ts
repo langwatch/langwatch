@@ -123,10 +123,7 @@ function evalSlimGroupByExpression(groupBy?: string): string | null {
 
 // isPercentile + percentileFor moved to _shared.
 
-function evalSlimAggExpression(
-  agg: AggregationTypes,
-  column: string,
-): string {
+function evalSlimAggExpression(agg: AggregationTypes, column: string): string {
   if (isPercentile(agg)) {
     return `quantileExact(${percentileFor(agg)})(${column})`;
   }
@@ -275,7 +272,10 @@ export function buildEvalSlimTimeseriesQuery(
       );
     }
     const alias = buildMetricAlias(i, s.metric, s.aggregation, s.key, s.subkey);
-    const expr = evalSlimAggExpression(s.aggregation, evalSlimColumnFor(s.metric));
+    const expr = evalSlimAggExpression(
+      s.aggregation,
+      evalSlimColumnFor(s.metric),
+    );
     selectExprs.push(`${expr} AS ${alias}`);
   }
 

@@ -252,10 +252,7 @@ export class SimulationAnalyticsFoldProjection
     "LastEventOccurredAt"
   >
   implements
-    FoldEventHandlers<
-      typeof simulationAnalyticsEvents,
-      SimulationAnalyticsData
-    >
+    FoldEventHandlers<typeof simulationAnalyticsEvents, SimulationAnalyticsData>
 {
   readonly name = "simulationAnalytics";
   readonly version = SIMULATION_ANALYTICS_PROJECTION_VERSION_LATEST;

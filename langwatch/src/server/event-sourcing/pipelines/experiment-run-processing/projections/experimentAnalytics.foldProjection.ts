@@ -4,7 +4,6 @@ import {
   type FoldEventHandlers,
 } from "../../../projections/abstractFoldProjection";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
-import { normalizeDurationMs } from "../utils/duration.utils";
 import type {
   EvaluatorResultEvent,
   ExperimentRunCompletedEvent,
@@ -19,6 +18,7 @@ import {
   targetResultEventSchema,
   traceMetricsComputedEventSchema,
 } from "../schemas/events";
+import { normalizeDurationMs } from "../utils/duration.utils";
 
 /**
  * ADR-034 Phase 7 — slim per-experiment-run fold projection.
@@ -259,10 +259,7 @@ export class ExperimentAnalyticsFoldProjection
     "LastEventOccurredAt"
   >
   implements
-    FoldEventHandlers<
-      typeof experimentAnalyticsEvents,
-      ExperimentAnalyticsData
-    >
+    FoldEventHandlers<typeof experimentAnalyticsEvents, ExperimentAnalyticsData>
 {
   readonly name = "experimentAnalytics";
   readonly version = EXPERIMENT_ANALYTICS_PROJECTION_VERSION_LATEST;
@@ -362,13 +359,8 @@ export class ExperimentAnalyticsFoldProjection
     event: EvaluatorResultEvent,
     state: ExperimentAnalyticsData,
   ): ExperimentAnalyticsData {
-    let {
-      totalScoreSum,
-      scoreCount,
-      passedCount,
-      gradedCount,
-      totalCost,
-    } = state;
+    let { totalScoreSum, scoreCount, passedCount, gradedCount, totalCost } =
+      state;
 
     if (event.data.status === "processed") {
       if (event.data.score != null) {
@@ -388,9 +380,7 @@ export class ExperimentAnalyticsFoldProjection
     const avgScoreBps =
       scoreCount > 0 ? Math.round(totalScoreSum / scoreCount) : null;
     const passRateBps =
-      gradedCount > 0
-        ? Math.round((passedCount / gradedCount) * 10000)
-        : null;
+      gradedCount > 0 ? Math.round((passedCount / gradedCount) * 10000) : null;
 
     return {
       ...state,

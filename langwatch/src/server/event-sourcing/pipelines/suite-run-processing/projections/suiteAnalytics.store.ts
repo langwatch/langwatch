@@ -2,9 +2,9 @@ import type { SuiteAnalyticsRepository } from "~/server/app-layer/suites/reposit
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import { BaseAnalyticsFoldStore } from "../../shared/analyticsStoreBase";
 import {
-  type SuiteAnalyticsData,
   projectSuiteAnalyticsStateToRow,
   SUITE_ANALYTICS_PROJECTION_VERSION_LATEST,
+  type SuiteAnalyticsData,
 } from "./suiteAnalytics.foldProjection";
 
 /**

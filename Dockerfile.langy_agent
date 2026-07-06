@@ -1,0 +1,195 @@
+# Langy agent pod image — the OpenCode "manager" plus the LangWatch CLI +
+# MCP server the per-session workers shell out to.
+#
+# Built by the `langy-agent` matrix entry in
+# .github/workflows/publish-docker-app.yml on `langwatch@*` releases, and
+# usable locally for the Minikube scenario loop:
+#   docker build -f Dockerfile.langy_agent -t langy-agent:dev .
+#
+# Build context is the repo root (context: .), so the COPYs below reach
+# into services/langy-agent/.
+#
+# Two-stage build: stage one compiles the Go manager binary from the
+# repo's mono-binary (services/langy-agent/ is the package, dispatched via
+# cmd/service). Stage two is the runtime image with all the tooling the
+# workers shell out to (opencode, gh, langwatch CLI/MCP, OTel plugin).
+
+# -----------------------------------------------------------------------------
+# Stage 1: build the Go manager binary.
+# -----------------------------------------------------------------------------
+# Pin the Go toolchain to the version recorded in go.mod (`go 1.26.2`) so
+# CI and local builds produce byte-identical binaries. Bump in lockstep.
+FROM golang:1.26.2-bookworm AS builder
+
+WORKDIR /src
+
+# Cache go module downloads in a layer that only invalidates when go.mod/
+# go.sum changes — the rest of the source tree is a churnier input.
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go mod download
+
+# Bring in everything the mono-binary needs to compile. We only ship the
+# `service langy-agent` codepath out the other side, but cmd/service
+# imports all three services so we need their packages present at build
+# time. The aigateway + nlpgo subtrees are tree-shaken by the linker —
+# only references reachable from `langy-agent` survive.
+COPY cmd ./cmd
+COPY pkg ./pkg
+COPY services ./services
+
+# CGO disabled so the produced binary is statically linked and runs on
+# any glibc the Ubuntu base ships with no surprise dynamic-link issues.
+# -trimpath drops the host build path from binary metadata for cleaner
+# diffs across reproducible builds.
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+ARG SERVICE_VERSION=dev
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+        go build -trimpath \
+        -ldflags "-s -w -X main.Version=${SERVICE_VERSION}" \
+        -o /out/langy-agent ./cmd/service
+
+# -----------------------------------------------------------------------------
+# Stage 2: runtime image.
+# -----------------------------------------------------------------------------
+FROM ubuntu:24.04
+
+# Pin the CLI + MCP versions the agent was validated against. Bump these
+# in lockstep with a tested release rather than tracking `latest`.
+ARG LANGWATCH_CLI_VERSION=0.31.0
+ARG LANGWATCH_MCP_VERSION=0.10.1
+# opencode has no native OpenTelemetry export, so the per-session worker loads
+# this opencode plugin to emit session/llm/tool spans over OTLP into the user's
+# LangWatch project. Pinned; opencode auto-loads it by name from the per-worker
+# config (manager writes one per worker at spawn). See
+# specs/assistant/langy-otel-tracing.feature.
+ARG OPENCODE_OTEL_PLUGIN_VERSION=1.0.0
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl git ca-certificates unzip build-essential python3 \
+    iptables \
+    && rm -rf /var/lib/apt/lists/*
+# `iptables` is installed so the manager (services/langy-agent/iptables.go)
+# can install a loopback OWNER-match DROP rule at startup. The rule closes
+# the sibling-worker exfiltration path Sergio flagged on 2026-06-30:
+# without it, a prompt-injected worker scans /proc/net/tcp, connects to a
+# sibling worker's unauthenticated opencode internal port as the victim's
+# UID, and `env` exfiltrates the victim's credentials. Requires
+# CAP_NET_ADMIN on the pod (set in charts/langy-agent/values.yaml).
+
+# GitHub CLI (`gh`) is what Langy's github.md skill uses to open PRs
+# attributed to the requesting user. The user's short-lived user-to-server
+# token rides into the worker as GH_TOKEN; gh reads it from env, and
+# `gh auth git-credential` proxies it to git pushes so nothing is ever
+# written to disk. Issue #4747, spec specs/assistant/langy-github-prs.feature.
+# Pinned via the GitHub releases .deb rather than the apt repo: the apt repo
+# only carries the LATEST gh, so `apt-get install gh` ships unreviewed gh
+# behavior changes on every rebuild (and an exact apt pin breaks on every gh
+# release). Release assets persist per version; arm64 + amd64 both published.
+ARG GH_CLI_VERSION=2.94.0
+RUN curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_CLI_VERSION}/gh_${GH_CLI_VERSION}_linux_$(dpkg --print-architecture).deb" \
+        -o /tmp/gh.deb \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends /tmp/gh.deb \
+    && rm -f /tmp/gh.deb \
+    && rm -rf /var/lib/apt/lists/* \
+    && gh --version
+
+# Node is still required at runtime: opencode is a Node application and
+# the langwatch CLI / MCP server ship as npm packages. The manager itself
+# is now a Go binary (see stage 1) — there is no `server.js` anymore.
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Pin opencode to a specific release artifact + verify sha256. The previous
+# `curl https://opencode.ai/install | bash` shape installed whatever was
+# `latest` at build time — every rebuild silently re-evaluated trust in
+# opencode upstream. opencode runs in every worker with the user's API
+# keys + GitHub user-to-server token in env, so it sits on the same
+# supply-chain surface as gh (already pinned above) and the npm packages.
+#
+# Bump procedure when raising OPENCODE_VERSION:
+#   v=NEW_VERSION
+#   curl -fsSL "https://github.com/anomalyco/opencode/releases/download/v${v}/opencode-linux-x64.tar.gz"  | sha256sum
+#   curl -fsSL "https://github.com/anomalyco/opencode/releases/download/v${v}/opencode-linux-arm64.tar.gz" | sha256sum
+# Paste both values below. Dev-cluster nodes are arm64 (Graviton) and CI
+# builds amd64 — both must verify.
+ARG OPENCODE_VERSION=1.17.11
+ARG OPENCODE_SHA256_AMD64=6aefcbbb7f04cdb4642be5208ddbfabb3c3d274f816bf42bff72eea5c244dca2
+ARG OPENCODE_SHA256_ARM64=6c0ae8212401c78f9dcddead35d385953c7a44eb1616309365b58503dbd1b4cd
+
+RUN set -eux; \
+    arch=$(dpkg --print-architecture); \
+    case "$arch" in \
+      amd64) target=linux-x64; sha=${OPENCODE_SHA256_AMD64} ;; \
+      arm64) target=linux-arm64; sha=${OPENCODE_SHA256_ARM64} ;; \
+      *) echo "Unsupported architecture for opencode pin: $arch" >&2; exit 1 ;; \
+    esac; \
+    url="https://github.com/anomalyco/opencode/releases/download/v${OPENCODE_VERSION}/opencode-${target}.tar.gz"; \
+    curl -fsSL "$url" -o /tmp/opencode.tar.gz; \
+    echo "${sha}  /tmp/opencode.tar.gz" | sha256sum -c -; \
+    tar -xzf /tmp/opencode.tar.gz -C /tmp; \
+    install -m0755 /tmp/opencode /usr/local/bin/opencode; \
+    rm -f /tmp/opencode /tmp/opencode.tar.gz; \
+    opencode --version
+
+# CLI (`langwatch`) + MCP server (`langwatch-mcp-server`) from npm. Replaces
+# the old locally-`pnpm pack`'d tarballs so the image builds reproducibly in
+# CI with no host-side build step. The opencode OTel plugin is installed here
+# too so the pinned version is present in the image (and the build fails fast
+# if the version is bad) rather than relying solely on opencode's runtime fetch.
+RUN npm install -g "langwatch@${LANGWATCH_CLI_VERSION}" \
+    "@langwatch/mcp-server@${LANGWATCH_MCP_VERSION}" \
+    "@devtheops/opencode-plugin-otel@${OPENCODE_OTEL_PLUGIN_VERSION}"
+
+# Surface the pinned plugin version to the manager so each per-worker
+# opencode config requests the exact same version opencode loads.
+ENV OPENCODE_OTEL_PLUGIN_VERSION=${OPENCODE_OTEL_PLUGIN_VERSION}
+
+# Drop the Go binary in place. The entrypoint dispatches the mono-binary
+# at `service langy-agent` so /langy-agent is the runtime command name.
+COPY --from=builder /out/langy-agent /usr/local/bin/langy-agent
+
+COPY services/langy-agent/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Static templates the entrypoint seeds into /workspace at pod startup.
+# They live under /opt (not /workspace) because /workspace is an emptyDir
+# volume in k8s, which would shadow any image content placed there.
+# AGENTS.md keeps the literal ${LANGWATCH_ENDPOINT} placeholder — the
+# manager substitutes it per-worker at spawn time.
+# Canonical skills, generated from skills/<name>/SKILL.mdx — the same source
+# behind the public skill directory (https://langwatch.ai/docs/skills/directory),
+# rendered for in-product use by skills/_compiler/native.ts. One <name>/SKILL.md
+# each; opencode discovers them per worker. Regenerate via
+# skills/_compiled/generate.sh.
+COPY skills/_compiled/native/ /opt/langy-templates/skills/
+# Langy-only skills authored in the service tree (e.g. opening GitHub PRs) —
+# runtime-specific, so they don't belong in the public directory.
+COPY services/langy-agent/skills/ /opt/langy-templates/skills/
+COPY services/langy-agent/AGENTS.md.template /opt/langy-templates/AGENTS.md
+
+# The manager process runs as root so it can chown per-session directories
+# to per-worker UIDs and exec into them with syscall.Credential. See the
+# SecurityContext block in charts/langy-agent/values.yaml for the cap set
+# that keeps the blast radius small (CAP_SETUID, CAP_SETGID, CAP_CHOWN,
+# CAP_DAC_OVERRIDE). Workers spawned by the manager enter unique UIDs
+# (2000+hash(conversationId)%60000) — no static user records needed
+# because setuid(N) doesn't require /etc/passwd to resolve N. Keep
+# /workspace root-owned at image build time; the manager re-chowns
+# per-session subdirs as workers spawn.
+RUN userdel -r ubuntu 2>/dev/null || true && \
+    mkdir -p /workspace && \
+    chown root:root /workspace && \
+    chmod 0755 /workspace
+
+ENV HOME=/root
+WORKDIR /workspace
+EXPOSE 8080
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["/usr/local/bin/langy-agent", "langy-agent"]

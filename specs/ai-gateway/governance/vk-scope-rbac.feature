@@ -195,6 +195,25 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
     And the response includes "vk_team_platform"
     And the response does NOT include "vk_team_data_sci"
 
+  Scenario: An org ADMIN with no TeamUser rows sees project-scoped VKs (e.g. the auto-managed Langy VK) anywhere in the org
+    Given user "admin@acme.test" has the ADMIN role on organization "acme"
+    And "admin@acme.test" has no TeamUser rows in "acme"
+    And a VirtualKey "vk_proj_a" scoped to PROJECT "proj-a" (under TEAM "platform")
+    And a VirtualKey "vk_proj_b" scoped to PROJECT "proj-b" (under TEAM "data-sci")
+    When "admin@acme.test" calls `api.virtualKeys.list`
+    Then the response includes "vk_proj_a"
+    And the response includes "vk_proj_b"
+    # Org admins need to see auto-managed project VKs (e.g. the Langy VK) without
+    # being explicitly enrolled in every team — otherwise admins can't audit or
+    # rotate keys that the system minted on a project's behalf.
+
+  Scenario: A plain MEMBER still does NOT see a sibling-team project VK — the admin short-circuit must not leak to members
+    Given user "mona@acme.test" has the MEMBER role on organization "acme"
+    And "mona@acme.test" is a member of TEAM "platform" only
+    And a VirtualKey "vk_proj_sibling" scoped to PROJECT "proj-b" (under TEAM "data-sci")
+    When "mona@acme.test" calls `api.virtualKeys.list`
+    Then the response does NOT include "vk_proj_sibling"
+
   # ============================================================================
   # Scope ownership — every scope must belong to the key's own organization
   # ============================================================================

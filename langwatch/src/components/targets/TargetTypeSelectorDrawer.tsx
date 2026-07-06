@@ -1,22 +1,45 @@
-import { Box, Button, Heading, HStack, Separator, Text, VStack } from "@chakra-ui/react";
-import { Bot, CheckCircle, FileText } from "lucide-react";
+import {
+  Box,
+  Button,
+  Heading,
+  HStack,
+  Separator,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { Bot, CheckCircle, FileText, Swords } from "lucide-react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
-import type { TargetType } from "~/experiments-v3/types";
+import type {
+  PairwiseEvaluatorConfig,
+  TargetConfig,
+  TargetType,
+} from "~/experiments-v3/types";
 import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
 
 // Re-export for backward compatibility
 export type { TargetType };
 
+// Card identifiers shown in the picker. "pairwise" is a UI-only shortcut that
+// creates an evaluator-target pre-configured for langevals/pairwise_compare —
+// the underlying TargetConfig is still type: "evaluator".
+type TargetCardKey = TargetType | "pairwise";
+
 export type TargetTypeSelectorDrawerProps = {
   open?: boolean;
   onClose?: () => void;
   onSelect?: (type: TargetType) => void;
+  /** Passed through to evaluatorEditor when "Pairwise Compare" is selected. */
+  pairwiseContext?: {
+    initialPairwise?: PairwiseEvaluatorConfig;
+    targets: TargetConfig[];
+    datasetColumns: { id: string; name: string }[];
+  };
 };
 
 const targetTypes: Array<{
-  type: TargetType;
+  type: TargetCardKey;
   icon: typeof FileText;
   title: string;
   description: string;
@@ -32,6 +55,13 @@ const targetTypes: Array<{
     icon: Bot,
     title: "Agent",
     description: "Integrate with your existing agent or create a workflow",
+  },
+  {
+    type: "pairwise",
+    icon: Swords,
+    title: "Pairwise Compare",
+    description:
+      "Judge two prior columns head-to-head against a golden reference",
   },
   {
     type: "evaluator",
@@ -55,7 +85,26 @@ export function TargetTypeSelectorDrawer(props: TargetTypeSelectorDrawerProps) {
     (complexProps.onSelect as TargetTypeSelectorDrawerProps["onSelect"]);
   const isOpen = props.open !== false && props.open !== undefined;
 
-  const handleSelectType = (type: TargetType) => {
+  const handleSelectType = (type: TargetCardKey) => {
+    // Pairwise is a UI shortcut: skip the category/type picker and jump
+    // straight into the pairwise_compare evaluator config. The save flow
+    // (set up by handleAddTarget) creates the column as an evaluator-target.
+    // Forward pairwiseContext from handleAddTarget so the creation form shows
+    // Variant A / Variant B / Golden field immediately (matching edit-mode UX).
+    if (type === "pairwise") {
+      openDrawer(
+        "evaluatorEditor",
+        {
+          evaluatorType: "langevals/pairwise_compare",
+          category: "llm_judge",
+          pairwiseContext: (complexProps.pairwiseContext ??
+            props.pairwiseContext) as TargetTypeSelectorDrawerProps["pairwiseContext"],
+        },
+        { replace: true },
+      );
+      return;
+    }
+
     // Navigate to appropriate drawer based on type
     if (onSelect) {
       // Parent handles navigation (backward compat)
@@ -137,7 +186,7 @@ export function TargetTypeSelectorDrawer(props: TargetTypeSelectorDrawerProps) {
 // ============================================================================
 
 type TargetTypeCardProps = {
-  type: TargetType;
+  type: TargetCardKey;
   icon: typeof FileText;
   title: string;
   description: string;
@@ -152,16 +201,29 @@ function TargetTypeCard({
   onClick,
 }: TargetTypeCardProps) {
   const iconColor =
-    type === "prompt" ? "green" : type === "evaluator" ? "green" : "blue";
+    type === "prompt"
+      ? "green"
+      : type === "evaluator"
+        ? "green"
+        : type === "pairwise"
+          ? "purple"
+          : "blue";
   const iconBg =
     type === "prompt"
       ? "green.subtle"
       : type === "evaluator"
         ? "green.subtle"
-        : "blue.subtle";
+        : type === "pairwise"
+          ? "purple.subtle"
+          : "blue.subtle";
 
   return (
     <VStack align="start">
+      {type === "pairwise" && (
+        <Text fontSize="13px" color="fg.muted">
+          Compare existing columns:
+        </Text>
+      )}
       {type === "evaluator" && (
         <Text fontSize="13px" color="fg.muted">
           Or evaluate an evaluator:

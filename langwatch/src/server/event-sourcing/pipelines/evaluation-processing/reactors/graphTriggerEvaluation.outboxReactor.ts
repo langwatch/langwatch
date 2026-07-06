@@ -1,5 +1,5 @@
-import type { EvaluationAnalyticsData } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
+import type { EvaluationAnalyticsData } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
 import { featureFlagService } from "~/server/featureFlag";
 import { createLogger } from "~/utils/logger/server";
 import type {
@@ -8,9 +8,9 @@ import type {
 } from "../../../outbox/outboxReactor.types";
 import {
   GRAPH_TRIGGER_EVAL_REACTOR_NAME,
+  type GraphEvalStagePayload,
   graphEvalDedupId,
   graphEvalGroupKey,
-  type GraphEvalStagePayload,
 } from "../../../outbox/payload";
 import type { ReactorContext } from "../../../reactors/reactor.types";
 import type { EvaluationProcessingEvent } from "../schemas/events";

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { SuiteAnalyticsFoldProjection } from "../suiteAnalytics.foldProjection";
-import { SuiteRunStateFoldProjection } from "../suiteRunState.foldProjection";
 import type {
   SuiteRunItemCompletedEvent,
   SuiteRunStartedEvent,
 } from "../../schemas/events";
+import { SuiteAnalyticsFoldProjection } from "../suiteAnalytics.foldProjection";
+import { SuiteRunStateFoldProjection } from "../suiteRunState.foldProjection";
 
 /**
  * ADR-034 Phase 7 parity contract — slim fold reuses the same per-event

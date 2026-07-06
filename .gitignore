@@ -127,6 +127,12 @@ uuid
 # referenced by raw URL from the PR body — never committed to the product tree.
 langwatch/pr-screenshots/
 
+# Per-scenario LLM conversation transcripts (langy.scenario.test.ts)
+langwatch/e2e/langy/scenario-logs/
+
 # Agent scratch + dogfood evidence (never track)
 **/.claude/dogfood-evidence/
 **/.claude/tmp/
+
+# Dev server logs
+server.log

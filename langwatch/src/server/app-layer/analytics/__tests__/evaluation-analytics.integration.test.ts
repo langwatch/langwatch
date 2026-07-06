@@ -18,14 +18,14 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { EvaluationAnalyticsClickHouseRepository } from "~/server/app-layer/evaluations/repositories/evaluation-analytics.clickhouse.repository";
 import { EvaluationAnalyticsRollupClickHouseRepository } from "~/server/app-layer/evaluations/repositories/evaluation-analytics-rollup.clickhouse.repository";
 import {
+  startTestContainers,
+  stopTestContainers,
+} from "~/server/event-sourcing/__tests__/integration/testContainers";
+import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
   type EvaluationAnalyticsRow,
 } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
 import type { EvaluationAnalyticsRollupRow } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationAnalyticsRollup.mapProjection";
-import {
-  startTestContainers,
-  stopTestContainers,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
 
 const tenantId = `test-eval-${nanoid()}`;
 
@@ -123,12 +123,29 @@ describe("evaluation_analytics_rollup — write path (ADR-034 Phase 6)", () => {
   it("inserts per-evaluation rows and SimpleAggregateFunction(sum) collapses cleanly on merge", async () => {
     // Seed three evals in the same bucket — 2 pass, 1 fail.
     await rollupRepo.insertRows([
-      makeRollupRow({ passCount: 1, failCount: 0, scoreSum: 1.0, scoreCount: 1 }),
-      makeRollupRow({ passCount: 1, failCount: 0, scoreSum: 0.7, scoreCount: 1 }),
-      makeRollupRow({ passCount: 0, failCount: 1, scoreSum: 0.0, scoreCount: 1 }),
+      makeRollupRow({
+        passCount: 1,
+        failCount: 0,
+        scoreSum: 1.0,
+        scoreCount: 1,
+      }),
+      makeRollupRow({
+        passCount: 1,
+        failCount: 0,
+        scoreSum: 0.7,
+        scoreCount: 1,
+      }),
+      makeRollupRow({
+        passCount: 0,
+        failCount: 1,
+        scoreSum: 0.0,
+        scoreCount: 1,
+      }),
     ]);
     await flushAsyncInserts();
-    await ch.exec({ query: "OPTIMIZE TABLE evaluation_analytics_rollup FINAL" });
+    await ch.exec({
+      query: "OPTIMIZE TABLE evaluation_analytics_rollup FINAL",
+    });
 
     const result = await ch.query({
       query: `

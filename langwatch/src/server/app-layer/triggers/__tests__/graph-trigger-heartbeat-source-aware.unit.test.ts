@@ -10,15 +10,15 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { TriggerAction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
 import type { AnalyticsMetricSource } from "~/server/app-layer/analytics/routing/field-availability";
-import type { TriggerSummary } from "../repositories/trigger.repository";
-import type { TriggerService } from "../trigger.service";
+import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
 import {
   decideGraphTriggerHeartbeat,
   type GraphTriggerHeartbeatDeps,
   type HeartbeatCandidateSources,
 } from "../graph-trigger-heartbeat";
+import type { TriggerSummary } from "../repositories/trigger.repository";
+import type { TriggerService } from "../trigger.service";
 
 const PROJECT = "proj-mixed";
 const TRIGGER_TRACE = "trig-trace";
@@ -50,7 +50,9 @@ function makeTrigger(
   };
 }
 
-function makeTriggersService(perProject: Record<string, TriggerSummary[]>): TriggerService {
+function makeTriggersService(
+  perProject: Record<string, TriggerSummary[]>,
+): TriggerService {
   return {
     getActiveTraceTriggersForProject: vi.fn(async () => []),
     getActiveGraphTriggersForProject: vi.fn(
@@ -100,11 +102,11 @@ function makeClickHouseStub(): {
   const calls: QueryCall[] = [];
   const client = {
     query: vi.fn(
-      async (params: {
-        query: string;
-        query_params: { tenantId: string };
-      }) => {
-        calls.push({ query: params.query, tenantId: params.query_params.tenantId });
+      async (params: { query: string; query_params: { tenantId: string } }) => {
+        calls.push({
+          query: params.query,
+          tenantId: params.query_params.tenantId,
+        });
         // Return null recency so EVERY candidate enqueues (the test cares
         // about query routing, not enqueue filtering).
         return { json: async () => [{ lastMs: null }] };
@@ -151,7 +153,8 @@ describe("decideGraphTriggerHeartbeat source-awareness (ADR-034 Phase 6)", () =>
         prisma: prismaStub as unknown as GraphTriggerHeartbeatDeps["prisma"],
         resolveClickHouseClient: async () => clickHouseStub.client,
         featureFlagService: makeFlagsAllOn(),
-        lookupTriggerSource: async ({ triggerId }) => sourceByTrigger[triggerId],
+        lookupTriggerSource: async ({ triggerId }) =>
+          sourceByTrigger[triggerId],
       };
 
       const requests = await decideGraphTriggerHeartbeat({
@@ -206,8 +209,12 @@ describe("decideGraphTriggerHeartbeat source-awareness (ADR-034 Phase 6)", () =>
 
       expect(requests).toHaveLength(1);
       expect(clickHouseStub.calls).toHaveLength(1);
-      expect(clickHouseStub.calls[0]?.query).toContain("FROM evaluation_analytics");
-      expect(clickHouseStub.calls[0]?.query).not.toContain("FROM trace_analytics");
+      expect(clickHouseStub.calls[0]?.query).toContain(
+        "FROM evaluation_analytics",
+      );
+      expect(clickHouseStub.calls[0]?.query).not.toContain(
+        "FROM trace_analytics",
+      );
     });
   });
 

@@ -146,12 +146,13 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
       expect(rows).toHaveLength(2);
 
       const scopesById = Object.fromEntries(
-        rows.map((r) => [r.id, r.scopes.map((s) => `${s.scopeType}:${s.scopeId}`)]),
+        rows.map((r) => [
+          r.id,
+          r.scopes.map((s) => `${s.scopeType}:${s.scopeId}`),
+        ]),
       );
       expect(scopesById[first.id]).toEqual([`PROJECT:${projectId}`]);
-      expect(scopesById[second.id]).toEqual([
-        `ORGANIZATION:${organizationId}`,
-      ]);
+      expect(scopesById[second.id]).toEqual([`ORGANIZATION:${organizationId}`]);
     });
 
     /** @scenario Save a provider with multiple scopes */
@@ -181,11 +182,50 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
         .map((s) => `${s.scopeType}:${s.scopeId}`)
         .sort();
       expect(scopes).toEqual(
-        [
-          `ORGANIZATION:${organizationId}`,
-          `TEAM:${teamId}`,
-        ].sort(),
+        [`ORGANIZATION:${organizationId}`, `TEAM:${teamId}`].sort(),
       );
+    });
+
+    it("updates an org-scoped provider by id from a project context without 404ing", async () => {
+      const created = await service().updateModelProvider(
+        {
+          projectId,
+          provider: "openai",
+          name: `OpenAI Org Edit ${ns}`,
+          enabled: true,
+          customKeys: { OPENAI_API_KEY: `sk-org-edit-${ns}` },
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+        },
+        ctx(),
+      );
+      const createdRow = await prisma.modelProvider.findFirst({
+        where: { id: created.id, projectId },
+      });
+
+      // The drawer's masked-only save: id + scopes, no customKeys. The row is
+      // ORG-scoped, so a PROJECT-only lookup would 404. The org-anchored lookup
+      // must find it and update it in place, preserving the stored key.
+      const updated = await service().updateModelProvider(
+        {
+          id: created.id,
+          projectId,
+          provider: "openai",
+          name: `OpenAI Org Edit ${ns}`,
+          enabled: true,
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: organizationId }],
+        },
+        ctx(),
+      );
+
+      expect(updated.id).toBe(created.id);
+      const rows = await prisma.modelProvider.findMany({
+        where: { name: `OpenAI Org Edit ${ns}`, projectId },
+        include: { scopes: true },
+      });
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.scopes.map((s) => s.scopeType)).toEqual(["ORGANIZATION"]);
+      // The stored credential is preserved (the masked-only save sends no key).
+      expect(rows[0]!.customKeys).toEqual(createdRow!.customKeys);
     });
   },
 );

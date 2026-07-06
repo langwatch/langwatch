@@ -22,7 +22,13 @@ export type {
   DatasetRecordResponse,
 } from "./services/datasets";
 export { DatasetError, DatasetNotFoundError, DatasetApiError, DatasetValidationError, DatasetPlanLimitError } from "./services/datasets";
-export type { ExperimentRunResult, RunExperimentOptions } from "./services/experiments";
+export type {
+  ExperimentRunResult,
+  RunExperimentOptions,
+  RunWithResultsOptions,
+  ExperimentRowResult,
+  ExperimentRunWithResults,
+} from "./services/experiments";
 export {
   ExperimentsError,
   ExperimentNotFoundError,

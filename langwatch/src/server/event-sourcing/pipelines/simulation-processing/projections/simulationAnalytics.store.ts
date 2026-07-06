@@ -1,9 +1,9 @@
 import type { SimulationAnalyticsRepository } from "~/server/app-layer/scenarios/repositories/simulation-analytics.repository";
 import { BaseAnalyticsFoldStore } from "../../shared/analyticsStoreBase";
 import {
-  type SimulationAnalyticsData,
   projectSimulationAnalyticsStateToRow,
   SIMULATION_ANALYTICS_PROJECTION_VERSION_LATEST,
+  type SimulationAnalyticsData,
 } from "./simulationAnalytics.foldProjection";
 
 /**

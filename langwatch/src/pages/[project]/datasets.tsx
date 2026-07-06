@@ -15,9 +15,11 @@ import {
 import type { inferRouterOutputs } from "@trpc/server";
 import { useMemo, useState } from "react";
 import {
+  ChevronDown,
   Copy,
   Edit,
   MoreVertical,
+  Plus,
   Search,
   Table as TableIcon,
   Trash2,
@@ -31,8 +33,8 @@ import { useDeleteDatasetConfirmation } from "~/hooks/useDeleteDatasetConfirmati
 import { useRouter } from "~/utils/compat/next-router";
 import { AddOrEditDatasetDrawer } from "../../components/AddOrEditDatasetDrawer";
 import { DashboardLayout } from "../../components/DashboardLayout";
+import { BulkUploadDrawer } from "../../components/datasets/bulkUpload/BulkUploadDrawer";
 import { CopyDatasetDialog } from "../../components/datasets/CopyDatasetDialog";
-import { UploadCSVDrawer } from "../../components/datasets/UploadCSVDrawer";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
@@ -44,9 +46,37 @@ import type { DatasetColumns } from "../../server/datasets/types";
 import { api } from "../../utils/api";
 import { isHandledByGlobalHandler } from "../../utils/trpcError";
 
+/** Single entry point for getting data into datasets: a dropdown that splits the
+ *  two flows — uploading file(s) (one dataset per file, bulk drawer) and creating
+ *  an empty dataset by defining its columns. The caller supplies the trigger so
+ *  the same menu backs both the header button and the empty-state CTA. */
+function UploadOrCreateDatasetMenu({
+  children,
+  onUpload,
+  onCreate,
+}: {
+  children: React.ReactNode;
+  onUpload: () => void;
+  onCreate: () => void;
+}) {
+  return (
+    <Menu.Root positioning={{ sameWidth: true }}>
+      <Menu.Trigger asChild>{children}</Menu.Trigger>
+      <Menu.Content>
+        <Menu.Item value="upload" onClick={onUpload}>
+          <Upload size={16} /> Upload datasets
+        </Menu.Item>
+        <Menu.Item value="create" onClick={onCreate}>
+          <Plus size={16} /> Create empty dataset
+        </Menu.Item>
+      </Menu.Content>
+    </Menu.Root>
+  );
+}
+
 function DatasetsPage() {
   const addEditDatasetDrawer = useDisclosure();
-  const uploadCSVModal = useDisclosure();
+  const bulkUploadModal = useDisclosure();
   const { project } = useOrganizationTeamProject();
   const { isLiteMember } = useLiteMemberGuard();
   const router = useRouter();
@@ -180,10 +210,22 @@ function DatasetsPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </InputGroup>
-        <PageLayout.HeaderButton onClick={() => uploadCSVModal.onOpen()}>
-          <Upload height={17} width={17} strokeWidth={2.5} /> Upload or Create
-          Dataset
-        </PageLayout.HeaderButton>
+        <UploadOrCreateDatasetMenu
+          onUpload={() => bulkUploadModal.onOpen()}
+          onCreate={() => {
+            setEditDataset(undefined);
+            addEditDatasetDrawer.onOpen();
+          }}
+        >
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="upload-or-create-dataset"
+          >
+            <Upload height={17} width={17} strokeWidth={2.5} /> Upload or create
+            dataset <ChevronDown size={16} />
+          </Button>
+        </UploadOrCreateDatasetMenu>
       </PageLayout.Header>
       <Box width="full" maxW="calc(100vw - 200px)" paddingX={6} paddingY={6}>
         {datasets.data && datasets.data.length === 0 ? (
@@ -192,13 +234,21 @@ function DatasetsPage() {
             description="Upload or create datasets on your messages to do further analysis or to train your own models."
             docsInfo={
               <VStack gap={3}>
-                <Button
-                  colorPalette="orange"
-                  data-testid="empty-state-create-dataset"
-                  onClick={() => uploadCSVModal.onOpen()}
+                <UploadOrCreateDatasetMenu
+                  onUpload={() => bulkUploadModal.onOpen()}
+                  onCreate={() => {
+                    setEditDataset(undefined);
+                    addEditDatasetDrawer.onOpen();
+                  }}
                 >
-                  <Upload size={16} /> Upload or Create Dataset
-                </Button>
+                  <Button
+                    colorPalette="orange"
+                    data-testid="empty-state-create-dataset"
+                  >
+                    <Upload size={16} /> Upload or create dataset{" "}
+                    <ChevronDown size={16} />
+                  </Button>
+                </UploadOrCreateDatasetMenu>
                 <Text>
                   To learn more about datasets, please visit our{" "}
                   <Link
@@ -377,14 +427,15 @@ function DatasetsPage() {
           addEditDatasetDrawer.onClose();
         }}
       />
-      <UploadCSVDrawer
-        isOpen={uploadCSVModal.open}
-        onClose={uploadCSVModal.onClose}
-        onSuccess={() => {
+      <BulkUploadDrawer
+        open={bulkUploadModal.open}
+        onClose={bulkUploadModal.onClose}
+        onUploaded={() => {
           void datasets.refetch();
         }}
         onCreateFromScratch={() => {
-          uploadCSVModal.onClose();
+          bulkUploadModal.onClose();
+          setEditDataset(undefined);
           setTimeout(() => {
             addEditDatasetDrawer.onOpen();
           }, 100);

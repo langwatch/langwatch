@@ -1,12 +1,7 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { createLogger } from "~/utils/logger/server";
 import type { QueueAuditAdapter } from "../queues/queue.types";
-import {
-  isCadence,
-  isGraphEval,
-  isSettle,
-  type OutboxJob,
-} from "./payload";
+import { isCadence, isGraphEval, isSettle, type OutboxJob } from "./payload";
 
 const logger = createLogger("langwatch:outbox:pg-audit-adapter");
 

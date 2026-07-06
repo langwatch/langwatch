@@ -62,8 +62,7 @@ export class SuiteAnalyticsRollupMapProjection
     SuiteAnalyticsRollupRow,
     typeof suiteRollupEvents
   >
-  implements
-    MapEventHandlers<typeof suiteRollupEvents, SuiteAnalyticsRollupRow>
+  implements MapEventHandlers<typeof suiteRollupEvents, SuiteAnalyticsRollupRow>
 {
   readonly name = "suiteAnalyticsRollup";
   readonly store: AppendStore<SuiteAnalyticsRollupRow>;

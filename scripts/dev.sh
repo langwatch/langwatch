@@ -155,22 +155,62 @@ EOF
   done
 }
 
-# Detect a host-side process holding port 6379 before redis tries to bind.
+# Predicate: is something already listening on host port 6379? Shared by
+# check_host_redis_collision (the pre-flight guard for container presets) and
+# frontend-only's reuse/start branch. Returns a status; never exits.
+redis_port_in_use() {
+  if command -v lsof >/dev/null 2>&1; then
+    [ -n "$(lsof -iTCP:6379 -sTCP:LISTEN -t 2>/dev/null | head -n1)" ]
+  elif command -v ss >/dev/null 2>&1; then
+    ss -ltnH "sport = :6379" 2>/dev/null | grep -q ":6379"
+  else
+    return 1
+  fi
+}
+
+# Predicate: is the listener on host port 6379 actually a usable local Redis?
+# redis_port_in_use only proves *something* owns the port; this confirms it
+# speaks the Redis protocol with no auth/TLS gate by issuing PING and checking
+# for a PONG reply. If redis-cli is unavailable we cannot verify it, so we
+# degrade to "not usable" and the caller refuses to reuse an unverifiable
+# listener (rather than silently breaking the in-process BullMQ workers).
+redis_listener_is_usable() {
+  command -v redis-cli >/dev/null 2>&1 || return 1
+  redis-cli -u redis://localhost:6379 ping 2>/dev/null | grep -qx 'PONG'
+}
+
+# Predicate: is host port 6379 published by THIS compose project's own redis
+# container? The compose `redis` service binds 6379:6379, so when our own stack
+# is already up (a prior `make quickstart` left it running), `docker compose up`
+# idempotently reuses that container — re-running quickstart must NOT treat it as
+# a port collision. `--filter publish=6379` matches by the *host* published port,
+# so a stray redis mapped to some other host port (e.g. 55002->6379) is correctly
+# ignored. Another worktree's redis is rejected earlier by
+# check_stateful_collision with a clearer, volume-scoped message, so only our own
+# project's container reaches this exemption.
+redis_6379_owned_by_this_project() {
+  command -v docker >/dev/null 2>&1 || return 1
+  local me="${COMPOSE_PROJECT_NAME:-langwatch}" cid project
+  for cid in $(docker ps -q --filter "publish=6379" 2>/dev/null); do
+    project=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$cid" 2>/dev/null || true)
+    [ "$project" = "$me" ] && return 0
+  done
+  return 1
+}
+
+# Detect a host-side process holding port 6379 before the compose redis service
+# tries to bind it. Our own already-running redis container is exempt: docker
+# compose reuses it, so re-running quickstart on an up stack must not fail.
 check_host_redis_collision() {
   [ "${SKIP_HOST_REDIS_CHECK:-0}" = "1" ] && return 0
-  local pid=""
-  if command -v lsof >/dev/null 2>&1; then
-    pid=$(lsof -iTCP:6379 -sTCP:LISTEN -t 2>/dev/null | head -n1)
-  elif command -v ss >/dev/null 2>&1; then
-    ss -ltnH "sport = :6379" 2>/dev/null | grep -q ":6379" && pid="<unknown>"
-  fi
-  [ -z "$pid" ] && return 0
+  redis_port_in_use || return 0
+  redis_6379_owned_by_this_project && return 0
   cat >&2 <<EOF
-ERROR: A process is already listening on host port 6379 (redis).
-       The dev-stack redis container needs that port to bind. Stop the
-       host-side redis first (e.g. 'brew services stop redis' on macOS,
-       'sudo systemctl stop redis-server' on Linux), or set
-       SKIP_HOST_REDIS_CHECK=1 if you've intentionally repointed the dev
+ERROR: A process is already listening on host port 6379 (redis), and it is not
+       this dev stack's own redis container. The compose redis service needs
+       that port to bind. Stop the host-side redis first (e.g. 'brew services
+       stop redis' on macOS, 'sudo systemctl stop redis-server' on Linux), or
+       set SKIP_HOST_REDIS_CHECK=1 if you've intentionally repointed the dev
        stack at a host redis.
 EOF
   exit 1
@@ -349,11 +389,47 @@ EOF
 }
 
 run_frontend_only() {
+  # frontend-only runs no app/DB/CH compose — DB, ClickHouse, NLP and S3 all
+  # come from the operator's .env (shared dev). BUT `pnpm dev` starts the
+  # BullMQ workers in-process by default (set START_WORKERS=false for pure
+  # Vite), and those workers need Redis. Bring up only the lightweight `redis`
+  # compose service locally — sharing dev Redis would collide with other
+  # developers' jobs (same reason dev-infra runs Redis locally). The overlay
+  # pins REDIS_URL=redis://localhost:6379 so the host-side `pnpm dev` reaches it.
+  #
+  # If a host process already owns 6379 (e.g. the operator runs their own
+  # redis), reuse it ONLY when it answers PING with PONG — i.e. a real,
+  # auth-free local Redis. A non-Redis listener, or a Redis that requires
+  # auth/TLS, would let `pnpm dev` start but silently break the in-process
+  # BullMQ workers later, so fail loudly instead of reusing it. If 6379 is
+  # free, bring up our own lightweight redis container.
   write_overrides frontend-only
-  echo "Preset: frontend-only — no compose. Run 'pnpm dev' from langwatch/ to start."
+  if redis_port_in_use && redis_listener_is_usable; then
+    echo "Port 6379 already has a usable Redis — reusing it for in-process workers (not starting a redis container)."
+  elif redis_port_in_use; then
+    cat >&2 <<'EOF'
+ERROR: Port 6379 has a listener, but it could not be verified as a usable
+       local Redis (redis-cli PING did not return PONG, or redis-cli is not
+       installed). frontend-only points the in-process BullMQ workers at
+       redis://localhost:6379, so reusing a non-Redis process — or a Redis
+       that needs auth/TLS — would silently break job processing. Fix one of:
+         - install redis-cli so the launcher can verify the listener, or
+         - stop whatever owns 6379 / repoint it at a plain local Redis, or
+         - free port 6379 so this launcher can start its own redis container.
+       Pure Vite with no workers: START_WORKERS=false pnpm dev.
+EOF
+    exit 1
+  else
+    echo "Starting: redis compose service (preset=frontend-only)"
+    $COMPOSE up -d redis
+    echo "Redis is running detached on localhost:6379 (for in-process workers)."
+  fi
+  echo "Preset: frontend-only — no app compose. Run 'pnpm dev' from langwatch/ to start."
   echo ""
   echo "Tip: pure UI / design / static iteration. URLs come from langwatch/.env."
   echo "     For services on top: switch to all-local, all-local-nlp, or full-local."
+  echo "     Pure Vite with no background processing: START_WORKERS=false pnpm dev."
+  echo "     Stop redis with: scripts/dev.sh down"
   # Skip flags must be on the shell env of the pnpm dev subprocess, NOT in
   # .env.dev-up: start:prepare:db runs the migrations before the app boots
   # dotenv, so it reads the shell environment, not the overlay file. Frontend-only

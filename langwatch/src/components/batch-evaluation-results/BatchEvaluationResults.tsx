@@ -18,13 +18,14 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { type Experiment, ExperimentType, type Project } from "@prisma/client";
-import { useRouter } from "~/utils/compat/next-router";
+import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BarChart2, Download, ExternalLink } from "react-feather";
 
 import { Link } from "~/components/ui/link";
 import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 import { PageLayout } from "../ui/layouts/PageLayout";
 import {
   BatchEvaluationResultsTable,
@@ -35,18 +36,14 @@ import { type BatchRunSummary, BatchRunsSidebar } from "./BatchRunsSidebar";
 import { ComparisonCharts, type XAxisOption } from "./ComparisonCharts";
 import { downloadCsv } from "./csvExport";
 import { getRunDisplayName } from "./getRunDisplayName";
+import { isRunFinished } from "./isRunFinished";
 import { TableSkeleton } from "./TableSkeleton";
 import {
   type BatchEvaluationData,
   transformBatchEvaluationData,
 } from "./types";
 import { useComparisonMode } from "./useComparisonMode";
-import { isRunFinished } from "./isRunFinished";
-import {
-  RUN_COLORS,
-  useMultiRunData,
-} from "./useMultiRunData";
-import React from "react";
+import { RUN_COLORS, useMultiRunData } from "./useMultiRunData";
 
 type BatchEvaluationResultsProps = {
   project?: Project;
@@ -102,6 +99,7 @@ export function BatchEvaluationResults({
       experimentId: experiment?.id ?? "",
     },
     {
+      enabled: !!project && !!experiment,
       refetchInterval: isSomeRunning ? 3000 : 10000,
     },
   );
@@ -213,7 +211,7 @@ export function BatchEvaluationResults({
       runId: selectedRunId ?? "",
     },
     {
-      enabled: !!selectedRunId,
+      enabled: !!project && !!experiment && !!selectedRunId,
       refetchInterval: runDataRefetchInterval,
     },
   );
@@ -408,9 +406,7 @@ export function BatchEvaluationResults({
   const runColors = stableRunColorMap;
 
   // Find sidebar run for selected
-  const sidebarSelectedRun = sidebarRuns.find(
-    (r) => r.runId === selectedRunId,
-  );
+  const sidebarSelectedRun = sidebarRuns.find((r) => r.runId === selectedRunId);
 
   // CSV download - using the new V3 export that properly handles multi-target data
   const handleDownloadCSV = useCallback(() => {
@@ -457,20 +453,35 @@ export function BatchEvaluationResults({
       </Box>
 
       {/* Main content - flex column that fills available space */}
-      <VStack flex={1} minWidth={0} height="full" gap={0} align="stretch" overflow="auto">
+      <VStack
+        flex={1}
+        minWidth={0}
+        height="full"
+        gap={0}
+        align="stretch"
+        overflow="auto"
+      >
         {/* Header - fixed height */}
         <PageLayout.Header paddingX={2} withBorder={false} flexShrink={0}>
           <HStack gap={1} minWidth={0} overflow="hidden" flexShrink={1}>
             <Heading whiteSpace="nowrap" flexShrink={0}>
               {experiment ? (
-                experiment.name ?? experiment.slug
+                (experiment.name ?? experiment.slug)
               ) : (
                 <Skeleton width="200px" height="28px" />
               )}
             </Heading>
             {experiment && sidebarSelectedRun && (
-              <Text textStyle={"xs"} color={"fg.muted"} whiteSpace="nowrap" overflow="hidden" textOverflow="ellipsis" flexShrink={1} minWidth={0}>
-                {'// '}
+              <Text
+                textStyle={"xs"}
+                color={"fg.muted"}
+                whiteSpace="nowrap"
+                overflow="hidden"
+                textOverflow="ellipsis"
+                flexShrink={1}
+                minWidth={0}
+              >
+                {"// "}
                 {sidebarSelectedRun.runId}
               </Text>
             )}
