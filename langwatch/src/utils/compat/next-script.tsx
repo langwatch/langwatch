@@ -69,13 +69,13 @@ export default function Script({
   // re-runs the effect; if this flag were set at schedule time instead of
   // at actual-injection time, that remount would see it already true and
   // skip rescheduling, so the script would never inject under StrictMode.
-  const injected = useRef(false);
+  const hasInjectedRef = useRef(false);
 
   useEffect(() => {
-    if (injected.current) return;
+    if (hasInjectedRef.current) return;
 
     const inject = () => {
-      injected.current = true;
+      hasInjectedRef.current = true;
 
       const script = document.createElement("script");
       if (id) script.id = id;
