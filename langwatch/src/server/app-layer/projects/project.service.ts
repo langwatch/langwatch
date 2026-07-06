@@ -76,21 +76,16 @@ export class ProjectService {
   }
 
   /**
-   * Single source of truth for the project's default model.
+   * Provider-level fallback for the project's default model.
    *
-   * Prefer this over reading `project.defaultModel` directly when you need
-   * to know what model to use. `project.defaultModel` is the user-set
-   * override; this method applies the full resolution chain:
-   *
-   *   1. project.defaultModel is set AND its provider is enabled → return it.
-   *   2. Else walk enabled providers in PROVIDER_RESOLUTION_ORDER; return the
-   *      first one that is enabled and has a canonical default in
-   *      PROVIDER_DEFAULT_MODELS.
-   *   3. Else → return null.
-   *
+   * Walks enabled providers in `PROVIDER_RESOLUTION_ORDER` and returns the
+   * first one that has a canonical default in `PROVIDER_DEFAULT_MODELS`.
    * Returns null when no providers are usable (new self-host install with no
-   * env vars set, or all providers disabled). Callers should treat null as
-   * "not configured yet" and surface an appropriate message.
+   * env vars set, or all providers disabled).
+   *
+   * For callers that need the full cascade (project → team → org overrides),
+   * use `modelProvider.getResolvedDefault` (tRPC) or `getResolvedDefaultForFeature`
+   * (server-side) instead — they layer DB-backed `ModelDefaultConfig` on top.
    */
   async resolveDefaultModel(projectId: string): Promise<string | null> {
     if (!this.modelProviderService) {
@@ -98,22 +93,15 @@ export class ProjectService {
       return null;
     }
 
-    const [project, modelProviders] = await Promise.all([
-      this.repo.getById(projectId),
-      this.modelProviderService.getProjectModelProviders(projectId, true),
-    ]);
+    // project.defaultModel was removed in ADR-021 (iter 109). Defaults now live
+    // in ModelDefaultConfig rows and are resolved via the feature-key cascade.
+    // This method provides the provider-level fallback for callers that have not
+    // yet migrated to getResolvedDefaultForFeature — it finds the first enabled
+    // provider that has a canonical default in PROVIDER_DEFAULT_MODELS.
+    const modelProviders =
+      await this.modelProviderService.getProjectModelProviders(projectId, true);
 
-    if (!project) return null;
-
-    // 1. User override wins when its provider is still enabled.
-    if (project.defaultModel) {
-      const providerKey = project.defaultModel.split("/")[0] ?? "";
-      if (modelProviders[providerKey]?.enabled) {
-        return project.defaultModel;
-      }
-    }
-
-    // 2. Walk providers in preferred order, return first usable canonical default.
+    // Walk providers in preferred order, return first usable canonical default.
     for (const providerId of PROVIDER_RESOLUTION_ORDER) {
       const provider = modelProviders[providerId];
       if (!provider?.enabled) continue;
@@ -124,7 +112,7 @@ export class ProjectService {
       return canonicalModel;
     }
 
-    // 3. Nothing usable.
+    // Nothing usable.
     return null;
   }
 
