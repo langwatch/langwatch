@@ -41,6 +41,11 @@ type ControlPlaneConfig struct {
 type AuthCacheConfig struct {
 	SoftBump  time.Duration `env:"SOFT_BUMP"`
 	HardGrace time.Duration `env:"HARD_GRACE"`
+	// ConfigTTL bounds how stale a cached virtual key's config
+	// (credentials, base URLs, routing chain) can get before a background
+	// re-fetch, covering config mutations that don't emit change-feed
+	// events. Default 60s; negative disables.
+	ConfigTTL time.Duration `env:"CONFIG_TTL"`
 }
 
 // CustomerTraceBridgeConfig holds customer trace bridge settings.
