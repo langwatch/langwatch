@@ -79,11 +79,31 @@ export async function thenISeeNewScenarioButton(page: Page) {
  */
 export async function whenIClickNewScenario(page: Page) {
   await page.getByRole("button", { name: /new scenario/i }).click();
-  // An AI-assist modal opens first; skip it to go straight to the form.
-  const skipButton = page.getByRole("button", { name: /i'll write it myself/i });
-  if (await skipButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-    await skipButton.click();
+
+  // Two interstitial modals may appear before the scenario form drawer:
+  //   1. ModelProviderRequiredModal ("Proceed anyway") — shown when no model
+  //      provider is configured (typical in CI).
+  //   2. AICreateModal ("I'll write it myself") — shown when a provider exists.
+  // Race both locators; whichever becomes visible first wins.
+  const dismissed = await Promise.race([
+    page
+      .getByRole("button", { name: /proceed anyway/i })
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => "proceed" as const)
+      .catch(() => null),
+    page
+      .getByRole("button", { name: /i'll write it myself/i })
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => "skip" as const)
+      .catch(() => null),
+  ]);
+
+  if (dismissed === "proceed") {
+    await page.getByRole("button", { name: /proceed anyway/i }).click();
+  } else if (dismissed === "skip") {
+    await page.getByRole("button", { name: /i'll write it myself/i }).click();
   }
+  // If neither modal appeared the form drawer opened directly — no action needed.
 }
 
 /**
