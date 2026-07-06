@@ -205,11 +205,20 @@ function getInputNearLabel(labelText: string): HTMLInputElement {
   while (node && !node.querySelector("input")) {
     node = node.parentElement;
   }
-  const input = node?.querySelector("input");
-  if (!input) {
+  if (!node) {
     throw new Error(`no input found near label "${labelText}"`);
   }
-  return input as HTMLInputElement;
+  // Exactly one input, not just "at least one" — if a future Field.Root
+  // flattening merges this field's wrapper with a sibling field's, a
+  // loose `querySelector` would silently return whichever input happens
+  // to come first in DOM order instead of failing loudly.
+  const inputs = node.querySelectorAll("input");
+  if (inputs.length !== 1) {
+    throw new Error(
+      `expected exactly one input near label "${labelText}", found ${inputs.length}`,
+    );
+  }
+  return inputs[0] as HTMLInputElement;
 }
 
 describe("Feature: editing a model-provider row resolves the correct row by id", () => {
@@ -222,7 +231,7 @@ describe("Feature: editing a model-provider row resolves the correct row by id",
   });
 
   describe("given two openai rows exist at different scopes (org-wide and project-scoped)", () => {
-    describe("when the edit drawer opens targeting the wider-scope row (not the collapse winner)", () => {
+    describe("when the form renders targeting the wider-scope row (edit flow)", () => {
       beforeEach(() => {
         primeQueries();
         render(
@@ -270,7 +279,13 @@ describe("Feature: editing a model-provider row resolves the correct row by id",
           expect(mockMutateAsync).toHaveBeenCalledTimes(1);
         });
         expect(mockMutateAsync).toHaveBeenCalledWith(
-          expect.objectContaining({ id: "row-a", provider: "openai" }),
+          expect.objectContaining({
+            id: "row-a",
+            provider: "openai",
+            customKeys: expect.objectContaining({
+              OPENAI_API_KEY: "sk-reentered-key",
+            }),
+          }),
         );
       });
     });

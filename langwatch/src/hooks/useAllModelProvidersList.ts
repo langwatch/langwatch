@@ -4,7 +4,9 @@ import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 
 /**
  * Flat (uncollapsed) list of every stored ModelProvider row the caller can
- * see — one entry per row, never deduped by provider type.
+ * see — one entry per row, never deduped by provider type. Canonical
+ * rationale for this hook's existence — point comments elsewhere at this
+ * block instead of restating it.
  *
  * `useModelProvidersSettings` returns a `Record<providerKey, row>` collapsed
  * to a single winner per provider type (narrowest scope wins), which is
@@ -14,7 +16,16 @@ import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
  * non-winning row from that Record entirely, so an id lookup against it
  * silently misses and falls back to a blank draft (#5380). Any caller that
  * looks up a row by id — not by provider key — must read from this flat
- * list instead.
+ * list instead, via `findModelProviderById` below.
+ *
+ * Note on the loading signal: a disabled query (the org/project id is
+ * momentarily unresolved, e.g. before the app-shell context hydrates)
+ * reports `isLoading: false` with `providers: []` — react-query only
+ * reports `isLoading` for a query that's actually enabled and fetching.
+ * Consumers that gate a seed-once form on "don't mount off an empty list"
+ * (`EditModelProviderDrawer`) rely on the surrounding settings page having
+ * already hydrated org/project before the drawer can even open; this hook
+ * does not itself distinguish "genuinely empty" from "not ready yet".
  */
 export function useAllModelProvidersList() {
   const { project, organization, hasPermission } = useOrganizationTeamProject();
@@ -47,10 +58,27 @@ export function useAllModelProvidersList() {
   );
   const activeQuery = canViewOrg ? orgQuery : projectQuery;
 
+  // Both procedures resolve to the identical `{ providers, modelMetadata }`
+  // shape (same MaybeStoredModelProvider[] / ModelMetadataForFrontend
+  // types on both branches), so tRPC's inference already gives
+  // `activeQuery.data?.providers` the right type here with no cast needed.
   return {
-    providers: (activeQuery.data?.providers ??
-      []) as MaybeStoredModelProvider[],
+    providers: activeQuery.data?.providers ?? [],
     isLoading: activeQuery.isLoading,
     refetch: activeQuery.refetch,
   } as const;
+}
+
+/**
+ * Resolves a single row by id from the flat list above. Shared by
+ * `ModelProviderForm`'s edit-target memo and `EditModelProviderDrawer`'s
+ * title lookup so the two can never again resolve different rows for the
+ * same id — the #5380 bug was exactly two separate resolvers drifting.
+ */
+export function findModelProviderById(
+  providers: MaybeStoredModelProvider[],
+  modelProviderId: string | undefined,
+): MaybeStoredModelProvider | undefined {
+  if (!modelProviderId || modelProviderId === "new") return undefined;
+  return providers.find((p) => p.id === modelProviderId);
 }

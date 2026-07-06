@@ -36,12 +36,8 @@ export default function ModelsPage() {
   const { project, organization, team, hasPermission } =
     useOrganizationTeamProject();
   const hasModelProvidersManagePermission = hasPermission("project:manage");
-  // The settings page renders one row per stored ModelProvider — the
-  // Record-by-provider-key shape returned by `useModelProvidersSettings`
-  // collapses multi-instance setups (two "OpenAI" rows at different
-  // scopes) into a single entry and silently drops the loser. The shared
-  // hook fans the flat list out across org/project scope so the table
-  // reflects every row regardless of the viewer's permissions.
+  // Flat, uncollapsed list — see useAllModelProvidersList for why this
+  // table can't use the collapsed Record from useModelProvidersSettings.
   const {
     providers: allProvidersList,
     isLoading,

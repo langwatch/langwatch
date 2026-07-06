@@ -1,6 +1,9 @@
 import { Box, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
 import { useDrawer } from "~/hooks/useDrawer";
-import { useAllModelProvidersList } from "../hooks/useAllModelProvidersList";
+import {
+  findModelProviderById,
+  useAllModelProvidersList,
+} from "../hooks/useAllModelProvidersList";
 import { useModelProvidersSettings } from "../hooks/useModelProvidersSettings";
 import { modelProviderIcons } from "../server/modelProviders/iconsMap";
 import { modelProviders } from "../server/modelProviders/registry";
@@ -20,19 +23,21 @@ export const EditModelProviderDrawer = (
   const { projectId, organizationId, modelProviderId, providerKey } = props;
   const { closeDrawer } = useDrawer();
   const { providers, isLoading } = useModelProvidersSettings({ projectId });
-  // The row this drawer is titled for must come from the same
-  // uncollapsed list `EditModelProviderForm` resolves its edit target
-  // from — the settings table passes ids from that flat list, and the
-  // `providers` Record above dedupes by provider type, so an id lookup
-  // against it can silently miss a same-type row (#5380).
+  // Resolve by id from the flat list — see useAllModelProvidersList for
+  // why the collapsed Record is wrong here (#5380).
   const { providers: allProviders, isLoading: isAllProvidersLoading } =
     useAllModelProvidersList();
 
-  // Get provider - by id (flat list) or provider key (collapsed record;
-  // correct there since it's asking "whichever row owns this provider
-  // type right now", not "this specific row").
-  const provider = modelProviderId
-    ? allProviders.find((p) => p.id === modelProviderId)
+  // A specific row is being edited only when modelProviderId is a real
+  // id — not the Add-flow sentinel "new" and not absent.
+  const isEditingSpecificRow = !!modelProviderId && modelProviderId !== "new";
+
+  // Title/icon source: the specific row by id (shared resolver) when
+  // editing one, else the collapsed record's current winner for this
+  // provider type — right there, since "new"/no-id means "whichever row
+  // owns this provider type right now", not "this specific row".
+  const provider = isEditingSpecificRow
+    ? findModelProviderById(allProviders, modelProviderId)
     : providers?.[providerKey];
 
   // Get provider name for the title
@@ -49,7 +54,6 @@ export const EditModelProviderDrawer = (
   // rendering the form off the (collapsed-record-only) blank fallback
   // and then resetting once the flat list arrives would wipe whatever
   // the user had already typed.
-  const isEditingSpecificRow = !!modelProviderId && modelProviderId !== "new";
   const isFormDataLoading =
     isLoading || !providers || (isEditingSpecificRow && isAllProvidersLoading);
 

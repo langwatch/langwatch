@@ -1,7 +1,10 @@
 import { Box, Button, Field, HStack, Input, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
-import { useAllModelProvidersList } from "../../hooks/useAllModelProvidersList";
+import {
+  findModelProviderById,
+  useAllModelProvidersList,
+} from "../../hooks/useAllModelProvidersList";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useFeatureFlag } from "../../hooks/useFeatureFlag";
 import { useModelProviderApiKeyValidation } from "../../hooks/useModelProviderApiKeyValidation";
@@ -50,9 +53,8 @@ export const EditModelProviderForm = ({
   const { providers } = useModelProvidersSettings({
     projectId: projectId,
   });
-  // Flat, uncollapsed list — the id lookup below must resolve against this,
-  // not the collapsed `providers` Record above (see the lookup comment on
-  // the `provider` memo for why).
+  // Flat, uncollapsed list — see useAllModelProvidersList for why the
+  // lookup below can't use the collapsed `providers` Record above.
   const { providers: allProviders } = useAllModelProvidersList();
   const { closeDrawer } = useDrawer();
   const { project, team, organization, hasPermission } =
@@ -100,23 +102,15 @@ export const EditModelProviderForm = ({
   //     an existing row. The Add Model Provider menu sets this so the
   //     user can stand up a second instance of an already-configured
   //     provider type without colliding with the first.
-  //   - `modelProviderId === "<cuid>"` → edit that specific row. The id
-  //     comes from the settings table, which reads the UNCOLLAPSED flat
-  //     list (`useAllModelProvidersList`), so the lookup has to search
-  //     that same flat list rather than the `providers` Record above.
-  //     That Record dedupes by provider string (narrowest scope wins)
-  //     and silently drops every other same-type row — with
-  //     multi-instance enabled, looking this id up against it can miss
-  //     the exact row the user clicked, fall through to the blank draft
-  //     below, and on Save submit `id: undefined`, which the server
-  //     treats as a create instead of an update (#5380).
+  //   - `modelProviderId === "<cuid>"` → edit that specific row, resolved
+  //     via the shared `findModelProviderById` against the flat list —
+  //     see useAllModelProvidersList for why the collapsed `providers`
+  //     Record above is the wrong source for this lookup (#5380).
   //   - `modelProviderId` undefined → no specific target, fresh blank
   //     (deep-link from evaluator selector or similar).
   const provider: MaybeStoredModelProvider = useMemo(() => {
-    if (modelProviderId && modelProviderId !== "new") {
-      const existing = allProviders.find((p) => p.id === modelProviderId);
-      if (existing) return existing;
-    }
+    const existing = findModelProviderById(allProviders, modelProviderId);
+    if (existing) return existing;
     return {
       provider: providerKey,
       enabled: false,
