@@ -8,19 +8,20 @@ import {
 interface CreateAppAnalyticsClientParams {
   isSaaS: boolean;
   posthogClient: PostHog | undefined;
+  isGtagReady: boolean;
 }
 
 export function createAppAnalyticsClient(
   params: CreateAppAnalyticsClientParams,
 ) {
-  const { isSaaS, posthogClient } = params;
+  const { isSaaS, posthogClient, isGtagReady } = params;
   const registeredProviders = [] as Provider[];
   const isDev = process.env.NODE_ENV !== "production";
 
   if (isDev) registeredProviders.push(providers.console);
 
   if (isSaaS) {
-    if (typeof window !== "undefined" && (window as any).gtag) {
+    if (isGtagReady) {
       registeredProviders.push(providers.google);
     }
 

@@ -1,11 +1,11 @@
+import posthog from "posthog-js";
 import { useEffect, useRef } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useRequiredSession } from "~/hooks/useRequiredSession";
-import Script from "~/utils/compat/next-script";
-
 import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
-import posthog from "posthog-js";
+import Script from "~/utils/compat/next-script";
+import { pollForGlobal } from "~/utils/pollForGlobal";
 
 export function ExtraFooterComponents() {
   const session = useRequiredSession({ required: false });
@@ -53,19 +53,27 @@ export function SignedInExtraFooterComponents() {
   const hasUpdatedLastLogin = useRef(false);
 
   useEffect(() => {
-    if (!session.data?.user?.email || !organization?.name || hasTracked.current)
-      return;
+    const email = session.data?.user?.email;
+    const name = session.data?.user?.name;
+    const companyName = organization?.name;
+    if (!email || !companyName || hasTracked.current) return;
 
-    const reo = (window as any).Reo;
-    if (!reo?.identify) return;
-
-    reo.identify({
-      username: session.data.user.email,
-      type: "email",
-      firstname: session.data.user.name || "",
-      company: organization.name,
-    });
-    hasTracked.current = true;
+    // Reo is defined by GTM's container once it loads — which is now
+    // idle-deferred — so it may not exist yet on first run. Poll instead of
+    // giving up permanently.
+    return pollForGlobal(
+      () => (window as any).Reo,
+      (reo) => {
+        if (!reo?.identify) return;
+        reo.identify({
+          username: email,
+          type: "email",
+          firstname: name || "",
+          company: companyName,
+        });
+        hasTracked.current = true;
+      },
+    );
   }, [session.data?.user?.email, session.data?.user?.name, organization?.name]);
 
   // Update last login separately from analytics — don't gate on gtag availability
@@ -85,28 +93,34 @@ export function SignedInExtraFooterComponents() {
   }, [organization?.id, project?.id]);
 
   useEffect(() => {
-    const gtag = (window as any).gtag;
-    if (!session.data?.user || !organization || !project || !gtag) return;
+    const user = session.data?.user;
+    if (!user || !organization || !project || user.impersonator) return;
 
-    if (!session.data.user.impersonator) {
-      gtag("set", "user_properties", {
-        organization_id: organization.id,
-        organization_name: organization.name,
-        project_id: project.id,
-        project_name: project.name,
-        environment: process.env.NODE_ENV,
-        user_id: session.data.user.id,
-      });
+    // gtag is defined by GTM's container once it loads — which is now
+    // idle-deferred — so it may not exist yet on first run. Poll instead of
+    // giving up permanently.
+    return pollForGlobal(
+      () => (window as any).gtag,
+      (gtag) => {
+        gtag("set", "user_properties", {
+          organization_id: organization.id,
+          organization_name: organization.name,
+          project_id: project.id,
+          project_name: project.name,
+          environment: process.env.NODE_ENV,
+          user_id: user.id,
+        });
 
-      gtag("event", "open_dashboard", {
-        organization_id: organization.id,
-        organization_name: organization.name,
-        project_id: project.id,
-        project_name: project.name,
-        environment: process.env.NODE_ENV,
-        user_id: session.data.user.id,
-      });
-    }
+        gtag("event", "open_dashboard", {
+          organization_id: organization.id,
+          organization_name: organization.name,
+          project_id: project.id,
+          project_name: project.name,
+          environment: process.env.NODE_ENV,
+          user_id: user.id,
+        });
+      },
+    );
   }, [organization?.id, project?.id]);
 
   useEffect(() => {
