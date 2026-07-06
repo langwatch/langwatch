@@ -4742,7 +4742,7 @@ wheels = [
 
 [[package]]
 name = "openinference-instrumentation-litellm"
-version = "0.1.24"
+version = "0.1.34"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "openinference-instrumentation" },
@@ -4753,9 +4753,9 @@ dependencies = [
     { name = "setuptools" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d9/ab/26bddd7789d351999bafea999a1f46000850a964356c9892b5f854596f5e/openinference_instrumentation_litellm-0.1.24.tar.gz", hash = "sha256:75537417a8ee19a86b1da38c27472d89f41b0ea0d6af19318ee21bcd6d1f4f98", size = 18585, upload-time = "2025-07-15T18:30:04.186Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ad/60/53c020d999db1e0a8cd389a308f8b4dea9e19e4dc2b03915f5daf33032c7/openinference_instrumentation_litellm-0.1.34.tar.gz", hash = "sha256:658e64d1ab72b5e98a72715f196c20a1e4a32ab6e85c83959b359c2532da4be7", size = 90562, upload-time = "2026-05-18T18:51:31.34Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c9/14/a244cf5557bde1e5dbb6490866bdf0f38d5d2def11b59d273544f915f82e/openinference_instrumentation_litellm-0.1.24-py3-none-any.whl", hash = "sha256:7c105b520eb889784a9a989d0c884be024f637e977c9a46cd4e63952e4ea8103", size = 12822, upload-time = "2025-07-15T18:30:03.037Z" },
+    { url = "https://files.pythonhosted.org/packages/f3/d0/efe9332070487d132d604bb7c6d0d57a5c2039760f200210efb57e7c940a/openinference_instrumentation_litellm-0.1.34-py3-none-any.whl", hash = "sha256:c73b5813467cc0faf010280e5196f677ac4f844f9c72ea7847b6dd29980261be", size = 17177, upload-time = "2026-05-18T18:51:29.987Z" },
 ]
 
 [[package]]
