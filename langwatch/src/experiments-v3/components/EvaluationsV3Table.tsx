@@ -1645,19 +1645,32 @@ export function EvaluationsV3Table({
   const totalColumnPercentage = useMemo(() => {
     let total = 0;
 
-    // Sum dataset column percentages
+    // Sum dataset column percentages. Column IDs here must match the
+    // header IDs resize actually writes to (`dataset.${column.id}` /
+    // `target.${targetId}`, see the columnHelper.accessor calls above) —
+    // a mismatched ID means a resized column's stored width is never
+    // found, so its contribution silently falls back to the default.
     for (const col of datasetColumns) {
-      const colId = `dataset_${col.id}`;
+      const colId = `dataset.${col.id}`;
       total += columnSizing[colId] ?? DATASET_COL_DEFAULT_PCT;
     }
 
     // Sum target column percentages
     for (const target of targets) {
-      total += columnSizing[target.id] ?? TARGET_COL_DEFAULT_PCT;
+      total += columnSizing[`target.${target.id}`] ?? TARGET_COL_DEFAULT_PCT;
+    }
+
+    // Sum dedicated pairwise result column percentages — omitting these
+    // left the table's overall width computed as if they didn't exist,
+    // so each pairwise column had to squeeze into whatever sliver of
+    // "auto" space was left over, rendering near-zero-width with its
+    // text wrapping one character per line.
+    for (const pwEval of stablePairwiseEvaluators) {
+      total += columnSizing[`pairwise.${pwEval.id}`] ?? TARGET_COL_DEFAULT_PCT;
     }
 
     return total;
-  }, [datasetColumns, targets, columnSizing]);
+  }, [datasetColumns, targets, stablePairwiseEvaluators, columnSizing]);
 
   // Get column width as CSS string
   // Converts stored percentage values to CSS percentage strings
@@ -1677,6 +1690,10 @@ export function EvaluationsV3Table({
       // Use default percentages based on column type
       if (columnType === "dataset") return `${DATASET_COL_DEFAULT_PCT}%`;
       if (columnType === "target") return `${TARGET_COL_DEFAULT_PCT}%`;
+      // Dedicated pairwise result columns need a real percentage too —
+      // falling through to "auto" here left them competing with the
+      // filler column for whatever sliver of space was left over.
+      if (columnType === "pairwise") return `${TARGET_COL_DEFAULT_PCT}%`;
       return "auto";
     },
     [columnSizing],
@@ -1781,7 +1798,6 @@ export function EvaluationsV3Table({
               colSpan={targetsColSpan}
               onAddClick={handleAddTarget}
               showWarning={targets.length === 0}
-              hasComparison={targets.length > 0}
               isLoading={isLoadingExperiment}
             />
           </tr>

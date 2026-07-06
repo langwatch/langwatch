@@ -53,6 +53,21 @@ import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import type { EvaluatorCategoryId } from "./EvaluatorCategorySelectorDrawer";
 import { EvaluatorMappingsSection } from "./EvaluatorMappingsSection";
 
+// Stable reference for the "no pairwise config yet" default (new pairwise
+// evaluator, before the user has picked anything). Must be a module-level
+// constant, not an inline literal in JSX — PairwiseConfigForm re-syncs its
+// local draft from this `value` prop whenever the *reference* changes
+// (`useEffect(() => setDraft(value), [value])`), and onChange only writes
+// to a ref (not back into this prop), so a fresh `{...}` literal on every
+// EvaluatorEditorBody re-render silently wiped Variant A/B/Golden field
+// mid-selection any time an unrelated field in the drawer re-rendered it.
+const EMPTY_PAIRWISE_CONFIG: PairwiseEvaluatorConfig = {
+  variantA: "",
+  variantB: "",
+  goldenField: "",
+  includeMetrics: [],
+};
+
 export type EvaluatorMappingsConfig = {
   level?: "trace" | "thread";
   availableSources?: AvailableSource[];
@@ -296,7 +311,13 @@ export function useEvaluatorEditorController(
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   useEffect(() => {
-    if (evaluatorDef && !evaluatorId) {
+    // `defaultSettings` depends on the cascade-resolved model/embeddings
+    // queries, which can resolve (new object reference) *after* the user has
+    // already started filling out the form — e.g. Pairwise Compare's Include
+    // cost/duration toggles. Without the isDirty guard, that async resolve
+    // re-fires this effect and form.reset() silently wipes whatever the user
+    // already touched ("resetting out of the blue").
+    if (evaluatorDef && !evaluatorId && !form.formState.isDirty) {
       form.reset({
         name: forceUserToDecideAName ? "" : evaluatorDef.name,
         settings: defaultSettings,
@@ -752,14 +773,7 @@ export function EvaluatorEditorBody({
         {isPairwise && pairwiseContext && onPairwiseChange && (
           <Box paddingTop={4}>
             <PairwiseConfigForm
-              value={
-                pairwiseContext.initialPairwise ?? {
-                  variantA: "",
-                  variantB: "",
-                  goldenField: "",
-                  includeMetrics: [],
-                }
-              }
+              value={pairwiseContext.initialPairwise ?? EMPTY_PAIRWISE_CONFIG}
               onChange={onPairwiseChange}
               targets={pairwiseContext.targets}
               datasetColumns={pairwiseContext.datasetColumns}
