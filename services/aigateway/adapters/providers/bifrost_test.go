@@ -441,3 +441,124 @@ func TestCredentialToBifrostKey_BedrockHonorsAWSStyleKeys(t *testing.T) {
 		t.Errorf("Region not honored: %+v", k.BedrockKeyConfig.Region)
 	}
 }
+
+// mapProvider routes customer-hosted OpenAI-compatible endpoints (provider
+// "custom", or "openai" with a base-URL override) through Bifrost's vLLM
+// provider, which carries the URL per-key. Without this, base URLs are
+// silently dropped and traffic goes to api.openai.com.
+//
+// Spec: specs/ai-gateway/custom-provider-base-url.feature
+func TestMapProvider_CustomAndBaseURLOverrides(t *testing.T) {
+	cases := []struct {
+		name string
+		cred domain.Credential
+		want bfschemas.ModelProvider
+	}{
+		{"custom provider maps to vllm", domain.Credential{ProviderID: domain.ProviderCustom}, bfschemas.VLLM},
+		{"openai with base_url maps to vllm", domain.Credential{
+			ProviderID: domain.ProviderOpenAI,
+			Extra:      map[string]string{"base_url": "http://llm-server:8000/v1"},
+		}, bfschemas.VLLM},
+		{"openai with litellm-style api_base maps to vllm", domain.Credential{
+			ProviderID: domain.ProviderOpenAI,
+			Extra:      map[string]string{"api_base": "http://llm-server:8000/v1"},
+		}, bfschemas.VLLM},
+		{"openai without base_url keeps openai", domain.Credential{ProviderID: domain.ProviderOpenAI}, bfschemas.OpenAI},
+		{"anthropic is unaffected", domain.Credential{ProviderID: domain.ProviderAnthropic}, bfschemas.Anthropic},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := mapProvider(tc.cred); got != tc.want {
+				t.Fatalf("mapProvider(%v) = %q, want %q", tc.cred.ProviderID, got, tc.want)
+			}
+		})
+	}
+}
+
+// credentialToBifrostKey must carry the endpoint on VLLMKeyConfig.URL
+// because Bifrost's vLLM provider has no provider-level URL fallback, so a key
+// without it fails dispatch. An empty API key stays allowed: self-hosted
+// servers commonly run unauthenticated.
+//
+// Spec: specs/ai-gateway/custom-provider-base-url.feature
+func TestCredentialToBifrostKey_VLLM(t *testing.T) {
+	cred := domain.Credential{
+		ID:         "mp-1",
+		ProviderID: domain.ProviderCustom,
+		Extra:      map[string]string{"base_url": "http://llm-server:8000/v1"},
+	}
+	key := credentialToBifrostKey(cred, bfschemas.VLLM)
+
+	if key.VLLMKeyConfig == nil {
+		t.Fatal("VLLMKeyConfig is nil: vLLM keys require a per-key URL")
+	}
+	// Bifrost's vLLM provider appends "/v1/chat/completions" itself, so
+	// the conventional "/v1" suffix must be stripped or requests land on
+	// ".../v1/v1/chat/completions" (404).
+	if got := key.VLLMKeyConfig.URL.Val; got != "http://llm-server:8000" {
+		t.Fatalf("VLLMKeyConfig.URL = %q, want base URL without /v1 suffix", got)
+	}
+	if key.Value.Val != "" {
+		t.Fatalf("key.Value = %q, want empty for unauthenticated server", key.Value.Val)
+	}
+}
+
+func TestNormalizeOpenAICompatBaseURL(t *testing.T) {
+	cases := map[string]string{
+		"http://h:8000/v1":  "http://h:8000",
+		"http://h:8000/v1/": "http://h:8000",
+		"http://h:8000":     "http://h:8000",
+		"http://h:8000/":    "http://h:8000",
+		"":                  "",
+	}
+	for in, want := range cases {
+		if got := normalizeOpenAICompatBaseURL(in); got != want {
+			t.Errorf("normalizeOpenAICompatBaseURL(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// isOpenAICompatibleProvider gates two behaviors the custom/vLLM path both
+// depend on: buildChatRequest raw-forwards the body byte-for-byte (so vendor
+// sampling params survive) and DispatchStream injects
+// stream_options.include_usage (so streamed token usage still reaches
+// billing/traces). VLLM, Bifrost's generic OpenAI-compatible adapter and
+// the destination for provider "custom" and "openai"+base_url, must be
+// recognized here alongside OpenAI and Azure.
+//
+// Spec: specs/ai-gateway/custom-provider-base-url.feature
+func TestIsOpenAICompatibleProvider(t *testing.T) {
+	for _, p := range []bfschemas.ModelProvider{bfschemas.OpenAI, bfschemas.Azure, bfschemas.VLLM} {
+		if !isOpenAICompatibleProvider(p) {
+			t.Errorf("isOpenAICompatibleProvider(%q) = false, want true", p)
+		}
+	}
+	for _, p := range []bfschemas.ModelProvider{bfschemas.Anthropic, bfschemas.Gemini, bfschemas.Bedrock} {
+		if isOpenAICompatibleProvider(p) {
+			t.Errorf("isOpenAICompatibleProvider(%q) = true, want false", p)
+		}
+	}
+}
+
+// A custom / self-hosted vLLM provider (bfschemas.VLLM) raw-forwards the
+// inbound chat body byte-for-byte, exactly like OpenAI/Azure, never through
+// the structured parse that would drop vendor sampling params. This is the
+// gateway-side guarantee that top_k / repetition_penalty /
+// chat_template_kwargs / guided_json reach the customer's endpoint unchanged.
+//
+// Spec: specs/ai-gateway/custom-provider-base-url.feature
+func TestBuildChatRequest_VLLMRawForwardsBody(t *testing.T) {
+	body := []byte(`{"model":"Qwen/Qwen2.5-32B-Instruct","messages":[{"role":"user","content":"hi"}],"top_k":5,"repetition_penalty":1.1,"chat_template_kwargs":{"enable_thinking":false}}`)
+	req := &domain.Request{Type: domain.RequestTypeChat, Body: body}
+
+	bfReq, _, err := buildChatRequest(context.Background(), req, bfschemas.VLLM, "Qwen/Qwen2.5-32B-Instruct")
+	if err != nil {
+		t.Fatalf("buildChatRequest returned error: %v", err)
+	}
+	if !bytes.Equal(bfReq.RawRequestBody, body) {
+		t.Fatalf("VLLM must raw-forward the inbound body byte-for-byte;\n got: %s\nwant: %s", bfReq.RawRequestBody, body)
+	}
+	if len(bfReq.Input) != 0 {
+		t.Fatalf("raw-forward must not populate Input via structured parse, got %d messages", len(bfReq.Input))
+	}
+}
