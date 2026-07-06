@@ -258,9 +258,7 @@ export const ModelSelector = React.memo(function ModelSelector({
     <HStack overflow="hidden" gap={2} align="center">
       {selectedItem?.icon && (
         <ProviderIconGlyph
-          provider={
-            selectedItem.value.split("/")[0] as keyof typeof modelProviderIcons
-          }
+          provider={providerKey as keyof typeof modelProviderIcons}
           size={size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}
         />
       )}
