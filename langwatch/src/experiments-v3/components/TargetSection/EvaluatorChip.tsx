@@ -90,7 +90,7 @@ export function EvaluatorChip({
   // matches TargetHeader.tsx's fix for the same class of bug: an
   // uncontrolled Menu.Trigger can start opening on pointerdown before a
   // later onClick's stopPropagation has a chance to run.
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Use explicit isRunning state from store (set when target output arrives, cleared when evaluator result arrives)
   // If result already exists, it overrides isRunning (evaluator completed)
@@ -132,7 +132,7 @@ export function EvaluatorChip({
   };
 
   return (
-    <Menu.Root open={menuOpen} onOpenChange={(e) => setMenuOpen(e.open)}>
+    <Menu.Root open={isMenuOpen} onOpenChange={(e) => setIsMenuOpen(e.open)}>
       <Menu.Trigger asChild>
         <Button
           variant="outline"
@@ -215,7 +215,7 @@ export function EvaluatorChip({
                   onClick={(e) => {
                     e.stopPropagation();
                     e.preventDefault();
-                    setMenuOpen(false); // Close menu if somehow open
+                    setIsMenuOpen(false); // Close menu if somehow open
                     onEdit(); // Open drawer directly, don't open the chip's own menu
                   }}
                   data-testid={`evaluator-missing-mapping-alert-${evaluator.id}`}

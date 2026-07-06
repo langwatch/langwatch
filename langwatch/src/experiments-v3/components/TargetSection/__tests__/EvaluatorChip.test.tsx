@@ -482,10 +482,11 @@ describe("EvaluatorChip", () => {
     it("opens the edit drawer directly instead of the chip's dropdown menu", async () => {
       const onEdit = vi.fn();
       const user = userEvent.setup();
+      const evaluator = createEvaluator();
 
       render(
         <EvaluatorChip
-          evaluator={createEvaluator()}
+          evaluator={evaluator}
           result={undefined}
           hasMissingMappings
           onEdit={onEdit}
@@ -495,7 +496,7 @@ describe("EvaluatorChip", () => {
       );
 
       const alert = screen.getByTestId(
-        `evaluator-missing-mapping-alert-${createEvaluator().id}`,
+        `evaluator-missing-mapping-alert-${evaluator.id}`,
       );
       await user.click(alert);
 
