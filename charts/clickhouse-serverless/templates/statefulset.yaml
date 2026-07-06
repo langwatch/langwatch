@@ -92,6 +92,7 @@ spec:
             # explicitly so it matches Keeper/backup and satisfies runAsUser /
             # MustRunAs policies that read the pod spec.
             runAsUser: 101
+            runAsNonRoot: true
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:

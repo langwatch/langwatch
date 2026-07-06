@@ -42,6 +42,7 @@ spec:
               command: ["/scripts/backup-data.sh"]
               securityContext:
                 runAsUser: 101
+                runAsNonRoot: true
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true
                 capabilities:
@@ -107,6 +108,7 @@ spec:
               command: ["/scripts/backup-data.sh"]
               securityContext:
                 runAsUser: 101
+                runAsNonRoot: true
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true
                 capabilities:
@@ -170,6 +172,7 @@ spec:
               command: ["/scripts/restore-data.sh"]
               securityContext:
                 runAsUser: 101
+                runAsNonRoot: true
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true
                 capabilities:
