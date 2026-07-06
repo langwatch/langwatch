@@ -44,16 +44,25 @@ describe("better-auth config", () => {
     });
 
     /** @scenario Credentials-only on-prem mode */
-    it("gates emailAndPassword.enabled on NEXTAUTH_PROVIDER=email", async () => {
+    it("gates emailAndPassword.enabled on NEXTAUTH_PROVIDER=email or self-hosted (ADR-027)", async () => {
       // Regression for iter-20 bug 16: BetterAuth's email/password routes
       // (`/sign-up/email`, `/sign-in/email`) were unconditionally enabled,
       // letting attackers bypass Auth0/SSO in cloud mode. The original
       // NextAuth code added EITHER a social provider OR CredentialsProvider,
       // never both. The BetterAuth equivalent must mirror that gate.
+      //
+      // ADR-027 widens this: on self-hosted (`!IS_SAAS`) the routes are
+      // always mounted (even with an enterprise IdP configured) so a
+      // denied/coerced deployment has a working email door and licensed
+      // installs keep password-reset self-recovery reachable. Mounting
+      // alone is not the gate — the ALLOW-path `before`-hook block (gate
+      // site #3, tested in `ssoGate.hook.test.ts`) is the load-bearing
+      // guard that stops a licensed install from minting password
+      // accounts through these routes. SaaS is unchanged.
       const { auth } = await import("../index");
       const options = (auth as any).options;
       const { env } = await import("~/env.mjs");
-      const expected = env.NEXTAUTH_PROVIDER === "email";
+      const expected = env.NEXTAUTH_PROVIDER === "email" || !env.IS_SAAS;
       expect(options?.emailAndPassword?.enabled).toBe(expected);
     });
   });

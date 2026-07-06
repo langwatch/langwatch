@@ -1,15 +1,17 @@
-import { betterAuth, type BetterAuthOptions } from "better-auth";
+import { compare, hash } from "bcrypt";
+import { type BetterAuthOptions, betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { APIError } from "better-auth/api";
 import { auth0, genericOAuth, okta } from "better-auth/plugins/generic-oauth";
-import { compare, hash } from "bcrypt";
 
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
 import { connection as redisConnection } from "~/server/redis";
-import { createLogger } from "../../utils/logger/server";
 import { fireActivityTrackingNurturing } from "../../../ee/billing/nurturing/hooks/activityTracking";
 import { ensureUserSyncedToCio } from "../../../ee/billing/nurturing/hooks/userSync";
+import { createLogger } from "../../utils/logger/server";
+import { sendResetPasswordEmail } from "../mailer/resetPasswordEmail";
+import { platformSSOAllowed } from "../sso/sso-gate";
 import {
   afterAccountCreate,
   afterAccountUpdate,
@@ -20,7 +22,6 @@ import {
   beforeUserCreate,
 } from "./hooks";
 import { revokeAllSessionsForUser } from "./revokeSessions";
-import { sendResetPasswordEmail } from "../mailer/resetPasswordEmail";
 
 const logger = createLogger("langwatch:better-auth");
 
@@ -50,7 +51,11 @@ export const fallbackName = (profile: Record<string, any>): string => {
 
 const socialProviders: NonNullable<BetterAuthOptions["socialProviders"]> = {};
 
-if (env.NEXTAUTH_PROVIDER === "google" && env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
+if (
+  env.NEXTAUTH_PROVIDER === "google" &&
+  env.GOOGLE_CLIENT_ID &&
+  env.GOOGLE_CLIENT_SECRET
+) {
   socialProviders.google = {
     clientId: env.GOOGLE_CLIENT_ID,
     clientSecret: env.GOOGLE_CLIENT_SECRET,
@@ -62,7 +67,11 @@ if (env.NEXTAUTH_PROVIDER === "google" && env.GOOGLE_CLIENT_ID && env.GOOGLE_CLI
   };
 }
 
-if (env.NEXTAUTH_PROVIDER === "github" && env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET) {
+if (
+  env.NEXTAUTH_PROVIDER === "github" &&
+  env.GITHUB_CLIENT_ID &&
+  env.GITHUB_CLIENT_SECRET
+) {
   socialProviders.github = {
     clientId: env.GITHUB_CLIENT_ID,
     clientSecret: env.GITHUB_CLIENT_SECRET,
@@ -74,7 +83,11 @@ if (env.NEXTAUTH_PROVIDER === "github" && env.GITHUB_CLIENT_ID && env.GITHUB_CLI
   };
 }
 
-if (env.NEXTAUTH_PROVIDER === "gitlab" && env.GITLAB_CLIENT_ID && env.GITLAB_CLIENT_SECRET) {
+if (
+  env.NEXTAUTH_PROVIDER === "gitlab" &&
+  env.GITLAB_CLIENT_ID &&
+  env.GITLAB_CLIENT_SECRET
+) {
   socialProviders.gitlab = {
     clientId: env.GITLAB_CLIENT_ID,
     clientSecret: env.GITLAB_CLIENT_SECRET,
@@ -99,8 +112,13 @@ if (
     mapProfileToUser: (profile) => ({
       name: fallbackName(profile as Record<string, any>),
       email:
-        (profile as { email?: string; mail?: string; userPrincipalName?: string })
-          .email ??
+        (
+          profile as {
+            email?: string;
+            mail?: string;
+            userPrincipalName?: string;
+          }
+        ).email ??
         (profile as { mail?: string }).mail ??
         (profile as { userPrincipalName?: string }).userPrincipalName,
     }),
@@ -197,6 +215,62 @@ if (
   });
 }
 
+/**
+ * ADR-027 gate site #2 — the SSO-initiation paths blocked when the platform
+ * gate denies. Verified against better-auth 1.6.x + genericOAuth (v5 MAJOR
+ * fix): `/oauth2/authorize` is a phantom (that's the OIDC-*provider*
+ * endpoint, not a client one) and is deliberately excluded. `/link-social` +
+ * `/oauth2/link` are included so a coerced-mode user can't pre-link a
+ * provider that goes live after a later allow-flip.
+ *
+ * Exported for unit testing.
+ */
+export const GATED_SSO_INITIATION_SUFFIXES = [
+  "/sign-in/social",
+  "/sign-in/oauth2",
+  "/link-social",
+  "/oauth2/link",
+] as const;
+
+/**
+ * Extracts the pathname from a BetterAuth request URL, stripping the query
+ * string. Falls back to a naive split if the URL isn't absolute (shouldn't
+ * happen in production, but keeps this defensive for tests).
+ *
+ * Exported for unit testing.
+ */
+export const requestPathname = (url: string): string => {
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return url.split("?")[0] ?? url;
+  }
+};
+
+/**
+ * ADR-027 gate site #2 — true for any request that must be refused while the
+ * platform SSO gate denies: the initiation paths above, plus ANY callback
+ * path (pathname-PREFIX match via `includes`, not the `endsWith`/suffix
+ * helper used elsewhere in this hook — callbacks carry `?code=&state=` and a
+ * provider segment, e.g. `/callback/auth0`, `/oauth2/callback/okta`). This
+ * is the only place that sees the legacy `/api/auth/callback/auth0|okta`
+ * rewrite (`redirectURI` pinned above), so it's also the only correct
+ * interception point for it (a path-prefix middleware on `/oauth2/*` alone
+ * would miss the legacy rewrite entirely).
+ *
+ * Exported for unit testing.
+ */
+export const isGatedSsoPath = (url: string): boolean => {
+  if (
+    GATED_SSO_INITIATION_SUFFIXES.some(
+      (suffix) => url.endsWith(suffix) || url.includes(`${suffix}?`),
+    )
+  ) {
+    return true;
+  }
+  return requestPathname(url).includes("/callback/");
+};
+
 // NOTE: BetterAuth's admin plugin is intentionally NOT used. It expects
 // `User.role` and `User.banned` columns which our schema doesn't have, and
 // it would override admin impersonation with its own mechanism. We use our
@@ -261,11 +335,7 @@ export const auth = betterAuth({
    */
   advanced: {
     ipAddress: {
-      ipAddressHeaders: [
-        "cf-connecting-ip",
-        "x-forwarded-for",
-        "x-real-ip",
-      ],
+      ipAddressHeaders: ["cf-connecting-ip", "x-forwarded-for", "x-real-ip"],
     },
   },
 
@@ -373,12 +443,23 @@ export const auth = betterAuth({
    * `emailAndPassword.enabled` is set, so we have to mirror the gate
    * here. Without it, an attacker could POST to `/api/auth/sign-up/email`
    * in cloud mode and bypass Auth0/SSO entirely.
+   *
+   * ADR-027: on self-hosted (`!IS_SAAS`) the routes are always MOUNTED —
+   * even when an enterprise IdP is configured — so a denied (unlicensed)
+   * deployment has a working coerced email door and licensed installs keep
+   * password-reset self-recovery reachable. Mounting alone is NOT the
+   * gate: the `before` hook below (gate site #3) is what blocks
+   * `/sign-in/email` + `/sign-up/email` when the SSO license gate ALLOWS —
+   * that's the load-bearing guard against minting password accounts on a
+   * licensed Auth0/Okta install (v5 BLOCKER fix). SaaS is unchanged: routes
+   * stay unmounted unless natively in email mode.
    */
   emailAndPassword: {
-    enabled: env.NEXTAUTH_PROVIDER === "email",
+    enabled: env.NEXTAUTH_PROVIDER === "email" || !env.IS_SAAS,
     password: {
       hash: async (password: string) => hash(password, 10),
-      verify: async ({ password, hash: storedHash }) => compare(password, storedHash),
+      verify: async ({ password, hash: storedHash }) =>
+        compare(password, storedHash),
     },
     /**
      * Reset-link lifetime. Kept at BetterAuth's one-hour default but stated
@@ -451,10 +532,16 @@ export const auth = betterAuth({
         before: async (user) =>
           beforeUserCreate({
             prisma,
-            user: user as { email: string; deactivatedAt?: Date | null } & Record<string, unknown>,
+            user: user as {
+              email: string;
+              deactivatedAt?: Date | null;
+            } & Record<string, unknown>,
           }),
         after: async (user) => {
-          await afterUserCreate({ prisma, user: user as { id: string; email: string; name: string } });
+          await afterUserCreate({
+            prisma,
+            user: user as { id: string; email: string; name: string },
+          });
         },
       },
     },
@@ -471,7 +558,8 @@ export const auth = betterAuth({
           });
         },
         after: async (account) => {
-          if (!account.userId || !account.providerId || !account.accountId) return;
+          if (!account.userId || !account.providerId || !account.accountId)
+            return;
           await afterAccountCreate({
             prisma,
             account: {
@@ -487,7 +575,8 @@ export const auth = betterAuth({
           // BetterAuth refreshes tokens on the linked Account row on every
           // OAuth sign-in. Use that as the trigger to reconcile pendingSsoSetup
           // for users whose correct-provider account is already linked.
-          if (!account.userId || !account.providerId || !account.accountId) return;
+          if (!account.userId || !account.providerId || !account.accountId)
+            return;
           await afterAccountUpdate({
             prisma,
             account: {
@@ -542,26 +631,37 @@ export const auth = betterAuth({
    * Also blocks `/set-password` (BetterAuth's flow for first-time
    * password setup on a social-signup user — not something we want
    * available in cloud mode where SSO is the only path).
+   *
+   * ADR-027 extends this SAME hook (one memoized gate value, branched both
+   * ways — no truth table, Decision 4) for SSO-capable deployments
+   * (`NEXTAUTH_PROVIDER !== "email"`):
+   *   - gate ALLOW: also 403 `/sign-in/email`, `/sign-up/email`, and the
+   *     password-reset pair — preserves `main`'s guarantee that a licensed
+   *     Auth0/Okta install can't mint a password account (v5 BLOCKER fix).
+   *   - gate DENY: 403 the SSO-initiation and callback paths (Constants
+   *     table in the ADR) instead — the deployment runs as if the SSO env
+   *     vars were unset. The password-reset pair is intentionally left OUT
+   *     of the deny branch (v6): every existing user on a denied install is
+   *     OAuth-born with no password, so reset is the inbox-proof
+   *     self-recovery door (Decision 4 exception).
    */
   hooks: {
     before: async (ctx) => {
+      const url = ctx.request?.url ?? "";
+      // The request URL is the FULL URL after Next.js routing, so we
+      // check for suffix matches on the BetterAuth endpoint paths.
+      const matches = (suffix: string) =>
+        url.endsWith(suffix) || url.includes(`${suffix}?`);
+
       if (env.NEXTAUTH_PROVIDER !== "email") {
-        const url = ctx.request?.url ?? "";
-        // The request URL is the FULL URL after Next.js routing, so we
-        // check for suffix matches on the BetterAuth endpoint paths.
-        const matches = (suffix: string) =>
-          url.endsWith(suffix) || url.includes(`${suffix}?`);
-        // All endpoints that mutate or read credential state and are
-        // NOT gated by `emailAndPassword.enabled` at the handler level.
-        // We defense-in-depth these in cloud mode to prevent bypasses
-        // of the iter-26 revokeOtherSessionsForUser wiring and any
-        // other cloud-mode invariants our application layer expects.
+        // Credential-mutation block: stays keyed off the CONFIGURED mode,
+        // blocked in every gate state (ADR-027 Constants table). The
+        // password-reset pair is deliberately NOT in this list — it's
+        // handled below, keyed off the gate value instead.
         if (
           matches("/change-password") ||
           matches("/set-password") ||
           matches("/change-email") ||
-          matches("/request-password-reset") ||
-          matches("/reset-password") ||
           matches("/send-verification-email") ||
           matches("/verify-email")
         ) {
@@ -569,6 +669,38 @@ export const auth = betterAuth({
             code: "EMAIL_PASSWORD_DISABLED",
             message:
               "Credential management is disabled in cloud/SSO mode — your account is managed by your identity provider.",
+          });
+        }
+
+        const isResetPath =
+          matches("/request-password-reset") || matches("/reset-password");
+        const ssoAllowed = await platformSSOAllowed();
+
+        if (ssoAllowed) {
+          // Gate ALLOW (site #3): block the routes that would otherwise
+          // mint a password account on a licensed SSO-capable deployment.
+          if (
+            isResetPath ||
+            matches("/sign-in/email") ||
+            matches("/sign-up/email")
+          ) {
+            throw APIError.from("BAD_REQUEST", {
+              code: "EMAIL_PASSWORD_DISABLED",
+              message:
+                "Credential management is disabled — your account is managed by your identity provider.",
+            });
+          }
+        } else if (!isResetPath && isGatedSsoPath(url)) {
+          // Gate DENY (site #2): the deployment runs in email mode, exactly
+          // as if the SSO env vars were unset.
+          logger.warn(
+            { path: requestPathname(url), reason: "no_license" },
+            "Blocked SSO request: deployment has no genuine license",
+          );
+          throw APIError.from("FORBIDDEN", {
+            code: "SSO_LICENSE_REQUIRED",
+            message:
+              "SSO is not available on this deployment — sign in with your email and password instead.",
           });
         }
       }

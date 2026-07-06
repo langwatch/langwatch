@@ -1,9 +1,9 @@
-@wip
 Feature: License-Gated SSO
 
   # Decision of record: dev/docs/adr/027-license-gated-sso.md (Accepted, v6).
-  # Implementation lands as a stacked set of PRs on top of #4830; all
-  # scenarios are @unimplemented until their PR lands.
+  # Implemented in PR #4830; the two remaining @unimplemented scenarios are
+  # tracked in the ADR's open questions (restart-required UI hint) and the
+  # session-survival migration test.
   #
   # Behavior, not internals: scenarios describe what an operator / user / admin
   # observes, never gate function names or config field values.
@@ -26,7 +26,7 @@ Feature: License-Gated SSO
   # Platform gate — self-hosted
   # ============================================================================
 
-  @unimplemented
+  @unit
   Scenario: Self-hosted with a genuine org license keeps SSO working with zero action
     Given a self-hosted deployment configured with an enterprise IdP
     And at least one organization holds a genuine license
@@ -35,7 +35,7 @@ Feature: License-Gated SSO
     Then they are taken to the identity provider as before
     And the email and password form is not offered
 
-  @unimplemented
+  @unit
   Scenario: An expired but genuine license still keeps SSO working
     Given a self-hosted deployment configured with an enterprise IdP
     And the only organization license is genuine but past its expiry date
@@ -43,7 +43,7 @@ Feature: License-Gated SSO
     Then they are taken to the identity provider as before
     And the server logs a renewal reminder naming the expired license
 
-  @unimplemented
+  @unit
   Scenario: Self-hosted that never had a license hides SSO and offers email sign-in
     Given a self-hosted deployment configured with an enterprise IdP
     And no organization holds a genuine license
@@ -52,7 +52,7 @@ Feature: License-Gated SSO
     Then the identity provider button is not shown
     And the email and password form is offered
 
-  @unimplemented
+  @unit
   Scenario: A tampered license does not enable SSO
     Given a self-hosted deployment configured with an enterprise IdP
     And the only stored license fails signature verification
@@ -60,7 +60,7 @@ Feature: License-Gated SSO
     Then the identity provider button is not shown
     And the server logs which license was inspected and why it was rejected
 
-  @unimplemented
+  @unit
   Scenario: SSO sign-in routes are refused while the deployment is unlicensed
     Given a self-hosted deployment configured with an enterprise IdP
     And no organization holds a genuine license
@@ -80,7 +80,7 @@ Feature: License-Gated SSO
   # Recovery — the no-lockout guarantee
   # ============================================================================
 
-  @unimplemented
+  @unit
   Scenario: An SSO-only deployment recovers by setting the instance license key
     Given a self-hosted deployment where every user signs in only through SSO
     And the deployment has no genuine license stored
@@ -88,7 +88,7 @@ Feature: License-Gated SSO
     Then SSO becomes available again
     And no password and no outbound email were required to recover
 
-  @unimplemented
+  @unit
   Scenario: Existing users on an unlicensed deployment self-recover via password reset
     Given an unlicensed self-hosted deployment previously using SSO
     And an existing user whose account was created through SSO and has no password
@@ -96,7 +96,7 @@ Feature: License-Gated SSO
     When that user requests a password reset and completes it from their inbox
     Then they can sign in with their email and new password
 
-  @unimplemented
+  @unit
   Scenario: A fresh unlicensed deployment bootstraps via email signup
     Given a fresh self-hosted deployment with no license
     When an operator signs up with email and password
@@ -108,7 +108,7 @@ Feature: License-Gated SSO
   # Fail-closed and anti-takeover
   # ============================================================================
 
-  @unimplemented
+  @unit
   Scenario: A licensed deployment cannot mint password accounts
     Given a self-hosted deployment configured with an enterprise IdP
     And at least one organization holds a genuine license
@@ -116,7 +116,7 @@ Feature: License-Gated SSO
     Then each attempt is refused
     And sign-in remains possible only through the identity provider
 
-  @unimplemented
+  @unit
   Scenario: No password can be attached to an SSO account without inbox proof
     Given a deployment configured with an enterprise IdP
     And an existing user who has only an SSO credential
@@ -124,7 +124,7 @@ Feature: License-Gated SSO
     Then the attempt is refused
     And this holds whether the deployment is licensed or not
 
-  @unimplemented
+  @unit
   Scenario: Unlicensed-mode signup does not auto-join a domain-matched organization
     Given an unlicensed self-hosted deployment running in email mode
     And an organization configured with a matching SSO domain
@@ -132,7 +132,7 @@ Feature: License-Gated SSO
     Then the account is created
     And the user is not added to that organization
 
-  @unimplemented
+  @unit
   Scenario: A licensing-store outage refuses SSO and heals itself
     Given a self-hosted deployment with a genuine license
     And the licensing store cannot be reached during the first sign-in attempt
@@ -150,13 +150,13 @@ Feature: License-Gated SSO
   # SaaS and multi-org
   # ============================================================================
 
-  @unimplemented
+  @unit
   Scenario: SaaS is unaffected by license gating
     Given the deployment is LangWatch Cloud
     When a user opens the sign-in page
     Then SSO is available regardless of any organization's plan or license
 
-  @unimplemented
+  @unit
   Scenario: One organization's genuine license enables SSO for the whole deployment
     Given a self-hosted deployment hosting two organizations
     And only the first organization holds a genuine license
@@ -167,7 +167,7 @@ Feature: License-Gated SSO
   # Observability
   # ============================================================================
 
-  @unimplemented
+  @unit
   Scenario: Denied SSO is explained in the server logs
     Given a self-hosted deployment configured with an enterprise IdP
     And no genuine license anywhere

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { env } from "../../../env.mjs";
+import { resolveAuthProvider } from "../../sso/sso-gate";
 import { skipPermissionCheck } from "../rbac";
 import { publicProcedure } from "../trpc";
 
@@ -16,12 +17,16 @@ const isOpsSidebarEmail = (userEmail: string | null | undefined) => {
 export const publicEnvRouter = publicProcedure
   .input(z.object({}).passthrough())
   .use(skipPermissionCheck)
-  .query(({ ctx }) => {
+  .query(async ({ ctx }) => {
     // Warning: be very careful with the env vars you expose here
 
     const publicEnvVars = {
       BASE_HOST: env.BASE_HOST,
-      NEXTAUTH_PROVIDER: env.NEXTAUTH_PROVIDER,
+      // ADR-027: report "email" whenever the license gate denies SSO, so
+      // the sign-in page renders the email form and never auto-redirects to
+      // a disabled IdP. `resolveAuthProvider()` is the single source of
+      // truth — never read `env.NEXTAUTH_PROVIDER` directly here.
+      NEXTAUTH_PROVIDER: await resolveAuthProvider(),
       DEMO_PROJECT_SLUG: env.DEMO_PROJECT_SLUG,
       NODE_ENV: env.NODE_ENV,
 
