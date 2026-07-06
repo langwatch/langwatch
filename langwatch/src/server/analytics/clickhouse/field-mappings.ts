@@ -73,11 +73,7 @@ export const EVALUATION_ANALYTICS_COLUMNS = [
 /**
  * Identity columns always included in stored_spans subqueries.
  */
-export const SPAN_IDENTITY_COLUMNS = [
-  "TenantId",
-  "TraceId",
-  "SpanId",
-] as const;
+export const SPAN_IDENTITY_COLUMNS = ["TenantId", "TraceId", "SpanId"] as const;
 
 /**
  * All stored_spans columns that analytics queries may reference.
@@ -99,10 +95,7 @@ export const SPAN_ANALYTICS_COLUMNS = [
 /**
  * The ClickHouse table that contains the data for a field
  */
-export type CHTable =
-  | "trace_summaries"
-  | "stored_spans"
-  | "evaluation_runs";
+export type CHTable = "trace_summaries" | "stored_spans" | "evaluation_runs";
 
 /**
  * Field mapping configuration for the legacy `trace_summaries` SQL builder

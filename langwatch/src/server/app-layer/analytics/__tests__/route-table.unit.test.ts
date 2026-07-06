@@ -206,9 +206,7 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
   describe("given a series with key/subkey", () => {
     it("falls back to trace_summaries (key/subkey metrics need the legacy translator)", () => {
       const table = pickAnalyticsTable({
-        series: [
-          series("performance.total_cost", "sum", { key: "anything" }),
-        ],
+        series: [series("performance.total_cost", "sum", { key: "anything" })],
       });
       expect(table).toBe("trace_summaries");
     });
@@ -264,7 +262,6 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
       // sentiment.thumbs_up_down isn't in SLIM_ELIGIBLE_METRIC_KEYS, so it
       // routes to trace_summaries.
       const table = pickAnalyticsTable({
-        // biome-ignore lint: forging an unknown shape for the fallback test
         series: [series("sentiment.thumbs_up_down" as any, "cardinality")],
       });
       expect(table).toBe("trace_summaries");
@@ -298,8 +295,12 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
     it("does not list percentile-only or distinct-only metrics", () => {
       // TimeToFirstToken / TokensPerSecond aren't on the rollup; cardinality
       // of trace_id isn't either (uniq state not held on Simple… columns).
-      expect(ROLLUP_ROLLABLE_METRIC_KEYS.has("performance.first_token")).toBe(false);
-      expect(ROLLUP_ROLLABLE_METRIC_KEYS.has("performance.tokens_per_second")).toBe(false);
+      expect(ROLLUP_ROLLABLE_METRIC_KEYS.has("performance.first_token")).toBe(
+        false,
+      );
+      expect(
+        ROLLUP_ROLLABLE_METRIC_KEYS.has("performance.tokens_per_second"),
+      ).toBe(false);
       expect(ROLLUP_ROLLABLE_METRIC_KEYS.has("metadata.trace_id")).toBe(false);
     });
   });
@@ -310,8 +311,12 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
         expect(SLIM_ELIGIBLE_METRIC_KEYS.has(m)).toBe(true);
       }
       // first_token + tokens_per_second + trace_id distinct only live on slim.
-      expect(SLIM_ELIGIBLE_METRIC_KEYS.has("performance.first_token")).toBe(true);
-      expect(SLIM_ELIGIBLE_METRIC_KEYS.has("performance.tokens_per_second")).toBe(true);
+      expect(SLIM_ELIGIBLE_METRIC_KEYS.has("performance.first_token")).toBe(
+        true,
+      );
+      expect(
+        SLIM_ELIGIBLE_METRIC_KEYS.has("performance.tokens_per_second"),
+      ).toBe(true);
       expect(SLIM_ELIGIBLE_METRIC_KEYS.has("metadata.trace_id")).toBe(true);
     });
   });

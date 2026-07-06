@@ -6,17 +6,18 @@
  * that EventRepositoryClickHouse and SpanStorageClickHouseRepository
  * route data to the correct instance based on env var configuration.
  */
+
+import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import {
   ClickHouseContainer,
   type StartedClickHouseContainer,
 } from "@testcontainers/clickhouse";
-import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { nanoid } from "nanoid";
-import { prisma } from "~/server/db";
-import type { ClickHouseClientResolver } from "../clickhouseClient";
-import type { EventRecord } from "~/server/event-sourcing/stores/repositories/eventRepository.types";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { SpanInsertData } from "~/server/app-layer/traces/types";
+import { prisma } from "~/server/db";
+import type { EventRecord } from "~/server/event-sourcing/stores/repositories/eventRepository.types";
+import type { ClickHouseClientResolver } from "../clickhouseClient";
 
 let sharedContainer: StartedClickHouseContainer;
 let privateContainer: StartedClickHouseContainer;
@@ -276,6 +277,8 @@ function makeSpanInsertData({
     droppedAttributesCount: 0,
     droppedEventsCount: 0,
     droppedLinksCount: 0,
+    cost: null,
+    nonBilledCost: null,
     retentionDays: 0,
   };
 }
@@ -319,8 +322,7 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
     const privateUrl = privateContainer.getConnectionUrl();
 
     // Set the private CH env var so the clickhouseClient module resolves it
-    process.env[`CLICKHOUSE_URL__testcustomer__${PRIVATE_ORG_ID}`] =
-      privateUrl;
+    process.env[`CLICKHOUSE_URL__testcustomer__${PRIVATE_ORG_ID}`] = privateUrl;
 
     sharedClient = createClient({
       url: sharedUrl,
@@ -416,7 +418,10 @@ describe("Private ClickHouse data isolation through event-sourcing repositories"
         const record = makeEventRecord({ tenantId: privateProjectId });
         await repo.insertEventRecords([record]);
 
-        const privateRows = await queryEventLog(privateClient, privateProjectId);
+        const privateRows = await queryEventLog(
+          privateClient,
+          privateProjectId,
+        );
         expect(privateRows).toHaveLength(1);
         expect(privateRows[0]!.EventId).toBe(record.EventId);
 

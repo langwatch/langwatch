@@ -13,8 +13,14 @@ import type { TraceAnalyticsRollupRow } from "~/server/event-sourcing/pipelines/
  * column; the table's TTL drops the row that many days after its `BucketStart`.
  */
 export interface TraceAnalyticsRollupRepository {
-  insertRow(row: TraceAnalyticsRollupRow, retentionDays?: number): Promise<void>;
-  insertRows(rows: TraceAnalyticsRollupRow[], retentionDays?: number): Promise<void>;
+  insertRow(
+    row: TraceAnalyticsRollupRow,
+    retentionDays?: number,
+  ): Promise<void>;
+  insertRows(
+    rows: TraceAnalyticsRollupRow[],
+    retentionDays?: number,
+  ): Promise<void>;
 }
 
 /** No-op implementation for tests and ClickHouse-less environments. */
@@ -24,10 +30,14 @@ export class NullTraceAnalyticsRollupRepository
   async insertRow(
     _row: TraceAnalyticsRollupRow,
     _retentionDays?: number,
-  ): Promise<void> {}
+  ): Promise<void> {
+    // no-op: the Null repository intentionally discards rollup writes
+  }
 
   async insertRows(
     _rows: TraceAnalyticsRollupRow[],
     _retentionDays?: number,
-  ): Promise<void> {}
+  ): Promise<void> {
+    // no-op: the Null repository intentionally discards rollup writes
+  }
 }

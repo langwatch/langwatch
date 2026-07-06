@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
+import type { NormalizedSpan } from "../../schemas/spans";
 import {
   applySpanToAnalytics,
-  TraceAnalyticsFoldProjection,
   type TraceAnalyticsData,
+  TraceAnalyticsFoldProjection,
 } from "../traceAnalytics.foldProjection";
 import { applySpanToSummary } from "../traceSummary.foldProjection";
 import {
   createInitState,
   createTestSpan,
 } from "./fixtures/trace-summary-test.fixtures";
-import type { NormalizedSpan } from "../../schemas/spans";
 
 /**
  * Drift guard: the slim fold's handlers MUST produce the same values as the
@@ -77,15 +77,15 @@ function assertSharedFieldsParity({
   expect(slim.totalCost).toBe(summary.totalCost);
   expect(slim.nonBilledCost).toBe(summary.nonBilledCost);
   expect(slim.totalPromptTokenCount).toBe(summary.totalPromptTokenCount);
-  expect(slim.totalCompletionTokenCount).toBe(summary.totalCompletionTokenCount);
+  expect(slim.totalCompletionTokenCount).toBe(
+    summary.totalCompletionTokenCount,
+  );
 
   // Status
   expect(slim.containsErrorStatus).toBe(summary.containsErrorStatus);
 
   // HasAnnotation source
-  expect(slim.annotationIds.length > 0).toBe(
-    summary.annotationIds.length > 0,
-  );
+  expect(slim.annotationIds.length > 0).toBe(summary.annotationIds.length > 0);
 
   // Hoisted dim values (read off attribute map) — these become the typed
   // columns on the slim row, so parity on the attribute strings means

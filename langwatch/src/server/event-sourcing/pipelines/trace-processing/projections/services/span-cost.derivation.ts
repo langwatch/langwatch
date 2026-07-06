@@ -1,5 +1,5 @@
 import type { NormalizedSpan } from "../../schemas/spans";
-import { SpanCostService } from "./span-cost.service";
+import type { SpanCostService } from "./span-cost.service";
 
 /**
  * Per-span cost split into billed-vs-bundled, derived at projection time so

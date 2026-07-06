@@ -12,12 +12,12 @@
  * Owns NO SQL — that's the builder's job.
  */
 
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { ANALYTICS_CLICKHOUSE_SETTINGS } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import type { TimeseriesResult } from "~/server/analytics/types";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { createLogger } from "~/utils/logger/server";
-import { buildRollupTimeseriesQuery } from "../query-builders/rollup-timeseries-query";
 import { AnalyticsClientUnavailableError } from "../errors";
+import { buildRollupTimeseriesQuery } from "../query-builders/rollup-timeseries-query";
 import {
   type AnalyticsTimeseriesRow,
   parseTimeseriesRows,

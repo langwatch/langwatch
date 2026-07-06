@@ -147,6 +147,30 @@ export const FEATURE_FLAGS = [
     description:
       "Gates the personal keys, admin oversight, RoutingPolicy, and IngestionSource UI surfaces. Distinct from release_ui_ai_gateway_menu_enabled — the existing gateway product ships unblocked while governance keeps cooking.",
   },
+  // ADR-034 Phase 3 — routes analytics getTimeseries reads to the slim
+  // `trace_analytics` / rollup `trace_analytics_rollup` tables (Phases 1+2)
+  // when the query shape allows. OFF (default) = legacy trace_summaries reads
+  // unchanged. The router (`pickAnalyticsTable`) is the SINGLE place that
+  // chooses; this flag gates whether the router runs at all per project.
+  {
+    key: "release_event_sourced_analytics_read",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Routes analytics getTimeseries reads to the slim trace_analytics / rollup trace_analytics_rollup tables (ADR-034 Phases 1+2) when the query shape allows. Off = legacy trace_summaries reads unchanged.",
+  },
+  // ADR-034 Phase 3 tripwire — when ON, runs both the routed query AND the
+  // legacy `trace_summaries` query in parallel and logs a structured warning
+  // on divergence beyond a small numeric tolerance. Returns the routed result
+  // either way; thin wrapper, no read-path duplication beyond the comparison.
+  // Disabled by default; flipped on per-project during canary.
+  {
+    key: "release_event_sourced_analytics_read_tripwire",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Tripwire for ADR-034 Phase 3: when ON alongside release_event_sourced_analytics_read, runs the routed and legacy trace_summaries queries in parallel and logs divergence beyond a small tolerance. Returns the routed result either way.",
+  },
   {
     key: "release_langy_enabled",
     scope: "PRODUCT",

@@ -36,12 +36,12 @@
  * it.
  */
 
+import type { SeriesInputType } from "~/server/analytics/registry";
+import type { AggregationTypes } from "~/server/analytics/types";
 import {
   PAYLOAD_BLOCKLIST_EXACT,
   PAYLOAD_BLOCKLIST_PREFIXES,
 } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/analytics-attribute-trim.service";
-import type { SeriesInputType } from "~/server/analytics/registry";
-import type { AggregationTypes } from "~/server/analytics/types";
 import type { FilterField } from "~/server/filters/types";
 
 /** The three destination tables routed between. */
@@ -203,9 +203,8 @@ const SLIM_FILTER_FIELDS: ReadonlySet<FilterField> = new Set<FilterField>([
  * table, whose one-row-per-trace shape computes them correctly per trace
  * (trace5012-P0).
  */
-const ROLLUP_AGGREGATIONS: ReadonlySet<AggregationTypes> = new Set<AggregationTypes>([
-  "sum",
-]);
+const ROLLUP_AGGREGATIONS: ReadonlySet<AggregationTypes> =
+  new Set<AggregationTypes>(["sum"]);
 
 /**
  * Input shape for the routing decision. Mirrors the relevant subset of
@@ -366,7 +365,11 @@ function filtersHitBlocklist(
   // metadata.value is keyed by the underlying metadata key — if the key on
   // the outer record is blocklisted we cannot read the value off slim either.
   const metadataValue = filters["metadata.value"];
-  if (metadataValue && typeof metadataValue === "object" && !Array.isArray(metadataValue)) {
+  if (
+    metadataValue &&
+    typeof metadataValue === "object" &&
+    !Array.isArray(metadataValue)
+  ) {
     for (const outerKey of Object.keys(metadataValue)) {
       if (isBlocklisted(outerKey)) return true;
     }
