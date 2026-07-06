@@ -1,21 +1,24 @@
 import { generate } from "@langwatch/ksuid";
-import { evaluatorLoopBlockedCounter } from "../../../../metrics";
 import type { MonitorService } from "~/server/app-layer/monitors/monitor.service";
-import type { QueueSendOptions } from "../../../queues";
-import { ExecuteEvaluationCommand } from "../../evaluation-processing/commands/executeEvaluation.command";
-import type { ExecuteEvaluationCommandData } from "../../evaluation-processing/schemas/commands";
+import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
 import { KSUID_RESOURCES } from "../../../../../utils/constants";
 import { createLogger } from "../../../../../utils/logger/server";
+import { featureFlagService } from "../../../../featureFlag";
+import { evaluatorLoopBlockedCounter } from "../../../../metrics";
+import type { QueueSendOptions } from "../../../queues";
 import type { ReactorDefinition } from "../../../reactors/reactor.types";
+import { ExecuteEvaluationCommand } from "../../evaluation-processing/commands/executeEvaluation.command";
+import type { ExecuteEvaluationCommandData } from "../../evaluation-processing/schemas/commands";
 import {
   MAX_PROCESSED_SPANS,
   type TraceSummaryData,
 } from "../projections/traceSummary.foldProjection";
-import { isSpanReceivedEvent, type TraceProcessingEvent } from "../schemas/events";
+import {
+  isSpanReceivedEvent,
+  type TraceProcessingEvent,
+} from "../schemas/events";
 import { defineOriginGuardedTraceReactor } from "./_originGuardedReactor";
-import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
 import { DEFERRED_CHECK_DELAY_MS } from "./originGate.reactor";
-import { featureFlagService } from "../../../../featureFlag";
 
 const CAUSALITY_LOOP_GUARD_DISABLED_FLAG =
   "ops_es_causality_loop_guard_disabled";
@@ -26,7 +29,10 @@ const logger = createLogger(
 
 export interface EvaluationTriggerReactorDeps {
   monitors: MonitorService;
-  evaluation: (data: ExecuteEvaluationCommandData, options?: QueueSendOptions<ExecuteEvaluationCommandData>) => Promise<void>;
+  evaluation: (
+    data: ExecuteEvaluationCommandData,
+    options?: QueueSendOptions<ExecuteEvaluationCommandData>,
+  ) => Promise<void>;
 }
 
 /**
@@ -48,7 +54,10 @@ export function createEvaluationTriggerReactor(
       // do not contribute to fold IO and must not re-trigger ON_MESSAGE evaluator runs. We
       // share `SYNTHETIC_SPAN_NAMES` with the trace-summary fold (foldProjection.ts:88) so a
       // future synthetic name updates both sites at once.
-      if (isSpanReceivedEvent(event) && SYNTHETIC_SPAN_NAMES.has(event.data.span.name)) {
+      if (
+        isSpanReceivedEvent(event) &&
+        SYNTHETIC_SPAN_NAMES.has(event.data.span.name)
+      ) {
         return;
       }
       const { tenantId, aggregateId: traceId, foldState } = context;
@@ -259,29 +268,37 @@ async function dispatchEvaluations({
       };
 
       const isThreadLevel =
-        monitor.threadIdleTimeout &&
-        monitor.threadIdleTimeout > 0 &&
-        threadId;
+        monitor.threadIdleTimeout && monitor.threadIdleTimeout > 0 && threadId;
 
-      const sendOptions: QueueSendOptions<ExecuteEvaluationCommandData> | undefined =
-        isThreadLevel
-          ? {
-              delay: monitor.threadIdleTimeout! * 1000,
-              deduplication: {
-                makeId: ExecuteEvaluationCommand.makeJobId,
-                ttlMs: monitor.threadIdleTimeout! * 1000,
-              },
-            }
-          : {
-              deduplication: {
-                makeId: ExecuteEvaluationCommand.makeJobId,
-                // 6 min — outlasts the 5-min deferred origin resolution window
-                // so that if the reactor fires twice (once from a late span,
-                // once from the deferred OriginResolvedEvent), the second
-                // dispatch is squashed by the dedup key.
-                ttlMs: DEFERRED_CHECK_DELAY_MS + 60_000,
-              },
-            };
+      const sendOptions:
+        | QueueSendOptions<ExecuteEvaluationCommandData>
+        | undefined = isThreadLevel
+        ? {
+            delay: monitor.threadIdleTimeout! * 1000,
+            deduplication: {
+              makeId: ExecuteEvaluationCommand.makeJobId,
+              ttlMs: monitor.threadIdleTimeout! * 1000,
+              // Defensive on this branch: the thread dedup TTL roughly equals the
+              // dispatch delay (both = threadIdleTimeout), so the post-dispatch
+              // squash window is ~0. The load-bearing fix is the trace-level
+              // deferred branch below (6-min TTL >> dispatch latency) (#3912).
+              shouldSurviveDispatch: true,
+            },
+          }
+        : {
+            deduplication: {
+              makeId: ExecuteEvaluationCommand.makeJobId,
+              // 6 min — outlasts the 5-min deferred origin resolution window
+              // so that if the reactor fires twice (once from a late span,
+              // once from the deferred OriginResolvedEvent), the second
+              // dispatch is squashed by the dedup key.
+              ttlMs: DEFERRED_CHECK_DELAY_MS + 60_000,
+              // Honor the still-alive dedup key even after the first command was
+              // dispatched, so the second trigger is squashed rather than
+              // DEL+restaged into a duplicate evaluation run (#3912).
+              shouldSurviveDispatch: true,
+            },
+          };
 
       await deps.evaluation(payload, sendOptions);
     } catch (error) {

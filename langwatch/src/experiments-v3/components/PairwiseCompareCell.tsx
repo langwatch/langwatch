@@ -84,6 +84,20 @@ function friendlyError(details: string | undefined): {
       raw,
     };
   }
+  // Distinct from the generic "outputs missing" case below: this fires when
+  // Variant A/B were never picked in the config drawer at all (the backend's
+  // required-field check on candidate_a_id/candidate_b_id), not when they're
+  // picked but haven't produced output yet.
+  if (
+    lower.includes("candidate_a_id is required") ||
+    lower.includes("candidate_b_id is required")
+  ) {
+    return {
+      headline: "Variant A/B not configured",
+      hint: "Open Edit Configuration and select both variants to compare.",
+      raw,
+    };
+  }
   if (
     lower.includes("candidate_a") ||
     lower.includes("candidate_b") ||

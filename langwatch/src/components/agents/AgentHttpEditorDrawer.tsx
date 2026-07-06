@@ -369,20 +369,11 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   });
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
-  // For HTTP agents the scenario output is always the HTTP response body,
-  // so we synthesize a single virtual "output" field and skip the output-field
-  // picker. The ScenarioInputMappingSection still renders its read-only row.
-  const httpScenarioOutputs: Variable[] = useMemo(
-    () => [{ identifier: "output", type: "str" }],
-    [],
-  );
   const isValid =
     (name?.trim().length ?? 0) > 0 &&
     (url?.trim().length ?? 0) > 0 &&
     isScenarioMappingValid({
       mappings: scenarioMappings,
-      outputs: httpScenarioOutputs,
-      outputField: undefined,
     });
 
   const handleSave = useCallback(() => {

@@ -19,6 +19,10 @@ const (
 	// messages, and responses calls against a Voyage credential land
 	// on a clean unsupported-request-type error.
 	ProviderVoyage ProviderID = "voyage"
+	// Custom is any OpenAI-compatible endpoint the customer hosts
+	// themselves (vLLM, LiteLLM proxy, ...). Requires a base URL; the
+	// API key is optional (many self-hosted servers run unauthenticated).
+	ProviderCustom ProviderID = "custom"
 )
 
 // Credential holds the resolved credentials for a provider.

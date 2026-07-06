@@ -25,6 +25,11 @@ type providerSlotWire struct {
 	ID          string                 `json:"id"`
 	Type        string                 `json:"type"`
 	Credentials map[string]interface{} `json:"credentials"`
+	// BaseURL overrides the provider's default endpoint. Emitted by the
+	// control-plane materialiser for OpenAI-compatible providers
+	// (type "custom": self-hosted vLLM, LiteLLM proxies, ...) — see
+	// config.materialiser.ts:buildProviderSlot.
+	BaseURL string `json:"base_url,omitempty"`
 	// DeploymentMap maps public model ids to provider-native deployment
 	// names (Azure routes on deployment, Bedrock on inference profile,
 	// etc.). Emitted by the control-plane materialiser as a top-level
@@ -326,6 +331,13 @@ func providerSlotToCredential(p providerSlotWire) domain.Credential {
 		}
 	default:
 		cred.APIKey = getString("api_key")
+	}
+
+	if p.BaseURL != "" {
+		if cred.Extra == nil {
+			cred.Extra = map[string]string{}
+		}
+		cred.Extra["base_url"] = p.BaseURL
 	}
 
 	return cred

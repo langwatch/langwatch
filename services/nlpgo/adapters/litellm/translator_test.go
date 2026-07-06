@@ -66,10 +66,12 @@ func TestTranslateModelID_BareIDsTreatedAsAnthropic(t *testing.T) {
 	}
 }
 
-func TestTranslateModelID_CustomDotToDash(t *testing.T) {
-	got := TranslateModelID("custom/my-llm-1.2")
-	if got != "custom/my-llm-1-2" {
-		t.Errorf("expected custom dot→dash, got %q", got)
+func TestTranslateModelID_CustomKeptVerbatim(t *testing.T) {
+	// Custom model ids are arbitrary customer strings (vLLM serves
+	// "Qwen/Qwen2.5-32B-Instruct") — dots must survive.
+	got := TranslateModelID("custom/Qwen/Qwen2.5-32B-Instruct")
+	if got != "custom/Qwen/Qwen2.5-32B-Instruct" {
+		t.Errorf("expected custom model id kept verbatim, got %q", got)
 	}
 }
 

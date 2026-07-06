@@ -9,7 +9,7 @@
 # ─── Go build ─────────────────────────────────────────────────────────────────
 # Pin the build stage to the host arch (BUILDPLATFORM) and cross-compile to
 # TARGETARCH natively, avoiding QEMU. Mirrors Dockerfile.go_service.
-FROM --platform=$BUILDPLATFORM golang:1.26.2-alpine AS go-build
+FROM --platform=$BUILDPLATFORM golang:1.26.4-alpine AS go-build
 WORKDIR /src
 RUN apk add --no-cache git ca-certificates
 ARG TARGETOS

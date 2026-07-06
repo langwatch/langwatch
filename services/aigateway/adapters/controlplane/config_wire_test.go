@@ -130,3 +130,44 @@ func TestBuildPolicyRules_Models(t *testing.T) {
 	assert.Contains(t, modelRules, domain.PolicyRule{Pattern: "^gpt-4.*", Type: domain.PolicyDeny, Target: domain.PolicyTargetModel})
 	assert.Contains(t, modelRules, domain.PolicyRule{Pattern: "^claude-.*", Type: domain.PolicyAllow, Target: domain.PolicyTargetModel})
 }
+
+// providerSlotToCredential must carry the top-level base_url from the wire
+// into cred.Extra — the bifrost adapter routes OpenAI-compatible custom
+// providers (self-hosted vLLM, LiteLLM proxies) by it. Dropping it sends
+// customer traffic to api.openai.com instead of their endpoint.
+//
+// Spec: specs/ai-gateway/custom-provider-base-url.feature
+func TestProviderSlotToCredential_BaseURL(t *testing.T) {
+	t.Run("custom slot forwards base_url into Extra", func(t *testing.T) {
+		cred := providerSlotToCredential(providerSlotWire{
+			ID:          "mp-1",
+			Type:        "custom",
+			Credentials: map[string]interface{}{"api_key": ""},
+			BaseURL:     "http://llm-server:8000/v1",
+		})
+		assert.Equal(t, domain.ProviderID("custom"), cred.ProviderID)
+		assert.Equal(t, "http://llm-server:8000/v1", cred.Extra["base_url"])
+		assert.Empty(t, cred.APIKey)
+	})
+
+	t.Run("openai slot with base_url override forwards it", func(t *testing.T) {
+		cred := providerSlotToCredential(providerSlotWire{
+			ID:          "mp-2",
+			Type:        "openai",
+			Credentials: map[string]interface{}{"api_key": "sk-test"},
+			BaseURL:     "https://proxy.example.com/v1",
+		})
+		assert.Equal(t, domain.ProviderOpenAI, cred.ProviderID)
+		assert.Equal(t, "https://proxy.example.com/v1", cred.Extra["base_url"])
+		assert.Equal(t, "sk-test", cred.APIKey)
+	})
+
+	t.Run("slot without base_url leaves Extra unset", func(t *testing.T) {
+		cred := providerSlotToCredential(providerSlotWire{
+			ID:          "mp-3",
+			Type:        "openai",
+			Credentials: map[string]interface{}{"api_key": "sk-test"},
+		})
+		assert.Empty(t, cred.Extra["base_url"])
+	})
+}

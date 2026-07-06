@@ -3,124 +3,14 @@ import { ExternalLink } from "lucide-react";
 import { useMemo } from "react";
 
 import { Link } from "~/components/ui/link";
-import { modelProviderRegistry } from "~/features/onboarding/regions/model-providers/registry";
 import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 
+import {
+  buildScopeHierarchy,
+  type OrgModelProvider,
+  resolveEligible,
+} from "./eligibleModelProviders";
 import type { VirtualKeyScopeEntry } from "./VirtualKeyScopePicker";
-
-type ScopeKey = `${VirtualKeyScopeEntry["scopeType"]}:${string}`;
-
-type OrgModelProvider = {
-  id?: string | null;
-  name?: string | null;
-  provider: string;
-  scopes: Array<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }>;
-  models?: string[] | null;
-  customModels?: Array<{ model: string }> | null;
-};
-
-type EligibleModelProvider = {
-  id: string;
-  provider: string;
-  label: string;
-  modelCount: number;
-  inheritedFrom: VirtualKeyScopeEntry;
-  defaultModel: string;
-};
-
-// Resolve the snippet-friendly model string for a provider row. The
-// gateway accepts both bare `gpt-5-mini` (OpenAI-SDK drop-in) and
-// `vendor/model` form. We emit the vendor-prefixed default per the
-// provider registry so a click on the row writes a model that the VK
-// can actually route to that specific provider.
-function resolveProviderDefaultModel(
-  providerKey: string,
-  providerLabel: string,
-  providerModels: string[],
-): string {
-  const registry = modelProviderRegistry.find(
-    (entry) => entry.backendModelProviderKey === providerKey,
-  );
-  const fallbackModel = providerModels[0];
-  const defaultModel = registry?.defaultModel ?? fallbackModel;
-  if (!defaultModel) {
-    // Best-effort: the registry has no default and the provider also
-    // shipped no models in scope. Emit the bare provider name; the
-    // gateway will surface a 404 the user can read instead of a silent
-    // empty model string.
-    return providerLabel.toLowerCase();
-  }
-  return `${providerKey}/${defaultModel}`;
-}
-
-/**
- * Resolves the union eligible-ModelProvider set for a multi-scope VirtualKey
- * client-side, mirroring `scopeResolver.eligibleModelProvidersForVk` on the
- * server. Inheritance rule from specs/ai-gateway/governance/vk-scope-inheritance.feature:
- *
- *   "A VK at scope S sees a ModelProvider P iff P's scope is an ancestor
- *    of S OR equal to S. ORG is the broadest, then TEAM, then PROJECT."
- *
- * Each surviving MP carries the broadest VK scope that admitted it (the
- * "inheritedFrom" chip in the picker UI) — that's the spec's
- * "via ORG"/"via TEAM:platform" annotation.
- */
-function resolveEligible(
-  scopes: VirtualKeyScopeEntry[],
-  providers: OrgModelProvider[],
-  hierarchy: {
-    organizationId: string | undefined;
-    teamOfProject: Map<string, string>;
-  },
-): EligibleModelProvider[] {
-  if (scopes.length === 0 || providers.length === 0) return [];
-  const matchesScope = (
-    mpScope: { scopeType: string; scopeId: string },
-    vkScope: VirtualKeyScopeEntry,
-  ): boolean => {
-    if (mpScope.scopeType === "ORGANIZATION") {
-      return mpScope.scopeId === hierarchy.organizationId;
-    }
-    if (mpScope.scopeType === "TEAM") {
-      if (vkScope.scopeType === "ORGANIZATION") return false;
-      if (vkScope.scopeType === "TEAM") return mpScope.scopeId === vkScope.scopeId;
-      const teamOfVkProject = hierarchy.teamOfProject.get(vkScope.scopeId);
-      return mpScope.scopeId === teamOfVkProject;
-    }
-    if (mpScope.scopeType === "PROJECT") {
-      return vkScope.scopeType === "PROJECT" && mpScope.scopeId === vkScope.scopeId;
-    }
-    return false;
-  };
-
-  const result = new Map<string, EligibleModelProvider>();
-  for (const provider of providers) {
-    if (!provider.id) continue;
-    for (const mpScope of provider.scopes) {
-      const winner = scopes.find((vkScope) => matchesScope(mpScope, vkScope));
-      if (!winner) continue;
-      if (result.has(provider.id)) continue;
-      const chatModels = provider.models ?? [];
-      const customCount = provider.customModels?.length ?? 0;
-      const label = provider.name ?? provider.provider;
-      result.set(provider.id, {
-        id: provider.id,
-        provider: provider.provider,
-        label,
-        modelCount: chatModels.length + customCount,
-        inheritedFrom: winner,
-        defaultModel: resolveProviderDefaultModel(
-          provider.provider,
-          label,
-          chatModels,
-        ),
-      });
-    }
-  }
-  return Array.from(result.values()).sort((a, b) =>
-    a.label.localeCompare(b.label),
-  );
-}
 
 function scopeChipLabel(
   scope: VirtualKeyScopeEntry,
@@ -188,13 +78,10 @@ export function EligibleModelProvidersPreview({
   selectedModel?: string;
   onSelectProviderModel?: (model: string) => void;
 }) {
-  const hierarchy = useMemo(() => {
-    const teamOfProject = new Map<string, string>();
-    for (const p of availableProjects) {
-      if (p.teamId) teamOfProject.set(p.id, p.teamId);
-    }
-    return { organizationId, teamOfProject };
-  }, [availableProjects, organizationId]);
+  const hierarchy = useMemo(
+    () => buildScopeHierarchy(availableProjects, organizationId),
+    [availableProjects, organizationId],
+  );
 
   const names = useMemo(() => {
     const teamNames = new Map(availableTeams.map((t) => [t.id, t.name]));
@@ -353,13 +240,10 @@ export function EligibleModelProvidersSummary({
   isLoading?: boolean;
   providers: OrgModelProvider[];
 }) {
-  const hierarchy = useMemo(() => {
-    const teamOfProject = new Map<string, string>();
-    for (const p of availableProjects) {
-      if (p.teamId) teamOfProject.set(p.id, p.teamId);
-    }
-    return { organizationId, teamOfProject };
-  }, [availableProjects, organizationId]);
+  const hierarchy = useMemo(
+    () => buildScopeHierarchy(availableProjects, organizationId),
+    [availableProjects, organizationId],
+  );
 
   const names = useMemo(() => {
     const teamNames = new Map(availableTeams.map((t) => [t.id, t.name]));
@@ -433,5 +317,3 @@ export function ConfigureModelProvidersLink({
     </Link>
   );
 }
-
-export type { OrgModelProvider, EligibleModelProvider };
