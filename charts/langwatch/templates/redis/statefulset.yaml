@@ -35,6 +35,7 @@ spec:
       containers:
         - name: redis
           securityContext:
+            runAsNonRoot: true
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:

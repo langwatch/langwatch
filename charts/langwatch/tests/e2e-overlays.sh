@@ -237,6 +237,18 @@ test_pod_security() {
     fail "hardening: expected >=10 read-only-root containers, found $ro_count"
   fi
 
+  # runAsNonRoot must be set at the *container* level too, not only the pod,
+  # because some Gatekeeper flavours of k8sreadonlyrootfilesystem inspect the
+  # container-level field directly. Regression guard for the customer report
+  # where pod-level alone tripped their constraint.
+  local nr_count
+  nr_count=$(count_matches "$def" "runAsNonRoot: true")
+  if (( nr_count >= 10 )); then
+    pass "hardening: container-level runAsNonRoot on $nr_count sites (>=10)"
+  else
+    fail "hardening: expected >=10 container-level runAsNonRoot, found $nr_count"
+  fi
+
   # Gateway pod must set automount on the POD spec, not just its ServiceAccount
   # (regression guard for the gap this work closed).
   local gw_block

@@ -175,6 +175,9 @@ podSecurityContext:
     type: RuntimeDefault
 
 containerSecurityContext:
+  # runAsNonRoot is also set on the pod above; some Gatekeeper constraints
+  # inspect the container-level field directly, so set it here too.
+  runAsNonRoot: true
   allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
   capabilities:
