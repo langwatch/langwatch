@@ -70,6 +70,18 @@ export function useAllModelProvidersList() {
 }
 
 /**
+ * True when `modelProviderId` names an actual stored row — i.e. it's
+ * neither absent nor the Add-flow sentinel `"new"`. Shared so every
+ * caller that branches on "is there a specific row to resolve" uses the
+ * same rule.
+ */
+export function isResolvableProviderId(
+  modelProviderId: string | undefined,
+): boolean {
+  return !!modelProviderId && modelProviderId !== "new";
+}
+
+/**
  * Resolves a single row by id from the flat list above. Shared by
  * `ModelProviderForm`'s edit-target memo and `EditModelProviderDrawer`'s
  * title lookup so the two can never again resolve different rows for the
@@ -79,6 +91,6 @@ export function findModelProviderById(
   providers: MaybeStoredModelProvider[],
   modelProviderId: string | undefined,
 ): MaybeStoredModelProvider | undefined {
-  if (!modelProviderId || modelProviderId === "new") return undefined;
+  if (!isResolvableProviderId(modelProviderId)) return undefined;
   return providers.find((p) => p.id === modelProviderId);
 }

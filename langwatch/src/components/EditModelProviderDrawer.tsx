@@ -2,6 +2,7 @@ import { Box, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
 import { useDrawer } from "~/hooks/useDrawer";
 import {
   findModelProviderById,
+  isResolvableProviderId,
   useAllModelProvidersList,
 } from "../hooks/useAllModelProvidersList";
 import { useModelProvidersSettings } from "../hooks/useModelProvidersSettings";
@@ -30,7 +31,7 @@ export const EditModelProviderDrawer = (
 
   // A specific row is being edited only when modelProviderId is a real
   // id — not the Add-flow sentinel "new" and not absent.
-  const isEditingSpecificRow = !!modelProviderId && modelProviderId !== "new";
+  const isEditingSpecificRow = isResolvableProviderId(modelProviderId);
 
   // Title/icon source: the specific row by id (shared resolver) when
   // editing one, else the collapsed record's current winner for this
