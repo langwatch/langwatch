@@ -15,6 +15,7 @@ import { auth } from "~/server/better-auth";
 import { isAllowedAuthOrigin } from "~/server/better-auth/originGate";
 import { prisma } from "~/server/db";
 import { connection as redisConnection } from "~/server/redis";
+import { resolveAuthProvider } from "~/server/sso/sso-gate";
 
 const secured = createServiceApp({ basePath: "/api" });
 
@@ -132,8 +133,11 @@ const logoutHandler = async (c: Context) => {
   }
 
   if (method === "GET") {
+    // Resolved provider, not raw env: on a denied (unlicensed) deployment
+    // the platform gate coerces the deployment to email mode (ADR-027), so
+    // logout must not bounce the user through the IdP.
     if (
-      env.NEXTAUTH_PROVIDER === "auth0" &&
+      (await resolveAuthProvider()) === "auth0" &&
       env.AUTH0_ISSUER &&
       env.AUTH0_CLIENT_ID
     ) {

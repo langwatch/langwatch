@@ -48,10 +48,8 @@ describe("useLicenseActions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     uploadMutationOptions.current = null;
-    Object.defineProperty(window, "location", {
-      value: { ...window.location, reload: vi.fn() },
-      writable: true,
-    });
+    // jsdom's location.reload is a non-configurable no-op that reports
+    // "Not implemented" to the virtual console — safe to let it run.
   });
 
   describe("when a license is activated on a self-hosted deployment", () => {

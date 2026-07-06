@@ -82,6 +82,18 @@ describe("better-auth before-hook (ADR-027 gate sites #2 and #3)", () => {
       ).rejects.toMatchObject({ statusCode: 403 });
     });
 
+    /** @scenario SSO sign-in routes are refused while the deployment is unlicensed */
+    it("refuses trailing-slash and query-string variants of the initiation routes", async () => {
+      await expect(
+        before(ctxFor("https://host/api/auth/sign-in/social/")),
+      ).rejects.toMatchObject({ statusCode: 403 });
+      await expect(
+        before(
+          ctxFor("https://host/api/auth/sign-in/oauth2/?providerId=auth0"),
+        ),
+      ).rejects.toMatchObject({ statusCode: 403 });
+    });
+
     /** @scenario Denied SSO is explained in the server logs */
     it("logs each refused SSO request with its path and reason", async () => {
       await expect(
@@ -192,6 +204,19 @@ describe("better-auth before-hook (ADR-027 gate sites #2 and #3)", () => {
       ).rejects.toMatchObject({ statusCode: 400 });
       await expect(
         before(ctxFor("https://host/api/auth/verify-email")),
+      ).rejects.toMatchObject({ statusCode: 400 });
+    });
+
+    /** @scenario A licensed deployment cannot mint password accounts */
+    it("refuses trailing-slash variants — the router resolves them to the same handler", async () => {
+      await expect(
+        before(ctxFor("https://host/api/auth/sign-up/email/")),
+      ).rejects.toMatchObject({ statusCode: 400 });
+      await expect(
+        before(ctxFor("https://host/api/auth/sign-in/email//")),
+      ).rejects.toMatchObject({ statusCode: 400 });
+      await expect(
+        before(ctxFor("https://host/api/auth/set-password/")),
       ).rejects.toMatchObject({ statusCode: 400 });
     });
 

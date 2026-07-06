@@ -127,7 +127,7 @@ describe("afterUserCreate", () => {
 
   describe("when the platform SSO gate denies (unlicensed deployment)", () => {
     /** @scenario Unlicensed-mode signup does not auto-join a domain-matched organization */
-    it("creates the user but does not auto-join the domain-matched organization", async () => {
+    it("skips the domain-matched organization auto-join", async () => {
       vi.mocked(platformSSOAllowed).mockResolvedValueOnce(false);
 
       const prisma = makePrismaMock({

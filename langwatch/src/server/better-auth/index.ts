@@ -248,6 +248,18 @@ export const requestPathname = (url: string): string => {
 };
 
 /**
+ * Pathname with trailing slashes stripped, for endpoint suffix matching.
+ * The router (rou3) resolves trailing-slash variants to the same handler,
+ * so `/sign-up/email/` must be treated as `/sign-up/email` — suffix-matching
+ * the raw URL would let a one-character variant walk past every block in
+ * the before-hook.
+ *
+ * Exported for unit testing.
+ */
+export const normalizedRequestPathname = (url: string): string =>
+  requestPathname(url).replace(/\/+$/, "");
+
+/**
  * ADR-027 gate site #2 — true for any request that must be refused while the
  * platform SSO gate denies: the initiation paths above, plus ANY callback
  * path (pathname-PREFIX match via `includes`, not the `endsWith`/suffix
@@ -261,10 +273,9 @@ export const requestPathname = (url: string): string => {
  * Exported for unit testing.
  */
 export const isGatedSsoPath = (url: string): boolean => {
+  const pathname = normalizedRequestPathname(url);
   if (
-    GATED_SSO_INITIATION_SUFFIXES.some(
-      (suffix) => url.endsWith(suffix) || url.includes(`${suffix}?`),
-    )
+    GATED_SSO_INITIATION_SUFFIXES.some((suffix) => pathname.endsWith(suffix))
   ) {
     return true;
   }
@@ -648,10 +659,11 @@ export const auth = betterAuth({
   hooks: {
     before: async (ctx) => {
       const url = ctx.request?.url ?? "";
-      // The request URL is the FULL URL after Next.js routing, so we
-      // check for suffix matches on the BetterAuth endpoint paths.
-      const matches = (suffix: string) =>
-        url.endsWith(suffix) || url.includes(`${suffix}?`);
+      // Suffix-match on the normalized pathname (query stripped, trailing
+      // slashes removed): the router treats `/sign-up/email/` as
+      // `/sign-up/email`, so the raw URL is never a safe matching target.
+      const pathname = normalizedRequestPathname(url);
+      const matches = (suffix: string) => pathname.endsWith(suffix);
 
       if (env.NEXTAUTH_PROVIDER !== "email") {
         // Credential-mutation block: stays keyed off the CONFIGURED mode,
