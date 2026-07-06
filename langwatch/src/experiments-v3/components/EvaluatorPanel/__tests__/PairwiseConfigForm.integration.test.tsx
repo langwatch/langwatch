@@ -89,6 +89,26 @@ describe("PairwiseConfigForm", () => {
     });
   });
 
+  describe("when hasGoldenAnswer is undefined (legacy pre-#5378 config)", () => {
+    it("shows the Golden field picker, defaulting to golden-aware", () => {
+      // loadState() copies persisted state without schema parsing, so a
+      // config saved before this field existed reaches the form with
+      // hasGoldenAnswer genuinely absent at runtime — not the `boolean`
+      // the type claims. Cast through unknown to reproduce that gap
+      // instead of the type system silently coercing it to a real value.
+      const legacyConfig = {
+        variantA: "",
+        variantB: "",
+        goldenField: "",
+        includeMetrics: [],
+      } as unknown as PairwiseEvaluatorConfig;
+
+      renderForm({ value: legacyConfig });
+
+      expect(screen.getByTestId("pairwise-golden-field")).toBeInTheDocument();
+    });
+  });
+
   describe("when the user toggles Has golden answer off", () => {
     it("hides the Golden field picker and reports hasGoldenAnswer=false, goldenField cleared", async () => {
       const onChange = vi.fn();

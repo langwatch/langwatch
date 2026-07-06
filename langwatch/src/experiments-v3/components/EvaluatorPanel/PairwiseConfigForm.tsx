@@ -263,7 +263,8 @@ function GoldenAnswerSection({
     control: formContext?.control,
     name: "settings.has_golden_answer",
   }) as boolean | undefined;
-  const hasGoldenAnswer = watchedHasGoldenAnswer ?? draft.hasGoldenAnswer;
+  const hasGoldenAnswer =
+    (watchedHasGoldenAnswer ?? draft.hasGoldenAnswer) !== false;
 
   const setHasGoldenAnswer = (on: boolean) => {
     formContext?.setValue("settings.has_golden_answer", on, {
