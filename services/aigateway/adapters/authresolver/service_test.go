@@ -464,7 +464,12 @@ func backdateConfig(t *testing.T, svc *Service, rawKey string, age time.Duration
 
 func TestResolve_FreshEntry_ConfigPastTTL_RefreshesConfigInBackground(t *testing.T) {
 	fetcher := &fakeConfigFetcher{
-		cfg: domain.BundleConfig{Credentials: []domain.Credential{{ID: "cred-new"}}},
+		cfg: domain.BundleConfig{
+			Credentials: []domain.Credential{{ID: "cred-new"}},
+			// A non-Credentials Config field, to lock in that the whole Config
+			// is refreshed, not just the mirrored top-level Credentials.
+			AllowedModels: []string{"anthropic/claude-sonnet-4-5"},
+		},
 	}
 	svc, _ := newService(t, Options{
 		Resolver:         &fetcher.fakeResolver,
@@ -492,13 +497,19 @@ func TestResolve_FreshEntry_ConfigPastTTL_RefreshesConfigInBackground(t *testing
 	for time.Now().Before(deadline) {
 		if e, ok := svc.l1.Get(hashKey(rawKey)); ok {
 			b, _, _ := e.snapshot()
-			if len(b.Credentials) == 1 && b.Credentials[0].ID == "cred-new" {
-				return // refreshed
+			// The whole Config is refreshed, not just the mirrored Credentials:
+			// the top-level Credentials mirror and a non-Credentials Config
+			// field (AllowedModels) both reflect the freshly fetched config.
+			credRefreshed := len(b.Credentials) == 1 && b.Credentials[0].ID == "cred-new"
+			cfgRefreshed := len(b.Config.AllowedModels) == 1 &&
+				b.Config.AllowedModels[0] == "anthropic/claude-sonnet-4-5"
+			if credRefreshed && cfgRefreshed {
+				return // whole config refreshed
 			}
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	t.Fatal("expected background config refresh to replace credentials within 2s")
+	t.Fatal("expected background config refresh to replace credentials and the full config within 2s")
 }
 
 func TestResolve_FreshEntry_ConfigTTLDisabled_NeverRefreshes(t *testing.T) {
