@@ -35,6 +35,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
@@ -141,16 +142,10 @@ vi.mock("../ui/toaster", () => ({
 // still renders for real.
 vi.mock("../ui/drawer", () => ({
   Drawer: {
-    Root: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-    Content: ({ children }: { children: React.ReactNode }) => (
-      <div>{children}</div>
-    ),
-    Header: ({ children }: { children: React.ReactNode }) => (
-      <div>{children}</div>
-    ),
-    Body: ({ children }: { children: React.ReactNode }) => (
-      <div>{children}</div>
-    ),
+    Root: ({ children }: { children: ReactNode }) => <>{children}</>,
+    Content: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+    Header: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+    Body: ({ children }: { children: ReactNode }) => <div>{children}</div>,
     CloseTrigger: () => <button aria-label="Close drawer" type="button" />,
   },
 }));
@@ -159,13 +154,17 @@ import type { MaybeStoredModelProvider } from "../../server/modelProviders/regis
 import { MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 import { EditModelProviderDrawer } from "../EditModelProviderDrawer";
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
+const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-// Same fixtures as ModelProviderForm.edit-row-resolution.integration.test.tsx:
+// Same two-scope shape as ModelProviderForm.edit-row-resolution.integration.test.tsx:
 // rowA is org-scoped (the edit target, absent from the collapsed record),
 // rowB is project-scoped (the collapse winner for the "openai" type).
+// rowB carries its OWN credential values so a wrong-row resolution renders
+// observably different form content — same provider type, so the header
+// title (the registry name for the TYPE, not the row's `name`) cannot
+// discriminate the two rows; the credential fields can.
 const rowA: MaybeStoredModelProvider = {
   id: "row-a",
   name: "OpenAI",
@@ -187,6 +186,10 @@ const rowA: MaybeStoredModelProvider = {
 const rowB: MaybeStoredModelProvider = {
   ...rowA,
   id: "row-b",
+  customKeys: {
+    OPENAI_API_KEY: "sk-row-b-key",
+    OPENAI_BASE_URL: "https://row-b.example.com",
+  },
   scopes: [{ scopeType: "PROJECT", scopeId: "proj-1" }],
   scopeType: "PROJECT",
   scopeId: "proj-1",
@@ -269,7 +272,21 @@ describe("<EditModelProviderDrawer/>", () => {
       });
 
       it("shows the targeted row's provider title in the header", () => {
+        // The header renders the registry display name for the provider
+        // TYPE, so with two same-type rows this alone proves a row
+        // resolved at all (a missed lookup renders an empty heading) —
+        // the row-discriminating check is the credential assertion below.
         expect(screen.getByRole("heading", { name: "OpenAI" })).toBeTruthy();
+      });
+
+      it("mounts the form on the targeted row's credential, not the collapse winner's", () => {
+        // row-a's key renders masked; a regression to the collapsed
+        // Record would resolve row-b and render row-b's values instead.
+        expect(screen.getByDisplayValue(MASKED_KEY_PLACEHOLDER)).toBeTruthy();
+        expect(screen.queryByDisplayValue("sk-row-b-key")).toBeNull();
+        expect(
+          screen.queryByDisplayValue("https://row-b.example.com"),
+        ).toBeNull();
       });
     });
   });

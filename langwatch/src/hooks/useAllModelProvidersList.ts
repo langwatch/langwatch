@@ -87,10 +87,13 @@ export function isResolvableProviderId(
  * title lookup so the two can never again resolve different rows for the
  * same id — the #5380 bug was exactly two separate resolvers drifting.
  */
-export function findModelProviderById(
-  providers: MaybeStoredModelProvider[],
-  modelProviderId: string | undefined,
-): MaybeStoredModelProvider | undefined {
+export function findModelProviderById({
+  providers,
+  modelProviderId,
+}: {
+  providers: MaybeStoredModelProvider[];
+  modelProviderId: string | undefined;
+}): MaybeStoredModelProvider | undefined {
   if (!isResolvableProviderId(modelProviderId)) return undefined;
   return providers.find((p) => p.id === modelProviderId);
 }

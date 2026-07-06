@@ -29,6 +29,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
@@ -141,7 +142,7 @@ import type { MaybeStoredModelProvider } from "../../../server/modelProviders/re
 import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import { EditModelProviderForm } from "../ModelProviderForm";
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
+const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 

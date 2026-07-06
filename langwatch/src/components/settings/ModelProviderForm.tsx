@@ -109,7 +109,10 @@ export const EditModelProviderForm = ({
   //   - `modelProviderId` undefined → no specific target, fresh blank
   //     (deep-link from evaluator selector or similar).
   const provider: MaybeStoredModelProvider = useMemo(() => {
-    const existing = findModelProviderById(allProviders, modelProviderId);
+    const existing = findModelProviderById({
+      providers: allProviders,
+      modelProviderId,
+    });
     if (existing) return existing;
     return {
       provider: providerKey,

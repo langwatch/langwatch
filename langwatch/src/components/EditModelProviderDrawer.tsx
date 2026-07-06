@@ -38,7 +38,7 @@ export const EditModelProviderDrawer = (
   // provider type — right there, since "new"/no-id means "whichever row
   // owns this provider type right now", not "this specific row".
   const provider = isEditingSpecificRow
-    ? findModelProviderById(allProviders, modelProviderId)
+    ? findModelProviderById({ providers: allProviders, modelProviderId })
     : providers?.[providerKey];
 
   // Get provider name for the title

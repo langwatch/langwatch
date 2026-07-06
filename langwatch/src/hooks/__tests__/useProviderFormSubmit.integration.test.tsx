@@ -26,6 +26,7 @@ const {
   mockInvalidate,
   mockSetRoleAssignmentMutateAsync,
   mockDefaultModelsInvalidate,
+  mockListAllForOrgInvalidate,
 } = vi.hoisted(() => ({
   mockUpdateMutateAsync: vi.fn().mockResolvedValue({}),
   mockUpdateProjectDefaultModelsMutateAsync: vi.fn().mockResolvedValue({}),
@@ -33,6 +34,7 @@ const {
   mockInvalidate: vi.fn(),
   mockSetRoleAssignmentMutateAsync: vi.fn().mockResolvedValue({ ok: true }),
   mockDefaultModelsInvalidate: vi.fn(),
+  mockListAllForOrgInvalidate: vi.fn(),
 }));
 
 vi.mock("../../utils/api", () => ({
@@ -47,7 +49,9 @@ vi.mock("../../utils/api", () => ({
         getAllForProject: { invalidate: vi.fn() },
         getAllForProjectForFrontend: { invalidate: vi.fn() },
         listAllForProjectForFrontend: { invalidate: vi.fn() },
-        listAllForOrganizationForFrontend: { invalidate: vi.fn() },
+        listAllForOrganizationForFrontend: {
+          invalidate: mockListAllForOrgInvalidate,
+        },
         getResolvedDefault: { invalidate: vi.fn() },
         getDefaultModelsForProject: {
           invalidate: mockDefaultModelsInvalidate,
@@ -304,6 +308,27 @@ describe("useProviderFormSubmit()", () => {
         });
 
         expect(mockDefaultModelsInvalidate).toHaveBeenCalled();
+      });
+
+      it("invalidates the org-wide provider list so the settings table refetches", async () => {
+        // #5380 second root cause: after add/save, the settings table
+        // reads listAllForOrganizationForFrontend — without this
+        // invalidation it keeps a stale list until window-focus refetch,
+        // inviting a duplicate re-add of the row just saved.
+        const snapshot = buildSnapshot({
+          useAsDefaultProvider: false,
+          projectDefaultModel: null,
+          projectTopicClusteringModel: null,
+          projectEmbeddingsModel: null,
+          scopes: [{ scopeType: "PROJECT", scopeId: "proj-1" }],
+        });
+        const { result } = renderSubmitHook({ snapshot });
+
+        await act(async () => {
+          await result.current.submit();
+        });
+
+        expect(mockListAllForOrgInvalidate).toHaveBeenCalled();
       });
     });
   });
