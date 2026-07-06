@@ -146,10 +146,11 @@ export async function whenIAddCriterion(page: Page, criterion: string) {
  * Then the criterion appears in the criteria list
  */
 export async function thenCriterionAppearsInList(page: Page, criterion: string) {
-  // Find the last input in the criteria list and assert its value safely
-  // Using toHaveValue() handles special characters (quotes, backslashes)
-  const criterionInput = page.locator("input[name]").last();
-  await expect(criterionInput).toHaveValue(criterion, { timeout: 5000 });
+  // Scope to the criteria list container so we only match rendered criteria items.
+  // Saved criteria render as plain text (not inputs), so we assert visibility of
+  // the criterion text within the container rather than an input value.
+  const criteriaList = page.getByTestId("criteria-list");
+  await expect(criteriaList.getByText(criterion)).toBeVisible({ timeout: 5000 });
 }
 
 /**
