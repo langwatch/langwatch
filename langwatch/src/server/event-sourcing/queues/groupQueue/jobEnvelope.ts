@@ -395,7 +395,10 @@ export async function decodeJobEnvelope({
         "Job envelope references a tiered blob but no tiered store was provided",
       );
     }
-    const data = await tieredBlobs.get(header.ref);
+    const data =
+      readMode === "peek"
+        ? await tieredBlobs.peek(header.ref)
+        : await tieredBlobs.get(header.ref);
     if (!data) {
       throw new Error(
         "Job envelope tiered blob is missing (deleted or expired)",

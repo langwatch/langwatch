@@ -27,6 +27,7 @@ const metricNames = [
   "gq_blob_decode_cap_exceeded_total",
   "gq_envelope_gq2_downgrade_total",
   "gq_payload_too_large_total",
+  "gq_retry_encode_failures_total",
 ] as const;
 
 for (const name of metricNames) {
@@ -192,4 +193,17 @@ export const gqPayloadTooLargeTotal = new Counter({
   name: "gq_payload_too_large_total",
   help: "Payload rejected at the encode cap",
   labelNames: ["queue_name"] as const,
+});
+
+/**
+ * Retry re-encode failed (transient blob-store 5xx, payload-too-large from a
+ * state-bloat regression) — the retry never re-staged and the slot dropped to
+ * the fail-safe. Distinct from `gqJobsNonRetryableTotal` (which is for genuine
+ * non-retryable process() errors) so oncall can disambiguate "gave up on a
+ * bad payload" from "gave up because encode blipped mid-retry".
+ */
+export const gqRetryEncodeFailuresTotal = new Counter({
+  name: "gq_retry_encode_failures_total",
+  help: "Retry re-encode failed — dispatched job completed via fail-safe, work recovers via event replay",
+  labelNames: ["queue_name", "pipeline_name", "job_type", "job_name"] as const,
 });

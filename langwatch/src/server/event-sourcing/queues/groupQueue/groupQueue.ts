@@ -56,6 +56,7 @@ import {
   gqJobsStagedTotal,
   gqRetryAttempt,
   gqRetryBackoffMilliseconds,
+  gqRetryEncodeFailuresTotal,
 } from "./metrics";
 import { GroupQueueMetricsCollector } from "./metricsCollector";
 import { RedisJobBlobStore } from "./redisJobBlobStore";
@@ -857,7 +858,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                     stagedJobId,
                     jobName,
                   });
-                  gqJobsNonRetryableTotal.inc(routingLabels);
+                  // Distinct counter — this is a retry-encode blip, not a
+                  // genuine non-retryable process() error. Oncall triaging a
+                  // gq_jobs_non_retryable_total spike shouldn't have to grep
+                  // logs to figure out which class of failure they're seeing.
+                  gqRetryEncodeFailuresTotal.inc(routingLabels);
                   return;
                 }
 

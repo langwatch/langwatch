@@ -177,6 +177,16 @@ export class TieredBlobStore {
     this.s3ThresholdBytes = deps.s3ThresholdBytes ?? S3_TIER_THRESHOLD_BYTES;
     this.queueName = deps.queueName;
     this.logger = deps.logger;
+    // Loud one-time warn when observability isn't wired at composition time.
+    // Silent-fail-if-unset was the original ADR-030 issue Aryan flagged — this
+    // makes the omission visible instead of latent (2026-07-03 audit follow-up).
+    // Test doubles construct without queueName; we only warn when a logger is
+    // available so tests stay quiet.
+    if (!this.queueName && this.logger) {
+      this.logger.warn(
+        "TieredBlobStore constructed without queueName — decode-cap counter and warn will silently no-op",
+      );
+    }
   }
 
   private resolveDestinationCached(
@@ -252,10 +262,26 @@ export class TieredBlobStore {
    * blob and reaches the fail-safe (complete the slot, recover via replay).
    */
   async get(ref: BlobRef): Promise<Buffer | null> {
+    return this.fetch(ref, /* refresh */ true);
+  }
+
+  /**
+   * Reads a blob WITHOUT refreshing its backstop TTL — the non-worker /
+   * ops-dashboard inspection path. Symmetric with {@link RedisJobBlobStore.peek}
+   * so a repeatedly-viewed blocked group can't extend the lifetime of its
+   * orphan blobs indefinitely by triggering GETEX on every render.
+   * S3-tier objects have no TTL; peek and get are functionally identical there.
+   */
+  async peek(ref: BlobRef): Promise<Buffer | null> {
+    return this.fetch(ref, /* refresh */ false);
+  }
+
+  private async fetch(ref: BlobRef, refresh: boolean): Promise<Buffer | null> {
     if (ref.tier === "redis") {
-      return this.redisBlobs.get({
-        id: redisBlobId({ projectId: ref.projectId, hash: ref.hash }),
-      });
+      const id = redisBlobId({ projectId: ref.projectId, hash: ref.hash });
+      return refresh
+        ? this.redisBlobs.get({ id })
+        : this.redisBlobs.peek({ id });
     }
     // Re-mint OUTSIDE the missing-classification: a destination-resolve / mint
     // failure is transient (retry), never "missing" (ADR-030 §2).
