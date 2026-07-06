@@ -79,7 +79,7 @@ const repoWithOrgs = (
 describe("platformSSOAllowed", () => {
   beforeEach(() => {
     __resetSsoGateForTests();
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     envMock.IS_SAAS = false;
     envMock.NEXTAUTH_PROVIDER = "auth0";
     envMock.LANGWATCH_LICENSE_KEY = undefined;
@@ -227,6 +227,32 @@ describe("platformSSOAllowed", () => {
     });
   });
 
+  describe("given two concurrent first-requests before the first resolution", () => {
+    /** @scenario Self-hosted with a genuine org license keeps SSO working with zero action */
+    it("shares one in-flight promise: reads the store once and both converge (MINOR-5)", async () => {
+      let resolveScan: (orgs: { id: string; license: string }[]) => void = () =>
+        undefined;
+      const findOrganizationsWithLicense = vi.fn().mockReturnValue(
+        new Promise<{ id: string; license: string }[]>((resolve) => {
+          resolveScan = resolve;
+        }),
+      );
+      __setSsoLicenseRepositoryForTests({ findOrganizationsWithLicense });
+      vi.mocked(parseLicenseKey).mockReturnValue(genuineLicense());
+      vi.mocked(verifySignature).mockReturnValue(true);
+      vi.mocked(isExpired).mockReturnValue(false);
+
+      // Both callers enter before the scan promise settles.
+      const first = platformSSOAllowed();
+      const second = platformSSOAllowed();
+      resolveScan([{ id: "org_1", license: "encoded" }]);
+
+      expect(await first).toBe(true);
+      expect(await second).toBe(true);
+      expect(findOrganizationsWithLicense).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("given the gate already resolved to deny earlier in this process", () => {
     /** @scenario Activating a license takes effect at the next restart */
     it("stays denied even after a genuine license appears in the DB, until the process restarts", async () => {
@@ -281,7 +307,7 @@ describe("platformSSOAllowed", () => {
 describe("resolveAuthProvider", () => {
   beforeEach(() => {
     __resetSsoGateForTests();
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     envMock.IS_SAAS = false;
     envMock.NEXTAUTH_PROVIDER = "auth0";
     envMock.LANGWATCH_LICENSE_KEY = undefined;
@@ -296,6 +322,20 @@ describe("resolveAuthProvider", () => {
       const provider = await resolveAuthProvider();
 
       expect(provider).toBe("email");
+      expect(repository.findOrganizationsWithLicense).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the deployment is LangWatch Cloud", () => {
+    /** @scenario SaaS is unaffected by license gating */
+    it("reports the configured provider without reading the licensing store", async () => {
+      envMock.IS_SAAS = true;
+      const repository = repoWithOrgs([]);
+      __setSsoLicenseRepositoryForTests(repository);
+
+      const provider = await resolveAuthProvider();
+
+      expect(provider).toBe("auth0");
       expect(repository.findOrganizationsWithLicense).not.toHaveBeenCalled();
     });
   });

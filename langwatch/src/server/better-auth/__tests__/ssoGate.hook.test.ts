@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Stub the Prisma client so importing `../index` (which constructs a real
+// `betterAuth({ database: prismaAdapter(prisma, ...) })`) doesn't instantiate
+// a live PrismaClient — same reason `fallbackName.test.ts` mocks it. This
+// file exercises only the `before`-hook's routing logic, no DB.
+vi.mock("~/server/db", () => ({ prisma: {} }));
+
 // The gate itself is unit-tested in `src/server/sso/__tests__/sso-gate.test.ts`.
 // This file tests ONLY the hook's orchestration: which paths get refused in
 // which gate state, per ADR-027 Decision 4 / Constants table.
