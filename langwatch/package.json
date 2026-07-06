@@ -258,7 +258,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.1",
-    "@playwright/test": "^1.59.1",
+    "@playwright/test": "^1.61.1",
     "@testcontainers/clickhouse": "^12.0.3",
     "@testcontainers/redis": "^12.0.3",
     "@testing-library/jest-dom": "^6.9.1",
