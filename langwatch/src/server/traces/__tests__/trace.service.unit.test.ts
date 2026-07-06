@@ -108,15 +108,6 @@ describe("TraceService", () => {
       );
     });
 
-    it("throws when ClickHouse returns null", async () => {
-      mockGetAllTracesForProjectCH.mockResolvedValue(null);
-
-      await expect(
-        service.getAllTracesForProject(input, protections),
-      ).rejects.toThrow(
-        "ClickHouse is enabled but returned null for getAllTracesForProject",
-      );
-    });
   });
 
   describe("getById()", () => {

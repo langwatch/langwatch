@@ -56,7 +56,7 @@ describe("EvaluationService memory-limit fallback", () => {
         const client = clientThatOOMsOnInputs([ROW]);
         getClickHouseClientForProjectMock.mockResolvedValue(client);
 
-        const service = EvaluationService.create({} as never);
+        const service = EvaluationService.create();
         const result = await service.getEvaluationsForTrace({
           projectId: "project_test",
           traceId: "trace-1",
@@ -75,7 +75,7 @@ describe("EvaluationService memory-limit fallback", () => {
         const client = clientThatOOMsOnInputs([ROW]);
         getClickHouseClientForProjectMock.mockResolvedValue(client);
 
-        const service = EvaluationService.create({} as never);
+        const service = EvaluationService.create();
         const result = await service.getEvaluationsMultiple({
           projectId: "project_test",
           traceIds: ["trace-1"],

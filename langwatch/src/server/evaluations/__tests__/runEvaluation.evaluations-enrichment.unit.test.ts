@@ -146,7 +146,7 @@ describe("runEvaluationForTrace evaluations enrichment", () => {
   });
 
   describe("given the enrichment query returns no evaluations", () => {
-    it("falls back to an empty list without throwing", async () => {
+    it("degrades the mapped value to the empty-string fallback without throwing", async () => {
       getEvaluationsMultipleMock.mockResolvedValue({});
 
       await expect(
@@ -167,6 +167,14 @@ describe("runEvaluationForTrace evaluations enrichment", () => {
           protections,
         }),
       ).resolves.toBeDefined();
+
+      // The missing evaluation must degrade to buildDataForEvaluation's
+      // empty-string fallback for default-type evaluators — not to garbage
+      // mapped into the evaluator input.
+      const mappedData = executeNativeEvaluationMock.mock.calls[0]?.[0]?.data as
+        | Record<string, unknown>
+        | undefined;
+      expect(mappedData?.input).toBe("");
     });
   });
 });

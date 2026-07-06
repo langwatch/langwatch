@@ -102,9 +102,6 @@ function buildMockTraceService(options: {
       callIndex++;
       return Promise.resolve(result);
     }),
-    getEvaluationsMultiple: vi
-      .fn()
-      .mockResolvedValue(options.evaluations ?? {}),
   } as unknown as TraceService;
 }
 

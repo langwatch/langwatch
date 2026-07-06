@@ -29,7 +29,7 @@ describe("EvaluationService.getEvaluationInputs", () => {
         );
         getClickHouseClientForProjectMock.mockResolvedValue({ query });
 
-        const service = EvaluationService.create({} as never);
+        const service = EvaluationService.create();
         const result = await service.getEvaluationInputs({
           projectId: "project_test",
           evaluationId: "eval-1",
@@ -58,7 +58,7 @@ describe("EvaluationService.getEvaluationInputs", () => {
         }));
         getClickHouseClientForProjectMock.mockResolvedValue({ query });
 
-        const service = EvaluationService.create({} as never);
+        const service = EvaluationService.create();
         const result = await service.getEvaluationInputs({
           projectId: "project_test",
           evaluationId: "eval-1",
@@ -79,7 +79,7 @@ describe("EvaluationService.getEvaluationInputs", () => {
         });
         getClickHouseClientForProjectMock.mockResolvedValue({ query });
 
-        const service = EvaluationService.create({} as never);
+        const service = EvaluationService.create();
         const result = await service.getEvaluationInputs({
           projectId: "project_test",
           evaluationId: "eval-1",
@@ -95,7 +95,7 @@ describe("EvaluationService.getEvaluationInputs", () => {
       it("returns null without querying", async () => {
         getClickHouseClientForProjectMock.mockResolvedValue(null);
 
-        const service = EvaluationService.create({} as never);
+        const service = EvaluationService.create();
         const result = await service.getEvaluationInputs({
           projectId: "project_test",
           evaluationId: "eval-1",

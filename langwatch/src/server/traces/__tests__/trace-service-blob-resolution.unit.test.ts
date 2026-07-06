@@ -50,12 +50,6 @@ vi.mock("../clickhouse-trace.service", () => ({
   }),
 }));
 
-vi.mock("../elasticsearch-trace.service", () => ({
-  ElasticsearchTraceService: Object.assign(vi.fn(), {
-    create: () => ({}),
-  }),
-}));
-
 vi.mock("~/server/evaluations/evaluation.service", () => ({
   EvaluationService: Object.assign(vi.fn(), {
     create: () => ({}),
@@ -223,15 +217,4 @@ describe("TraceService.getTracesWithSpans() — ADR-022 blob resolution pipeline
     });
   });
 
-  describe("given ClickHouse returns null (ClickHouse unavailable)", () => {
-    describe("when getTracesWithSpans is called", () => {
-      it("throws a descriptive error", async () => {
-        mockGetTracesWithSpansCH.mockResolvedValue(null);
-
-        await expect(
-          service.getTracesWithSpans("proj-1", ["trace-1"], protections),
-        ).rejects.toThrow("ClickHouse is enabled but returned null");
-      });
-    });
-  });
 });

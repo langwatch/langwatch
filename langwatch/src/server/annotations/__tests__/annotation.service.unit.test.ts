@@ -103,12 +103,9 @@ describe("AnnotationService", () => {
   });
 
   describe("static create() factory", () => {
-    it("returns a working service", async () => {
+    it("returns a working service", () => {
       const mockPrisma = {} as any;
-      const service = await AnnotationService.create({
-        prisma: mockPrisma,
-        projectId: "proj-1",
-      });
+      const service = AnnotationService.create({ prisma: mockPrisma });
 
       expect(service).toBeInstanceOf(AnnotationService);
     });

@@ -10,9 +10,9 @@ import { LicenseEnforcementRepository } from "../license-enforcement.repository"
  * - Confirms archivedAt: null filtering for workflows/evaluators
  * - Validates query structure for all 8 Prisma-based methods
  *
- * Note: Message/trace counting is NOT tested here because it uses
- * ClickHouse via TraceUsageService, not Prisma. That's tested
- * in the UsageStatsService tests.
+ * Note: Message/trace counting is NOT tested here because it lives in
+ * TraceUsageService (ClickHouse, not Prisma). See
+ * src/server/traces/__tests__/trace-usage.service.unit.test.ts.
  *
  * Note: Classification function tests (isViewOnlyPermission, isViewOnlyCustomRole,
  * classifyMemberType, isFullMember, isLiteMember) are in member-classification.unit.test.ts

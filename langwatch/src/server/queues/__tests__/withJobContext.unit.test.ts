@@ -32,13 +32,38 @@ describe("withJobContext", () => {
       return "result";
     });
 
-    await withJobContext(processor)(mockJob);
+    const result = await withJobContext(processor)(mockJob);
 
+    expect(result).toBe("result");
     expect(capturedContext?.organizationId).toBe("org-new");
     expect(capturedContext?.projectId).toBe("proj-new");
     expect(capturedContext?.userId).toBe("user-new");
     expect(capturedData.traceId).toBe("trace-123");
     expect(capturedData.spans).toEqual([{ id: "span-1" }]);
+  });
+
+  it("processes plain jobs with neither __payload nor __context", async () => {
+    const mockJob = {
+      data: {
+        traceId: "plain-trace-123",
+        spans: [{ id: "plain-span-1" }],
+      },
+    } as any;
+
+    let capturedData: any;
+    const processor = vi.fn(async (job: any) => {
+      capturedData = job.data;
+      return "result";
+    });
+
+    const result = await withJobContext(processor)(mockJob);
+
+    expect(result).toBe("result");
+    expect(processor).toHaveBeenCalledTimes(1);
+    expect(capturedData).toEqual({
+      traceId: "plain-trace-123",
+      spans: [{ id: "plain-span-1" }],
+    });
   });
 
   it("migrates legacy format jobs with __payload wrapper", async () => {
