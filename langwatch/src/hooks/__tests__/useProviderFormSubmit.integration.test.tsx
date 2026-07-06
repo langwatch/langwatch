@@ -47,6 +47,7 @@ vi.mock("../../utils/api", () => ({
         getAllForProject: { invalidate: vi.fn() },
         getAllForProjectForFrontend: { invalidate: vi.fn() },
         listAllForProjectForFrontend: { invalidate: vi.fn() },
+        listAllForOrganizationForFrontend: { invalidate: vi.fn() },
         getResolvedDefault: { invalidate: vi.fn() },
         getDefaultModelsForProject: {
           invalidate: mockDefaultModelsInvalidate,

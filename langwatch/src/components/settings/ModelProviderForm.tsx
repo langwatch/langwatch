@@ -1,6 +1,7 @@
 import { Box, Button, Field, HStack, Input, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
+import { useAllModelProvidersList } from "../../hooks/useAllModelProvidersList";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useFeatureFlag } from "../../hooks/useFeatureFlag";
 import { useModelProviderApiKeyValidation } from "../../hooks/useModelProviderApiKeyValidation";
@@ -49,6 +50,10 @@ export const EditModelProviderForm = ({
   const { providers } = useModelProvidersSettings({
     projectId: projectId,
   });
+  // Flat, uncollapsed list — the id lookup below must resolve against this,
+  // not the collapsed `providers` Record above (see the lookup comment on
+  // the `provider` memo for why).
+  const { providers: allProviders } = useAllModelProvidersList();
   const { closeDrawer } = useDrawer();
   const { project, team, organization, hasPermission } =
     useOrganizationTeamProject();
@@ -95,19 +100,21 @@ export const EditModelProviderForm = ({
   //     an existing row. The Add Model Provider menu sets this so the
   //     user can stand up a second instance of an already-configured
   //     provider type without colliding with the first.
-  //   - `modelProviderId === "<cuid>"` → edit that specific row. With
-  //     multi-instance enabled the providers Record dedupes by provider
-  //     string and may not contain this row, so we don't fall back on
-  //     `providers[providerKey]` if the id lookup misses (that fallback
-  //     used to silently swap the user's intended row for whichever
-  //     same-type row happened to win the dedupe).
+  //   - `modelProviderId === "<cuid>"` → edit that specific row. The id
+  //     comes from the settings table, which reads the UNCOLLAPSED flat
+  //     list (`useAllModelProvidersList`), so the lookup has to search
+  //     that same flat list rather than the `providers` Record above.
+  //     That Record dedupes by provider string (narrowest scope wins)
+  //     and silently drops every other same-type row — with
+  //     multi-instance enabled, looking this id up against it can miss
+  //     the exact row the user clicked, fall through to the blank draft
+  //     below, and on Save submit `id: undefined`, which the server
+  //     treats as a create instead of an update (#5380).
   //   - `modelProviderId` undefined → no specific target, fresh blank
   //     (deep-link from evaluator selector or similar).
   const provider: MaybeStoredModelProvider = useMemo(() => {
-    if (providers && modelProviderId && modelProviderId !== "new") {
-      const existing = Object.values(providers).find(
-        (p) => p.id === modelProviderId,
-      );
+    if (modelProviderId && modelProviderId !== "new") {
+      const existing = allProviders.find((p) => p.id === modelProviderId);
       if (existing) return existing;
     }
     return {
@@ -120,7 +127,7 @@ export const EditModelProviderForm = ({
       deploymentMapping: null,
       extraHeaders: [],
     };
-  }, [modelProviderId, providerKey, providers]);
+  }, [allProviders, modelProviderId, providerKey]);
 
   // Detect if provider is using environment variables (enabled but no stored customKeys)
   // Must be computed before the hook call so we can pass it to the hook

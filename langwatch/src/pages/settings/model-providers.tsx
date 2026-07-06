@@ -14,6 +14,7 @@ import {
 import { BrainCircuit, Edit, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { useAllModelProvidersList } from "~/hooks/useAllModelProvidersList";
 import { useAvailableScopes } from "~/hooks/useAvailableScopes";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
@@ -38,34 +39,14 @@ export default function ModelsPage() {
   // The settings page renders one row per stored ModelProvider — the
   // Record-by-provider-key shape returned by `useModelProvidersSettings`
   // collapses multi-instance setups (two "OpenAI" rows at different
-  // scopes) into a single entry and silently drops the loser. Use the
-  // flat list endpoint instead so the table reflects every row.
-  //
-  // The "All you can see" view fans out across the whole organization
-  // so an admin sees providers a sibling project has configured. Members
-  // without `organization:view` (project-only members) fall back to the
-  // per-project endpoint, which they always have permission to read.
-  const canViewOrg = hasPermission("organization:view");
-  const orgQuery = api.modelProvider.listAllForOrganizationForFrontend.useQuery(
-    { organizationId: organization?.id ?? "" },
-    {
-      enabled: !!organization?.id && canViewOrg,
-      retry: false,
-      refetchOnWindowFocus: false,
-    },
-  );
-  const projectQuery = api.modelProvider.listAllForProjectForFrontend.useQuery(
-    { projectId: project?.id ?? "" },
-    {
-      enabled: !!project?.id && !canViewOrg,
-      retry: false,
-      refetchOnWindowFocus: false,
-    },
-  );
-  const activeQuery = canViewOrg ? orgQuery : projectQuery;
-  const allProvidersList = activeQuery.data?.providers ?? [];
-  const isLoading = activeQuery.isLoading;
-  const refetch = activeQuery.refetch;
+  // scopes) into a single entry and silently drops the loser. The shared
+  // hook fans the flat list out across org/project scope so the table
+  // reflects every row regardless of the viewer's permissions.
+  const {
+    providers: allProvidersList,
+    isLoading,
+    refetch,
+  } = useAllModelProvidersList();
 
   const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
   const isProviderDrawerOpen = isDrawerOpen("editModelProvider");
