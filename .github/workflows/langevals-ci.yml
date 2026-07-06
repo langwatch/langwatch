@@ -86,6 +86,14 @@ jobs:
         run: uv sync --all-extras --all-groups
 
       - name: Run tests
+        # Fork and Dependabot PRs don't receive repository secrets, so a
+        # secret-backed run can only fail on a missing key. Skip it there;
+        # same-repo PRs, pushes, and label-approved pull_request_target run.
+        if: >
+          (github.event_name != 'pull_request'
+           || github.event.pull_request.head.repo.full_name == github.repository)
+          && (github.actor != 'dependabot[bot]'
+           || github.event_name == 'pull_request_target')
         working-directory: langevals
         env:
           OPENAI_API_KEY: ${{ secrets.LANGEVALS_OPENAI_API_KEY }}

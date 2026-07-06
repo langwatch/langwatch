@@ -72,7 +72,14 @@ jobs:
         run: go mod download
 
       - name: Run e2e examples
-        if: github.event_name != 'pull_request' || github.actor != 'dependabot[bot]'
+        # Fork and Dependabot PRs don't receive repository secrets, so a
+        # secret-backed run can only fail on a missing key. Skip it there;
+        # same-repo PRs, pushes, and label-approved pull_request_target run.
+        if: >
+          (github.event_name != 'pull_request'
+           || github.event.pull_request.head.repo.full_name == github.repository)
+          && (github.event_name != 'pull_request'
+           || github.actor != 'dependabot[bot]')
         working-directory: ./sdk-go/e2e
         run: go run cmd/main.go --ci run-examples
         env:
