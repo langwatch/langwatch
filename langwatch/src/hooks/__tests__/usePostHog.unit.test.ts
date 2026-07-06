@@ -4,20 +4,46 @@
 import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockInit, mockStartSessionRecording, mockDebug } = vi.hoisted(() => ({
-  mockInit: vi.fn(),
-  mockStartSessionRecording: vi.fn(),
-  mockDebug: vi.fn(),
-}));
+// vi.hoisted() is required: vi.mock() factories are hoisted to the top of the
+// file, so any variable they reference directly must also be hoisted — otherwise
+// we hit a temporal dead zone error.
+const {
+  mockInit,
+  mockStartSessionRecording,
+  mockDebug,
+  mockIdentify,
+  mockReset,
+  mockPeopleSet,
+  mockPosthogLoaded,
+} = vi.hoisted(() => {
+  const loaded = { value: true };
+  return {
+    mockInit: vi.fn(),
+    mockStartSessionRecording: vi.fn(),
+    mockDebug: vi.fn(),
+    mockIdentify: vi.fn(),
+    mockReset: vi.fn(),
+    mockPeopleSet: vi.fn(),
+    // Boxed so tests can toggle __loaded without re-creating the object.
+    mockPosthogLoaded: loaded,
+  };
+});
 
 vi.mock("posthog-js", () => ({
   default: {
     init: mockInit,
     startSessionRecording: mockStartSessionRecording,
     debug: mockDebug,
+    identify: mockIdentify,
+    reset: mockReset,
+    people: { set: mockPeopleSet },
+    get __loaded() {
+      return mockPosthogLoaded.value;
+    },
   },
 }));
 
+// --- publicEnv mock (used by init tests) ---
 let publicEnvData: Record<string, unknown> | undefined = {
   POSTHOG_KEY: "test-key",
   POSTHOG_HOST: "https://eu.i.posthog.com",
@@ -26,6 +52,25 @@ let publicEnvData: Record<string, unknown> | undefined = {
 
 vi.mock("../usePublicEnv", () => ({
   usePublicEnv: () => ({ data: publicEnvData }),
+}));
+
+// --- session mock (used by identify tests) ---
+const mockSession = {
+  data: null as { user: { id: string; email: string; name: string } } | null,
+};
+
+vi.mock("~/utils/auth-client", () => ({
+  useSession: () => mockSession,
+}));
+
+// --- router mock (used by project-context tests) ---
+const mockRouter = {
+  events: { on: vi.fn(), off: vi.fn() },
+  query: {} as Record<string, string>,
+};
+
+vi.mock("~/utils/compat/next-router", () => ({
+  useRouter: () => mockRouter,
 }));
 
 import { usePostHog } from "../usePostHog";
@@ -37,14 +82,20 @@ function fireLoadedCallback() {
   loaded({ debug: mockDebug });
 }
 
+// ─────────────────────────────────────────────────────────────────
+// Init / session-recording tests (preserved from main)
+// ─────────────────────────────────────────────────────────────────
 describe("usePostHog", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPosthogLoaded.value = true;
     publicEnvData = {
       POSTHOG_KEY: "test-key",
       POSTHOG_HOST: "https://eu.i.posthog.com",
       NODE_ENV: "test",
     };
+    mockSession.data = null;
+    mockRouter.query = {};
     delete (window as { posthog?: unknown }).posthog;
   });
 
@@ -351,6 +402,125 @@ describe("usePostHog", () => {
 
           expect(mockStartSessionRecording).not.toHaveBeenCalled();
         });
+      });
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────
+  // User identification tests
+  // ─────────────────────────────────────────────────────────────────
+  describe("user identification", () => {
+    describe("when user is not logged in", () => {
+      it("does not call identify", () => {
+        mockSession.data = null;
+
+        renderHook(() => usePostHog());
+
+        expect(mockIdentify).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when user logs in", () => {
+      it("identifies user by internal user ID only (no PII forwarded)", () => {
+        mockSession.data = null;
+        const { rerender } = renderHook(() => usePostHog());
+
+        mockSession.data = {
+          user: { id: "user-123", email: "test@example.com", name: "Test User" },
+        };
+        rerender();
+
+        expect(mockIdentify).toHaveBeenCalledWith("user-123");
+      });
+
+      it("identifies only once for the same user across re-renders", () => {
+        mockSession.data = {
+          user: { id: "user-123", email: "test@example.com", name: "Test User" },
+        };
+
+        const { rerender } = renderHook(() => usePostHog());
+        rerender();
+        rerender();
+
+        expect(mockIdentify).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when user logs out", () => {
+      it("resets PostHog", () => {
+        mockSession.data = {
+          user: { id: "user-123", email: "test@example.com", name: "Test User" },
+        };
+        const { rerender } = renderHook(() => usePostHog());
+
+        mockSession.data = null;
+        rerender();
+
+        expect(mockReset).toHaveBeenCalled();
+      });
+    });
+
+    describe("when user switches accounts", () => {
+      it("re-identifies with new user credentials", () => {
+        mockSession.data = {
+          user: { id: "user-1", email: "user1@example.com", name: "User One" },
+        };
+        const { rerender } = renderHook(() => usePostHog());
+
+        mockSession.data = {
+          user: { id: "user-2", email: "user2@example.com", name: "User Two" },
+        };
+        rerender();
+
+        expect(mockIdentify).toHaveBeenCalledTimes(2);
+        expect(mockIdentify).toHaveBeenLastCalledWith("user-2");
+      });
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────
+  // Project context tracking tests
+  // ─────────────────────────────────────────────────────────────────
+  describe("project context tracking", () => {
+    beforeEach(() => {
+      mockSession.data = {
+        user: { id: "user-123", email: "test@example.com", name: "Test User" },
+      };
+    });
+
+    describe("when project slug is in URL", () => {
+      it("sets current_project_slug as a person property", () => {
+        mockRouter.query = { project: "my-project" };
+
+        renderHook(() => usePostHog());
+
+        expect(mockPeopleSet).toHaveBeenCalledWith({
+          current_project_slug: "my-project",
+        });
+      });
+    });
+
+    describe("when project slug changes", () => {
+      it("updates the person property to the new slug", () => {
+        mockRouter.query = { project: "project-a" };
+        const { rerender } = renderHook(() => usePostHog());
+
+        mockRouter.query = { project: "project-b" };
+        rerender();
+
+        expect(mockPeopleSet).toHaveBeenCalledWith({
+          current_project_slug: "project-b",
+        });
+      });
+    });
+
+    describe("when no project slug is in URL", () => {
+      it("does not set the project person property", () => {
+        mockRouter.query = {};
+
+        renderHook(() => usePostHog());
+
+        expect(mockPeopleSet).not.toHaveBeenCalled();
       });
     });
   });

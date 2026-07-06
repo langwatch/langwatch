@@ -1,3 +1,5 @@
+import { useSession } from "~/utils/auth-client";
+import { useRouter } from "~/utils/compat/next-router";
 import posthog from "posthog-js";
 import { useEffect, useRef } from "react";
 import { usePublicEnv } from "./usePublicEnv";
@@ -41,6 +43,15 @@ function startSessionRecordingWhenIdle(): () => void {
 export function usePostHog() {
   const publicEnv = usePublicEnv();
   const cancelStartSessionRecordingRef = useRef<(() => void) | null>(null);
+  const { data: session } = useSession();
+  const router = useRouter();
+  const identifiedUserRef = useRef<string | null>(null);
+
+  // Extract project slug from URL (e.g., /my-project/messages -> "my-project")
+  const projectSlug =
+    typeof router.query.project === "string"
+      ? router.query.project
+      : undefined;
 
   useEffect(() => {
     if (!publicEnv.data) return;
@@ -104,6 +115,40 @@ export function usePostHog() {
       cancelStartSessionRecordingRef.current = null;
     };
   }, [publicEnv.data]);
+
+  // Identify user when session is available; prevent duplicate identifies.
+  useEffect(() => {
+    if (!publicEnv.data?.POSTHOG_KEY) return;
+    if (!posthog.__loaded) return;
+
+    const userId = session?.user?.id;
+
+    if (userId && identifiedUserRef.current !== userId) {
+      // Identify by internal user ID only — email and name are PII and must
+      // not be forwarded to third-party analytics.
+      posthog.identify(userId);
+      identifiedUserRef.current = userId;
+    }
+
+    // Reset identification when user logs out.
+    if (!userId && identifiedUserRef.current) {
+      posthog.reset();
+      identifiedUserRef.current = null;
+    }
+  }, [session?.user?.id, publicEnv.data?.POSTHOG_KEY]);
+
+  // Update person properties when project context changes.
+  useEffect(() => {
+    if (!publicEnv.data?.POSTHOG_KEY) return;
+    if (!posthog.__loaded) return;
+    if (!session?.user?.id) return;
+
+    if (projectSlug) {
+      posthog.people.set({
+        current_project_slug: projectSlug,
+      });
+    }
+  }, [projectSlug, session?.user?.id, publicEnv.data?.POSTHOG_KEY]);
 
   return publicEnv.data?.POSTHOG_KEY ? posthog : undefined;
 }
