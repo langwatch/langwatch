@@ -68,7 +68,7 @@ export async function whenIClickAddMembers(page: Page) {
  * Fill the email input field in the Add Members dialog.
  */
 export async function whenIFillEmailWith(page: Page, email: string) {
-  await page.getByPlaceholder("Enter email address").last().fill(email);
+  await page.getByPlaceholder("alice@example.com, bob@example.com").last().fill(email);
 }
 
 /**

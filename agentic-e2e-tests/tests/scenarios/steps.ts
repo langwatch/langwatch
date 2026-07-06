@@ -75,9 +75,15 @@ export async function thenISeeNewScenarioButton(page: Page) {
 
 /**
  * When I click "New Scenario"
+ * Dismisses the AI-assist modal that now appears first.
  */
 export async function whenIClickNewScenario(page: Page) {
   await page.getByRole("button", { name: /new scenario/i }).click();
+  // An AI-assist modal opens first; skip it to go straight to the form.
+  const skipButton = page.getByRole("button", { name: /i'll write it myself/i });
+  if (await skipButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+    await skipButton.click();
+  }
 }
 
 /**
