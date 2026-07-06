@@ -174,7 +174,11 @@ export function PairwiseConfigForm({
   const selectedB = targets.find((t) => t.id === draft.variantB);
 
   return (
-    <VStack align="stretch" gap={3} padding={4}>
+    // No horizontal padding here — the drawer body (EvaluatorEditorShared)
+    // already applies paddingX to its content, same as the boolean settings
+    // section above us. Adding our own here previously double-inset this
+    // section relative to Swap And Confirm / Allow Tie / Include metrics.
+    <VStack align="stretch" gap={3}>
       <HStack align="end" gap={3}>
         <Picker
           label="Variant A"
@@ -306,7 +310,14 @@ function MetricsSection({
 
   return (
     <Box paddingTop={2}>
-      <Text fontSize="13px" fontWeight="medium" marginBottom={2}>
+      <Text
+        fontSize="11px"
+        fontWeight="bold"
+        textTransform="uppercase"
+        letterSpacing="wide"
+        color="fg.muted"
+        marginBottom={2}
+      >
         Include metrics
       </Text>
       <VStack align="stretch" gap={2}>

@@ -9,6 +9,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
+import { useState } from "react";
 import {
   LuChevronDown,
   LuCircleAlert,
@@ -84,6 +85,13 @@ export function EvaluatorChip({
   const evaluatorName = useEvaluatorName(evaluator);
   const parsed = parseEvaluationResult(result);
 
+  // Controlled menu state so the missing-mapping alert icon can force-close
+  // the menu before opening the edit drawer (see its onClick below) —
+  // matches TargetHeader.tsx's fix for the same class of bug: an
+  // uncontrolled Menu.Trigger can start opening on pointerdown before a
+  // later onClick's stopPropagation has a chance to run.
+  const [menuOpen, setMenuOpen] = useState(false);
+
   // Use explicit isRunning state from store (set when target output arrives, cleared when evaluator result arrives)
   // If result already exists, it overrides isRunning (evaluator completed)
   const status =
@@ -124,7 +132,7 @@ export function EvaluatorChip({
   };
 
   return (
-    <Menu.Root>
+    <Menu.Root open={menuOpen} onOpenChange={(e) => setMenuOpen(e.open)}>
       <Menu.Trigger asChild>
         <Button
           variant="outline"
@@ -206,7 +214,9 @@ export function EvaluatorChip({
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    onEdit();
+                    e.preventDefault();
+                    setMenuOpen(false); // Close menu if somehow open
+                    onEdit(); // Open drawer directly, don't open the chip's own menu
                   }}
                   data-testid={`evaluator-missing-mapping-alert-${evaluator.id}`}
                 />

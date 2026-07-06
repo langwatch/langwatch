@@ -318,6 +318,12 @@ const DynamicZodForm = ({
     fieldSchema: ZodType,
     fieldName: string,
     evaluator: EvaluatorDefinition<T> | undefined,
+    // True when the caller (HorizontalFormControl / PropertySectionTitle)
+    // already renders this field's title above/beside it — suppresses the
+    // boolean branch's own inline label so it isn't shown twice at two
+    // different sizes. Nested ZodObject fields render with no outer label
+    // for booleans, so they keep passing false (the default) here.
+    topLevel = false,
   ): React.JSX.Element | null => {
     const fullPath = prefix ? `${prefix}.${fieldName}` : fieldName;
     let defaultValue =
@@ -372,14 +378,21 @@ const DynamicZodForm = ({
                 />
               )}
             />
-            <Field.Label
-              htmlFor={fullPath}
-              marginBottom="0"
-              fontWeight={variant === "studio" ? 400 : undefined}
-              fontSize={variant === "studio" ? "13px" : undefined}
-            >
-              {camelCaseToTitleCase(fieldName.split(".").toReversed()[0] ?? "")}
-            </Field.Label>
+            {/* When topLevel, HorizontalFormControl/PropertySectionTitle
+                already renders this field's title — repeating it here reads
+                as duplicated text at a jarringly different size. */}
+            {!topLevel && (
+              <Field.Label
+                htmlFor={fullPath}
+                marginBottom="0"
+                fontWeight={variant === "studio" ? 400 : undefined}
+                fontSize={variant === "studio" ? "13px" : undefined}
+              >
+                {camelCaseToTitleCase(
+                  fieldName.split(".").toReversed()[0] ?? "",
+                )}
+              </Field.Label>
+            )}
           </HStack>
         </Field.Root>
       );
@@ -617,6 +630,7 @@ const DynamicZodForm = ({
                     field,
                     basePath ? `${basePath}.${key}` : key,
                     evaluatorDefinition,
+                    true,
                   )}
                 </Field.Root>
               </VStack>
@@ -636,6 +650,7 @@ const DynamicZodForm = ({
                   field,
                   basePath ? `${basePath}.${key}` : key,
                   evaluatorDefinition,
+                  true,
                 )}
               </HorizontalFormControl>
             </React.Fragment>

@@ -1,4 +1,5 @@
 import {
+  Badge,
   Box,
   Button,
   Heading,
@@ -99,6 +100,7 @@ export function TargetTypeSelectorDrawer(props: TargetTypeSelectorDrawerProps) {
           category: "llm_judge",
           pairwiseContext: (complexProps.pairwiseContext ??
             props.pairwiseContext) as TargetTypeSelectorDrawerProps["pairwiseContext"],
+          saveButtonText: "Add Comparison",
         },
         { replace: true },
       );
@@ -256,7 +258,14 @@ function TargetTypeCard({
             <Icon size={16} />
           </Box>
           <VStack align="start" gap={1} flex={1}>
-            <Text fontWeight="medium">{title}</Text>
+            <HStack gap={2}>
+              <Text fontWeight="medium">{title}</Text>
+              {type === "pairwise" && (
+                <Badge colorPalette="purple" variant="surface" size="sm">
+                  New
+                </Badge>
+              )}
+            </HStack>
             <Text fontSize="13px" color="fg.muted">
               {description}
             </Text>

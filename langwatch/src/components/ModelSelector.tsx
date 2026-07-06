@@ -12,7 +12,10 @@ import { AlertTriangle, Search } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { LuSettings2 } from "react-icons/lu";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
-import { modelProviderIcons } from "../server/modelProviders/iconsMap";
+import {
+  modelProviderIcons,
+  ProviderIconGlyph,
+} from "../server/modelProviders/iconsMap";
 import type { MaybeStoredModelProvider } from "../server/modelProviders/registry";
 import { allLitellmModels } from "../server/modelProviders/registry";
 import { api } from "../utils/api";
@@ -254,9 +257,14 @@ export const ModelSelector = React.memo(function ModelSelector({
   const selectValueText = (
     <HStack overflow="hidden" gap={2} align="center">
       {selectedItem?.icon && (
-        <Box minWidth={size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}>
-          {selectedItem.icon}
-        </Box>
+        <ProviderIconGlyph
+          provider={
+            selectedItem.value.split(
+              "/",
+            )[0] as keyof typeof modelProviderIcons
+          }
+          size={size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}
+        />
       )}
       <Box
         fontSize={size === "sm" ? 12 : 14}
@@ -388,6 +396,8 @@ export const ModelSelector = React.memo(function ModelSelector({
                 size="sm"
                 placeholder="Search models"
                 type="search"
+                background="transparent"
+                color="fg"
                 value={modelSearch}
                 onChange={(e) => setModelSearch(e.target.value)}
               />
@@ -429,12 +439,14 @@ export const ModelSelector = React.memo(function ModelSelector({
                     <Select.Item item={item}>
                       <HStack gap={2}>
                         {item.icon && (
-                          <Box
-                            width={MODEL_ICON_SIZE}
-                            minWidth={MODEL_ICON_SIZE}
-                          >
-                            {item.icon}
-                          </Box>
+                          <ProviderIconGlyph
+                            provider={
+                              item.value.split(
+                                "/",
+                              )[0] as keyof typeof modelProviderIcons
+                            }
+                            size={MODEL_ICON_SIZE}
+                          />
                         )}
                         <Box
                           fontSize={size === "sm" ? 12 : 14}

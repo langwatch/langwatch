@@ -38,6 +38,7 @@ import {
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { getApp } from "~/server/app-layer/app";
 import { DomainError } from "~/server/app-layer/domain-error";
+import { EvaluatorMissingFieldError } from "~/server/app-layer/evaluations/errors";
 import { evaluationNameAutoslug } from "~/server/background/workers/collector/evaluationNameAutoslug";
 import { extractChunkTextualContent } from "~/server/background/workers/collector/rag";
 import {
@@ -895,11 +896,26 @@ async function handleEvaluatorCall(
       data.data[requiredField] === undefined ||
       data.data[requiredField] === null
     ) {
+      const domainError = new EvaluatorMissingFieldError(
+        requiredField,
+        evaluatorDefinition.name,
+      );
+      logger.warn(
+        { kind: domainError.kind, meta: domainError.meta, projectId: project.id },
+        "missing required field for evaluator",
+      );
       return c.json(
         {
-          error: `${requiredField} is required for ${evaluatorDefinition.name} evaluator`,
+          // `error` keeps carrying the human-readable message, matching
+          // this endpoint's existing wire shape for external API consumers.
+          // `kind`/`meta` are additive so the workbench client can build a
+          // friendly message (e.g. map candidate_a_id -> "Variant A")
+          // without depending on the message being a specific string.
+          error: domainError.message,
+          kind: domainError.kind,
+          meta: domainError.meta,
         },
-        400,
+        domainError.httpStatus as 400,
       );
     }
   }
