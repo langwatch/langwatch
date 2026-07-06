@@ -461,16 +461,22 @@ export const generatePairwiseCells = (
     if (!cfg || !target.targetEvaluatorId) continue;
 
     // Skip column-style pairwise targets where the user hasn't finished
-    // configuring the form. Without all three the judge endpoint would
-    // 400 with "<field> is required" and the cell would render that as
-    // a verdict-shaped error — confusing for users who haven't opened
-    // the drawer yet.
-    if (!cfg.variantA || !cfg.variantB || !cfg.goldenField) {
+    // configuring the form. Golden field is only required when the user
+    // hasn't opted out of golden-answer comparison (#5378) — `!== false`
+    // defaults old saved configs (predating that field) to golden-required.
+    // Without variantA/variantB (or golden when required) the judge
+    // endpoint would 400 with "<field> is required" and the cell would
+    // render that as a verdict-shaped error — confusing for users who
+    // haven't opened the drawer yet.
+    const goldenFieldMissing =
+      cfg.hasGoldenAnswer !== false && !cfg.goldenField;
+    if (!cfg.variantA || !cfg.variantB || goldenFieldMissing) {
       logger.debug(
         {
           targetId: target.id,
           variantA: cfg.variantA,
           variantB: cfg.variantB,
+          hasGoldenAnswer: cfg.hasGoldenAnswer,
           goldenField: cfg.goldenField,
         },
         "Pairwise column-target skipped: variants or golden field not configured",

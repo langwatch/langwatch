@@ -225,51 +225,116 @@ export function PairwiseConfigForm({
             ))
           )}
         </Picker>
-
-        <Picker
-          label="Golden field"
-          placeholder="Select a dataset column…"
-          isEmpty={!draft.goldenField}
-          selectedDisplay={<>{draft.goldenField}</>}
-          testId="pairwise-golden-field"
-        >
-          {datasetColumns.length === 0 ? (
-            <EmptyMenuItem />
-          ) : (
-            datasetColumns.map((c) => (
-              <Menu.Item
-                key={c.id}
-                value={c.name}
-                onClick={() => update({ goldenField: c.name })}
-                data-testid={`pairwise-golden-field-option-${c.name}`}
-              >
-                <Text fontSize="13px">{c.name}</Text>
-              </Menu.Item>
-            ))
-          )}
-        </Picker>
       </HStack>
 
-      <Text fontSize="xs" color="fg.muted">
-        Pick the dataset column that holds the{" "}
-        <Text as="span" fontWeight="medium" color="fg">
-          ground-truth answer
-        </Text>{" "}
-        — usually{" "}
-        <Text as="span" fontFamily="mono">
-          expected_output
-        </Text>
-        . The judge compares each candidate against it and prefers the one
-        closest in correctness, completeness, and style. Pick{" "}
-        <Text as="span" fontFamily="mono">
-          input
-        </Text>{" "}
-        only if your dataset has no reference answer and you want the judge to
-        compare candidates against the question itself (rarely useful).
-      </Text>
+      <GoldenAnswerSection
+        draft={draft}
+        update={update}
+        datasetColumns={datasetColumns}
+      />
 
       <MetricsSection draft={draft} update={update} />
     </VStack>
+  );
+}
+
+/**
+ * "Has golden answer" toggle (#5378) plus the Golden field picker it
+ * gates. Source of truth is the parent form's `settings.has_golden_answer`
+ * (the field the judge reads); `pairwise.hasGoldenAnswer` is mirrored on
+ * every write so the orchestrator's cell-generation guard and the missing-
+ * mappings validator — which only see `target.pairwise`, not the
+ * evaluator's Python settings — can read it too. Same dual-representation
+ * pattern as MetricsSection/include_metrics below.
+ */
+function GoldenAnswerSection({
+  draft,
+  update,
+  datasetColumns,
+}: {
+  draft: PairwiseEvaluatorConfig;
+  update: (patch: Partial<PairwiseEvaluatorConfig>) => void;
+  datasetColumns: DatasetColumn[];
+}) {
+  const formContext = useFormContext<{
+    settings?: { has_golden_answer?: boolean };
+  }>();
+  const watchedHasGoldenAnswer = useWatch({
+    control: formContext?.control,
+    name: "settings.has_golden_answer",
+  }) as boolean | undefined;
+  const hasGoldenAnswer = watchedHasGoldenAnswer ?? draft.hasGoldenAnswer;
+
+  const setHasGoldenAnswer = (on: boolean) => {
+    formContext?.setValue("settings.has_golden_answer", on, {
+      shouldDirty: true,
+      shouldTouch: true,
+    });
+    // Clearing goldenField when turning the toggle off isn't strictly
+    // necessary (an unused golden field is harmless), but it avoids a
+    // stale selection resurfacing confusingly if the user toggles back on.
+    update({ hasGoldenAnswer: on, ...(on ? {} : { goldenField: "" }) });
+  };
+
+  return (
+    <Box>
+      <HStack justify="space-between" align="start">
+        <VStack align="start" gap={0}>
+          <Text fontSize="13px" fontWeight="medium">
+            Has golden answer
+          </Text>
+          <Text fontSize="xs" color="fg.muted" maxWidth="480px">
+            Compare each candidate against a reference answer. Turn off to let
+            the judge compare Candidate A and Candidate B directly, with no
+            reference answer involved.
+          </Text>
+        </VStack>
+        <Switch
+          checked={hasGoldenAnswer}
+          onCheckedChange={({ checked }) => setHasGoldenAnswer(checked)}
+          data-testid="pairwise-has-golden-answer"
+        />
+      </HStack>
+
+      {hasGoldenAnswer && (
+        <Box paddingTop={3}>
+          <Picker
+            label="Golden field"
+            placeholder="Select a dataset column…"
+            isEmpty={!draft.goldenField}
+            selectedDisplay={<>{draft.goldenField}</>}
+            testId="pairwise-golden-field"
+          >
+            {datasetColumns.length === 0 ? (
+              <EmptyMenuItem />
+            ) : (
+              datasetColumns.map((c) => (
+                <Menu.Item
+                  key={c.id}
+                  value={c.name}
+                  onClick={() => update({ goldenField: c.name })}
+                  data-testid={`pairwise-golden-field-option-${c.name}`}
+                >
+                  <Text fontSize="13px">{c.name}</Text>
+                </Menu.Item>
+              ))
+            )}
+          </Picker>
+          <Text fontSize="xs" color="fg.muted" marginTop={2}>
+            Pick the dataset column that holds the{" "}
+            <Text as="span" fontWeight="medium" color="fg">
+              ground-truth answer
+            </Text>{" "}
+            — usually{" "}
+            <Text as="span" fontFamily="mono">
+              expected_output
+            </Text>
+            . The judge compares each candidate against it and prefers the one
+            closest in correctness, completeness, and style.
+          </Text>
+        </Box>
+      )}
+    </Box>
   );
 }
 

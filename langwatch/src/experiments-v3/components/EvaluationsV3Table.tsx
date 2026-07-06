@@ -299,6 +299,7 @@ export function EvaluationsV3Table({
   const pendingPairwiseRef = useRef<{
     variantA: string;
     variantB: string;
+    hasGoldenAnswer: boolean;
     goldenField: string;
     includeMetrics: ("cost" | "duration")[];
   } | null>(null);
@@ -416,6 +417,7 @@ export function EvaluationsV3Table({
           pairwise: pendingPairwiseRef.current ?? {
             variantA: "",
             variantB: "",
+            hasGoldenAnswer: true,
             goldenField: "",
             includeMetrics: [],
           },
@@ -1190,27 +1192,21 @@ export function EvaluationsV3Table({
     [datasetColumnsKey],
   );
 
-  // Stabilize pairwise evaluators — only those with both variants configured.
-  // Only recreate columns when the set of configured pairwise evaluators changes.
+  // Stabilize pairwise evaluators — only those with both variants configured
+  // (and a golden field, unless the user opted out of golden-answer
+  // comparison — #5378). Only recreate columns when the set of configured
+  // pairwise evaluators changes.
+  const isPairwiseConfigured = (e: EvaluatorConfig) =>
+    e.evaluatorType === "langevals/pairwise_compare" &&
+    !!e.pairwise?.variantA &&
+    !!e.pairwise?.variantB &&
+    (!!e.pairwise?.goldenField || e.pairwise?.hasGoldenAnswer === false);
   const pairwiseEvaluatorsKey = evaluators
-    .filter(
-      (e) =>
-        e.evaluatorType === "langevals/pairwise_compare" &&
-        e.pairwise?.variantA &&
-        e.pairwise?.variantB &&
-        e.pairwise?.goldenField,
-    )
+    .filter(isPairwiseConfigured)
     .map((e) => `${e.id}:${e.pairwise?.variantA}:${e.pairwise?.variantB}`)
     .join(",");
   const stablePairwiseEvaluators = useMemo(
-    () =>
-      evaluators.filter(
-        (e) =>
-          e.evaluatorType === "langevals/pairwise_compare" &&
-          e.pairwise?.variantA &&
-          e.pairwise?.variantB &&
-          e.pairwise?.goldenField,
-      ),
+    () => evaluators.filter(isPairwiseConfigured),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [pairwiseEvaluatorsKey],
   );

@@ -191,7 +191,10 @@ export const getTargetMissingMappings = (
         isRequired: true,
       });
     }
-    if (!pw.goldenField) {
+    // Golden field is only required when the user hasn't opted out of
+    // golden-answer comparison (#5378). `!== false` defaults old saved
+    // configs (predating this field) to the golden-required behavior.
+    if (pw.hasGoldenAnswer !== false && !pw.goldenField) {
       missingMappings.push({
         fieldId: "goldenField",
         fieldName: "Golden field",

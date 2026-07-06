@@ -183,12 +183,20 @@ export type LocalEvaluatorConfig = z.infer<typeof localEvaluatorConfigSchema>;
  *
  * - variantA / variantB: TargetConfig ids whose per-row outputs are
  *   the two candidates.
+ * - hasGoldenAnswer: whether the judge compares against a reference
+ *   answer at all (#5378). When false, goldenField is not required —
+ *   the judge compares the two candidates directly on their own merits.
+ *   Mirrors the evaluator's `settings.has_golden_answer` (source of
+ *   truth the judge reads), same dual-representation pattern as
+ *   includeMetrics/settings.include_metrics below.
  * - goldenField: dataset field name whose value is the reference answer.
+ *   Only meaningful when hasGoldenAnswer is true.
  * - includeMetrics: per-candidate metrics injected into the judge prompt.
  */
 export const pairwiseEvaluatorConfigSchema = z.object({
   variantA: z.string(),
   variantB: z.string(),
+  hasGoldenAnswer: z.boolean().default(true),
   goldenField: z.string(),
   includeMetrics: z.array(z.enum(["cost", "duration"])).default([]),
 });
