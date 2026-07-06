@@ -38,7 +38,6 @@ REPO="langwatch/langwatch"
 DEFAULT_OWNER="rogeriochaves"   # global fallback / used when an area has no member history
 GO_COOWNER="0xdeafcafe"         # standing co-owner of the Go surface
 
-SAMPLE_COMMITS=2000             # recent commits sampled to resolve email -> login
 SECONDARY_MIN=2                 # a 2nd owner needs at least this many commits ...
 SECONDARY_RATIO_PCT=25          # ... and at least this percent of the top owner's
 
@@ -47,19 +46,45 @@ trap 'rm -rf "$TMP"' EXIT
 MEMBER_FILE="$TMP/members"
 MAP_FILE="$TMP/email2login"
 
-# --- 1. Eligible owners: current org members, minus bots/automation accounts.
+# --- 1. Eligible owners: current org members with repo write access, minus
+#        bots/automation accounts. CODEOWNERS silently ignores owners without
+#        write access, so an owner without write is effectively an empty owner
+#        line — worse than picking someone slightly less relevant who can
+#        actually approve.
+raw_members="$TMP/members.raw"
 gh api "orgs/$ORG/members" --paginate --jq '.[].login' 2>/dev/null \
   | grep -ivE '\[bot\]$|(^|-)(agent|bot)$' \
-  | sort -u > "$MEMBER_FILE" || true
+  | sort -u > "$raw_members" || true
 
-member_count="$(wc -l < "$MEMBER_FILE" | tr -d ' ')"
-if [ "$member_count" -eq 0 ]; then
+raw_member_count="$(wc -l < "$raw_members" | tr -d ' ')"
+if [ "$raw_member_count" -eq 0 ]; then
   echo "ERROR: 'gh api orgs/$ORG/members' returned no members — the token almost" >&2
   echo "       certainly lacks read:org (langwatch has no public members)." >&2
   echo "       Refusing to generate a CODEOWNERS with no owners." >&2
   exit 1
 fi
-echo "Eligible owners ($member_count org members): $(tr '\n' ' ' < "$MEMBER_FILE")" >&2
+
+# Filter to write-access (admin/maintain/write). A rate-limited or 404 lookup
+# would silently drop a real owner, so fail closed on any error.
+: > "$MEMBER_FILE"
+while read -r user; do
+  perm="$(gh api "repos/$REPO/collaborators/$user/permission" --jq '.permission' 2>/dev/null || true)"
+  case "$perm" in
+    admin|maintain|write) echo "$user" >> "$MEMBER_FILE" ;;
+    "") echo "ERROR: could not resolve repo permission for @$user — refusing to" >&2
+        echo "       generate a CODEOWNERS with an incomplete write-access filter." >&2
+        exit 1 ;;
+    *)  echo "Skipping @$user (repo permission: $perm) — not eligible as an owner." >&2 ;;
+  esac
+done < "$raw_members"
+
+member_count="$(wc -l < "$MEMBER_FILE" | tr -d ' ')"
+if [ "$member_count" -eq 0 ]; then
+  echo "ERROR: no org members have write access on $REPO. Refusing to generate" >&2
+  echo "       a CODEOWNERS whose owners can't approve." >&2
+  exit 1
+fi
+echo "Eligible owners ($member_count with write access): $(tr '\n' ' ' < "$MEMBER_FILE")" >&2
 
 # Policy owners are hard-coded into every rule (fallback + Go co-owner), so if
 # either leaves the org the whole file would violate the "org members only"
@@ -72,26 +97,80 @@ for required in "$DEFAULT_OWNER" "$GO_COOWNER"; do
   }
 done
 
-# --- 2. email -> GitHub login, from a recent-commit sample (GitHub attributes
-#        each commit to a user, so we don't keep a hand-written identity map).
-pages=$(( (SAMPLE_COMMITS + 99) / 100 ))
-for p in $(seq 1 "$pages"); do
-  gh api "repos/$REPO/commits?sha=main&per_page=100&page=$p" \
-    --jq '.[] | select(.author.login != null) | [.commit.author.email, .author.login] | @tsv' \
-    2>/dev/null || true
+# --- 2. email -> GitHub login. Coverage-guaranteed: iterate every unique email
+#        in local history, not a "recent N commits" sample (which can miss an
+#        area's real owner if their commits are older than the window). Noreply
+#        emails encode the login and are resolved offline; anything else gets
+#        one commit-lookup API call. Bounded by unique-email count, not commit
+#        count.
+unresolved_file="$TMP/unresolved-emails"
+: > "$unresolved_file"
+
+git log --all --no-merges --format='%ae' | sort -u | while read -r email; do
+  [ -z "$email" ] && continue
+  # noreply-email fast path: <login>@users.noreply.github.com
+  # or <id>+<login>@users.noreply.github.com.
+  case "$email" in
+    *@users.noreply.github.com)
+      login="${email%@users.noreply.github.com}"
+      login="${login#*+}"
+      printf '%s\t%s\n' "$email" "$login"
+      continue
+      ;;
+  esac
+  # Otherwise: look up one commit by this author and use GitHub's own attribution.
+  # Distinguish "API call failed" (fail closed) from "GitHub has no user for
+  # this email" (external contributor, machine-generated address — skip silently).
+  sha="$(git log --all --no-merges --format='%H' --author="$email" -1 2>/dev/null)"
+  if [ -z "$sha" ]; then continue; fi
+  if response="$(gh api "repos/$REPO/commits/$sha" 2>/dev/null)"; then
+    login="$(printf '%s' "$response" | jq -r '.author.login // empty' 2>/dev/null)"
+    if [ -n "$login" ]; then
+      printf '%s\t%s\n' "$email" "$login"
+    fi
+    # else: .author is null — GitHub has no linked user. Not an error.
+  else
+    # API call errored (rate limit / network / auth). This is the case we care
+    # about; the P1 bug on #4926 was exactly this class of silent failure.
+    printf '%s\n' "$email" >> "$unresolved_file"
+  fi
 done | sort -u > "$MAP_FILE"
 
-# If the commits API failed (rate limit, transient error, bad token) the map is
-# empty, no author gets attributed to an org member, and every rule collapses
-# to DEFAULT_OWNER — producing a large and wrong CODEOWNERS diff. Fail closed,
-# matching the empty-members check.
 map_size="$(wc -l < "$MAP_FILE" | tr -d ' ')"
 if [ "$map_size" -eq 0 ]; then
-  echo "ERROR: commit email->login sample is empty (no rows from" >&2
-  echo "       repos/$REPO/commits). Likely a token, rate-limit, or network issue." >&2
+  echo "ERROR: email->login map is empty (no unique authors resolved)." >&2
+  echo "       Likely a token, rate-limit, or network issue talking to $REPO." >&2
   echo "       Refusing to generate a CODEOWNERS with no attribution." >&2
   exit 1
 fi
+
+# Partial-failure guard (Sergio's P2 from #4926): a non-empty map that missed a
+# real owner would silently collapse that owner's areas to DEFAULT_OWNER. Fail
+# closed if any non-noreply email failed to resolve — the alternative is a
+# large, silently-wrong CODEOWNERS diff.
+if [ -s "$unresolved_file" ]; then
+  echo "ERROR: some commit emails could not be resolved to a GitHub login:" >&2
+  sed 's/^/         - /' "$unresolved_file" >&2
+  echo "       This would silently collapse those authors' areas to DEFAULT_OWNER." >&2
+  echo "       Refusing to generate a partially-resolved CODEOWNERS." >&2
+  exit 1
+fi
+
+# Sanity floor: how many DISTINCT non-bot org members did the map actually cover?
+# The current members roster (minus bots) is the ceiling; a healthy sample covers
+# most of them. If we're dramatically under, something has degraded (rate limits,
+# a token that can't read enough history, etc). Half-round-up of members is a
+# forgiving floor that still catches the "everything collapsed to one owner" bug.
+resolved_members="$(awk -F'\t' '{print $2}' "$MAP_FILE" | sort -u \
+  | grep -Fxf "$MEMBER_FILE" - 2>/dev/null | wc -l | tr -d ' ' || echo 0)"
+member_floor=$(( (member_count + 1) / 2 ))
+if [ "$resolved_members" -lt "$member_floor" ]; then
+  echo "ERROR: email->login map covers only $resolved_members of $member_count org members" >&2
+  echo "       (floor is $member_floor). Likely a partial API failure — refusing to" >&2
+  echo "       generate a CODEOWNERS that would collapse most rules to DEFAULT_OWNER." >&2
+  exit 1
+fi
+echo "Attribution: resolved $map_size distinct emails; $resolved_members / $member_count members covered." >&2
 
 # owners_for <pathspec...> — top (max 2) org-member owners for the given paths,
 # as space-separated bare logins, or empty if none.

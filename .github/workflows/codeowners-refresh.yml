@@ -98,6 +98,12 @@ jobs:
 
           BODY="Automated weekly refresh of \`.github/CODEOWNERS\` by the codeowners-refresh workflow. Owners are recomputed per area from \`git log\` authorship restricted to current langwatch org members, via \`.github/scripts/generate-codeowners.sh\`. The diff reflects how contribution and org membership have shifted since the last refresh. To change ownership policy (areas, the Go co-owner rule, or thresholds), edit the generator script rather than this PR."
 
+          # Reuse the OPEN PR if there is one (the force-pushed branch already
+          # updates it). If the last PR was MERGED, `gh pr create` correctly
+          # opens a fresh one for the new diff. If a human CLOSED it without
+          # merging, that's a "don't want this" — the create call may then error
+          # ("can't reopen"), which we tolerate: next week's run will get a new
+          # PR once the branch head advances.
           if gh pr view "$BRANCH" --json state --jq '.state' 2>/dev/null | grep -q OPEN; then
             echo "PR already open for $BRANCH; force-pushed branch keeps it current."
           else
@@ -105,5 +111,5 @@ jobs:
               --base main \
               --head "$BRANCH" \
               --title "chore: refresh CODEOWNERS from git history" \
-              --body "$BODY"
+              --body "$BODY" || echo "Skipping PR creation (may be a declined prior PR); next diff will retry."
           fi
