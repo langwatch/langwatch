@@ -343,7 +343,12 @@ const DynamicZodForm = ({
     const fieldKey = fieldName.split(".").toReversed()[0] ?? "";
 
     if (fieldSchema_ instanceof z.ZodDefault) {
-      return renderField(fieldSchema_._def.innerType, fieldName, evaluator);
+      return renderField(
+        fieldSchema_._def.innerType,
+        fieldName,
+        evaluator,
+        topLevel,
+      );
     } else if (fieldSchema_ instanceof z.ZodNumber) {
       return (
         <Input
