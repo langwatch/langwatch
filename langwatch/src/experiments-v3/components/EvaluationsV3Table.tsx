@@ -103,6 +103,16 @@ type EvaluatorDbConfig = {
   settings?: Record<string, unknown>;
 };
 
+// A pairwise evaluator is ready to render its own result column once both
+// variants are picked and either a golden field is set or the user has
+// explicitly opted out of golden-answer comparison (#5378). Exported so it
+// can be unit-tested directly instead of only through a full table render.
+export const isPairwiseConfigured = (e: EvaluatorConfig) =>
+  e.evaluatorType === "langevals/pairwise_compare" &&
+  !!e.pairwise?.variantA &&
+  !!e.pairwise?.variantB &&
+  (!!e.pairwise?.goldenField || e.pairwise?.hasGoldenAnswer === false);
+
 // ============================================================================
 // Main Component
 // ============================================================================
@@ -1192,15 +1202,9 @@ export function EvaluationsV3Table({
     [datasetColumnsKey],
   );
 
-  // Stabilize pairwise evaluators — only those with both variants configured
-  // (and a golden field, unless the user opted out of golden-answer
-  // comparison — #5378). Only recreate columns when the set of configured
-  // pairwise evaluators changes.
-  const isPairwiseConfigured = (e: EvaluatorConfig) =>
-    e.evaluatorType === "langevals/pairwise_compare" &&
-    !!e.pairwise?.variantA &&
-    !!e.pairwise?.variantB &&
-    (!!e.pairwise?.goldenField || e.pairwise?.hasGoldenAnswer === false);
+  // Stabilize pairwise evaluators — only those considered configured (see
+  // isPairwiseConfigured above). Only recreate columns when the set of
+  // configured pairwise evaluators changes.
   const pairwiseEvaluatorsKey = evaluators
     .filter(isPairwiseConfigured)
     .map((e) => `${e.id}:${e.pairwise?.variantA}:${e.pairwise?.variantB}`)
