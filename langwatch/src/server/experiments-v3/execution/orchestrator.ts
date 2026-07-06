@@ -17,6 +17,7 @@ import type {
   EvaluatorConfig,
   TargetConfig,
 } from "~/experiments-v3/types";
+import { isGoldenFieldSatisfied } from "~/experiments-v3/types";
 import { isRowEmpty } from "~/experiments-v3/utils/emptyRowDetection";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
@@ -461,15 +462,12 @@ export const generatePairwiseCells = (
     if (!cfg || !target.targetEvaluatorId) continue;
 
     // Skip column-style pairwise targets where the user hasn't finished
-    // configuring the form. Golden field is only required when the user
-    // hasn't opted out of golden-answer comparison (#5378) — `!== false`
-    // defaults old saved configs (predating that field) to golden-required.
-    // Without variantA/variantB (or golden when required) the judge
-    // endpoint would 400 with "<field> is required" and the cell would
+    // configuring the form (see isGoldenFieldSatisfied for the golden-field
+    // rule, #5378). Without variantA/variantB (or golden when required) the
+    // judge endpoint would 400 with "<field> is required" and the cell would
     // render that as a verdict-shaped error — confusing for users who
     // haven't opened the drawer yet.
-    const goldenFieldMissing =
-      cfg.hasGoldenAnswer !== false && !cfg.goldenField;
+    const goldenFieldMissing = !isGoldenFieldSatisfied(cfg);
     if (!cfg.variantA || !cfg.variantB || goldenFieldMissing) {
       logger.debug(
         {

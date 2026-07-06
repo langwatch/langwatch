@@ -58,6 +58,7 @@ import type {
   TableRowData,
   TargetConfig,
 } from "../types";
+import { isGoldenFieldSatisfied } from "../types";
 import { convertInlineToRowRecords } from "../utils/datasetConversion";
 import { isRowEmpty } from "../utils/emptyRowDetection";
 import { createEvaluatorEditorCallbacks } from "../utils/evaluatorEditorCallbacks";
@@ -104,14 +105,15 @@ type EvaluatorDbConfig = {
 };
 
 // A pairwise evaluator is ready to render its own result column once both
-// variants are picked and either a golden field is set or the user has
-// explicitly opted out of golden-answer comparison (#5378). Exported so it
-// can be unit-tested directly instead of only through a full table render.
+// variants are picked and the golden-field requirement is satisfied (see
+// isGoldenFieldSatisfied). Exported so it can be unit-tested directly
+// instead of only through a full table render.
 export const isPairwiseConfigured = (e: EvaluatorConfig) =>
   e.evaluatorType === "langevals/pairwise_compare" &&
   !!e.pairwise?.variantA &&
   !!e.pairwise?.variantB &&
-  (!!e.pairwise?.goldenField || e.pairwise?.hasGoldenAnswer === false);
+  !!e.pairwise &&
+  isGoldenFieldSatisfied(e.pairwise);
 
 // ============================================================================
 // Main Component

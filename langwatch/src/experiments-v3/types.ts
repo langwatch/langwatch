@@ -204,6 +204,23 @@ export type PairwiseEvaluatorConfig = z.infer<
   typeof pairwiseEvaluatorConfigSchema
 >;
 
+/**
+ * Whether a pairwise config's golden-field requirement is satisfied: either
+ * a golden field is set, or the user has explicitly opted out of
+ * golden-answer comparison (#5378). `hasGoldenAnswer !== false` (rather than
+ * `=== true`) is deliberate — old saved configs that predate this field have
+ * `hasGoldenAnswer` undefined and must still default to golden-required.
+ * Single source of truth for the UI gating (EvaluationsV3Table), client
+ * validation (mappingValidation), and server cell-generation (orchestrator)
+ * call sites — they must never drift from each other.
+ */
+export function isGoldenFieldSatisfied(pairwise: {
+  goldenField?: string;
+  hasGoldenAnswer?: boolean;
+}): boolean {
+  return !!pairwise.goldenField || pairwise.hasGoldenAnswer === false;
+}
+
 export const evaluatorConfigSchema = z.object({
   id: z.string(),
   evaluatorType: z.string(),

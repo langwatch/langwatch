@@ -16,6 +16,7 @@ import type {
   FieldMapping,
   TargetConfig,
 } from "../types";
+import { isGoldenFieldSatisfied } from "../types";
 import { extractVariablesFromBodyTemplate } from "./httpAgentUtils";
 
 // ============================================================================
@@ -192,9 +193,8 @@ export const getTargetMissingMappings = (
       });
     }
     // Golden field is only required when the user hasn't opted out of
-    // golden-answer comparison (#5378). `!== false` defaults old saved
-    // configs (predating this field) to the golden-required behavior.
-    if (pw.hasGoldenAnswer !== false && !pw.goldenField) {
+    // golden-answer comparison (#5378) — see isGoldenFieldSatisfied.
+    if (!isGoldenFieldSatisfied(pw)) {
       missingMappings.push({
         fieldId: "goldenField",
         fieldName: "Golden field",
