@@ -5,12 +5,13 @@ import { AnalyticsProvider } from "react-contextual-analytics";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { createAppAnalyticsClient } from "~/utils/analyticsClient";
 import { SessionProvider } from "~/utils/auth-client";
+import { ExtraFooterComponents } from "../ee/saas/ExtraFooterComponents";
 import { ColorModeProvider } from "./components/ui/color-mode";
 import { Toaster } from "./components/ui/toaster";
-import { useAttributionCapture } from "./hooks/useAttributionCapture";
-import { usePostHog } from "./hooks/usePostHog";
-import { ExtraFooterComponents } from "../ee/saas/ExtraFooterComponents";
 import { CommandBarProvider } from "./features/command-bar";
+import { useAttributionCapture } from "./hooks/useAttributionCapture";
+import { useIsGtagReady } from "./hooks/useIsGtagReady";
+import { usePostHog } from "./hooks/usePostHog";
 import { system } from "./theme";
 import { TRPCProvider } from "./utils/api";
 
@@ -28,9 +29,7 @@ export function OuterProviders({ children }: { children: ReactNode }) {
     <SessionProvider refetchInterval={0} refetchOnWindowFocus={false}>
       <TRPCProvider>
         <ChakraProvider value={system}>
-          <ColorModeProvider>
-            {children}
-          </ColorModeProvider>
+          <ColorModeProvider>{children}</ColorModeProvider>
         </ChakraProvider>
       </TRPCProvider>
     </SessionProvider>
@@ -44,6 +43,7 @@ export function OuterProviders({ children }: { children: ReactNode }) {
 export function InnerProviders({ children }: { children: ReactNode }) {
   const postHog = usePostHog();
   const publicEnv = usePublicEnv();
+  const isGtagReady = useIsGtagReady();
 
   return (
     <>
@@ -52,6 +52,7 @@ export function InnerProviders({ children }: { children: ReactNode }) {
           client={createAppAnalyticsClient({
             isSaaS: Boolean(publicEnv.data?.IS_SAAS),
             posthogClient: postHog,
+            isGtagReady,
           })}
         >
           {postHog ? (

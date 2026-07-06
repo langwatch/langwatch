@@ -55,6 +55,10 @@ type CreatedSecret = {
   id: string;
   name: string;
   secret: string;
+  // Resolver-safe `vendor/model` example for the reveal snippet, computed
+  // from the key's eligible providers at create time. Undefined for
+  // list-page rotations, where the snippet falls back to its default.
+  model?: string;
   // Differentiates mint flow (initial creation) from rotate — the
   // reveal dialog adds a 24h-grace banner on rotations.
   kind: "create" | "rotate";
@@ -510,6 +514,7 @@ function VirtualKeysPage() {
         onClose={() => setRevealSecret(null)}
         keyName={revealSecret?.name ?? ""}
         secret={revealSecret?.secret ?? ""}
+        model={revealSecret?.model}
         kind={revealSecret?.kind ?? "create"}
       />
       {orgId && (

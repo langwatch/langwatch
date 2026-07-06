@@ -24,6 +24,10 @@ import {
   EligibleModelProvidersPreview,
   EligibleModelProvidersSummary,
 } from "./EligibleModelProvidersPreview";
+import {
+  firstEligibleDefaultModel,
+  type OrgModelProvider,
+} from "./eligibleModelProviders";
 import { FieldInfoTooltip } from "./FieldInfoTooltip";
 import {
   VirtualKeyScopePicker,
@@ -34,7 +38,12 @@ type VirtualKeyCreateDrawerProps = {
   organizationId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreated: (result: { id: string; name: string; secret: string }) => void;
+  onCreated: (result: {
+    id: string;
+    name: string;
+    secret: string;
+    model?: string;
+  }) => void;
 };
 
 export function VirtualKeyCreateDrawer({
@@ -139,6 +148,12 @@ export function VirtualKeyCreateDrawer({
         id: result.virtualKey.id,
         name: result.virtualKey.name,
         secret: result.secret,
+        model: firstEligibleDefaultModel({
+          scopes,
+          providers: providers as OrgModelProvider[],
+          availableProjects,
+          organizationId,
+        }),
       });
       reset();
       onOpenChange(false);

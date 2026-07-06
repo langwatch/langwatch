@@ -4,6 +4,7 @@ import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { generate as generateSelfsigned } from "selfsigned";
+import { shikiManualChunk } from "./src/features/traces-v2/components/TraceDrawer/markdownView/shikiChunking";
 
 // Load `.env` into the Vite config's process environment. Vite normally
 // only exposes `VITE_*` vars to client code — but this config itself
@@ -171,21 +172,13 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id: string) {
-          // Keep the whole Shiki ecosystem in one self-contained chunk.
-          // Under the rolldown bundler the default split hoists Shiki's
-          // singleton factory into the entry chunk and leaves the Shiki
-          // chunk calling back into it at module top level. Because the
-          // entry eagerly loads Shiki, that call runs before the entry has
-          // initialized the export, throwing "undefined is not a function"
-          // at boot and white-screening the app. One chunk removes the
-          // cross-chunk cycle.
-          if (
-            /[\\/]node_modules[\\/](\.pnpm[\\/])?(@shikijs[\\/+]|shiki[\\/@]|oniguruma-to-es|oniguruma-parser|hast-util-to-html)/.test(
-              id,
-            )
-          ) {
-            return "shiki";
-          }
+          // Shiki chunk-splitting lives in shikiChunking.ts (dependency-free) so
+          // its guard test can exercise the real logic. It keeps the core + base
+          // grammars/themes eager and splits the other ~340 grammars into lazy
+          // chunks — removing the ~9.5 MB raw / 1.66 MB gzip eager Shiki chunk
+          // that used to load on every page. See that file for the boot-cycle
+          // rationale.
+          return shikiManualChunk(id);
         },
       },
     },

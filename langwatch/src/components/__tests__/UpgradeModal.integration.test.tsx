@@ -58,7 +58,7 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-const { UpgradeModal } = await import("../UpgradeModal");
+const { UpgradeModal } = await import("../UpgradeModalContent");
 
 const renderModal = () =>
   render(

@@ -464,7 +464,12 @@ func backdateConfig(t *testing.T, svc *Service, rawKey string, age time.Duration
 
 func TestResolve_FreshEntry_ConfigPastTTL_RefreshesConfigInBackground(t *testing.T) {
 	fetcher := &fakeConfigFetcher{
-		cfg: domain.BundleConfig{Credentials: []domain.Credential{{ID: "cred-new"}}},
+		cfg: domain.BundleConfig{
+			Credentials: []domain.Credential{{ID: "cred-new"}},
+			// A non-Credentials Config field, to lock in that the whole Config
+			// is refreshed, not just the mirrored top-level Credentials.
+			AllowedModels: []string{"anthropic/claude-sonnet-4-5"},
+		},
 	}
 	svc, _ := newService(t, Options{
 		Resolver:         &fetcher.fakeResolver,
@@ -492,13 +497,19 @@ func TestResolve_FreshEntry_ConfigPastTTL_RefreshesConfigInBackground(t *testing
 	for time.Now().Before(deadline) {
 		if e, ok := svc.l1.Get(hashKey(rawKey)); ok {
 			b, _, _ := e.snapshot()
-			if len(b.Credentials) == 1 && b.Credentials[0].ID == "cred-new" {
-				return // refreshed
+			// The whole Config is refreshed, not just the mirrored Credentials:
+			// the top-level Credentials mirror and a non-Credentials Config
+			// field (AllowedModels) both reflect the freshly fetched config.
+			credRefreshed := len(b.Credentials) == 1 && b.Credentials[0].ID == "cred-new"
+			cfgRefreshed := len(b.Config.AllowedModels) == 1 &&
+				b.Config.AllowedModels[0] == "anthropic/claude-sonnet-4-5"
+			if credRefreshed && cfgRefreshed {
+				return // whole config refreshed
 			}
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	t.Fatal("expected background config refresh to replace credentials within 2s")
+	t.Fatal("expected background config refresh to replace credentials and the full config within 2s")
 }
 
 func TestResolve_FreshEntry_ConfigTTLDisabled_NeverRefreshes(t *testing.T) {
@@ -572,5 +583,90 @@ func TestResolve_FreshEntry_ConfigRefreshFailure_KeepsStaleAndWaitsFullTTL(t *te
 	time.Sleep(50 * time.Millisecond)
 	if n := fetcher.fetches.Load(); n != 1 {
 		t.Fatalf("expected exactly one fetch until next TTL, got %d", n)
+	}
+}
+
+// blockingConfigFetcher blocks inside FetchConfig until released, so a test
+// can evict or replace the L1 entry while the config fetch is still in flight.
+type blockingConfigFetcher struct {
+	fakeResolver
+	cfg     domain.BundleConfig
+	started chan struct{}
+	release chan struct{}
+	fetches atomic.Int64
+}
+
+func (f *blockingConfigFetcher) FetchConfig(_ context.Context, _ string) (domain.BundleConfig, error) {
+	f.fetches.Add(1)
+	f.started <- struct{}{}
+	<-f.release
+	return f.cfg, nil
+}
+
+// Regression: a background ConfigTTL refresh must not resurrect an entry that
+// another path evicted while the config fetch was in flight (e.g. the VK or
+// provider binding was revoked via the change feed). Otherwise the gateway
+// would keep serving stale or revoked config until the next invalidation. The
+// same live-entry guard covers the L2 write.
+//
+// Spec: specs/ai-gateway/auth-cache.feature
+func TestResolve_ConfigRefresh_EvictedMidFetch_NotResurrected(t *testing.T) {
+	fetcher := &blockingConfigFetcher{
+		cfg:     domain.BundleConfig{Credentials: []domain.Credential{{ID: "cred-new"}}},
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+	}
+	svc, _ := newService(t, Options{
+		Resolver:         &fetcher.fakeResolver,
+		ConfigFetcher:    fetcher,
+		ConfigTTL:        60 * time.Second,
+		RefreshThreshold: time.Second,
+	})
+
+	rawKey := "vk-lw-cfgttl_race"
+	h := hashKey(rawKey)
+	bundle := freshBundle("vk_cfg_race", time.Now().Add(1*time.Hour))
+	bundle.Credentials = []domain.Credential{{ID: "cred-old"}}
+	svc.storeL1(h, bundle)
+	e := backdateConfig(t, svc, rawKey, 2*time.Minute)
+
+	// Triggering request serves the stale bundle and kicks off the refresh.
+	if _, err := svc.Resolve(context.Background(), rawKey); err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+
+	// Once the fetch is in flight, evict the entry mid-fetch (change-feed revoke).
+	select {
+	case <-fetcher.started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("background config refresh did not start")
+	}
+	svc.l1.Remove(h)
+
+	// Release the fetch; the now-stale goroutine must drop its result.
+	close(fetcher.release)
+
+	// Wait for the goroutine to finish (endConfigRefresh clears the flag) so
+	// the store-or-drop decision is settled before asserting.
+	done := false
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		e.mu.Lock()
+		done = !e.configRefreshing
+		e.mu.Unlock()
+		if done {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if !done {
+		t.Fatal("config refresh goroutine did not finish")
+	}
+
+	if _, ok := svc.l1.Peek(h); ok {
+		t.Fatal("evicted entry was resurrected by the stale config-refresh goroutine")
+	}
+	if n := fetcher.fetches.Load(); n != 1 {
+		t.Fatalf("expected exactly one config fetch, got %d", n)
 	}
 }

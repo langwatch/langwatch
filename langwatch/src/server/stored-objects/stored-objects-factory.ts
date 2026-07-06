@@ -39,16 +39,32 @@ function maybeAzureDriver(): AzureBlobDriver | undefined {
  * The `S3Driver` is scoped to `projectId` so per-tenant BYOC S3 credentials
  * are resolved at call time.
  */
+/**
+ * Builds a `StorageRegistry` with the S3 / local-filesystem / (optional) Azure
+ * drivers wired. The `S3Driver` is projectId-scoped so per-tenant BYOC creds
+ * resolve at call time. Shared by `createStoredObjectsService` and any other
+ * byte path that needs the object store (e.g. the GroupQueue s3 blob tier).
+ */
+export function createStorageRegistry({
+  projectId,
+}: {
+  projectId: string;
+}): StorageRegistry {
+  return new StorageRegistry({
+    s3: new S3Driver(projectId),
+    file: new LocalFilesystemDriver(),
+    "azure-blob": maybeAzureDriver(),
+  });
+}
+
 export function createStoredObjectsService({
   projectId,
 }: {
   projectId: string;
 }): StoredObjectsService {
   const repository = new StoredObjectsRepository();
-  const registry = new StorageRegistry({
-    s3: new S3Driver(projectId),
-    file: new LocalFilesystemDriver(),
-    "azure-blob": maybeAzureDriver(),
-  });
-  return new StoredObjectsService(repository, registry);
+  return new StoredObjectsService(
+    repository,
+    createStorageRegistry({ projectId }),
+  );
 }

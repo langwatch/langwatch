@@ -1,9 +1,9 @@
 Feature: Custom (OpenAI-compatible) provider routing to customer endpoints
   Customers who self-host OpenAI-compatible model servers (vLLM, LiteLLM
   proxy, ...) configure them in LangWatch as the "Custom (OpenAI-compatible)"
-  provider with a base URL and an optional API key. Every dispatch path —
+  provider with a base URL and an optional API key. Every dispatch path,
   virtual-key gateway traffic and in-app features (playground, workflows,
-  evaluations) — must send requests to the customer's endpoint, never to
+  evaluations), must send requests to the customer's endpoint, never to
   api.openai.com.
 
   Background:
@@ -36,3 +36,15 @@ Feature: Custom (OpenAI-compatible) provider routing to customer endpoints
     Given an "openai" model provider with only OPENAI_API_KEY set
     When a chat completion is dispatched through it
     Then the upstream request is sent to api.openai.com
+
+  Scenario: Streaming chat completion still reports token usage
+    Given a virtual key whose provider slot is the custom provider
+    When a streaming chat completion for "custom/<model>" is sent through the gateway
+    Then the gateway asks the endpoint for a final usage chunk
+    And the streamed response reports non-zero prompt and completion tokens
+
+  Scenario: Provider-specific sampling params reach the endpoint unchanged
+    Given a virtual key whose provider slot is the custom provider
+    When a chat completion carrying vLLM-specific params (top_k, chat_template_kwargs, guided_json) is sent through the gateway
+    Then the upstream request preserves every param byte-for-byte
+    And no provider-specific param is dropped on the way to the endpoint

@@ -35,6 +35,9 @@ vi.mock("~/server/app-layer/traces/lean-for-projection", () => ({
     // Marker so tests can verify dispatch received the leaned shape
     data: { ...((event.data as Record<string, unknown>) ?? {}), _leaned: true },
   })),
+  // Also re-export the size constant used by the GQ2 tiered blob store — the
+  // event-sourcing graph transitively imports it via tieredBlobStore.ts.
+  COMMAND_INLINE_THRESHOLD: 256 * 1024,
 }));
 
 // Pull the mock handle so we can assert call counts and override behavior

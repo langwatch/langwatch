@@ -37,6 +37,21 @@ export interface DeduplicationConfig<Payload> {
    * @default true
    */
   replace?: boolean;
+  /**
+   * Whether a dedup key whose job has already been DISPATCHED (removed from
+   * staging) but whose TTL is still alive should SQUASH a new job rather than be
+   * treated as stale and cleaned up.
+   *
+   * Default (`false`): the historical behavior — once the deduplicated job is
+   * dispatched, the dedup key is considered stale, deleted, and a new job stages
+   * (so a late re-trigger re-runs the command). When `true`, the still-alive TTL
+   * is HONORED: the new job is squashed for the remainder of the TTL window, so a
+   * late re-trigger arriving after dispatch cannot re-run the command. Use it
+   * when the dedup TTL is sized to span the whole window in which duplicate
+   * triggers may arrive (fixes per-trace evaluations running twice, #3912).
+   * @default false
+   */
+  shouldSurviveDispatch?: boolean;
 }
 
 /**
@@ -88,7 +103,9 @@ export function resolveDeduplicationStrategy<Payload>(
   return strategy;
 }
 
-export interface EventSourcedQueueDefinition<Payload extends Record<string, unknown>> {
+export interface EventSourcedQueueDefinition<
+  Payload extends Record<string, unknown>,
+> {
   /**
    * Base name for the queue and job.
    * Queue name will be derived as `{name}` (with braces).
@@ -168,9 +185,14 @@ export interface QueueSendOptions<Payload> {
   deduplication?: DeduplicationConfig<Payload>;
 }
 
-export interface EventSourcedQueueProcessor<Payload extends Record<string, unknown>> {
+export interface EventSourcedQueueProcessor<
+  Payload extends Record<string, unknown>,
+> {
   send(payload: Payload, options?: QueueSendOptions<Payload>): Promise<void>;
-  sendBatch(payloads: Payload[], options?: QueueSendOptions<Payload>): Promise<void>;
+  sendBatch(
+    payloads: Payload[],
+    options?: QueueSendOptions<Payload>,
+  ): Promise<void>;
   /**
    * Gracefully closes the queue processor, waiting for in-flight jobs to complete.
    * Should be called during application shutdown.

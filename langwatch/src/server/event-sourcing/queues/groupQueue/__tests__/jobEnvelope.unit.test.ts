@@ -1,28 +1,20 @@
+import { gzipSync } from "node:zlib";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
+import { MAX_BLOB_BYTES } from "../blobConstants";
 import {
+  assertPayloadWithinCap,
   decodeJobEnvelope,
   encodeJobEnvelope,
-  type JobBlobStore,
+  PayloadTooLargeError,
   readEnvelopeBlobId,
+  readEnvelopeHold,
   readJobRoutingMeta,
 } from "../jobEnvelope";
-
-class InMemoryBlobStore implements JobBlobStore {
-  readonly blobs = new Map<string, Buffer>();
-
-  async put({ id, data }: { id: string; data: Buffer }): Promise<void> {
-    this.blobs.set(id, data);
-  }
-
-  async get({ id }: { id: string }): Promise<Buffer | null> {
-    return this.blobs.get(id) ?? null;
-  }
-
-  async delete({ id }: { id: string }): Promise<void> {
-    this.blobs.delete(id);
-  }
-}
+import { TieredBlobStore } from "../tieredBlobStore";
+import { InMemoryJobBlobStore, InMemoryObjectStore } from "./blobTestDoubles";
 
 describe("jobEnvelope", () => {
   beforeEach(() => {
@@ -183,14 +175,14 @@ describe("jobEnvelope", () => {
 
     describe("when a blob store is provided", () => {
       it("offloads the body to the store and leaves a tiny ref envelope", async () => {
-        const blobs = new InMemoryBlobStore();
+        const blobs = new InMemoryJobBlobStore();
         const encoded = await encodeJobEnvelope({
           jobData: hugePayload,
           blobs,
         });
         expect(encoded).toContain('"e":"ref"');
         expect(encoded.length).toBeLessThan(256);
-        expect(blobs.blobs.size).toBe(1);
+        expect(blobs.store.size).toBe(1);
         expect(readJobRoutingMeta(encoded)).toEqual({
           pipelineName: "traces",
           jobType: "command",
@@ -199,7 +191,7 @@ describe("jobEnvelope", () => {
       });
 
       it("round-trips the payload through the store", async () => {
-        const blobs = new InMemoryBlobStore();
+        const blobs = new InMemoryJobBlobStore();
         const encoded = await encodeJobEnvelope({
           jobData: hugePayload,
           blobs,
@@ -210,18 +202,18 @@ describe("jobEnvelope", () => {
       });
 
       it("exposes the blob id for completion-time deletion", async () => {
-        const blobs = new InMemoryBlobStore();
+        const blobs = new InMemoryJobBlobStore();
         const encoded = await encodeJobEnvelope({
           jobData: hugePayload,
           blobs,
         });
         const blobId = readEnvelopeBlobId(encoded);
         expect(blobId).not.toBeNull();
-        expect(blobs.blobs.has(blobId!)).toBe(true);
+        expect(blobs.store.has(blobId!)).toBe(true);
       });
 
       it("rejects decode when the blob is missing or no store is given", async () => {
-        const blobs = new InMemoryBlobStore();
+        const blobs = new InMemoryJobBlobStore();
         const encoded = await encodeJobEnvelope({
           jobData: hugePayload,
           blobs,
@@ -229,7 +221,7 @@ describe("jobEnvelope", () => {
         await expect(decodeJobEnvelope({ value: encoded })).rejects.toThrow(
           /blob store/,
         );
-        blobs.blobs.clear();
+        blobs.store.clear();
         await expect(
           decodeJobEnvelope({ value: encoded, blobs }),
         ).rejects.toThrow(/missing/);
@@ -361,6 +353,252 @@ describe("jobEnvelope", () => {
       const payload = { __jobName: "uni", text: "héllo 🌍 ".repeat(500) };
       const encoded = await encodeJobEnvelope({ jobData: payload });
       expect(await decodeJobEnvelope({ value: encoded })).toEqual(payload);
+    });
+  });
+
+  describe("given the payload-size ceiling", () => {
+    describe("when the payload is at the ceiling", () => {
+      it("accepts it", () => {
+        expect(() => assertPayloadWithinCap(MAX_BLOB_BYTES)).not.toThrow();
+      });
+    });
+
+    describe("when the payload is over the ceiling", () => {
+      it("rejects it with PayloadTooLargeError", () => {
+        expect(() => assertPayloadWithinCap(MAX_BLOB_BYTES + 1)).toThrow(
+          PayloadTooLargeError,
+        );
+      });
+    });
+  });
+
+  describe("given a tiered blob store and a projectId (GQ2)", () => {
+    const PROJECT = createTenantId("project-abc");
+
+    function makeTiered(s3ThresholdBytes = 256 * 1024) {
+      const redisBlobs = new InMemoryJobBlobStore();
+      const objectStore = new InMemoryObjectStore();
+      const tieredBlobs = new TieredBlobStore({
+        redisBlobs,
+        objectStoreFor: () => objectStore,
+        resolveDestination: async () => ({ kind: "s3", bucket: "test-bucket" }),
+        s3ThresholdBytes,
+      });
+      return { tieredBlobs, redisBlobs, objectStore };
+    }
+
+    describe("when a blob decompresses past the ceiling", () => {
+      it("rejects it rather than OOMing (zip-bomb guard)", async () => {
+        const { tieredBlobs } = makeTiered();
+        const encoded = await encodeJobEnvelope({
+          jobData: { __jobName: "x", bulk: "z".repeat(8 * 1024) },
+          tieredBlobs,
+          projectId: PROJECT,
+        });
+        // Valid JSON that inflates past MAX_BLOB_BYTES: without the gunzip cap,
+        // decode would SUCCEED (valid JSON), so dropping the cap fails this test
+        // instead of false-passing on an unrelated JSON-parse error.
+        const oversizedValidJson = `"${"z".repeat(MAX_BLOB_BYTES + 1)}"`;
+        const bombStore = {
+          get: async () => gzipSync(Buffer.from(oversizedValidJson, "utf8")),
+        } as unknown as TieredBlobStore;
+
+        await expect(
+          decodeJobEnvelope({ value: encoded, tieredBlobs: bombStore }),
+        ).rejects.toThrow();
+      });
+    });
+
+    describe("when a small payload is encoded", () => {
+      it("keeps it inline under a GQ2 prefix and round-trips", async () => {
+        const { tieredBlobs } = makeTiered();
+        const payload = { __jobName: "tiny", value: 1 };
+
+        const encoded = await encodeJobEnvelope({
+          jobData: payload,
+          tieredBlobs,
+          projectId: PROJECT,
+        });
+
+        expect(encoded.startsWith("GQ2|")).toBe(true);
+        expect(readEnvelopeHold(encoded)).toBeNull();
+        expect(
+          await decodeJobEnvelope({ value: encoded, tieredBlobs }),
+        ).toEqual(payload);
+      });
+    });
+
+    describe("when a payload over the inline ceiling is encoded", () => {
+      const big = {
+        __pipelineName: "traces",
+        __jobType: "event",
+        __jobName: "spanReceived",
+        bulk: "z".repeat(8 * 1024),
+      };
+
+      it("offloads to the redis tier as a content-addressed ref and round-trips", async () => {
+        const { tieredBlobs, redisBlobs } = makeTiered();
+
+        const encoded = await encodeJobEnvelope({
+          jobData: big,
+          tieredBlobs,
+          projectId: PROJECT,
+        });
+
+        expect(encoded).toContain('"e":"redis"');
+        expect(readEnvelopeHold(encoded)?.ref).toMatchObject({
+          tier: "redis",
+          projectId: PROJECT,
+        });
+        expect(redisBlobs.store.size).toBe(1);
+        expect(
+          await decodeJobEnvelope({ value: encoded, tieredBlobs }),
+        ).toEqual(big);
+      });
+
+      it("offloads to the s3 tier when the stored bytes exceed the s3 threshold", async () => {
+        const { tieredBlobs, objectStore } = makeTiered(8);
+
+        const encoded = await encodeJobEnvelope({
+          jobData: big,
+          tieredBlobs,
+          projectId: PROJECT,
+        });
+
+        expect(encoded).toContain('"e":"s3"');
+        expect(readEnvelopeHold(encoded)?.ref.tier).toBe("s3");
+        expect(objectStore.store.size).toBe(1);
+        expect(
+          await decodeJobEnvelope({ value: encoded, tieredBlobs }),
+        ).toEqual(big);
+      });
+
+      it("exposes routing meta from the header without resolving the blob", async () => {
+        const { tieredBlobs } = makeTiered();
+        const encoded = await encodeJobEnvelope({
+          jobData: big,
+          tieredBlobs,
+          projectId: PROJECT,
+        });
+        expect(readJobRoutingMeta(encoded)).toEqual({
+          pipelineName: "traces",
+          jobType: "event",
+          jobName: "spanReceived",
+        });
+      });
+
+      it("stores one copy for byte-identical payloads, with distinct hold tokens", async () => {
+        const { tieredBlobs, redisBlobs } = makeTiered();
+
+        const e1 = await encodeJobEnvelope({
+          jobData: big,
+          tieredBlobs,
+          projectId: PROJECT,
+        });
+        const e2 = await encodeJobEnvelope({
+          jobData: { ...big },
+          tieredBlobs,
+          projectId: PROJECT,
+        });
+
+        expect(redisBlobs.store.size).toBe(1);
+        // One shared blob ref, but a distinct per-stage hold token each time —
+        // so N fan-out jobs share one body yet each holds its own reference.
+        expect(readEnvelopeHold(e1)?.ref).toEqual(readEnvelopeHold(e2)?.ref);
+        expect(readEnvelopeHold(e1)?.token).not.toBe(
+          readEnvelopeHold(e2)?.token,
+        );
+      });
+
+      it("rejects decode when the tiered blob is missing or no store is given", async () => {
+        const { tieredBlobs, redisBlobs } = makeTiered();
+        const encoded = await encodeJobEnvelope({
+          jobData: big,
+          tieredBlobs,
+          projectId: PROJECT,
+        });
+
+        await expect(decodeJobEnvelope({ value: encoded })).rejects.toThrow(
+          /tiered/,
+        );
+        redisBlobs.store.clear();
+        await expect(
+          decodeJobEnvelope({ value: encoded, tieredBlobs }),
+        ).rejects.toThrow(/missing/);
+      });
+    });
+
+    describe("when two envelopes have identical user payloads but different queue machinery", () => {
+      it("collapses to ONE stored blob (machinery is lifted into the header, not the hashed body)", async () => {
+        const { tieredBlobs, redisBlobs } = makeTiered();
+        const payload = { evt: "x".repeat(8 * 1024) }; // > 4 KiB → offloads
+
+        // Same user payload, two distinct fan-out reactors over the same event.
+        const v1 = await encodeJobEnvelope({
+          jobData: {
+            ...payload,
+            __pipelineName: "experiment-run",
+            __jobType: "fold",
+            __jobName: "rollup-by-day",
+            __attempt: 1,
+            __stagedJobId: "j-1",
+          },
+          tieredBlobs,
+          projectId: PROJECT,
+        });
+        const v2 = await encodeJobEnvelope({
+          jobData: {
+            ...payload,
+            __pipelineName: "experiment-run",
+            __jobType: "map",
+            __jobName: "billing-projection",
+            __attempt: 3,
+            __stagedJobId: "j-2",
+          },
+          tieredBlobs,
+          projectId: PROJECT,
+        });
+
+        // The two envelopes are different (different headers / hold tokens)
+        // but the underlying blob is a single content-addressed entry.
+        expect(v1).not.toBe(v2);
+        expect(redisBlobs.store.size).toBe(1);
+
+        // Both decode back to the original jobData shape — machinery comes
+        // back from the header.
+        const d1 = await decodeJobEnvelope({ value: v1, tieredBlobs });
+        const d2 = await decodeJobEnvelope({ value: v2, tieredBlobs });
+        expect(d1.__jobName).toBe("rollup-by-day");
+        expect(d2.__jobName).toBe("billing-projection");
+        expect(d1.__attempt).toBe(1);
+        expect(d2.__attempt).toBe(3);
+        expect(d1.evt).toBe(payload.evt);
+        expect(d2.evt).toBe(payload.evt);
+      });
+    });
+
+    describe("when an inline-tier GQ2 envelope carries machinery", () => {
+      it("round-trips via header.m so downstream code sees the original jobData", async () => {
+        const { tieredBlobs } = makeTiered();
+        const jobData = {
+          evt: "small inline payload",
+          __pipelineName: "p",
+          __jobType: "t",
+          __jobName: "n",
+          __attempt: 2,
+        };
+        const encoded = await encodeJobEnvelope({
+          jobData,
+          tieredBlobs,
+          projectId: PROJECT,
+        });
+
+        const decoded = await decodeJobEnvelope({
+          value: encoded,
+          tieredBlobs,
+        });
+        expect(decoded).toEqual(jobData);
+      });
     });
   });
 });

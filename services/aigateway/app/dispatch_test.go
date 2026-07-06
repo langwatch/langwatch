@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -410,6 +411,42 @@ func TestHandleChat_FallbackOnUpstream404(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 2, callCount)
 	assert.Equal(t, 1, result.Meta.FallbackCount)
+}
+
+func TestHandleChat_TerminatesOnUpstream400(t *testing.T) {
+	callCount := 0
+	provider := &mockProvider{
+		dispatchFn: func(_ context.Context, _ *domain.Request, cred domain.Credential) (*domain.Response, error) {
+			callCount++
+			if cred.ID == "cred-1" {
+				return nil, &domain.UpstreamError{StatusCode: 400, Message: "invalid request"}
+			}
+			return successResponse(), nil
+		},
+	}
+
+	bundle := testBundle(
+		domain.Credential{ID: "cred-1", ProviderID: domain.ProviderOpenAI, APIKey: "sk-1"},
+		domain.Credential{ID: "cred-2", ProviderID: domain.ProviderOpenAI, APIKey: "sk-2"},
+	)
+	bundle.Config.Fallback.MaxAttempts = 2
+
+	application := New(
+		WithProviders(provider),
+		WithLogger(zap.NewNop()),
+	)
+
+	_, err := application.HandleChat(context.Background(), bundle, bytes.NewReader(testBody()), "gpt-4")
+
+	// A terminal 4xx (here a 400 "invalid request") must not fall back to the
+	// next credential: cred-1 is the only provider dialed, and the upstream
+	// status reaches the caller verbatim instead of being masked by a
+	// pointless retry on cred-2.
+	require.Error(t, err)
+	assert.Equal(t, 1, callCount)
+	var ue *domain.UpstreamError
+	require.True(t, errors.As(err, &ue))
+	assert.Equal(t, 400, ue.StatusCode)
 }
 
 func TestHandleChat_EmitsTraceAfterSuccess(t *testing.T) {
