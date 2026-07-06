@@ -689,6 +689,20 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 	fresh := *stale
 	fresh.Config = cfg
 	fresh.Credentials = cfg.Credentials
+
+	// Guard against resurrecting an entry that another path evicted or
+	// replaced while FetchConfig was in flight: a change-feed eviction
+	// (VK/provider updated or revoked), an async auth rejection, or a
+	// foreground auth refresh that swapped in a newer bundle. If the live L1
+	// entry for h is no longer the one we started from, drop this result
+	// instead of writing a stale (possibly revoked) bundle back into L1/L2.
+	// Peek avoids perturbing LRU recency from this background goroutine.
+	if cur, ok := s.l1.Peek(h); !ok || cur != e {
+		s.logger.Debug("config_ttl_refresh_dropped_stale",
+			zap.String("vk_id", stale.VirtualKeyID),
+		)
+		return
+	}
 	s.storeL1(h, &fresh)
 	if s.l2 != nil {
 		s.l2.Set(ctx, string(h[:]), &fresh)
