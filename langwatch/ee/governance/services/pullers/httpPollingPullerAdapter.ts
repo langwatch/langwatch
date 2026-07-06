@@ -46,14 +46,14 @@ const eventMappingSchema = z.object({
   cost_usd: z.string().optional(),
   tokens_input: z.string().optional(),
   tokens_output: z.string().optional(),
-  extra: z.record(z.string()).optional(),
+  extra: z.record(z.string(), z.string()).optional(),
 });
 
 const httpPollingConfigSchema = z.object({
   adapter: z.literal("http_polling"),
   url: z.string().url(),
   method: z.enum(["GET", "POST"]).default("GET"),
-  headers: z.record(z.string()).default({}),
+  headers: z.record(z.string(), z.string()).default({}),
   /**
    * Optional request body for POST. Templating same as headers.
    */

@@ -61,7 +61,7 @@ const eventMappingSchema = z.object({
   cost_usd: z.string().optional(),
   tokens_input: z.string().optional(),
   tokens_output: z.string().optional(),
-  extra: z.record(z.string()).optional(),
+  extra: z.record(z.string(), z.string()).optional(),
 });
 
 const s3PollingConfigSchema = z.object({

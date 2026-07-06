@@ -23,11 +23,11 @@ const metadataValueSchema = z.union([
   z.number(),
   z.boolean(),
   z.array(z.string()),
-  z.record(z.unknown()),
+  z.record(z.string(), z.unknown()),
 ]);
 
 export const traceMetadataUpdateSchema = z
-  .record(metadataValueSchema)
+  .record(z.string(), metadataValueSchema)
   .refine((obj) => Object.keys(obj).length > 0, {
     message: "metadata must contain at least one key",
   })

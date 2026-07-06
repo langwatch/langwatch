@@ -210,7 +210,7 @@ export const modelProviderRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         provider: z.string(),
-        customKeys: z.record(z.string()),
+        customKeys: z.record(z.string(), z.string()),
       }),
     )
     .use(checkProjectPermission("project:update"))
@@ -385,7 +385,7 @@ export const modelProviderRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.string().optional(),
-        config: z.record(z.string()),
+        config: z.record(z.string(), z.string()),
         scopes: z
           .array(
             z.object({

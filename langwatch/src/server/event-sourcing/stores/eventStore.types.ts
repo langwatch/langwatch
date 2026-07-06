@@ -23,12 +23,12 @@ export const EventStoreReadContextSchema = z.object({
    * Additional metadata for the read operation.
    * Should not be used to bypass security checks.
    */
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   /**
    * Raw/implementation-specific context.
    * Use with caution - should not bypass security or validation.
    */
-  raw: z.record(z.unknown()).optional(),
+  raw: z.record(z.string(), z.unknown()).optional(),
 });
 
 export interface EventStoreReadContext<_EventType extends Event = Event> {

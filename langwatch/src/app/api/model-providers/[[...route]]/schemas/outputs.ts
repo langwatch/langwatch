@@ -14,7 +14,7 @@ export const apiResponseModelProviderSchema = z.object({
   id: z.string().optional(),
   provider: z.string(),
   enabled: z.boolean(),
-  customKeys: z.record(z.unknown()).nullable(),
+  customKeys: z.record(z.string(), z.unknown()).nullable(),
   deploymentMapping: z.unknown().nullable(),
   models: z.array(z.string()).nullable().optional(),
   embeddingsModels: z.array(z.string()).nullable().optional(),
@@ -36,7 +36,7 @@ export type ApiResponseModelProvider = z.infer<
  * A record mapping provider keys to their configuration.
  */
 export const apiResponseModelProvidersSchema = z.record(
-  apiResponseModelProviderSchema,
+  z.string(), apiResponseModelProviderSchema,
 );
 
 export type ApiResponseModelProviders = z.infer<

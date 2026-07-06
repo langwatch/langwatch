@@ -92,7 +92,7 @@ export const workbenchStateSchema = z.object({
   realTimeThreadMappings: z
     .object({
       mapping: z.record(
-        z.object({
+        z.string(), z.object({
           source: z.enum(["", "thread_id", "traces", "formatted_traces"]),
           selectedFields: z.array(z.string()).optional(),
         }),

@@ -78,7 +78,7 @@ export const evaluatorsRouter = createTRPCRouter({
         projectId: z.string(),
         name: z.string().min(1).max(255),
         type: evaluatorTypeSchema,
-        config: z.record(z.unknown()),
+        config: z.record(z.string(), z.unknown()),
         workflowId: z.string().optional(),
       }),
     )
@@ -136,7 +136,7 @@ export const evaluatorsRouter = createTRPCRouter({
         projectId: z.string(),
         name: z.string().min(1).max(255).optional(),
         type: evaluatorTypeSchema.optional(),
-        config: z.record(z.unknown()).optional(),
+        config: z.record(z.string(), z.unknown()).optional(),
         workflowId: z.string().nullable().optional(),
       }),
     )

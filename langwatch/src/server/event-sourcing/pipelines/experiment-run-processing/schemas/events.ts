@@ -44,8 +44,8 @@ export const targetResultEventDataSchema = z.object({
   experimentId: z.string(),
   index: z.number(),
   targetId: z.string(),
-  entry: z.record(z.unknown()),
-  predicted: z.record(z.unknown()).nullable().optional(),
+  entry: z.record(z.string(), z.unknown()),
+  predicted: z.record(z.string(), z.unknown()).nullable().optional(),
   cost: z.number().nullable().optional(),
   duration: z.number().nullable().optional(),
   error: z.string().nullable().optional(),
@@ -78,7 +78,7 @@ export const evaluatorResultEventDataSchema = z.object({
   passed: z.boolean().nullable().optional(),
   details: z.string().nullable().optional(),
   cost: z.number().nullable().optional(),
-  inputs: z.record(z.unknown()).nullable().optional(),
+  inputs: z.record(z.string(), z.unknown()).nullable().optional(),
   duration: z.number().nullable().optional(),
 });
 

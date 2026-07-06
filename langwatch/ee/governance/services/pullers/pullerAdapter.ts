@@ -75,7 +75,7 @@ export const normalizedPullEventSchema = z.object({
    * stash source-specific signals (correlation ids, request ids, etc.)
    * without polluting the canonical fields.
    */
-  extra: z.record(z.unknown()).optional(),
+  extra: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type NormalizedPullEvent = z.infer<typeof normalizedPullEventSchema>;

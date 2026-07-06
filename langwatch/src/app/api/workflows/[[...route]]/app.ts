@@ -260,7 +260,7 @@ const evaluateBodySchema = z
         "Platform dataset id to evaluate; mutually exclusive with data",
       ),
     parameters: z
-      .record(z.union([z.string(), z.number(), z.boolean()]))
+      .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
       .optional()
       .describe(
         "Constant entry inputs applied to every row, e.g. a feature flag or PR number",

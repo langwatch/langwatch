@@ -123,7 +123,7 @@ const traceHeaderSchema = z.object({
   lastUsedPromptVersionNumber: z.number().nullable().default(null),
   lastUsedPromptVersionId: z.string().nullable().default(null),
   lastUsedPromptSpanId: z.string().nullable().default(null),
-  attributes: z.record(z.string()),
+  attributes: z.record(z.string(), z.string()),
   /**
    * Read-time privacy markers for the trace. `droppedCategories` lists content
    * categories (`input` / `output`) that a `drop` data-privacy policy stripped
@@ -293,12 +293,12 @@ export const spanDetailSchema = z.object({
       tokensEstimated: z.boolean().nullish(),
     })
     .nullish(),
-  params: z.record(z.unknown()).nullish(),
+  params: z.record(z.string(), z.unknown()).nullish(),
   events: z.array(
     z.object({
       name: z.string(),
       timestampMs: z.number(),
-      attributes: z.record(z.unknown()),
+      attributes: z.record(z.string(), z.unknown()),
     }),
   ),
   /**
@@ -356,7 +356,7 @@ export type InstrumentationScope = z.infer<typeof instrumentationScopeSchema>;
 export const spanResourceInfoSchema = z.object({
   spanId: z.string(),
   parentSpanId: z.string().nullable(),
-  resourceAttributes: z.record(z.string()),
+  resourceAttributes: z.record(z.string(), z.string()),
   scope: instrumentationScopeSchema,
 });
 
@@ -366,7 +366,7 @@ export const traceResourceInfoSchema = z.object({
   /** The root (or earliest) span used as the trace-level representative. */
   rootSpanId: z.string().nullable(),
   /** Resource attributes from the root span — usually identical across the trace. */
-  resourceAttributes: z.record(z.string()),
+  resourceAttributes: z.record(z.string(), z.string()),
   /** Instrumentation scope from the root span. */
   scope: instrumentationScopeSchema.nullable(),
   /** Per-span info for the rest of the trace, in case scopes diverge. */

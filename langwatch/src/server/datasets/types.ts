@@ -130,7 +130,7 @@ type Literal = z.infer<typeof literalSchema>;
 type Json = Literal | { [key: string]: Json } | Json[];
 
 export const jsonSchema: z.ZodType<Json> = z.lazy(() =>
-  z.union([literalSchema, z.array(jsonSchema), z.record(jsonSchema)]),
+  z.union([literalSchema, z.array(jsonSchema), z.record(z.string(), jsonSchema)]),
 );
 
 export const datasetSpanSchema = z.union([
@@ -195,6 +195,6 @@ export const newDatasetEntriesSchema = z.object({
       .object({
         id: z.string(),
       })
-      .and(z.record(z.any())),
+      .and(z.record(z.string(), z.any())),
   ),
 });

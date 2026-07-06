@@ -191,7 +191,7 @@ export const scenarioTextMessageEndSchema = baseScenarioEventSchema.extend({
   messageId: z.string(),
   role: z.string(),
   content: z.string().optional(),
-  message: z.record(z.unknown()).optional(),
+  message: z.record(z.string(), z.unknown()).optional(),
   traceId: z.string().optional(),
   messageIndex: z.number().optional(),
 });

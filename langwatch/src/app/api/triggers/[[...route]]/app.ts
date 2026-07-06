@@ -30,8 +30,8 @@ const triggerResponseSchema = z.object({
   id: z.string(),
   name: z.string(),
   action: triggerActionEnum,
-  actionParams: z.record(z.unknown()),
-  filters: z.record(z.unknown()),
+  actionParams: z.record(z.string(), z.unknown()),
+  filters: z.record(z.string(), z.unknown()),
   active: z.boolean(),
   message: z.string().nullable(),
   alertType: alertTypeEnum.nullable(),
@@ -46,8 +46,8 @@ const triggerResponseWithPlatformUrlSchema = triggerResponseSchema.extend({
 const createTriggerSchema = z.object({
   name: z.string().min(1, "name is required"),
   action: triggerActionEnum,
-  actionParams: z.record(z.unknown()).default({}),
-  filters: z.record(z.unknown()).default({}),
+  actionParams: z.record(z.string(), z.unknown()).default({}),
+  filters: z.record(z.string(), z.unknown()).default({}),
   message: z.string().optional(),
   alertType: alertTypeEnum.optional(),
 });
@@ -57,8 +57,8 @@ const updateTriggerSchema = z.object({
   active: z.boolean().optional(),
   message: z.string().nullable().optional(),
   alertType: alertTypeEnum.nullable().optional(),
-  filters: z.record(z.unknown()).optional(),
-  actionParams: z.record(z.unknown()).optional(),
+  filters: z.record(z.string(), z.unknown()).optional(),
+  actionParams: z.record(z.string(), z.unknown()).optional(),
 });
 
 function toTriggerResponse(trigger: Trigger) {

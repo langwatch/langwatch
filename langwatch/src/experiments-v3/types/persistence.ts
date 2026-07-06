@@ -19,10 +19,10 @@ import {
 export const persistedResultsSchema = z.object({
   runId: z.string().optional(),
   versionId: z.string().optional(),
-  targetOutputs: z.record(z.array(z.unknown())),
-  targetMetadata: z.record(z.array(targetRowMetadataSchema.nullish())),
-  evaluatorResults: z.record(z.record(z.array(z.unknown()))),
-  errors: z.record(z.array(z.string().nullish())),
+  targetOutputs: z.record(z.string(), z.array(z.unknown())),
+  targetMetadata: z.record(z.string(), z.array(targetRowMetadataSchema.nullish())),
+  evaluatorResults: z.record(z.string(), z.record(z.string(), z.array(z.unknown()))),
+  errors: z.record(z.string(), z.array(z.string().nullish())),
 });
 
 /**

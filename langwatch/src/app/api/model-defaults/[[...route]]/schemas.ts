@@ -13,7 +13,7 @@ const scopeAttachmentSchema = z.object({
  * scopeId) attachments — at least one entry required.
  */
 export const createModelDefaultConfigInputSchema = z.object({
-  config: z.record(z.string()),
+  config: z.record(z.string(), z.string()),
   scopes: z.array(scopeAttachmentSchema).min(1),
 });
 
@@ -24,7 +24,7 @@ export const createModelDefaultConfigInputSchema = z.object({
  * never be hit by the resolver).
  */
 export const updateModelDefaultConfigInputSchema = z.object({
-  config: z.record(z.string()).optional(),
+  config: z.record(z.string(), z.string()).optional(),
   scopes: z.array(scopeAttachmentSchema).optional(),
 });
 
@@ -36,7 +36,7 @@ const scopeRefSchema = z.object({
 
 const configRowSchema = z.object({
   id: z.string(),
-  config: z.record(z.string()),
+  config: z.record(z.string(), z.string()),
   scopes: z.array(scopeRefSchema),
   createdAt: z.string(),
   updatedAt: z.string(),

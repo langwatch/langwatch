@@ -9,7 +9,7 @@ export const queueRunCommandDataSchema = z.object({
   scenarioSetId: z.string(),
   name: z.string().optional(),
   description: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   /** Target for execution. Used by the execution reactor to spawn the right adapter. */
   target: z.object({
     type: z.enum(["prompt", "http", "code", "workflow"]),
@@ -27,7 +27,7 @@ export const startRunCommandDataSchema = z.object({
   scenarioSetId: z.string(),
   name: z.string().optional(),
   description: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
   occurredAt: z.number(),
 });
 export type StartRunCommandData = z.infer<typeof startRunCommandDataSchema>;
@@ -68,7 +68,7 @@ export const textMessageEndCommandDataSchema = z.object({
   messageId: z.string(),
   role: z.string(),
   content: z.string(),
-  message: z.record(z.unknown()).optional(),
+  message: z.record(z.string(), z.unknown()).optional(),
   traceId: z.string().optional(),
   messageIndex: z.number().optional(),
   occurredAt: z.number(),

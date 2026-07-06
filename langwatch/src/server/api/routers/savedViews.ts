@@ -49,7 +49,7 @@ export const savedViewsRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         name: z.string().min(1).max(255),
-        filters: z.record(z.unknown()),
+        filters: z.record(z.string(), z.unknown()),
         query: z.string().optional(),
         period: z
           .object({

@@ -14,8 +14,8 @@ export const spanInsertDataSchema = z.object({
   durationMs: z.number(),
   name: z.string(),
   kind: z.number(),
-  resourceAttributes: z.record(z.unknown()),
-  spanAttributes: z.record(z.unknown()),
+  resourceAttributes: z.record(z.string(), z.unknown()),
+  spanAttributes: z.record(z.string(), z.unknown()),
   statusCode: z.number().nullable(),
   statusMessage: z.string().nullable(),
   instrumentationScope: z.object({
@@ -26,14 +26,14 @@ export const spanInsertDataSchema = z.object({
     z.object({
       name: z.string(),
       timeUnixMs: z.number(),
-      attributes: z.record(z.unknown()),
+      attributes: z.record(z.string(), z.unknown()),
     }),
   ),
   links: z.array(
     z.object({
       traceId: z.string(),
       spanId: z.string(),
-      attributes: z.record(z.unknown()),
+      attributes: z.record(z.string(), z.unknown()),
     }),
   ),
   droppedAttributesCount: z.number(),
@@ -95,7 +95,7 @@ export const traceSummaryDataSchema = z.object({
    * upsert path leaves it undefined — only the list read populates it.
    */
   sizeBytes: z.number().optional(),
-  attributes: z.record(z.string()),
+  attributes: z.record(z.string(), z.string()),
   traceName: z.string(),
   /** Start time of the root span that set traceName, used for deterministic tie-breaking when multiple root spans exist. Internal bookkeeping. */
   rootSpanStartTimeMs: z.number().optional(),

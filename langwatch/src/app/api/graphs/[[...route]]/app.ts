@@ -18,8 +18,8 @@ const logger = createLogger("langwatch:api:graphs");
 const graphResponseSchema = z.object({
   id: z.string(),
   name: z.string(),
-  graph: z.record(z.unknown()),
-  filters: z.record(z.unknown()).nullable(),
+  graph: z.record(z.string(), z.unknown()),
+  filters: z.record(z.string(), z.unknown()).nullable(),
   dashboardId: z.string().nullable(),
   gridColumn: z.number(),
   gridRow: z.number(),
@@ -31,9 +31,9 @@ const graphResponseSchema = z.object({
 
 const createGraphSchema = z.object({
   name: z.string().min(1, "name is required"),
-  graph: z.record(z.unknown()),
+  graph: z.record(z.string(), z.unknown()),
   dashboardId: z.string().optional(),
-  filters: z.record(z.unknown()).optional(),
+  filters: z.record(z.string(), z.unknown()).optional(),
   gridColumn: z.number().min(0).max(1).optional(),
   gridRow: z.number().min(0).optional(),
   colSpan: z.number().min(1).max(2).optional(),
@@ -42,8 +42,8 @@ const createGraphSchema = z.object({
 
 const updateGraphSchema = z.object({
   name: z.string().min(1).optional(),
-  graph: z.record(z.unknown()).optional(),
-  filters: z.record(z.unknown()).optional(),
+  graph: z.record(z.string(), z.unknown()).optional(),
+  filters: z.record(z.string(), z.unknown()).optional(),
 });
 
 function toGraphResponse(graph: CustomGraph) {

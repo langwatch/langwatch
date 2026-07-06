@@ -131,7 +131,7 @@ export const llmConfigSchema = z.object({
   thinkingLevel: z.string().optional(), // Gemini (legacy)
   effort: z.string().optional(), // Anthropic (legacy)
   verbosity: z.string().optional(),
-  litellm_params: z.record(z.string()).optional(),
+  litellm_params: z.record(z.string(), z.string()).optional(),
 });
 
 export type LLMConfig = z.infer<typeof llmConfigSchema>;
@@ -243,7 +243,7 @@ export const nodeDatasetSchema = z.object({
   name: z.string().optional(),
   inline: z
     .object({
-      records: z.record(z.array(z.any())),
+      records: z.record(z.string(), z.array(z.any())),
       columnTypes: z.array(
         z.object({
           id: z.string().optional(),
@@ -507,7 +507,7 @@ export const customComponentSchema = baseComponentSchema.extend({
   workflow_id: z.string().optional(),
   publishedId: z.string().optional(),
   version_id: z.string().optional(),
-  versions: z.record(z.any()).optional(),
+  versions: z.record(z.string(), z.any()).optional(),
   /** Maps agent input field identifiers to scenario data sources or static values. */
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
   /** Which output field to use as the scenario result. When unset, uses the first output. */

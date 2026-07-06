@@ -35,14 +35,14 @@ const paginationQuerySchema = z.object({
 const createAgentSchema = z.object({
   name: z.string().min(1, "name is required").max(255),
   type: agentTypeSchema,
-  config: z.record(z.unknown()),
+  config: z.record(z.string(), z.unknown()),
   workflowId: z.string().optional(),
 });
 
 const updateAgentSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   type: agentTypeSchema.optional(),
-  config: z.record(z.unknown()).optional(),
+  config: z.record(z.string(), z.unknown()).optional(),
   workflowId: z.string().nullable().optional(),
 });
 
