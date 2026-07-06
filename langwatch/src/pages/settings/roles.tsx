@@ -16,6 +16,7 @@ import { ShieldUser } from "lucide-react";
 
 import { useState } from "react";
 import { Eye, Plus, Shield, Users } from "react-feather";
+import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import SettingsLayout from "../../components/SettingsLayout";
 import { ContactSalesBlock } from "../../components/subscription/ContactSalesBlock";
@@ -134,6 +135,10 @@ function RolesManagement({
     name: string;
     description: string;
     permissions: Permission[];
+  } | null>(null);
+  const [roleToDelete, setRoleToDelete] = useState<{
+    id: string;
+    name: string;
   } | null>(null);
   const apiContext = api.useContext();
   // Fetch custom roles
@@ -398,15 +403,7 @@ function RolesManagement({
               description={role.description ?? ""}
               permissionCount={`${role.permissions.length} permissions`}
               hasPermission={hasPermission}
-              onDelete={() => {
-                if (
-                  confirm(
-                    `Are you sure you want to delete the role "${role.name}"?`,
-                  )
-                ) {
-                  deleteRole.mutate({ roleId: role.id });
-                }
-              }}
+              onDelete={() => setRoleToDelete({ id: role.id, name: role.name })}
               onEdit={() => {
                 void handleEditRole(role.id);
               }}
@@ -448,6 +445,27 @@ function RolesManagement({
         title="Edit Role"
         submitLabel="Update Role"
         isSubmitting={updateRole.isLoading}
+      />
+
+      <ConfirmDialog
+        open={!!roleToDelete}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setRoleToDelete(null);
+        }}
+        title="Delete role"
+        message={`Are you sure you want to delete the role "${
+          roleToDelete?.name ?? ""
+        }"?`}
+        confirmLabel="Delete"
+        tone="danger"
+        loading={deleteRole.isLoading}
+        onConfirm={() => {
+          if (!roleToDelete) return;
+          deleteRole.mutate(
+            { roleId: roleToDelete.id },
+            { onSettled: () => setRoleToDelete(null) },
+          );
+        }}
       />
 
       {/* View Permissions Dialog */}

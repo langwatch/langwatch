@@ -1,6 +1,6 @@
 import { Button, createListCollection, Field } from "@chakra-ui/react";
 import type { Dataset } from "@prisma/client";
-import { useEffect, useState, type ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import type {
   FieldErrors,
   Path,
@@ -35,7 +35,7 @@ export function DatasetSelector<T extends { datasetId: string }>({
   });
 
   const [selectedValue, setSelectedValue] = useState<string[]>(
-    localStorageDatasetId ? [localStorageDatasetId] : []
+    localStorageDatasetId ? [localStorageDatasetId] : [],
   );
 
   useEffect(() => {

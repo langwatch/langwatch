@@ -27,12 +27,11 @@
  * render "no usage yet" cards without special-case branching.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
-
+import { ANALYTICS_CLICKHOUSE_SETTINGS } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import {
   getClickHouseClientForProject,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
-import { ANALYTICS_CLICKHOUSE_SETTINGS } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 
 export interface PersonalUsageWindow {
   /** Inclusive UTC start of the rollup window. */
@@ -84,14 +83,32 @@ export interface PersonalUsageQueryInput {
   /** Defaults to start-of-current-month → now if omitted. */
   window?: PersonalUsageWindow;
   /**
-   * Owner's userId. When supplied, the service unions in any
-   * gateway_budget_ledger_events written under PRINCIPAL scope for
-   * this user — picks up Claude Code OTLP / other ingestion-source
-   * traffic that lands under the hidden Governance Project tenant
-   * rather than the user's personal-project tenant. Without it,
-   * summaries / buckets / breakdowns reflect only gateway-VK traffic.
+   * Owner's userId. When supplied alongside `ingestionTenantId`, the
+   * service unions in any gateway_budget_ledger_events written under
+   * PRINCIPAL scope for this user — picks up Claude Code OTLP / other
+   * ingestion-source traffic that lands under the hidden Governance
+   * Project tenant rather than the user's personal-project tenant.
+   * Without it, summaries / buckets / breakdowns reflect only gateway-VK
+   * traffic.
    */
   userId?: string;
+  /**
+   * The org's hidden Governance Project tenant id. Ingestion-source
+   * ledger rows are written under THIS tenant (ingestionRoutes.ts writes
+   * `TenantId: govProject.id`), never the personal project. It is the
+   * mandatory tenant scope for the PRINCIPAL-ledger union:
+   *   - Correctness: a user in multiple orgs has PRINCIPAL rows under
+   *     each org's governance tenant. Filtering on this org's tenant
+   *     keeps /me scoped to the right org instead of summing the user's
+   *     spend across every org they belong to.
+   *   - Performance: `TenantId` is the leading ORDER BY key on
+   *     gateway_budget_ledger_events, so this lets ClickHouse prune to
+   *     the tenant's parts instead of scanning every tenant's ledger.
+   * Omitted → the union is skipped entirely (an org with no Governance
+   * Project has no ingestion traffic, and an unbounded cross-tenant scan
+   * is never the right fallback).
+   */
+  ingestionTenantId?: string;
 }
 
 /**
@@ -110,13 +127,16 @@ export interface PersonalUsageQueryInput {
  *             PRINCIPAL the User.id).
  *   AmountUSD, TokensInput, TokensOutput, Model, OccurredAt, etc.
  *
- * Personal-usage queries pin Scope='principal' (lowercase, matching
- * `scopeToClickHouse` in budget.clickhouse.repository.ts:539) AND
- * ScopeId=userId so
- * we get exactly the per-user ledger rows. Multi-budget events show
- * up multiple times across scope rows (one row per applicable budget),
- * but the Scope/ScopeId pair narrows to the user's principal slice
- * cleanly.
+ * Personal-usage queries pin TenantId=<org's hidden Governance Project>
+ * AND Scope='principal' (lowercase, matching `scopeToClickHouse` in
+ * budget.clickhouse.repository.ts:539) AND ScopeId=userId so we get
+ * exactly the per-user ledger rows for THIS org. The TenantId pin both
+ * prunes partitions (it is the leading ORDER BY key) and scopes a
+ * multi-org user to the current org — without it the query would sum the
+ * user's principal spend across every org they belong to. Multi-budget
+ * events show up multiple times across scope rows (one row per applicable
+ * budget), but the Scope/ScopeId pair narrows to the user's principal
+ * slice cleanly.
  */
 
 export class PersonalUsageService {
@@ -124,9 +144,7 @@ export class PersonalUsageService {
    * Returns aggregated spend + token + model summary for the window.
    * Empty state safe — returns zeros + null model if no traces.
    */
-  async summary(
-    input: PersonalUsageQueryInput,
-  ): Promise<PersonalUsageSummary> {
+  async summary(input: PersonalUsageQueryInput): Promise<PersonalUsageSummary> {
     const window = input.window ?? defaultMonthWindow();
     const client = await getClickHouseClientForProject(input.personalProjectId);
     if (!client) return emptySummary();
@@ -144,12 +162,14 @@ export class PersonalUsageService {
     // hidden governance project tenant, NOT the user's personal
     // project — so the trace_summaries query above misses them. Pull
     // per-principal ledger rows and merge.
-    const ingestion = input.userId
-      ? await this.queryIngestionPrincipalSummary(client, {
-          userId: input.userId,
-          window,
-        })
-      : null;
+    const ingestion =
+      input.userId && input.ingestionTenantId
+        ? await this.queryIngestionPrincipalSummary(client, {
+            tenantId: input.ingestionTenantId,
+            userId: input.userId,
+            window,
+          })
+        : null;
 
     const totalCost = summaryRow.totalCost + (ingestion?.totalCost ?? 0);
     // The gateway ledger records real per-token spend (virtual-key traffic the
@@ -174,8 +194,7 @@ export class PersonalUsageService {
     }
     if (
       ingestion?.topModel &&
-      (!mergedTopModel ||
-        ingestion.topModel.requests > mergedTopModel.requests)
+      (!mergedTopModel || ingestion.topModel.requests > mergedTopModel.requests)
     ) {
       mergedTopModel = ingestion.topModel;
     }
@@ -202,7 +221,9 @@ export class PersonalUsageService {
    * Daily spend buckets across the window. UTC day boundaries.
    * Empty buckets are filled with zeros so the chart line connects.
    */
-  async dailyBuckets(input: PersonalUsageQueryInput): Promise<PersonalUsageBucket[]> {
+  async dailyBuckets(
+    input: PersonalUsageQueryInput,
+  ): Promise<PersonalUsageBucket[]> {
     const window = input.window ?? defaultLast14DaysWindow();
     const client = await getClickHouseClientForProject(input.personalProjectId);
     if (!client) return fillEmptyBuckets(window);
@@ -264,8 +285,9 @@ export class PersonalUsageService {
 
     // Ingestion-source ledger union: per-day spend for the user's
     // PRINCIPAL-scope rows, merged into the same byDay map.
-    if (input.userId) {
+    if (input.userId && input.ingestionTenantId) {
       const ledgerBuckets = await this.queryIngestionPrincipalBuckets(client, {
+        tenantId: input.ingestionTenantId,
         userId: input.userId,
         window,
       });
@@ -287,7 +309,7 @@ export class PersonalUsageService {
 
   private async queryIngestionPrincipalBuckets(
     client: ClickHouseClient,
-    params: { userId: string; window: PersonalUsageWindow },
+    params: { tenantId: string; userId: string; window: PersonalUsageWindow },
   ): Promise<PersonalUsageBucket[]> {
     if (!isClickHouseEnabled()) return [];
     try {
@@ -298,7 +320,8 @@ export class PersonalUsageService {
             sum(AmountUSD)     AS SpentUsd,
             countDistinct(GatewayRequestId) AS Requests
           FROM gateway_budget_ledger_events
-          WHERE Scope = 'principal'
+          WHERE TenantId = {tenantId:String}
+            AND Scope = 'principal'
             AND ScopeId = {userId:String}
             AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
             AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
@@ -307,6 +330,7 @@ export class PersonalUsageService {
           SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
         `,
         query_params: {
+          tenantId: params.tenantId,
           userId: params.userId,
           fromMs: params.window.start.getTime(),
           toMs: params.window.end.getTime(),
@@ -412,10 +436,10 @@ export class PersonalUsageService {
 
     // Ingestion-source ledger union: per-model spend for the user's
     // PRINCIPAL-scope rows, merged into the same map.
-    if (input.userId) {
+    if (input.userId && input.ingestionTenantId) {
       const ledgerBreakdown = await this.queryIngestionPrincipalBreakdown(
         client,
-        { userId: input.userId, window },
+        { tenantId: input.ingestionTenantId, userId: input.userId, window },
       );
       for (const r of ledgerBreakdown) {
         const existing = aggregated.get(r.label) ?? {
@@ -438,7 +462,7 @@ export class PersonalUsageService {
 
   private async queryIngestionPrincipalBreakdown(
     client: ClickHouseClient,
-    params: { userId: string; window: PersonalUsageWindow },
+    params: { tenantId: string; userId: string; window: PersonalUsageWindow },
   ): Promise<PersonalUsageBreakdown[]> {
     if (!isClickHouseEnabled()) return [];
     try {
@@ -449,7 +473,8 @@ export class PersonalUsageService {
             sum(AmountUSD)             AS SpentUsd,
             countDistinct(GatewayRequestId) AS Requests
           FROM gateway_budget_ledger_events
-          WHERE Scope = 'principal'
+          WHERE TenantId = {tenantId:String}
+            AND Scope = 'principal'
             AND ScopeId = {userId:String}
             AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
             AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
@@ -458,6 +483,7 @@ export class PersonalUsageService {
           SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
         `,
         query_params: {
+          tenantId: params.tenantId,
           userId: params.userId,
           fromMs: params.window.start.getTime(),
           toMs: params.window.end.getTime(),
@@ -572,7 +598,7 @@ export class PersonalUsageService {
    */
   private async queryIngestionPrincipalSummary(
     client: ClickHouseClient,
-    params: { userId: string; window: PersonalUsageWindow },
+    params: { tenantId: string; userId: string; window: PersonalUsageWindow },
   ): Promise<{
     totalCost: number;
     requestCount: number;
@@ -590,13 +616,15 @@ export class PersonalUsageService {
             sum(TokensInput)          AS PromptTokens,
             sum(TokensOutput)         AS CompletionTokens
           FROM gateway_budget_ledger_events
-          WHERE Scope = 'principal'
+          WHERE TenantId = {tenantId:String}
+            AND Scope = 'principal'
             AND ScopeId = {userId:String}
             AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
             AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
           SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
         `,
         query_params: {
+          tenantId: params.tenantId,
           userId: params.userId,
           fromMs: params.window.start.getTime(),
           toMs: params.window.end.getTime(),
@@ -619,7 +647,8 @@ export class PersonalUsageService {
             Model AS Name,
             countDistinct(GatewayRequestId) AS Requests
           FROM gateway_budget_ledger_events
-          WHERE Scope = 'principal'
+          WHERE TenantId = {tenantId:String}
+            AND Scope = 'principal'
             AND ScopeId = {userId:String}
             AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
             AND OccurredAt <  fromUnixTimestamp64Milli({toMs:Int64})
@@ -629,6 +658,7 @@ export class PersonalUsageService {
           SETTINGS ${formatSettings(ANALYTICS_CLICKHOUSE_SETTINGS)}
         `,
         query_params: {
+          tenantId: params.tenantId,
           userId: params.userId,
           fromMs: params.window.start.getTime(),
           toMs: params.window.end.getTime(),

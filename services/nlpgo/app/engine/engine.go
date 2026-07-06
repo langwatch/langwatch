@@ -166,8 +166,22 @@ type NodeState struct {
 	Stdout     string         `json:"stdout,omitempty"`
 	Stderr     string         `json:"stderr,omitempty"`
 	Cost       float64        `json:"cost,omitempty"`
+	Metrics    *NodeMetrics   `json:"metrics,omitempty"`
 	DurationMS int64          `json:"duration_ms,omitempty"`
 	Error      *NodeError     `json:"error,omitempty"`
+}
+
+// NodeMetrics carries an LLM node's token usage + resolved model so the
+// control plane can price the call with its canonical cost table. The engine
+// has no pricing data of its own, so it surfaces the raw counts rather than a
+// cost figure; the consumer multiplies tokens by the model rate (the same path
+// the trace-ingest collector uses), keeping a single source of truth for cost.
+type NodeMetrics struct {
+	PromptTokens     int    `json:"prompt_tokens,omitempty"`
+	CompletionTokens int    `json:"completion_tokens,omitempty"`
+	TotalTokens      int    `json:"total_tokens,omitempty"`
+	ReasoningTokens  int    `json:"reasoning_tokens,omitempty"`
+	Model            string `json:"model,omitempty"`
 }
 
 // NodeError is the structured error attached to a failed node.
@@ -297,7 +311,7 @@ func (e *Engine) dispatch(ctx context.Context, req ExecuteRequest, node *dsl.Nod
 	case dsl.ComponentHTTP:
 		return e.runHTTP(ctx, node, inputs, ns, req.Workflow.Secrets)
 	case dsl.ComponentSignature:
-		return e.runSignature(ctx, req, node, inputs)
+		return e.runSignature(ctx, req, node, inputs, ns)
 	case dsl.ComponentPromptingTechnique:
 		// Decorator: produces no outputs of its own; signature nodes
 		// reference it via a parameter and apply it at LLM-call time.
@@ -493,7 +507,7 @@ func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]
 	return out, nil
 }
 
-func (e *Engine) runSignature(ctx context.Context, execReq ExecuteRequest, node *dsl.Node, inputs map[string]any) (map[string]any, *NodeError) {
+func (e *Engine) runSignature(ctx context.Context, execReq ExecuteRequest, node *dsl.Node, inputs map[string]any, ns *NodeState) (map[string]any, *NodeError) {
 	if e.llm == nil {
 		return nil, &NodeError{Type: "llm_executor_unavailable", Message: "LLM executor not yet wired"}
 	}
@@ -586,6 +600,24 @@ func (e *Engine) runSignature(ctx context.Context, execReq ExecuteRequest, node 
 			ne.Status = hs.HTTPStatusCode()
 		}
 		return nil, ne
+	}
+	// Surface token usage + model so the control plane can price the call.
+	// The engine carries no cost table; it reports the raw counts and lets the
+	// consumer apply the model rate (the gateway returns no cost on this path).
+	// Use the provider/model form (matching the cost table keys + the LLM span
+	// name) so the consumer's model-cost lookup hits the right entry.
+	if u := resp.Usage; u.TotalTokens > 0 || u.PromptTokens > 0 || u.CompletionTokens > 0 {
+		metricsModel := model
+		if provider != "" && model != "" {
+			metricsModel = provider + "/" + model
+		}
+		ns.Metrics = &NodeMetrics{
+			PromptTokens:     u.PromptTokens,
+			CompletionTokens: u.CompletionTokens,
+			TotalTokens:      u.TotalTokens,
+			ReasoningTokens:  u.ReasoningTokens,
+			Model:            metricsModel,
+		}
 	}
 	if useStructured {
 		out, warnings := extractSignatureOutputs(resp.Content, node.Data.Outputs)

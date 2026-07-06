@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "langy-agent.fullname" . }}
+  labels: {{- include "langy-agent.labels" . | nindent 4 }}
+data:
+  # Non-secret tunables read by the manager (services/langy-agent). The service-to-
+  # service auth secret (LANGY_INTERNAL_SECRET) is NOT here — it comes from
+  # the existing Secret, injected directly in the Deployment env.
+  PORT: {{ .Values.manager.port | quote }}
+  LANGY_MAX_WORKERS: {{ .Values.manager.maxWorkers | quote }}
+  LANGY_WORKER_IDLE_MS: {{ .Values.manager.workerIdleMs | quote }}
+  LANGY_READINESS_TIMEOUT_MS: {{ .Values.manager.readinessTimeoutMs | quote }}

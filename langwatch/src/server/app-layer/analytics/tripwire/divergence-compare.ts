@@ -11,8 +11,8 @@
  * about flag-and-dispatch and the tripwire stays about comparison + logging.
  */
 
-import { createLogger } from "~/utils/logger/server";
 import type { TimeseriesResult } from "~/server/analytics/types";
+import { createLogger } from "~/utils/logger/server";
 import type { AnalyticsTable } from "../routing/route-table";
 
 /**

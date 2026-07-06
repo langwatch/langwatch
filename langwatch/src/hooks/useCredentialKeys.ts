@@ -41,7 +41,7 @@ export type UseCredentialKeysReturn = UseCredentialKeysState &
       | undefined;
   };
 
-function computeInitialUseApiGateway(
+export function computeInitialUseApiGateway(
   provider: MaybeStoredModelProvider,
 ): boolean {
   if (provider.provider === "azure" && provider.customKeys) {
@@ -95,10 +95,7 @@ export function useCredentialKeys({
   );
 
   const setUseApiGateway = useCallback(
-    (
-      use: boolean,
-      onGatewayToggle?: (useGateway: boolean) => void,
-    ) => {
+    (use: boolean, onGatewayToggle?: (useGateway: boolean) => void) => {
       setUseApiGatewayState(use);
       setCustomKeys((previousKeys) => {
         originalStoredKeysRef.current = {

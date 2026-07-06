@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-
-import { NormalizedSpanKind } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import { NormalizedSpanKind } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 
 import { SpanCostService } from "../span-cost.service";
 
@@ -27,9 +26,9 @@ function makeSpan(overrides: Partial<NormalizedSpan> = {}): NormalizedSpan {
     statusMessage: null,
     statusCode: null,
     instrumentationScope: { name: "test", version: null },
-    droppedAttributesCount: 0 as 0,
-    droppedEventsCount: 0 as 0,
-    droppedLinksCount: 0 as 0,
+    droppedAttributesCount: 0 as const,
+    droppedEventsCount: 0 as const,
+    droppedLinksCount: 0 as const,
     cost: null,
     nonBilledCost: null,
     ...overrides,

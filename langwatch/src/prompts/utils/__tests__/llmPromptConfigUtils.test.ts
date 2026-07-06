@@ -885,53 +885,57 @@ describe("formSchema runtime parameters validation", () => {
  * a unit test — the shape is small and stable.
  */
 describe("nodeDataToLocalPromptConfig — workflow scaffold round-trip (Issue #3196)", () => {
-  // Binds the @e2e scenario at integration scope — the round-trip
-  // through the bridge is the bug surface (Bug 1).  Browser-level
-  // e2e is queued as a follow-up.
-  /** @scenario "New workflow's default prompt node is scaffolded with the default system prompt" */
-  it("preserves the registry's default system message when converting the scaffolded signature node to LocalPromptConfig", () => {
-    const scaffoldedNodeData = {
-      inputs: [{ identifier: "input", type: "str" as const }],
-      outputs: [{ identifier: "output", type: "str" as const }],
-      parameters: [
-        {
-          identifier: "llm",
-          type: "llm" as const,
-          value: {
-            model: "openai/gpt-5-mini",
-            temperature: 0,
-            max_tokens: 2048,
-          },
-        },
-        {
-          identifier: "prompting_technique",
-          type: "prompting_technique" as const,
-          value: undefined,
-        },
-        {
-          identifier: "instructions",
-          type: "str" as const,
-          value: "You are a helpful assistant.",
-        },
-        {
-          identifier: "messages",
-          type: "chat_messages" as const,
-          value: [{ role: "user" as const, content: "{{input}}" }],
-        },
-        {
-          identifier: "demonstrations",
-          type: "dataset" as const,
-          value: undefined,
-        },
-      ],
-    } as any;
+  describe("given a scaffolded signature node carrying the registry's default system message", () => {
+    describe("when converting the node data to LocalPromptConfig", () => {
+      // Binds the @e2e scenario at integration scope — the round-trip
+      // through the bridge is the bug surface (Bug 1).  Browser-level
+      // e2e is queued as a follow-up.
+      /** @scenario "New workflow's default prompt node is scaffolded with the default system prompt" */
+      it("preserves the default system message in the messages array", () => {
+        const scaffoldedNodeData = {
+          inputs: [{ identifier: "input", type: "str" as const }],
+          outputs: [{ identifier: "output", type: "str" as const }],
+          parameters: [
+            {
+              identifier: "llm",
+              type: "llm" as const,
+              value: {
+                model: "openai/gpt-5-mini",
+                temperature: 0,
+                max_tokens: 2048,
+              },
+            },
+            {
+              identifier: "prompting_technique",
+              type: "prompting_technique" as const,
+              value: undefined,
+            },
+            {
+              identifier: "instructions",
+              type: "str" as const,
+              value: "You are a helpful assistant.",
+            },
+            {
+              identifier: "messages",
+              type: "chat_messages" as const,
+              value: [{ role: "user" as const, content: "{{input}}" }],
+            },
+            {
+              identifier: "demonstrations",
+              type: "dataset" as const,
+              value: undefined,
+            },
+          ],
+        } as any;
 
-    const result = nodeDataToLocalPromptConfig(scaffoldedNodeData);
+        const result = nodeDataToLocalPromptConfig(scaffoldedNodeData);
 
-    expect(result).not.toBeUndefined();
-    expect(result!.messages).toEqual([
-      { role: "system", content: "You are a helpful assistant." },
-      { role: "user", content: "{{input}}" },
-    ]);
+        expect(result).not.toBeUndefined();
+        expect(result!.messages).toEqual([
+          { role: "system", content: "You are a helpful assistant." },
+          { role: "user", content: "{{input}}" },
+        ]);
+      });
+    });
   });
 });

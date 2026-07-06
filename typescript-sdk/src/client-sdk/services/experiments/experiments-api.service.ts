@@ -16,8 +16,77 @@ export interface ExperimentRunStartResponse {
   runUrl?: string;
 }
 
+/**
+ * Optional body for `POST /api/evaluations/v3/{slug}/run`. `data` and
+ * `dataset_id` are mutually exclusive on the server (400 if both are sent).
+ */
+export interface ExperimentRunStartRequest {
+  data?: Array<Record<string, unknown>>;
+  dataset_id?: string;
+  parameters?: Record<string, string | number | boolean>;
+  row_indices?: number[];
+}
+
+/**
+ * Build the snake_case run-start request body from camelCase options.
+ *
+ * Returns `undefined` when no overrides are provided so the caller can send a
+ * body-less request (the server then uses the configured inputs).
+ */
+export const toRunStartRequest = ({
+  data,
+  datasetId,
+  parameters,
+  rowIndices,
+}: {
+  data?: Array<Record<string, unknown>>;
+  datasetId?: string;
+  parameters?: Record<string, string | number | boolean>;
+  rowIndices?: number[];
+}): ExperimentRunStartRequest | undefined => {
+  const body: ExperimentRunStartRequest = {};
+  if (data !== undefined) body.data = data;
+  if (datasetId !== undefined) body.dataset_id = datasetId;
+  if (parameters !== undefined) body.parameters = parameters;
+  if (rowIndices !== undefined) body.row_indices = rowIndices;
+  return Object.keys(body).length > 0 ? body : undefined;
+};
+
 export type ExperimentRunStatusResponse =
   paths["/api/experiments/runs/{runId}"]["get"]["responses"]["200"]["content"]["application/json"];
+
+/**
+ * Status payload for `GET /api/evaluations/v3/runs/{runId}` (polling).
+ *
+ * Hand-written because the v3 path is served via a legacy-alias that rewrites
+ * to `/api/experiments/...`, so only the legacy path is declared in the
+ * generated OpenAPI types. Kept structurally aligned with that legacy schema.
+ */
+export interface ExperimentV3RunStatusResponse {
+  runId: string;
+  status: "pending" | "running" | "completed" | "failed" | "stopped";
+  /** Number of cells completed */
+  progress: number;
+  /** Total number of cells */
+  total: number;
+  /** Unix timestamp when run started */
+  startedAt?: number;
+  /** Unix timestamp when run finished (completed/failed/stopped only) */
+  finishedAt?: number;
+  /** Execution summary (present when completed) */
+  summary?: {
+    runId?: string;
+    totalCells?: number;
+    completedCells?: number;
+    failedCells?: number;
+    /** Total execution time in milliseconds */
+    duration?: number;
+    /** URL to view the run in LangWatch */
+    runUrl?: string;
+  };
+  /** Error message (present when failed) */
+  error?: string;
+}
 
 /**
  * Summary entry returned by `GET /api/experiments`. Mirrors
@@ -193,6 +262,36 @@ export class ExperimentsApiService {
     return result.data as T;
   }
 
+  private async postUndeclaredEndpoint<T>({
+    path,
+    body,
+    operation,
+  }: {
+    path: string;
+    body?: unknown;
+    operation: string;
+  }): Promise<T> {
+    type UntypedClient = {
+      POST: (
+        path: string,
+        init?: { body?: unknown; parseAs?: "json" },
+      ) => Promise<{ data?: unknown; error?: unknown; response: Response }>;
+    };
+
+    let result: { data?: unknown; error?: unknown; response: Response };
+    try {
+      result = await (this.apiClient as unknown as UntypedClient).POST(path, {
+        ...(body !== undefined ? { body } : {}),
+        parseAs: "json",
+      });
+    } catch (error) {
+      this.handleApiError(operation, error);
+    }
+
+    if (result.error) this.handleApiError(operation, result.error);
+    return result.data as T;
+  }
+
   async startRun(slug: string): Promise<ExperimentRunStartResponse> {
     const { data, error } = await this.apiClient.POST(
       "/api/experiments/{slug}/run",
@@ -286,6 +385,72 @@ export class ExperimentsApiService {
       ExperimentRunResultsResponse | null
     >({
       path: `/api/experiments/runs/${encodeURIComponent(runId)}/results${qs}`,
+      operation: `get run results for "${runId}"`,
+    });
+    if (body === null) {
+      this.handleApiError(`get run results for "${runId}"`, {
+        response: { status: 404 },
+        data: { error: `Run not found: ${runId}` },
+      });
+    }
+    return body;
+  }
+
+  /**
+   * Start a saved Evaluations V3 experiment by slug through the unified
+   * evaluations-v3 backend.
+   *
+   * Hits `POST /api/evaluations/v3/{slug}/run`. The optional body overrides
+   * the configured inputs (`data` / `dataset_id` are mutually exclusive on the
+   * server). The route accepts a body, but the generated OpenAPI types declare
+   * it body-less, so the call is dispatched through a narrow untyped helper.
+   */
+  async startV3Run({
+    slug,
+    body,
+  }: {
+    slug: string;
+    body?: ExperimentRunStartRequest;
+  }): Promise<ExperimentRunStartResponse> {
+    return this.postUndeclaredEndpoint<ExperimentRunStartResponse>({
+      path: `/api/evaluations/v3/${encodeURIComponent(slug)}/run`,
+      body,
+      operation: `start evaluation run for "${slug}"`,
+    });
+  }
+
+  /**
+   * Poll the status of an Evaluations V3 run.
+   *
+   * Hits `GET /api/evaluations/v3/runs/{runId}`.
+   */
+  async getV3RunStatus(runId: string): Promise<ExperimentV3RunStatusResponse> {
+    return this.getUndeclaredEndpoint<ExperimentV3RunStatusResponse>({
+      path: `/api/evaluations/v3/runs/${encodeURIComponent(runId)}`,
+      operation: `get run status for "${runId}"`,
+    });
+  }
+
+  /**
+   * Fetch per-row results for an Evaluations V3 run.
+   *
+   * Hits `GET /api/evaluations/v3/runs/{runId}/results`. `experimentSlug` is
+   * optional for runs created in the last 24h and required afterwards.
+   */
+  async getV3RunResults({
+    runId,
+    experimentSlug,
+  }: {
+    runId: string;
+    experimentSlug?: string;
+  }): Promise<ExperimentRunResultsResponse> {
+    const search = new URLSearchParams();
+    if (experimentSlug) search.set("experimentSlug", experimentSlug);
+    const qs = search.toString() ? `?${search.toString()}` : "";
+    const body = await this.getUndeclaredEndpoint<
+      ExperimentRunResultsResponse | null
+    >({
+      path: `/api/evaluations/v3/runs/${encodeURIComponent(runId)}/results${qs}`,
       operation: `get run results for "${runId}"`,
     });
     if (body === null) {

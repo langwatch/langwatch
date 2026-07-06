@@ -37,10 +37,12 @@ import { prisma } from "~/server/db";
 // the `/*` chain before the POST handler; without it the middleware throws
 // "Cannot read properties of undefined (reading 'checkLimit')" and the
 // onError handler turns that into a 500 — masking the route logic entirely.
-// Hoisted so the DELETE scope-guard tests can control the scoped run-id
+// Hoisted so the DELETE scope-guard tests can control the set-scoped run-id
 // lookup and assert which runs get archived (or that none do).
-const { mockGetRunIdsForScope, mockDeleteRun } = vi.hoisted(() => ({
-  mockGetRunIdsForScope: vi.fn().mockResolvedValue([] as string[]),
+const { mockGetRunIdsForSet, mockDeleteRun } = vi.hoisted(() => ({
+  mockGetRunIdsForSet: vi
+    .fn()
+    .mockResolvedValue({ runIds: [] as string[], reachedCap: false }),
   mockDeleteRun: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -53,7 +55,7 @@ vi.mock("~/server/app-layer/app", () => ({
       textMessageEnd: vi.fn().mockResolvedValue(undefined),
       finishRun: vi.fn().mockResolvedValue(undefined),
       deleteRun: mockDeleteRun,
-      runs: { getRunIdsForScope: mockGetRunIdsForScope },
+      runs: { getRunIdsForSet: mockGetRunIdsForSet },
     },
     broadcast: {
       broadcastToTenantRateLimited: vi.fn().mockResolvedValue(undefined),
@@ -214,6 +216,42 @@ function makeEventWithInlineImage(scenarioRunId: string) {
         },
       ],
     },
+  };
+}
+
+/**
+ * A SCENARIO_MESSAGE_SNAPSHOT whose message content is a voice turn:
+ * `[text, {type:"input_audio", input_audio:{data, format}}]` — the shape the
+ * python-sdk emits and the ts-sdk's convert-core-messages translates to.
+ *
+ * Unlike TEXT_MESSAGE_END (whose `message` field is `z.record(z.unknown())` and
+ * bypasses content validation), this payload is validated by the STRICT
+ * `scenarioMessageSnapshotSchema` messages union — the exact gate that
+ * 400-rejected voice audio before #5149. This is the end-to-end wire test the
+ * isolated extractor/renderer tests were missing.
+ */
+function makeMessageSnapshotWithInputAudio(scenarioRunId: string) {
+  const audioBase64 = Buffer.from("fake-wav-bytes").toString("base64");
+  return {
+    type: ScenarioEventType.MESSAGE_SNAPSHOT,
+    timestamp: Date.now(),
+    batchRunId: `batch-${nanoid(6)}`,
+    scenarioId: `scenario-${nanoid(6)}`,
+    scenarioRunId,
+    scenarioSetId: "default",
+    messages: [
+      {
+        id: `msg-${nanoid(6)}`,
+        role: "assistant",
+        content: [
+          { type: "text", text: "Here is your audio reply" },
+          {
+            type: "input_audio",
+            input_audio: { data: audioBase64, format: "wav" },
+          },
+        ],
+      },
+    ],
   };
 }
 
@@ -384,6 +422,46 @@ describe("POST /api/scenario-events (ingest)", () => {
     });
   });
 
+  describe("when a MESSAGE_SNAPSHOT carries a voice input_audio turn (#5149 — missing wire leg of #4138)", () => {
+    /** @scenario "Voice MESSAGE_SNAPSHOT with input_audio is accepted (201) and the audio is externalized" */
+    it("returns 201 (not 400) and externalizes the input_audio bytes via storeFromBytes", async () => {
+      const extractedId = `stored-${nanoid(8)}`;
+      mockStoreFromBytes.mockResolvedValueOnce({
+        id: extractedId,
+        mediaType: "audio/wav",
+        isDuplicate: false,
+      });
+
+      const scenarioRunId = `run-${nanoid(6)}`;
+      const body = makeMessageSnapshotWithInputAudio(scenarioRunId);
+
+      const res = await app.request("/api/scenario-events", {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+
+      // Before the wire-leg fix this returned 400 — the scenarioEventSchema
+      // message union (event-schemas.ts) had no `input_audio` member, so
+      // zValidator rejected the snapshot before extraction ever ran.
+      expect(res.status).toBe(201);
+
+      // The audio survived validation and reached extractInlineMediaFromEvent,
+      // which decoded the base64 and externalized it as a stored object. The
+      // wav format resolves to the audio/wav media type.
+      expect(mockStoreFromBytes).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: testProjectId,
+          mediaType: "audio/wav",
+          purpose: "scenario_event",
+        }),
+      );
+    });
+  });
+
   describe("when an event is posted without auth credentials", () => {
     it("returns 401", async () => {
       const body = makeRunStartedEvent();
@@ -447,13 +525,13 @@ describe("POST /api/scenario-events (ingest)", () => {
 
 describe("DELETE /api/scenario-events (scoped archive)", () => {
   beforeEach(() => {
-    mockGetRunIdsForScope.mockClear();
+    mockGetRunIdsForSet.mockClear();
     mockDeleteRun.mockClear();
-    mockGetRunIdsForScope.mockResolvedValue([] as string[]);
+    mockGetRunIdsForSet.mockResolvedValue({ runIds: [], reachedCap: false });
   });
 
-  describe("when no batchRunId or scenarioSetId is provided", () => {
-    /** @scenario "Archiving scenario runs without a scope is rejected" */
+  describe("when no scenarioSetId is provided", () => {
+    /** @scenario "DELETE without scenarioSetId returns 400" */
     it("returns 400 and archives nothing — never wipes the whole project", async () => {
       const res = await app.request("/api/scenario-events", {
         method: "DELETE",
@@ -462,34 +540,82 @@ describe("DELETE /api/scenario-events (scoped archive)", () => {
 
       expect(res.status).toBe(400);
       // The footgun guard: neither the run lookup nor any archive ran.
-      expect(mockGetRunIdsForScope).not.toHaveBeenCalled();
+      expect(mockGetRunIdsForSet).not.toHaveBeenCalled();
       expect(mockDeleteRun).not.toHaveBeenCalled();
     });
   });
 
-  describe("when a batchRunId is provided", () => {
-    /** @scenario "Archiving scenario runs by batchRunId archives only that batch" */
-    it("archives only the runs the scoped lookup returns", async () => {
-      mockGetRunIdsForScope.mockResolvedValueOnce(["run-a", "run-b"]);
+  describe("when scenarioSetId is empty", () => {
+    /** @scenario "DELETE with empty scenarioSetId returns 400" */
+    it("returns 400 and archives nothing", async () => {
+      const res = await app.request("/api/scenario-events?scenarioSetId=", {
+        method: "DELETE",
+        headers: { "X-Auth-Token": testApiKey },
+      });
+
+      expect(res.status).toBe(400);
+      expect(mockGetRunIdsForSet).not.toHaveBeenCalled();
+      expect(mockDeleteRun).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when a scenarioSetId is provided", () => {
+    /** @scenario "Archiving one set leaves runs in other sets untouched" */
+    it("archives only the runs the set-scoped lookup returns and reports counts", async () => {
+      mockGetRunIdsForSet.mockResolvedValueOnce({
+        runIds: ["run-a", "run-b"],
+        reachedCap: false,
+      });
 
       const res = await app.request(
-        "/api/scenario-events?batchRunId=batch-xyz",
+        "/api/scenario-events?scenarioSetId=set-a",
         { method: "DELETE", headers: { "X-Auth-Token": testApiKey } },
       );
 
       expect(res.status).toBe(200);
-      expect(mockGetRunIdsForScope).toHaveBeenCalledWith(
+      expect(mockGetRunIdsForSet).toHaveBeenCalledWith(
         expect.objectContaining({
           projectId: testProjectId,
-          batchRunId: "batch-xyz",
+          scenarioSetId: "set-a",
         }),
       );
-      // Only the two runs the scoped lookup returned are archived.
       expect(mockDeleteRun).toHaveBeenCalledTimes(2);
       const archivedIds = mockDeleteRun.mock.calls.map(
         (args) => (args[0] as { scenarioRunId: string }).scenarioRunId,
       );
       expect(archivedIds).toEqual(["run-a", "run-b"]);
+
+      const body = (await res.json()) as {
+        archived: number;
+        failed: number;
+        scenarioSetId: string;
+        hasMore: boolean;
+      };
+      expect(body).toEqual({
+        archived: 2,
+        failed: 0,
+        scenarioSetId: "set-a",
+        hasMore: false,
+      });
+    });
+  });
+
+  describe("when the run-id lookup hits its cap", () => {
+    /** @scenario "Reaching the 10k cap reports hasMore true" */
+    it("reports hasMore true", async () => {
+      mockGetRunIdsForSet.mockResolvedValueOnce({
+        runIds: ["run-a"],
+        reachedCap: true,
+      });
+
+      const res = await app.request(
+        "/api/scenario-events?scenarioSetId=big-set",
+        { method: "DELETE", headers: { "X-Auth-Token": testApiKey } },
+      );
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { hasMore: boolean };
+      expect(body.hasMore).toBe(true);
     });
   });
 });

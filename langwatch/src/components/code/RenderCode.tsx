@@ -1,16 +1,14 @@
 import { Box, IconButton } from "@chakra-ui/react";
 import { CopyIcon } from "lucide-react";
-import { Highlight, Prism, type PrismTheme } from "prism-react-renderer";
+import { Highlight, type PrismTheme } from "prism-react-renderer";
 import { toaster } from "../ui/toaster";
 import { monokaiTheme } from "./monokaiTheme";
-
-(typeof global !== "undefined" ? global : window).Prism = Prism;
-// @ts-ignore — prismjs component modules lack type declarations
-void import("prismjs/components/prism-bash");
-// @ts-ignore — prismjs component modules lack type declarations
-void import("prismjs/components/prism-python");
-// @ts-ignore — prismjs component modules lack type declarations
-void import("prismjs/components/prism-diff");
+// `./prismLanguages` imports `./prismGlobal` first (which assigns the global
+// Prism instance) and then registers the bash / python / diff / javascript /
+// typescript grammars onto it. Importing the instance from the same module
+// keeps a single source of truth for the global assignment.
+import { Prism } from "./prismGlobal";
+import "./prismLanguages";
 
 export const RenderCode = ({
   code,

@@ -33,7 +33,7 @@ importers:
   .:
     dependencies:
       '@ai-sdk/openai':
-        specifier: '>=2.0.0 <4.0.0'
+        specifier: '>=2.0.0 <5.0.0'
         version: 2.0.32(zod@4.3.6)
       '@opentelemetry/api-logs':
         specifier: 0.205.0
@@ -1105,9 +1105,6 @@ packages:
 
   '@sinclair/typebox@0.34.49':
     resolution: {integrity: sha512-brySQQs7Jtn0joV8Xh9ZV/hZb9Ozb0pmazDIASBkYKCjXrXU3mpcFahmK/z4YDhGkQvP9mWJbVyahdtU5wQA+A==}
-
-  '@standard-schema/spec@1.0.0':
-    resolution: {integrity: sha512-m2bOd0f2RT9k8QJx1JN85cZYyH1RqFBdlwtkSlf4tBDYLCiiZnv1fIIwacK6cqwXavOydf0NPToMQgpKq+dVlA==}
 
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
@@ -2756,7 +2753,7 @@ snapshots:
   '@ai-sdk/provider-utils@3.0.9(zod@4.3.6)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
-      '@standard-schema/spec': 1.0.0
+      '@standard-schema/spec': 1.1.0
       eventsource-parser: 3.0.6
       zod: 4.3.6
 
@@ -3540,8 +3537,6 @@ snapshots:
     optional: true
 
   '@sinclair/typebox@0.34.49': {}
-
-  '@standard-schema/spec@1.0.0': {}
 
   '@standard-schema/spec@1.1.0': {}
 

@@ -31,7 +31,9 @@ export {
 } from "./experiments-api.service";
 export type {
   ExperimentRunStartResponse,
+  ExperimentRunStartRequest,
   ExperimentRunStatusResponse,
+  ExperimentV3RunStatusResponse,
   ExperimentSummary,
   ExperimentListResponse,
   ExperimentListPagination,
@@ -41,6 +43,8 @@ export type {
   ExperimentRunEvaluation,
   ExperimentRunResultsResponse,
 } from "./experiments-api.service";
+
+export { mapRunResultsToRows } from "./mapResults";
 
 // SDK-defined experiment types
 export type {
@@ -76,7 +80,18 @@ export type {
   ExperimentRunSummary,
   RunExperimentOptions,
   ExperimentRunResult,
+  RunWithResultsOptions,
+  ExperimentRowResult,
+  ExperimentRunWithResults,
 } from "./platformTypes";
+
+// Run polling
+export {
+  pollExperimentRun,
+  DEFAULT_POLL_INTERVAL,
+  DEFAULT_POLL_TIMEOUT,
+} from "./run-status";
+export type { PollRunStatus, PollExperimentRunResult } from "./run-status";
 
 export {
   ExperimentsError,

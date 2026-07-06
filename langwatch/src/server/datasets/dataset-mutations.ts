@@ -25,6 +25,7 @@
  */
 import type { Dataset, Prisma, PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
+import { tryToMapPreviousColumnsToNewColumns } from "~/optimization_studio/utils/datasetUtils";
 import { createLogger } from "~/utils/logger/server";
 import { DatasetRepository } from "./dataset.repository";
 import {
@@ -36,10 +37,25 @@ import {
 } from "./dataset-chunking";
 import { withDatasetLock } from "./dataset-lock";
 import { type DatasetStorage, getDatasetStorage } from "./dataset-storage";
-import { DatasetNotReadyError, DuplicateRecordIdError } from "./errors";
+import {
+  DatasetConflictError,
+  DatasetNotReadyError,
+  DatasetTooLargeToEditColumnsError,
+  DuplicateRecordIdError,
+} from "./errors";
 import { stripNullBytes } from "./sanitize";
+import type { DatasetColumns, DatasetRecordEntry } from "./types";
+import { convertRowsToColumnTypes } from "./upload-utils";
 
 const logger = createLogger("langwatch:datasets:mutations");
+
+/**
+ * Byte ceiling for the in-memory column-type rewrite (ADR-032 v19). Above this
+ * we refuse rather than buffer the whole dataset (+ converted copies) in heap
+ * while holding the advisory lock. Set above the largest expected hand-edited
+ * dataset; the deferred streaming rewrite lifts the cap entirely.
+ */
+export const MAX_INMEMORY_COLUMN_EDIT_BYTES = 512 * 1024 * 1024;
 
 export type RecomputedDatasetCounts = {
   rowCount: number;
@@ -875,5 +891,151 @@ export const recomputeDatasetCounts = async ({
       chunkCount: keptChunkCount,
       chunkOffsets: keptOffsets,
     };
+  });
+};
+
+/**
+ * Change an s3_jsonl dataset's column schema (rename / retype / add / remove)
+ * under the advisory lock (ADR-032 v19). The legacy PG path migrates records via
+ * `migrateDatasetRecordColumns`; the s3 equivalent is a full chunk rewrite:
+ *   1. read every row (id + entry) across all chunks,
+ *   2. remap keys old→new (exact-name then by-position, the SAME
+ *      `tryToMapPreviousColumnsToNewColumns` the PG path uses — so renames keep
+ *      data, removed columns drop, added columns are absent),
+ *   3. convert each value to its new column type (`convertRowsToColumnTypes` —
+ *      text→number/json/date/etc.; `image` is a URL string, so a text→image
+ *      change keeps the value verbatim and only the column's declared type
+ *      changes),
+ *   4. rewrite chunks from index 0 (row ids preserved via `forcedIds`), reap any
+ *      orphan chunks past the new count (converted rows may pack into fewer),
+ *   5. update counters + `columnTypes` + name/slug in the lock's tx.
+ *
+ * Memory: step 1 buffers all rows (bounded by dataset size) — the same shape as
+ * the PG record migrator this replaces, and the operation is a deliberate,
+ * user-driven edit, not the unbounded upload path (so it is NOT held to the
+ * normalize job's streaming I-MEM contract). A streaming chunk-by-chunk rewrite
+ * is a future optimization if multi-GB column edits become common.
+ */
+export const migrateS3JsonlColumns = async ({
+  prisma,
+  dataset,
+  projectId,
+  oldColumnTypes,
+  newColumnTypes,
+  name,
+  slug,
+  storage,
+  repository: providedRepository,
+}: {
+  prisma: PrismaClient;
+  dataset: Dataset;
+  projectId: string;
+  oldColumnTypes: DatasetColumns;
+  newColumnTypes: DatasetColumns;
+  name: string;
+  slug: string;
+  storage?: DatasetStorage;
+  repository?: DatasetRepository;
+}): Promise<Dataset> => {
+  const datasetStorage = storage ?? (await getDatasetStorage(projectId));
+  const repository = providedRepository ?? new DatasetRepository(prisma);
+
+  return withDatasetLock({ prisma, datasetId: dataset.id }, async (tx) => {
+    const current = await repository.findOneOrThrow(
+      { id: dataset.id, projectId },
+      { tx },
+    );
+    assertReady(current);
+
+    // Revalidate the SOURCE schema under the lock. `oldColumnTypes` was captured
+    // before the lock; a concurrent column edit that already rewrote the chunks
+    // to a different schema would make the remap below read those rows with the
+    // stale schema and shift/drop values. Abort so the caller retries against the
+    // now-current schema (no partial rewrite occurs — we bail before any write).
+    if (
+      JSON.stringify(current.columnTypes) !== JSON.stringify(oldColumnTypes)
+    ) {
+      throw new DatasetConflictError(
+        "Dataset columns changed since you opened the editor — please reopen and retry.",
+      );
+    }
+
+    // In-memory rewrite guard: the rewrite buffers every row (+ converted copies)
+    // while holding the lock. Above the cap, refuse rather than risk OOMing the
+    // shared worker. Streaming chunk-by-chunk is the deferred fix.
+    const currentSizeBytes = Number(current.sizeBytes ?? 0n);
+    if (currentSizeBytes > MAX_INMEMORY_COLUMN_EDIT_BYTES) {
+      throw new DatasetTooLargeToEditColumnsError({
+        sizeBytes: currentSizeBytes,
+        maxBytes: MAX_INMEMORY_COLUMN_EDIT_BYTES,
+      });
+    }
+
+    const chunkCount = current.chunkCount ?? 0;
+    const ids: string[] = [];
+    const oldEntries: DatasetRecordEntry[] = [];
+    for (let index = 0; index < chunkCount; index++) {
+      const rows = await datasetStorage.readChunk({
+        projectId,
+        datasetId: dataset.id,
+        index,
+      });
+      for (const line of rows) {
+        if (isChunkLine(line)) {
+          ids.push(line.id);
+          oldEntries.push(line.entry as DatasetRecordEntry);
+        }
+      }
+    }
+
+    // Remap keys old→new, then convert each value to its new declared type.
+    const remapped = tryToMapPreviousColumnsToNewColumns(
+      oldEntries,
+      oldColumnTypes,
+      newColumnTypes,
+    );
+    const converted = convertRowsToColumnTypes(
+      remapped as Record<string, unknown>[],
+      newColumnTypes,
+    );
+
+    // Rewrite the chunks from index 0, preserving each row's id. Deliberately NOT
+    // `writeInitialS3JsonlChunks`: that helper reaps chunks-from-0 on a write
+    // FAILURE (safe only for a rowless CREATE) — on this LIVE dataset that would
+    // delete existing content on a transient error. We write directly and do NOT
+    // delete on failure: a retype is row-count-stable, so a partial overwrite
+    // keeps every row addressable, the lock's tx rolls PG back, and
+    // `recomputeDatasetCounts` can repair byte drift. Orphan chunks past the new
+    // (possibly smaller) count are reaped only AFTER a clean write.
+    const lines = toChunkLines(converted, { forcedIds: ids });
+    const written = await datasetStorage.writeChunks({
+      projectId,
+      datasetId: dataset.id,
+      records: lines,
+      fromIndex: 0,
+    });
+    const meta = chunkedMeta(written.map(chunkMetaOf));
+    await datasetStorage.deleteChunksFrom({
+      projectId,
+      datasetId: dataset.id,
+      fromIndex: meta.chunkCount,
+    });
+
+    return await repository.update(
+      {
+        id: dataset.id,
+        projectId,
+        data: {
+          name,
+          slug,
+          columnTypes: newColumnTypes as unknown as Prisma.InputJsonValue,
+          rowCount: meta.rowCount,
+          sizeBytes: BigInt(meta.sizeBytes),
+          chunkCount: meta.chunkCount,
+          chunkOffsets: meta.chunkOffsets as unknown as Prisma.InputJsonValue,
+        },
+      },
+      { tx },
+    );
   });
 };

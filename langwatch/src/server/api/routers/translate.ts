@@ -1,12 +1,16 @@
 import { TRPCError } from "@trpc/server";
 import { generateText } from "ai";
 import { z } from "zod";
-import { getVercelAIModel } from "../../modelProviders/utils";
 import { createLogger } from "~/utils/logger/server";
+import { wrapAiCall } from "../../modelProviders/aiCallFailedError";
+import { featureByKey } from "../../modelProviders/featureRegistry";
+import { getVercelAIModel } from "../../modelProviders/utils";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const logger = createLogger("langwatch:translate");
+
+const TRANSLATE_FEATURE_KEY = "translate.text";
 
 export const translateRouter = createTRPCRouter({
   translate: protectedProcedure
@@ -18,25 +22,50 @@ export const translateRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("triggers:view"))
     .mutation(async ({ input }) => {
-      try {
-        const model = await getVercelAIModel({ projectId: input.projectId, featureKey: "translate.text" });
-        const response: { text: string } = await generateText({
-          model,
-          prompt: `Translate the following text to English only reply with the translated text, do not include any other text: ${input.textToTranslate}`,
-        });
-        const { text } = response;
-        return { translation: text };
-      } catch (error) {
-        logger.error(
-          { error, projectId: input.projectId },
-          "Failed to get translation",
-        );
+      const feature = featureByKey(TRANSLATE_FEATURE_KEY);
+      if (!feature) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message:
-            "Failed to get translation. Check model provider configuration.",
-          cause: error,
+          message: `${TRANSLATE_FEATURE_KEY} feature is not registered`,
         });
       }
+
+      // Don't wrap everything in a generic INTERNAL_SERVER_ERROR — that
+      // strips the typed `cause` the frontend needs and the user only ever
+      // sees "please try again". Resolve the model OUTSIDE wrapAiCall: the
+      // cascade resolver (resolveModelForFeature) throws the typed
+      // ModelNotConfiguredError when nothing is set and
+      // ModelProviderDisabledError when the resolved FAST model's provider
+      // is disabled, and both must reach domainErrorMiddleware untouched to
+      // open their own toasts. wrapAiCall only passes ModelNotConfiguredError
+      // through, so resolving inside it would mis-tag a disabled provider as
+      // an AI_CALL_FAILED.
+      const model = await getVercelAIModel({
+        projectId: input.projectId,
+        featureKey: TRANSLATE_FEATURE_KEY,
+      });
+
+      // Any provider/SDK failure during the call surfaces as a typed
+      // AiCallFailedError → "double-check your model configuration" toast
+      // carrying the real (truncated) provider error message. wrapAiCall
+      // truncates that message to the first line for the client, so log the
+      // FULL underlying error server-side first — the later lines (provider
+      // status bodies, gateway 404 detail) are what we need for prod triage.
+      const { text } = await wrapAiCall(feature, async () => {
+        try {
+          return await generateText({
+            model,
+            prompt: `Translate the following text to English only reply with the translated text, do not include any other text: ${input.textToTranslate}`,
+          });
+        } catch (error) {
+          logger.error(
+            { error, projectId: input.projectId },
+            "Translation model call failed",
+          );
+          throw error;
+        }
+      });
+
+      return { translation: text };
     }),
 });

@@ -3,7 +3,7 @@ import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
 import type { NormalizedSpan } from "../../schemas/spans";
 import { NormalizedSpanKind, NormalizedStatusCode } from "../../schemas/spans";
-import { SpanTimingService, isValidTimestamp } from "./span-timing.service";
+import { isValidTimestamp, SpanTimingService } from "./span-timing.service";
 
 function makeSpan(overrides: Partial<NormalizedSpan> = {}): NormalizedSpan {
   return {
@@ -181,14 +181,9 @@ describe("SpanTimingService", () => {
   });
 
   describe("isValidTimestamp()", () => {
-    it.each([null, undefined, 0, -1, Infinity, NaN])(
-      "rejects %s",
-      (value) => {
-        expect(isValidTimestamp(value as number | null | undefined)).toBe(
-          false,
-        );
-      },
-    );
+    it.each([null, undefined, 0, -1, Infinity, NaN])("rejects %s", (value) => {
+      expect(isValidTimestamp(value as number | null | undefined)).toBe(false);
+    });
 
     it.each([1, 1713000000000])("accepts %d", (value) => {
       expect(isValidTimestamp(value)).toBe(true);

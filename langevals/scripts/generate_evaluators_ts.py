@@ -234,8 +234,8 @@ def generate_evaluator_definition_type() -> str:
         f"    category: {categories_union};\n"
         f"    docsUrl?: string;\n"
         f"    isGuardrail: boolean;\n"
-        f'    requiredFields: ("input" | "output" | "contexts" | "expected_output" | "expected_contexts" | "conversation")[];\n'
-        f'    optionalFields: ("input" | "output" | "contexts" | "expected_output" | "expected_contexts" | "conversation")[];\n'
+        f"    requiredFields: string[];\n"
+        f"    optionalFields: string[];\n"
         f"    settings: {{\n"
         f'        [K in keyof Evaluators[T]["settings"]]: {{\n'
         f"        description?: string;\n"

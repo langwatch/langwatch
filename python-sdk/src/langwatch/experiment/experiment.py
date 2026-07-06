@@ -36,6 +36,7 @@ from tqdm.auto import tqdm
 import langwatch
 from langwatch.attributes import AttributeKey
 from langwatch.domain import Money, TypedValueJson
+from langwatch.experiment._results_df import build_results_df
 from langwatch.experiment.platform_run import (
     EvaluatorStats,
     ExperimentRunResult,
@@ -309,68 +310,7 @@ class Experiment:
     @staticmethod
     def _build_df_from_platform(data: Dict[str, Any]) -> pd.DataFrame:
         """Build a DataFrame from the platform API response (ExperimentRunWithItems)."""
-        dataset_entries = data.get("dataset", [])
-        evaluations = data.get("evaluations", [])
-
-        if not dataset_entries:
-            return pd.DataFrame()
-
-        # Build base rows from dataset entries
-        rows: List[Dict[str, Any]] = []
-        for entry in dataset_entries:
-            row: Dict[str, Any] = {"index": entry.get("index", 0)}
-            # Flatten entry data
-            entry_data = entry.get("entry", {})
-            if isinstance(entry_data, dict):
-                for k, v in entry_data.items():
-                    row[k] = v
-            # Output from the target
-            predicted = entry.get("predicted")
-            if predicted:
-                row["output"] = predicted.get("output", predicted) if isinstance(predicted, dict) else predicted
-            row["trace_id"] = entry.get("traceId", "")
-            row["duration_ms"] = entry.get("duration", 0)
-            cost = entry.get("cost")
-            if cost is not None:
-                row["cost"] = cost
-            error = entry.get("error")
-            if error:
-                row["error"] = error
-            target_id = entry.get("targetId")
-            if target_id:
-                row["target"] = target_id
-            rows.append(row)
-
-        df = pd.DataFrame(rows)
-        if df.empty:
-            return df
-
-        # Pivot evaluation scores into columns
-        for ev in evaluations:
-            idx = ev.get("index")
-            name = ev.get("name") or ev.get("evaluator", "")
-            if idx is None or not name:
-                continue
-            mask = df["index"] == idx
-            target_id = ev.get("targetId")
-            if target_id and "target" in df.columns:
-                mask = mask & (df["target"] == target_id)
-            score = ev.get("score")
-            if score is not None:
-                df.loc[mask, name] = score
-            passed = ev.get("passed")
-            if passed is not None:
-                df.loc[mask, f"{name}_passed"] = passed
-
-        # Set up proper indexing
-        if "target" in df.columns and len(df["target"].unique()) > 1:
-            # Multi-target: use (target, index) MultiIndex for natural grouping
-            if "index" in df.columns:
-                df = df.set_index(["target", "index"]).sort_index()
-        elif "index" in df.columns:
-            df = df.set_index("index")
-
-        return df
+        return build_results_df(data)
 
     def _auto_display_results(self) -> None:
         """Fetch and display results after loop completion."""

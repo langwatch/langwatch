@@ -51,6 +51,59 @@ describe("directUpload service", () => {
         expect(form.get("projectId")).toBe("proj_1");
         expect(form.get("name")).toBe("My Dataset");
         expect(form.get("filename")).toBe("data.csv");
+        // No confirm step → no columnTypes field (normalize derives).
+        expect(form.get("columnTypes")).toBeNull();
+      });
+    });
+
+    describe("when confirmed columns are provided (ADR-032 v19 confirm step)", () => {
+      it("sends them as a JSON columnTypes field so normalize honours them", async () => {
+        mockFetch().mockResolvedValue({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              datasetId: "dataset_1",
+              slug: "s",
+              uploadUrl: "https://s3.example/staging/abc",
+            }),
+        });
+
+        await requestDirectUpload({
+          projectId: "proj_1",
+          name: "My Dataset",
+          filename: "data.csv",
+          columnTypes: [
+            { name: "qty", type: "number" },
+            { name: "name", type: "string" },
+          ],
+        });
+
+        const [, init] = mockFetch().mock.calls[0]!;
+        const form = init.body as FormData;
+        expect(JSON.parse(form.get("columnTypes") as string)).toEqual([
+          { name: "qty", type: "number" },
+          { name: "name", type: "string" },
+        ]);
+      });
+    });
+
+    describe("when an empty columnTypes array is provided", () => {
+      it("omits the field rather than sending an empty schema", async () => {
+        mockFetch().mockResolvedValue({
+          ok: true,
+          json: () =>
+            Promise.resolve({ datasetId: "d", slug: "s", uploadUrl: "/u" }),
+        });
+
+        await requestDirectUpload({
+          projectId: "proj_1",
+          name: "X",
+          filename: "x.csv",
+          columnTypes: [],
+        });
+
+        const [, init] = mockFetch().mock.calls[0]!;
+        expect((init.body as FormData).get("columnTypes")).toBeNull();
       });
     });
 

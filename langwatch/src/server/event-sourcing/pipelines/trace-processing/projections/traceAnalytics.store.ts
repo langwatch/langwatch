@@ -4,8 +4,8 @@ import type { FoldProjectionStore } from "../../../projections/foldProjection.ty
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import {
   projectAnalyticsStateToRow,
-  type TraceAnalyticsData,
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
+  type TraceAnalyticsData,
 } from "./traceAnalytics.foldProjection";
 
 /**

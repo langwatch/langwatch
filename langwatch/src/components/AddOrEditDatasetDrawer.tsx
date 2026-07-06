@@ -60,6 +60,15 @@ export interface AddDatasetDrawerProps {
     hiddenColumns: Set<string>;
     onToggleVisibility: (columnName: string) => void;
   };
+  /**
+   * When true, the column SET is fixed: the user can rename columns and change
+   * their types but cannot add or remove them. Used by the upload confirm step
+   * (ADR-032 v19), where the columns come from the file's header and must stay
+   * positionally aligned with what the normalize job parses — adding (no row
+   * data to back an invented column) or removing a column is a post-create edit
+   * on the dataset page via this same drawer.
+   */
+  isColumnsLocked?: boolean;
 }
 
 type FormValues = {
@@ -361,18 +370,30 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                             )}
                           </IconButton>
                         )}
-                        <Button size="sm" onClick={() => remove(index)}>
-                          <Trash2 size={32} />
-                        </Button>
+                        {!props.isColumnsLocked && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            aria-label="Remove column"
+                            onClick={() => remove(index)}
+                          >
+                            <Trash2 size={32} />
+                          </Button>
+                        )}
                       </HStack>
                     );
                   })}
                   <Field.ErrorText>
                     {errors.columnTypes?.message}
                   </Field.ErrorText>
-                  <Button onClick={() => append({ name: "", type: "string" })}>
-                    Add Column
-                  </Button>
+                  {!props.isColumnsLocked && (
+                    <Button
+                      type="button"
+                      onClick={() => append({ name: "", type: "string" })}
+                    >
+                      Add Column
+                    </Button>
+                  )}
                 </VStack>
               </VStack>
             </HorizontalFormControl>

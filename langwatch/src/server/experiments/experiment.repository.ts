@@ -182,22 +182,20 @@ export class ExperimentRepository {
     );
   }
 
-  async upsert(
+  async upsertById(
     input: {
       id: string;
       projectId: string;
-      data: Prisma.ExperimentUpdateInput;
+      create: Prisma.ExperimentUncheckedCreateInput;
+      update: Prisma.ExperimentUpdateInput;
     },
     options?: { tx?: Prisma.TransactionClient },
   ): Promise<Experiment> {
     const client = options?.tx ?? this.prisma;
     return await client.experiment.upsert({
       where: { id: input.id, projectId: input.projectId },
-      update: input.data,
-      create: {
-        ...(input.data as Prisma.ExperimentUncheckedCreateInput),
-        id: input.id,
-      },
+      create: input.create,
+      update: input.update,
     });
   }
 
@@ -220,8 +218,7 @@ export class ExperimentRepository {
     input: { id: string; projectId: string },
     options?: { tx?: Prisma.TransactionClient },
   ): Promise<
-    | { exists: false }
-    | { exists: true; archived: boolean; slug: string }
+    { exists: false } | { exists: true; archived: boolean; slug: string }
   > {
     const client = options?.tx ?? this.prisma;
     const row = await client.experiment.findUnique({

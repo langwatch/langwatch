@@ -24,13 +24,20 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
+  AGGREGATE_TYPE,
+  assertOverThreshold,
+  extractSpanAttrs,
+  insertEventLogRow,
+  LARGE_VALUE,
+  UNIQUE_TAIL,
+} from "~/server/app-layer/traces/__tests__/blob-offload-test-helpers";
+import {
   EVENTREF_ATTR_PREFIX,
   IO_PREVIEW_BYTES,
   leanForProjection,
 } from "~/server/app-layer/traces/lean-for-projection";
 import * as clickhouseClientModule from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
-import type { Protections } from "~/server/elasticsearch/protections";
 import type { Event } from "~/server/event-sourcing";
 import {
   startTestContainers,
@@ -42,6 +49,7 @@ import {
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import type { Span, Trace } from "~/server/tracer/types";
+import { openProtections } from "~/server/traces/__tests__/open-protections";
 import { TraceService } from "~/server/traces/trace.service";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 
@@ -67,36 +75,9 @@ vi.mock("~/server/clickhouse/clickhouseClient", async (importOriginal) => ({
   isClickHouseEnabled: () => true,
 }));
 
-const AGGREGATE_TYPE = "trace";
-
 /** The IO fields the matrix covers; each is leaned + offloaded independently. */
 const IO_FIELDS = ["langwatch.input", "langwatch.output"] as const;
 type IoField = (typeof IO_FIELDS)[number];
-
-/**
- * A 200 KB deterministic payload whose final bytes only exist past the 64 KB
- * preview boundary. The preview is `value.slice(0, 64KB) + "…"`, so it can NEVER
- * contain UNIQUE_TAIL — a preview-only read fails the tail assertion.
- */
-const UNIQUE_TAIL = "__OFFLOAD_FULL_VALUE_TAIL_MARKER__";
-const LARGE_VALUE = "x".repeat(200_000) + UNIQUE_TAIL;
-
-/**
- * Permissive protections that allow all content categories to be visible, so the
- * read mappers never redact the IO value out from under the assertions. Mirrors
- * `openProtections` in clickhouse-trace-dedup.integration.test.ts; the shape is
- * verified against the current `Protections` type (all fields optional).
- */
-const openProtections: Protections = {
-  canSeeCosts: true,
-  canSeeCapturedInput: true,
-  canSeeCapturedOutput: true,
-};
-
-/** Sanity: the payload genuinely exceeds the offload threshold. */
-function assertOverThreshold(value: string): void {
-  expect(Buffer.byteLength(value, "utf-8")).toBeGreaterThan(IO_PREVIEW_BYTES);
-}
 
 /**
  * Builds a SpanReceived domain Event whose IO field (`langwatch.input` or
@@ -162,70 +143,6 @@ function makeSpanReceivedEvent({
       instrumentationScope: { name: "test" },
     },
   } as unknown as Event;
-}
-
-/** Reads span attributes out of a leaned SpanReceived event into a string map. */
-function extractSpanAttrs(event: Event): Record<string, string> {
-  const data = event.data as {
-    span?: {
-      attributes?: Array<{ key: string; value: { stringValue?: string } }>;
-    };
-  };
-  const attrs: Record<string, string> = {};
-  for (const attr of data?.span?.attributes ?? []) {
-    if (typeof attr.value.stringValue === "string") {
-      attrs[attr.key] = attr.value.stringValue;
-    }
-  }
-  return attrs;
-}
-
-/**
- * Inserts ONE full event_log row, exactly as the production write path stores it
- * (`EventPayload` IS `event.data`). Mirrors the canonical event_log test idiom —
- * JSONEachRow with a stringified payload — and stamps `_retention_days: 0`
- * (never-expire sentinel, test-only) so a merge-cycle TTL can't evict the fixture
- * mid-run.
- */
-async function insertEventLogRow({
-  client,
-  tenantId,
-  aggregateId,
-  eventId,
-  eventType,
-  eventVersion,
-  eventData,
-}: {
-  client: ClickHouseClient;
-  tenantId: string;
-  aggregateId: string;
-  eventId: string;
-  eventType: string;
-  eventVersion: string;
-  eventData: unknown;
-}): Promise<void> {
-  const ts = Date.now();
-  await client.insert({
-    table: "event_log",
-    values: [
-      {
-        TenantId: tenantId,
-        AggregateType: AGGREGATE_TYPE,
-        AggregateId: aggregateId,
-        EventId: eventId,
-        EventType: eventType,
-        EventVersion: eventVersion,
-        EventTimestamp: ts,
-        EventOccurredAt: ts,
-        EventPayload: JSON.stringify(eventData),
-        IdempotencyKey: eventId,
-        _retention_days: 0,
-      },
-    ],
-    format: "JSONEachRow",
-    // Sync insert so the read-back in the same test sees the row immediately.
-    clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
-  });
 }
 
 /**

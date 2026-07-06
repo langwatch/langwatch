@@ -148,13 +148,17 @@ teardown() {
 
 # --- frontend-only ---
 
-# @scenario "frontend-only mode starts no compose containers"
-@test "frontend-only writes only NEXTAUTH_PROVIDER (no compose, no URL overrides)" {
+# @scenario "frontend-only pins host-side Redis for in-process workers, no other compose"
+@test "frontend-only pins host-side REDIS_URL but no DB/CH/NLP overrides" {
+  # frontend-only runs no app/DB/CH compose, but `pnpm dev` runs the BullMQ
+  # workers in-process and the dev.sh launcher brings up a local redis for
+  # them. REDIS_URL must be the host-side localhost (pnpm dev runs on the
+  # host, not in the docker network). DB / CH / NLP still come from .env.
   write_dev_overrides frontend-only "$OUT"
   result=$(cat "$OUT")
   [[ "$result" == *"NEXTAUTH_PROVIDER=email"* ]]
+  [[ "$result" == *"REDIS_URL=redis://localhost:6379"* ]]
   [[ "$result" != *"DATABASE_URL"* ]]
-  [[ "$result" != *"REDIS_URL"* ]]
   [[ "$result" != *"CLICKHOUSE_URL"* ]]
   [[ "$result" != *"LANGWATCH_NLP_SERVICE"* ]]
 }
@@ -199,8 +203,13 @@ teardown() {
   write_dev_overrides all-local "$OUT"
   write_dev_overrides frontend-only "$OUT"
   result=$(cat "$OUT")
+  # all-local's DATABASE_URL is gone — proves replace, not append
   [[ "$result" != *"DATABASE_URL"* ]]
+  # both frontend-only overrides are present
   [[ "$result" == *"NEXTAUTH_PROVIDER=email"* ]]
+  [[ "$result" == *"REDIS_URL=redis://localhost:6379"* ]]
+  # the prior all-local REDIS_URL was replaced at the key level, not appended
+  [[ "$result" != *"redis://redis:6379"* ]]
 }
 
 # --- credential-leak invariant across all presets ---

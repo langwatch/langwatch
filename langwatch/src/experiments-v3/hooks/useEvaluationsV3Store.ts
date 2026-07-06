@@ -18,6 +18,7 @@ import {
   type TargetConfig,
 } from "../types";
 import {
+  derivePairwiseTargetMappings,
   inferAllEvaluatorMappings,
   inferAllTargetMappings,
   propagateMappingsToNewDataset,
@@ -559,6 +560,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       };
 
       // Also auto-map evaluator inputs for this new target
+      const newTargets = [...state.targets, targetWithMappings];
       const evaluatorsWithNewMappings = state.evaluators.map((evaluator) => {
         const newMappings = inferAllEvaluatorMappings(
           evaluator,
@@ -573,11 +575,32 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
           }
           Object.assign(mergedMappings[datasetId]!, targetMappings);
         }
+
+        // Auto-wire pairwise variants when going from 1 → 2 targets.
+        // Guard: only fires at exactly 2 targets (3+ is ambiguous).
+        if (
+          evaluator.evaluatorType === "langevals/pairwise_compare" &&
+          evaluator.pairwise &&
+          newTargets.length === 2 &&
+          !evaluator.pairwise.variantA &&
+          !evaluator.pairwise.variantB
+        ) {
+          return {
+            ...evaluator,
+            mappings: mergedMappings,
+            pairwise: {
+              ...evaluator.pairwise,
+              variantA: state.targets[0]!.id,
+              variantB: targetWithMappings.id,
+            },
+          };
+        }
+
         return { ...evaluator, mappings: mergedMappings };
       });
 
       return {
-        targets: [...state.targets, targetWithMappings],
+        targets: newTargets,
         evaluators: evaluatorsWithNewMappings,
       };
     });
@@ -668,6 +691,55 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     });
   },
 
+  updateTargetPairwise: (targetId, pairwise) => {
+    set((state) => {
+      const existingTarget = state.targets.find((r) => r.id === targetId);
+      // Strictly additive: silently skip for non-pairwise targets so we never
+      // perturb the prompt / agent / non-pairwise-evaluator code paths.
+      if (!existingTarget || existingTarget.pairwise === undefined) {
+        return state;
+      }
+
+      // Derive the per-row field mappings the orchestrator expects from the
+      // high-level pairwise picks — this is what lets the PairwiseConfigForm
+      // be a clean 3-field UI while keeping the orchestrator unchanged.
+      // Keys we own — must be stripped from prior mappings BEFORE spreading
+      // derived on top. Otherwise clearing a variant (or goldenField) just
+      // leaves the previously-derived candidate_*_id / golden mapping in
+      // place, and the orchestrator dispatches against a dead variant id
+      // or stale golden column.
+      const PAIRWISE_DERIVED_KEYS = [
+        "candidate_a_id",
+        "candidate_a_output",
+        "candidate_b_id",
+        "candidate_b_output",
+        "golden",
+        "input",
+      ];
+      const newDatasetMappings: Record<
+        string,
+        Record<string, FieldMapping>
+      > = {};
+      for (const dataset of state.datasets) {
+        const derived = derivePairwiseTargetMappings(pairwise, dataset);
+        const existing = { ...(existingTarget.mappings[dataset.id] ?? {}) };
+        for (const key of PAIRWISE_DERIVED_KEYS) delete existing[key];
+        newDatasetMappings[dataset.id] = {
+          ...existing,
+          ...derived,
+        };
+      }
+
+      return {
+        targets: state.targets.map((t) =>
+          t.id === targetId
+            ? { ...t, pairwise, mappings: newDatasetMappings }
+            : t,
+        ),
+      };
+    });
+  },
+
   setTargetMapping: (targetId, datasetId, inputField, mapping) => {
     set((state) => ({
       targets: state.targets.map((r) =>
@@ -716,13 +788,33 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         state.datasets,
         state.targets,
       );
-      const evaluatorWithMappings = {
+      let evaluatorWithMappings = {
         ...evaluator,
         mappings: {
           ...evaluator.mappings,
           ...autoMappings,
         },
       };
+
+      // Auto-wire pairwise variants when exactly 2 targets already exist.
+      // Guard: only fires at exactly 2 targets (3+ is ambiguous, user configures manually).
+      if (
+        evaluatorWithMappings.evaluatorType === "langevals/pairwise_compare" &&
+        evaluatorWithMappings.pairwise &&
+        state.targets.length === 2 &&
+        !evaluatorWithMappings.pairwise.variantA &&
+        !evaluatorWithMappings.pairwise.variantB
+      ) {
+        evaluatorWithMappings = {
+          ...evaluatorWithMappings,
+          pairwise: {
+            ...evaluatorWithMappings.pairwise,
+            variantA: state.targets[0]!.id,
+            variantB: state.targets[1]!.id,
+          },
+        };
+      }
+
       return {
         evaluators: [...state.evaluators, evaluatorWithMappings],
       };

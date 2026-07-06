@@ -190,6 +190,13 @@ export const FEATURE_FLAGS = [
       "Moves custom-graph threshold-alert firing off the K8s cron onto the event-sourced path (ADR-034 Phase 5). Self-hosted flag; toggle globally via RELEASE_ES_GRAPH_TRIGGERS_FIRING=1 or per-project from /ops/feature-flags. On = cron skips this project's graph triggers; real-time outbox reactor + heartbeat fire them. Off = cron handles as today.",
     family: "Event sourcing",
   },
+  {
+    key: "release_langy_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Opens the Langy in-product assistant. Default off: only LangWatch staff (isLangwatchStaff() — @langwatch.ai email) get Langy out of the box. To open it for a specific project/org/user, flip the flag on via a PostHog rule, an operator-store row via /ops/feature-flags, or RELEASE_LANGY_ENABLED=true for a blanket on. Staff always bypass the flag so a global kill switch still leaves us able to debug.",
+  },
 ] as const satisfies readonly FeatureFlagDefinition[];
 
 export const FEATURE_FLAG_FAMILIES = [

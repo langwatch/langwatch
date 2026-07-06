@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Tests for TableSettingsMenu component.
+ * Tests for TableSettingsMenu component (the toolbar "Run Options" menu).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
@@ -25,7 +25,7 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 describe("TableSettingsMenu", () => {
   beforeEach(() => {
     useEvaluationsV3Store.getState().reset();
-    // Set experiment slug so CI/CD option shows
+    // Set experiment slug so the Run via API automation entry shows
     useEvaluationsV3Store.setState({ experimentSlug: "test-slug" });
   });
 
@@ -34,13 +34,14 @@ describe("TableSettingsMenu", () => {
   });
 
   describe("Rendering", () => {
-    it("renders a settings button", () => {
+    it("renders a Run Options button", () => {
       render(<TableSettingsMenu />, { wrapper: Wrapper });
 
       const button = screen.getByRole("button", {
-        name: /workbench settings/i,
+        name: /run options/i,
       });
       expect(button).toBeInTheDocument();
+      expect(screen.getByText("Run Options")).toBeInTheDocument();
     });
 
     it("opens popover when clicking the button", async () => {
@@ -48,7 +49,7 @@ describe("TableSettingsMenu", () => {
       render(<TableSettingsMenu />, { wrapper: Wrapper });
 
       const button = screen.getByRole("button", {
-        name: /workbench settings/i,
+        name: /run options/i,
       });
       await user.click(button);
 
@@ -62,7 +63,7 @@ describe("TableSettingsMenu", () => {
       render(<TableSettingsMenu />, { wrapper: Wrapper });
 
       const button = screen.getByRole("button", {
-        name: /workbench settings/i,
+        name: /run options/i,
       });
       await user.click(button);
 
@@ -72,12 +73,12 @@ describe("TableSettingsMenu", () => {
       });
     });
 
-    it("shows CI/CD option when experiment slug exists", async () => {
+    it("shows the automation entry when experiment slug exists", async () => {
       const user = userEvent.setup();
       render(<TableSettingsMenu />, { wrapper: Wrapper });
 
       const button = screen.getByRole("button", {
-        name: /workbench settings/i,
+        name: /run options/i,
       });
       await user.click(button);
 
@@ -89,13 +90,13 @@ describe("TableSettingsMenu", () => {
       });
     });
 
-    it("hides CI/CD option when no experiment slug", async () => {
+    it("hides the automation entry when no experiment slug", async () => {
       useEvaluationsV3Store.setState({ experimentSlug: undefined });
       const user = userEvent.setup();
       render(<TableSettingsMenu />, { wrapper: Wrapper });
 
       const button = screen.getByRole("button", {
-        name: /workbench settings/i,
+        name: /run options/i,
       });
       await user.click(button);
 
@@ -112,7 +113,7 @@ describe("TableSettingsMenu", () => {
       render(<TableSettingsMenu />, { wrapper: Wrapper });
 
       const button = screen.getByRole("button", {
-        name: /workbench settings/i,
+        name: /run options/i,
       });
       await user.click(button);
 
@@ -133,7 +134,7 @@ describe("TableSettingsMenu", () => {
       render(<TableSettingsMenu />, { wrapper: Wrapper });
 
       const button = screen.getByRole("button", {
-        name: /workbench settings/i,
+        name: /run options/i,
       });
       await user.click(button);
 
@@ -148,97 +149,54 @@ describe("TableSettingsMenu", () => {
     });
   });
 
-  describe("CI/CD dialog", () => {
-    it("opens CI/CD dialog when clicking Run in CI/CD", async () => {
-      const user = userEvent.setup();
-      render(<TableSettingsMenu />, { wrapper: Wrapper });
+  describe("given an experiment with the automation entry", () => {
+    describe("when Run in CI/CD is clicked", () => {
+      const openRunDialog = async () => {
+        const user = userEvent.setup();
+        const button = screen.getByRole("button", { name: /run options/i });
+        await user.click(button);
 
-      // Open settings menu
-      const button = screen.getByRole("button", {
-        name: /workbench settings/i,
-      });
-      await user.click(button);
+        const cicdText = await screen.findByText("Run in CI/CD");
+        const cicdButton = cicdText.closest("button");
+        expect(cicdButton).not.toBeNull();
+        await user.click(cicdButton!);
 
-      // Click CI/CD option - find the button containing "Run in CI/CD" text
-      const cicdText = await screen.findByText("Run in CI/CD");
-      const cicdButton = cicdText.closest("button");
-      expect(cicdButton).not.toBeNull();
-      await user.click(cicdButton!);
+        return screen.findByRole("dialog");
+      };
 
-      // Dialog should open with title
-      await waitFor(() => {
-        // Dialog has same title as button, so we look for the dialog element
-        const dialog = screen.getByRole("dialog");
+      it("opens the Run via API dialog", async () => {
+        render(<TableSettingsMenu />, { wrapper: Wrapper });
+
+        const dialog = await openRunDialog();
         expect(dialog).toBeInTheDocument();
+        expect(screen.getByText("Run via API")).toBeInTheDocument();
       });
-    });
 
-    it("closes popover when opening CI/CD dialog", async () => {
-      const user = userEvent.setup();
-      render(<TableSettingsMenu />, { wrapper: Wrapper });
+      it("shows the snippet targeting the experiment run", async () => {
+        render(<TableSettingsMenu />, { wrapper: Wrapper });
 
-      // Open settings menu
-      const button = screen.getByRole("button", {
-        name: /workbench settings/i,
+        const dialog = await openRunDialog();
+        expect(dialog.textContent ?? "").toContain(
+          'langwatch.experiment.run("test-slug"',
+        );
       });
-      await user.click(button);
 
-      // Verify popover is open by finding content
-      const cicdText = await screen.findByText("Run in CI/CD");
-      expect(cicdText).toBeInTheDocument();
+      it("shows Python, TypeScript and Shell language tabs", async () => {
+        render(<TableSettingsMenu />, { wrapper: Wrapper });
 
-      // Click CI/CD option
-      const cicdButton = cicdText.closest("button");
-      expect(cicdButton).not.toBeNull();
-      await user.click(cicdButton!);
-
-      // Dialog should open (this implicitly means the action worked)
-      await waitFor(() => {
-        expect(screen.getByRole("dialog")).toBeInTheDocument();
+        await openRunDialog();
+        expect(screen.getByText("Python")).toBeInTheDocument();
+        expect(screen.getByText("TypeScript")).toBeInTheDocument();
+        expect(screen.getByText("Shell")).toBeInTheDocument();
       });
-    });
 
-    it("shows code snippet area", async () => {
-      const user = userEvent.setup();
-      render(<TableSettingsMenu />, { wrapper: Wrapper });
+      it("shows the data-source picker", async () => {
+        render(<TableSettingsMenu />, { wrapper: Wrapper });
 
-      const button = screen.getByRole("button", {
-        name: /workbench settings/i,
-      });
-      await user.click(button);
-
-      // Find the button containing "Run in CI/CD" text
-      const cicdText = await screen.findByText("Run in CI/CD");
-      const cicdButton = cicdText.closest("button");
-      expect(cicdButton).not.toBeNull();
-      await user.click(cicdButton!);
-
-      // Look for the API key instruction which is always shown
-      await waitFor(() => {
-        expect(screen.getByText(/LANGWATCH_API_KEY/)).toBeInTheDocument();
-      });
-    });
-
-    it("shows language selector defaulting to Python", async () => {
-      const user = userEvent.setup();
-      render(<TableSettingsMenu />, { wrapper: Wrapper });
-
-      const button = screen.getByRole("button", {
-        name: /workbench settings/i,
-      });
-      await user.click(button);
-
-      // Find the button containing "Run in CI/CD" text
-      const cicdText = await screen.findByText("Run in CI/CD");
-      const cicdButton = cicdText.closest("button");
-      expect(cicdButton).not.toBeNull();
-      await user.click(cicdButton!);
-
-      await waitFor(() => {
-        // Language selector button should show "Python" as default
+        await openRunDialog();
         expect(
-          screen.getByRole("button", { name: /select language/i }),
-        ).toHaveTextContent("Python");
+          screen.getByTestId("run-via-api-data-source"),
+        ).toBeInTheDocument();
       });
     });
   });
@@ -248,7 +206,7 @@ describe("TableSettingsMenu", () => {
       render(<TableSettingsMenu disabled />, { wrapper: Wrapper });
 
       const button = screen.getByRole("button", {
-        name: /workbench settings/i,
+        name: /run options/i,
       });
       expect(button).toBeDisabled();
     });
@@ -280,7 +238,7 @@ describe("TableSettingsMenu", () => {
       render(<TableSettingsMenu />, { wrapper: Wrapper });
 
       const button = screen.getByRole("button", {
-        name: /workbench settings/i,
+        name: /run options/i,
       });
       await user.click(button);
 
@@ -320,7 +278,7 @@ describe("TableSettingsMenu", () => {
       render(<TableSettingsMenu />, { wrapper: Wrapper });
 
       const button = screen.getByRole("button", {
-        name: /workbench settings/i,
+        name: /run options/i,
       });
       await user.click(button);
 
@@ -359,7 +317,7 @@ describe("TableSettingsMenu", () => {
       render(<TableSettingsMenu />, { wrapper: Wrapper });
 
       const button = screen.getByRole("button", {
-        name: /workbench settings/i,
+        name: /run options/i,
       });
       await user.click(button);
 

@@ -33,11 +33,7 @@ import type {
   AnalyticsTimeseriesBuilderInput,
   BuiltAnalyticsQuery,
 } from "../types";
-import {
-  collectStringValues,
-  dateTrunc,
-  hasFilterValues,
-} from "./_shared";
+import { collectStringValues, dateTrunc, hasFilterValues } from "./_shared";
 
 const SLIM_TABLE = "trace_analytics" as const;
 const ta = "ta";
@@ -179,10 +175,7 @@ function percentileFor(agg: AggregationTypes): number {
  * `quantileExact` directly (matches the legacy builder's behaviour to keep
  * parity).
  */
-function slimAggExpression(
-  agg: AggregationTypes,
-  column: string,
-): string {
+function slimAggExpression(agg: AggregationTypes, column: string): string {
   if (isPercentile(agg)) {
     return `quantileExact(${percentileFor(agg)})(${column})`;
   }
@@ -198,6 +191,8 @@ function slimAggExpression(
     case "cardinality":
     case "terms":
       return `uniq(${column})`;
+    default:
+      throw new Error(`Unhandled slim aggregation: ${String(agg)}`);
   }
 }
 

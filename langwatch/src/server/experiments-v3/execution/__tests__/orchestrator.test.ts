@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { EvaluationsV3State } from "~/experiments-v3/types";
-import { generateCells } from "../orchestrator";
+import { generateCells, generatePairwiseCells } from "../orchestrator";
 import type { ExecutionScope } from "../types";
 
 describe("orchestrator", () => {
@@ -210,141 +210,371 @@ describe("orchestrator", () => {
 
       expect(cells[0]?.evaluatorConfigs).toHaveLength(3);
     });
+
+    it("defers pairwise evaluators to phase 2 instead of attaching them to target cells", () => {
+      const state = createTestState(2, 1);
+      state.evaluators.push({
+        id: "pairwise-eval",
+        evaluatorType: "langevals/pairwise_compare",
+        inputs: [
+          { identifier: "candidate_a_output", type: "str" },
+          { identifier: "candidate_b_output", type: "str" },
+          { identifier: "golden", type: "str" },
+        ],
+        mappings: {},
+        pairwise: {
+          variantA: "target-1",
+          variantB: "target-2",
+          goldenField: "expected",
+          includeMetrics: [],
+        },
+      });
+      const datasetRows = createTestDataset(1);
+      const scope: ExecutionScope = { type: "full" };
+
+      const cells = generateCells(state, datasetRows, scope);
+
+      expect(cells).toHaveLength(2);
+      expect(
+        cells.every((cell) =>
+          cell.evaluatorConfigs.every((evaluator) => !evaluator.pairwise),
+        ),
+      ).toBe(true);
+    });
+
+    it("skips column-style pairwise evaluator targets during phase 1", () => {
+      const state = createTestState(2, 0);
+      state.targets.push({
+        id: "pairwise-target",
+        type: "evaluator",
+        targetEvaluatorId: "db-pairwise-evaluator",
+        inputs: [
+          { identifier: "candidate_a_output", type: "str" },
+          { identifier: "candidate_b_output", type: "str" },
+          { identifier: "golden", type: "str" },
+        ],
+        outputs: [{ identifier: "label", type: "str" }],
+        mappings: {},
+        pairwise: {
+          variantA: "target-1",
+          variantB: "target-2",
+          goldenField: "expected",
+          includeMetrics: [],
+        },
+      });
+      const datasetRows = createTestDataset(1);
+      const scope: ExecutionScope = { type: "full" };
+
+      const cells = generateCells(state, datasetRows, scope);
+
+      expect(cells.map((cell) => cell.targetId)).toEqual([
+        "target-1",
+        "target-2",
+      ]);
+    });
+  });
+
+  describe("generatePairwiseCells", () => {
+    it("creates a column-target pairwise cell with both candidate outputs", () => {
+      const state = createTestState(2, 0);
+      state.targets.push({
+        id: "pairwise-target",
+        type: "evaluator",
+        targetEvaluatorId: "db-pairwise-evaluator",
+        inputs: [
+          { identifier: "candidate_a_output", type: "str" },
+          { identifier: "candidate_b_output", type: "str" },
+          { identifier: "golden", type: "str" },
+        ],
+        outputs: [{ identifier: "label", type: "str" }],
+        mappings: {},
+        pairwise: {
+          variantA: "target-1",
+          variantB: "target-2",
+          goldenField: "expected",
+          includeMetrics: [],
+        },
+      });
+      const completedTargetOutputs = new Map([
+        [
+          "0:target-1",
+          { output: { output: "answer from A" }, cost: 0.01, duration: 120 },
+        ],
+        [
+          "0:target-2",
+          { output: { output: "answer from B" }, cost: 0.02, duration: 150 },
+        ],
+      ]);
+
+      const { cells } = generatePairwiseCells(
+        state,
+        createTestDataset(1),
+        completedTargetOutputs,
+      );
+
+      expect(cells).toHaveLength(1);
+      expect(cells[0]?.targetId).toBe("pairwise-target");
+      expect(cells[0]?.skipTarget).toBe(true);
+      expect(cells[0]?.pairwise?.candidateA.output).toEqual({
+        output: "answer from A",
+      });
+      expect(cells[0]?.pairwise?.candidateB.output).toEqual({
+        output: "answer from B",
+      });
+      expect(cells[0]?.evaluatorConfigs[0]?.pairwise?.goldenField).toBe(
+        "expected",
+      );
+    });
+
+    it("uses the prompt handle as candidate id when loadedPrompts has it", () => {
+      const state = createTestState(2, 0);
+      // Mark the variants as prompt-typed so variantIdentifierFor can look
+      // them up. The IDs in createTestState are "target-1" and "target-2".
+      const variantA = state.targets[0]!;
+      const variantB = state.targets[1]!;
+      (variantA as { type: string; promptId?: string }).type = "prompt";
+      (variantA as { type: string; promptId?: string }).promptId = "prompt_A";
+      (variantB as { type: string; promptId?: string }).type = "prompt";
+      (variantB as { type: string; promptId?: string }).promptId = "prompt_B";
+      state.targets.push({
+        id: "pairwise-target",
+        type: "evaluator",
+        targetEvaluatorId: "db-pairwise-evaluator",
+        inputs: [],
+        outputs: [],
+        mappings: {},
+        pairwise: {
+          variantA: variantA.id,
+          variantB: variantB.id,
+          goldenField: "expected",
+          includeMetrics: [],
+        },
+      });
+      const loadedPrompts = new Map<
+        string,
+        { handle: string } & Record<string, unknown>
+      >([
+        ["prompt_A", { handle: "say-hi" } as never],
+        ["prompt_B", { handle: "be-formal" } as never],
+      ]);
+      const { cells } = generatePairwiseCells(
+        state,
+        createTestDataset(1),
+        new Map([
+          ["0:" + variantA.id, { output: "a" }],
+          ["0:" + variantB.id, { output: "b" }],
+        ]),
+        undefined,
+        loadedPrompts as never,
+      );
+      expect(cells).toHaveLength(1);
+      expect(cells[0]?.pairwise?.candidateA.id).toBe("say-hi");
+      expect(cells[0]?.pairwise?.candidateB.id).toBe("be-formal");
+    });
+
+    it("falls back to target id (not promptId) when handle is unavailable", () => {
+      const state = createTestState(2, 0);
+      // Prompt-typed variants with promptIds but NO entry in loadedPrompts —
+      // simulates a deleted prompt or a worker that hasn't loaded the cache.
+      const variantA = state.targets[0]!;
+      const variantB = state.targets[1]!;
+      (variantA as { type: string; promptId?: string }).type = "prompt";
+      (variantA as { type: string; promptId?: string }).promptId = "prompt_A";
+      (variantB as { type: string; promptId?: string }).type = "prompt";
+      (variantB as { type: string; promptId?: string }).promptId = "prompt_B";
+      state.targets.push({
+        id: "pairwise-target",
+        type: "evaluator",
+        targetEvaluatorId: "db-pairwise-evaluator",
+        inputs: [],
+        outputs: [],
+        mappings: {},
+        pairwise: {
+          variantA: variantA.id,
+          variantB: variantB.id,
+          goldenField: "expected",
+          includeMetrics: [],
+        },
+      });
+      const { cells } = generatePairwiseCells(
+        state,
+        createTestDataset(1),
+        new Map([
+          ["0:" + variantA.id, { output: "a" }],
+          ["0:" + variantB.id, { output: "b" }],
+        ]),
+        undefined,
+        new Map(),
+      );
+      // Must be the internal target id (which the aggregator can normalize),
+      // never the raw promptId KSUID which would silently drop the verdict.
+      expect(cells[0]?.pairwise?.candidateA.id).toBe(variantA.id);
+      expect(cells[0]?.pairwise?.candidateB.id).toBe(variantB.id);
+      expect(cells[0]?.pairwise?.candidateA.id).not.toBe("prompt_A");
+    });
+
+    it("does not create pairwise cells until both variants have output", () => {
+      const state = createTestState(2, 0);
+      state.targets.push({
+        id: "pairwise-target",
+        type: "evaluator",
+        targetEvaluatorId: "db-pairwise-evaluator",
+        inputs: [],
+        outputs: [],
+        mappings: {},
+        pairwise: {
+          variantA: "target-1",
+          variantB: "target-2",
+          goldenField: "expected",
+          includeMetrics: [],
+        },
+      });
+
+      const { cells, skipReasons } = generatePairwiseCells(
+        state,
+        createTestDataset(1),
+        new Map([["0:target-1", { output: { output: "answer from A" } }]]),
+      );
+
+      expect(cells).toHaveLength(0);
+      expect(skipReasons).toHaveLength(1);
+      expect(skipReasons[0]?.missing).toBe("B");
+    });
   });
 
   describe("generateCells with evaluator-all-rows scope", () => {
-      /** @scenario "Running evaluator on all rows creates one execution per row with target output" */
-      it("creates one cell per row that has a pre-computed target output", () => {
-        const state = createTestState(1, 2);
-        const datasetRows = createTestDataset(4);
-        const scope: ExecutionScope = {
-          type: "evaluator-all-rows",
-          targetId: "target-1",
-          evaluatorId: "eval-1",
-          precomputedTargetOutputs: {
-            0: { output: "result-0" },
-            1: { output: "result-1" },
-            3: { output: "result-3" },
-          },
-          traceIds: {
-            0: "trace-0",
-            1: "trace-1",
-            3: "trace-3",
-          },
-        };
+    /** @scenario "Running evaluator on all rows creates one execution per row with target output" */
+    it("creates one cell per row that has a pre-computed target output", () => {
+      const state = createTestState(1, 2);
+      const datasetRows = createTestDataset(4);
+      const scope: ExecutionScope = {
+        type: "evaluator-all-rows",
+        targetId: "target-1",
+        evaluatorId: "eval-1",
+        precomputedTargetOutputs: {
+          0: { output: "result-0" },
+          1: { output: "result-1" },
+          3: { output: "result-3" },
+        },
+        traceIds: {
+          0: "trace-0",
+          1: "trace-1",
+          3: "trace-3",
+        },
+      };
 
-        const cells = generateCells(state, datasetRows, scope);
+      const cells = generateCells(state, datasetRows, scope);
 
-        // Only rows 0, 1, 3 have outputs - row 2 is skipped
-        expect(cells).toHaveLength(3);
-        expect(cells.map((c) => c.rowIndex)).toEqual([0, 1, 3]);
-      });
-
-      /** @scenario "Running evaluator on all rows creates one execution per row with target output" */
-      it("skips target execution for each cell", () => {
-        const state = createTestState(1, 1);
-        const datasetRows = createTestDataset(2);
-        const scope: ExecutionScope = {
-          type: "evaluator-all-rows",
-          targetId: "target-1",
-          evaluatorId: "eval-1",
-          precomputedTargetOutputs: {
-            0: { output: "result-0" },
-            1: { output: "result-1" },
-          },
-          traceIds: {},
-        };
-
-        const cells = generateCells(state, datasetRows, scope);
-
-        for (const cell of cells) {
-          expect(cell.skipTarget).toBe(true);
-        }
-      });
-
-      it("includes only the specified evaluator in each cell", () => {
-        const state = createTestState(1, 3);
-        const datasetRows = createTestDataset(2);
-        const scope: ExecutionScope = {
-          type: "evaluator-all-rows",
-          targetId: "target-1",
-          evaluatorId: "eval-2",
-          precomputedTargetOutputs: {
-            0: { output: "result-0" },
-            1: { output: "result-1" },
-          },
-          traceIds: {},
-        };
-
-        const cells = generateCells(state, datasetRows, scope);
-
-        for (const cell of cells) {
-          expect(cell.evaluatorConfigs).toHaveLength(1);
-          expect(cell.evaluatorConfigs[0]?.id).toBe("eval-2");
-        }
-      });
-
-      it("assigns precomputed target output to each cell", () => {
-        const state = createTestState(1, 1);
-        const datasetRows = createTestDataset(3);
-        const scope: ExecutionScope = {
-          type: "evaluator-all-rows",
-          targetId: "target-1",
-          evaluatorId: "eval-1",
-          precomputedTargetOutputs: {
-            0: { output: "result-0" },
-            2: { output: "result-2" },
-          },
-          traceIds: {
-            0: "trace-0",
-            2: "trace-2",
-          },
-        };
-
-        const cells = generateCells(state, datasetRows, scope);
-
-        expect(cells[0]?.precomputedTargetOutput).toEqual({ output: "result-0" });
-        expect(cells[0]?.traceId).toBe("trace-0");
-        expect(cells[1]?.precomputedTargetOutput).toEqual({ output: "result-2" });
-        expect(cells[1]?.traceId).toBe("trace-2");
-      });
-
-      it("returns empty array when evaluator is not found", () => {
-        const state = createTestState(1, 1);
-        const datasetRows = createTestDataset(2);
-        const scope: ExecutionScope = {
-          type: "evaluator-all-rows",
-          targetId: "target-1",
-          evaluatorId: "non-existent",
-          precomputedTargetOutputs: {
-            0: { output: "result-0" },
-          },
-          traceIds: {},
-        };
-
-        const cells = generateCells(state, datasetRows, scope);
-
-        expect(cells).toHaveLength(0);
-      });
-
-      it("returns empty array when target is not found", () => {
-        const state = createTestState(1, 1);
-        const datasetRows = createTestDataset(2);
-        const scope: ExecutionScope = {
-          type: "evaluator-all-rows",
-          targetId: "non-existent",
-          evaluatorId: "eval-1",
-          precomputedTargetOutputs: {
-            0: { output: "result-0" },
-          },
-          traceIds: {},
-        };
-
-        const cells = generateCells(state, datasetRows, scope);
-
-        expect(cells).toHaveLength(0);
-      });
+      // Only rows 0, 1, 3 have outputs - row 2 is skipped
+      expect(cells).toHaveLength(3);
+      expect(cells.map((c) => c.rowIndex)).toEqual([0, 1, 3]);
     });
+
+    /** @scenario "Running evaluator on all rows creates one execution per row with target output" */
+    it("skips target execution for each cell", () => {
+      const state = createTestState(1, 1);
+      const datasetRows = createTestDataset(2);
+      const scope: ExecutionScope = {
+        type: "evaluator-all-rows",
+        targetId: "target-1",
+        evaluatorId: "eval-1",
+        precomputedTargetOutputs: {
+          0: { output: "result-0" },
+          1: { output: "result-1" },
+        },
+        traceIds: {},
+      };
+
+      const cells = generateCells(state, datasetRows, scope);
+
+      for (const cell of cells) {
+        expect(cell.skipTarget).toBe(true);
+      }
+    });
+
+    it("includes only the specified evaluator in each cell", () => {
+      const state = createTestState(1, 3);
+      const datasetRows = createTestDataset(2);
+      const scope: ExecutionScope = {
+        type: "evaluator-all-rows",
+        targetId: "target-1",
+        evaluatorId: "eval-2",
+        precomputedTargetOutputs: {
+          0: { output: "result-0" },
+          1: { output: "result-1" },
+        },
+        traceIds: {},
+      };
+
+      const cells = generateCells(state, datasetRows, scope);
+
+      for (const cell of cells) {
+        expect(cell.evaluatorConfigs).toHaveLength(1);
+        expect(cell.evaluatorConfigs[0]?.id).toBe("eval-2");
+      }
+    });
+
+    it("assigns precomputed target output to each cell", () => {
+      const state = createTestState(1, 1);
+      const datasetRows = createTestDataset(3);
+      const scope: ExecutionScope = {
+        type: "evaluator-all-rows",
+        targetId: "target-1",
+        evaluatorId: "eval-1",
+        precomputedTargetOutputs: {
+          0: { output: "result-0" },
+          2: { output: "result-2" },
+        },
+        traceIds: {
+          0: "trace-0",
+          2: "trace-2",
+        },
+      };
+
+      const cells = generateCells(state, datasetRows, scope);
+
+      expect(cells[0]?.precomputedTargetOutput).toEqual({ output: "result-0" });
+      expect(cells[0]?.traceId).toBe("trace-0");
+      expect(cells[1]?.precomputedTargetOutput).toEqual({ output: "result-2" });
+      expect(cells[1]?.traceId).toBe("trace-2");
+    });
+
+    it("returns empty array when evaluator is not found", () => {
+      const state = createTestState(1, 1);
+      const datasetRows = createTestDataset(2);
+      const scope: ExecutionScope = {
+        type: "evaluator-all-rows",
+        targetId: "target-1",
+        evaluatorId: "non-existent",
+        precomputedTargetOutputs: {
+          0: { output: "result-0" },
+        },
+        traceIds: {},
+      };
+
+      const cells = generateCells(state, datasetRows, scope);
+
+      expect(cells).toHaveLength(0);
+    });
+
+    it("returns empty array when target is not found", () => {
+      const state = createTestState(1, 1);
+      const datasetRows = createTestDataset(2);
+      const scope: ExecutionScope = {
+        type: "evaluator-all-rows",
+        targetId: "non-existent",
+        evaluatorId: "eval-1",
+        precomputedTargetOutputs: {
+          0: { output: "result-0" },
+        },
+        traceIds: {},
+      };
+
+      const cells = generateCells(state, datasetRows, scope);
+
+      expect(cells).toHaveLength(0);
+    });
+  });
 
   describe("cell ordering", () => {
     it("orders cells by row first, then target", () => {

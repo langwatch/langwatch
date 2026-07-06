@@ -1,8 +1,8 @@
 import { createClient } from "@clickhouse/client";
 
 import { createLogger } from "../../utils/logger/server";
-import { parseConnectionUrl } from "./goose";
 import { RETENTION_MANAGED_TABLES } from "../data-retention/retentionPolicy.schema";
+import { parseConnectionUrl } from "./goose";
 
 const logger = createLogger("langwatch:clickhouse:ttl-reconciler");
 
@@ -233,11 +233,14 @@ export function buildDesiredTTLExpression({
   config: TableTTLEntry;
   days: number;
 }): string {
-  const colExpr = config.ttlColumnExpression ?? `toDateTime(${config.ttlColumn})`;
+  const colExpr =
+    config.ttlColumnExpression ?? `toDateTime(${config.ttlColumn})`;
   return `${colExpr} + INTERVAL ${days} DAY TO VOLUME 'cold'`;
 }
 
-export function buildRetentionTTLExpression(config: TableTTLEntry): string | null {
+export function buildRetentionTTLExpression(
+  config: TableTTLEntry,
+): string | null {
   if (!config.retentionTTLColumn) return null;
   const colExpr =
     config.retentionTTLColumnExpression ??
@@ -336,11 +339,16 @@ export async function reconcileTTL(
       // but they CAN still have retention DELETE TTL. Likewise, when the operator
       // disables cold-storage management we still need to install retention TTL,
       // so collapse to the retention-only branch in both cases.
-      if (tableInfo.storage_policy !== TIERED_STORAGE_POLICY || !coldStorageEnabled) {
+      if (
+        tableInfo.storage_policy !== TIERED_STORAGE_POLICY ||
+        !coldStorageEnabled
+      ) {
         const retentionTTLExpr = buildRetentionTTLExpression(tableConfig);
         if (
           retentionTTLExpr &&
-          (RETENTION_MANAGED_TABLES as readonly string[]).includes(tableConfig.table) &&
+          (RETENTION_MANAGED_TABLES as readonly string[]).includes(
+            tableConfig.table,
+          ) &&
           !hasRetentionTTL(tableInfo.engine_full)
         ) {
           // No ON CLUSTER: whenever a cluster is configured the database uses
@@ -375,7 +383,9 @@ export async function reconcileTTL(
       const currentDays = parseTTLDaysFromEngineMetadata(engineFull);
 
       const retentionTTLExpr = buildRetentionTTLExpression(tableConfig);
-      const isManaged = (RETENTION_MANAGED_TABLES as readonly string[]).includes(tableConfig.table);
+      const isManaged = (
+        RETENTION_MANAGED_TABLES as readonly string[]
+      ).includes(tableConfig.table);
       // Whether the cold TTL alone is enough to skip this run — i.e. nothing
       // has changed in the cold-TTL space. For managed tables we must still
       // run when retention TTL is missing from the table (first-time apply).

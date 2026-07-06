@@ -381,11 +381,67 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         ? transposeColumnsFirstToRowsFirstWithId(activeDataset.inline.records)
         : (activeDataset.savedRecords ?? []);
 
-      const executionCells = computeExecutionCells({
+      const baseExecutionCells = computeExecutionCells({
         scope,
         targetIds: targets.map((t) => t.id),
         datasetRows,
       });
+
+      // Pairwise dispatch: when the user runs only the Pairwise column,
+      // Phase 2 needs both variants' outputs to exist. Two cases:
+      //   (a) Variants haven't run / are missing outputs for some rows →
+      //       expand the dispatch to include those variant cells so Phase 1
+      //       produces fresh outputs for them.
+      //   (b) Variants ALREADY ran and have outputs for every row → send
+      //       the existing outputs as `seedTargetOutputs` so the orchestrator
+      //       pre-fills its completedTargetOutputs map, and Phase 2 reuses
+      //       them without forcing a re-run.
+      // The two cases coexist row-by-row: re-run rows that are missing,
+      // seed rows that already have output.
+      const targetPairwiseDeps = (id: string): string[] => {
+        const t = targets.find((tg) => tg.id === id);
+        if (!t || t.type !== "evaluator" || !t.pairwise) return [];
+        return [t.pairwise.variantA, t.pairwise.variantB].filter(
+          (v): v is string => !!v,
+        );
+      };
+      const currentTargetOutputs =
+        useEvaluationsV3Store.getState().results.targetOutputs;
+      const currentTargetMetadata =
+        useEvaluationsV3Store.getState().results.targetMetadata;
+      const seedTargetOutputs: Record<
+        string,
+        { output: unknown; cost?: number; duration?: number }
+      > = {};
+      const expandedCells = [...baseExecutionCells];
+      if (scope.type === "target" || scope.type === "cell") {
+        const deps = targetPairwiseDeps(scope.targetId);
+        if (deps.length) {
+          const rowsForExpansion =
+            scope.type === "cell"
+              ? [scope.rowIndex]
+              : datasetRows.map((_, i) => i);
+          for (const depTargetId of deps) {
+            const depOutputs = currentTargetOutputs[depTargetId] ?? [];
+            const depMeta = currentTargetMetadata[depTargetId] ?? [];
+            for (const rowIndex of rowsForExpansion) {
+              const existing = depOutputs[rowIndex];
+              if (existing !== undefined && existing !== null) {
+                // Already have an output for this row — seed it.
+                seedTargetOutputs[`${rowIndex}:${depTargetId}`] = {
+                  output: existing,
+                  cost: depMeta[rowIndex]?.cost ?? undefined,
+                  duration: depMeta[rowIndex]?.duration ?? undefined,
+                };
+              } else {
+                // Missing — schedule the variant cell to actually run.
+                expandedCells.push({ rowIndex, targetId: depTargetId });
+              }
+            }
+          }
+        }
+      }
+      const executionCells = expandedCells;
       const executingCellsSet = createExecutionCellSet(executionCells);
 
       // Set progress based on actual cells to execute
@@ -548,6 +604,14 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           mappings: t.mappings,
           localPromptConfig: t.localPromptConfig,
           localEvaluatorConfig: t.localEvaluatorConfig,
+          // Pairwise column-targets (#5100) need this on the wire so the
+          // orchestrator can skip the column in Phase 1 and emit Phase 2
+          // synthetic cells with both variants' outputs baked in. Without
+          // it, the server falls through to a normal evaluator-target
+          // dispatch whose mappings have no per-row candidate outputs,
+          // and the judge endpoint 400s with "candidate_a_output is
+          // required".
+          pairwise: t.pairwise,
         })),
         evaluators: evaluators.map((e) => ({
           id: e.id,
@@ -559,6 +623,10 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         })),
         scope,
         concurrency,
+        seedTargetOutputs:
+          Object.keys(seedTargetOutputs).length > 0
+            ? seedTargetOutputs
+            : undefined,
       };
 
       // Helper to remove this execution's cells and evaluators from state when done
@@ -684,6 +752,19 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         body: JSON.stringify({ projectId: project.id, runId }),
       });
 
+      if (response.status === 404) {
+        // Server says the run isn't running anymore — it finished (or
+        // was already aborted) between the user's click and this request
+        // landing. Not a failure: just inform the user and reset state.
+        setIsAborting(false);
+        toaster.create({
+          title: "Already finished",
+          description:
+            "The run completed on its own before the stop request reached the server.",
+          type: "info",
+        });
+        return;
+      }
       if (!response.ok) {
         throw new Error("Failed to abort execution");
         // Note: we don't setIsAborting(false) here - we wait for the `stopped` event
@@ -724,7 +805,8 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       // Get the existing target output and trace ID from the store
       const state = useEvaluationsV3Store.getState();
       const targetOutput = state.results.targetOutputs[targetId]?.[rowIndex];
-      const traceId = state.results.targetMetadata[targetId]?.[rowIndex]?.traceId;
+      const traceId =
+        state.results.targetMetadata[targetId]?.[rowIndex]?.traceId;
 
       // Immediately set the evaluator result to "running" for UI feedback
       updateEvaluatorResult(rowIndex, targetId, evaluatorId, {
