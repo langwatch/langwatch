@@ -384,73 +384,85 @@ describe("mappingValidation", () => {
       ...overrides,
     });
 
-    it("returns valid when variants and golden field are all set", () => {
-      const target = createPairwiseTargetConfig();
+    describe("given hasGoldenAnswer is true", () => {
+      describe("when goldenField is set", () => {
+        it("returns valid with no missing mappings", () => {
+          const target = createPairwiseTargetConfig();
 
-      const result = getTargetMissingMappings(target, "dataset-1");
+          const result = getTargetMissingMappings(target, "dataset-1");
 
-      expect(result.isValid).toBe(true);
-      expect(result.missingMappings).toHaveLength(0);
-    });
-
-    it("returns invalid with a goldenField entry when hasGoldenAnswer is true but goldenField is unset", () => {
-      const target = createPairwiseTargetConfig({
-        pairwise: {
-          variantA: "target-a",
-          variantB: "target-b",
-          hasGoldenAnswer: true,
-          goldenField: "",
-          includeMetrics: [],
-        },
+          expect(result.isValid).toBe(true);
+          expect(result.missingMappings).toHaveLength(0);
+        });
       });
 
-      const result = getTargetMissingMappings(target, "dataset-1");
+      describe("when goldenField is unset", () => {
+        it("returns invalid with a goldenField entry", () => {
+          const target = createPairwiseTargetConfig({
+            pairwise: {
+              variantA: "target-a",
+              variantB: "target-b",
+              hasGoldenAnswer: true,
+              goldenField: "",
+              includeMetrics: [],
+            },
+          });
 
-      expect(result.isValid).toBe(false);
-      expect(
-        result.missingMappings.some((m) => m.fieldId === "goldenField"),
-      ).toBe(true);
+          const result = getTargetMissingMappings(target, "dataset-1");
+
+          expect(result.isValid).toBe(false);
+          expect(
+            result.missingMappings.some((m) => m.fieldId === "goldenField"),
+          ).toBe(true);
+        });
+      });
     });
 
-    it("returns valid without requiring goldenField when hasGoldenAnswer is false", () => {
-      const target = createPairwiseTargetConfig({
-        pairwise: {
-          variantA: "target-a",
-          variantB: "target-b",
-          hasGoldenAnswer: false,
-          goldenField: "",
-          includeMetrics: [],
-        },
+    describe("given hasGoldenAnswer is false", () => {
+      describe("when goldenField is unset", () => {
+        it("returns valid without requiring goldenField", () => {
+          const target = createPairwiseTargetConfig({
+            pairwise: {
+              variantA: "target-a",
+              variantB: "target-b",
+              hasGoldenAnswer: false,
+              goldenField: "",
+              includeMetrics: [],
+            },
+          });
+
+          const result = getTargetMissingMappings(target, "dataset-1");
+
+          expect(result.isValid).toBe(true);
+          expect(
+            result.missingMappings.some((m) => m.fieldId === "goldenField"),
+          ).toBe(false);
+        });
       });
 
-      const result = getTargetMissingMappings(target, "dataset-1");
+      describe("when variantA/variantB are unset", () => {
+        it("still requires variantA/variantB", () => {
+          const target = createPairwiseTargetConfig({
+            pairwise: {
+              variantA: "",
+              variantB: "",
+              hasGoldenAnswer: false,
+              goldenField: "",
+              includeMetrics: [],
+            },
+          });
 
-      expect(result.isValid).toBe(true);
-      expect(
-        result.missingMappings.some((m) => m.fieldId === "goldenField"),
-      ).toBe(false);
-    });
+          const result = getTargetMissingMappings(target, "dataset-1");
 
-    it("still requires variantA/variantB regardless of hasGoldenAnswer", () => {
-      const target = createPairwiseTargetConfig({
-        pairwise: {
-          variantA: "",
-          variantB: "",
-          hasGoldenAnswer: false,
-          goldenField: "",
-          includeMetrics: [],
-        },
+          expect(result.isValid).toBe(false);
+          expect(
+            result.missingMappings.some((m) => m.fieldId === "variantA"),
+          ).toBe(true);
+          expect(
+            result.missingMappings.some((m) => m.fieldId === "variantB"),
+          ).toBe(true);
+        });
       });
-
-      const result = getTargetMissingMappings(target, "dataset-1");
-
-      expect(result.isValid).toBe(false);
-      expect(result.missingMappings.some((m) => m.fieldId === "variantA")).toBe(
-        true,
-      );
-      expect(result.missingMappings.some((m) => m.fieldId === "variantB")).toBe(
-        true,
-      );
     });
   });
 });
