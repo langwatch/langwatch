@@ -67,9 +67,11 @@ function makeDeps() {
     async ({ emails }: { emails: string[] }) => emails,
   );
   return {
-    deps: { sendEmail, sendSlack, filterSuppressedRecipients } as unknown as Parameters<
-      typeof dispatchGraphAlertAction
-    >[0]["deps"],
+    deps: {
+      sendEmail,
+      sendSlack,
+      filterSuppressedRecipients,
+    } as unknown as Parameters<typeof dispatchGraphAlertAction>[0]["deps"],
     sendEmail,
     sendSlack,
     filterSuppressedRecipients,
@@ -137,7 +139,9 @@ describe("dispatchGraphAlertAction", () => {
           triggerId: "trg_1",
           emails: ["a@example.com", "unsubscribed@example.com"],
         });
-        const call = sendEmail.mock.calls[0]?.[0] as { triggerEmails: string[] };
+        const call = sendEmail.mock.calls[0]?.[0] as {
+          triggerEmails: string[];
+        };
         expect(call.triggerEmails).toEqual(["a@example.com"]);
       });
     });
@@ -251,7 +255,9 @@ describe("dispatchGraphAlertAction", () => {
         triggerName: string;
         payload: { text?: string; blocks?: unknown };
       };
-      expect(call.triggerWebhook).toBe("https://hooks.slack.com/services/T/B/abc");
+      expect(call.triggerWebhook).toBe(
+        "https://hooks.slack.com/services/T/B/abc",
+      );
       expect(call.triggerName).toBe("High latency");
       const text = (call.payload as { text: string }).text;
       expect(text).toContain("High latency");

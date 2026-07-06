@@ -1,5 +1,5 @@
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { BaseAnalyticsSlimClickHouseRepository } from "~/server/app-layer/analytics/repositories/analyticsWriteBase";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { EvaluationAnalyticsRow } from "~/server/event-sourcing/pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
 import type { EvaluationAnalyticsRepository } from "./evaluation-analytics.repository";
 

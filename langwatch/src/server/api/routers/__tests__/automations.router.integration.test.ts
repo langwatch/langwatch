@@ -25,7 +25,8 @@ const {
 }));
 
 vi.mock("~/server/license-enforcement", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("~/server/license-enforcement")>();
+  const actual =
+    await importOriginal<typeof import("~/server/license-enforcement")>();
 
   return {
     ...actual,
@@ -206,7 +207,9 @@ describe("automationRouter", () => {
             customGraphId: "graph_1",
             deleted: true,
           });
-          mockTriggerUpdate.mockResolvedValueOnce({ id: "trigger_soft_deleted" });
+          mockTriggerUpdate.mockResolvedValueOnce({
+            id: "trigger_soft_deleted",
+          });
 
           await caller.upsert(baseGraphAlertInput as any);
 

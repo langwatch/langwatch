@@ -115,7 +115,9 @@ describe("alert-default Slack rendering", () => {
           slackBlockKit: ALERT_TRIGGER_DEFAULTS.slackBlockKit,
         },
       });
-      const payload = slack.payload as { blocks: Array<Record<string, unknown>> };
+      const payload = slack.payload as {
+        blocks: Array<Record<string, unknown>>;
+      };
       expect(payload.blocks.length).toBeGreaterThan(0);
       const serialized = JSON.stringify(payload.blocks);
       expect(serialized).toContain("High latency");

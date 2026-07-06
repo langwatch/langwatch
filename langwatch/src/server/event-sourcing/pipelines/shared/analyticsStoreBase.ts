@@ -1,7 +1,7 @@
 import type { RetentionCategory } from "~/server/data-retention/retentionPolicy.schema";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import type { AppendStore } from "../../projections/mapProjection.types";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
+import type { AppendStore } from "../../projections/mapProjection.types";
 import type { ProjectionStoreContext } from "../../projections/projectionStoreContext";
 
 /**
@@ -64,9 +64,7 @@ function retentionDaysFrom(
   context: ProjectionStoreContext,
   category: RetentionCategory,
 ): number {
-  return (
-    context.retentionPolicy?.[category] ?? PLATFORM_DEFAULT_RETENTION_DAYS
-  );
+  return context.retentionPolicy?.[category] ?? PLATFORM_DEFAULT_RETENTION_DAYS;
 }
 
 /**
@@ -93,10 +91,7 @@ export abstract class BaseAnalyticsFoldStore<TState, TRow>
     this.config = config;
   }
 
-  async store(
-    state: TState,
-    context: ProjectionStoreContext,
-  ): Promise<void> {
+  async store(state: TState, context: ProjectionStoreContext): Promise<void> {
     if (!this.config.hasPersistableSignal(state, context)) return;
     const stateWithId = this.config.stampAggregateId(
       state,
@@ -179,10 +174,7 @@ export abstract class BaseAnalyticsRollupAppendStore<TRow>
     this.config = config;
   }
 
-  async append(
-    record: TRow,
-    context: ProjectionStoreContext,
-  ): Promise<void> {
+  async append(record: TRow, context: ProjectionStoreContext): Promise<void> {
     const retentionDays = retentionDaysFrom(
       context,
       this.config.retentionCategory,

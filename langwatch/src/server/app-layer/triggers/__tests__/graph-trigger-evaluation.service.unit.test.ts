@@ -162,14 +162,14 @@ function makeHarness({
   project?: Project | null;
   series: TimeseriesResult;
 }): Harness {
-  const dispatch = vi.fn<
-    (input: unknown) => Promise<GraphAlertDispatchResult>
-  >(async () => ({
-    channel: "email",
-    didSend: true,
-    missingVariables: [],
-    renderErrors: [],
-  }));
+  const dispatch = vi.fn<(input: unknown) => Promise<GraphAlertDispatchResult>>(
+    async () => ({
+      channel: "email",
+      didSend: true,
+      missingVariables: [],
+      renderErrors: [],
+    }),
+  );
   const getTimeseries = vi.fn(async () => series);
   const updateLastRunAt = vi.fn(async () => undefined);
   const loadTrigger = vi.fn(async () => trigger);

@@ -1,7 +1,7 @@
 import type { Project, Trigger } from "@prisma/client";
 import { DispatchError } from "~/server/event-sourcing/outbox/dispatchError";
-import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
-import { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
+import type { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
+import type { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
 import { ALERT_TRIGGER_DEFAULTS } from "~/shared/templating/defaults";
 import { renderTriggerEmail } from "~/shared/templating/renderEmail";
 import {

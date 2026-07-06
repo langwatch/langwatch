@@ -621,13 +621,7 @@ export function AutomationDrawer({
         projectId={projectId}
         prefilledGraphId={prefilledGraphId}
         prefilledSeriesName={prefilledSeriesName}
-        onSave={({
-          source,
-          filters,
-          customGraphId,
-          graphAlert,
-          alertType,
-        }) => {
+        onSave={({ source, filters, customGraphId, graphAlert, alertType }) => {
           dispatch({ type: "SET_SOURCE", value: source });
           if (source === "trace") {
             dispatch({ type: "SET_FILTERS", value: filters });

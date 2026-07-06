@@ -8,9 +8,9 @@ import { TemplateValidationError, TestFireUnavailableError } from "../errors";
 import {
   type DraftIdentity,
   type DraftProject,
-  testFireTrigger,
   type TestFireTriggerInput,
   type TriggerNotifier,
+  testFireTrigger,
   validateTemplateDraft,
 } from "../trigger-template.service";
 

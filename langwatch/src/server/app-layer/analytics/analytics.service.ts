@@ -36,10 +36,7 @@ import { prisma as defaultPrisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
 import type { FilterField } from "~/server/filters/types";
 import { TtlCache } from "~/server/utils/ttlCache";
-import {
-  type AnalyticsTable,
-  pickAnalyticsTable,
-} from "./routing/route-table";
+import { adjustTimeScaleForBucketCap } from "./query-builders/_shared";
 import {
   type AnalyticsTimeseriesReadRepository,
   createEvalRollupReadRepo,
@@ -51,7 +48,7 @@ import {
   ClickHouseLegacyAnalyticsShim,
   type LegacyAnalyticsShim,
 } from "./repositories/legacy.shim";
-import { adjustTimeScaleForBucketCap } from "./query-builders/_shared";
+import { type AnalyticsTable, pickAnalyticsTable } from "./routing/route-table";
 import { compareForTripwire } from "./tripwire/divergence-compare";
 
 const TIMESERIES_CACHE_TTL_MS = 30_000 as const;

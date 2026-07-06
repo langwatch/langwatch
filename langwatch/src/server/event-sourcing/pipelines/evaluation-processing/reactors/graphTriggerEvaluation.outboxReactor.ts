@@ -56,8 +56,7 @@ const REAL_TIME_DEBOUNCE_MS = 5_000;
  * check is scoped per-pipeline, so the trace pipeline reusing the same name is
  * fine; dedup logs disambiguate by pipeline name.
  */
-const EVALUATION_GRAPH_TRIGGER_REACTOR_NAME =
-  GRAPH_TRIGGER_EVAL_REACTOR_NAME;
+const EVALUATION_GRAPH_TRIGGER_REACTOR_NAME = GRAPH_TRIGGER_EVAL_REACTOR_NAME;
 
 export function createEvaluationGraphTriggerEvaluationOutboxReactor(
   deps: EvaluationGraphTriggerEvaluationOutboxReactorDeps,

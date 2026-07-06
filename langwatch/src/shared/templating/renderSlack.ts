@@ -107,7 +107,8 @@ export async function renderTriggerSlack({
 }): Promise<RenderedSlack> {
   const ctx = context as unknown as Record<string, unknown>;
   const slackString = defaults?.slackString ?? DEFAULT_SLACK_TEMPLATE;
-  const slackBlockKit = defaults?.slackBlockKit ?? DEFAULT_SLACK_BLOCK_KIT_TEMPLATE;
+  const slackBlockKit =
+    defaults?.slackBlockKit ?? DEFAULT_SLACK_BLOCK_KIT_TEMPLATE;
 
   if (templateType !== "block_kit") {
     const rendered = await renderWithFallback({

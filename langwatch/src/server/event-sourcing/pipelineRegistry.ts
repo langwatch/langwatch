@@ -17,6 +17,7 @@ import type { Cluster, Redis } from "ioredis";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
 import { getProtectionsForProject } from "~/server/api/utils";
+import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { DatasetRepository } from "~/server/datasets/dataset.repository";
 import {
   createDatasetNormalizeHandler,
@@ -25,7 +26,6 @@ import {
 import { registerDatasetNormalizeEnqueue } from "~/server/datasets/dataset-normalize.queue";
 import { getDatasetStorage } from "~/server/datasets/dataset-storage";
 import { TraceService } from "~/server/traces/trace.service";
-import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { createLogger } from "~/utils/logger/server";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
 import type { UsageReportingService } from "../../../ee/billing/services/usageReportingService";

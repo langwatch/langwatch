@@ -1,5 +1,5 @@
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { BaseAnalyticsRollupClickHouseRepository } from "~/server/app-layer/analytics/repositories/analyticsWriteBase";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { ExperimentAnalyticsRollupRow } from "~/server/event-sourcing/pipelines/experiment-run-processing/projections/experimentAnalyticsRollup.mapProjection";
 import type { ExperimentAnalyticsRollupRepository } from "./experiment-analytics-rollup.repository";
 

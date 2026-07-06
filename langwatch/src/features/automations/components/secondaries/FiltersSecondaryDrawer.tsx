@@ -7,24 +7,24 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { AlertType } from "@prisma/client";
 import type { Monaco } from "@monaco-editor/react";
+import { AlertType } from "@prisma/client";
 import { useEffect, useMemo, useState } from "react";
 import { deriveSeriesIdentifier } from "~/components/analytics/seriesIdentifier";
 import { FieldsFilters } from "~/components/filters/FieldsFilters";
 import { Switch } from "~/components/ui/switch";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import {
+  GRAPH_ALERT_TIME_PERIODS,
+  type GraphAlertOperator,
+  type GraphAlertTimePeriod,
+} from "~/server/app-layer/triggers/graph-alert.builder";
+import {
   type FilterField,
   sanitizeTriggerFilters,
   type TriggerFilterValue,
   triggerFiltersPermissiveSchema,
 } from "~/server/filters/types";
-import {
-  GRAPH_ALERT_TIME_PERIODS,
-  type GraphAlertOperator,
-  type GraphAlertTimePeriod,
-} from "~/server/app-layer/triggers/graph-alert.builder";
 import { api } from "~/utils/api";
 import dynamic from "~/utils/compat/next-dynamic";
 import {
@@ -171,7 +171,10 @@ export function FiltersSecondaryDrawer({
     { projectId, id: localCustomGraphId ?? "" },
     {
       enabled:
-        open && localSource === "customGraph" && !!localCustomGraphId && !!projectId,
+        open &&
+        localSource === "customGraph" &&
+        !!localCustomGraphId &&
+        !!projectId,
     },
   );
 
@@ -333,9 +336,7 @@ export function FiltersSecondaryDrawer({
             <Field.Label>Series</Field.Label>
             <NativeSelect.Root
               disabled={
-                isPrefilled ||
-                !localCustomGraphId ||
-                seriesOptions.length === 0
+                isPrefilled || !localCustomGraphId || seriesOptions.length === 0
               }
             >
               <NativeSelect.Field
@@ -386,9 +387,11 @@ export function FiltersSecondaryDrawer({
               <Input
                 type="number"
                 step="any"
-                value={Number.isFinite(localGraphAlert.threshold)
-                  ? localGraphAlert.threshold
-                  : 0}
+                value={
+                  Number.isFinite(localGraphAlert.threshold)
+                    ? localGraphAlert.threshold
+                    : 0
+                }
                 onChange={(e) => {
                   const next = Number(e.target.value);
                   setLocalGraphAlert((prev) => ({
@@ -409,7 +412,9 @@ export function FiltersSecondaryDrawer({
                   onChange={(e) =>
                     setLocalGraphAlert((prev) => ({
                       ...prev,
-                      timePeriod: Number(e.target.value) as GraphAlertTimePeriod,
+                      timePeriod: Number(
+                        e.target.value,
+                      ) as GraphAlertTimePeriod,
                     }))
                   }
                 >

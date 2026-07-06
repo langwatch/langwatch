@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   buildGraphAlertTriggerData,
   extractGraphAlertFromTriggerRow,
-  graphAlertActionParamsSchema,
   GRAPH_ALERT_OPERATORS,
   GRAPH_ALERT_TIME_PERIODS,
+  graphAlertActionParamsSchema,
 } from "../graph-alert.builder";
 
 describe("buildGraphAlertTriggerData", () => {
@@ -230,10 +230,7 @@ describe("extractGraphAlertFromTriggerRow (builder5015-004)", () => {
         seriesName: "0/cost/sum",
         members: ["alice@example.com", "bob@example.com"],
       });
-      expect(parsed?.members).toEqual([
-        "alice@example.com",
-        "bob@example.com",
-      ]);
+      expect(parsed?.members).toEqual(["alice@example.com", "bob@example.com"]);
       expect(parsed?.threshold).toBe(1000);
     });
   });
@@ -276,33 +273,30 @@ describe("extractGraphAlertFromTriggerRow (builder5015-004)", () => {
           (timePeriod) => [operator, timePeriod] as const,
         ),
       ),
-    )(
-      "build then extract yields the same threshold rule (operator=%s, timePeriod=%d)",
-      (operator, timePeriod) => {
-        const data = buildGraphAlertTriggerData({
-          id: "t-1",
-          name: "test",
-          projectId: "p",
-          action: TriggerAction.SEND_EMAIL,
-          alertType: AlertType.INFO,
-          customGraphId: "g",
-          actionParams: {
-            threshold: 42,
-            operator,
-            timePeriod,
-            seriesName: "0/metric/sum",
-            members: ["a@b.co"],
-          },
-        });
-        const extracted = extractGraphAlertFromTriggerRow(data.actionParams);
-        expect(extracted).toMatchObject({
+    )("build then extract yields the same threshold rule (operator=%s, timePeriod=%d)", (operator, timePeriod) => {
+      const data = buildGraphAlertTriggerData({
+        id: "t-1",
+        name: "test",
+        projectId: "p",
+        action: TriggerAction.SEND_EMAIL,
+        alertType: AlertType.INFO,
+        customGraphId: "g",
+        actionParams: {
           threshold: 42,
           operator,
           timePeriod,
           seriesName: "0/metric/sum",
           members: ["a@b.co"],
-        });
-      },
-    );
+        },
+      });
+      const extracted = extractGraphAlertFromTriggerRow(data.actionParams);
+      expect(extracted).toMatchObject({
+        threshold: 42,
+        operator,
+        timePeriod,
+        seriesName: "0/metric/sum",
+        members: ["a@b.co"],
+      });
+    });
   });
 });

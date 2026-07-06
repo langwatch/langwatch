@@ -40,8 +40,8 @@ import type { TraceSummaryService } from "./traces/trace-summary.service";
 import type { EmailSuppressionService } from "./triggers/emailSuppression.service";
 import type { TriggerService } from "./triggers/trigger.service";
 import type {
-  TestFireTriggerInput,
   TestFireResult,
+  TestFireTriggerInput,
 } from "./triggers/trigger-template.service";
 import type { UsageService } from "./usage/usage.service";
 

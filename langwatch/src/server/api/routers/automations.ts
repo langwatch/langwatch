@@ -1,5 +1,5 @@
 import { generate as ksuid } from "@langwatch/ksuid";
-import { AlertType, Prisma, TriggerAction } from "@prisma/client";
+import { AlertType, type Prisma, TriggerAction } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
@@ -21,8 +21,8 @@ import {
 } from "~/server/app-layer/triggers/errors";
 import {
   buildGraphAlertTriggerData,
-  graphAlertActionParamsSchema,
   type GraphAlertActionParams,
+  graphAlertActionParamsSchema,
 } from "~/server/app-layer/triggers/graph-alert.builder";
 import {
   type DraftProject,
@@ -370,7 +370,7 @@ export const automationRouter = createTRPCRouter({
         const checks = checkIds.map((id) => checksMap[id]).filter(Boolean);
 
         const customGraph = trigger.customGraphId
-          ? customGraphsById.get(trigger.customGraphId) ?? null
+          ? (customGraphsById.get(trigger.customGraphId) ?? null)
           : null;
 
         return {

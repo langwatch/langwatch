@@ -27,11 +27,7 @@
  * `lastRunAt`).
  */
 
-import type {
-  CustomGraph,
-  Project,
-  Trigger,
-} from "@prisma/client";
+import type { CustomGraph, Project, Trigger } from "@prisma/client";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 import { sumMetricAcrossGroups } from "~/pages/api/cron/triggers/customGraphTrigger";
 import type { ActionParams } from "~/pages/api/cron/triggers/types";

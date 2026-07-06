@@ -1,5 +1,5 @@
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { BaseAnalyticsRollupClickHouseRepository } from "~/server/app-layer/analytics/repositories/analyticsWriteBase";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { SuiteAnalyticsRollupRow } from "~/server/event-sourcing/pipelines/suite-run-processing/projections/suiteAnalyticsRollup.mapProjection";
 import type { SuiteAnalyticsRollupRepository } from "./suite-analytics-rollup.repository";
 

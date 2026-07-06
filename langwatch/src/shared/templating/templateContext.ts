@@ -238,7 +238,11 @@ export function buildGraphAlertTemplateContext({
   project,
   baseHost,
 }: {
-  trigger: { id: string; name: string; alertType: "INFO" | "WARNING" | "CRITICAL" | null };
+  trigger: {
+    id: string;
+    name: string;
+    alertType: "INFO" | "WARNING" | "CRITICAL" | null;
+  };
   graph: { id: string; name: string };
   metric: { label: string; seriesName: string };
   condition: {

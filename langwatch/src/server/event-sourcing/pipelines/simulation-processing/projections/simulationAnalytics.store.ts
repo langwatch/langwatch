@@ -24,9 +24,7 @@ export class SimulationAnalyticsStore extends BaseAnalyticsFoldStore<
     super(repo, {
       hasPersistableSignal,
       stampAggregateId: (state, aggregateId) =>
-        state.scenarioRunId
-          ? state
-          : { ...state, scenarioRunId: aggregateId },
+        state.scenarioRunId ? state : { ...state, scenarioRunId: aggregateId },
       retentionCategory: "scenarios",
       versionLatest: SIMULATION_ANALYTICS_PROJECTION_VERSION_LATEST,
       project: projectSimulationAnalyticsStateToRow,

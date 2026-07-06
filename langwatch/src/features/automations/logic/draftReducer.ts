@@ -12,12 +12,12 @@ import {
 } from "~/automations/providers/client";
 import { isNotifyEntry } from "~/automations/providers/types";
 import type { FilterParam } from "~/hooks/useFilterParams";
-import type { FilterField } from "~/server/filters/types";
 import {
-  extractGraphAlertFromTriggerRow as parseGraphAlertRow,
   type GraphAlertOperator,
   type GraphAlertTimePeriod,
+  extractGraphAlertFromTriggerRow as parseGraphAlertRow,
 } from "~/server/app-layer/triggers/graph-alert.builder";
+import type { FilterField } from "~/server/filters/types";
 
 /**
  * Pure state machine for the staged automation drawer (ADR-036). Lives

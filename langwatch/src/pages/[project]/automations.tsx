@@ -300,8 +300,7 @@ function Automations() {
                   ) : (
                     triggers.data?.map((trigger) => {
                       const isGraphAlert = !!trigger.customGraphId;
-                      const actionParams =
-                        trigger.actionParams as ActionParams;
+                      const actionParams = trigger.actionParams as ActionParams;
                       return (
                         <Table.Row
                           key={trigger.id}
