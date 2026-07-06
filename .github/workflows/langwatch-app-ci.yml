@@ -303,7 +303,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: mongolyy/reviewdog-action-biome@cdea4bd64ef0291fba37174f9684c9770a9573fc # v2
+      - uses: mongolyy/reviewdog-action-biome@58f27dce74f1f648943d3a88de554385727ce11b # v2
         with:
           reporter: github-pr-review
           fail_level: error
