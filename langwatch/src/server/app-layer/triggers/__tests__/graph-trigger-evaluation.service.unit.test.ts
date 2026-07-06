@@ -1,8 +1,4 @@
-import type {
-  CustomGraph,
-  Project,
-  Trigger,
-} from "@prisma/client";
+import type { CustomGraph, Project, Trigger } from "@prisma/client";
 import { TriggerAction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TimeseriesResult } from "~/server/analytics/types";
@@ -91,7 +87,10 @@ function timeseries(value: number | null): TimeseriesResult {
   }
   return {
     currentPeriod: [
-      { date: "2026-06-20T11:00:00Z", "0/metadata.trace_id/cardinality": value },
+      {
+        date: "2026-06-20T11:00:00Z",
+        "0/metadata.trace_id/cardinality": value,
+      },
     ],
     previousPeriod: [],
   } as unknown as TimeseriesResult;

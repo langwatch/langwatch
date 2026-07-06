@@ -21,7 +21,9 @@ describe("pickTriggerDefaults", () => {
       expect(defaults.emailSubject).toBe(DEFAULT_ALERT_EMAIL_SUBJECT_TEMPLATE);
       expect(defaults.emailBody).toBe(DEFAULT_ALERT_EMAIL_BODY_TEMPLATE);
       expect(defaults.slackString).toBe(DEFAULT_ALERT_SLACK_TEMPLATE);
-      expect(defaults.slackBlockKit).toBe(DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE);
+      expect(defaults.slackBlockKit).toBe(
+        DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE,
+      );
     });
 
     it("uses the alert-shape subject prefix [Alert]", () => {
