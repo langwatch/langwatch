@@ -8,8 +8,8 @@ import type { PrismaClient } from "@prisma/client";
  * billable-events checkpoint is never altered to make room for it.
  */
 export interface StorageBillingCheckpoint {
-  lastReportedTotal: number;
-  pendingReportedTotal: number | null;
+  lastReportedTotal: bigint;
+  pendingReportedTotal: bigint | null;
   consecutiveFailures: number;
 }
 
@@ -34,14 +34,14 @@ export interface StorageBillingCheckpointService {
   writeIntent(params: {
     organizationId: string;
     billingMonth: string;
-    lastReportedTotal: number;
-    pendingReportedTotal: number;
+    lastReportedTotal: bigint;
+    pendingReportedTotal: bigint;
   }): Promise<void>;
 
   confirm(params: {
     organizationId: string;
     billingMonth: string;
-    lastReportedTotal: number;
+    lastReportedTotal: bigint;
   }): Promise<void>;
 
   clearPendingAndIncrementFailures(params: {
@@ -53,8 +53,8 @@ export interface StorageBillingCheckpointService {
   incrementFailures(params: {
     organizationId: string;
     billingMonth: string;
-    lastReportedTotal: number;
-    pendingReportedTotal: number;
+    lastReportedTotal: bigint;
+    pendingReportedTotal: bigint;
     consecutiveFailures: number;
   }): Promise<void>;
 }
@@ -90,8 +90,8 @@ export class PrismaStorageBillingCheckpointService
   async writeIntent(params: {
     organizationId: string;
     billingMonth: string;
-    lastReportedTotal: number;
-    pendingReportedTotal: number;
+    lastReportedTotal: bigint;
+    pendingReportedTotal: bigint;
   }): Promise<void> {
     await this.prisma.storageBillingCheckpoint.upsert({
       where: {
@@ -115,7 +115,7 @@ export class PrismaStorageBillingCheckpointService
   async confirm(params: {
     organizationId: string;
     billingMonth: string;
-    lastReportedTotal: number;
+    lastReportedTotal: bigint;
   }): Promise<void> {
     await this.prisma.storageBillingCheckpoint.upsert({
       where: {
@@ -161,8 +161,8 @@ export class PrismaStorageBillingCheckpointService
   async incrementFailures(params: {
     organizationId: string;
     billingMonth: string;
-    lastReportedTotal: number;
-    pendingReportedTotal: number;
+    lastReportedTotal: bigint;
+    pendingReportedTotal: bigint;
     consecutiveFailures: number;
   }): Promise<void> {
     await this.prisma.storageBillingCheckpoint.upsert({

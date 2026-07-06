@@ -26,8 +26,8 @@ CREATE TABLE "StorageBillingCheckpoint" (
     "id" TEXT NOT NULL,
     "organizationId" TEXT NOT NULL,
     "billingMonth" TEXT NOT NULL,
-    "lastReportedTotal" INTEGER NOT NULL DEFAULT 0,
-    "pendingReportedTotal" INTEGER,
+    "lastReportedTotal" BIGINT NOT NULL DEFAULT 0,
+    "pendingReportedTotal" BIGINT,
     "consecutiveFailures" INTEGER NOT NULL DEFAULT 0,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

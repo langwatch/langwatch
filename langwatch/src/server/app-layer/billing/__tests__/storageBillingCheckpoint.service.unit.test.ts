@@ -64,13 +64,13 @@ describe("PrismaStorageBillingCheckpointService", () => {
       await service.writeIntent({
         organizationId: "org-1",
         billingMonth: "2026-02",
-        lastReportedTotal: 0,
-        pendingReportedTotal: 5,
+        lastReportedTotal: 0n,
+        pendingReportedTotal: 5n,
       });
       await service.confirm({
         organizationId: "org-1",
         billingMonth: "2026-02",
-        lastReportedTotal: 5,
+        lastReportedTotal: 5n,
       });
 
       expect(storageBillingCheckpoint.upsert).toHaveBeenCalledTimes(2);
@@ -83,7 +83,7 @@ describe("PrismaStorageBillingCheckpointService", () => {
             },
           },
           update: {
-            lastReportedTotal: 5,
+            lastReportedTotal: 5n,
             pendingReportedTotal: null,
             consecutiveFailures: 0,
           },
@@ -101,8 +101,8 @@ describe("PrismaStorageBillingCheckpointService", () => {
       await service.incrementFailures({
         organizationId: "org-1",
         billingMonth: "2026-02",
-        lastReportedTotal: 0,
-        pendingReportedTotal: 5,
+        lastReportedTotal: 0n,
+        pendingReportedTotal: 5n,
         consecutiveFailures: 3,
       });
 

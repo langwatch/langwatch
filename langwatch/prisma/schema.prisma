@@ -1822,8 +1822,11 @@ model StorageBillingCheckpoint {
   id                   String   @id @default(cuid())
   organizationId       String
   billingMonth         String // "2026-02"
-  lastReportedTotal    Int      @default(0)
-  pendingReportedTotal Int? // non-null = in-flight Stripe call
+  // Cumulative MiB-hours reported for the period (ADR-027: Σ megabytes over the
+  // billing month). BigInt, not Int: Int32 caps at ~2.8 TiB held for a full
+  // month before overflow, which a large enterprise org can exceed.
+  lastReportedTotal    BigInt   @default(0)
+  pendingReportedTotal BigInt? // non-null = in-flight Stripe call
   consecutiveFailures  Int      @default(0)
   updatedAt            DateTime @updatedAt
 
