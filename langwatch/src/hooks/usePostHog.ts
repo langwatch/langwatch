@@ -124,6 +124,12 @@ export function usePostHog() {
     const userId = session?.user?.id;
 
     if (userId && identifiedUserRef.current !== userId) {
+      // When switching between two different authenticated users (user-A →
+      // user-B without an intermediate logout), reset first so the prior
+      // user's session is not merged into the new user's PostHog profile.
+      if (identifiedUserRef.current !== null) {
+        posthog.reset();
+      }
       // Identify by internal user ID only — email and name are PII and must
       // not be forwarded to third-party analytics.
       posthog.identify(userId);

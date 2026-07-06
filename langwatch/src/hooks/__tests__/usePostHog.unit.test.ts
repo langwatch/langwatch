@@ -475,6 +475,29 @@ describe("usePostHog", () => {
         expect(mockIdentify).toHaveBeenCalledTimes(2);
         expect(mockIdentify).toHaveBeenLastCalledWith("user-2");
       });
+
+      it("calls reset() before identifying the new user to prevent session merging", () => {
+        mockSession.data = {
+          user: { id: "user-1", email: "user1@example.com", name: "User One" },
+        };
+        const { rerender } = renderHook(() => usePostHog());
+
+        mockSession.data = {
+          user: { id: "user-2", email: "user2@example.com", name: "User Two" },
+        };
+        rerender();
+
+        // reset() must be called exactly once — between the two identifies.
+        expect(mockReset).toHaveBeenCalledTimes(1);
+
+        // Verify ordering: reset invocation comes after the first identify
+        // and before the second identify via invocationCallOrder indices.
+        const [firstIdentifyOrder, secondIdentifyOrder] =
+          mockIdentify.mock.invocationCallOrder;
+        const [resetOrder] = mockReset.mock.invocationCallOrder;
+        expect(resetOrder).toBeGreaterThan(firstIdentifyOrder!);
+        expect(resetOrder).toBeLessThan(secondIdentifyOrder!);
+      });
     });
   });
 
