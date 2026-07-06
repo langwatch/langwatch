@@ -50,6 +50,26 @@ the better candidate, or "tie" if equivalent.
 Prefer cheaper/faster only when quality is comparable.
 """
 
+# Used when has_golden_answer is False (#5378) — no reference answer exists,
+# so the judge compares the two candidates directly instead of against a
+# "golden answer" that would otherwise have to be faked (e.g. by pointing
+# the golden field back at the input question, which used to be the only
+# workaround and produced a prompt that lied about having a reference).
+DEFAULT_PAIRWISE_PROMPT_NO_GOLDEN = """\
+Compare two candidate outputs and decide which one is better on its own \
+merits — there is no reference answer to compare against.
+
+Task:           {input}
+
+Candidate A:    {candidate_a_output}
+Candidate B:    {candidate_b_output}
+
+Reason step-by-step about which candidate is more correct, complete, and
+well-styled for the given task. Then pick the better candidate, or "tie"
+if equivalent.
+Prefer cheaper/faster only when quality is comparable.
+"""
+
 
 class PairwiseCompareEntry(EvaluatorEntry, allow_extra=True):
     input: Optional[str] = None
@@ -68,6 +88,15 @@ class PairwiseCompareSettings(LLMEvaluatorSettings):
     prompt: str = Field(
         default=DEFAULT_PAIRWISE_PROMPT,
         description="Judge prompt template (golden-aware by default)",
+    )
+    has_golden_answer: bool = Field(
+        default=True,
+        description=(
+            "Compare each candidate against a reference answer. Turn off "
+            "to have the judge compare Candidate A and Candidate B "
+            "directly on their own merits, with no reference answer "
+            "involved."
+        ),
     )
     swap_and_confirm: bool = Field(
         default=True,
@@ -186,12 +215,25 @@ class PairwiseCompareEvaluator(
             actual = order[0] if slot == "A" else order[1]
             return getattr(entry, f"candidate_{actual.lower()}_{attr}")
 
+        # When has_golden_answer is off and the user hasn't customized the
+        # prompt, swap in the golden-free template instead of rendering
+        # "Golden answer: " with nothing after it — the point of the toggle
+        # is to drop the golden framing entirely, not just blank it out. A
+        # customized prompt is the user's explicit choice and is left as-is
+        # (they opted into whatever placeholders it contains).
+        effective_prompt = self.settings.prompt
+        if (
+            not self.settings.has_golden_answer
+            and effective_prompt == DEFAULT_PAIRWISE_PROMPT
+        ):
+            effective_prompt = DEFAULT_PAIRWISE_PROMPT_NO_GOLDEN
+
         # `str.format` raises KeyError on any placeholder the user added that
         # we don't know about (e.g. a custom prompt with `{candidate_a_id}`),
         # surfacing as an opaque evaluator error. Use literal substitution
         # for the slots we know about; anything else passes through verbatim
         # — the judge gets a slightly weird prompt instead of a hard crash.
-        rendered_prompt = self.settings.prompt
+        rendered_prompt = effective_prompt
         for key, val in {
             "input": entry.input or "",
             "golden": entry.golden or "",
