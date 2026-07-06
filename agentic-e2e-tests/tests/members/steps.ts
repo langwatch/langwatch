@@ -240,6 +240,39 @@ export async function getOrgAndTeamIds(page: Page): Promise<{
 }
 
 /**
+ * Purge all PENDING/WAITING_APPROVAL invites for the org before seeding.
+ * Required because the CI DB persists across runs (SKIP_PRISMA_MIGRATE=true),
+ * so accumulated invites count toward the free plan maxMembers=2 cap and
+ * cause 403 FORBIDDEN on subsequent seeding calls.
+ */
+async function purgeExistingInvites({
+  page,
+  organizationId,
+}: {
+  page: Page;
+  organizationId: string;
+}) {
+  const listResponse = await page.request.get(
+    "/api/trpc/organization.getOrganizationPendingInvites?batch=1&input=" +
+      encodeURIComponent(
+        JSON.stringify({ "0": { json: { organizationId } } }),
+      ),
+  );
+  if (!listResponse.ok()) return; // best-effort
+
+  const data = (await listResponse.json().catch(() => null)) as
+    | { "0": { result: { data: { json: { id: string }[] } } } }
+    | null;
+  const invites = data?.["0"]?.result?.data?.json ?? [];
+
+  for (const invite of invites) {
+    await page.request.post("/api/trpc/organization.deleteInvite", {
+      data: { json: { inviteId: invite.id, organizationId } },
+    });
+  }
+}
+
+/**
  * Create a WAITING_APPROVAL invitation via tRPC API.
  */
 export async function seedWaitingApprovalInvite({
@@ -253,6 +286,9 @@ export async function seedWaitingApprovalInvite({
   organizationId: string;
   teamId: string;
 }) {
+  // Purge accumulated invites first so we don't hit the free plan member cap.
+  await purgeExistingInvites({ page, organizationId });
+
   const response = await page.request.post(
     "/api/trpc/organization.createInviteRequest",
     {

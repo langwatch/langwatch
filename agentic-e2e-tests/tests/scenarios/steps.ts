@@ -135,17 +135,18 @@ export async function thenISeeTheScenarioEditor(page: Page) {
  * Then I see the scenario form fields (Name, Situation, Criteria, Labels)
  */
 export async function thenISeeScenarioFormFields(page: Page) {
-  // Name field
+  // Name field — SectionHeader renders as <p> not <label>, so there is no
+  // ARIA name association; match by placeholder instead.
   await expect(
-    page.getByRole("textbox", { name: "Name", exact: true }).first()
+    page.getByPlaceholder(/angry refund request/i).first()
   ).toBeVisible();
 
-  // Situation field (using placeholder as fallback - no label available)
+  // Situation field
   await expect(
     page.getByPlaceholder(/a frustrated premium subscriber/i).first()
   ).toBeVisible();
 
-  // Criteria field (using placeholder as fallback - no label available)
+  // Criteria field
   await expect(
     page.getByPlaceholder(/must apologize for the inconvenience/i).first()
   ).toBeVisible();
@@ -155,8 +156,9 @@ export async function thenISeeScenarioFormFields(page: Page) {
  * When I fill in "Name" with "<name>"
  */
 export async function whenIFillInNameWith(page: Page, name: string) {
+  // SectionHeader is a <p> not <label> — no accessible name; use placeholder.
   await page
-    .getByRole("textbox", { name: "Name", exact: true })
+    .getByPlaceholder(/angry refund request/i)
     .last()
     .fill(name);
 }
@@ -245,8 +247,9 @@ export async function whenIClickOnScenarioInList(page: Page, name: string) {
  * Then the form is populated with the existing data
  */
 export async function thenFormIsPopulatedWithName(page: Page, name: string) {
+  // SectionHeader is a <p> not <label> — no accessible name; use placeholder.
   const nameField = page
-    .getByRole("textbox", { name: "Name", exact: true })
+    .getByPlaceholder(/angry refund request/i)
     .last();
   await expect(nameField).toHaveValue(name);
 }
@@ -255,8 +258,9 @@ export async function thenFormIsPopulatedWithName(page: Page, name: string) {
  * When I change the name to "<name>"
  */
 export async function whenIChangeNameTo(page: Page, name: string) {
+  // SectionHeader is a <p> not <label> — no accessible name; use placeholder.
   const nameField = page
-    .getByRole("textbox", { name: "Name", exact: true })
+    .getByPlaceholder(/angry refund request/i)
     .last();
   await nameField.clear();
   await nameField.fill(name);
