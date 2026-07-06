@@ -117,7 +117,7 @@ function SettingsForm({
           toaster.create({
             title: "Failed to update organization",
             description:
-              "Please make sure you have filled out all fields related to S3",
+              "Your changes could not be saved. Please try again.",
             type: "error",
             meta: {
               closable: true,
@@ -418,7 +418,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
           toaster.create({
             title: "Failed to update project",
             description:
-              "Please make sure you have filled out all fields related to S3",
+              "Your changes could not be saved. Please try again.",
             type: "error",
             meta: {
               closable: true,

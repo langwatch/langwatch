@@ -1,8 +1,6 @@
-import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
-import { prisma as defaultPrisma } from "~/server/db";
 import { createLogger } from "~/utils/logger/server";
 import {
   buildScopeConditions,
@@ -12,8 +10,6 @@ import {
   type SupportedClickHouseFilterDefinition,
 } from "./clickhouse";
 import type { FilterField } from "./types";
-
-export type { FilterOption };
 
 export type GetFilterOptionsInput = {
   projectId: string;
@@ -33,10 +29,8 @@ export class FilterService {
   private readonly logger = createLogger("langwatch:filters:service");
   private readonly tracer = getLangWatchTracer("langwatch.filters.service");
 
-  constructor(private readonly prisma: PrismaClient) {}
-
-  static create(prisma: PrismaClient = defaultPrisma): FilterService {
-    return new FilterService(prisma);
+  static create(): FilterService {
+    return new FilterService();
   }
 
   private getFilterDefinition(
@@ -62,6 +56,16 @@ export class FilterService {
         },
       },
       async (span) => {
+        if (
+          !input.projectId ||
+          typeof input.projectId !== "string" ||
+          input.projectId.trim() === ""
+        ) {
+          throw new Error(
+            "Security: projectId (tenantId) must be a non-empty string",
+          );
+        }
+
         const clickHouseClient = await getClickHouseClientForProject(
           input.projectId,
         );
@@ -94,15 +98,13 @@ export class FilterService {
 
           const sqlQuery = filterDef.buildQuery(queryParams);
 
-          if (
-            !input.projectId ||
-            typeof input.projectId !== "string" ||
-            input.projectId.trim() === ""
-          ) {
-            throw new Error(
-              "Security: projectId (tenantId) must be a non-empty string",
-            );
+          // Definitions that require a key/subkey return null when it is
+          // missing — there is nothing to query yet, so resolve to no options.
+          if (sqlQuery === null) {
+            span.setAttribute("clickhouse.query_skipped", true);
+            return [];
           }
+
           if (!sqlQuery.includes("TenantId = {tenantId:String}")) {
             throw new Error(
               `Security: Filter query for ${input.field} is missing TenantId isolation`,
@@ -145,7 +147,10 @@ export class FilterService {
             "Failed to fetch filter options from ClickHouse",
           );
           span.setAttribute("clickhouse.error", true);
-          throw error;
+          // Do not rethrow the raw ClickHouse error — its message embeds the
+          // failing SQL (table/column layout), which tRPC would forward to the
+          // browser. Details stay in the server log and span above.
+          throw new Error("Failed to fetch filter options");
         }
       },
     );

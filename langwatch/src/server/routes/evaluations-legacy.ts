@@ -1100,7 +1100,7 @@ const processBatchEvaluation = async (
   project: Project,
   param: ESBatchEvaluationRESTParams,
 ) => {
-  const { run_id, experiment_id, experiment_slug } = param;
+  const { experiment_id, experiment_slug } = param;
 
   const experiment = await findOrCreateExperiment({
     project,

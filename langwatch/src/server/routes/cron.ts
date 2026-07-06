@@ -17,17 +17,33 @@ import {
   type SeedRunReport,
 } from "../../../scripts/dogfood/governance/_lib/seedRunner";
 import { runSeedDemo } from "../../../scripts/dogfood/governance/seed-demo";
-import { validateInternalSecret } from "./_lib/internal-secret";
+import {
+  isInternalSecretValid,
+  validateInternalSecret,
+} from "./_lib/internal-secret";
 
 const logger = createLogger("langwatch:cron");
 
-const secured = createServiceApp({ basePath: "/api" });
+// Builder-enforced secret gate: every route registered on this app passes
+// through the shared-secret check before its handler runs, so a future cron
+// route whose author forgets the in-handler validateCronKey call still ships
+// authenticated. The per-handler checks below stay as belt-and-braces.
+const secured = createServiceApp({
+  basePath: "/api",
+  verifySecret: async (c, next) => {
+    if (!isInternalSecretValid(c.req.header("authorization"))) {
+      return c.body(null, 401);
+    }
+    await next();
+  },
+});
 
 type CronContext = Context;
 
 const cronPolicy = () =>
   internalSecret(
-    "cron shared secret validated in-handler via validateInternalSecret",
+    "cron shared secret enforced by the builder-level verifySecret middleware " +
+      "(and re-checked in-handler via validateInternalSecret)",
   );
 
 /** Validates the cron shared secret. See validateInternalSecret (fail-closed + constant-time). */

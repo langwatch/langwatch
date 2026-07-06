@@ -16,6 +16,7 @@ import {
 } from "../api-key/auth-middleware";
 import { TokenResolver } from "../api-key/token-resolver";
 import { getApp } from "../app-layer/app";
+import { SPAN_MAX_PAST_MS } from "../app-layer/traces/trace-request-collection.service";
 import { prisma } from "../db";
 import { evaluationNameAutoslug } from "../tracer/collector/evaluationNameAutoslug";
 import { maybeAddIdsToContextList } from "../tracer/collector/rag";
@@ -311,6 +312,26 @@ secured
         );
       }
 
+      // Mirror the span cap for evaluations: without it, a 10MB body of minimal
+      // evaluation objects yields tens of thousands of sequential event-sourcing
+      // dispatches per request (evaluations have no dedup gate, unlike spans).
+      if ((params.evaluations?.length ?? 0) > 200) {
+        logger.info(
+          {
+            projectId: project.id,
+            evaluationsCount: params.evaluations?.length,
+            traceId: nullableTraceId,
+          },
+          "[429] Too many evaluations",
+        );
+        return c.json(
+          {
+            message: "Too many evaluations, maximum of 200 per trace",
+          },
+          429,
+        );
+      }
+
       let reservedTraceMetadata: ReservedTraceMetadata = {};
       let customMetadata: CustomMetadata = {};
       try {
@@ -511,8 +532,38 @@ secured
         }
       }
 
-      let rejectedSpans = 0;
-      let rejectionErrors: string[] = [];
+      // OTLP parity: processSpan drops spans older than SPAN_MAX_PAST_MS before
+      // the dedup gate, so apply the same age cutoff here — otherwise the REST
+      // path alone would write arbitrarily old timestamps into cold ClickHouse
+      // partitions, undermining partition pruning.
+      const startedAtCutoff = Date.now() - SPAN_MAX_PAST_MS;
+      const freshSpans: Span[] = [];
+      let droppedOldSpans = 0;
+      for (const span of spans) {
+        if (
+          span.timestamps.started_at &&
+          span.timestamps.started_at < startedAtCutoff
+        ) {
+          droppedOldSpans++;
+          continue;
+        }
+        freshSpans.push(span);
+      }
+      if (droppedOldSpans > 0) {
+        logger.info(
+          { projectId: project.id, traceId, droppedOldSpans },
+          "dropped spans with start time more than 31 days in the past",
+        );
+      }
+
+      let rejectedSpans = droppedOldSpans;
+      let dispatchFailures = 0;
+      let rejectionErrors: string[] =
+        droppedOldSpans > 0
+          ? [
+              `${droppedOldSpans} span(s) dropped: start time is more than 31 days in the past`,
+            ]
+          : [];
       try {
         const resource = CollectorSpanUtils.buildResource({
           reservedTraceMetadata,
@@ -521,7 +572,7 @@ secured
         });
 
         const results = await Promise.allSettled(
-          spans.map((span) =>
+          freshSpans.map((span) =>
             // Route through ingestNormalizedSpan (not recordSpan directly) so the
             // REST collector shares the (tenant, trace, span) dedup gate + ADR-022
             // spool hook with the OTLP path — a retry storm here must not bypass
@@ -553,8 +604,9 @@ secured
               : null;
           })
           .filter((e): e is string => e !== null);
-        rejectedSpans = failureErrors.length;
-        rejectionErrors = failureErrors;
+        dispatchFailures = failureErrors.length;
+        rejectedSpans += failureErrors.length;
+        rejectionErrors = [...rejectionErrors, ...failureErrors];
         if (failureErrors.length > 0) {
           logger.error(
             {
@@ -568,25 +620,50 @@ secured
         }
       } catch (error) {
         // Catch synchronous errors (e.g., from buildResource)
-        rejectedSpans = spans.length;
-        rejectionErrors = [
+        dispatchFailures = freshSpans.length;
+        rejectedSpans += freshSpans.length;
+        rejectionErrors.push(
           error instanceof Error ? error.message : String(error),
-        ];
+        );
         logger.error(
           { error, projectId: project.id, traceId },
           "Error initializing event sourcing dispatch",
         );
       }
 
+      // Total ingestion failure: every dispatched span failed (e.g. Redis /
+      // group-queue outage). With the BullMQ fallback stack gone, a 200 here
+      // would tell the SDK the trace landed and it would never retry —
+      // permanent trace loss. Return 500 so clients retry; the dedup gate
+      // releases failed spans via tryReleaseOnFailure, so a retry is safe.
+      // Partial success stays 2xx for SDK back-compat.
+      if (freshSpans.length > 0 && dispatchFailures === freshSpans.length) {
+        return c.json(
+          {
+            message: `Failed to ingest all ${dispatchFailures} spans, please retry`,
+            partialSuccess: {
+              rejectedSpans,
+              errorMessage: rejectionErrors.join("; "),
+            },
+          },
+          500,
+        );
+      }
+
       // Dispatch custom SDK evaluations to the event-sourcing evaluation pipeline.
       // The REST collector receives evaluations as a separate field (not as span events),
       // so they must be dispatched independently from the spans above.
+      let rejectedEvaluations = 0;
+      const evaluationErrors: string[] = [];
       if (params.evaluations && params.evaluations.length > 0 && traceId) {
-        try {
-          const app = getApp();
-          const occurredAt = Date.now();
+        const app = getApp();
+        const occurredAt = Date.now();
 
-          for (const evaluation of params.evaluations) {
+        for (const evaluation of params.evaluations) {
+          // try/catch per evaluation so one failing dispatch does not silently
+          // drop the remaining evaluations; failures are surfaced to the client
+          // via partialSuccess.rejectedEvaluations below.
+          try {
             const evaluationMD5 = crypto
               .createHash("md5")
               .update(JSON.stringify({ traceId, evaluation }))
@@ -615,12 +692,21 @@ secured
               error: evaluation.error?.message ?? null,
               occurredAt,
             });
+          } catch (error) {
+            rejectedEvaluations++;
+            evaluationErrors.push(
+              error instanceof Error ? error.message : String(error),
+            );
+            logger.error(
+              {
+                error,
+                projectId: project.id,
+                traceId,
+                evaluationName: evaluation.name,
+              },
+              "Error dispatching REST evaluation to event sourcing",
+            );
           }
-        } catch (error) {
-          logger.error(
-            { error, projectId: project.id, traceId },
-            "Error dispatching REST evaluations to event sourcing",
-          );
         }
       }
 
@@ -628,7 +714,8 @@ secured
         message: "Trace received successfully.",
         partialSuccess: {
           rejectedSpans,
-          errorMessage: rejectionErrors.join("; "),
+          rejectedEvaluations,
+          errorMessage: [...rejectionErrors, ...evaluationErrors].join("; "),
         },
       });
     },

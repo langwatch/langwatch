@@ -20,11 +20,10 @@ const monthCountCache = new TtlCache<number>(
 export class TraceUsageService {
   constructor(
     private readonly organizationRepository: OrganizationRepository,
-    private readonly prisma: PrismaClient,
   ) {}
 
   static create(db: PrismaClient = prisma): TraceUsageService {
-    return new TraceUsageService(new OrganizationRepository(db), db);
+    return new TraceUsageService(new OrganizationRepository(db));
   }
 
   async getCurrentMonthCount({
@@ -50,14 +49,30 @@ export class TraceUsageService {
       { organizationId, projectIds },
       "getCurrentMonthCount: querying trace_summaries",
     );
-    const total =
-      (await queryTraceSummariesTotalUniq({ projectIds, billingMonth })) ?? 0;
+    const total = await queryTraceSummariesTotalUniq({
+      projectIds,
+      billingMonth,
+    });
+
+    if (total === null) {
+      // queryTraceSummariesTotalUniq returns null only when no ClickHouse
+      // client is available. Fail open (report 0), mirroring
+      // event-usage.service.ts — but do NOT cache the failure-derived zero:
+      // a cached 0 would keep license/limit enforcement reading "no usage"
+      // for the full 5-minute TTL even after ClickHouse recovers.
+      logger.warn(
+        { organizationId, billingMonth },
+        "getCurrentMonthCount: ClickHouse unavailable, returning 0 (fail-open, not cached)",
+      );
+      return 0;
+    }
 
     await monthCountCache.set(cacheKey, total);
     return total;
   }
 
   async getCountByProjects({
+    organizationId,
     projectIds,
   }: {
     organizationId: string;
@@ -65,9 +80,27 @@ export class TraceUsageService {
   }): Promise<Array<{ projectId: string; count: number }>> {
     if (projectIds.length === 0) return [];
 
+    // The signature advertises organization scoping — enforce it. Current
+    // callers derive projectIds from the organization already, so a foreign
+    // id here is a programming error (or attacker-influenced input) and must
+    // not read another tenant's trace counts.
+    const organizationProjectIds = new Set(
+      await this.organizationRepository.getProjectIds(organizationId),
+    );
+    const foreignProjectIds = projectIds.filter(
+      (projectId) => !organizationProjectIds.has(projectId),
+    );
+    if (foreignProjectIds.length > 0) {
+      throw new Error(
+        `getCountByProjects: projectIds [${foreignProjectIds.join(", ")}] do not belong to organization ${organizationId}`,
+      );
+    }
+
     const billingMonth = getBillingMonth();
     return Promise.all(
       projectIds.map(async (projectId) => {
+        // null means ClickHouse is unavailable — fail open per-project with 0
+        // (matching event-usage.service.ts); nothing is cached on this path.
         const count =
           (await queryTraceSummariesTotalUniq({
             projectIds: [projectId],

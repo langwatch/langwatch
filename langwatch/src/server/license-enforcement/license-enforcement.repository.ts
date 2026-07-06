@@ -12,15 +12,6 @@ import {
   isViewOnlyCustomRole,
 } from "./member-classification";
 
-// Re-export classification functions for backwards compatibility
-export {
-  classifyMemberType,
-  isFullMember,
-  isLiteMember,
-  isViewOnlyCustomRole,
-  isViewOnlyPermission,
-} from "./member-classification";
-
 /**
  * Type for team assignment in organization invites.
  */

@@ -32,7 +32,9 @@ import { BullMQOtel } from "bullmq-otel";
 import { env } from "~/env.mjs";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
-import { connection, makeQueueName } from "~/server/redis";
+import { makeQueueName } from "~/server/queues/makeQueueName";
+import { withJobContext } from "~/server/queues/withJobContext";
+import { connection } from "~/server/redis";
 import { createLogger } from "~/utils/logger/server";
 import {
   captureException,
@@ -40,7 +42,6 @@ import {
   withScope,
 } from "~/utils/posthogErrorCapture";
 import { decryptCredentials } from "../activity-monitor/ingestionCredentials";
-import { withJobContext } from "~/server/queues/withJobContext";
 
 export type IngestionPullerJob = {
   /** IngestionSource id this run targets. */

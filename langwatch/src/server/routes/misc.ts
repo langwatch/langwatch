@@ -8,23 +8,17 @@
  * - src/pages/api/experiment/init.ts
  * - src/pages/api/mcp/authorize.ts
  * - src/pages/api/optimization/[...params].ts
- * - src/pages/api/rerun_checks.ts
- * - src/pages/api/start_workers.ts
  * - src/pages/api/track_event.ts
  * - src/pages/api/track_usage.ts
  * - src/pages/api/trigger/slack.ts
  * - src/pages/api/webhooks/stripe.ts
  */
 
-import { createHash, randomUUID } from "node:crypto";
-import { generate } from "@langwatch/ksuid";
-import { SpanStatusCode } from "@opentelemetry/api";
-import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
+import { randomUUID } from "node:crypto";
 import type { Project } from "@prisma/client";
 import { AlertType, ExperimentType, TriggerAction } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
-import type { Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { nanoid } from "nanoid";
 import { OpenAI } from "openai";
@@ -53,18 +47,22 @@ import {
 } from "~/server/api-key/auth-middleware";
 import { getApp } from "~/server/app-layer/app";
 import type { DspyStepData } from "~/server/app-layer/dspy-steps/types";
+import {
+  generateTrackedEventId,
+  predefinedEventsSchemas,
+  predefinedEventTypes,
+  recordTrackedEventSpan,
+} from "~/server/app-layer/events/track-event.service";
 import { ProjectService } from "~/server/app-layer/projects/project.service";
 import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
-import { DEFAULT_PII_REDACTION_LEVEL } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
   type DSPyLLMCall,
   type DSPyStepRESTParams,
   dSPyStepRESTParamsSchema,
 } from "~/server/experiments/types";
 import { filterFieldsEnum } from "~/server/filters/types";
-import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
 import { buildResourceLimitMessage } from "~/server/license-enforcement/limit-message";
 import { getPayloadSizeHistogram } from "~/server/metrics";
@@ -78,18 +76,15 @@ import {
   estimateCost,
   matchModelCostWithFallbacks,
 } from "~/server/tracer/collector/cost";
-import { TRACK_EVENT_SPAN_NAME } from "~/server/tracer/constants";
 import {
   type TrackEventRESTParamsValidator,
   trackEventRESTParamsValidatorSchema,
 } from "~/server/tracer/types";
 import { runWorkflow as runWorkflowFn } from "~/server/workflows/runWorkflow";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
-import { slugify } from "~/utils/slugify";
-import { validateInternalSecret } from "./_lib/internal-secret";
+import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 
 const logger = createLogger("langwatch:misc");
 // Shared auth middlewares for every API-key-aware handler in this file.
@@ -655,37 +650,8 @@ secured
 // =============================================
 // POST /api/track_event
 // =============================================
-const thumbsUpDownSchema = z.object({
-  trace_id: z.string(),
-  event_type: z.literal("thumbs_up_down"),
-  metrics: z.object({ vote: z.number().min(-1).max(1) }),
-  event_details: z.object({ feedback: z.string().nullish() }).optional(),
-});
-
-const selectedTextSchema = z.object({
-  trace_id: z.string(),
-  event_type: z.literal("selected_text"),
-  metrics: z.object({ text_length: z.number().positive() }),
-  event_details: z.object({ selected_text: z.string().optional() }).optional(),
-});
-
-const waitedToFinishSchema = z.object({
-  trace_id: z.string(),
-  event_type: z.literal("waited_to_finish"),
-  metrics: z.object({ finished: z.number().min(0).max(1) }),
-  event_details: z.object({}).optional(),
-});
-
-export const predefinedEventsSchemas = z.union([
-  thumbsUpDownSchema,
-  selectedTextSchema,
-  waitedToFinishSchema,
-]);
-
-const predefinedEventTypes = predefinedEventsSchemas.options.map(
-  (schema) => schema.shape.event_type.value,
-);
-
+// Both this legacy URL and the canonical POST /api/events/track route
+// through track-event.service so behaviour stays identical between them.
 secured
   .access(inRouteAuth)
   .post("/track_event", authMiddleware, requireTracesCreate, async (c) => {
@@ -725,82 +691,10 @@ secured
       }
     }
 
-    const eventId =
-      body.event_id ?? generate(KSUID_RESOURCES.TRACKED_EVENT).toString();
+    const eventId = body.event_id ?? generateTrackedEventId();
 
     try {
-      const timestampMs = body.timestamp ?? Date.now();
-      const timestampNano = String(timestampMs * 1_000_000);
-      const spanId = createHash("sha256")
-        .update(`${body.trace_id}:${eventId}`)
-        .digest("hex")
-        .slice(0, 16);
-
-      const attributes: {
-        key: string;
-        value: { stringValue?: string; doubleValue?: number };
-      }[] = [
-        { key: "event.type", value: { stringValue: body.event_type } },
-        { key: "event.id", value: { stringValue: eventId } },
-      ];
-
-      for (const [key, value] of Object.entries(body.metrics)) {
-        attributes.push({
-          key: `event.metrics.${key}`,
-          value: { doubleValue: value },
-        });
-      }
-
-      if (body.event_details) {
-        for (const [key, value] of Object.entries(body.event_details)) {
-          if (typeof value === "string") {
-            attributes.push({
-              key: `event.details.${key}`,
-              value: { stringValue: value },
-            });
-          } else if (typeof value === "number") {
-            attributes.push({
-              key: `event.details.${key}`,
-              value: { doubleValue: value },
-            });
-          } else if (value != null) {
-            attributes.push({
-              key: `event.details.${key}`,
-              value: { stringValue: String(value) },
-            });
-          }
-        }
-      }
-
-      await getApp().traces.collection.ingestNormalizedSpan({
-        tenantId: project.id,
-        span: {
-          traceId: body.trace_id,
-          spanId,
-          traceState: null,
-          parentSpanId: null,
-          name: TRACK_EVENT_SPAN_NAME,
-          kind: ESpanKind.SPAN_KIND_INTERNAL,
-          startTimeUnixNano: timestampNano,
-          endTimeUnixNano: timestampNano,
-          attributes,
-          events: [
-            {
-              name: body.event_type,
-              timeUnixNano: timestampNano,
-              attributes,
-            },
-          ],
-          links: [],
-          status: { code: SpanStatusCode.OK as 1 },
-          droppedAttributesCount: null,
-          droppedEventsCount: null,
-          droppedLinksCount: null,
-        },
-        resource: { attributes: [] },
-        instrumentationScope: { name: TRACK_EVENT_SPAN_NAME },
-        piiRedactionLevel: DEFAULT_PII_REDACTION_LEVEL,
-      });
+      await recordTrackedEventSpan({ project, body, eventId });
     } catch (error) {
       logger.error({ error }, "unable to dispatch tracked event span");
     }
@@ -1336,7 +1230,6 @@ secured
     }
 
     try {
-      const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
       const response = await ssrfSafeFetch(url);
 
       if (!response.ok) {

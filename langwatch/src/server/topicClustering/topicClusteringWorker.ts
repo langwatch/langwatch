@@ -15,8 +15,6 @@ import {
   type TopicClusteringJob,
 } from "./topicClusteringQueue.constants";
 
-export { TOPIC_CLUSTERING_QUEUE, type TopicClusteringJob };
-
 const logger = createLogger("langwatch:workers:topicClusteringWorker");
 
 export async function runTopicClusteringJob(
@@ -35,7 +33,7 @@ export async function runTopicClusteringJob(
 
 export const startTopicClusteringWorker = () => {
   if (!connection) {
-    logger.info("no redis connection, skipping collector worker");
+    logger.info("no redis connection, skipping topic clustering worker");
     return;
   }
 
@@ -63,6 +61,6 @@ export const startTopicClusteringWorker = () => {
     });
   });
 
-  logger.info("topic clustering checks worker registered");
+  logger.info("topic clustering worker registered");
   return topicClusteringWorker;
 };

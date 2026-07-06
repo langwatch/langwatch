@@ -28,6 +28,7 @@ import {
   createLicenseEnforcementService,
   LimitExceededError,
 } from "../../license-enforcement";
+import { scheduleTopicClusteringForProject } from "../../topicClustering/topicClusteringQueue";
 import { generateApiKey } from "../../utils/apiKeyGenerator";
 import {
   checkOrganizationPermission,
@@ -488,9 +489,6 @@ export const projectRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("project:update"))
     .mutation(async ({ input }) => {
-      const { scheduleTopicClusteringForProject } = await import(
-        "../../topicClustering/topicClusteringQueue"
-      );
       try {
         await scheduleTopicClusteringForProject(input.projectId, true);
         return {

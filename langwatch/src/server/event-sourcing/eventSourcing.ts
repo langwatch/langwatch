@@ -6,7 +6,7 @@ import { getLangWatchTracer } from "langwatch";
 import type { ProcessRole } from "~/server/app-layer/config";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
-import { makeQueueName } from "~/server/redis";
+import { makeQueueName } from "~/server/queues/makeQueueName";
 import { createLogger } from "~/utils/logger/server";
 import { resolveProjectStorageDestination } from "../stored-objects/project-storage-destination";
 import { createStorageRegistry } from "../stored-objects/stored-objects-factory";

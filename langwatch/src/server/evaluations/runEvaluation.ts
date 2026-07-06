@@ -27,7 +27,6 @@ import {
   extractParentTraceForNlpgo,
   maxCausalityDepthOfSpans,
 } from "../app-layer/evaluations/evaluation-execution.service";
-import { prisma } from "../db";
 import {
   evaluationDurationHistogram,
   getEvaluationStatusCounter,
@@ -43,18 +42,15 @@ import {
   tryAndConvertTo,
 } from "../tracer/tracesMapping";
 import { runEvaluationWorkflow } from "../workflows/runWorkflow";
-import { DEFAULT_MAPPINGS, migrateLegacyMappings } from "./evaluationMappings";
+import {
+  DEFAULT_MAPPINGS,
+  mappingsReadEvaluationsSource,
+  migrateLegacyMappings,
+} from "./evaluationMappings";
 import {
   hasThreadMappings,
   resolveThreadMappingsIntoData,
 } from "./threadMappingResolver";
-
-class UserConfigError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "UserConfigError";
-  }
-}
 
 export type DataForEvaluation =
   | {
@@ -82,7 +78,7 @@ const buildThreadData = async (
   }
   const threadId = trace.metadata?.thread_id;
   if (!threadId) {
-    throw new UserConfigError(
+    throw new EvaluatorConfigError(
       "Trace does not have a thread_id for thread-based evaluation",
     );
   }
@@ -290,12 +286,17 @@ export const runEvaluationForTrace = async ({
   // getById → getTracesWithSpans does not enrich evaluations, but evaluator
   // field mappings that read the `evaluations` source need them. Fetch and
   // attach before building the mapped data so they aren't silently empty.
-  const evaluationsByTrace = await traceService.getEvaluationsMultiple(
-    projectId,
-    [traceId],
-    protections,
-  );
-  trace.evaluations = evaluationsByTrace[traceId] ?? [];
+  // Gated on the mappings actually reading the `evaluations` source — the
+  // fetch is a heavy Inputs-projection ClickHouse read that most evaluator
+  // mappings never need.
+  if (mappingsReadEvaluationsSource(mappings)) {
+    const evaluationsByTrace = await traceService.getEvaluationsMultiple(
+      projectId,
+      [traceId],
+      protections,
+    );
+    trace.evaluations = evaluationsByTrace[traceId] ?? [];
+  }
 
   const data = await buildDataForEvaluation(
     evaluatorType,
@@ -544,11 +545,18 @@ export const runEvaluation = async ({
   if (!response.ok) {
     if (response.status >= 500 && retries > 0) {
       await new Promise((resolve) => setTimeout(resolve, 100));
+      // Forward trace/workflowId/parentCausalityDepth so the retried attempt
+      // keeps the redaction context (trace.privacy.droppedCategories) and the
+      // causality linkage — omitting them made a guardrail retried after a
+      // transient 5xx report clean instead of flagging dropped content.
       return runEvaluation({
         projectId,
         evaluatorType: builtInEvaluatorType,
         data,
         settings,
+        trace,
+        workflowId,
+        parentCausalityDepth,
         retries: retries - 1,
       });
     }
@@ -559,13 +567,13 @@ export const runEvaluation = async ({
     } catch {
       /* safe json parse fallback */
     }
-    throw `${response.status} ${statusText}`;
+    throw new Error(`${response.status} ${statusText}`);
   }
 
   const raw = ((await response.json()) as BatchEvaluationResult)[0];
   if (!raw) {
     getEvaluationStatusCounter(builtInEvaluatorType, "error").inc();
-    throw "Unexpected response: empty results";
+    throw new Error("Unexpected response: empty results");
   }
 
   const result: typeof raw = {
@@ -599,14 +607,6 @@ const customEvaluation = async (
 ): Promise<SingleEvaluationResult> => {
   const resolvedWorkflowId = workflowId ?? evaluatorType.split("/")[1];
 
-  const project = await prisma.project.findUnique({
-    where: { id: projectId, archivedAt: null },
-  });
-
-  if (!project) {
-    throw new Error("Project not found");
-  }
-
   const requestBody: Record<string, any> = {
     trace_id: trace?.trace_id,
     do_not_trace: false,
@@ -621,7 +621,7 @@ const customEvaluation = async (
 
   const response = await runEvaluationWorkflow(
     resolvedWorkflowId,
-    project.id,
+    projectId,
     requestBody,
     undefined,
     parentCausalityDepth,

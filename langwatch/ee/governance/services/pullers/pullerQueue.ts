@@ -5,7 +5,7 @@ import { QueueWithFallback } from "~/server/queues/queueWithFallback";
 import { connection } from "~/server/redis";
 import { createLogger } from "~/utils/logger/server";
 
-import { PULLER_QUEUE, type IngestionPullerJob } from "./pullerWorker";
+import { type IngestionPullerJob, PULLER_QUEUE } from "./pullerWorker";
 
 const logger = createLogger("langwatch:ingestionPullerQueue");
 
@@ -13,15 +13,21 @@ export const ingestionPullerQueue = new QueueWithFallback<
   IngestionPullerJob,
   void,
   string
->(PULLER_QUEUE.NAME, async () => {}, {
-  connection: connection as ConnectionOptions,
-  defaultJobOptions: {
-    backoff: { type: "exponential", delay: 5000 },
-    attempts: 3,
-    removeOnComplete: { age: 60 * 60 * 24 },
-    removeOnFail: { age: 60 * 60 * 24 * 7 },
+>(
+  PULLER_QUEUE.NAME,
+  async () => {
+    /* producer-only queue; jobs are processed by the Worker in pullerWorker.ts */
   },
-});
+  {
+    connection: connection as ConnectionOptions,
+    defaultJobOptions: {
+      backoff: { type: "exponential", delay: 5000 },
+      attempts: 3,
+      removeOnComplete: { age: 60 * 60 * 24 },
+      removeOnFail: { age: 60 * 60 * 24 * 7 },
+    },
+  },
+);
 
 function jobIdForSource(sourceId: string): string {
   return `puller_tick:${sourceId}`;

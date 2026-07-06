@@ -37,6 +37,10 @@ interface ClickHouseCountRow {
   totalHits: number | string;
 }
 
+type ProjectClickHouseClient = NonNullable<
+  Awaited<ReturnType<typeof getClickHouseClientForProject>>
+>;
+
 /**
  * ClickHouse backend for experiment run queries.
  *
@@ -100,8 +104,6 @@ export class ExperimentRunService {
    *
    * Returns runs grouped by experiment ID, with per-evaluator breakdown
    * and workflow version metadata.
-   *
-   * @returns `null` if ClickHouse is not enabled for this project
    */
   async listRuns({
     projectId,
@@ -167,190 +169,15 @@ export class ExperimentRunService {
             return {};
           }
 
-          // Build the exact (ExperimentId, RunId) tuple list and an OccurredAt
-          // bound from the runs we just fetched. Two reasons:
-          //
-          //   1. `ExperimentId IN (...) AND RunId IN (...)` would match the
-          //      cartesian product of those sets, pulling in unrelated rows
-          //      whenever a runId happens to be reused across experiments.
-          //      Filtering by exact pairs eliminates that overfetching and
-          //      avoids wasting LIMIT slots on rows that get discarded.
-          //
-          //   2. `experiment_run_items` is partitioned by `toYearWeek(OccurredAt)`.
-          //      Without an OccurredAt range in the WHERE clause, ClickHouse
-          //      cannot prune historical partitions and ends up scanning the
-          //      whole table. Bounds derived from the runs' lifecycle
-          //      (CreatedAt..UpdatedAt with a buffer for clock skew / late
-          //      writes) keep this cheap.
-          const runPairs = runRows.map(
-            (r) => new TupleParam([r.ExperimentId, r.RunId]),
-          );
-          const occurredAtRange = computeOccurredAtRangeForRuns(runRows);
-          this.warnIfRunsAreOld({
+          const runs = await this.enrichRunsWithBreakdownAndCosts({
+            clickHouseClient,
             projectId,
-            minMs: occurredAtRange.minMs,
-            runCount: runRows.length,
+            runRows,
           });
 
-          // Fetch per-evaluator breakdown for all runs.
-          //
-          // Dedup uses an IN-tuple subquery on (key columns, OccurredAt) instead
-          // of the per-row dedup anti-pattern. That pattern reads every selected column
-          // (including heavy payloads like EvaluationDetails / EvaluationInputs)
-          // before deduplicating, which can OOM on large parts. The IN-tuple
-          // pattern resolves dedup using only lightweight key columns and the
-          // ReplacingMergeTree version column (OccurredAt). See
-          // trace-dedup-oom-safety.unit.test.ts for the rationale.
-          const breakdownResult = await clickHouseClient.query({
-            query: `
-              SELECT
-                ExperimentId,
-                RunId,
-                EvaluatorId,
-                max(EvaluatorName) AS EvaluatorName,
-                avg(Score) AS avgScore,
-                if(countIf(Passed IS NOT NULL) > 0, countIf(Passed = 1) / countIf(Passed IS NOT NULL), NULL) AS passRate,
-                countIf(Passed IS NOT NULL) AS hasPassedCount
-              FROM experiment_run_items
-              WHERE TenantId = {tenantId:String}
-                AND OccurredAt >= {minOccurredAt:DateTime64(3)}
-                AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
-                AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}
-                AND ResultType = 'evaluator'
-                AND EvaluationStatus = 'processed'
-                AND (TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, ''), OccurredAt) IN (
-                  SELECT
-                    TenantId,
-                    ExperimentId,
-                    RunId,
-                    RowIndex,
-                    TargetId,
-                    ResultType,
-                    coalesce(EvaluatorId, ''),
-                    max(OccurredAt)
-                  FROM experiment_run_items
-                  WHERE TenantId = {tenantId:String}
-                    AND OccurredAt >= {minOccurredAt:DateTime64(3)}
-                    AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
-                    AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}
-                  GROUP BY TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
-                )
-              GROUP BY ExperimentId, RunId, EvaluatorId
-              LIMIT 10000
-            `,
-            query_params: {
-              tenantId: projectId,
-              runPairs,
-              minOccurredAt: occurredAtRange.minOccurredAt,
-              maxOccurredAt: occurredAtRange.maxOccurredAt,
-            },
-            format: "JSONEachRow",
-          });
-
-          const breakdownRows =
-            (await breakdownResult.json()) as ClickHouseEvaluatorBreakdownRow[];
-
-          // Group breakdown by (ExperimentId, RunId) — runIds are not unique
-          // across experiments, so a composite key is required to avoid mixing
-          // results between experiments that happen to share a runId.
-          const breakdownByExperimentRun = new Map<
-            string,
-            ClickHouseEvaluatorBreakdownRow[]
-          >();
-          for (const row of breakdownRows) {
-            const key = `${row.ExperimentId}:${row.RunId}`;
-            const existing = breakdownByExperimentRun.get(key) ?? [];
-            existing.push(row);
-            breakdownByExperimentRun.set(key, existing);
-          }
-
-          // Fetch cost/duration summary per run.
-          // Same exact-pair + OccurredAt-bounded + IN-tuple-dedup pattern as
-          // the breakdown query above — see comment there for the rationale.
-          const costResult = await clickHouseClient.query({
-            query: `
-              SELECT
-                ExperimentId,
-                RunId,
-                sumIf(TargetCost, ResultType = 'target') AS datasetCost,
-                sumIf(EvaluationCost, ResultType = 'evaluator') AS evaluationsCost,
-                avgIf(TargetCost, ResultType = 'target' AND TargetCost IS NOT NULL) AS datasetAverageCost,
-                avgIf(TargetDurationMs, ResultType = 'target' AND TargetDurationMs IS NOT NULL) AS datasetAverageDuration,
-                avgIf(EvaluationCost, ResultType = 'evaluator' AND EvaluationCost IS NOT NULL) AS evaluationsAverageCost,
-                avgIf(EvaluationDurationMs, ResultType = 'evaluator' AND EvaluationDurationMs IS NOT NULL) AS evaluationsAverageDuration
-              FROM experiment_run_items
-              WHERE TenantId = {tenantId:String}
-                AND OccurredAt >= {minOccurredAt:DateTime64(3)}
-                AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
-                AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}
-                AND (TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, ''), OccurredAt) IN (
-                  SELECT
-                    TenantId,
-                    ExperimentId,
-                    RunId,
-                    RowIndex,
-                    TargetId,
-                    ResultType,
-                    coalesce(EvaluatorId, ''),
-                    max(OccurredAt)
-                  FROM experiment_run_items
-                  WHERE TenantId = {tenantId:String}
-                    AND OccurredAt >= {minOccurredAt:DateTime64(3)}
-                    AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
-                    AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}
-                  GROUP BY TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
-                )
-              GROUP BY ExperimentId, RunId
-              LIMIT 10000
-            `,
-            query_params: {
-              tenantId: projectId,
-              runPairs,
-              minOccurredAt: occurredAtRange.minOccurredAt,
-              maxOccurredAt: occurredAtRange.maxOccurredAt,
-            },
-            format: "JSONEachRow",
-          });
-
-          const costRows =
-            (await costResult.json()) as ClickHouseCostSummaryRow[];
-
-          // Same composite key as breakdownByExperimentRun.
-          const costByExperimentRun = new Map<
-            string,
-            ClickHouseCostSummaryRow
-          >();
-          for (const row of costRows) {
-            costByExperimentRun.set(`${row.ExperimentId}:${row.RunId}`, row);
-          }
-
-          // Fetch workflow version metadata from Prisma
-          const versionIds = runRows
-            .map((r) => r.WorkflowVersionId)
-            .filter((id): id is string => id !== null);
-
-          const versionsMap = await getVersionMap({
-            prisma: this.prisma,
-            projectId,
-            versionIds,
-          });
-
-          // Map to canonical types and group by experiment ID
+          // Group by experiment ID
           const result: Record<string, ExperimentRun[]> = {};
-
-          for (const row of runRows) {
-            const workflowVersion = row.WorkflowVersionId
-              ? (versionsMap[row.WorkflowVersionId] ?? null)
-              : null;
-
-            const compositeKey = `${row.ExperimentId}:${row.RunId}`;
-            const run = mapClickHouseRunToExperimentRun({
-              record: row,
-              workflowVersion,
-              evaluatorBreakdown: breakdownByExperimentRun.get(compositeKey),
-              costSummary: costByExperimentRun.get(compositeKey),
-            });
-
+          for (const run of runs) {
             if (!(run.experimentId in result)) {
               result[run.experimentId] = [];
             }
@@ -531,149 +358,10 @@ export class ExperimentRunService {
             return { runs: [], totalHits };
           }
 
-          const runPairs = runRows.map(
-            (r) => new TupleParam([r.ExperimentId, r.RunId]),
-          );
-          const occurredAtRange = computeOccurredAtRangeForRuns(runRows);
-          this.warnIfRunsAreOld({
+          const runs = await this.enrichRunsWithBreakdownAndCosts({
+            clickHouseClient,
             projectId,
-            minMs: occurredAtRange.minMs,
-            runCount: runRows.length,
-          });
-
-          const breakdownResult = await clickHouseClient.query({
-            query: `
-              SELECT
-                ExperimentId,
-                RunId,
-                EvaluatorId,
-                max(EvaluatorName) AS EvaluatorName,
-                avg(Score) AS avgScore,
-                if(countIf(Passed IS NOT NULL) > 0, countIf(Passed = 1) / countIf(Passed IS NOT NULL), NULL) AS passRate,
-                countIf(Passed IS NOT NULL) AS hasPassedCount
-              FROM experiment_run_items
-              WHERE TenantId = {tenantId:String}
-                AND OccurredAt >= {minOccurredAt:DateTime64(3)}
-                AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
-                AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}
-                AND ResultType = 'evaluator'
-                AND EvaluationStatus = 'processed'
-                AND (TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, ''), OccurredAt) IN (
-                  SELECT
-                    TenantId,
-                    ExperimentId,
-                    RunId,
-                    RowIndex,
-                    TargetId,
-                    ResultType,
-                    coalesce(EvaluatorId, ''),
-                    max(OccurredAt)
-                  FROM experiment_run_items
-                  WHERE TenantId = {tenantId:String}
-                    AND OccurredAt >= {minOccurredAt:DateTime64(3)}
-                    AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
-                    AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}
-                  GROUP BY TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
-                )
-              GROUP BY ExperimentId, RunId, EvaluatorId
-              LIMIT 10000
-            `,
-            query_params: {
-              tenantId: projectId,
-              runPairs,
-              minOccurredAt: occurredAtRange.minOccurredAt,
-              maxOccurredAt: occurredAtRange.maxOccurredAt,
-            },
-            format: "JSONEachRow",
-          });
-
-          const breakdownRows =
-            (await breakdownResult.json()) as ClickHouseEvaluatorBreakdownRow[];
-          const breakdownByExperimentRun = new Map<
-            string,
-            ClickHouseEvaluatorBreakdownRow[]
-          >();
-          for (const row of breakdownRows) {
-            const key = `${row.ExperimentId}:${row.RunId}`;
-            const existing = breakdownByExperimentRun.get(key) ?? [];
-            existing.push(row);
-            breakdownByExperimentRun.set(key, existing);
-          }
-
-          const costResult = await clickHouseClient.query({
-            query: `
-              SELECT
-                ExperimentId,
-                RunId,
-                sumIf(TargetCost, ResultType = 'target') AS datasetCost,
-                sumIf(EvaluationCost, ResultType = 'evaluator') AS evaluationsCost,
-                avgIf(TargetCost, ResultType = 'target' AND TargetCost IS NOT NULL) AS datasetAverageCost,
-                avgIf(TargetDurationMs, ResultType = 'target' AND TargetDurationMs IS NOT NULL) AS datasetAverageDuration,
-                avgIf(EvaluationCost, ResultType = 'evaluator' AND EvaluationCost IS NOT NULL) AS evaluationsAverageCost,
-                avgIf(EvaluationDurationMs, ResultType = 'evaluator' AND EvaluationDurationMs IS NOT NULL) AS evaluationsAverageDuration
-              FROM experiment_run_items
-              WHERE TenantId = {tenantId:String}
-                AND OccurredAt >= {minOccurredAt:DateTime64(3)}
-                AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
-                AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}
-                AND (TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, ''), OccurredAt) IN (
-                  SELECT
-                    TenantId,
-                    ExperimentId,
-                    RunId,
-                    RowIndex,
-                    TargetId,
-                    ResultType,
-                    coalesce(EvaluatorId, ''),
-                    max(OccurredAt)
-                  FROM experiment_run_items
-                  WHERE TenantId = {tenantId:String}
-                    AND OccurredAt >= {minOccurredAt:DateTime64(3)}
-                    AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
-                    AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}
-                  GROUP BY TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
-                )
-              GROUP BY ExperimentId, RunId
-              LIMIT 10000
-            `,
-            query_params: {
-              tenantId: projectId,
-              runPairs,
-              minOccurredAt: occurredAtRange.minOccurredAt,
-              maxOccurredAt: occurredAtRange.maxOccurredAt,
-            },
-            format: "JSONEachRow",
-          });
-
-          const costRows =
-            (await costResult.json()) as ClickHouseCostSummaryRow[];
-          const costByExperimentRun = new Map<
-            string,
-            ClickHouseCostSummaryRow
-          >();
-          for (const row of costRows) {
-            costByExperimentRun.set(`${row.ExperimentId}:${row.RunId}`, row);
-          }
-
-          const versionIds = runRows
-            .map((r) => r.WorkflowVersionId)
-            .filter((id): id is string => id !== null);
-          const versionsMap = await getVersionMap({
-            prisma: this.prisma,
-            projectId,
-            versionIds,
-          });
-
-          const runs = runRows.map((row) => {
-            const compositeKey = `${row.ExperimentId}:${row.RunId}`;
-            return mapClickHouseRunToExperimentRun({
-              record: row,
-              workflowVersion: row.WorkflowVersionId
-                ? (versionsMap[row.WorkflowVersionId] ?? null)
-                : null,
-              evaluatorBreakdown: breakdownByExperimentRun.get(compositeKey),
-              costSummary: costByExperimentRun.get(compositeKey),
-            });
+            runRows,
           });
 
           return { runs, totalHits };
@@ -891,6 +579,201 @@ export class ExperimentRunService {
   }
 
   /**
+   * Fetch per-evaluator breakdown, cost/duration summaries, and workflow
+   * version metadata for the given run rows and map them to canonical
+   * `ExperimentRun`s, preserving `runRows` order.
+   *
+   * Shared by {@link listRuns} and {@link listRunsForExperimentPaginated} so
+   * the dedup key, OccurredAt bounds, and LIMIT handling live in one place.
+   *
+   * Builds the exact (ExperimentId, RunId) tuple list and an OccurredAt
+   * bound from the runs passed in. Two reasons:
+   *
+   *   1. `ExperimentId IN (...) AND RunId IN (...)` would match the
+   *      cartesian product of those sets, pulling in unrelated rows
+   *      whenever a runId happens to be reused across experiments.
+   *      Filtering by exact pairs eliminates that overfetching and
+   *      avoids wasting LIMIT slots on rows that get discarded.
+   *
+   *   2. `experiment_run_items` is partitioned by `toYearWeek(OccurredAt)`.
+   *      Without an OccurredAt range in the WHERE clause, ClickHouse
+   *      cannot prune historical partitions and ends up scanning the
+   *      whole table. Bounds derived from the runs' lifecycle
+   *      (CreatedAt..UpdatedAt with a buffer for clock skew / late
+   *      writes) keep this cheap.
+   */
+  private async enrichRunsWithBreakdownAndCosts({
+    clickHouseClient,
+    projectId,
+    runRows,
+  }: {
+    clickHouseClient: ProjectClickHouseClient;
+    projectId: string;
+    runRows: ClickHouseExperimentRunRow[];
+  }): Promise<ExperimentRun[]> {
+    const runPairs = runRows.map(
+      (r) => new TupleParam([r.ExperimentId, r.RunId]),
+    );
+    const occurredAtRange = computeOccurredAtRangeForRuns(runRows);
+    this.warnIfRunsAreOld({
+      projectId,
+      minMs: occurredAtRange.minMs,
+      runCount: runRows.length,
+    });
+
+    // Fetch per-evaluator breakdown for all runs.
+    //
+    // Dedup uses an IN-tuple subquery on (key columns, OccurredAt) instead
+    // of the per-row dedup anti-pattern. That pattern reads every selected column
+    // (including heavy payloads like EvaluationDetails / EvaluationInputs)
+    // before deduplicating, which can OOM on large parts. The IN-tuple
+    // pattern resolves dedup using only lightweight key columns and the
+    // ReplacingMergeTree version column (OccurredAt). See
+    // trace-dedup-oom-safety.unit.test.ts for the rationale.
+    const breakdownResult = await clickHouseClient.query({
+      query: `
+        SELECT
+          ExperimentId,
+          RunId,
+          EvaluatorId,
+          max(EvaluatorName) AS EvaluatorName,
+          avg(Score) AS avgScore,
+          if(countIf(Passed IS NOT NULL) > 0, countIf(Passed = 1) / countIf(Passed IS NOT NULL), NULL) AS passRate,
+          countIf(Passed IS NOT NULL) AS hasPassedCount
+        FROM experiment_run_items
+        WHERE TenantId = {tenantId:String}
+          AND OccurredAt >= {minOccurredAt:DateTime64(3)}
+          AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
+          AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}
+          AND ResultType = 'evaluator'
+          AND EvaluationStatus = 'processed'
+          AND (TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, ''), OccurredAt) IN (
+            SELECT
+              TenantId,
+              ExperimentId,
+              RunId,
+              RowIndex,
+              TargetId,
+              ResultType,
+              coalesce(EvaluatorId, ''),
+              max(OccurredAt)
+            FROM experiment_run_items
+            WHERE TenantId = {tenantId:String}
+              AND OccurredAt >= {minOccurredAt:DateTime64(3)}
+              AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
+              AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}
+            GROUP BY TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
+          )
+        GROUP BY ExperimentId, RunId, EvaluatorId
+        LIMIT 10000
+      `,
+      query_params: {
+        tenantId: projectId,
+        runPairs,
+        minOccurredAt: occurredAtRange.minOccurredAt,
+        maxOccurredAt: occurredAtRange.maxOccurredAt,
+      },
+      format: "JSONEachRow",
+    });
+
+    const breakdownRows =
+      (await breakdownResult.json()) as ClickHouseEvaluatorBreakdownRow[];
+
+    // Group breakdown by (ExperimentId, RunId) — runIds are not unique
+    // across experiments, so a composite key is required to avoid mixing
+    // results between experiments that happen to share a runId.
+    const breakdownByExperimentRun = new Map<
+      string,
+      ClickHouseEvaluatorBreakdownRow[]
+    >();
+    for (const row of breakdownRows) {
+      const key = `${row.ExperimentId}:${row.RunId}`;
+      const existing = breakdownByExperimentRun.get(key) ?? [];
+      existing.push(row);
+      breakdownByExperimentRun.set(key, existing);
+    }
+
+    // Fetch cost/duration summary per run.
+    // Same exact-pair + OccurredAt-bounded + IN-tuple-dedup pattern as
+    // the breakdown query above — see comment there for the rationale.
+    const costResult = await clickHouseClient.query({
+      query: `
+        SELECT
+          ExperimentId,
+          RunId,
+          sumIf(TargetCost, ResultType = 'target') AS datasetCost,
+          sumIf(EvaluationCost, ResultType = 'evaluator') AS evaluationsCost,
+          avgIf(TargetCost, ResultType = 'target' AND TargetCost IS NOT NULL) AS datasetAverageCost,
+          avgIf(TargetDurationMs, ResultType = 'target' AND TargetDurationMs IS NOT NULL) AS datasetAverageDuration,
+          avgIf(EvaluationCost, ResultType = 'evaluator' AND EvaluationCost IS NOT NULL) AS evaluationsAverageCost,
+          avgIf(EvaluationDurationMs, ResultType = 'evaluator' AND EvaluationDurationMs IS NOT NULL) AS evaluationsAverageDuration
+        FROM experiment_run_items
+        WHERE TenantId = {tenantId:String}
+          AND OccurredAt >= {minOccurredAt:DateTime64(3)}
+          AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
+          AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}
+          AND (TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, ''), OccurredAt) IN (
+            SELECT
+              TenantId,
+              ExperimentId,
+              RunId,
+              RowIndex,
+              TargetId,
+              ResultType,
+              coalesce(EvaluatorId, ''),
+              max(OccurredAt)
+            FROM experiment_run_items
+            WHERE TenantId = {tenantId:String}
+              AND OccurredAt >= {minOccurredAt:DateTime64(3)}
+              AND OccurredAt <= {maxOccurredAt:DateTime64(3)}
+              AND (ExperimentId, RunId) IN {runPairs:Array(Tuple(String, String))}
+            GROUP BY TenantId, ExperimentId, RunId, RowIndex, TargetId, ResultType, coalesce(EvaluatorId, '')
+          )
+        GROUP BY ExperimentId, RunId
+        LIMIT 10000
+      `,
+      query_params: {
+        tenantId: projectId,
+        runPairs,
+        minOccurredAt: occurredAtRange.minOccurredAt,
+        maxOccurredAt: occurredAtRange.maxOccurredAt,
+      },
+      format: "JSONEachRow",
+    });
+
+    const costRows = (await costResult.json()) as ClickHouseCostSummaryRow[];
+
+    // Same composite key as breakdownByExperimentRun.
+    const costByExperimentRun = new Map<string, ClickHouseCostSummaryRow>();
+    for (const row of costRows) {
+      costByExperimentRun.set(`${row.ExperimentId}:${row.RunId}`, row);
+    }
+
+    // Fetch workflow version metadata from Prisma
+    const versionIds = runRows
+      .map((r) => r.WorkflowVersionId)
+      .filter((id): id is string => id !== null);
+
+    const versionsMap = await getVersionMap({
+      prisma: this.prisma,
+      projectId,
+      versionIds,
+    });
+
+    return runRows.map((row) => {
+      const compositeKey = `${row.ExperimentId}:${row.RunId}`;
+      return mapClickHouseRunToExperimentRun({
+        record: row,
+        workflowVersion: row.WorkflowVersionId
+          ? (versionsMap[row.WorkflowVersionId] ?? null)
+          : null,
+        evaluatorBreakdown: breakdownByExperimentRun.get(compositeKey),
+        costSummary: costByExperimentRun.get(compositeKey),
+      });
+    });
+  }
+
+  /**
    * Enriches experiment run items with cost data from trace_summaries.
    *
    * SDK experiments don't send costs inline — costs are computed by the
@@ -902,10 +785,7 @@ export class ExperimentRunService {
    * a child span of the same iteration trace).
    */
   private async enrichItemsWithTraceCosts(
-    clickHouseClient: Awaited<
-      ReturnType<typeof getClickHouseClientForProject>
-    > &
-      object,
+    clickHouseClient: ProjectClickHouseClient,
     projectId: string,
     items: ClickHouseExperimentRunItemRow[],
   ): Promise<ClickHouseExperimentRunItemRow[]> {

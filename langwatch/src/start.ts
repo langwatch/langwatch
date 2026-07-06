@@ -228,10 +228,18 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
           res.setHeader("Content-Type", register.contentType);
           res.end(await register.metrics());
         } else {
+          // Forward the caller's bearer token — the worker's metrics
+          // listener enforces the same isMetricsAuthorized gate, so a
+          // credential-less internal fetch would get a 401 in production.
+          const authorization = req.headers.authorization;
           const workersMetricsRes = await fetch(
-            `http://0.0.0.0:${getWorkerMetricsPort()}/metrics`
+            `http://0.0.0.0:${getWorkerMetricsPort()}/metrics`,
+            authorization ? { headers: { authorization } } : undefined,
           );
-          res.setHeader("Content-Type", register.contentType);
+          res.statusCode = workersMetricsRes.status;
+          if (workersMetricsRes.ok) {
+            res.setHeader("Content-Type", register.contentType);
+          }
           res.end(await workersMetricsRes.text());
         }
         return;

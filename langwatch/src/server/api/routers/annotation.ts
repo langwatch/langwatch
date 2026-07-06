@@ -116,10 +116,7 @@ export const annotationRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("annotations:create"))
     .mutation(async ({ ctx, input }) => {
-      const service = await AnnotationService.create({
-        prisma: ctx.prisma,
-        projectId: input.projectId,
-      });
+      const service = AnnotationService.create({ prisma: ctx.prisma });
 
       const createdAnnotation = await service.create({
         id: nanoid(),
@@ -166,10 +163,7 @@ export const annotationRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("annotations:update"))
     .mutation(async ({ ctx, input }) => {
-      const service = await AnnotationService.create({
-        prisma: ctx.prisma,
-        projectId: input.projectId,
-      });
+      const service = AnnotationService.create({ prisma: ctx.prisma });
 
       return service.update({
         id: input.id,
@@ -250,10 +244,7 @@ export const annotationRouter = createTRPCRouter({
     .input(z.object({ annotationId: z.string(), projectId: z.string() }))
     .use(checkProjectPermission("annotations:delete"))
     .mutation(async ({ ctx, input }) => {
-      const service = await AnnotationService.create({
-        prisma: ctx.prisma,
-        projectId: input.projectId,
-      });
+      const service = AnnotationService.create({ prisma: ctx.prisma });
 
       const deletedAnnotation = await service.delete({
         id: input.annotationId,

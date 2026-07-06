@@ -9,8 +9,6 @@ import {
 } from "./topicClusteringQueue.constants";
 import { runTopicClusteringJob } from "./topicClusteringWorker";
 
-export { TOPIC_CLUSTERING_QUEUE };
-
 export const topicClusteringQueue = new QueueWithFallback<
   TopicClusteringJob,
   void,

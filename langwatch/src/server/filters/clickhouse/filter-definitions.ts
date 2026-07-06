@@ -226,7 +226,7 @@ export const clickHouseFilters: Record<
     tableName: "trace_summaries",
     buildQuery: (params) => {
       if (!params.key) {
-        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+        return null;
       }
       const { sql: scopeSql } = buildScopeConditions(params);
       // Note: The key parameter is passed via query_params as {key:String}
@@ -435,7 +435,7 @@ export const clickHouseFilters: Record<
     tableName: "evaluation_runs",
     buildQuery: (params) => {
       if (!params.key) {
-        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+        return null;
       }
       const { sql: scopeSql } = buildScopeConditions(params);
       const scopeJoin = scopeSql
@@ -462,7 +462,7 @@ export const clickHouseFilters: Record<
     tableName: "evaluation_runs",
     buildQuery: (params) => {
       if (!params.key) {
-        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+        return null;
       }
       const { sql: scopeSql } = buildScopeConditions(params);
       const scopeJoin = scopeSql
@@ -497,7 +497,7 @@ export const clickHouseFilters: Record<
     tableName: "evaluation_runs",
     buildQuery: (params) => {
       if (!params.key) {
-        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+        return null;
       }
       const { sql: scopeSql } = buildScopeConditions(params);
       const scopeJoin = scopeSql
@@ -525,7 +525,7 @@ export const clickHouseFilters: Record<
     tableName: "evaluation_runs",
     buildQuery: (params) => {
       if (!params.key) {
-        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+        return null;
       }
       const { sql: scopeSql } = buildScopeConditions(params);
       const scopeJoin = scopeSql
@@ -583,7 +583,7 @@ export const clickHouseFilters: Record<
     tableName: "stored_spans",
     buildQuery: (params) => {
       if (!params.key) {
-        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+        return null;
       }
       const { sql: scopeSql } = buildScopeConditions(params);
       const scopeJoin = scopeSql
@@ -613,7 +613,7 @@ export const clickHouseFilters: Record<
     tableName: "stored_spans",
     buildQuery: (params) => {
       if (!params.key || !params.subkey) {
-        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+        return null;
       }
       const { sql: scopeSql } = buildScopeConditions(params);
       const scopeJoin = scopeSql
@@ -649,7 +649,7 @@ export const clickHouseFilters: Record<
     tableName: "stored_spans",
     buildQuery: (params) => {
       if (!params.key) {
-        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+        return null;
       }
       const { sql: scopeSql } = buildScopeConditions(params);
       const scopeJoin = scopeSql

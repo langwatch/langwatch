@@ -151,7 +151,6 @@ const getMessageContent = (message: any): unknown => {
   return message.content ?? message.parts;
 };
 
-// TODO: test
 export const typedValueToText = (
   typed: SpanInputOutput,
   last = false,
@@ -214,7 +213,6 @@ export const typedValueToText = (
     };
 
     const specialKeysMapping = (json: any): string | undefined => {
-      // TODO: test those
       if (hasNonEmptyValue(json.text)) {
         return json.text;
       }
@@ -237,7 +235,6 @@ export const typedValueToText = (
       if (hasNonEmptyValue(json.input_value)) {
         return json.input_value;
       }
-      // TODO: test this happens for finding outputs
       if (hasNonEmptyValue(json.output)) {
         return json.output;
       }

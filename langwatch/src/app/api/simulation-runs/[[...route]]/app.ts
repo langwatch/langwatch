@@ -72,10 +72,6 @@ const batchQuerySchema = z.object({
   cursor: z.string().optional(),
 });
 
-function createFacade() {
-  return getApp().simulations.runs;
-}
-
 const secured = createProjectApp({ basePath: "/api/simulation-runs" });
 
 // ── List Runs ──────────────────────────────────────────────
@@ -111,11 +107,11 @@ secured.access(requires("scenarios:view")).get(
       "Listing simulation runs",
     );
 
-    const facade = createFacade();
+    const simulationRuns = getApp().simulations.runs;
 
     if (batchRunId && scenarioSetId) {
       // Get runs for a specific batch
-      const result = await facade.getRunDataForBatchRun({
+      const result = await simulationRuns.getRunDataForBatchRun({
         projectId: project.id,
         scenarioSetId,
         batchRunId,
@@ -140,7 +136,7 @@ secured.access(requires("scenarios:view")).get(
 
     if (scenarioSetId) {
       // Get runs for a scenario set
-      const result = await facade.getRunDataForScenarioSet({
+      const result = await simulationRuns.getRunDataForScenarioSet({
         projectId: project.id,
         scenarioSetId,
         limit,
@@ -161,7 +157,7 @@ secured.access(requires("scenarios:view")).get(
     }
 
     // No filter - get all suite runs
-    const result = await facade.getRunDataForAllSuites({
+    const result = await simulationRuns.getRunDataForAllSuites({
       projectId: project.id,
       limit,
       cursor,
@@ -216,8 +212,8 @@ secured.access(requires("scenarios:view")).get(
       "Getting simulation run",
     );
 
-    const facade = createFacade();
-    const run = await facade.getScenarioRunData({
+    const simulationRuns = getApp().simulations.runs;
+    const run = await simulationRuns.getScenarioRunData({
       projectId: project.id,
       scenarioRunId,
     });
@@ -269,8 +265,8 @@ secured.access(requires("scenarios:view")).get(
       "Listing batch history",
     );
 
-    const facade = createFacade();
-    const result = await facade.getBatchHistoryForScenarioSet({
+    const simulationRuns = getApp().simulations.runs;
+    const result = await simulationRuns.getBatchHistoryForScenarioSet({
       projectId: project.id,
       scenarioSetId,
       limit,

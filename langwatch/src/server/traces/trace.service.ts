@@ -174,7 +174,7 @@ export class TraceService {
       prisma,
       resolveTraceSpansFn,
     );
-    this.evaluationService = EvaluationService.create(prisma);
+    this.evaluationService = EvaluationService.create();
   }
 
   /**
@@ -213,8 +213,6 @@ export class TraceService {
       "TraceService.getById",
       { attributes: { "tenant.id": projectId, "trace.id": traceId } },
       async (span) => {
-        span.setAttribute("backend", "clickhouse");
-
         const traces = await this.clickHouseService.getTracesWithSpans(
           projectId,
           [traceId],
@@ -222,11 +220,6 @@ export class TraceService {
           undefined,
           { resolveBlobs: opts?.full },
         );
-        if (traces === null) {
-          throw new Error(
-            "ClickHouse is enabled but returned null for getById — check ClickHouse client configuration",
-          );
-        }
         if (traces[0]) {
           return traces[0];
         }
@@ -253,11 +246,6 @@ export class TraceService {
               },
               limit: TRACE_ID_PREFIX_CANDIDATE_LIMIT,
             });
-          if (candidates === null) {
-            throw new Error(
-              "ClickHouse is enabled but returned null for resolveTraceIdByPrefix — check ClickHouse client configuration",
-            );
-          }
           if (candidates.length === 0) {
             return undefined;
           }
@@ -274,7 +262,7 @@ export class TraceService {
             undefined,
             { resolveBlobs: opts?.full },
           );
-          return resolved?.[0];
+          return resolved[0];
         }
 
         return undefined;
@@ -308,22 +296,14 @@ export class TraceService {
       {
         attributes: { "tenant.id": projectId, "trace.count": traceIds.length },
       },
-      async (span) => {
-        span.setAttribute("backend", "clickhouse");
-
-        const traces = await this.clickHouseService.getTracesWithSpans(
+      async () => {
+        return this.clickHouseService.getTracesWithSpans(
           projectId,
           traceIds,
           protections,
           occurredAt,
           { resolveBlobs: opts?.full },
         );
-        if (traces === null) {
-          throw new Error(
-            "ClickHouse is enabled but returned null for getTracesWithSpans — check ClickHouse client configuration",
-          );
-        }
-        return traces;
       },
     );
   }
@@ -344,20 +324,12 @@ export class TraceService {
     return this.tracer.withActiveSpan(
       "TraceService.getTracesByThreadId",
       { attributes: { "tenant.id": projectId, "thread.id": threadId } },
-      async (span) => {
-        span.setAttribute("backend", "clickhouse");
-
-        const traces = await this.clickHouseService.getTracesByThreadId(
+      async () => {
+        return this.clickHouseService.getTracesByThreadId(
           projectId,
           threadId,
           protections,
         );
-        if (traces === null) {
-          throw new Error(
-            "ClickHouse is enabled but returned null for getTracesByThreadId — check ClickHouse client configuration",
-          );
-        }
-        return traces;
       },
     );
   }
@@ -378,21 +350,12 @@ export class TraceService {
     return this.tracer.withActiveSpan(
       "TraceService.getAllTracesForProject",
       { attributes: { "tenant.id": input.projectId } },
-      async (span) => {
-        span.setAttribute("backend", "clickhouse");
-
-        const result = await this.clickHouseService.getAllTracesForProject(
+      async () => {
+        return this.clickHouseService.getAllTracesForProject(
           input,
           protections,
           options,
         );
-        if (result === null) {
-          throw new Error(
-            "ClickHouse is enabled but returned null for getAllTracesForProject — check ClickHouse client configuration",
-          );
-        }
-
-        return result;
       },
     );
   }
@@ -415,9 +378,7 @@ export class TraceService {
       {
         attributes: { "tenant.id": projectId, "trace.count": traceIds.length },
       },
-      async (span) => {
-        span.setAttribute("backend", "clickhouse");
-
+      async () => {
         const result = await this.evaluationService.getEvaluationsMultiple({
           projectId,
           traceIds,
@@ -450,8 +411,7 @@ export class TraceService {
           "evaluation.id": evaluationId,
         },
       },
-      async (span) => {
-        span.setAttribute("backend", "clickhouse");
+      async () => {
         return this.evaluationService.getEvaluationInputs({
           projectId,
           evaluationId,
@@ -487,22 +447,13 @@ export class TraceService {
           "thread.count": threadIds.length,
         },
       },
-      async (span) => {
-        span.setAttribute("backend", "clickhouse");
-
-        const traces =
-          await this.clickHouseService.getTracesWithSpansByThreadIds(
-            projectId,
-            threadIds,
-            protections,
-            { resolveBlobs: opts?.full },
-          );
-        if (traces === null) {
-          throw new Error(
-            "ClickHouse is enabled but returned null for getTracesWithSpansByThreadIds — check ClickHouse client configuration",
-          );
-        }
-        return traces;
+      async () => {
+        return this.clickHouseService.getTracesWithSpansByThreadIds(
+          projectId,
+          threadIds,
+          protections,
+          { resolveBlobs: opts?.full },
+        );
       },
     );
   }
@@ -519,16 +470,8 @@ export class TraceService {
     return this.tracer.withActiveSpan(
       "TraceService.getTopicCounts",
       { attributes: { "tenant.id": input.projectId } },
-      async (span) => {
-        span.setAttribute("backend", "clickhouse");
-
-        const result = await this.clickHouseService.getTopicCounts(input);
-        if (result === null) {
-          throw new Error(
-            "ClickHouse is enabled but returned null for getTopicCounts — check ClickHouse client configuration",
-          );
-        }
-        return result;
+      async () => {
+        return this.clickHouseService.getTopicCounts(input);
       },
     );
   }
@@ -545,17 +488,8 @@ export class TraceService {
     return this.tracer.withActiveSpan(
       "TraceService.getCustomersAndLabels",
       { attributes: { "tenant.id": input.projectId } },
-      async (span) => {
-        span.setAttribute("backend", "clickhouse");
-
-        const result =
-          await this.clickHouseService.getCustomersAndLabels(input);
-        if (result === null) {
-          throw new Error(
-            "ClickHouse is enabled but returned null for getCustomersAndLabels — check ClickHouse client configuration",
-          );
-        }
-        return result;
+      async () => {
+        return this.clickHouseService.getCustomersAndLabels(input);
       },
     );
   }
@@ -576,20 +510,12 @@ export class TraceService {
     return this.tracer.withActiveSpan(
       "TraceService.getDistinctFieldNames",
       { attributes: { "tenant.id": projectId } },
-      async (span) => {
-        span.setAttribute("backend", "clickhouse");
-
-        const result = await this.clickHouseService.getDistinctFieldNames(
+      async () => {
+        return this.clickHouseService.getDistinctFieldNames(
           projectId,
           startDate,
           endDate,
         );
-        if (result === null) {
-          throw new Error(
-            "ClickHouse is enabled but returned null for getDistinctFieldNames — check ClickHouse client configuration",
-          );
-        }
-        return result;
       },
     );
   }
@@ -610,9 +536,7 @@ export class TraceService {
     return this.tracer.withActiveSpan(
       "TraceService.getSpanForPromptStudio",
       { attributes: { "tenant.id": projectId, "span.id": spanId } },
-      async (span) => {
-        span.setAttribute("backend", "clickhouse");
-
+      async () => {
         return this.clickHouseService.getSpanForPromptStudio(
           projectId,
           spanId,

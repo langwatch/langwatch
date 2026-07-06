@@ -1,8 +1,5 @@
 import { z } from "zod";
 
-type AggregationsAggregationContainer = Record<string, unknown>;
-type QueryDslQueryContainer = Record<string, unknown>;
-
 export const filterFieldsEnum = z.enum([
   "topics.topics",
   "topics.subtopics",
@@ -87,11 +84,6 @@ export const sanitizeTriggerFilters = (
 export type FilterDefinition = {
   name: string;
   urlKey: string;
-  query: (
-    values: string[],
-    key: string | undefined,
-    subkey: string | undefined,
-  ) => QueryDslQueryContainer;
   single?: boolean;
   type?: "numeric";
   requiresKey?: {
@@ -99,15 +91,5 @@ export type FilterDefinition = {
   };
   requiresSubkey?: {
     filter: FilterField;
-  };
-  listMatch: {
-    aggregation: (
-      query: string | undefined,
-      key: string | undefined,
-      subkey: string | undefined,
-    ) => Record<string, AggregationsAggregationContainer>;
-    extract: (
-      result: Record<string, any>,
-    ) => { field: string; label: string; count: number }[];
   };
 };

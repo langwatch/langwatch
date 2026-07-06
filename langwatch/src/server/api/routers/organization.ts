@@ -144,16 +144,33 @@ export const organizationRouter = createTRPCRouter({
             ).listForOrganizationsAndUser({ orgIds, userId })
           : [];
 
+      // The plaintext S3 secret access key is only needed by the org/project
+      // settings forms, which are organization:manage surfaces that round-trip
+      // the stored value on save. Everyone else gets it redacted — the API
+      // must not hand the decrypted secret to lite/viewer members just
+      // because the UI happens not to render it.
+      const manageableOrgIds = new Set<string>();
       for (const organization of organizations) {
+        const canManage = await hasOrganizationPermission(
+          ctx,
+          organization.id,
+          "organization:manage",
+        );
+        if (canManage) manageableOrgIds.add(organization.id);
+      }
+
+      for (const organization of organizations) {
+        const canManage = manageableOrgIds.has(organization.id);
         for (const project of organization.teams.flatMap(
           (team) => team.projects,
         )) {
           if (project.s3AccessKeyId) {
             project.s3AccessKeyId = decrypt(project.s3AccessKeyId);
           }
-          if (project.s3SecretAccessKey) {
-            project.s3SecretAccessKey = decrypt(project.s3SecretAccessKey);
-          }
+          project.s3SecretAccessKey =
+            canManage && project.s3SecretAccessKey
+              ? decrypt(project.s3SecretAccessKey)
+              : null;
           if (project.s3Endpoint) {
             project.s3Endpoint = decrypt(project.s3Endpoint);
           }
@@ -176,14 +193,21 @@ export const organizationRouter = createTRPCRouter({
         if (organization.s3AccessKeyId) {
           organization.s3AccessKeyId = decrypt(organization.s3AccessKeyId);
         }
-        if (organization.s3SecretAccessKey) {
-          organization.s3SecretAccessKey = decrypt(
-            organization.s3SecretAccessKey,
-          );
-        }
+        organization.s3SecretAccessKey =
+          manageableOrgIds.has(organization.id) &&
+          organization.s3SecretAccessKey
+            ? decrypt(organization.s3SecretAccessKey)
+            : null;
         if (organization.s3Endpoint) {
           organization.s3Endpoint = decrypt(organization.s3Endpoint);
         }
+
+        // The Organization row still carries the dead Elasticsearch columns
+        // (kept for deploy safety until a follow-up migration drops them).
+        // Never ship the stored ciphertext / flag to clients.
+        organization.elasticsearchNodeUrl = null;
+        organization.elasticsearchApiKey = null;
+        organization.useCustomElasticsearch = false;
 
         // A user can be an org admin via either the legacy OrganizationUser row
         // OR via an ORGANIZATION-scoped ADMIN RoleBinding (direct or via group).

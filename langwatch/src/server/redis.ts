@@ -161,8 +161,3 @@ export async function verifyRedisReady(timeoutMs = 15_000): Promise<void> {
     process.exit(1);
   }
 }
-
-// makeQueueName lives in its own tiny module — see queues/makeQueueName.ts —
-// so callers that need it (e.g. scenario.constants pulled in by SimulationsPage)
-// don't drag ioredis into the client bundle.
-export { makeQueueName } from "./queues/makeQueueName";

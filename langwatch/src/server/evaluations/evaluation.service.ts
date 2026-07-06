@@ -1,7 +1,5 @@
-import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
-import { prisma as defaultPrisma } from "~/server/db";
 import type { Protections } from "~/server/traces/protections";
 import { createLogger } from "~/utils/logger/server";
 import { safeJsonParse } from "~/utils/safeJsonParse";
@@ -60,92 +58,27 @@ export class EvaluationService {
   private readonly logger = createLogger("langwatch:evaluations:service");
   private readonly tracer = getLangWatchTracer("langwatch.evaluations.service");
 
-  constructor(private readonly prisma: PrismaClient) {}
-
-  static create(prisma: PrismaClient = defaultPrisma): EvaluationService {
-    return new EvaluationService(prisma);
+  static create(): EvaluationService {
+    return new EvaluationService();
   }
 
   async getEvaluationsForTrace({
     projectId,
     traceId,
-    protections: _protections,
+    protections,
   }: {
     projectId: string;
     traceId: string;
     protections?: Protections;
   }): Promise<TraceEvaluation[]> {
-    return await this.tracer.withActiveSpan(
-      "EvaluationService.getEvaluationsForTrace",
-      { attributes: { "tenant.id": projectId, "trace.id": traceId } },
-      async () => {
-        const clickHouseClient = await getClickHouseClientForProject(projectId);
-        if (!clickHouseClient) {
-          throw new Error(
-            `ClickHouse client unavailable for project ${projectId}`,
-          );
-        }
-
-        const runQuery = async (columns: string) => {
-          const result = await clickHouseClient.query({
-            query: `
-              SELECT ${columns}
-              FROM evaluation_runs
-              WHERE TenantId = {tenantId:String}
-                AND TraceId = {traceId:String}
-                AND (TenantId, EvaluationId, UpdatedAt) IN (
-                  SELECT TenantId, EvaluationId, max(UpdatedAt)
-                  FROM evaluation_runs
-                  WHERE TenantId = {tenantId:String}
-                    AND TraceId = {traceId:String}
-                  GROUP BY TenantId, EvaluationId
-                )
-            `,
-            query_params: { tenantId: projectId, traceId },
-            format: "JSONEachRow",
-          });
-          return (await result.json()) as ClickHouseEvaluationRunRow[];
-        };
-
-        try {
-          const rows = await runQuery(EVAL_COLUMNS_WITH_INPUTS);
-          return rows.map(mapClickHouseEvaluationToTraceEvaluation);
-        } catch (error) {
-          if (isMemoryLimitError(error)) {
-            this.logger.warn(
-              { projectId, traceId },
-              "Evaluations read hit the ClickHouse memory limit; retrying without Inputs",
-            );
-            try {
-              const rows = await runQuery(EVAL_COLUMNS_LIGHT);
-              return rows.map(mapClickHouseEvaluationToTraceEvaluation);
-            } catch (retryError) {
-              this.logger.error(
-                {
-                  projectId,
-                  traceId,
-                  error:
-                    retryError instanceof Error
-                      ? retryError.message
-                      : retryError,
-                },
-                "Failed to fetch evaluations for trace from ClickHouse after light-projection retry",
-              );
-              throw new Error("Failed to fetch evaluations for trace");
-            }
-          }
-          this.logger.error(
-            {
-              projectId,
-              traceId,
-              error: error instanceof Error ? error.message : error,
-            },
-            "Failed to fetch evaluations for trace from ClickHouse",
-          );
-          throw new Error("Failed to fetch evaluations for trace");
-        }
-      },
-    );
+    // Single-trace read is the multi-trace read with one id — keeps the
+    // query shape and the memory-limit fallback policy in one place.
+    const evaluationsByTrace = await this.getEvaluationsMultiple({
+      projectId,
+      traceIds: [traceId],
+      protections,
+    });
+    return evaluationsByTrace[traceId] ?? [];
   }
 
   async getEvaluationsMultiple({

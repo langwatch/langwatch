@@ -18,7 +18,7 @@ export const dataForFilter = protectedProcedure
     }),
   )
   .use(checkProjectPermission("analytics:view"))
-  .query(async ({ input, ctx }) => {
+  .query(async ({ input }) => {
     const { field, key, subkey } = input;
 
     if (availableFilters[field].requiresKey && !key) {
@@ -40,7 +40,7 @@ export const dataForFilter = protectedProcedure
       Object.entries(input.filters).filter(([key]) => key !== field),
     ) as Partial<Record<FilterField, FilterParam>>;
 
-    const filterService = FilterService.create(ctx.prisma);
+    const filterService = FilterService.create();
     const results = await filterService.getFilterOptions({
       projectId: input.projectId,
       field,

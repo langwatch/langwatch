@@ -1,4 +1,10 @@
 import "dotenv/config";
+// OTel instrumentation MUST load before any module that creates spans —
+// without it the worker process has no registered tracer provider and every
+// BullMQOtel adapter / getLangWatchTracer span becomes a non-recording no-op.
+// dotenv stays first so instrumentation.node sees .env-provided config
+// (LANGWATCH_API_KEY, OTEL_EXPORTER_OTLP_ENDPOINT).
+import "./instrumentation.node";
 import { setEnvironment } from "@langwatch/ksuid";
 import http from "http";
 import { register } from "prom-client";
@@ -49,6 +55,17 @@ process.on("SIGTERM", () => void gracefulShutdown());
 // top-level) for that reason; `http`/`prom-client` are safe to import eagerly.
 void verifyRedisReady().then(async () => {
   try {
+    // Fail fast if the database is unreachable — better to crash the pod at
+    // boot than to boot green and have every job fail individually.
+    const { prisma } = await import("./server/db");
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      logger.info("database connection verified");
+    } catch (error) {
+      logger.fatal({ error }, "database unreachable at boot");
+      process.exit(1);
+    }
+
     const { startIngestionPullerWorker } = await import(
       "@ee/governance/services/pullers/pullerWorker"
     );
@@ -118,6 +135,27 @@ void verifyRedisReady().then(async () => {
     if (anomalyWorker) {
       shutdownHandles.push(() => anomalyWorker.stop());
       logger.info("anomaly worker ready");
+    }
+
+    // Governance spend-spike anomaly evaluation: a 5-minute tick that
+    // evaluates admin-authored spend_spike rules and persists AnomalyAlert
+    // rows (specs/ai-gateway/governance/anomaly-detection.feature).
+    const { startSpendSpikeAnomalyWorker } = await import(
+      "@ee/governance/services/spendSpikeAnomalyWorker"
+    );
+    const spendSpikeAnomalyWorker = startSpendSpikeAnomalyWorker();
+    shutdownHandles.push(() => spendSpikeAnomalyWorker.stop());
+    logger.info("spend spike anomaly worker ready");
+
+    // Self-hosted daily usage telemetry (no-op on SaaS or when
+    // DISABLE_USAGE_STATS is set).
+    const { startUsageStatsWorker } = await import(
+      "./server/usageStatsWorker"
+    );
+    const usageStatsWorker = startUsageStatsWorker();
+    if (usageStatsWorker) {
+      shutdownHandles.push(() => usageStatsWorker.stop());
+      logger.info("usage stats worker ready");
     }
 
     // Expose the worker process's prom-client registry over HTTP so the web

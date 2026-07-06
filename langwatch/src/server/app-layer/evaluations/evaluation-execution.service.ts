@@ -1,5 +1,6 @@
 import {
   DEFAULT_MAPPINGS,
+  mappingsReadEvaluationsSource,
   migrateLegacyMappings,
 } from "~/server/evaluations/evaluationMappings";
 import {
@@ -268,14 +269,19 @@ export class EvaluationExecutionService {
     // `trace.evaluations`, but evaluator field mappings that read the
     // `evaluations` source need them. Fetch and attach before building the
     // mapped data so they aren't silently empty (parity with
-    // runEvaluationForTrace in runEvaluation.ts).
-    const evaluationsByTrace =
-      await this.deps.traceService.getEvaluationsMultiple(
-        projectId,
-        [traceId],
-        INTERNAL_PROTECTIONS,
-      );
-    trace.evaluations = evaluationsByTrace[traceId] ?? [];
+    // runEvaluationForTrace in runEvaluation.ts). Gated on the mappings
+    // actually reading the `evaluations` source — this runs on the hot
+    // live-monitor path and the fetch is a heavy Inputs-projection
+    // ClickHouse read that most evaluator mappings never need.
+    if (mappingsReadEvaluationsSource(mappings)) {
+      const evaluationsByTrace =
+        await this.deps.traceService.getEvaluationsMultiple(
+          projectId,
+          [traceId],
+          INTERNAL_PROTECTIONS,
+        );
+      trace.evaluations = evaluationsByTrace[traceId] ?? [];
+    }
 
     // 4. Build evaluation data
     const data = await this.buildDataForEvaluation({

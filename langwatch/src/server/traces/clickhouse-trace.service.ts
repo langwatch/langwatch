@@ -203,6 +203,21 @@ function buildEventOccurrenceWindows(occurredAts: number[]): {
 }
 
 /**
+ * Thrown when no ClickHouse client can be resolved for a project — the only
+ * cause is a configuration problem (e.g. CLICKHOUSE_URL unset), never missing
+ * data. ClickHouse is the sole trace backend, so callers cannot fall back;
+ * they surface this as a configuration error.
+ */
+export class ClickHouseClientUnavailableError extends Error {
+  constructor(projectId: string) {
+    super(
+      `No ClickHouse client could be resolved for project "${projectId}" — check ClickHouse client configuration (CLICKHOUSE_URL)`,
+    );
+    this.name = "ClickHouseClientUnavailableError";
+  }
+}
+
+/**
  * Service for fetching traces from ClickHouse.
  *
  * Fetches trace summaries and, when needed, span rows via separate ClickHouse
@@ -235,9 +250,17 @@ export class ClickHouseTraceService {
    * The returned client is already wrapped with wrapWithDefaultSettings
    * by getClickHouseClientForProject, so every query automatically receives
    * memory-safety limits (max_memory_usage, max_bytes_before_external_group_by).
+   *
+   * @throws ClickHouseClientUnavailableError when no client resolves —
+   *   ClickHouse is the sole backend, so an unresolvable client is always a
+   *   configuration error, never a signal to fall back.
    */
-  private async resolveClient(projectId: string) {
-    return getClickHouseClientForProject(projectId);
+  private async resolveClient(projectId: string): Promise<ClickHouseClient> {
+    const client = await getClickHouseClientForProject(projectId);
+    if (!client) {
+      throw new ClickHouseClientUnavailableError(projectId);
+    }
+    return client;
   }
 
   /**
@@ -253,10 +276,6 @@ export class ClickHouseTraceService {
   /**
    * Get traces with spans for the given trace IDs.
    *
-   * Returns null if:
-   * - ClickHouse client is not available
-   * - ClickHouse is not enabled for this project
-   *
    * @param projectId - The project ID
    * @param traceIds - Array of trace IDs to fetch
    * @param protections - Field redaction protections
@@ -268,7 +287,8 @@ export class ClickHouseTraceService {
    *   over-threshold IO values read back full (#4888). Default
    *   (undefined/false) maps the ≤64 KB preview as-is and issues zero
    *   event_log SELECTs.
-   * @returns Array of Trace objects with spans, or null if ClickHouse is not enabled
+   * @returns Array of Trace objects with spans
+   * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
   async getTracesWithSpans(
     projectId: string,
@@ -276,17 +296,17 @@ export class ClickHouseTraceService {
     protections: Protections,
     occurredAt?: OccurredAtRange,
     opts?: { resolveBlobs?: boolean },
-  ): Promise<Trace[] | null> {
+  ): Promise<Trace[]> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getTracesWithSpans",
       {
         attributes: { "tenant.id": projectId },
       },
       async () => {
-        const clickHouseClient = await this.resolveClient(projectId);
-        if (!clickHouseClient) {
-          return null;
-        }
+        // Resolved up front (and discarded) so a configuration problem
+        // surfaces as ClickHouseClientUnavailableError rather than the
+        // generic fetch failure from the try/catch below.
+        await this.resolveClient(projectId);
 
         if (traceIds.length === 0) {
           return [];
@@ -351,7 +371,7 @@ export class ClickHouseTraceService {
    * required — without it ClickHouse scans every partition (including cold
    * S3 storage) for every lookup miss.
    *
-   * Returns null if the ClickHouse client is not available for the project.
+   * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
   async resolveTraceIdByPrefix({
     projectId,
@@ -367,15 +387,12 @@ export class ClickHouseTraceService {
     occurredAt: { from: number; to: number };
     /** Maximum distinct trace IDs to return (default 2 — enough to detect ambiguity) */
     limit?: number;
-  }): Promise<string[] | null> {
+  }): Promise<string[]> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.resolveTraceIdByPrefix",
       { attributes: { "tenant.id": projectId, "trace.id.prefix": prefix } },
       async () => {
         const clickHouseClient = await this.resolveClient(projectId);
-        if (!clickHouseClient) {
-          return null;
-        }
 
         try {
           const result = await clickHouseClient.query({
@@ -421,20 +438,17 @@ export class ClickHouseTraceService {
    * Queries trace_summaries using the Attributes map to find traces
    * with matching thread_id (stored under various attribute keys).
    *
-   * Returns null if:
-   * - ClickHouse client is not available
-   * - ClickHouse is not enabled for this project
-   *
    * @param projectId - The project ID
    * @param threadId - The thread ID to search for
    * @param protections - Field redaction protections
-   * @returns Array of Trace objects, or null if ClickHouse is not enabled
+   * @returns Array of Trace objects
+   * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
   async getTracesByThreadId(
     projectId: string,
     threadId: string,
     protections: Protections,
-  ): Promise<Trace[] | null> {
+  ): Promise<Trace[]> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getTracesByThreadId",
       {
@@ -442,9 +456,6 @@ export class ClickHouseTraceService {
       },
       async () => {
         const clickHouseClient = await this.resolveClient(projectId);
-        if (!clickHouseClient) {
-          return null;
-        }
 
         this.logger.debug(
           { projectId, threadId },
@@ -483,7 +494,6 @@ export class ClickHouseTraceService {
             traceIds,
             protections,
           );
-          if (!traces) return null;
 
           // Re-sort by timestamp — getTracesWithSpans returns in TraceId
           // order which doesn't match the chronological order we need.
@@ -513,24 +523,21 @@ export class ClickHouseTraceService {
    * Queries trace_summaries using the Attributes map to find traces
    * with matching thread_ids (stored under various attribute keys).
    *
-   * Returns null if:
-   * - ClickHouse client is not available
-   * - ClickHouse is not enabled for this project
-   *
    * @param projectId - The project ID
    * @param threadIds - Array of thread IDs to search for
    * @param protections - Field redaction protections
    * @param opts.resolveBlobs - Forwarded to the per-trace fetch so the eval
    *   path can read full thread IO (#4888). Customer thread views construct
    *   without a blob resolver, so this is a no-op for them.
-   * @returns Array of Trace objects with spans, or null if ClickHouse is not enabled
+   * @returns Array of Trace objects with spans
+   * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
   async getTracesWithSpansByThreadIds(
     projectId: string,
     threadIds: string[],
     protections: Protections,
     opts?: { resolveBlobs?: boolean },
-  ): Promise<Trace[] | null> {
+  ): Promise<Trace[]> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getTracesWithSpansByThreadIds",
       {
@@ -541,9 +548,6 @@ export class ClickHouseTraceService {
       },
       async () => {
         const clickHouseClient = await this.resolveClient(projectId);
-        if (!clickHouseClient) {
-          return null;
-        }
 
         if (threadIds.length === 0) {
           return [];
@@ -590,7 +594,6 @@ export class ClickHouseTraceService {
             undefined,
             { resolveBlobs: opts?.resolveBlobs },
           );
-          if (!traces) return null;
 
           // Re-sort by timestamp — getTracesWithSpans returns in TraceId
           // order which doesn't match the chronological order we need.
@@ -620,26 +623,20 @@ export class ClickHouseTraceService {
    * Uses keyset pagination for efficient cursor-based scrolling.
    * The scrollId encodes the last-seen (timestamp, traceId) pair.
    *
-   * Returns null if:
-   * - ClickHouse client is not available
-   * - ClickHouse is not enabled for this project
-   *
    * @param input - Query parameters including filters, pagination, and sorting
    * @param protections - Field redaction protections
-   * @returns TracesForProjectResult or null if ClickHouse is not enabled
+   * @returns TracesForProjectResult
+   * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
   async getAllTracesForProject(
     input: GetAllTracesForProjectInput,
     protections: Protections,
     options: GetAllTracesForProjectOptions = {},
-  ): Promise<TracesForProjectResult | null> {
+  ): Promise<TracesForProjectResult> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getAllTracesForProject",
       async (_span) => {
         const clickHouseClient = await this.resolveClient(input.projectId);
-        if (!clickHouseClient) {
-          return null;
-        }
 
         try {
           const pageSize = input.pageSize ?? 25;
@@ -834,7 +831,7 @@ export class ClickHouseTraceService {
           // Enrich with evaluations — direct ClickHouse query, no extra isClickHouseEnabled roundtrip
           const traceIds = groups.flat().map((t) => t.trace_id);
           let traceChecks: TracesForProjectResult["traceChecks"] = {};
-          if (traceIds.length > 0 && clickHouseClient) {
+          if (traceIds.length > 0) {
             const evalRows = await this.fetchEvaluationRows({
               clickHouseClient,
               projectId: input.projectId,
@@ -866,7 +863,7 @@ export class ClickHouseTraceService {
           // trace.events / trace.annotations off these same objects.
           if (projection?.needsEvents || projection?.needsAnnotations) {
             const pageTraces = groups.flat() as unknown as ProjectableTrace[];
-            if (projection.needsEvents && clickHouseClient) {
+            if (projection.needsEvents) {
               await this.enrichTracesWithEventsForProjection({
                 clickHouseClient,
                 projectId: input.projectId,
@@ -906,22 +903,18 @@ export class ClickHouseTraceService {
   /**
    * Get topic and subtopic counts for a project.
    *
-   * Returns null if ClickHouse is not enabled for the project.
-   *
    * @param input - Filter parameters including projectId and date range
-   * @returns TopicCountsResult or null if ClickHouse is not enabled
+   * @returns TopicCountsResult
+   * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
   async getTopicCounts(
     input: AggregationFiltersInput,
-  ): Promise<TopicCountsResult | null> {
+  ): Promise<TopicCountsResult> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getTopicCounts",
       { attributes: { "tenant.id": input.projectId } },
       async () => {
         const clickHouseClient = await this.resolveClient(input.projectId);
-        if (!clickHouseClient) {
-          return null;
-        }
 
         try {
           // Build date filter conditions
@@ -1011,22 +1004,18 @@ export class ClickHouseTraceService {
   /**
    * Get unique customers and labels for a project.
    *
-   * Returns null if ClickHouse is not enabled for the project.
-   *
    * @param input - Filter parameters including projectId and date range
-   * @returns CustomersAndLabelsResult or null if ClickHouse is not enabled
+   * @returns CustomersAndLabelsResult
+   * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
   async getCustomersAndLabels(
     input: AggregationFiltersInput,
-  ): Promise<CustomersAndLabelsResult | null> {
+  ): Promise<CustomersAndLabelsResult> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getCustomersAndLabels",
       { attributes: { "tenant.id": input.projectId } },
       async () => {
         const clickHouseClient = await this.resolveClient(input.projectId);
-        if (!clickHouseClient) {
-          return null;
-        }
 
         try {
           // Build date filter conditions
@@ -1127,7 +1116,6 @@ export class ClickHouseTraceService {
    * Get a span for prompt studio by span ID.
    *
    * Returns null if:
-   * - ClickHouse is not enabled for the project
    * - The span is not found
    * - The span is not an LLM span
    *
@@ -1146,9 +1134,6 @@ export class ClickHouseTraceService {
       { attributes: { "tenant.id": projectId, "span.id": spanId } },
       async () => {
         const clickHouseClient = await this.resolveClient(projectId);
-        if (!clickHouseClient) {
-          return null;
-        }
 
         try {
           // Fetch ALL spans in the trace in a single query so we can
@@ -1391,21 +1376,18 @@ export class ClickHouseTraceService {
   /**
    * Get distinct span names and metadata keys for a project.
    *
-   * Returns null if ClickHouse is not enabled for the project.
+   * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
   async getDistinctFieldNames(
     projectId: string,
     startDate: number,
     endDate: number,
-  ): Promise<DistinctFieldNamesResult | null> {
+  ): Promise<DistinctFieldNamesResult> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getDistinctFieldNames",
       { attributes: { "tenant.id": projectId } },
       async () => {
         const clickHouseClient = await this.resolveClient(projectId);
-        if (!clickHouseClient) {
-          return null;
-        }
 
         try {
           // Get distinct span names from stored_spans
@@ -1560,9 +1542,6 @@ export class ClickHouseTraceService {
       },
       async (_span) => {
         const clickHouseClient = await this.resolveClient(projectId);
-        if (!clickHouseClient) {
-          throw new Error("ClickHouse client not available");
-        }
 
         // Additional filter conditions (already parameterized by the filter module)
         const extraFilters =
@@ -2388,9 +2367,6 @@ export class ClickHouseTraceService {
       },
       async (_span) => {
         const clickHouseClient = await this.resolveClient(projectId);
-        if (!clickHouseClient) {
-          throw new Error("ClickHouse client not available");
-        }
 
         // The summary + span reads pull heavy columns (ComputedInput/Output,
         // Attributes, SpanAttributes/Events/Links) for the whole trace list, so a

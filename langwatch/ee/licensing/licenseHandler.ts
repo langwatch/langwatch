@@ -259,7 +259,8 @@ export class LicenseHandler {
     // Resolve defaults for optional plan fields
     const resolved = resolvePlanDefaults(plan);
 
-    // Get message count via TraceUsageService (direct ES/CH query).
+    // Get message count via the app-layer UsageService (meter policy selects
+    // traces vs events, counted in ClickHouse).
     // Returns 0 if service not provided (e.g., in tests).
     // "unlimited" is resolved to 0 since license display needs a numeric value.
     const messagesCountPromise = this.traceUsageService

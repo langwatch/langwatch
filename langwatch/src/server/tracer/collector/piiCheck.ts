@@ -3,7 +3,6 @@ import type { google } from "@google-cloud/dlp/build/protos/protos";
 import type { PIIRedactionLevel } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import { env } from "../../../env.mjs";
 import { createLogger } from "../../../utils/logger/server";
-import { startSpan } from "../../../utils/posthogErrorCapture";
 import { normalizePresidioMarkers } from "../../data-privacy/redaction/markers";
 import type { BatchEvaluationResult } from "../../evaluations/evaluators";
 import {
@@ -11,9 +10,8 @@ import {
   getEvaluationStatusCounter,
   getPiiChecksCounter,
 } from "../../metrics";
-import type { ElasticSearchSpan, ElasticSearchTrace, Trace } from "../types";
 
-const logger = createLogger("langwatch:workers:collector:piiCheck");
+const logger = createLogger("langwatch:tracer:collector:piiCheck");
 
 // Lazy initialization - env vars accessed only when getCredentials() is called
 // null = not yet initialized, undefined = initialized but no credentials
@@ -175,70 +173,25 @@ const dlpCheck = async (
   return response.result?.findings ?? [];
 };
 
-export const clearPII = async (
-  object: Record<string | number, any>,
-  keysPath: (string | number)[],
-  options: PIICheckOptions,
-) => {
-  const { piiRedactionLevel, mainMethod, enforced } = options;
-
-  const lastKey = keysPath[keysPath.length - 1];
-  if (!lastKey) {
-    return;
+/**
+ * Builds a converter from Google DLP codepoint offsets to JS string (UTF-16
+ * code unit) indices for `text`. When the text has no surrogate pairs the two
+ * indexing schemes coincide, so the identity function is returned.
+ */
+const codepointToCodeUnitConverter = (text: string): ((cp: number) => number) => {
+  if (!/[\uD800-\uDFFF]/.test(text)) {
+    return (cp) => cp;
   }
-
-  let currentObject = object;
-  for (const key of keysPath.slice(0, -1)) {
-    currentObject = currentObject[key];
-    if (!currentObject) {
-      return;
-    }
+  // offsets[i] = code-unit index of the i-th codepoint (plus a final sentinel
+  // at text.length so an end offset past the last codepoint clamps cleanly).
+  const offsets: number[] = [];
+  let codeUnit = 0;
+  for (const char of text) {
+    offsets.push(codeUnit);
+    codeUnit += char.length;
   }
-
-  if (!currentObject[lastKey] || typeof currentObject[lastKey] !== "string") {
-    return;
-  }
-
-  const methods = {
-    presidio: presidioClearPII,
-    google_dlp: googleDLPClearPII,
-  };
-  const firstMethod = mainMethod ?? "presidio";
-  const secondMethod = firstMethod === "google_dlp" ? "presidio" : "google_dlp";
-
-  try {
-    await methods[firstMethod](currentObject, lastKey, piiRedactionLevel);
-  } catch (e) {
-    if (
-      secondMethod === "google_dlp"
-        ? !getCredentials()
-        : !process.env.LANGEVALS_ENDPOINT
-    ) {
-      if (enforced) {
-        throw e;
-      } else {
-        logger.warn(
-          "⚠️  WARNING: Fail to redact PII with error but allowed to continue, this will fail in production by default.",
-        );
-        return;
-      }
-    }
-    logger.debug(
-      { error: e as any },
-      `error running ${firstMethod} PII check, running ${secondMethod} as fallback`,
-    );
-
-    try {
-      await methods[secondMethod](currentObject, lastKey, piiRedactionLevel);
-    } catch (e) {
-      if (enforced) {
-        throw e;
-      }
-      logger.warn(
-        "⚠️  WARNING: Fail to redact PII with error but allowed to continue, this will fail in production by default.",
-      );
-    }
-  }
+  offsets.push(codeUnit);
+  return (cp) => offsets[Math.max(0, Math.min(cp, offsets.length - 1))]!;
 };
 
 export const googleDLPClearPII = async (
@@ -253,18 +206,26 @@ export const googleDLPClearPII = async (
   ];
 
   const findings = await dlpCheck(text, piiRedactionLevel);
+  // DLP reports codepoint offsets against the original text; convert them to
+  // code-unit indices once. Each mask below replaces the range with the same
+  // number of code units ("✳" is a single BMP code unit), so code-unit indices
+  // derived from the original text stay valid on the accumulating copy.
+  const toCodeUnit = codepointToCodeUnitConverter(text);
+  let redacted = text;
   for (const finding of findings) {
     const start = finding.location?.codepointRange?.start;
     const end = finding.location?.codepointRange?.end;
-    if (start && end) {
-      currentObject[lastKey] =
-        text.substring(0, +start) +
-        "✳".repeat(+end - +start) +
-        text.substring(+end);
+    if (start != null && end != null) {
+      const startIdx = toCodeUnit(+start);
+      const endIdx = toCodeUnit(+end);
+      redacted =
+        redacted.substring(0, startIdx) +
+        "✳".repeat(endIdx - startIdx) +
+        redacted.substring(endIdx);
     }
   }
   if (findings.length > 0) {
-    currentObject[lastKey] = text.replace(/\✳{1,}/g, "[REDACTED]") + remaining;
+    currentObject[lastKey] = redacted.replace(/✳+/g, "[REDACTED]") + remaining;
   }
 };
 
@@ -284,75 +245,8 @@ function presidioEntitiesSetting(
   return Object.fromEntries(names.map((name) => [name.toLowerCase(), true]));
 }
 
-export const presidioClearPII = async (
-  currentObject: Record<string | number, any>,
-  lastKey: string | number,
-  piiRedactionLevel: PIIRedactionLevel,
-  entities?: readonly string[],
-): Promise<void> => {
-  getPiiChecksCounter("presidio").inc();
-  const timeout = 60_000;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-  const startTime = performance.now();
-
-  const [text, remaining] = [
-    currentObject[lastKey].slice(0, 250_000),
-    currentObject[lastKey].slice(250_000),
-  ];
-
-  const response = await fetch(
-    `${env.LANGEVALS_ENDPOINT}/presidio/pii_detection/evaluate`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        data: [{ input: text }],
-        settings: {
-          entities: presidioEntitiesSetting(piiRedactionLevel, entities),
-          min_threshold: 0.5,
-        },
-        env: {},
-      }),
-      signal: controller.signal,
-    },
-  );
-
-  clearTimeout(timeoutId);
-
-  const duration = performance.now() - startTime;
-  evaluationDurationHistogram
-    .labels("presidio/pii_detection")
-    .observe(duration);
-
-  if (!response.ok) {
-    getEvaluationStatusCounter("presidio/pii_detection", "error").inc();
-    throw new Error(await response.text());
-  }
-
-  const result = ((await response.json()) as BatchEvaluationResult)[0];
-  if (!result) {
-    getEvaluationStatusCounter("presidio/pii_detection", "error").inc();
-    throw new Error("Unexpected response: empty results");
-  }
-  getEvaluationStatusCounter("presidio/pii_detection", result.status).inc();
-  if (result.status === "skipped") {
-    return;
-  }
-  if (result.status === "error") {
-    throw new Error(result.details);
-  }
-  if (result.status === "processed" && result.raw_response?.anonymized) {
-    currentObject[lastKey] =
-      normalizePresidioMarkers(result.raw_response.anonymized) + remaining;
-  }
-};
-
 /**
- * Batch version of presidioClearPII that sends multiple texts in a single
+ * Presidio PII redaction that sends multiple texts in a single batch
  * HTTP request, reducing the number of lambda invocations.
  *
  * @returns Array of anonymized strings (null when text was unchanged).
@@ -447,70 +341,4 @@ export type PIICheckOptions = {
    * only the analysis-service identifiers a team selected.
    */
   entities?: readonly string[];
-};
-
-export const cleanupPIIs = async (
-  trace: Trace | Omit<ElasticSearchTrace, "spans">,
-  spans: ElasticSearchSpan[],
-  options: PIICheckOptions,
-): Promise<void> => {
-  return await startSpan({ name: "cleanupPIIs" }, async () => {
-    const { enforced, mainMethod } = options;
-
-    if (!getCredentials() && mainMethod === "google_dlp") {
-      if (enforced) {
-        throw new Error(
-          "GOOGLE_APPLICATION_CREDENTIALS is not set, PII check cannot be performed",
-        );
-      }
-      logger.warn(
-        "⚠️  WARNING: GOOGLE_APPLICATION_CREDENTIALS is not set, so PII check will not be performed, you are risking storing PII on the database, please set them if you wish to avoid that, this will fail in production by default",
-      );
-      return;
-    }
-    if (mainMethod === "presidio" && !process.env.LANGEVALS_ENDPOINT) {
-      if (enforced) {
-        throw new Error(
-          "LANGEVALS_ENDPOINT is not set, PII check cannot be performed",
-        );
-      }
-      logger.warn(
-        "⚠️  WARNING: LANGEVALS_ENDPOINT is not set, so PII check will not be performed, you are risking storing PII on the database, please set them if you wish to avoid that, this will fail in production by default",
-      );
-      return;
-    }
-
-    logger.debug({ observedTraceId: trace.trace_id }, "checking PII for trace");
-
-    const clearPIIPromises = [
-      clearPII(trace, ["input", "value"], options),
-      clearPII(trace, ["output", "value"], options),
-      clearPII(trace, ["error", "message"], options),
-    ];
-
-    for (const span of spans) {
-      clearPIIPromises.push(clearPII(span, ["input", "value"], options));
-      clearPIIPromises.push(clearPII(span, ["error", "message"], options));
-
-      if (span.output) {
-        clearPIIPromises.push(clearPII(span.output, ["value"], options));
-      }
-
-      for (const context of span.contexts ?? []) {
-        if (Array.isArray(context.content)) {
-          for (let i = 0; i < context.content.length; i++) {
-            clearPIIPromises.push(clearPII(context.content, [i], options));
-          }
-        } else if (typeof context.content === "object") {
-          for (const key of Object.keys(context.content)) {
-            clearPIIPromises.push(clearPII(context.content, [key], options));
-          }
-        } else {
-          clearPIIPromises.push(clearPII(context, ["content"], options));
-        }
-      }
-    }
-
-    await Promise.all(clearPIIPromises);
-  });
 };

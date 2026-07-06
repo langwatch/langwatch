@@ -9,13 +9,7 @@ import {
 export class AnnotationService {
   constructor(private readonly repository: AnnotationRepository) {}
 
-  static async create({
-    prisma,
-    projectId: _projectId,
-  }: {
-    prisma: PrismaClient;
-    projectId: string;
-  }): Promise<AnnotationService> {
+  static create({ prisma }: { prisma: PrismaClient }): AnnotationService {
     return new AnnotationService(new AnnotationRepository(prisma));
   }
 

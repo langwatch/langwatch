@@ -1,56 +1,14 @@
 import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
 import { createLogger } from "../../../utils/logger/server";
-import { startSpan } from "../../../utils/posthogErrorCapture";
 import { compileSafeRegex } from "../../../utils/safeRegex";
 import {
   getLLMModelCosts,
   type MaybeStoredLLMModelCost,
 } from "../../modelProviders/llmModelCost";
-import { isBuildOrNoRedis } from "../../redis";
 
-const logger = createLogger("langwatch:workers:collector:cost");
+const logger = createLogger("langwatch:tracer:collector:cost");
 
 const tiktokenClient = new TiktokenClient();
-
-async function countTokens(
-  llmModelCost: MaybeStoredLLMModelCost,
-  text: string | undefined,
-): Promise<number | undefined> {
-  if (!text) return 0;
-
-  const model = llmModelCost.model.includes("/")
-    ? llmModelCost.model.substring(llmModelCost.model.indexOf("/") + 1)
-    : llmModelCost.model;
-
-  return tiktokenClient.countTokens(model, text);
-}
-
-export async function tokenizeAndEstimateCost({
-  llmModelCost,
-  input,
-  output,
-}: {
-  llmModelCost: MaybeStoredLLMModelCost;
-  input?: string;
-  output?: string;
-}): Promise<{
-  inputTokens: number;
-  outputTokens: number;
-  cost: number | undefined;
-}> {
-  return await startSpan({ name: "tokenizeAndEstimateCost" }, async () => {
-    const inputTokens = (await countTokens(llmModelCost, input)) ?? 0;
-    const outputTokens = (await countTokens(llmModelCost, output)) ?? 0;
-
-    const cost = estimateCost({ llmModelCost, inputTokens, outputTokens });
-
-    return {
-      inputTokens,
-      outputTokens,
-      cost,
-    };
-  });
-}
 
 export function estimateCost({
   llmModelCost,

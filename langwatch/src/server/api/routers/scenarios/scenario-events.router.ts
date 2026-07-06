@@ -39,7 +39,7 @@ const dateRangeFields = {
  * Unified helper that fetches suite run data for either a single suite
  * (when scenarioSetId is provided) or all suites (when absent).
  *
- * Returns data from ES/ClickHouse. Pending items are visible immediately
+ * Returns data from ClickHouse. Pending items are visible immediately
  * because SuiteRunService dispatches simulation startRun commands at
  * scheduling time (before BullMQ jobs begin processing).
  *
@@ -144,14 +144,13 @@ export const scenarioEventsRouter = createTRPCRouter({
         },
         "Fetching suite run data (unified)",
       );
-      const _dates = resolveDateRange(input);
+      const dates = resolveDateRange(input);
       return fetchSuiteRunData({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
         limit: input.limit,
         cursor: input.cursor,
-        startDate: input.startDate,
-        endDate: input.endDate,
+        ...dates,
         sinceTimestamp: input.sinceTimestamp,
       });
     }),
@@ -218,11 +217,9 @@ export const scenarioEventsRouter = createTRPCRouter({
   // Get scenario run state
   getRunState: protectedProcedure
     .input(
-      projectSchema
-        .extend({
-          scenarioRunId: z.string(),
-        })
-        .extend(dateRangeFields),
+      projectSchema.extend({
+        scenarioRunId: z.string(),
+      }),
     )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
@@ -231,11 +228,11 @@ export const scenarioEventsRouter = createTRPCRouter({
         "Fetching scenario run state",
       );
       const service = getApp().simulations.runs;
-      const dates = resolveDateRange(input);
+      // Point lookup by unique run id — no date window, so runs older than any
+      // default range stay reachable.
       const data = await service.getScenarioRunData({
         projectId: input.projectId,
         scenarioRunId: input.scenarioRunId,
-        ...dates,
       });
 
       if (!data) {
@@ -273,11 +270,9 @@ export const scenarioEventsRouter = createTRPCRouter({
   // Get scenario run data by scenario id
   getRunDataByScenarioId: protectedProcedure
     .input(
-      projectSchema
-        .extend({
-          scenarioId: z.string(),
-        })
-        .extend(dateRangeFields),
+      projectSchema.extend({
+        scenarioId: z.string(),
+      }),
     )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
@@ -286,11 +281,11 @@ export const scenarioEventsRouter = createTRPCRouter({
         "Fetching run data by scenario id",
       );
       const service = getApp().simulations.runs;
-      const dates = resolveDateRange(input);
+      // Point lookup by scenario id — no date window, so a scenario's full run
+      // history stays reachable.
       const data = await service.getScenarioRunDataByScenarioId({
         projectId: input.projectId,
         scenarioId: input.scenarioId,
-        ...dates,
       });
       return { data };
     }),
@@ -330,14 +325,12 @@ export const scenarioEventsRouter = createTRPCRouter({
   // Get scenario run data for a specific batch run (conditional: skip if unchanged)
   getBatchRunData: protectedProcedure
     .input(
-      projectSchema
-        .extend({
-          scenarioSetId: z.string(),
-          batchRunId: z.string(),
-          sinceTimestamp: z.number().optional(),
-          runTimestamps: z.record(z.string(), z.number()).optional(),
-        })
-        .extend(dateRangeFields),
+      projectSchema.extend({
+        scenarioSetId: z.string(),
+        batchRunId: z.string(),
+        sinceTimestamp: z.number().optional(),
+        runTimestamps: z.record(z.string(), z.number()).optional(),
+      }),
     )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
@@ -350,13 +343,13 @@ export const scenarioEventsRouter = createTRPCRouter({
         "Fetching batch run data",
       );
       const service = getApp().simulations.runs;
-      const dates = resolveDateRange(input);
+      // Point lookup by batch run id — no date window, so old batches stay
+      // reachable when opened directly.
       const result = await service.getRunDataForBatchRun({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
         batchRunId: input.batchRunId,
         sinceTimestamp: input.sinceTimestamp,
-        ...dates,
       });
       return filterRunsByTimestamp(result, input.runTimestamps);
     }),

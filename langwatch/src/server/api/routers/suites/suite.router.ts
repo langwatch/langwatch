@@ -4,6 +4,7 @@
  * Provides CRUD, duplicate, archive, and run endpoints.
  */
 
+import type { PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -22,16 +23,20 @@ import {
   updateSuiteSchema,
 } from "./schemas";
 
+function createSuiteService(prisma: PrismaClient) {
+  return SuiteService.create({
+    prisma,
+    suiteRunService: getApp().suiteRuns.runs,
+  });
+}
+
 export const suiteRouter = createTRPCRouter({
   create: protectedProcedure
     .input(createSuiteSchema)
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
       await enforceLicenseLimit(ctx, input.projectId, "experiments");
-      const service = SuiteService.create({
-        prisma: ctx.prisma,
-        suiteRunService: getApp().suiteRuns.runs,
-      });
+      const service = createSuiteService(ctx.prisma);
       return service.create(input);
     }),
 
@@ -39,10 +44,7 @@ export const suiteRouter = createTRPCRouter({
     .input(projectSchema)
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ ctx, input }) => {
-      const service = SuiteService.create({
-        prisma: ctx.prisma,
-        suiteRunService: getApp().suiteRuns.runs,
-      });
+      const service = createSuiteService(ctx.prisma);
       return service.getAll(input);
     }),
 
@@ -50,10 +52,7 @@ export const suiteRouter = createTRPCRouter({
     .input(projectSchema.extend({ id: z.string() }))
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ ctx, input }) => {
-      const service = SuiteService.create({
-        prisma: ctx.prisma,
-        suiteRunService: getApp().suiteRuns.runs,
-      });
+      const service = createSuiteService(ctx.prisma);
       const suite = await service.getById(input);
       if (!suite) {
         throw new TRPCError({
@@ -69,10 +68,7 @@ export const suiteRouter = createTRPCRouter({
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
       const { id, projectId, ...data } = input;
-      const service = SuiteService.create({
-        prisma: ctx.prisma,
-        suiteRunService: getApp().suiteRuns.runs,
-      });
+      const service = createSuiteService(ctx.prisma);
       return service.update({ id, projectId, data });
     }),
 
@@ -80,10 +76,7 @@ export const suiteRouter = createTRPCRouter({
     .input(projectSchema.extend({ id: z.string() }))
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
-      const service = SuiteService.create({
-        prisma: ctx.prisma,
-        suiteRunService: getApp().suiteRuns.runs,
-      });
+      const service = createSuiteService(ctx.prisma);
       // Validate source suite exists before checking limits — avoids masking NOT_FOUND with a limit error
       const source = await service.getById(input);
       if (!source) {
@@ -107,10 +100,7 @@ export const suiteRouter = createTRPCRouter({
     .input(projectSchema.extend({ id: z.string() }))
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
-      const service = SuiteService.create({
-        prisma: ctx.prisma,
-        suiteRunService: getApp().suiteRuns.runs,
-      });
+      const service = createSuiteService(ctx.prisma);
       const result = await service.archive(input);
       if (!result) {
         throw new TRPCError({
@@ -141,10 +131,7 @@ export const suiteRouter = createTRPCRouter({
           message: "Organization not found for project",
         });
       }
-      const service = SuiteService.create({
-        prisma: ctx.prisma,
-        suiteRunService: getApp().suiteRuns.runs,
-      });
+      const service = createSuiteService(ctx.prisma);
       return service.resolveArchivedNames({
         ...input,
         organizationId,
@@ -162,10 +149,7 @@ export const suiteRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
-      const service = SuiteService.create({
-        prisma: ctx.prisma,
-        suiteRunService: getApp().suiteRuns.runs,
-      });
+      const service = createSuiteService(ctx.prisma);
       const suite = await service.getById(input);
       if (!suite) {
         throw new TRPCError({
@@ -227,8 +211,8 @@ export const suiteRouter = createTRPCRouter({
       const startDate = input.startDate ?? Date.now() - THIRTY_DAYS_MS;
       const endDate = input.endDate ?? Date.now();
 
-      const facade = getApp().simulations.runs;
-      const summaries = await facade.getInternalSuiteSummaries({
+      const simulationRuns = getApp().simulations.runs;
+      const summaries = await simulationRuns.getInternalSuiteSummaries({
         projectId: input.projectId,
         startDate,
         endDate,

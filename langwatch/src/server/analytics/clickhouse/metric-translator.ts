@@ -328,7 +328,6 @@ function translateMetadataMetric(
   requiredJoins: CHTable[],
 ): MetricTranslation {
   const ts = tableAliases.trace_summaries;
-  const _ss = tableAliases.stored_spans;
 
   switch (metric) {
     case "metadata.trace_id":
@@ -873,7 +872,6 @@ function translateThreadsMetric(
   requiredJoins: CHTable[],
 ): MetricTranslation {
   const ts = tableAliases.trace_summaries;
-  const _ss = tableAliases.stored_spans;
 
   switch (metric) {
     case "threads.average_duration_per_thread":
