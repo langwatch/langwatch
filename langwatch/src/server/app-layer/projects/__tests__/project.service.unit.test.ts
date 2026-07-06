@@ -83,7 +83,8 @@ describe("ProjectService", () => {
 
         const result = await service.resolveDefaultModel("proj_test");
 
-        // anthropic appears before bedrock in PROVIDER_RESOLUTION_ORDER
+        // bedrock is not a member of PROVIDER_RESOLUTION_ORDER so it is never
+        // iterated; anthropic is the only candidate evaluated here.
         expect(result).toBe("anthropic/latest");
       });
     });

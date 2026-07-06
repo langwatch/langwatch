@@ -98,8 +98,22 @@ export class ProjectService {
     // This method provides the provider-level fallback for callers that have not
     // yet migrated to getResolvedDefaultForFeature — it finds the first enabled
     // provider that has a canonical default in PROVIDER_DEFAULT_MODELS.
-    const modelProviders =
-      await this.modelProviderService.getProjectModelProviders(projectId, true);
+    let modelProviders: Awaited<
+      ReturnType<
+        typeof this.modelProviderService.getProjectModelProviders
+      >
+    >;
+    try {
+      modelProviders =
+        await this.modelProviderService.getProjectModelProviders(projectId, true);
+    } catch (error) {
+      logger.error(
+        { projectId, error },
+        "resolveDefaultModel: provider lookup failed — returning null",
+      );
+      captureException(error);
+      return null;
+    }
 
     // Walk providers in preferred order, return first usable canonical default.
     for (const providerId of PROVIDER_RESOLUTION_ORDER) {
