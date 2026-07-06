@@ -19,7 +19,7 @@
 # -----------------------------------------------------------------------------
 # Pin the Go toolchain to the version recorded in go.mod (`go 1.26.2`) so
 # CI and local builds produce byte-identical binaries. Bump in lockstep.
-FROM golang:1.26.2-bookworm AS builder
+FROM golang:1.26.4-bookworm AS builder
 
 WORKDIR /src
 
