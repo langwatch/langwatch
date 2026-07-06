@@ -129,20 +129,6 @@ export class AgentRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   /**
-   * Find an agent by ID regardless of its archived status.
-   * Used for checking archived vs. missing status during suite run resolution.
-   */
-  async findByIdIncludingArchived(input: {
-    id: string;
-    projectId: string;
-  }): Promise<{ id: string; archivedAt: Date | null } | null> {
-    return this.prisma.agent.findFirst({
-      where: { id: input.id, projectId: input.projectId },
-      select: { id: true, archivedAt: true },
-    });
-  }
-
-  /**
    * Find multiple agents by IDs regardless of archived status.
    * Returns only id and archivedAt for lightweight classification.
    */
