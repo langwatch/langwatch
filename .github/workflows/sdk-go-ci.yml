@@ -72,9 +72,9 @@ jobs:
         run: go mod download
 
       - name: Run e2e examples
-        # Fork PRs don't receive repository secrets, so a secret-backed run
-        # can only fail on a missing key. Skip it on forks; same-repo PRs,
-        # pushes, and label-approved pull_request_target still run.
+        # Fork and Dependabot PRs don't receive repository secrets, so a
+        # secret-backed run can only fail on a missing key. Skip it there;
+        # same-repo PRs, pushes, and label-approved pull_request_target run.
         if: >
           (github.event_name != 'pull_request'
            || github.event.pull_request.head.repo.full_name == github.repository)
