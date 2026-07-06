@@ -11,6 +11,15 @@ Feature: BullMQ Redis Cluster Compatibility
   # Wrapping queue names in {braces} forces Redis to hash only the braced
   # portion, guaranteeing all keys for a queue land on the same slot.
 
+  # The @integration scenarios below were previously bound to
+  # background/__tests__/redis-cluster.integration.test.ts (a testcontainers
+  # 6-node cluster), which was deleted with the background stack in the
+  # Elasticsearch/background removal. They remain valid requirements for the
+  # surviving BullMQ queues (topic clustering, ingestion puller, scenarios)
+  # but are unbound until a cluster testbed is wired up again. The @unit
+  # scenario at the bottom is live — see
+  # src/server/queues/__tests__/makeQueueName.unit.test.ts.
+
   @integration @unimplemented
   Scenario: Adding a job to a queue without a hash tag fails on Redis Cluster
     Given a Redis Cluster is running
@@ -54,7 +63,7 @@ Feature: BullMQ Redis Cluster Compatibility
     Then every pipeline queue name contains a hash tag
     And adding a job to each pipeline queue succeeds on the cluster
 
-  @unit @unimplemented
+  @unit
   Scenario: Every queue name produced by the system contains a hash tag
     Given all queue name sources in the codebase
     When each source produces its queue name

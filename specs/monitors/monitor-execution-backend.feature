@@ -32,7 +32,7 @@ Feature: Monitor Execution with Evaluator Reference
   # tracked in PR #3458.
 
   Background:
-    Given the evaluation worker is running
+    Given the evaluation execution pipeline is running
     And LangEvals service is available
 
   @unimplemented
