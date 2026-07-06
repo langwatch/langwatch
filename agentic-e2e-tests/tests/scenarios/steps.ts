@@ -80,7 +80,21 @@ export async function thenISeeNewScenarioButton(page: Page) {
 export async function whenIClickNewScenario(page: Page) {
   await page.getByRole("button", { name: /new scenario/i }).click();
 
-  // Two interstitial modals may appear before the scenario form drawer:
+  // Step 1: Handle ScenarioWelcomeModal — shown when user has zero scenarios
+  // and has not previously dismissed the welcome screen (localStorage flag).
+  // This modal appears BEFORE the scenario creation modals in step 2.
+  const welcomeButton = page.getByRole("button", {
+    name: /create your first scenario/i,
+  });
+  const welcomeVisible = await welcomeButton
+    .waitFor({ state: "visible", timeout: 3000 })
+    .then(() => true)
+    .catch(() => false);
+  if (welcomeVisible) {
+    await welcomeButton.click();
+  }
+
+  // Step 2: Handle interstitial modals before the scenario form drawer opens.
   //   1. ModelProviderRequiredModal ("Proceed anyway") — shown when no model
   //      provider is configured (typical in CI).
   //   2. AICreateModal ("I'll write it myself") — shown when a provider exists.

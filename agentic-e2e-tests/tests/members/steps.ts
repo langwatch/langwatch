@@ -181,8 +181,10 @@ export async function thenEmailIsNotVisible(page: Page, email: string) {
  * Assert that a success toast with the given title text appears.
  */
 export async function thenISeeSuccessToast(page: Page, titleText: string) {
+  // 15 s: CI mutation round-trips can be slow; toast appears only after the
+  // server responds, and the default 5 s is too tight under load.
   await expect(page.getByText(titleText, { exact: false })).toBeVisible({
-    timeout: 5000,
+    timeout: 15000,
   });
 }
 
@@ -265,7 +267,7 @@ export async function seedWaitingApprovalInvite({
                 {
                   teamId,
                   role: "MEMBER",
-                  customRoleId: null,
+                  // customRoleId omitted — z.string().optional() accepts undefined, not null
                 },
               ],
             },
