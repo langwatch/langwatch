@@ -111,7 +111,7 @@ export class ProjectService {
         { projectId, error },
         "resolveDefaultModel: provider lookup failed — returning null",
       );
-      captureException(error);
+      captureException(error instanceof Error ? error : new Error(String(error)));
       return null;
     }
 
