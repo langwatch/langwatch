@@ -47,6 +47,7 @@ jobs:
       CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/langwatch"
       IS_OPENSEARCH: "true"
       REDIS_URL: "redis://localhost:6380"
+      ELASTICSEARCH_NODE_URL: "http://localhost:9201"
       LANGWATCH_NLP_SERVICE: "http://localhost:5563"
       LANGEVALS_ENDPOINT: "http://localhost:5564"
       NEXTAUTH_SECRET: "test-secret-for-e2e-testing"
@@ -120,6 +121,33 @@ jobs:
           --health-interval 30s
           --health-timeout 30s
           --health-retries 3
+
+      langwatch_nlp:
+        image: langwatch/langwatch_nlp:latest
+        ports:
+          - 5563:5561
+        env:
+          LANGWATCH_ENDPOINT: http://host.docker.internal:5570
+        options: >-
+          --add-host host.docker.internal:host-gateway
+          --health-cmd "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5561/health')\" || exit 1"
+          --health-interval 15s
+          --health-timeout 10s
+          --health-retries 12
+          --health-start-period 30s
+
+      langevals:
+        image: langwatch/langevals:latest
+        ports:
+          - 5564:5562
+        env:
+          DISABLE_EVALUATORS_PRELOAD: "true"
+        options: >-
+          --health-cmd "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5562/healthcheck')\" || exit 1"
+          --health-interval 15s
+          --health-timeout 10s
+          --health-retries 12
+          --health-start-period 30s
 
     steps:
       - name: Checkout
