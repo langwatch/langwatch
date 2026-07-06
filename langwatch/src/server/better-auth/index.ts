@@ -22,6 +22,14 @@ import {
   beforeUserCreate,
 } from "./hooks";
 import { revokeAllSessionsForUser } from "./revokeSessions";
+import {
+  isCredentialMutationPath,
+  isEmailAuthPath,
+  isGatedSsoPath,
+  isPasswordResetPath,
+  normalizedRequestPathname,
+  requestPathname,
+} from "./ssoPathGate";
 
 const logger = createLogger("langwatch:better-auth");
 
@@ -214,73 +222,6 @@ if (
     }),
   });
 }
-
-/**
- * ADR-027 gate site #2 — the SSO-initiation paths blocked when the platform
- * gate denies. Verified against better-auth 1.6.x + genericOAuth (v5 MAJOR
- * fix): `/oauth2/authorize` is a phantom (that's the OIDC-*provider*
- * endpoint, not a client one) and is deliberately excluded. `/link-social` +
- * `/oauth2/link` are included so a coerced-mode user can't pre-link a
- * provider that goes live after a later allow-flip.
- *
- * Exported for unit testing.
- */
-export const GATED_SSO_INITIATION_SUFFIXES = [
-  "/sign-in/social",
-  "/sign-in/oauth2",
-  "/link-social",
-  "/oauth2/link",
-] as const;
-
-/**
- * Extracts the pathname from a BetterAuth request URL, stripping the query
- * string. Falls back to a naive split if the URL isn't absolute (shouldn't
- * happen in production, but keeps this defensive for tests).
- *
- * Exported for unit testing.
- */
-export const requestPathname = (url: string): string => {
-  try {
-    return new URL(url).pathname;
-  } catch {
-    return url.split("?")[0] ?? url;
-  }
-};
-
-/**
- * Pathname with trailing slashes stripped, for endpoint suffix matching.
- * The router (rou3) resolves trailing-slash variants to the same handler,
- * so `/sign-up/email/` must be treated as `/sign-up/email` — suffix-matching
- * the raw URL would let a one-character variant walk past every block in
- * the before-hook.
- *
- * Exported for unit testing.
- */
-export const normalizedRequestPathname = (url: string): string =>
-  requestPathname(url).replace(/\/+$/, "");
-
-/**
- * ADR-027 gate site #2 — true for any request that must be refused while the
- * platform SSO gate denies: the initiation paths above, plus ANY callback
- * path (pathname-PREFIX match via `includes`, not the `endsWith`/suffix
- * helper used elsewhere in this hook — callbacks carry `?code=&state=` and a
- * provider segment, e.g. `/callback/auth0`, `/oauth2/callback/okta`). This
- * is the only place that sees the legacy `/api/auth/callback/auth0|okta`
- * rewrite (`redirectURI` pinned above), so it's also the only correct
- * interception point for it (a path-prefix middleware on `/oauth2/*` alone
- * would miss the legacy rewrite entirely).
- *
- * Exported for unit testing.
- */
-export const isGatedSsoPath = (url: string): boolean => {
-  const pathname = normalizedRequestPathname(url);
-  if (
-    GATED_SSO_INITIATION_SUFFIXES.some((suffix) => pathname.endsWith(suffix))
-  ) {
-    return true;
-  }
-  return requestPathname(url).includes("/callback/");
-};
 
 // NOTE: BetterAuth's admin plugin is intentionally NOT used. It expects
 // `User.role` and `User.banned` columns which our schema doesn't have, and
@@ -659,62 +600,50 @@ export const auth = betterAuth({
   hooks: {
     before: async (ctx) => {
       const url = ctx.request?.url ?? "";
-      // Suffix-match on the normalized pathname (query stripped, trailing
-      // slashes removed): the router treats `/sign-up/email/` as
-      // `/sign-up/email`, so the raw URL is never a safe matching target.
-      const pathname = normalizedRequestPathname(url);
-      const matches = (suffix: string) => pathname.endsWith(suffix);
+      // Email-mode deployments never register an IdP, so the gate is moot —
+      // leave every route untouched (zero behavior change from `main`).
+      if (env.NEXTAUTH_PROVIDER === "email") return;
 
-      if (env.NEXTAUTH_PROVIDER !== "email") {
-        // Credential-mutation block: stays keyed off the CONFIGURED mode,
-        // blocked in every gate state (ADR-027 Constants table). The
-        // password-reset pair is deliberately NOT in this list — it's
-        // handled below, keyed off the gate value instead.
-        if (
-          matches("/change-password") ||
-          matches("/set-password") ||
-          matches("/change-email") ||
-          matches("/send-verification-email") ||
-          matches("/verify-email")
-        ) {
+      const pathname = normalizedRequestPathname(url);
+
+      // Credential-mutation block: keyed off the CONFIGURED mode, blocked in
+      // every gate state (ADR-027 Constants table). The password-reset pair
+      // is excluded here — it's gate-dependent, handled below.
+      if (isCredentialMutationPath(pathname)) {
+        throw APIError.from("BAD_REQUEST", {
+          code: "EMAIL_PASSWORD_DISABLED",
+          message:
+            "Credential management is disabled in cloud/SSO mode — your account is managed by your identity provider.",
+        });
+      }
+
+      const isResetPath = isPasswordResetPath(pathname);
+
+      if (await platformSSOAllowed()) {
+        // Gate ALLOW (site #3): refuse the routes that would otherwise mint a
+        // password account on a licensed SSO-capable deployment (v5 BLOCKER).
+        if (isResetPath || isEmailAuthPath(pathname)) {
           throw APIError.from("BAD_REQUEST", {
             code: "EMAIL_PASSWORD_DISABLED",
             message:
-              "Credential management is disabled in cloud/SSO mode — your account is managed by your identity provider.",
+              "Credential management is disabled — your account is managed by your identity provider.",
           });
         }
+        return;
+      }
 
-        const isResetPath =
-          matches("/request-password-reset") || matches("/reset-password");
-        const ssoAllowed = await platformSSOAllowed();
-
-        if (ssoAllowed) {
-          // Gate ALLOW (site #3): block the routes that would otherwise
-          // mint a password account on a licensed SSO-capable deployment.
-          if (
-            isResetPath ||
-            matches("/sign-in/email") ||
-            matches("/sign-up/email")
-          ) {
-            throw APIError.from("BAD_REQUEST", {
-              code: "EMAIL_PASSWORD_DISABLED",
-              message:
-                "Credential management is disabled — your account is managed by your identity provider.",
-            });
-          }
-        } else if (!isResetPath && isGatedSsoPath(url)) {
-          // Gate DENY (site #2): the deployment runs in email mode, exactly
-          // as if the SSO env vars were unset.
-          logger.warn(
-            { path: requestPathname(url), reason: "no_license" },
-            "Blocked SSO request: deployment has no genuine license",
-          );
-          throw APIError.from("FORBIDDEN", {
-            code: "SSO_LICENSE_REQUIRED",
-            message:
-              "SSO is not available on this deployment — sign in with your email and password instead.",
-          });
-        }
+      // Gate DENY (site #2): run in email mode, exactly as if the SSO env vars
+      // were unset. The reset pair stays open so OAuth-born users self-recover.
+      if (!isResetPath && isGatedSsoPath(url)) {
+        logger.warn(
+          { path: requestPathname(url), reason: "no_license" },
+          "Blocked SSO request: deployment has no genuine license",
+        );
+        throw APIError.from("FORBIDDEN", {
+          code: "SSO_LICENSE_REQUIRED",
+          message:
+            "SSO is not available on this deployment — sign in with your email and password instead.",
+        });
       }
     },
   },
