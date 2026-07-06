@@ -17,6 +17,13 @@ vi.mock("../../../hooks/useTraceFacets", () => ({
   useTraceFacets: () => ({ data: [], isLoading: false }),
 }));
 
+// SearchBar mounts TokenValuePicker, which now calls useFacetSearch (a tRPC
+// query) at the top level. This suite renders SearchBar without a tRPC
+// provider, so stub the hook out — server search has its own dedicated suite.
+vi.mock("../../../hooks/useFacetSearch", () => ({
+  useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
+}));
+
 import { useFilterStore } from "../../../stores/filterStore";
 import { SearchBar } from "../SearchBar";
 
