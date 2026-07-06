@@ -61,6 +61,12 @@ spec:
         app.kubernetes.io/component: dataset-s3-migration
     spec:
       restartPolicy: Never
+      {{/* Same parity as app/workers: the task talks to Postgres/object
+           storage only, never the Kubernetes API, so don't mount the SA token
+           (chart default false). IRSA is unaffected — the EKS pod-identity
+           webhook injects its own projected web-identity token independent of
+           this flag. (Preflight deliberately differs: it calls kubectl.) */}}
+      automountServiceAccountToken: {{ .Values.global.automountServiceAccountToken }}
       {{/* On EKS+IRSA the Job must run as the same IAM-role-annotated
            ServiceAccount as the app/workers to reach S3; default ("") falls
            through to the namespace default SA (consistent with app/workers). */}}
@@ -84,9 +90,10 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if (coalesce .Values.datasetS3Migration.affinity .Values.global.scheduling.affinity) }}
+      {{- $affinity := coalesce .Values.datasetS3Migration.affinity .Values.global.scheduling.affinity }}
+      {{- if $affinity }}
       affinity:
-        {{- toYaml (coalesce .Values.datasetS3Migration.affinity .Values.global.scheduling.affinity) | nindent 8 }}
+        {{- toYaml $affinity | nindent 8 }}
       {{- else if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
       {{/* Default co-location with the app pod: on local-FS the Job writes
            migrated chunks to the app's RWO stored-objects PVC (mounted below),

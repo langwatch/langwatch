@@ -69,9 +69,10 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 
-      {{- if (coalesce .Values.workers.affinity .Values.global.scheduling.affinity) }}
+      {{- $affinity := coalesce .Values.workers.affinity .Values.global.scheduling.affinity }}
+      {{- if $affinity }}
       affinity:
-        {{- toYaml (coalesce .Values.workers.affinity .Values.global.scheduling.affinity) | nindent 8 }}
+        {{- toYaml $affinity | nindent 8 }}
       {{- else if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
       {{/* Default co-location with the app pod: workers mount the app's RWO
            stored-objects PVC below, so off-node scheduling means a multi-attach
