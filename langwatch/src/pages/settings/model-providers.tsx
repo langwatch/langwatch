@@ -12,18 +12,19 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { BrainCircuit, Edit, MoreVertical, Plus, Trash2 } from "lucide-react";
-import { DefaultModelsSection } from "../../components/settings/DefaultModelsSection";
-import { ScopeFilter as ScopeFilterComponent } from "../../components/settings/ScopeFilter";
-import { ProviderScopeChips } from "../../components/settings/ProviderScopeChips";
 import { useEffect, useMemo, useState } from "react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { useDrawer } from "~/hooks/useDrawer";
 import { useAvailableScopes } from "~/hooks/useAvailableScopes";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useUrlScopeFilter } from "~/hooks/useUrlScopeFilter";
 import { api } from "~/utils/api";
 import SettingsLayout from "../../components/SettingsLayout";
+import { DefaultModelsSection } from "../../components/settings/DefaultModelsSection";
+import { ProviderScopeChips } from "../../components/settings/ProviderScopeChips";
+import { ScopeFilter as ScopeFilterComponent } from "../../components/settings/ScopeFilter";
 import { Dialog } from "../../components/ui/dialog";
 import { Menu } from "../../components/ui/menu";
+import { TriggerAnchor } from "../../components/ui/TriggerAnchor";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
@@ -45,15 +46,14 @@ export default function ModelsPage() {
   // without `organization:view` (project-only members) fall back to the
   // per-project endpoint, which they always have permission to read.
   const canViewOrg = hasPermission("organization:view");
-  const orgQuery =
-    api.modelProvider.listAllForOrganizationForFrontend.useQuery(
-      { organizationId: organization?.id ?? "" },
-      {
-        enabled: !!organization?.id && canViewOrg,
-        retry: false,
-        refetchOnWindowFocus: false,
-      },
-    );
+  const orgQuery = api.modelProvider.listAllForOrganizationForFrontend.useQuery(
+    { organizationId: organization?.id ?? "" },
+    {
+      enabled: !!organization?.id && canViewOrg,
+      retry: false,
+      refetchOnWindowFocus: false,
+    },
+  );
   const projectQuery = api.modelProvider.listAllForProjectForFrontend.useQuery(
     { projectId: project?.id ?? "" },
     {
@@ -132,9 +132,7 @@ export default function ModelsPage() {
         modelProvidersRegistry[
           providerKey as keyof typeof modelProvidersRegistry
         ]?.name ?? providerKey,
-      icon: modelProviderIcons[
-        providerKey as keyof typeof modelProviderIcons
-      ],
+      icon: modelProviderIcons[providerKey as keyof typeof modelProviderIcons],
     }));
   }, []);
 
@@ -249,147 +247,161 @@ export default function ModelsPage() {
         ) : (
           <Card.Root width="full" overflow="hidden">
             <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-          <Table.Root variant="line" size="md" width="full">
-            <Table.Header>
-              <Table.Row>
-                <Table.ColumnHeader>Provider</Table.ColumnHeader>
-                <Table.ColumnHeader>Scope</Table.ColumnHeader>
-                <Table.ColumnHeader />
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {enabledProviders.map((provider) => {
-                // Build a scope-id → display-name map so each chip can
-                // render the real org / team / project name instead of
-                // the bare type label. Without this lookup, providers
-                // bound to multiple teams render as identical "Team",
-                // "Team" pills (see ProviderScopeChips comment).
-                const scopeNameById = new Map<string, string>();
-                if (organization) {
-                  scopeNameById.set(organization.id, organization.name);
-                  for (const t of organization.teams ?? []) {
-                    scopeNameById.set(t.id, t.name);
-                    for (const p of t.projects ?? []) {
-                      scopeNameById.set(p.id, p.name);
-                    }
-                  }
-                }
-                const namedScopes = (provider as any).scopes
-                  ? ((provider as any).scopes as Array<{
-                      scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-                      scopeId: string;
-                    }>).map((s) => ({
-                      ...s,
-                      name: scopeNameById.get(s.scopeId),
-                    }))
-                  : undefined;
-                const providerIcon =
-                  modelProviderIcons[
-                    provider.provider as keyof typeof modelProviderIcons
-                  ];
-                const providerSpec =
-                  modelProvidersRegistry[
-                    provider.provider as keyof typeof modelProvidersRegistry
-                  ];
-
-                const isSystem = !!(provider as any).isSystem;
-                return (
-                  <Table.Row key={provider.id ?? `system-${provider.provider}`}>
-                    <Table.Cell>
-                      <HStack gap={3} align="center">
-                        <Box width="24px" height="24px">
-                          {providerIcon}
-                        </Box>
-                        <Text>
-                          {(provider as any).name ??
-                            providerSpec?.name ??
-                            provider.provider}
-                        </Text>
-                      </HStack>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <ProviderScopeChips
-                        scopes={namedScopes}
-                        fallbackScopeType={(provider as any).scopeType}
-                        // Env-var-fed providers carry `isSystem` from
-                        // the service; the chip column reads "System"
-                        // instead of an empty cell.
-                        system={isSystem}
-                      />
-                    </Table.Cell>
-                    <Table.Cell textAlign="right">
-                      {isSystem ? (
-                        // System (env-fed) providers can't be edited
-                        // through the UI — their config lives in the
-                        // server's process env. Hide the menu so the
-                        // row reads as read-only at a glance.
-                        null
-                      ) : (
-                        <Menu.Root>
-                          <Tooltip
-                            content="You need model provider manage permissions to edit or delete providers."
-                            disabled={hasModelProvidersManagePermission}
-                          >
-                            <Menu.Trigger asChild>
-                              <Button
-                                variant="ghost"
-                                disabled={!hasModelProvidersManagePermission}
-                              >
-                                <MoreVertical />
-                              </Button>
-                            </Menu.Trigger>
-                          </Tooltip>
-                          <Menu.Content>
-                            <Menu.Item
-                              value="edit"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                openDrawer("editModelProvider", {
-                                  projectId: project?.id,
-                                  organizationId: organization?.id,
-                                  modelProviderId: provider.id,
-                                  providerKey: provider.provider,
-                                });
-                              }}
-                            >
-                              <Box display="flex" alignItems="center" gap={2}>
-                                <Edit size={14} />
-                                Edit Provider
-                              </Box>
-                            </Menu.Item>
-                            <Menu.Item
-                              value="delete"
-                              color="red"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setProviderToDelete({
-                                  id: provider.id ?? undefined,
-                                  provider: provider.provider,
-                                  // Match the row label (the instance name,
-                                  // e.g. "OpenAI2") instead of the generic
-                                  // registry name so the dialog names the
-                                  // exact provider the user clicked.
-                                  name:
-                                    (provider as { name?: string }).name ??
-                                    providerSpec?.name ??
-                                    provider.provider,
-                                });
-                              }}
-                            >
-                              <Box display="flex" alignItems="center" gap={2}>
-                                <Trash2 size={14} />
-                                Delete Provider
-                              </Box>
-                            </Menu.Item>
-                          </Menu.Content>
-                        </Menu.Root>
-                      )}
-                    </Table.Cell>
+              <Table.Root variant="line" size="md" width="full">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader>Provider</Table.ColumnHeader>
+                    <Table.ColumnHeader>Scope</Table.ColumnHeader>
+                    <Table.ColumnHeader />
                   </Table.Row>
-                );
-              })}
-            </Table.Body>
-          </Table.Root>
+                </Table.Header>
+                <Table.Body>
+                  {enabledProviders.map((provider) => {
+                    // Build a scope-id → display-name map so each chip can
+                    // render the real org / team / project name instead of
+                    // the bare type label. Without this lookup, providers
+                    // bound to multiple teams render as identical "Team",
+                    // "Team" pills (see ProviderScopeChips comment).
+                    const scopeNameById = new Map<string, string>();
+                    if (organization) {
+                      scopeNameById.set(organization.id, organization.name);
+                      for (const t of organization.teams ?? []) {
+                        scopeNameById.set(t.id, t.name);
+                        for (const p of t.projects ?? []) {
+                          scopeNameById.set(p.id, p.name);
+                        }
+                      }
+                    }
+                    const namedScopes = (provider as any).scopes
+                      ? (
+                          (provider as any).scopes as Array<{
+                            scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+                            scopeId: string;
+                          }>
+                        ).map((s) => ({
+                          ...s,
+                          name: scopeNameById.get(s.scopeId),
+                        }))
+                      : undefined;
+                    const providerIcon =
+                      modelProviderIcons[
+                        provider.provider as keyof typeof modelProviderIcons
+                      ];
+                    const providerSpec =
+                      modelProvidersRegistry[
+                        provider.provider as keyof typeof modelProvidersRegistry
+                      ];
+
+                    const isSystem = !!(provider as any).isSystem;
+                    return (
+                      <Table.Row
+                        key={provider.id ?? `system-${provider.provider}`}
+                      >
+                        <Table.Cell>
+                          <HStack gap={3} align="center">
+                            <Box width="24px" height="24px">
+                              {providerIcon}
+                            </Box>
+                            <Text>
+                              {(provider as any).name ??
+                                providerSpec?.name ??
+                                provider.provider}
+                            </Text>
+                          </HStack>
+                        </Table.Cell>
+                        <Table.Cell>
+                          <ProviderScopeChips
+                            scopes={namedScopes}
+                            fallbackScopeType={(provider as any).scopeType}
+                            // Env-var-fed providers carry `isSystem` from
+                            // the service; the chip column reads "System"
+                            // instead of an empty cell.
+                            system={isSystem}
+                          />
+                        </Table.Cell>
+                        <Table.Cell textAlign="right">
+                          {isSystem ? // System (env-fed) providers can't be edited
+                          // through the UI — their config lives in the
+                          // server's process env. Hide the menu so the
+                          // row reads as read-only at a glance.
+                          null : (
+                            <Menu.Root>
+                              <Tooltip
+                                content="You need model provider manage permissions to edit or delete providers."
+                                disabled={hasModelProvidersManagePermission}
+                              >
+                                <TriggerAnchor>
+                                  <Menu.Trigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      disabled={
+                                        !hasModelProvidersManagePermission
+                                      }
+                                    >
+                                      <MoreVertical />
+                                    </Button>
+                                  </Menu.Trigger>
+                                </TriggerAnchor>
+                              </Tooltip>
+                              <Menu.Content>
+                                <Menu.Item
+                                  value="edit"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    openDrawer("editModelProvider", {
+                                      projectId: project?.id,
+                                      organizationId: organization?.id,
+                                      modelProviderId: provider.id,
+                                      providerKey: provider.provider,
+                                    });
+                                  }}
+                                >
+                                  <Box
+                                    display="flex"
+                                    alignItems="center"
+                                    gap={2}
+                                  >
+                                    <Edit size={14} />
+                                    Edit Provider
+                                  </Box>
+                                </Menu.Item>
+                                <Menu.Item
+                                  value="delete"
+                                  color="red"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setProviderToDelete({
+                                      id: provider.id ?? undefined,
+                                      provider: provider.provider,
+                                      // Match the row label (the instance name,
+                                      // e.g. "OpenAI2") instead of the generic
+                                      // registry name so the dialog names the
+                                      // exact provider the user clicked.
+                                      name:
+                                        (provider as { name?: string }).name ??
+                                        providerSpec?.name ??
+                                        provider.provider,
+                                    });
+                                  }}
+                                >
+                                  <Box
+                                    display="flex"
+                                    alignItems="center"
+                                    gap={2}
+                                  >
+                                    <Trash2 size={14} />
+                                    Delete Provider
+                                  </Box>
+                                </Menu.Item>
+                              </Menu.Content>
+                            </Menu.Root>
+                          )}
+                        </Table.Cell>
+                      </Table.Row>
+                    );
+                  })}
+                </Table.Body>
+              </Table.Root>
             </Card.Body>
           </Card.Root>
         )}
@@ -425,8 +437,8 @@ export default function ModelsPage() {
             <Dialog.Body>
               <VStack gap={3} align="start">
                 <Text>
-                  This permanently deletes the provider and its stored API
-                  keys. This cannot be undone.
+                  This permanently deletes the provider and its stored API keys.
+                  This cannot be undone.
                 </Text>
                 <Text fontSize="sm" color="fg.muted">
                   Default model configs that reference this provider will
@@ -503,7 +515,9 @@ function AddModelProviderMenu({
   return (
     <Menu.Root>
       <Tooltip content={disabledReason} disabled={!disabled}>
-        <Menu.Trigger asChild>{children}</Menu.Trigger>
+        <TriggerAnchor>
+          <Menu.Trigger asChild>{children}</Menu.Trigger>
+        </TriggerAnchor>
       </Tooltip>
       <Menu.Content>
         {addableProviders.map((provider) => (
@@ -513,7 +527,9 @@ function AddModelProviderMenu({
             onClick={() => onPick(provider.provider)}
           >
             <HStack gap={3}>
-              <Box width="20px" height="20px">{provider.icon}</Box>
+              <Box width="20px" height="20px">
+                {provider.icon}
+              </Box>
               <Text>{provider.name}</Text>
             </HStack>
           </Menu.Item>
@@ -532,7 +548,11 @@ function AddModelProviderMenu({
  */
 function ProvidersTableSkeleton() {
   return (
-    <Card.Root width="full" overflow="hidden" data-testid="providers-table-skeleton">
+    <Card.Root
+      width="full"
+      overflow="hidden"
+      data-testid="providers-table-skeleton"
+    >
       <Card.Body paddingY={0} paddingX={0} overflowX="auto">
         <Table.Root variant="line" size="md" width="full">
           <Table.Header>
@@ -555,7 +575,12 @@ function ProvidersTableSkeleton() {
                   <Skeleton width="80px" height="20px" borderRadius="full" />
                 </Table.Cell>
                 <Table.Cell textAlign="right">
-                  <Skeleton width="24px" height="24px" borderRadius="md" marginLeft="auto" />
+                  <Skeleton
+                    width="24px"
+                    height="24px"
+                    borderRadius="md"
+                    marginLeft="auto"
+                  />
                 </Table.Cell>
               </Table.Row>
             ))}
@@ -565,4 +590,3 @@ function ProvidersTableSkeleton() {
     </Card.Root>
   );
 }
-

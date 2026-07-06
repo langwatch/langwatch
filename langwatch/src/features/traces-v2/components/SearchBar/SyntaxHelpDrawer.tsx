@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { Drawer } from "~/components/ui/drawer";
+import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
   FIELD_VALUES,
@@ -437,20 +438,22 @@ const ExampleRow: React.FC<{
 const CopyTrigger: React.FC<{ value: string }> = ({ value }) => (
   <Clipboard.Root value={value}>
     <Tooltip content="Copy" openDelay={200}>
-      <Clipboard.Trigger asChild>
-        <IconButton
-          aria-label="Copy query"
-          size="2xs"
-          variant="ghost"
-          color="fg.subtle"
-          opacity={0}
-          _groupHover={{ opacity: 1 }}
-        >
-          <Clipboard.Indicator copied={<Check size={11} />}>
-            <Copy size={11} />
-          </Clipboard.Indicator>
-        </IconButton>
-      </Clipboard.Trigger>
+      <TriggerAnchor>
+        <Clipboard.Trigger asChild>
+          <IconButton
+            aria-label="Copy query"
+            size="2xs"
+            variant="ghost"
+            color="fg.subtle"
+            opacity={0}
+            _groupHover={{ opacity: 1 }}
+          >
+            <Clipboard.Indicator copied={<Check size={11} />}>
+              <Copy size={11} />
+            </Clipboard.Indicator>
+          </IconButton>
+        </Clipboard.Trigger>
+      </TriggerAnchor>
     </Tooltip>
   </Clipboard.Root>
 );

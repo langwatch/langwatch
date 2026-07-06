@@ -25,6 +25,7 @@ import {
   MenuItem,
   MenuRoot,
 } from "~/components/ui/menu";
+import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { TracePresenceAvatars } from "~/features/presence/components/TracePresenceAvatars";
@@ -923,17 +924,19 @@ export const DrawerHeader = memo(function DrawerHeader({
                 }
                 positioning={{ placement: "bottom" }}
               >
-                <MenuContextTrigger asChild>
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    onClick={goBack}
-                    aria-label="Back to previous trace"
-                    flexShrink={0}
-                  >
-                    <Icon as={LuArrowLeft} boxSize={3.5} />
-                  </Button>
-                </MenuContextTrigger>
+                <TriggerAnchor>
+                  <MenuContextTrigger asChild>
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      onClick={goBack}
+                      aria-label="Back to previous trace"
+                      flexShrink={0}
+                    >
+                      <Icon as={LuArrowLeft} boxSize={3.5} />
+                    </Button>
+                  </MenuContextTrigger>
+                </TriggerAnchor>
               </Tooltip>
               <MenuContent minWidth="240px">
                 {/* Most-recent first so the visual order matches the

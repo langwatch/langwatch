@@ -21,6 +21,7 @@ import {
 import { History, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Menu } from "~/components/ui/menu";
+import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { LangyConversationSummary } from "./useLangyConversations";
 
@@ -53,16 +54,18 @@ export function RecentChatsMenu({
       positioning={{ placement: "bottom-end" }}
     >
       <Tooltip content="Recent chats" showArrow>
-        <Menu.Trigger asChild>
-          <IconButton
-            size="xs"
-            variant="ghost"
-            aria-label="Recent chats"
-            color="fg.muted"
-          >
-            <History size={15} />
-          </IconButton>
-        </Menu.Trigger>
+        <TriggerAnchor>
+          <Menu.Trigger asChild>
+            <IconButton
+              size="xs"
+              variant="ghost"
+              aria-label="Recent chats"
+              color="fg.muted"
+            >
+              <History size={15} />
+            </IconButton>
+          </Menu.Trigger>
+        </TriggerAnchor>
       </Tooltip>
       <Menu.Content
         minWidth="280px"
