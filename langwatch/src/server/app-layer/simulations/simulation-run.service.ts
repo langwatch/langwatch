@@ -119,12 +119,11 @@ export class SimulationRunService {
     return this.repository.getRunDataForAllSuites(params);
   }
 
-  async getRunIdsForScope(params: {
+  async getRunIdsForSet(params: {
     projectId: string;
-    batchRunId?: string;
-    scenarioSetId?: string;
-  }): Promise<string[]> {
-    return this.repository.getRunIdsForScope(params);
+    scenarioSetId: string;
+  }): Promise<{ runIds: string[]; reachedCap: boolean }> {
+    return this.repository.findAllRunIdsForSet(params);
   }
 
   /**

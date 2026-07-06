@@ -224,4 +224,47 @@ describe("executionRequestSchema", () => {
       }).success,
     ).toBe(true);
   });
+
+  describe("given a request supplying both inline data and a dataset id", () => {
+    describe("when the request is validated", () => {
+      /** @scenario "Passing both inline data and a dataset id is rejected" */
+      it("rejects the request but accepts either input on its own", () => {
+        const baseRequest = {
+          projectId: "project-123",
+          name: "Test",
+          dataset: {
+            id: "d1",
+            name: "D",
+            type: "inline" as const,
+            columns: [],
+            inline: { columns: [], records: {} },
+          },
+          targets: [],
+          evaluators: [],
+          scope: { type: "full" as const },
+        };
+
+        expect(
+          executionRequestSchema.safeParse({
+            ...baseRequest,
+            data: [{ question: "a" }],
+            dataset_id: "dataset-123",
+          }).success,
+        ).toBe(false);
+
+        expect(
+          executionRequestSchema.safeParse({
+            ...baseRequest,
+            data: [{ question: "a" }],
+          }).success,
+        ).toBe(true);
+        expect(
+          executionRequestSchema.safeParse({
+            ...baseRequest,
+            dataset_id: "dataset-123",
+          }).success,
+        ).toBe(true);
+      });
+    });
+  });
 });

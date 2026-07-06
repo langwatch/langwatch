@@ -131,6 +131,7 @@ function makeDeps(trigger: TriggerSummary = makeTrigger()) {
     filterSuppressedEmails: vi
       .fn()
       .mockImplementation(async ({ emails }: { emails: string[] }) => emails),
+    evaluateGraphTrigger: vi.fn().mockResolvedValue(undefined),
   };
 }
 

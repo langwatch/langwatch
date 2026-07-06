@@ -245,3 +245,33 @@ func TestCredentialFromHeaders_UnsupportedProvider(t *testing.T) {
 		t.Fatalf("expected unsupported-provider error, got %v", err)
 	}
 }
+
+func TestWithDeploymentMap_SelfMapsByDefault(t *testing.T) {
+	cred := domain.Credential{ProviderID: domain.ProviderAzure}
+	cred = withDeploymentMap(cred, "gpt-5-mini")
+	if got := cred.DeploymentMap["gpt-5-mini"]; got != "gpt-5-mini" {
+		t.Errorf("expected self-map, got %q", got)
+	}
+}
+
+func TestWithDeploymentMap_HonorsExplicitDeployment(t *testing.T) {
+	// When the model id differs from the Azure deployment name, the control
+	// plane forwards the real deployment as Extra["deployment"]; the model
+	// id must map to it rather than to itself.
+	cred := domain.Credential{
+		ProviderID: domain.ProviderAzure,
+		Extra:      map[string]string{"deployment": "my-gpt5-deployment"},
+	}
+	cred = withDeploymentMap(cred, "gpt-5.4")
+	if got := cred.DeploymentMap["gpt-5.4"]; got != "my-gpt5-deployment" {
+		t.Errorf("expected explicit deployment, got %q", got)
+	}
+}
+
+func TestWithDeploymentMap_IgnoresNonMappedProviders(t *testing.T) {
+	cred := domain.Credential{ProviderID: domain.ProviderOpenAI}
+	cred = withDeploymentMap(cred, "gpt-5-mini")
+	if cred.DeploymentMap != nil {
+		t.Errorf("expected no deployment map for OpenAI, got %v", cred.DeploymentMap)
+	}
+}

@@ -152,23 +152,14 @@ export default function OptimizationStudio() {
     }
   };
 
-  const [defaultTab, setDefaultTab] = useState<"evaluations" | "optimizations">(
-    "evaluations",
-  );
-
   useEffect(() => {
-    if (
-      openResultsPanelRequest === "evaluations" ||
-      (openResultsPanelRequest === "optimizations" && isResultsPanelCollapsed)
-    ) {
-      setDefaultTab(openResultsPanelRequest);
+    if (openResultsPanelRequest === "evaluations") {
       panelRef.current?.expand(0);
       panelRef.current?.resize(6);
 
-      const openTo = openResultsPanelRequest === "optimizations" ? 100 : 70;
       const step = () => {
         const size = panelRef.current?.getSize() ?? 0;
-        if (size < openTo) {
+        if (size < 70) {
           panelRef.current?.resize(size + 10);
           window.requestAnimationFrame(step);
         }
@@ -388,7 +379,6 @@ export default function OptimizationStudio() {
                       <ResultsPanel
                         isCollapsed={isResultsPanelCollapsed}
                         collapsePanel={collapsePanel}
-                        defaultTab={defaultTab}
                       />
                     </Panel>
                   </PanelGroup>

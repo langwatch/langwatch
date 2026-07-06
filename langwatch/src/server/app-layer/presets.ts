@@ -54,10 +54,6 @@ import {
   outboxHeartbeatRegistry,
 } from "../event-sourcing/outbox/heartbeat";
 import { buildOutboxRuntime } from "../event-sourcing/outbox/setup";
-import {
-  defaultGraphTriggerHeartbeatDeps,
-  registerGraphTriggerHeartbeat,
-} from "./triggers/graph-trigger-heartbeat";
 import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
 import {
   type AppCommands,
@@ -168,12 +164,12 @@ import { SuiteAnalyticsClickHouseRepository } from "./suites/repositories/suite-
 import { NullSuiteAnalyticsRepository } from "./suites/repositories/suite-analytics.repository";
 import { SuiteAnalyticsRollupClickHouseRepository } from "./suites/repositories/suite-analytics-rollup.clickhouse.repository";
 import { NullSuiteAnalyticsRollupRepository } from "./suites/repositories/suite-analytics-rollup.repository";
+import { SpanStorageClickHouseRepository } from "./traces/repositories/span-storage.clickhouse.repository";
+import { NullSpanStorageRepository } from "./traces/repositories/span-storage.repository";
 import { TraceAnalyticsClickHouseRepository } from "./traces/repositories/trace-analytics.clickhouse.repository";
 import { NullTraceAnalyticsRepository } from "./traces/repositories/trace-analytics.repository";
 import { TraceAnalyticsRollupClickHouseRepository } from "./traces/repositories/trace-analytics-rollup.clickhouse.repository";
 import { NullTraceAnalyticsRollupRepository } from "./traces/repositories/trace-analytics-rollup.repository";
-import { SpanStorageClickHouseRepository } from "./traces/repositories/span-storage.clickhouse.repository";
-import { NullSpanStorageRepository } from "./traces/repositories/span-storage.repository";
 import { TraceListClickHouseRepository } from "./traces/repositories/trace-list.clickhouse.repository";
 import { NullTraceListRepository } from "./traces/repositories/trace-list.repository";
 import { TraceSummaryClickHouseRepository } from "./traces/repositories/trace-summary.clickhouse.repository";
@@ -189,6 +185,10 @@ import { TraceRequestCollectionService } from "./traces/trace-request-collection
 import { TraceSummaryService } from "./traces/trace-summary.service";
 import { traced } from "./tracing";
 import { EmailSuppressionService } from "./triggers/emailSuppression.service";
+import {
+  defaultGraphTriggerHeartbeatDeps,
+  registerGraphTriggerHeartbeat,
+} from "./triggers/graph-trigger-heartbeat";
 import {
   PrismaEmailSuppressionNameLookupRepository,
   PrismaEmailSuppressionRepository,
@@ -529,9 +529,9 @@ export function initializeDefaultApp(options?: {
   const retroactiveUpdateService = new RetroactiveUpdateService(
     clickhouseEnabled ? resolveClickHouseClient : null,
   );
-  const storageMeterService = new StorageMeterService(
-    clickhouseEnabled ? resolveClickHouseClient : null,
-  );
+  const storageMeterService = new StorageMeterService({
+    resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
+  });
   const dataRetention: DataRetentionDependencies = {
     policy: dataRetentionPolicyService,
     pinning: pinnedTraceService,
@@ -1153,7 +1153,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       ),
       pinning: testPinnedTraceService,
       retroactive: new RetroactiveUpdateService(null),
-      metering: new StorageMeterService(null),
+      metering: new StorageMeterService({ resolveClickHouseClient: null }),
     },
     share: new ShareService(
       new PrismaShareRepository(testPrisma),

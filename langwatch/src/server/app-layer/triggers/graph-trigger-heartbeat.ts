@@ -27,6 +27,7 @@
  */
 
 import type { PrismaClient } from "@prisma/client";
+import type { ActionParams } from "~/pages/api/cron/triggers/types";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma as defaultPrisma } from "~/server/db";
@@ -34,13 +35,12 @@ import { outboxHeartbeatRegistry } from "~/server/event-sourcing/outbox/heartbea
 import type { OutboxEnqueueRequest } from "~/server/event-sourcing/outbox/outboxReactor.types";
 import {
   GRAPH_TRIGGER_EVAL_REACTOR_NAME,
+  type GraphEvalStagePayload,
   graphEvalDedupId,
   graphEvalGroupKey,
-  type GraphEvalStagePayload,
 } from "~/server/event-sourcing/outbox/payload";
 import { featureFlagService as defaultFeatureFlagService } from "~/server/featureFlag";
 import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
-import type { ActionParams } from "~/pages/api/cron/triggers/types";
 import { createLogger } from "~/utils/logger/server";
 import {
   type AnalyticsMetricSource,
@@ -49,7 +49,9 @@ import {
 import { isNoDataPredicate } from "./evaluate-custom-graph-threshold.service";
 import type { TriggerService } from "./trigger.service";
 
-const logger = createLogger("langwatch:app-layer:triggers:graph-trigger-heartbeat");
+const logger = createLogger(
+  "langwatch:app-layer:triggers:graph-trigger-heartbeat",
+);
 
 export const GRAPH_TRIGGER_HEARTBEAT_NAME = "graphTriggerHeartbeat" as const;
 export const GRAPH_TRIGGER_HEARTBEAT_INTERVAL_MS = 30_000;
@@ -146,7 +148,9 @@ const SLIM_AGGREGATE_ID_COLUMN_BY_SOURCE: Record<
  * process role. Returns the registered definition so callers can keep
  * a reference for tests / shutdown.
  */
-export function registerGraphTriggerHeartbeat(deps: GraphTriggerHeartbeatDeps): {
+export function registerGraphTriggerHeartbeat(
+  deps: GraphTriggerHeartbeatDeps,
+): {
   name: typeof GRAPH_TRIGGER_HEARTBEAT_NAME;
 } {
   const sources = defaultCandidateSources(deps.prisma);
@@ -352,7 +356,11 @@ async function loadCandidatesForProject({
     const operator = params.operator;
     const threshold = params.threshold;
     const timePeriod = params.timePeriod;
-    if (operator === undefined || threshold === undefined || timePeriod === undefined) {
+    if (
+      operator === undefined ||
+      threshold === undefined ||
+      timePeriod === undefined
+    ) {
       continue;
     }
     const windowMs = Math.max(MIN_BOUND_WINDOW_MS, timePeriod * 60 * 1000);
@@ -469,12 +477,17 @@ async function loadProjectRecency({
       query_params: { tenantId: projectId, startMs },
       format: "JSONEachRow",
     });
-    const rows = (await result.json()) as Array<{ lastMs: string | number | null }>;
+    const rows = (await result.json()) as Array<{
+      lastMs: string | number | null;
+    }>;
     const row = rows[0];
     if (!row || row.lastMs === null || row.lastMs === undefined) {
       return { projectId, source, lastOccurredAtMs: null };
     }
-    const ms = typeof row.lastMs === "string" ? Number.parseInt(row.lastMs, 10) : row.lastMs;
+    const ms =
+      typeof row.lastMs === "string"
+        ? Number.parseInt(row.lastMs, 10)
+        : row.lastMs;
     if (!Number.isFinite(ms) || ms <= 0) {
       return { projectId, source, lastOccurredAtMs: null };
     }
@@ -506,9 +519,7 @@ export function defaultGraphTriggerHeartbeatDeps({
     resolveClickHouseClient: async (tenantId) => {
       const client = await getClickHouseClientForProject(tenantId);
       if (!client) {
-        throw new Error(
-          `ClickHouse not available for tenant ${tenantId}`,
-        );
+        throw new Error(`ClickHouse not available for tenant ${tenantId}`);
       }
       return client;
     },

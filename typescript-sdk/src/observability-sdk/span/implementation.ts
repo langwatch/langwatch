@@ -20,6 +20,10 @@ import { type ChatMessage, type SpanInputOutput } from "../../internal/generated
 import * as intSemconv from "../semconv/attributes";
 import { processSpanInputOutput } from "./input-output";
 import type { SemConvAttributeKey, SemConvAttributes } from "../semconv";
+import {
+  emitEvaluationEvent,
+  type AddEvaluationParams,
+} from "../evaluation";
 
 class LangWatchSpanInternal implements LangWatchSpan {
   constructor(private span: Span) { }
@@ -73,6 +77,23 @@ class LangWatchSpanInternal implements LangWatchSpan {
   addLinks(links: Link[]): this {
     this.span.addLinks(links);
     return this;
+  }
+
+  /**
+   * Records a manual evaluation on this span by emitting the `langwatch.evaluation.custom` span
+   * event. See {@link AddEvaluationParams} for available parameters.
+   */
+  addEvaluation(params: AddEvaluationParams): this {
+    emitEvaluationEvent(this.span, params);
+    return this;
+  }
+
+  /**
+   * @deprecated Use {@link addEvaluation} instead. Thin back-compat alias kept for
+   * the earlier documented name.
+   */
+  recordEvaluation(params: AddEvaluationParams): this {
+    return this.addEvaluation(params);
   }
 
   setType(type: SpanType): this {

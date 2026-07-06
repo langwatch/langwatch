@@ -1,25 +1,28 @@
-Feature: Trigger workflow evaluations via the API with parameters
+Feature: Trigger workflow evaluations via the API
   As a platform engineer wiring evaluations into CI
-  I want to trigger a workflow evaluation through the REST API and pass parameters
-  So that runs configured on the platform can be launched from pipelines without
-  hardcoding values in the agent
+  I want to trigger a workflow evaluation through the REST API
+  So that runs configured in the studio can be launched from pipelines and read back
 
-  # Customer context: experiments built in the studio could only be
-  # evaluated from the Evaluate button; CI pipelines that let users pick
-  # a PR number / feature flag / variant had no way to launch them or to
-  # feed those values in. Parameters bind as constant entry inputs for
-  # every dataset row - pairing with the entry point's user-defined
-  # inputs (see entry-point-node.feature).
+  # Customer context: experiments built in the studio could only be evaluated
+  # from the Evaluate button; CI pipelines had no way to launch them, pass a
+  # PR number / feature flag / variant, or read the results back. The endpoint
+  # now runs through the same evaluations-v3 pipeline as the run API and returns
+  # a results URL. Parameters bind as constant inputs for every dataset row.
 
   Background:
     Given a project API key with workflow permissions
     And a workflow with a committed version and an attached dataset
 
   @integration
-  Scenario: Triggering an evaluation returns a run id
+  Scenario: Triggering an evaluation returns a run id and a results url
     When I POST to the workflow's evaluate endpoint
-    Then the response carries a run id and the evaluated version
-    And the evaluation executes against the workflow's dataset
+    Then the response carries a run id and a results url for the run
+    And the workflow's evaluation experiment exists
+
+  @integration
+  Scenario: The response stays backward compatible
+    When I POST to the workflow's evaluate endpoint
+    Then the response still carries the evaluated version id and version
 
   @integration
   Scenario: The latest committed version is evaluated by default
@@ -34,17 +37,19 @@ Feature: Trigger workflow evaluations via the API with parameters
     Then version 1 is the one evaluated
 
   @integration
-  Scenario: Parameters bind as constant entry inputs across all rows
-    Given the dataset has 3 rows
-    When I POST with parameters {"feature_flag": "variant-b"}
-    Then every evaluated row's entry carries feature_flag = "variant-b"
-    And the entry point exposes "feature_flag" as an input field
+  Scenario: Caller-supplied parameters are accepted
+    When I POST with parameters that set a feature flag
+    Then the run starts and a results url is returned
 
   @integration
-  Scenario: Parameters alone evaluate a single synthetic row
-    Given the workflow's entry point has no dataset attached
-    When I POST with parameters {"query": "hello"}
-    Then the evaluation runs over one row built from the parameters
+  Scenario: Inline data can be evaluated instead of the attached dataset
+    When I POST with inline data rows
+    Then the run starts and a results url is returned
+
+  @integration
+  Scenario: The endpoint rejects inline data and a dataset id together
+    When I POST with both inline data and a dataset id
+    Then the response is a 400
 
   @integration
   Scenario: Unknown workflow returns not found

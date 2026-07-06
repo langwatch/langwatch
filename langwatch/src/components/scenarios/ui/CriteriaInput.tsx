@@ -99,6 +99,7 @@ export function CriteriaInput({
                 value={editingValue}
                 onChange={(e) => setEditingValue(e.target.value)}
                 onKeyDown={handleEditKeyDown}
+                onBlur={handleSaveEdit}
                 size="sm"
                 autoresize
                 rows={2}
@@ -116,10 +117,18 @@ export function CriteriaInput({
                   <Trash2 size={12} />
                 </IconButton>
                 <Spacer />
+                {/* preventDefault on mousedown keeps the textarea focused so this
+                    Cancel's onClick discards BEFORE the textarea's onBlur can commit
+                    the edit. Removing it silently reintroduces commit-on-cancel — the
+                    data-loss path this component guards against. Save needs no such
+                    guard: its onClick runs the same commit onBlur would, so the
+                    double-fire is an idempotent no-op (handleSaveEdit early-returns
+                    once editingIndex is cleared). */}
                 <Button
                   type="button"
                   size="xs"
                   variant="outline"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => setEditingIndex(null)}
                 >
                   Cancel
@@ -178,16 +187,20 @@ export function CriteriaInput({
               placeholder={placeholder}
               flex={1}
               onKeyDown={handleAddKeyDown}
+              onBlur={handleSaveNew}
               _placeholder={{ color: "gray.400", fontStyle: "italic" }}
               autoresize
               rows={2}
             />
           </HStack>
           <HStack gap={1} justify="end">
+            {/* preventDefault keeps focus so Cancel discards before onBlur commits
+                the new criterion (see the edit-mode Cancel above for the full why). */}
             <Button
               type="button"
               size="xs"
               variant="outline"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
                 setInputValue("");
                 setIsAddingNew(false);

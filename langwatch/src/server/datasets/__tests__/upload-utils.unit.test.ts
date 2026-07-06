@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { DatasetColumns } from "../types";
 import {
   convertRowsToColumnTypes,
+  convertValueToColumnType,
+  dedupeHeaders,
   detectFileFormat,
   parseCSV,
   parseJSON,
@@ -128,8 +130,7 @@ describe("Feature: Dataset File Upload - Upload Utils", () => {
     describe("when given 3 lines of JSONL", () => {
       /** @scenario "Parse JSONL with one object per line" */
       it("returns 3 records", () => {
-        const jsonl =
-          '{"a": 1}\n{"a": 2}\n{"a": 3}';
+        const jsonl = '{"a": 1}\n{"a": 2}\n{"a": 3}';
         const result = parseJSONL(jsonl);
         expect(result).toHaveLength(3);
       });
@@ -203,9 +204,7 @@ describe("Feature: Dataset File Upload - Upload Utils", () => {
   describe("convertRowsToColumnTypes()", () => {
     describe("when converting string values to numbers", () => {
       it("converts numeric strings to numbers", () => {
-        const columns: DatasetColumns = [
-          { name: "count", type: "number" },
-        ];
+        const columns: DatasetColumns = [{ name: "count", type: "number" }];
         const rows = [{ count: "42" }, { count: "3.14" }];
         const result = convertRowsToColumnTypes(rows, columns);
         expect(result[0]!.count).toBe(42);
@@ -213,9 +212,7 @@ describe("Feature: Dataset File Upload - Upload Utils", () => {
       });
 
       it("converts empty values to null", () => {
-        const columns: DatasetColumns = [
-          { name: "count", type: "number" },
-        ];
+        const columns: DatasetColumns = [{ name: "count", type: "number" }];
         const rows = [{ count: "" }];
         const result = convertRowsToColumnTypes(rows, columns);
         expect(result[0]!.count).toBeNull();
@@ -224,14 +221,8 @@ describe("Feature: Dataset File Upload - Upload Utils", () => {
 
     describe("when converting string values to booleans", () => {
       it("converts truthy strings to true", () => {
-        const columns: DatasetColumns = [
-          { name: "active", type: "boolean" },
-        ];
-        const rows = [
-          { active: "true" },
-          { active: "1" },
-          { active: "yes" },
-        ];
+        const columns: DatasetColumns = [{ name: "active", type: "boolean" }];
+        const rows = [{ active: "true" }, { active: "1" }, { active: "yes" }];
         const result = convertRowsToColumnTypes(rows, columns);
         expect(result[0]!.active).toBe(true);
         expect(result[1]!.active).toBe(true);
@@ -239,14 +230,8 @@ describe("Feature: Dataset File Upload - Upload Utils", () => {
       });
 
       it("converts falsy strings to false", () => {
-        const columns: DatasetColumns = [
-          { name: "active", type: "boolean" },
-        ];
-        const rows = [
-          { active: "false" },
-          { active: "0" },
-          { active: "no" },
-        ];
+        const columns: DatasetColumns = [{ name: "active", type: "boolean" }];
+        const rows = [{ active: "false" }, { active: "0" }, { active: "no" }];
         const result = convertRowsToColumnTypes(rows, columns);
         expect(result[0]!.active).toBe(false);
         expect(result[1]!.active).toBe(false);
@@ -256,9 +241,7 @@ describe("Feature: Dataset File Upload - Upload Utils", () => {
 
     describe("when converting string values to dates", () => {
       it("converts valid date strings to ISO date format", () => {
-        const columns: DatasetColumns = [
-          { name: "created", type: "date" },
-        ];
+        const columns: DatasetColumns = [{ name: "created", type: "date" }];
         const rows = [{ created: "2024-01-15" }];
         const result = convertRowsToColumnTypes(rows, columns);
         expect(result[0]!.created).toBe("2024-01-15");
@@ -267,9 +250,7 @@ describe("Feature: Dataset File Upload - Upload Utils", () => {
 
     describe("when converting string values to JSON", () => {
       it("parses JSON strings", () => {
-        const columns: DatasetColumns = [
-          { name: "meta", type: "json" },
-        ];
+        const columns: DatasetColumns = [{ name: "meta", type: "json" }];
         const rows = [{ meta: '{"key": "value"}' }];
         const result = convertRowsToColumnTypes(rows, columns);
         expect(result[0]!.meta).toEqual({ key: "value" });
@@ -278,13 +259,59 @@ describe("Feature: Dataset File Upload - Upload Utils", () => {
 
     describe("when column type is string", () => {
       it("leaves values unchanged", () => {
-        const columns: DatasetColumns = [
-          { name: "text", type: "string" },
-        ];
+        const columns: DatasetColumns = [{ name: "text", type: "string" }];
         const rows = [{ text: "hello" }];
         const result = convertRowsToColumnTypes(rows, columns);
         expect(result[0]!.text).toBe("hello");
       });
+    });
+  });
+
+  // ADR-032 v19: the single-value converter the streaming normalize job applies
+  // per record (so a confirmed type is honoured without buffering rows).
+  describe("convertValueToColumnType()", () => {
+    describe("when the type is number", () => {
+      it("parses a numeric string and nulls an empty value", () => {
+        expect(convertValueToColumnType("42", "number")).toBe(42);
+        expect(convertValueToColumnType("", "number")).toBeNull();
+        expect(convertValueToColumnType(0, "number")).toBe(0);
+      });
+    });
+
+    describe("when the type is boolean", () => {
+      it("maps the truthy/falsy token sets", () => {
+        expect(convertValueToColumnType("yes", "boolean")).toBe(true);
+        expect(convertValueToColumnType("0", "boolean")).toBe(false);
+      });
+    });
+
+    describe("when the type is image", () => {
+      it("keeps a base64 data URL verbatim (URL passthrough)", () => {
+        const dataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==";
+        expect(convertValueToColumnType(dataUrl, "image")).toBe(dataUrl);
+      });
+    });
+
+    describe("when the type is json/list", () => {
+      it("parses valid JSON and keeps the original on a parse error", () => {
+        expect(convertValueToColumnType("[1,2]", "list")).toEqual([1, 2]);
+        expect(convertValueToColumnType("not json", "json")).toBe("not json");
+      });
+    });
+  });
+
+  // Shared with the browser confirm step (`parseHeaderColumns`) so both
+  // canonicalise headers identically (positional 1:1 alignment).
+  describe("dedupeHeaders()", () => {
+    it("suffixes repeats and avoids colliding with a literal _N column", () => {
+      expect(dedupeHeaders(["col", "col"])).toEqual(["col", "col_1"]);
+      // The literal "col_1" collides with the suffix emitted for the 2nd "col",
+      // so it bumps again rather than silently overwriting it.
+      expect(dedupeHeaders(["col", "col", "col_1"])).toEqual([
+        "col",
+        "col_1",
+        "col_1_1",
+      ]);
     });
   });
 });

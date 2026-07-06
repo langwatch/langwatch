@@ -1,20 +1,16 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { TriggerAction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { GraphEvalStagePayload } from "~/server/event-sourcing/outbox/payload";
 import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
-import type {
-  GraphEvalStagePayload,
-} from "~/server/event-sourcing/outbox/payload";
-import type {
-  TriggerSummary,
-} from "../repositories/trigger.repository";
-import type { TriggerService } from "../trigger.service";
 import {
   decideGraphTriggerHeartbeat,
   defaultCandidateSources,
   type GraphTriggerHeartbeatDeps,
   type HeartbeatCandidateSources,
 } from "../graph-trigger-heartbeat";
+import type { TriggerSummary } from "../repositories/trigger.repository";
+import type { TriggerService } from "../trigger.service";
 
 const PROJECT_A = "proj-a";
 const PROJECT_B = "proj-b";
@@ -97,7 +93,9 @@ function makePrismaStub(perProjectOpenTriggers: Record<string, string[]>): {
   };
 }
 
-function makeClickHouseStub(maxOccurredAtMsByProject: Record<string, number | null>): {
+function makeClickHouseStub(
+  maxOccurredAtMsByProject: Record<string, number | null>,
+): {
   client: ClickHouseClient;
   callsByProject: Record<string, number>;
 } {
@@ -374,7 +372,8 @@ describe("defaultCandidateSources", () => {
       const projects = await sources.loadProjectsWithGraphTriggers();
 
       expect(prismaStub.project.findMany).toHaveBeenCalledTimes(1);
-      const triggerWhere = prismaStub.trigger.findMany.mock.calls[0]?.[0]?.where;
+      const triggerWhere =
+        prismaStub.trigger.findMany.mock.calls[0]?.[0]?.where;
       expect(triggerWhere?.projectId).toEqual({ in: [PROJECT_A, PROJECT_B] });
       expect(projects).toEqual([PROJECT_A]);
     });
@@ -389,7 +388,8 @@ describe("defaultCandidateSources", () => {
 
       const projects = await sources.loadProjectsWithOpenGraphTriggerSent();
 
-      const sentWhere = prismaStub.triggerSent.findMany.mock.calls[0]?.[0]?.where;
+      const sentWhere =
+        prismaStub.triggerSent.findMany.mock.calls[0]?.[0]?.where;
       expect(sentWhere?.projectId).toEqual({ in: [PROJECT_A, PROJECT_B] });
       expect(projects).toEqual(new Set([PROJECT_B]));
     });

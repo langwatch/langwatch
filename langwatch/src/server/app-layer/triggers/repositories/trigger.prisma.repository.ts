@@ -135,7 +135,12 @@ export class PrismaGraphTriggerSentRepository
     const row = await this.prisma.triggerSent.findFirst({
       where: { triggerId, projectId, customGraphId, resolvedAt: null },
       orderBy: { createdAt: "desc" },
-      select: { id: true, triggerId: true, projectId: true, customGraphId: true },
+      select: {
+        id: true,
+        triggerId: true,
+        projectId: true,
+        customGraphId: true,
+      },
     });
     if (!row || row.customGraphId == null) return null;
     return {
@@ -163,7 +168,12 @@ export class PrismaGraphTriggerSentRepository
         projectId,
         resolvedAt: null,
       },
-      select: { id: true, triggerId: true, projectId: true, customGraphId: true },
+      select: {
+        id: true,
+        triggerId: true,
+        projectId: true,
+        customGraphId: true,
+      },
     });
     return {
       id: row.id,

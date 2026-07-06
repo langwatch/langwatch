@@ -34,6 +34,12 @@ Feature: Datasets list page
     Then I see an empty state explaining what datasets are for
     And I can create a dataset right from the empty state
 
+  @integration
+  Scenario: Empty-state CTA can launch the bulk upload flow
+    Given my project has no datasets
+    When I choose to upload datasets from the empty state
+    Then I am taken into the upload flow to add files
+
   # ============================================================================
   # Creating
   # ============================================================================

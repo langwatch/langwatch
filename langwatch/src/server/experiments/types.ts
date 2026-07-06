@@ -1,5 +1,5 @@
-import { z } from "zod";
 import type { WorkflowVersion } from "@prisma/client";
+import { z } from "zod";
 
 // ---------------------------------------------------------------------------
 // Experiment schemas (Zod-first). DSPy optimization steps and batch-evaluation
@@ -130,6 +130,7 @@ export const eSBatchEvaluationTargetTypeSchema = z.union([
   z.literal("prompt"),
   z.literal("agent"),
   z.literal("evaluator"),
+  z.literal("workflow"),
   z.literal("custom"),
 ]);
 

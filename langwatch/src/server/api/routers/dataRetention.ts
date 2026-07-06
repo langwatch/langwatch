@@ -3,11 +3,13 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
+import { resolveScopeStorageUsage } from "~/server/data-retention/metering/storageMeter.read";
 import {
   assertCanDisableRetention,
   assertCanWriteRetentionScope,
   assertRetentionPlan,
   assertRetentionPlanForScope,
+  assertRetentionWriteAllowed,
 } from "~/server/data-retention/policy/dataRetentionPolicy.authz";
 import { getRetentionPolicySnapshot } from "~/server/data-retention/policy/dataRetentionPolicy.read";
 import { ScopeTargetNotFoundError } from "~/server/data-retention/policy/dataRetentionPolicy.service";
@@ -87,10 +89,16 @@ export const dataRetentionRouter = createTRPCRouter({
         input.scope,
       );
       // Plan-gate against the scope's owning org, not the caller-supplied
-      // projectId. The two can belong to different organizations.
-      await assertRetentionPlanForScope(
+      // projectId (the two can belong to different orgs). Resolves the org +
+      // plan once, then applies the free gate AND the value gate: paid plans
+      // may persist only their fixed presets; enterprise/self-hosted keep the
+      // full range + custom (≥49). No-ops on the indefinite sentinel so the
+      // platform-admin check below still runs. The write-path prevention — the
+      // UI menu is a mirror, not the enforcement.
+      await assertRetentionWriteAllowed(
         { prisma: ctx.prisma, session: ctx.session },
         input.scope,
+        input.retentionDays,
       );
       // Disabling retention (indefinite/keep-forever) is platform-admin only.
       // The schema accepts the 0 sentinel structurally; this is where the
@@ -110,6 +118,25 @@ export const dataRetentionRouter = createTRPCRouter({
         }
         throw error;
       }
+    }),
+
+  /**
+   * Preview the retention each category would fall back to if the scope's
+   * override were removed — the cascade value (next tier, or the platform
+   * default) the data would land on. Powers the remove-confirmation dialog so
+   * the user sees the real post-removal number, never a guessed one. Read-only;
+   * gated by the same write-on-scope check as the removal it previews, so the
+   * resolved org-default never leaks to a caller who couldn't remove the rule.
+   */
+  previewScopeRemoval: protectedProcedure
+    .input(z.object({ projectId: z.string(), scope: scopeInput }))
+    .use(authorizeInResolver)
+    .query(async ({ input, ctx }) => {
+      await assertCanWriteRetentionScope(
+        { prisma: ctx.prisma, session: ctx.session },
+        input.scope,
+      );
+      return getApp().dataRetention.policy.previewScopeRemoval(input.scope);
     }),
 
   /** Remove one category's override at one scope; the next tier then applies. */
@@ -203,23 +230,21 @@ export const dataRetentionRouter = createTRPCRouter({
       });
     }),
 
-  getStorageUsage: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
+  /**
+   * Total stored bytes for the projects the scope selector resolves to, summed
+   * across every in-scope project the caller can read. Lets the Data Storage
+   * card reflect the chosen scope (organization / team / project) instead of
+   * always showing only the current project. RBAC-filtering happens inside the
+   * resolver against the scope's owning org, so a wider scope never leaks a
+   * project's storage the caller couldn't see.
+   */
+  getScopeStorageUsage: protectedProcedure
+    .input(z.object({ projectId: z.string(), scope: scopeInput }))
     .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }) => {
-      const totalBytes =
-        await getApp().dataRetention.metering.getTotalStorageBytes({
-          tenantId: input.projectId,
-        });
-      return { totalBytes };
-    }),
-
-  getStorageBreakdown: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("traces:view"))
-    .query(async ({ input }) => {
-      return getApp().dataRetention.metering.getStorageBreakdown({
-        tenantId: input.projectId,
+    .query(async ({ input, ctx }) => {
+      return resolveScopeStorageUsage(ctx, {
+        projectId: input.projectId,
+        scope: input.scope,
       });
     }),
 });

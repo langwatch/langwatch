@@ -1,10 +1,10 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import { RETENTION_MANAGED_TABLES } from "../../data-retention/retentionPolicy.schema";
 import {
   buildRetentionTTLExpression,
   hasRetentionTTL,
   TABLE_TTL_CONFIG,
 } from "../ttlReconciler";
-import { RETENTION_MANAGED_TABLES } from "../../data-retention/retentionPolicy.schema";
 
 describe("buildRetentionTTLExpression", () => {
   // The IF(_retention_days > 0, ...) guard is a safety net, not a normal path:
@@ -35,7 +35,9 @@ describe("buildRetentionTTLExpression", () => {
     // BAD_TTL_EXPRESSION (code 450). The anchor must be UpdatedAt — non-null
     // and partition-aligned with `toYearWeek(UpdatedAt)`.
     it("evaluation_runs anchors retention on the non-null partition key", () => {
-      const config = TABLE_TTL_CONFIG.find((c) => c.table === "evaluation_runs")!;
+      const config = TABLE_TTL_CONFIG.find(
+        (c) => c.table === "evaluation_runs",
+      )!;
       expect(config.retentionTTLColumn).toBe("UpdatedAt");
       const expr = buildRetentionTTLExpression(config);
       expect(expr).toBe(
@@ -58,7 +60,7 @@ describe("buildRetentionTTLExpression", () => {
 describe("hasRetentionTTL", () => {
   it("detects retention TTL in engine metadata", () => {
     const engineFull =
-      'ReplacingMergeTree(UpdatedAt) TTL toDateTime(OccurredAt) + toIntervalDay(49) TO VOLUME \'cold\', IF(_retention_days > 0, ...) DELETE';
+      "ReplacingMergeTree(UpdatedAt) TTL toDateTime(OccurredAt) + toIntervalDay(49) TO VOLUME 'cold', IF(_retention_days > 0, ...) DELETE";
     expect(hasRetentionTTL(engineFull)).toBe(true);
   });
 

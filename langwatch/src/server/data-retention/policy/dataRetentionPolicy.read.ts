@@ -6,12 +6,12 @@ import {
 } from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer/app";
 import type { Session } from "~/server/auth";
-import { canConfigureRetention } from "./dataRetentionPolicy.authz";
 import type { ScopeTier } from "~/server/scopes/scope.types";
 import type {
   ResolvedRetention,
   RetentionCategory,
 } from "../retentionPolicy.schema";
+import { canConfigureRetention } from "./dataRetentionPolicy.authz";
 
 export type ReadCtx = { prisma: PrismaClient; session: Session | null };
 
@@ -124,7 +124,10 @@ export async function getRetentionPolicySnapshot(
       }),
       ctx.prisma.project.findMany({
         where: { team: { organizationId } },
-        select: { id: true, name: true, teamId: true },
+        // `archivedAt` is selected (not filtered in the query) so the name
+        // lookup below still resolves a rule that targets a since-archived
+        // project; the archived ones are dropped only from the scope PICKER.
+        select: { id: true, name: true, teamId: true, archivedAt: true },
         orderBy: { name: "asc" },
       }),
       app.dataRetention.policy.listOrganizationRules(organizationId),
@@ -198,7 +201,9 @@ export async function getRetentionPolicySnapshot(
       .filter((t) => teamManage.teams.get(t.id))
       .map(({ id, name }) => ({ id, name })),
     projects: orgProjects
-      .filter((p) => projectUpdate.projects.get(p.id))
+      // Archived projects are hidden from the nav and can't be navigated to, so
+      // they must not be offered as a scope to attach a new retention policy.
+      .filter((p) => !p.archivedAt && projectUpdate.projects.get(p.id))
       .map(({ id, name, teamId }) => ({ id, name, teamId })),
   };
 

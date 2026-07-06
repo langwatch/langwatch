@@ -4,12 +4,12 @@ import {
   SpanNormalizationPipelineService,
 } from "~/server/app-layer/traces/span-normalization.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
 import {
   AbstractFoldProjection,
   type FoldEventHandlers,
 } from "~/server/event-sourcing/projections/abstractFoldProjection";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
+import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
 import type {
   AnnotationAddedEvent,
   AnnotationRemovedEvent,
@@ -34,13 +34,6 @@ import {
 } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
 import {
-  MAX_PROCESSED_SPANS,
-  mergeModelsMostRecentFirst,
-  RESERVED_CACHE_CREATION_TOKENS,
-  RESERVED_CACHE_READ_TOKENS,
-  RESERVED_REASONING_TOKENS,
-} from "./traceSummary.foldProjection";
-import {
   liftCanonicalAttributesFromLogRecord,
   NON_BILLABLE_ATTR,
   OUTPUT_SOURCE,
@@ -52,6 +45,13 @@ import {
   TraceOriginService,
 } from "./services";
 import { trimAttributesForAnalytics } from "./services/analytics-attribute-trim.service";
+import {
+  MAX_PROCESSED_SPANS,
+  mergeModelsMostRecentFirst,
+  RESERVED_CACHE_CREATION_TOKENS,
+  RESERVED_CACHE_READ_TOKENS,
+  RESERVED_REASONING_TOKENS,
+} from "./traceSummary.foldProjection";
 
 /**
  * ADR-034 Phase 2: slim per-trace fold projection.

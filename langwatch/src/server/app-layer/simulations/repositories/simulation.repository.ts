@@ -91,16 +91,15 @@ export interface SimulationRepository {
   }): Promise<AllSuitesRunDataResult>;
 
   /**
-   * Returns the run ids for a SPECIFIC scope — a batch run and/or a scenario
-   * set — never the whole project. At least one of `batchRunId` /
-   * `scenarioSetId` must be provided; callers must not be able to address
-   * every run in a tenant with one unqualified request.
+   * Returns the run ids for a SPECIFIC scenario set — never the whole project.
+   * `scenarioSetId` is required so callers cannot address every run in a tenant
+   * with one unqualified request. Results are capped; `reachedCap` signals that
+   * the cap was hit and more matching runs may exist beyond what was returned.
    */
-  getRunIdsForScope(params: {
+  findAllRunIdsForSet(params: {
     projectId: string;
-    batchRunId?: string;
-    scenarioSetId?: string;
-  }): Promise<string[]>;
+    scenarioSetId: string;
+  }): Promise<{ runIds: string[]; reachedCap: boolean }>;
 
   /**
    * Returns distinct external (non-internal) scenario set IDs across the given projects.
@@ -166,8 +165,11 @@ export class NullSimulationRepository implements SimulationRepository {
     };
   }
 
-  async getRunIdsForScope(): Promise<string[]> {
-    return [];
+  async findAllRunIdsForSet(): Promise<{
+    runIds: string[];
+    reachedCap: boolean;
+  }> {
+    return { runIds: [], reachedCap: false };
   }
 
   async getDistinctExternalSetIds(): Promise<Set<string>> {

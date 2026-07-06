@@ -52,6 +52,10 @@ const DOMAIN_ERROR_HTTP: Record<
     status: 413,
     code: "DatasetTooLargeToExport",
   },
+  DatasetTooLargeToEditColumnsError: {
+    status: 413,
+    code: "DatasetTooLargeToEditColumns",
+  },
 };
 
 /**

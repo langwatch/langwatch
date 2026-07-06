@@ -1,10 +1,10 @@
-import { coerceToNumber } from "~/utils/coerceToNumber";
-import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
+import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import {
   enrichRagContextIds,
   SpanNormalizationPipelineService,
 } from "~/server/app-layer/traces/span-normalization.service";
+import { coerceToNumber } from "~/utils/coerceToNumber";
 import {
   AbstractMapProjection,
   type MapEventHandlers,
@@ -122,8 +122,7 @@ export class TraceAnalyticsRollupMapProjection
     span.nonBilledCost = nonBilledCost;
 
     const isRoot = span.parentSpanId === null;
-    const isError =
-      isRoot && span.statusCode === NormalizedStatusCode.ERROR;
+    const isError = isRoot && span.statusCode === NormalizedStatusCode.ERROR;
 
     // Model precedence mirrors SpanCostService.extractModelsFromSpan: response
     // wins over request, fall back to '' for cardinality-friendly LowCardinality

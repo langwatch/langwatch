@@ -1,14 +1,10 @@
 import { TriggerAction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import type {
-  TriggerSummary,
-} from "~/server/app-layer/triggers/repositories/trigger.repository";
+import type { TriggerSummary } from "~/server/app-layer/triggers/repositories/trigger.repository";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
+import type { GraphEvalStagePayload } from "../../../../outbox/payload";
 import type { ReactorContext } from "../../../../reactors/reactor.types";
-import type {
-  GraphEvalStagePayload,
-} from "../../../../outbox/payload";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import { createGraphTriggerEvaluationOutboxReactor } from "../graphTriggerEvaluation.outboxReactor";
 
@@ -19,6 +15,7 @@ vi.mock("~/server/featureFlag", () => ({
     isEnabled: vi.fn(),
   },
 }));
+
 // eslint-disable-next-line import/order
 import { featureFlagService } from "~/server/featureFlag";
 
@@ -69,9 +66,7 @@ function makeContext(): ReactorContext<TraceSummaryData> {
   } as unknown as ReactorContext<TraceSummaryData>;
 }
 
-function makeTriggersStub(
-  graphTriggers: TriggerSummary[],
-): TriggerService {
+function makeTriggersStub(graphTriggers: TriggerSummary[]): TriggerService {
   return {
     getActiveTraceTriggersForProject: vi.fn(async () => []),
     getActiveGraphTriggersForProject: vi.fn(async () => graphTriggers),

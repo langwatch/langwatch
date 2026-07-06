@@ -12,31 +12,31 @@
 import type { Prisma, Project, Trigger } from "@prisma/client";
 import type { Context } from "hono";
 import { env } from "~/env.mjs";
-import {
-  createServiceApp,
-  internalSecret,
-} from "~/server/api/security";
-import { validateInternalSecret } from "./_lib/internal-secret";
+import { processCustomGraphTrigger } from "~/pages/api/cron/triggers/customGraphTrigger";
+import { createServiceApp, internalSecret } from "~/server/api/security";
 import { getApp } from "~/server/app-layer/app";
+import { scheduleTopicClustering } from "~/server/background/queues/topicClusteringQueue";
 import { prisma } from "~/server/db";
-import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
+import {
+  COLD_STORAGE_AGE_DAYS,
+  esClient,
+  TRACE_INDEX,
+} from "~/server/elasticsearch";
+import { featureFlagService } from "~/server/featureFlag";
 import { createScenarioAnalyticsQueriesForAllEventTypes } from "~/server/scenario-analytics";
-import { deleteTracesRetentionPolicy } from "~/tasks/deleteTracesRetentionPolicy";
-import { COLD_STORAGE_AGE_DAYS } from "~/server/elasticsearch";
+import cleanupOldLambdas from "~/tasks/cleanupOldLambdas";
 import { cleanupOrphanedTraces } from "~/tasks/cold/cleanupOrphanedHotTraces";
 import { migrateToColdStorage } from "~/tasks/cold/moveTracesToColdStorage";
-import { scheduleTopicClustering } from "~/server/background/queues/topicClusteringQueue";
-import cleanupOldLambdas from "~/tasks/cleanupOldLambdas";
-import { processCustomGraphTrigger } from "~/pages/api/cron/triggers/customGraphTrigger";
-import { featureFlagService } from "~/server/featureFlag";
+import { deleteTracesRetentionPolicy } from "~/tasks/deleteTracesRetentionPolicy";
+import { ANALYTICS_KEYS } from "~/types";
+import { createLogger } from "~/utils/logger/server";
+import { captureException, toError } from "~/utils/posthogErrorCapture";
 import {
   reportHasFailures,
   type SeedRunReport,
 } from "../../../scripts/dogfood/governance/_lib/seedRunner";
 import { runSeedDemo } from "../../../scripts/dogfood/governance/seed-demo";
-import { ANALYTICS_KEYS } from "~/types";
-import { createLogger } from "~/utils/logger/server";
-import { captureException, toError } from "~/utils/posthogErrorCapture";
+import { validateInternalSecret } from "./_lib/internal-secret";
 
 const logger = createLogger("langwatch:cron");
 
@@ -73,8 +73,12 @@ const oldLambdasCleanupHandler = async (c: CronContext) => {
     );
   }
 };
-secured.access(cronPolicy()).get("/cron/old_lambdas_cleanup", oldLambdasCleanupHandler);
-secured.access(cronPolicy()).post("/cron/old_lambdas_cleanup", oldLambdasCleanupHandler);
+secured
+  .access(cronPolicy())
+  .get("/cron/old_lambdas_cleanup", oldLambdasCleanupHandler);
+secured
+  .access(cronPolicy())
+  .post("/cron/old_lambdas_cleanup", oldLambdasCleanupHandler);
 
 // ---------- GET /api/cron/scenario_analytics ----------
 secured.access(cronPolicy()).get("/cron/scenario_analytics", async (c) => {
@@ -117,8 +121,12 @@ const scheduleTopicClusteringHandler = async (c: CronContext) => {
     );
   }
 };
-secured.access(cronPolicy()).get("/cron/schedule_topic_clustering", scheduleTopicClusteringHandler);
-secured.access(cronPolicy()).post("/cron/schedule_topic_clustering", scheduleTopicClusteringHandler);
+secured
+  .access(cronPolicy())
+  .get("/cron/schedule_topic_clustering", scheduleTopicClusteringHandler);
+secured
+  .access(cronPolicy())
+  .post("/cron/schedule_topic_clustering", scheduleTopicClusteringHandler);
 
 // ---------- GET /api/cron/trace_analytics ----------
 secured.access(cronPolicy()).get("/cron/trace_analytics", async (c) => {
@@ -142,13 +150,19 @@ secured.access(cronPolicy()).get("/cron/trace_analytics", async (c) => {
     yesterday.getUTCFullYear(),
     yesterday.getUTCMonth(),
     yesterday.getUTCDate(),
-    0, 0, 0, 0,
+    0,
+    0,
+    0,
+    0,
   );
   const endTimestamp = Date.UTC(
     yesterdayEnd.getUTCFullYear(),
     yesterdayEnd.getUTCMonth(),
     yesterdayEnd.getUTCDate(),
-    0, 0, 0, 0,
+    0,
+    0,
+    0,
+    0,
   );
 
   const msearchBody = projects.flatMap((project) => [
@@ -257,9 +271,7 @@ secured.access(cronPolicy()).get("/cron/trace_analytics", async (c) => {
 
       for (const org of organizations) {
         try {
-          const projectIds = await getApp().organizations.getProjectIds(
-            org.id,
-          );
+          const projectIds = await getApp().organizations.getProjectIds(org.id);
           if (projectIds.length === 0) {
             logger.debug(
               { organizationId: org.id },
@@ -267,10 +279,9 @@ secured.access(cronPolicy()).get("/cron/trace_analytics", async (c) => {
             );
             continue;
           }
-          const currentMonthCount =
-            await usageService.getCurrentMonthCount({
-              organizationId: org.id,
-            });
+          const currentMonthCount = await usageService.getCurrentMonthCount({
+            organizationId: org.id,
+          });
 
           if (currentMonthCount === "unlimited") {
             logger.debug(
@@ -368,8 +379,7 @@ const tracesRetentionPeriodCleanupHandler = async (c: CronContext) => {
     const totalDeleted = await deleteTracesRetentionPolicy(projectId);
 
     return c.json({
-      message:
-        "Traces retention period maintenance completed successfully",
+      message: "Traces retention period maintenance completed successfully",
       totalDeleted,
       movedToColdStorage: movedToColdStorage?.migrated,
       cleanedUpOrphanedTraces: cleanedUpOrphanedTraces?.deleted,
@@ -384,8 +394,18 @@ const tracesRetentionPeriodCleanupHandler = async (c: CronContext) => {
     );
   }
 };
-secured.access(cronPolicy()).get("/cron/traces_retention_period_cleanup", tracesRetentionPeriodCleanupHandler);
-secured.access(cronPolicy()).post("/cron/traces_retention_period_cleanup", tracesRetentionPeriodCleanupHandler);
+secured
+  .access(cronPolicy())
+  .get(
+    "/cron/traces_retention_period_cleanup",
+    tracesRetentionPeriodCleanupHandler,
+  );
+secured
+  .access(cronPolicy())
+  .post(
+    "/cron/traces_retention_period_cleanup",
+    tracesRetentionPeriodCleanupHandler,
+  );
 
 // ---------- GET /api/cron/triggers ----------
 secured.access(cronPolicy()).get("/cron/triggers", async (c) => {
@@ -451,8 +471,7 @@ secured.access(cronPolicy()).get("/cron/triggers", async (c) => {
       results.push({
         triggerId: trigger.id,
         status: "error",
-        message:
-          error instanceof Error ? error.message : "Unknown error",
+        message: error instanceof Error ? error.message : "Unknown error",
         type: "customGraph",
       });
     }

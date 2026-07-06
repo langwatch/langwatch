@@ -21,4 +21,18 @@ export class ProjectRepository {
     });
     return project?.team?.organizationId ?? null;
   }
+
+  async findForLangyCredentials(
+    projectId: string,
+  ): Promise<{ apiKey: string; organizationId: string } | null> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { apiKey: true, team: { select: { organizationId: true } } },
+    });
+    if (!project?.team) return null;
+    return {
+      apiKey: project.apiKey,
+      organizationId: project.team.organizationId,
+    };
+  }
 }

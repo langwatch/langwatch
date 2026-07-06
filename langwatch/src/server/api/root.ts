@@ -38,6 +38,7 @@ import { groupRouter } from "./routers/group";
 import { homeRouter } from "./routers/home";
 import { httpProxyRouter } from "./routers/httpProxy";
 import { integrationsChecksRouter } from "./routers/integrationsChecks";
+import { langyGithubRouter } from "./routers/langyGithub";
 import { licenseRouter } from "./routers/license";
 import { licenseEnforcementRouter } from "./routers/licenseEnforcement";
 import { limitsRouter } from "./routers/limits";
@@ -157,6 +158,7 @@ const coreRouters = {
   gatewayCacheRules: gatewayCacheRulesRouter,
   gatewayGuardrails: gatewayGuardrailsRouter,
   gatewayUsage: gatewayUsageRouter,
+  langyGithub: langyGithubRouter,
 };
 
 const eeRouters = {

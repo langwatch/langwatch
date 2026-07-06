@@ -445,6 +445,18 @@ export const readDatasetHeadS3Jsonl = async ({
   };
 };
 
+/**
+ * Byte budget for the dataset editor's read (`datasetRecord.getAll`). The editor
+ * loads rows into the browser, so this caps how much it pulls — for datasets
+ * with heavy cells (e.g. base64 images ~1.25 MB/row) it's what decides how many
+ * rows are visible. Raised from the 5 MB default so heavy-row datasets show a
+ * useful window (~10 rows at 1.25 MB/row) instead of ~3. Browsing the full set
+ * of a multi-GB dataset is the separate paginated/streaming-reads epic (ADR-032);
+ * this is just a bigger window, not a cap removal. Run/export paths keep their
+ * own budgets (the function default / `null`).
+ */
+export const DATASET_EDITOR_READ_LIMIT_MB = 13;
+
 export const getFullDataset = async ({
   datasetId,
   projectId,

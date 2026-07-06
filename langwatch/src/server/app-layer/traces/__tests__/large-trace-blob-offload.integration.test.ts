@@ -22,30 +22,29 @@
  * No "should" in it() names (project convention).
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
-
-import {
-  leanForProjection,
-  EVENTREF_ATTR_PREFIX,
-  IO_PREVIEW_BYTES,
-  COMMAND_INLINE_THRESHOLD,
-} from "~/server/app-layer/traces/lean-for-projection";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
+import { maybeSpool } from "~/server/app-layer/traces/edge-spool";
+import {
+  COMMAND_INLINE_THRESHOLD,
+  EVENTREF_ATTR_PREFIX,
+  IO_PREVIEW_BYTES,
+  leanForProjection,
+} from "~/server/app-layer/traces/lean-for-projection";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
+import type { Event } from "~/server/event-sourcing";
+import type { RecordSpanCommandData } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
+import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import {
+  type NormalizedSpan,
+  NormalizedSpanKind,
+  NormalizedStatusCode,
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import {
   resolveOffloadedTraces,
   type WarnLogger,
 } from "~/server/traces/resolve-offloaded-traces";
-import {
-  NormalizedSpanKind,
-  NormalizedStatusCode,
-  type NormalizedSpan,
-} from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import type { Event } from "~/server/event-sourcing";
-import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
-import { maybeSpool } from "~/server/app-layer/traces/edge-spool";
-import type { RecordSpanCommandData } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 
 // ---------------------------------------------------------------------------
 // Mock langwatch tracer (passthrough in tests)
@@ -100,7 +99,15 @@ function makeEventLogBlobStore(contents: Record<string, string>): {
   getFromEventLogSpy: ReturnType<typeof vi.fn>;
 } {
   const getFromEventLogSpy = vi.fn(
-    async ({ field }: { eventId: string; field: string; tenantId: string; aggregateType: string; aggregateId: string }) => {
+    async ({
+      field,
+    }: {
+      eventId: string;
+      field: string;
+      tenantId: string;
+      aggregateType: string;
+      aggregateId: string;
+    }) => {
       if (field in contents) return contents[field]!;
       throw new BlobNotFoundError("evt-test", field, PROJECT_ID);
     },
@@ -210,7 +217,9 @@ function makeSpanReceivedEvent({ output }: { output: string }): Event {
  */
 function extractSpanAttrs(event: Event): Record<string, string> {
   const data = event.data as {
-    span?: { attributes?: Array<{ key: string; value: { stringValue?: string } }> };
+    span?: {
+      attributes?: Array<{ key: string; value: { stringValue?: string } }>;
+    };
   };
   const attrs: Record<string, string> = {};
   for (const attr of data?.span?.attributes ?? []) {
@@ -225,7 +234,9 @@ function extractSpanAttrs(event: Event): Record<string, string> {
  * Builds a NormalizedSpan from a span attributes map, simulating what the
  * projection receives from the command worker after leanForProjection.
  */
-function makeNormalizedSpan(spanAttributes: Record<string, string>): NormalizedSpan {
+function makeNormalizedSpan(
+  spanAttributes: Record<string, string>,
+): NormalizedSpan {
   return {
     id: SPAN_ID,
     traceId: TRACE_ID,
@@ -421,9 +432,9 @@ describe("given the span output is below IO_PREVIEW_BYTES (flag-off / sub-thresh
       expect(result.anyResolved).toBe(false);
 
       // Full value preserved
-      expect(result.resolvedSpans[0]?.spanAttributes?.["langwatch.output"]).toBe(
-        SMALL_OUTPUT,
-      );
+      expect(
+        result.resolvedSpans[0]?.spanAttributes?.["langwatch.output"],
+      ).toBe(SMALL_OUTPUT);
     });
   });
 });
@@ -481,7 +492,9 @@ describe("given the span was offloaded but the event_log row is missing on read 
         result.resolvedSpans[0]?.spanAttributes?.["langwatch.output"];
       expect(returnedValue).toBe(previewValue);
       // Preview is shorter than the original 1 MB value
-      expect((returnedValue as string).length).toBeLessThan(ONE_MB_OUTPUT.length);
+      expect((returnedValue as string).length).toBeLessThan(
+        ONE_MB_OUTPUT.length,
+      );
     });
 
     it("logs at warn level (not error or silent)", async () => {
@@ -544,7 +557,9 @@ describe("given a span whose serialized command payload exceeds COMMAND_INLINE_T
         name: "test-span",
         kind: 1,
         startTimeUnixNano: String(Date.now() * 1_000_000) as unknown as number,
-        endTimeUnixNano: String((Date.now() + 1000) * 1_000_000) as unknown as number,
+        endTimeUnixNano: String(
+          (Date.now() + 1000) * 1_000_000,
+        ) as unknown as number,
         attributes: [
           { key: "langwatch.output", value: { stringValue: LARGE_OUTPUT } },
         ],
@@ -614,7 +629,11 @@ describe("given a span whose serialized command payload exceeds COMMAND_INLINE_T
       const logger = { warn: vi.fn() };
       const data = makeOversizedCommand();
 
-      const result = await maybeSpool({ data, blobStore: failingBlobStore, logger });
+      const result = await maybeSpool({
+        data,
+        blobStore: failingBlobStore,
+        logger,
+      });
 
       // Returns original data (fail-open)
       expect(result).toBe(data);

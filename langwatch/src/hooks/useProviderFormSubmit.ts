@@ -4,8 +4,8 @@ import { fromZodError } from "zod-validation-error";
 import { toaster } from "../components/ui/toaster";
 import type { CustomModelEntry } from "../server/modelProviders/customModel.schema";
 import {
-  modelProviders,
   type MaybeStoredModelProvider,
+  modelProviders,
 } from "../server/modelProviders/registry";
 import { api } from "../utils/api";
 import {
@@ -214,7 +214,9 @@ export function useProviderFormSubmit({
             description: `${mismatched.join(" and ")} ${
               mismatched.length === 1 ? "belongs" : "belong"
             } to a different provider. Pick a model from ${providerDisplayName}${
-              provider.provider === "azure" ? " (or add a custom deployment)" : ""
+              provider.provider === "azure"
+                ? " (or add a custom deployment)"
+                : ""
             } before saving.`,
             type: "error",
             duration: 5000,
@@ -229,11 +231,25 @@ export function useProviderFormSubmit({
       let customKeysToSend: Record<string, unknown> | undefined;
       const userEnteredNewKey = hasUserEnteredNewApiKey(customKeys);
       if (!isUsingEnvVars) {
-        // Strip any masked placeholder values — they appear when the provider
-        // was configured via env vars in a prior session and the user opened
-        // the drawer without editing. Submitting the placeholder string would
-        // fail backend validation; omitting it preserves the existing key.
-        customKeysToSend = filterMaskedApiKeys(customKeys);
+        // When editing an existing provider, the stored key is shown masked.
+        // Strip the masked placeholders, then keep the result only if something
+        // actually changed versus the stored values. If nothing changed (the
+        // common case of opening the drawer and saving without re-entering the
+        // key), send `undefined` so the server preserves the stored credentials
+        // instead of validating a partial object (e.g. just an empty base URL)
+        // against the provider's required-key schema and rejecting the save.
+        // A genuine change — a new key, a cleared key, or an edited field —
+        // still goes through.
+        const filtered = filterMaskedApiKeys(customKeys);
+        const hasRealChange = Object.entries(filtered).some(([key, value]) => {
+          const current = (value ?? "").trim();
+          const stored =
+            typeof initialKeys[key] === "string"
+              ? (initialKeys[key] as string).trim()
+              : "";
+          return current !== stored;
+        });
+        customKeysToSend = hasRealChange ? filtered : undefined;
       } else if (userEnteredNewKey || hasNonApiKeyChanges) {
         customKeysToSend = userEnteredNewKey
           ? { ...customKeys }
@@ -254,6 +270,17 @@ export function useProviderFormSubmit({
           }
         });
         customKeysToSend = { ...customKeysToSend, ...headerMap };
+      }
+
+      // Safety net: if the steps above (placeholder stripping, azure-header
+      // merge) leave an empty customKeys object, send `undefined` so the
+      // server treats it as "no key change" and preserves the stored key,
+      // rather than validating `{}` against the provider's keysSchema.
+      if (
+        customKeysToSend !== undefined &&
+        Object.keys(customKeysToSend).length === 0
+      ) {
+        customKeysToSend = undefined;
       }
 
       // Strip concealed for send
@@ -315,11 +342,12 @@ export function useProviderFormSubmit({
       // `analytics.topic_clustering_llm` to FAST). See
       // specs/model-providers/role-based-default-models.feature.
       if (useAsDefaultProvider) {
-        const targetScopes = scopes && scopes.length > 0
-          ? scopes
-          : scopeType && scopeId
-            ? [{ scopeType, scopeId }]
-            : [];
+        const targetScopes =
+          scopes && scopes.length > 0
+            ? scopes
+            : scopeType && scopeId
+              ? [{ scopeType, scopeId }]
+              : [];
         type RoleWrite = {
           label: string;
           promise: Promise<unknown>;
@@ -369,8 +397,9 @@ export function useProviderFormSubmit({
         const results = await Promise.allSettled(writes.map((w) => w.promise));
         const failed = results
           .map((r, i) => ({ r, label: writes[i]!.label }))
-          .filter((x): x is { r: PromiseRejectedResult; label: string } =>
-            x.r.status === "rejected",
+          .filter(
+            (x): x is { r: PromiseRejectedResult; label: string } =>
+              x.r.status === "rejected",
           );
         if (failed.length > 0) {
           const reasons = failed

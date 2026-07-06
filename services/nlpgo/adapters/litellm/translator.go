@@ -60,7 +60,7 @@ func FromLiteLLMParams(provider string, params map[string]any) (InlineCredential
 			Provider: "azure",
 			Azure: pickAny(params,
 				"api_key", "api_base", "api_version",
-				"use_azure_gateway", "extra_headers",
+				"deployment", "use_azure_gateway", "extra_headers",
 			),
 		}, nil
 	case "bedrock":

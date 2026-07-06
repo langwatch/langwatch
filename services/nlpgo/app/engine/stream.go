@@ -285,6 +285,9 @@ func stateEvent(traceID, nodeID string, ns *NodeState) StreamEvent {
 	if ns.Cost > 0 {
 		es["cost"] = ns.Cost
 	}
+	if ns.Metrics != nil {
+		es["metrics"] = ns.Metrics
+	}
 	if ns.Error != nil {
 		es["error"] = ns.Error.Message
 	}

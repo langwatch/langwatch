@@ -30,6 +30,53 @@ Feature: Dataset editor
     And scrolling through the dataset stays smooth
 
   # ============================================================================
+  # Pagination
+  # ============================================================================
+  # A dataset larger than one page is read a page at a time instead of loading
+  # the whole thing into the browser (which previously stopped at a byte cap and
+  # silently hid the rest). The editor shows one page of records with a pager;
+  # editing still works on the visible page because edits target each record by
+  # its own id.
+
+  @integration
+  Scenario: A dataset larger than one page shows the first page with a pager
+    Given the dataset has more records than fit on one page
+    When I open the dataset in the editor
+    Then I see the first page of records
+    And I see which page I am on and how many pages there are
+    And the total record count reflects the whole dataset, not just this page
+
+  @integration
+  Scenario: Move between pages
+    Given the dataset has more records than fit on one page
+    When I open the dataset in the editor
+    And I go to the next page
+    Then I see the next page of records
+    And I can return to the previous page
+
+  @integration
+  Scenario: Edits on a page are saved to the right record
+    Given the dataset has more records than fit on one page
+    When I move to a later page
+    And I edit a cell on that page
+    Then the change is saved to that record
+    And it is still there when I return to that page
+
+  @integration
+  Scenario: A new row is added on the last page
+    Given the dataset has more records than fit on one page
+    When I go to the last page
+    Then an empty row to add a record is available there
+    And it is not offered on earlier, full pages
+
+  @integration
+  Scenario: Change how many rows are shown per page
+    Given the dataset has more records than fit on one page
+    When I change how many rows are shown per page
+    Then that many records are loaded
+    And I am returned to the first page
+
+  # ============================================================================
   # Inline cell editing
   # ============================================================================
 

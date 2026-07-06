@@ -1,0 +1,272 @@
+import type { LangyConversation, PrismaClient } from "@prisma/client";
+
+/**
+ * Thrown by ensureConversation when the caller passes a conversationId
+ * that belongs to a different user in the same project. The /chat route
+ * catches this and returns 403 rather than silently forking off a brand
+ * new conversation (which loses the caller's intent and confuses the UI).
+ */
+export class LangyConversationNotOwnedError extends Error {
+  constructor(public readonly conversationId: string) {
+    super(`Langy conversation ${conversationId} is not owned by the caller`);
+    this.name = "LangyConversationNotOwnedError";
+  }
+}
+
+export type ConversationListItem = {
+  id: string;
+  title: string | null;
+  isShared: boolean;
+  isOwn: boolean;
+  // Serialized to an ISO string on the wire; the UI sorts on it as
+  // `lastActivityAt`. Named for the domain, not the DB column (`updatedAt`).
+  lastActivityAt: Date;
+  messageCount: number;
+};
+
+export class LangyConversationRepository {
+  constructor(private readonly prisma: PrismaClient) {}
+
+  async findById({
+    id,
+    projectId,
+  }: {
+    id: string;
+    projectId: string;
+  }): Promise<LangyConversation | null> {
+    return await this.prisma.langyConversation.findFirst({
+      where: { id, projectId, deletedAt: null },
+    });
+  }
+
+  async findAllForUser({
+    projectId,
+    userId,
+    limit,
+  }: {
+    projectId: string;
+    userId: string;
+    limit: number;
+  }) {
+    return await this.prisma.langyConversation.findMany({
+      where: {
+        projectId,
+        deletedAt: null,
+        OR: [{ userId }, { isShared: true }],
+      },
+      orderBy: { lastActivityAt: "desc" },
+      take: limit,
+    });
+  }
+
+  async create({
+    projectId,
+    userId,
+    title,
+  }: {
+    projectId: string;
+    userId: string;
+    title?: string | null;
+  }): Promise<LangyConversation> {
+    return await this.prisma.langyConversation.create({
+      data: { projectId, userId, title: title ?? null },
+    });
+  }
+
+  async update({
+    id,
+    projectId,
+    data,
+  }: {
+    id: string;
+    projectId: string;
+    data: Partial<{
+      title: string | null;
+      isShared: boolean;
+      sharedAt: Date | null;
+      sharedById: string | null;
+    }>;
+  }) {
+    return await this.prisma.langyConversation.updateMany({
+      where: { id, projectId },
+      data,
+    });
+  }
+
+  async softDelete({ id, projectId }: { id: string; projectId: string }) {
+    return await this.prisma.langyConversation.updateMany({
+      where: { id, projectId, deletedAt: null },
+      data: { deletedAt: new Date() },
+    });
+  }
+
+  async softDeleteAllForUser({
+    projectId,
+    userId,
+  }: {
+    projectId: string;
+    userId: string;
+  }) {
+    return await this.prisma.langyConversation.updateMany({
+      where: { projectId, userId, deletedAt: null },
+      data: { deletedAt: new Date() },
+    });
+  }
+
+  async bumpActivity({ id, projectId }: { id: string; projectId: string }) {
+    return await this.prisma.langyConversation.updateMany({
+      where: { id, projectId },
+      data: {
+        lastActivityAt: new Date(),
+        messageCount: { increment: 1 },
+      },
+    });
+  }
+}
+
+export class LangyConversationService {
+  constructor(private readonly repository: LangyConversationRepository) {}
+
+  static create(prisma: PrismaClient): LangyConversationService {
+    return new LangyConversationService(
+      new LangyConversationRepository(prisma),
+    );
+  }
+
+  async getById({
+    id,
+    projectId,
+    userId,
+  }: {
+    id: string;
+    projectId: string;
+    userId: string;
+  }): Promise<LangyConversation | null> {
+    const conv = await this.repository.findById({ id, projectId });
+    if (!conv) return null;
+    if (conv.userId !== userId && !conv.isShared) return null;
+    return conv;
+  }
+
+  async getAll({
+    projectId,
+    userId,
+    limit = 50,
+  }: {
+    projectId: string;
+    userId: string;
+    limit?: number;
+  }): Promise<ConversationListItem[]> {
+    const rows = await this.repository.findAllForUser({
+      projectId,
+      userId,
+      limit,
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      isShared: r.isShared,
+      isOwn: r.userId === userId,
+      lastActivityAt: r.lastActivityAt ?? r.createdAt,
+      messageCount: r.messageCount,
+    }));
+  }
+
+  async ensureConversation({
+    projectId,
+    userId,
+    conversationId,
+    title,
+  }: {
+    projectId: string;
+    userId: string;
+    conversationId?: string | null;
+    title?: string | null;
+  }): Promise<LangyConversation> {
+    if (conversationId) {
+      // Resolve straight from the repo, bypassing the share-aware getById:
+      // visibility of a shared conversation does not grant continuation rights.
+      const existing = await this.repository.findById({
+        id: conversationId,
+        projectId,
+      });
+      if (existing) {
+        if (existing.userId !== userId) {
+          throw new LangyConversationNotOwnedError(conversationId);
+        }
+        return existing;
+      }
+      // Soft-deleted or never existed in this project: fall through and create
+      // a fresh one. Acceptable because a stale id from a deleted conversation
+      // is a legitimate client state, unlike one owned by a different user.
+    }
+    return await this.repository.create({ projectId, userId, title });
+  }
+
+  async deleteById({
+    id,
+    projectId,
+    userId,
+  }: {
+    id: string;
+    projectId: string;
+    userId: string;
+  }): Promise<boolean> {
+    const conv = await this.getById({ id, projectId, userId });
+    if (!conv || conv.userId !== userId) return false;
+    const result = await this.repository.softDelete({ id, projectId });
+    return result.count > 0;
+  }
+
+  async updateById({
+    id,
+    projectId,
+    userId,
+    title,
+    isShared,
+  }: {
+    id: string;
+    projectId: string;
+    userId: string;
+    title?: string | null;
+    isShared?: boolean;
+  }) {
+    const conv = await this.getById({ id, projectId, userId });
+    if (!conv || conv.userId !== userId) {
+      throw new Error("conversation not found or not owned");
+    }
+    const data: Parameters<LangyConversationRepository["update"]>[0]["data"] =
+      {};
+    if (title !== undefined) data.title = title;
+    if (isShared !== undefined) {
+      data.isShared = isShared;
+      data.sharedAt = isShared ? new Date() : null;
+      data.sharedById = isShared ? userId : null;
+    }
+    // Nothing to change — skip the write (Prisma update with an empty payload
+    // throws) and return the unchanged conversation.
+    if (Object.keys(data).length === 0) {
+      return conv;
+    }
+    await this.repository.update({ id, projectId, data });
+    return await this.repository.findById({ id, projectId });
+  }
+
+  async clearAllForUser({
+    projectId,
+    userId,
+  }: {
+    projectId: string;
+    userId: string;
+  }) {
+    const result = await this.repository.softDeleteAllForUser({
+      projectId,
+      userId,
+    });
+    return { deletedCount: result.count };
+  }
+
+  async bumpActivity({ id, projectId }: { id: string; projectId: string }) {
+    await this.repository.bumpActivity({ id, projectId });
+  }
+}

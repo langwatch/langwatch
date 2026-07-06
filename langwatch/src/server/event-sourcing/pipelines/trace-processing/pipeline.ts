@@ -23,8 +23,8 @@ import { LogRecordStorageMapProjection } from "./projections/logRecordStorage.ma
 import { MetricRecordStorageMapProjection } from "./projections/metricRecordStorage.mapProjection";
 import { SpanStorageMapProjection } from "./projections/spanStorage.mapProjection";
 import {
-  TraceAnalyticsFoldProjection,
   type TraceAnalyticsData,
+  TraceAnalyticsFoldProjection,
 } from "./projections/traceAnalytics.foldProjection";
 import {
   TraceAnalyticsRollupMapProjection,

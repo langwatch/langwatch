@@ -57,63 +57,126 @@ export type ExecutionRequest = {
   scope: ExecutionScope;
   /** Concurrency limit for parallel execution (default 10) */
   concurrency?: number;
+  /**
+   * Pre-existing target outputs the client already has for targets NOT
+   * being re-run this dispatch. Used by Phase 2 pairwise so it can read
+   * variantA / variantB outputs from a prior run without forcing them to
+   * re-execute. Keyed by `${rowIndex}:${targetId}`.
+   */
+  seedTargetOutputs?: Record<
+    string,
+    { output: unknown; cost?: number; duration?: number }
+  >;
+  /** Inline row data to evaluate instead of a saved or attached dataset. */
+  data?: Array<Record<string, unknown>>;
+  /** Saved platform dataset id to load and evaluate. Mutually exclusive with data. */
+  dataset_id?: string;
+  /** Constant inputs applied to every row, overriding entry fields. */
+  parameters?: Record<string, string | number | boolean>;
 };
 
-export const executionRequestSchema = z.object({
-  projectId: z.string(),
-  experimentId: z.string().optional(),
-  experimentSlug: z.string().optional(),
-  name: z.string(),
-  dataset: z.object({
-    id: z.string(),
+export const executionRequestSchema = z
+  .object({
+    projectId: z.string(),
+    experimentId: z.string().optional(),
+    experimentSlug: z.string().optional(),
     name: z.string(),
-    type: z.enum(["inline", "saved"]),
-    inline: z
-      .object({
-        columns: z.array(
-          z.object({ id: z.string(), name: z.string(), type: z.string() }),
-        ),
-        records: z.record(z.string(), z.array(z.string())),
-      })
+    dataset: z.object({
+      id: z.string(),
+      name: z.string(),
+      type: z.enum(["inline", "saved"]),
+      inline: z
+        .object({
+          columns: z.array(
+            z.object({ id: z.string(), name: z.string(), type: z.string() }),
+          ),
+          records: z.record(z.string(), z.array(z.string())),
+        })
+        .optional(),
+      datasetId: z.string().optional(),
+      columns: z.array(
+        z.object({ id: z.string(), name: z.string(), type: z.string() }),
+      ),
+      savedRecords: z
+        .array(z.object({ id: z.string() }).passthrough())
+        .optional(),
+    }),
+    // Use shared schemas to avoid duplication and ensure consistency
+    targets: z.array(targetConfigSchema),
+    evaluators: z.array(evaluatorConfigSchema),
+    scope: z.discriminatedUnion("type", [
+      z.object({ type: z.literal("full") }),
+      z.object({ type: z.literal("rows"), rowIndices: z.array(z.number()) }),
+      z.object({ type: z.literal("target"), targetId: z.string() }),
+      z.object({
+        type: z.literal("cell"),
+        targetId: z.string(),
+        rowIndex: z.number(),
+      }),
+      z.object({
+        type: z.literal("evaluator"),
+        targetId: z.string(),
+        rowIndex: z.number(),
+        evaluatorId: z.string(),
+        targetOutput: z.unknown().optional(),
+        traceId: z.string().optional(),
+      }),
+      z.object({
+        type: z.literal("evaluator-all-rows"),
+        targetId: z.string(),
+        evaluatorId: z.string(),
+        precomputedTargetOutputs: z.record(z.coerce.number(), z.unknown()),
+        traceIds: z.record(z.coerce.number(), z.string().optional()),
+      }),
+    ]),
+    concurrency: z.number().min(1).max(24).optional(),
+    /** Inline row data to evaluate instead of a saved or attached dataset (row-first). */
+    data: z.array(z.record(z.string(), z.unknown())).optional(),
+    /** Saved platform dataset id to load and evaluate. Mutually exclusive with data. */
+    dataset_id: z.string().optional(),
+    /** Constant inputs applied to every row, overriding entry fields. */
+    parameters: z
+      .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
       .optional(),
-    datasetId: z.string().optional(),
-    columns: z.array(
-      z.object({ id: z.string(), name: z.string(), type: z.string() }),
-    ),
-    savedRecords: z
-      .array(z.object({ id: z.string() }).passthrough())
+    // Row subsetting on /execute is expressed through `scope` ({ type: "rows" });
+    // a separate row_indices here would be redundant and is intentionally absent.
+    // The CI run path (/:slug/run) carries its own row_indices in runInputsBodySchema.
+    seedTargetOutputs: z
+      .record(
+        z.string(),
+        z.object({
+          output: z.unknown(),
+          cost: z.number().optional(),
+          duration: z.number().optional(),
+        }),
+      )
       .optional(),
-  }),
-  // Use shared schemas to avoid duplication and ensure consistency
-  targets: z.array(targetConfigSchema),
-  evaluators: z.array(evaluatorConfigSchema),
-  scope: z.discriminatedUnion("type", [
-    z.object({ type: z.literal("full") }),
-    z.object({ type: z.literal("rows"), rowIndices: z.array(z.number()) }),
-    z.object({ type: z.literal("target"), targetId: z.string() }),
-    z.object({
-      type: z.literal("cell"),
-      targetId: z.string(),
-      rowIndex: z.number(),
-    }),
-    z.object({
-      type: z.literal("evaluator"),
-      targetId: z.string(),
-      rowIndex: z.number(),
-      evaluatorId: z.string(),
-      targetOutput: z.unknown().optional(),
-      traceId: z.string().optional(),
-    }),
-    z.object({
-      type: z.literal("evaluator-all-rows"),
-      targetId: z.string(),
-      evaluatorId: z.string(),
-      precomputedTargetOutputs: z.record(z.coerce.number(), z.unknown()),
-      traceIds: z.record(z.coerce.number(), z.string().optional()),
-    }),
-  ]),
-  concurrency: z.number().min(1).max(24).optional(),
-});
+  })
+  .refine((req) => !(req.data && req.dataset_id), {
+    message: "Pass either inline data or a dataset_id, not both",
+    path: ["data"],
+  });
+
+/**
+ * Optional run inputs accepted as a JSON body by the run API and the workflow
+ * evaluate endpoint: inline data, a saved dataset id, constant parameters that
+ * override every row, and a row-index subset. data and dataset_id are mutually
+ * exclusive.
+ */
+export const runInputsBodySchema = z
+  .object({
+    data: z.array(z.record(z.string(), z.unknown())).optional(),
+    dataset_id: z.string().optional(),
+    parameters: z
+      .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
+      .optional(),
+    row_indices: z.array(z.number().int().nonnegative()).optional(),
+  })
+  .refine((b) => !(b.data && b.dataset_id), {
+    message: "Pass either inline data or a dataset_id, not both",
+    path: ["data"],
+  });
+export type RunInputsBody = z.infer<typeof runInputsBodySchema>;
 
 // ============================================================================
 // SSE Event Types
@@ -158,6 +221,9 @@ export type EvaluationV3Event =
       rowIndex: number;
       targetId: string;
       evaluatorId: string;
+      // Display name for evaluators that carry one without a DB record (workflow
+      // evaluator nodes). DB-backed evaluators resolve their name at storage time.
+      evaluatorName?: string;
       result: SingleEvaluationResult;
     }
   | { type: "progress"; completed: number; total: number }
@@ -191,6 +257,26 @@ export type ExecutionCell = {
   precomputedTargetOutput?: unknown;
   /** Existing trace ID to reuse (for evaluator reruns) */
   traceId?: string;
+  /**
+   * Pairwise candidates baked into the cell after Phase 1 target execution.
+   * Set ONLY for synthetic pairwise cells; targetId on those cells points
+   * at variantA so the workflow builder has a real TargetConfig to lean on,
+   * but the target step is skipped via `skipTarget`.
+   */
+  pairwise?: {
+    candidateA: {
+      id: string;
+      output: unknown;
+      cost?: number;
+      duration?: number;
+    };
+    candidateB: {
+      id: string;
+      output: unknown;
+      cost?: number;
+      duration?: number;
+    };
+  };
 };
 
 /**

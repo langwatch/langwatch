@@ -359,6 +359,24 @@ func TestFromLiteLLMParams_Azure_PreservesNestedExtraHeaders(t *testing.T) {
 	}
 }
 
+func TestFromLiteLLMParams_Azure_ForwardsDeployment(t *testing.T) {
+	// prepareLitellmParams sets `deployment` when the provider defines an
+	// explicit deploymentMapping (model id != Azure deployment name). It must
+	// survive into the inline credentials so withDeploymentMap can use it.
+	ic, err := FromLiteLLMParams("azure", map[string]any{
+		"api_key":     "azk",
+		"api_base":    "https://acme.openai.azure.com",
+		"api_version": "2025-04-01-preview",
+		"deployment":  "my-gpt5-deployment",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ic.Azure["deployment"] != "my-gpt5-deployment" {
+		t.Errorf("expected deployment to be forwarded, got %v", ic.Azure["deployment"])
+	}
+}
+
 func TestFromLiteLLMParams_Bedrock(t *testing.T) {
 	ic, err := FromLiteLLMParams("bedrock", map[string]any{
 		"aws_access_key_id":     "AKIA",

@@ -36,12 +36,12 @@
  * it.
  */
 
+import type { SeriesInputType } from "~/server/analytics/registry";
+import type { AggregationTypes } from "~/server/analytics/types";
 import {
   PAYLOAD_BLOCKLIST_EXACT,
   PAYLOAD_BLOCKLIST_PREFIXES,
 } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/analytics-attribute-trim.service";
-import type { SeriesInputType } from "~/server/analytics/registry";
-import type { AggregationTypes } from "~/server/analytics/types";
 import type { FilterField } from "~/server/filters/types";
 import {
   type AnalyticsMetricSource,

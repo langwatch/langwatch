@@ -17,6 +17,11 @@
  * (see `putFileToPresignedUrl`).
  */
 
+import type {
+  DatasetColumns,
+  DatasetConfirmColumns,
+} from "~/server/datasets/types";
+
 /**
  * Sentinel error for "no browser-reachable object storage" (the backend's
  * 409 `DirectUploadUnavailable`). The caller branches on this to fall back to
@@ -75,15 +80,30 @@ export async function requestDirectUpload({
   projectId,
   name,
   filename,
+  columnTypes,
 }: {
   projectId: string;
   name: string;
   filename: string;
+  /**
+   * Confirmed columns from the upload confirm step (ADR-032 v19), sent as JSON
+   * so the normalize job binds each file header to its column and renames +
+   * type-converts each record to match. The bulk drawer sends the richer shape
+   * (each column carries an immutable `sourceHeader`) so the confirm UI can
+   * rename + drag-reorder without breaking the binding; the legacy single-file
+   * drawer locks column order and sends the bare name+type shape (normalize then
+   * binds positionally). Omitted when the header couldn't be parsed (then
+   * normalize derives all-`string`).
+   */
+  columnTypes?: DatasetConfirmColumns | DatasetColumns;
 }): Promise<DirectUploadHandle> {
   const form = new FormData();
   form.append("projectId", projectId);
   form.append("name", name);
   form.append("filename", filename);
+  if (columnTypes && columnTypes.length > 0) {
+    form.append("columnTypes", JSON.stringify(columnTypes));
+  }
 
   const response = await fetch("/api/dataset/direct-upload", {
     method: "POST",

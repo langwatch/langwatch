@@ -10,15 +10,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { keyframes } from "@emotion/react";
-import {
-  CheckCircle,
-  CloudUpload,
-  FileText,
-  Trash2,
-  X,
-  XCircle,
-} from "lucide-react";
+import { CheckCircle, FileText, Trash2, X, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   formatFileSize,
@@ -48,6 +40,12 @@ import {
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import {
+  DROPZONE_DOTTED_STYLE,
+  DropzonePrompt,
+  dropzoneSurfaceProps,
+  RAINBOW_TEXT_CSS,
+} from "./datasetDropzoneStyles";
+import {
   abortPendingUpload,
   DirectUploadUnavailableError,
   finalizeDirectUpload,
@@ -56,6 +54,7 @@ import {
   requestDirectUpload,
   retryDatasetNormalize,
 } from "./services/directUpload";
+import { parseHeaderColumns } from "./utils/parseHeaderColumns";
 import { getSafeColumnName } from "./utils/reservedColumns";
 
 const logger = createLogger("UploadCSVDrawer");
@@ -90,6 +89,18 @@ export function UploadCSVDrawer({
   const [uploadedDataset, setUploadedDataset] = useState<
     InMemoryDataset | undefined
   >(undefined);
+  // Confirm-columns step (ADR-032 v19): when the form requests it, hold the
+  // parsed columns + the resume callback and render the confirm drawer. Null
+  // when no confirm is in progress (so the drawer — and its hooks — only mount
+  // while confirming).
+  const [columnConfirm, setColumnConfirm] = useState<{
+    columns: DatasetColumns;
+    proposedName: string;
+    onConfirmed: (confirmed: {
+      name: string;
+      columnTypes: DatasetColumns;
+    }) => void;
+  } | null>(null);
   // Direct-upload (ADR-032 D4) processing stays IN this drawer: once the raw
   // file is streamed + finalized, the dataset normalizes server-side. We hold
   // its id and poll its status here instead of navigating to the dataset page,
@@ -159,6 +170,7 @@ export function UploadCSVDrawer({
                 enableDirectUpload={enableDirectUpload}
                 onClose={onClose}
                 onDirectUploadComplete={setProcessingDatasetId}
+                requestColumnConfirm={setColumnConfirm}
               />
             )}
           </Drawer.Body>
@@ -176,6 +188,29 @@ export function UploadCSVDrawer({
           onClose();
         }}
       />
+      {/* Confirm-columns step for the direct path (ADR-032 v19): rename + retype
+          the file's columns before the upload starts. localOnly so it never
+          writes the DB itself — on Apply it returns the confirmed schema to the
+          form (via onConfirmed), which then runs the direct upload. isColumnsLocked
+          hides add/remove so the confirmed columns stay positionally aligned
+          with the file the normalize job parses. */}
+      {columnConfirm && (
+        <AddOrEditDatasetDrawer
+          open
+          localOnly
+          isColumnsLocked
+          datasetToSave={{
+            name: columnConfirm.proposedName,
+            columnTypes: columnConfirm.columns,
+          }}
+          onClose={() => setColumnConfirm(null)}
+          onSuccess={({ name, columnTypes }) => {
+            const { onConfirmed } = columnConfirm;
+            setColumnConfirm(null);
+            onConfirmed({ name, columnTypes });
+          }}
+        />
+      )}
     </>
   );
 }
@@ -345,6 +380,7 @@ export function UploadCSVForm({
   enableDirectUpload = false,
   onClose,
   onDirectUploadComplete,
+  requestColumnConfirm,
 }: {
   setUploadedDataset: (dataset: InMemoryDataset | undefined) => void;
   uploadedDataset: InMemoryDataset | undefined;
@@ -360,6 +396,19 @@ export function UploadCSVForm({
    *  host (UploadCSVDrawer) takes over and shows processing IN the drawer.
    *  When omitted, the direct path navigates to the dataset page instead. */
   onDirectUploadComplete?: (datasetId: string) => void;
+  /** Host-provided confirm-columns step (ADR-032 v19). When set, the direct
+   *  path hands the parsed header columns to the host before uploading; the host
+   *  shows the confirm drawer and calls `onConfirmed` with the final name +
+   *  columnTypes. When omitted (standalone form), the upload runs without a
+   *  confirm step (normalize derives all-`string`). */
+  requestColumnConfirm?: (params: {
+    columns: DatasetColumns;
+    proposedName: string;
+    onConfirmed: (confirmed: {
+      name: string;
+      columnTypes: DatasetColumns;
+    }) => void;
+  }) => void;
 }) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
@@ -372,6 +421,21 @@ export function UploadCSVForm({
   // used by the fallback (no-storage) flow.
   const [rawFile, setRawFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  // Confirm-columns step (ADR-032 v19, direct path only): the columns parsed
+  // from the file's header (null when the header couldn't be read → upload
+  // without a confirm step) and the proposed dataset name. The host renders the
+  // confirm drawer (see `requestColumnConfirm`); the user corrects names + types
+  // before the upload starts.
+  const [parsedColumns, setParsedColumns] = useState<DatasetColumns | null>(
+    null,
+  );
+  const [proposedName, setProposedName] = useState<string>("");
+  // The header parse runs async on file pick; Upload must wait for it so a fast
+  // click can't bypass the confirm step. A monotonic token discards a stale
+  // parse (from a since-removed/replaced file) so it never overwrites the
+  // current file's columns.
+  const [isParsingHeader, setIsParsingHeader] = useState(false);
+  const parseHeaderTokenRef = useRef(0);
   // System/drawer-level failure (storage not writable, upload failed) → top
   // alert. File-level validation (too large / over the row limit) → inline on
   // the file's row (sizeError + overRowLimitForFallback below).
@@ -435,7 +499,10 @@ export function UploadCSVForm({
    * file and fall back to the parse-and-drawer flow, so small/self-hosted
    * setups are unaffected.
    */
-  const handleUpload = async () => {
+  const handleUpload = async (confirmed?: {
+    name: string;
+    columnTypes: DatasetColumns;
+  }) => {
     if (!enableDirectUpload || !rawFile || !projectId || !project) {
       uploadCSVData();
       return;
@@ -452,11 +519,17 @@ export function UploadCSVForm({
     let pendingDatasetId: string | undefined;
     try {
       const name =
-        uploadedDataset?.name ?? (await proposeValidName(rawFile.name));
+        confirmed?.name ??
+        uploadedDataset?.name ??
+        (await proposeValidName(rawFile.name));
       const { datasetId, uploadUrl } = await requestDirectUpload({
         projectId,
         name,
         filename: rawFile.name,
+        // Confirmed columns (names + types) drive normalize's rename + type
+        // conversion. Absent when the header couldn't be parsed → normalize
+        // derives all-`string`.
+        columnTypes: confirmed?.columnTypes,
       });
       pendingDatasetId = datasetId;
       pendingDatasetIdRef.current = datasetId;
@@ -649,6 +722,32 @@ export function UploadCSVForm({
     }
   };
 
+  /**
+   * Upload button handler. On the direct path with a parseable header AND a host
+   * that can show the confirm drawer, hand the parsed columns to the host first
+   * (ADR-032 v19) so the user fixes names + types before the upload starts; the
+   * host calls back `onConfirmed` with the final schema, which resumes
+   * `handleUpload`. Without a host confirm handler (standalone form) or an
+   * unparseable header, upload straight away — normalize then derives
+   * all-`string` columns as before.
+   */
+  const handleUploadClick = () => {
+    if (
+      enableDirectUpload &&
+      rawFile &&
+      parsedColumns &&
+      requestColumnConfirm
+    ) {
+      requestColumnConfirm({
+        columns: parsedColumns,
+        proposedName,
+        onConfirmed: (confirmed) => void handleUpload(confirmed),
+      });
+      return;
+    }
+    void handleUpload();
+  };
+
   // The direct path streams the raw file, so it is not bound by the in-browser
   // row limit. The limit only constrains the fallback (parse-and-drawer) flow.
   const overRowLimitForFallback =
@@ -657,7 +756,8 @@ export function UploadCSVForm({
     uploadedDataset.datasetRecords.length > MAX_ROWS_LIMIT;
 
   const canUpload = enableDirectUpload
-    ? !!rawFile
+    ? // Wait for the header parse to settle so a fast click can't bypass confirm.
+      !!rawFile && !isParsingHeader
     : !!uploadedDataset &&
       uploadedDataset.datasetRecords.length > 0 &&
       !overRowLimitForFallback;
@@ -694,12 +794,51 @@ export function UploadCSVForm({
           setRawFile(file);
           setUploadError(null);
           setSizeError(null);
+          setParsedColumns(null);
+          // Bump the token so any in-flight parse from a previous file is
+          // discarded when it resolves (no stale overwrite).
+          const token = ++parseHeaderTokenRef.current;
+          // Read just the header (bounded slice — never the whole file) so the
+          // confirm step can show the file's columns. Best-effort: on an
+          // unreadable header the upload proceeds without confirm. Upload stays
+          // disabled (`isParsingHeader`) until this settles. Only when a confirm
+          // host is wired — without it the parse result is unused, so a standalone
+          // form neither parses nor blocks.
+          if (file && enableDirectUpload && requestColumnConfirm) {
+            setIsParsingHeader(true);
+            void (async () => {
+              try {
+                const [columns, name] = await Promise.all([
+                  parseHeaderColumns(file),
+                  proposeValidName(file.name),
+                ]);
+                if (parseHeaderTokenRef.current !== token) return; // stale
+                setParsedColumns(columns);
+                setProposedName(name);
+              } catch (error) {
+                // Best-effort: an unreadable header just skips the confirm step
+                // (parsedColumns stays null → upload proceeds, normalize derives).
+                logger.error(
+                  { error },
+                  "Failed to parse dataset header columns",
+                );
+              } finally {
+                if (parseHeaderTokenRef.current === token) {
+                  setIsParsingHeader(false);
+                }
+              }
+            })();
+          }
         }}
         onUploadRemoved={() => {
           setUploadedDataset(undefined);
           setRawFile(null);
           setUploadError(null);
           setSizeError(null);
+          setParsedColumns(null);
+          // Invalidate any in-flight parse and clear the pending state.
+          parseHeaderTokenRef.current++;
+          setIsParsingHeader(false);
         }}
       />
       <HStack width="full" align="end">
@@ -721,7 +860,7 @@ export function UploadCSVForm({
           loading={isUploading}
           loadingText="Uploading"
           disabled={!!disabled || isUploading || !canUpload}
-          onClick={() => void handleUpload()}
+          onClick={handleUploadClick}
         >
           Upload
         </Button>
@@ -1008,90 +1147,6 @@ function jsonToCSV(jsonContents: object[]): string {
 }
 
 type DatasetFileStatus = "selected" | "uploading" | "ready" | "error";
-
-const DROPZONE_SUPPORTED_HELP = "Supported files: CSV, JSON, or JSONL";
-
-// Dotted-grid surface for the empty dropzone. Raw CSS (not a Chakra token) so
-// it composes over the theme-aware background color; `border` follows the
-// active color mode.
-const DROPZONE_DOTTED_STYLE: React.CSSProperties = {
-  backgroundImage:
-    "radial-gradient(var(--chakra-colors-border) 1px, transparent 1px)",
-  backgroundSize: "16px 16px",
-};
-
-/** Shared Chakra props for the dashed dropzone surface; highlights when active
- *  (dragging a file over it) and on hover, and softly grows the cloud icon. */
-const dropzoneSurfaceProps = (active: boolean) => ({
-  borderRadius: "xl",
-  borderWidth: "2px",
-  borderStyle: "dashed" as const,
-  borderColor: active ? "blue.400" : "border",
-  bg: active ? "blue.500/10" : "transparent",
-  padding: 10,
-  textAlign: "center" as const,
-  cursor: "pointer",
-  width: "full",
-  transition: "border-color 0.15s ease, background-color 0.15s ease",
-  // Grow the icon while dragging a file over the zone; the icon's own
-  // transition animates the grow/shrink smoothly.
-  "& .lw-dropzone-icon": active ? { transform: "scale(1.12)" } : {},
-  _hover: {
-    borderColor: "blue.300",
-    bg: "blue.500/5",
-    "& .lw-dropzone-icon": { transform: "scale(1.12)" },
-  },
-});
-
-// PostHog's rainbow-scroll text sheen (same recipe as ShikiCommandBox): a
-// gradient clipped to the text whose background-position scrolls to animate.
-// Applied to the file name while it uploads — one continuous "loading" tell.
-const lwRainbowScroll = keyframes`
-  0% { background-position-x: 0%; }
-  100% { background-position-x: 200%; }
-`;
-
-const LW_RAINBOW_GRADIENT =
-  "linear-gradient(90deg, #0143cb 0%, #2b6ff4 24%, #d23401 47%, #ff651f 66%, #fba000 83%, #0143cb 100%)";
-
-const RAINBOW_TEXT_CSS = {
-  color: "transparent",
-  backgroundImage: LW_RAINBOW_GRADIENT,
-  backgroundClip: "text",
-  WebkitBackgroundClip: "text",
-  WebkitTextFillColor: "transparent",
-  backgroundSize: "200% 100%",
-  animation: `${lwRainbowScroll} 3s linear infinite`,
-  "@media (prefers-reduced-motion: reduce)": { animation: "none" },
-} as const;
-
-/**
- * Empty-state contents of the dropzone: an upload illustration, the primary
- * prompt (with "click to browse" reading as a link), and the supported types.
- */
-function DropzonePrompt() {
-  return (
-    <VStack gap={2}>
-      <Box
-        className="lw-dropzone-icon"
-        color="blue.400"
-        transition="transform 0.2s ease"
-        transformOrigin="center"
-      >
-        <CloudUpload size={36} strokeWidth={1.5} />
-      </Box>
-      <Text fontSize="md" color="fg">
-        Drag and drop file, or{" "}
-        <Text as="span" color="blue.500" fontWeight="medium">
-          click to browse
-        </Text>
-      </Text>
-      <Text fontSize="xs" color="fg.muted">
-        {DROPZONE_SUPPORTED_HELP}
-      </Text>
-    </VStack>
-  );
-}
 
 function DatasetFileStatusIcon({ status }: { status: DatasetFileStatus }) {
   if (status === "uploading") return <Spinner size="sm" color="blue.500" />;

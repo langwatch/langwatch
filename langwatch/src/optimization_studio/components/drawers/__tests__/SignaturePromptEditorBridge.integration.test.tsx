@@ -2,11 +2,11 @@
  * @vitest-environment jsdom
  */
 import { render } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import React from "react";
 import type { Node } from "@xyflow/react";
-import type { Component, Signature } from "../../../types/dsl";
+import React from "react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LocalPromptConfig } from "~/experiments-v3/types";
+import type { Component, Signature } from "../../../types/dsl";
 
 // ---- Mocks ----
 
@@ -55,7 +55,7 @@ vi.mock("~/prompts/utils/llmPromptConfigUtils", () => ({
 // ---- Helpers ----
 
 function createSignatureNode(
-  overrides: Partial<Signature> = {}
+  overrides: Partial<Signature> = {},
 ): Node<Component> {
   return {
     id: "llm-1",
@@ -114,7 +114,8 @@ describe("SignaturePromptEditorBridge", () => {
   });
 
   describe("when initialLocalConfig is computed", () => {
-    it("uses localPromptConfig when present on node data", () => {
+    /** @scenario "Unpublished local edits are restored when the node is reopened" */
+    it("passes localPromptConfig as initialLocalConfig when present on node data", () => {
       const localConfig: LocalPromptConfig = {
         llm: { model: "gpt-5-mini" },
         messages: [{ role: "system", content: "You are helpful" }],
@@ -124,11 +125,13 @@ describe("SignaturePromptEditorBridge", () => {
       const node = createSignatureNode({ localPromptConfig: localConfig });
       render(<SignaturePromptEditorBridge node={node} />);
 
+      // Genuine unpublished edits are passed through so the drawer restores
+      // them on top of the saved prompt.
       expect(capturedProps.initialLocalConfig).toBe(localConfig);
-      expect(mockNodeDataToLocalPromptConfig).not.toHaveBeenCalled();
     });
 
-    it("falls back to nodeDataToLocalPromptConfig when node has promptId but no localPromptConfig", () => {
+    /** @scenario "A saved prompt opens from the library when its node is reopened" */
+    it("does not pass the inline config as initialLocalConfig when the node references a saved prompt with no local edits", () => {
       const fallbackConfig: LocalPromptConfig = {
         llm: { model: "gpt-5-mini" },
         messages: [{ role: "system", content: "You are helpful" }],
@@ -138,7 +141,7 @@ describe("SignaturePromptEditorBridge", () => {
       mockNodeDataToLocalPromptConfig.mockReturnValue(fallbackConfig);
 
       const node = createSignatureNode({
-        promptId: "prompt-from-other-project",
+        promptId: "prompt-123",
         parameters: [
           { identifier: "llm", type: "llm", value: { model: "gpt-5-mini" } },
           { identifier: "instructions", type: "str", value: "You are helpful" },
@@ -146,12 +149,15 @@ describe("SignaturePromptEditorBridge", () => {
       });
       render(<SignaturePromptEditorBridge node={node} />);
 
-      // Bridge should provide fallback so the drawer can use it when DB query returns null
-      expect(mockNodeDataToLocalPromptConfig).toHaveBeenCalledWith(node.data);
-      expect(capturedProps.initialLocalConfig).toBe(fallbackConfig);
+      // initialLocalConfig must be undefined so the drawer shows the saved
+      // prompt loaded from the library instead of overriding it with this stale
+      // inline mirror (the bug that made a just-saved prompt look deleted).
+      expect(capturedProps.initialLocalConfig).toBeUndefined();
+      // The inline mirror is still provided, but only as the not-found fallback.
+      expect(capturedProps.inlineConfigFallback).toBe(fallbackConfig);
     });
 
-    it("returns undefined when node has promptId but no inline parameters", () => {
+    it("passes undefined for both configs when node has promptId but no inline parameters", () => {
       mockNodeDataToLocalPromptConfig.mockReturnValue(undefined);
 
       const node = createSignatureNode({ promptId: "prompt-123" });
@@ -159,11 +165,12 @@ describe("SignaturePromptEditorBridge", () => {
 
       expect(mockNodeDataToLocalPromptConfig).toHaveBeenCalledWith(node.data);
       expect(capturedProps.initialLocalConfig).toBeUndefined();
+      expect(capturedProps.inlineConfigFallback).toBeUndefined();
     });
 
-    it("falls back to nodeDataToLocalPromptConfig when no promptId and no localPromptConfig", () => {
+    it("provides the inline config as the fallback when there is no promptId and no localPromptConfig", () => {
       const fallbackConfig: LocalPromptConfig = {
-        llm: { model: "gpt-3.5-turbo" },
+        llm: { model: "gpt-5-mini" },
         messages: [],
         inputs: [],
         outputs: [],
@@ -174,7 +181,8 @@ describe("SignaturePromptEditorBridge", () => {
       render(<SignaturePromptEditorBridge node={node} />);
 
       expect(mockNodeDataToLocalPromptConfig).toHaveBeenCalledWith(node.data);
-      expect(capturedProps.initialLocalConfig).toBe(fallbackConfig);
+      expect(capturedProps.initialLocalConfig).toBeUndefined();
+      expect(capturedProps.inlineConfigFallback).toBe(fallbackConfig);
     });
   });
 
@@ -475,9 +483,7 @@ describe("SignaturePromptEditorBridge", () => {
 
       const callData = mockSetNode.mock.calls[0]![0].data;
       expect(callData.localPromptConfig).toBe(config);
-      expect(callData.inputs).toEqual([
-        { identifier: "query", type: "str" },
-      ]);
+      expect(callData.inputs).toEqual([{ identifier: "query", type: "str" }]);
       expect(callData.outputs).toEqual([
         { identifier: "response", type: "str" },
       ]);
