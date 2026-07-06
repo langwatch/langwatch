@@ -12,7 +12,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { system as langwatchSystem } from "~/pages/_app";
 import "@testing-library/jest-dom/vitest";
 import { FormProvider, useForm } from "react-hook-form";
-import { afterEach, describe, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { page } from "vitest/browser";
 
 vi.mock("../../hooks/useEvaluatorName", () => ({
@@ -137,12 +137,9 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
 
     await screen.findByText(/Variant A/);
     // The toggle being off must hide the Golden field picker entirely (#5378).
-    const goldenFieldPicker = screen.queryByTestId("pairwise-golden-field");
-    if (goldenFieldPicker) {
-      throw new Error(
-        "Golden field picker should be hidden when hasGoldenAnswer is false",
-      );
-    }
+    expect(
+      screen.queryByTestId("pairwise-golden-field"),
+    ).not.toBeInTheDocument();
     await page.screenshot({
       path: "/tmp/pr5381/02-pairwise-config-form-golden-off.png",
     });

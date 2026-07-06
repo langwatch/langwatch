@@ -33,6 +33,16 @@ describe("isPairwiseConfigured (#5378)", () => {
         expect(isPairwiseConfigured(evaluator)).toBe(false);
       });
     });
+
+    describe("when hasGoldenAnswer is omitted (legacy config)", () => {
+      it("still requires a golden field", () => {
+        const evaluator = createPairwiseEvaluator({
+          hasGoldenAnswer: undefined,
+          goldenField: "",
+        });
+        expect(isPairwiseConfigured(evaluator)).toBe(false);
+      });
+    });
   });
 
   describe("given hasGoldenAnswer is false", () => {
