@@ -269,9 +269,7 @@ describe("<EditModelProviderDrawer/>", () => {
       });
 
       it("shows the targeted row's provider title in the header", () => {
-        expect(
-          screen.getByRole("heading", { name: "OpenAI" }),
-        ).toBeTruthy();
+        expect(screen.getByRole("heading", { name: "OpenAI" })).toBeTruthy();
       });
     });
   });
@@ -303,9 +301,7 @@ describe("<EditModelProviderDrawer/>", () => {
       });
 
       it("shows the provider-type title from the collapsed record", () => {
-        expect(
-          screen.getByRole("heading", { name: "OpenAI" }),
-        ).toBeTruthy();
+        expect(screen.getByRole("heading", { name: "OpenAI" })).toBeTruthy();
       });
 
       it("still mounts the form", () => {

@@ -46,7 +46,6 @@ export default function ModelsPage() {
 
   const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
   const isProviderDrawerOpen = isDrawerOpen("editModelProvider");
-  const updateMutation = api.modelProvider.update.useMutation();
   const deleteMutation = api.modelProvider.delete.useMutation();
   const [providerToDelete, setProviderToDelete] = useState<{
     id?: string;
