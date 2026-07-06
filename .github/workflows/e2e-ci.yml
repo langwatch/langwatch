@@ -135,10 +135,7 @@ jobs:
         with:
           node-version: 24
           cache: "pnpm"
-          cache-dependency-path: |
-            langwatch/pnpm-lock.yaml
-            agentic-e2e-tests/pnpm-lock.yaml
-            mcp-server/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
       # node-pty@1.1.0 only ships prebuilds for darwin/win32, so on Linux
       # its postinstall always falls back to `node-gyp rebuild`. With
@@ -148,25 +145,12 @@ jobs:
       - name: Install node-gyp (for node-pty postinstall)
         run: npm install -g node-gyp@12.3.0
 
-      - name: Build mcp-server
-        working-directory: mcp-server
-        run: pnpm install --frozen-lockfile && pnpm run build
-
       - name: Install app dependencies
-        working-directory: langwatch
         run: CI=true pnpm install --frozen-lockfile
 
-      # `--ignore-workspace` because agentic-e2e-tests sits one level under
-      # the repo-root pnpm-workspace.yaml introduced by the @langwatch/server
-      # CLI in packages/. Without the flag, pnpm walks up, finds the root
-      # workspace, scopes the install to `packages/*` only, and never lands
-      # @playwright/test in agentic-e2e-tests/node_modules — the next step
-      # then fails with `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL Command
-      # "playwright" not found`. agentic-e2e-tests is intentionally a
-      # standalone pnpm project (see its self-contained pnpm-lock.yaml).
-      - name: Install E2E test dependencies
-        working-directory: agentic-e2e-tests
-        run: pnpm install --frozen-lockfile --ignore-workspace
+      - name: Build mcp-server
+        working-directory: mcp-server
+        run: pnpm run build
 
       # No Playwright browser/ffmpeg download: the tests launch the runner's
       # preinstalled Google Chrome via channel (E2E_BROWSER_CHANNEL below) and

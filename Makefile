@@ -160,7 +160,7 @@ clean:
 # =============================================================================
 
 install:
-	cd langwatch && pnpm install
+	pnpm install
 
 # Run the app (pnpm dev, which also auto-starts the Go aigateway) alongside
 # the Go nlpgo engine. nlpgo is the `nlpgo` subcommand of the cmd/service

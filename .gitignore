@@ -4,6 +4,12 @@
 traceDir
 node_modules
 
+# Standalone langwatch workspace + lockfile DERIVED at pack time by
+# scripts/pack-npm.sh for the @langwatch/server tarball. The single source of
+# truth is the root pnpm-workspace.yaml / pnpm-lock.yaml; these are throwaway.
+/langwatch/pnpm-workspace.yaml
+/langwatch/pnpm-lock.yaml
+
 # Defense against MCP env-var leaks: external tooling can mkdir a literal
 # directory like "${HOME/...}" relative to cwd when bash-style env defaults
 # aren't expanded. Never let those slip into the repo again.

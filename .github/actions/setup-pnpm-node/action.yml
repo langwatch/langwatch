@@ -5,9 +5,9 @@
 # Usage:
 #   - uses: ./.github/actions/setup-pnpm-node
 #     with:
-#       cache-dependency-path: "langwatch/pnpm-lock.yaml"
+#       cache-dependency-path: "pnpm-lock.yaml"
 #       # optional: set install-dir to also run `pnpm install --frozen-lockfile`
-#       install-dir: langwatch
+#       install-dir: .
 name: setup-pnpm-node
 description: Set up pnpm + Node 24 with pnpm-store caching.
 inputs:

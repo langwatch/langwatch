@@ -27,12 +27,13 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-          cache-dependency-path: "mcp-server/pnpm-lock.yaml"
+          cache-dependency-path: "pnpm-lock.yaml"
           registry-url: "https://registry.npmjs.org"
 
+      # Single root workspace: scope the install to mcp-server's own dependency
+      # closure (reproduces the pre-consolidation per-package install scope).
       - name: Install dependencies
-        working-directory: mcp-server
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter @langwatch/mcp-server...
 
       - name: Build and publish
         working-directory: mcp-server

@@ -27,12 +27,14 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-          cache-dependency-path: "typescript-sdk/pnpm-lock.yaml"
+          cache-dependency-path: "pnpm-lock.yaml"
           registry-url: "https://registry.npmjs.org"
 
+      # Single root workspace: scope the install to the SDK's own dependency
+      # closure so this publish job stays lean and doesn't pull mcp-server's
+      # node-pty (which would need node-gyp on PATH).
       - name: Install dependencies
-        working-directory: typescript-sdk
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --filter langwatch...
 
       - name: Build
         working-directory: ./typescript-sdk

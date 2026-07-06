@@ -1,7 +1,10 @@
 # ── Stage 1: build ──────────────────────────────────────────────────
 FROM node:24-alpine AS builder
 RUN apk --no-cache add curl python3 make gcc g++ openssl bash
-RUN npm install -g pnpm@10.24.0
+# node-gyp is no longer on PATH under Node-24 + npm-11; install it globally so
+# the workspace install can compile node-pty's musl fallback (mcp-server/skills
+# pull it in and it's in the root onlyBuiltDependencies allowlist).
+RUN npm install -g pnpm@10.24.0 node-gyp
 
 # Install Goose migration tool (copied to runtime stage later)
 ARG GOOSE_SHA256_ARM64=dfafe0254b0058cabf016234a500df5ada1623ed034e9473cee9fe4ed07ca090
@@ -26,24 +29,34 @@ WORKDIR /app
 # Skip Prisma checksum verification for air-gapped builds
 ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 
-# mcp-server is a workspace member — copy it early so pnpm install can link it.
-# Its build runs automatically as part of langwatch's `pnpm run build`
-# (via start:prepare:files → build:mcp-server).
-COPY mcp-server ./mcp-server
-COPY langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
-
-COPY langwatch/package.json langwatch/pnpm-lock.yaml langwatch/pnpm-workspace.yaml ./langwatch/
+# The whole repo is ONE pnpm workspace (root pnpm-workspace.yaml / pnpm-lock.yaml).
+# Copy the root manifests + every member's package.json first so
+# `pnpm install --frozen-lockfile` forms a cache-friendly layer, then bring in
+# the full source and build. mcp-server is a workspace member linked into
+# langwatch via workspace:*; its build runs as part of langwatch's
+# `pnpm run build` (start:prepare:files → build:mcp-server).
+COPY pnpm-workspace.yaml pnpm-lock.yaml .npmrc package.json ./
+COPY packages/server/package.json ./packages/server/
+COPY langwatch/package.json ./langwatch/
 COPY langwatch/vendor ./langwatch/vendor
+COPY mcp-server/package.json ./mcp-server/
+COPY skills/package.json ./skills/
+COPY typescript-sdk/package.json ./typescript-sdk/
+COPY typescript-sdk/examples ./typescript-sdk/examples
+COPY bullboard/package.json ./bullboard/
+COPY agentic-e2e-tests/package.json ./agentic-e2e-tests/
+COPY langevals/ts-integration/evaluators.generated.ts ./langevals/ts-integration/evaluators.generated.ts
 # https://stackoverflow.com/questions/70154568/pnpm-equivalent-command-for-npm-ci
-RUN cd langwatch && CI=true pnpm install --frozen-lockfile
-# SDK package files needed by generate-sdk-versions.sh during build
-COPY typescript-sdk/package.json ./typescript-sdk/package.json
+RUN CI=true pnpm install --frozen-lockfile
+# Full source needed by the langwatch build (generate-sdk-versions.sh reads the
+# SDK + python-sdk manifests; build:mcp-server compiles mcp-server).
 COPY python-sdk/pyproject.toml ./python-sdk/pyproject.toml
+COPY mcp-server ./mcp-server
 COPY langwatch ./langwatch
 RUN cd langwatch && NODE_OPTIONS=--max-old-space-size=4096 pnpm run build
 
-# Remove dev dependencies — not needed at runtime
-RUN cd langwatch && CI=true pnpm prune --prod
+# Remove dev dependencies — not needed at runtime (workspace-wide prune).
+RUN CI=true pnpm prune --prod
 # Regenerate Prisma client after pruning (prisma is a prod dep, but generate needs re-run)
 RUN cd langwatch && pnpm prisma generate
 
@@ -56,9 +69,13 @@ COPY --from=builder /usr/local/bin/goose /usr/local/bin/goose
 
 WORKDIR /app
 
-# Copy built artifacts from builder.
-# mcp-server must be copied alongside langwatch because pnpm workspace
-# symlinks langwatch/node_modules/@langwatch/mcp-server -> ../../../mcp-server.
+# Copy built artifacts from builder. In a single pnpm workspace the dependency
+# store lives at the ROOT node_modules/.pnpm and each member's node_modules holds
+# only symlinks into it, so the root node_modules + workspace manifests must come
+# along or langwatch/node_modules symlinks dangle. mcp-server is copied alongside
+# langwatch because langwatch/node_modules/@langwatch/mcp-server -> ../../mcp-server.
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/pnpm-workspace.yaml /app/pnpm-lock.yaml /app/package.json /app/.npmrc ./
 COPY --from=builder /app/langwatch ./langwatch
 COPY --from=builder /app/mcp-server ./mcp-server
 COPY --from=builder /app/typescript-sdk/package.json ./typescript-sdk/package.json

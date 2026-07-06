@@ -67,8 +67,8 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
-          install-dir: langwatch
+          cache-dependency-path: "pnpm-lock.yaml"
+          install-dir: .
 
       - name: Prepare files
         working-directory: langwatch
@@ -113,8 +113,8 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
-          install-dir: langwatch
+          cache-dependency-path: "pnpm-lock.yaml"
+          install-dir: .
 
       - name: Prepare files
         working-directory: langwatch
@@ -216,8 +216,8 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
-          install-dir: langwatch
+          cache-dependency-path: "pnpm-lock.yaml"
+          install-dir: .
 
       - name: Prepare files
         working-directory: langwatch
@@ -329,8 +329,8 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
-          install-dir: langwatch
+          cache-dependency-path: "pnpm-lock.yaml"
+          install-dir: .
 
       - name: Check feature-file parity
         working-directory: langwatch
@@ -375,7 +375,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('langwatch/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
@@ -392,9 +392,9 @@ jobs:
         with:
           path: |
             langwatch/node_modules/.vite
-          key: ${{ runner.os }}-vite-${{ hashFiles('langwatch/pnpm-lock.yaml') }}-${{ hashFiles('langwatch/src/**/*', 'langwatch/vite.config.ts') }}
+          key: ${{ runner.os }}-vite-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('langwatch/src/**/*', 'langwatch/vite.config.ts') }}
           restore-keys: |
-            ${{ runner.os }}-vite-${{ hashFiles('langwatch/pnpm-lock.yaml') }}-
+            ${{ runner.os }}-vite-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-vite-
 
       # Cache Turbo build outputs
@@ -414,13 +414,12 @@ jobs:
       - name: Install node-gyp (for node-pty postinstall)
         run: npm install -g node-gyp@12.3.0
 
+      - name: Install dependencies
+        run: CI=true pnpm install --frozen-lockfile
+
       - name: Build mcp-server
         working-directory: mcp-server
-        run: pnpm install --frozen-lockfile && pnpm run build
-
-      - name: Install dependencies
-        working-directory: langwatch
-        run: CI=true pnpm install --frozen-lockfile
+        run: pnpm run build
 
       - name: Build
         working-directory: langwatch
@@ -477,8 +476,8 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
-          install-dir: langwatch
+          cache-dependency-path: "pnpm-lock.yaml"
+          install-dir: .
 
       - name: Stage canary fixture inside vitest root
         working-directory: langwatch

@@ -1,19 +1,120 @@
+# Single pnpm workspace for the whole repo.
+#
+# Every JS/TS package.json in the tree is a member of this one workspace, so
+# there is ONE root pnpm-lock.yaml and dependency updates (Dependabot) happen
+# in one place instead of across 8 separate lockfiles.
+#
+# NOTE on the @langwatch/server npm tarball: the tarball ships langwatch/ as
+# source and, on first boot, runs `pnpm -C langwatch install --frozen-lockfile`
+# (packages/server/src/services/node-deps.ts) — which needs a self-contained
+# langwatch-rooted workspace + lockfile. That is NOT committed here (single
+# source of truth = this root workspace); scripts/pack-npm.sh DERIVES a
+# standalone langwatch/pnpm-workspace.yaml + langwatch/pnpm-lock.yaml at pack
+# time and removes them afterwards.
 packages:
   - packages/*
-  # The langwatch/ next.js app keeps its own pnpm-workspace.yaml for its
-  # internal sub-packages (saas-src, langwatch/packages/*, mcp-server). We do
-  # NOT include it here — the @langwatch/server tarball ships langwatch/'s
-  # pre-built dist + a copy of the source so a fresh `pnpm install` runs at
-  # ~/.langwatch/app on first boot. Treating it as a peer workspace would
-  # double-install React/Next/etc. across the dev environment.
+  - langwatch
+  - langwatch/packages/*
+  - mcp-server
+  - skills
+  - typescript-sdk
+  - typescript-sdk/examples/*
+  - bullboard
+  - agentic-e2e-tests
 
-overrides:
-  # Security: shell-quote quote() newline escaping (CRITICAL)
-  shell-quote@<1.8.4: '>=1.8.4'
-  # Security: esbuild Deno binary integrity RCE + dev-server file read (GHSA-gv7w-rqvm-qjhr / GHSA-g7r4-m6w7-qqqr)
-  esbuild@<0.28.1: '>=0.28.1'
-  # Security: vite dev-server file read / middleware path bypass
-  vite@<6.4.3: '>=6.4.3'
+# Wait 7 days before adopting a freshly-published version (supply-chain
+# hardening); @langwatch/* is ours, so exclude it. Mirrors the per-project
+# .npmrc `minimum-release-age` settings that this workspace replaces, and the
+# Dependabot `cooldown: 8` in .github/dependabot.yml.
+minimumReleaseAge: 10080
+minimumReleaseAgeExclude:
+  - "@langwatch/scenario"
 
+# Native/build-script deps that are allowed to run install scripts. Union of
+# every former sub-workspace's onlyBuiltDependencies.
 onlyBuiltDependencies:
+  - "@prisma/client"
+  - "@prisma/engines"
+  - "@scarf/scarf"
+  - bcrypt
+  - bufferutil
+  - core-js
+  - cpu-features
   - esbuild
+  - msgpackr-extract
+  - node-pty
+  - prisma
+  - protobufjs
+  - sharp
+  - ssh2
+
+packageExtensions:
+  bullmq-otel:
+    dependencies:
+      tslib: "^2.6.0"
+  "@google-cloud/dlp":
+    dependencies:
+      protobufjs: "^7.5.4"
+
+# Global overrides = tree-wide SECURITY FLOORS only (bump vulnerable transitive
+# deps to a safe version). Version-ALIGNMENT pins that differ between the app
+# and the published SDK are deliberately NOT here: the app is on zod 3 + the
+# OpenTelemetry 0.217 line, the SDK is on zod 4 + the 0.205/0.218 line, and
+# pnpm's default link-workspace-packages=false lets each resolve its own
+# declared range so both coexist (exactly as they did in separate workspaces).
+# Adding an unscoped `zod`/`@opentelemetry/*` override here would force one
+# onto the other and break it.
+overrides:
+  # OpenTelemetry — align the APP's transitive OTel to its 0.217 line. The SDK
+  # declares its OTel deps exactly in its own package.json, within these ranges.
+  "@opentelemetry/sdk-node": ">=0.217.0"
+  "@opentelemetry/exporter-prometheus": ">=0.217.0"
+  # Framework/runtime pins the app depends on (no other member uses these, so
+  # globalizing is a no-op for them).
+  ai: "^6.0.161"
+  react: "^19.2.5"
+  react-dom: "^19.2.5"
+  react-is: "^19.2.5"
+  kysely: "0.28.17"
+  pino: "^10.3.1"
+  pino-pretty: "^13.1.3"
+  thread-stream: "^4.0.0"
+  postcss: "^8.5.13"
+  lodash: "^4.18.1"
+  liquidjs: ">=10.26.0"
+  # Security floors (safe across the whole tree)
+  esbuild@<0.28.1: ">=0.28.1"
+  uuid@<11.1.1: ">=11.1.1 <12"
+  fast-uri@<3.1.2: "3.1.2"
+  hono@<4.12.25: ">=4.12.25"
+  "@hono/node-server@<1.19.13": ">=1.19.13"
+  qs@>=6.11.1 <=6.15.1: ">=6.15.2"
+  ip-address@<=10.1.0: ">=10.1.1"
+  form-data@<4.0.6: ">=4.0.6"
+  shell-quote@<1.8.4: ">=1.8.4"
+  langsmith@<0.6.0: "0.6.0"
+  langchain@<0.3.37: "0.3.37"
+  "@langchain/core@<0.3.80": "0.3.80"
+  "@grpc/grpc-js@<1.14.4": ">=1.14.4"
+  brace-expansion@>=4.0.0 <5.0.6: ">=5.0.6"
+  file-type@>=13.0.0 <21.3.1: ">=21.3.1 <22"
+  prismjs@<1.30.0: ">=1.30.0"
+  axios@>=1.0.0 <1.16.0: "1.16.0"
+  undici@>=6.0.0 <6.27.0: ">=6.27.0 <7"
+  undici@>=7.0.0 <7.28.0: ">=7.28.0 <8"
+  vitest@<4.1.0: ">=4.1.0"
+  tmp: ">=0.2.6"
+  merge: ">=2.1.1 <3.0.0"
+  picomatch: ">=4.0.4"
+  braces: "^3.0.3"
+  cross-spawn: "^7.0.6"
+  exec-sh: "^0.4.0"
+  glob: "^11.1.0"
+  protobufjs: ">=7.5.6 <8.0.0 || >=8.6.0"
+  "@aws-sdk/xml-builder>fast-xml-parser": "^5.7.0"
+  "@langchain/community>fast-xml-parser": "^5.7.0"
+  fast-xml-builder@<1.1.7: "1.1.7"
+  # vite — unified so both the app (v8) and the SDK/mcp/skills (v7) stay
+  # patched without forcing a v7->v8 major bump on the v7 consumers.
+  vite@<7.3.5: ">=7.3.5 <8"
+  vite@>=8.0.0 <8.0.16: ">=8.0.16"
