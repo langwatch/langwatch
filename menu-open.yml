@@ -1,0 +1,437 @@
+- generic [ref=e1] [box=0,0,1280,720]:
+  - generic [ref=e4] [box=0,0,1280,720]:
+    - generic [ref=e5] [box=0,0,1280,56]:
+      - generic [ref=e6] [box=16,13,1012,30]:
+        - link [ref=e8] [cursor=pointer] [box=24,15,109,27]:
+          - /url: /
+          - img [ref=e9] [box=24,15,109,27]
+        - generic [ref=e14] [box=216,13,350,30]:
+          - 'button "Switch workspace (current: test@langwatch.ai)" [ref=e15] [cursor=pointer] [box=216,13,181,30]':
+            - generic [ref=e16] [box=225,18,163,20]:
+              - generic [ref=e18] [box=232,23,7,10]: t
+              - paragraph [ref=e19] [box=253,18,113,20]: test@langwatch.ai
+              - img [ref=e20] [box=374,21,14,14]
+          - generic [ref=e23] [box=397,16,169,24]:
+            - img [ref=e24] [box=397,16,12,24]
+            - link "Dashboard" [ref=e26] [cursor=pointer] [box=417,18,67,20]:
+              - /url: /testlangwatchai-nS7-3i
+            - img [ref=e27] [box=492,16,12,24]
+            - paragraph [ref=e29] [box=512,18,54,20]: Datasets
+      - generic [ref=e30] [box=1044,12,220,32]:
+        - paragraph [ref=e31] [box=1044,12,51,32]: DEV
+        - button "Open command bar" [ref=e32] [cursor=pointer] [box=1102,12,124,32]:
+          - img [ref=e33] [box=1115,21,14,14]
+          - paragraph [ref=e36] [box=1137,18,43,20]: Search
+          - generic [ref=e37] [box=1189,19,24,18]: ⌘K
+        - button "t" [ref=e38] [cursor=pointer] [box=1234,13,30,30]:
+          - generic [ref=e40] [box=1245,23,7,11]: t
+    - generic [ref=e41] [box=0,56,1280,664]:
+      - generic [ref=e44] [box=0,56,200,660]:
+        - generic [ref=e45] [box=8,64,184,486]:
+          - link "Home" [ref=e46] [cursor=pointer] [box=8,64,184,32]:
+            - /url: /testlangwatchai-nS7-3i
+            - generic [ref=e47] [box=8,64,184,32]:
+              - img [ref=e49] [box=20,72,16,16]
+              - paragraph [ref=e52] [box=48,70,132,21]: Home
+          - paragraph [ref=e53] [box=8,98,67,33]: Observe
+          - link "Analytics" [ref=e54] [cursor=pointer] [box=8,133,184,32]:
+            - /url: /testlangwatchai-nS7-3i/analytics
+            - generic [ref=e55] [box=8,133,184,32]:
+              - img [ref=e57] [box=20,141,16,16]
+              - paragraph [ref=e60] [box=48,138,132,21]: Analytics
+          - link "Trace Explorer" [ref=e61] [cursor=pointer] [box=8,167,184,32]:
+            - /url: /testlangwatchai-nS7-3i/traces
+            - generic [ref=e62] [box=8,167,184,32]:
+              - img [ref=e64] [box=20,175,16,16]
+              - paragraph [ref=e68] [box=48,172,132,21]: Trace Explorer
+          - link "Traces" [ref=e69] [cursor=pointer] [box=8,201,184,32]:
+            - /url: /testlangwatchai-nS7-3i/messages?view=table
+            - generic [ref=e70] [box=8,201,184,32]:
+              - img [ref=e72] [box=20,209,16,16]
+              - paragraph [ref=e75] [box=48,206,73,21]: Traces
+              - button "Legacy" [ref=e76] [box=133,207,47,20]
+          - paragraph [ref=e77] [box=8,235,72,33]: Evaluate
+          - button "Expand Simulations" [ref=e80] [cursor=pointer] [box=8,269,184,32]:
+            - generic [ref=e81] [box=8,269,184,32]:
+              - img [ref=e83] [box=20,277,16,16]
+              - paragraph [ref=e85] [box=48,275,76,21]: Simulations
+              - img [ref=e87] [box=166,278,14,14]
+          - link "Evaluations" [ref=e89] [cursor=pointer] [box=8,303,184,32]:
+            - /url: /testlangwatchai-nS7-3i/evaluations
+            - generic [ref=e90] [box=8,303,184,32]:
+              - img [ref=e92] [box=20,311,16,16]
+              - paragraph [ref=e95] [box=48,309,132,21]: Evaluations
+          - link "Annotations" [ref=e96] [cursor=pointer] [box=8,337,184,32]:
+            - /url: /testlangwatchai-nS7-3i/annotations
+            - generic [ref=e97] [box=8,337,184,32]:
+              - img [ref=e99] [box=20,345,16,16]
+              - paragraph [ref=e102] [box=48,343,132,21]: Annotations
+          - paragraph [ref=e103] [box=8,371,62,33]: Library
+          - link "Prompts" [ref=e104] [cursor=pointer] [box=8,406,184,32]:
+            - /url: /testlangwatchai-nS7-3i/prompts
+            - generic [ref=e105] [box=8,406,184,32]:
+              - img [ref=e107] [box=20,414,16,16]
+              - paragraph [ref=e109] [box=48,411,132,21]: Prompts
+          - link "Agents" [ref=e110] [cursor=pointer] [box=8,440,184,32]:
+            - /url: /testlangwatchai-nS7-3i/agents
+            - generic [ref=e111] [box=8,440,184,32]:
+              - img [ref=e113] [box=20,448,16,16]
+              - paragraph [ref=e116] [box=48,445,132,21]: Agents
+          - link "Workflows" [ref=e117] [cursor=pointer] [box=8,474,184,32]:
+            - /url: /testlangwatchai-nS7-3i/workflows
+            - generic [ref=e118] [box=8,474,184,32]:
+              - img [ref=e120] [box=20,482,16,16]
+              - paragraph [ref=e124] [box=48,479,132,21]: Workflows
+          - link "Evaluators" [ref=e125] [cursor=pointer] [box=8,508,184,32]:
+            - /url: /testlangwatchai-nS7-3i/evaluators
+            - generic [ref=e126] [box=8,508,184,32]:
+              - img [ref=e128] [box=20,516,16,16]
+              - paragraph [ref=e132] [box=48,513,132,21]: Evaluators
+          - link "Datasets" [ref=e133] [cursor=pointer] [box=8,542,184,32]:
+            - /url: /testlangwatchai-nS7-3i/datasets
+            - generic [ref=e134] [box=8,542,184,32]:
+              - img [ref=e136] [box=20,550,16,16]
+              - paragraph [ref=e138] [box=48,547,132,21]: Datasets
+          - paragraph [ref=e139] [box=8,576,62,33]: Govern
+          - link "AI Gateway" [ref=e140] [cursor=pointer] [box=8,610,184,32]:
+            - /url: /settings/gateway/virtual-keys
+            - generic [ref=e141] [box=8,610,184,32]:
+              - img [ref=e143] [box=20,618,16,16]
+              - paragraph [ref=e150] [box=48,616,132,21]: AI Gateway
+        - generic [ref=e151] [box=8,550,184,158]:
+          - link "Settings" [ref=e152] [cursor=pointer] [box=8,550,184,32]:
+            - /url: /settings
+            - generic [ref=e153] [box=8,550,184,32]:
+              - img [ref=e155] [box=20,558,16,16]
+              - paragraph [ref=e158] [box=48,556,132,21]: Settings
+          - generic [ref=e159] [box=8,584,184,66]:
+            - button "Chat" [ref=e160] [cursor=pointer] [box=8,584,184,32]:
+              - generic [ref=e161] [box=8,584,184,32]:
+                - img [ref=e163] [box=20,592,16,16]
+                - paragraph [ref=e165] [box=48,590,132,21]: Chat
+            - button "Support" [ref=e166] [cursor=pointer] [box=8,618,184,32]:
+              - generic [ref=e167] [box=8,618,184,32]:
+                - img [ref=e169] [box=20,626,16,16]
+                - paragraph [ref=e176] [box=48,624,106,21]: Support
+                - img [ref=e177] [box=166,627,14,14]
+          - radiogroup "Theme" [ref=e180] [box=16,664,168,32]:
+            - radio "Set theme to light" [checked] [ref=e181] [cursor=pointer] [box=16,664,51,32]:
+              - img [ref=e183] [box=33,671,17,17]
+            - radio "Set theme to system" [ref=e189] [cursor=pointer] [box=75,664,51,32]:
+              - img [ref=e191] [box=92,673,15,15]
+            - radio "Set theme to dark" [ref=e193] [cursor=pointer] [box=133,664,51,32]:
+              - img [ref=e195] [box=151,673,15,15]
+      - generic [ref=e200] [box=200,56,1080,664]:
+        - generic [ref=e201] [box=200,56,1080,48]:
+          - heading "Datasets" [level=1] [ref=e202] [box=224,68,67,24]
+          - generic [ref=e204] [box=743,64,280,32]:
+            - generic [box=743,64,38,32]:
+              - img [box=755,73,14,14]
+            - textbox "Search datasets" [ref=e205] [box=743,64,280,32]
+          - button "Upload or create dataset" [expanded] [ref=e206] [cursor=pointer] [box=1031,64,225,32]:
+            - img [ref=e207] [box=1042,72,16,16]
+            - text: Upload or create dataset
+            - img [ref=e210] [box=1229,72,16,16]
+        - table [ref=e214] [box=225,129,1030,1118]:
+          - rowgroup [ref=e215] [box=225,129,1030,52]:
+            - row "Name Columns Entries Last Update" [ref=e216] [box=225,129,1030,52]:
+              - columnheader "Name" [ref=e217] [box=225,129,297,52]
+              - columnheader "Columns" [ref=e218] [box=522,129,320,52]
+              - columnheader "Entries" [ref=e219] [box=843,129,92,52]
+              - columnheader "Last Update" [ref=e220] [box=935,129,240,52]
+              - columnheader [ref=e221] [box=1175,129,80,52]
+          - rowgroup [ref=e222] [box=225,181,1030,1065]:
+            - row "beta question answer score 1 6/25/2026, 9:39:35 AM" [ref=e223] [cursor=pointer] [box=225,181,1030,45]:
+              - cell "beta" [ref=e224] [box=225,181,297,45]:
+                - paragraph [ref=e226] [box=241,194,29,20]: beta
+              - cell "question answer score" [ref=e227] [box=522,181,320,45]:
+                - generic [ref=e228] [box=531,194,303,20]:
+                  - generic [ref=e229] [box=531,194,62,20]: question
+                  - generic [ref=e230] [box=600,194,54,20]: answer
+                  - generic [ref=e231] [box=662,194,44,20]: score
+              - cell "1" [ref=e232] [box=843,181,92,45]
+              - cell "6/25/2026, 9:39:35 AM" [ref=e233] [box=935,181,240,45]
+              - cell [ref=e234] [box=1175,181,80,45]:
+                - button [ref=e235] [box=1184,188,38,32]:
+                  - img [ref=e236] [box=1195,196,16,16]
+            - row "alpha question answer score 2 6/25/2026, 9:39:35 AM" [ref=e240] [cursor=pointer] [box=225,226,1030,45]:
+              - cell "alpha" [ref=e241] [box=225,226,297,45]:
+                - paragraph [ref=e243] [box=241,239,36,20]: alpha
+              - cell "question answer score" [ref=e244] [box=522,226,320,45]:
+                - generic [ref=e245] [box=531,239,303,20]:
+                  - generic [ref=e246] [box=531,239,62,20]: question
+                  - generic [ref=e247] [box=600,239,54,20]: answer
+                  - generic [ref=e248] [box=662,239,44,20]: score
+              - cell "2" [ref=e249] [box=843,226,92,45]
+              - cell "6/25/2026, 9:39:35 AM" [ref=e250] [box=935,226,240,45]
+              - cell [ref=e251] [box=1175,226,80,45]:
+                - button [ref=e252] [box=1184,233,38,32]:
+                  - img [ref=e253] [box=1195,241,16,16]
+            - row "prove-no-dup id_ question answer 3 6/24/2026, 11:34:42 AM" [ref=e257] [cursor=pointer] [box=225,271,1030,45]:
+              - cell "prove-no-dup" [ref=e258] [box=225,271,297,45]:
+                - paragraph [ref=e260] [box=241,284,98,20]: prove-no-dup
+              - cell "id_ question answer" [ref=e261] [box=522,271,320,45]:
+                - generic [ref=e262] [box=531,284,303,20]:
+                  - generic [ref=e263] [box=531,284,28,20]: id_
+                  - generic [ref=e264] [box=567,284,62,20]: question
+                  - generic [ref=e265] [box=636,284,54,20]: answer
+              - cell "3" [ref=e266] [box=843,271,92,45]
+              - cell "6/24/2026, 11:34:42 AM" [ref=e267] [box=935,271,240,45]
+              - cell [ref=e268] [box=1175,271,80,45]:
+                - button [ref=e269] [box=1184,278,38,32]:
+                  - img [ref=e270] [box=1195,286,16,16]
+            - row "dataset-light-100mb question answer expected_answer category score 594000 6/23/2026, 3:44:27 PM" [ref=e274] [cursor=pointer] [box=225,316,1030,61]:
+              - cell "dataset-light-100mb" [ref=e275] [box=225,316,297,61]:
+                - paragraph [ref=e277] [box=241,337,144,20]: dataset-light-100mb
+              - cell "question answer expected_answer category score" [ref=e278] [box=522,316,320,61]:
+                - generic [ref=e279] [box=531,323,303,48]:
+                  - generic [ref=e280] [box=531,323,62,20]: question
+                  - generic [ref=e281] [box=600,323,54,20]: answer
+                  - generic [ref=e282] [box=662,323,113,20]: expected_answer
+                  - generic [ref=e283] [box=531,351,63,20]: category
+                  - generic [ref=e284] [box=602,351,44,20]: score
+              - cell "594000" [ref=e285] [box=843,316,92,61]
+              - cell "6/23/2026, 3:44:27 PM" [ref=e286] [box=935,316,240,61]
+              - cell [ref=e287] [box=1175,316,80,61]:
+                - button [ref=e288] [box=1184,331,38,32]:
+                  - img [ref=e289] [box=1195,339,16,16]
+            - row "ptw-drawer-1782204988502 id_ question answer 3 6/23/2026, 10:56:43 AM" [ref=e293] [cursor=pointer] [box=225,377,1030,45]:
+              - cell "ptw-drawer-1782204988502" [ref=e294] [box=225,377,297,45]:
+                - paragraph [ref=e296] [box=241,390,207,20]: ptw-drawer-1782204988502
+              - cell "id_ question answer" [ref=e297] [box=522,377,320,45]:
+                - generic [ref=e298] [box=531,390,303,20]:
+                  - generic [ref=e299] [box=531,390,28,20]: id_
+                  - generic [ref=e300] [box=567,390,62,20]: question
+                  - generic [ref=e301] [box=636,390,54,20]: answer
+              - cell "3" [ref=e302] [box=843,377,92,45]
+              - cell "6/23/2026, 10:56:43 AM" [ref=e303] [box=935,377,240,45]
+              - cell [ref=e304] [box=1175,377,80,45]:
+                - button [ref=e305] [box=1184,384,38,32]:
+                  - img [ref=e306] [box=1195,392,16,16]
+            - row "probe2-1782204963061 id_ question answer 2 6/23/2026, 10:56:14 AM" [ref=e310] [cursor=pointer] [box=225,422,1030,45]:
+              - cell "probe2-1782204963061" [ref=e311] [box=225,422,297,45]:
+                - paragraph [ref=e313] [box=241,435,175,20]: probe2-1782204963061
+              - cell "id_ question answer" [ref=e314] [box=522,422,320,45]:
+                - generic [ref=e315] [box=531,435,303,20]:
+                  - generic [ref=e316] [box=531,435,28,20]: id_
+                  - generic [ref=e317] [box=567,435,62,20]: question
+                  - generic [ref=e318] [box=636,435,54,20]: answer
+              - cell "2" [ref=e319] [box=843,422,92,45]
+              - cell "6/23/2026, 10:56:14 AM" [ref=e320] [box=935,422,240,45]
+              - cell [ref=e321] [box=1175,422,80,45]:
+                - button [ref=e322] [box=1184,429,38,32]:
+                  - img [ref=e323] [box=1195,437,16,16]
+            - row "small2 id_ question answer 4 6/22/2026, 8:21:50 PM" [ref=e327] [cursor=pointer] [box=225,467,1030,45]:
+              - cell "small2" [ref=e328] [box=225,467,297,45]:
+                - paragraph [ref=e330] [box=241,480,43,20]: small2
+              - cell "id_ question answer" [ref=e331] [box=522,467,320,45]:
+                - generic [ref=e332] [box=531,480,303,20]:
+                  - generic [ref=e333] [box=531,480,28,20]: id_
+                  - generic [ref=e334] [box=567,480,62,20]: question
+                  - generic [ref=e335] [box=636,480,54,20]: answer
+              - cell "4" [ref=e336] [box=843,467,92,45]
+              - cell "6/22/2026, 8:21:50 PM" [ref=e337] [box=935,467,240,45]
+              - cell [ref=e338] [box=1175,467,80,45]:
+                - button [ref=e339] [box=1184,474,38,32]:
+                  - img [ref=e340] [box=1195,482,16,16]
+            - row "here-i-am id_ document_name document_type_expected should_pass expected_findings document_content input 5 6/19/2026, 12:56:11 PM" [ref=e344] [cursor=pointer] [box=225,512,1030,89]:
+              - cell "here-i-am" [ref=e345] [box=225,512,297,89]:
+                - paragraph [ref=e347] [box=241,547,71,20]: here-i-am
+              - cell "id_ document_name document_type_expected should_pass expected_findings document_content input" [ref=e348] [box=522,512,320,89]:
+                - generic [ref=e349] [box=531,519,303,76]:
+                  - generic [ref=e350] [box=531,519,28,20]: id_
+                  - generic [ref=e351] [box=567,519,108,20]: document_name
+                  - generic [ref=e352] [box=531,547,160,20]: document_type_expected
+                  - generic [ref=e353] [box=699,547,84,20]: should_pass
+                  - generic [ref=e354] [box=531,575,117,20]: expected_findings
+                  - generic [ref=e355] [box=656,575,119,20]: document_content
+                  - generic [ref=e356] [box=783,575,41,20]: input
+              - cell "5" [ref=e357] [box=843,512,92,89]
+              - cell "6/19/2026, 12:56:11 PM" [ref=e358] [box=935,512,240,89]
+              - cell [ref=e359] [box=1175,512,80,89]:
+                - button [ref=e360] [box=1184,541,38,32]:
+                  - img [ref=e361] [box=1195,549,16,16]
+            - row "testing-logs Timestamp User Name User Email Action Project IP Address User Agent Error Args 6 6/19/2026, 10:22:32 AM" [ref=e365] [cursor=pointer] [box=225,601,1030,89]:
+              - cell "testing-logs" [ref=e366] [box=225,601,297,89]:
+                - paragraph [ref=e368] [box=241,636,82,20]: testing-logs
+              - cell "Timestamp User Name User Email Action Project IP Address User Agent Error Args" [ref=e369] [box=522,601,320,89]:
+                - generic [ref=e370] [box=531,608,303,76]:
+                  - generic [ref=e371] [box=531,608,76,20]: Timestamp
+                  - generic [ref=e372] [box=615,608,76,20]: User Name
+                  - generic [ref=e373] [box=699,608,73,20]: User Email
+                  - generic [ref=e374] [box=780,608,49,20]: Action
+                  - generic [ref=e375] [box=531,636,52,20]: Project
+                  - generic [ref=e376] [box=591,636,74,20]: IP Address
+                  - generic [ref=e377] [box=673,636,76,20]: User Agent
+                  - generic [ref=e378] [box=757,636,40,20]: Error
+                  - generic [ref=e379] [box=531,664,39,20]: Args
+              - cell "6" [ref=e380] [box=843,601,92,89]
+              - cell "6/19/2026, 10:22:32 AM" [ref=e381] [box=935,601,240,89]
+              - cell [ref=e382] [box=1175,601,80,89]:
+                - button [ref=e383] [box=1184,630,38,32]:
+                  - img [ref=e384] [box=1195,638,16,16]
+            - row "Populator QA Dataset input expected_output 0 6/19/2026, 10:22:32 AM" [ref=e388] [cursor=pointer] [box=225,690,1030,45]:
+              - cell "Populator QA Dataset" [ref=e389] [box=225,690,297,45]:
+                - paragraph [ref=e391] [box=241,703,141,20]: Populator QA Dataset
+              - cell "input expected_output" [ref=e392] [box=522,690,320,45]:
+                - generic [ref=e393] [box=531,703,303,20]:
+                  - generic [ref=e394] [box=531,703,41,20]: input
+                  - generic [ref=e395] [box=580,703,108,20]: expected_output
+              - cell "0" [ref=e396] [box=843,690,92,45]
+              - cell "6/19/2026, 10:22:32 AM" [ref=e397] [box=935,690,240,45]
+              - cell [ref=e398] [box=1175,690,80,45]:
+                - button [ref=e399] [box=1184,697,38,32]:
+                  - img [ref=e400] [box=1195,705,16,16]
+            - row "Heavy Products Image URLs filename qty sku image_url supply_chain_image_url 10000 6/19/2026, 10:22:32 AM" [ref=e404] [cursor=pointer] [box=225,735,1030,61]:
+              - cell "Heavy Products Image URLs" [ref=e405] [box=225,735,297,61]:
+                - paragraph [ref=e407] [box=241,756,188,20]: Heavy Products Image URLs
+              - cell "filename qty sku image_url supply_chain_image_url" [ref=e408] [box=522,735,320,61]:
+                - generic [ref=e409] [box=531,742,303,48]:
+                  - generic [ref=e410] [box=531,742,61,20]: filename
+                  - generic [ref=e411] [box=600,742,31,20]: qty
+                  - generic [ref=e412] [box=639,742,32,20]: sku
+                  - generic [ref=e413] [box=679,742,68,20]: image_url
+                  - generic [ref=e414] [box=531,770,148,20]: supply_chain_image_url
+              - cell "10000" [ref=e415] [box=843,735,92,61]
+              - cell "6/19/2026, 10:22:32 AM" [ref=e416] [box=935,735,240,61]
+              - cell [ref=e417] [box=1175,735,80,61]:
+                - button [ref=e418] [box=1184,750,38,32]:
+                  - img [ref=e419] [box=1195,758,16,16]
+            - row "Light Dataset 10 input expected_output category 5 6/19/2026, 10:22:32 AM" [ref=e423] [cursor=pointer] [box=225,796,1030,45]:
+              - cell "Light Dataset 10" [ref=e424] [box=225,796,297,45]:
+                - paragraph [ref=e426] [box=241,809,109,20]: Light Dataset 10
+              - cell "input expected_output category" [ref=e427] [box=522,796,320,45]:
+                - generic [ref=e428] [box=531,809,303,20]:
+                  - generic [ref=e429] [box=531,809,41,20]: input
+                  - generic [ref=e430] [box=580,809,108,20]: expected_output
+                  - generic [ref=e431] [box=696,809,63,20]: category
+              - cell "5" [ref=e432] [box=843,796,92,45]
+              - cell "6/19/2026, 10:22:32 AM" [ref=e433] [box=935,796,240,45]
+              - cell [ref=e434] [box=1175,796,80,45]:
+                - button [ref=e435] [box=1184,803,38,32]:
+                  - img [ref=e436] [box=1195,811,16,16]
+            - row "Light Dataset 9 input expected_output category 5 6/19/2026, 10:22:32 AM" [ref=e440] [cursor=pointer] [box=225,841,1030,45]:
+              - cell "Light Dataset 9" [ref=e441] [box=225,841,297,45]:
+                - paragraph [ref=e443] [box=241,854,100,20]: Light Dataset 9
+              - cell "input expected_output category" [ref=e444] [box=522,841,320,45]:
+                - generic [ref=e445] [box=531,854,303,20]:
+                  - generic [ref=e446] [box=531,854,41,20]: input
+                  - generic [ref=e447] [box=580,854,108,20]: expected_output
+                  - generic [ref=e448] [box=696,854,63,20]: category
+              - cell "5" [ref=e449] [box=843,841,92,45]
+              - cell "6/19/2026, 10:22:32 AM" [ref=e450] [box=935,841,240,45]
+              - cell [ref=e451] [box=1175,841,80,45]:
+                - button [ref=e452] [box=1184,848,38,32]:
+                  - img [ref=e453] [box=1195,856,16,16]
+            - row "Light Dataset 8 input expected_output category 5 6/19/2026, 10:22:32 AM" [ref=e457] [cursor=pointer] [box=225,886,1030,45]:
+              - cell "Light Dataset 8" [ref=e458] [box=225,886,297,45]:
+                - paragraph [ref=e460] [box=241,899,100,20]: Light Dataset 8
+              - cell "input expected_output category" [ref=e461] [box=522,886,320,45]:
+                - generic [ref=e462] [box=531,899,303,20]:
+                  - generic [ref=e463] [box=531,899,41,20]: input
+                  - generic [ref=e464] [box=580,899,108,20]: expected_output
+                  - generic [ref=e465] [box=696,899,63,20]: category
+              - cell "5" [ref=e466] [box=843,886,92,45]
+              - cell "6/19/2026, 10:22:32 AM" [ref=e467] [box=935,886,240,45]
+              - cell [ref=e468] [box=1175,886,80,45]:
+                - button [ref=e469] [box=1184,893,38,32]:
+                  - img [ref=e470] [box=1195,901,16,16]
+            - row "Light Dataset 7 input expected_output category 5 6/19/2026, 10:22:32 AM" [ref=e474] [cursor=pointer] [box=225,931,1030,45]:
+              - cell "Light Dataset 7" [ref=e475] [box=225,931,297,45]:
+                - paragraph [ref=e477] [box=241,944,100,20]: Light Dataset 7
+              - cell "input expected_output category" [ref=e478] [box=522,931,320,45]:
+                - generic [ref=e479] [box=531,944,303,20]:
+                  - generic [ref=e480] [box=531,944,41,20]: input
+                  - generic [ref=e481] [box=580,944,108,20]: expected_output
+                  - generic [ref=e482] [box=696,944,63,20]: category
+              - cell "5" [ref=e483] [box=843,931,92,45]
+              - cell "6/19/2026, 10:22:32 AM" [ref=e484] [box=935,931,240,45]
+              - cell [ref=e485] [box=1175,931,80,45]:
+                - button [ref=e486] [box=1184,938,38,32]:
+                  - img [ref=e487] [box=1195,946,16,16]
+            - row "Light Dataset 6 input expected_output category 5 6/19/2026, 10:22:32 AM" [ref=e491] [cursor=pointer] [box=225,976,1030,45]:
+              - cell "Light Dataset 6" [ref=e492] [box=225,976,297,45]:
+                - paragraph [ref=e494] [box=241,989,100,20]: Light Dataset 6
+              - cell "input expected_output category" [ref=e495] [box=522,976,320,45]:
+                - generic [ref=e496] [box=531,989,303,20]:
+                  - generic [ref=e497] [box=531,989,41,20]: input
+                  - generic [ref=e498] [box=580,989,108,20]: expected_output
+                  - generic [ref=e499] [box=696,989,63,20]: category
+              - cell "5" [ref=e500] [box=843,976,92,45]
+              - cell "6/19/2026, 10:22:32 AM" [ref=e501] [box=935,976,240,45]
+              - cell [ref=e502] [box=1175,976,80,45]:
+                - button [ref=e503] [box=1184,983,38,32]:
+                  - img [ref=e504] [box=1195,991,16,16]
+            - row "Light Dataset 5 input expected_output category 5 6/19/2026, 10:22:32 AM" [ref=e508] [cursor=pointer] [box=225,1021,1030,45]:
+              - cell "Light Dataset 5" [ref=e509] [box=225,1021,297,45]:
+                - paragraph [ref=e511] [box=241,1034,100,20]: Light Dataset 5
+              - cell "input expected_output category" [ref=e512] [box=522,1021,320,45]:
+                - generic [ref=e513] [box=531,1034,303,20]:
+                  - generic [ref=e514] [box=531,1034,41,20]: input
+                  - generic [ref=e515] [box=580,1034,108,20]: expected_output
+                  - generic [ref=e516] [box=696,1034,63,20]: category
+              - cell "5" [ref=e517] [box=843,1021,92,45]
+              - cell "6/19/2026, 10:22:32 AM" [ref=e518] [box=935,1021,240,45]
+              - cell [ref=e519] [box=1175,1021,80,45]:
+                - button [ref=e520] [box=1184,1028,38,32]:
+                  - img [ref=e521] [box=1195,1036,16,16]
+            - row "Light Dataset 4 input expected_output category 5 6/19/2026, 10:22:32 AM" [ref=e525] [cursor=pointer] [box=225,1066,1030,45]:
+              - cell "Light Dataset 4" [ref=e526] [box=225,1066,297,45]:
+                - paragraph [ref=e528] [box=241,1079,100,20]: Light Dataset 4
+              - cell "input expected_output category" [ref=e529] [box=522,1066,320,45]:
+                - generic [ref=e530] [box=531,1079,303,20]:
+                  - generic [ref=e531] [box=531,1079,41,20]: input
+                  - generic [ref=e532] [box=580,1079,108,20]: expected_output
+                  - generic [ref=e533] [box=696,1079,63,20]: category
+              - cell "5" [ref=e534] [box=843,1066,92,45]
+              - cell "6/19/2026, 10:22:32 AM" [ref=e535] [box=935,1066,240,45]
+              - cell [ref=e536] [box=1175,1066,80,45]:
+                - button [ref=e537] [box=1184,1073,38,32]:
+                  - img [ref=e538] [box=1195,1081,16,16]
+            - row "Light Dataset 3 input expected_output category 5 6/19/2026, 10:22:32 AM" [ref=e542] [cursor=pointer] [box=225,1111,1030,45]:
+              - cell "Light Dataset 3" [ref=e543] [box=225,1111,297,45]:
+                - paragraph [ref=e545] [box=241,1124,100,20]: Light Dataset 3
+              - cell "input expected_output category" [ref=e546] [box=522,1111,320,45]:
+                - generic [ref=e547] [box=531,1124,303,20]:
+                  - generic [ref=e548] [box=531,1124,41,20]: input
+                  - generic [ref=e549] [box=580,1124,108,20]: expected_output
+                  - generic [ref=e550] [box=696,1124,63,20]: category
+              - cell "5" [ref=e551] [box=843,1111,92,45]
+              - cell "6/19/2026, 10:22:32 AM" [ref=e552] [box=935,1111,240,45]
+              - cell [ref=e553] [box=1175,1111,80,45]:
+                - button [ref=e554] [box=1184,1118,38,32]:
+                  - img [ref=e555] [box=1195,1126,16,16]
+            - row "Light Dataset 2 input expected_output category 5 6/19/2026, 10:22:32 AM" [ref=e559] [cursor=pointer] [box=225,1156,1030,45]:
+              - cell "Light Dataset 2" [ref=e560] [box=225,1156,297,45]:
+                - paragraph [ref=e562] [box=241,1169,100,20]: Light Dataset 2
+              - cell "input expected_output category" [ref=e563] [box=522,1156,320,45]:
+                - generic [ref=e564] [box=531,1169,303,20]:
+                  - generic [ref=e565] [box=531,1169,41,20]: input
+                  - generic [ref=e566] [box=580,1169,108,20]: expected_output
+                  - generic [ref=e567] [box=696,1169,63,20]: category
+              - cell "5" [ref=e568] [box=843,1156,92,45]
+              - cell "6/19/2026, 10:22:32 AM" [ref=e569] [box=935,1156,240,45]
+              - cell [ref=e570] [box=1175,1156,80,45]:
+                - button [ref=e571] [box=1184,1163,38,32]:
+                  - img [ref=e572] [box=1195,1171,16,16]
+            - row "Light Dataset 1 input expected_output category 5 6/19/2026, 10:22:32 AM" [ref=e576] [cursor=pointer] [box=225,1201,1030,45]:
+              - cell "Light Dataset 1" [ref=e577] [box=225,1201,297,45]:
+                - paragraph [ref=e579] [box=241,1214,100,20]: Light Dataset 1
+              - cell "input expected_output category" [ref=e580] [box=522,1201,320,45]:
+                - generic [ref=e581] [box=531,1214,303,20]:
+                  - generic [ref=e582] [box=531,1214,41,20]: input
+                  - generic [ref=e583] [box=580,1214,108,20]: expected_output
+                  - generic [ref=e584] [box=696,1214,63,20]: category
+              - cell "5" [ref=e585] [box=843,1201,92,45]
+              - cell "6/19/2026, 10:22:32 AM" [ref=e586] [box=935,1201,240,45]
+              - cell [ref=e587] [box=1175,1201,80,45]:
+                - button [ref=e588] [box=1184,1208,38,32]:
+                  - img [ref=e589] [box=1195,1216,16,16]
+  - region "Notifications, top-end (alt+T)" [box=1264,16,0,0]
+  - menu "Upload or create dataset" [active] [ref=e594] [box=1031,104,225,78]:
+    - menuitem "Upload datasets" [ref=e595] [cursor=pointer] [box=1038,111,211,32]:
+      - img [ref=e596] [box=1046,119,16,16]
+      - text: Upload datasets
+    - menuitem "Create empty dataset" [ref=e599] [cursor=pointer] [box=1038,143,211,32]:
+      - img [ref=e600] [box=1046,151,16,16]
+      - text: Create empty dataset

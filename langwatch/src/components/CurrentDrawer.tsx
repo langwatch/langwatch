@@ -61,7 +61,9 @@ export function CurrentDrawer({ marginTop }: { marginTop?: number }) {
       .getState()
       .openLiteMemberRestriction({ resource: restrictedResource });
 
-    // Clear drawer from URL so it doesn't persist in browser history
+    // Clear drawer from URL so it doesn't persist in browser history.
+    // flushSync: see useDrawer.ts closeDrawer for why plain push can leave
+    // this update uncommitted.
     void router.push(
       "?" +
         qs.stringify(
@@ -72,7 +74,7 @@ export function CurrentDrawer({ marginTop }: { marginTop?: number }) {
           ),
         ),
       undefined,
-      { shallow: true },
+      { shallow: true, flushSync: true },
     );
   }, [isRestricted]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -131,7 +133,7 @@ export function CurrentDrawer({ marginTop }: { marginTop?: number }) {
                 ),
               ),
             undefined,
-            { shallow: true },
+            { shallow: true, flushSync: true },
           );
         }}
       >

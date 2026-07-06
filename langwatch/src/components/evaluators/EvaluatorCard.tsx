@@ -4,6 +4,7 @@ import { ArrowUp, CheckSquare, Clock, Code, Copy, MoreVertical, RefreshCw, Workf
 import { useState } from "react";
 import { LuPencil, LuTrash2 } from "react-icons/lu";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
+import { OverflownTextWithTooltip } from "../OverflownText";
 import { Menu } from "../ui/menu";
 import { EvaluatorApiUsageDialog } from "./EvaluatorApiUsageDialog";
 
@@ -179,12 +180,19 @@ export function EvaluatorCard({
             <Spacer />
 
             {/* Name */}
-            <Text color="fg" fontSize="sm" fontWeight={500}>
+            <OverflownTextWithTooltip
+              color="fg"
+              fontSize="sm"
+              fontWeight={500}
+              lineClamp={2}
+              width="full"
+              wordBreak="break-word"
+            >
               {evaluator.name}
-            </Text>
+            </OverflownTextWithTooltip>
 
             {/* Metadata */}
-            <Text color="fg.subtle" fontSize="12px">
+            <Text color="fg.subtle" fontSize="12px" lineClamp={1} width="full">
               {typeLabel}
               {evaluatorType && ` • ${evaluatorType}`} •{" "}
               {formatTimeAgo(new Date(evaluator.updatedAt).getTime())}

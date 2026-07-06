@@ -74,6 +74,13 @@ vi.mock("~/experiments-v3/hooks/useLambdaWarmup", () => ({
   useLambdaWarmup: () => undefined,
 }));
 
+// The page registers Langy action handlers via useRegisterLangyHandlers, which
+// calls useLangy() and requires a <LangyProvider>. We don't render the panel
+// here, so stub the hook to a no-op.
+vi.mock("~/components/langy/LangyContext", () => ({
+  useRegisterLangyHandlers: () => undefined,
+}));
+
 // Heavy children are never rendered (DashboardLayout mock drops them), but the
 // page still imports their modules; stub the data-bound ones to keep the import
 // graph light and free of tRPC / store wiring.
@@ -82,6 +89,27 @@ vi.mock("~/experiments-v3/components/EvaluationsV3Table", () => ({
 }));
 vi.mock("~/experiments-v3/components/SavedDatasetLoaders", () => ({
   SavedDatasetLoaders: () => null,
+}));
+
+// The page body calls tRPC hooks at the top level (api.*.useMutation +
+// api.useContext). DashboardLayout is mocked away, but the page module still
+// executes these on render, so stub the api boundary like the sibling
+// experiments-v3 workbench tests (see ExecutionControls.integration.test.tsx).
+vi.mock("~/utils/api", () => ({
+  api: {
+    useContext: () => ({}),
+    evaluators: {
+      create: { useMutation: () => ({ mutate: vi.fn() }) },
+      update: { useMutation: () => ({ mutate: vi.fn() }) },
+      delete: { useMutation: () => ({ mutate: vi.fn() }) },
+    },
+    prompts: {
+      create: { useMutation: () => ({ mutate: vi.fn() }) },
+      update: { useMutation: () => ({ mutate: vi.fn() }) },
+    },
+    dataset: { upsert: { useMutation: () => ({ mutate: vi.fn() }) } },
+    datasetRecord: { create: { useMutation: () => ({ mutate: vi.fn() }) } },
+  },
 }));
 
 import ExperimentsWorkbenchPage from "~/pages/[project]/experiments/workbench/[slug]";

@@ -49,16 +49,119 @@ Feature: make quickstart is the single dev environment entry point with intent-b
   # --- Default = fastest path (#3860 AC#3) ---
 
   @unit
-  Scenario: frontend-only mode starts no compose containers
-    When I run "make quickstart frontend-only"
-    Then no compose services are brought up
-    And langwatch/.env.dev-up contains only NEXTAUTH_PROVIDER=email
-    And no infrastructure URLs are overridden
+  Scenario: frontend-only pins host-side Redis for in-process workers, no other compose
+    When write_overrides is called with mode=frontend-only
+    Then langwatch/.env.dev-up contains NEXTAUTH_PROVIDER=email
+    And REDIS_URL pointing at localhost:6379 (for the in-process BullMQ workers)
+    And it does NOT override DATABASE_URL, CLICKHOUSE_URL, or LANGWATCH_NLP_SERVICE
 
   @integration @unimplemented
   Scenario: frontend-only mode is fast — under 5 seconds to ready hint
     When I run "make quickstart frontend-only"
     Then the command completes in under 5 seconds with a hint to run "pnpm dev"
+
+  # --- Host-Redis verification before reuse (#5143, CodeRabbit 4579126710) ---
+  # frontend-only runs the BullMQ workers in-process under `pnpm dev`, so it
+  # needs a usable local Redis on host :6379. A bare port-in-use check is not
+  # enough — the listener might be a non-Redis process or a Redis that needs
+  # auth/TLS. dev.sh verifies the listener with `redis-cli ... ping` (PONG)
+  # before reusing it, errors out when :6379 is occupied by something
+  # unverifiable, and only starts its own container when the port is free.
+  # Bound to `scripts/__tests__/dev-redis-detection.unit.bats`.
+
+  @unit
+  Scenario: redis-cli PONG reply means the listener is a usable local Redis
+    Given redis-cli is on PATH and the listener on 6379 replies PONG to ping
+    When redis_listener_is_usable runs
+    Then it succeeds (the listener is treated as a usable local Redis)
+
+  @unit
+  Scenario: a listener that does not reply PONG is not a usable Redis
+    Given a listener on 6379 that replies with something other than PONG
+    When redis_listener_is_usable runs
+    Then it fails (the listener is not treated as a usable Redis)
+
+  @unit
+  Scenario: absent redis-cli degrades gracefully to not-usable (no crash)
+    Given redis-cli is not on PATH
+    When redis_listener_is_usable runs
+    Then it fails without crashing (the listener cannot be verified)
+
+  @unit
+  Scenario: frontend-only reuses a verified usable Redis without starting a container
+    Given host port 6379 is in use and the listener verifies as a usable Redis
+    When run_frontend_only runs
+    Then it reuses the existing Redis for the in-process workers
+    And it does not start a redis compose container
+
+  @unit
+  Scenario: frontend-only errors out when 6379 is occupied by an unusable listener
+    Given host port 6379 is in use but the listener does not verify as a usable Redis
+    When run_frontend_only runs
+    Then it errors out with a non-zero exit
+    And it does not start a redis compose container
+
+  @unit
+  Scenario: frontend-only starts its own redis container when 6379 is free
+    Given host port 6379 is free
+    When run_frontend_only runs
+    Then it starts its own redis compose container for the in-process workers
+
+  # --- Container presets reuse their own running redis (#5213) ---
+  # Container presets (all-local, all-local-nlp, dev-storage, full-local) start a
+  # redis container bound to host :6379. A blunt "anything on :6379 fails" check
+  # false-positives when this same project's redis is already running from a prior
+  # run — docker compose would simply reuse it. The check now exempts this
+  # project's own redis container and only fails on a foreign listener it cannot
+  # bind over. Bound to `scripts/__tests__/dev-redis-detection.unit.bats`.
+
+  @unit
+  Scenario: the host-redis collision check is skipped when SKIP_HOST_REDIS_CHECK is set
+    Given SKIP_HOST_REDIS_CHECK is set to 1
+    When check_host_redis_collision runs
+    Then it returns success without inspecting the port
+
+  @unit
+  Scenario: container presets pass the host-redis check when 6379 is free
+    Given host port 6379 is free
+    When check_host_redis_collision runs
+    Then it returns success so the preset can start its own redis container
+
+  @unit
+  Scenario: this project's own running redis on 6379 is reused, not rejected
+    Given this project's own redis container already holds host port 6379
+    When check_host_redis_collision runs
+    Then it returns success and prints no collision error
+
+  @unit
+  Scenario: a foreign listener on 6379 fails the host-redis check loudly
+    Given host port 6379 is held by a process that is not this project's redis
+    When check_host_redis_collision runs
+    Then it exits non-zero with a message explaining how to free the port or skip the check
+
+  @unit
+  Scenario: redis ownership degrades to not-ours when docker is unavailable
+    Given docker is not on PATH
+    When redis_6379_owned_by_this_project runs
+    Then it reports the port is not owned by this project without crashing
+
+  @unit
+  Scenario: a redis on host 6379 from this same project counts as ours
+    Given a container from this compose project publishes host port 6379
+    When redis_6379_owned_by_this_project runs
+    Then it reports the port is owned by this project
+
+  @unit
+  Scenario: a redis on host 6379 from another project does not count as ours
+    Given a container from a different compose project publishes host port 6379
+    When redis_6379_owned_by_this_project runs
+    Then it reports the port is not owned by this project
+
+  @unit
+  Scenario: a redis mapped to a different host port does not count as ours
+    Given no container publishes host port 6379
+    When redis_6379_owned_by_this_project runs
+    Then it reports the port is not owned by this project
 
   # --- URL rewrite per mode (#3860 AC#6) ---
 
@@ -101,7 +204,8 @@ Feature: make quickstart is the single dev environment entry point with intent-b
     Given a previous run wrote all-local overrides
     When write_overrides runs again with mode=frontend-only
     Then langwatch/.env.dev-up no longer contains DATABASE_URL
-    And only the frontend-only override (NEXTAUTH_PROVIDER) remains
+    And it contains the frontend-only overrides NEXTAUTH_PROVIDER and REDIS_URL pointing at localhost:6379
+    And the previous all-local REDIS_URL (redis:6379) was replaced, not appended
 
   # --- Stateful volume sharing (#3860 AC#4) ---
 

@@ -10,6 +10,7 @@ import {
 } from "@chakra-ui/react";
 import { AlertTriangle, Search } from "lucide-react";
 import React, { useEffect, useState } from "react";
+import { LuSettings2 } from "react-icons/lu";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { modelProviderIcons } from "../server/modelProviders/iconsMap";
 import type { MaybeStoredModelProvider } from "../server/modelProviders/registry";
@@ -20,12 +21,11 @@ import {
   MODEL_ICON_SIZE,
   MODEL_ICON_SIZE_SM,
 } from "./llmPromptConfigs/constants";
+import { NoModelsConfiguredCallout } from "./NoModelsConfiguredCallout";
 import { InputGroup } from "./ui/input-group";
 import { Link } from "./ui/link";
 import { Select } from "./ui/select";
 import { Tooltip } from "./ui/tooltip";
-import { LuSettings2 } from "react-icons/lu";
-import { NoModelsConfiguredCallout } from "./NoModelsConfiguredCallout";
 
 export type ModelOption = {
   label: string;
@@ -190,6 +190,8 @@ export const ModelSelector = React.memo(function ModelSelector({
   mode,
   showConfigureAction = false,
   forFeatureLabel,
+  open,
+  onOpenChange,
 }: {
   model: string;
   options: string[];
@@ -202,6 +204,10 @@ export const ModelSelector = React.memo(function ModelSelector({
    *  models are available — e.g. "for AI search", "for evaluators".
    *  Optional; the callout falls back to a generic message. */
   forFeatureLabel?: string;
+  /** Controlled open state. Pass with onOpenChange to drive the dropdown
+   *  from outside — e.g. force-close it when the parent collapses. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const { selectOptions, groupedByProvider, isEmpty, isLoading } =
     useModelSelectionOptions(options, model, mode);
@@ -343,6 +349,8 @@ export const ModelSelector = React.memo(function ModelSelector({
           onChange(selectedValue);
         }
       }}
+      {...(open !== undefined ? { open } : {})}
+      {...(onOpenChange ? { onOpenChange: (e) => onOpenChange(e.open) } : {})}
       loopFocus={true}
       highlightedValue={highlightedValue}
       onHighlightChange={(details) => {
@@ -403,7 +411,10 @@ export const ModelSelector = React.memo(function ModelSelector({
                 // Add a subtle divider between custom and registry models
                 const prevItem = group.models[itemIndex - 1];
                 const showDivider =
-                  hasCustom && hasRegistry && !item.isCustom && prevItem?.isCustom;
+                  hasCustom &&
+                  hasRegistry &&
+                  !item.isCustom &&
+                  prevItem?.isCustom;
 
                 return (
                   <React.Fragment key={item.value}>
@@ -418,7 +429,10 @@ export const ModelSelector = React.memo(function ModelSelector({
                     <Select.Item item={item}>
                       <HStack gap={2}>
                         {item.icon && (
-                          <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
+                          <Box
+                            width={MODEL_ICON_SIZE}
+                            minWidth={MODEL_ICON_SIZE}
+                          >
                             {item.icon}
                           </Box>
                         )}
@@ -446,7 +460,18 @@ export const ModelSelector = React.memo(function ModelSelector({
             borderColor="border"
             zIndex="1"
           >
-            <Button width="full" fontWeight="500" color="fg.muted" paddingY={5} justifyContent="flex-start" variant="ghost" colorPalette="gray" size="sm" borderRadius="none" asChild>
+            <Button
+              width="full"
+              fontWeight="500"
+              color="fg.muted"
+              paddingY={5}
+              justifyContent="flex-start"
+              variant="ghost"
+              colorPalette="gray"
+              size="sm"
+              borderRadius="none"
+              asChild
+            >
               <Link
                 href="/settings/model-providers"
                 isExternal

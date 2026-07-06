@@ -1,4 +1,5 @@
 import { CliBootstrapService } from "@ee/governance/services/cliBootstrap.service";
+import { findHiddenGovernanceProject } from "@ee/governance/services/governanceProject.service";
 import { PersonalUsageService } from "@ee/governance/services/personalUsage.service";
 import { PersonalVirtualKeyService } from "@ee/governance/services/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "@ee/governance/services/personalWorkspace.service";
@@ -563,29 +564,42 @@ export const userRouter = createTRPCRouter({
 
       const usage = new PersonalUsageService();
 
+      // Ingestion-source ledger rows (Claude Code OTLP, etc.) land under
+      // the org's hidden Governance Project tenant. Resolve it read-only
+      // so the PRINCIPAL-ledger union is scoped to this org's tenant.
+      const governanceProject = await findHiddenGovernanceProject({
+        prisma: ctx.prisma,
+        organizationId: input.organizationId,
+      });
+
       // Run the rollup queries in parallel — they're independent and the
-      // CH server happily multiplexes. userId is threaded so
-      // PersonalUsageService can union ingestion-source ledger rows
-      // (Claude Code OTLP, etc.) keyed on PRINCIPAL-scope budgets where
-      // ScopeId=userId. Without it, the /me dashboard misses third-party
-      // traffic landing in the hidden governance project tenant. Recent
-      // activity itself is read directly from the personal project tenant
-      // by the /me table (tracesV2.list), so it isn't fetched here.
+      // CH server happily multiplexes. userId + ingestionTenantId are
+      // threaded so PersonalUsageService can union ingestion-source ledger
+      // rows keyed on PRINCIPAL-scope budgets where ScopeId=userId, scoped
+      // to this org's governance tenant. Without them, the /me dashboard
+      // misses third-party traffic landing in the hidden governance
+      // project tenant. Recent activity itself is read directly from the
+      // personal project tenant by the /me table (tracesV2.list), so it
+      // isn't fetched here.
+      const ingestionTenantId = governanceProject?.id;
       const [summary, dailyBuckets, breakdownByModel] = await Promise.all([
         usage.summary({
           personalProjectId: workspace.project.id,
           window,
           userId,
+          ingestionTenantId,
         }),
         usage.dailyBuckets({
           personalProjectId: workspace.project.id,
           window,
           userId,
+          ingestionTenantId,
         }),
         usage.breakdownByModel({
           personalProjectId: workspace.project.id,
           window,
           userId,
+          ingestionTenantId,
         }),
       ]);
 

@@ -61,3 +61,14 @@ Feature: Studio evaluations panel
       When I open the run-via-API dialog
       Then the parameters example shows an illustrative feature-flag value
       And a comment explains parameters are constant per-row inputs for fields the dataset does not provide
+
+  Rule: The panel shows only evaluation results
+
+    # Optimizations were DSPy-only and have been removed, so the results panel
+    # no longer carries an Optimizations tab next to Evaluations.
+
+    @integration
+    Scenario: The results panel has no Optimizations tab
+      When the results panel opens at the bottom of the studio
+      Then it shows the Evaluations results
+      And there is no Optimizations tab

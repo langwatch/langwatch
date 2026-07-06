@@ -173,12 +173,16 @@ describe("Privacy rule drawer URL routing", () => {
         />,
       );
 
-      // Wait for the drawer to mount before dispatching Escape, then allow the
-      // close handler to fire — both are async on loaded CI runners, where the
-      // original bare assertion raced and flaked (passes locally in isolation).
+      // The drawer is modal={false}, so Ark UI attaches its Escape listener on
+      // the document only after the portaled content mounts. Wait for the
+      // drawer to be on screen before pressing Escape, otherwise the keypress
+      // can land before the listener exists (the CI flake).
       await screen.findByText("Edit privacy rule");
+
       await user.keyboard("{Escape}");
 
+      // onOpenChange -> onClose resolves a tick later, so poll rather than
+      // asserting synchronously.
       await waitFor(() => expect(mockCloseDrawer).toHaveBeenCalled());
     });
   });

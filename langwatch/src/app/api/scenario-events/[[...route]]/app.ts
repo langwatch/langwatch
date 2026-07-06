@@ -137,59 +137,49 @@ secured.access(requires("scenarios:manage")).post(
   },
 );
 
-// DELETE /api/scenario-events - Archive the simulation runs for a specific
-// batch run and/or scenario set. A scope is MANDATORY: an unqualified request
-// is rejected so a single call can never archive every run in the project.
-const deleteScenarioEventsQuerySchema = z.object({
-  batchRunId: z.string().min(1).optional(),
-  scenarioSetId: z.string().min(1).optional(),
-});
-
+// DELETE /api/scenario-events - Archive all simulation runs for a scenario
+// set. A scenarioSetId is MANDATORY: an unqualified request is rejected so a
+// single call can never archive every run in the project.
 export const route = secured.access(requires("scenarios:manage")).delete(
   "/",
   blockTraceUsageExceededMiddleware,
   describeRoute({
     description:
-      "Archive the simulation runs for a batch run and/or scenario set. Requires at least one of batchRunId or scenarioSetId — archiving every run in the project in one call is not supported.",
+      "Archive all simulation runs for a scenario set. Pass `scenarioSetId=default` to archive runs in the implicit default set; future SDK runs without an explicit setId will repopulate it.",
     responses: {
       ...baseResponses,
       200: {
-        description: "Matching runs archived successfully",
+        description: "Runs archived successfully",
         content: {
-          "application/json": { schema: resolver(responseSchemas.success) },
+          "application/json": { schema: resolver(responseSchemas.archive) },
         },
       },
       400: {
-        description:
-          "No scope provided — a batchRunId or scenarioSetId is required",
+        description: "Missing or invalid scenarioSetId",
         content: {
           "application/json": { schema: resolver(responseSchemas.error) },
         },
       },
     },
   }),
-  zValidator("query", deleteScenarioEventsQuerySchema),
+  zValidator(
+    "query",
+    z.object({
+      scenarioSetId: z
+        .string()
+        .min(1, "scenarioSetId query parameter is required"),
+    }),
+  ),
   async (c) => {
     const { project } = c.var;
-    const { batchRunId, scenarioSetId } = c.req.valid("query");
+    const { scenarioSetId } = c.req.valid("query");
 
-    if (!batchRunId && !scenarioSetId) {
-      return c.json(
-        {
-          error:
-            "A batchRunId or scenarioSetId must be specified. Archiving every simulation run for the project in one request is not supported.",
-        },
-        400,
-      );
-    }
-
-    await archiveSimulationRunsForScope({
+    const result = await archiveScenarioSetRuns({
       projectId: project.id,
-      batchRunId,
       scenarioSetId,
     });
 
-    return c.json({ success: true }, 200);
+    return c.json(result, 200);
   },
 );
 
@@ -273,37 +263,83 @@ function isStreamingEvent(type: string): boolean {
   );
 }
 
-async function archiveSimulationRunsForScope({
+/**
+ * Archives every active run in a scenario set by dispatching a deleteRun
+ * command per run id. Exported as a test seam.
+ *
+ * Dispatch is bounded-concurrency (not an unbounded `Promise.all`) and
+ * failure-collecting: one rejected deleteRun never short-circuits the rest;
+ * the failure is counted and logged. The returned `hasMore` reflects whether
+ * the run-id lookup hit its cap, i.e. more runs may remain to archive.
+ */
+export async function archiveScenarioSetRuns({
   projectId,
-  batchRunId,
   scenarioSetId,
 }: {
   projectId: string;
-  batchRunId?: string;
-  scenarioSetId?: string;
-}): Promise<void> {
-  const app = getApp();
-  const runIds = await app.simulations.runs.getRunIdsForScope({
-    projectId,
-    batchRunId,
-    scenarioSetId,
-  });
+  scenarioSetId: string;
+}): Promise<{
+  archived: number;
+  failed: number;
+  scenarioSetId: string;
+  hasMore: boolean;
+}> {
+  const { runIds, reachedCap } =
+    await getApp().simulations.runs.getRunIdsForSet({
+      projectId,
+      scenarioSetId,
+    });
 
   const now = Date.now();
-  await Promise.all(
-    runIds.map((scenarioRunId) =>
-      getApp().simulations.deleteRun({
-        tenantId: projectId,
-        scenarioRunId,
-        occurredAt: now,
-      }),
-    ),
-  );
+  let archived = 0;
+  let failed = 0;
 
-  logger.info(
-    { projectId, batchRunId, scenarioSetId, count: runIds.length },
-    "Dispatched archive commands for scoped simulation runs",
-  );
+  await pMapLimited({
+    items: runIds,
+    concurrency: 8,
+    fn: async (id) => {
+      try {
+        await getApp().simulations.deleteRun({
+          tenantId: projectId,
+          scenarioRunId: id,
+          occurredAt: now,
+        });
+        archived++;
+      } catch (err) {
+        failed++;
+        logger.warn(
+          { projectId, scenarioRunId: id, err },
+          "Failed to dispatch deleteRun",
+        );
+      }
+    },
+  });
+
+  return { archived, failed, scenarioSetId, hasMore: reachedCap };
+}
+
+/**
+ * Maps `fn` over `items` with at most `concurrency` invocations in flight at
+ * once, awaiting the next free slot before starting the following item.
+ */
+async function pMapLimited<T>({
+  items,
+  fn,
+  concurrency,
+}: {
+  items: T[];
+  fn: (item: T) => Promise<void>;
+  concurrency: number;
+}): Promise<void> {
+  const executing = new Set<Promise<void>>();
+  for (const item of items) {
+    const p = fn(item).finally(() => {
+      executing.delete(p);
+    });
+    executing.add(p);
+    if (executing.size >= concurrency) await Promise.race(executing);
+  }
+  await Promise.all(executing);
 }
 
 async function broadcastStreamingEvent(

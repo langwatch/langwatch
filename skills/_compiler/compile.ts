@@ -12,6 +12,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { inlineMdx } from "../_lib/mdx-inline.js";
+import { splitFrontmatter } from "../_lib/frontmatter.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -23,17 +24,6 @@ interface CompileOptions {
   skills: string[];
   mode: CompileMode;
   apiKey?: string;
-}
-
-function splitFrontmatter(raw: string): { frontmatter: Record<string, string>; body: string } {
-  const m = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-  if (!m) return { frontmatter: {}, body: raw };
-  const fm: Record<string, string> = {};
-  for (const line of m[1]!.split("\n")) {
-    const kv = line.match(/^(\w[\w-]*?):\s*(.+)$/);
-    if (kv) fm[kv[1]!] = kv[2]!.trim();
-  }
-  return { frontmatter: fm, body: m[2]!.trim() };
 }
 
 function handleApiKey(content: string, mode: CompileMode, apiKey?: string): string {

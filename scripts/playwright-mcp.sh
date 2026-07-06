@@ -21,4 +21,14 @@ if [ "$1" = "--headed" ]; then
   shift
 fi
 
-exec npx @playwright/mcp@latest $HEADLESS_FLAG "${EXTRA_ARGS[@]}" "$@"
+# `npx @playwright/mcp@latest` does a registry lookup on every cold start (~55s
+# observed on this machine — well over Claude Code's 30s MCP-connect timeout).
+# Resolve to the already-installed CLI directly. Fall back to npx only if the
+# cached install can't be found.
+CACHED_CLI=$(find ~/.npm/_npx -path "*/node_modules/@playwright/mcp/cli.js" 2>/dev/null | head -1)
+if [ -n "$CACHED_CLI" ] && [ -f "$CACHED_CLI" ]; then
+  exec node "$CACHED_CLI" $HEADLESS_FLAG "${EXTRA_ARGS[@]}" "$@"
+else
+  exec npx --offline @playwright/mcp $HEADLESS_FLAG "${EXTRA_ARGS[@]}" "$@" 2>/dev/null \
+    || exec npx @playwright/mcp@latest $HEADLESS_FLAG "${EXTRA_ARGS[@]}" "$@"
+fi

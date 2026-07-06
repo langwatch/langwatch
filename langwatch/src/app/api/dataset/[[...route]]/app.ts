@@ -10,8 +10,15 @@ import {
 import { createLogger } from "~/utils/logger/server";
 import { UploadValidationError } from "../../../../server/datasets/dataset.service";
 import type { DatasetNotReadyError } from "../../../../server/datasets/errors";
-import type { DatasetColumns } from "../../../../server/datasets/types";
-import { datasetColumnTypeSchema } from "../../../../server/datasets/types";
+import type {
+  DatasetColumns,
+  DatasetConfirmColumns,
+} from "../../../../server/datasets/types";
+import {
+  datasetColumnsSchema,
+  datasetColumnTypeSchema,
+  datasetConfirmColumnsSchema,
+} from "../../../../server/datasets/types";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 import {
   enforceResourceLimitOrRespond,
@@ -379,6 +386,58 @@ secured.access(directUploadSessionAuth).post(
     if (!filename || typeof filename !== "string" || filename.trim() === "") {
       throw new UnprocessableEntityError("filename field is required");
     }
+    // ADR-032 v19: optional user-confirmed columns from the upload confirm step,
+    // sent as a JSON string. The confirm UI sends the richer shape carrying each
+    // column's immutable `sourceHeader` (so reorder + rename can't break the
+    // header→column binding); legacy callers may send the bare name+type shape.
+    // Prefer the confirm shape, fall back to legacy. A malformed value is
+    // rejected rather than silently dropped (so a UI bug surfaces instead of
+    // producing an all-`string` dataset). Absent → normalize derives as before.
+    let columnTypes: DatasetConfirmColumns | DatasetColumns | undefined;
+    if (body.columnTypes !== undefined) {
+      // Present-but-invalid is rejected, never silently dropped (the contract).
+      // Absent (undefined) is the only "no schema → derive" path.
+      if (
+        typeof body.columnTypes !== "string" ||
+        body.columnTypes.trim() === ""
+      ) {
+        throw new UnprocessableEntityError(
+          "columnTypes must be a non-empty JSON string",
+        );
+      }
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(body.columnTypes);
+      } catch {
+        throw new UnprocessableEntityError("columnTypes must be valid JSON");
+      }
+      const confirm = datasetConfirmColumnsSchema.safeParse(parsed);
+      if (confirm.success) {
+        columnTypes = confirm.data;
+      } else {
+        // Only a plainly legacy-shaped payload may fall back to positional
+        // binding. Once any item carries `sourceHeader` the payload is from the
+        // confirm flow, so a confirm parse failure is a real client bug — reject
+        // it rather than downgrade to legacy (which would silently bind columns
+        // by position and can persist the wrong column→data mapping).
+        const looksLikeConfirmPayload =
+          Array.isArray(parsed) &&
+          parsed.some(
+            (column) =>
+              column !== null &&
+              typeof column === "object" &&
+              "sourceHeader" in column,
+          );
+        if (looksLikeConfirmPayload) {
+          throw new UnprocessableEntityError("columnTypes is malformed");
+        }
+        const legacy = datasetColumnsSchema.safeParse(parsed);
+        if (!legacy.success) {
+          throw new UnprocessableEntityError("columnTypes is malformed");
+        }
+        columnTypes = legacy.data;
+      }
+    }
 
     // Domain errors map centrally in `handleDatasetError` (see DOMAIN_ERROR_HTTP).
     // Note: DirectUploadUnavailableError (→ 409) is the client's signal to fall
@@ -387,6 +446,7 @@ secured.access(directUploadSessionAuth).post(
       projectId: auth.projectId,
       name: name.trim(),
       filename: filename.trim(),
+      columnTypes,
     });
     return c.json(result, 201);
   },

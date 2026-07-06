@@ -9,6 +9,7 @@ import {
   mapEvaluatorResult,
   mapNlpEvent,
   mapTargetResult,
+  mapWorkflowEvaluatorResult,
   parseNodeId,
 } from "../resultMapper";
 
@@ -58,7 +59,9 @@ describe("resultMapper", () => {
     });
 
     it("returns output field when present (backward compatible)", () => {
-      expect(extractTargetOutput({ output: "hello world" })).toBe("hello world");
+      expect(extractTargetOutput({ output: "hello world" })).toBe(
+        "hello world",
+      );
     });
 
     it("returns full object when output field is present with other fields", () => {
@@ -586,6 +589,47 @@ describe("resultMapper", () => {
           traceback: [],
         });
       }
+    });
+  });
+
+  describe("mapWorkflowEvaluatorResult", () => {
+    describe("when the evaluator node has a display name", () => {
+      it("carries the name on the event so results show it over the raw node id", () => {
+        const result = mapWorkflowEvaluatorResult(
+          0,
+          "workflow-target",
+          "evaluator_node_abc",
+          "Exact Match",
+          { status: "success", outputs: { passed: true, score: 1 } },
+        );
+
+        expect(result.type).toBe("evaluator_result");
+        if (result.type === "evaluator_result") {
+          expect(result.evaluatorId).toBe("evaluator_node_abc");
+          expect(result.evaluatorName).toBe("Exact Match");
+          expect(result.result).toMatchObject({
+            status: "processed",
+            passed: true,
+          });
+        }
+      });
+    });
+
+    describe("when the evaluator node has no display name", () => {
+      it("leaves the name undefined so storage falls back to null", () => {
+        const result = mapWorkflowEvaluatorResult(
+          1,
+          "workflow-target",
+          "evaluator_node_xyz",
+          undefined,
+          { status: "success", outputs: { score: 0.5 } },
+        );
+
+        expect(result.type).toBe("evaluator_result");
+        if (result.type === "evaluator_result") {
+          expect(result.evaluatorName).toBeUndefined();
+        }
+      });
     });
   });
 

@@ -75,6 +75,15 @@ vi.mock("~/utils/api", () => ({
           refetch: vi.fn(),
         }),
       },
+      // The saved-dataset editor reads one page at a time now; draft (in-memory)
+      // mode keeps it disabled but the hook is still invoked, so it must exist.
+      listPaginated: {
+        useQuery: () => ({
+          data: undefined,
+          isLoading: false,
+          refetch: vi.fn(),
+        }),
+      },
       update: { useMutation: () => ({ mutate: vi.fn() }) },
       deleteMany: { useMutation: () => ({ mutate: vi.fn() }) },
       create: { useMutation: () => ({ mutate: vi.fn() }) },

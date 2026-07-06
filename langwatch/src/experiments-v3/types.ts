@@ -176,6 +176,26 @@ export type LocalEvaluatorConfig = z.infer<typeof localEvaluatorConfigSchema>;
  * - Each dataset (same column might have different names)
  * - Each target (target A outputs "output", target B outputs "result")
  */
+/**
+ * Pairwise evaluator config. Set only for evaluators of type
+ * "langevals/pairwise_compare" (and future n-way variants). Picks two
+ * existing target columns to compare against a dataset golden field.
+ *
+ * - variantA / variantB: TargetConfig ids whose per-row outputs are
+ *   the two candidates.
+ * - goldenField: dataset field name whose value is the reference answer.
+ * - includeMetrics: per-candidate metrics injected into the judge prompt.
+ */
+export const pairwiseEvaluatorConfigSchema = z.object({
+  variantA: z.string(),
+  variantB: z.string(),
+  goldenField: z.string(),
+  includeMetrics: z.array(z.enum(["cost", "duration"])).default([]),
+});
+export type PairwiseEvaluatorConfig = z.infer<
+  typeof pairwiseEvaluatorConfigSchema
+>;
+
 export const evaluatorConfigSchema = z.object({
   id: z.string(),
   evaluatorType: z.string(),
@@ -191,6 +211,8 @@ export const evaluatorConfigSchema = z.object({
   dbEvaluatorId: z.string().optional(),
   /** Local unsaved evaluator settings that override DB values during execution */
   localEvaluatorConfig: localEvaluatorConfigSchema.optional(),
+  /** Set only for pairwise / n-way evaluators (#5100, #5101). */
+  pairwise: pairwiseEvaluatorConfigSchema.optional(),
 });
 export type EvaluatorConfig = Omit<
   z.infer<typeof evaluatorConfigSchema>,
@@ -233,54 +255,81 @@ export type HttpConfig = z.infer<typeof httpConfigSchema>;
  * Note: Evaluators are NOT tied to targets. All evaluators in the store
  * apply to ALL targets. Only the mappings differ per target (and per dataset).
  */
-export const targetConfigSchema = z.object({
-  id: z.string(),
-  type: z.enum(["prompt", "agent", "evaluator"]),
-  icon: z.string().optional(),
-  promptId: z.string().optional(),
-  promptVersionId: z.string().optional(),
-  /**
-   * The version number currently loaded for this target.
-   * Used for:
-   * - Displaying version badge in UI
-   * - Comparing with latest DB version to detect outdated status
-   * - When undefined + no localPromptConfig, target "follows latest" automatically
-   * - When set + has localPromptConfig, target is "pinned" to this version
-   */
-  promptVersionNumber: z.number().optional(),
-  localPromptConfig: localPromptConfigSchema.optional(),
-  dbAgentId: z.string().optional(),
-  /**
-   * The specific agent type (code, signature, workflow, http).
-   * Used by DSL adapter to determine which node type to generate.
-   * Only set for agent targets (type === "agent").
-   */
-  agentType: agentTypeEnum.optional(),
-  /**
-   * HTTP configuration for HTTP agent targets.
-   * Stored on the target so DSL adapter can generate HTTP nodes synchronously.
-   * Only set when agentType === "http".
-   */
-  httpConfig: httpConfigSchema.optional(),
-  /**
-   * Database evaluator ID for evaluator targets.
-   * Used to load evaluator settings from the database at execution time.
-   * Only set when type === "evaluator".
-   */
-  targetEvaluatorId: z.string().optional(),
-  /**
-   * Local evaluator config for unsaved changes.
-   * Stores name and settings modifications until the user clicks "Save".
-   * When present, the target header shows an orange dot indicator.
-   * Only set when type === "evaluator".
-   */
-  localEvaluatorConfig: localEvaluatorConfigSchema.optional(),
-  inputs: z.array(fieldSchema).optional(),
-  outputs: z.array(fieldSchema).optional(),
-  // Per-dataset mappings: datasetId -> inputFieldName -> FieldMapping
-  mappings: z.record(z.string(), z.record(z.string(), fieldMappingSchema)),
-});
-export type TargetType = "prompt" | "agent" | "evaluator";
+export const targetConfigSchema = z
+  .object({
+    id: z.string(),
+    type: z.enum(["prompt", "agent", "evaluator", "workflow"]),
+    icon: z.string().optional(),
+    promptId: z.string().optional(),
+    promptVersionId: z.string().optional(),
+    /**
+     * The version number currently loaded for this target.
+     * Used for:
+     * - Displaying version badge in UI
+     * - Comparing with latest DB version to detect outdated status
+     * - When undefined + no localPromptConfig, target "follows latest" automatically
+     * - When set + has localPromptConfig, target is "pinned" to this version
+     */
+    promptVersionNumber: z.number().optional(),
+    localPromptConfig: localPromptConfigSchema.optional(),
+    dbAgentId: z.string().optional(),
+    /**
+     * The specific agent type (code, signature, workflow, http).
+     * Used by DSL adapter to determine which node type to generate.
+     * Only set for agent targets (type === "agent").
+     */
+    agentType: agentTypeEnum.optional(),
+    /**
+     * HTTP configuration for HTTP agent targets.
+     * Stored on the target so DSL adapter can generate HTTP nodes synchronously.
+     * Only set when agentType === "http".
+     */
+    httpConfig: httpConfigSchema.optional(),
+    /**
+     * Database evaluator ID for evaluator targets.
+     * Used to load evaluator settings from the database at execution time.
+     * Only set when type === "evaluator".
+     */
+    targetEvaluatorId: z.string().optional(),
+    /**
+     * Local evaluator config for unsaved changes.
+     * Stores name and settings modifications until the user clicks "Save".
+     * When present, the target header shows an orange dot indicator.
+     * Only set when type === "evaluator".
+     */
+    localEvaluatorConfig: localEvaluatorConfigSchema.optional(),
+    /**
+     * Pairwise config for column-style pairwise evaluator targets (#5100).
+     * Set only when type === "evaluator" AND the underlying evaluator is
+     * langevals/pairwise_compare. Mirrors the evaluator-as-chip pairwise
+     * field so the column path has a single source of truth for which two
+     * other targets to compare. Per-row input mappings are derived from
+     * variantA/variantB/goldenField at save time and run time.
+     */
+    pairwise: pairwiseEvaluatorConfigSchema.optional(),
+    /**
+     * Studio workflow target: the committed studio workflow evaluated as a whole
+     * per dataset row (distinct from an "agent" target with agentType "workflow",
+     * which is a saved agent built as a single code node). Only set when
+     * type === "workflow".
+     */
+    workflowId: z.string().optional(),
+    workflowVersionId: z.string().optional(),
+    inputs: z.array(fieldSchema).optional(),
+    outputs: z.array(fieldSchema).optional(),
+    // Per-dataset mappings: datasetId -> inputFieldName -> FieldMapping
+    mappings: z.record(z.string(), z.record(z.string(), fieldMappingSchema)),
+  })
+  .superRefine((value, ctx) => {
+    if (value.type === "workflow" && !value.workflowId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["workflowId"],
+        message: "workflowId is required when type is workflow",
+      });
+    }
+  });
+export type TargetType = "prompt" | "agent" | "evaluator" | "workflow";
 export type TargetConfig = Omit<
   z.infer<typeof targetConfigSchema>,
   "inputs" | "outputs"
@@ -495,6 +544,15 @@ export type EvaluationsV3Actions = {
     targetId: string,
     datasetId: string,
     inputField: string,
+  ) => void;
+  /**
+   * Pairwise column-target (#5100): write the high-level pairwise config and
+   * deterministically derive the per-row field mappings on the same target.
+   * Strictly additive — leaves non-pairwise targets untouched.
+   */
+  updateTargetPairwise: (
+    targetId: string,
+    pairwise: PairwiseEvaluatorConfig,
   ) => void;
 
   // Global evaluator actions (evaluators apply to ALL targets automatically)

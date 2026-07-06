@@ -33,7 +33,9 @@ export default defineConfig({
   // `@playwright/test` specs — they need a running dev server plus an
   // isolated Postgres and talk directly to Prisma for fixture setup.
   // See `e2e/auth-regression/README.md`.
-  testIgnore: ["**/auth-regression/**"],
+  // The langy/ subfolder is a vitest scenario suite, not playwright —
+  // it's invoked manually per its README.
+  testIgnore: ["**/auth-regression/**", "**/langy/**"],
   /* Run tests in files in parallel */
   fullyParallel: false,
   /* Fail the build on CI if you accidentally left test.only in the source code. */

@@ -20,10 +20,15 @@ import {
 import { DatasetRepository } from "./dataset.repository";
 import type { ChunkOffset } from "./dataset-chunking";
 import {
+  DATASET_MUTATION_TXN_MAX_WAIT_MS,
+  DATASET_MUTATION_TXN_TIMEOUT_MS,
+} from "./dataset-lock";
+import {
   appendS3JsonlRecords,
   deleteAllS3JsonlChunks,
   deleteS3JsonlRecords,
   editS3JsonlRecord,
+  migrateS3JsonlColumns,
   writeInitialS3JsonlChunks,
 } from "./dataset-mutations";
 import { enqueueDatasetNormalize } from "./dataset-normalize.queue";
@@ -55,6 +60,7 @@ import { datasetDisplayRecordCount } from "./record-count";
 import { stripNullBytes } from "./sanitize";
 import type {
   DatasetColumns,
+  DatasetConfirmColumns,
   DatasetRecordEntry,
   DatasetRecordInput,
 } from "./types";
@@ -202,89 +208,159 @@ export class DatasetService {
   }) {
     const { datasetId, projectId, name, columnTypes } = params;
 
-    return await this.prisma.$transaction(async (tx) => {
-      // Get existing dataset for column comparison
-      const existingDataset = await this.repository.findOne(
-        {
-          id: datasetId,
-          projectId,
-        },
-        { tx },
-      );
-
-      if (!existingDataset) {
-        throw new DatasetNotFoundError();
-      }
-
-      // Defense in depth for the UI's ready-gate: editing a dataset that is still
-      // `uploading`/`processing` (or `failed`) races the normalize job and edits
-      // content that isn't settled. Refuse unless ready (a null status = legacy =
-      // ready). The datasets-page menu hides Edit for non-ready rows; this stops a
-      // direct/stale call too.
-      if (
-        existingDataset.status != null &&
-        existingDataset.status !== "ready"
-      ) {
-        throw new DatasetNotReadyError({
-          status: existingDataset.status,
-          statusError: existingDataset.statusError,
-        });
-      }
-
+    // s3_jsonl column changes (rename / retype / add / remove) are a chunk
+    // rewrite under the per-dataset advisory lock (ADR-032 v19) — which owns its
+    // own transaction and so can't run inside the `$transaction` below. Handle it
+    // up front; the lock re-reads + re-validates the row under it. (Reads here are
+    // outside the lock, so this is a fast pre-check, not the authoritative gate.)
+    const preexisting = await this.repository.findOne({
+      id: datasetId,
+      projectId,
+    });
+    if (!preexisting) {
+      throw new DatasetNotFoundError();
+    }
+    if (preexisting.status != null && preexisting.status !== "ready") {
+      throw new DatasetNotReadyError({
+        status: preexisting.status,
+        statusError: preexisting.statusError,
+      });
+    }
+    const columnsChanged =
+      JSON.stringify(preexisting.columnTypes) !== JSON.stringify(columnTypes);
+    if (columnsChanged && preexisting.contentLayout === "s3_jsonl") {
       const slug = this.generateSlug(name);
-
-      // Check for slug collision with other datasets (excluding current one)
-      const conflictingDataset = await this.repository.findBySlug(
-        {
-          slug,
-          projectId,
-          excludeId: datasetId,
-        },
-        { tx },
-      );
-
+      const conflictingDataset = await this.repository.findBySlug({
+        slug,
+        projectId,
+        excludeId: datasetId,
+      });
       if (conflictingDataset) {
         throw new DatasetConflictError();
       }
+      return await migrateS3JsonlColumns({
+        prisma: this.prisma,
+        dataset: preexisting,
+        projectId,
+        oldColumnTypes: preexisting.columnTypes as DatasetColumns,
+        newColumnTypes: columnTypes,
+        name,
+        slug,
+        repository: this.repository,
+      });
+    }
 
-      // Migrate records if column schema changed
-      if (
-        JSON.stringify(existingDataset.columnTypes) !==
-        JSON.stringify(columnTypes)
-      ) {
-        // ADR-032: column migration rewrites every record's keys — for s3_jsonl
-        // that's a chunk-rewrite (write-mutation), which is a later rung. The PG
-        // record migrator would read zero rows (I-PG) and silently "migrate"
-        // nothing, leaving stored chunk keys out of sync with columnTypes.
-        // Refuse rather than corrupt. (Deferred: s3_jsonl column migration.)
-        if (existingDataset.contentLayout === "s3_jsonl") {
-          throw new ColumnTypeChangeNotSupportedError();
-        }
-        await this.migrateDatasetRecordColumns(
+    return await this.prisma.$transaction(
+      async (tx) => {
+        // Get existing dataset for column comparison
+        const existingDataset = await this.repository.findOne(
           {
-            datasetId,
+            id: datasetId,
             projectId,
-            oldColumnTypes: existingDataset.columnTypes as DatasetColumns,
-            newColumnTypes: columnTypes,
           },
           { tx },
         );
-      }
 
-      // Update the dataset (repository validates ownership - will throw if datasetId doesn't belong to projectId)
-      return await this.repository.update(
-        {
-          id: datasetId,
-          projectId,
-          data: {
-            name,
+        if (!existingDataset) {
+          throw new DatasetNotFoundError();
+        }
+
+        // Defense in depth for the UI's ready-gate: editing a dataset that is still
+        // `uploading`/`processing` (or `failed`) races the normalize job and edits
+        // content that isn't settled. Refuse unless ready (a null status = legacy =
+        // ready). The datasets-page menu hides Edit for non-ready rows; this stops a
+        // direct/stale call too.
+        if (
+          existingDataset.status != null &&
+          existingDataset.status !== "ready"
+        ) {
+          throw new DatasetNotReadyError({
+            status: existingDataset.status,
+            statusError: existingDataset.statusError,
+          });
+        }
+
+        const slug = this.generateSlug(name);
+
+        // Check for slug collision with other datasets (excluding current one)
+        const conflictingDataset = await this.repository.findBySlug(
+          {
             slug,
-            columnTypes,
+            projectId,
+            excludeId: datasetId,
           },
-        },
-        { tx },
-      );
-    });
+          { tx },
+        );
+
+        if (conflictingDataset) {
+          throw new DatasetConflictError();
+        }
+
+        const existingColumns = existingDataset.columnTypes as DatasetColumns;
+        const columnsChanged =
+          JSON.stringify(existingColumns) !== JSON.stringify(columnTypes);
+
+        // Defensive: s3_jsonl column changes are handled up front via
+        // `migrateS3JsonlColumns` (the advisory-lock chunk rewrite) and return
+        // before this transaction (ADR-032 v19). Reaching here with s3_jsonl and a
+        // changed schema would mean that early branch regressed — refuse rather
+        // than run the PG record migrator, which would read zero rows (I-PG) and
+        // silently corrupt nothing into the chunk store.
+        if (existingDataset.contentLayout === "s3_jsonl" && columnsChanged) {
+          throw new ColumnTypeChangeNotSupportedError();
+        }
+
+        // Only rewrite row data when the column KEY structure changes
+        // (rename / add / remove / reorder). In the legacy postgres layout the
+        // stored `entry` JSON is untyped — column types are metadata — and the
+        // record migrator (`tryToMapPreviousColumnsToNewColumns`) only remaps
+        // keys, never values. So a type-only change (e.g. string→image) would
+        // rewrite every row with byte-identical JSON: O(rowCount) UPDATEs of pure
+        // no-ops, which is exactly what blew the transaction budget. Skip it and
+        // let the `dataset.update` below persist the new types alone. The
+        // `columnsChanged` short-circuit means a name-only edit never reaches
+        // `columnKeysChanged` (and so never reads/maps the stored column array).
+        if (
+          columnsChanged &&
+          this.columnKeysChanged(existingColumns, columnTypes)
+        ) {
+          await this.migrateDatasetRecordColumns(
+            {
+              datasetId,
+              projectId,
+              oldColumnTypes: existingColumns,
+              newColumnTypes: columnTypes,
+            },
+            { tx },
+          );
+        }
+
+        // Update the dataset (repository validates ownership - will throw if datasetId doesn't belong to projectId)
+        return await this.repository.update(
+          {
+            id: datasetId,
+            projectId,
+            data: {
+              name,
+              slug,
+              columnTypes,
+            },
+          },
+          { tx },
+        );
+      },
+      {
+        // Safety net for the remaining heavy case: a column rename / add / remove
+        // still runs `migrateDatasetRecordColumns` here — one `datasetRecord.update`
+        // per row across the whole dataset — which can exceed Prisma's 5s default
+        // interactive-txn timeout and P2028 ("Transaction already closed"). Type-only
+        // changes no longer reach the migrator (see `columnKeysChanged` above), so
+        // this budget only ever covers genuine structural rewrites. Mirrors the
+        // s3_jsonl chunk-rewrite path (`withDatasetLock`).
+        timeout: DATASET_MUTATION_TXN_TIMEOUT_MS,
+        maxWait: DATASET_MUTATION_TXN_MAX_WAIT_MS,
+      },
+    );
   }
 
   /**
@@ -386,6 +462,25 @@ export class DatasetService {
       );
       throw error;
     }
+  }
+
+  /**
+   * Whether the column KEY structure changed (the SET of names), as opposed to
+   * only the declared types or their order. The legacy record migrator remaps by
+   * name first and only falls back to position for names that have no match — so
+   * when the name sets are equal every column maps to itself and the rewrite is a
+   * guaranteed no-op on every row's keys. That covers both a type-only change and
+   * a pure reorder (column order is `dataset.columnTypes` metadata, persisted by
+   * the `dataset.update` regardless; it never lives in the row JSON), so neither
+   * needs a row rewrite. Compare sorted names so order alone doesn't trigger it.
+   */
+  private columnKeysChanged(
+    oldColumns: DatasetColumns,
+    newColumns: DatasetColumns,
+  ): boolean {
+    const oldNames = oldColumns.map((c) => c.name).sort();
+    const newNames = newColumns.map((c) => c.name).sort();
+    return JSON.stringify(oldNames) !== JSON.stringify(newNames);
   }
 
   /**
@@ -629,7 +724,28 @@ export class DatasetService {
       slugOrId: params.slugOrId,
       projectId: params.projectId,
     });
+    return this.paginateResolvedDataset({
+      dataset,
+      projectId: params.projectId,
+      page: params.page,
+      limit: params.limit,
+    });
+  }
 
+  /**
+   * Reads one page of records from an already-resolved dataset — the shared
+   * windowed read behind both `listRecords` (slug/id lookup first) and
+   * `getDatasetPage` (the editor's paged read), so the s3_jsonl chunk-window
+   * logic lives in exactly one place and a caller that already holds the row
+   * doesn't look it up twice.
+   */
+  private async paginateResolvedDataset(params: {
+    dataset: Dataset;
+    projectId: string;
+    page: number;
+    limit: number;
+  }) {
+    const { dataset } = params;
     const skip = (params.page - 1) * params.limit;
 
     // ADR-032: s3_jsonl content lives in chunk objects, not the PG
@@ -748,6 +864,48 @@ export class DatasetService {
         total,
         totalPages: Math.ceil(total / params.limit),
       },
+    };
+  }
+
+  /**
+   * One page of a dataset for the editor: the dataset's name + columnTypes plus
+   * the page's records ({ id, entry }) and the PG-authoritative total. Replaces
+   * the editor's whole-dataset `getFullDataset` read (which truncated past a
+   * byte cap) with a bounded windowed read, so arbitrarily large datasets page
+   * instead of silently hiding rows. Resolves the row ONCE and reuses the same
+   * windowed reader as `listRecords`.
+   *
+   * @throws {DatasetNotFoundError} if dataset not found
+   * @throws {DatasetNotReadyError} if an s3_jsonl dataset is still preparing
+   */
+  async getDatasetPage(params: {
+    slugOrId: string;
+    projectId: string;
+    page: number;
+    limit: number;
+  }) {
+    const dataset = await this.getBySlugOrId({
+      slugOrId: params.slugOrId,
+      projectId: params.projectId,
+    });
+    const { data, pagination } = await this.paginateResolvedDataset({
+      dataset,
+      projectId: params.projectId,
+      page: params.page,
+      limit: params.limit,
+    });
+    return {
+      id: dataset.id,
+      name: dataset.name,
+      columnTypes: dataset.columnTypes,
+      datasetRecords: data.map((record) => ({
+        id: record.id,
+        entry: record.entry,
+      })),
+      count: pagination.total,
+      page: pagination.page,
+      limit: pagination.limit,
+      totalPages: pagination.totalPages,
     };
   }
 
@@ -1197,12 +1355,24 @@ export class DatasetService {
     projectId: string;
     name: string;
     filename: string;
+    /**
+     * User-confirmed columns from the upload confirm step (ADR-032 v19): the
+     * normalize job binds each file header to its column and renames +
+     * type-converts each record to match. The confirm UI sends the richer shape
+     * carrying each column's immutable `sourceHeader` (reorder/rename-safe
+     * binding); legacy callers may send the bare name+type shape (normalize then
+     * falls back to positional binding). Omitted by non-UI callers (SDK / REST /
+     * API key) that don't run the confirm step — normalize then derives
+     * all-`string` columns as before. Stored transiently on the row; normalize
+     * strips `sourceHeader` and persists a clean `DatasetColumns`.
+     */
+    columnTypes?: DatasetConfirmColumns | DatasetColumns;
   }): Promise<{
     datasetId: string;
     slug: string;
     uploadUrl: string;
   }> {
-    const { projectId, name, filename } = params;
+    const { projectId, name, filename, columnTypes } = params;
 
     // Bound the accumulation of abandoned `uploading` rows + staging objects and
     // recover any normalize wedged at `processing` (lost-after-send) as new
@@ -1235,7 +1405,10 @@ export class DatasetService {
       slug,
       name,
       projectId,
-      columnTypes: [], // unknown until normalize parses the uploaded file
+      // Confirmed columns (names + types) from the upload step drive normalize's
+      // rename + type conversion (ADR-032 v19). Empty when the caller skipped
+      // confirm (SDK / REST / API key) — normalize then derives all-`string`.
+      columnTypes: columnTypes ?? [],
       status: "uploading",
       contentLayout: "s3_jsonl",
       // C1: bind the minted key to the row so finalize never trusts a

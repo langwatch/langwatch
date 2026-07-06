@@ -1,0 +1,20 @@
+{{- /* ClusterIP is a security boundary, not a default — fail loudly rather
+       than let a values override expose the manager auth surface. */ -}}
+{{- if ne .Values.service.type "ClusterIP" }}
+{{- fail "langy-agent.service.type must be ClusterIP — the agent is never exposed outside the cluster" }}
+{{- end }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "langy-agent.fullname" . }}
+  labels: {{- include "langy-agent.labels" . | nindent 4 }}
+spec:
+  # ClusterIP only — the agent is never exposed outside the cluster. The
+  # control plane reaches it at http://<release>-langy-agent:<port>.
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector: {{- include "langy-agent.selectorLabels" . | nindent 4 }}

@@ -1,17 +1,17 @@
+import NProgress from "nprogress";
 import { Suspense, useEffect } from "react";
+import { ErrorBoundary } from "react-error-boundary";
 import {
   createBrowserRouter,
   Outlet,
+  type RouteObject,
   redirect,
   useLocation,
   useNavigation,
-  type RouteObject,
 } from "react-router";
-import { ErrorBoundary } from "react-error-boundary";
-import NProgress from "nprogress";
+import { PageErrorFallback } from "~/components/ui/PageErrorFallback";
 import { InnerProviders } from "./AppProviders";
 import NotFoundOrErrorPage from "./pages/_not-found";
-import { PageErrorFallback } from "~/components/ui/PageErrorFallback";
 import { reloadOnChunkError } from "./utils/chunkReload";
 
 /**
@@ -120,6 +120,10 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/settings/data-retention")),
   },
   {
+    path: "/settings/integrations",
+    ...page(() => import("./pages/settings/integrations")),
+  },
+  {
     path: "/settings/data-privacy",
     ...page(() => import("./pages/settings/data-privacy")),
   },
@@ -217,8 +221,8 @@ const routes: RouteObject[] = [
   },
   {
     path: "/settings/governance/ingestion-sources/:id",
-    ...page(() =>
-      import("@ee/governance/dashboard/pages/ingestion-source-detail"),
+    ...page(
+      () => import("@ee/governance/dashboard/pages/ingestion-source-detail"),
     ),
   },
   {
@@ -295,23 +299,12 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/cli/auth")),
   },
 
-  // Project routes
-  {
-    path: "/:project",
-    ...page(() => import("./pages/[project]/index")),
-  },
-  {
-    path: "/:project/agents",
-    ...page(() => import("./pages/[project]/agents")),
-  },
-  {
-    path: "/:project/automations",
-    ...page(() => import("./pages/[project]/automations")),
-  },
-  // AI Gateway - org-scoped admin pages live under /settings/gateway/**
+  // AI Gateway — org-scoped admin pages live under /settings/gateway/**
   // alongside model-providers, routing-policies, audit-log etc. Every
   // gateway resource (VirtualKey / GatewayBudget / ModelProvider) is
-  // org-keyed by the schema, so the chrome reflects that.
+  // org-keyed by the schema, so the chrome reflects that. Kept OUT of the
+  // project layout route below — these are /settings/* routes, not
+  // /:project/* routes, so Langy must not mount on them.
   {
     path: "/settings/gateway",
     ...page(() => import("./pages/settings/gateway/index")),
@@ -344,177 +337,201 @@ const routes: RouteObject[] = [
     path: "/settings/gateway/guardrails",
     ...page(() => import("./pages/settings/gateway/guardrails")),
   },
-  {
-    path: "/:project/datasets",
-    ...page(() => import("./pages/[project]/datasets")),
-  },
-  {
-    path: "/:project/datasets/:id",
-    ...page(() => import("./pages/[project]/datasets/[id]")),
-  },
-  {
-    path: "/:project/evaluators",
-    ...page(() => import("./pages/[project]/evaluators")),
-  },
-  {
-    path: "/:project/evaluations",
-    ...page(() => import("./pages/[project]/evaluations")),
-  },
-  {
-    path: "/:project/evaluations/new",
-    ...page(() => import("./pages/[project]/evaluations/new")),
-  },
-  {
-    path: "/:project/evaluations/new/choose",
-    ...page(() => import("./pages/[project]/evaluations/new/choose")),
-  },
-  {
-    path: "/:project/evaluations/wizard",
-    ...page(() => import("./pages/[project]/evaluations/wizard")),
-  },
-  {
-    path: "/:project/evaluations/wizard/:slug",
-    ...page(() => import("./pages/[project]/evaluations/wizard/[slug]")),
-  },
-  {
-    path: "/:project/evaluations/:id/edit",
-    ...page(() => import("./pages/[project]/evaluations/[id]/edit")),
-  },
-  {
-    path: "/:project/evaluations/:id/edit/choose",
-    ...page(() => import("./pages/[project]/evaluations/[id]/edit/choose")),
-  },
-  {
-    path: "/:project/messages",
-    ...page(() => import("./pages/[project]/messages")),
-  },
-  {
-    path: "/:project/traces",
-    ...page(() => import("./pages/[project]/traces")),
-  },
-  {
-    path: "/:project/messages/:trace",
-    ...page(() => import("./pages/[project]/messages/[trace]/index")),
-  },
-  {
-    path: "/:project/messages/:trace/:openTab",
-    ...page(
-      () => import("./pages/[project]/messages/[trace]/[openTab]/index")
-    ),
-  },
-  {
-    path: "/:project/messages/:trace/:openTab/:span",
-    ...page(
-      () => import("./pages/[project]/messages/[trace]/[openTab]/[span]")
-    ),
-  },
-  {
-    path: "/:project/prompts",
-    ...page(() => import("./pages/[project]/prompts")),
-  },
-  {
-    path: "/:project/setup",
-    ...page(() => import("./pages/[project]/setup")),
-  },
-  {
-    path: "/:project/workflows",
-    ...page(() => import("./pages/[project]/workflows")),
-  },
-  {
-    path: "/:project/chat/:workflow",
-    ...page(() => import("./pages/[project]/chat/[workflow]")),
-  },
-  {
-    path: "/:project/studio/:workflow",
-    ...page(() => import("./pages/[project]/studio/[workflow]")),
-  },
 
-  // Annotations
+  // Project routes — wrapped in a layout route that mounts Langy ONCE per
+  // project, above the swapping page, so the panel + composer draft + any
+  // in-flight response survive navigation between project pages. The layout
+  // component is keyed by :project, so Langy resets on project switch. Loaded
+  // lazily via page() so Langy's chat bundle stays out of the initial load.
+  // See ProjectLangyLayout + specs/langy/langy-navigation-persistence.feature
   {
-    path: "/:project/annotations",
-    ...page(() => import("./pages/[project]/annotations")),
-  },
-  {
-    path: "/:project/annotations/all",
-    ...page(() => import("./pages/[project]/annotations/all")),
-  },
-  {
-    path: "/:project/annotations/me",
-    ...page(() => import("./pages/[project]/annotations/me")),
-  },
-  {
-    path: "/:project/annotations/my-queue",
-    ...page(() => import("./pages/[project]/annotations/my-queue")),
-  },
-  {
-    path: "/:project/annotations/:slug",
-    ...page(() => import("./pages/[project]/annotations/[slug]")),
-  },
+    ...page(() => import("./components/langy/ProjectLangyLayout")),
+    children: [
+      {
+        path: "/:project",
+        ...page(() => import("./pages/[project]/index")),
+      },
+      {
+        path: "/:project/agents",
+        ...page(() => import("./pages/[project]/agents")),
+      },
+      {
+        path: "/:project/automations",
+        ...page(() => import("./pages/[project]/automations")),
+      },
+      {
+        path: "/:project/datasets",
+        ...page(() => import("./pages/[project]/datasets")),
+      },
+      {
+        path: "/:project/datasets/:id",
+        ...page(() => import("./pages/[project]/datasets/[id]")),
+      },
+      {
+        path: "/:project/evaluators",
+        ...page(() => import("./pages/[project]/evaluators")),
+      },
+      {
+        path: "/:project/evaluations",
+        ...page(() => import("./pages/[project]/evaluations")),
+      },
+      {
+        path: "/:project/evaluations/new",
+        ...page(() => import("./pages/[project]/evaluations/new")),
+      },
+      {
+        path: "/:project/evaluations/new/choose",
+        ...page(() => import("./pages/[project]/evaluations/new/choose")),
+      },
+      {
+        path: "/:project/evaluations/wizard",
+        ...page(() => import("./pages/[project]/evaluations/wizard")),
+      },
+      {
+        path: "/:project/evaluations/wizard/:slug",
+        ...page(() => import("./pages/[project]/evaluations/wizard/[slug]")),
+      },
+      {
+        path: "/:project/evaluations/:id/edit",
+        ...page(() => import("./pages/[project]/evaluations/[id]/edit")),
+      },
+      {
+        path: "/:project/evaluations/:id/edit/choose",
+        ...page(() => import("./pages/[project]/evaluations/[id]/edit/choose")),
+      },
+      {
+        path: "/:project/messages",
+        ...page(() => import("./pages/[project]/messages")),
+      },
+      {
+        path: "/:project/traces",
+        ...page(() => import("./pages/[project]/traces")),
+      },
+      {
+        path: "/:project/messages/:trace",
+        ...page(() => import("./pages/[project]/messages/[trace]/index")),
+      },
+      {
+        path: "/:project/messages/:trace/:openTab",
+        ...page(
+          () => import("./pages/[project]/messages/[trace]/[openTab]/index"),
+        ),
+      },
+      {
+        path: "/:project/messages/:trace/:openTab/:span",
+        ...page(
+          () => import("./pages/[project]/messages/[trace]/[openTab]/[span]"),
+        ),
+      },
+      {
+        path: "/:project/prompts",
+        ...page(() => import("./pages/[project]/prompts")),
+      },
+      {
+        path: "/:project/setup",
+        ...page(() => import("./pages/[project]/setup")),
+      },
+      {
+        path: "/:project/workflows",
+        ...page(() => import("./pages/[project]/workflows")),
+      },
+      {
+        path: "/:project/chat/:workflow",
+        ...page(() => import("./pages/[project]/chat/[workflow]")),
+      },
+      {
+        path: "/:project/studio/:workflow",
+        ...page(() => import("./pages/[project]/studio/[workflow]")),
+      },
 
-  // Analytics
-  {
-    path: "/:project/analytics",
-    ...page(() => import("./pages/[project]/analytics/index")),
-  },
-  {
-    path: "/:project/analytics/evaluations",
-    ...page(() => import("./pages/[project]/analytics/evaluations")),
-  },
-  {
-    path: "/:project/analytics/metrics",
-    ...page(() => import("./pages/[project]/analytics/metrics")),
-  },
-  {
-    path: "/:project/analytics/reports",
-    ...page(() => import("./pages/[project]/analytics/reports")),
-  },
-  {
-    path: "/:project/analytics/topics",
-    ...page(() => import("./pages/[project]/analytics/topics")),
-  },
-  {
-    path: "/:project/analytics/users",
-    ...page(() => import("./pages/[project]/analytics/users")),
-  },
-  {
-    path: "/:project/analytics/custom",
-    ...page(() => import("./pages/[project]/analytics/custom/index")),
-  },
-  {
-    path: "/:project/analytics/custom/:id",
-    ...page(() => import("./pages/[project]/analytics/custom/[id]")),
-  },
+      // Annotations
+      {
+        path: "/:project/annotations",
+        ...page(() => import("./pages/[project]/annotations")),
+      },
+      {
+        path: "/:project/annotations/all",
+        ...page(() => import("./pages/[project]/annotations/all")),
+      },
+      {
+        path: "/:project/annotations/me",
+        ...page(() => import("./pages/[project]/annotations/me")),
+      },
+      {
+        path: "/:project/annotations/my-queue",
+        ...page(() => import("./pages/[project]/annotations/my-queue")),
+      },
+      {
+        path: "/:project/annotations/:slug",
+        ...page(() => import("./pages/[project]/annotations/[slug]")),
+      },
 
-  // Experiments
-  {
-    path: "/:project/experiments",
-    ...page(() => import("./pages/[project]/experiments/index")),
-  },
-  {
-    path: "/:project/experiments/workbench",
-    ...page(() => import("./pages/[project]/experiments/workbench/index")),
-  },
-  {
-    path: "/:project/experiments/workbench/:slug",
-    ...page(() => import("./pages/[project]/experiments/workbench/[slug]")),
-  },
-  {
-    path: "/:project/experiments/:experiment",
-    ...page(() => import("./pages/[project]/experiments/[experiment]")),
-  },
+      // Analytics
+      {
+        path: "/:project/analytics",
+        ...page(() => import("./pages/[project]/analytics/index")),
+      },
+      {
+        path: "/:project/analytics/evaluations",
+        ...page(() => import("./pages/[project]/analytics/evaluations")),
+      },
+      {
+        path: "/:project/analytics/metrics",
+        ...page(() => import("./pages/[project]/analytics/metrics")),
+      },
+      {
+        path: "/:project/analytics/reports",
+        ...page(() => import("./pages/[project]/analytics/reports")),
+      },
+      {
+        path: "/:project/analytics/topics",
+        ...page(() => import("./pages/[project]/analytics/topics")),
+      },
+      {
+        path: "/:project/analytics/users",
+        ...page(() => import("./pages/[project]/analytics/users")),
+      },
+      {
+        path: "/:project/analytics/custom",
+        ...page(() => import("./pages/[project]/analytics/custom/index")),
+      },
+      {
+        path: "/:project/analytics/custom/:id",
+        ...page(() => import("./pages/[project]/analytics/custom/[id]")),
+      },
 
-  // Simulations (catch-all)
-  {
-    path: "/:project/simulations/scenarios",
-    ...page(() => import("./pages/[project]/simulations/scenarios/index")),
-  },
-  {
-    path: "/:project/simulations/*",
-    ...page(() => import("./pages/[project]/simulations/[[...path]]")),
-  },
-  {
-    path: "/:project/simulations",
-    ...page(() => import("./pages/[project]/simulations/[[...path]]")),
+      // Experiments
+      {
+        path: "/:project/experiments",
+        ...page(() => import("./pages/[project]/experiments/index")),
+      },
+      {
+        path: "/:project/experiments/workbench",
+        ...page(() => import("./pages/[project]/experiments/workbench/index")),
+      },
+      {
+        path: "/:project/experiments/workbench/:slug",
+        ...page(() => import("./pages/[project]/experiments/workbench/[slug]")),
+      },
+      {
+        path: "/:project/experiments/:experiment",
+        ...page(() => import("./pages/[project]/experiments/[experiment]")),
+      },
+
+      // Simulations (catch-all)
+      {
+        path: "/:project/simulations/scenarios",
+        ...page(() => import("./pages/[project]/simulations/scenarios/index")),
+      },
+      {
+        path: "/:project/simulations/*",
+        ...page(() => import("./pages/[project]/simulations/[[...path]]")),
+      },
+      {
+        path: "/:project/simulations",
+        ...page(() => import("./pages/[project]/simulations/[[...path]]")),
+      },
+    ],
   },
 
   // Ops

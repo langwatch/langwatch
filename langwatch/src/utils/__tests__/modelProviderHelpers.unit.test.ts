@@ -81,6 +81,7 @@ describe("modelProviderHelpers", () => {
     const schemaShape = {
       AZURE_OPENAI_API_KEY: {},
       AZURE_OPENAI_ENDPOINT: {},
+      AZURE_OPENAI_API_VERSION: {},
       AZURE_API_GATEWAY_BASE_URL: {},
       AZURE_API_GATEWAY_VERSION: {},
       OPENAI_API_KEY: {},
@@ -95,11 +96,12 @@ describe("modelProviderHelpers", () => {
       });
     });
 
-    it("returns standard keys for Azure with API Gateway disabled", () => {
+    it("returns standard keys (incl. api-version override) for Azure with API Gateway disabled", () => {
       const result = getDisplayKeysForProvider("azure", false, schemaShape);
       expect(result).toEqual({
         AZURE_OPENAI_API_KEY: {},
         AZURE_OPENAI_ENDPOINT: {},
+        AZURE_OPENAI_API_VERSION: {},
       });
     });
 

@@ -190,5 +190,35 @@ describe("getRetentionPolicySnapshot — scope visibility", () => {
         "project_a",
       ]);
     });
+
+    it("omits an archived project from `available` even when writable", async () => {
+      // A writable but archived project must not be offered as a scope to
+      // attach a new retention policy — it's hidden from the nav everywhere.
+      prisma.project.findMany.mockResolvedValueOnce([
+        { id: "project_a", name: "Project A", teamId: "team_a" },
+        {
+          id: "project_arch",
+          name: "Archived",
+          teamId: "team_a",
+          archivedAt: new Date("2026-01-01"),
+        },
+      ]);
+      rbacMocks.batchScopePermissions.mockResolvedValueOnce({
+        teams: new Map(),
+        projects: new Map([
+          ["project_a", true],
+          ["project_arch", true],
+        ]),
+      });
+
+      const snapshot = await getRetentionPolicySnapshot(
+        { prisma, session },
+        { projectId: "project_a" },
+      );
+
+      expect(snapshot.available.projects.map((p) => p.id)).toEqual([
+        "project_a",
+      ]);
+    });
   });
 });

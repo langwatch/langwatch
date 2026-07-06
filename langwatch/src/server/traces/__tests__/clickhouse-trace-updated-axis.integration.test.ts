@@ -22,7 +22,6 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
-import type { Protections } from "../../elasticsearch/protections";
 import {
   startTestContainers,
   stopTestContainers,
@@ -32,6 +31,7 @@ import type {
   GetAllTracesForProjectInput,
   TracesForProjectResult,
 } from "../types";
+import { openProtections } from "./open-protections";
 
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
   getClickHouseClientForProject: vi.fn(),
@@ -48,12 +48,6 @@ const tenantId = `test-updated-axis-${nanoid()}`;
 const now = Date.now();
 const SECOND = 1000;
 const ONE_DAY = 24 * 60 * 60 * 1000;
-
-const openProtections: Protections = {
-  canSeeCosts: true,
-  canSeeCapturedInput: true,
-  canSeeCapturedOutput: true,
-};
 
 // Distinct traces, each inserted as MULTIPLE versions (same TraceId, same
 // OccurredAt, increasing UpdatedAt) — exactly what re-ingestion / late

@@ -15,23 +15,28 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 
 /**
- * Max wall-clock the locked transaction may run before Prisma aborts it with
- * P2028. Sized for worst-case chunk I/O under the lock: edit / delete /
- * `recomputeDatasetCounts` do O(chunkCount) `readChunk` + `rewriteChunk` calls —
- * each a network round-trip to object storage — inside this transaction.
+ * Max wall-clock a dataset-mutation transaction may run before Prisma aborts it
+ * with P2028. Sized for worst-case bulk work inside the transaction:
+ *  - s3_jsonl path: edit / delete / `recomputeDatasetCounts` do O(chunkCount)
+ *    `readChunk` + `rewriteChunk` calls — each a network round-trip to object
+ *    storage — under the advisory lock.
+ *  - legacy postgres path: a column-type migration does O(rowCount) per-row
+ *    `datasetRecord.update`s before the final `dataset.update`.
  * Prisma's DEFAULT interactive-txn timeout is 5s, which P2028s on any
- * multi-chunk dataset; 120s is generous enough for a large chunk set's
- * sequential S3 round-trips while still bounding a wedged transaction.
+ * non-trivial dataset; 120s is generous enough for a large chunk set's
+ * sequential S3 round-trips (or a large row set's per-row UPDATEs) while still
+ * bounding a wedged transaction. Exported so the legacy path
+ * (`DatasetService.updateExistingDataset`) shares the same budget.
  */
-const DATASET_LOCK_TXN_TIMEOUT_MS = 120_000;
+export const DATASET_MUTATION_TXN_TIMEOUT_MS = 120_000;
 
 /**
  * Max wall-clock to WAIT for a connection from the pool before starting the
  * transaction (separate from the run timeout above). Bumped from Prisma's 2s
  * default so a busy pool doesn't spuriously fail the mutation before it even
- * acquires the advisory lock.
+ * starts work.
  */
-const DATASET_LOCK_TXN_MAX_WAIT_MS = 10_000;
+export const DATASET_MUTATION_TXN_MAX_WAIT_MS = 10_000;
 
 /**
  * Run `fn` inside a `$transaction` holding the per-dataset advisory lock. The
@@ -67,7 +72,7 @@ export const withDatasetLock = async <T>(
       return fn(tx);
     },
     {
-      timeout: DATASET_LOCK_TXN_TIMEOUT_MS,
-      maxWait: DATASET_LOCK_TXN_MAX_WAIT_MS,
+      timeout: DATASET_MUTATION_TXN_TIMEOUT_MS,
+      maxWait: DATASET_MUTATION_TXN_MAX_WAIT_MS,
     },
   );

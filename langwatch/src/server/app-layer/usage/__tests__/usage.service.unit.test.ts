@@ -279,6 +279,38 @@ describe("UsageService", () => {
 
         expect(mockPlanResolver).toHaveBeenCalledWith("org-123");
       });
+
+      /** @scenario Limit checks decide from one active plan snapshot */
+      it("uses one active plan snapshot for counting, threshold, and message wording", async () => {
+        const firstPlan: PlanInfo = {
+          ...FREE_PLAN,
+          planSource: "license",
+          free: false,
+          maxMessagesPerMonth: 1000,
+          usageUnit: "events",
+        };
+        const laterPlan: PlanInfo = {
+          ...FREE_PLAN,
+          planSource: "subscription",
+          free: false,
+          maxMessagesPerMonth: 2000,
+          usageUnit: "traces",
+        };
+        (mockPlanResolver as ReturnType<typeof vi.fn>)
+          .mockResolvedValue(laterPlan)
+          .mockResolvedValueOnce(firstPlan);
+
+        const result = await service.checkLimit({ teamId: "team-123" });
+
+        expect(result.exceeded).toBe(true);
+        expect(result.maxMessagesPerMonth).toBe(1000);
+        // "Monthly"/"events" only come from firstPlan (free: false, license
+        // override with usageUnit "events"); laterPlan would render "Free"/"traces".
+        expect(result.message).toContain(
+          "Monthly limit of 1000 events reached",
+        );
+        expect(mockPlanResolver).toHaveBeenCalledTimes(1);
+      });
     });
 
     describe("when count < maxMessagesPerMonth", () => {

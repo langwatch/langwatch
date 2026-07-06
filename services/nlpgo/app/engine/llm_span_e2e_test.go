@@ -121,3 +121,68 @@ func TestEngineExecute_SignatureNodeEmitsLLMChildSpan(t *testing.T) {
 	assert.EqualValues(t, 1, llmAttrs["gen_ai.usage.output_tokens"])
 	assert.InDelta(t, 0.00018, toFloat(llmAttrs["langwatch.cost"]), 1e-9)
 }
+
+// TestEngineExecute_SignatureNodeSurfacesTokenMetrics proves runSignature
+// surfaces the LLM token usage + resolved model on the node state. The gateway
+// returns no cost on this path, so the control plane prices the call from these
+// counts; without them the evaluations-v3 cell showed no cost even though the
+// trace did (rchaves dogfood 2026-06-19).
+func TestEngineExecute_SignatureNodeSurfacesTokenMetrics(t *testing.T) {
+	_ = withRecorder(t)
+
+	model := "openai/gpt-5-mini"
+	llm := &fakeLLMClient{
+		resp: &app.LLMResponse{
+			Content: "4",
+			Usage: app.Usage{
+				PromptTokens:     30,
+				CompletionTokens: 5,
+				TotalTokens:      35,
+				ReasoningTokens:  2,
+			},
+		},
+	}
+
+	eng := New(Options{LLM: llm})
+	llmConfigJSON, err := json.Marshal(map[string]any{"model": model})
+	require.NoError(t, err)
+
+	wf := &dsl.Workflow{
+		WorkflowID: "wf_llm_metrics",
+		Nodes: []dsl.Node{
+			{ID: "entry", Type: dsl.ComponentEntry, Data: dsl.Component{
+				Outputs: []dsl.Field{{Identifier: "question", Type: dsl.FieldTypeStr}},
+			}},
+			{ID: "answer", Type: dsl.ComponentSignature, Data: dsl.Component{
+				Parameters: []dsl.Field{
+					{Identifier: "llm", Type: dsl.FieldTypeLLM, Value: llmConfigJSON},
+				},
+				Inputs:  []dsl.Field{{Identifier: "question", Type: dsl.FieldTypeStr}},
+				Outputs: []dsl.Field{{Identifier: "answer", Type: dsl.FieldTypeStr}},
+			}},
+			{ID: "end", Type: dsl.ComponentEnd, Data: dsl.Component{
+				Inputs: []dsl.Field{{Identifier: "answer", Type: dsl.FieldTypeStr}},
+			}},
+		},
+		Edges: []dsl.Edge{
+			{Source: "entry", SourceHandle: "outputs.question", Target: "answer", TargetHandle: "inputs.question"},
+			{Source: "answer", SourceHandle: "outputs.answer", Target: "end", TargetHandle: "inputs.answer"},
+		},
+	}
+
+	res, err := eng.Execute(context.Background(), ExecuteRequest{
+		Workflow: wf,
+		Inputs:   map[string]any{"question": "What is 2+2?"},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+
+	ns := res.Nodes["answer"]
+	require.NotNil(t, ns, "answer node state must be present")
+	require.NotNil(t, ns.Metrics, "signature node must surface token metrics for pricing")
+	assert.Equal(t, 30, ns.Metrics.PromptTokens)
+	assert.Equal(t, 5, ns.Metrics.CompletionTokens)
+	assert.Equal(t, 35, ns.Metrics.TotalTokens)
+	assert.Equal(t, 2, ns.Metrics.ReasoningTokens)
+	assert.Equal(t, model, ns.Metrics.Model)
+}

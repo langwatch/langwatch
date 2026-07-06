@@ -40,6 +40,7 @@ import type { SavedView } from "../../hooks/useSavedViews";
 import { useSavedViews } from "../../hooks/useSavedViews";
 import { getOriginColor } from "../../utils/originColors";
 import { getColorForString } from "../../utils/rotatingColors";
+import { ConfirmDialog } from "../gateway/ConfirmDialog";
 import { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "../MainMenu";
 import { Menu } from "../ui/menu";
 
@@ -246,6 +247,7 @@ function ViewBadge({
 }) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [editName, setEditName] = useState(name);
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleDoubleClick = useCallback(() => {
@@ -361,9 +363,7 @@ function ViewBadge({
             height="14px"
             onClick={(e) => {
               e.stopPropagation();
-              if (window.confirm(`Delete "${name}" saved view?`)) {
-                onDelete?.();
-              }
+              setIsConfirmDeleteOpen(true);
             }}
             data-testid={`delete-view-${id}`}
           >
@@ -371,6 +371,18 @@ function ViewBadge({
           </IconButton>
         )}
       </HStack>
+      <ConfirmDialog
+        open={isConfirmDeleteOpen}
+        onOpenChange={setIsConfirmDeleteOpen}
+        title="Delete saved view"
+        message={`Delete "${name}" saved view?`}
+        confirmLabel="Delete"
+        tone="danger"
+        onConfirm={() => {
+          setIsConfirmDeleteOpen(false);
+          onDelete?.();
+        }}
+      />
     </Badge>
   );
 }

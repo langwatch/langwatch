@@ -9,10 +9,16 @@
 import type { LangwatchApiClient } from "@/internal/api/client";
 import type { Logger } from "@/logger";
 import { Experiment } from "./experiment";
+import {
+  ExperimentsApiService,
+  toRunStartRequest,
+} from "./experiments-api.service";
 import type { ExperimentInitOptions } from "./types";
 import type {
   ExperimentRunResult,
   RunExperimentOptions,
+  RunWithResultsOptions,
+  ExperimentRunWithResults,
   ExperimentRunSummary,
 } from "./platformTypes";
 import {
@@ -21,6 +27,12 @@ import {
   ExperimentTimeoutError,
   ExperimentRunFailedError,
 } from "./platformErrors";
+import {
+  pollExperimentRun,
+  rebaseUrlToEndpoint,
+  fetchResultsWithRetry,
+} from "./run-status";
+import { mapRunResultsToRows } from "./mapResults";
 import { printSummary } from "./printSummary";
 
 const DEFAULT_POLL_INTERVAL = 2000;
@@ -38,9 +50,13 @@ type ExperimentsFacadeConfig = {
  */
 export class ExperimentsFacade {
   private readonly config: ExperimentsFacadeConfig;
+  private readonly apiService: ExperimentsApiService;
 
   constructor(config: ExperimentsFacadeConfig) {
     this.config = config;
+    this.apiService = new ExperimentsApiService({
+      langwatchApiClient: config.langwatchApiClient,
+    });
   }
 
   /**
@@ -98,6 +114,84 @@ export class ExperimentsFacade {
   }
 
   /**
+   * Run a platform experiment and return per-row structured results.
+   *
+   * Starts the run through the unified evaluations-v3 backend (optionally
+   * overriding the configured inputs via `data` / `datasetId` / `parameters` /
+   * `rowIndices`), polls to completion, fetches the per-row results, and maps
+   * them to the same row structure as the python SDK's results DataFrame.
+   *
+   * @param slug - The slug of the experiment (found in the experiment URL)
+   * @param options - Optional inputs and polling configuration
+   * @returns The run id, results URL, status, summary, and per-row results
+   *
+   * @example
+   * ```typescript
+   * const langwatch = new LangWatch();
+   * const { rows, runUrl } = await langwatch.experiments.runWithResults(
+   *   "my-experiment-slug",
+   *   { data: [{ question: "What is 2 + 2?" }] },
+   * );
+   * for (const row of rows) {
+   *   console.log(row.output, row.evaluations);
+   * }
+   * ```
+   */
+  async runWithResults(
+    slug: string,
+    options: RunWithResultsOptions = {},
+  ): Promise<ExperimentRunWithResults> {
+    this.config.logger.info(`Running platform experiment with results: ${slug}`);
+
+    const body = toRunStartRequest({
+      data: options.data,
+      datasetId: options.datasetId,
+      parameters: options.parameters,
+      rowIndices: options.rowIndices,
+    });
+
+    const startResponse = await this.apiService.startV3Run({ slug, body });
+    const { runId } = startResponse;
+
+    const { status, summary } = await pollExperimentRun({
+      runId,
+      getStatus: (id) => this.apiService.getV3RunStatus(id),
+      pollInterval: options.pollInterval,
+      timeout: options.timeout,
+      onProgress: options.onProgress,
+    });
+
+    // ClickHouse can lag right after completion: the results endpoint may 404
+    // ("not yet available") or return 200 with an empty dataset before the rows
+    // materialize. Retry both cases when the run reported rows, mirroring the
+    // python SDK, instead of failing or returning an empty result.
+    const results = await fetchResultsWithRetry({
+      getResults: () =>
+        this.apiService.getV3RunResults({ runId, experimentSlug: slug }),
+      isEmpty: (r) => (r.dataset?.length ?? 0) === 0,
+      expectsRows: (summary.totalCells ?? 0) > 0,
+      delay: options.pollInterval ?? DEFAULT_POLL_INTERVAL,
+    });
+
+    // Always return the URL rebased onto the configured endpoint, so a
+    // self-hosted run does not surface a cloud (app.langwatch.ai) link. Both
+    // the start response and the summary carry the platform's own URL; whichever
+    // is present gets its domain replaced. Mirrors the python SDK.
+    const rawRunUrl = startResponse.runUrl ?? summary.runUrl;
+    const runUrl = rawRunUrl
+      ? rebaseUrlToEndpoint(rawRunUrl, this.config.endpoint)
+      : "";
+
+    return {
+      runId,
+      runUrl,
+      status,
+      summary,
+      rows: mapRunResultsToRows(results),
+    };
+  }
+
+  /**
    * Run an experiment and wait for completion using polling
    */
   private async runWithPolling(
@@ -113,7 +207,7 @@ export class ExperimentsFacade {
 
     // Use the run URL from API but replace domain with configured endpoint
     const apiRunUrl = startResponse.runUrl ?? "";
-    const runUrl = apiRunUrl ? this.replaceUrlDomain(apiRunUrl, this.config.endpoint) : "";
+    const runUrl = apiRunUrl ? rebaseUrlToEndpoint(apiRunUrl, this.config.endpoint) : "";
 
     console.log(`Started experiment run: ${runId}`);
     if (runUrl) {
@@ -311,21 +405,4 @@ export class ExperimentsFacade {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  /**
-   * Replace the domain of a URL with a new base URL, preserving the path
-   */
-  private replaceUrlDomain(url: string, newBase: string): string {
-    if (!url) return url;
-
-    try {
-      const parsedUrl = new URL(url);
-      const parsedNewBase = new URL(newBase);
-
-      // Replace origin with new base, keep path/query/fragment
-      return `${parsedNewBase.origin}${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
-    } catch {
-      // If URL parsing fails, return original
-      return url;
-    }
-  }
 }
