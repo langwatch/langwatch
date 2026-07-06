@@ -130,7 +130,7 @@ jobs:
           LANGWATCH_ENDPOINT: http://host.docker.internal:5570
         options: >-
           --add-host host.docker.internal:host-gateway
-          --health-cmd "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5561/health')\" || exit 1"
+          --health-cmd "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5561/healthz')\" || exit 1"
           --health-interval 15s
           --health-timeout 10s
           --health-retries 12
