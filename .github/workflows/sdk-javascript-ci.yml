@@ -69,7 +69,14 @@ jobs:
         run: pnpm run build
 
       - name: Run tests
-        if: github.actor != 'dependabot[bot]' || github.event_name == 'pull_request_target'
+        # Fork PRs don't receive repository secrets, so a secret-backed run
+        # can only fail on a missing key. Skip it on forks; same-repo PRs,
+        # pushes, and label-approved pull_request_target still run.
+        if: >
+          (github.event_name != 'pull_request'
+           || github.event.pull_request.head.repo.full_name == github.repository)
+          && (github.actor != 'dependabot[bot]'
+           || github.event_name == 'pull_request_target')
         env:
           LANGWATCH_ENDPOINT: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_ENDPOINT }}
           OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
@@ -229,7 +236,14 @@ jobs:
         run: pnpm run build
 
       - name: Run e2e tests
-        if: github.actor != 'dependabot[bot]' || github.event_name == 'pull_request_target'
+        # Fork PRs don't receive repository secrets, so a secret-backed run
+        # can only fail on a missing key. Skip it on forks; same-repo PRs,
+        # pushes, and label-approved pull_request_target still run.
+        if: >
+          (github.event_name != 'pull_request'
+           || github.event.pull_request.head.repo.full_name == github.repository)
+          && (github.actor != 'dependabot[bot]'
+           || github.event_name == 'pull_request_target')
         env:
           OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
           E2E_TIMEOUT: 120000
