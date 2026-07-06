@@ -144,8 +144,8 @@ importers:
         specifier: ^0.4.3
         version: 0.4.3(hono@4.12.25)(zod@3.25.76)
       '@hookform/resolvers':
-        specifier: ^5.2.2
-        version: 5.2.2(react-hook-form@7.72.1(react@19.2.5))
+        specifier: ^5.4.0
+        version: 5.4.0(react-hook-form@7.72.1(react@19.2.5))
       '@langwatch/ksuid':
         specifier: ^2.0.2
         version: 2.0.2
@@ -2228,8 +2228,8 @@ packages:
       hono: '>=4.12.25'
       zod: ^3.19.1
 
-  '@hookform/resolvers@5.2.2':
-    resolution: {integrity: sha512-A/IxlMLShx3KjV/HeTcTfaMxdwy690+L/ZADoeaTltLx+CVuzkeVIPuybK3jrRfw7YZnmdKsVVHAlEPIAEUNlA==}
+  '@hookform/resolvers@5.4.0':
+    resolution: {integrity: sha512-EIsqr/t/qbinPIhGjMdtvutIN1Kk4uwbROE9/UQ93CAVGR7GkA7Y92+fX80OzXi/OB67jVFYwKGO1WzkxmkFZw==}
     peerDependencies:
       react-hook-form: ^7.55.0
 
@@ -13961,7 +13961,7 @@ snapshots:
       hono: 4.12.25
       zod: 3.25.76
 
-  '@hookform/resolvers@5.2.2(react-hook-form@7.72.1(react@19.2.5))':
+  '@hookform/resolvers@5.4.0(react-hook-form@7.72.1(react@19.2.5))':
     dependencies:
       '@standard-schema/utils': 0.3.0
       react-hook-form: 7.72.1(react@19.2.5)
