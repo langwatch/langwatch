@@ -180,7 +180,7 @@ export async function evaluateGraphTrigger({
     });
   }
 
-  const params = (trigger.actionParams ?? {}) as ActionParams;
+  const params = (trigger.actionParams ?? {}) as unknown as ActionParams;
   const threshold = params.threshold;
   const operator = params.operator;
   const timePeriod = params.timePeriod;
