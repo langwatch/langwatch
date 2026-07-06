@@ -14,6 +14,14 @@ import { Compass } from "lucide-react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
+// FacetSection now calls useFacetSearch (server-side value search) at the top
+// level. This suite renders FacetSection without a tRPC provider, so stub the
+// hook out — server search has its own dedicated suite
+// (FacetSection.serverSearch.integration.test.tsx).
+vi.mock("../../../hooks/useFacetSearch", () => ({
+  useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
+}));
+
 import { FacetSection } from "../FacetSection";
 import type { FacetItem, FacetValueState } from "../types";
 

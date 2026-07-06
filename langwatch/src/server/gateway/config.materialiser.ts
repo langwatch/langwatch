@@ -18,6 +18,7 @@ import type {
 } from "@prisma/client";
 
 import { decrypt } from "../../utils/encryption";
+import { modelProviders } from "../modelProviders/registry";
 import { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
 import { GatewayCacheRuleService } from "./cacheRule.service";
 import {
@@ -485,8 +486,26 @@ function buildCredentials(mp: ModelProvider): Record<string, unknown> {
 function buildProviderSlot(mp: ModelProvider, index: number): ProviderSlot {
   const credentials = buildCredentials(mp);
   const customKeys = decryptCustomKeys(mp.customKeys);
+  // Only "custom" and "openai" route a base-URL override to Bifrost's VLLM
+  // adapter (see mapProvider in bifrost.go), the sole consumer of the
+  // per-slot base_url. Other providers with an endpointKey resolve their
+  // endpoint elsewhere (Azure/Vertex via credentials.endpoint, Anthropic via
+  // Bifrost's provider-level network_config), so emitting a per-slot base_url
+  // for them would be a dead field. Scope the override to what's consumed;
+  // this is what lets an "openai" provider with OPENAI_BASE_URL reach a
+  // self-hosted proxy instead of api.openai.com.
+  const supportsBaseURLOverride =
+    mp.provider === "custom" || mp.provider === "openai";
+  const endpointKey = supportsBaseURLOverride
+    ? modelProviders[mp.provider as keyof typeof modelProviders]?.endpointKey
+    : undefined;
+  const registryBaseURL = endpointKey
+    ? pickString(customKeys, endpointKey)
+    : undefined;
   const baseURL =
-    pickString(customKeys, "base_url") ?? pickString(customKeys, "BASE_URL");
+    pickString(customKeys, "base_url") ??
+    pickString(customKeys, "BASE_URL") ??
+    registryBaseURL;
   const region = pickString(credentials, "region");
   const deploymentMap = mp.deploymentMapping
     ? (mp.deploymentMapping as Record<string, string>)

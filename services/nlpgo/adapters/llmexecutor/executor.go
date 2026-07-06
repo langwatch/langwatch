@@ -70,9 +70,9 @@ func (e *Executor) Execute(ctx context.Context, req app.LLMRequest) (*app.LLMRes
 	}
 	durationMS := time.Since(start).Milliseconds()
 	if resp.StatusCode/100 != 2 {
-		provider, _ := litellm.SplitProviderModel(req.Model)
+		provider := req.Provider
 		if provider == "" {
-			provider = req.Provider
+			provider, _ = litellm.SplitProviderModel(req.Model)
 		}
 		return nil, &GatewayHTTPError{
 			StatusCode: resp.StatusCode,
@@ -167,25 +167,30 @@ func extractProviderErrorMessage(body []byte) string {
 // buildGatewayRequest performs all the shape mapping in one place so the
 // streaming and non-streaming paths share identical translation logic.
 func buildGatewayRequest(ctx context.Context, req app.LLMRequest, stream bool) (app.GatewayRequest, error) {
-	provider, _ := litellm.SplitProviderModel(req.Model)
+	// req.Provider is authoritative when set: the engine strips the
+	// provider prefix in `splitModel` (engine.go) and stores it there.
+	// Splitting req.Model first would mis-derive the provider for custom
+	// model ids that contain a slash of their own — "custom/Qwen/Qwen2.5"
+	// arrives here as Model "Qwen/Qwen2.5" + Provider "custom", and the
+	// split would yield provider "qwen".
+	provider := req.Provider
 	if provider == "" {
-		// Some workflows store the provider on the LLMRequest separately —
-		// honor that as a fall-back.
-		provider = req.Provider
+		provider, _ = litellm.SplitProviderModel(req.Model)
 	}
 	if provider == "" {
 		return app.GatewayRequest{}, fmt.Errorf("could not infer provider from model %q", req.Model)
 	}
 
 	// Reconstruct the prefixed model id before TranslateModelID so its
-	// providersNeedingDotToDash gate can see the provider. The engine
-	// strips the prefix in `splitModel` (engine.go) and stores it on
-	// req.Provider — without re-prefixing here, TranslateModelID falls
-	// to its empty-provider safety branch (treats as anthropic-like)
-	// and dot→dashes every model id, mangling Gemini + Vertex + Gemini's
-	// 2.5 family on the inline-credentials path.
+	// providersNeedingDotToDash gate can see the provider — without
+	// re-prefixing, TranslateModelID falls to its empty-provider safety
+	// branch (treats as anthropic-like) and dot→dashes every model id,
+	// mangling Gemini + Vertex + Gemini's 2.5 family on the
+	// inline-credentials path. Prefix-check (not just slash-check) so a
+	// custom model id like "Qwen/Qwen2.5-32B-Instruct" still gets its
+	// "custom/" prefix restored.
 	prefixedModel := req.Model
-	if !strings.Contains(req.Model, "/") && provider != "" {
+	if !strings.HasPrefix(req.Model, provider+"/") {
 		prefixedModel = provider + "/" + req.Model
 	}
 	translatedModel := litellm.TranslateModelID(prefixedModel)

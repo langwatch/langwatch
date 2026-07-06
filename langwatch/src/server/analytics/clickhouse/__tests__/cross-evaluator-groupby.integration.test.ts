@@ -33,6 +33,7 @@ import type { FlattenAnalyticsMetricsEnum } from "../../registry";
 import type { AggregationTypes } from "../../types";
 import { seedSpans } from "./test-utils/clickhouse-fixtures";
 import { wrapWithDefaultSettings } from "~/server/clickhouse/safeClickhouseClient";
+import { deleteEvaluationRunsByTenant } from "./test-utils/clickhouse-cleanup";
 
 const TENANT_ID = "test-cross-eval-2668";
 
@@ -149,15 +150,7 @@ describe("cross-evaluator-groupby", () => {
 
   afterAll(async () => {
     await cleanupTestData(TENANT_ID);
-
-    // cleanupTestData does not delete from evaluation_runs — clean up manually
-    const rawClient = getTestClickHouseClient();
-    if (rawClient) {
-      await rawClient.exec({
-        query: `ALTER TABLE evaluation_runs DELETE WHERE TenantId = {tenantId:String} SETTINGS mutations_sync = 1`,
-        query_params: { tenantId: TENANT_ID },
-      });
-    }
+    await deleteEvaluationRunsByTenant({ client: ch, tenantId: TENANT_ID });
   });
 
   describe("regression: issue #2668 — groupByKey evaluator filter removed from global WHERE", () => {
