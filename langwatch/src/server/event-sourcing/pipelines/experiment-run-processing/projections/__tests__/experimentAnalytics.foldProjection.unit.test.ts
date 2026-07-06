@@ -1,9 +1,4 @@
 import { describe, expect, it } from "vitest";
-import {
-  ExperimentAnalyticsFoldProjection,
-  EXPERIMENT_ANALYTICS_PROJECTION_VERSION_LATEST,
-  projectExperimentAnalyticsStateToRow,
-} from "../experimentAnalytics.foldProjection";
 import type {
   EvaluatorResultEvent,
   ExperimentRunCompletedEvent,
@@ -11,6 +6,11 @@ import type {
   TargetResultEvent,
   TraceMetricsComputedEvent,
 } from "../../schemas/events";
+import {
+  EXPERIMENT_ANALYTICS_PROJECTION_VERSION_LATEST,
+  ExperimentAnalyticsFoldProjection,
+  projectExperimentAnalyticsStateToRow,
+} from "../experimentAnalytics.foldProjection";
 
 const TENANT = "proj-exp";
 
@@ -120,13 +120,22 @@ describe("ExperimentAnalyticsFoldProjection", () => {
       });
       let state = slim.init();
       state = slim.handleExperimentRunStarted(makeStarted(), state);
-      state = slim.handleExperimentRunTargetResult(makeTarget(false, 0.1), state);
-      state = slim.handleExperimentRunTargetResult(makeTarget(true, 0.05), state);
+      state = slim.handleExperimentRunTargetResult(
+        makeTarget(false, 0.1),
+        state,
+      );
+      state = slim.handleExperimentRunTargetResult(
+        makeTarget(true, 0.05),
+        state,
+      );
       state = slim.handleExperimentRunEvaluatorResult(
         makeEvaluator(0.8, true),
         state,
       );
-      state = slim.handleExperimentRunCompleted(makeCompleted(true, false), state);
+      state = slim.handleExperimentRunCompleted(
+        makeCompleted(true, false),
+        state,
+      );
 
       expect(state.runId).toBe("run-1");
       expect(state.experimentId).toBe("exp-1");
@@ -151,7 +160,10 @@ describe("ExperimentAnalyticsFoldProjection", () => {
       });
       let state = slim.init();
       state = slim.handleExperimentRunStarted(makeStarted(), state);
-      state = slim.handleExperimentRunCompleted(makeCompleted(true, false), state);
+      state = slim.handleExperimentRunCompleted(
+        makeCompleted(true, false),
+        state,
+      );
       state = { ...state, LastEventOccurredAt: 9, createdAt: 1, updatedAt: 9 };
       const row = projectExperimentAnalyticsStateToRow({
         state,
@@ -167,7 +179,10 @@ describe("ExperimentAnalyticsFoldProjection", () => {
       });
       let state = slim.init();
       state = slim.handleExperimentRunStarted(makeStarted(), state);
-      state = slim.handleExperimentRunCompleted(makeCompleted(false, true), state);
+      state = slim.handleExperimentRunCompleted(
+        makeCompleted(false, true),
+        state,
+      );
       state = { ...state, LastEventOccurredAt: 9, createdAt: 1, updatedAt: 9 };
       const row = projectExperimentAnalyticsStateToRow({
         state,

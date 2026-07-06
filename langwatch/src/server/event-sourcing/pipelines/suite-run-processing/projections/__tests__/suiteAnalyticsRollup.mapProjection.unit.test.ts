@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { SuiteAnalyticsRollupMapProjection } from "../suiteAnalyticsRollup.mapProjection";
 import type { SuiteRunItemCompletedEvent } from "../../schemas/events";
+import { SuiteAnalyticsRollupMapProjection } from "../suiteAnalyticsRollup.mapProjection";
 
 const TENANT = "proj-suite-rollup";
 
@@ -38,7 +38,11 @@ describe("SuiteAnalyticsRollupMapProjection", () => {
   describe("given an item with verdict success", () => {
     it("emits successCount=1 / itemCount=1 / verdict 'success'", () => {
       const row = proj.mapSuiteRunItemCompleted(
-        makeItemCompleted({ status: "SUCCESS", verdict: "success", durationMs: 250 }),
+        makeItemCompleted({
+          status: "SUCCESS",
+          verdict: "success",
+          durationMs: 250,
+        }),
       );
       expect(row.tenantId).toBe(TENANT);
       expect(row.batchRunId).toBe("batch-rollup");

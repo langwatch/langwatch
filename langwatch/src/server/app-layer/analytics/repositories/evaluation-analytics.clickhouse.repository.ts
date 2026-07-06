@@ -8,9 +8,9 @@
  * builder's job.
  */
 
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { ANALYTICS_CLICKHOUSE_SETTINGS } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import type { TimeseriesResult } from "~/server/analytics/types";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { createLogger } from "~/utils/logger/server";
 import { AnalyticsClientUnavailableError } from "../errors";
 import { buildEvalSlimTimeseriesQuery } from "../query-builders/eval-slim-timeseries-query";

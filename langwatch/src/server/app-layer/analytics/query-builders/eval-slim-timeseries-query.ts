@@ -30,11 +30,7 @@ import type {
   AnalyticsTimeseriesBuilderInput,
   BuiltAnalyticsQuery,
 } from "../types";
-import {
-  collectStringValues,
-  dateTrunc,
-  hasFilterValues,
-} from "./_shared";
+import { collectStringValues, dateTrunc, hasFilterValues } from "./_shared";
 
 const SLIM_TABLE = "evaluation_analytics" as const;
 const ea = "ea";
@@ -138,10 +134,7 @@ function percentileFor(agg: AggregationTypes): number {
   }
 }
 
-function evalSlimAggExpression(
-  agg: AggregationTypes,
-  column: string,
-): string {
+function evalSlimAggExpression(agg: AggregationTypes, column: string): string {
   if (isPercentile(agg)) {
     return `quantileExact(${percentileFor(agg)})(${column})`;
   }
@@ -157,6 +150,8 @@ function evalSlimAggExpression(
     case "cardinality":
     case "terms":
       return `uniq(${column})`;
+    default:
+      throw new Error(`Unhandled eval slim aggregation: ${String(agg)}`);
   }
 }
 
@@ -280,7 +275,10 @@ export function buildEvalSlimTimeseriesQuery(
       );
     }
     const alias = buildMetricAlias(i, s.metric, s.aggregation, s.key, s.subkey);
-    const expr = evalSlimAggExpression(s.aggregation, evalSlimColumnFor(s.metric));
+    const expr = evalSlimAggExpression(
+      s.aggregation,
+      evalSlimColumnFor(s.metric),
+    );
     selectExprs.push(`${expr} AS ${alias}`);
     // Stamp evaluator-id filter parameters when a `requiresKey` value is
     // present on the series. The WHERE-fragment below ANDs them via a
@@ -300,7 +298,9 @@ export function buildEvalSlimTimeseriesQuery(
     buildEvalSlimFilterClauses(input.filters);
 
   const evaluatorIdClauses = Object.keys(evaluatorKeyParams)
-    .map((p) => `${ea}.EvaluatorType IS NOT NULL AND ${ea}.EvaluatorId = ANY(?)`)
+    .map(
+      (p) => `${ea}.EvaluatorType IS NOT NULL AND ${ea}.EvaluatorId = ANY(?)`,
+    )
     .join("");
   // Use a single `EvaluatorId IN (...)` predicate built from the union of
   // all series' keys. (Each series targets a single evaluator; the union

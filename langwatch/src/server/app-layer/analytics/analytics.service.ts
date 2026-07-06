@@ -37,18 +37,6 @@ import { featureFlagService } from "~/server/featureFlag";
 import type { FilterField } from "~/server/filters/types";
 import { TtlCache } from "~/server/utils/ttlCache";
 import {
-  ClickHouseLegacyTraceSummariesShim,
-  type LegacyTraceSummariesShim,
-} from "./repositories/legacy-trace-summaries.shim";
-import {
-  TraceAnalyticsClickHouseReadRepository,
-  type TraceAnalyticsReadRepository,
-} from "./repositories/trace-analytics.clickhouse.repository";
-import {
-  TraceAnalyticsRollupClickHouseReadRepository,
-  type TraceAnalyticsRollupReadRepository,
-} from "./repositories/trace-analytics-rollup.clickhouse.repository";
-import {
   EvaluationAnalyticsClickHouseReadRepository,
   type EvaluationAnalyticsReadRepository,
 } from "./repositories/evaluation-analytics.clickhouse.repository";
@@ -60,6 +48,18 @@ import {
   ClickHouseLegacyEvaluationRunsShim,
   type LegacyEvaluationRunsShim,
 } from "./repositories/legacy-evaluation-runs.shim";
+import {
+  ClickHouseLegacyTraceSummariesShim,
+  type LegacyTraceSummariesShim,
+} from "./repositories/legacy-trace-summaries.shim";
+import {
+  TraceAnalyticsClickHouseReadRepository,
+  type TraceAnalyticsReadRepository,
+} from "./repositories/trace-analytics.clickhouse.repository";
+import {
+  TraceAnalyticsRollupClickHouseReadRepository,
+  type TraceAnalyticsRollupReadRepository,
+} from "./repositories/trace-analytics-rollup.clickhouse.repository";
 import { type AnalyticsTable, pickAnalyticsTable } from "./routing/route-table";
 import { compareForTripwire } from "./tripwire/divergence-compare";
 

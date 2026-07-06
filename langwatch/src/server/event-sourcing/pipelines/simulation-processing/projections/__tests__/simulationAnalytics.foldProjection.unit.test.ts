@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
-import {
-  projectSimulationAnalyticsStateToRow,
-  SimulationAnalyticsFoldProjection,
-  SIMULATION_ANALYTICS_PROJECTION_VERSION_LATEST,
-} from "../simulationAnalytics.foldProjection";
 import type {
   SimulationRunFinishedEvent,
   SimulationRunMetricsComputedEvent,
   SimulationRunQueuedEvent,
   SimulationRunStartedEvent,
 } from "../../schemas/events";
+import {
+  projectSimulationAnalyticsStateToRow,
+  SIMULATION_ANALYTICS_PROJECTION_VERSION_LATEST,
+  SimulationAnalyticsFoldProjection,
+} from "../simulationAnalytics.foldProjection";
 
 /**
  * ADR-034 Phase 7 — slim scenario fold unit tests.
@@ -142,7 +142,12 @@ describe("SimulationAnalyticsFoldProjection", () => {
       });
       let state = slim.init();
       state = slim.handleSimulationRunQueued(makeQueued(), state);
-      state = { ...state, LastEventOccurredAt: 1234, createdAt: 1234, updatedAt: 1234 };
+      state = {
+        ...state,
+        LastEventOccurredAt: 1234,
+        createdAt: 1234,
+        updatedAt: 1234,
+      };
       const row = projectSimulationAnalyticsStateToRow({
         state,
         tenantId: TENANT,

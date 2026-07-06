@@ -3,22 +3,28 @@ import type { FoldProjectionStore } from "../../projections/foldProjection.types
 import type { AppendStore } from "../../projections/mapProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
 import {
-  StartExperimentRunCommand,
-  RecordTargetResultCommand,
-  RecordEvaluatorResultCommand,
-  ComputeExperimentRunMetricsCommand,
   CompleteExperimentRunCommand,
+  ComputeExperimentRunMetricsCommand,
+  RecordEvaluatorResultCommand,
+  RecordTargetResultCommand,
+  StartExperimentRunCommand,
 } from "./commands";
 import {
-  ExperimentAnalyticsFoldProjection,
   type ExperimentAnalyticsData,
+  ExperimentAnalyticsFoldProjection,
 } from "./projections/experimentAnalytics.foldProjection";
 import {
   ExperimentAnalyticsRollupMapProjection,
   type ExperimentAnalyticsRollupRow,
 } from "./projections/experimentAnalyticsRollup.mapProjection";
-import { ExperimentRunResultStorageMapProjection, type ClickHouseExperimentRunResultRecord } from "./projections/experimentRunResultStorage.mapProjection";
-import { ExperimentRunStateFoldProjection, type ExperimentRunStateData } from "./projections/experimentRunState.foldProjection";
+import {
+  type ClickHouseExperimentRunResultRecord,
+  ExperimentRunResultStorageMapProjection,
+} from "./projections/experimentRunResultStorage.mapProjection";
+import {
+  type ExperimentRunStateData,
+  ExperimentRunStateFoldProjection,
+} from "./projections/experimentRunState.foldProjection";
 import type { ExperimentRunProcessingEvent } from "./schemas/events";
 
 export interface ExperimentRunProcessingPipelineDeps {
@@ -28,7 +34,10 @@ export interface ExperimentRunProcessingPipelineDeps {
   experimentAnalyticsStore: FoldProjectionStore<ExperimentAnalyticsData>;
   /** ADR-034 Phase 7: per-experiment-run rollup writer. */
   experimentAnalyticsRollupAppendStore: AppendStore<ExperimentAnalyticsRollupRow>;
-  esSync?: ReactorDefinition<ExperimentRunProcessingEvent, ExperimentRunStateData>;
+  esSync?: ReactorDefinition<
+    ExperimentRunProcessingEvent,
+    ExperimentRunStateData
+  >;
 }
 
 /**
@@ -52,22 +61,30 @@ export interface ExperimentRunProcessingPipelineDeps {
  * - recordEvaluatorResult: Emits EvaluatorResultEvent per row/evaluator
  * - completeExperimentRun: Emits ExperimentRunCompletedEvent when run finishes
  */
-export function createExperimentRunProcessingPipeline(deps: ExperimentRunProcessingPipelineDeps) {
+export function createExperimentRunProcessingPipeline(
+  deps: ExperimentRunProcessingPipelineDeps,
+) {
   const builder = definePipeline<ExperimentRunProcessingEvent>()
     .withName("experiment_run_processing")
     .withAggregateType("experiment_run")
-    .withFoldProjection("experimentRunState", new ExperimentRunStateFoldProjection({
-      store: deps.experimentRunStateFoldStore,
-    }))
+    .withFoldProjection(
+      "experimentRunState",
+      new ExperimentRunStateFoldProjection({
+        store: deps.experimentRunStateFoldStore,
+      }),
+    )
     .withFoldProjection(
       "experimentAnalytics",
       new ExperimentAnalyticsFoldProjection({
         store: deps.experimentAnalyticsStore,
       }),
     )
-    .withMapProjection("experimentRunResultStorage", new ExperimentRunResultStorageMapProjection({
-      store: deps.experimentRunItemAppendStore,
-    }))
+    .withMapProjection(
+      "experimentRunResultStorage",
+      new ExperimentRunResultStorageMapProjection({
+        store: deps.experimentRunItemAppendStore,
+      }),
+    )
     .withMapProjection(
       "experimentAnalyticsRollup",
       new ExperimentAnalyticsRollupMapProjection({
@@ -76,14 +93,21 @@ export function createExperimentRunProcessingPipeline(deps: ExperimentRunProcess
     );
 
   if (deps.esSync) {
-    builder.withReactor("experimentRunState", "experimentRunEsSync", deps.esSync);
+    builder.withReactor(
+      "experimentRunState",
+      "experimentRunEsSync",
+      deps.esSync,
+    );
   }
 
   return builder
     .withCommand("startExperimentRun", StartExperimentRunCommand)
     .withCommand("recordTargetResult", RecordTargetResultCommand)
     .withCommand("recordEvaluatorResult", RecordEvaluatorResultCommand)
-    .withCommand("computeExperimentRunMetrics", ComputeExperimentRunMetricsCommand)
+    .withCommand(
+      "computeExperimentRunMetrics",
+      ComputeExperimentRunMetricsCommand,
+    )
     .withCommand("completeExperimentRun", CompleteExperimentRunCommand)
     .build();
 }

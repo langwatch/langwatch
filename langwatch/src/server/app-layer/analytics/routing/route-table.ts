@@ -150,10 +150,12 @@ export type RollupRollableMetricKey =
   | TraceRollupMetricKey
   | EvalRollupMetricKey;
 
-export const ROLLUP_ROLLABLE_METRIC_KEYS: ReadonlySet<string> = new Set<string>([
-  ...ROLLUP_ROLLABLE_TRACE_METRIC_KEYS_LIST,
-  ...ROLLUP_ROLLABLE_EVAL_METRIC_KEYS_LIST,
-]);
+export const ROLLUP_ROLLABLE_METRIC_KEYS: ReadonlySet<string> = new Set<string>(
+  [
+    ...ROLLUP_ROLLABLE_TRACE_METRIC_KEYS_LIST,
+    ...ROLLUP_ROLLABLE_EVAL_METRIC_KEYS_LIST,
+  ],
+);
 
 export function isRollupRollableMetricKey(
   metric: string,
@@ -167,6 +169,23 @@ const ROLLUP_ROLLABLE_TRACE_METRIC_KEYS: ReadonlySet<string> = new Set<string>(
 const ROLLUP_ROLLABLE_EVAL_METRIC_KEYS: ReadonlySet<string> = new Set<string>(
   ROLLUP_ROLLABLE_EVAL_METRIC_KEYS_LIST,
 );
+
+/**
+ * Narrower guards for callers that only want trace- or eval-scoped rollable
+ * keys — used by the per-source SQL builders so their exhaustive switches
+ * type-narrow correctly.
+ */
+export function isRollupRollableTraceMetricKey(
+  metric: string,
+): metric is TraceRollupMetricKey {
+  return ROLLUP_ROLLABLE_TRACE_METRIC_KEYS.has(metric);
+}
+
+export function isSlimEligibleTraceMetricKey(
+  metric: string,
+): metric is SlimTraceMetricKey {
+  return SLIM_ELIGIBLE_TRACE_METRIC_KEYS.has(metric);
+}
 
 // ─── Slim eligibility ────────────────────────────────────────────────
 
@@ -308,12 +327,10 @@ const SLIM_TRACE_FILTER_FIELDS: ReadonlySet<FilterField> = new Set<FilterField>(
 );
 
 /** Slim-eval filter fields — typed columns on the slim row. */
-const SLIM_EVAL_FILTER_FIELDS: ReadonlySet<FilterField> = new Set<FilterField>(
-  [
-    "metadata.key",
-    "metadata.value",
-  ],
-);
+const SLIM_EVAL_FILTER_FIELDS: ReadonlySet<FilterField> = new Set<FilterField>([
+  "metadata.key",
+  "metadata.value",
+]);
 
 /**
  * Aggregations the trace rollup can compute CORRECTLY from its columns. The
@@ -455,9 +472,7 @@ function rollupHandlesSeries(
   source: AnalyticsMetricSource,
 ): boolean {
   const allowedAggs =
-    source === "trace"
-      ? ROLLUP_TRACE_AGGREGATIONS
-      : ROLLUP_EVAL_AGGREGATIONS;
+    source === "trace" ? ROLLUP_TRACE_AGGREGATIONS : ROLLUP_EVAL_AGGREGATIONS;
   if (!allowedAggs.has(s.aggregation)) return false;
   if (s.key !== undefined || s.subkey !== undefined) {
     // `requiresKey` metrics in the eval domain (every entry in
@@ -481,9 +496,7 @@ function rollupHandlesGroupBy(
 ): boolean {
   if (!groupBy) return true;
   const keys =
-    source === "trace"
-      ? ROLLUP_TRACE_GROUP_BY_KEYS
-      : ROLLUP_EVAL_GROUP_BY_KEYS;
+    source === "trace" ? ROLLUP_TRACE_GROUP_BY_KEYS : ROLLUP_EVAL_GROUP_BY_KEYS;
   return keys.has(groupBy);
 }
 

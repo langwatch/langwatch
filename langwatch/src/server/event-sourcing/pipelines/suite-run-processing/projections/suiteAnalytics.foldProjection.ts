@@ -33,8 +33,7 @@ const suiteAnalyticsEvents = [
 ] as const;
 
 /** Schema-snapshot version (calendar date). */
-export const SUITE_ANALYTICS_PROJECTION_VERSION_LATEST =
-  "2026-06-20" as const;
+export const SUITE_ANALYTICS_PROJECTION_VERSION_LATEST = "2026-06-20" as const;
 
 /**
  * Slim row landing in `suite_analytics`. Names align with the CH columns.
@@ -146,8 +145,7 @@ export class SuiteAnalyticsFoldProjection
     "updatedAt",
     "LastEventOccurredAt"
   >
-  implements
-    FoldEventHandlers<typeof suiteAnalyticsEvents, SuiteAnalyticsData>
+  implements FoldEventHandlers<typeof suiteAnalyticsEvents, SuiteAnalyticsData>
 {
   readonly name = "suiteAnalytics";
   readonly version = SUITE_ANALYTICS_PROJECTION_VERSION_LATEST;
@@ -230,9 +228,7 @@ export class SuiteAnalyticsFoldProjection
     }
 
     const passRateBps =
-      gradedCount > 0
-        ? Math.round((passedCount / gradedCount) * 10000)
-        : null;
+      gradedCount > 0 ? Math.round((passedCount / gradedCount) * 10000) : null;
 
     const progress = completedCount + failedCount;
     const allDone = state.total > 0 && progress >= state.total;

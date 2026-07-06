@@ -7,9 +7,9 @@
  * `query-builders/eval-rollup-timeseries-query.ts`.
  */
 
-import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { ANALYTICS_CLICKHOUSE_SETTINGS } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
 import type { TimeseriesResult } from "~/server/analytics/types";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { createLogger } from "~/utils/logger/server";
 import { AnalyticsClientUnavailableError } from "../errors";
 import { buildEvalRollupTimeseriesQuery } from "../query-builders/eval-rollup-timeseries-query";

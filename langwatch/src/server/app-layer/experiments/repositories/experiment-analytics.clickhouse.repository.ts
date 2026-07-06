@@ -68,7 +68,9 @@ function toClickHouseRecord(
     FailedCount: row.failedCount,
     TotalCost: row.totalCost,
     TotalDurationMs:
-      row.totalDurationMs == null ? null : String(Math.round(row.totalDurationMs)),
+      row.totalDurationMs == null
+        ? null
+        : String(Math.round(row.totalDurationMs)),
     AvgScoreBps: row.avgScoreBps,
     PassRateBps: row.passRateBps,
 

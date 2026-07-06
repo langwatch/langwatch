@@ -131,7 +131,10 @@ export class EvaluationAnalyticsRollupMapProjection
     typeof evaluationRollupEvents
   >
   implements
-    MapEventHandlers<typeof evaluationRollupEvents, EvaluationAnalyticsRollupRow>
+    MapEventHandlers<
+      typeof evaluationRollupEvents,
+      EvaluationAnalyticsRollupRow
+    >
 {
   readonly name = "evaluationAnalyticsRollup";
   readonly store: AppendStore<EvaluationAnalyticsRollupRow>;

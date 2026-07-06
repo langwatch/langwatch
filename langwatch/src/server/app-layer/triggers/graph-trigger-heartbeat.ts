@@ -28,6 +28,10 @@
 
 import type { PrismaClient } from "@prisma/client";
 import type { ActionParams } from "~/pages/api/cron/triggers/types";
+import {
+  type AnalyticsMetricSource,
+  getMetricSource,
+} from "~/server/app-layer/analytics/routing/field-availability";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma as defaultPrisma } from "~/server/db";
@@ -42,10 +46,6 @@ import {
 import { featureFlagService as defaultFeatureFlagService } from "~/server/featureFlag";
 import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
 import { createLogger } from "~/utils/logger/server";
-import {
-  type AnalyticsMetricSource,
-  getMetricSource,
-} from "~/server/app-layer/analytics/routing/field-availability";
 import { isNoDataPredicate } from "./evaluate-custom-graph-threshold.service";
 import type { TriggerService } from "./trigger.service";
 
@@ -533,7 +533,9 @@ export function defaultGraphTriggerHeartbeatDeps({
         select: { graph: true },
       });
       if (!graph) return undefined;
-      const blob = graph.graph as { series?: Array<{ metric?: string }> } | null;
+      const blob = graph.graph as {
+        series?: Array<{ metric?: string }>;
+      } | null;
       const firstMetric = blob?.series?.[0]?.metric;
       if (typeof firstMetric !== "string" || firstMetric.length === 0) {
         return undefined;

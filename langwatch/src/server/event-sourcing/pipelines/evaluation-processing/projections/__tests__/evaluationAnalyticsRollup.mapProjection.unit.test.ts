@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { EvaluationAnalyticsRollupMapProjection } from "../evaluationAnalyticsRollup.mapProjection";
 import type {
   EvaluationCompletedEvent,
   EvaluationReportedEvent,
 } from "../../schemas/events";
+import { EvaluationAnalyticsRollupMapProjection } from "../evaluationAnalyticsRollup.mapProjection";
 
 const TENANT = "proj-1";
 
@@ -67,20 +67,47 @@ describe("evaluationAnalyticsRollup map projection — per-event row", () => {
     });
 
     it("decodes pass/fail counters from `passed`", () => {
-      expect(map.mapEvaluationCompleted(makeCompleted({ passed: true })).passCount).toBe(1);
-      expect(map.mapEvaluationCompleted(makeCompleted({ passed: true })).failCount).toBe(0);
-      expect(map.mapEvaluationCompleted(makeCompleted({ passed: false })).passCount).toBe(0);
-      expect(map.mapEvaluationCompleted(makeCompleted({ passed: false })).failCount).toBe(1);
-      expect(map.mapEvaluationCompleted(makeCompleted({ passed: null })).passCount).toBe(0);
-      expect(map.mapEvaluationCompleted(makeCompleted({ passed: null })).failCount).toBe(0);
+      expect(
+        map.mapEvaluationCompleted(makeCompleted({ passed: true })).passCount,
+      ).toBe(1);
+      expect(
+        map.mapEvaluationCompleted(makeCompleted({ passed: true })).failCount,
+      ).toBe(0);
+      expect(
+        map.mapEvaluationCompleted(makeCompleted({ passed: false })).passCount,
+      ).toBe(0);
+      expect(
+        map.mapEvaluationCompleted(makeCompleted({ passed: false })).failCount,
+      ).toBe(1);
+      expect(
+        map.mapEvaluationCompleted(makeCompleted({ passed: null })).passCount,
+      ).toBe(0);
+      expect(
+        map.mapEvaluationCompleted(makeCompleted({ passed: null })).failCount,
+      ).toBe(0);
     });
 
     it("decodes error / skipped counters from `status`", () => {
-      expect(map.mapEvaluationCompleted(makeCompleted({ status: "error" })).errorCount).toBe(1);
-      expect(map.mapEvaluationCompleted(makeCompleted({ status: "error" })).skippedCount).toBe(0);
-      expect(map.mapEvaluationCompleted(makeCompleted({ status: "skipped" })).errorCount).toBe(0);
-      expect(map.mapEvaluationCompleted(makeCompleted({ status: "skipped" })).skippedCount).toBe(1);
-      expect(map.mapEvaluationCompleted(makeCompleted({ status: "processed" })).errorCount).toBe(0);
+      expect(
+        map.mapEvaluationCompleted(makeCompleted({ status: "error" }))
+          .errorCount,
+      ).toBe(1);
+      expect(
+        map.mapEvaluationCompleted(makeCompleted({ status: "error" }))
+          .skippedCount,
+      ).toBe(0);
+      expect(
+        map.mapEvaluationCompleted(makeCompleted({ status: "skipped" }))
+          .errorCount,
+      ).toBe(0);
+      expect(
+        map.mapEvaluationCompleted(makeCompleted({ status: "skipped" }))
+          .skippedCount,
+      ).toBe(1);
+      expect(
+        map.mapEvaluationCompleted(makeCompleted({ status: "processed" }))
+          .errorCount,
+      ).toBe(0);
     });
 
     it("decodes ScoreSum/ScoreCount with null-aware divisor", () => {

@@ -26,8 +26,8 @@ import { buildMetricAlias } from "~/server/analytics/clickhouse/metric-translato
 import type { AggregationTypes } from "~/server/analytics/types";
 import type { FilterField } from "~/server/filters/types";
 import {
-  isSlimEligibleMetricKey,
-  type SlimEligibleMetricKey,
+  isSlimEligibleTraceMetricKey,
+  type SlimTraceMetricKey,
 } from "../routing/route-table";
 import type {
   AnalyticsTimeseriesBuilderInput,
@@ -52,11 +52,11 @@ export type SlimGroupByKey =
  * Slim column / Attributes-map read for a registry metric (Phase 2 hoisted
  * columns; `Attributes['…']` for legacy reads kept by the trim service).
  *
- * Narrowed to `SlimEligibleMetricKey` so the exhaustive switch is enforced
+ * Narrowed to `SlimTraceMetricKey` so the exhaustive switch is enforced
  * at compile time; `buildSlimTimeseriesQuery` validates each metric via
- * `isSlimEligibleMetricKey` before dispatch.
+ * `isSlimEligibleTraceMetricKey` before dispatch.
  */
-function slimColumnFor(metric: SlimEligibleMetricKey): string {
+function slimColumnFor(metric: SlimTraceMetricKey): string {
   switch (metric) {
     case "metadata.trace_id":
       return `${ta}.TraceId`;
@@ -393,7 +393,7 @@ export function buildSlimTimeseriesQuery(
 
   for (let i = 0; i < input.series.length; i++) {
     const s = input.series[i]!;
-    if (!isSlimEligibleMetricKey(s.metric)) {
+    if (!isSlimEligibleTraceMetricKey(s.metric)) {
       throw new Error(
         `Slim builder cannot serve metric "${s.metric}". The router should have routed this to trace_summaries.`,
       );

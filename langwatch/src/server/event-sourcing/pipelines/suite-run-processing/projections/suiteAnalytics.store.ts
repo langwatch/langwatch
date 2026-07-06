@@ -3,9 +3,9 @@ import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retenti
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
 import {
-  type SuiteAnalyticsData,
   projectSuiteAnalyticsStateToRow,
   SUITE_ANALYTICS_PROJECTION_VERSION_LATEST,
+  type SuiteAnalyticsData,
 } from "./suiteAnalytics.foldProjection";
 
 /**

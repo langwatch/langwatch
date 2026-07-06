@@ -3,25 +3,28 @@ import type { FoldProjectionStore } from "../../projections/foldProjection.types
 import type { AppendStore } from "../../projections/mapProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
 import {
-  QueueRunCommand,
-  StartRunCommand,
-  MessageSnapshotCommand,
-  TextMessageStartCommand,
-  TextMessageEndCommand,
-  FinishRunCommand,
   CancelRunCommand,
   DeleteRunCommand,
+  FinishRunCommand,
+  MessageSnapshotCommand,
+  QueueRunCommand,
+  StartRunCommand,
+  TextMessageEndCommand,
+  TextMessageStartCommand,
 } from "./commands";
 import { ComputeRunMetricsCommand } from "./commands/computeRunMetrics.command";
 import {
-  SimulationAnalyticsFoldProjection,
   type SimulationAnalyticsData,
+  SimulationAnalyticsFoldProjection,
 } from "./projections/simulationAnalytics.foldProjection";
 import {
   SimulationAnalyticsRollupMapProjection,
   type SimulationAnalyticsRollupRow,
 } from "./projections/simulationAnalyticsRollup.mapProjection";
-import { SimulationRunStateFoldProjection, type SimulationRunStateData } from "./projections/simulationRunState.foldProjection";
+import {
+  type SimulationRunStateData,
+  SimulationRunStateFoldProjection,
+} from "./projections/simulationRunState.foldProjection";
 import type { SimulationProcessingEvent } from "./schemas/events";
 
 export interface SimulationProcessingPipelineDeps {
@@ -32,13 +35,31 @@ export interface SimulationProcessingPipelineDeps {
   /** ADR-034 Phase 7: per-simulation-run rollup writer (scenarios mirror of
    *  `evaluationAnalyticsRollupAppendStore`). */
   simulationAnalyticsRollupAppendStore: AppendStore<SimulationAnalyticsRollupRow>;
-  snapshotUpdateBroadcastReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
-  cancellationBroadcastReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
-  scenarioExecutionReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
-  suiteRunSyncReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
-  traceMetricsSyncReactor: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
+  snapshotUpdateBroadcastReactor: ReactorDefinition<
+    SimulationProcessingEvent,
+    SimulationRunStateData
+  >;
+  cancellationBroadcastReactor: ReactorDefinition<
+    SimulationProcessingEvent,
+    SimulationRunStateData
+  >;
+  scenarioExecutionReactor: ReactorDefinition<
+    SimulationProcessingEvent,
+    SimulationRunStateData
+  >;
+  suiteRunSyncReactor: ReactorDefinition<
+    SimulationProcessingEvent,
+    SimulationRunStateData
+  >;
+  traceMetricsSyncReactor: ReactorDefinition<
+    SimulationProcessingEvent,
+    SimulationRunStateData
+  >;
   computeRunMetricsCommand: ComputeRunMetricsCommand;
-  customerIoSimulationSyncReactor?: ReactorDefinition<SimulationProcessingEvent, SimulationRunStateData>;
+  customerIoSimulationSyncReactor?: ReactorDefinition<
+    SimulationProcessingEvent,
+    SimulationRunStateData
+  >;
 }
 
 /**
@@ -59,13 +80,18 @@ export interface SimulationProcessingPipelineDeps {
  * - deleteRun: Emits SimulationRunDeletedEvent for soft-delete
  * - computeRunMetrics: Computes cost/latency metrics from traces (ECST + pull)
  */
-export function createSimulationProcessingPipeline(deps: SimulationProcessingPipelineDeps) {
+export function createSimulationProcessingPipeline(
+  deps: SimulationProcessingPipelineDeps,
+) {
   let builder = definePipeline<SimulationProcessingEvent>()
     .withName("simulation_processing")
     .withAggregateType("simulation_run")
-    .withFoldProjection("simulationRunState", new SimulationRunStateFoldProjection({
-      store: deps.simulationRunStore,
-    }))
+    .withFoldProjection(
+      "simulationRunState",
+      new SimulationRunStateFoldProjection({
+        store: deps.simulationRunStore,
+      }),
+    )
     .withFoldProjection(
       "simulationAnalytics",
       new SimulationAnalyticsFoldProjection({
@@ -78,11 +104,27 @@ export function createSimulationProcessingPipeline(deps: SimulationProcessingPip
         store: deps.simulationAnalyticsRollupAppendStore,
       }),
     )
-    .withReactor("simulationRunState", "snapshotUpdateBroadcast", deps.snapshotUpdateBroadcastReactor)
-    .withReactor("simulationRunState", "cancellationBroadcast", deps.cancellationBroadcastReactor)
+    .withReactor(
+      "simulationRunState",
+      "snapshotUpdateBroadcast",
+      deps.snapshotUpdateBroadcastReactor,
+    )
+    .withReactor(
+      "simulationRunState",
+      "cancellationBroadcast",
+      deps.cancellationBroadcastReactor,
+    )
     .withReactor("simulationRunState", "suiteRunSync", deps.suiteRunSyncReactor)
-    .withReactor("simulationRunState", "traceMetricsSync", deps.traceMetricsSyncReactor)
-    .withReactor("simulationRunState", "scenarioExecution", deps.scenarioExecutionReactor);
+    .withReactor(
+      "simulationRunState",
+      "traceMetricsSync",
+      deps.traceMetricsSyncReactor,
+    )
+    .withReactor(
+      "simulationRunState",
+      "scenarioExecution",
+      deps.scenarioExecutionReactor,
+    );
 
   if (deps.customerIoSimulationSyncReactor) {
     builder = builder.withReactor(
@@ -101,11 +143,16 @@ export function createSimulationProcessingPipeline(deps: SimulationProcessingPip
     .withCommand("finishRun", FinishRunCommand)
     .withCommand("cancelRun", CancelRunCommand)
     .withCommand("deleteRun", DeleteRunCommand)
-    .withCommandInstance("computeRunMetrics", ComputeRunMetricsCommand, deps.computeRunMetricsCommand, {
-      deduplication: {
-        makeId: ComputeRunMetricsCommand.makeJobId,
-        ttlMs: 60_000,
+    .withCommandInstance(
+      "computeRunMetrics",
+      ComputeRunMetricsCommand,
+      deps.computeRunMetricsCommand,
+      {
+        deduplication: {
+          makeId: ComputeRunMetricsCommand.makeJobId,
+          ttlMs: 60_000,
+        },
       },
-    })
+    )
     .build();
 }
