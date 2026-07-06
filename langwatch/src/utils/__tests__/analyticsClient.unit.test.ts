@@ -4,9 +4,21 @@
  * react-contextual-analytics' createAnalyticsClient no-ops (empty providers)
  * without a `window` global, so this needs a browser-like environment.
  */
+import type { PostHog } from "posthog-js";
+import type { Provider } from "react-contextual-analytics";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createAppAnalyticsClient } from "../analyticsClient";
+
+type ProviderEvent = Parameters<Provider["send"]>[0];
+
+function fakePostHog(overrides: Partial<PostHog> = {}): PostHog {
+  return overrides as PostHog;
+}
+
+function fakeEvent(overrides: Partial<ProviderEvent> = {}): ProviderEvent {
+  return { version: "2025-05-29", action: "click", ...overrides };
+}
 
 describe("createAppAnalyticsClient", () => {
   const originalNodeEnv = process.env.NODE_ENV;
@@ -23,7 +35,7 @@ describe("createAppAnalyticsClient", () => {
     it("registers neither the google nor posthog provider", () => {
       const client = createAppAnalyticsClient({
         isSaaS: false,
-        posthogClient: { capture: vi.fn() } as any,
+        posthogClient: fakePostHog({ capture: vi.fn() as PostHog["capture"] }),
         isGtagReady: true,
       });
 
@@ -61,18 +73,20 @@ describe("createAppAnalyticsClient", () => {
       const capture = vi.fn();
       const client = createAppAnalyticsClient({
         isSaaS: true,
-        posthogClient: { capture } as any,
+        posthogClient: fakePostHog({ capture: capture as PostHog["capture"] }),
         isGtagReady: false,
       });
 
       const posthogProvider = client.providers.find((p) => p.id === "posthog")!;
-      await posthogProvider.send({
-        boundary: "workflow",
-        action: "create",
-        name: "click",
-        attributes: { project_id: "p1" },
-        context: {},
-      } as any);
+      await posthogProvider.send(
+        fakeEvent({
+          boundary: "workflow",
+          action: "create",
+          name: "click",
+          attributes: { project_id: "p1" },
+          context: {},
+        }),
+      );
 
       expect(capture).toHaveBeenCalledWith("workflow.create.click", {
         project_id: "p1",
@@ -85,7 +99,7 @@ describe("createAppAnalyticsClient", () => {
       it("does not throw", async () => {
         const client = createAppAnalyticsClient({
           isSaaS: true,
-          posthogClient: {} as any,
+          posthogClient: fakePostHog(),
           isGtagReady: false,
         });
 
@@ -94,13 +108,15 @@ describe("createAppAnalyticsClient", () => {
         )!;
 
         await expect(
-          posthogProvider.send({
-            boundary: "workflow",
-            action: "create",
-            name: "click",
-            attributes: {},
-            context: {},
-          } as any),
+          posthogProvider.send(
+            fakeEvent({
+              boundary: "workflow",
+              action: "create",
+              name: "click",
+              attributes: {},
+              context: {},
+            }),
+          ),
         ).resolves.not.toThrow();
       });
     });
