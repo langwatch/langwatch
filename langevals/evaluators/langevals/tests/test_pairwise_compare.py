@@ -308,6 +308,56 @@ def test_golden_framing_dropped_when_has_golden_answer_is_false():
     assert "on its own merits" in user_msg
 
 
+def test_tool_schema_reasoning_mentions_golden_answer_by_default():
+    """The judge's tool-call schema also frames "reasoning" around the
+    golden answer by default — not just the user-facing prompt text."""
+    evaluator = PairwiseCompareEvaluator(
+        settings=PairwiseCompareSettings(swap_and_confirm=False)
+    )
+    entry = _make_entry()
+
+    with patch(
+        "langevals_langevals.pairwise_compare.litellm.completion",
+        return_value=_mock_completion_response("ok", "tie"),
+    ) as mock_completion, patch(
+        "langevals_langevals.pairwise_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        evaluator.evaluate(entry)
+
+    reasoning_description = mock_completion.call_args.kwargs["tools"][0][
+        "function"
+    ]["parameters"]["properties"]["reasoning"]["description"]
+    assert "golden answer" in reasoning_description.lower()
+
+
+def test_tool_schema_reasoning_drops_golden_mention_when_has_golden_answer_is_false():
+    """Regression: the tool-call schema used to unconditionally tell the
+    judge to reason "against the golden answer" even when has_golden_answer
+    is off and no golden answer is involved at all."""
+    evaluator = PairwiseCompareEvaluator(
+        settings=PairwiseCompareSettings(
+            swap_and_confirm=False, has_golden_answer=False
+        )
+    )
+    entry = _make_entry()
+
+    with patch(
+        "langevals_langevals.pairwise_compare.litellm.completion",
+        return_value=_mock_completion_response("ok", "tie"),
+    ) as mock_completion, patch(
+        "langevals_langevals.pairwise_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        evaluator.evaluate(entry)
+
+    reasoning_description = mock_completion.call_args.kwargs["tools"][0][
+        "function"
+    ]["parameters"]["properties"]["reasoning"]["description"]
+    assert "golden answer" not in reasoning_description.lower()
+    assert "own merits" in reasoning_description.lower()
+
+
 def test_custom_prompt_is_respected_even_when_has_golden_answer_is_false():
     """A user-customized prompt is an explicit choice — never silently
     rewritten by the has_golden_answer toggle."""

@@ -261,6 +261,14 @@ class PairwiseCompareEvaluator(
 
         winner_enum = ["A", "B", "tie"] if self.settings.allow_tie else ["A", "B"]
 
+        reasoning_description = (
+            "Step-by-step comparison of the two candidates against the "
+            "golden answer."
+            if self.settings.has_golden_answer
+            else "Step-by-step comparison of the two candidates on their "
+            "own merits — no reference answer is involved."
+        )
+
         response = litellm.completion(
             model=self.settings.model,
             messages=[
@@ -288,10 +296,7 @@ class PairwiseCompareEvaluator(
                             "properties": {
                                 "reasoning": {
                                     "type": "string",
-                                    "description": (
-                                        "Step-by-step comparison of the two "
-                                        "candidates against the golden answer."
-                                    ),
+                                    "description": reasoning_description,
                                 },
                                 "winner": {
                                     "type": "string",
