@@ -20,6 +20,11 @@ type VirtualKeySecretRevealProps = {
   onClose: () => void;
   keyName: string;
   secret: string;
+  // Model string for the copy-paste usage example. Threaded from the
+  // create/rotate surface (which knows the key's eligible providers) so a
+  // self-hosted / custom key shows a model it can actually serve instead of
+  // the OpenAI-only default.
+  model?: string;
   // Distinguishes the initial-mint flow from a rotation. Rotations
   // also carry a grace-window banner (previous secret stays valid
   // for 24h so clients can roll over without a cliff).
@@ -36,6 +41,7 @@ export function VirtualKeySecretReveal({
   onClose,
   keyName,
   secret,
+  model,
   kind = "create",
 }: VirtualKeySecretRevealProps) {
   const [revealed, setRevealed] = useState(false);
@@ -69,115 +75,111 @@ export function VirtualKeySecretReveal({
       closeOnEscape={false}
     >
       <Dialog.Content bg="bg" maxWidth="560px">
-          <Dialog.Header>
-            <Dialog.Title>
-              {kind === "rotate"
-                ? "Save your rotated secret"
-                : "Save your virtual key secret"}
-            </Dialog.Title>
-          </Dialog.Header>
-          <Dialog.Body>
-            <VStack align="stretch" gap={4}>
-              <Alert.Root status="warning">
+        <Dialog.Header>
+          <Dialog.Title>
+            {kind === "rotate"
+              ? "Save your rotated secret"
+              : "Save your virtual key secret"}
+          </Dialog.Title>
+        </Dialog.Header>
+        <Dialog.Body>
+          <VStack align="stretch" gap={4}>
+            <Alert.Root status="warning">
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Title>You will only see this secret once.</Alert.Title>
+                <Alert.Description>
+                  LangWatch stores only a hash. Copy and save the raw secret in
+                  your password manager or secret store before closing.
+                </Alert.Description>
+              </Alert.Content>
+            </Alert.Root>
+            {kind === "rotate" && (
+              <Alert.Root status="info">
                 <Alert.Indicator />
                 <Alert.Content>
-                  <Alert.Title>You will only see this secret once.</Alert.Title>
+                  <Alert.Title>24-hour grace window active.</Alert.Title>
                   <Alert.Description>
-                    LangWatch stores only a hash. Copy and save the raw secret
-                    in your password manager or secret store before closing.
+                    The previous secret keeps working for 24 hours so clients
+                    can roll over gradually. After that it hard-fails with a 401
+                    even though this key stays active.
                   </Alert.Description>
                 </Alert.Content>
               </Alert.Root>
-              {kind === "rotate" && (
-                <Alert.Root status="info">
-                  <Alert.Indicator />
-                  <Alert.Content>
-                    <Alert.Title>24-hour grace window active.</Alert.Title>
-                    <Alert.Description>
-                      The previous secret keeps working for 24 hours so
-                      clients can roll over gradually. After that it hard-
-                      fails with a 401 even though this key stays active.
-                    </Alert.Description>
-                  </Alert.Content>
-                </Alert.Root>
-              )}
+            )}
 
-              <VStack align="start" gap={1}>
-                <Text fontSize="sm" color="fg.muted">
-                  Virtual key name
-                </Text>
-                <Text fontWeight="medium">{keyName}</Text>
-              </VStack>
-
-              <VStack align="stretch" gap={2}>
-                <Text fontSize="sm" color="fg.muted">
-                  Secret
-                </Text>
-                <HStack
-                  border="1px solid"
-                  borderColor="border.subtle"
-                  borderRadius="md"
-                  padding={2}
-                  gap={2}
-                >
-                  <Box flex={1} overflowX="auto">
-                    <Code
-                      fontSize="sm"
-                      bg="transparent"
-                      paddingX={0}
-                      whiteSpace="nowrap"
-                    >
-                      {revealed ? secret : maskSecret(secret)}
-                    </Code>
-                  </Box>
-                  <IconButton
-                    aria-label={revealed ? "Hide secret" : "Reveal secret"}
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setRevealed((v) => !v)}
-                  >
-                    {revealed ? <EyeOff size={14} /> : <Eye size={14} />}
-                  </IconButton>
-                  <IconButton
-                    aria-label="Copy secret"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleCopy}
-                  >
-                    {copied ? <Check size={14} /> : <Copy size={14} />}
-                  </IconButton>
-                </HStack>
-              </VStack>
-
-              <Separator />
-              <VirtualKeyUsageSnippet secret={secret} />
+            <VStack align="start" gap={1}>
+              <Text fontSize="sm" color="fg.muted">
+                Virtual key name
+              </Text>
+              <Text fontWeight="medium">{keyName}</Text>
             </VStack>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <HStack width="full" gap={4}>
-              <HStack>
-                <input
-                  type="checkbox"
-                  id="vk-secret-confirm"
-                  checked={confirmed}
-                  onChange={(e) => setConfirmed(e.target.checked)}
-                />
-                <label htmlFor="vk-secret-confirm">
-                  <Text fontSize="sm">
-                    I've saved the secret in a safe place.
-                  </Text>
-                </label>
-              </HStack>
-              <Box flex={1} />
-              <Button
-                colorPalette="orange"
-                onClick={close}
-                disabled={!confirmed}
+
+            <VStack align="stretch" gap={2}>
+              <Text fontSize="sm" color="fg.muted">
+                Secret
+              </Text>
+              <HStack
+                border="1px solid"
+                borderColor="border.subtle"
+                borderRadius="md"
+                padding={2}
+                gap={2}
               >
-                Close
-              </Button>
+                <Box flex={1} overflowX="auto">
+                  <Code
+                    fontSize="sm"
+                    bg="transparent"
+                    paddingX={0}
+                    whiteSpace="nowrap"
+                  >
+                    {revealed ? secret : maskSecret(secret)}
+                  </Code>
+                </Box>
+                <IconButton
+                  aria-label={revealed ? "Hide secret" : "Reveal secret"}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setRevealed((v) => !v)}
+                >
+                  {revealed ? <EyeOff size={14} /> : <Eye size={14} />}
+                </IconButton>
+                <IconButton
+                  aria-label="Copy secret"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCopy}
+                >
+                  {copied ? <Check size={14} /> : <Copy size={14} />}
+                </IconButton>
+              </HStack>
+            </VStack>
+
+            <Separator />
+            <VirtualKeyUsageSnippet secret={secret} model={model} />
+          </VStack>
+        </Dialog.Body>
+        <Dialog.Footer>
+          <HStack width="full" gap={4}>
+            <HStack>
+              <input
+                type="checkbox"
+                id="vk-secret-confirm"
+                checked={confirmed}
+                onChange={(e) => setConfirmed(e.target.checked)}
+              />
+              <label htmlFor="vk-secret-confirm">
+                <Text fontSize="sm">
+                  I've saved the secret in a safe place.
+                </Text>
+              </label>
             </HStack>
-          </Dialog.Footer>
+            <Box flex={1} />
+            <Button colorPalette="orange" onClick={close} disabled={!confirmed}>
+              Close
+            </Button>
+          </HStack>
+        </Dialog.Footer>
       </Dialog.Content>
     </Dialog.Root>
   );

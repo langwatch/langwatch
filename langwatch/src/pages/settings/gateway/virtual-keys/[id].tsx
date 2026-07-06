@@ -32,6 +32,10 @@ import {
   EligibleModelProvidersPreview,
   EligibleModelProvidersSummary,
 } from "~/components/gateway/EligibleModelProvidersPreview";
+import {
+  firstEligibleDefaultModel,
+  type OrgModelProvider,
+} from "~/components/gateway/eligibleModelProviders";
 import { FieldInfoTooltip } from "~/components/gateway/FieldInfoTooltip";
 import { GuardrailAttachmentsSection } from "~/components/gateway/GuardrailAttachmentsSection";
 import { VirtualKeyEditDrawer } from "~/components/gateway/VirtualKeyEditDrawer";
@@ -121,18 +125,38 @@ function VirtualKeyDetailPage() {
     name: string;
     secret: string;
   } | null>(null);
-  // Drives the model name written into the "How to use" snippet. Starts
-  // at the bare OpenAI-SDK default; clicking a provider row in the
-  // eligible-MP preview rewrites this to `${vendor}/${defaultModel}` so
-  // the copy-pasteable example points at a model the VK can actually
-  // serve through that provider.
-  const [snippetModel, setSnippetModel] = useState<string>("gpt-5-mini");
+  // Manual override for the model written into the "How to use" snippet.
+  // Null until the user clicks a provider row in the eligible-MP preview;
+  // otherwise the snippet model is derived from the key's first eligible
+  // provider (see snippetModel below).
+  const [snippetModelOverride, setSnippetModelOverride] = useState<
+    string | null
+  >(null);
 
   const canUpdate = hasPermission("virtualKeys:update");
   const canRotate = hasPermission("virtualKeys:rotate");
   const canAttachGuardrails = hasPermission("gatewayGuardrails:attach");
 
   const vk = detailQuery.data;
+
+  // The model shown in the "How to use" snippet: the manual override wins,
+  // else the key's first eligible provider in resolver-safe `vendor/model`
+  // form (so a self-hosted / custom key shows `custom/<model>`, not the
+  // OpenAI-only `gpt-5-mini`). `gpt-5-mini` is only the placeholder shown
+  // before the eligible providers resolve.
+  const computedDefaultModel = useMemo(
+    () =>
+      firstEligibleDefaultModel({
+        scopes: vk?.scopes ?? [],
+        providers: (orgProvidersQuery.data?.providers ??
+          []) as OrgModelProvider[],
+        availableProjects,
+        organizationId: orgId,
+      }),
+    [vk?.scopes, orgProvidersQuery.data?.providers, availableProjects, orgId],
+  );
+  const snippetModel =
+    snippetModelOverride ?? computedDefaultModel ?? "gpt-5-mini";
 
   // Guardrails are project-scoped: only a VK reachable from exactly one
   // PROJECT scope has a single guardrail surface to edit.
@@ -382,7 +406,7 @@ function VirtualKeyDetailPage() {
                         (orgProvidersQuery.data?.providers ?? []) as any
                       }
                       selectedModel={snippetModel}
-                      onSelectProviderModel={setSnippetModel}
+                      onSelectProviderModel={setSnippetModelOverride}
                     />
                   </Box>
                 </VStack>
@@ -445,6 +469,7 @@ function VirtualKeyDetailPage() {
         onClose={() => setRevealSecret(null)}
         keyName={revealSecret?.name ?? ""}
         secret={revealSecret?.secret ?? ""}
+        model={snippetModel}
         kind="rotate"
       />
     </AiGatewayLayout>
