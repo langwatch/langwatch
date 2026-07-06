@@ -1,96 +1,53 @@
 import {
-  type UnknownKeysParam,
+  z,
   ZodArray,
   ZodNullable,
   ZodObject,
   ZodOptional,
-  type ZodRawShape,
   ZodTuple,
-  type ZodTupleItems,
-  type ZodTypeAny,
+  type ZodType,
 } from "zod";
 
-type ZodObjectMapper<T extends ZodRawShape, U extends UnknownKeysParam> = (
-  o: ZodObject<T>,
-) => ZodObject<T, U>;
+// Recursively rebuild an object schema tree, applying `map` to every ZodObject
+// node so the object's unknown-key mode (passthrough/strip/strict) is set at
+// every level. In zod 4 the unknown-key mode is a runtime concern only (it is
+// no longer encoded in the schema's type), so the deep* helpers return the same
+// type as the input — the transformation is purely at the value level.
+type ZodObjectMapper = (o: ZodObject) => ZodObject;
 
-function deepApplyObject(
-  schema: ZodTypeAny,
-  map: ZodObjectMapper<any, any>,
-): any {
+function deepApplyObject(schema: ZodType, map: ZodObjectMapper): ZodType {
   if (schema instanceof ZodObject) {
-    const newShape: Record<string, ZodTypeAny> = {};
+    const newShape: Record<string, ZodType> = {};
     for (const key of Object.keys(schema.shape)) {
-      const fieldSchema = schema.shape[key];
-      newShape[key] = deepApplyObject(fieldSchema, map);
+      newShape[key] = deepApplyObject(schema.shape[key] as ZodType, map);
     }
-    const newObject = new ZodObject({
-      ...schema._def,
-      shape: () => newShape,
-    });
-    return map(newObject);
+    return map(z.object(newShape));
   } else if (schema instanceof ZodArray) {
-    return ZodArray.create(deepApplyObject(schema.element, map));
+    return z.array(deepApplyObject(schema.element as ZodType, map));
   } else if (schema instanceof ZodOptional) {
-    return ZodOptional.create(deepApplyObject(schema.unwrap(), map));
+    return z.optional(deepApplyObject(schema.unwrap() as ZodType, map));
   } else if (schema instanceof ZodNullable) {
-    return ZodNullable.create(deepApplyObject(schema.unwrap(), map));
+    return z.nullable(deepApplyObject(schema.unwrap() as ZodType, map));
   } else if (schema instanceof ZodTuple) {
-    return ZodTuple.create(
-      schema.items.map((item: any) => deepApplyObject(item, map)),
+    const items = schema.def.items.map((item) =>
+      deepApplyObject(item as ZodType, map),
     );
+    return z.tuple(items as [ZodType, ...ZodType[]]);
   } else {
     return schema;
   }
 }
 
-type DeepUnknownKeys<
-  T extends ZodTypeAny,
-  UnknownKeys extends UnknownKeysParam,
-> = T extends ZodObject<infer Shape, infer _, infer Catchall>
-  ? ZodObject<
-      {
-        [k in keyof Shape]: DeepUnknownKeys<Shape[k], UnknownKeys>;
-      },
-      UnknownKeys,
-      Catchall
-    >
-  : T extends ZodArray<infer Type, infer Card>
-    ? ZodArray<DeepUnknownKeys<Type, UnknownKeys>, Card>
-    : T extends ZodOptional<infer Type>
-      ? ZodOptional<DeepUnknownKeys<Type, UnknownKeys>>
-      : T extends ZodNullable<infer Type>
-        ? ZodNullable<DeepUnknownKeys<Type, UnknownKeys>>
-        : T extends ZodTuple<infer Items>
-          ? {
-              [k in keyof Items]: Items[k] extends ZodTypeAny
-                ? DeepUnknownKeys<Items[k], UnknownKeys>
-                : never;
-            } extends infer PI
-            ? PI extends ZodTupleItems
-              ? ZodTuple<PI>
-              : never
-            : never
-          : T;
-
-type DeepPassthrough<T extends ZodTypeAny> = DeepUnknownKeys<T, "passthrough">;
-export function deepPassthrough<T extends ZodTypeAny>(
-  schema: T,
-): DeepPassthrough<T> {
-  return deepApplyObject(schema, (s) => s.passthrough()) as DeepPassthrough<T>;
+export function deepPassthrough<T extends ZodType>(schema: T): T {
+  return deepApplyObject(schema, (s) => s.loose()) as unknown as T;
 }
 
-type DeepStrip<T extends ZodTypeAny> = DeepUnknownKeys<T, "strip">;
-export function deepStrip<T extends ZodTypeAny>(schema: T): DeepStrip<T> {
-  return deepApplyObject(schema, (s) => s.strip()) as DeepStrip<T>;
+export function deepStrip<T extends ZodType>(schema: T): T {
+  return deepApplyObject(schema, (s) => s.strip()) as unknown as T;
 }
 
-type DeepStrict<T extends ZodTypeAny> = DeepUnknownKeys<T, "strict">;
-export function deepStrict<T extends ZodTypeAny>(
-  schema: T,
-  error?: Error,
-): DeepStrict<T> {
-  return deepApplyObject(schema, (s) => s.strict(error)) as DeepStrict<T>;
+export function deepStrict<T extends ZodType>(schema: T, _error?: Error): T {
+  return deepApplyObject(schema, (s) => s.strict()) as unknown as T;
 }
 
 /**
