@@ -155,6 +155,28 @@ Feature: Model Provider Scope and Multi-Instance
     # Previously the menu hid providers that already had a row — we now allow
     # multiple rows per provider type.
 
+  @regression @integration
+  Scenario: Editing a row shows its own saved credential, not another row's
+    Given the org "acme" already has a ModelProvider named "OpenAI" scoped to project "web-app"
+    And the org "acme" also has a ModelProvider named "OpenAI" scoped to organization "acme"
+    When I open the edit drawer for the organization-scoped "OpenAI" row
+    Then the API key field shows that row's saved credential (masked)
+    And the field is not blank
+    # A row's credential must resolve by its own id. Collapsing same-type
+    # rows down to "one per provider type" for other views (e.g. the
+    # settings list) must never leak into which row an edit drawer
+    # actually opens.
+
+  @regression @integration
+  Scenario: Saving an edited row updates it in place, not as a duplicate
+    Given the org "acme" already has a ModelProvider named "OpenAI" scoped to project "web-app"
+    And the org "acme" also has a ModelProvider named "OpenAI" scoped to organization "acme"
+    When I open the edit drawer for the organization-scoped "OpenAI" row
+    And I re-enter the API key
+    And I click "Save"
+    Then the organization-scoped row is updated with the new key
+    And exactly two "OpenAI" ModelProvider rows still exist for "acme"
+
   # ────────────────────────────────────────────────────────────────────────────
   # Model Providers page becomes org-level
   # ────────────────────────────────────────────────────────────────────────────
