@@ -135,3 +135,5 @@ export const createCheckoutLineItems = ({
     },
   ];
 };
+
+export { GROWTH_SEAT_INCLUDED_EVENTS } from "./growthSeatConstants";

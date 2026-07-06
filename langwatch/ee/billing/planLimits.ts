@@ -9,6 +9,8 @@ import { GROWTH_SEAT_PLAN_TYPES } from "./utils/growthSeatEvent";
  */
 export const UNLIMITED_MESSAGES = 999_999_999;
 
+export { GROWTH_SEAT_INCLUDED_EVENTS } from "./utils/growthSeatConstants";
+
 const PAID_FEATURES = {
   maxWorkflows: 9999,
   maxPrompts: 9999,

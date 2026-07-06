@@ -597,8 +597,8 @@ importers:
         specifier: ^1.6.9
         version: 1.6.9
       stripe:
-        specifier: ^15.12.0
-        version: 15.12.0
+        specifier: ^22.1.1
+        version: 22.1.1(@types/node@18.19.130)
       superjson:
         specifier: ^1.13.3
         version: 1.13.3
@@ -1719,6 +1719,7 @@ packages:
 
   '@clickhouse/client-common@1.18.3':
     resolution: {integrity: sha512-3axzO3zvrsGT5PzDenxgWscltYCNRDbhaHWUgdsmcM9OnW/VnZn9EarOcZogr9P82Z0mQh+Jd2x+p2K4TFD2fA==}
+    deprecated: 'Deprecated: import from @clickhouse/client or @clickhouse/client-web instead.'
 
   '@clickhouse/client@1.18.3':
     resolution: {integrity: sha512-340ngdYktL8PLUBK2QKSwe0o02tYfZSz1mSn1uXCEU8TxHvwh9pnQxElf9YHumDGj5gX/IdgxPsJTGMs82Hgug==}
@@ -10581,9 +10582,14 @@ packages:
     resolution: {integrity: sha512-1tB5mhVo7U+ETBKNf92xT4hrQa3pm0MZ0PQvuDnWgAAGHDsfp4lPSpiS6psrSiet87wyGPh9ft6wmhOMQ0hDiw==}
     engines: {node: '>=14.16'}
 
-  stripe@15.12.0:
-    resolution: {integrity: sha512-slTbYS1WhRJXVB8YXU8fgHizkUrM9KJyrw4Dd8pLEwzKHYyQTIE46EePC2MVbSDZdE24o1GdNtzmJV4PrPpmJA==}
-    engines: {node: '>=12.*'}
+  stripe@22.1.1:
+    resolution: {integrity: sha512-cmodIYP27tBkJ8G7DuGgWw0PFuemlFZbuF3Wwr1TrjFjUa3T7NIgCe6TVwX8BO2ynu+xtTuDGfHafNDCPt9lXA==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      '@types/node': '>=18'
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
 
   strnum@2.2.3:
     resolution: {integrity: sha512-oKx6RUCuHfT3oyVjtnrmn19H1SiCqgJSg+54XqURKp5aCMbrXrhLjRN9TjuwMjiYstZ0MzDrHqkGZ5dFTKd+zg==}
@@ -23695,10 +23701,9 @@ snapshots:
 
   strip-json-comments@5.0.3: {}
 
-  stripe@15.12.0:
-    dependencies:
-      '@types/node': 20.19.39
-      qs: 6.15.2
+  stripe@22.1.1(@types/node@18.19.130):
+    optionalDependencies:
+      '@types/node': 18.19.130
 
   strnum@2.2.3: {}
 
