@@ -51,13 +51,14 @@ export interface EvaluationGraphTriggerEvaluationOutboxReactorDeps {
 const REAL_TIME_DEBOUNCE_MS = 5_000;
 
 /**
- * Reactor-name suffix so framework-level dedup logs don't conflate the
- * eval and trace reactors. The dispatch-side reactor name on the payload
- * stays `GRAPH_TRIGGER_EVAL_REACTOR_NAME` so the outbox dispatcher routes
- * both pipelines' enqueues to the same `evaluateGraphTrigger` handler.
+ * Reactor name matches `GRAPH_TRIGGER_EVAL_REACTOR_NAME` — the pipeline's
+ * `.withOutbox(...)` call must pass this exact string or the static builder
+ * rejects it (`staticBuilder.ts:293`, wire-001). The framework's name-uniqueness
+ * check is scoped per-pipeline, so the trace pipeline reusing the same name is
+ * fine; dedup logs disambiguate by pipeline name.
  */
 const EVALUATION_GRAPH_TRIGGER_REACTOR_NAME =
-  `${GRAPH_TRIGGER_EVAL_REACTOR_NAME}:evaluation` as const;
+  GRAPH_TRIGGER_EVAL_REACTOR_NAME;
 
 export function createEvaluationGraphTriggerEvaluationOutboxReactor(
   deps: EvaluationGraphTriggerEvaluationOutboxReactorDeps,
