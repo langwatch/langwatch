@@ -1645,15 +1645,19 @@ export function EvaluationsV3Table({
   const totalColumnPercentage = useMemo(() => {
     let total = 0;
 
-    // Sum dataset column percentages
+    // Sum dataset column percentages. Column IDs here must match the
+    // header IDs resize actually writes to (`dataset.${column.id}` /
+    // `target.${targetId}`, see the columnHelper.accessor calls above) —
+    // a mismatched ID means a resized column's stored width is never
+    // found, so its contribution silently falls back to the default.
     for (const col of datasetColumns) {
-      const colId = `dataset_${col.id}`;
+      const colId = `dataset.${col.id}`;
       total += columnSizing[colId] ?? DATASET_COL_DEFAULT_PCT;
     }
 
     // Sum target column percentages
     for (const target of targets) {
-      total += columnSizing[target.id] ?? TARGET_COL_DEFAULT_PCT;
+      total += columnSizing[`target.${target.id}`] ?? TARGET_COL_DEFAULT_PCT;
     }
 
     // Sum dedicated pairwise result column percentages — omitting these

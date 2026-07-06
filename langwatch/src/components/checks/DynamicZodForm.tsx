@@ -323,7 +323,7 @@ const DynamicZodForm = ({
     // boolean branch's own inline label so it isn't shown twice at two
     // different sizes. Nested ZodObject fields render with no outer label
     // for booleans, so they keep passing false (the default) here.
-    topLevel = false,
+    isTopLevel = false,
   ): React.JSX.Element | null => {
     const fullPath = prefix ? `${prefix}.${fieldName}` : fieldName;
     let defaultValue =
@@ -347,7 +347,7 @@ const DynamicZodForm = ({
         fieldSchema_._def.innerType,
         fieldName,
         evaluator,
-        topLevel,
+        isTopLevel,
       );
     } else if (fieldSchema_ instanceof z.ZodNumber) {
       return (
@@ -383,10 +383,10 @@ const DynamicZodForm = ({
                 />
               )}
             />
-            {/* When topLevel, HorizontalFormControl/PropertySectionTitle
+            {/* When isTopLevel, HorizontalFormControl/PropertySectionTitle
                 already renders this field's title — repeating it here reads
                 as duplicated text at a jarringly different size. */}
-            {!topLevel && (
+            {!isTopLevel && (
               <Field.Label
                 htmlFor={fullPath}
                 marginBottom="0"
