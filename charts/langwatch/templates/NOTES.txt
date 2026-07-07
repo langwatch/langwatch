@@ -121,11 +121,13 @@ backend for you:
         clusters with no default StorageClass the PVC — and every pod
         mounting it — stays Pending: install a provisioner (e.g.
         local-path-provisioner) or set storageClassName explicitly.
-      • App and worker Deployments default to strategy: Recreate so
-        upgrades release the shared volume before new pods schedule (a
-        surged pod wedges Pending on an RWO multi-attach error on
-        multi-node clusters). Expect a brief downtime per upgrade; set
-        app/workers deployment.strategy explicitly to override.
+      • App and worker Deployments default to a kill-then-start rollout
+        (RollingUpdate with maxSurge=0/maxUnavailable=1) so upgrades
+        release the shared volume before new pods schedule (a surged pod
+        wedges Pending on an RWO multi-attach error on multi-node
+        clusters). Expect a brief downtime per upgrade; set app/workers
+        deployment.strategy explicitly to override. Zero-downtime
+        upgrades require S3-backed stored objects instead of local-FS.
       • GitOps (ArgoCD / Flux): the dataset-migration hook maps to a
         PostSync hook, which already waits for the rollout to be healthy;
         plain Helm should upgrade with --wait when crossing the ADR-032
