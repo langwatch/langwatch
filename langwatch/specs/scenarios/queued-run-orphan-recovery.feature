@@ -33,6 +33,13 @@ Feature: Queued scenario run orphan recovery
     Then both runs are marked failed before the worker restarts
     And neither run is left QUEUED
 
+  @unit
+  Scenario: A cancelled in-flight run is preserved as cancelled, not failed
+    Given a worker is executing a scenario run that was cancelled before it finished
+    When the worker begins shutting down
+    Then the run is marked cancelled
+    And it is not marked failed
+
   # ---------------------------------------------------------------------------
   # Layer 2: startup reconciler for hard kills
   # ---------------------------------------------------------------------------
