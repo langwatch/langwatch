@@ -7,7 +7,6 @@ import {
   IconButton,
   Spacer,
   Text,
-  VStack,
 } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import { Swords } from "lucide-react";
@@ -367,18 +366,6 @@ export const TargetHeader = memo(function TargetHeader({
         ? "Switch Evaluator"
         : "Switch Agent";
 
-  // For pairwise column-targets, the header carries a lot: title +
-  // "<variantA> vs <variantB>" identity + wins summary + full metrics
-  // popover + play button. Cramming everything on one HStack squishes the
-  // subtitle out and hides the metric chip behind the play button on
-  // narrower columns. Split into two rows for pairwise so both the
-  // variants and the metrics get real estate — matches how the results
-  // page header stacks them.
-  const isPairwiseColumn = target.type === "evaluator" && !!target.pairwise;
-  const pairwiseSubtitle = isPairwiseColumn
-    ? `${variantAName} vs ${variantBName}`
-    : null;
-
   const headerRow = (
     <HStack gap={2} width="full" marginY={-2}>
       <Menu.Root
@@ -592,57 +579,6 @@ export const TargetHeader = memo(function TargetHeader({
       </Tooltip>
     </HStack>
   );
-
-  if (isPairwiseColumn) {
-    return (
-      <VStack align="stretch" gap={1} width="full">
-        {headerRow}
-        {/* Design 3 — colored variant names + swords separator. Zero
-            boxes / chips / underlines: the variant names carry their
-            palette color themselves (green for A, purple for B) with a
-            small swords glyph between them. Highest information density
-            for the least visual weight — reads as one calm line beneath
-            the title. */}
-        <HStack
-          gap={2}
-          paddingLeft={7}
-          minWidth={0}
-          alignItems="center"
-          data-testid="pairwise-variants-subtitle"
-        >
-          <Text
-            fontSize="12px"
-            fontWeight="medium"
-            color="green.fg"
-            lineHeight="1.2"
-            minWidth={0}
-            maxWidth="45%"
-            truncate
-          >
-            {variantAName}
-          </Text>
-          <Icon
-            as={Swords}
-            boxSize="11px"
-            color="fg.muted"
-            flexShrink={0}
-            aria-label="vs"
-          />
-          <Text
-            fontSize="12px"
-            fontWeight="medium"
-            color="purple.fg"
-            lineHeight="1.2"
-            minWidth={0}
-            maxWidth="45%"
-            truncate
-          >
-            {variantBName}
-          </Text>
-        </HStack>
-      </VStack>
-    );
-  }
 
   return headerRow;
 });

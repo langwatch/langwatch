@@ -167,30 +167,13 @@ const buildColumns = (
     columns.push(
       columnHelper.accessor((row) => row.targets[targetCol.id], {
         id: `target_${targetCol.id}`,
-        header: () =>
-          pairwiseMeta ? (
-            <VStack align="start" gap={1.5} paddingY={1}>
-              <BatchTargetHeader
-                target={targetCol}
-                aggregates={aggregates}
-                colorIndicator={targetColor}
-              />
-              <Text
-                fontSize="12px"
-                color="fg"
-                fontWeight="medium"
-                lineHeight="1.3"
-              >
-                {pairwiseMeta.variantAName} vs {pairwiseMeta.variantBName}
-              </Text>
-            </VStack>
-          ) : (
-            <BatchTargetHeader
-              target={targetCol}
-              aggregates={aggregates}
-              colorIndicator={targetColor}
-            />
-          ),
+        header: () => (
+          <BatchTargetHeader
+            target={targetCol}
+            aggregates={aggregates}
+            colorIndicator={targetColor}
+          />
+        ),
         size: 300,
         minSize: 200,
         cell: ({ getValue, row }) => {
