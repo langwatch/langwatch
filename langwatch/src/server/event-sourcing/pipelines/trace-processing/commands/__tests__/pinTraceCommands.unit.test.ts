@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { createTenantId } from "~/server/event-sourcing";
 import {
   PIN_TRACE_COMMAND_TYPE,
   UNPIN_TRACE_COMMAND_TYPE,
   type TracePinSource,
 } from "../../schemas/constants";
 import { PinTraceCommand, UnpinTraceCommand } from "../pinTraceCommands";
+
+type WithKey = { idempotencyKey?: string };
 
 /**
  * These tests guard the idempotency-key design directly, not through the
@@ -29,19 +32,19 @@ function pinKey({
 }): string {
   const command = new PinTraceCommand();
   const [event] = command.handle({
-    tenantId: TENANT,
+    tenantId: createTenantId(TENANT),
     aggregateId: TRACE,
     type: PIN_TRACE_COMMAND_TYPE,
     data: {
-      tenantId: TENANT,
+      tenantId: createTenantId(TENANT),
       traceId: TRACE,
       source,
       reason: null,
       pinnedByUserId: null,
       occurredAt,
     },
-  }) as [{ idempotencyKey?: string }];
-  return event.idempotencyKey ?? "";
+  }) as unknown as WithKey[];
+  return event?.idempotencyKey ?? "";
 }
 
 function unpinKey({
@@ -53,12 +56,17 @@ function unpinKey({
 }): string {
   const command = new UnpinTraceCommand();
   const [event] = command.handle({
-    tenantId: TENANT,
+    tenantId: createTenantId(TENANT),
     aggregateId: TRACE,
     type: UNPIN_TRACE_COMMAND_TYPE,
-    data: { tenantId: TENANT, traceId: TRACE, source, occurredAt },
-  }) as [{ idempotencyKey?: string }];
-  return event.idempotencyKey ?? "";
+    data: {
+      tenantId: createTenantId(TENANT),
+      traceId: TRACE,
+      source,
+      occurredAt,
+    },
+  }) as unknown as WithKey[];
+  return event?.idempotencyKey ?? "";
 }
 
 describe("pin/unpin command idempotency keys", () => {
@@ -87,7 +95,7 @@ describe("pin/unpin command idempotency keys", () => {
     describe("when a manual pin and a share pin land in the same millisecond", () => {
       it("produces distinct job ids so neither is dropped at the queue", () => {
         const manual = PinTraceCommand.makeJobId?.({
-          tenantId: TENANT,
+          tenantId: createTenantId(TENANT),
           traceId: TRACE,
           source: "manual",
           reason: null,
@@ -95,7 +103,7 @@ describe("pin/unpin command idempotency keys", () => {
           occurredAt: 9_000,
         });
         const share = PinTraceCommand.makeJobId?.({
-          tenantId: TENANT,
+          tenantId: createTenantId(TENANT),
           traceId: TRACE,
           source: "share",
           reason: null,
