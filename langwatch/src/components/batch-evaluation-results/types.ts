@@ -468,6 +468,18 @@ const detectPairwiseColumns = (
 ): BatchPairwiseColumn[] => {
   const targetIds = new Set(targetColumns.map((t) => t.id));
   const targetNameById = new Map(targetColumns.map((t) => [t.id, t.name]));
+  // Langevals echoes back the variant's DISPLAY IDENTIFIER as the verdict
+  // label — for prompt targets that's the prompt handle (e.g. "say-hi"), not
+  // the internal `target_XYZ` id. Build a lookup that accepts either shape so
+  // detection resolves either to the underlying target id.
+  const targetIdByAnyKey = new Map<string, string>();
+  for (const t of targetColumns) {
+    targetIdByAnyKey.set(t.id, t.id);
+    if (t.name) targetIdByAnyKey.set(t.name, t.id);
+    if (t.promptId) targetIdByAnyKey.set(t.promptId, t.id);
+  }
+  const resolveToTargetId = (identifier: string): string | undefined =>
+    targetIdByAnyKey.get(identifier);
   // Every target column with `type: "evaluator"` is treated as a pairwise
   // column-target — the synthetic evaluator generated for it stores
   // evaluator id == target id, and no scalar evaluator ever ends up as a
@@ -522,9 +534,13 @@ const detectPairwiseColumns = (
     const label = ev.label ?? "";
     const isLegacySlot = isSlotLabel(label);
     const isTargetId = targetIds.has(label);
+    // Accept prompt-handle-shaped labels too (langevals echoes prompt handles
+    // as the winner identifier, not raw target ids).
+    const resolvesToTarget = !!resolveToTargetId(label);
     if (
       !isLegacySlot &&
       !isTargetId &&
+      !resolvesToTarget &&
       !isPairwiseEvaluator(ev) &&
       !isForced
     ) {
@@ -570,32 +586,43 @@ const detectPairwiseColumns = (
     let variantAName = "Variant A";
     let variantBName = "Variant B";
 
-    if (candidateIds.length >= 2) {
+    // Resolve any handle-shaped candidate to its real target id up front so
+    // downstream lookups (win-count buckets, winner-output row scan) all key
+    // off the internal id.
+    const resolvedCandidateIds = candidateIds
+      .map((id) => resolveToTargetId(id) ?? id)
+      .filter((id, i, arr) => arr.indexOf(id) === i);
+
+    if (resolvedCandidateIds.length >= 2) {
       // Winner-by-id contract. Two distinct winners observed across the
       // run — assign A/B by target-column order so the labeling is stable.
       const orderedIds = targetColumns
         .map((t) => t.id)
-        .filter((id) => candidateIds.includes(id));
-      variantAId = orderedIds[0] ?? candidateIds[0]!;
-      variantBId = orderedIds[1] ?? candidateIds[1]!;
+        .filter((id) => resolvedCandidateIds.includes(id));
+      variantAId = orderedIds[0] ?? resolvedCandidateIds[0]!;
+      variantBId = orderedIds[1] ?? resolvedCandidateIds[1]!;
       variantAName = targetNameById.get(variantAId) || variantAName;
       variantBName = targetNameById.get(variantBId) || variantBName;
-    } else if (candidateIds.length === 1) {
+    } else if (resolvedCandidateIds.length === 1) {
       // Only one id ever won — we can name that side but not the other.
       // Assign it to A; the other side stays generic.
-      variantAId = candidateIds[0]!;
+      variantAId = resolvedCandidateIds[0]!;
       variantAName = targetNameById.get(variantAId) || variantAName;
     }
 
-    // Normalize per-row verdicts against the resolved A/B ids.
+    // Normalize per-row verdicts against the resolved A/B ids. Handle-shaped
+    // labels are resolved through the same key map used at the bucket level
+    // so "structured-demo-a" and its underlying `target_XYZ` both land on
+    // the same slot.
     const verdictsByRow: Record<number, BatchPairwiseVerdict> = {};
     for (const v of bucket.verdicts) {
       const raw = v.label as unknown as string;
+      const resolvedRaw = resolveToTargetId(raw) ?? raw;
       let normalized: "A" | "B" | "tie";
       if (raw === "tie") normalized = "tie";
       else if (raw === "A" || raw === "B") normalized = raw;
-      else if (variantAId && raw === variantAId) normalized = "A";
-      else if (variantBId && raw === variantBId) normalized = "B";
+      else if (variantAId && resolvedRaw === variantAId) normalized = "A";
+      else if (variantBId && resolvedRaw === variantBId) normalized = "B";
       else continue; // orphan id we couldn't classify
 
       // Look up the winning variant's actual output text so the row cell can
