@@ -112,7 +112,7 @@ importers:
         version: 1.8.14(@types/react@19.2.14)(encoding@0.1.13)(graphql@16.13.2)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@copilotkit/runtime':
         specifier: ~1.8.14
-        version: 1.8.14(310630f46e4f0295cf9c448813346559)
+        version: 1.8.14(9f162009aeb3ce42bda626c72e07b42c)
       '@copilotkit/runtime-client-gql':
         specifier: 1.8.13
         version: 1.8.13(encoding@0.1.13)(graphql@16.13.2)(react@19.2.5)
@@ -737,7 +737,7 @@ importers:
         version: 4.1.8(bufferutil@4.1.0)(vite@8.0.16(@types/node@18.19.130)(esbuild@0.28.1)(sass@1.101.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.9.0))(vitest@4.1.4)
       '@vitest/browser-playwright':
         specifier: ^4.1.8
-        version: 4.1.8(bufferutil@4.1.0)(playwright@1.59.1)(vite@8.0.16(@types/node@18.19.130)(esbuild@0.28.1)(sass@1.101.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.9.0))(vitest@4.1.4)
+        version: 4.1.8(bufferutil@4.1.0)(playwright@1.61.1)(vite@8.0.16(@types/node@18.19.130)(esbuild@0.28.1)(sass@1.101.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.9.0))(vitest@4.1.4)
       '@vitest/coverage-v8':
         specifier: ^4.1.5
         version: 4.1.5(@vitest/browser@4.1.8)(vitest@4.1.4)
@@ -769,8 +769,8 @@ importers:
         specifier: ^1.17.2
         version: 1.17.2(@types/express@5.0.6)(@types/node@18.19.130)
       playwright:
-        specifier: 1.59.1
-        version: 1.59.1
+        specifier: 1.61.1
+        version: 1.61.1
       raw-loader:
         specifier: ^4.0.2
         version: 4.0.2(webpack@5.107.2(esbuild@0.28.1))
@@ -9980,18 +9980,8 @@ packages:
   pkg-types@1.3.1:
     resolution: {integrity: sha512-/Jm5M4RvtBFVkKWRu2BLUTNP8/M2a+UwuAX+ae4770q1qVGtfjG+WTCupoZixokjmHiry8uI+dlY8KXYV5HVVQ==}
 
-  playwright-core@1.59.1:
-    resolution: {integrity: sha512-HBV/RJg81z5BiiZ9yPzIiClYV/QMsDCKUyogwH9p3MCP6IYjUFu/MActgYAvK0oWyV9NlwM3GLBjADyWgydVyg==}
-    engines: {node: '>=18'}
-    hasBin: true
-
   playwright-core@1.61.1:
     resolution: {integrity: sha512-h7Qlt6m4REp25qvIdvbDtVmD4LqVXfpRxhORv9L0jzETM05p4fuPJ3dKyuSXQxDSbXnmS79HAgi9589lGSpLkg==}
-    engines: {node: '>=18'}
-    hasBin: true
-
-  playwright@1.59.1:
-    resolution: {integrity: sha512-C8oWjPR3F81yljW9o5OxcWzfh6avkVwDD2VYdwIGqTkl+OGFISgypqzfu7dOe4QNLL2aqcWBmI3PMtLIK233lw==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -13497,7 +13487,7 @@ snapshots:
       - encoding
       - graphql
 
-  '@copilotkit/runtime@1.8.14(310630f46e4f0295cf9c448813346559)':
+  '@copilotkit/runtime@1.8.14(9f162009aeb3ce42bda626c72e07b42c)':
     dependencies:
       '@ag-ui/client': 0.0.47
       '@ag-ui/core': 0.0.57
@@ -13506,7 +13496,7 @@ snapshots:
       '@anthropic-ai/sdk': 0.27.3(encoding@0.1.13)
       '@copilotkit/shared': 1.8.14(encoding@0.1.13)
       '@graphql-yoga/plugin-defer-stream': 3.21.0(graphql-yoga@5.21.0(graphql@16.13.2))(graphql@16.13.2)
-      '@langchain/community': 0.3.59(80a7b3fc025185e144d6be711c8829bb)
+      '@langchain/community': 0.3.59(68938f4bff76db6c5b1a50fd9af8dd6e)
       '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.219.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.7.1(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.0(bufferutil@4.1.0))
       '@langchain/google-gauth': 0.1.8(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.219.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.7.1(@opentelemetry/api@1.9.1))(openai@5.23.2(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.0(bufferutil@4.1.0)))(encoding@0.1.13)(zod@3.25.76)
       '@langchain/langgraph-sdk': 0.0.70(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.219.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.7.1(@opentelemetry/api@1.9.1))(openai@5.23.2(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.0(bufferutil@4.1.0)))(react@19.2.5)
@@ -14427,7 +14417,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@langchain/community@0.3.59(80a7b3fc025185e144d6be711c8829bb)':
+  '@langchain/community@0.3.59(68938f4bff76db6c5b1a50fd9af8dd6e)':
     dependencies:
       '@browserbasehq/stagehand': 1.14.0(@playwright/test@1.61.1)(bufferutil@4.1.0)(deepmerge@4.3.1)(dotenv@17.4.2)(encoding@0.1.13)(openai@5.23.2(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76))(zod@3.25.76)
       '@ibm-cloud/watsonx-ai': 1.7.9
@@ -14463,7 +14453,7 @@ snapshots:
       jsdom: 29.1.1(@noble/hashes@2.2.0)
       jsonwebtoken: 9.0.3
       lodash: 4.18.1
-      playwright: 1.59.1
+      playwright: 1.61.1
       weaviate-client: 3.12.1(encoding@0.1.13)
       ws: 8.21.0(bufferutil@4.1.0)
     transitivePeerDependencies:
@@ -17915,11 +17905,11 @@ snapshots:
     optionalDependencies:
       babel-plugin-react-compiler: 1.0.0
 
-  '@vitest/browser-playwright@4.1.8(bufferutil@4.1.0)(playwright@1.59.1)(vite@8.0.16(@types/node@18.19.130)(esbuild@0.28.1)(sass@1.101.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.9.0))(vitest@4.1.4)':
+  '@vitest/browser-playwright@4.1.8(bufferutil@4.1.0)(playwright@1.61.1)(vite@8.0.16(@types/node@18.19.130)(esbuild@0.28.1)(sass@1.101.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.9.0))(vitest@4.1.4)':
     dependencies:
       '@vitest/browser': 4.1.8(bufferutil@4.1.0)(vite@8.0.16(@types/node@18.19.130)(esbuild@0.28.1)(sass@1.101.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.9.0))(vitest@4.1.4)
       '@vitest/mocker': 4.1.8(vite@8.0.16(@types/node@18.19.130)(esbuild@0.28.1)(sass@1.101.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.9.0))
-      playwright: 1.59.1
+      playwright: 1.61.1
       tinyrainbow: 3.1.0
       vitest: 4.1.4(@opentelemetry/api@1.9.1)(@types/node@18.19.130)(@vitest/browser-playwright@4.1.8)(@vitest/coverage-v8@4.1.5)(@vitest/ui@4.1.5)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@18.19.130)(esbuild@0.28.1)(sass@1.101.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.9.0))
     transitivePeerDependencies:
@@ -23345,15 +23335,7 @@ snapshots:
       mlly: 1.8.0
       pathe: 2.0.3
 
-  playwright-core@1.59.1: {}
-
   playwright-core@1.61.1: {}
-
-  playwright@1.59.1:
-    dependencies:
-      playwright-core: 1.59.1
-    optionalDependencies:
-      fsevents: 2.3.2
 
   playwright@1.61.1:
     dependencies:
@@ -25314,7 +25296,7 @@ snapshots:
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
       '@types/node': 18.19.130
-      '@vitest/browser-playwright': 4.1.8(bufferutil@4.1.0)(playwright@1.59.1)(vite@8.0.16(@types/node@18.19.130)(esbuild@0.28.1)(sass@1.101.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.9.0))(vitest@4.1.4)
+      '@vitest/browser-playwright': 4.1.8(bufferutil@4.1.0)(playwright@1.61.1)(vite@8.0.16(@types/node@18.19.130)(esbuild@0.28.1)(sass@1.101.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.9.0))(vitest@4.1.4)
       '@vitest/coverage-v8': 4.1.5(@vitest/browser@4.1.8)(vitest@4.1.4)
       '@vitest/ui': 4.1.5(vitest@4.1.4)
       jsdom: 29.1.1(@noble/hashes@2.2.0)
@@ -25346,7 +25328,7 @@ snapshots:
     optionalDependencies:
       '@opentelemetry/api': 1.9.1
       '@types/node': 25.6.0
-      '@vitest/browser-playwright': 4.1.8(bufferutil@4.1.0)(playwright@1.59.1)(vite@8.0.16(@types/node@18.19.130)(esbuild@0.28.1)(sass@1.101.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.9.0))(vitest@4.1.4)
+      '@vitest/browser-playwright': 4.1.8(bufferutil@4.1.0)(playwright@1.61.1)(vite@8.0.16(@types/node@18.19.130)(esbuild@0.28.1)(sass@1.101.0)(terser@5.48.0)(tsx@4.21.0)(yaml@2.9.0))(vitest@4.1.4)
       '@vitest/coverage-v8': 4.1.5(@vitest/browser@4.1.8)(vitest@4.1.4)
       '@vitest/ui': 4.1.5(vitest@4.1.4)
       jsdom: 29.1.1(@noble/hashes@2.2.0)
