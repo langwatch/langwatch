@@ -197,7 +197,7 @@
     "nprogress": "^0.2.0",
     "numeral": "^2.0.6",
     "ohm-js": "^17.5.0",
-    "openai": "^5.23.2",
+    "openai": "^6.45.0",
     "papaparse": "^5.5.3",
     "path-to-regexp": "^8.4.2",
     "pino": "^10.3.1",
