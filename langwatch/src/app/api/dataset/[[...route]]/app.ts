@@ -95,7 +95,7 @@ const batchCreateRecordsSchema = z.object({
 function validationHook(
   result: {
     success: boolean;
-    error?: { issues: Array<{ message?: string; path?: (string | number)[] }> };
+    error?: { issues: Array<{ message?: string; path?: readonly PropertyKey[] }> };
   },
   c: { json: (body: unknown, status: number) => Response },
 ): Response | undefined {

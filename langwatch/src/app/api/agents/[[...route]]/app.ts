@@ -50,7 +50,7 @@ const updateAgentSchema = z.object({
  * Validation hook that returns 422 instead of the default 400 for Zod validation errors.
  */
 function validationHook(
-  result: { success: boolean; error?: { issues: Array<{ message?: string; path?: (string | number)[] }> } },
+  result: { success: boolean; error?: { issues: Array<{ message?: string; path?: readonly PropertyKey[] }> } },
   c: { json: (body: unknown, status: number) => Response },
 ): Response | undefined {
   if (!result.success) {

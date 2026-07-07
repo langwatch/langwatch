@@ -85,7 +85,11 @@ export async function processCommand<EventType extends Event>(
       undefined,
       {
         commandType,
-        zodIssues: mapZodIssuesToLogContext(validation.error.issues),
+        zodIssues: mapZodIssuesToLogContext(
+          validation.error.issues as unknown as Parameters<
+            typeof mapZodIssuesToLogContext
+          >[0],
+        ),
       },
     );
   }
@@ -167,7 +171,11 @@ export async function processCommand<EventType extends Event>(
             index: i,
             zodIssues:
               parseResult.success === false
-                ? mapZodIssuesToLogContext(parseResult.error.issues)
+                ? mapZodIssuesToLogContext(
+                    parseResult.error.issues as unknown as Parameters<
+                      typeof mapZodIssuesToLogContext
+                    >[0],
+                  )
                 : void 0,
           },
         );

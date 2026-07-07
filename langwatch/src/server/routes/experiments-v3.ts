@@ -372,7 +372,7 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
   );
   if (!parseResult.success) {
     logger.error(
-      { slug, errors: parseResult.error.errors },
+      { slug, errors: parseResult.error.issues },
       "Invalid workbenchState",
     );
     return c.json(
@@ -402,7 +402,7 @@ secured.access(apiKeyAuth).post("/:slug/run", async (c) => {
   if (!inputsParse.success) {
     return c.json(
       {
-        error: inputsParse.error.errors[0]?.message ?? "Invalid request body",
+        error: inputsParse.error.issues[0]?.message ?? "Invalid request body",
       },
       { status: 400 },
     );

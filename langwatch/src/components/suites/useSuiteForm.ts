@@ -11,7 +11,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
+import { type Resolver, useForm } from "react-hook-form";
 import { z } from "zod";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
 import {
@@ -106,7 +106,10 @@ export function useSuiteForm({
 }: UseSuiteFormParams) {
   const form = useForm<SuiteFormData>({
     defaultValues,
-    resolver: zodResolver(suiteFormSchema),
+    // z.coerce.number() gives repeatCount an `unknown` input type, so zod 4's
+    // zodResolver types field values by `z.input`; cast back to the resolved
+    // form shape the form is generically typed against.
+    resolver: zodResolver(suiteFormSchema) as Resolver<SuiteFormData>,
     mode: "onSubmit",
   });
 

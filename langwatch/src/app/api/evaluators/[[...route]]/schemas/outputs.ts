@@ -43,9 +43,13 @@ export const createEvaluatorInputSchema = z.object({
     )
     .refine(
       (config) => validEvaluatorTypes.has(config.evaluatorType as string),
-      (config) => ({
-        message: `Unknown evaluatorType "${String(config.evaluatorType)}". Use GET /api/evaluators to list valid evaluator configurations, or refer to the docs for available evaluator types.`,
-      }),
+      {
+        error: (issue) => {
+          const evaluatorType = (issue.input as { evaluatorType?: unknown })
+            ?.evaluatorType;
+          return `Unknown evaluatorType "${String(evaluatorType)}". Use GET /api/evaluators to list valid evaluator configurations, or refer to the docs for available evaluator types.`;
+        },
+      },
     ),
 });
 

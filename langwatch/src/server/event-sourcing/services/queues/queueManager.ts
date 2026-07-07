@@ -496,7 +496,9 @@ export class QueueManager<EventType extends Event = Event> {
               {
                 commandType: cmdEntry.commandType,
                 zodIssues: mapZodIssuesToLogContext(
-                  validation.error.issues,
+                  validation.error.issues as unknown as Parameters<
+                    typeof mapZodIssuesToLogContext
+                  >[0],
                 ),
               },
             );
@@ -514,7 +516,9 @@ export class QueueManager<EventType extends Event = Event> {
                 {
                   commandType: cmdEntry.commandType,
                   zodIssues: mapZodIssuesToLogContext(
-                    validation.error.issues,
+                    validation.error.issues as unknown as Parameters<
+                    typeof mapZodIssuesToLogContext
+                  >[0],
                   ),
                 },
               );

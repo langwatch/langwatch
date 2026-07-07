@@ -340,7 +340,7 @@ secured.access(CLI_POLICY).post("/device-code", async (c: Context) => {
     return c.json(
       {
         error: "invalid_request",
-        error_description: parsed.error.errors[0]?.message ?? "invalid body",
+        error_description: parsed.error.issues[0]?.message ?? "invalid body",
       },
       400,
     );

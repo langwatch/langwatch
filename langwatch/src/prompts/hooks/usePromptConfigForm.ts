@@ -70,7 +70,10 @@ export const usePromptConfigForm = ({
       // validates PromptConfigFormValues, so narrow the inferred resolver type
       // to match rather than widening the call site with `any`.
       const resolver = zodResolver(
-        schemaRef.current,
+        schemaRef.current as z.ZodType<
+          PromptConfigFormValues,
+          PromptConfigFormValues
+        >,
       ) as Resolver<PromptConfigFormValues>;
       return resolver(data, context, options);
     },

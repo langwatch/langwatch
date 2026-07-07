@@ -209,8 +209,10 @@ const ArrayField = <T extends EvaluatorTypes>({
       ? Object.fromEntries(
           Object.entries(arraySchema.element.shape).flatMap(([key, value]) => {
             if (value instanceof z.ZodUnion && value.options.length > 0) {
-              const defaultValue = value.options[0].value;
-              return [[key, defaultValue]];
+              const firstOption = value.options[0] as z.ZodLiteral | undefined;
+              if (firstOption) {
+                return [[key, firstOption.value]];
+              }
             }
 
             return [];
@@ -344,7 +346,7 @@ const DynamicZodForm = ({
 
     if (fieldSchema_ instanceof z.ZodDefault) {
       return renderField(
-        fieldSchema_._def.innerType,
+        fieldSchema_.def.innerType as z.ZodType,
         fieldName,
         evaluator,
         isTopLevel,
@@ -407,9 +409,11 @@ const DynamicZodForm = ({
       (fieldSchema_ instanceof z.ZodString &&
         (fieldName === "model" || fieldName === "embeddings_model"))
     ) {
-      const options =
+      const options: { value: any }[] =
         fieldSchema_ instanceof z.ZodUnion
-          ? fieldSchema_.options
+          ? fieldSchema_.options.map((option) => ({
+              value: (option as z.ZodLiteral).value,
+            }))
           : fieldSchema_ instanceof z.ZodLiteral
             ? [{ value: fieldSchema_.value }]
             : allModelOptions.map((option) => ({ value: option }));
@@ -673,7 +677,9 @@ const DynamicZodForm = ({
     return null;
   };
 
-  return <>{renderSchema(schema)}</>;
+  // `schema` is a runtime evaluator-settings schema erased to `ZodType`; the
+  // generic renderSchema can't recover the concrete evaluator type from it.
+  return <>{renderSchema(schema as z.ZodType<Evaluators[EvaluatorTypes]["settings"]>)}</>;
 };
 
 export default DynamicZodForm;

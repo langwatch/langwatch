@@ -51,8 +51,14 @@ const filterValueSchema: z.ZodType<
 export type TriggerFilterValue = z.infer<typeof filterValueSchema>;
 export type TriggerFilters = Partial<Record<FilterField, TriggerFilterValue>>;
 
-// Schema for validating trigger filter JSON structure — rejects unknown fields
-export const triggerFiltersSchema = z.record(filterFieldsEnum, filterValueSchema);
+// Schema for validating trigger filter JSON structure — rejects unknown fields.
+// partialRecord (not record): zod 4's z.record(enum, V) is exhaustive (requires
+// every enum key), but filters are a partial subset — matching TriggerFilters
+// (Partial<Record<...>>) above and the prior zod-3 behaviour.
+export const triggerFiltersSchema = z.partialRecord(
+  filterFieldsEnum,
+  filterValueSchema,
+);
 
 /** Validates filter value structure without restricting field names. */
 export const triggerFiltersPermissiveSchema = z.record(

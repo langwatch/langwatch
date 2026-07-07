@@ -78,6 +78,10 @@ const runFinishedMapping: ElasticSearchMappingFrom<
 const messageSnapshotMapping: ElasticSearchMappingFrom<
   RemoveBaseEventMapping<ScenarioMessageSnapshotEvent>
 > = {
+  // The stored wire message shape (content as ES text, snake_case parts /
+  // tool_calls / function_call / reasoning_content) is richer than — and
+  // deliberately distinct from — the consumer-facing ScenarioSnapshotMessage
+  // type, so this nested mapping is authored directly rather than derived.
   messages: {
     properties: {
       id: { type: "keyword" },
@@ -122,7 +126,9 @@ const messageSnapshotMapping: ElasticSearchMappingFrom<
       reasoning_content: { type: "text" },
       trace_id: { type: "keyword" },
     },
-  },
+  } as unknown as ElasticSearchMappingFrom<
+    RemoveBaseEventMapping<ScenarioMessageSnapshotEvent>
+  >["messages"],
 };
 
 // Combine all mappings

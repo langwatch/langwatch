@@ -794,7 +794,13 @@ async function handleEvaluatorCall(
       {
         err: error,
         ...(error instanceof ZodErrorClass
-          ? { zodIssues: mapZodIssuesToLogContext(error.issues) }
+          ? {
+              zodIssues: mapZodIssuesToLogContext(
+                error.issues as unknown as Parameters<
+                  typeof mapZodIssuesToLogContext
+                >[0],
+              ),
+            }
           : {}),
         projectId: project.id,
       },
@@ -845,7 +851,13 @@ async function handleEvaluatorCall(
       {
         err: error,
         ...(error instanceof ZodErrorClass
-          ? { zodIssues: mapZodIssuesToLogContext(error.issues) }
+          ? {
+              zodIssues: mapZodIssuesToLogContext(
+                error.issues as unknown as Parameters<
+                  typeof mapZodIssuesToLogContext
+                >[0],
+              ),
+            }
           : {}),
         projectId: project.id,
       },
@@ -879,7 +891,13 @@ async function handleEvaluatorCall(
       {
         err: error,
         ...(error instanceof ZodErrorClass
-          ? { zodIssues: mapZodIssuesToLogContext(error.issues) }
+          ? {
+              zodIssues: mapZodIssuesToLogContext(
+                error.issues as unknown as Parameters<
+                  typeof mapZodIssuesToLogContext
+                >[0],
+              ),
+            }
           : {}),
         projectId: project.id,
       },

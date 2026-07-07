@@ -26,7 +26,7 @@
  * Spec: specs/ai-governance/puller-framework/puller-adapter-contract.feature
  */
 import { Prisma } from "@prisma/client";
-import { type Job, Worker } from "bullmq";
+import { type ConnectionOptions, type Job, Worker } from "bullmq";
 import { BullMQOtel } from "bullmq-otel";
 
 import { env } from "~/env.mjs";
@@ -351,7 +351,7 @@ export const startIngestionPullerWorker = (): Worker | null => {
     PULLER_QUEUE.NAME,
     withJobContext(runIngestionPullerJob),
     {
-      connection,
+      connection: connection as ConnectionOptions,
       concurrency: env.NODE_ENV === "test" ? 1 : 4,
       telemetry: new BullMQOtel("ingestion_puller"),
     },

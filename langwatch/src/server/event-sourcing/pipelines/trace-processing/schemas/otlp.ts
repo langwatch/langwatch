@@ -73,7 +73,7 @@ export const idSchema = z.preprocess((val) => {
  * least one of the optional fields, but does NOT enforce exclusivity.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Input type widened to accept JSON-serialized bytesValue
-export const anyValueSchema: z.ZodType<OtlpAnyValue, z.ZodTypeDef, any> = z.object({
+export const anyValueSchema: z.ZodType<OtlpAnyValue, any> = z.object({
   stringValue: z.string().nullable().optional(),
   boolValue: z.union([z.boolean(), z.string()]).nullable().optional(),
   intValue: z
@@ -102,18 +102,18 @@ export const anyValueSchema: z.ZodType<OtlpAnyValue, z.ZodTypeDef, any> = z.obje
 });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const keyValueSchema: z.ZodType<OtlpKeyValue, z.ZodTypeDef, any> = z.object({
+export const keyValueSchema: z.ZodType<OtlpKeyValue, any> = z.object({
   key: z.string(),
   value: anyValueSchema,
 });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const arrayValueSchema: z.ZodType<OtlpArrayValue, z.ZodTypeDef, any> = z.object({
+export const arrayValueSchema: z.ZodType<OtlpArrayValue, any> = z.object({
   values: z.array(anyValueSchema),
 });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const keyValueListSchema: z.ZodType<OtlpKeyValueList, z.ZodTypeDef, any> = z.object({
+export const keyValueListSchema: z.ZodType<OtlpKeyValueList, any> = z.object({
   values: z.array(keyValueSchema),
 });
 

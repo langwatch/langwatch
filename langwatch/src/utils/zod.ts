@@ -55,10 +55,14 @@ export function deepStrict<T extends ZodType>(schema: T, _error?: Error): T {
  * Extracts path, code, and message for consistent logging.
  */
 export function mapZodIssuesToLogContext(
-  issues: Array<{ path: (string | number)[]; code: string; message: string }>,
+  issues: Array<{
+    path: readonly PropertyKey[];
+    code: string;
+    message: string;
+  }>,
 ): Array<{ path: string; code: string; message: string }> {
   return issues.map((issue) => ({
-    path: issue.path.join("."),
+    path: issue.path.map(String).join("."),
     code: issue.code,
     message: issue.message,
   }));

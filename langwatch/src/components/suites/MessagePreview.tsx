@@ -9,10 +9,10 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { Settings } from "react-feather";
 import type { StreamingMessage } from "~/hooks/useSimulationStreamingState";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import type { ScenarioSnapshotMessage } from "~/server/scenarios/scenario-event.types";
 
 type MessagePreviewProps = {
-  messages: ScenarioRunData["messages"];
+  messages: ScenarioSnapshotMessage[];
   streamingMessages?: StreamingMessage[];
 };
 
@@ -154,7 +154,7 @@ export function MessagePreview({
       {(messages ?? []).map((message, index) => {
         // Tool call indicators (assistant messages with tool_calls or toolCalls)
         const toolCalls = ("tool_calls" in message && message.tool_calls)
-          ? message.tool_calls
+          ? (message.tool_calls as Array<{ function?: { name?: string } }>)
           : ("toolCalls" in message && (message as Record<string, unknown>).toolCalls)
             ? (message as Record<string, unknown>).toolCalls as Array<{ function?: { name?: string } }>
             : null;

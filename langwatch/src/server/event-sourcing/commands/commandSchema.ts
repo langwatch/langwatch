@@ -18,9 +18,7 @@ export interface CommandSchema<Payload, Type extends CommandType> {
    * Validation function that checks if a payload matches the expected type.
    * Should return true if valid, false otherwise.
    */
-  readonly validate: (
-    payload: unknown,
-  ) => z.SafeParseReturnType<unknown, Payload>;
+  readonly validate: (payload: unknown) => z.ZodSafeParseResult<Payload>;
   /**
    * Optional description of the command for documentation.
    */
@@ -53,13 +51,17 @@ export function defineCommandSchema<
 ): CommandSchema<z.infer<Schema>, Type> {
   return {
     type,
-    validate: (payload: unknown): z.SafeParseReturnType<unknown, Schema> => {
+    validate: (payload: unknown): z.ZodSafeParseResult<z.infer<Schema>> => {
       const result = schema.safeParse(payload);
       if (!result.success) {
         logger.error(
           {
             commandType: type,
-            zodIssues: mapZodIssuesToLogContext(result.error.issues),
+            zodIssues: mapZodIssuesToLogContext(
+              result.error.issues as unknown as Parameters<
+                typeof mapZodIssuesToLogContext
+              >[0],
+            ),
           },
           "Command payload validation failed",
         );

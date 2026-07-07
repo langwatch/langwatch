@@ -172,7 +172,6 @@ export const AddOrEditAnnotationScore = ({
         category: data.category,
         categoryExplanation: data.categoryExplanation,
         projectId: project?.id ?? "",
-        options: data.options,
         radioCheckboxOptions: trimmedRadioCheckboxOptions,
         defaultRadioOption: defaultRadioOption,
         defaultCheckboxOption: defaultCheckboxOption,
