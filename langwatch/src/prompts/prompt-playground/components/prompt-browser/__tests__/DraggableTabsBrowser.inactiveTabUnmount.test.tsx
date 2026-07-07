@@ -2,12 +2,13 @@
  * @vitest-environment jsdom
  *
  * Regression test for GitHub issue #5454: inactive tabs in the Prompt
- * Playground stay mounted in the DOM instead of unmounting.
+ * Playground stayed mounted in the DOM instead of unmounting.
  *
- * DraggableTabsBrowser renders a Chakra v3 `Tabs.Root` (Ark UI under the
- * hood) with no `lazyMount`/`unmountOnExit` props, so Ark UI mounts every
- * `Tabs.Content` panel and only toggles the `hidden` attribute on inactive
- * ones instead of unmounting them.
+ * Before the fix, DraggableTabsBrowser rendered a Chakra v3 `Tabs.Root`
+ * (Ark UI under the hood) with no `lazyMount`/`unmountOnExit` props, so Ark
+ * UI mounted every `Tabs.Content` panel and only toggled the `hidden`
+ * attribute on inactive ones instead of unmounting them. This test guards
+ * against that regression now that both props are set.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

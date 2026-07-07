@@ -101,71 +101,73 @@ describe("PublishedPromptActions", () => {
     cleanup();
   });
 
-  describe("when the menu is closed", () => {
-    it("does not enable the resolved-default model query", () => {
-      renderWithChakra(
-        <PublishedPromptActions
-          promptId="prompt-1"
-          promptHandle="test-prompt"
-        />,
-      );
+  describe("given a rendered row menu", () => {
+    describe("when the menu is closed", () => {
+      it("does not enable the resolved-default model query", () => {
+        renderWithChakra(
+          <PublishedPromptActions
+            promptId="prompt-1"
+            promptHandle="test-prompt"
+          />,
+        );
 
-      expect(mockGetResolvedDefault).toHaveBeenCalledWith(
-        expect.objectContaining({ projectId: "test-project" }),
-        expect.objectContaining({ enabled: false }),
-      );
+        expect(mockGetResolvedDefault).toHaveBeenCalledWith(
+          expect.objectContaining({ projectId: "test-project" }),
+          expect.objectContaining({ enabled: false }),
+        );
+      });
+
+      it("does not enable the modify-permission query", () => {
+        renderWithChakra(
+          <PublishedPromptActions
+            promptId="prompt-1"
+            promptHandle="test-prompt"
+          />,
+        );
+
+        expect(mockCheckModifyPermission).toHaveBeenCalledWith(
+          expect.objectContaining({ idOrHandle: "prompt-1" }),
+          expect.objectContaining({ enabled: false }),
+        );
+      });
     });
 
-    it("does not enable the modify-permission query", () => {
-      renderWithChakra(
-        <PublishedPromptActions
-          promptId="prompt-1"
-          promptHandle="test-prompt"
-        />,
-      );
+    describe("when the menu is opened", () => {
+      it("enables the resolved-default model query", async () => {
+        const user = userEvent.setup();
+        renderWithChakra(
+          <PublishedPromptActions
+            promptId="prompt-1"
+            promptHandle="test-prompt"
+          />,
+        );
 
-      expect(mockCheckModifyPermission).toHaveBeenCalledWith(
-        expect.objectContaining({ idOrHandle: "prompt-1" }),
-        expect.objectContaining({ enabled: false }),
-      );
-    });
-  });
+        const trigger = screen.getByRole("button");
+        await user.click(trigger);
 
-  describe("when the menu is opened", () => {
-    it("enables the resolved-default model query", async () => {
-      const user = userEvent.setup();
-      renderWithChakra(
-        <PublishedPromptActions
-          promptId="prompt-1"
-          promptHandle="test-prompt"
-        />,
-      );
+        expect(mockGetResolvedDefault).toHaveBeenLastCalledWith(
+          expect.objectContaining({ projectId: "test-project" }),
+          expect.objectContaining({ enabled: true }),
+        );
+      });
 
-      const trigger = screen.getByRole("button");
-      await user.click(trigger);
+      it("enables the modify-permission query", async () => {
+        const user = userEvent.setup();
+        renderWithChakra(
+          <PublishedPromptActions
+            promptId="prompt-1"
+            promptHandle="test-prompt"
+          />,
+        );
 
-      expect(mockGetResolvedDefault).toHaveBeenLastCalledWith(
-        expect.objectContaining({ projectId: "test-project" }),
-        expect.objectContaining({ enabled: true }),
-      );
-    });
+        const trigger = screen.getByRole("button");
+        await user.click(trigger);
 
-    it("enables the modify-permission query", async () => {
-      const user = userEvent.setup();
-      renderWithChakra(
-        <PublishedPromptActions
-          promptId="prompt-1"
-          promptHandle="test-prompt"
-        />,
-      );
-
-      const trigger = screen.getByRole("button");
-      await user.click(trigger);
-
-      expect(mockCheckModifyPermission).toHaveBeenLastCalledWith(
-        expect.objectContaining({ idOrHandle: "prompt-1" }),
-        expect.objectContaining({ enabled: true }),
-      );
+        expect(mockCheckModifyPermission).toHaveBeenLastCalledWith(
+          expect.objectContaining({ idOrHandle: "prompt-1" }),
+          expect.objectContaining({ enabled: true }),
+        );
+      });
     });
   });
 });
