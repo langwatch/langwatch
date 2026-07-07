@@ -855,8 +855,8 @@ importers:
         specifier: ^3.0.44
         version: 3.0.69(zod@4.3.6)
       '@anthropic-ai/claude-code':
-        specifier: ^2.1.119
-        version: 2.1.119
+        specifier: ^2.1.195
+        version: 2.1.195
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.2.1)
@@ -1020,52 +1020,52 @@ packages:
   '@antfu/install-pkg@1.1.0':
     resolution: {integrity: sha512-MGQsmw10ZyI+EJo45CdSER4zEb+p31LpDAFp2Z3gkSd1yqVZGi0Ebx++YTEMonJy4oChEMLsxZ64j8FH6sSqtQ==}
 
-  '@anthropic-ai/claude-code-darwin-arm64@2.1.119':
-    resolution: {integrity: sha512-+DC98VI72gZeuSz6VgEc+aAe5RlQGy4gdylf3moyypYPOGzY2eX099pXggdK1sAlFiHQ5xRXCq6QfBnw4/RvZQ==}
+  '@anthropic-ai/claude-code-darwin-arm64@2.1.195':
+    resolution: {integrity: sha512-x1H5ABaWgs97DCe3yzuxFvqaCescJJVyWE8miWthklQvp9R+PeTWrlgXtj3rbNszqkgmwINQ9Fg8y/qZT6oYHA==}
     cpu: [arm64]
     os: [darwin]
 
-  '@anthropic-ai/claude-code-darwin-x64@2.1.119':
-    resolution: {integrity: sha512-4O848nP+ligPgfGKuuQ1MspbwY3eDSwpH0mWfr97HWs8T79Q22Ev291j0tTGJf0qYQ9YP0oCCvVfS93ThVn6zg==}
+  '@anthropic-ai/claude-code-darwin-x64@2.1.195':
+    resolution: {integrity: sha512-PToVqTlvhXyJW+Xb2W8gokr0gFI4zbMv+jXq4dvQP/VQVOS5lF6MwLUPjhAyhpcsxr3+f+qq2792oyTxcq5iZA==}
     cpu: [x64]
     os: [darwin]
 
-  '@anthropic-ai/claude-code-linux-arm64-musl@2.1.119':
-    resolution: {integrity: sha512-ALgp64QveCo9s/AR56CUJBDQT6Z7j5twRXFs2LGMvZfod+LxBp9LHCcVfCk0BpJx2edMw/2OOwXFosK5qlXtLA==}
+  '@anthropic-ai/claude-code-linux-arm64-musl@2.1.195':
+    resolution: {integrity: sha512-uI5eQZyvROOyCpws47aobX7B5AIFQDmNEH0yU1xsClS9tFzeXCI2HgepFGhfuLaGpR93hYz7n/qW/ECnMMyFiw==}
     cpu: [arm64]
     os: [linux]
     libc: [musl]
 
-  '@anthropic-ai/claude-code-linux-arm64@2.1.119':
-    resolution: {integrity: sha512-b+ricBXcR7iiEmzelRcRjMGJgpazkvlJzcezFUK41kcJ6HKCPCHVCvGh/4yhoK74PACFA74oSWCp1PK68o0boQ==}
+  '@anthropic-ai/claude-code-linux-arm64@2.1.195':
+    resolution: {integrity: sha512-/K1XESsZw40q9dUzK2trHPDDq7hwKoxkyj6CAn1mpPy54jjMEfO/fgCjN/Ek1W0H2nzy2I6jkshl/e+zC11Z0g==}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  '@anthropic-ai/claude-code-linux-x64-musl@2.1.119':
-    resolution: {integrity: sha512-GTUn2pFM2I+ZiN+bEmgnH59SQ4M0SOEqUUXw1bA75LVVVKMLarZsb52fBp/KU0ja3O9hx5AaXpT+/FMu5eGBKg==}
+  '@anthropic-ai/claude-code-linux-x64-musl@2.1.195':
+    resolution: {integrity: sha512-3vwU82TrWfbKiegIpGVFtWR82gtixLtYN/QfXR9mDQqpRg4p6m6laVNOvBCz2Mlpdocc9PcUBl8Vg68nzxbt9Q==}
     cpu: [x64]
     os: [linux]
     libc: [musl]
 
-  '@anthropic-ai/claude-code-linux-x64@2.1.119':
-    resolution: {integrity: sha512-i6nqfRnvW0IaCTJSHADxX23ykQTlYsmHRja72W92HhjyG8fudaSH2f1XM/zSbaSOp5s33mZAZ3js5coiH6Ksdw==}
+  '@anthropic-ai/claude-code-linux-x64@2.1.195':
+    resolution: {integrity: sha512-EqF+Ws50rRnfJg7LIAbWbsyAMkzC8jPNVHPUlvoEk1UCjA8x3POFCgADK0IHjWEIcIp7a7lgQtYbYrb+5cH1WQ==}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  '@anthropic-ai/claude-code-win32-arm64@2.1.119':
-    resolution: {integrity: sha512-eoMd3ocujGELdMi2jLrMpDEtC2KLTK/NCO7+oVTAKfsBUo6X7V2GQVa4Vdejk0zhxo+o68Jb4oTKQHt/wlRO6g==}
+  '@anthropic-ai/claude-code-win32-arm64@2.1.195':
+    resolution: {integrity: sha512-XrWKAYRxKTq1dYdNBK5sQwrFM2NQDff7/4wPEW20CZYnmZdMbT1YFXUSDmz1OmHoWqxkV8C57qYaD8wE7eRFPg==}
     cpu: [arm64]
     os: [win32]
 
-  '@anthropic-ai/claude-code-win32-x64@2.1.119':
-    resolution: {integrity: sha512-vf8Zoqk1ysHsN+0zh/PTx75oVTLL/Tr3qXLnjewycM3lCYDDhtowTyCCkQGU587npHC3BG0FW9+eskaHKZBnzA==}
+  '@anthropic-ai/claude-code-win32-x64@2.1.195':
+    resolution: {integrity: sha512-fDkMXE0HYSqw/JevfE+iDBKupfo2aOVZP8bvTYe8hGDO+tcRwJMysAwjytWRxmchZjMiEb7/k/qFq0yP0YOfYQ==}
     cpu: [x64]
     os: [win32]
 
-  '@anthropic-ai/claude-code@2.1.119':
-    resolution: {integrity: sha512-gt9dxiIQU60eWcSM26fwu31vzLeL1NYwY3HDFby1TipzwF5lNY766DEqKLkGemZGxaAOXKe9nY3c8GQK/gQ7VA==}
+  '@anthropic-ai/claude-code@2.1.195':
+    resolution: {integrity: sha512-/+2gBqSTYvO3gct5TKNM6sLZVSa0iuR1fjfHmCRr33fcE53Jcvg1gTXgp7+PIm/lyEla8mWNBBRrTpCOhCW48Q==}
     engines: {node: '>=18.0.0'}
     hasBin: true
 
@@ -6754,8 +6754,8 @@ packages:
   caniuse-lite@1.0.30001793:
     resolution: {integrity: sha512-iwSsYWaCOoh26cV8NwNRViHlrfUvYsHDfRVcbtmw0Kg6PJIZZXwMkj1442FYLBGkeUf1juAsU3DTfxW579mrPA==}
 
-  caniuse-lite@1.0.30001799:
-    resolution: {integrity: sha512-hG1bReV+OUU+MOqK4t/ZWI0tZOyz3rqS9XuhOUz1cIcbwBKjOyJEJuw9ER5JuNyqxNk8u/JUVbGibBOL1yrjFw==}
+  caniuse-lite@1.0.30001800:
+    resolution: {integrity: sha512-MMHtuAz9Ys840zAY5F4k6fV5GaivZ9sPk+nz0mY+GYVzRBnYkN0mpqkSR92oWRQ19yQWo4HvBV/FnC16AJX8MA==}
 
   ccount@2.0.1:
     resolution: {integrity: sha512-eyrF0jiFpY+3drT6383f1qhkbGsLSifNAjA61IUjZjmLCWjItY6LB9ft9YhoDgwfmclB2zhu51Lc7+95b8NRAg==}
@@ -7435,8 +7435,8 @@ packages:
   electron-to-chromium@1.5.364:
     resolution: {integrity: sha512-G/dYE3+AYhyHwzTwg8UbnXf7zqMERYh7l2jJ3QujhFsH8agSYwtnGAR2aZ7f0AakIKJXd5En/Hre4igIUrdlYw==}
 
-  electron-to-chromium@1.5.381:
-    resolution: {integrity: sha512-n9Wa6yB+vDsGuA8AKbl/0z7HbvWqt5jxIdvr1IUicd0ryPrk7/xzwqLv8D9AbbvZ6avVNtXYLTfmgFHkwkyelg==}
+  electron-to-chromium@1.5.382:
+    resolution: {integrity: sha512-8ETaWbV6SZOrno+G93Ffd9ENsMtetqdnqj4nlfxFW90Sm5GgnuV28Kf62hqQVD6VUgzm7qFQKsTsAPmeUiU3Ug==}
 
   emittery@0.13.1:
     resolution: {integrity: sha512-DeWwawk6r5yR9jFgnDKYt4sLS0LmHJJi3ZOnb5/JdbYwj3nW+FxQnHIjhBKz8YLC7oRNPVM9NQ47I3CVx34eqQ==}
@@ -12123,40 +12123,40 @@ snapshots:
       package-manager-detector: 1.6.0
       tinyexec: 1.2.3
 
-  '@anthropic-ai/claude-code-darwin-arm64@2.1.119':
+  '@anthropic-ai/claude-code-darwin-arm64@2.1.195':
     optional: true
 
-  '@anthropic-ai/claude-code-darwin-x64@2.1.119':
+  '@anthropic-ai/claude-code-darwin-x64@2.1.195':
     optional: true
 
-  '@anthropic-ai/claude-code-linux-arm64-musl@2.1.119':
+  '@anthropic-ai/claude-code-linux-arm64-musl@2.1.195':
     optional: true
 
-  '@anthropic-ai/claude-code-linux-arm64@2.1.119':
+  '@anthropic-ai/claude-code-linux-arm64@2.1.195':
     optional: true
 
-  '@anthropic-ai/claude-code-linux-x64-musl@2.1.119':
+  '@anthropic-ai/claude-code-linux-x64-musl@2.1.195':
     optional: true
 
-  '@anthropic-ai/claude-code-linux-x64@2.1.119':
+  '@anthropic-ai/claude-code-linux-x64@2.1.195':
     optional: true
 
-  '@anthropic-ai/claude-code-win32-arm64@2.1.119':
+  '@anthropic-ai/claude-code-win32-arm64@2.1.195':
     optional: true
 
-  '@anthropic-ai/claude-code-win32-x64@2.1.119':
+  '@anthropic-ai/claude-code-win32-x64@2.1.195':
     optional: true
 
-  '@anthropic-ai/claude-code@2.1.119':
+  '@anthropic-ai/claude-code@2.1.195':
     optionalDependencies:
-      '@anthropic-ai/claude-code-darwin-arm64': 2.1.119
-      '@anthropic-ai/claude-code-darwin-x64': 2.1.119
-      '@anthropic-ai/claude-code-linux-arm64': 2.1.119
-      '@anthropic-ai/claude-code-linux-arm64-musl': 2.1.119
-      '@anthropic-ai/claude-code-linux-x64': 2.1.119
-      '@anthropic-ai/claude-code-linux-x64-musl': 2.1.119
-      '@anthropic-ai/claude-code-win32-arm64': 2.1.119
-      '@anthropic-ai/claude-code-win32-x64': 2.1.119
+      '@anthropic-ai/claude-code-darwin-arm64': 2.1.195
+      '@anthropic-ai/claude-code-darwin-x64': 2.1.195
+      '@anthropic-ai/claude-code-linux-arm64': 2.1.195
+      '@anthropic-ai/claude-code-linux-arm64-musl': 2.1.195
+      '@anthropic-ai/claude-code-linux-x64': 2.1.195
+      '@anthropic-ai/claude-code-linux-x64-musl': 2.1.195
+      '@anthropic-ai/claude-code-win32-arm64': 2.1.195
+      '@anthropic-ai/claude-code-win32-x64': 2.1.195
 
   '@anthropic-ai/sdk@0.27.3(encoding@0.1.13)':
     dependencies:
@@ -19261,8 +19261,8 @@ snapshots:
   browserslist@4.28.4:
     dependencies:
       baseline-browser-mapping: 2.10.40
-      caniuse-lite: 1.0.30001799
-      electron-to-chromium: 1.5.381
+      caniuse-lite: 1.0.30001800
+      electron-to-chromium: 1.5.382
       node-releases: 2.0.50
       update-browserslist-db: 1.2.3(browserslist@4.28.4)
 
@@ -19378,7 +19378,7 @@ snapshots:
 
   caniuse-lite@1.0.30001793: {}
 
-  caniuse-lite@1.0.30001799: {}
+  caniuse-lite@1.0.30001800: {}
 
   ccount@2.0.1: {}
 
@@ -20034,7 +20034,7 @@ snapshots:
 
   electron-to-chromium@1.5.364: {}
 
-  electron-to-chromium@1.5.381: {}
+  electron-to-chromium@1.5.382: {}
 
   emittery@0.13.1: {}
 
