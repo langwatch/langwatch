@@ -28,6 +28,7 @@ import {
   createLicenseEnforcementService,
   LimitExceededError,
 } from "../../license-enforcement";
+import { scheduleTopicClusteringForProject } from "../../topicClustering/topicClusteringQueue";
 import { generateApiKey } from "../../utils/apiKeyGenerator";
 import {
   checkOrganizationPermission,
@@ -488,15 +489,8 @@ export const projectRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("project:update"))
     .mutation(async ({ input }) => {
-      const { projectId } = input;
-      const { scheduleTopicClusteringForProject } = await import(
-        "../../background/queues/topicClusteringQueue"
-      );
-
       try {
-        // Add the job directly to the queue for immediate processing
-        await scheduleTopicClusteringForProject(projectId, true); // true for manual trigger
-
+        await scheduleTopicClusteringForProject(input.projectId, true);
         return {
           success: true,
           message: "Topic clustering job queued successfully",

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ContentCategory } from "~/server/data-privacy/dataPrivacy.types";
-import type { CategoryVisibility } from "~/server/elasticsearch/protections";
+import type { CategoryVisibility } from "~/server/traces/protections";
 import { buildContentPrivacy, redactV2Content } from "../tracesV2";
 
 const visible: CategoryVisibility = { canSee: true, restrictVisibleTo: null };

@@ -10,7 +10,6 @@ type TargetSuperHeaderProps = {
   colSpan: number;
   onAddClick?: () => void;
   showWarning?: boolean;
-  hasComparison?: boolean;
   isLoading?: boolean;
 };
 
@@ -22,11 +21,8 @@ export const TargetSuperHeader = React.memo(function TargetSuperHeader({
   colSpan,
   onAddClick,
   showWarning,
-  hasComparison,
   isLoading,
 }: TargetSuperHeaderProps) {
-  const addButtonText = hasComparison ? "Add Comparison" : "Add";
-
   return (
     <SuperHeader colSpan={colSpan} color="green.emphasized" icon={<LLMIcon />}>
       {isLoading ? (
@@ -50,7 +46,7 @@ export const TargetSuperHeader = React.memo(function TargetSuperHeader({
           _hover={{ color: "fg" }}
         >
           <Plus size={12} />
-          {addButtonText}
+          Add
           {showWarning && <PulsingDot />}
         </Button>
       )}

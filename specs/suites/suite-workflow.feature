@@ -286,7 +286,7 @@ Feature: Suite Workflow — Create, Run, See Results
   # (not an individual scenario×target pair). Runs are collapsible — expanding
   # shows the scenario × target breakdown as a summary preview.
   # Clicking a run navigates to the existing run detail page.
-  # Results are fetched from ElasticSearch filtered by the suite's setId.
+  # Results are fetched from the scenario-run read model filtered by the suite's setId.
   #
 
   @e2e @unimplemented

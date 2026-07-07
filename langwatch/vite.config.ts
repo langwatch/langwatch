@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, type Plugin, type UserConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 import { generate as generateSelfsigned } from "selfsigned";
@@ -32,9 +32,9 @@ const API_PROTOCOL = USE_HTTP2 ? "https" : "http";
  * the race benign — whichever loses the race overwrites with the same
  * effective contents, and subsequent reads find a valid pair.
  */
-function loadDevHttpsCredentials():
-  | { cert: Buffer; key: Buffer }
-  | null {
+async function loadDevHttpsCredentials(): Promise<
+  { cert: Buffer; key: Buffer } | null
+> {
   if (!USE_HTTP2) return null;
 
   if (process.env.DEV_HTTPS_CERT && process.env.DEV_HTTPS_KEY) {
@@ -54,10 +54,13 @@ function loadDevHttpsCredentials():
     return { cert: readFileSync(certPath), key: readFileSync(keyPath) };
   }
 
-  const pems = generateSelfsigned(
+  // selfsigned v5 dropped the `days` option; use an explicit not-after date.
+  const notAfterDate = new Date();
+  notAfterDate.setDate(notAfterDate.getDate() + 825);
+  const pems = await generateSelfsigned(
     [{ name: "commonName", value: "localhost" }],
     {
-      days: 825,
+      notAfterDate,
       keySize: 2048,
       extensions: [
         {
@@ -76,23 +79,6 @@ function loadDevHttpsCredentials():
   writeFileSync(certPath, pems.cert);
   writeFileSync(keyPath, pems.private);
   return { cert: Buffer.from(pems.cert), key: Buffer.from(pems.private) };
-}
-
-const devHttpsCredentials = loadDevHttpsCredentials();
-
-// Diagnostic: when Vite hot-restarts on a config change, the https block is
-// re-evaluated but in-process TLS state can land in a broken pair (server
-// listening, TLS handshake failing with `ERR_SSL_PROTOCOL_ERROR`). This log
-// makes the post-restart scheme observable in `server.log`, so a "blank
-// page after editing config" failure mode is easy to diagnose without
-// digging into TLS errors. Drop in `pnpm dev:clean` to reset both the Vite
-// module graph and `.dev-certs/` if the cert pair is suspected.
-if (USE_HTTP2) {
-  console.log(
-    `[vite-config] HTTP/2 enabled; https credentials ${devHttpsCredentials ? "loaded" : "MISSING"}`,
-  );
-} else {
-  console.log("[vite-config] HTTPS disabled (set LANGWATCH_DEV_HTTP2=1)");
 }
 
 // object-inspect's index.js does `var inspectCustom = require('./util.inspect')`
@@ -122,7 +108,25 @@ function patchObjectInspectBrowserStub(): Plugin {
   };
 }
 
-export default defineConfig({
+export default defineConfig(async (): Promise<UserConfig> => {
+  const devHttpsCredentials = await loadDevHttpsCredentials();
+
+  // Diagnostic: when Vite hot-restarts on a config change, the https block is
+  // re-evaluated but in-process TLS state can land in a broken pair (server
+  // listening, TLS handshake failing with `ERR_SSL_PROTOCOL_ERROR`). This log
+  // makes the post-restart scheme observable in `server.log`, so a "blank
+  // page after editing config" failure mode is easy to diagnose without
+  // digging into TLS errors. Drop in `pnpm dev:clean` to reset both the Vite
+  // module graph and `.dev-certs/` if the cert pair is suspected.
+  if (USE_HTTP2) {
+    console.log(
+      `[vite-config] HTTP/2 enabled; https credentials ${devHttpsCredentials ? "loaded" : "MISSING"}`,
+    );
+  } else {
+    console.log("[vite-config] HTTPS disabled (set LANGWATCH_DEV_HTTP2=1)");
+  }
+
+  return {
   plugins: [react(), patchObjectInspectBrowserStub()],
   resolve: {
     alias: {
@@ -271,4 +275,5 @@ export default defineConfig({
       },
     },
   },
+  };
 });

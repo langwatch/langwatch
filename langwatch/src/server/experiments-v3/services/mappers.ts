@@ -1,14 +1,11 @@
 /**
  * Mapper functions that convert backend-specific data shapes
- * (ClickHouse PascalCase, Elasticsearch snake_case) into the
+ * (ClickHouse PascalCase, legacy snake_case) into the
  * canonical camelCase service types.
  */
 
 import { parseClickHouseDateTimeMs } from "~/server/clickhouse/dateTime";
-import type {
-  ESBatchEvaluation,
-  ESBatchEvaluationTarget,
-} from "~/server/experiments/types";
+import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
 import type {
   ExperimentRun,
   ExperimentRunDatasetEntry,
@@ -143,7 +140,8 @@ export function mapClickHouseRunToExperimentRun({
     datasetAverageCost: costSummary?.datasetAverageCost ?? undefined,
     datasetAverageDuration: costSummary?.datasetAverageDuration ?? undefined,
     evaluationsAverageCost: costSummary?.evaluationsAverageCost ?? undefined,
-    evaluationsAverageDuration: costSummary?.evaluationsAverageDuration ?? undefined,
+    evaluationsAverageDuration:
+      costSummary?.evaluationsAverageDuration ?? undefined,
     evaluations,
   };
 
@@ -215,7 +213,8 @@ export function mapClickHouseItemsToRunWithItems({
         }
       }
 
-      const targetId = item.TargetId && item.TargetId !== "default" ? item.TargetId : null;
+      const targetId =
+        item.TargetId && item.TargetId !== "default" ? item.TargetId : null;
       dataset.push({
         index: item.RowIndex,
         targetId,
@@ -227,12 +226,14 @@ export function mapClickHouseItemsToRunWithItems({
         traceId: item.TraceId,
       });
     } else if (item.ResultType === "evaluator") {
-      const targetId = item.TargetId && item.TargetId !== "default" ? item.TargetId : null;
+      const targetId =
+        item.TargetId && item.TargetId !== "default" ? item.TargetId : null;
       evaluations.push({
         evaluator: item.EvaluatorId ?? "",
         name: item.EvaluatorName,
         targetId,
-        status: (item.EvaluationStatus as "processed" | "skipped" | "error") ||
+        status:
+          (item.EvaluationStatus as "processed" | "skipped" | "error") ||
           "error",
         index: item.RowIndex,
         score: item.Score,
@@ -277,169 +278,11 @@ export function mapClickHouseItemsToRunWithItems({
 }
 
 // ---------------------------------------------------------------------------
-// Elasticsearch mappers
-// ---------------------------------------------------------------------------
-
-/** Elasticsearch run aggregation bucket (from `getExperimentBatchEvaluationRuns`). */
-export interface ESRunAggregationBucket {
-  key: string;
-  dataset_cost: { value: number | null };
-  evaluations_cost: {
-    cost: { value: number | null };
-    average_cost: { value: number | null };
-    average_duration: { value: number | null };
-  };
-  dataset_average_cost: { value: number | null };
-  dataset_average_duration: { value: number | null };
-  evaluations: {
-    child: {
-      buckets: Array<{
-        key: string;
-        name: { buckets: Array<{ key: string }> };
-        processed_evaluations: {
-          average_score: { value: number | null };
-          has_passed: { doc_count: number };
-          average_passed: { value: number | null };
-        };
-      }>;
-    };
-  };
-}
-
-/**
- * Maps an Elasticsearch `ESBatchEvaluation` source document and its
- * aggregation bucket into the canonical `ExperimentRun` type.
- *
- * @param source - The ES document _source
- * @param runAgg - The aggregation bucket for this run
- * @param workflowVersion - Optional workflow version metadata from Prisma
- * @returns The canonical ExperimentRun
- */
-export function mapEsRunToExperimentRun(
-  source: Pick<
-    ESBatchEvaluation,
-    | "experiment_id"
-    | "run_id"
-    | "workflow_version_id"
-    | "timestamps"
-    | "progress"
-    | "total"
-  >,
-  runAgg: ESRunAggregationBucket | undefined,
-  workflowVersion?: ExperimentRunWorkflowVersion | null,
-): ExperimentRun {
-  const evaluations: Record<string, ExperimentRunEvaluationSummary> = {};
-
-  if (runAgg) {
-    for (const bucket of runAgg.evaluations.child.buckets) {
-      const summary: ExperimentRunEvaluationSummary = {
-        name: bucket.name.buckets[0]?.key ?? bucket.key,
-        averageScore: bucket.processed_evaluations.average_score.value,
-      };
-      if (bucket.processed_evaluations.has_passed.doc_count > 0) {
-        summary.averagePassed =
-          bucket.processed_evaluations.average_passed.value ?? undefined;
-      }
-      evaluations[bucket.key] = summary;
-    }
-  }
-
-  const summary: ExperimentRunSummary = {
-    datasetCost: runAgg?.dataset_cost.value ?? undefined,
-    evaluationsCost: runAgg?.evaluations_cost.cost.value ?? undefined,
-    datasetAverageCost: runAgg?.dataset_average_cost.value ?? undefined,
-    datasetAverageDuration:
-      runAgg?.dataset_average_duration.value ?? undefined,
-    evaluationsAverageCost:
-      runAgg?.evaluations_cost.average_cost.value ?? undefined,
-    evaluationsAverageDuration:
-      runAgg?.evaluations_cost.average_duration.value ?? undefined,
-    evaluations,
-  };
-
-  return {
-    experimentId: source.experiment_id,
-    runId: source.run_id,
-    workflowVersion: workflowVersion ?? null,
-    timestamps: {
-      createdAt: source.timestamps.created_at,
-      updatedAt: source.timestamps.updated_at,
-      finishedAt: source.timestamps.finished_at,
-      stoppedAt: source.timestamps.stopped_at,
-    },
-    progress: source.progress,
-    total: source.total,
-    summary,
-  };
-}
-
-/**
- * Maps a full Elasticsearch `ESBatchEvaluation` document into the
- * canonical `ExperimentRunWithItems` type.
- *
- * @param source - The full ES batch evaluation document
- * @returns The canonical ExperimentRunWithItems
- */
-export function mapEsBatchEvaluationToRunWithItems(
-  source: ESBatchEvaluation,
-): ExperimentRunWithItems {
-  const dataset: ExperimentRunDatasetEntry[] = source.dataset.map((d) => ({
-    index: d.index,
-    targetId: d.target_id,
-    entry: d.entry,
-    predicted: d.predicted,
-    cost: d.cost,
-    duration: d.duration,
-    error: d.error,
-    traceId: d.trace_id,
-  }));
-
-  const evaluations: ExperimentRunEvaluation[] = source.evaluations.map(
-    (e) => ({
-      evaluator: e.evaluator,
-      name: e.name,
-      targetId: e.target_id,
-      status: e.status,
-      index: e.index,
-      score: e.score,
-      label: e.label,
-      passed: e.passed,
-      details: e.details,
-      cost: e.cost,
-      duration: e.duration,
-      inputs: e.inputs,
-    }),
-  );
-
-  const targets = source.targets
-    ? mapEsTargetsToTargets(source.targets)
-    : undefined;
-
-  return {
-    experimentId: source.experiment_id,
-    runId: source.run_id,
-    projectId: source.project_id,
-    workflowVersionId: source.workflow_version_id,
-    progress: source.progress,
-    total: source.total,
-    targets: targets ?? null,
-    dataset,
-    evaluations,
-    timestamps: {
-      createdAt: source.timestamps.created_at,
-      updatedAt: source.timestamps.updated_at,
-      finishedAt: source.timestamps.finished_at,
-      stoppedAt: source.timestamps.stopped_at,
-    },
-  };
-}
-
-// ---------------------------------------------------------------------------
 // Shared ES target mapper
 // ---------------------------------------------------------------------------
 
 /**
- * Maps Elasticsearch snake_case targets to the canonical camelCase shape.
+ * Maps legacy snake_case targets to the canonical camelCase shape.
  */
 export function mapEsTargetsToTargets(
   targets: ESBatchEvaluationTarget[],
@@ -456,4 +299,3 @@ export function mapEsTargetsToTargets(
     metadata: t.metadata,
   }));
 }
-

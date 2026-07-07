@@ -19,11 +19,13 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { api } from "../../utils/api";
 import { createLogger } from "../../utils/logger";
 import { toaster } from "../ui/toaster";
+import { ResolvedModelCaption } from "./ResolvedModelCaption";
 import type { ScenarioFormData } from "./ScenarioForm";
 import {
   generateScenarioWithAI,
   type GeneratedScenario,
 } from "./services/scenarioGeneration";
+import { classifyGenerationError } from "./utils/classifyGenerationError";
 import { getDefaultModelState } from "./utils/defaultModelState";
 import { consumeStoredPrompt } from "./services/scenarioPromptStorage";
 
@@ -188,12 +190,24 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
       setInput("");
     } catch (error) {
       logger.error({ error }, "Error generating scenario");
+      const classified = classifyGenerationError(error);
+      const needsConfiguration =
+        classified.cta === "configure" ||
+        classified.cta === "configure-and-retry";
       toaster.create({
         title: "Generation failed",
         description:
-          error instanceof Error ? error.message : "An error occurred",
+          classified.tier === "unknown"
+            ? classified.rawMessage
+            : classified.copy,
         type: "error",
         duration: TOAST_DURATION_MS,
+        action: needsConfiguration
+          ? {
+              label: "Model settings",
+              onClick: () => window.open("/settings/model-providers", "_blank"),
+            }
+          : undefined,
         meta: { closable: true },
       });
     }
@@ -291,6 +305,8 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
               <Sparkles size={14} />
               Generate with AI
             </Button>
+
+            <ResolvedModelCaption model={resolvedDefault.data?.model} />
           </VStack>
         </Card.Body>
       </Card.Root>
@@ -415,6 +431,8 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
               </>
             )}
           </Button>
+
+          <ResolvedModelCaption model={resolvedDefault.data?.model} />
         </VStack>
       </Card.Body>
     </Card.Root>

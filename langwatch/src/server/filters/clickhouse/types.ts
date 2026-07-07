@@ -41,9 +41,11 @@ export type ClickHouseFilterDefinition = {
    */
   tableName: ClickHouseFilterTable | null;
   /**
-   * Build the SQL query for this filter.
+   * Build the SQL query for this filter. Returns null when the filter cannot
+   * be queried yet (e.g. a required key/subkey is missing) — callers resolve
+   * that to an empty option list without hitting ClickHouse.
    */
-  buildQuery: (params: ClickHouseFilterQueryParams) => string;
+  buildQuery: (params: ClickHouseFilterQueryParams) => string | null;
   /**
    * Extract filter options from the query result rows.
    */

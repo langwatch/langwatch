@@ -240,7 +240,7 @@ export function registerValidator(
   };
 
   const onChangeDisposers: IDisposable[] = [];
-  const onCreate = monaco.editor.onDidCreateModel((model) => {
+  const onCreate = monaco.editor.onDidCreateModel((model: editor.ITextModel) => {
     validate(model);
     onChangeDisposers.push(model.onDidChangeContent(() => validate(model)));
   });

@@ -80,9 +80,11 @@ describe("translateModelIdForLitellm", () => {
   });
 
   describe("Custom provider prefix", () => {
-    it("translates custom/claude-opus-4.5 to custom/claude-opus-4-5", () => {
-      const result = translateModelIdForLitellm("custom/claude-opus-4.5");
-      expect(result).toBe("custom/claude-opus-4-5");
+    it("keeps custom model ids verbatim (dots are part of the customer's model name)", () => {
+      const result = translateModelIdForLitellm(
+        "custom/Qwen/Qwen2.5-32B-Instruct",
+      );
+      expect(result).toBe("custom/Qwen/Qwen2.5-32B-Instruct");
     });
   });
 

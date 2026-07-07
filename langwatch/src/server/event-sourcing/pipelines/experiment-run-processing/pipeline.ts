@@ -1,7 +1,6 @@
 import { definePipeline } from "../../";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { AppendStore } from "../../projections/mapProjection.types";
-import type { ReactorDefinition } from "../../reactors/reactor.types";
 import {
   CompleteExperimentRunCommand,
   ComputeExperimentRunMetricsCommand,
@@ -34,10 +33,6 @@ export interface ExperimentRunProcessingPipelineDeps {
   experimentAnalyticsStore: FoldProjectionStore<ExperimentAnalyticsData>;
   /** ADR-034 Phase 7: per-experiment-run rollup writer. */
   experimentAnalyticsRollupAppendStore: AppendStore<ExperimentAnalyticsRollupRow>;
-  esSync?: ReactorDefinition<
-    ExperimentRunProcessingEvent,
-    ExperimentRunStateData
-  >;
 }
 
 /**
@@ -91,14 +86,6 @@ export function createExperimentRunProcessingPipeline(
         store: deps.experimentAnalyticsRollupAppendStore,
       }),
     );
-
-  if (deps.esSync) {
-    builder.withReactor(
-      "experimentRunState",
-      "experimentRunEsSync",
-      deps.esSync,
-    );
-  }
 
   return builder
     .withCommand("startExperimentRun", StartExperimentRunCommand)

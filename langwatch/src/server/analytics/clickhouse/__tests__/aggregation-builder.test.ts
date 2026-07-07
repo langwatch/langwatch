@@ -70,6 +70,24 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("StartTime < {currentEnd:DateTime64(3)}");
     });
 
+    // A span groupBy (e.g. metadata.span_type) resolves to a `JOIN (... FROM
+    // stored_spans ...)` rather than a filter subquery. That JOIN path was
+    // previously unbounded and cold-scanned every weekly partition. It must
+    // carry the same StartTime envelope.
+    it("bounds the stored_spans JOIN to the date envelope by StartTime", () => {
+      const input = {
+        ...baseInput,
+        groupBy: "metadata.span_type" as const,
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // The JOIN subquery filters stored_spans by StartTime, not just TenantId.
+      expect(result.sql).toMatch(
+        /JOIN \(SELECT[\s\S]*FROM stored_spans WHERE TenantId = \{tenantId:String\} AND StartTime >= \{previousStart:DateTime64\(3\)\}/,
+      );
+      expect(result.sql).toContain("StartTime < {currentEnd:DateTime64(3)}");
+    });
+
     it("includes date truncation for timescale", () => {
       const result = buildTimeseriesQuery(baseInput);
 
@@ -598,6 +616,70 @@ describe("aggregation-builder", () => {
       // Column aliases starting with digits are quoted with backticks
       expect(result.sql).toContain("`0__metadata_trace_id__cardinality`");
       expect(result.sql).toContain("`1__performance_total_cost__sum`");
+    });
+
+    describe("when traceIds are provided", () => {
+      it("adds a parameterized TraceId IN clause and the traceIds param", () => {
+        const input = {
+          ...baseInput,
+          traceIds: ["trace-1", "trace-2"],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        expect(result.sql).toContain(
+          "ts.TraceId IN ({traceIds:Array(String)})",
+        );
+        expect(result.params.traceIds).toEqual(["trace-1", "trace-2"]);
+      });
+
+      it("omits the clause when traceIds is empty", () => {
+        const result = buildTimeseriesQuery({ ...baseInput, traceIds: [] });
+
+        expect(result.sql).not.toContain("{traceIds:Array(String)}");
+        expect(result.params).not.toHaveProperty("traceIds");
+      });
+    });
+
+    describe("when negateFilters is set", () => {
+      it("wraps the filter conditions in NOT", () => {
+        const input = {
+          ...baseInput,
+          filters: { "topics.topics": ["topic-1"] },
+          negateFilters: true,
+        };
+        const result = buildTimeseriesQuery(input);
+
+        expect(result.sql).toMatch(/AND NOT \(.*ts\.TopicId IN/s);
+      });
+
+      it("does not negate the traceIds scope restriction", () => {
+        const input = {
+          ...baseInput,
+          filters: { "topics.topics": ["topic-1"] },
+          negateFilters: true,
+          traceIds: ["trace-1"],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        expect(result.sql).toMatch(/AND NOT \(.*ts\.TopicId IN/s);
+        expect(result.sql).toContain(
+          "ts.TraceId IN ({traceIds:Array(String)})",
+        );
+        expect(result.sql).not.toMatch(
+          /NOT \([^)]*\{traceIds:Array\(String\)\}/,
+        );
+      });
+
+      it("leaves the query untouched when there are no filters", () => {
+        const withNegate = buildTimeseriesQuery({
+          ...baseInput,
+          negateFilters: true,
+        });
+        resetParamCounter();
+        const without = buildTimeseriesQuery(baseInput);
+
+        expect(withNegate.sql).toBe(without.sql);
+      });
     });
 
     describe("when timeScale is full with groupBy", () => {

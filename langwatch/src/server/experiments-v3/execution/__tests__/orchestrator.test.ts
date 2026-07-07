@@ -225,6 +225,7 @@ describe("orchestrator", () => {
         pairwise: {
           variantA: "target-1",
           variantB: "target-2",
+          hasGoldenAnswer: true,
           goldenField: "expected",
           includeMetrics: [],
         },
@@ -258,6 +259,7 @@ describe("orchestrator", () => {
         pairwise: {
           variantA: "target-1",
           variantB: "target-2",
+          hasGoldenAnswer: true,
           goldenField: "expected",
           includeMetrics: [],
         },
@@ -291,6 +293,7 @@ describe("orchestrator", () => {
         pairwise: {
           variantA: "target-1",
           variantB: "target-2",
+          hasGoldenAnswer: true,
           goldenField: "expected",
           includeMetrics: [],
         },
@@ -346,6 +349,7 @@ describe("orchestrator", () => {
         pairwise: {
           variantA: variantA.id,
           variantB: variantB.id,
+          hasGoldenAnswer: true,
           goldenField: "expected",
           includeMetrics: [],
         },
@@ -392,6 +396,7 @@ describe("orchestrator", () => {
         pairwise: {
           variantA: variantA.id,
           variantB: variantB.id,
+          hasGoldenAnswer: true,
           goldenField: "expected",
           includeMetrics: [],
         },
@@ -425,6 +430,7 @@ describe("orchestrator", () => {
         pairwise: {
           variantA: "target-1",
           variantB: "target-2",
+          hasGoldenAnswer: true,
           goldenField: "expected",
           includeMetrics: [],
         },
@@ -439,6 +445,81 @@ describe("orchestrator", () => {
       expect(cells).toHaveLength(0);
       expect(skipReasons).toHaveLength(1);
       expect(skipReasons[0]?.missing).toBe("B");
+    });
+
+    // #5378: golden field is only required when the user hasn't opted out
+    // of golden-answer comparison. Before this fix, an empty goldenField
+    // always skipped cell generation regardless of hasGoldenAnswer, so a
+    // no-golden pairwise column never ran at all.
+    it("creates a cell with an empty goldenField when hasGoldenAnswer is false", () => {
+      const state = createTestState(2, 0);
+      state.targets.push({
+        id: "pairwise-target",
+        type: "evaluator",
+        targetEvaluatorId: "db-pairwise-evaluator",
+        inputs: [],
+        outputs: [{ identifier: "label", type: "str" }],
+        mappings: {},
+        pairwise: {
+          variantA: "target-1",
+          variantB: "target-2",
+          hasGoldenAnswer: false,
+          goldenField: "",
+          includeMetrics: [],
+        },
+      });
+      const completedTargetOutputs = new Map([
+        [
+          "0:target-1",
+          { output: { output: "answer from A" }, cost: 0.01, duration: 120 },
+        ],
+        [
+          "0:target-2",
+          { output: { output: "answer from B" }, cost: 0.02, duration: 150 },
+        ],
+      ]);
+
+      const { cells, skipReasons } = generatePairwiseCells(
+        state,
+        createTestDataset(1),
+        completedTargetOutputs,
+      );
+
+      expect(skipReasons).toHaveLength(0);
+      expect(cells).toHaveLength(1);
+      expect(cells[0]?.targetId).toBe("pairwise-target");
+      expect(cells[0]?.evaluatorConfigs[0]?.pairwise?.goldenField).toBe("");
+    });
+
+    it("still skips when hasGoldenAnswer is true and goldenField is empty", () => {
+      const state = createTestState(2, 0);
+      state.targets.push({
+        id: "pairwise-target",
+        type: "evaluator",
+        targetEvaluatorId: "db-pairwise-evaluator",
+        inputs: [],
+        outputs: [{ identifier: "label", type: "str" }],
+        mappings: {},
+        pairwise: {
+          variantA: "target-1",
+          variantB: "target-2",
+          hasGoldenAnswer: true,
+          goldenField: "",
+          includeMetrics: [],
+        },
+      });
+      const completedTargetOutputs = new Map([
+        ["0:target-1", { output: { output: "answer from A" } }],
+        ["0:target-2", { output: { output: "answer from B" } }],
+      ]);
+
+      const { cells } = generatePairwiseCells(
+        state,
+        createTestDataset(1),
+        completedTargetOutputs,
+      );
+
+      expect(cells).toHaveLength(0);
     });
   });
 

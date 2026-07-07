@@ -267,17 +267,26 @@ export async function cleanupTestData(tenantId?: string): Promise<void> {
       query_params: { tenantId },
     });
 
-    // Clean up test_event_handler_log table (created in testPipelines.ts)
-    // Use try/catch since the table may not exist if no events were processed
-    try {
+    // Clean up test_event_handler_log (created lazily in testPipelines.ts, only
+    // when events are processed, so it is absent on shards that never ran the map
+    // projection). Guard on EXISTS rather than catching the error: the ClickHouse
+    // client logs the "Could not find table" error BEFORE a try/catch can swallow
+    // the throw, and that benign line has twice masqueraded as a real failure and
+    // burned triage (#4824, PR #5071). See #5308. `EXISTS TABLE` never errors on a
+    // missing table (it returns 0), so no noise is emitted on the absent path.
+    const [existsRow] = await clickHouseClient
+      .query({
+        query: `EXISTS TABLE "${TEST_DATABASE}".test_event_handler_log`,
+        format: "JSONEachRow",
+      })
+      .then((r) => r.json<{ result: number }>());
+    if (existsRow?.result === 1) {
       await clickHouseClient.exec({
         query: `
           ALTER TABLE "${TEST_DATABASE}".test_event_handler_log DELETE WHERE TenantId = {tenantId:String}
         `,
         query_params: { tenantId },
       });
-    } catch {
-      // Table doesn't exist - this is fine
     }
   } else {
     // Clean up all test data using TRUNCATE (synchronous and faster)

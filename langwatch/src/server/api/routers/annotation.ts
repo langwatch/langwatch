@@ -5,16 +5,18 @@ import {
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
-import type { Session } from "~/server/auth";
 import { z } from "zod";
 import { AnnotationService } from "~/server/annotations/annotation.service";
+import { getApp } from "~/server/app-layer/app";
+import type { Session } from "~/server/auth";
 import { TraceService } from "~/server/traces/trace.service";
 import { slugify } from "~/utils/slugify";
-import { getApp } from "~/server/app-layer/app";
 import { createLogger } from "../../../utils/logger/server";
-import type { Protections } from "../../elasticsearch/protections";
-import { checkPermissionOrPubliclyShared } from "../rbac";
-import { checkProjectPermission } from "../rbac";
+import type { Protections } from "../../traces/protections";
+import {
+  checkPermissionOrPubliclyShared,
+  checkProjectPermission,
+} from "../rbac";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { getUserProtectionsForProject } from "../utils";
 
@@ -114,10 +116,7 @@ export const annotationRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("annotations:create"))
     .mutation(async ({ ctx, input }) => {
-      const service = await AnnotationService.create({
-        prisma: ctx.prisma,
-        projectId: input.projectId,
-      });
+      const service = AnnotationService.create({ prisma: ctx.prisma });
 
       const createdAnnotation = await service.create({
         id: nanoid(),
@@ -164,10 +163,7 @@ export const annotationRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("annotations:update"))
     .mutation(async ({ ctx, input }) => {
-      const service = await AnnotationService.create({
-        prisma: ctx.prisma,
-        projectId: input.projectId,
-      });
+      const service = AnnotationService.create({ prisma: ctx.prisma });
 
       return service.update({
         id: input.id,
@@ -248,10 +244,7 @@ export const annotationRouter = createTRPCRouter({
     .input(z.object({ annotationId: z.string(), projectId: z.string() }))
     .use(checkProjectPermission("annotations:delete"))
     .mutation(async ({ ctx, input }) => {
-      const service = await AnnotationService.create({
-        prisma: ctx.prisma,
-        projectId: input.projectId,
-      });
+      const service = AnnotationService.create({ prisma: ctx.prisma });
 
       const deletedAnnotation = await service.delete({
         id: input.annotationId,
@@ -269,7 +262,11 @@ export const annotationRouter = createTRPCRouter({
         });
       } catch (error) {
         logger.error(
-          { error, traceId: deletedAnnotation.traceId, projectId: input.projectId },
+          {
+            error,
+            traceId: deletedAnnotation.traceId,
+            projectId: input.projectId,
+          },
           "Failed to sync annotation removal to ClickHouse",
         );
       }

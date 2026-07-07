@@ -226,6 +226,62 @@ describe("simulationRunStateFoldProjection", () => {
     });
   });
 
+  describe("when RunStarted event carries metadata", () => {
+    /** @scenario Custom metadata passes through from ingestion to read projection */
+    it("serializes custom fields and the langwatch namespace into Metadata JSON", () => {
+      const state = foldEvents([
+        createRunStartedEvent({
+          name: "Login flow",
+          description: "Tests login",
+          metadata: {
+            name: "Login flow",
+            description: "Tests login",
+            environment: "staging",
+            commit_sha: "abc123",
+            langwatch: {
+              targetReferenceId: "prompt_abc123",
+              targetType: "prompt",
+              simulationSuiteId: "suite_456",
+            },
+          },
+        }),
+      ]);
+
+      expect(state.Metadata).not.toBeNull();
+      const metadata = JSON.parse(state.Metadata!) as Record<string, unknown>;
+      expect(metadata.name).toBe("Login flow");
+      expect(metadata.description).toBe("Tests login");
+      expect(metadata.environment).toBe("staging");
+      expect(metadata.commit_sha).toBe("abc123");
+      expect(metadata.langwatch).toEqual({
+        targetReferenceId: "prompt_abc123",
+        targetType: "prompt",
+        simulationSuiteId: "suite_456",
+      });
+    });
+
+    /** @scenario Events with only name and description remain valid */
+    it("preserves standard-only metadata without inventing extra keys", () => {
+      const state = foldEvents([
+        createRunStartedEvent({
+          metadata: { name: "Login flow", description: "Tests login" },
+        }),
+      ]);
+
+      const metadata = JSON.parse(state.Metadata!) as Record<string, unknown>;
+      expect(metadata).toEqual({
+        name: "Login flow",
+        description: "Tests login",
+      });
+    });
+
+    it("stores null Metadata when the event carries none", () => {
+      const state = foldEvents([createRunStartedEvent()]);
+
+      expect(state.Metadata).toBeNull();
+    });
+  });
+
   describe("when MessageSnapshot event is applied", () => {
     it("updates Messages, TraceIds, and UpdatedAt", () => {
       const state = foldEvents([

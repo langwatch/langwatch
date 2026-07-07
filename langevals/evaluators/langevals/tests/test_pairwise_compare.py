@@ -13,6 +13,7 @@ from unittest.mock import patch
 import pytest
 
 from langevals_langevals.pairwise_compare import (
+    DEFAULT_PAIRWISE_PROMPT,
     PairwiseCompareEntry,
     PairwiseCompareEvaluator,
     PairwiseCompareSettings,
@@ -251,3 +252,172 @@ def test_b_wins_score_is_one():
 
     assert result.label == "variant_b"
     assert result.score == 1.0
+
+
+# --- has_golden_answer (#5378) ------------------------------------------
+
+
+def test_has_golden_answer_defaults_to_true():
+    settings = PairwiseCompareSettings()
+    assert settings.has_golden_answer is True
+
+
+def test_golden_framing_present_by_default():
+    evaluator = PairwiseCompareEvaluator(
+        settings=PairwiseCompareSettings(swap_and_confirm=False)
+    )
+    entry = _make_entry()
+
+    with patch(
+        "langevals_langevals.pairwise_compare.litellm.completion",
+        return_value=_mock_completion_response("ok", "tie"),
+    ) as mock_completion, patch(
+        "langevals_langevals.pairwise_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        evaluator.evaluate(entry)
+
+    user_msg = mock_completion.call_args.kwargs["messages"][1]["content"]
+    assert "golden answer" in user_msg.lower()
+    assert "Golden answer:  Paris" in user_msg
+
+
+def test_golden_framing_dropped_when_has_golden_answer_is_false():
+    evaluator = PairwiseCompareEvaluator(
+        settings=PairwiseCompareSettings(
+            swap_and_confirm=False, has_golden_answer=False
+        )
+    )
+    # golden is still populated on the entry (e.g. a stale mapping), using a
+    # value distinct from the candidate outputs, to prove the template swap
+    # — not just an empty {golden} substitution — is what drops the framing.
+    entry = _make_entry(golden="UNIQUE_GOLDEN_MARKER_XYZ")
+
+    with patch(
+        "langevals_langevals.pairwise_compare.litellm.completion",
+        return_value=_mock_completion_response("ok", "tie"),
+    ) as mock_completion, patch(
+        "langevals_langevals.pairwise_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        evaluator.evaluate(entry)
+
+    user_msg = mock_completion.call_args.kwargs["messages"][1]["content"]
+    assert "golden answer" not in user_msg.lower()
+    assert "UNIQUE_GOLDEN_MARKER_XYZ" not in user_msg
+    assert "on its own merits" in user_msg
+
+
+def test_tool_schema_reasoning_mentions_golden_answer_by_default():
+    """The judge's tool-call schema also frames "reasoning" around the
+    golden answer by default — not just the user-facing prompt text."""
+    evaluator = PairwiseCompareEvaluator(
+        settings=PairwiseCompareSettings(swap_and_confirm=False)
+    )
+    entry = _make_entry()
+
+    with patch(
+        "langevals_langevals.pairwise_compare.litellm.completion",
+        return_value=_mock_completion_response("ok", "tie"),
+    ) as mock_completion, patch(
+        "langevals_langevals.pairwise_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        evaluator.evaluate(entry)
+
+    reasoning_description = mock_completion.call_args.kwargs["tools"][0][
+        "function"
+    ]["parameters"]["properties"]["reasoning"]["description"]
+    assert "golden answer" in reasoning_description.lower()
+
+
+def test_tool_schema_reasoning_drops_golden_mention_when_has_golden_answer_is_false():
+    """Regression: the tool-call schema used to unconditionally tell the
+    judge to reason "against the golden answer" even when has_golden_answer
+    is off and no golden answer is involved at all."""
+    evaluator = PairwiseCompareEvaluator(
+        settings=PairwiseCompareSettings(
+            swap_and_confirm=False, has_golden_answer=False
+        )
+    )
+    entry = _make_entry()
+
+    with patch(
+        "langevals_langevals.pairwise_compare.litellm.completion",
+        return_value=_mock_completion_response("ok", "tie"),
+    ) as mock_completion, patch(
+        "langevals_langevals.pairwise_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        evaluator.evaluate(entry)
+
+    reasoning_description = mock_completion.call_args.kwargs["tools"][0][
+        "function"
+    ]["parameters"]["properties"]["reasoning"]["description"]
+    assert "golden answer" not in reasoning_description.lower()
+    assert "own merits" in reasoning_description.lower()
+
+
+def test_custom_prompt_is_respected_even_when_has_golden_answer_is_false():
+    """A user-customized prompt is an explicit choice — never silently
+    rewritten by the has_golden_answer toggle."""
+    custom_prompt = "My own template. Task: {input}. A: {candidate_a_output}. B: {candidate_b_output}."
+    evaluator = PairwiseCompareEvaluator(
+        settings=PairwiseCompareSettings(
+            swap_and_confirm=False,
+            has_golden_answer=False,
+            prompt=custom_prompt,
+        )
+    )
+    entry = _make_entry()
+
+    with patch(
+        "langevals_langevals.pairwise_compare.litellm.completion",
+        return_value=_mock_completion_response("ok", "tie"),
+    ) as mock_completion, patch(
+        "langevals_langevals.pairwise_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        evaluator.evaluate(entry)
+
+    user_msg = mock_completion.call_args.kwargs["messages"][1]["content"]
+    assert "My own template." in user_msg
+
+
+def test_reasoning_description_matches_customized_golden_prompt():
+    """Regression: reasoning_description used to be derived from the raw
+    has_golden_answer flag alone, so a customized prompt that keeps golden
+    framing (never swapped, since customization is always respected as-is)
+    combined with has_golden_answer=False produced a rendered prompt asking
+    the judge to compare against a golden answer while the tool schema's
+    reasoning field simultaneously claimed no reference answer was involved
+    — contradictory instructions in the same LLM call."""
+    evaluator = PairwiseCompareEvaluator(
+        settings=PairwiseCompareSettings(
+            swap_and_confirm=False,
+            has_golden_answer=False,
+            prompt=DEFAULT_PAIRWISE_PROMPT + " Extra instruction.",
+        )
+    )
+    entry = _make_entry()
+
+    with patch(
+        "langevals_langevals.pairwise_compare.litellm.completion",
+        return_value=_mock_completion_response("ok", "tie"),
+    ) as mock_completion, patch(
+        "langevals_langevals.pairwise_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        evaluator.evaluate(entry)
+
+    user_msg = mock_completion.call_args.kwargs["messages"][1]["content"]
+    reasoning_description = mock_completion.call_args.kwargs["tools"][0][
+        "function"
+    ]["parameters"]["properties"]["reasoning"]["description"]
+
+    assert "golden answer" in user_msg.lower()
+    assert "golden answer" in reasoning_description.lower()
+
+
+def test_default_prompt_constant_is_golden_aware():
+    assert "golden answer" in DEFAULT_PAIRWISE_PROMPT.lower()

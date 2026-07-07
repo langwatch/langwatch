@@ -1,6 +1,7 @@
 import { Box, Button, Text } from "@chakra-ui/react";
 import { ChevronDown, Layers } from "lucide-react";
 import type React from "react";
+import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
   MenuContent,
@@ -36,18 +37,20 @@ export const GroupingSelector: React.FC<{ compact?: boolean }> = ({
         }
         positioning={{ placement: "bottom" }}
       >
-        <MenuTrigger asChild>
-          <Button
-            size="xs"
-            variant={grouping === "flat" ? "outline" : "subtle"}
-            aria-label={`Group rows. Currently ${GROUPING_OPTIONS[grouping]}.`}
-            gap={1}
-            paddingX={2}
-          >
-            <Layers size={14} />
-            {!compact && <ChevronDown size={12} />}
-          </Button>
-        </MenuTrigger>
+        <TriggerAnchor>
+          <MenuTrigger asChild>
+            <Button
+              size="xs"
+              variant={grouping === "flat" ? "outline" : "subtle"}
+              aria-label={`Group rows. Currently ${GROUPING_OPTIONS[grouping]}.`}
+              gap={1}
+              paddingX={2}
+            >
+              <Layers size={14} />
+              {!compact && <ChevronDown size={12} />}
+            </Button>
+          </MenuTrigger>
+        </TriggerAnchor>
       </Tooltip>
       <MenuContent minWidth="160px" textStyle="xs" paddingY={1}>
         <Box

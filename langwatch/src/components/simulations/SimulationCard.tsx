@@ -295,6 +295,9 @@ export function SimulationCard({
           height="100%"
           width="100%"
           overflow="hidden"
+          // Clearance for the floating status pill so the last visible
+          // line of the preview isn't hidden underneath it.
+          paddingBottom={status ? "40px" : undefined}
         >
           {isLoading ? (
             <SimulationCardSkeleton />

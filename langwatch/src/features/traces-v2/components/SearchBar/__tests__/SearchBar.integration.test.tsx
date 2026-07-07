@@ -44,6 +44,14 @@ vi.mock("../../../hooks/useTraceFacets", () => ({
   useTraceFacets: () => ({ data: [], isLoading: false }),
 }));
 
+// SearchBar mounts TokenValuePicker, which now calls useFacetSearch at the
+// top level. These smoke tests don't wrap with a tRPC provider, so stub the
+// hook out — its server search is covered by
+// TokenValuePicker.serverSearch.integration.test.tsx.
+vi.mock("../../../hooks/useFacetSearch", () => ({
+  useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
+}));
+
 // @paper-design/shaders-react requires WebGL, which jsdom does not provide.
 // The shader backdrop is decorative; rendering nothing keeps the SearchBar
 // mountable without crashing on an unhandled WebGL constructor rejection.

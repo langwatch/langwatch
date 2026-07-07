@@ -4,10 +4,12 @@ import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
 import type { ProcessRole } from "~/server/app-layer/config";
-import { makeQueueName } from "~/server/background/queues/makeQueueName";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { RetentionPolicyResolver } from "~/server/data-retention/retentionPolicyResolver";
+import { makeQueueName } from "~/server/queues/makeQueueName";
 import { createLogger } from "~/utils/logger/server";
+import { resolveProjectStorageDestination } from "../stored-objects/project-storage-destination";
+import { createStorageRegistry } from "../stored-objects/stored-objects-factory";
 import { DisabledPipeline } from "./disabledPipeline";
 import type { Event, Projection } from "./domain/types";
 import type { OutboxReactorDefinition } from "./outbox/outboxReactor.types";
@@ -646,6 +648,8 @@ export class EventSourcing {
     if (effectiveRedis) {
       this._globalQueue = new GroupQueueProcessor(definition, effectiveRedis, {
         consumerEnabled: this._processRole === "worker",
+        objectStoreFor: (projectId) => createStorageRegistry({ projectId }),
+        resolveStorageDestination: resolveProjectStorageDestination,
       });
     } else {
       this._globalQueue = new EventSourcedQueueProcessorMemory(definition);
