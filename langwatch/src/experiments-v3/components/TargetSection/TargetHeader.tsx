@@ -595,58 +595,63 @@ export const TargetHeader = memo(function TargetHeader({
 
   if (isPairwiseColumn) {
     return (
-      <VStack align="stretch" gap={1} width="full">
+      <VStack align="stretch" gap={1.5} width="full">
         {headerRow}
-        {/* Design 2 — pure typography with brand-color underline under each
-            variant name. Matches LangWatch's minimalist header vocabulary
-            (no chips, no badges, no icons — just type + color) so the
-            subtitle sits calmly under the title instead of competing with
-            the metrics chip / play button for attention. */}
+        {/* Design 1 — gradient split bar. Reads as ONE visual object (the
+            comparison) rather than two names plus a separator: left half is
+            green-tinted for variant A, right half is purple-tinted for
+            variant B, and the two halves meet in the middle. No icons, no
+            "vs" string — the bar itself is the comparison metaphor. Names
+            truncate with ellipsis if the column is narrow so nothing hides
+            behind the play button. */}
         <HStack
-          gap={2}
-          paddingLeft={7}
+          gap={0}
+          marginLeft={7}
+          borderRadius="4px"
+          overflow="hidden"
+          height="22px"
           minWidth={0}
-          alignItems="baseline"
           data-testid="pairwise-variants-subtitle"
         >
-          <Text
-            fontSize="12px"
+          <Box
+            flex={1}
+            display="flex"
+            alignItems="center"
+            paddingX={2.5}
+            fontSize="11px"
             fontWeight="medium"
-            color="fg"
-            lineHeight="1.2"
-            borderBottomWidth="2px"
-            borderBottomColor="green.solid"
-            paddingBottom="1px"
+            color="green.fg"
+            css={{
+              background:
+                "linear-gradient(90deg, var(--chakra-colors-green-emphasized), var(--chakra-colors-green-subtle))",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
             minWidth={0}
-            maxWidth="45%"
-            truncate
           >
             {variantAName}
-          </Text>
-          <Text
-            fontSize="10px"
-            fontWeight="semibold"
-            color="fg.subtle"
-            letterSpacing="0.08em"
-            textTransform="uppercase"
-            flexShrink={0}
-          >
-            vs
-          </Text>
-          <Text
-            fontSize="12px"
+          </Box>
+          <Box
+            flex={1}
+            display="flex"
+            alignItems="center"
+            justifyContent="flex-end"
+            paddingX={2.5}
+            fontSize="11px"
             fontWeight="medium"
-            color="fg"
-            lineHeight="1.2"
-            borderBottomWidth="2px"
-            borderBottomColor="purple.solid"
-            paddingBottom="1px"
+            color="purple.fg"
+            css={{
+              background:
+                "linear-gradient(90deg, var(--chakra-colors-purple-subtle), var(--chakra-colors-purple-emphasized))",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
             minWidth={0}
-            maxWidth="45%"
-            truncate
           >
             {variantBName}
-          </Text>
+          </Box>
         </HStack>
       </VStack>
     );
