@@ -547,9 +547,15 @@ export function EvaluationsV3Table({
         (e) => e.dbEvaluatorId === evaluator.id,
       );
 
-      // If already exists, no need to add again (it applies to all targets)
+      // If already exists, reuse it instead of silently no-op'ing. The
+      // pre-existing behavior (return null) made the drawer close with no
+      // visible feedback, which trained users to fall back to "New Evaluator"
+      // and pile up duplicate rows in the DB (Rogerio dogfood report — the
+      // "why do I have 3 Pairwise Compare evaluators" thread). Returning the
+      // existing config's id lets `guideOrCloseAfterAdd` route to the editor
+      // just like a fresh add would, so the click has an observable effect.
       if (existingEvaluator) {
-        return null;
+        return existingEvaluator.id;
       }
 
       // Create a new EvaluatorConfig from the evaluator
