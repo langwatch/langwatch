@@ -43,6 +43,11 @@ import type {
   CodeComponentConfig,
   Field as DSLField,
 } from "~/optimization_studio/types/dsl";
+import {
+  DEFAULT_CODE,
+  buildCodeConfig,
+  getCodeFromConfig,
+} from "~/optimization_studio/utils/codeAgentConfig";
 import type {
   AgentComponentConfig,
   TypedAgent,
@@ -51,26 +56,8 @@ import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-f
 import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
-const DEFAULT_CODE = `class Code:
-    def __call__(self, input: str):
-        # Your code goes here
-
-        return {"output": input.upper()}
-`;
-
 const DEFAULT_INPUTS: DSLField[] = [{ identifier: "input", type: "str" }];
 const DEFAULT_OUTPUTS: DSLField[] = [{ identifier: "output", type: "str" }];
-
-/**
- * Extract code value from CodeComponentConfig parameters
- */
-const getCodeFromConfig = (config: AgentComponentConfig): string => {
-  const codeConfig = config as CodeComponentConfig;
-  const codeParam = codeConfig.parameters?.find(
-    (p) => p.identifier === "code" && p.type === "code",
-  );
-  return (codeParam?.value as string) ?? DEFAULT_CODE;
-};
 
 /**
  * Extract inputs from CodeComponentConfig
@@ -87,32 +74,6 @@ const getOutputsFromConfig = (config: AgentComponentConfig): DSLField[] => {
   const codeConfig = config as CodeComponentConfig;
   return codeConfig.outputs ?? DEFAULT_OUTPUTS;
 };
-
-/**
- * Build DSL-compatible config for code agent
- */
-const buildCodeConfig = (
-  code: string,
-  inputs: DSLField[],
-  outputs: DSLField[],
-  scenarioMappings: Record<string, FieldMapping>,
-  scenarioOutputField: string | undefined,
-): CodeComponentConfig => ({
-  name: "Code",
-  description: "Python code block",
-  parameters: [
-    {
-      identifier: "code",
-      type: "code",
-      value: code,
-    },
-  ],
-  inputs: inputs as CodeComponentConfig["inputs"],
-  outputs: outputs as CodeComponentConfig["outputs"],
-  scenarioMappings:
-    Object.keys(scenarioMappings).length > 0 ? scenarioMappings : undefined,
-  scenarioOutputField,
-});
 
 export type AgentCodeEditorDrawerProps = {
   open?: boolean;
@@ -270,13 +231,13 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
     if (!project?.id || !isValid) return;
 
     // Build DSL-compatible config with current inputs/outputs/scenarioMappings/scenarioOutputField
-    const config = buildCodeConfig(
+    const config = buildCodeConfig({
       code,
       inputs,
       outputs,
       scenarioMappings,
       scenarioOutputField,
-    );
+    });
 
     if (agentId) {
       // Editing existing agent - no limit check needed
