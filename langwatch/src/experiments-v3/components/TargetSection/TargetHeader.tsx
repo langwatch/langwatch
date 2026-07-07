@@ -597,62 +597,56 @@ export const TargetHeader = memo(function TargetHeader({
     return (
       <VStack align="stretch" gap={1} width="full">
         {headerRow}
-        {/* Compact "who vs who" — two subtle pills (green A / purple B to
-            match the winner badge palette everywhere else) with a small
-            swords icon between them. Reads as "these two are in a
-            head-to-head" at a glance, without leaning on a flat "vs"
-            string that competes with the title for attention. */}
+        {/* Design 2 — pure typography with brand-color underline under each
+            variant name. Matches LangWatch's minimalist header vocabulary
+            (no chips, no badges, no icons — just type + color) so the
+            subtitle sits calmly under the title instead of competing with
+            the metrics chip / play button for attention. */}
         <HStack
           gap={2}
           paddingLeft={7}
           minWidth={0}
+          alignItems="baseline"
           data-testid="pairwise-variants-subtitle"
         >
-          <Box
-            paddingX={2}
-            paddingY={0.5}
-            borderRadius="full"
-            bg="green.subtle"
-            color="green.fg"
-            fontSize="11px"
+          <Text
+            fontSize="12px"
             fontWeight="medium"
+            color="fg"
             lineHeight="1.2"
+            borderBottomWidth="2px"
+            borderBottomColor="green.solid"
+            paddingBottom="1px"
             minWidth={0}
             maxWidth="45%"
-            css={{
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
+            truncate
           >
             {variantAName}
-          </Box>
-          <Icon
-            as={Swords}
-            boxSize="12px"
-            color="fg.muted"
+          </Text>
+          <Text
+            fontSize="10px"
+            fontWeight="semibold"
+            color="fg.subtle"
+            letterSpacing="0.08em"
+            textTransform="uppercase"
             flexShrink={0}
-            aria-label="vs"
-          />
-          <Box
-            paddingX={2}
-            paddingY={0.5}
-            borderRadius="full"
-            bg="purple.subtle"
-            color="purple.fg"
-            fontSize="11px"
+          >
+            vs
+          </Text>
+          <Text
+            fontSize="12px"
             fontWeight="medium"
+            color="fg"
             lineHeight="1.2"
+            borderBottomWidth="2px"
+            borderBottomColor="purple.solid"
+            paddingBottom="1px"
             minWidth={0}
             maxWidth="45%"
-            css={{
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
+            truncate
           >
             {variantBName}
-          </Box>
+          </Text>
         </HStack>
       </VStack>
     );
