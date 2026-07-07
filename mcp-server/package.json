@@ -56,7 +56,7 @@
     "esbuild": "^0.28.1",
     "eslint": "^10.2.1",
     "tsup": "^8.1.0",
-    "tsx": "^4.20.5",
+    "tsx": "^4.22.4",
     "typescript": "^5.0.0",
     "typescript-eslint": "^8.55.0"
   },

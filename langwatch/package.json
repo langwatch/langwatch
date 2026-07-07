@@ -244,7 +244,7 @@
     "superjson": "^2.2.6",
     "tiktoken": "^1.0.22",
     "ts-pattern": "^5.9.0",
-    "tsx": "^4.21.0",
+    "tsx": "^4.22.4",
     "undici": "^8.5.0",
     "use-debounce": "^10.1.1",
     "usehooks-ts": "^3.1.1",
