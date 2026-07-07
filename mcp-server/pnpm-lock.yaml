@@ -56,7 +56,7 @@ importers:
         specifier: ^3.0.44
         version: 3.0.81(zod@4.4.3)
       '@anthropic-ai/claude-code':
-        specifier: ^2.1.119
+        specifier: ^2.1.195
         version: 2.1.195
       '@eslint/js':
         specifier: ^10.0.1
@@ -65,7 +65,7 @@ importers:
         specifier: ^0.4.6
         version: 0.4.15(668bbc6991063a13cac3c4f471982977)
       '@types/debug':
-        specifier: ^4.1.12
+        specifier: ^4.1.13
         version: 4.1.13
       '@types/express':
         specifier: ^5.0.6
