@@ -196,7 +196,13 @@ export function PairwiseConfigForm({
               <VariantMenuItem
                 key={t.id}
                 target={t}
-                onSelect={(id) => update({ variantA: id })}
+                // Reset the output-field path whenever the variant changes —
+                // a stale path from the previous variant would silently
+                // point at a field that doesn't exist on the new one, and
+                // the orchestrator would ship `undefined` to the judge.
+                onSelect={(id) =>
+                  update({ variantA: id, variantAOutputPath: undefined })
+                }
                 testId={`pairwise-variant-a-option-${t.id}`}
               />
             ))
@@ -219,13 +225,28 @@ export function PairwiseConfigForm({
               <VariantMenuItem
                 key={t.id}
                 target={t}
-                onSelect={(id) => update({ variantB: id })}
+                onSelect={(id) =>
+                  update({ variantB: id, variantBOutputPath: undefined })
+                }
                 testId={`pairwise-variant-b-option-${t.id}`}
               />
             ))
           )}
         </Picker>
       </HStack>
+
+      {/* Structured-output narrowing: when a picked variant emits more than
+          one output field, let the user pick a single field so the judge
+          sees just that value instead of the whole JSON object. Empty
+          selection ("use whole output") is preserved as a first option. */}
+      <VariantOutputFieldRow
+        selectedA={selectedA}
+        selectedB={selectedB}
+        pathA={draft.variantAOutputPath}
+        pathB={draft.variantBOutputPath}
+        onChangeA={(path) => update({ variantAOutputPath: path })}
+        onChangeB={(path) => update({ variantBOutputPath: path })}
+      />
 
       <GoldenAnswerSection
         draft={draft}
@@ -409,5 +430,101 @@ function MetricsSection({
         prefer the cheaper / faster variant when quality is comparable.
       </Text>
     </Box>
+  );
+}
+
+/**
+ * Per-variant "Output field" pickers, side-by-side and only rendered when
+ * at least one selected variant has more than one output field. Empty
+ * selection means "use whole output" and is the pre-existing behavior
+ * (the orchestrator's `pickOutputPath` treats an empty path as no-op).
+ *
+ * We deliberately only surface this when there's a real choice — showing
+ * a single-option picker for a target with one output field would just
+ * add noise. If neither variant has more than one output field, the row
+ * hides entirely.
+ */
+function VariantOutputFieldRow({
+  selectedA,
+  selectedB,
+  pathA,
+  pathB,
+  onChangeA,
+  onChangeB,
+}: {
+  selectedA: TargetConfig | undefined;
+  selectedB: TargetConfig | undefined;
+  pathA: string[] | undefined;
+  pathB: string[] | undefined;
+  onChangeA: (path: string[] | undefined) => void;
+  onChangeB: (path: string[] | undefined) => void;
+}) {
+  const outputsA = selectedA?.outputs ?? [];
+  const outputsB = selectedB?.outputs ?? [];
+  if (outputsA.length < 2 && outputsB.length < 2) return null;
+  return (
+    <HStack align="end" gap={3}>
+      <OutputFieldPicker
+        label="Output field (A)"
+        outputs={outputsA}
+        value={pathA}
+        onChange={onChangeA}
+        testId="pairwise-variant-a-output-field"
+      />
+      <OutputFieldPicker
+        label="Output field (B)"
+        outputs={outputsB}
+        value={pathB}
+        onChange={onChangeB}
+        testId="pairwise-variant-b-output-field"
+      />
+    </HStack>
+  );
+}
+
+function OutputFieldPicker({
+  label,
+  outputs,
+  value,
+  onChange,
+  testId,
+}: {
+  label: string;
+  outputs: { identifier: string }[];
+  value: string[] | undefined;
+  onChange: (path: string[] | undefined) => void;
+  testId: string;
+}) {
+  const selected = value && value.length > 0 ? value[0] : undefined;
+  const isEmpty = !selected;
+  const noChoice = outputs.length < 2;
+  return (
+    <Picker
+      label={label}
+      placeholder={noChoice ? "Whole output (default)" : "Whole output"}
+      isEmpty={isEmpty}
+      selectedDisplay={selected}
+      testId={testId}
+    >
+      <Menu.Item
+        value="__whole__"
+        onClick={() => onChange(undefined)}
+        data-testid={`${testId}-option-whole`}
+      >
+        <Text fontSize="13px" color="fg.muted">
+          Whole output
+        </Text>
+      </Menu.Item>
+      {outputs.map((o) => (
+        <Menu.Item
+          key={o.identifier}
+          value={o.identifier}
+          onClick={() => onChange([o.identifier])}
+          data-testid={`${testId}-option-${o.identifier}`}
+        >
+          <Text fontSize="13px">{o.identifier}</Text>
+        </Menu.Item>
+      ))}
+    </Picker>
   );
 }
