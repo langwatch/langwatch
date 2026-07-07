@@ -597,49 +597,62 @@ export const TargetHeader = memo(function TargetHeader({
     return (
       <VStack align="stretch" gap={1} width="full">
         {headerRow}
-        {/* Cleaner "who vs who" — small colored dots on each side (green =
-            A, purple = B — matches the winner badge palette in the row
-            cells + win-rate chart), variant name in medium weight, "vs"
-            in a subtle color. Reads at a glance without a wall of grey
-            text. */}
+        {/* Compact "who vs who" — two subtle pills (green A / purple B to
+            match the winner badge palette everywhere else) with a small
+            swords icon between them. Reads as "these two are in a
+            head-to-head" at a glance, without leaning on a flat "vs"
+            string that competes with the title for attention. */}
         <HStack
           gap={2}
           paddingLeft={7}
           minWidth={0}
           data-testid="pairwise-variants-subtitle"
         >
-          <HStack gap={1.5} minWidth={0} flex="0 1 auto">
-            <Circle size="6px" bg="green.solid" flexShrink={0} />
-            <Text
-              fontSize="11px"
-              color="fg"
-              fontWeight="medium"
-              lineHeight="1.2"
-              truncate
-            >
-              {variantAName}
-            </Text>
-          </HStack>
-          <Text
-            fontSize="10px"
-            color="fg.subtle"
-            fontWeight="normal"
-            flexShrink={0}
+          <Box
+            paddingX={2}
+            paddingY={0.5}
+            borderRadius="full"
+            bg="green.subtle"
+            color="green.fg"
+            fontSize="11px"
+            fontWeight="medium"
+            lineHeight="1.2"
+            minWidth={0}
+            maxWidth="45%"
+            css={{
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
           >
-            vs
-          </Text>
-          <HStack gap={1.5} minWidth={0} flex="0 1 auto">
-            <Circle size="6px" bg="purple.solid" flexShrink={0} />
-            <Text
-              fontSize="11px"
-              color="fg"
-              fontWeight="medium"
-              lineHeight="1.2"
-              truncate
-            >
-              {variantBName}
-            </Text>
-          </HStack>
+            {variantAName}
+          </Box>
+          <Icon
+            as={Swords}
+            boxSize="12px"
+            color="fg.muted"
+            flexShrink={0}
+            aria-label="vs"
+          />
+          <Box
+            paddingX={2}
+            paddingY={0.5}
+            borderRadius="full"
+            bg="purple.subtle"
+            color="purple.fg"
+            fontSize="11px"
+            fontWeight="medium"
+            lineHeight="1.2"
+            minWidth={0}
+            maxWidth="45%"
+            css={{
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {variantBName}
+          </Box>
         </HStack>
       </VStack>
     );
