@@ -7,6 +7,7 @@ import {
   IconButton,
   Spacer,
   Text,
+  VStack,
 } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 import { Swords } from "lucide-react";
@@ -366,7 +367,19 @@ export const TargetHeader = memo(function TargetHeader({
         ? "Switch Evaluator"
         : "Switch Agent";
 
-  return (
+  // For pairwise column-targets, the header carries a lot: title +
+  // "<variantA> vs <variantB>" identity + wins summary + full metrics
+  // popover + play button. Cramming everything on one HStack squishes the
+  // subtitle out and hides the metric chip behind the play button on
+  // narrower columns. Split into two rows for pairwise so both the
+  // variants and the metrics get real estate — matches how the results
+  // page header stacks them.
+  const isPairwiseColumn = target.type === "evaluator" && !!target.pairwise;
+  const pairwiseSubtitle = isPairwiseColumn
+    ? `${variantAName} vs ${variantBName}`
+    : null;
+
+  const headerRow = (
     <HStack gap={2} width="full" marginY={-2}>
       <Menu.Root
         positioning={{ placement: "bottom-start" }}
@@ -579,4 +592,25 @@ export const TargetHeader = memo(function TargetHeader({
       </Tooltip>
     </HStack>
   );
+
+  if (isPairwiseColumn && pairwiseSubtitle) {
+    return (
+      <VStack align="stretch" gap={1} width="full">
+        {headerRow}
+        <Text
+          fontSize="12px"
+          color="fg.muted"
+          fontWeight="medium"
+          lineHeight="1.2"
+          paddingLeft={7}
+          truncate
+          data-testid="pairwise-variants-subtitle"
+        >
+          {pairwiseSubtitle}
+        </Text>
+      </VStack>
+    );
+  }
+
+  return headerRow;
 });
