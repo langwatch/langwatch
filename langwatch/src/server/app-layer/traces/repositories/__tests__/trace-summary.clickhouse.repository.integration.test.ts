@@ -20,6 +20,7 @@ import { TraceSummaryClickHouseRepository } from "../trace-summary.clickhouse.re
 
 const tenantId = `test-tsumm-resolve-${nanoid()}`;
 const presentTraceId = `trace-${nanoid()}`;
+const logsOnlyTraceId = `logs-only-${nanoid()}`;
 const base = Date.now() - 60 * 60 * 1000;
 
 let ch: ClickHouseClient;
@@ -65,6 +66,16 @@ function makeRow(traceId: string, occurredAtMs: number) {
   };
 }
 
+function makeLogsOnlyRow(traceId: string) {
+  return {
+    ...makeRow(traceId, 0),
+    SpanCount: 0,
+    Attributes: { "langwatch.reserved.log_record_count": "1" },
+    ComputedInput: "log-input",
+    ComputedOutput: "log-output",
+  };
+}
+
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
@@ -72,7 +83,7 @@ beforeAll(async () => {
 
   await ch.insert({
     table: "trace_summaries",
-    values: [makeRow(presentTraceId, base)],
+    values: [makeRow(presentTraceId, base), makeLogsOnlyRow(logsOnlyTraceId)],
     format: "JSONEachRow",
     clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
   });
@@ -145,5 +156,21 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (integration)", () => {
     // issued (this is the win for the not-found case).
     expect(queries.some((q) => q.includes("min(OccurredAt)"))).toBe(true);
     expect(queries.some((q) => q.includes("ComputedInput"))).toBe(false);
+  });
+
+  it("still returns a logs-only trace that carries the OccurredAt=0 sentinel", async () => {
+    const { repo: rec, queries } = recordingRepo();
+
+    const result = await rec.findByTraceId(tenantId, logsOnlyTraceId);
+
+    expect(result).not.toBeNull();
+    expect(result?.traceId).toBe(logsOnlyTraceId);
+    expect(result?.spanCount).toBe(0);
+    expect(result?.computedInput).toBe("log-input");
+    const resolveQuery = queries.find((q) => q.includes("count() AS rowCount"));
+    const heavyQuery = queries.find((q) => q.includes("ComputedInput"));
+    expect(resolveQuery).toBeDefined();
+    expect(heavyQuery).toBeDefined();
+    expect(heavyQuery!).not.toContain("OccurredAt >=");
   });
 });

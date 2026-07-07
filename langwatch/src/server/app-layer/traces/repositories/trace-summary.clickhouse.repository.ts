@@ -137,9 +137,9 @@ export class TraceSummaryClickHouseRepository
     //
     // The hint is *best-effort*. If the hint window misses (clock skew,
     // stale URL, the row's `timestamp` ≠ trace's actual OccurredAt) we
-    // fall back to an unconstrained scan so the drawer doesn't 404 on a
-    // trace that genuinely exists. The fallback is the slow path; the
-    // happy path stays fast.
+    // resolve the real OccurredAt via a cheap sort-key seek and bound the
+    // retry so the drawer doesn't 404 on a trace that genuinely exists.
+    // The resolve+retry is the slow path; the hint happy path stays fast.
     const PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
     const hasHint = options?.occurredAtMs !== undefined;
 
@@ -160,14 +160,22 @@ export class TraceSummaryClickHouseRepository
       // every weekly partition (incl. cold S3). OccurredAt is the trace's
       // occurrence time and is stable across versions (it's the
       // `PARTITION BY toYearWeek(OccurredAt)` key), so the ±2-day window always
-      // contains the row — no unbounded fallback is needed. A trace genuinely
-      // absent resolves to undefined, and we return null from the light scan
-      // without ever issuing the heavy unbounded read.
-      const resolvedMs = await this.resolveOccurredAtMs(tenantId, traceId);
-      if (resolvedMs === undefined) return null;
+      // contains the row — no unbounded fallback is needed for normal rows. A
+      // trace genuinely absent returns null from the light scan without ever
+      // issuing the heavy read; historical sentinel rows still use the legacy
+      // unbounded fallback to preserve correctness.
+      const resolved = await this.resolveOccurredAtMs({ tenantId, traceId });
+      if (!resolved.found) return null;
+      if (resolved.occurredAtMs === undefined) {
+        logger.debug(
+          { tenantId, traceId },
+          "Trace summary resolved with sentinel OccurredAt — falling back to unbounded read",
+        );
+        return await this.queryByTraceId(tenantId, traceId);
+      }
       return await this.queryByTraceId(tenantId, traceId, {
-        fromMs: resolvedMs - PARTITION_WINDOW_MS,
-        toMs: resolvedMs + PARTITION_WINDOW_MS,
+        fromMs: resolved.occurredAtMs - PARTITION_WINDOW_MS,
+        toMs: resolved.occurredAtMs + PARTITION_WINDOW_MS,
       });
     } catch (error) {
       const errorMessage =
@@ -188,17 +196,23 @@ export class TraceSummaryClickHouseRepository
    * couple of granules of small columns — far cheaper than letting the heavy
    * single-trace read fall back to scanning every weekly partition (incl. cold
    * S3). For a not-yet-projected / absent trace this also lets the caller skip
-   * the heavy read entirely. Returns undefined when the trace isn't in
-   * `trace_summaries`.
+   * the heavy read entirely. Rows that still carry the historical
+   * `OccurredAt = 0` sentinel are reported as found without a usable timestamp
+   * so the caller can preserve correctness with the legacy unbounded fallback.
    */
-  private async resolveOccurredAtMs(
-    tenantId: string,
-    traceId: string,
-  ): Promise<number | undefined> {
+  private async resolveOccurredAtMs({
+    tenantId,
+    traceId,
+  }: {
+    tenantId: string;
+    traceId: string;
+  }): Promise<{ found: boolean; occurredAtMs?: number }> {
     const client = await this.resolveClient(tenantId);
     const result = await client.query({
       query: `
-        SELECT toUnixTimestamp64Milli(min(OccurredAt)) AS occurredAtMs
+        SELECT
+          count() AS rowCount,
+          toUnixTimestamp64Milli(min(OccurredAt)) AS occurredAtMs
         FROM ${TABLE_NAME}
         WHERE TenantId = {tenantId:String}
           AND TraceId = {traceId:String}
@@ -207,15 +221,24 @@ export class TraceSummaryClickHouseRepository
       format: "JSONEachRow",
     });
     const rows = (await result.json()) as Array<{
+      rowCount: string | number;
       occurredAtMs: string | number | null;
     }>;
+    const rowCountRaw = rows[0]?.rowCount;
     const raw = rows[0]?.occurredAtMs;
-    if (raw === null || raw === undefined) return undefined;
-    // min over no matching rows yields the epoch default (0); treat that — and
-    // any non-positive value — as "trace absent" so the caller returns null and
-    // skips the heavy read.
+    const rowCount =
+      typeof rowCountRaw === "string" ? Number(rowCountRaw) : rowCountRaw;
+    if (!Number.isFinite(rowCount) || rowCount <= 0) {
+      return { found: false };
+    }
+    if (raw === null || raw === undefined) return { found: true };
+    // A positive OccurredAt can safely bound the read. Historical rows with the
+    // epoch sentinel (0) must fall back to the legacy unbounded lookup because
+    // they do exist but have no usable partition key.
     const ms = typeof raw === "string" ? Number(raw) : raw;
-    return Number.isFinite(ms) && ms > 0 ? ms : undefined;
+    return Number.isFinite(ms) && ms > 0
+      ? { found: true, occurredAtMs: ms }
+      : { found: true };
   }
 
   private async queryByTraceId(
