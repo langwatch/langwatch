@@ -570,13 +570,13 @@ const detectPairwiseColumns = (
         .filter((id) => candidateIds.includes(id));
       variantAId = orderedIds[0] ?? candidateIds[0]!;
       variantBId = orderedIds[1] ?? candidateIds[1]!;
-      variantAName = targetNameById.get(variantAId) ?? variantAName;
-      variantBName = targetNameById.get(variantBId) ?? variantBName;
+      variantAName = targetNameById.get(variantAId) || variantAName;
+      variantBName = targetNameById.get(variantBId) || variantBName;
     } else if (candidateIds.length === 1) {
       // Only one id ever won — we can name that side but not the other.
       // Assign it to A; the other side stays generic.
       variantAId = candidateIds[0]!;
-      variantAName = targetNameById.get(variantAId) ?? variantAName;
+      variantAName = targetNameById.get(variantAId) || variantAName;
     }
 
     // Normalize per-row verdicts against the resolved A/B ids.
