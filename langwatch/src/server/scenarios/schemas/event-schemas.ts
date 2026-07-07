@@ -7,7 +7,7 @@ import {
   EventType,
   MessageSchema,
   MessagesSnapshotEventSchema,
-} from "./ag-ui-core";
+} from "./ag-ui-schemas";
 import { chatMessageSchema } from "~/server/tracer/types";
 import { ScenarioEventType, ScenarioRunStatus, Verdict } from "../scenario-event.enums";
 
