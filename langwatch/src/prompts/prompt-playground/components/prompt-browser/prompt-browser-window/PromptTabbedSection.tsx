@@ -151,6 +151,8 @@ export function PromptTabbedSection({
       size="sm"
       minHeight={0}
       paddingTop={1}
+      lazyMount
+      unmountOnExit
     >
       <Tabs.List
         display="flex"

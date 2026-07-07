@@ -1,4 +1,4 @@
-import { Box, Button, Text } from "@chakra-ui/react";
+import { Box, Button, Text, useDisclosure } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
 import { ArrowUp, Copy, RefreshCw } from "react-feather";
 import { LuClock, LuEllipsisVertical, LuPencil, LuTrash2 } from "react-icons/lu";
@@ -37,6 +37,7 @@ export function PublishedPromptActions({
   const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
   const [isPushToCopiesDialogOpen, setIsPushToCopiesDialogOpen] =
     useState(false);
+  const { open, setOpen } = useDisclosure();
   const { deletePrompt } = usePrompts();
   const { project, hasPermission } = useOrganizationTeamProject();
   const { addTab } = useDraggableTabsBrowserStore(({ addTab }) => ({ addTab }));
@@ -52,7 +53,7 @@ export function PublishedPromptActions({
   // Cascade-resolved model for new-tab "view history" prompts.
   const resolvedDefault = api.modelProvider.getResolvedDefault.useQuery(
     { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
-    { enabled: !!project?.id },
+    { enabled: open && !!project?.id },
   );
 
   const isCopiedPrompt = !!prompt?.copiedFromPromptId;
@@ -97,7 +98,7 @@ export function PublishedPromptActions({
       projectId: project?.id ?? "",
     },
     {
-      enabled: !!project?.id,
+      enabled: open && !!project?.id,
     },
   );
 
@@ -137,7 +138,10 @@ export function PublishedPromptActions({
         _groupHover={{ opacity: 1 }}
         transition="opacity 0.2s"
       >
-        <Menu.Root>
+        <Menu.Root
+          open={open}
+          onOpenChange={({ open }) => setOpen(open)}
+        >
           <Menu.Trigger asChild>
             <Button
               variant="ghost"

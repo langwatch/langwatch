@@ -321,15 +321,16 @@ describe("PromptTabbedSection Store Integration", () => {
     });
 
     it("persists variable values to localStorage", () => {
-      store.getState().addTab({
+      const tabId = store.getState().addTab({
         data: createTabData({
           variableValues: { name: "Persisted" },
         }),
       });
 
-      // Check localStorage contains the value
-      const storageKey = `${TEST_PROJECT_ID}:draggable-tabs-browser-store`;
-      const storedData = localStorage.getItem(storageKey);
+      // Tab data (including variableValues) is persisted under its own
+      // per-tab key, not the top-level window/tab-order index key.
+      const tabStorageKey = `${TEST_PROJECT_ID}:tab:${tabId}`;
+      const storedData = localStorage.getItem(tabStorageKey);
       expect(storedData).toBeDefined();
       expect(storedData).toContain("Persisted");
     });

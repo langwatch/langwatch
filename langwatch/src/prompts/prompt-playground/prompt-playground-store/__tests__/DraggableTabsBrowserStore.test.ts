@@ -19,10 +19,19 @@ const localStorageMock = (() => {
     clear: () => {
       store = {};
     },
+    key: (index: number) => Object.keys(store)[index] ?? null,
+    get length() {
+      return Object.keys(store).length;
+    },
   };
 })();
 
 vi.stubGlobal("localStorage", localStorageMock);
+
+/** Builds a large-ish string so per-tab payload size differences are obvious. */
+function buildLargeContent(label: string): string {
+  return `${label}-`.repeat(5000); // ~30-40KB per tab
+}
 
 /**
  * Helper to create a minimal TabData object for testing
@@ -414,6 +423,113 @@ describe("DraggableTabsBrowserStore", () => {
       expect(store.getState().windows[0]?.tabs[0]?.data.meta.title).toBe(
         "Updated",
       );
+    });
+  });
+
+  describe("persistence", () => {
+    describe("when updating one tab's data with other large tabs open", () => {
+      it("does not rewrite the untouched tab's full content", () => {
+        store.getState().addTab({
+          data: createTabData({
+            form: { currentValues: { handle: buildLargeContent("tab-1") } },
+          }),
+        });
+        store.getState().addTab({
+          data: createTabData({
+            form: { currentValues: { handle: buildLargeContent("tab-2") } },
+          }),
+        });
+
+        const tab1Id = store.getState().windows[0]?.tabs[0]?.id;
+        const tab2Id = store.getState().windows[0]?.tabs[1]?.id;
+        expect(tab1Id).toBeDefined();
+        expect(tab2Id).toBeDefined();
+
+        const originalSetItem = localStorageMock.setItem.bind(localStorageMock);
+        const setItemSpy = vi.fn(originalSetItem);
+        localStorageMock.setItem = setItemSpy;
+
+        try {
+          store.getState().updateTabData({
+            tabId: tab2Id!,
+            updater: (data) => ({
+              ...data,
+              meta: { ...data.meta, title: "Updated" },
+            }),
+          });
+
+          // Every write that happened while editing tab2 must not embed
+          // tab1's untouched large content anywhere in its payload.
+          const tab1Content = buildLargeContent("tab-1");
+          for (const call of setItemSpy.mock.calls) {
+            const [, value] = call;
+            expect(value.includes(tab1Content)).toBe(false);
+          }
+
+          // Sanity check: tab1's content is still recoverable after tab2 was
+          // edited, proving we didn't just fail to persist it at all.
+          const persistedTab1 = localStorageMock.getItem(
+            `${TEST_PROJECT_ID}:tab:${tab1Id!}`,
+          );
+          expect(persistedTab1).toContain(tab1Content);
+        } finally {
+          localStorageMock.setItem = originalSetItem;
+        }
+      });
+    });
+  });
+
+  describe("rehydration recovery", () => {
+    describe("when a persisted tab fails schema validation", () => {
+      it("removes all per-tab keys along with the light index key", async () => {
+        const lightKey = `${TEST_PROJECT_ID}:draggable-tabs-browser-store`;
+        const tab1Key = `${TEST_PROJECT_ID}:tab:tab-1`;
+        const tab2Key = `${TEST_PROJECT_ID}:tab:tab-2`;
+
+        // Light index key parses fine and references both tabs...
+        localStorage.setItem(
+          lightKey,
+          JSON.stringify({
+            state: {
+              windows: [
+                {
+                  id: "window-1",
+                  tabs: [{ id: "tab-1" }, { id: "tab-2" }],
+                  activeTabId: "tab-1",
+                },
+              ],
+              activeWindowId: "window-1",
+            },
+            version: 0,
+          }),
+        );
+        localStorage.setItem(tab1Key, JSON.stringify(createTabData()));
+        // ...but tab-2's own data is corrupted (missing required `form`
+        // field), which fails PersistedStateSchema validation and should
+        // trigger the "invalid shape" recovery path.
+        localStorage.setItem(tab2Key, JSON.stringify({}));
+
+        await store.persist.rehydrate();
+
+        expect(localStorage.getItem(tab1Key)).toBeNull();
+        expect(localStorage.getItem(tab2Key)).toBeNull();
+        expect(localStorage.getItem(lightKey)).toBeNull();
+      });
+    });
+
+    describe("when the light index key itself is unparseable", () => {
+      it("falls back to removing the light key without throwing", async () => {
+        const lightKey = `${TEST_PROJECT_ID}:draggable-tabs-browser-store`;
+        const tab1Key = `${TEST_PROJECT_ID}:tab:tab-1`;
+
+        localStorage.setItem(tab1Key, JSON.stringify(createTabData()));
+        localStorage.setItem(lightKey, "{not valid json");
+
+        await store.persist.rehydrate();
+
+        expect(localStorage.getItem(lightKey)).toBeNull();
+        expect(localStorage.getItem(tab1Key)).toBeNull();
+      });
     });
   });
 
