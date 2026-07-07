@@ -130,7 +130,7 @@
     "@t3-oss/env-core": "^0.13.11",
     "@tanstack/react-query": "^4.44.0",
     "@tanstack/react-table": "^8.21.3",
-    "@tanstack/react-virtual": "^3.13.24",
+    "@tanstack/react-virtual": "^3.14.4",
     "@tiptap/extension-document": "^3.22.5",
     "@tiptap/extension-history": "^3.22.5",
     "@tiptap/extension-mention": "^3.22.5",
