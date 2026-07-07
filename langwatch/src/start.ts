@@ -37,10 +37,14 @@ async function loadDevHttpsCredentials(
   }
 
   const { generate } = await import("selfsigned");
-  const pems = generate(
+  // Apple's max accepted lifetime for trusted certs. selfsigned v5 dropped the
+  // `days` option in favour of explicit not-before/not-after dates.
+  const notAfterDate = new Date();
+  notAfterDate.setDate(notAfterDate.getDate() + 825);
+  const pems = await generate(
     [{ name: "commonName", value: "localhost" }],
     {
-      days: 825, // Apple's max accepted lifetime for trusted certs.
+      notAfterDate,
       keySize: 2048,
       extensions: [
         {
