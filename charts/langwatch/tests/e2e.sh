@@ -26,6 +26,10 @@ source "$(cd "$(dirname "$0")/../../lib" && pwd)/test-helpers.sh"
 trap cleanup_cluster EXIT
 
 # ─── PostgreSQL helper ───────────────────────────────────────────────────────
+# Argv-embedded query — only safe for simple queries with no double quotes or
+# single-quoted literals (its only call site is `SELECT 1`). Suites needing
+# real SQL (double-quoted Prisma identifiers, string literals) use a local
+# stdin-based variant instead — see pg_exec in test_dataset_s3_migration_upgrade.
 pg_query() {
   local pod="$1" query="$2"
   kc exec "$pod" -- \
