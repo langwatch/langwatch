@@ -37,6 +37,10 @@ const config = tseslint.config(
             "@typescript-eslint/no-unsafe-argument": "off",
             "@typescript-eslint/no-unsafe-return": "off",
 
+            // typescript-eslint 8.62 flags load-bearing generic assertions whose
+            // auto-fix breaks tsc; downgrade to a warning (see the existing overrides).
+            "@typescript-eslint/no-unnecessary-type-assertion": "warn",
+
             "@typescript-eslint/consistent-type-imports": [
                 "warn",
                 {
