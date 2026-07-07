@@ -333,7 +333,22 @@ export const generatePairwiseCells = (
     if (!path || path.length === 0) return output;
     let cursor: unknown = output;
     for (const segment of path) {
-      if (cursor === null || typeof cursor !== "object") return undefined;
+      if (
+        cursor === null ||
+        typeof cursor !== "object" ||
+        Array.isArray(cursor)
+      ) {
+        // LangWatch's runtime unwraps a single-output-field target's dict
+        // back to a scalar at storage time, so a target declared with one
+        // `output` field ends up stored as the plain string value. The
+        // mappings picker still records the path as `["output"]` in that
+        // case (it's the only field to point at), so a strict object-only
+        // walk here would surface as "Variant outputs missing" for every
+        // single-field prompt / agent. Return the scalar itself when the
+        // remaining path is exactly one segment — this matches the runtime
+        // unwrap and keeps single-field targets usable in pairwise.
+        return path.length === 1 && path[0] === segment ? cursor : undefined;
+      }
       cursor = (cursor as Record<string, unknown>)[segment];
     }
     return cursor;
