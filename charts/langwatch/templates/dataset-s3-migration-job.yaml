@@ -118,6 +118,35 @@ spec:
           env:
             {{- include "langwatch.sharedEnv" . | nindent 12 }}
 
+            {{/* NEXTAUTH_SECRET: not part of sharedEnv (app-only today), but
+                 the task's module graph eagerly initializes the BetterAuth
+                 client at import time regardless of what the task itself
+                 does. Without this, better-auth falls through to its own
+                 default-secret detection, finds nothing, and throws
+                 "You are using the default secret" — crashing the Job on
+                 every attempt. Same secretKeyRef precedence as
+                 app/deployment.yaml (explicit override -> existingSecret ->
+                 autogen). */}}
+            {{- if .Values.app.nextAuth.secret.secretKeyRef.name }}
+            - name: NEXTAUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.nextAuth.secret.secretKeyRef.name }}
+                  key: {{ .Values.app.nextAuth.secret.secretKeyRef.key }}
+            {{- else if .Values.secrets.existingSecret }}
+            - name: NEXTAUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: {{ .Values.secrets.secretKeys.nextAuthSecret | default "nextAuthSecret" }}
+            {{- else if .Values.autogen.enabled }}
+            - name: NEXTAUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "langwatch.appSecretName" . }}
+                  key: nextAuthSecret
+            {{- end }}
+
             {{/* No SKIP_DATASET_S3_MIGRATE env here: the outer guard above
                  (`and .enabled (not .skip)`) already excludes skip=true, so this
                  Job only renders when the migration is meant to run. Setting

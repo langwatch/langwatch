@@ -21,15 +21,31 @@ spec:
   strategy:
     {{- toYaml .Values.workers.deployment.strategy | nindent 8 }}
   {{- else if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
-  {{/* Default Recreate under local-FS, same rationale as the app Deployment:
-       workers mount the app's RWO stored-objects PVC, and a surged worker pod
-       keeps the volume attached to the old node during an upgrade — which can
-       wedge the app's own replacement pod on a multi-attach error. Recreate on
-       BOTH deployments releases the volume before new pods schedule; the
-       co-location affinity then reunites them on one node. An explicit
-       workers.deployment.strategy overrides this. */}}
+  {{/* Default kill-then-start under local-FS, same rationale as the app
+       Deployment: workers mount the app's RWO stored-objects PVC, and the k8s default RollingUpdate (25% surge) starts
+       the new pod BEFORE the old one releases the volume — on a multi-node
+       cluster the new pod can land on another node and wedge Pending on a
+       multi-attach error (the scheduler does not avoid RWO conflicts for CSI
+       volumes). maxSurge=0/maxUnavailable=1 at replicas=1 behaves exactly like
+       Recreate (old pod terminates and releases the volume before the new one
+       schedules), at the cost of a brief downtime — honest for the
+       single-replica local-FS tier.
+
+       Deliberately NOT `type: Recreate`: switching a live Deployment from the
+       k8s-defaulted RollingUpdate to Recreate requires DELETING the live
+       `rollingUpdate` struct, and Helm's 3-way merge cannot emit that deletion
+       when the previous release's manifest never had a `strategy` key (the
+       pre-#5083 chart) — the API then rejects the patch with
+       "spec.strategy.rollingUpdate: Forbidden: may not be specified when
+       strategy `type` is 'Recreate'", failing every upgrade across this
+       boundary. Setting maxSurge/maxUnavailable only UPDATES existing fields,
+       which the merge applies cleanly. An explicit workers.deployment.strategy
+       overrides this. */}}
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   {{- end }}
   {{- if hasKey (default (dict) .Values.workers.deployment) "revisionHistoryLimit" }}
   revisionHistoryLimit: {{ .Values.workers.deployment.revisionHistoryLimit }}
