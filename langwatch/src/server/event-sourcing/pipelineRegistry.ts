@@ -37,15 +37,9 @@ import type { EvaluationExecutionService } from "../app-layer/evaluations/evalua
 import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
 import type { EvaluationAnalyticsRepository } from "../app-layer/evaluations/repositories/evaluation-analytics.repository";
 import type { EvaluationAnalyticsRollupRepository } from "../app-layer/evaluations/repositories/evaluation-analytics-rollup.repository";
-import type { ExperimentAnalyticsRepository } from "../app-layer/experiments/repositories/experiment-analytics.repository";
-import type { ExperimentAnalyticsRollupRepository } from "../app-layer/experiments/repositories/experiment-analytics-rollup.repository";
 import type { MonitorService } from "../app-layer/monitors/monitor.service";
 import type { OrganizationService } from "../app-layer/organizations/organization.service";
 import type { ProjectService } from "../app-layer/projects/project.service";
-import type { SimulationAnalyticsRepository } from "../app-layer/scenarios/repositories/simulation-analytics.repository";
-import type { SimulationAnalyticsRollupRepository } from "../app-layer/scenarios/repositories/simulation-analytics-rollup.repository";
-import type { SuiteAnalyticsRepository } from "../app-layer/suites/repositories/suite-analytics.repository";
-import type { SuiteAnalyticsRollupRepository } from "../app-layer/suites/repositories/suite-analytics-rollup.repository";
 import type { LogRecordStorageRepository } from "../app-layer/traces/repositories/log-record-storage.repository";
 import type { MetricRecordStorageRepository } from "../app-layer/traces/repositories/metric-record-storage.repository";
 import type { TraceAnalyticsRepository } from "../app-layer/traces/repositories/trace-analytics.repository";
@@ -70,6 +64,7 @@ import {
 } from "./pipelines/billing-reporting/pipeline";
 import { ExecuteEvaluationCommand } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
 import { createEvaluationProcessingPipeline } from "./pipelines/evaluation-processing/pipeline";
+import type { EvaluationAnalyticsData } from "./pipelines/evaluation-processing/projections/evaluationAnalytics.foldProjection";
 import { EvaluationAnalyticsStore } from "./pipelines/evaluation-processing/projections/evaluationAnalytics.store";
 import { EvaluationAnalyticsRollupAppendStore } from "./pipelines/evaluation-processing/projections/evaluationAnalyticsRollup.store";
 import { EvaluationRunStore } from "./pipelines/evaluation-processing/projections/evaluationRun.store";
@@ -77,8 +72,6 @@ import { createEvaluationAlertTriggerReactor } from "./pipelines/evaluation-proc
 import { createEvaluationAlertTriggerNotifyOutboxReactor } from "./pipelines/evaluation-processing/reactors/evaluationAlertTriggerNotifyOutbox.reactor";
 import { createEvaluationGraphTriggerEvaluationOutboxReactor } from "./pipelines/evaluation-processing/reactors/graphTriggerEvaluation.outboxReactor";
 import { createExperimentRunProcessingPipeline } from "./pipelines/experiment-run-processing/pipeline";
-import { ExperimentAnalyticsStore } from "./pipelines/experiment-run-processing/projections/experimentAnalytics.store";
-import { ExperimentAnalyticsRollupAppendStore } from "./pipelines/experiment-run-processing/projections/experimentAnalyticsRollup.store";
 import type { ClickHouseExperimentRunResultRecord } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.mapProjection";
 import { createExperimentRunItemAppendStore } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
 import type { ExperimentRunStateData } from "./pipelines/experiment-run-processing/projections/experimentRunState.foldProjection";
@@ -91,8 +84,6 @@ import {
   ComputeRunMetricsCommand,
 } from "./pipelines/simulation-processing/commands/computeRunMetrics.command";
 import { createSimulationProcessingPipeline } from "./pipelines/simulation-processing/pipeline";
-import { SimulationAnalyticsStore } from "./pipelines/simulation-processing/projections/simulationAnalytics.store";
-import { SimulationAnalyticsRollupAppendStore } from "./pipelines/simulation-processing/projections/simulationAnalyticsRollup.store";
 import type { SimulationRunStateData } from "./pipelines/simulation-processing/projections/simulationRunState.foldProjection";
 import { createCancellationBroadcastReactor } from "./pipelines/simulation-processing/reactors/cancellationBroadcast.reactor";
 import type { ScenarioExecutionReactorHandle } from "./pipelines/simulation-processing/reactors/scenarioExecution.reactor";
@@ -104,8 +95,6 @@ import type { SimulationRunStateRepository } from "./pipelines/simulation-proces
 import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
 import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
-import { SuiteAnalyticsStore } from "./pipelines/suite-run-processing/projections/suiteAnalytics.store";
-import { SuiteAnalyticsRollupAppendStore } from "./pipelines/suite-run-processing/projections/suiteAnalyticsRollup.store";
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
 import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/schemas/constants";
@@ -114,6 +103,7 @@ import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/l
 import { MetricRecordAppendStore } from "./pipelines/trace-processing/projections/metricRecordStorage.store";
 import type { DerivedTraceEvent } from "./pipelines/trace-processing/projections/services/trace-events.derivation";
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
+import type { TraceAnalyticsData } from "./pipelines/trace-processing/projections/traceAnalytics.foldProjection";
 import { TraceAnalyticsStore } from "./pipelines/trace-processing/projections/traceAnalytics.store";
 import { TraceAnalyticsRollupAppendStore } from "./pipelines/trace-processing/projections/traceAnalyticsRollup.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
@@ -211,18 +201,6 @@ export interface PipelineRepositories {
   evaluationAnalyticsRollup: EvaluationAnalyticsRollupRepository;
   /** ADR-034 Phase 6: slim per-evaluation analytics repository. */
   evaluationAnalytics: EvaluationAnalyticsRepository;
-  /** ADR-034 Phase 7: per-simulation-run rollup repository. */
-  simulationAnalyticsRollup: SimulationAnalyticsRollupRepository;
-  /** ADR-034 Phase 7: slim per-simulation-run analytics repository. */
-  simulationAnalytics: SimulationAnalyticsRepository;
-  /** ADR-034 Phase 7: per-experiment-run rollup repository. */
-  experimentAnalyticsRollup: ExperimentAnalyticsRollupRepository;
-  /** ADR-034 Phase 7: slim per-experiment-run analytics repository. */
-  experimentAnalytics: ExperimentAnalyticsRepository;
-  /** ADR-034 Phase 7: per-item suite rollup repository. */
-  suiteAnalyticsRollup: SuiteAnalyticsRollupRepository;
-  /** ADR-034 Phase 7: slim per-suite-run analytics repository. */
-  suiteAnalytics: SuiteAnalyticsRepository;
   experimentRunItemStorage: AppendStore<ClickHouseExperimentRunResultRecord>;
 }
 
@@ -377,8 +355,15 @@ export class PipelineRegistry {
         evalRunStore: new EvaluationRunStore(
           this.deps.evaluations.runs.repository,
         ),
-        evaluationAnalyticsStore: new EvaluationAnalyticsStore(
-          this.deps.repositories.evaluationAnalytics,
+        // Redis cache is the eval slim fold's ONLY warm read path — its
+        // store's get() returns null by design (lossy row, no read-back),
+        // and on a cache miss the fold's refoldOnStoreMiss option rebuilds
+        // state from the event log. Same wiring as trace_analytics.
+        evaluationAnalyticsStore: this.cached<EvaluationAnalyticsData>(
+          new EvaluationAnalyticsStore(
+            this.deps.repositories.evaluationAnalytics,
+          ),
+          "evaluation_analytics",
         ),
         evaluationAnalyticsRollupAppendStore:
           new EvaluationAnalyticsRollupAppendStore(
@@ -531,8 +516,14 @@ export class PipelineRegistry {
         traceAnalyticsRollupAppendStore: new TraceAnalyticsRollupAppendStore(
           this.deps.repositories.traceAnalyticsRollup,
         ),
-        traceAnalyticsStore: new TraceAnalyticsStore(
-          this.deps.repositories.traceAnalytics,
+        // Redis cache is the slim fold's ONLY warm read path — its store's
+        // get() returns null by design (lossy row, no read-back), and on a
+        // cache miss the fold's refoldOnStoreMiss option rebuilds state from
+        // the event log. Without this wrapper every event would trigger a
+        // full event-log re-fold.
+        traceAnalyticsStore: this.cached<TraceAnalyticsData>(
+          new TraceAnalyticsStore(this.deps.repositories.traceAnalytics),
+          "trace_analytics",
         ),
         logRecordAppendStore: new LogRecordAppendStore(
           this.deps.repositories.logRecordStorage,
@@ -666,12 +657,6 @@ export class PipelineRegistry {
           ),
           "suite_runs",
         ),
-        suiteAnalyticsStore: new SuiteAnalyticsStore(
-          this.deps.repositories.suiteAnalytics,
-        ),
-        suiteAnalyticsRollupAppendStore: new SuiteAnalyticsRollupAppendStore(
-          this.deps.repositories.suiteAnalyticsRollup,
-        ),
       }),
     );
   }
@@ -738,13 +723,6 @@ export class PipelineRegistry {
     const simulationPipeline = this.deps.eventSourcing.register(
       createSimulationProcessingPipeline({
         simulationRunStore,
-        simulationAnalyticsStore: new SimulationAnalyticsStore(
-          this.deps.repositories.simulationAnalytics,
-        ),
-        simulationAnalyticsRollupAppendStore:
-          new SimulationAnalyticsRollupAppendStore(
-            this.deps.repositories.simulationAnalyticsRollup,
-          ),
         snapshotUpdateBroadcastReactor,
         cancellationBroadcastReactor,
         scenarioExecutionReactor: scenarioExecutionHandle.reactor,
@@ -846,13 +824,6 @@ export class PipelineRegistry {
         experimentRunStateFoldStore: experimentRunStore,
         experimentRunItemAppendStore:
           this.deps.repositories.experimentRunItemStorage,
-        experimentAnalyticsStore: new ExperimentAnalyticsStore(
-          this.deps.repositories.experimentAnalytics,
-        ),
-        experimentAnalyticsRollupAppendStore:
-          new ExperimentAnalyticsRollupAppendStore(
-            this.deps.repositories.experimentAnalyticsRollup,
-          ),
       }),
     );
 

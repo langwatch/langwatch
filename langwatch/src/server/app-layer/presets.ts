@@ -111,10 +111,6 @@ import { EvaluationAnalyticsRollupClickHouseRepository } from "./evaluations/rep
 import { NullEvaluationAnalyticsRollupRepository } from "./evaluations/repositories/evaluation-analytics-rollup.repository";
 import { EvaluationRunClickHouseRepository } from "./evaluations/repositories/evaluation-run.clickhouse.repository";
 import { NullEvaluationRunRepository } from "./evaluations/repositories/evaluation-run.repository";
-import { ExperimentAnalyticsClickHouseRepository } from "./experiments/repositories/experiment-analytics.clickhouse.repository";
-import { NullExperimentAnalyticsRepository } from "./experiments/repositories/experiment-analytics.repository";
-import { ExperimentAnalyticsRollupClickHouseRepository } from "./experiments/repositories/experiment-analytics-rollup.clickhouse.repository";
-import { NullExperimentAnalyticsRollupRepository } from "./experiments/repositories/experiment-analytics-rollup.repository";
 import { MonitorService } from "./monitors/monitor.service";
 import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.repository";
 import { EventExplorerService } from "./ops/event-explorer.service";
@@ -136,20 +132,12 @@ import { RedisPresenceRepository } from "./presence/repositories/presence.redis.
 import { ProjectService } from "./projects/project.service";
 import { PrismaProjectRepository } from "./projects/repositories/project.prisma.repository";
 import { NullProjectRepository } from "./projects/repositories/project.repository";
-import { SimulationAnalyticsClickHouseRepository } from "./scenarios/repositories/simulation-analytics.clickhouse.repository";
-import { NullSimulationAnalyticsRepository } from "./scenarios/repositories/simulation-analytics.repository";
-import { SimulationAnalyticsRollupClickHouseRepository } from "./scenarios/repositories/simulation-analytics-rollup.clickhouse.repository";
-import { NullSimulationAnalyticsRollupRepository } from "./scenarios/repositories/simulation-analytics-rollup.repository";
 import { PrismaShareRepository } from "./share/repositories/share.prisma.repository";
 import { ShareService } from "./share/share.service";
 import { SimulationRunService } from "./simulations/simulation-run.service";
 import { createCompositePlanProvider } from "./subscription/composite-plan-provider";
 import { PlanProviderService } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
-import { SuiteAnalyticsClickHouseRepository } from "./suites/repositories/suite-analytics.clickhouse.repository";
-import { NullSuiteAnalyticsRepository } from "./suites/repositories/suite-analytics.repository";
-import { SuiteAnalyticsRollupClickHouseRepository } from "./suites/repositories/suite-analytics-rollup.clickhouse.repository";
-import { NullSuiteAnalyticsRollupRepository } from "./suites/repositories/suite-analytics-rollup.repository";
 import { SuiteRunService } from "./suites/suite-run.service";
 import { NullTopicRepository } from "./topics/null-topic.repository";
 import { PrismaTopicRepository } from "./topics/topic.prisma.repository";
@@ -589,28 +577,6 @@ export function initializeDefaultApp(options?: {
     evaluationAnalytics: clickhouseEnabled
       ? new EvaluationAnalyticsClickHouseRepository(resolveClickHouseClient)
       : new NullEvaluationAnalyticsRepository(),
-    simulationAnalyticsRollup: clickhouseEnabled
-      ? new SimulationAnalyticsRollupClickHouseRepository(
-          resolveClickHouseClient,
-        )
-      : new NullSimulationAnalyticsRollupRepository(),
-    simulationAnalytics: clickhouseEnabled
-      ? new SimulationAnalyticsClickHouseRepository(resolveClickHouseClient)
-      : new NullSimulationAnalyticsRepository(),
-    experimentAnalyticsRollup: clickhouseEnabled
-      ? new ExperimentAnalyticsRollupClickHouseRepository(
-          resolveClickHouseClient,
-        )
-      : new NullExperimentAnalyticsRollupRepository(),
-    experimentAnalytics: clickhouseEnabled
-      ? new ExperimentAnalyticsClickHouseRepository(resolveClickHouseClient)
-      : new NullExperimentAnalyticsRepository(),
-    suiteAnalyticsRollup: clickhouseEnabled
-      ? new SuiteAnalyticsRollupClickHouseRepository(resolveClickHouseClient)
-      : new NullSuiteAnalyticsRollupRepository(),
-    suiteAnalytics: clickhouseEnabled
-      ? new SuiteAnalyticsClickHouseRepository(resolveClickHouseClient)
-      : new NullSuiteAnalyticsRepository(),
     experimentRunItemStorage: createExperimentRunItemAppendStore(
       clickhouseEnabled ? resolveClickHouseClient : null,
     ),

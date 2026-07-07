@@ -72,9 +72,13 @@ function retentionDaysFrom(
  * `storeBatch` (N rows with per-row retention). Concrete classes provide
  * the aggregate-specific config via `super(...)`.
  *
- * `get` returns `null` for every aggregate we've shipped so far (Phase 2/3
- * contract — the executor re-folds from the event log on slim cache miss
- * rather than reading slim back). Override in a subclass if a future
+ * `get` returns `null` for every aggregate we've shipped so far — the slim
+ * rows are lossy by design, so fold state cannot be read back. Fold-state
+ * continuity therefore REQUIRES two layers around any store built on this
+ * base: a RedisCachedFoldStore wrapper at registration (warm path) and the
+ * fold's `refoldOnStoreMiss` option (event-log rebuild on a cache miss).
+ * Without both, a miss folds only the delivered batch and partial rows
+ * overwrite complete ones. Override `get` in a subclass if a future
  * aggregate genuinely needs a read-back path.
  */
 export abstract class BaseAnalyticsFoldStore<TState, TRow>

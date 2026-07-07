@@ -172,7 +172,7 @@ describe("evaluateCustomGraphThreshold", () => {
 });
 
 describe("isNoDataPredicate", () => {
-  describe("when operator is in the no-data set", () => {
+  describe("when zero traffic would breach the trigger (cron fired these on silence)", () => {
     it("matches lt with threshold 1", () => {
       expect(isNoDataPredicate({ operator: "lt", threshold: 1 })).toBe(true);
     });
@@ -185,27 +185,35 @@ describe("isNoDataPredicate", () => {
       expect(isNoDataPredicate({ operator: "eq", threshold: 0 })).toBe(true);
     });
 
-    it("matches lte with threshold 1 (boundary inclusive)", () => {
+    it("matches lt with a threshold above 1 — 'count < 10' fires on total silence, exactly as the cron did", () => {
+      expect(isNoDataPredicate({ operator: "lt", threshold: 2 })).toBe(true);
+      expect(isNoDataPredicate({ operator: "lt", threshold: 10 })).toBe(true);
+      expect(isNoDataPredicate({ operator: "lte", threshold: 100 })).toBe(
+        true,
+      );
+    });
+
+    it("matches lte with threshold 1", () => {
       expect(isNoDataPredicate({ operator: "lte", threshold: 1 })).toBe(true);
     });
 
-    it("does not match when threshold exceeds 1", () => {
-      expect(isNoDataPredicate({ operator: "lt", threshold: 2 })).toBe(false);
-      expect(isNoDataPredicate({ operator: "lte", threshold: 100 })).toBe(
-        false,
-      );
-      expect(isNoDataPredicate({ operator: "eq", threshold: 5 })).toBe(false);
+    it("matches the degenerate gte 0 — always-breached, and the cron fired it on silence too", () => {
+      expect(isNoDataPredicate({ operator: "gte", threshold: 0 })).toBe(true);
     });
   });
 
-  describe("when operator is not in the no-data set", () => {
+  describe("when zero traffic would NOT breach the trigger", () => {
+    it("does not match eq with a non-zero threshold — silence yields 0, which never equals 5", () => {
+      expect(isNoDataPredicate({ operator: "eq", threshold: 5 })).toBe(false);
+      expect(isNoDataPredicate({ operator: "eq", threshold: 1 })).toBe(false);
+    });
+
     it("does not match gt regardless of threshold", () => {
       expect(isNoDataPredicate({ operator: "gt", threshold: 0 })).toBe(false);
       expect(isNoDataPredicate({ operator: "gt", threshold: 1 })).toBe(false);
     });
 
-    it("does not match gte regardless of threshold", () => {
-      expect(isNoDataPredicate({ operator: "gte", threshold: 0 })).toBe(false);
+    it("does not match gte with a positive threshold", () => {
       expect(isNoDataPredicate({ operator: "gte", threshold: 1 })).toBe(false);
     });
 

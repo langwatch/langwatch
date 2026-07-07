@@ -8,8 +8,9 @@ Feature: Event-sourced analytics materialization
       every dimension (including late ones like topic and origin), and serves
       percentiles, min/max, dim-grouped, and arbitrary-filter reads.
     - trace_analytics_rollup: additive metrics pre-summed per time bucket, fed by
-      immutable per-span increments — counts, sums, averages and distinct-counts over
+      immutable per-span increments — counts, sums and per-trace averages over
       dimensions that are final at span-write time (model, span type).
+      Distinct-counts over arbitrary dimensions live on the slim table.
 
   Background:
     Given delivery of events to projections is at-least-once
@@ -22,6 +23,13 @@ Feature: Event-sourced analytics materialization
       Then it returns the latest version — the final cost and the final origin
       And the trace's earlier versions are not double-counted
 
+    Scenario: A late topic classification lands on the slim row without losing the metrics
+      Given a trace whose spans were folded some time ago
+      And the projection's warm state has since been evicted
+      When the topic classification event arrives on its own
+      Then the slim row is rebuilt from the trace's full event history
+      And it carries the topic AND the trace's original cost and tokens
+
   Rule: The rollup sums additive metrics correctly from per-span increments
 
     Scenario: Total cost is the sum of the trace's span costs
@@ -29,16 +37,16 @@ Feature: Event-sourced analytics materialization
       When each span contributes its own cost
       Then the bucket's summed cost for that trace is 0.10
 
-    Scenario: Trace count is the distinct count of trace ids
-      Given a trace whose spans all share the same trace id
+    Scenario: Trace count is carried by the root span
+      Given a trace with several spans
       When the spans contribute to the rollup
-      Then the trace is counted exactly once, as a distinct trace id
+      Then the trace is counted exactly once, by its root span's increment
       And counting raw spans would have over-counted it
 
     Scenario: Trace-level duration is carried by the root span
       Given a trace with several spans
       Then the root span carries the trace's wall-clock duration and the others carry zero
-      And summed duration over the distinct trace count yields the average trace duration
+      And summed duration over the trace count yields the average trace duration
 
   Rule: A re-delivered span is tolerated, not corrected
 

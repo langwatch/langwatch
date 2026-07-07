@@ -120,10 +120,17 @@ function passFailOf(value: boolean | null | undefined): {
  * Map projection that transforms terminal evaluation events into per-event
  * rollup rows for `evaluation_analytics_rollup` (ADR-034 Phase 6).
  *
- * Idempotency / re-delivery: each insert is a separate row in the
- * AggregatingMergeTree; a rare retry over-counts the bucket by one
- * evaluation's contribution. ADR-034 accepts that explicitly. Replay
- * rebuilds the rollup truncate-first rather than incrementing it.
+ * Idempotency / re-delivery: UNLIKE spans, eval terminal events are
+ * at-least-once BY DESIGN — deterministic evaluation ids, collector retry
+ * guidance, and the `tenantId:evaluationId:reported` idempotency key on the
+ * report command all invite duplicate appends. Read-time dedup protects the
+ * fold, but each appended duplicate would land another increment here —
+ * systematic over-counting, not ADR-034's accepted rare crash-retry noise.
+ * `dedupeByIdempotencyKey` therefore guards this projection: the executor
+ * skips any delivery whose idempotency key is already held by an earlier
+ * event in the aggregate's log (fail-open on read lag, so the worst case
+ * remains the accepted transient over-count). Replay still rebuilds the
+ * rollup truncate-first rather than incrementing it.
  */
 export class EvaluationAnalyticsRollupMapProjection
   extends AbstractMapProjection<
@@ -145,6 +152,10 @@ export class EvaluationAnalyticsRollupMapProjection
     // and of sibling evaluations on the same trace (the rollup is dim-keyed,
     // not eval-keyed).
     groupKeyFn: (event: { id: string }) => `evalRollup:${event.id}`,
+    // Eval terminal events are re-reported by design (deterministic ids,
+    // SDK retries); without this, every duplicate append double-counts the
+    // bucket. See the class doc.
+    dedupeByIdempotencyKey: true,
   };
 
   constructor(deps: { store: AppendStore<EvaluationAnalyticsRollupRow> }) {

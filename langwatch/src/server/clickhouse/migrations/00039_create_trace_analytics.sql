@@ -21,8 +21,14 @@
 -- data, less of it", not "different data, computed differently".
 --
 -- Engine / partition / order / retention column mirror trace_summaries:
---   * `ReplacingMergeTree(UpdatedAt)` — re-folds replay-safely dedup to the
---     latest version per (TenantId, TraceId) — ADR-021 / ADR-022 semantics.
+--   * `ReplacingMergeTree(UpdatedAt)` — re-folds are replay-safe: readers
+--     dedup to the latest UpdatedAt per (TenantId, TraceId) — ADR-021 /
+--     ADR-022 semantics. NOTE the engine itself only collapses rows sharing
+--     the FULL sort key (TenantId, OccurredAt, TraceId); OccurredAt can shift
+--     when an earlier-starting span arrives late, so superseded rows may
+--     persist until TTL and every read MUST dedup by
+--     (TenantId, TraceId, max(UpdatedAt)) — the IN-tuple pattern the slim
+--     query builders use.
 --     Same LWW column as trace_summaries (00002_create_schema.sql:178). The
 --     Version column on the table is the schema-snapshot identifier (calendar
 --     date string) so a fold can address which schema version produced the

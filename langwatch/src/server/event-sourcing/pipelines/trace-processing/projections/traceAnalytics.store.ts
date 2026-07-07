@@ -82,13 +82,19 @@ export class TraceAnalyticsStore
   }
 
   /**
-   * The slim table is dual-tap only in Phase 2 — no read path. `get` returns
-   * null so the executor always re-folds from the event log when slim needs a
-   * cache miss, rather than reading slim back (which would require duplicating
-   * the trace-summary read path with the typed-column hoist reversed).
+   * No read-back, by design: the slim row is lossy (trimmed attributes,
+   * booleans instead of arrays), so fold state cannot be reconstructed from
+   * it. Returning null here means fold-state continuity comes from the two
+   * layers above this store:
    *
-   * Phase 3 will wire `getTimeseries` through a proper slim repository read;
-   * this method stays a no-op until then.
+   *   1. the RedisCachedFoldStore wrapped around it at registration (serves
+   *      the warm path), and
+   *   2. the fold's `refoldOnStoreMiss` option (see
+   *      TraceAnalyticsFoldProjection.options) — on a cache miss the executor
+   *      rebuilds state from the event log up to the delivered event.
+   *
+   * Without BOTH of those, a null get would make every delivery fold only its
+   * own batch — partial rows overwriting complete ones.
    */
   async get(
     _aggregateId: string,

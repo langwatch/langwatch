@@ -10,8 +10,8 @@ import type { TraceAnalyticsRow } from "~/server/event-sourcing/pipelines/trace-
  */
 export interface TraceAnalyticsRepository {
   /**
-   * Upserts a slim row. Idempotent — the table's ReplacingMergeTree(Version)
-   * dedup collapses re-folds to the latest version per (TenantId, TraceId).
+   * Upserts a slim row. Idempotent — the table is ReplacingMergeTree(UpdatedAt)
+   * and readers dedup to the latest UpdatedAt per (TenantId, TraceId).
    * `retentionDays` is stamped onto the row's `_retention_days` column; the
    * table's TTL drops the row that many days after its `OccurredAt`.
    */

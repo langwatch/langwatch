@@ -49,6 +49,8 @@ interface SpanFixture {
   nonBilledCost?: number;
   /** Root-span carries duration; children pass 0 (matches projection logic). */
   durationMs?: number;
+  /** Root span (contributes TraceCount 1). Defaults false — a child span. */
+  isRoot?: boolean;
   /** 1 = error root, 0 otherwise. Pre-computed (projection gates on root+ERROR). */
   errorCount?: 0 | 1;
 }
@@ -69,6 +71,7 @@ function makeRow(
     model: "",
     spanType: "",
     spanCount: 1,
+    traceCount: fixture.isRoot ? 1 : 0,
     errorCount: fixture.errorCount ?? 0,
     costSum: fixture.cost,
     nonBilledCostSum: fixture.nonBilledCost ?? 0,
@@ -91,6 +94,7 @@ function makeRow(
 async function readRollupForTenant(tenant: string): Promise<{
   costSum: number;
   spanCount: number;
+  traceCount: number;
   durationSum: number;
   errorCount: number;
 }> {
@@ -99,6 +103,7 @@ async function readRollupForTenant(tenant: string): Promise<{
       SELECT
         sum(CostSum) AS costSum,
         sum(SpanCount) AS spanCount,
+        sum(TraceCount) AS traceCount,
         sum(DurationSum) AS durationSum,
         sum(ErrorCount) AS errorCount
       FROM trace_analytics_rollup
@@ -114,6 +119,7 @@ async function readRollupForTenant(tenant: string): Promise<{
   return {
     costSum: Number(row.costSum ?? 0),
     spanCount: Number(row.spanCount ?? 0),
+    traceCount: Number(row.traceCount ?? 0),
     durationSum: Number(row.durationSum ?? 0),
     errorCount: Number(row.errorCount ?? 0),
   };
@@ -169,7 +175,7 @@ describe("trace_analytics_rollup root-span duration (integration)", () => {
     // Only the root span carries the trace's wall-clock duration; the two
     // children carry 0 — same gate the projection applies via `parentSpanId === null`.
     await durRepo.insertRows([
-      makeRow(rootTenantId, { cost: 0, durationMs: 900 }),
+      makeRow(rootTenantId, { cost: 0, durationMs: 900, isRoot: true }),
       makeRow(rootTenantId, { cost: 0, durationMs: 0 }),
       makeRow(rootTenantId, { cost: 0, durationMs: 0 }),
     ]);
@@ -187,6 +193,53 @@ describe("trace_analytics_rollup root-span duration (integration)", () => {
     it("sums DurationSum to the root duration, ignoring the children", async () => {
       const rollup = await readRollupForTenant(rootTenantId);
       expect(rollup.durationSum).toBe(900);
+    });
+
+    it("counts exactly one trace via TraceCount (1 per root span)", async () => {
+      const rollup = await readRollupForTenant(rootTenantId);
+      expect(rollup.traceCount).toBe(1);
+    });
+  });
+});
+
+describe("trace_analytics_rollup per-trace average via TraceCount (integration)", () => {
+  const avgTenantId = `test-rollup-avg-${nanoid()}`;
+  let avgRepo: TraceAnalyticsRollupClickHouseRepository;
+
+  beforeAll(async () => {
+    avgRepo = new TraceAnalyticsRollupClickHouseRepository(async () => ch);
+    // Two traces in the bucket: roots carrying 900ms and 300ms, plus a child
+    // span. TraceCount (1 per root) is the denominator that turns the
+    // duration sum into a per-trace mean — the shape the rollup query builder
+    // emits for avg(performance.completion_time).
+    await avgRepo.insertRows([
+      makeRow(avgTenantId, { cost: 0, durationMs: 900, isRoot: true }),
+      makeRow(avgTenantId, { cost: 0, durationMs: 300, isRoot: true }),
+      makeRow(avgTenantId, { cost: 0, durationMs: 0 }),
+    ]);
+  });
+
+  afterAll(async () => {
+    await ch.exec({
+      query:
+        "ALTER TABLE trace_analytics_rollup DELETE WHERE TenantId = {tenantId:String}",
+      query_params: { tenantId: avgTenantId },
+    });
+  });
+
+  describe("when duration sums are divided by the trace count", () => {
+    it("yields the per-trace average duration", async () => {
+      const result = await ch.query({
+        query: `
+          SELECT sum(DurationSum) / nullIf(sum(TraceCount), 0) AS avgDuration
+          FROM trace_analytics_rollup
+          WHERE TenantId = {tenantId:String}
+        `,
+        query_params: { tenantId: avgTenantId },
+        format: "JSONEachRow",
+      });
+      const rows = (await result.json()) as Array<{ avgDuration: number }>;
+      expect(Number(rows[0]?.avgDuration)).toBe(600);
     });
   });
 });
