@@ -73,6 +73,13 @@ overrides:
   # parses under zod 4), so pin it to the app's zod. Drop this once @ag-ui/core
   # ships a zod-4 release.
   "@ag-ui/core>zod": "^4.4.3"
+  # @langwatch/scenario (vendored 0.4.10) was built for the zod 3.25 transition
+  # release (imports both "zod" and "zod/v4"). With the app on zod 4, the hoisted
+  # zod 4 leaks into its "zod/v4" while "zod" stays 3.25 → mixing two zod
+  # instances crashes .merge() at import. Pin its whole subtree to ONE instance
+  # (the app's zod 4) so there's no cross-instance mix. The app only consumes its
+  # classes/types (not composed schemas), so this is isolated.
+  "@langwatch/scenario>zod": "^4.4.3"
   # OpenTelemetry — align the APP's transitive OTel to its 0.217 line. The SDK
   # declares its OTel deps exactly in its own package.json, within these ranges.
   "@opentelemetry/sdk-node": ">=0.217.0"
