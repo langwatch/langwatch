@@ -34,14 +34,19 @@ export function createEnvConfig() {
       DATABASE_URL: optionalIfBuildTime(z.string().url()),
       CLICKHOUSE_URL: z.string().url().optional(),
       NODE_ENV: z.enum(["development", "test", "production"]),
-      ENVIRONMENT: z.string().optional().transform((val) => {
-        if (val) return val;
-        if (process.env.NODE_ENV === "production") {
-          console.warn("ENVIRONMENT is not set in production. Defaulting to 'local'.");
-        }
+      ENVIRONMENT: z
+        .string()
+        .optional()
+        .transform((val) => {
+          if (val) return val;
+          if (process.env.NODE_ENV === "production") {
+            console.warn(
+              "ENVIRONMENT is not set in production. Defaulting to 'local'.",
+            );
+          }
 
-        return "local";
-      }),
+          return "local";
+        }),
       BASE_HOST: optionalIfBuildTime(z.string().min(1)),
       NEXTAUTH_PROVIDER: z.string().optional(),
       NEXTAUTH_SECRET: optionalIfBuildTime(z.string().min(1)),
@@ -69,7 +74,8 @@ export function createEnvConfig() {
       API_TOKEN_JWT_SECRET: optionalIfBuildTime(z.string().min(1)),
       // Shared HMAC secret between control-plane and the Go AI Gateway service.
       // See specs/ai-gateway/_shared/contract.md §4 + §9.
-      LW_GATEWAY_INTERNAL_SECRET: gatewaySecretsSchema.LW_GATEWAY_INTERNAL_SECRET,
+      LW_GATEWAY_INTERNAL_SECRET:
+        gatewaySecretsSchema.LW_GATEWAY_INTERNAL_SECRET,
       // HS256 secret used by control-plane to sign the short-lived JWT that the
       // gateway verifies on every request (contract §4.1). 32+ chars.
       LW_GATEWAY_JWT_SECRET: gatewaySecretsSchema.LW_GATEWAY_JWT_SECRET,
@@ -129,10 +135,26 @@ export function createEnvConfig() {
       // LANGEVALS_STAGING_TTL_SECONDS bounds how long the presigned URL
       // stays valid; keep it short so a leaked URL doesn't grant
       // long-window access.
-      LANGEVALS_STAGING_THRESHOLD_BYTES: z.coerce.number().int().positive().optional(),
-      LANGEVALS_STAGING_TTL_SECONDS: z.coerce.number().int().positive().default(600),
-      EVAL_MAX_PAYLOAD_BYTES: z.coerce.number().int().positive().default(16_000_000),
-      TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES: z.coerce.number().int().positive().default(180_000_000),
+      LANGEVALS_STAGING_THRESHOLD_BYTES: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional(),
+      LANGEVALS_STAGING_TTL_SECONDS: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(600),
+      EVAL_MAX_PAYLOAD_BYTES: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(16_000_000),
+      TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(180_000_000),
       DEMO_PROJECT_ID: z.string().optional(),
       DEMO_PROJECT_USER_ID: z.string().optional(),
       DEMO_PROJECT_SLUG: z.string().optional(),
@@ -257,6 +279,9 @@ export function createEnvConfig() {
 
       LANGWATCH_LICENSE_PUBLIC_KEY: z.string().optional(),
       LANGWATCH_LICENSE_PRIVATE_KEY: z.string().optional(),
+      // ADR-027: instance-level license, bootstraps + recovers SSO on
+      // self-hosted deployments without requiring an in-DB org license.
+      LANGWATCH_LICENSE_KEY: z.string().optional(),
 
       // Stripe
       STRIPE_SECRET_KEY: z.string().optional(),
@@ -307,17 +332,20 @@ export function createEnvConfig() {
       REDIS_URL: process.env.REDIS_URL,
       REDIS_CLUSTER_ENDPOINTS: process.env.REDIS_CLUSTER_ENDPOINTS,
       REDIS_DB_INDEX: process.env.REDIS_DB_INDEX,
-      GOOGLE_APPLICATION_CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+      GOOGLE_APPLICATION_CREDENTIALS:
+        process.env.GOOGLE_APPLICATION_CREDENTIALS,
       AZURE_OPENAI_ENDPOINT: process.env.AZURE_OPENAI_ENDPOINT,
       AZURE_OPENAI_KEY: process.env.AZURE_OPENAI_KEY,
       OPENAI_API_KEY: process.env.OPENAI_API_KEY,
       SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
       LANGWATCH_NLP_SERVICE: process.env.LANGWATCH_NLP_SERVICE,
       LANGEVALS_ENDPOINT: process.env.LANGEVALS_ENDPOINT,
-      LANGEVALS_STAGING_THRESHOLD_BYTES: process.env.LANGEVALS_STAGING_THRESHOLD_BYTES,
+      LANGEVALS_STAGING_THRESHOLD_BYTES:
+        process.env.LANGEVALS_STAGING_THRESHOLD_BYTES,
       LANGEVALS_STAGING_TTL_SECONDS: process.env.LANGEVALS_STAGING_TTL_SECONDS,
       EVAL_MAX_PAYLOAD_BYTES: process.env.EVAL_MAX_PAYLOAD_BYTES,
-      TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES: process.env.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES,
+      TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES:
+        process.env.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES,
       DEMO_PROJECT_ID: process.env.DEMO_PROJECT_ID,
       DEMO_PROJECT_USER_ID: process.env.DEMO_PROJECT_USER_ID,
       DEMO_PROJECT_SLUG: process.env.DEMO_PROJECT_SLUG,
@@ -386,10 +414,13 @@ export function createEnvConfig() {
       CLICKHOUSE_CLUSTER: process.env.CLICKHOUSE_CLUSTER,
       LANGWATCH_LICENSE_PUBLIC_KEY: process.env.LANGWATCH_LICENSE_PUBLIC_KEY,
       LANGWATCH_LICENSE_PRIVATE_KEY: process.env.LANGWATCH_LICENSE_PRIVATE_KEY,
+      LANGWATCH_LICENSE_KEY: process.env.LANGWATCH_LICENSE_KEY,
       STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
       STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
-      STRIPE_LICENSE_PAYMENT_LINK_ID: process.env.STRIPE_LICENSE_PAYMENT_LINK_ID,
-      STRIPE_LICENSE_PAYMENT_LINK_URL: process.env.STRIPE_LICENSE_PAYMENT_LINK_URL,
+      STRIPE_LICENSE_PAYMENT_LINK_ID:
+        process.env.STRIPE_LICENSE_PAYMENT_LINK_ID,
+      STRIPE_LICENSE_PAYMENT_LINK_URL:
+        process.env.STRIPE_LICENSE_PAYMENT_LINK_URL,
       ADMIN_EMAILS: process.env.ADMIN_EMAILS,
       HUBSPOT_PORTAL_ID: process.env.HUBSPOT_PORTAL_ID,
       HUBSPOT_REACHED_LIMIT_FORM_ID: process.env.HUBSPOT_REACHED_LIMIT_FORM_ID,

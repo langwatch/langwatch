@@ -39,9 +39,49 @@ async function main() {
   assertLocalhostDatabaseUrl();
 
   const prisma = new PrismaClient();
+
+  // ADR-027: the ssoDomain auto-join rides the platform SSO gate, which
+  // requires a genuine (signature-valid) license. Mint one with a throwaway
+  // keypair BEFORE importing the app modules (the public key and env are
+  // captured at import time).
+  const { generateKeyPairSync } = await import("node:crypto");
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+    privateKeyEncoding: { type: "pkcs8", format: "pem" },
+  });
+  process.env.LANGWATCH_LICENSE_PUBLIC_KEY = publicKey;
+  const { signLicense, encodeLicenseKey } = await import(
+    "../../ee/licensing/signing"
+  );
+  process.env.LANGWATCH_LICENSE_KEY = encodeLicenseKey(
+    signLicense(
+      {
+        licenseId: "lic_sso_smoke",
+        version: 1,
+        organizationName: "SSO Smoketest",
+        email: "smoketest@example.com",
+        issuedAt: new Date().toISOString(),
+        expiresAt: "2099-01-01T00:00:00Z",
+        plan: {
+          type: "ENTERPRISE",
+          name: "Enterprise",
+          maxMembers: 100,
+          maxMessagesPerMonth: 1_000_000,
+          canPublish: true,
+        },
+      },
+      privateKey,
+    ),
+  );
+
   const { afterUserCreate, beforeAccountCreate } = await import(
     "../../src/server/better-auth/hooks"
   );
+  const { __resetSsoGateForTests } = await import(
+    "../../src/server/sso/sso-gate"
+  );
+  const { env: appEnv } = await import("../../src/env.mjs");
 
   // ─────────────────────────────────────────────────────────────────
   // FIXTURES
@@ -120,17 +160,17 @@ async function main() {
   });
   await afterUserCreate({
     prisma,
-    user: { id: "sso_smoke_newuser1", email: "alice@google-corp.test", name: "Alice" },
+    user: {
+      id: "sso_smoke_newuser1",
+      email: "alice@google-corp.test",
+      name: "Alice",
+    },
   });
   const alice = await prisma.organizationUser.findFirst({
     where: { userId: "sso_smoke_newuser1" },
   });
   check("OrganizationUser row created", !!alice);
-  check(
-    "role=MEMBER",
-    alice?.role === "MEMBER",
-    alice?.role,
-  );
+  check("role=MEMBER", alice?.role === "MEMBER", alice?.role);
   check(
     "organizationId matches SSO org",
     alice?.organizationId === "sso_smoke_org_google",
@@ -151,7 +191,11 @@ async function main() {
   });
   await afterUserCreate({
     prisma,
-    user: { id: "sso_smoke_newuser2", email: "bob@unrelated.test", name: "Bob" },
+    user: {
+      id: "sso_smoke_newuser2",
+      email: "bob@unrelated.test",
+      name: "Bob",
+    },
   });
   const bobOrgs = await prisma.organizationUser.findMany({
     where: { userId: "sso_smoke_newuser2" },
@@ -166,7 +210,9 @@ async function main() {
   // [3] Existing user + correct Google provider → clears pendingSsoSetup
   // ─────────────────────────────────────────────────────────────────
 
-  console.log("\n[3] Existing user + correct Google provider → clears pendingSsoSetup");
+  console.log(
+    "\n[3] Existing user + correct Google provider → clears pendingSsoSetup",
+  );
   await prisma.user.create({
     data: {
       id: "sso_smoke_existing1",
@@ -186,10 +232,7 @@ async function main() {
   const carolRefreshed = await prisma.user.findUnique({
     where: { id: "sso_smoke_existing1" },
   });
-  check(
-    "pendingSsoSetup cleared",
-    carolRefreshed?.pendingSsoSetup === false,
-  );
+  check("pendingSsoSetup cleared", carolRefreshed?.pendingSsoSetup === false);
 
   // ─────────────────────────────────────────────────────────────────
   // [4] EXISTING user (with a prior working account) + WRONG provider
@@ -204,7 +247,9 @@ async function main() {
   //     below for that case.
   // ─────────────────────────────────────────────────────────────────
 
-  console.log("\n[4] Existing user (with prior account) + WRONG provider → sets pendingSsoSetup=true");
+  console.log(
+    "\n[4] Existing user (with prior account) + WRONG provider → sets pendingSsoSetup=true",
+  );
   await prisma.user.create({
     data: {
       id: "sso_smoke_existing2",
@@ -248,7 +293,9 @@ async function main() {
   //      org's SSO enforcement by signing up via a different provider.
   // ─────────────────────────────────────────────────────────────────
 
-  console.log("\n[4.5] NEW signup (no prior account) + WRONG provider → hard-blocks with SSO_PROVIDER_NOT_ALLOWED");
+  console.log(
+    "\n[4.5] NEW signup (no prior account) + WRONG provider → hard-blocks with SSO_PROVIDER_NOT_ALLOWED",
+  );
   await prisma.user.create({
     data: {
       id: "sso_smoke_newsignup2",
@@ -341,7 +388,9 @@ async function main() {
   });
   check(
     "stale google account deleted",
-    frankAccounts.every((a) => a.providerAccountId !== "google-oauth2|frank-OLD-id"),
+    frankAccounts.every(
+      (a) => a.providerAccountId !== "google-oauth2|frank-OLD-id",
+    ),
   );
 
   // ─────────────────────────────────────────────────────────────────
@@ -415,7 +464,11 @@ async function main() {
   });
   await afterUserCreate({
     prisma,
-    user: { id: "sso_smoke_mixedcase", email: "Isaac@GOOGLE-CORP.TEST", name: "Isaac" },
+    user: {
+      id: "sso_smoke_mixedcase",
+      email: "Isaac@GOOGLE-CORP.TEST",
+      name: "Isaac",
+    },
   });
   const isaacOrg = await prisma.organizationUser.findFirst({
     where: { userId: "sso_smoke_mixedcase" },
@@ -425,6 +478,40 @@ async function main() {
     isaacOrg?.organizationId === "sso_smoke_org_google",
     isaacOrg?.organizationId,
   );
+
+  // ─────────────────────────────────────────────────────────────────
+  // [8.6] ADR-027: denied platform gate skips the ssoDomain auto-join
+  // ─────────────────────────────────────────────────────────────────
+
+  console.log("\n[8.6] Unlicensed deployment: auto-join is skipped");
+  (appEnv as { LANGWATCH_LICENSE_KEY?: string }).LANGWATCH_LICENSE_KEY =
+    undefined;
+  __resetSsoGateForTests();
+  await prisma.user.create({
+    data: {
+      id: "sso_smoke_denied",
+      email: "denied@google-corp.test",
+      name: "Denied",
+    },
+  });
+  await afterUserCreate({
+    prisma,
+    user: {
+      id: "sso_smoke_denied",
+      email: "denied@google-corp.test",
+      name: "Denied",
+    },
+  });
+  const deniedOrg = await prisma.organizationUser.findFirst({
+    where: { userId: "sso_smoke_denied" },
+  });
+  check(
+    "denied gate: matching-domain user NOT auto-joined",
+    deniedOrg === null,
+  );
+  (appEnv as { LANGWATCH_LICENSE_KEY?: string }).LANGWATCH_LICENSE_KEY =
+    process.env.LANGWATCH_LICENSE_KEY;
+  __resetSsoGateForTests();
 
   // ─────────────────────────────────────────────────────────────────
   // [9] Idempotency — running afterUserCreate twice doesn't double-add
@@ -438,7 +525,11 @@ async function main() {
   try {
     await afterUserCreate({
       prisma,
-      user: { id: "sso_smoke_newuser1", email: "alice@google-corp.test", name: "Alice" },
+      user: {
+        id: "sso_smoke_newuser1",
+        email: "alice@google-corp.test",
+        name: "Alice",
+      },
     });
   } catch (err) {
     secondAddThrew = true;

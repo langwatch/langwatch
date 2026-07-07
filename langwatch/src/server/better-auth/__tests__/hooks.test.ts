@@ -10,6 +10,16 @@ vi.mock("~/server/app-layer/app", () => ({
   }),
 }));
 
+// ADR-027 (Decision 7, site #4): `afterUserCreate`'s domain auto-join is
+// guarded on the platform SSO gate. Defaults to ALLOW so every pre-existing
+// test in this file (written before the gate existed) keeps its original
+// behavior; the denied-mode guard itself is exercised below via
+// `mockResolvedValueOnce(false)`.
+vi.mock("../../sso/sso-gate", () => ({
+  platformSSOAllowed: vi.fn().mockResolvedValue(true),
+}));
+
+import { platformSSOAllowed } from "../../sso/sso-gate";
 import {
   afterAccountCreate,
   afterAccountUpdate,
@@ -112,6 +122,30 @@ describe("afterUserCreate", () => {
       expect(prisma.organizationUser.create).toHaveBeenCalledWith({
         data: { userId: "user_1", organizationId: "org_1", role: "MEMBER" },
       });
+    });
+  });
+
+  describe("when the platform SSO gate denies (unlicensed deployment)", () => {
+    /** @scenario Unlicensed-mode signup does not auto-join a domain-matched organization */
+    it("skips the domain-matched organization auto-join", async () => {
+      vi.mocked(platformSSOAllowed).mockResolvedValueOnce(false);
+
+      const prisma = makePrismaMock({
+        organization: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "org_1",
+            ssoDomain: "acme.com",
+          }),
+        },
+      });
+
+      await afterUserCreate({
+        prisma,
+        user: { id: "user_1", email: "new@acme.com", name: "New User" },
+      });
+
+      expect(prisma.organization.findUnique).not.toHaveBeenCalled();
+      expect(prisma.organizationUser.create).not.toHaveBeenCalled();
     });
   });
 
@@ -270,7 +304,11 @@ describe("beforeAccountCreate", () => {
       await expect(
         beforeAccountCreate({
           prisma,
-          account: { userId: "user_1", providerId: "google", accountId: "sub-1" },
+          account: {
+            userId: "user_1",
+            providerId: "google",
+            accountId: "sub-1",
+          },
         }),
       ).rejects.toThrow("USER_DEACTIVATED");
     });
@@ -348,6 +386,43 @@ describe("beforeAccountCreate", () => {
         where: { id: "user_1" },
         data: { pendingSsoSetup: true },
       });
+    });
+  });
+
+  describe("when the platform SSO gate DENIES (unlicensed deployment)", () => {
+    /** @scenario Existing users on an unlicensed deployment self-recover via password reset */
+    it("does not set pendingSsoSetup for a credential account at a matching ssoDomain", async () => {
+      // The v6 reset-recovery path creates a `credential` account for an
+      // OAuth-born user; without the gate check this would strand them behind
+      // a permanent, unclearable "Link your SSO account" banner.
+      vi.mocked(platformSSOAllowed).mockResolvedValueOnce(false);
+      const update = vi.fn().mockResolvedValue(undefined);
+      const organizationFindUnique = vi.fn();
+      const prisma = makePrismaMock({
+        user: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "user_1",
+            email: "sso-born@acme.com",
+            deactivatedAt: null,
+          }),
+          update,
+        },
+        organization: { findUnique: organizationFindUnique },
+        account: { deleteMany: vi.fn(), count: vi.fn() },
+      });
+
+      await beforeAccountCreate({
+        prisma,
+        account: {
+          userId: "user_1",
+          providerId: "credential",
+          accountId: "user_1",
+        },
+      });
+
+      expect(update).not.toHaveBeenCalled();
+      // Gate denied before any ssoDomain lookup even happened.
+      expect(organizationFindUnique).not.toHaveBeenCalled();
     });
   });
 

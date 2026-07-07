@@ -21,6 +21,7 @@ import { sendBudgetIncreaseRequestEmail } from "~/server/mailer/budgetIncreaseRe
 import { resolveOrgAdminEmail } from "~/server/organizations/resolveOrgAdminEmail";
 import { resolveSupportContact } from "~/server/organizations/resolveSupportContact";
 import { rateLimit } from "~/server/rateLimit";
+import { resolveAuthProvider } from "~/server/sso/sso-gate";
 import { UserService } from "~/server/users/user.service";
 import { getClientIp } from "~/utils/getClientIp";
 import { createLogger } from "~/utils/logger/server";
@@ -62,7 +63,12 @@ export const userRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { name, email, password } = input;
 
-      if (env.NEXTAUTH_PROVIDER !== "email") {
+      // Keyed off the RESOLVED provider, not the raw env: on an SSO-capable
+      // deployment with no genuine license the platform gate coerces the
+      // deployment to email mode (ADR-027 Decision 4), and this tRPC path is
+      // the signup form's actual backend — blocking it would kill the
+      // fresh-signup recovery route (Decision 5c).
+      if ((await resolveAuthProvider()) !== "email") {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message:
@@ -235,10 +241,14 @@ export const userRouter = createTRPCRouter({
     )
     .use(skipPermissionCheck)
     .mutation(async ({ ctx, input }) => {
-      if (
-        env.NEXTAUTH_PROVIDER !== "email" &&
-        env.NEXTAUTH_PROVIDER !== "auth0"
-      ) {
+      // Resolved provider, not raw env (ADR-027): on a denied SSO deployment
+      // the platform gate coerces to email mode, and a user who recovered via
+      // the v6 password-reset path owns a `credential` account — they must be
+      // able to change it (the coerced UI offers the button). `changePassword`
+      // requires the current password, so this is not the takeover vector
+      // Decision 4's all-states block guards against.
+      const provider = await resolveAuthProvider();
+      if (provider !== "email" && provider !== "auth0") {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Password changes are not available for this auth provider",
@@ -267,7 +277,7 @@ export const userRouter = createTRPCRouter({
         });
       }
 
-      if (env.NEXTAUTH_PROVIDER === "auth0") {
+      if (provider === "auth0") {
         // Only the Auth0 database connection (`auth0|<id>` providerAccountId)
         // has a password we can update via the Management API. Social
         // identities linked through Auth0 (google-oauth2|..., github|...,

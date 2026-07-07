@@ -1,7 +1,8 @@
+import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
-import { toaster } from "../ui/toaster";
 import { getUserFriendlyLicenseError } from "../../../ee/licensing/constants";
+import { toaster } from "../ui/toaster";
 
 interface UseLicenseActionsOptions {
   organizationId: string;
@@ -14,11 +15,18 @@ export function useLicenseActions({
   onUploadSuccess,
   onRemoveSuccess,
 }: UseLicenseActionsOptions) {
+  const publicEnv = usePublicEnv();
+  // The SSO license gate is decided once per process (ADR-027), so a license
+  // activated on a running self-hosted server only enables SSO after a restart.
+  const isSelfHosted = publicEnv.data?.IS_SAAS === false;
+
   const uploadMutation = api.license.upload.useMutation({
     onSuccess: () => {
       toaster.create({
         title: "License activated",
-        description: "Your license has been successfully activated.",
+        description: isSelfHosted
+          ? "Your license has been successfully activated. If your deployment uses SSO, restart the server to enable it."
+          : "Your license has been successfully activated.",
         type: "success",
       });
       onUploadSuccess();
@@ -38,7 +46,8 @@ export function useLicenseActions({
     onSuccess: () => {
       toaster.create({
         title: "License removed",
-        description: "Your organization is now running without a license. Some features may be limited.",
+        description:
+          "Your organization is now running without a license. Some features may be limited.",
         type: "info",
       });
       onRemoveSuccess();

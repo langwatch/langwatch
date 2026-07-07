@@ -1,13 +1,20 @@
-import { Prisma, RoleBindingScopeType, TeamUserRole, type Organization, type PrismaClient } from "@prisma/client";
-import { APIError } from "better-auth/api";
 import { generate } from "@langwatch/ksuid";
+import {
+  type Organization,
+  Prisma,
+  type PrismaClient,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "@prisma/client";
+import { APIError } from "better-auth/api";
+import { getApp } from "~/server/app-layer/app";
+import { InviteService } from "~/server/invites/invite.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { fireSsoAutoAddNurturingCalls } from "../../../ee/billing/nurturing/hooks/ssoAutoAdd";
 import { createLogger } from "../../utils/logger/server";
 import { captureException } from "../../utils/posthogErrorCapture";
-import { isSsoProviderMatch, extractEmailDomain } from "./sso";
-import { InviteService } from "~/server/invites/invite.service";
-import { getApp } from "~/server/app-layer/app";
-import { fireSsoAutoAddNurturingCalls } from "../../../ee/billing/nurturing/hooks/ssoAutoAdd";
+import { platformSSOAllowed } from "../sso/sso-gate";
+import { extractEmailDomain, isSsoProviderMatch } from "./sso";
 
 const logger = createLogger("langwatch:better-auth:hooks");
 
@@ -64,7 +71,10 @@ export const beforeUserCreate = async ({
   user,
 }: {
   prisma: PrismaClient;
-  user: { email: string; deactivatedAt?: Date | null } & Record<string, unknown>;
+  user: { email: string; deactivatedAt?: Date | null } & Record<
+    string,
+    unknown
+  >;
 }): Promise<boolean | void> => {
   if (user.deactivatedAt) {
     logger.warn({ email: user.email }, "Blocked signup: user is deactivated");
@@ -99,6 +109,14 @@ export const beforeUserCreate = async ({
  * the OAuth callback. The user can always be added later via invite or admin
  * action, and the pendingSsoSetup + afterAccountUpdate self-heal path covers
  * re-attempts on subsequent sign-ins.
+ *
+ * ADR-027 (Decision 7, v5 MAJOR fix): this auto-join is federation — a login
+ * capability — and runs on email+password signup too, not just OAuth. In a
+ * denied (coerced-to-email) deployment with fresh signup open, an unverified
+ * `POST /sign-up/email` at a customer's domain would otherwise auto-join
+ * that org with zero IdP round-trip. Guarded on the SAME platform gate every
+ * other provider rides — no per-org license check, just "is SSO allowed at
+ * all on this deployment".
  */
 export const afterUserCreate = async ({
   prisma,
@@ -110,17 +128,33 @@ export const afterUserCreate = async ({
   const domain = extractEmailDomain(user.email);
   if (!domain) return;
 
+  // ADR-027 site #4: domain auto-join is federation and rides the platform
+  // gate. When it denies (unlicensed deployment), skip the join — but log it,
+  // because on an email-mode install the gate-resolution warning is suppressed
+  // (sso-gate.ts), so a staff-set ssoDomain silently losing auto-join would
+  // otherwise leave zero trace for an operator debugging "why wasn't this user
+  // added to the org".
+  const ssoAllowed = await platformSSOAllowed();
+  if (!ssoAllowed) {
+    logger.info(
+      { domain },
+      "Skipped ssoDomain auto-join: platform SSO gate denies (no genuine license)",
+    );
+    return;
+  }
+
   try {
     const org = await prisma.organization.findUnique({
       where: { ssoDomain: domain },
     });
     if (!org) return;
 
-    const pendingInvite = await InviteService.create(prisma)
-      .findPendingByOrgAndEmail({
-        organizationId: org.id,
-        email: user.email,
-      });
+    const pendingInvite = await InviteService.create(
+      prisma,
+    ).findPendingByOrgAndEmail({
+      organizationId: org.id,
+      email: user.email,
+    });
 
     try {
       await prisma.$transaction(async (tx) => {
@@ -246,6 +280,15 @@ export const beforeAccountCreate = async ({
       message: "USER_DEACTIVATED",
     });
   }
+
+  // ADR-027: when the platform SSO gate denies, all ssoDomain enforcement is
+  // off (site #4, mirroring `afterUserCreate`). Critically, this stops the
+  // `pendingSsoSetup=true` soft-flag below from being written when the v6
+  // reset-recovery path creates a `credential` account for an OAuth-born user
+  // on an unlicensed install — that flag would otherwise strand them behind a
+  // permanent "Link your SSO account" banner they can never clear (every SSO
+  // path 403s on a denied deployment).
+  if (!(await platformSSOAllowed())) return;
 
   const domain = extractEmailDomain(user.email);
   if (!domain) return;
@@ -449,7 +492,10 @@ export const beforeSessionCreate = async ({
     select: { deactivatedAt: true },
   });
   if (user?.deactivatedAt) {
-    logger.warn({ userId: session.userId }, "Blocked session create: user deactivated");
+    logger.warn(
+      { userId: session.userId },
+      "Blocked session create: user deactivated",
+    );
     return false;
   }
 };
@@ -474,8 +520,14 @@ export const afterSessionCreate = async ({
   prisma: PrismaClient;
   userId: string;
   isImpersonationSession?: boolean;
-  fireActivityTrackingNurturing: (args: { userId: string; hasOrganization: boolean }) => void;
-  ensureUserSyncedToCio: (args: { userId: string; hasOrganization: boolean }) => void;
+  fireActivityTrackingNurturing: (args: {
+    userId: string;
+    hasOrganization: boolean;
+  }) => void;
+  ensureUserSyncedToCio: (args: {
+    userId: string;
+    hasOrganization: boolean;
+  }) => void;
 }): Promise<void> => {
   // lastLoginAt is only updated for "real" sessions — not admin impersonation.
   if (!isImpersonationSession) {
@@ -485,7 +537,10 @@ export const afterSessionCreate = async ({
         data: { lastLoginAt: new Date() },
       });
     } catch (err) {
-      logger.error({ err, userId }, "Failed to update lastLoginAt after session create");
+      logger.error(
+        { err, userId },
+        "Failed to update lastLoginAt after session create",
+      );
     }
   }
 
@@ -504,6 +559,9 @@ export const afterSessionCreate = async ({
       ensureUserSyncedToCio({ userId, hasOrganization });
     })
     .catch((err) => {
-      logger.error({ err, userId }, "Failed to fire nurturing hooks after session create");
+      logger.error(
+        { err, userId },
+        "Failed to fire nurturing hooks after session create",
+      );
     });
 };
