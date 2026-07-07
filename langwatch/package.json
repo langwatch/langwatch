@@ -220,7 +220,7 @@
     "react-dnd": "^16.0.1",
     "react-dnd-html5-backend": "^16.0.1",
     "react-dom": "^19.2.5",
-    "react-error-boundary": "^6.1.1",
+    "react-error-boundary": "^6.1.2",
     "react-feather": "^2.0.10",
     "react-helmet-async": "^3.0.0",
     "react-hook-form": "^7.72.1",
