@@ -145,7 +145,7 @@
     "@trpc/react-query": "^10.45.4",
     "@trpc/server": "^10.45.4",
     "@vitejs/plugin-react": "^6.0.3",
-    "@xyflow/react": "^12.10.2",
+    "@xyflow/react": "^12.11.1",
     "ai": "^6.0.174",
     "ajv": "^8.20.0",
     "bcrypt": "^6.0.0",
