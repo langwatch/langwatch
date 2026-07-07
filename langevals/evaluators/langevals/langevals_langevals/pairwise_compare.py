@@ -222,10 +222,11 @@ class PairwiseCompareEvaluator(
         # customized prompt is the user's explicit choice and is left as-is
         # (they opted into whatever placeholders it contains).
         effective_prompt = self.settings.prompt
-        if (
+        prompt_is_golden_free = (
             not self.settings.has_golden_answer
             and effective_prompt == DEFAULT_PAIRWISE_PROMPT
-        ):
+        )
+        if prompt_is_golden_free:
             effective_prompt = DEFAULT_PAIRWISE_PROMPT_NO_GOLDEN
 
         # `str.format` raises KeyError on any placeholder the user added that
@@ -261,13 +262,15 @@ class PairwiseCompareEvaluator(
 
         winner_enum = ["A", "B", "tie"] if self.settings.allow_tie else ["A", "B"]
 
+        # Tied to prompt_is_golden_free (not the raw has_golden_answer flag)
+        # so this can never contradict the rendered prompt: a customized
+        # prompt that keeps golden framing (because it wasn't swapped above)
+        # still gets a reasoning description that matches what it asks for.
         reasoning_description = (
-            "Step-by-step comparison of the two candidates against the golden answer."
-            if self.settings.has_golden_answer
-            else (
-                "Step-by-step comparison of the two candidates on their "
-                "own merits — no reference answer is involved."
-            )
+            "Step-by-step comparison of the two candidates on their "
+            "own merits — no reference answer is involved."
+            if prompt_is_golden_free
+            else "Step-by-step comparison of the two candidates against the golden answer."
         )
 
         response = litellm.completion(
