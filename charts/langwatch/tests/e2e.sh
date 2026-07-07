@@ -409,8 +409,16 @@ test_dataset_s3_migration_upgrade() {
   # Minimal org/team/project/dataset graph, inserted directly (no auth flow
   # needed — this is disposable seed data, not an auth-path test). IDs are
   # explicit because Prisma's @default(nanoid()) is applied client-side, not
-  # a DB default.
+  # a DB default. Delete-before-insert makes this safe to re-run against a
+  # reused cluster (KEEP_CLUSTER=true local dev loop) — CI always starts from
+  # a fresh Kind cluster, but a local rerun without this would hit a
+  # duplicate-key error on the second pass.
   pg_exec <<'SQL' >/dev/null
+DELETE FROM "DatasetRecord" WHERE "projectId" = 'e2e_project';
+DELETE FROM "Dataset" WHERE "projectId" = 'e2e_project';
+DELETE FROM "Project" WHERE id = 'e2e_project';
+DELETE FROM "Team" WHERE id = 'e2e_team';
+DELETE FROM "Organization" WHERE id = 'e2e_org';
 INSERT INTO "Organization" (id, name, slug) VALUES ('e2e_org', 'E2E Org', 'e2e-org');
 INSERT INTO "Team" (id, name, slug, "organizationId") VALUES ('e2e_team', 'E2E Team', 'e2e-team', 'e2e_org');
 INSERT INTO "Project" (id, name, slug, "apiKey", "teamId", language, framework) VALUES ('e2e_project', 'E2E Project', 'e2e-project', 'e2e_api_key', 'e2e_team', 'other', 'other');
