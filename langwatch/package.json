@@ -299,7 +299,7 @@
     "jest-mock-extended": "^4.0.1",
     "jsdom": "^29.1.1",
     "node-mocks-http": "^1.17.2",
-    "playwright": "1.59.1",
+    "playwright": "1.61.1",
     "raw-loader": "^4.0.2",
     "sass": "^1.101.0",
     "selfsigned": "^3.0.1",
