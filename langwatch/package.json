@@ -311,7 +311,7 @@
     "vite": "^8.0.16",
     "vitest": "^4.1.4",
     "watch": "^1.0.2",
-    "webpack": "^5.104.1"
+    "webpack": "^5.108.1"
   },
   "pnpm": {
     "overrides": {
