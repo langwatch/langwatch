@@ -595,63 +595,50 @@ export const TargetHeader = memo(function TargetHeader({
 
   if (isPairwiseColumn) {
     return (
-      <VStack align="stretch" gap={1.5} width="full">
+      <VStack align="stretch" gap={1} width="full">
         {headerRow}
-        {/* Design 1 — gradient split bar. Reads as ONE visual object (the
-            comparison) rather than two names plus a separator: left half is
-            green-tinted for variant A, right half is purple-tinted for
-            variant B, and the two halves meet in the middle. No icons, no
-            "vs" string — the bar itself is the comparison metaphor. Names
-            truncate with ellipsis if the column is narrow so nothing hides
-            behind the play button. */}
+        {/* Design 3 — colored variant names + swords separator. Zero
+            boxes / chips / underlines: the variant names carry their
+            palette color themselves (green for A, purple for B) with a
+            small swords glyph between them. Highest information density
+            for the least visual weight — reads as one calm line beneath
+            the title. */}
         <HStack
-          gap={0}
-          marginLeft={7}
-          borderRadius="4px"
-          overflow="hidden"
-          height="22px"
+          gap={2}
+          paddingLeft={7}
           minWidth={0}
+          alignItems="center"
           data-testid="pairwise-variants-subtitle"
         >
-          <Box
-            flex={1}
-            display="flex"
-            alignItems="center"
-            paddingX={2.5}
-            fontSize="11px"
+          <Text
+            fontSize="12px"
             fontWeight="medium"
             color="green.fg"
-            css={{
-              background:
-                "linear-gradient(90deg, var(--chakra-colors-green-emphasized), var(--chakra-colors-green-subtle))",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
+            lineHeight="1.2"
             minWidth={0}
+            maxWidth="45%"
+            truncate
           >
             {variantAName}
-          </Box>
-          <Box
-            flex={1}
-            display="flex"
-            alignItems="center"
-            justifyContent="flex-end"
-            paddingX={2.5}
-            fontSize="11px"
+          </Text>
+          <Icon
+            as={Swords}
+            boxSize="11px"
+            color="fg.muted"
+            flexShrink={0}
+            aria-label="vs"
+          />
+          <Text
+            fontSize="12px"
             fontWeight="medium"
             color="purple.fg"
-            css={{
-              background:
-                "linear-gradient(90deg, var(--chakra-colors-purple-subtle), var(--chakra-colors-purple-emphasized))",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
+            lineHeight="1.2"
             minWidth={0}
+            maxWidth="45%"
+            truncate
           >
             {variantBName}
-          </Box>
+          </Text>
         </HStack>
       </VStack>
     );
