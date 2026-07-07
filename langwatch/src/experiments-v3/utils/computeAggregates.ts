@@ -250,43 +250,34 @@ export type PairwiseAggregate = {
  * Execution Time chip prompt/agent columns render (dogfood ask "reuse the
  * same two components — one play button, one time/cost").
  *
- * Reads the JUDGE's own cost / duration — not the two variants' averages.
- * The pairwise column's metrics are the metrics of the comparison itself
- * ("the metrics of that comparison itself" — dogfood), which is the judge
- * LLM call. Variant cost/latency already surfaces on the variant columns.
- *
- * Pairwise column-targets don't emit `targetOutputs`; the judge's per-row
- * cost and duration live on the pairwise verdict at
- * `evaluatorResults[target.id][target.id][rowIndex]` (per orchestrator
- * convention, synthetic evaluator id equals target id).
+ * Reads the pairwise column-target's own `targetMetadata` — the target_result
+ * event the orchestrator emits for the pairwise cell attaches cost + duration
+ * for the whole comparison (variants + judge), so this gives Avg Latency,
+ * Total Cost, AND Execution Time (dogfood follow-up: "you can have a total
+ * latency as you have in other ones") at parity with prompt / agent columns.
+ * Evaluator-derived score/pass-rate stays empty because the pairwise column
+ * itself doesn't emit those.
  */
 export const computePairwiseColumnTargetAggregate = (
   targetId: string,
   results: EvaluationResults,
   rowCount: number,
 ): TargetAggregate => {
-  const verdicts = results.evaluatorResults[targetId]?.[targetId] ?? [];
+  const metadata = results.targetMetadata[targetId] ?? [];
 
   let completedRows = 0;
-  let errorRows = 0;
   const costValues: number[] = [];
   const latencyValues: number[] = [];
 
   for (let i = 0; i < rowCount; i++) {
-    const raw = verdicts[i];
-    if (raw === undefined || raw === null) continue;
-    const parsed = parseEvaluationResult(raw);
-    if (parsed.status === "pending" || parsed.status === "running") continue;
-    if (parsed.status === "error") {
-      errorRows++;
-      continue;
-    }
+    const row = metadata[i];
+    if (!row) continue;
     completedRows++;
-    const costAmount = readCostAmount(raw);
-    if (costAmount > 0) costValues.push(costAmount);
-    const duration = (raw as { duration?: unknown }).duration;
-    if (typeof duration === "number" && Number.isFinite(duration)) {
-      latencyValues.push(duration);
+    if (typeof row.cost === "number" && Number.isFinite(row.cost)) {
+      costValues.push(row.cost);
+    }
+    if (typeof row.duration === "number" && Number.isFinite(row.duration)) {
+      latencyValues.push(row.duration);
     }
   }
 
@@ -297,7 +288,7 @@ export const computePairwiseColumnTargetAggregate = (
     targetId,
     completedRows,
     totalRows: rowCount,
-    errorRows,
+    errorRows: 0,
     evaluators: [],
     overallPassRate: null,
     overallAverageScore: null,
