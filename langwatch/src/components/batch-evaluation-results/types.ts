@@ -461,6 +461,41 @@ export const transformBatchEvaluationData = (
  * targets, we know exactly who's A and who's B. Otherwise we fall back
  * to "Variant A" / "Variant B" so the column still reads sensibly.
  */
+/**
+ * Peel the winning target's stored output to a display string. Handles the
+ * three shapes we see in the wild:
+ *   1. A plain string (single-output-field target unwrapped at storage).
+ *   2. `{ output: "..." }` — the conventional flat-key shape.
+ *   3. `{ output: { output: "...", confidence: "high" } }` — the double-
+ *      wrap that happens when structured outputs get stored under an outer
+ *      `output` key too.
+ * Recurses into `.output` / `.answer` until it hits a scalar. Anything more
+ * exotic than that gets JSON-stringified so the cell still shows *something*
+ * instead of "[object Object]".
+ */
+const extractWinnerOutputText = (raw: unknown): string | null => {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw === "string") return raw;
+  if (typeof raw !== "object") return String(raw);
+  // Up to 3 layers of `.output` / `.answer` unwrap covers structured outputs
+  // stored as `{output: {output: "..."}}` without recursing forever on
+  // pathological shapes.
+  let cursor: unknown = raw;
+  for (let i = 0; i < 3; i++) {
+    if (cursor === null || typeof cursor !== "object") break;
+    const asObj = cursor as Record<string, unknown>;
+    const candidate = asObj.output ?? asObj.answer;
+    if (typeof candidate === "string") return candidate;
+    if (candidate === undefined || candidate === null) break;
+    cursor = candidate;
+  }
+  try {
+    return JSON.stringify(raw);
+  } catch {
+    return null;
+  }
+};
+
 const detectPairwiseColumns = (
   evaluations: ExperimentRunWithItems["evaluations"],
   targetColumns: BatchTargetColumn[],
@@ -633,29 +668,7 @@ const detectPairwiseColumns = (
         const winnerId = normalized === "A" ? variantAId : variantBId;
         if (winnerId) {
           const winnerCell = rows[v.rowIndex]?.targets[winnerId];
-          const raw = winnerCell?.output;
-          if (raw !== null && raw !== undefined) {
-            // Single-output-field targets get unwrapped to a scalar at
-            // storage time; multi-field targets stay as objects. Prefer the
-            // `output` key when present (that's the conventional field
-            // name), otherwise stringify the whole payload — either way the
-            // cell renderer just needs a display string.
-            if (typeof raw === "string") {
-              winnerOutput = raw;
-            } else if (typeof raw === "object") {
-              const asObj = raw as Record<string, unknown>;
-              const candidate = asObj.output ?? asObj.answer;
-              if (typeof candidate === "string") {
-                winnerOutput = candidate;
-              } else {
-                try {
-                  winnerOutput = JSON.stringify(raw);
-                } catch {
-                  winnerOutput = null;
-                }
-              }
-            }
-          }
+          winnerOutput = extractWinnerOutputText(winnerCell?.output);
         }
       }
 
