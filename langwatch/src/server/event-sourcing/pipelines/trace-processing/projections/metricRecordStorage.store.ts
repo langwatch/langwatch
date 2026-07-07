@@ -20,9 +20,11 @@ export class MetricRecordAppendStore
 
   async bulkAppend(
     records: NormalizedMetricRecord[],
-    _context: ProjectionStoreContext,
+    context: ProjectionStoreContext,
   ): Promise<void> {
     if (records.length === 0) return;
-    await this.repo.insertMetricRecords(records);
+    const retentionDays =
+      context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
+    await this.repo.insertMetricRecords(records, retentionDays);
   }
 }

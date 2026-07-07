@@ -25,6 +25,7 @@ import {
   aggregateKey,
   markPendingBatch,
   markCutoffBatch,
+  markCompletedBatch,
   unmarkBatch,
   getCompletedSet,
   getCutoffMarkers,
@@ -34,6 +35,7 @@ import {
 } from "./replayMarkers";
 import { pauseProjection, unpauseProjection, waitForActiveJobs, waitForAllActiveJobs } from "./replayDrain";
 import { FoldAccumulator, MapAccumulator } from "./replayExecutor";
+import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
 
 /** Minimal log interface — CLI provides concrete implementation. */
 export interface ReplayLogWriter {
@@ -47,7 +49,41 @@ export class ReplayService {
   constructor(private readonly deps: {
     clickhouseClientResolver: (tenantId: string) => Promise<ClickHouseClient>;
     redis: IORedis;
+    /**
+     * Resolves per-tenant retention so replay-rebuilt rows honour the tenant's
+     * policy instead of the platform default. Optional — when absent, stores
+     * fall back to PLATFORM_DEFAULT_RETENTION_DAYS, matching pre-existing
+     * behaviour (and the NullReplayRepository test path).
+     */
+    retentionPolicyResolver?: RetentionPolicyResolver;
   }) {}
+
+  /** Accumulator options carrying the retention resolver (if wired). */
+  private get accumulatorOpts(): { retentionResolver?: RetentionPolicyResolver } {
+    return { retentionResolver: this.deps.retentionPolicyResolver };
+  }
+
+  /**
+   * Restrict discovered aggregates to a caller-supplied `aggregateIds` allow-list
+   * (single-/scoped-aggregate replay). Mutates `byTenant` in place to stay in
+   * sync and returns the filtered `allAggregates`. A no-op when the list is
+   * empty/absent (full replay). The optimized path applies the same filter
+   * against its aggregate→projection map.
+   */
+  private static filterDiscoveredByAggregateIds(
+    allAggregates: DiscoveredAggregate[],
+    byTenant: Map<string, DiscoveredAggregate[]>,
+    aggregateIds?: string[],
+  ): DiscoveredAggregate[] {
+    if (!aggregateIds || aggregateIds.length === 0) return allAggregates;
+    const allowed = new Set(aggregateIds);
+    for (const [tid, aggs] of byTenant) {
+      const kept = aggs.filter((a) => allowed.has(a.aggregateId));
+      if (kept.length > 0) byTenant.set(tid, kept);
+      else byTenant.delete(tid);
+    }
+    return allAggregates.filter((a) => allowed.has(a.aggregateId));
+  }
 
   private async resolveClient(tenantId?: string): Promise<ClickHouseClient> {
     return this.deps.clickhouseClientResolver(tenantId ?? "default");
@@ -113,6 +149,7 @@ export class ReplayService {
         projectionIndex: pi,
         totalProjections,
         tenantIds: config.tenantIds,
+        aggregateIds: config.aggregateIds,
         since: config.since,
         batchSize,
         aggregateBatchSize,
@@ -139,6 +176,7 @@ export class ReplayService {
           projectionIndex: config.projections.length + mi,
           totalProjections,
           tenantIds: config.tenantIds,
+          aggregateIds: config.aggregateIds,
           since: config.since,
           batchSize,
           aggregateBatchSize,
@@ -200,6 +238,7 @@ export class ReplayService {
     projectionIndex,
     totalProjections,
     tenantIds,
+    aggregateIds,
     since,
     batchSize,
     aggregateBatchSize,
@@ -212,6 +251,7 @@ export class ReplayService {
     projectionIndex: number;
     totalProjections: number;
     tenantIds: string[];
+    aggregateIds?: string[];
     since: string;
     batchSize: number;
     aggregateBatchSize: number;
@@ -236,6 +276,13 @@ export class ReplayService {
         byTenant.set(tid, existing.concat(aggs));
       }
     }
+
+    // Scoped replay: keep only the requested aggregates (no-op for full replay).
+    allAggregates = ReplayService.filterDiscoveredByAggregateIds(
+      allAggregates,
+      byTenant,
+      aggregateIds,
+    );
 
     if (allAggregates.length === 0) {
       return { aggregatesReplayed: 0, totalEvents: 0, batchErrors: 0, touchedTenants: [] };
@@ -461,7 +508,7 @@ export class ReplayService {
     // 5. REPLAY — stream events page-by-page through the fold accumulator.
     //    Only fold states (bounded by batch size) stay in memory.
     onBatchPhase("replay", 0);
-    const accumulator = new FoldAccumulator(projection.definition);
+    const accumulator = new FoldAccumulator(projection.definition, this.accumulatorOpts);
     const maxCutoffEventId = [...cutoffs.values()]
       .map((c) => c.eventId)
       .reduce((a, b) => (a > b ? a : b));
@@ -516,9 +563,12 @@ export class ReplayService {
       durationMs: Date.now() - replayStart,
     });
 
-    // 7. UNMARK + UNPAUSE
+    // 7. COMPLETE + UNPAUSE — replace each replayed aggregate's active cutoff
+    //    marker with a terminal `done:` marker (rather than deleting it) so a
+    //    job staged but never active during the pause is still skipped for
+    //    events at/before the cutoff after unpause, instead of double-writing.
     onBatchPhase("unmark", totalBatchEvents);
-    await unmarkBatch({ redis, projectionName, aggKeys: withCutoffKeys });
+    await markCompletedBatch({ redis, projectionName, cutoffs });
     await unpauseProjection({ redis, pauseKey: projection.pauseKey });
     log.write({ step: "unmark-batch", tenant: tenantId, count: withCutoffKeys.length });
 
@@ -538,6 +588,7 @@ export class ReplayService {
     projectionIndex,
     totalProjections,
     tenantIds,
+    aggregateIds,
     since,
     batchSize,
     aggregateBatchSize,
@@ -550,6 +601,7 @@ export class ReplayService {
     projectionIndex: number;
     totalProjections: number;
     tenantIds: string[];
+    aggregateIds?: string[];
     since: string;
     batchSize: number;
     aggregateBatchSize: number;
@@ -580,6 +632,13 @@ export class ReplayService {
         byTenant.set(tid, existing.concat(aggs));
       }
     }
+
+    // Scoped replay: keep only the requested aggregates (no-op for full replay).
+    allAggregates = ReplayService.filterDiscoveredByAggregateIds(
+      allAggregates,
+      byTenant,
+      aggregateIds,
+    );
 
     if (allAggregates.length === 0 || dryRun) {
       return { aggregatesReplayed: 0, totalEvents: 0, batchErrors: 0, touchedTenants: [] };
@@ -809,7 +868,7 @@ export class ReplayService {
       .filter((a) => cutoffs.has(aggregateKey(a)))
       .map((a) => a.aggregateId);
 
-    const accumulator = new MapAccumulator(projection.definition);
+    const accumulator = new MapAccumulator(projection.definition, this.accumulatorOpts);
     let cursorEventId = "";
     let eventsProcessed = 0;
     const replayStart = Date.now();
@@ -863,9 +922,12 @@ export class ReplayService {
     onBatchPhase("write", eventsProcessed);
     await accumulator.flush();
 
-    // 7. UNMARK + UNPAUSE
+    // 7. COMPLETE + UNPAUSE — terminal `done:` markers preserve the cutoff
+    //    boundary so a job staged but never active during the pause doesn't
+    //    re-run events at/before the cutoff (double-write + double reactor
+    //    dispatch) after unpause. See the fold path for the full rationale.
     onBatchPhase("unmark", eventsProcessed);
-    await unmarkBatch({ redis, projectionName, aggKeys: withCutoffKeys });
+    await markCompletedBatch({ redis, projectionName, cutoffs });
     await unpauseProjection({ redis, pauseKey: projection.pauseKey });
     log.write({ step: "unmark-batch", tenant: tenantId, count: withCutoffKeys.length, kind: "map" });
 
@@ -1319,11 +1381,11 @@ export class ReplayService {
     for (const projName of projNames) {
       const foldProj = projectionByName.get(projName);
       if (foldProj) {
-        foldAccumulators.set(projName, new FoldAccumulator(foldProj.definition));
+        foldAccumulators.set(projName, new FoldAccumulator(foldProj.definition, this.accumulatorOpts));
       }
       const mapProj = mapProjectionByName.get(projName);
       if (mapProj) {
-        mapAccumulators.set(projName, new MapAccumulator(mapProj.definition));
+        mapAccumulators.set(projName, new MapAccumulator(mapProj.definition, this.accumulatorOpts));
       }
     }
 
@@ -1387,15 +1449,20 @@ export class ReplayService {
       projections: projNames,
     });
 
-    // 5. UNMARK
+    // 5. COMPLETE — terminal `done:` markers per projection (not HDEL), each
+    //    preserving its aggregate's cutoff boundary so a job staged but never
+    //    active during the pause is still skipped for events at/before the
+    //    cutoff after unpause. See replayProjection for the full rationale.
     onBatchPhase("unmark", eventsProcessed);
     const withCutoffSet = new Set(withCutoffKeys);
     for (const [projName, projAggKeys] of aggKeysByProjection) {
-      await unmarkBatch({
-        redis,
-        projectionName: projName,
-        aggKeys: projAggKeys.filter((k) => withCutoffSet.has(k)),
-      });
+      const projCutoffs = new Map<string, CutoffInfo>();
+      for (const key of projAggKeys) {
+        if (!withCutoffSet.has(key)) continue;
+        const cutoff = allCutoffs.get(key);
+        if (cutoff) projCutoffs.set(key, cutoff);
+      }
+      await markCompletedBatch({ redis, projectionName: projName, cutoffs: projCutoffs });
     }
     log.write({ step: "unmark-batch-multi", count: withCutoffKeys.length, projections: projNames });
 

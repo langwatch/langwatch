@@ -105,7 +105,13 @@ export function createReplayRuntime(config: {
     }
   }
 
-  const service = new ReplayService({ clickhouseClientResolver: clientResolver, redis });
+  const service = new ReplayService({
+    clickhouseClientResolver: clientResolver,
+    redis,
+    // Reuse the live pipeline's cached resolver so replay-rebuilt rows honour
+    // the same per-tenant retention as live ingestion.
+    retentionPolicyResolver: getApp().retentionPolicyCache,
+  });
 
   return {
     service,

@@ -3,6 +3,9 @@ import { replayEvents, FoldAccumulator, MapAccumulator } from "../replayExecutor
 import type { FoldProjectionDefinition } from "../../projections/foldProjection.types";
 import type { MapProjectionDefinition } from "../../projections/mapProjection.types";
 import type { ReplayEvent } from "../replayEventLoader";
+import { SPAN_RECEIVED_EVENT_TYPE } from "../../pipelines/trace-processing/schemas/constants";
+import type { RetentionPolicyResolver } from "../../../data-retention/retentionPolicyResolver";
+import type { ResolvedRetention } from "../../../data-retention/retentionPolicy.schema";
 
 /**
  * Helper: create a simple test fold projection with a spy store.
@@ -564,6 +567,123 @@ describe("MapAccumulator", () => {
       expect(acc.processed).toBe(0);
       expect(bulkAppendSpy).not.toHaveBeenCalled();
       expect(appendSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  // Regression: map replay used to transform the RAW event, so replayed
+  // spans/logs kept oversized full content instead of the previews live
+  // dispatch produces. The accumulator must lean the event before map().
+  describe("when a map event carries an oversized IO attribute", () => {
+    it("leans the event before mapping, matching live dispatch parity", async () => {
+      const bulkAppendSpy = vi.fn().mockResolvedValue(undefined);
+      const projection: MapProjectionDefinition<{ outLen: number }, any> = {
+        name: "spanOutputLen",
+        eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
+        map: (event: any) => {
+          const attrs = event.data?.span?.attributes ?? [];
+          const out =
+            attrs.find((a: any) => a.key === "langwatch.output")?.value
+              ?.stringValue ?? "";
+          return { outLen: out.length };
+        },
+        store: { append: vi.fn(), bulkAppend: bulkAppendSpy },
+      };
+      const acc = new MapAccumulator(projection);
+
+      const oversized = "x".repeat(200_000); // well over the 64 KB IO preview
+      await acc.apply(
+        makeEvent({
+          type: SPAN_RECEIVED_EVENT_TYPE,
+          data: {
+            span: {
+              attributes: [
+                { key: "langwatch.output", value: { stringValue: oversized } },
+              ],
+            },
+          },
+        }),
+      );
+      await acc.flush();
+
+      const record = bulkAppendSpy.mock.calls[0]![0][0] as { outLen: number };
+      // Leaned: the mapped record saw the truncated preview, not the full 200 KB.
+      expect(record.outLen).toBeGreaterThan(0);
+      expect(record.outLen).toBeLessThan(oversized.length);
+    });
+  });
+});
+
+// #3: replay contexts previously omitted retentionPolicy, so replay-rebuilt
+// rows fell back to the store default regardless of the tenant's policy. Both
+// accumulators must resolve retention per tenant and stamp it on write contexts.
+describe("retention policy on replay write contexts", () => {
+  const retention = { traces: 42 } as unknown as ResolvedRetention;
+
+  function makeResolver(): RetentionPolicyResolver & {
+    resolve: ReturnType<typeof vi.fn>;
+  } {
+    return { resolve: vi.fn().mockResolvedValue(retention) };
+  }
+
+  describe("MapAccumulator", () => {
+    it("stamps the resolved retention policy on the bulkAppend context", async () => {
+      const bulkAppendSpy = vi.fn().mockResolvedValue(undefined);
+      const projection: MapProjectionDefinition<{ doubled: number }, any> = {
+        name: "m",
+        eventTypes: ["test.event"],
+        map: (event: any) => ({ doubled: (event.data?.value ?? 0) * 2 }),
+        store: { append: vi.fn(), bulkAppend: bulkAppendSpy },
+      };
+      const resolver = makeResolver();
+      const acc = new MapAccumulator(projection, { retentionResolver: resolver });
+
+      acc.apply(makeEvent({ tenantId: "t-A", data: { value: 5 } }));
+      acc.apply(makeEvent({ tenantId: "t-A", data: { value: 6 } }));
+      await acc.flush();
+
+      const context = bulkAppendSpy.mock.calls[0]![1] as {
+        retentionPolicy?: ResolvedRetention;
+      };
+      expect(context.retentionPolicy).toBe(retention);
+      // Cached: one resolve per tenant, not per event.
+      expect(resolver.resolve).toHaveBeenCalledTimes(1);
+      expect(resolver.resolve).toHaveBeenCalledWith("t-A");
+    });
+
+    it("leaves retentionPolicy null when no resolver is wired", async () => {
+      const bulkAppendSpy = vi.fn().mockResolvedValue(undefined);
+      const projection: MapProjectionDefinition<{ doubled: number }, any> = {
+        name: "m",
+        eventTypes: ["test.event"],
+        map: (event: any) => ({ doubled: (event.data?.value ?? 0) * 2 }),
+        store: { append: vi.fn(), bulkAppend: bulkAppendSpy },
+      };
+      const acc = new MapAccumulator(projection);
+
+      acc.apply(makeEvent({ tenantId: "t-A", data: { value: 5 } }));
+      await acc.flush();
+
+      const context = bulkAppendSpy.mock.calls[0]![1] as {
+        retentionPolicy?: ResolvedRetention | null;
+      };
+      expect(context.retentionPolicy ?? null).toBeNull();
+    });
+  });
+
+  describe("FoldAccumulator", () => {
+    it("stamps the resolved retention policy on the storeBatch context", async () => {
+      const { projection, storeBatchSpy } = createTestProjection();
+      const resolver = makeResolver();
+      const acc = new FoldAccumulator(projection, { retentionResolver: resolver });
+
+      acc.apply(makeEvent({ tenantId: "t-A", data: { value: 10 } }));
+      await acc.flush();
+
+      const batch = storeBatchSpy.mock.calls[0]![0] as Array<{
+        context: { retentionPolicy?: ResolvedRetention };
+      }>;
+      expect(batch[0]!.context.retentionPolicy).toBe(retention);
+      expect(resolver.resolve).toHaveBeenCalledWith("t-A");
     });
   });
 });

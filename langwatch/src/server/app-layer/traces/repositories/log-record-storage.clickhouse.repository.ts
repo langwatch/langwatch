@@ -196,7 +196,10 @@ export class LogRecordStorageClickHouseRepository
     }));
   }
 
-  async insertLogRecords(records: NormalizedLogRecord[]): Promise<void> {
+  async insertLogRecords(
+    records: NormalizedLogRecord[],
+    retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
+  ): Promise<void> {
     if (records.length === 0) return;
 
     for (const record of records) {
@@ -236,6 +239,14 @@ export class LogRecordStorageClickHouseRepository
         ScopeVersion: record.scopeVersion,
         CreatedAt: now,
         UpdatedAt: now,
+        // Match the single-insert path: claude_code fold-intermediate logs get
+        // the short CC floor (they turn into pure duplication once folded into
+        // spans); everything else gets the caller's resolved retention. Stamped,
+        // not min'd, so an indefinite (0) project retention can't keep a
+        // fold-intermediate log forever.
+        _retention_days: record.attributes[CLAUDE_CODE_KIND_ATTR]
+          ? CLAUDE_CODE_LOG_RETENTION_DAYS
+          : retentionDays,
       }));
 
       await client.insert({

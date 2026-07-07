@@ -64,7 +64,10 @@ export class MetricRecordStorageClickHouseRepository
     }
   }
 
-  async insertMetricRecords(records: NormalizedMetricRecord[]): Promise<void> {
+  async insertMetricRecords(
+    records: NormalizedMetricRecord[],
+    retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
+  ): Promise<void> {
     if (records.length === 0) return;
 
     for (const record of records) {
@@ -103,6 +106,7 @@ export class MetricRecordStorageClickHouseRepository
         ResourceAttributes: record.resourceAttributes,
         CreatedAt: now,
         UpdatedAt: now,
+        _retention_days: retentionDays,
       }));
 
       await client.insert({

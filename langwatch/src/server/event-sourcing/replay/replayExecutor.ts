@@ -5,9 +5,39 @@ import type { ProjectionStoreContext } from "../projections/projectionStoreConte
 import type { ReplayEvent } from "./replayEventLoader";
 import type { Event } from "../domain/types";
 import { leanForProjection } from "~/server/app-layer/traces/lean-for-projection";
+import type { ResolvedRetention } from "../../data-retention/retentionPolicy.schema";
+import type { RetentionPolicyResolver } from "../../data-retention/retentionPolicyResolver";
 
 /** Default number of projection entries per ClickHouse INSERT batch. */
 const DEFAULT_WRITE_BATCH_SIZE = 5000;
+
+/** Resolves a tenant's effective retention for a replay-built store context. */
+export type ReplayRetentionResolver = (
+  tenantId: string,
+) => Promise<ResolvedRetention | null>;
+
+/**
+ * Wrap a {@link RetentionPolicyResolver} in a per-instance, promise-caching
+ * lookup so each tenant is resolved at most once per accumulator — deduping
+ * concurrent `apply` calls (optimized replay runs aggregates in parallel) and
+ * avoiding a resolver round-trip per event. Returns `null` when no resolver is
+ * wired; the store then stamps PLATFORM_DEFAULT_RETENTION_DAYS (never
+ * indefinite), matching the live dispatch fallback.
+ */
+function makeRetentionResolver(
+  resolver?: RetentionPolicyResolver,
+): ReplayRetentionResolver {
+  const cache = new Map<string, Promise<ResolvedRetention | null>>();
+  return (tenantId: string) => {
+    if (!resolver) return Promise.resolve(null);
+    let pending = cache.get(tenantId);
+    if (!pending) {
+      pending = resolver.resolve(tenantId);
+      cache.set(tenantId, pending);
+    }
+    return pending;
+  };
+}
 
 /**
  * Composite key: `${tenantId}::${projectionKey}` — ensures tenant isolation
@@ -32,9 +62,14 @@ export class FoldAccumulator {
   private touchedKeys = new Set<string>();
   private _processed = 0;
   private readonly eventTypeSet: Set<string>;
+  private readonly resolveRetention: ReplayRetentionResolver;
 
-  constructor(private readonly projection: FoldProjectionDefinition<any, any>) {
+  constructor(
+    private readonly projection: FoldProjectionDefinition<any, any>,
+    opts?: { retentionResolver?: RetentionPolicyResolver },
+  ) {
     this.eventTypeSet = new Set(projection.eventTypes);
+    this.resolveRetention = makeRetentionResolver(opts?.retentionResolver);
   }
 
   get processed(): number {
@@ -85,6 +120,9 @@ export class FoldAccumulator {
           aggregateId,
           tenantId: tenantId as TenantId,
           key: projectionKey,
+          // Stamp resolved retention so replay-rebuilt rows honour the tenant's
+          // policy, matching the live dispatch path (buildStoreContext).
+          retentionPolicy: await this.resolveRetention(tenantId),
         } as ProjectionStoreContext,
       };
 
@@ -140,13 +178,15 @@ export class MapAccumulator {
   private _processed = 0;
   private readonly eventTypeSet: Set<string>;
   private readonly writeBatchSize: number;
+  private readonly resolveRetention: ReplayRetentionResolver;
 
   constructor(
     private readonly projection: MapProjectionDefinition<any, any>,
-    opts?: { writeBatchSize?: number },
+    opts?: { writeBatchSize?: number; retentionResolver?: RetentionPolicyResolver },
   ) {
     this.eventTypeSet = new Set(projection.eventTypes);
     this.writeBatchSize = opts?.writeBatchSize ?? DEFAULT_WRITE_BATCH_SIZE;
+    this.resolveRetention = makeRetentionResolver(opts?.retentionResolver);
   }
 
   get processed(): number {
@@ -156,9 +196,19 @@ export class MapAccumulator {
   async apply(event: ReplayEvent): Promise<void> {
     if (!this.eventTypeSet.has(event.type)) return;
 
-    const record = this.projection.map(event as any);
+    // ADR-022: lean the event before the map handler — the same interposition
+    // live dispatch applies and the fold accumulator mirrors — so replayed
+    // records carry previews + event references, not oversized full content.
+    // aggregateId/tenantId still come from the original event (leaning may
+    // strip fields the store context needs).
+    const leanedEvent = leanForProjection(
+      event as unknown as Event,
+    ) as unknown as ReplayEvent;
+    const record = this.projection.map(leanedEvent as any);
     if (record === null) return;
 
+    // Retention is resolved (per tenant) at drain/write time, not here, so
+    // `apply` stays synchronous through the `_processed` bookkeeping below.
     const context: ProjectionStoreContext = {
       aggregateId: event.aggregateId,
       tenantId: event.tenantId as unknown as TenantId,
@@ -193,7 +243,12 @@ export class MapAccumulator {
 
     const store = this.projection.store;
 
-    for (const [_tenantId, entries] of byTenant) {
+    for (const [tenantId, entries] of byTenant) {
+      // Resolve the tenant's retention once per drain (cached across drains) and
+      // stamp it on the write context so replay-rebuilt rows honour the tenant's
+      // policy instead of the store default — matching live dispatch.
+      const retentionPolicy = await this.resolveRetention(tenantId);
+
       if (store.bulkAppend) {
         // Group by aggregateId so each `bulkAppend` call gets a real
         // per-aggregate context. Stores that key off `context.aggregateId`
@@ -211,7 +266,7 @@ export class MapAccumulator {
         }
 
         for (const aggregateEntries of byAggregate.values()) {
-          const groupContext = aggregateEntries[0]!.context;
+          const groupContext = { ...aggregateEntries[0]!.context, retentionPolicy };
           for (let i = 0; i < aggregateEntries.length; i += writeBatchSize) {
             const chunk = aggregateEntries.slice(i, i + writeBatchSize).map((e) => e.record);
             await store.bulkAppend(chunk, groupContext);
@@ -221,7 +276,7 @@ export class MapAccumulator {
         // Sequential fallback: pass each record's original per-event context
         // so stores that key off `context.aggregateId` get the real value.
         for (const entry of entries) {
-          await store.append(entry.record, entry.context);
+          await store.append(entry.record, { ...entry.context, retentionPolicy });
         }
       }
     }
