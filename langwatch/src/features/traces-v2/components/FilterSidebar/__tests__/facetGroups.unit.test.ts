@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   ATTRIBUTES_SECTION_KEY,
+  COMFORTABLE_DEFAULT_SECTIONS,
   DEFAULT_PERSPECTIVE_ID,
   EVENT_ATTRIBUTES_SECTION_KEY,
+  FACET_DEFAULTS,
   FACET_GROUPS,
   FACET_PERSPECTIVES,
   type FacetGroupDef,
@@ -128,6 +130,15 @@ describe("FACET_GROUPS configuration", () => {
     expect(getFacetGroupId(ATTRIBUTES_SECTION_KEY)).toBe("traces");
     expect(getFacetGroupId(SPAN_ATTRIBUTES_SECTION_KEY)).toBe("spans");
     expect(getFacetGroupId(EVENT_ATTRIBUTES_SECTION_KEY)).toBe("spans");
+  });
+
+  it("offers the Pinned facet in the Traces group and by default", () => {
+    // The trace-pinning spec promises a "Pinned" facet without the user having
+    // to add it. That means: grouped under Traces, present in the comfortable
+    // default section set, and given its two discrete values.
+    expect(getFacetGroupId("pinned")).toBe("traces");
+    expect(COMFORTABLE_DEFAULT_SECTIONS.has("pinned")).toBe(true);
+    expect(FACET_DEFAULTS.pinned).toEqual(["pinned", "unpinned"]);
   });
 
   it("wires `has:` / `none:` toggles for the identity-axis fields", () => {

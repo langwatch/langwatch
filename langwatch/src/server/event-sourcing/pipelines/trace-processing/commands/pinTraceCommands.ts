@@ -39,7 +39,11 @@ export const PinTraceCommand = defineCommand({
     "payload.pin.source": d.source,
     "payload.pinned_by_user_id": d.pinnedByUserId ?? "",
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.traceId}:pin_trace:${d.occurredAt}`,
+  // Include `source` so a concurrent manual pin and share auto-pin on the same
+  // trace in the same millisecond get distinct jobs instead of one being
+  // dropped at the queue; retries of the same action still collapse.
+  makeJobId: (d) =>
+    `${d.tenantId}:${d.traceId}:pin_trace:${d.source}:${d.occurredAt}`,
 });
 
 /**
@@ -61,5 +65,6 @@ export const UnpinTraceCommand = defineCommand({
     "payload.trace.id": d.traceId,
     "payload.unpin.source": d.source,
   }),
-  makeJobId: (d) => `${d.tenantId}:${d.traceId}:unpin_trace:${d.occurredAt}`,
+  makeJobId: (d) =>
+    `${d.tenantId}:${d.traceId}:unpin_trace:${d.source}:${d.occurredAt}`,
 });

@@ -152,19 +152,21 @@ describe("PinnedTraceService", () => {
     });
   });
 
-  describe("listByProject", () => {
-    it("returns only the pinned traces of the project", async () => {
-      const service = createInMemoryPinnedTraceService();
+  describe("given pins spread across projects", () => {
+    describe("when listByProject is called", () => {
+      it("returns only the pinned traces of that project", async () => {
+        const service = createInMemoryPinnedTraceService();
 
-      await service.pin({ projectId: project, traceId: "t1" });
-      await service.autoPin({ projectId: project, traceId: "t2" });
-      await service.pin({ projectId: "other-project", traceId: "t3" });
+        await service.pin({ projectId: project, traceId: "t1" });
+        await service.autoPin({ projectId: project, traceId: "t2" });
+        await service.pin({ projectId: "other-project", traceId: "t3" });
 
-      const pins = await service.listByProject({ projectId: project });
-      expect(pins.map((p) => p.traceId).sort()).toEqual(["t1", "t2"]);
+        const pins = await service.listByProject({ projectId: project });
+        expect(pins.map((p) => p.traceId).sort()).toEqual(["t1", "t2"]);
 
-      const ids = await service.getPinnedTraceIds({ projectId: project });
-      expect(ids.sort()).toEqual(["t1", "t2"]);
+        const ids = await service.getPinnedTraceIds({ projectId: project });
+        expect(ids.sort()).toEqual(["t1", "t2"]);
+      });
     });
   });
 });

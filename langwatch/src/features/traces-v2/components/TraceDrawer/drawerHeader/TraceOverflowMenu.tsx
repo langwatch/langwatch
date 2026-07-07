@@ -60,9 +60,13 @@ export function TraceOverflowMenu({
   const { project } = useOrganizationTeamProject();
 
   const utils = api.useUtils();
+  // Pin writes are eventually consistent (event-sourced); hold the optimistic
+  // `setData` seed for a short window so a focus/remount refetch doesn't read
+  // the pre-projection summary and flip the menu item back before the fold
+  // catches up.
   const pinQuery = api.pinnedTrace.getPin.useQuery(
     project ? { projectId: project.id, traceId } : (undefined as never),
-    { enabled: !!project },
+    { enabled: !!project, staleTime: 10_000, refetchOnWindowFocus: false },
   );
   const isPinned = !!pinQuery.data;
   // Pins are UI annotations only and do not exempt CH rows from TTL. While a

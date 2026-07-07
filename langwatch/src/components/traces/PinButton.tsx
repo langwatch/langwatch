@@ -12,7 +12,14 @@ export function PinButton({
   traceId: string;
 }) {
   const utils = api.useUtils();
-  const pinQuery = api.pinnedTrace.getPin.useQuery({ projectId, traceId });
+  // Pin writes are eventually consistent (event-sourced). Keep the optimistic
+  // `setData` seed authoritative for a short window instead of letting a
+  // focus/remount refetch read the pre-projection summary and flip the button
+  // back to "unpinned" until the fold catches up.
+  const pinQuery = api.pinnedTrace.getPin.useQuery(
+    { projectId, traceId },
+    { staleTime: 10_000, refetchOnWindowFocus: false },
+  );
   const isPinned = !!pinQuery.data;
   // A `source=share` pin is the system's protection against retention TTL
   // deleting a still-shared trace. The user can't unpin it manually — they
