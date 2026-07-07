@@ -247,45 +247,82 @@ export type PairwiseAggregate = {
 /**
  * Compute a TargetAggregate-shaped object for a pairwise column-target so
  * the workbench header can render the same Rows / Avg Latency / Total Cost /
- * Execution Time chip prompt/agent columns render (dogfood ask "reuse the
- * same two components — one play button, one time/cost").
+ * Execution Time chip prompt/agent columns render (dogfood: "I already have
+ * the scores on the results page — I want the same in the workbench").
  *
- * Reads the pairwise column-target's own `targetMetadata` — the target_result
- * event the orchestrator emits for the pairwise cell attaches cost + duration
- * for the whole comparison (variants + judge), so this gives Avg Latency,
- * Total Cost, AND Execution Time (dogfood follow-up: "you can have a total
- * latency as you have in other ones") at parity with prompt / agent columns.
- * Evaluator-derived score/pass-rate stays empty because the pairwise column
- * itself doesn't emit those.
+ * Pairwise column-target cells hit the orchestrator's `skipTarget: true`
+ * branch — no target execution → target_result fires with undefined
+ * cost/duration → workbench `targetMetadata[pairwiseId]` carries no
+ * metrics. We reconstruct them the way the results page does:
+ *   - cost per row = variantA cost + variantB cost + judge (evaluator) cost
+ *   - duration per row = variantA duration + variantB duration (judge
+ *     duration isn't persisted on evaluator results)
+ *
+ * A row counts as "complete" when either variant produced metadata for it —
+ * matching how the popover renders on the results page.
  */
 export const computePairwiseColumnTargetAggregate = (
-  targetId: string,
+  target: {
+    id: string;
+    pairwise?: { variantA?: string; variantB?: string } | null;
+  },
   results: EvaluationResults,
   rowCount: number,
 ): TargetAggregate => {
-  const metadata = results.targetMetadata[targetId] ?? [];
+  const variantAId = target.pairwise?.variantA;
+  const variantBId = target.pairwise?.variantB;
+  const metadataA = (variantAId && results.targetMetadata[variantAId]) || [];
+  const metadataB = (variantBId && results.targetMetadata[variantBId]) || [];
+  const verdicts = results.evaluatorResults[target.id]?.[target.id] ?? [];
 
   let completedRows = 0;
   const costValues: number[] = [];
   const latencyValues: number[] = [];
 
   for (let i = 0; i < rowCount; i++) {
-    const row = metadata[i];
-    if (!row) continue;
+    const rowA = metadataA[i];
+    const rowB = metadataB[i];
+    const verdict = verdicts[i];
+    if (!rowA && !rowB && !verdict) continue;
     completedRows++;
-    if (typeof row.cost === "number" && Number.isFinite(row.cost)) {
-      costValues.push(row.cost);
+
+    let rowCost = 0;
+    let sawCost = false;
+    for (const m of [rowA, rowB]) {
+      if (m && typeof m.cost === "number" && Number.isFinite(m.cost)) {
+        rowCost += m.cost;
+        sawCost = true;
+      }
     }
-    if (typeof row.duration === "number" && Number.isFinite(row.duration)) {
-      latencyValues.push(row.duration);
+    if (verdict) {
+      const judgeCost = readCostAmount(verdict);
+      if (judgeCost > 0) {
+        rowCost += judgeCost;
+        sawCost = true;
+      }
     }
+    if (sawCost) costValues.push(rowCost);
+
+    let rowLatency = 0;
+    let sawLatency = false;
+    for (const m of [rowA, rowB]) {
+      if (
+        m &&
+        typeof m.duration === "number" &&
+        Number.isFinite(m.duration)
+      ) {
+        rowLatency += m.duration;
+        sawLatency = true;
+      }
+    }
+    if (sawLatency) latencyValues.push(rowLatency);
   }
 
   const costStats = computeMetricStats(costValues);
   const latencyStats = computeMetricStats(latencyValues);
 
   return {
-    targetId,
+    targetId: target.id,
     completedRows,
     totalRows: rowCount,
     errorRows: 0,
