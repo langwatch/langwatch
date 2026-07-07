@@ -49,7 +49,7 @@ function buildEvaluatorIdClickHouseFilter(
 /**
  * ClickHouse filter definitions for each filter field.
  * Each definition specifies how to query filter options from ClickHouse.
- * Set to null for filters not supported in ClickHouse (will fall back to Elasticsearch).
+ * Set to null for filters with no ClickHouse options query.
  */
 export const clickHouseFilters: Record<
   FilterField,
@@ -226,7 +226,7 @@ export const clickHouseFilters: Record<
     tableName: "trace_summaries",
     buildQuery: (params) => {
       if (!params.key) {
-        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+        return null;
       }
       const { sql: scopeSql } = buildScopeConditions(params);
       // Note: The key parameter is passed via query_params as {key:String}
@@ -435,7 +435,7 @@ export const clickHouseFilters: Record<
     tableName: "evaluation_runs",
     buildQuery: (params) => {
       if (!params.key) {
-        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+        return null;
       }
       const { sql: scopeSql } = buildScopeConditions(params);
       const scopeJoin = scopeSql
@@ -462,7 +462,7 @@ export const clickHouseFilters: Record<
     tableName: "evaluation_runs",
     buildQuery: (params) => {
       if (!params.key) {
-        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+        return null;
       }
       const { sql: scopeSql } = buildScopeConditions(params);
       const scopeJoin = scopeSql
@@ -497,7 +497,7 @@ export const clickHouseFilters: Record<
     tableName: "evaluation_runs",
     buildQuery: (params) => {
       if (!params.key) {
-        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+        return null;
       }
       const { sql: scopeSql } = buildScopeConditions(params);
       const scopeJoin = scopeSql
@@ -525,7 +525,7 @@ export const clickHouseFilters: Record<
     tableName: "evaluation_runs",
     buildQuery: (params) => {
       if (!params.key) {
-        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+        return null;
       }
       const { sql: scopeSql } = buildScopeConditions(params);
       const scopeJoin = scopeSql
@@ -583,7 +583,7 @@ export const clickHouseFilters: Record<
     tableName: "stored_spans",
     buildQuery: (params) => {
       if (!params.key) {
-        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+        return null;
       }
       const { sql: scopeSql } = buildScopeConditions(params);
       const scopeJoin = scopeSql
@@ -613,7 +613,7 @@ export const clickHouseFilters: Record<
     tableName: "stored_spans",
     buildQuery: (params) => {
       if (!params.key || !params.subkey) {
-        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+        return null;
       }
       const { sql: scopeSql } = buildScopeConditions(params);
       const scopeJoin = scopeSql
@@ -649,7 +649,7 @@ export const clickHouseFilters: Record<
     tableName: "stored_spans",
     buildQuery: (params) => {
       if (!params.key) {
-        return `SELECT '' as field, '' as label, 0 as count WHERE false`;
+        return null;
       }
       const { sql: scopeSql } = buildScopeConditions(params);
       const scopeJoin = scopeSql

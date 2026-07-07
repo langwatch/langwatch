@@ -465,6 +465,10 @@ func TestMapProvider_CustomAndBaseURLOverrides(t *testing.T) {
 		}, bfschemas.VLLM},
 		{"openai without base_url keeps openai", domain.Credential{ProviderID: domain.ProviderOpenAI}, bfschemas.OpenAI},
 		{"anthropic is unaffected", domain.Credential{ProviderID: domain.ProviderAnthropic}, bfschemas.Anthropic},
+		{"xai is bifrost-native", domain.Credential{ProviderID: domain.ProviderXAI}, bfschemas.XAI},
+		{"groq is bifrost-native", domain.Credential{ProviderID: domain.ProviderGroq}, bfschemas.Groq},
+		{"cerebras is bifrost-native", domain.Credential{ProviderID: domain.ProviderCerebras}, bfschemas.Cerebras},
+		{"deepseek maps to vllm (openai-compat)", domain.Credential{ProviderID: domain.ProviderDeepSeek}, bfschemas.VLLM},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -500,6 +504,27 @@ func TestCredentialToBifrostKey_VLLM(t *testing.T) {
 	}
 	if key.Value.Val != "" {
 		t.Fatalf("key.Value = %q, want empty for unauthenticated server", key.Value.Val)
+	}
+}
+
+// DeepSeek rides the vLLM (openai-compat) path but is a hosted API —
+// customers configure only an API key, so the key must default to
+// DeepSeek's public endpoint instead of dispatching with an empty URL.
+func TestCredentialToBifrostKey_DeepSeekDefaultsBaseURL(t *testing.T) {
+	key := credentialToBifrostKey(domain.Credential{
+		ID:         "mp-ds",
+		ProviderID: domain.ProviderDeepSeek,
+		APIKey:     "sk-ds",
+	}, bfschemas.VLLM)
+
+	if key.VLLMKeyConfig == nil {
+		t.Fatal("VLLMKeyConfig is nil: vLLM keys require a per-key URL")
+	}
+	if got := key.VLLMKeyConfig.URL.Val; got != "https://api.deepseek.com" {
+		t.Fatalf("VLLMKeyConfig.URL = %q, want DeepSeek public endpoint", got)
+	}
+	if key.Value.Val != "sk-ds" {
+		t.Fatalf("key.Value = %q, want api key", key.Value.Val)
 	}
 }
 

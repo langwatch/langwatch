@@ -25,13 +25,14 @@ import type { ExecutionState, Workflow } from "~/optimization_studio/types/dsl";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { getApp } from "~/server/app-layer/app";
+import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
+import type { RecordTargetResultCommandData } from "~/server/event-sourcing/pipelines/experiment-run-processing/schemas/commands";
+import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
+import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import {
   estimateCost,
   getMatchingLLMModelCost,
-} from "~/server/background/workers/collector/cost";
-import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
-import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
-import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+} from "~/server/tracer/collector/cost";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { createLogger } from "~/utils/logger/server";
@@ -1208,6 +1209,137 @@ const buildTargetInputs = (cell: ExecutionCell): Record<string, unknown> => {
 };
 
 /**
+ * Build the per-target metadata stored with a run (startExperimentRun's
+ * `targets` payload).
+ *
+ * Model attribution: `localPromptConfig.llm.model` wins (edited prompts),
+ * falling back to the loaded prompt's model for saved prompts. Name comes
+ * from the loaded entity (prompt, agent, evaluator, or workflow), falling
+ * back to the target id. Exported for unit testing — a regression here
+ * blanks the model column on every stored run.
+ */
+export const buildTargetMetadata = ({
+  targets,
+  loadedPrompts,
+  loadedAgents,
+  loadedEvaluators,
+  loadedWorkflows,
+}: {
+  targets: EvaluationsV3State["targets"];
+  loadedPrompts: Map<string, VersionedPrompt>;
+  loadedAgents: Map<string, TypedAgent>;
+  loadedEvaluators?: Map<string, { id: string; name: string; config: unknown }>;
+  loadedWorkflows?: Map<string, LoadedWorkflow>;
+}): ESBatchEvaluationTarget[] =>
+  targets.map((t) => {
+    let model: string | null = null;
+    let name: string | null = null;
+
+    // First check local prompt config (for edited prompts)
+    if (t.localPromptConfig?.llm?.model) {
+      model = t.localPromptConfig.llm.model;
+    }
+    // Otherwise, check loaded prompts (for saved prompts)
+    else if (t.type === "prompt" && t.promptId) {
+      const loadedPrompt = loadedPrompts.get(t.promptId);
+      if (loadedPrompt?.model) {
+        model = loadedPrompt.model;
+      }
+    }
+
+    // Get name from loaded entity
+    if (t.type === "prompt" && t.promptId) {
+      name = loadedPrompts.get(t.promptId)?.name ?? null;
+    } else if (t.type === "agent" && t.dbAgentId) {
+      name = loadedAgents.get(t.dbAgentId)?.name ?? null;
+    } else if (t.type === "evaluator" && t.targetEvaluatorId) {
+      name = loadedEvaluators?.get(t.targetEvaluatorId)?.name ?? null;
+    } else if (t.type === "workflow" && t.workflowId) {
+      name = loadedWorkflows?.get(workflowLoadKey(t))?.name ?? null;
+    }
+
+    return {
+      id: t.id,
+      name: name ?? t.id,
+      type: t.type,
+      prompt_id: t.promptId ?? null,
+      prompt_version: t.promptVersionNumber ?? null,
+      agent_id: t.dbAgentId ?? null,
+      evaluator_id: t.targetEvaluatorId ?? null,
+      model,
+    };
+  });
+
+/**
+ * Build the recordTargetResult dispatch payload for a `target_result` or
+ * cell-level `error` event. Returns null for events that don't record a
+ * target result.
+ *
+ * Exported for unit testing — two regression-prone behaviours live here:
+ * falsy target outputs (`false`, `0`, `""`) must persist as
+ * `{ output: value }` (only null/undefined become a null `predicted`), and
+ * error events must land as predicted-null rows carrying the error message.
+ */
+export const buildTargetResultDispatch = ({
+  tenantId,
+  runId,
+  experimentId,
+  event,
+  datasetEntry,
+  occurredAt,
+}: {
+  tenantId: string;
+  runId: string;
+  experimentId: string;
+  event: EvaluationV3Event;
+  datasetEntry: Record<string, unknown>;
+  occurredAt: number;
+}): RecordTargetResultCommandData | null => {
+  if (event.type === "target_result") {
+    return {
+      tenantId,
+      runId,
+      experimentId,
+      index: event.rowIndex,
+      targetId: event.targetId,
+      entry: datasetEntry,
+      predicted:
+        event.output === null || event.output === undefined
+          ? null
+          : { output: event.output },
+      cost: event.cost ?? null,
+      duration: event.duration ?? null,
+      error: event.error ?? null,
+      traceId: event.traceId ?? null,
+      occurredAt,
+    };
+  }
+
+  if (
+    event.type === "error" &&
+    event.rowIndex !== undefined &&
+    event.targetId
+  ) {
+    return {
+      tenantId,
+      runId,
+      experimentId,
+      index: event.rowIndex,
+      targetId: event.targetId,
+      entry: datasetEntry,
+      predicted: null,
+      cost: null,
+      duration: null,
+      error: event.message,
+      traceId: null,
+      occurredAt,
+    };
+  }
+
+  return null;
+};
+
+/**
  * Main orchestrator - executes all cells and yields SSE events.
  * Uses parallel execution with semaphore-based rate limiting.
  */
@@ -1297,46 +1429,14 @@ export async function* runOrchestrator(
     }
   }
 
-  // Build target metadata for storage
-  // For model: first check localPromptConfig, then fall back to loadedPrompts
-  // For name: get from loaded entity (prompt, agent, or evaluator)
-  const targetMetadata: ESBatchEvaluationTarget[] = state.targets.map((t) => {
-    let model: string | null = null;
-    let name: string | null = null;
-
-    // First check local prompt config (for edited prompts)
-    if (t.localPromptConfig?.llm?.model) {
-      model = t.localPromptConfig.llm.model;
-    }
-    // Otherwise, check loaded prompts (for saved prompts)
-    else if (t.type === "prompt" && t.promptId) {
-      const loadedPrompt = loadedPrompts.get(t.promptId);
-      if (loadedPrompt?.model) {
-        model = loadedPrompt.model;
-      }
-    }
-
-    // Get name from loaded entity
-    if (t.type === "prompt" && t.promptId) {
-      name = loadedPrompts.get(t.promptId)?.name ?? null;
-    } else if (t.type === "agent" && t.dbAgentId) {
-      name = loadedAgents.get(t.dbAgentId)?.name ?? null;
-    } else if (t.type === "evaluator" && t.targetEvaluatorId) {
-      name = loadedEvaluators?.get(t.targetEvaluatorId)?.name ?? null;
-    } else if (t.type === "workflow" && t.workflowId) {
-      name = loadedWorkflows?.get(workflowLoadKey(t))?.name ?? null;
-    }
-
-    return {
-      id: t.id,
-      name: name ?? t.id,
-      type: t.type,
-      prompt_id: t.promptId ?? null,
-      prompt_version: t.promptVersionNumber ?? null,
-      agent_id: t.dbAgentId ?? null,
-      evaluator_id: t.targetEvaluatorId ?? null,
-      model,
-    };
+  // Build target metadata for storage (model + name attribution — see
+  // buildTargetMetadata's JSDoc).
+  const targetMetadata: ESBatchEvaluationTarget[] = buildTargetMetadata({
+    targets: state.targets,
+    loadedPrompts,
+    loadedAgents,
+    loadedEvaluators,
+    loadedWorkflows,
   });
 
   // Build config for result mapper - determines which evaluators have scores stripped
@@ -1469,63 +1569,30 @@ export async function* runOrchestrator(
 
     // Dispatch events to ClickHouse.
     if (experimentId) {
-      if (event.type === "target_result") {
-        const datasetEntry = datasetRows[event.rowIndex] ?? {};
+      const targetResultDispatch =
+        event.type === "target_result" || event.type === "error"
+          ? buildTargetResultDispatch({
+              tenantId: projectId,
+              runId,
+              experimentId,
+              event,
+              datasetEntry:
+                event.rowIndex !== undefined
+                  ? (datasetRows[event.rowIndex] ?? {})
+                  : {},
+              occurredAt: Date.now(),
+            })
+          : null;
+
+      if (targetResultDispatch) {
         chDispatchTotal++;
-        await commands
-          .recordTargetResult({
-            tenantId: projectId,
-            runId,
-            experimentId,
-            index: event.rowIndex,
-            targetId: event.targetId,
-            entry: datasetEntry,
-            predicted:
-              event.output === null || event.output === undefined
-                ? null
-                : { output: event.output },
-            cost: event.cost ?? null,
-            duration: event.duration ?? null,
-            error: event.error ?? null,
-            traceId: event.traceId ?? null,
-            occurredAt: Date.now(),
-          })
-          .catch((err) => {
-            chDispatchFailures++;
-            logger.warn(
-              { err, runId },
-              "Failed to dispatch recordTargetResult to CH",
-            );
-          });
-      } else if (
-        event.type === "error" &&
-        event.rowIndex !== undefined &&
-        event.targetId
-      ) {
-        const datasetEntry = datasetRows[event.rowIndex] ?? {};
-        chDispatchTotal++;
-        await commands
-          .recordTargetResult({
-            tenantId: projectId,
-            runId,
-            experimentId,
-            index: event.rowIndex,
-            targetId: event.targetId,
-            entry: datasetEntry,
-            predicted: null,
-            cost: null,
-            duration: null,
-            error: event.message,
-            traceId: null,
-            occurredAt: Date.now(),
-          })
-          .catch((err) => {
-            chDispatchFailures++;
-            logger.warn(
-              { err, runId },
-              "Failed to dispatch recordTargetResult to CH",
-            );
-          });
+        await commands.recordTargetResult(targetResultDispatch).catch((err) => {
+          chDispatchFailures++;
+          logger.warn(
+            { err, runId },
+            "Failed to dispatch recordTargetResult to CH",
+          );
+        });
       } else if (event.type === "evaluator_result") {
         const result = event.result as SingleEvaluationResult;
         const evaluatorConfig = state.evaluators.find(

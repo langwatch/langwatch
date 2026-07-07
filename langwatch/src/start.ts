@@ -73,8 +73,8 @@ import { createMcpHandler } from "./mcp/handler";
 import { createApiRouter } from "./server/api-router";
 import { getApp } from "./server/app-layer/app";
 import { initializeWebApp } from "./server/app-layer/presets";
-import { getWorkerMetricsPort } from "./server/background/config";
 import { buildStorageConnectSrc } from "./server/buildStorageConnectSrc";
+import { getWorkerMetricsPort, isMetricsAuthorized } from "./server/metrics";
 import { shutdownPostHog } from "./server/posthog";
 import { verifyRedisReady } from "./server/redis";
 import { serveStaticOrFallback } from "./server/static-handler";
@@ -104,17 +104,6 @@ export const metricsMiddleware = promBundle({
     return req.url?.split("?")[0] ?? req.url;
   },
 });
-
-const isMetricsAuthorized = (req: IncomingMessage): boolean => {
-  const authHeader = req.headers.authorization;
-  if (process.env.NODE_ENV === "production" && !process.env.METRICS_API_KEY) {
-    throw new Error("METRICS_API_KEY is not set");
-  }
-  return (
-    !process.env.METRICS_API_KEY ||
-    authHeader === `Bearer ${process.env.METRICS_API_KEY}`
-  );
-};
 
 export const startApp = async (dir = path.dirname(__dirname)) => {
   const dev = process.env.NODE_ENV !== "production";
@@ -239,10 +228,18 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
           res.setHeader("Content-Type", register.contentType);
           res.end(await register.metrics());
         } else {
+          // Forward the caller's bearer token — the worker's metrics
+          // listener enforces the same isMetricsAuthorized gate, so a
+          // credential-less internal fetch would get a 401 in production.
+          const authorization = req.headers.authorization;
           const workersMetricsRes = await fetch(
-            `http://0.0.0.0:${getWorkerMetricsPort()}/metrics`
+            `http://0.0.0.0:${getWorkerMetricsPort()}/metrics`,
+            authorization ? { headers: { authorization } } : undefined,
           );
-          res.setHeader("Content-Type", register.contentType);
+          res.statusCode = workersMetricsRes.status;
+          if (workersMetricsRes.ok) {
+            res.setHeader("Content-Type", register.contentType);
+          }
           res.end(await workersMetricsRes.text());
         }
         return;

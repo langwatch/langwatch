@@ -10,12 +10,12 @@ Feature: Detect and display stalled scenario runs
   # are pending rewrite/E2E coverage in PR #3458.
 
   # Context: When a worker dies (OOM, container kill, stalled job) the RUN_FINISHED
-  # event never reaches ElasticSearch. Without detection, these runs appear as
+  # event never reaches the event store. Without detection, these runs appear as
   # "in progress" forever. This feature derives a STALLED status at read time
   # when a run has RUN_STARTED but no RUN_FINISHED and enough time has passed.
   #
   # The stall threshold is ~10 minutes (job timeout is 5 minutes, so 2x covers
-  # all reasonable completion scenarios). No new events are written to ES, no
+  # all reasonable completion scenarios). No new events are written, no
   # cron jobs, no extra infrastructure.
 
   # ============================================================================

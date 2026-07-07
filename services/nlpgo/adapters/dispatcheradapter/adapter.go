@@ -143,6 +143,9 @@ type inlineCreds struct {
 	VertexAI  map[string]string `json:"vertex_ai,omitempty"`
 	Gemini    map[string]string `json:"gemini,omitempty"`
 	Custom    map[string]string `json:"custom,omitempty"`
+	// Generic carries plain api-key providers (xai, groq, cerebras,
+	// deepseek); Provider disambiguates which one.
+	Generic map[string]string `json:"generic,omitempty"`
 }
 
 // credentialFromHeaders reads the inline-credentials header that
@@ -170,9 +173,9 @@ func credentialFromHeaders(headers map[string]string) (domain.Credential, error)
 func toDomainCredential(ic inlineCreds) (domain.Credential, error) {
 	switch ic.Provider {
 	case "openai":
-		return openAICred(ic.OpenAI), nil
+		return apiKeyCred(domain.ProviderOpenAI, ic.OpenAI), nil
 	case "anthropic":
-		return anthropicCred(ic.Anthropic), nil
+		return apiKeyCred(domain.ProviderAnthropic, ic.Anthropic), nil
 	case "azure":
 		return azureCred(ic.Azure), nil
 	case "bedrock":
@@ -180,12 +183,17 @@ func toDomainCredential(ic inlineCreds) (domain.Credential, error) {
 	case "vertex_ai", "vertex":
 		return vertexCred(ic.VertexAI), nil
 	case "gemini":
-		return geminiCred(ic.Gemini), nil
+		return apiKeyCred(domain.ProviderGemini, ic.Gemini), nil
+	case "xai", "groq", "cerebras", "deepseek":
+		// Plain api-key providers share the Generic slot. DeepSeek routes
+		// through the gateway's openai-compat (vLLM) path with its public
+		// endpoint as the default base URL; the rest are Bifrost-native.
+		return apiKeyCred(domain.ProviderID(ic.Provider), ic.Generic), nil
 	case "custom":
 		// Custom routes through Bifrost's openai-compat adapter — same
 		// credential layout as OpenAI but a different ProviderID so the
 		// gateway-side custom-→-openai mapping logic stays applicable.
-		return openAICred(ic.Custom), nil
+		return apiKeyCred(domain.ProviderOpenAI, ic.Custom), nil
 	case "":
 		return domain.Credential{}, errors.New("dispatcheradapter: provider is required in inline credentials")
 	default:
@@ -203,19 +211,12 @@ func inlineCredentialID(provider domain.ProviderID) string {
 	return "nlpgo-inline-" + string(provider)
 }
 
-func openAICred(m map[string]string) domain.Credential {
+// apiKeyCred builds the Credential for providers that authenticate with
+// a plain api_key (plus optional pass-through extras like api_base).
+func apiKeyCred(provider domain.ProviderID, m map[string]string) domain.Credential {
 	return domain.Credential{
-		ID:         inlineCredentialID(domain.ProviderOpenAI),
-		ProviderID: domain.ProviderOpenAI,
-		APIKey:     m["api_key"],
-		Extra:      stringExtras(m, "api_key"),
-	}
-}
-
-func anthropicCred(m map[string]string) domain.Credential {
-	return domain.Credential{
-		ID:         inlineCredentialID(domain.ProviderAnthropic),
-		ProviderID: domain.ProviderAnthropic,
+		ID:         inlineCredentialID(provider),
+		ProviderID: provider,
 		APIKey:     m["api_key"],
 		Extra:      stringExtras(m, "api_key"),
 	}
@@ -309,15 +310,6 @@ func vertexCred(m map[string]string) domain.Credential {
 		ProviderID: domain.ProviderVertex,
 		APIKey:     m["vertex_credentials"],
 		Extra:      extra,
-	}
-}
-
-func geminiCred(m map[string]string) domain.Credential {
-	return domain.Credential{
-		ID:         inlineCredentialID(domain.ProviderGemini),
-		ProviderID: domain.ProviderGemini,
-		APIKey:     m["api_key"],
-		Extra:      stringExtras(m, "api_key"),
 	}
 }
 

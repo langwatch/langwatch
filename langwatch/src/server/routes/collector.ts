@@ -1,6 +1,5 @@
 import crypto from "node:crypto";
 import { bodyLimit } from "hono/body-limit";
-import superjson from "superjson";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
@@ -17,18 +16,20 @@ import {
 } from "../api-key/auth-middleware";
 import { TokenResolver } from "../api-key/token-resolver";
 import { getApp } from "../app-layer/app";
-import { evaluationNameAutoslug } from "../background/workers/collector/evaluationNameAutoslug";
-import { maybeAddIdsToContextList } from "../background/workers/collector/rag";
-import { fetchExistingMD5s } from "../background/workers/collectorWorker";
+import { SPAN_MAX_PAST_MS } from "../app-layer/traces/trace-request-collection.service";
 import { prisma } from "../db";
+import { evaluationNameAutoslug } from "../tracer/collector/evaluationNameAutoslug";
+import { maybeAddIdsToContextList } from "../tracer/collector/rag";
+import type {
+  CollectorRESTParamsValidator,
+  CustomMetadata,
+  ReservedTraceMetadata,
+  Span,
+} from "../tracer/types";
 import {
-  type CollectorRESTParamsValidator,
-  type CustomMetadata,
   collectorRESTParamsValidatorSchema,
   customMetadataSchema,
-  type ReservedTraceMetadata,
   reservedTraceMetadataSchema,
-  type Span,
   spanMetricsSchema,
   spanSchema,
   spanValidatorSchema,
@@ -294,6 +295,43 @@ secured
         );
       }
 
+      if (body.spans?.length > 200) {
+        logger.info(
+          {
+            projectId: project.id,
+            spansCount: body.spans?.length,
+            traceId: nullableTraceId,
+          },
+          "[429] Too many spans",
+        );
+        return c.json(
+          {
+            message: "Too many spans, maximum of 200 per trace",
+          },
+          429,
+        );
+      }
+
+      // Mirror the span cap for evaluations: without it, a 10MB body of minimal
+      // evaluation objects yields tens of thousands of sequential event-sourcing
+      // dispatches per request (evaluations have no dedup gate, unlike spans).
+      if ((params.evaluations?.length ?? 0) > 200) {
+        logger.info(
+          {
+            projectId: project.id,
+            evaluationsCount: params.evaluations?.length,
+            traceId: nullableTraceId,
+          },
+          "[429] Too many evaluations",
+        );
+        return c.json(
+          {
+            message: "Too many evaluations, maximum of 200 per trace",
+          },
+          429,
+        );
+      }
+
       let reservedTraceMetadata: ReservedTraceMetadata = {};
       let customMetadata: CustomMetadata = {};
       try {
@@ -494,51 +532,38 @@ secured
         }
       }
 
-      const paramsMD5 = crypto
-        .createHash("md5")
-        .update(superjson.stringify({ ...params, spans }))
-        .digest("hex");
-      const existingTrace = await fetchExistingMD5s(traceId, project.id);
-      if (existingTrace?.indexing_md5s?.includes(paramsMD5)) {
+      // OTLP parity: processSpan drops spans older than SPAN_MAX_PAST_MS before
+      // the dedup gate, so apply the same age cutoff here — otherwise the REST
+      // path alone would write arbitrarily old timestamps into cold ClickHouse
+      // partitions, undermining partition pruning.
+      const startedAtCutoff = Date.now() - SPAN_MAX_PAST_MS;
+      const freshSpans: Span[] = [];
+      let droppedOldSpans = 0;
+      for (const span of spans) {
+        if (
+          span.timestamps.started_at &&
+          span.timestamps.started_at < startedAtCutoff
+        ) {
+          droppedOldSpans++;
+          continue;
+        }
+        freshSpans.push(span);
+      }
+      if (droppedOldSpans > 0) {
         logger.info(
-          { traceId, projectId: project.id, paramsMD5 },
-          "trace already indexed",
-        );
-
-        return c.json({
-          message: "No changes",
-          partialSuccess: {
-            rejectedSpans: 0,
-            dedupedSpans: 0,
-            errorMessage: "",
-          },
-        });
-      }
-
-      if (existingTrace?.version && existingTrace.version > 256) {
-        logger.error(
-          { traceId, projectId: project.id, version: existingTrace.version },
-          "over 256 updates were sent for this trace already, no more updates will be accepted",
-        );
-
-        return c.json(
-          {
-            message:
-              "Over 256 updates were sent for this trace already, no more updates will be accepted",
-          },
-          400,
+          { projectId: project.id, traceId, droppedOldSpans },
+          "dropped spans with start time more than 31 days in the past",
         );
       }
-      if (existingTrace?.existing_metadata?.custom) {
-        customMetadata = {
-          ...existingTrace.existing_metadata.custom,
-          ...customMetadata,
-        };
-      }
 
-      let rejectedSpans = 0;
-      let dedupedSpans = 0;
-      let rejectionErrors: string[] = [];
+      let rejectedSpans = droppedOldSpans;
+      let dispatchFailures = 0;
+      let rejectionErrors: string[] =
+        droppedOldSpans > 0
+          ? [
+              `${droppedOldSpans} span(s) dropped: start time is more than 31 days in the past`,
+            ]
+          : [];
       try {
         const resource = CollectorSpanUtils.buildResource({
           reservedTraceMetadata,
@@ -546,10 +571,13 @@ secured
           expectedOutput,
         });
 
-        const ingestion = getApp().traces.collection;
-        const results = await Promise.all(
-          spans.map((span) =>
-            ingestion.ingestNormalizedSpan({
+        const results = await Promise.allSettled(
+          freshSpans.map((span) =>
+            // Route through ingestNormalizedSpan (not recordSpan directly) so the
+            // REST collector shares the (tenant, trace, span) dedup gate + ADR-022
+            // spool hook with the OTLP path — a retry storm here must not bypass
+            // dedup. occurredAt is stamped inside ingestNormalizedSpan.
+            getApp().traces.collection.ingestNormalizedSpan({
               tenantId: project.id,
               span: CollectorSpanUtils.convertSpanToOtlp(span),
               resource,
@@ -559,48 +587,83 @@ secured
           ),
         );
 
-        const failures = results.filter((r) => r.status === "failed");
-        dedupedSpans = results.filter((r) => r.status === "deduped").length;
-        rejectedSpans = failures.length;
-        rejectionErrors = failures.map((f) => f.error ?? "unknown error");
-        if (failures.length > 0) {
+        // `ingestNormalizedSpan` catches its own errors and RESOLVES with
+        // `{ status: "failed", error }` (it never rejects), so inspect the
+        // resolved status — checking the allSettled "rejected" wrapper would
+        // count every failure as a success. An unexpected rejection is still
+        // treated as a failure defensively. "deduped" is a success, not an error.
+        const failureErrors = results
+          .map((r) => {
+            if (r.status === "rejected") {
+              return r.reason instanceof Error
+                ? r.reason.message
+                : String(r.reason);
+            }
+            return r.value.status === "failed"
+              ? (r.value.error ?? "span ingestion failed")
+              : null;
+          })
+          .filter((e): e is string => e !== null);
+        dispatchFailures = failureErrors.length;
+        rejectedSpans += failureErrors.length;
+        rejectionErrors = [...rejectionErrors, ...failureErrors];
+        if (failureErrors.length > 0) {
           logger.error(
             {
               projectId: project.id,
               traceId,
-              failureCount: failures.length,
-              errors: rejectionErrors,
+              failureCount: failureErrors.length,
+              errors: failureErrors,
             },
             "Error dispatching collector spans to event sourcing",
           );
         }
-        if (dedupedSpans > 0) {
-          logger.info(
-            { projectId: project.id, traceId, dedupedSpans },
-            "REST collector deduped repeated spans",
-          );
-        }
       } catch (error) {
         // Catch synchronous errors (e.g., from buildResource)
-        rejectedSpans = spans.length;
-        rejectionErrors = [
+        dispatchFailures = freshSpans.length;
+        rejectedSpans += freshSpans.length;
+        rejectionErrors.push(
           error instanceof Error ? error.message : String(error),
-        ];
+        );
         logger.error(
           { error, projectId: project.id, traceId },
           "Error initializing event sourcing dispatch",
         );
       }
 
+      // Total ingestion failure: every dispatched span failed (e.g. Redis /
+      // group-queue outage). With the BullMQ fallback stack gone, a 200 here
+      // would tell the SDK the trace landed and it would never retry —
+      // permanent trace loss. Return 500 so clients retry; the dedup gate
+      // releases failed spans via tryReleaseOnFailure, so a retry is safe.
+      // Partial success stays 2xx for SDK back-compat.
+      if (freshSpans.length > 0 && dispatchFailures === freshSpans.length) {
+        return c.json(
+          {
+            message: `Failed to ingest all ${dispatchFailures} spans, please retry`,
+            partialSuccess: {
+              rejectedSpans,
+              errorMessage: rejectionErrors.join("; "),
+            },
+          },
+          500,
+        );
+      }
+
       // Dispatch custom SDK evaluations to the event-sourcing evaluation pipeline.
       // The REST collector receives evaluations as a separate field (not as span events),
       // so they must be dispatched independently from the spans above.
+      let rejectedEvaluations = 0;
+      const evaluationErrors: string[] = [];
       if (params.evaluations && params.evaluations.length > 0 && traceId) {
-        try {
-          const app = getApp();
-          const occurredAt = Date.now();
+        const app = getApp();
+        const occurredAt = Date.now();
 
-          for (const evaluation of params.evaluations) {
+        for (const evaluation of params.evaluations) {
+          // try/catch per evaluation so one failing dispatch does not silently
+          // drop the remaining evaluations; failures are surfaced to the client
+          // via partialSuccess.rejectedEvaluations below.
+          try {
             const evaluationMD5 = crypto
               .createHash("md5")
               .update(JSON.stringify({ traceId, evaluation }))
@@ -629,12 +692,21 @@ secured
               error: evaluation.error?.message ?? null,
               occurredAt,
             });
+          } catch (error) {
+            rejectedEvaluations++;
+            evaluationErrors.push(
+              error instanceof Error ? error.message : String(error),
+            );
+            logger.error(
+              {
+                error,
+                projectId: project.id,
+                traceId,
+                evaluationName: evaluation.name,
+              },
+              "Error dispatching REST evaluation to event sourcing",
+            );
           }
-        } catch (error) {
-          logger.error(
-            { error, projectId: project.id, traceId },
-            "Error dispatching REST evaluations to event sourcing",
-          );
         }
       }
 
@@ -642,8 +714,8 @@ secured
         message: "Trace received successfully.",
         partialSuccess: {
           rejectedSpans,
-          dedupedSpans,
-          errorMessage: rejectionErrors.join("; "),
+          rejectedEvaluations,
+          errorMessage: [...rejectionErrors, ...evaluationErrors].join("; "),
         },
       });
     },

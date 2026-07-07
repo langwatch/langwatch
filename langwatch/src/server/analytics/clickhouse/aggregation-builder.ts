@@ -406,6 +406,10 @@ export interface TimeseriesQueryInput {
   groupByKey?: string;
   timeScale?: number | "full";
   timeZone?: string;
+  /** Restrict the query to these trace IDs (parameterized IN clause). */
+  traceIds?: string[];
+  /** Invert the filter conditions (NOT wrap), matching the UI's negate toggle. */
+  negateFilters?: boolean;
 }
 
 /**
@@ -627,10 +631,24 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
     )
   `;
 
-  let filterWhere =
-    filterTranslation.whereClause !== "1=1"
-      ? `AND ${filterTranslation.whereClause}`
-      : "";
+  // Assemble the filter conditions appended to every builder path's WHERE.
+  // negateFilters inverts the user's filter selection (NOT wrap), matching the
+  // UI's negate toggle. traceIds narrows the scan to an explicit trace set —
+  // it is a scope restriction, so it is never negated.
+  const filterConditions: string[] = [];
+  if (filterTranslation.whereClause !== "1=1") {
+    filterConditions.push(
+      input.negateFilters
+        ? `NOT (${filterTranslation.whereClause})`
+        : filterTranslation.whereClause,
+    );
+  }
+  if (input.traceIds && input.traceIds.length > 0) {
+    filterConditions.push(`${ts}.TraceId IN ({traceIds:Array(String)})`);
+    allTranslationParams.traceIds = input.traceIds;
+  }
+  const filterWhere =
+    filterConditions.length > 0 ? `AND ${filterConditions.join(" AND ")}` : "";
 
   // When using arrayJoin for grouping (like labels) or span-level groupBy (like model),
   // we need a CTE approach to avoid trace duplication affecting counts. The CTE deduplicates

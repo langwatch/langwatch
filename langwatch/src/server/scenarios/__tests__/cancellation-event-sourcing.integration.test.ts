@@ -10,32 +10,51 @@
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 
-import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 // Mock the Redis module so startScenarioProcessor uses the test Redis connection.
 // The getter is wired in beforeAll after testContainers starts.
 let _testRedis: any = null;
-vi.mock("~/server/redis", () => ({
-  get connection() { return _testRedis; },
+vi.mock("~/server/redis", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("~/server/redis")>()),
+  get connection() {
+    return _testRedis;
+  },
 }));
+
+import type { Redis } from "ioredis";
 import {
+  getTestRedisConnection,
   startTestContainers,
   stopTestContainers,
-  getTestRedisConnection,
 } from "../../event-sourcing/__tests__/integration/testContainers";
+import type {
+  CancellationMessage,
+  CancellationSubscriber,
+} from "../cancellation-channel";
 import {
   publishCancellation,
   subscribeToCancellations,
 } from "../cancellation-channel";
-import type { CancellationMessage, CancellationSubscriber } from "../cancellation-channel";
-import { ScenarioExecutionPool } from "../execution/execution-pool";
 import type { ExecutionJobData } from "../execution/execution-pool";
-import { startScenarioProcessor } from "../scenario.processor";
+import { ScenarioExecutionPool } from "../execution/execution-pool";
 import type { ProcessorDependencies } from "../scenario.processor";
-import type { Redis } from "ioredis";
+import { startScenarioProcessor } from "../scenario.processor";
 
 /** Poll until condition is true, or throw on timeout. */
-async function waitFor(condition: () => boolean, timeoutMs = 2000, intervalMs = 20): Promise<void> {
+async function waitFor(
+  condition: () => boolean,
+  timeoutMs = 2000,
+  intervalMs = 20,
+): Promise<void> {
   const start = Date.now();
   while (!condition()) {
     if (Date.now() - start > timeoutMs) {
@@ -122,7 +141,11 @@ describe("Event-sourcing cancellation (real Redis)", () => {
 
       await publishCancellation({
         publisher: redis,
-        message: { projectId: "proj-1", scenarioRunId: "run-1", batchRunId: "batch-1" },
+        message: {
+          projectId: "proj-1",
+          scenarioRunId: "run-1",
+          batchRunId: "batch-1",
+        },
       });
 
       await waitFor(() => worker.killed.get("run-1") === true);
@@ -149,7 +172,11 @@ describe("Event-sourcing cancellation (real Redis)", () => {
       // Cancel only run-A1
       await publishCancellation({
         publisher: redis,
-        message: { projectId: "proj-1", scenarioRunId: "run-A1", batchRunId: "batch-1" },
+        message: {
+          projectId: "proj-1",
+          scenarioRunId: "run-A1",
+          batchRunId: "batch-1",
+        },
       });
 
       await waitFor(() => workerA.killed.get("run-A1") === true);
@@ -182,22 +209,35 @@ describe("Event-sourcing cancellation (real Redis)", () => {
       await Promise.all([
         publishCancellation({
           publisher: redis,
-          message: { projectId: "proj-1", scenarioRunId: "run-1", batchRunId: "batch-1" },
+          message: {
+            projectId: "proj-1",
+            scenarioRunId: "run-1",
+            batchRunId: "batch-1",
+          },
         }),
         publishCancellation({
           publisher: redis,
-          message: { projectId: "proj-1", scenarioRunId: "run-2", batchRunId: "batch-1" },
+          message: {
+            projectId: "proj-1",
+            scenarioRunId: "run-2",
+            batchRunId: "batch-1",
+          },
         }),
         publishCancellation({
           publisher: redis,
-          message: { projectId: "proj-1", scenarioRunId: "run-3", batchRunId: "batch-1" },
+          message: {
+            projectId: "proj-1",
+            scenarioRunId: "run-3",
+            batchRunId: "batch-1",
+          },
         }),
       ]);
 
-      await waitFor(() =>
-        workerA.killed.get("run-1") === true &&
-        workerA.killed.get("run-2") === true &&
-        workerB.killed.get("run-3") === true,
+      await waitFor(
+        () =>
+          workerA.killed.get("run-1") === true &&
+          workerA.killed.get("run-2") === true &&
+          workerB.killed.get("run-3") === true,
       );
 
       expect(workerA.killed.get("run-1")).toBe(true);
@@ -217,7 +257,11 @@ describe("Event-sourcing cancellation (real Redis)", () => {
 
       await publishCancellation({
         publisher: redis,
-        message: { projectId: "proj-1", scenarioRunId: "run-nonexistent", batchRunId: "batch-1" },
+        message: {
+          projectId: "proj-1",
+          scenarioRunId: "run-nonexistent",
+          batchRunId: "batch-1",
+        },
       });
 
       // Give time for message delivery — if it were going to kill, it would by now
@@ -240,7 +284,11 @@ describe("Event-sourcing cancellation (real Redis)", () => {
       // First cancel
       await publishCancellation({
         publisher: redis,
-        message: { projectId: "proj-1", scenarioRunId: "run-1", batchRunId: "batch-1" },
+        message: {
+          projectId: "proj-1",
+          scenarioRunId: "run-1",
+          batchRunId: "batch-1",
+        },
       });
 
       await waitFor(() => workerA.killed.get("run-1") === true);
@@ -249,7 +297,11 @@ describe("Event-sourcing cancellation (real Redis)", () => {
       // Second cancel for same run (idempotent — child already removed from running map)
       await publishCancellation({
         publisher: redis,
-        message: { projectId: "proj-1", scenarioRunId: "run-1", batchRunId: "batch-1" },
+        message: {
+          projectId: "proj-1",
+          scenarioRunId: "run-1",
+          batchRunId: "batch-1",
+        },
       });
 
       // Give time for the no-op delivery
@@ -264,7 +316,11 @@ describe("Event-sourcing cancellation (real Redis)", () => {
       // Publish cancel BEFORE any worker subscribes
       await publishCancellation({
         publisher: redis,
-        message: { projectId: "proj-1", scenarioRunId: "run-late", batchRunId: "batch-1" },
+        message: {
+          projectId: "proj-1",
+          scenarioRunId: "run-late",
+          batchRunId: "batch-1",
+        },
       });
 
       await new Promise((r) => setTimeout(r, 50));
@@ -293,14 +349,20 @@ describe("Event-sourcing cancellation (real Redis)", () => {
       const pool = new ScenarioExecutionPool({ concurrency: 3 });
 
       // Track what the failure emitter receives
-      const emittedFailures: Array<{ scenarioRunId?: string; cancelled?: boolean }> = [];
+      const emittedFailures: Array<{
+        scenarioRunId?: string;
+        cancelled?: boolean;
+      }> = [];
       const mockDeps: ProcessorDependencies = {
         scenarioLookup: {
           getById: async () => ({ name: "Test", situation: "Test situation" }),
         },
         failureEmitter: {
           ensureFailureEventsEmitted: async (params) => {
-            emittedFailures.push({ scenarioRunId: params.scenarioRunId, cancelled: params.cancelled });
+            emittedFailures.push({
+              scenarioRunId: params.scenarioRunId,
+              cancelled: params.cancelled,
+            });
           },
         },
       };
@@ -312,7 +374,8 @@ describe("Event-sourcing cancellation (real Redis)", () => {
       // If no Redis in test env, skip (testContainers provides it)
       if (!testConnection) {
         // Fallback: wire manually with test redis to prove the flow
-        const subscriber = redis.duplicate() as unknown as CancellationSubscriber;
+        const subscriber =
+          redis.duplicate() as unknown as CancellationSubscriber;
         const unsubscribe = await subscribeToCancellations({
           subscriber,
           onCancel: (message: CancellationMessage) => {
@@ -344,7 +407,11 @@ describe("Event-sourcing cancellation (real Redis)", () => {
       // Step 1: Cancel broadcast arrives
       await publishCancellation({
         publisher: redis,
-        message: { projectId: "proj-1", scenarioRunId: "run-pre-cancel", batchRunId: "batch-1" },
+        message: {
+          projectId: "proj-1",
+          scenarioRunId: "run-pre-cancel",
+          batchRunId: "batch-1",
+        },
       });
 
       await waitFor(() => pool.wasCancelled("run-pre-cancel"));

@@ -1,8 +1,9 @@
-import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/types";
 import { z } from "zod";
+
 import type { RotatingColorSet } from "../../utils/rotatingColors";
 import type { DeepRequired, Unpacked } from "../../utils/types";
 import { type FilterField, filterFieldsEnum } from "../filters/types";
+import type { TimeseriesInputType } from "./registry";
 
 export type AnalyticsMetric = {
   label: string;
@@ -17,18 +18,6 @@ export type AnalyticsMetric = {
     filter: FilterField;
   };
   allowedAggregations: AggregationTypes[];
-  aggregation: (
-    index: number,
-    aggregation: AggregationTypes,
-    key: string | undefined,
-    subkey: string | undefined,
-  ) => Record<string, AggregationsAggregationContainer>;
-  extractionPath: (
-    index: number,
-    aggregations: AggregationTypes,
-    key: string | undefined,
-    subkey: string | undefined,
-  ) => string;
 };
 
 export type AnalyticsGroup = {
@@ -37,11 +26,6 @@ export type AnalyticsGroup = {
     filter: FilterField;
     optional?: boolean;
   };
-  aggregation: (
-    aggToGroup: Record<string, AggregationsAggregationContainer>,
-    key?: string,
-  ) => Record<string, AggregationsAggregationContainer>;
-  extractionPath: () => string;
 };
 
 export const aggregationTypesEnum = z.enum([
@@ -192,7 +176,7 @@ export interface FeedbacksResult {
  * Analytics backend interface for dependency injection
  */
 export interface AnalyticsBackend {
-  getTimeseries(input: import("./registry").TimeseriesInputType): Promise<TimeseriesResult>;
+  getTimeseries(input: TimeseriesInputType): Promise<TimeseriesResult>;
   getDataForFilter(
     projectId: string,
     field: FilterField,

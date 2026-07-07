@@ -161,9 +161,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
 
   describe("single target execution", () => {
     it("executes single row with single target", async () => {
-      const state = createTestState([
-        createTargetConfig("target-1"),
-      ]);
+      const state = createTestState([createTargetConfig("target-1")]);
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
       const datasetColumns = [
         { id: "question", name: "question", type: "string" },
@@ -207,9 +205,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
     }, 60000);
 
     it("executes multiple rows with single target", async () => {
-      const state = createTestState([
-        createTargetConfig("target-1"),
-      ]);
+      const state = createTestState([createTargetConfig("target-1")]);
       const datasetRows = [
         { question: "Say hello", expected: "hello" },
         { question: "Say world", expected: "world" },
@@ -250,9 +246,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
     }, 120000);
 
     it("includes duration and traceId in target_result events", async () => {
-      const state = createTestState([
-        createTargetConfig("target-1"),
-      ]);
+      const state = createTestState([createTargetConfig("target-1")]);
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
       const datasetColumns = [
         { id: "question", name: "question", type: "string" },
@@ -375,9 +369,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
 
   describe("partial execution scopes", () => {
     it("executes only specified rows", async () => {
-      const state = createTestState([
-        createTargetConfig("target-1"),
-      ]);
+      const state = createTestState([createTargetConfig("target-1")]);
       const datasetRows = [
         { question: "Say one", expected: "one" },
         { question: "Say two", expected: "two" },
@@ -1159,9 +1151,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
 
   describe("execution summary", () => {
     it("provides accurate summary with duration", async () => {
-      const state = createTestState([
-        createTargetConfig("target-1"),
-      ]);
+      const state = createTestState([createTargetConfig("target-1")]);
       const datasetRows = [{ question: "Say hello", expected: "hello" }];
       const datasetColumns = [
         { id: "question", name: "question", type: "string" },
@@ -1205,9 +1195,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
   describe("abort functionality", () => {
     it("stops execution when abort flag is set and emits stopped event", async () => {
       // Create state with multiple rows to ensure we can abort mid-execution
-      const state = createTestState([
-        createTargetConfig("target-1"),
-      ]);
+      const state = createTestState([createTargetConfig("target-1")]);
       const datasetRows = [
         { question: "Say one", expected: "one" },
         { question: "Say two", expected: "two" },
@@ -1264,9 +1252,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
     }, 120000);
 
     it("preserves partial results when aborted", async () => {
-      const state = createTestState([
-        createTargetConfig("target-1"),
-      ]);
+      const state = createTestState([createTargetConfig("target-1")]);
       const datasetRows = [
         { question: "Say alpha", expected: "alpha" },
         { question: "Say beta", expected: "beta" },
@@ -1324,9 +1310,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
 
     it("stops quickly even with many rows when abort is requested immediately", async () => {
       // This test verifies that abort is responsive even with many pending cells
-      const state = createTestState([
-        createTargetConfig("target-1"),
-      ]);
+      const state = createTestState([createTargetConfig("target-1")]);
       // Create 20 rows - without abort this would take a long time
       const datasetRows = Array.from({ length: 20 }, (_, i) => ({
         question: `Say number ${i + 1}`,
@@ -1383,9 +1367,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
 
   describe("empty row handling", () => {
     it("skips completely empty rows in full execution", async () => {
-      const state = createTestState([
-        createTargetConfig("target-1"),
-      ]);
+      const state = createTestState([createTargetConfig("target-1")]);
       const datasetRows = [
         { question: "Say hello", expected: "hello" }, // row 0 - non-empty
         { question: "", expected: "" }, // row 1 - empty (skipped)
@@ -1481,9 +1463,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
       // When user explicitly requests a cell, we should attempt it even if empty
       // This test verifies the behavior - currently we skip empty rows in all scopes
       // If we want to change this behavior for explicit cell execution, we can adjust
-      const state = createTestState([
-        createTargetConfig("target-1"),
-      ]);
+      const state = createTestState([createTargetConfig("target-1")]);
       const datasetRows = [
         { question: "", expected: "" }, // row 0 - empty
       ];
@@ -1512,9 +1492,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
     }, 30000);
 
     it("handles dataset with all empty rows", async () => {
-      const state = createTestState([
-        createTargetConfig("target-1"),
-      ]);
+      const state = createTestState([createTargetConfig("target-1")]);
       const datasetRows = [
         { question: "", expected: "" },
         { question: null, expected: null },
@@ -1550,666 +1528,6 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
         expect(doneEvent.summary.completedCells).toBe(0);
       }
     }, 30000);
-  });
-
-  describe("Elasticsearch Storage", () => {
-    it("stores full evaluation run results to Elasticsearch when saveToEs is true", async () => {
-      // Import required modules for ES verification
-      const { prisma } = await import("~/server/db");
-      const { nanoid } = await import("nanoid");
-      const { getDefaultBatchEvaluationRepository } = await import(
-        "../../repositories/elasticsearchBatchEvaluation.repository"
-      );
-
-      // Create a real experiment in the database (required for ES storage)
-      const experimentId = `exp_${nanoid()}`;
-      await prisma.experiment.create({
-        data: {
-          id: experimentId,
-          projectId: project.id,
-          name: "ES Storage Test",
-          slug: `es-test-${nanoid(8)}`,
-          type: "EVALUATIONS_V3",
-        },
-      });
-
-      try {
-        const state = createTestState(
-          [createTargetConfig("target-1")],
-          [createEvaluatorConfig()],
-        );
-        const datasetRows = [
-          { question: "Say hello", expected: "hello" },
-          { question: "Say world", expected: "world" },
-        ];
-        const datasetColumns = [
-          { id: "question", name: "question", type: "string" },
-          { id: "expected", name: "expected", type: "string" },
-        ];
-
-        const input: OrchestratorInput = {
-          projectId: project.id,
-          experimentId, // Pass experiment ID to enable storage
-          scope: { type: "full" },
-          state,
-          datasetRows,
-          datasetColumns,
-          loadedPrompts: new Map(),
-          loadedAgents: new Map(),
-          // ES storage removed — ClickHouse is the sole data store
-        };
-
-        const events = await collectEvents(input);
-
-        // Verify execution completed
-        const doneEvent = events.find((e) => e.type === "done");
-        expect(doneEvent).toBeDefined();
-        if (doneEvent?.type !== "done") throw new Error("Expected done event");
-
-        // Get the run ID from the execution_started event
-        const startEvent = events.find((e) => e.type === "execution_started");
-        if (startEvent?.type !== "execution_started")
-          throw new Error("Expected execution_started event");
-        const runId = startEvent.runId;
-
-        // Wait for ES to index
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-
-        // Verify data was stored in Elasticsearch
-        const repository = getDefaultBatchEvaluationRepository();
-        const storedRun = await repository.getByRunId({
-          projectId: project.id,
-          experimentId,
-          runId,
-        });
-
-        // Verify the stored data
-        expect(storedRun).not.toBeNull();
-        expect(storedRun?.run_id).toBe(runId);
-        expect(storedRun?.experiment_id).toBe(experimentId);
-        expect(storedRun?.project_id).toBe(project.id);
-
-        // Verify targets were stored
-        // Note: target name falls back to target ID when no loadedPrompt is provided
-        expect(storedRun?.targets).toBeDefined();
-        expect(storedRun?.targets?.length).toBeGreaterThanOrEqual(1);
-        expect(storedRun?.targets?.[0]?.name).toBe("target-1");
-
-        // Verify dataset entries were stored with actual input values
-        expect(storedRun?.dataset).toBeDefined();
-        expect(storedRun?.dataset?.length).toBe(2);
-
-        // Verify dataset entries contain the input data (not just empty objects)
-        const datasetEntries = storedRun?.dataset ?? [];
-        const firstEntry = datasetEntries.find((d) => d.index === 0);
-        const secondEntry = datasetEntries.find((d) => d.index === 1);
-
-        expect(firstEntry?.entry).toBeDefined();
-        expect(firstEntry?.entry?.question).toBe("Say hello");
-
-        expect(secondEntry?.entry).toBeDefined();
-        expect(secondEntry?.entry?.question).toBe("Say world");
-
-        // Verify evaluations were stored
-        expect(storedRun?.evaluations).toBeDefined();
-        expect(storedRun?.evaluations?.length).toBe(2); // 2 rows, 1 evaluator each
-
-        // Verify evaluator ID is stored
-        // Note: evaluator name is null when using built-in evaluators without dbEvaluatorId
-        // (name is only populated when evaluator is loaded from DB via loadedEvaluators)
-        const firstEvaluation = storedRun?.evaluations?.[0];
-        expect(firstEvaluation?.evaluator).toBe("eval-1");
-        expect(firstEvaluation?.name).toBeNull();
-
-        // Verify timestamps
-        expect(storedRun?.timestamps.created_at).toBeDefined();
-        expect(storedRun?.timestamps.finished_at).toBeDefined();
-
-        // Clean up - delete the ES document
-        const { esClient, BATCH_EVALUATION_INDEX } = await import(
-          "~/server/elasticsearch"
-        );
-        const client = await esClient({ projectId: project.id });
-        await client.deleteByQuery({
-          index: BATCH_EVALUATION_INDEX.alias,
-          body: {
-            query: {
-              bool: {
-                must: [
-                  { term: { project_id: project.id } },
-                  { term: { run_id: runId } },
-                ],
-              },
-            },
-          },
-        });
-      } finally {
-        // Clean up experiment
-        await prisma.experiment.delete({
-          where: { id: experimentId, projectId: project.id },
-        });
-      }
-    }, 120000);
-
-    it("does not store to Elasticsearch when saveToEs is false", async () => {
-      const { prisma } = await import("~/server/db");
-      const { nanoid } = await import("nanoid");
-      const { getDefaultBatchEvaluationRepository } = await import(
-        "../../repositories/elasticsearchBatchEvaluation.repository"
-      );
-
-      const experimentId = `exp_${nanoid()}`;
-      await prisma.experiment.create({
-        data: {
-          id: experimentId,
-          projectId: project.id,
-          name: "No ES Storage Test",
-          slug: `no-es-test-${nanoid(8)}`,
-          type: "EVALUATIONS_V3",
-        },
-      });
-
-      try {
-        const state = createTestState([
-          createTargetConfig("target-1"),
-        ]);
-        const datasetRows = [{ question: "Say hello", expected: "hello" }];
-        const datasetColumns = [
-          { id: "question", name: "question", type: "string" },
-          { id: "expected", name: "expected", type: "string" },
-        ];
-
-        const input: OrchestratorInput = {
-          projectId: project.id,
-          experimentId,
-          scope: { type: "full" },
-          state,
-          datasetRows,
-          datasetColumns,
-          loadedPrompts: new Map(),
-          loadedAgents: new Map(),
-          // ES storage removed — ClickHouse is the sole data store
-        };
-
-        const events = await collectEvents(input);
-
-        // Get run ID
-        const startEvent = events.find((e) => e.type === "execution_started");
-        if (startEvent?.type !== "execution_started")
-          throw new Error("Expected execution_started event");
-        const runId = startEvent.runId;
-
-        // Wait a bit
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        // Verify nothing was stored
-        const repository = getDefaultBatchEvaluationRepository();
-        const storedRun = await repository.getByRunId({
-          projectId: project.id,
-          experimentId,
-          runId,
-        });
-
-        expect(storedRun).toBeNull();
-      } finally {
-        await prisma.experiment.delete({
-          where: { id: experimentId, projectId: project.id },
-        });
-      }
-    }, 60000);
-
-    it("stores model from loadedPrompts when target has no localPromptConfig", async () => {
-      const { prisma } = await import("~/server/db");
-      const { nanoid } = await import("nanoid");
-      const { getDefaultBatchEvaluationRepository } = await import(
-        "../../repositories/elasticsearchBatchEvaluation.repository"
-      );
-
-      const experimentId = `exp_${nanoid()}`;
-      const promptId = `prompt_${nanoid()}`;
-      await prisma.experiment.create({
-        data: {
-          id: experimentId,
-          projectId: project.id,
-          name: "Model From Loaded Prompt Test",
-          slug: `model-test-${nanoid(8)}`,
-          type: "EVALUATIONS_V3",
-        },
-      });
-
-      try {
-        // Create a target WITHOUT localPromptConfig (simulates saved prompt)
-        const targetWithoutLocalConfig: TargetConfig = {
-          id: "target-1",
-          type: "prompt",
-          promptId: promptId, // Reference to saved prompt
-          promptVersionId: "version-1",
-          promptVersionNumber: 1,
-          inputs: [{ identifier: "input", type: "str" }],
-          outputs: [{ identifier: "output", type: "str" }],
-          mappings: {
-            "dataset-1": {
-              input: {
-                type: "source",
-                source: "dataset",
-                sourceId: "dataset-1",
-                sourceField: "question",
-              },
-            },
-          },
-          // NOTE: no localPromptConfig - this is the scenario we're testing
-        };
-
-        const state = createTestState([targetWithoutLocalConfig]);
-        const datasetRows = [{ question: "Say hello", expected: "hello" }];
-        const datasetColumns = [
-          { id: "question", name: "question", type: "string" },
-          { id: "expected", name: "expected", type: "string" },
-        ];
-
-        // Create a mock VersionedPrompt with a model
-        const mockVersionedPrompt: VersionedPrompt = {
-          id: promptId,
-          name: "Saved Prompt Target",
-          handle: "test-prompt",
-          scope: "PROJECT",
-          version: 1,
-          versionId: "version-1",
-          versionCreatedAt: new Date(),
-          model: "openai/gpt-4-turbo", // This should be stored
-          temperature: 0.7,
-          maxTokens: 100,
-          prompt: "You are a helpful assistant.",
-          projectId: project.id,
-          organizationId: "org-1",
-          messages: [
-            { role: "system", content: "You are a helpful assistant." },
-            { role: "user", content: "{{input}}" },
-          ],
-          authorId: null,
-          inputs: [{ identifier: "input", type: "str" }],
-          outputs: [{ identifier: "output", type: "str" }],
-          updatedAt: new Date(),
-          createdAt: new Date(),
-          tags: [],
-          parameters: {},
-        };
-
-        // Create loadedPrompts map with our mock prompt
-        const loadedPrompts = new Map<string, VersionedPrompt>();
-        loadedPrompts.set(promptId, mockVersionedPrompt);
-
-        const input: OrchestratorInput = {
-          projectId: project.id,
-          experimentId,
-          scope: { type: "full" },
-          state,
-          datasetRows,
-          datasetColumns,
-          loadedPrompts, // Pass loaded prompts
-          loadedAgents: new Map(),
-        };
-
-        const events = await collectEvents(input);
-
-        // Verify execution completed
-        const doneEvent = events.find((e) => e.type === "done");
-        expect(doneEvent).toBeDefined();
-
-        // Get the run ID
-        const startEvent = events.find((e) => e.type === "execution_started");
-        if (startEvent?.type !== "execution_started")
-          throw new Error("Expected execution_started event");
-        const runId = startEvent.runId;
-
-        // Wait for ES to index
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-
-        // Verify data was stored in Elasticsearch
-        const repository = getDefaultBatchEvaluationRepository();
-        const storedRun = await repository.getByRunId({
-          projectId: project.id,
-          experimentId,
-          runId,
-        });
-
-        // Verify the target has the model from loadedPrompts
-        expect(storedRun).not.toBeNull();
-        expect(storedRun?.targets).toBeDefined();
-        expect(storedRun?.targets?.length).toBe(1);
-        expect(storedRun?.targets?.[0]?.name).toBe("Saved Prompt Target");
-        expect(storedRun?.targets?.[0]?.model).toBe("openai/gpt-4-turbo");
-
-        // Clean up ES document
-        const { esClient, BATCH_EVALUATION_INDEX } = await import(
-          "~/server/elasticsearch"
-        );
-        const client = await esClient({ projectId: project.id });
-        await client.deleteByQuery({
-          index: BATCH_EVALUATION_INDEX.alias,
-          body: {
-            query: {
-              bool: {
-                must: [
-                  { term: { project_id: project.id } },
-                  { term: { run_id: runId } },
-                ],
-              },
-            },
-          },
-        });
-      } finally {
-        await prisma.experiment.delete({
-          where: { id: experimentId, projectId: project.id },
-        });
-      }
-    }, 120000);
-
-    it("stores falsy output values (false, null) to Elasticsearch correctly", async () => {
-      // This test verifies the fix for storing falsy outputs like {output: false}
-      // Previously, the check `event.output ? {...}` would skip falsy values
-      const { prisma } = await import("~/server/db");
-      const { nanoid } = await import("nanoid");
-      const { getDefaultBatchEvaluationRepository } = await import(
-        "../../repositories/elasticsearchBatchEvaluation.repository"
-      );
-
-      const experimentId = `exp_${nanoid()}`;
-      const evaluatorId = `evaluator_${nanoid()}`;
-
-      // Create experiment
-      await prisma.experiment.create({
-        data: {
-          id: experimentId,
-          projectId: project.id,
-          name: "Falsy Output Storage Test",
-          slug: `falsy-output-test-${nanoid(8)}`,
-          type: "EVALUATIONS_V3",
-        },
-      });
-
-      // Create evaluator (exact_match returns passed: false for non-matching)
-      await prisma.evaluator.create({
-        data: {
-          id: evaluatorId,
-          projectId: project.id,
-          name: "Exact Match for Falsy Test",
-          type: "evaluator",
-          config: {
-            evaluatorType: "langevals/exact_match",
-            settings: {},
-          },
-        },
-      });
-
-      try {
-        // Use evaluator as target - it returns boolean `passed` field
-        const evaluatorTargetConfig: TargetConfig = {
-          id: "target-eval",
-          type: "evaluator",
-          targetEvaluatorId: evaluatorId,
-          inputs: [
-            { identifier: "output", type: "str" },
-            { identifier: "expected_output", type: "str" },
-          ],
-          outputs: [
-            { identifier: "passed", type: "bool" },
-            { identifier: "score", type: "float" },
-          ],
-          mappings: {
-            "dataset-1": {
-              output: {
-                type: "source",
-                source: "dataset",
-                sourceId: "dataset-1",
-                sourceField: "response",
-              },
-              expected_output: {
-                type: "source",
-                source: "dataset",
-                sourceId: "dataset-1",
-                sourceField: "expected",
-              },
-            },
-          },
-        };
-
-        const state = createTestState([evaluatorTargetConfig]);
-        // Non-matching values will produce passed: false
-        const datasetRows = [
-          { response: "hello", expected: "world" }, // Will return passed: false
-        ];
-        const datasetColumns = [
-          { id: "response", name: "response", type: "string" },
-          { id: "expected", name: "expected", type: "string" },
-        ];
-
-        // Load the evaluator
-        const loadedEvaluators = new Map<
-          string,
-          { id: string; name: string; config: unknown }
-        >();
-        loadedEvaluators.set(evaluatorId, {
-          id: evaluatorId,
-          name: "Exact Match for Falsy Test",
-          config: { evaluatorType: "langevals/exact_match", settings: {} },
-        });
-
-        const input: OrchestratorInput = {
-          projectId: project.id,
-          experimentId,
-          scope: { type: "full" },
-          state,
-          datasetRows,
-          datasetColumns,
-          loadedPrompts: new Map(),
-          loadedAgents: new Map(),
-          loadedEvaluators,
-        };
-
-        const events = await collectEvents(input);
-
-        // Verify execution completed
-        const doneEvent = events.find((e) => e.type === "done");
-        expect(doneEvent).toBeDefined();
-
-        // Verify target_result has passed: false
-        const targetResult = events.find((e) => e.type === "target_result");
-        expect(targetResult).toBeDefined();
-        if (targetResult?.type === "target_result") {
-          const output = targetResult.output as { passed?: boolean };
-          expect(output.passed).toBe(false); // This is the falsy value we're testing
-        }
-
-        // Get run ID
-        const startEvent = events.find((e) => e.type === "execution_started");
-        if (startEvent?.type !== "execution_started")
-          throw new Error("Expected execution_started event");
-        const runId = startEvent.runId;
-
-        // Wait for ES to index
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-
-        // Verify the falsy output was stored in Elasticsearch
-        const repository = getDefaultBatchEvaluationRepository();
-        const storedRun = await repository.getByRunId({
-          projectId: project.id,
-          experimentId,
-          runId,
-        });
-
-        expect(storedRun).not.toBeNull();
-        expect(storedRun?.dataset).toBeDefined();
-        expect(storedRun?.dataset?.length).toBe(1);
-
-        // CRITICAL: Verify predicted field is stored even with falsy output
-        const datasetEntry = storedRun?.dataset?.[0];
-        expect(datasetEntry?.predicted).toBeDefined();
-        expect(datasetEntry?.predicted?.output).toBeDefined();
-        // The output should contain passed: false (not be undefined/missing)
-        expect((datasetEntry?.predicted?.output as any)?.passed).toBe(false);
-
-        // Clean up ES document
-        const { esClient, BATCH_EVALUATION_INDEX } = await import(
-          "~/server/elasticsearch"
-        );
-        const client = await esClient({ projectId: project.id });
-        await client.deleteByQuery({
-          index: BATCH_EVALUATION_INDEX.alias,
-          body: {
-            query: {
-              bool: {
-                must: [
-                  { term: { project_id: project.id } },
-                  { term: { run_id: runId } },
-                ],
-              },
-            },
-          },
-        });
-      } finally {
-        // Clean up
-        await prisma.evaluator.delete({
-          where: { id: evaluatorId, projectId: project.id },
-        });
-        await prisma.experiment.delete({
-          where: { id: experimentId, projectId: project.id },
-        });
-      }
-    }, 120000);
-
-    it("stores errors to Elasticsearch when cell execution fails", async () => {
-      const { prisma } = await import("~/server/db");
-      const { nanoid } = await import("nanoid");
-      const { getDefaultBatchEvaluationRepository } = await import(
-        "../../repositories/elasticsearchBatchEvaluation.repository"
-      );
-
-      const experimentId = `exp_${nanoid()}`;
-      await prisma.experiment.create({
-        data: {
-          id: experimentId,
-          projectId: project.id,
-          name: "Error Storage Test",
-          slug: `error-test-${nanoid(8)}`,
-          type: "EVALUATIONS_V3",
-        },
-      });
-
-      try {
-        // Create a target with an invalid model to cause an error
-        const targetConfig: TargetConfig = {
-          id: "target-1",
-          type: "prompt",
-          inputs: [{ identifier: "input", type: "str" }],
-          outputs: [{ identifier: "output", type: "str" }],
-          mappings: {
-            "dataset-1": {
-              input: {
-                type: "source",
-                source: "dataset",
-                sourceId: "dataset-1",
-                sourceField: "question",
-              },
-            },
-          },
-          localPromptConfig: {
-            llm: {
-              model: "openai/invalid-model-that-does-not-exist",
-              temperature: 0,
-              maxTokens: 50,
-            },
-            messages: [{ role: "user", content: "{{input}}" }],
-            inputs: [{ identifier: "input", type: "str" }],
-            outputs: [{ identifier: "output", type: "str" }],
-          },
-        };
-
-        const state = createTestState([targetConfig]);
-        const datasetRows = [{ question: "Test question" }];
-        const datasetColumns = [
-          { id: "question", name: "question", type: "string" },
-        ];
-
-        const input: OrchestratorInput = {
-          projectId: project.id,
-          experimentId,
-          scope: { type: "full" },
-          state,
-          datasetRows,
-          datasetColumns,
-          loadedPrompts: new Map(),
-          loadedAgents: new Map(),
-        };
-
-        const events = await collectEvents(input);
-
-        // Verify execution completed (even with errors)
-        const doneEvent = events.find((e) => e.type === "done");
-        expect(doneEvent).toBeDefined();
-
-        // Verify there was an error
-        const errorEvents = events.filter(
-          (e) =>
-            e.type === "error" ||
-            (e.type === "target_result" && (e as any).error),
-        );
-        expect(errorEvents.length).toBeGreaterThan(0);
-
-        // Get the run ID
-        const startEvent = events.find((e) => e.type === "execution_started");
-        if (startEvent?.type !== "execution_started")
-          throw new Error("Expected execution_started event");
-        const runId = startEvent.runId;
-
-        // Wait for ES to index
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-
-        // Verify error was stored in Elasticsearch
-        const repository = getDefaultBatchEvaluationRepository();
-        const storedRun = await repository.getByRunId({
-          projectId: project.id,
-          experimentId,
-          runId,
-        });
-
-        expect(storedRun).not.toBeNull();
-
-        // Verify dataset entry has error field populated
-        expect(storedRun?.dataset).toBeDefined();
-        expect(storedRun?.dataset?.length).toBeGreaterThan(0);
-
-        const entryWithError = storedRun?.dataset?.find(
-          (d) => d.error !== null && d.error !== undefined,
-        );
-        expect(entryWithError).toBeDefined();
-        expect(entryWithError?.error).toBeTruthy();
-        expect(typeof entryWithError?.error).toBe("string");
-
-        // Clean up ES document
-        const { esClient, BATCH_EVALUATION_INDEX } = await import(
-          "~/server/elasticsearch"
-        );
-        const client = await esClient({ projectId: project.id });
-        await client.deleteByQuery({
-          index: BATCH_EVALUATION_INDEX.alias,
-          body: {
-            query: {
-              bool: {
-                must: [
-                  { term: { project_id: project.id } },
-                  { term: { run_id: runId } },
-                ],
-              },
-            },
-          },
-        });
-      } finally {
-        await prisma.experiment.delete({
-          where: { id: experimentId, projectId: project.id },
-        });
-      }
-    }, 120000);
   });
 
   describe("column name vs ID mapping", () => {
@@ -2514,7 +1832,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
           id: "target-eval",
           type: "evaluator",
           targetEvaluatorId: evaluatorId,
-          
+
           inputs: [
             { identifier: "output", type: "str" },
             { identifier: "expected_output", type: "str" },
@@ -2640,7 +1958,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
           id: "target-eval",
           type: "evaluator",
           targetEvaluatorId: evaluatorId,
-          
+
           inputs: [
             { identifier: "output", type: "str" },
             { identifier: "expected_output", type: "str" },
@@ -2755,7 +2073,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
           id: "target-eval",
           type: "evaluator",
           targetEvaluatorId: targetEvaluatorId,
-          
+
           inputs: [
             { identifier: "output", type: "str" },
             { identifier: "expected_output", type: "str" },
@@ -2920,7 +2238,7 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
           id: "target-eval",
           type: "evaluator",
           targetEvaluatorId: evaluatorId,
-          
+
           inputs: [
             { identifier: "output", type: "str" },
             { identifier: "expected_output", type: "str" },
@@ -3007,17 +2325,17 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
         );
 
         // Row 0: should pass
-        expect(
-          (resultByRow[0]?.output as { passed?: boolean })?.passed,
-        ).toBe(true);
+        expect((resultByRow[0]?.output as { passed?: boolean })?.passed).toBe(
+          true,
+        );
         // Row 1: should fail
-        expect(
-          (resultByRow[1]?.output as { passed?: boolean })?.passed,
-        ).toBe(false);
+        expect((resultByRow[1]?.output as { passed?: boolean })?.passed).toBe(
+          false,
+        );
         // Row 2: should pass
-        expect(
-          (resultByRow[2]?.output as { passed?: boolean })?.passed,
-        ).toBe(true);
+        expect((resultByRow[2]?.output as { passed?: boolean })?.passed).toBe(
+          true,
+        );
 
         // Done event should show 3 completed cells
         const doneEvent = events[events.length - 1];
@@ -3114,7 +2432,10 @@ describe.skipIf(!hasNlpService)("Orchestrator Integration", () => {
           localPromptConfig: createPromptConfig(),
         };
 
-        const state = createTestState([passthroughTarget], [customFieldsEvaluator]);
+        const state = createTestState(
+          [passthroughTarget],
+          [customFieldsEvaluator],
+        );
 
         // Dataset with custom field names
         const datasetRows = [

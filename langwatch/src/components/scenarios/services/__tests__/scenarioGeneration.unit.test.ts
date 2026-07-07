@@ -4,6 +4,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import {
   generateScenarioWithAI,
+  ScenarioGenerationError,
   type GeneratedScenario,
 } from "../scenarioGeneration";
 
@@ -108,6 +109,35 @@ describe("generateScenarioWithAI()", () => {
       await expect(
         generateScenarioWithAI("test prompt", "project-123", null)
       ).rejects.toThrow("Failed to generate scenario");
+    });
+  });
+
+  describe("when API returns a handled domain error", () => {
+    it("throws ScenarioGenerationError carrying the kind and meta", async () => {
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ok: false,
+        json: () =>
+          Promise.resolve({
+            error: "bad_request",
+            domainError: {
+              kind: "missing_provider",
+              meta: { reason: "missing_provider" },
+              httpStatus: 400,
+            },
+          }),
+      });
+
+      const error = await generateScenarioWithAI(
+        "test prompt",
+        "project-123",
+        null
+      ).catch((e: unknown) => e);
+
+      expect(error).toBeInstanceOf(ScenarioGenerationError);
+      expect((error as ScenarioGenerationError).kind).toBe("missing_provider");
+      expect((error as ScenarioGenerationError).meta).toEqual({
+        reason: "missing_provider",
+      });
     });
   });
 

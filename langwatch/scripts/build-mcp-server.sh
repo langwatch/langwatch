@@ -7,7 +7,10 @@
 set -eo pipefail
 
 printf 'building mcp server... '
-start=$(node -e 'console.log(Date.now())' 2>/dev/null)
+# process.stdout.write, not console.log: under `pnpm dev` concurrently sets
+# FORCE_COLOR, and console.log wraps numbers in ANSI colour codes even when
+# piped — which then get interpolated into the elapsed-time eval below.
+start=$(node -e 'process.stdout.write(String(Date.now()))' 2>/dev/null)
 
 # Self-heal a half-linked mcp-server/node_modules. An interrupted prep run
 # (Ctrl-C, OOM, the compose-v5 crash) can leave the `.bin/tsup` symlink in
@@ -32,5 +35,5 @@ if ! output=$(pnpm --silent --filter @langwatch/mcp-server run build 2>&1); then
   exit 1
 fi
 
-elapsed=$(node -e "console.log(((Date.now() - $start) / 1000).toFixed(1))")
+elapsed=$(node -e "process.stdout.write(((Date.now() - $start) / 1000).toFixed(1))")
 printf 'built in %ss\n' "$elapsed"

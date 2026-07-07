@@ -1,6 +1,12 @@
 import safe from "safe-regex2";
 import { createLogger } from "../../utils/logger";
-import { extractRAGTextualContext } from "../background/workers/collector/rag";
+import type { ExecuteEvaluationCommandData } from "../event-sourcing/pipelines/evaluation-processing/schemas/commands";
+import {
+  normalizePreconditionTraceData,
+  PRECONDITION_FIELD_MATCHERS,
+  type PreconditionTraceData,
+} from "../filters/precondition-matchers";
+import { extractRAGTextualContext } from "../tracer/collector/rag";
 import type {
   ElasticSearchTrace,
   ErrorCapture,
@@ -8,17 +14,8 @@ import type {
   RAGSpan,
   Span,
 } from "../tracer/types";
-import {
-  PRECONDITION_FIELD_MATCHERS,
-  normalizePreconditionTraceData,
-  type PreconditionTraceData,
-} from "../filters/precondition-matchers";
 import { getEvaluatorDefinitions } from "./getEvaluator";
-import type {
-  CheckPreconditionRule,
-  CheckPreconditions,
-} from "./types";
-import type { ExecuteEvaluationCommandData } from "../event-sourcing/pipelines/evaluation-processing/schemas/commands";
+import type { CheckPreconditionRule, CheckPreconditions } from "./types";
 
 export type { PreconditionTraceData } from "../filters/precondition-matchers";
 
@@ -324,14 +321,18 @@ export function buildPreconditionTraceDataFromTrace({
     spanTypes: spans.map((span) => span.type),
     spanModels: spans
       .map((span) => (span as LLMSpan).model)
-      .filter((model): model is string => typeof model === "string" && model !== ""),
-    customMetadata: Object.keys(customMetadata).length > 0 ? customMetadata : null,
+      .filter(
+        (model): model is string => typeof model === "string" && model !== "",
+      ),
+    customMetadata:
+      Object.keys(customMetadata).length > 0 ? customMetadata : null,
     annotationIds: [], // Not available in legacy collector path
-    events: events?.map((e) => ({
-      event_type: e.event_type,
-      metrics: e.metrics ?? [],
-      event_details: e.event_details ?? [],
-    })) ?? null,
+    events:
+      events?.map((e) => ({
+        event_type: e.event_type,
+        metrics: e.metrics ?? [],
+        event_details: e.event_details ?? [],
+      })) ?? null,
   };
 }
 
@@ -365,8 +366,7 @@ export function buildPreconditionTraceDataFromCommand({
       spans
         .map((span) => (span as LLMSpan).model)
         .filter(
-          (model): model is string =>
-            typeof model === "string" && model !== "",
+          (model): model is string => typeof model === "string" && model !== "",
         ),
     customMetadata: data.customMetadata ?? null,
     annotationIds: [], // Not available at command time
