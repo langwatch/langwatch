@@ -169,13 +169,18 @@ const buildColumns = (
         id: `target_${targetCol.id}`,
         header: () =>
           pairwiseMeta ? (
-            <VStack align="start" gap={0}>
+            <VStack align="start" gap={1.5} paddingY={1}>
               <BatchTargetHeader
                 target={targetCol}
                 aggregates={aggregates}
                 colorIndicator={targetColor}
               />
-              <Text fontSize="11px" color="fg.muted">
+              <Text
+                fontSize="12px"
+                color="fg"
+                fontWeight="medium"
+                lineHeight="1.3"
+              >
                 {pairwiseMeta.variantAName} vs {pairwiseMeta.variantBName}
               </Text>
             </VStack>
