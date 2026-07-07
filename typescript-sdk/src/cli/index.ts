@@ -249,6 +249,7 @@ program
   .command("claude", { hidden: true })
   .description("Run `claude` (Claude Code) routed through the LangWatch gateway.")
   .allowUnknownOption(true)
+  .allowExcessArguments(true)
   .helpOption(false)
   .action(async (_opts, cmd: { args?: string[] }) => {
     try {
@@ -264,6 +265,7 @@ program
   .command("codex", { hidden: true })
   .description("Run `codex` (OpenAI Codex CLI) routed through the LangWatch gateway.")
   .allowUnknownOption(true)
+  .allowExcessArguments(true)
   .helpOption(false)
   .action(async (_opts, cmd: { args?: string[] }) => {
     try {
@@ -279,6 +281,7 @@ program
   .command("cursor", { hidden: true })
   .description("Run `cursor` routed through the LangWatch gateway.")
   .allowUnknownOption(true)
+  .allowExcessArguments(true)
   .helpOption(false)
   .action(async (_opts, cmd: { args?: string[] }) => {
     try {
@@ -294,6 +297,7 @@ program
   .command("gemini", { hidden: true })
   .description("Run `gemini` (Gemini CLI) routed through the LangWatch gateway.")
   .allowUnknownOption(true)
+  .allowExcessArguments(true)
   .helpOption(false)
   .action(async (_opts, cmd: { args?: string[] }) => {
     try {
@@ -309,6 +313,7 @@ program
   .command("opencode")
   .description("Run `opencode` routed through the LangWatch gateway (multi-provider; injects both Anthropic and OpenAI env vars).")
   .allowUnknownOption(true)
+  .allowExcessArguments(true)
   .helpOption(false)
   .action(async (_opts, cmd: { args?: string[] }) => {
     try {
