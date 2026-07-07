@@ -464,16 +464,16 @@ function VariantOutputFieldRow({
   if (outputsA.length < 2 && outputsB.length < 2) return null;
   return (
     <HStack align="end" gap={3}>
-      <OutputFieldPicker
+      <NamedOutputFieldPicker
         label="Output field (A)"
-        outputs={outputsA}
+        target={selectedA}
         value={pathA}
         onChange={onChangeA}
         testId="pairwise-variant-a-output-field"
       />
-      <OutputFieldPicker
+      <NamedOutputFieldPicker
         label="Output field (B)"
-        outputs={outputsB}
+        target={selectedB}
         value={pathB}
         onChange={onChangeB}
         testId="pairwise-variant-b-output-field"
@@ -482,14 +482,89 @@ function VariantOutputFieldRow({
   );
 }
 
+/**
+ * Resolves the variant's display name via `useTargetName` so the picker can
+ * render each option in the `<targetName>.<field>` shape the mappings picker
+ * uses across the rest of the app. Lives in its own component so the hook
+ * is called at a stable position even when the underlying target changes
+ * (renaming, deletion, etc.).
+ */
+function NamedOutputFieldPicker({
+  label,
+  target,
+  value,
+  onChange,
+  testId,
+}: {
+  label: string;
+  target: TargetConfig | undefined;
+  value: string[] | undefined;
+  onChange: (path: string[] | undefined) => void;
+  testId: string;
+}) {
+  if (!target) {
+    // Row is only rendered when SOMETHING has ≥2 outputs; the opposite
+    // picker still needs to occupy the layout slot so both sides align,
+    // but there's no target yet to resolve a name for.
+    return (
+      <OutputFieldPicker
+        label={label}
+        targetName=""
+        outputs={[]}
+        value={value}
+        onChange={onChange}
+        testId={testId}
+      />
+    );
+  }
+  return <NamedOutputFieldPickerInner
+    label={label}
+    target={target}
+    value={value}
+    onChange={onChange}
+    testId={testId}
+  />;
+}
+
+// Split so `useTargetName` — which requires a defined TargetConfig — is
+// called at a stable hook position guarded by the `!target` early return
+// in the parent.
+function NamedOutputFieldPickerInner({
+  label,
+  target,
+  value,
+  onChange,
+  testId,
+}: {
+  label: string;
+  target: TargetConfig;
+  value: string[] | undefined;
+  onChange: (path: string[] | undefined) => void;
+  testId: string;
+}) {
+  const resolvedName = useTargetName(target);
+  return (
+    <OutputFieldPicker
+      label={label}
+      targetName={resolvedName || target.id}
+      outputs={target.outputs ?? []}
+      value={value}
+      onChange={onChange}
+      testId={testId}
+    />
+  );
+}
+
 function OutputFieldPicker({
   label,
+  targetName,
   outputs,
   value,
   onChange,
   testId,
 }: {
   label: string;
+  targetName: string;
   outputs: { identifier: string }[];
   value: string[] | undefined;
   onChange: (path: string[] | undefined) => void;
@@ -498,12 +573,32 @@ function OutputFieldPicker({
   const selected = value && value.length > 0 ? value[0] : undefined;
   const isEmpty = !selected;
   const noChoice = outputs.length < 2;
+  // Options render in `<targetName>.<field>` shape (with the target part
+  // slightly muted, the field part emphasized) so the picker reads as a
+  // path against the target — the same convention the mappings picker uses
+  // across the rest of the app. Consistent syntax means the user doesn't
+  // have to translate between two different conceptual pointers.
+  const fieldLabel = (field: string) => (
+    <Text
+      as="span"
+      fontFamily="mono"
+      fontSize="13px"
+      whiteSpace="nowrap"
+      color="fg"
+    >
+      <Text as="span" color="fg.muted">
+        {targetName || "target"}.
+      </Text>
+      {field}
+    </Text>
+  );
+
   return (
     <Picker
       label={label}
       placeholder={noChoice ? "Whole output (default)" : "Whole output"}
       isEmpty={isEmpty}
-      selectedDisplay={selected}
+      selectedDisplay={selected ? fieldLabel(selected) : null}
       testId={testId}
     >
       <Menu.Item
@@ -522,7 +617,7 @@ function OutputFieldPicker({
           onClick={() => onChange([o.identifier])}
           data-testid={`${testId}-option-${o.identifier}`}
         >
-          <Text fontSize="13px">{o.identifier}</Text>
+          {fieldLabel(o.identifier)}
         </Menu.Item>
       ))}
     </Picker>
