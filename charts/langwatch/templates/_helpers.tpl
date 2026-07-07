@@ -600,6 +600,33 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: LANGWATCH_LOCAL_STORAGE_PATH
   value: {{ .Values.app.storedObjects.localFilesystem.path | quote }}
 {{- end }}
+
+# NextAuth secret. Lives in sharedEnv (not just the app Deployment) because
+# BetterAuth initializes eagerly at import time across every consumer of the
+# app image — workers and the dataset-s3-migration hook Job both pull in the
+# same module graph, so any of them can crash with "You are using the default
+# secret" if this is missing, regardless of whether that consumer's own logic
+# ever touches auth. Same secretKeyRef precedence everywhere (explicit
+# override -> existingSecret -> autogen).
+{{- if .Values.app.nextAuth.secret.secretKeyRef.name }}
+- name: NEXTAUTH_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.app.nextAuth.secret.secretKeyRef.name }}
+      key: {{ .Values.app.nextAuth.secret.secretKeyRef.key }}
+{{- else if .Values.secrets.existingSecret }}
+- name: NEXTAUTH_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Values.secrets.existingSecret }}
+      key: {{ .Values.secrets.secretKeys.nextAuthSecret | default "nextAuthSecret" }}
+{{- else if .Values.autogen.enabled }}
+- name: NEXTAUTH_SECRET
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "langwatch.appSecretName" . }}
+      key: nextAuthSecret
+{{- end }}
 {{- end }}
 
 {{/* ============================================================ */}}

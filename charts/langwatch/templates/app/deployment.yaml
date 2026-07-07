@@ -254,30 +254,10 @@ spec:
               value: {{ $gwPublic | quote }}
             {{- end }}
 
-            # NextAuth configuration
+            # NextAuth configuration (NEXTAUTH_SECRET lives in sharedEnv —
+            # every app-image consumer needs it, see _helpers.tpl)
             - name: NEXTAUTH_PROVIDER
               value: {{ .Values.app.nextAuth.provider | quote }}
-
-            # NextAuth secret
-            {{- if .Values.app.nextAuth.secret.secretKeyRef.name }}
-            - name: NEXTAUTH_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.app.nextAuth.secret.secretKeyRef.name }}
-                  key: {{ .Values.app.nextAuth.secret.secretKeyRef.key }}
-            {{- else if .Values.secrets.existingSecret }}
-            - name: NEXTAUTH_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.secrets.existingSecret }}
-                  key: {{ .Values.secrets.secretKeys.nextAuthSecret | default "nextAuthSecret" }}
-            {{- else if .Values.autogen.enabled }}
-            - name: NEXTAUTH_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "langwatch.appSecretName" . }}
-                  key: nextAuthSecret
-            {{- end }}
 
             # NextAuth - SSO OAuth providers (auth0, azureAd, cognito, github, gitlab, google, okta)
             {{- $oauthProviders := list
