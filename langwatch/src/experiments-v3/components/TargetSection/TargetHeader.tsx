@@ -37,6 +37,7 @@ import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import { useTargetName } from "../../hooks/useTargetName";
 import type { TargetConfig } from "../../types";
 import {
+  computePairwiseColumnTargetAggregate,
   computePairwiseTargetAggregate,
   computeTargetAggregates,
 } from "../../utils/computeAggregates";
@@ -218,19 +219,34 @@ export const TargetHeader = memo(function TargetHeader({
   }, [results.executingCells, isRunning, target.id, nonEmptyRowCount]);
 
   // Compute aggregate statistics using effective row count. Pairwise
-  // column-targets don't emit target outputs — their aggregates come back
-  // zero here, which hides the cost/latency popover automatically. That's
-  // the desired behavior for pairwise: cost/latency of the judge isn't
-  // actionable in the head-to-head comparison view, so we don't surface it.
+  // column-targets don't emit target outputs, so `computeTargetAggregates`
+  // returns zeros for them (cost / duration live on the verdict, not the
+  // target-output store). Route those through the pairwise-aware helper so
+  // the workbench header still surfaces the same Rows / Avg Latency / Total
+  // Cost / Execution Time popover as prompt / agent columns — dogfood ask
+  // per the "4.3s $0.000967" chip on prompt headers.
   const aggregates = useMemo(
     () =>
-      computeTargetAggregates(
-        target.id,
-        results,
-        evaluators,
-        effectiveRowCount,
-      ),
-    [target.id, results, evaluators, effectiveRowCount],
+      target.type === "evaluator" && target.pairwise
+        ? computePairwiseColumnTargetAggregate(
+            target.id,
+            results,
+            effectiveRowCount,
+          )
+        : computeTargetAggregates(
+            target.id,
+            results,
+            evaluators,
+            effectiveRowCount,
+          ),
+    [
+      target.id,
+      target.type,
+      target.pairwise,
+      results,
+      evaluators,
+      effectiveRowCount,
+    ],
   );
 
   const pairwiseAggregate = useMemo(() => {
@@ -474,42 +490,51 @@ export const TargetHeader = memo(function TargetHeader({
       <Spacer />
 
       {/* Summary statistics (positioned on the right before play button).
-          Pairwise columns only surface the "<winner> wins N" summary —
-          cost/latency numbers on a pairwise column don't tell the user
-          anything they can act on (dogfood feedback: "for pairwise you're
-          trying to compare A with B, cost is not the story"). */}
+          Pairwise columns surface BOTH the "<winner> wins N" summary AND
+          the shared Rows / Avg Latency / Total Cost / Execution Time
+          popover — dogfood ask "I also want the cost metric in pairwise
+          compare in v3". Non-pairwise columns keep the single popover. */}
       {pairwiseAggregate &&
       pairwiseAggregate.counts.a +
         pairwiseAggregate.counts.b +
         pairwiseAggregate.counts.tie >
         0 ? (
-        (() => {
-          const { a, b, tie } = pairwiseAggregate.counts;
-          const isTie = a === b;
-          const winnerName = a > b ? variantAName : variantBName;
-          const winnerCount = Math.max(a, b);
-          const shortName = (s: string) =>
-            s.length > 18 ? `${s.slice(0, 17)}…` : s;
-          const summary = isTie
-            ? tie > 0
-              ? `Tied · ${tie} tie${tie === 1 ? "" : "s"}`
-              : "Tied"
-            : `${shortName(winnerName)} wins ${winnerCount}` +
-              (tie > 0 ? ` · ${tie} tie${tie === 1 ? "" : "s"}` : "");
-          return (
-            <Tooltip
-              content={`${variantAName}: ${a} wins · ${variantBName}: ${b} wins${
-                tie > 0 ? ` · ${tie} ${tie === 1 ? "tie" : "ties"}` : ""
-              }`}
-              positioning={{ placement: "top" }}
-              openDelay={200}
-            >
-              <Text fontSize="11px" color="fg.muted" whiteSpace="nowrap">
-                {summary}
-              </Text>
-            </Tooltip>
-          );
-        })()
+        <HStack gap={2}>
+          {(() => {
+            const { a, b, tie } = pairwiseAggregate.counts;
+            const isTie = a === b;
+            const winnerName = a > b ? variantAName : variantBName;
+            const winnerCount = Math.max(a, b);
+            const shortName = (s: string) =>
+              s.length > 18 ? `${s.slice(0, 17)}…` : s;
+            const summary = isTie
+              ? tie > 0
+                ? `Tied · ${tie} tie${tie === 1 ? "" : "s"}`
+                : "Tied"
+              : `${shortName(winnerName)} wins ${winnerCount}` +
+                (tie > 0 ? ` · ${tie} tie${tie === 1 ? "" : "s"}` : "");
+            return (
+              <Tooltip
+                content={`${variantAName}: ${a} wins · ${variantBName}: ${b} wins${
+                  tie > 0 ? ` · ${tie} ${tie === 1 ? "tie" : "ties"}` : ""
+                }`}
+                positioning={{ placement: "top" }}
+                openDelay={200}
+              >
+                <Text fontSize="11px" color="fg.muted" whiteSpace="nowrap">
+                  {summary}
+                </Text>
+              </Tooltip>
+            );
+          })()}
+          {hasAggregates && (
+            <TargetSummary
+              aggregates={aggregates}
+              evaluators={evaluators}
+              isRunning={isRunning}
+            />
+          )}
+        </HStack>
       ) : hasAggregates ? (
         <TargetSummary
           aggregates={aggregates}

@@ -18,6 +18,27 @@ import type { PairwiseEvaluatorConfig, TargetConfig } from "../../types";
 type Metric = "cost" | "duration";
 
 /**
+ * Default judge prompt when Has Golden Answer is ON — mirrors the langevals
+ * evaluator schema's default. Kept verbatim (including whitespace) so the
+ * equality check in `setHasGoldenAnswer` recognizes an untouched prompt
+ * against the exact string the evaluator ships with. Any drift here would
+ * silently disable the auto-swap for users who kept the default.
+ */
+const GOLDEN_AWARE_JUDGE_PROMPT =
+  'Compare two candidate outputs against a known-good reference (golden answer).\n\nTask:           {input}\nGolden answer:  {golden}\n\nCandidate A:    {candidate_a_output}\nCandidate B:    {candidate_b_output}\n\nReason step-by-step about how closely each candidate matches the\ngolden answer in correctness, completeness, and style. Then pick\nthe better candidate, or "tie" if equivalent.\nPrefer cheaper/faster only when quality is comparable.\n';
+
+/**
+ * Default judge prompt when Has Golden Answer is OFF — no {golden} slot,
+ * comparison is A vs B on their own merits given the task. Kept in sync
+ * with the langevals evaluator's `has_golden_answer=false` handling —
+ * langevals just ignores {golden} in that mode, but the prompt still reads
+ * as if there's a reference, which confuses the judge and biases the
+ * verdict. This template drops the reference entirely.
+ */
+const GOLDEN_FREE_JUDGE_PROMPT =
+  'Compare two candidate outputs directly, on their own merits — there is no reference answer.\n\nTask:         {input}\n\nCandidate A:  {candidate_a_output}\nCandidate B:  {candidate_b_output}\n\nReason step-by-step about which candidate better answers the task in\ncorrectness, completeness, and style. Then pick the better candidate,\nor "tie" if equivalent. Prefer cheaper/faster only when quality is\ncomparable.\n';
+
+/**
  * Configuration form for the langevals/pairwise_compare evaluator
  * (#5100). Three required selects:
  *
@@ -182,7 +203,7 @@ function GoldenAnswerSection({
   datasetColumns: DatasetColumn[];
 }) {
   const formContext = useFormContext<{
-    settings?: { has_golden_answer?: boolean };
+    settings?: { has_golden_answer?: boolean; prompt?: string };
   }>();
   const watchedHasGoldenAnswer = useWatch({
     control: formContext?.control,
@@ -196,6 +217,27 @@ function GoldenAnswerSection({
       shouldDirty: true,
       shouldTouch: true,
     });
+    // If the user hasn't customized the judge prompt, swap it to match the
+    // new mode — a golden-aware prompt is nonsense when we're comparing A
+    // vs B with no reference, and vice versa. Only swap when the current
+    // prompt is one of our known defaults so hand-tuned prompts survive
+    // toggling.
+    const currentPrompt = formContext?.getValues("settings.prompt");
+    if (typeof currentPrompt === "string") {
+      const nextPrompt = on
+        ? currentPrompt === GOLDEN_FREE_JUDGE_PROMPT
+          ? GOLDEN_AWARE_JUDGE_PROMPT
+          : null
+        : currentPrompt === GOLDEN_AWARE_JUDGE_PROMPT
+          ? GOLDEN_FREE_JUDGE_PROMPT
+          : null;
+      if (nextPrompt) {
+        formContext?.setValue("settings.prompt", nextPrompt, {
+          shouldDirty: true,
+          shouldTouch: true,
+        });
+      }
+    }
     // Clearing goldenField when turning the toggle off isn't strictly
     // necessary (an unused golden field is harmless), but it avoids a
     // stale selection resurfacing confusingly if the user toggles back on.

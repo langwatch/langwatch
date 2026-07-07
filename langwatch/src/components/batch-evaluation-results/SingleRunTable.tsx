@@ -150,25 +150,58 @@ const buildColumns = (
     );
   }
 
+  // Map each pairwise column-target to its detected pairwise metadata so we
+  // can render the winner cell (badge + winning output + reasoning) INSIDE
+  // the pairwise column's own cell — the user wants everything in one
+  // place, not split across a target column and a trailing Winner column.
+  const pairwiseByTargetId = new Map(
+    pairwiseColumns.map((p) => [p.evaluatorId, p]),
+  );
+
   // Target columns with headers that include summary
   for (const targetCol of targetColumns) {
     const aggregates = aggregatesMap.get(targetCol.id) ?? null;
     const targetColor = targetColors?.[targetCol.id];
+    const pairwiseMeta = pairwiseByTargetId.get(targetCol.id);
 
     columns.push(
       columnHelper.accessor((row) => row.targets[targetCol.id], {
         id: `target_${targetCol.id}`,
-        header: () => (
-          <BatchTargetHeader
-            target={targetCol}
-            aggregates={aggregates}
-            colorIndicator={targetColor}
-          />
-        ),
+        header: () =>
+          pairwiseMeta ? (
+            <VStack align="start" gap={0}>
+              <BatchTargetHeader
+                target={targetCol}
+                aggregates={aggregates}
+                colorIndicator={targetColor}
+              />
+              <Text fontSize="11px" color="fg.muted">
+                {pairwiseMeta.variantAName} vs {pairwiseMeta.variantBName}
+              </Text>
+            </VStack>
+          ) : (
+            <BatchTargetHeader
+              target={targetCol}
+              aggregates={aggregates}
+              colorIndicator={targetColor}
+            />
+          ),
         size: 300,
         minSize: 200,
-        cell: ({ getValue }) => {
+        cell: ({ getValue, row }) => {
           const targetOutput = getValue();
+          // Pairwise column-target cell: render the dedicated Winner cell
+          // (badge + winning output + reasoning) instead of the generic
+          // target output. That keeps everything the reader wants in one
+          // column so they don't need to scroll to a trailing Winner column.
+          if (pairwiseMeta) {
+            return (
+              <BatchPairwiseWinnerCell
+                column={pairwiseMeta}
+                verdict={pairwiseMeta.verdictsByRow[row.original.index]}
+              />
+            );
+          }
           if (!targetOutput) {
             return (
               <Text fontSize="13px" color="fg.subtle">
@@ -176,53 +209,13 @@ const buildColumns = (
               </Text>
             );
           }
-          // For evaluator-type target columns (pairwise column-targets),
-          // the cell text already carries the judge's reasoning — every
-          // chip renders the same verdict as `<targetId> 1.00` and reads
-          // as pure noise. Suppress ALL evaluator chips there. For
-          // prompt / agent columns we only suppress the specific pairwise
-          // evaluator ids so downstream (non-pairwise) chips still show.
-          const suppressAll = targetCol.type === "evaluator";
-          const suppressed = suppressAll
-            ? new Set(
-                targetOutput.evaluatorResults.map((r) => r.evaluatorId),
-              )
-            : pairwiseEvaluatorIds;
           return (
             <BatchTargetCell
               targetOutput={targetOutput}
-              suppressedEvaluatorIds={suppressed}
+              suppressedEvaluatorIds={pairwiseEvaluatorIds}
             />
           );
         },
-      }),
-    );
-  }
-
-  // Pairwise winner columns — one per detected pairwise evaluator, rendered
-  // after all target columns so the reading order is variants → verdict.
-  for (const pairwiseCol of pairwiseColumns) {
-    columns.push(
-      columnHelper.display({
-        id: `pairwise_${pairwiseCol.evaluatorId}`,
-        header: () => (
-          <VStack align="start" gap={0}>
-            <Text fontSize="13px" fontWeight="medium">
-              {pairwiseCol.name}
-            </Text>
-            <Text fontSize="11px" color="fg.muted">
-              {pairwiseCol.variantAName} vs {pairwiseCol.variantBName}
-            </Text>
-          </VStack>
-        ),
-        size: 240,
-        minSize: 180,
-        cell: ({ row }) => (
-          <BatchPairwiseWinnerCell
-            column={pairwiseCol}
-            verdict={pairwiseCol.verdictsByRow[row.original.index]}
-          />
-        ),
       }),
     );
   }
