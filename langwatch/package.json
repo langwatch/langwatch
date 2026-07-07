@@ -289,7 +289,7 @@
     "@vitest/coverage-v8": "^4.1.9",
     "@vitest/ui": "^4.1.9",
     "babel-plugin-react-compiler": "^1.0.0",
-    "concurrently": "^9.2.1",
+    "concurrently": "^10.0.3",
     "encoding": "^0.1.13",
     "esbuild": "^0.28.1",
     "fishery": "^2.4.0",
