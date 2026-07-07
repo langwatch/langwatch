@@ -10,7 +10,7 @@
  * BDD structure: given/when nested describes, action-based it() names.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Protections } from "~/server/elasticsearch/protections";
+import type { Protections } from "~/server/traces/protections";
 import type { TraceService } from "~/server/traces/trace.service";
 import type {
   GetAllTracesForProjectOptions,

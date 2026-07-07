@@ -469,7 +469,7 @@ export class ClickHouseTraceService {
    * @param opts.resolveBlobs - Forwarded to the per-trace fetch so the
    *   thread-detail read resolves full IO (#4991). Customer thread views that
    *   construct without a blob resolver get a no-op. Defaults to false.
-   * @returns Array of Trace objects, or null if ClickHouse is not enabled
+   * @returns Array of Trace objects (empty array if no matching traces found)
    * @throws ClickHouseClientUnavailableError when no ClickHouse client resolves
    */
   async getTracesByThreadId(
@@ -477,7 +477,7 @@ export class ClickHouseTraceService {
     threadId: string,
     protections: Protections,
     opts?: { resolveBlobs?: boolean },
-  ): Promise<Trace[] | null> {
+  ): Promise<Trace[]> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getTracesByThreadId",
       {
