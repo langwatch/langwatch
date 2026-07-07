@@ -55,6 +55,7 @@ function makeRollupRow(
     model: "",
     spanType: "",
     spanCount: 1,
+    traceCount: 0,
     errorCount: 0,
     costSum: 0,
     nonBilledCostSum: 0,

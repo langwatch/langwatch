@@ -23,14 +23,27 @@ function withOccurredAtHint(
  *
  * Flow:
  * 1. Load existing state via `store.get()` (or `init()` if none)
- * 2. `state = projection.apply(state, event)`
- * 3. If out-of-order detected and `eventLoader` available → re-fold from scratch
- * 4. `projection.store.store(state, context)`
+ * 2. If the store missed and `options.refoldOnStoreMiss` is set → re-fold
+ *    from the event log up to the delivered event (see below)
+ * 3. `state = projection.apply(state, event)`
+ * 4. If out-of-order detected and `eventLoader` available → re-fold from scratch
+ * 5. `projection.store.store(state, context)`
  *
  * Out-of-order detection: compares event.occurredAt against the state's
  * LastEventOccurredAt (tracked by AbstractFoldProjection). If the event
  * occurred earlier than what we've already seen, all events are re-loaded
  * in occurredAt order and replayed from init().
+ *
+ * Store-miss re-fold (`options.refoldOnStoreMiss`): a fold whose persisted
+ * row cannot be read back into fold state (lossy analytics rows) returns
+ * null from `store.get()` whenever its cache is cold. Starting from `init()`
+ * there would fold only the delivered events — a partial state that
+ * overwrites the complete row. Instead, the aggregate's history is loaded
+ * up to AND INCLUDING the delivered event in log order (`eventLoaderUpTo`)
+ * and folded from scratch. The log-order bound guarantees an event that is
+ * persisted but still queued for this projection is NOT pre-applied (its own
+ * delivery is next). If the delivered event is missing from the loaded
+ * history (event-log read lag), it is applied on top.
  */
 export class FoldProjectionExecutor {
   async execute<State, E extends Event>(
@@ -48,8 +61,21 @@ export class FoldProjectionExecutor {
     // time instead of scanning every partition. Best-effort: the store falls
     // back to an unbounded read when the hint misses.
     const loadContext = withOccurredAtHint(context, event);
-    let state =
-      (await projection.store.get(key, loadContext)) ?? projection.init();
+    const loaded = await projection.store.get(key, loadContext);
+
+    if (loaded === null && this.shouldRefoldOnMiss(projection)) {
+      const refolded = await this.refoldUpToDelivered(
+        projection,
+        [event],
+        context,
+      );
+      if (refolded !== null) {
+        await projection.store.store(refolded, context);
+        return refolded;
+      }
+    }
+
+    let state = loaded ?? projection.init();
 
     // Capture the highest occurredAt before applying the new event.
     const prevLastOccurred =
@@ -149,8 +175,21 @@ export class FoldProjectionExecutor {
     const loadContext = ordered[0]
       ? withOccurredAtHint(context, ordered[0])
       : context;
-    let state =
-      (await projection.store.get(key, loadContext)) ?? projection.init();
+    const loaded = await projection.store.get(key, loadContext);
+
+    if (loaded === null && this.shouldRefoldOnMiss(projection)) {
+      const refolded = await this.refoldUpToDelivered(
+        projection,
+        ordered,
+        context,
+      );
+      if (refolded !== null) {
+        await projection.store.store(refolded, context);
+        return refolded;
+      }
+    }
+
+    let state = loaded ?? projection.init();
 
     const prevLastOccurred =
       (state as Record<string, unknown>)[projection.LastEventOccurredAtKey] ??
@@ -221,5 +260,68 @@ export class FoldProjectionExecutor {
       projection.eventTypes.length === 0 ||
       projection.eventTypes.includes(event.type)
     );
+  }
+
+  private shouldRefoldOnMiss<State, E extends Event>(
+    projection: FoldProjectionDefinition<State, E>,
+  ): boolean {
+    return (
+      projection.options?.refoldOnStoreMiss === true &&
+      projection.eventLoaderUpTo !== undefined
+    );
+  }
+
+  /**
+   * Store-miss re-fold: rebuild state from the aggregate's event history up
+   * to AND INCLUDING the log-latest delivered event, then apply any delivered
+   * event the history read did not return (event-log read lag on the
+   * just-persisted event).
+   *
+   * Returns null when the history read comes back empty — the caller falls
+   * through to the plain init+apply path, which is equivalent for a genuinely
+   * new aggregate. A failed history read propagates: correctness over
+   * availability, the queue's retry machinery re-delivers.
+   */
+  private async refoldUpToDelivered<State, E extends Event>(
+    projection: FoldProjectionDefinition<State, E>,
+    delivered: E[],
+    context: ProjectionStoreContext,
+  ): Promise<State | null> {
+    const upToEvent = delivered.reduce((latest, e) => {
+      if (e.createdAt !== latest.createdAt) {
+        return e.createdAt > latest.createdAt ? e : latest;
+      }
+      return e.id > latest.id ? e : latest;
+    });
+
+    const history = await projection.eventLoaderUpTo!({
+      tenantId: context.tenantId,
+      aggregateId: context.aggregateId,
+      upToEvent,
+    });
+    if (history.length === 0) return null;
+
+    logger.info(
+      {
+        projection: projection.name,
+        aggregateId: context.aggregateId,
+        tenantId: context.tenantId,
+        deliveredCount: delivered.length,
+        refoldEventCount: history.length,
+      },
+      "Store miss with refoldOnStoreMiss — re-folding from the event log",
+    );
+
+    const seen = new Set(history.map((e) => e.id));
+    let state = projection.init();
+    for (const e of history) {
+      state = projection.apply(state, e as E);
+    }
+    for (const e of delivered) {
+      if (!seen.has(e.id)) {
+        state = projection.apply(state, e);
+      }
+    }
+    return state;
   }
 }

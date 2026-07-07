@@ -53,17 +53,18 @@ export type AnalyticsTable =
 /**
  * Registry metric keys ("<group>.<metric>") that can be served from
  * `trace_analytics_rollup` for additive aggregations. Derived directly from
- * the rollup column set (migration 00037 — see
- * `trace_analytics_rollup.mapProjection.ts`):
+ * the rollup column set (migration 00038 — see
+ * `traceAnalyticsRollup.mapProjection.ts`):
  *
  *   CostSum, NonBilledCostSum, DurationSum (root), PromptTokensSum,
  *   CompletionTokensSum, CacheReadTokensSum, CacheWriteTokensSum,
- *   ReasoningTokensSum, SpanCount, ErrorCount.
+ *   ReasoningTokensSum, SpanCount, TraceCount (root), ErrorCount.
  *
- * Distinct trace counts (TraceUniq) are NOT in the rollup — Phase 1 removed
- * the uniq column because that requires `AggregateFunction(uniq, …)`
- * (binary state), and the rollup only has `SimpleAggregateFunction(sum, …)`.
- * `metadata.trace_id` (cardinality) therefore routes to slim instead.
+ * Distinct trace counts over arbitrary dims (TraceUniq) are NOT in the
+ * rollup — that requires `AggregateFunction(uniq, …)` (binary state), and the
+ * rollup only has `SimpleAggregateFunction(sum, …)`. `metadata.trace_id`
+ * (cardinality) therefore routes to slim instead. Plain per-bucket trace
+ * counts ARE available additively via `sum(TraceCount)` (1 per root span).
  */
 const ROLLUP_ROLLABLE_METRIC_KEYS_LIST = [
   "performance.total_cost",
@@ -88,6 +89,37 @@ export function isRollupRollableMetricKey(
   metric: string,
 ): metric is RollupRollableMetricKey {
   return ROLLUP_ROLLABLE_METRIC_KEYS.has(metric);
+}
+
+/**
+ * The subset of rollable metrics whose `avg` can be served from the rollup as
+ * `sum(<MetricSum>) / nullIf(sum(TraceCount), 0)` — a per-TRACE mean, which is
+ * what the legacy path computes.
+ *
+ * Only `performance.completion_time` qualifies, because parity with legacy
+ * `avg(column)` requires the trace_summaries column to be NON-NULLABLE (CH
+ * `avg` skips NULLs, shrinking legacy's denominator to "traces where the
+ * metric is present"; `sum/TraceCount` divides by ALL rooted traces).
+ * `TotalDurationMs` is Int64 NOT NULL, so every trace counts on both paths.
+ * Cost and token columns are Nullable — a rollup avg for those needs a
+ * per-metric non-null trace count the rollup doesn't carry, so they stay on
+ * slim (whose one-row-per-trace shape reproduces NULL-skipping for free).
+ *
+ * Known accepted divergences for completion_time (same class already
+ * accepted for sums): rollup duration is the ROOT SPAN's own duration while
+ * legacy folds max(end)-min(start), and rootless traces contribute neither
+ * duration nor TraceCount to the rollup.
+ */
+const ROLLUP_AVG_METRIC_KEYS_LIST = ["performance.completion_time"] as const;
+export type RollupAvgMetricKey = (typeof ROLLUP_AVG_METRIC_KEYS_LIST)[number];
+export const ROLLUP_AVG_METRIC_KEYS: ReadonlySet<string> = new Set<string>(
+  ROLLUP_AVG_METRIC_KEYS_LIST,
+);
+
+export function isRollupAvgMetricKey(
+  metric: string,
+): metric is RollupAvgMetricKey {
+  return ROLLUP_AVG_METRIC_KEYS.has(metric);
 }
 
 /**
@@ -190,21 +222,25 @@ const SLIM_FILTER_FIELDS: ReadonlySet<FilterField> = new Set<FilterField>([
 
 /**
  * Aggregations the rollup can compute CORRECTLY from its columns. The rollup
- * carries `SimpleAggregateFunction(sum, …)` columns only — one summed value per
- * (bucket, model, span_type). Only `sum` is well-defined:
+ * carries `SimpleAggregateFunction(sum, …)` columns — one summed value per
+ * (bucket, model, span_type):
  *
  *   - `sum(col)`     → the additive total. Correct.
- *   - `avg(col)`     → mean of per-bucket SUMS, not the per-trace mean the
- *                      legacy path returns (no count column to divide by). Wrong.
- *   - `min/max(col)` → min/max of per-bucket sums, which also changes value
+ *   - `avg(col)`     → naive `avg(col)` would be the mean of per-bucket SUMS
+ *                      (merge-state-dependent, wrong). The builder instead
+ *                      computes `sum(col) / nullIf(sum(TraceCount), 0)` — a
+ *                      true per-trace mean — but ONLY for the metrics in
+ *                      ROLLUP_AVG_METRIC_KEYS (non-nullable legacy columns)
+ *                      and ONLY ungrouped: TraceCount lands in the ROOT
+ *                      span's (Model, SpanType) bucket while metric sums
+ *                      spread across every bucket the trace touched, so a
+ *                      grouped division would use the wrong denominator.
+ *   - `min/max(col)` → min/max of per-bucket sums, which changes value
  *                      across background merges. Non-deterministic + wrong.
- *
- * So avg/min/max are DELIBERATELY excluded — they fall through to the slim
- * table, whose one-row-per-trace shape computes them correctly per trace
- * (trace5012-P0).
+ *                      Excluded; routes to slim.
  */
-const ROLLUP_AGGREGATIONS: ReadonlySet<AggregationTypes> =
-  new Set<AggregationTypes>(["sum"]);
+const ROLLUP_SUM_AGGREGATION: AggregationTypes = "sum";
+const ROLLUP_AVG_AGGREGATION: AggregationTypes = "avg";
 
 /**
  * Input shape for the routing decision. Mirrors the relevant subset of
@@ -258,7 +294,7 @@ export function pickAnalyticsTable(
   // ---------- Rollup eligibility ----------
   const rollupOk =
     !hasPipeline &&
-    rollupHandlesAllSeries(input.series) &&
+    rollupHandlesAllSeries(input.series, input.groupBy) &&
     rollupHandlesGroupBy(input.groupBy) &&
     rollupHandlesFilters(input.filters);
   if (rollupOk) return "trace_analytics_rollup";
@@ -278,14 +314,25 @@ export function pickAnalyticsTable(
 // Rollup predicates
 // ---------------------------------------------------------------------------
 
-function rollupHandlesAllSeries(series: SeriesInputType[]): boolean {
-  return series.every((s) => rollupHandlesSeries(s));
+function rollupHandlesAllSeries(
+  series: SeriesInputType[],
+  groupBy?: string,
+): boolean {
+  return series.every((s) => rollupHandlesSeries(s, groupBy));
 }
 
-function rollupHandlesSeries(s: SeriesInputType): boolean {
-  if (!ROLLUP_AGGREGATIONS.has(s.aggregation)) return false;
+function rollupHandlesSeries(s: SeriesInputType, groupBy?: string): boolean {
   if (s.key !== undefined || s.subkey !== undefined) return false;
-  return ROLLUP_ROLLABLE_METRIC_KEYS.has(s.metric);
+  if (!ROLLUP_ROLLABLE_METRIC_KEYS.has(s.metric)) return false;
+  if (s.aggregation === ROLLUP_SUM_AGGREGATION) return true;
+  // avg is only a true per-trace mean when TraceCount is the denominator —
+  // which requires the query to be UNGROUPED (see ROLLUP_AVG_METRIC_KEYS).
+  if (s.aggregation === ROLLUP_AVG_AGGREGATION) {
+    // `!groupBy` mirrors rollupHandlesGroupBy's "no group" test (undefined
+    // and "" both mean ungrouped).
+    return !groupBy && ROLLUP_AVG_METRIC_KEYS.has(s.metric);
+  }
+  return false;
 }
 
 function rollupHandlesGroupBy(groupBy?: string): boolean {
@@ -437,5 +484,4 @@ export const __testOnly__ = {
   SLIM_GROUP_BY_KEYS,
   ROLLUP_FILTER_FIELDS,
   SLIM_FILTER_FIELDS,
-  ROLLUP_AGGREGATIONS,
 };

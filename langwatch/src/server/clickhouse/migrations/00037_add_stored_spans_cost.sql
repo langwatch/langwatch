@@ -15,9 +15,10 @@
 -- billed portion is `Cost - NonBilledCost`.
 --
 -- Existing rows keep NULL in both columns (no reprojection required); this is
--- foundational for the ADR-034 analytics rollup, which will later sum these
--- via a materialized view, and independently useful as a queryable per-span
--- column.
+-- foundational for the ADR-034 analytics rollup — fed by an APP-SIDE map
+-- projection computing the same per-span cost (see 00038; the earlier
+-- materialized-view approach was abandoned) — and independently useful as a
+-- queryable per-span column.
 
 -- +goose StatementBegin
 ALTER TABLE ${CLICKHOUSE_DATABASE}.stored_spans

@@ -83,6 +83,23 @@ export interface FoldProjectionDefinition<State, E extends Event = Event> {
      * lower-bound the event_log rehydration scan for time-local aggregates. */
     occurredAtMs?: number;
   }) => Promise<Event[]>;
+
+  /**
+   * Loads the aggregate's events up to AND INCLUDING `upToEvent` in log order
+   * (EventTimestamp, EventId), sorted by occurredAt ASC. Used by the executor
+   * for `refoldOnStoreMiss` — bounding at the delivered event guarantees a
+   * re-fold never pre-applies an event that is persisted but still queued for
+   * this projection (per-aggregate FIFO delivers it next; applying it twice
+   * would double-count).
+   *
+   * Auto-wired by EventSourcingService at registration time, like
+   * `eventLoader`.
+   */
+  eventLoaderUpTo?: (context: {
+    tenantId: string;
+    aggregateId: string;
+    upToEvent: Event;
+  }) => Promise<Event[]>;
 }
 
 /**
@@ -98,6 +115,23 @@ export interface FoldProjectionOptions {
    * is drained per dispatch — converting an O(n²) backlog into O(n).
    */
   coalesceMaxBatch?: number;
+  /**
+   * Re-fold from the event log when `store.get()` returns null instead of
+   * starting from `init()`.
+   *
+   * A fold whose persisted row cannot be read back into fold state (e.g. the
+   * slim analytics tables — deliberately lossy rows) has NO state continuity
+   * of its own: without this option, every store miss silently folds only the
+   * delivered events, so a partial batch overwrites the complete row and
+   * late dimension-only events land on empty state. With this option, a miss
+   * rebuilds state from the aggregate's event history up to the delivered
+   * event (log order, `eventLoaderUpTo`), which is the event-sourcing-native
+   * source of truth.
+   *
+   * Pair the store with a RedisCachedFoldStore so the re-fold only runs on
+   * cache expiry/eviction/restart, not on every event.
+   */
+  refoldOnStoreMiss?: boolean;
 }
 
 /**

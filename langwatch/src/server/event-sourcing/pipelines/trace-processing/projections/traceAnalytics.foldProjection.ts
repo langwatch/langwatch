@@ -8,7 +8,10 @@ import {
   AbstractFoldProjection,
   type FoldEventHandlers,
 } from "~/server/event-sourcing/projections/abstractFoldProjection";
-import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
+import type {
+  FoldProjectionOptions,
+  FoldProjectionStore,
+} from "~/server/event-sourcing/projections/foldProjection.types";
 import { SYNTHETIC_SPAN_NAMES } from "~/server/tracer/constants";
 import type {
   AnnotationAddedEvent,
@@ -94,9 +97,19 @@ import {
  * zero/default placeholders for the fields the slim state drops — those
  * placeholders feed only the service call and are discarded, never persisted.
  *
- * Re-fold safety (ADR-021/022): same state → same canonical projection → same
- * Version → ReplacingMergeTree collapses duplicates. No explicit truncate, no
+ * Re-fold safety (ADR-021/022): a re-fold produces the same canonical state,
+ * written with a later UpdatedAt — the LWW column readers dedup on. Note the
+ * ENGINE only physically collapses rows sharing the full sort key
+ * `(TenantId, OccurredAt, TraceId)`; OccurredAt can shift when an
+ * earlier-starting span arrives late, so superseded rows may persist until
+ * TTL and every read MUST dedup by (TenantId, TraceId, max(UpdatedAt)) — the
+ * IN-tuple pattern the slim query builders use. No explicit truncate, no
  * settle, no signs.
+ *
+ * State continuity: the slim row is too lossy to read back, so the store's
+ * `get` serves only from its Redis cache; on a miss the executor re-folds
+ * from the event log (`options.refoldOnStoreMiss`). Without that option this
+ * fold would silently fold each delivery from empty state.
  */
 
 const traceAnalyticsEvents = [
@@ -137,7 +150,8 @@ export const TRACE_ANALYTICS_PROJECTION_VERSION_LATEST = "2026-06-20" as const;
 export interface TraceAnalyticsRow {
   tenantId: string;
   traceId: string;
-  /** Schema-snapshot version (the LWW dedup key). */
+  /** Schema-snapshot version (NOT the LWW dedup key — that is UpdatedAt,
+   *  same as trace_summaries; migration 00039). */
   version: string;
   /** The trace's occurred-at (partition column + lead sort key). */
   occurredAtMs: number;
@@ -572,6 +586,17 @@ export class TraceAnalyticsFoldProjection
   readonly store: FoldProjectionStore<TraceAnalyticsData>;
 
   protected readonly events = traceAnalyticsEvents;
+
+  /**
+   * Slim has NO read-back: the `trace_analytics` row is deliberately lossy
+   * (trimmed attributes, booleans instead of arrays), so `store.get()` can
+   * only ever serve from the Redis cache in front of it. On a cache miss the
+   * executor must rebuild state from the event log — without this option a
+   * miss folds ONLY the delivered events, so a partial batch overwrites the
+   * complete row and late dimension-only events (topic classification, the
+   * deferred origin resolution) land on empty state and are dropped.
+   */
+  override options: FoldProjectionOptions = { refoldOnStoreMiss: true };
 
   constructor(deps: { store: FoldProjectionStore<TraceAnalyticsData> }) {
     super({
