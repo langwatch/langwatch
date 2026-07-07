@@ -5,7 +5,7 @@
  * Target headers include summary statistics.
  */
 
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import {
   createColumnHelper,
   flexRender,
@@ -16,6 +16,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useMemo, useState } from "react";
 import { ExternalImage, getImageUrl } from "~/components/ExternalImage";
 import { ColumnTypeIcon } from "~/components/shared/ColumnTypeIcon";
+import { BatchPairwiseWinnerCell } from "./BatchPairwiseWinnerCell";
 import { BatchTargetCell } from "./BatchTargetCell";
 import { BatchTargetHeader } from "./BatchTargetHeader";
 import {
@@ -33,6 +34,7 @@ import {
 import type {
   BatchDatasetColumn,
   BatchEvaluationData,
+  BatchPairwiseColumn,
   BatchResultRow,
   BatchTargetColumn,
 } from "./types";
@@ -59,6 +61,7 @@ const columnHelper = createColumnHelper<BatchResultRow>();
 const buildColumns = (
   datasetColumns: BatchDatasetColumn[],
   targetColumns: BatchTargetColumn[],
+  pairwiseColumns: BatchPairwiseColumn[],
   aggregatesMap: Map<string, BatchTargetAggregate>,
   rows: BatchResultRow[],
   hiddenColumns: Set<string>,
@@ -171,6 +174,34 @@ const buildColumns = (
     );
   }
 
+  // Pairwise winner columns — one per detected pairwise evaluator, rendered
+  // after all target columns so the reading order is variants → verdict.
+  for (const pairwiseCol of pairwiseColumns) {
+    columns.push(
+      columnHelper.display({
+        id: `pairwise_${pairwiseCol.evaluatorId}`,
+        header: () => (
+          <VStack align="start" gap={0}>
+            <Text fontSize="13px" fontWeight="medium">
+              {pairwiseCol.name}
+            </Text>
+            <Text fontSize="11px" color="fg.muted">
+              {pairwiseCol.variantAName} vs {pairwiseCol.variantBName}
+            </Text>
+          </VStack>
+        ),
+        size: 240,
+        minSize: 180,
+        cell: ({ row }) => (
+          <BatchPairwiseWinnerCell
+            column={pairwiseCol}
+            verdict={pairwiseCol.verdictsByRow[row.original.index]}
+          />
+        ),
+      }),
+    );
+  }
+
   return columns;
 };
 
@@ -196,6 +227,7 @@ export function SingleRunTable({
     return buildColumns(
       data.datasetColumns,
       data.targetColumns,
+      data.pairwiseColumns ?? [],
       aggregatesMap,
       data.rows,
       hiddenColumns,
@@ -267,7 +299,12 @@ export function SingleRunTable({
     (c) => !hiddenColumns.has(c.name),
   ).length;
   const targetColCount = data.targetColumns.length;
-  const minTableWidth = calculateMinTableWidth(datasetColCount, targetColCount);
+  const pairwiseColCount = data.pairwiseColumns?.length ?? 0;
+  const minTableWidth = calculateMinTableWidth(
+    datasetColCount,
+    targetColCount,
+    pairwiseColCount,
+  );
 
   const tableStyles = getTableStyles(minTableWidth);
   const virtualRows = rowVirtualizer.getVirtualItems();

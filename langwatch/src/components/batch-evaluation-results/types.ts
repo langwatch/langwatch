@@ -99,6 +99,39 @@ export type BatchDatasetColumn = {
 };
 
 /**
+ * A pairwise evaluator's per-row verdict. Slot label ("A"/"B"/"tie") is
+ * the canonical shape after normalization; winner name is resolved from
+ * `targets[]` when we can (best-effort — legacy rows without a matching
+ * variant fall back to "Variant A" / "Variant B").
+ */
+export type BatchPairwiseVerdict = {
+  rowIndex: number;
+  label: "A" | "B" | "tie";
+  reasoning?: string | null;
+};
+
+/**
+ * Column definition for a pairwise evaluator. One per pairwise evaluator
+ * in a run; the batch results table renders these AFTER the target columns.
+ */
+export type BatchPairwiseColumn = {
+  /** Evaluator id (config-level), used to key verdicts and column ids. */
+  evaluatorId: string;
+  /** Display name (e.g. "Pairwise Compare"). */
+  name: string;
+  /** Variant A target id, if resolvable. */
+  variantAId?: string | null;
+  /** Variant A display name — falls back to "Variant A". */
+  variantAName: string;
+  /** Variant B target id, if resolvable. */
+  variantBId?: string | null;
+  /** Variant B display name — falls back to "Variant B". */
+  variantBName: string;
+  /** Per-row verdicts keyed by row index. Missing rows → no verdict. */
+  verdictsByRow: Record<number, BatchPairwiseVerdict>;
+};
+
+/**
  * Complete transformed batch evaluation data ready for display
  */
 export type BatchEvaluationData = {
@@ -120,6 +153,13 @@ export type BatchEvaluationData = {
   evaluatorIds: string[];
   /** Map of evaluator ID to display name */
   evaluatorNames: Record<string, string>;
+  /**
+   * Pairwise evaluator columns detected in this run. Empty when no
+   * evaluator emitted an A/B/tie or variant-id label. Rendered as an
+   * extra "Winner" column per pairwise evaluator after target columns.
+   * Optional so pre-existing test literals don't have to spell it out.
+   */
+  pairwiseColumns?: BatchPairwiseColumn[];
   /** Row data */
   rows: BatchResultRow[];
 };
@@ -398,8 +438,131 @@ export const transformBatchEvaluationData = (
     targetColumns,
     evaluatorIds: Array.from(evaluatorMap.keys()),
     evaluatorNames: Object.fromEntries(evaluatorMap),
+    pairwiseColumns: detectPairwiseColumns(evaluations, targetColumns),
     rows,
   };
+};
+
+/**
+ * Detect pairwise evaluators by observing their per-row label shapes.
+ * A pairwise evaluator's label is either a slot letter ("A" / "B" / "tie")
+ * — the legacy contract — or the winning candidate's target id / prompt
+ * handle — the current contract. Anything else is not pairwise.
+ *
+ * We also try to resolve variant A/B to human names via `targetColumns`:
+ * when the two distinct non-tie labels observed are BOTH ids that match
+ * targets, we know exactly who's A and who's B. Otherwise we fall back
+ * to "Variant A" / "Variant B" so the column still reads sensibly.
+ */
+const detectPairwiseColumns = (
+  evaluations: ExperimentRunWithItems["evaluations"],
+  targetColumns: BatchTargetColumn[],
+): BatchPairwiseColumn[] => {
+  const targetIds = new Set(targetColumns.map((t) => t.id));
+  const targetNameById = new Map(targetColumns.map((t) => [t.id, t.name]));
+
+  // Group by evaluator id + name so different pairwise instances (same
+  // evaluator type wired against different variant pairs) stay separate.
+  const buckets = new Map<
+    string,
+    {
+      evaluatorId: string;
+      name: string;
+      seenLabels: Set<string>;
+      verdicts: BatchPairwiseVerdict[];
+    }
+  >();
+
+  const isSlotLabel = (v: string): v is "A" | "B" | "tie" =>
+    v === "A" || v === "B" || v === "tie";
+
+  for (const ev of evaluations) {
+    if (ev.status !== "processed") continue;
+    if (typeof ev.label !== "string" || ev.label.length === 0) continue;
+    const label = ev.label;
+    const isLegacySlot = isSlotLabel(label);
+    const isTargetId = targetIds.has(label);
+    if (!isLegacySlot && !isTargetId) continue;
+
+    const key = ev.name ? `${ev.evaluator}::${ev.name}` : ev.evaluator;
+    let bucket = buckets.get(key);
+    if (!bucket) {
+      bucket = {
+        evaluatorId: ev.evaluator,
+        name: ev.name ?? ev.evaluator,
+        seenLabels: new Set<string>(),
+        verdicts: [],
+      };
+      buckets.set(key, bucket);
+    }
+    bucket.seenLabels.add(label);
+    bucket.verdicts.push({
+      rowIndex: ev.index,
+      // Normalized to slot letter here; when the label is a target id we
+      // resolve slot after we know which id is A / B (see below).
+      label: isLegacySlot ? label : (label as unknown as "A"),
+      reasoning: ev.details ?? null,
+    });
+  }
+
+  const columns: BatchPairwiseColumn[] = [];
+  for (const bucket of buckets.values()) {
+    // Split observed labels into "candidate ids" (target ids seen as the
+    // winner) and legacy slot letters. Ties are ignored for slot assignment.
+    const candidateIds = Array.from(bucket.seenLabels).filter(
+      (l) => l !== "A" && l !== "B" && l !== "tie",
+    );
+
+    let variantAId: string | null = null;
+    let variantBId: string | null = null;
+    let variantAName = "Variant A";
+    let variantBName = "Variant B";
+
+    if (candidateIds.length >= 2) {
+      // Winner-by-id contract. Two distinct winners observed across the
+      // run — assign A/B by target-column order so the labeling is stable.
+      const orderedIds = targetColumns
+        .map((t) => t.id)
+        .filter((id) => candidateIds.includes(id));
+      variantAId = orderedIds[0] ?? candidateIds[0]!;
+      variantBId = orderedIds[1] ?? candidateIds[1]!;
+      variantAName = targetNameById.get(variantAId) ?? variantAName;
+      variantBName = targetNameById.get(variantBId) ?? variantBName;
+    } else if (candidateIds.length === 1) {
+      // Only one id ever won — we can name that side but not the other.
+      // Assign it to A; the other side stays generic.
+      variantAId = candidateIds[0]!;
+      variantAName = targetNameById.get(variantAId) ?? variantAName;
+    }
+
+    // Normalize per-row verdicts against the resolved A/B ids.
+    const verdictsByRow: Record<number, BatchPairwiseVerdict> = {};
+    for (const v of bucket.verdicts) {
+      const raw = v.label as unknown as string;
+      let normalized: "A" | "B" | "tie";
+      if (raw === "tie") normalized = "tie";
+      else if (raw === "A" || raw === "B") normalized = raw;
+      else if (variantAId && raw === variantAId) normalized = "A";
+      else if (variantBId && raw === variantBId) normalized = "B";
+      else continue; // orphan id we couldn't classify
+      verdictsByRow[v.rowIndex] = {
+        rowIndex: v.rowIndex,
+        label: normalized,
+        reasoning: v.reasoning,
+      };
+    }
+
+    columns.push({
+      evaluatorId: bucket.evaluatorId,
+      name: bucket.name,
+      variantAId,
+      variantAName,
+      variantBId,
+      variantBName,
+      verdictsByRow,
+    });
+  }
+  return columns;
 };
 
 /**
