@@ -33,6 +33,13 @@ Feature: Event-sourced custom-graph threshold alerts
     Then the heartbeat fires the alert within thirty seconds
     And the notification names the metric and the no-data condition
 
+  Scenario: flag on, a below-threshold alert fires on total silence
+    Given the project is on the event-sourced path
+    And a graph trigger is configured to fire when the metric is below ten
+    When the project's traffic stops entirely
+    Then the heartbeat fires the alert, just as the cron did on silence
+    And no real-time event is needed to wake the evaluation
+
   Scenario: flag on, traffic stops while the alert is firing — resolve via heartbeat
     Given the project is on the event-sourced path
     And a graph alert is currently firing with an unresolved `TriggerSent`

@@ -96,6 +96,7 @@ import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/l
 import { MetricRecordAppendStore } from "./pipelines/trace-processing/projections/metricRecordStorage.store";
 import type { DerivedTraceEvent } from "./pipelines/trace-processing/projections/services/trace-events.derivation";
 import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanStorage.store";
+import type { TraceAnalyticsData } from "./pipelines/trace-processing/projections/traceAnalytics.foldProjection";
 import { TraceAnalyticsStore } from "./pipelines/trace-processing/projections/traceAnalytics.store";
 import { TraceAnalyticsRollupAppendStore } from "./pipelines/trace-processing/projections/traceAnalyticsRollup.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
@@ -480,8 +481,14 @@ export class PipelineRegistry {
         traceAnalyticsRollupAppendStore: new TraceAnalyticsRollupAppendStore(
           this.deps.repositories.traceAnalyticsRollup,
         ),
-        traceAnalyticsStore: new TraceAnalyticsStore(
-          this.deps.repositories.traceAnalytics,
+        // Redis cache is the slim fold's ONLY warm read path — its store's
+        // get() returns null by design (lossy row, no read-back), and on a
+        // cache miss the fold's refoldOnStoreMiss option rebuilds state from
+        // the event log. Without this wrapper every event would trigger a
+        // full event-log re-fold.
+        traceAnalyticsStore: this.cached<TraceAnalyticsData>(
+          new TraceAnalyticsStore(this.deps.repositories.traceAnalytics),
+          "trace_analytics",
         ),
         logRecordAppendStore: new LogRecordAppendStore(
           this.deps.repositories.logRecordStorage,
