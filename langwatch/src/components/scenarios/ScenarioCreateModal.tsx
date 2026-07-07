@@ -7,6 +7,7 @@ import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { api } from "~/utils/api";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
+import { ResolvedModelCaption } from "./ResolvedModelCaption";
 import { generateScenarioWithAI } from "./services/scenarioGeneration";
 import { storePromptForScenario } from "./services/scenarioPromptStorage";
 import type { ScenarioFormData, ScenarioInitialData } from "./ScenarioForm";
@@ -140,6 +141,7 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
       onGenerate={(desc) => checkAndProceed(() => handleGenerate(desc))}
       onSkip={() => checkAndProceed(handleSkip)}
       generatingText={GENERATING_TEXT}
+      footerHint={<ResolvedModelCaption model={resolvedDefault.data?.model} />}
     />
   );
 }

@@ -88,6 +88,29 @@ describe("<ScenarioAIGeneration/>", () => {
     expect(screen.getByText("Need Help?")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /generate with ai/i })).toBeInTheDocument();
   });
+
+  describe("when a default model is resolved", () => {
+    it("shows which model generation uses, with a settings link", () => {
+      render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+      const caption = screen.getByTestId("scenario-ai-model-caption");
+      expect(caption).toHaveTextContent("Uses openai/gpt-4");
+      expect(
+        screen.getByRole("link", { name: "Change" }),
+      ).toHaveAttribute("href", "/settings/model-providers");
+    });
+  });
+
+  describe("when no default model resolves", () => {
+    it("does not render the model caption", () => {
+      setResolved(null);
+      render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+      expect(
+        screen.queryByTestId("scenario-ai-model-caption"),
+      ).not.toBeInTheDocument();
+    });
+  });
 });
 
 describe("when resolved default is an Azure deployment not in registry", () => {
