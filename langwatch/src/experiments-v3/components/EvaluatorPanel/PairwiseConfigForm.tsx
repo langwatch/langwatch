@@ -1,10 +1,16 @@
 import { Box, Button, Field, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 
 import { Menu } from "~/components/ui/menu";
 import { Switch } from "~/components/ui/switch";
+import {
+  type AvailableSource,
+  type FieldMapping as UIFieldMapping,
+  VariableMappingInput,
+} from "~/components/variables";
+import type { Field as DSLField } from "~/optimization_studio/types/dsl";
 
 import { useTargetName } from "../../hooks/useTargetName";
 import type { PairwiseEvaluatorConfig, TargetConfig } from "../../types";
@@ -42,43 +48,6 @@ export type PairwiseConfigFormProps = {
   targets: TargetConfig[];
   /** Active dataset columns the user can pick the golden field from. */
   datasetColumns: DatasetColumn[];
-};
-
-/**
- * One row inside a Variant A/B menu. Lives in its own component so each
- * row owns its own `useTargetName` hook call — calling the hook inside
- * a .map() over `targets` would break the rules of hooks when the list
- * grows or shrinks between renders.
- */
-const VariantMenuItem = ({
-  target,
-  onSelect,
-  testId,
-}: {
-  target: TargetConfig;
-  onSelect: (id: string) => void;
-  testId?: string;
-}) => {
-  const name = useTargetName(target);
-  const label = name || target.id;
-  return (
-    <Menu.Item
-      value={target.id}
-      onClick={() => onSelect(target.id)}
-      data-testid={testId}
-    >
-      <Text fontSize="13px">{label}</Text>
-    </Menu.Item>
-  );
-};
-
-/**
- * Inline label for the selected variant inside the picker trigger. Same
- * reactive name resolution as VariantMenuItem.
- */
-const SelectedVariantLabel = ({ target }: { target: TargetConfig }) => {
-  const name = useTargetName(target);
-  return <>{name || target.id}</>;
 };
 
 type PickerProps = {
@@ -170,82 +139,17 @@ export function PairwiseConfigForm({
   // target twice (a pairwise comparison of X vs X is always a tie).
   const variantBOptions = targets.filter((t) => t.id !== draft.variantA);
 
-  const selectedA = targets.find((t) => t.id === draft.variantA);
-  const selectedB = targets.find((t) => t.id === draft.variantB);
-
   return (
     // No horizontal padding here — the drawer body (EvaluatorEditorShared)
     // already applies paddingX to its content, same as the boolean settings
     // section above us. Adding our own here previously double-inset this
     // section relative to Swap And Confirm / Allow Tie / Include metrics.
     <VStack align="stretch" gap={3}>
-      <HStack align="end" gap={3}>
-        <Picker
-          label="Variant A"
-          placeholder="Select a target…"
-          isEmpty={!selectedA}
-          selectedDisplay={
-            selectedA ? <SelectedVariantLabel target={selectedA} /> : null
-          }
-          testId="pairwise-variant-a"
-        >
-          {targets.length === 0 ? (
-            <EmptyMenuItem />
-          ) : (
-            targets.map((t) => (
-              <VariantMenuItem
-                key={t.id}
-                target={t}
-                // Reset the output-field path whenever the variant changes —
-                // a stale path from the previous variant would silently
-                // point at a field that doesn't exist on the new one, and
-                // the orchestrator would ship `undefined` to the judge.
-                onSelect={(id) =>
-                  update({ variantA: id, variantAOutputPath: undefined })
-                }
-                testId={`pairwise-variant-a-option-${t.id}`}
-              />
-            ))
-          )}
-        </Picker>
-
-        <Picker
-          label="Variant B"
-          placeholder="Select a target…"
-          isEmpty={!selectedB}
-          selectedDisplay={
-            selectedB ? <SelectedVariantLabel target={selectedB} /> : null
-          }
-          testId="pairwise-variant-b"
-        >
-          {variantBOptions.length === 0 ? (
-            <EmptyMenuItem />
-          ) : (
-            variantBOptions.map((t) => (
-              <VariantMenuItem
-                key={t.id}
-                target={t}
-                onSelect={(id) =>
-                  update({ variantB: id, variantBOutputPath: undefined })
-                }
-                testId={`pairwise-variant-b-option-${t.id}`}
-              />
-            ))
-          )}
-        </Picker>
-      </HStack>
-
-      {/* Structured-output narrowing: when a picked variant emits more than
-          one output field, let the user pick a single field so the judge
-          sees just that value instead of the whole JSON object. Empty
-          selection ("use whole output") is preserved as a first option. */}
-      <VariantOutputFieldRow
-        selectedA={selectedA}
-        selectedB={selectedB}
-        pathA={draft.variantAOutputPath}
-        pathB={draft.variantBOutputPath}
-        onChangeA={(path) => update({ variantAOutputPath: path })}
-        onChangeB={(path) => update({ variantBOutputPath: path })}
+      <VariantMappingRow
+        draft={draft}
+        update={update}
+        targets={targets}
+        variantBOptions={variantBOptions}
       />
 
       <GoldenAnswerSection
@@ -434,192 +338,153 @@ function MetricsSection({
 }
 
 /**
- * Per-variant "Output field" pickers, side-by-side and only rendered when
- * at least one selected variant has more than one output field. Empty
- * selection means "use whole output" and is the pre-existing behavior
- * (the orchestrator's `pickOutputPath` treats an empty path as no-op).
+ * Reuse the app-wide mappings widget (`VariableMappingInput`) for both
+ * Variant A and Variant B (#5100 dogfood follow-up — Rogerio).
  *
- * We deliberately only surface this when there's a real choice — showing
- * a single-option picker for a target with one output field would just
- * add noise. If neither variant has more than one output field, the row
- * hides entirely.
+ * The bespoke Menu-based picker forced the user to reason in two steps
+ * ("pick a target", "pick an output field of that target") and diverged
+ * from the mappings picker's `<target>.<field>` pill shape everywhere
+ * else in the app. Structured outputs also had no natural home.
+ * `VariableMappingInput` handles both concerns natively via grouped
+ * sources → fields dropdowns.
+ *
+ * Storage stays the same: `variantA` = target id, `variantAOutputPath` =
+ * the selected field path. Whole-output selection stays representable as
+ * an empty / omitted path so previously saved configs keep working.
  */
-function VariantOutputFieldRow({
-  selectedA,
-  selectedB,
-  pathA,
-  pathB,
-  onChangeA,
-  onChangeB,
+function VariantMappingRow({
+  draft,
+  update,
+  targets,
+  variantBOptions,
 }: {
-  selectedA: TargetConfig | undefined;
-  selectedB: TargetConfig | undefined;
-  pathA: string[] | undefined;
-  pathB: string[] | undefined;
-  onChangeA: (path: string[] | undefined) => void;
-  onChangeB: (path: string[] | undefined) => void;
+  draft: PairwiseEvaluatorConfig;
+  update: (patch: Partial<PairwiseEvaluatorConfig>) => void;
+  targets: TargetConfig[];
+  variantBOptions: TargetConfig[];
 }) {
-  const outputsA = selectedA?.outputs ?? [];
-  const outputsB = selectedB?.outputs ?? [];
-  if (outputsA.length < 2 && outputsB.length < 2) return null;
+  // A→B and B→A must reflect fresh names as targets are added / renamed;
+  // the contributor pattern below lifts each target's `useTargetName`
+  // result into a plain map so the two mapping pickers can render a stable
+  // AvailableSource[] without violating hooks rules over a dynamic array.
+  const [nameById, setNameById] = useState<Record<string, string>>({});
+  const setName = useCallback((id: string, name: string) => {
+    setNameById((prev) => (prev[id] === name ? prev : { ...prev, [id]: name }));
+  }, []);
+
+  const sourcesForVariantA = useMemo(
+    () => targets.map((t) => targetToSource(t, nameById[t.id] ?? t.id)),
+    [targets, nameById],
+  );
+  const sourcesForVariantB = useMemo(
+    () => variantBOptions.map((t) => targetToSource(t, nameById[t.id] ?? t.id)),
+    [variantBOptions, nameById],
+  );
+
   return (
-    <HStack align="end" gap={3}>
-      <NamedOutputFieldPicker
-        label="Output field (A)"
-        target={selectedA}
-        value={pathA}
-        onChange={onChangeA}
-        testId="pairwise-variant-a-output-field"
-      />
-      <NamedOutputFieldPicker
-        label="Output field (B)"
-        target={selectedB}
-        value={pathB}
-        onChange={onChangeB}
-        testId="pairwise-variant-b-output-field"
-      />
-    </HStack>
+    <VStack align="stretch" gap={3}>
+      <HStack align="end" gap={3}>
+        <Field.Root required flex="1">
+          <Field.Label fontSize="13px" color="fg.muted" marginBottom={1}>
+            Variant A
+          </Field.Label>
+          <VariableMappingInput
+            mapping={buildUIMapping(draft.variantA, draft.variantAOutputPath)}
+            onMappingChange={(mapping) =>
+              update(mappingToVariantPatch(mapping, "A"))
+            }
+            availableSources={sourcesForVariantA}
+            placeholder="Select a target field"
+            inputTestId="pairwise-variant-a"
+          />
+        </Field.Root>
+        <Field.Root required flex="1">
+          <Field.Label fontSize="13px" color="fg.muted" marginBottom={1}>
+            Variant B
+          </Field.Label>
+          <VariableMappingInput
+            mapping={buildUIMapping(draft.variantB, draft.variantBOutputPath)}
+            onMappingChange={(mapping) =>
+              update(mappingToVariantPatch(mapping, "B"))
+            }
+            availableSources={sourcesForVariantB}
+            placeholder="Select a target field"
+            inputTestId="pairwise-variant-b"
+          />
+        </Field.Root>
+      </HStack>
+      {targets.map((t) => (
+        <TargetNameContributor key={t.id} target={t} onName={setName} />
+      ))}
+    </VStack>
   );
 }
 
 /**
- * Resolves the variant's display name via `useTargetName` so the picker can
- * render each option in the `<targetName>.<field>` shape the mappings picker
- * uses across the rest of the app. Lives in its own component so the hook
- * is called at a stable position even when the underlying target changes
- * (renaming, deletion, etc.).
+ * Non-rendering hook consumer: resolves this target's display name via
+ * `useTargetName` and reports it up to the parent. Split into its own
+ * component so `useTargetName` (which needs a concrete target) is called
+ * at a stable hook position even as the targets list grows / shrinks.
  */
-function NamedOutputFieldPicker({
-  label,
+function TargetNameContributor({
   target,
-  value,
-  onChange,
-  testId,
+  onName,
 }: {
-  label: string;
-  target: TargetConfig | undefined;
-  value: string[] | undefined;
-  onChange: (path: string[] | undefined) => void;
-  testId: string;
-}) {
-  if (!target) {
-    // Row is only rendered when SOMETHING has ≥2 outputs; the opposite
-    // picker still needs to occupy the layout slot so both sides align,
-    // but there's no target yet to resolve a name for.
-    return (
-      <OutputFieldPicker
-        label={label}
-        targetName=""
-        outputs={[]}
-        value={value}
-        onChange={onChange}
-        testId={testId}
-      />
-    );
-  }
-  return <NamedOutputFieldPickerInner
-    label={label}
-    target={target}
-    value={value}
-    onChange={onChange}
-    testId={testId}
-  />;
-}
-
-// Split so `useTargetName` — which requires a defined TargetConfig — is
-// called at a stable hook position guarded by the `!target` early return
-// in the parent.
-function NamedOutputFieldPickerInner({
-  label,
-  target,
-  value,
-  onChange,
-  testId,
-}: {
-  label: string;
   target: TargetConfig;
-  value: string[] | undefined;
-  onChange: (path: string[] | undefined) => void;
-  testId: string;
+  onName: (id: string, name: string) => void;
 }) {
-  const resolvedName = useTargetName(target);
-  return (
-    <OutputFieldPicker
-      label={label}
-      targetName={resolvedName || target.id}
-      outputs={target.outputs ?? []}
-      value={value}
-      onChange={onChange}
-      testId={testId}
-    />
-  );
+  const name = useTargetName(target);
+  useEffect(() => {
+    if (name) onName(target.id, name);
+  }, [name, target.id, onName]);
+  return null;
 }
 
-function OutputFieldPicker({
-  label,
-  targetName,
-  outputs,
-  value,
-  onChange,
-  testId,
-}: {
-  label: string;
-  targetName: string;
-  outputs: { identifier: string }[];
-  value: string[] | undefined;
-  onChange: (path: string[] | undefined) => void;
-  testId: string;
-}) {
-  const selected = value && value.length > 0 ? value[0] : undefined;
-  const isEmpty = !selected;
-  const noChoice = outputs.length < 2;
-  // Options render in `<targetName>.<field>` shape (with the target part
-  // slightly muted, the field part emphasized) so the picker reads as a
-  // path against the target — the same convention the mappings picker uses
-  // across the rest of the app. Consistent syntax means the user doesn't
-  // have to translate between two different conceptual pointers.
-  const fieldLabel = (field: string) => (
-    <Text
-      as="span"
-      fontFamily="mono"
-      fontSize="13px"
-      whiteSpace="nowrap"
-      color="fg"
-    >
-      <Text as="span" color="fg.muted">
-        {targetName || "target"}.
-      </Text>
-      {field}
-    </Text>
-  );
+const targetToSource = (
+  target: TargetConfig,
+  displayName: string,
+): AvailableSource => ({
+  id: target.id,
+  name: displayName,
+  // "signature" matches the source type the evaluator mappings drawer uses
+  // for its target source (see useOpenEvaluatorEditor) — same widget, same
+  // icon, same tree shape.
+  type: "signature",
+  fields: (target.outputs ?? []).map((o) => ({
+    name: o.identifier,
+    type: o.type as DSLField["type"],
+  })),
+});
 
-  return (
-    <Picker
-      label={label}
-      placeholder={noChoice ? "Whole output (default)" : "Whole output"}
-      isEmpty={isEmpty}
-      selectedDisplay={selected ? fieldLabel(selected) : null}
-      testId={testId}
-    >
-      <Menu.Item
-        value="__whole__"
-        onClick={() => onChange(undefined)}
-        data-testid={`${testId}-option-whole`}
-      >
-        <Text fontSize="13px" color="fg.muted">
-          Whole output
-        </Text>
-      </Menu.Item>
-      {outputs.map((o) => (
-        <Menu.Item
-          key={o.identifier}
-          value={o.identifier}
-          onClick={() => onChange([o.identifier])}
-          data-testid={`${testId}-option-${o.identifier}`}
-        >
-          {fieldLabel(o.identifier)}
-        </Menu.Item>
-      ))}
-    </Picker>
-  );
-}
+const buildUIMapping = (
+  variantId: string | undefined,
+  path: string[] | undefined,
+): UIFieldMapping | undefined => {
+  if (!variantId) return undefined;
+  return { type: "source", sourceId: variantId, path: path ?? [] };
+};
+
+const mappingToVariantPatch = (
+  mapping: UIFieldMapping | undefined,
+  slot: "A" | "B",
+): Partial<PairwiseEvaluatorConfig> => {
+  if (!mapping || mapping.type !== "source") {
+    // Clearing / a stray hardcoded-value mapping both reset to unset.
+    return slot === "A"
+      ? { variantA: "", variantAOutputPath: undefined }
+      : { variantB: "", variantBOutputPath: undefined };
+  }
+  const patch: Partial<PairwiseEvaluatorConfig> =
+    slot === "A"
+      ? {
+          variantA: mapping.sourceId,
+          variantAOutputPath:
+            mapping.path.length > 0 ? mapping.path : undefined,
+        }
+      : {
+          variantB: mapping.sourceId,
+          variantBOutputPath:
+            mapping.path.length > 0 ? mapping.path : undefined,
+        };
+  return patch;
+};
