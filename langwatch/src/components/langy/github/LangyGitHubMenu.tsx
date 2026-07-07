@@ -25,6 +25,7 @@ import { useState } from "react";
 import { GitHub } from "react-feather";
 
 import { Menu } from "~/components/ui/menu";
+import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { api } from "~/utils/api";
@@ -84,26 +85,28 @@ export function LangyGitHubMenu({
         content={`GitHub connected — acting as @${connection.data.githubLogin}`}
         showArrow
       >
-        <Menu.Trigger asChild>
-          <IconButton
-            size="xs"
-            variant="ghost"
-            aria-label={`GitHub: acting as @${connection.data.githubLogin}`}
-            color="fg.muted"
-            position="relative"
-          >
-            <GitHub size={14} />
-            <Box
-              position="absolute"
-              top="4px"
-              right="4px"
-              width="6px"
-              height="6px"
-              borderRadius="full"
-              background="green.solid"
-            />
-          </IconButton>
-        </Menu.Trigger>
+        <TriggerAnchor>
+          <Menu.Trigger asChild>
+            <IconButton
+              size="xs"
+              variant="ghost"
+              aria-label={`GitHub: acting as @${connection.data.githubLogin}`}
+              color="fg.muted"
+              position="relative"
+            >
+              <GitHub size={14} />
+              <Box
+                position="absolute"
+                top="4px"
+                right="4px"
+                width="6px"
+                height="6px"
+                borderRadius="full"
+                background="green.solid"
+              />
+            </IconButton>
+          </Menu.Trigger>
+        </TriggerAnchor>
       </Tooltip>
       <Menu.Content
         minWidth="220px"

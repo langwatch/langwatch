@@ -30,7 +30,6 @@ import {
   PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
   stripRolesFromChatArrayJson,
 } from "~/server/data-privacy/dropKeyCatalog";
-import type { CategoryVisibility } from "~/server/elasticsearch/protections";
 import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
 import { changeTraceNameInputSchema } from "~/server/event-sourcing/pipelines/trace-processing/schemas/commands";
 import {
@@ -53,6 +52,7 @@ import {
   extractRedactionsFromAllSpanOutputs,
   redactObject,
 } from "~/server/traces/mappers/redaction";
+import type { CategoryVisibility } from "~/server/traces/protections";
 import { checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 import { withoutHiddenResourceAttrs } from "./tracesV2.resourceAttrs";

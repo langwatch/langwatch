@@ -1,5 +1,5 @@
 import type { Monaco } from "@monaco-editor/react";
-import type { IDisposable, languages } from "monaco-editor";
+import type { editor, IDisposable, languages, Range } from "monaco-editor";
 import {
   CALL_METHOD_SNIPPET,
   CODE_SCAFFOLD_SNIPPET,
@@ -21,7 +21,11 @@ export function registerCodeActions(
   contractRef: ContractRef,
 ): IDisposable {
   return monaco.languages.registerCodeActionProvider("python", {
-    provideCodeActions: (model, _range, context) => {
+    provideCodeActions: (
+      model: editor.ITextModel,
+      _range: Range,
+      context: languages.CodeActionContext,
+    ) => {
       const actions: languages.CodeAction[] = [];
       const matching = context.markers.filter((m) => {
         const c = typeof m.code === "string" ? m.code : m.code?.value;

@@ -37,7 +37,7 @@ import type { BlobStore } from "~/server/app-layer/traces/blob-store.service";
 import { BlobNotFoundError } from "~/server/app-layer/traces/blob-store.service";
 import { EVENTREF_ATTR_PREFIX } from "~/server/app-layer/traces/lean-for-projection";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { Protections } from "~/server/elasticsearch/protections";
+import type { Protections } from "~/server/traces/protections";
 import { createLogger } from "~/utils/logger/server";
 import { ClickHouseTraceService } from "../clickhouse-trace.service";
 import { resolveOffloadedTraces } from "../resolve-offloaded-traces";
@@ -74,12 +74,6 @@ vi.mock("~/server/filters/clickhouse", () => ({
 
 vi.mock("~/server/evaluations/evaluation.service", () => ({
   EvaluationService: Object.assign(vi.fn(), {
-    create: () => ({}),
-  }),
-}));
-
-vi.mock("../elasticsearch-trace.service", () => ({
-  ElasticsearchTraceService: Object.assign(vi.fn(), {
     create: () => ({}),
   }),
 }));

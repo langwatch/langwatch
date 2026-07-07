@@ -12,6 +12,16 @@ const (
 	ProviderBedrock   ProviderID = "bedrock"
 	ProviderVertex    ProviderID = "vertex"
 	ProviderGemini    ProviderID = "gemini"
+	// XAI, Groq, and Cerebras are Bifrost-native providers routed with a
+	// plain API key (see mapProvider / credentialToBifrostKey defaults).
+	ProviderXAI      ProviderID = "xai"
+	ProviderGroq     ProviderID = "groq"
+	ProviderCerebras ProviderID = "cerebras"
+	// DeepSeek is not in Bifrost's ModelProvider enum. Its API is
+	// OpenAI-compatible, so the gateway routes it through Bifrost's vLLM
+	// (openai-compat) provider with DeepSeek's public endpoint as the
+	// default base URL.
+	ProviderDeepSeek ProviderID = "deepseek"
 	// Voyage is direct-API only. Bifrost has no Voyage ModelProvider
 	// enum; the gateway proxies Voyage embeddings via a thin direct
 	// HTTP path. Voyage's wire format is OpenAI-compatible so no body
@@ -19,6 +29,10 @@ const (
 	// messages, and responses calls against a Voyage credential land
 	// on a clean unsupported-request-type error.
 	ProviderVoyage ProviderID = "voyage"
+	// Custom is any OpenAI-compatible endpoint the customer hosts
+	// themselves (vLLM, LiteLLM proxy, ...). Requires a base URL; the
+	// API key is optional (many self-hosted servers run unauthenticated).
+	ProviderCustom ProviderID = "custom"
 )
 
 // Credential holds the resolved credentials for a provider.

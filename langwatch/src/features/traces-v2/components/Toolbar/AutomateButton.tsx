@@ -7,6 +7,7 @@ import {
   PopoverRoot,
   PopoverTrigger,
 } from "~/components/ui/popover";
+import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import NextLink from "~/utils/compat/next-link";
@@ -40,22 +41,24 @@ export const AutomateButton: React.FC<{ compact?: boolean }> = ({
         content="Automations from a filter. Coming soon."
         positioning={{ placement: "bottom" }}
       >
-        <PopoverTrigger asChild>
-          <Button
-            size="xs"
-            variant="ghost"
-            aria-label="Create an automation from the current filter"
-            // Read as gated, not missing — same pattern as the AskAi
-            // primer state. Keeps the affordance discoverable.
-            opacity={0.7}
-            filter="saturate(0.7)"
-          >
-            <Icon boxSize={3.5}>
-              <Zap />
-            </Icon>
-            {!compact && "Automate"}
-          </Button>
-        </PopoverTrigger>
+        <TriggerAnchor>
+          <PopoverTrigger asChild>
+            <Button
+              size="xs"
+              variant="ghost"
+              aria-label="Create an automation from the current filter"
+              // Read as gated, not missing — same pattern as the AskAi
+              // primer state. Keeps the affordance discoverable.
+              opacity={0.7}
+              filter="saturate(0.7)"
+            >
+              <Icon boxSize={3.5}>
+                <Zap />
+              </Icon>
+              {!compact && "Automate"}
+            </Button>
+          </PopoverTrigger>
+        </TriggerAnchor>
       </Tooltip>
       <PopoverContent width="320px">
         <PopoverArrow />

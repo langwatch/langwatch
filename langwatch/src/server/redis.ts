@@ -1,6 +1,8 @@
 import IORedis, { Cluster } from "ioredis";
+
 // PHASE_PRODUCTION_BUILD was "phase-production-build" from next/constants
 const PHASE_PRODUCTION_BUILD = "phase-production-build";
+
 import { env } from "../env.mjs";
 import { createLogger } from "../utils/logger/server";
 import { parseRedisDbIndex } from "./redis-db-index";
@@ -134,10 +136,7 @@ if (!isBuildOrNoRedis) {
 // errors; it just shouldn't trip on a real-world TLS handshake.
 export async function verifyRedisReady(timeoutMs = 15_000): Promise<void> {
   if (isBuildOrNoRedis || !connection) return;
-  const target =
-    env.REDIS_CLUSTER_ENDPOINTS ??
-    env.REDIS_URL ??
-    "(unset)";
+  const target = env.REDIS_CLUSTER_ENDPOINTS ?? env.REDIS_URL ?? "(unset)";
   try {
     await Promise.race([
       connection.ping(),

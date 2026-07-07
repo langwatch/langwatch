@@ -67,7 +67,9 @@ export function updateCurrentContext(updates: Partial<RequestContext>): void {
  * Gets the current OTel span context if available.
  * Used for propagating trace context to job payloads for span linking.
  */
-export function getOtelSpanContext(): { traceId: string; spanId: string } | undefined {
+export function getOtelSpanContext():
+  | { traceId: string; spanId: string }
+  | undefined {
   const span = trace.getSpan(otelContext.active());
   if (span) {
     const spanContext = span.spanContext();
@@ -79,3 +81,40 @@ export function getOtelSpanContext(): { traceId: string; spanId: string } | unde
   return undefined;
 }
 
+/**
+ * Type for job data that includes the optional __context field used to
+ * propagate request context through queue payloads.
+ */
+export type JobDataWithContext<T extends Record<string, unknown>> = T & {
+  __context?: JobContextMetadata;
+};
+
+/**
+ * Builds a RequestContext from propagated job metadata.
+ */
+export function createContextFromJobData(
+  metadata?: JobContextMetadata,
+): RequestContext {
+  return {
+    organizationId: metadata?.organizationId,
+    projectId: metadata?.projectId,
+    userId: metadata?.userId,
+  };
+}
+
+/**
+ * Extracts context metadata for job propagation.
+ * - Trace/span from OTel for span linking
+ * - Business context from ALS for logging
+ */
+export function getJobContextMetadata(): JobContextMetadata {
+  const spanContext = getOtelSpanContext();
+  const ctx = getCurrentContext();
+  return {
+    traceId: spanContext?.traceId,
+    parentSpanId: spanContext?.spanId,
+    organizationId: ctx?.organizationId,
+    projectId: ctx?.projectId,
+    userId: ctx?.userId,
+  };
+}

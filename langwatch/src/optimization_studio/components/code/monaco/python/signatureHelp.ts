@@ -1,5 +1,5 @@
 import type { Monaco } from "@monaco-editor/react";
-import type { IDisposable } from "monaco-editor";
+import type { editor, IDisposable, Position } from "monaco-editor";
 import { PYTHON_BUILTIN_BY_NAME, type PyMember } from "../pythonStdlib";
 import { scanImports } from "./shared";
 
@@ -14,7 +14,7 @@ export function registerSignatureHelp(monaco: Monaco): IDisposable {
   return monaco.languages.registerSignatureHelpProvider("python", {
     signatureHelpTriggerCharacters: ["(", ","],
     signatureHelpRetriggerCharacters: [","],
-    provideSignatureHelp: (model, position) => {
+    provideSignatureHelp: (model: editor.ITextModel, position: Position) => {
       const lineBefore = model.getValueInRange({
         startLineNumber: position.lineNumber,
         startColumn: 1,

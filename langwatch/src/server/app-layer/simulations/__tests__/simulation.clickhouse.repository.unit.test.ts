@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
+import { STALL_THRESHOLD_MS } from "~/server/scenarios/stall-detection";
 import { SimulationClickHouseRepository } from "../repositories/simulation.clickhouse.repository";
 
 function makeRunRow(overrides: Record<string, string | null> = {}) {
@@ -480,6 +482,225 @@ describe("SimulationClickHouseRepository", () => {
       // getRunDataForAllSuites fetches all runs (suite filtering is done by getSetSummaries)
       expect(call.query).toContain("TenantId");
       expect(call.query).not.toContain("__internal__");
+    });
+  });
+
+  describe("getBatchHistoryForScenarioSet()", () => {
+    /** Batch-aggregate row as returned by the step-1 query. */
+    function makeBatchRow(overrides: Record<string, string> = {}) {
+      return {
+        BatchRunId: "batch-1",
+        TotalCount: "3",
+        PassCount: "1",
+        FailCount: "0",
+        RunningCount: "2",
+        LastUpdatedAt: "9000",
+        LastRunAt: "9000",
+        FirstCompletedAt: "0",
+        AllCompletedAt: "0",
+        ...overrides,
+      };
+    }
+
+    /** Slim preview item row as returned by the step-2 query. */
+    function makeItemRow(
+      overrides: Record<string, string | string[] | null> = {},
+    ) {
+      return {
+        ScenarioRunId: "run-1",
+        BatchRunId: "batch-1",
+        Name: "Test run",
+        Description: null,
+        Status: "IN_PROGRESS",
+        DurationMs: null,
+        UpdatedAt: String(Date.now()),
+        FinishedAt: null,
+        MessagePreviewRoles: [],
+        MessagePreviewContents: [],
+        ...overrides,
+      };
+    }
+
+    describe("given a batch with mixed finished, stalled, and active runs", () => {
+      describe("when the batch history is resolved", () => {
+        it("derives STALLED at read time for unfinished runs past the stall threshold", async () => {
+          const now = Date.now();
+          const staleTs = String(now - STALL_THRESHOLD_MS - 60_000);
+          const freshTs = String(now - 1_000);
+
+          setQueryResults(clickhouse, [
+            [{ TotalBatchCount: "1" }],
+            [makeBatchRow({ RunningCount: "2" })],
+            [
+              // Run A: finished with SUCCESS -> keeps its stored status
+              makeItemRow({
+                ScenarioRunId: "run-A",
+                Status: "SUCCESS",
+                FinishedAt: "5000",
+                UpdatedAt: "5000",
+              }),
+              // Run B: unfinished, last update beyond the threshold -> STALLED
+              makeItemRow({
+                ScenarioRunId: "run-B",
+                Status: "IN_PROGRESS",
+                FinishedAt: null,
+                UpdatedAt: staleTs,
+              }),
+              // Run C: unfinished, fresh -> IN_PROGRESS
+              makeItemRow({
+                ScenarioRunId: "run-C",
+                Status: "IN_PROGRESS",
+                FinishedAt: null,
+                UpdatedAt: freshTs,
+              }),
+            ],
+          ]);
+
+          const result = await repo.getBatchHistoryForScenarioSet({
+            projectId: "proj-1",
+            scenarioSetId: "set-1",
+          });
+
+          const batch = result.batches[0]!;
+          const statusByRunId = new Map(
+            batch.items.map((i) => [i.scenarioRunId, i.status]),
+          );
+          expect(statusByRunId.get("run-A")).toBe(ScenarioRunStatus.SUCCESS);
+          expect(statusByRunId.get("run-B")).toBe(ScenarioRunStatus.STALLED);
+          expect(statusByRunId.get("run-C")).toBe(
+            ScenarioRunStatus.IN_PROGRESS,
+          );
+        });
+
+        it("derives stalledCount and subtracts it from runningCount", async () => {
+          const now = Date.now();
+          const staleTs = String(now - STALL_THRESHOLD_MS - 60_000);
+          const freshTs = String(now - 1_000);
+
+          setQueryResults(clickhouse, [
+            [{ TotalBatchCount: "1" }],
+            [makeBatchRow({ RunningCount: "2" })],
+            [
+              makeItemRow({
+                ScenarioRunId: "run-A",
+                Status: "SUCCESS",
+                FinishedAt: "5000",
+                UpdatedAt: "5000",
+              }),
+              makeItemRow({
+                ScenarioRunId: "run-B",
+                Status: "IN_PROGRESS",
+                FinishedAt: null,
+                UpdatedAt: staleTs,
+              }),
+              makeItemRow({
+                ScenarioRunId: "run-C",
+                Status: "IN_PROGRESS",
+                FinishedAt: null,
+                UpdatedAt: freshTs,
+              }),
+            ],
+          ]);
+
+          const result = await repo.getBatchHistoryForScenarioSet({
+            projectId: "proj-1",
+            scenarioSetId: "set-1",
+          });
+
+          const batch = result.batches[0]!;
+          expect(batch.stalledCount).toBe(1);
+          expect(batch.runningCount).toBe(1);
+        });
+      });
+    });
+
+    describe("given more stalled items than the stored RunningCount", () => {
+      describe("when the batch history is resolved", () => {
+        it("clamps runningCount at zero", async () => {
+          const staleTs = String(Date.now() - STALL_THRESHOLD_MS - 60_000);
+
+          setQueryResults(clickhouse, [
+            [{ TotalBatchCount: "1" }],
+            // Stored as STALLED, so it is not counted in RunningCount…
+            [makeBatchRow({ RunningCount: "0", TotalCount: "1", PassCount: "0" })],
+            [
+              // …but the item is still unfinished and stale, so it re-derives
+              // STALLED at read time; RunningCount - stalledCount would go
+              // negative without the clamp.
+              makeItemRow({
+                ScenarioRunId: "run-B",
+                Status: "STALLED",
+                FinishedAt: null,
+                UpdatedAt: staleTs,
+              }),
+            ],
+          ]);
+
+          const result = await repo.getBatchHistoryForScenarioSet({
+            projectId: "proj-1",
+            scenarioSetId: "set-1",
+          });
+
+          const batch = result.batches[0]!;
+          expect(batch.stalledCount).toBe(1);
+          expect(batch.runningCount).toBe(0);
+        });
+      });
+    });
+
+    describe("given a finished run whose last update is older than the threshold", () => {
+      describe("when the batch history is resolved", () => {
+        it("keeps the stored terminal status instead of deriving STALLED", async () => {
+          const staleTs = String(Date.now() - STALL_THRESHOLD_MS - 60_000);
+
+          setQueryResults(clickhouse, [
+            [{ TotalBatchCount: "1" }],
+            [makeBatchRow({ RunningCount: "0", TotalCount: "1" })],
+            [
+              makeItemRow({
+                ScenarioRunId: "run-A",
+                Status: "SUCCESS",
+                FinishedAt: staleTs,
+                UpdatedAt: staleTs,
+              }),
+            ],
+          ]);
+
+          const result = await repo.getBatchHistoryForScenarioSet({
+            projectId: "proj-1",
+            scenarioSetId: "set-1",
+          });
+
+          const batch = result.batches[0]!;
+          expect(batch.items[0]!.status).toBe(ScenarioRunStatus.SUCCESS);
+          expect(batch.stalledCount).toBe(0);
+        });
+      });
+    });
+
+    describe("when startDate and endDate are provided", () => {
+      it("passes date parameters for partition pruning", async () => {
+        setQueryResults(clickhouse, [
+          [{ TotalBatchCount: "0" }],
+          [],
+        ]);
+
+        await repo.getBatchHistoryForScenarioSet({
+          projectId: "proj-1",
+          scenarioSetId: "set-1",
+          startDate: 1000,
+          endDate: 5000,
+        });
+
+        expect(clickhouse.query).toHaveBeenCalledWith(
+          expect.objectContaining({
+            query_params: expect.objectContaining({
+              startDateMs: "1000",
+              endDateMs: "5000",
+            }),
+          }),
+        );
+      });
     });
   });
 

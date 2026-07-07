@@ -156,6 +156,35 @@ func TestParseCredentialFromHeaders_Gemini_PlainAPIKey(t *testing.T) {
 	}
 }
 
+func TestParseCredentialFromHeaders_APIKeyOnlyProviders(t *testing.T) {
+	// The long-tail providers the TS registry ships with just an API key
+	// (XAI_API_KEY, GROQ_API_KEY, ...). A default model like xai/grok-4.3
+	// must route instead of 400ing with missing_provider.
+	cases := map[string]domain.ProviderID{
+		"xai/grok-4.3":           domain.ProviderXAI,
+		"groq/llama-3.3-70b":     domain.ProviderGroq,
+		"cerebras/llama-3.3-70b": domain.ProviderCerebras,
+		"deepseek/deepseek-chat": domain.ProviderDeepSeek,
+	}
+	for model, want := range cases {
+		t.Run(model, func(t *testing.T) {
+			cred, err := gatewayproxy.ParseCredentialFromHeaders(mkHeader(
+				"x-litellm-model", model,
+				"x-litellm-api_key", "sk-key",
+			))
+			if err != nil {
+				t.Fatalf("err = %v", err)
+			}
+			if cred.ProviderID != want {
+				t.Errorf("ProviderID = %q, want %q", cred.ProviderID, want)
+			}
+			if cred.APIKey != "sk-key" {
+				t.Errorf("APIKey = %q", cred.APIKey)
+			}
+		})
+	}
+}
+
 func TestParseCredentialFromHeaders_CustomLLMProviderHeaderTakesPrecedence(t *testing.T) {
 	// Some clients send a bare model name + the explicit custom_llm_provider
 	// to point the dispatcher at a specific backend. We honor the explicit

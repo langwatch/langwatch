@@ -27,7 +27,6 @@ Feature: Experiments are archived, not hard-deleted
     And the ClickHouse `experiment_runs` rows for that experiment are untouched
     And the ClickHouse `experiment_run_items` rows for that experiment are untouched
     And the ClickHouse `dspy_steps` rows for that experiment are untouched
-    And the Elasticsearch `batch_evaluation` documents for that experiment are untouched
 
   Scenario: Archiving cascades to the associated workflow and hard-deletes the monitor
     Given a project "p1" with an experiment "exp1" linked to workflow "wf1" and monitor "mon1"
@@ -71,7 +70,7 @@ Feature: Experiments are archived, not hard-deleted
     # Idempotency: avoid spurious DB writes on duplicate clicks.
 
   # ============================================================================
-  # No ClickHouse / Elasticsearch / DSpy delete calls
+  # No ClickHouse / DSpy delete calls
   # ============================================================================
 
   Scenario: The delete-experiment code path does NOT contact ClickHouse
@@ -80,13 +79,6 @@ Feature: Experiments are archived, not hard-deleted
     When I call `experiments.deleteExperiment` for any experiment
     Then no ClickHouse mutation is issued
     And no S3 PUT / DELETE is triggered by the request
-
-  Scenario: The delete-experiment code path does NOT contact Elasticsearch
-    Given the test runner has wrapped the Elasticsearch client with an assertion
-      that fails the test if any deleteByQuery call is issued against the
-      batch_evaluation index
-    When I call `experiments.deleteExperiment` for any experiment
-    Then no deleteByQuery call is issued
 
   Scenario: The delete-experiment code path does NOT call the DSpy step cleanup
     Given the test runner has wrapped getApp().dspySteps.steps.deleteByExperiment

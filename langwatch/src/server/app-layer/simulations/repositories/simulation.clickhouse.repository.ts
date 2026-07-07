@@ -200,9 +200,15 @@ export class SimulationClickHouseRepository implements SimulationRepository {
 
   async getScenarioSetsData({
     projectId,
+    startDate,
+    endDate,
   }: {
     projectId: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<ScenarioSetData[]> {
+    const dateFilter = buildDateFilter({ startDate, endDate });
+
     const rows = await this.queryRows<{
       ScenarioSetId: string;
       ScenarioCount: string;
@@ -220,12 +226,13 @@ export class SimulationClickHouseRepository implements SimulationRepository {
            ArchivedAt
          FROM ${TABLE_NAME}
          WHERE TenantId = {tenantId:String}
-           ${simulationRunDedupPredicate("TenantId = {tenantId:String}")}
+           ${dateFilter.whereClause}
+           ${simulationRunDedupPredicate(`TenantId = {tenantId:String} ${dateFilter.whereClause}`)}
        )
        WHERE ArchivedAt IS NULL
        GROUP BY NormalizedSetId
        ORDER BY LastRunAt DESC`,
-      { tenantId: projectId },
+      { tenantId: projectId, ...dateFilter.params },
     );
 
     return rows.map((row) => ({
@@ -272,11 +279,15 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     scenarioSetId,
     limit = 8,
     cursor,
+    startDate,
+    endDate,
   }: {
     projectId: string;
     scenarioSetId: string;
     limit?: number;
     cursor?: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<{
     batches: BatchHistoryItem[];
     nextCursor?: string;
@@ -287,10 +298,14 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     const validatedLimit = Math.min(Math.max(1, limit), 100);
     const decoded = cursor ? this.decodeCursor(cursor) : null;
 
-    const cursorClause = decoded
-      ? `HAVING (toString(toUnixTimestamp64Milli(max(CreatedAt))) < {cursorTs:String})
-         OR (toString(toUnixTimestamp64Milli(max(CreatedAt))) = {cursorTs:String} AND BatchRunId > {cursorBatchRunId:String})`
-      : "HAVING 1 = 1";
+    const cursorPredicate = decoded
+      ? `((toString(toUnixTimestamp64Milli(max(CreatedAt))) < {cursorTs:String})
+         OR (toString(toUnixTimestamp64Milli(max(CreatedAt))) = {cursorTs:String} AND BatchRunId > {cursorBatchRunId:String}))`
+      : "1 = 1";
+
+    const dateFilter = buildDateFilter({ startDate, endDate });
+
+    const combinedHaving = `HAVING ${[cursorPredicate, dateFilter.havingClause].filter(Boolean).join(" AND ")}`;
 
     // Step 0: fetch total distinct batch count (runs in parallel with step 1)
     const totalCountPromise = this.queryRows<{ TotalBatchCount: string }>(
@@ -298,9 +313,14 @@ export class SimulationClickHouseRepository implements SimulationRepository {
        FROM ${TABLE_NAME}
        WHERE TenantId = {tenantId:String}
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
+         ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
-         ${simulationRunDedupPredicate("TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)})")}`,
-      { tenantId: projectId, scenarioSetIds: expandSetIdFilter(scenarioSetId) },
+         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}`,
+      {
+        tenantId: projectId,
+        scenarioSetIds: expandSetIdFilter(scenarioSetId),
+        ...dateFilter.params,
+      },
     );
 
     // Step 1: fetch batch-level aggregates
@@ -332,10 +352,11 @@ export class SimulationClickHouseRepository implements SimulationRepository {
        FROM ${TABLE_NAME}
        WHERE TenantId = {tenantId:String}
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
+         ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
-         ${simulationRunDedupPredicate("TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)})")}
+         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}
        GROUP BY BatchRunId
-       ${cursorClause}
+       ${combinedHaving}
        ORDER BY LastRunAt DESC, BatchRunId ASC
        LIMIT {fetchLimit:UInt32}`,
       {
@@ -344,6 +365,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         ...(decoded
           ? { cursorTs: decoded.ts, cursorBatchRunId: decoded.batchRunId }
           : {}),
+        ...dateFilter.params,
         fetchLimit: String(validatedLimit + 1),
       },
     );
@@ -536,18 +558,29 @@ export class SimulationClickHouseRepository implements SimulationRepository {
   async getBatchRunCountForScenarioSet({
     projectId,
     scenarioSetId,
+    startDate,
+    endDate,
   }: {
     projectId: string;
     scenarioSetId: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<number> {
+    const dateFilter = buildDateFilter({ startDate, endDate });
+
     const rows = await this.queryRows<{ BatchRunCount: string }>(
       `SELECT toString(count(DISTINCT BatchRunId)) AS BatchRunCount
        FROM ${TABLE_NAME}
        WHERE TenantId = {tenantId:String}
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
+         ${dateFilter.whereClause}
          AND ArchivedAt IS NULL
-         ${simulationRunDedupPredicate("TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)})")}`,
-      { tenantId: projectId, scenarioSetIds: expandSetIdFilter(scenarioSetId) },
+         ${simulationRunDedupPredicate(`TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) ${dateFilter.whereClause}`)}`,
+      {
+        tenantId: projectId,
+        scenarioSetIds: expandSetIdFilter(scenarioSetId),
+        ...dateFilter.params,
+      },
     );
     return parseInt(rows[0]?.BatchRunCount ?? "0", 10);
   }

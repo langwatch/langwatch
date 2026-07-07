@@ -58,6 +58,7 @@ import type {
   TableRowData,
   TargetConfig,
 } from "../types";
+import { isGoldenFieldSatisfied } from "../types";
 import { convertInlineToRowRecords } from "../utils/datasetConversion";
 import { isRowEmpty } from "../utils/emptyRowDetection";
 import { createEvaluatorEditorCallbacks } from "../utils/evaluatorEditorCallbacks";
@@ -102,6 +103,17 @@ type EvaluatorDbConfig = {
   evaluatorType?: EvaluatorTypes;
   settings?: Record<string, unknown>;
 };
+
+// A pairwise evaluator is ready to render its own result column once both
+// variants are picked and the golden-field requirement is satisfied (see
+// isGoldenFieldSatisfied). Exported so it can be unit-tested directly
+// instead of only through a full table render.
+export const isPairwiseConfigured = (e: EvaluatorConfig) =>
+  e.evaluatorType === "langevals/pairwise_compare" &&
+  !!e.pairwise?.variantA &&
+  !!e.pairwise?.variantB &&
+  !!e.pairwise &&
+  isGoldenFieldSatisfied(e.pairwise);
 
 // ============================================================================
 // Main Component
@@ -299,6 +311,7 @@ export function EvaluationsV3Table({
   const pendingPairwiseRef = useRef<{
     variantA: string;
     variantB: string;
+    hasGoldenAnswer: boolean;
     goldenField: string;
     includeMetrics: ("cost" | "duration")[];
   } | null>(null);
@@ -416,6 +429,7 @@ export function EvaluationsV3Table({
           pairwise: pendingPairwiseRef.current ?? {
             variantA: "",
             variantB: "",
+            hasGoldenAnswer: true,
             goldenField: "",
             includeMetrics: [],
           },
@@ -1190,27 +1204,15 @@ export function EvaluationsV3Table({
     [datasetColumnsKey],
   );
 
-  // Stabilize pairwise evaluators — only those with both variants configured.
-  // Only recreate columns when the set of configured pairwise evaluators changes.
+  // Stabilize pairwise evaluators — only those considered configured (see
+  // isPairwiseConfigured above). Only recreate columns when the set of
+  // configured pairwise evaluators changes.
   const pairwiseEvaluatorsKey = evaluators
-    .filter(
-      (e) =>
-        e.evaluatorType === "langevals/pairwise_compare" &&
-        e.pairwise?.variantA &&
-        e.pairwise?.variantB &&
-        e.pairwise?.goldenField,
-    )
+    .filter(isPairwiseConfigured)
     .map((e) => `${e.id}:${e.pairwise?.variantA}:${e.pairwise?.variantB}`)
     .join(",");
   const stablePairwiseEvaluators = useMemo(
-    () =>
-      evaluators.filter(
-        (e) =>
-          e.evaluatorType === "langevals/pairwise_compare" &&
-          e.pairwise?.variantA &&
-          e.pairwise?.variantB &&
-          e.pairwise?.goldenField,
-      ),
+    () => evaluators.filter(isPairwiseConfigured),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [pairwiseEvaluatorsKey],
   );
@@ -1645,19 +1647,32 @@ export function EvaluationsV3Table({
   const totalColumnPercentage = useMemo(() => {
     let total = 0;
 
-    // Sum dataset column percentages
+    // Sum dataset column percentages. Column IDs here must match the
+    // header IDs resize actually writes to (`dataset.${column.id}` /
+    // `target.${targetId}`, see the columnHelper.accessor calls above) —
+    // a mismatched ID means a resized column's stored width is never
+    // found, so its contribution silently falls back to the default.
     for (const col of datasetColumns) {
-      const colId = `dataset_${col.id}`;
+      const colId = `dataset.${col.id}`;
       total += columnSizing[colId] ?? DATASET_COL_DEFAULT_PCT;
     }
 
     // Sum target column percentages
     for (const target of targets) {
-      total += columnSizing[target.id] ?? TARGET_COL_DEFAULT_PCT;
+      total += columnSizing[`target.${target.id}`] ?? TARGET_COL_DEFAULT_PCT;
+    }
+
+    // Sum dedicated pairwise result column percentages — omitting these
+    // left the table's overall width computed as if they didn't exist,
+    // so each pairwise column had to squeeze into whatever sliver of
+    // "auto" space was left over, rendering near-zero-width with its
+    // text wrapping one character per line.
+    for (const pwEval of stablePairwiseEvaluators) {
+      total += columnSizing[`pairwise.${pwEval.id}`] ?? TARGET_COL_DEFAULT_PCT;
     }
 
     return total;
-  }, [datasetColumns, targets, columnSizing]);
+  }, [datasetColumns, targets, stablePairwiseEvaluators, columnSizing]);
 
   // Get column width as CSS string
   // Converts stored percentage values to CSS percentage strings
@@ -1677,6 +1692,10 @@ export function EvaluationsV3Table({
       // Use default percentages based on column type
       if (columnType === "dataset") return `${DATASET_COL_DEFAULT_PCT}%`;
       if (columnType === "target") return `${TARGET_COL_DEFAULT_PCT}%`;
+      // Dedicated pairwise result columns need a real percentage too —
+      // falling through to "auto" here left them competing with the
+      // filler column for whatever sliver of space was left over.
+      if (columnType === "pairwise") return `${TARGET_COL_DEFAULT_PCT}%`;
       return "auto";
     },
     [columnSizing],
@@ -1781,7 +1800,6 @@ export function EvaluationsV3Table({
               colSpan={targetsColSpan}
               onAddClick={handleAddTarget}
               showWarning={targets.length === 0}
-              hasComparison={targets.length > 0}
               isLoading={isLoadingExperiment}
             />
           </tr>

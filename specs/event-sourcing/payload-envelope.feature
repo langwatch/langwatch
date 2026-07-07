@@ -26,6 +26,13 @@ Feature: GroupQueue payload envelope
     Then the stored value is an envelope with a raw JSON body
 
   # Large-payload blob offload
+  #
+  # NOTE (ADR-029): the blob-lifecycle scenarios in this section — cleanup on
+  # complete, dedup-squash reclaim, the TTL safety net — describe the GQ1
+  # mechanism (a private random-id blob per job, best-effort delete, 7-day
+  # backstop). They are SUPERSEDED for envelope v2 by content-addressed sharing
+  # + holder-set eager reclaim; see
+  # specs/event-sourcing/payload-store-content-addressed.feature.
 
   Scenario: Very large payloads are offloaded out of the queue hash
     When a job whose payload exceeds the blob offload threshold is staged

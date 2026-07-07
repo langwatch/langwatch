@@ -22,7 +22,6 @@ import { useColorRawValue } from "../../components/ui/color-mode";
 import { toaster } from "../../components/ui/toaster";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { transformElasticSearchSpanToSpan } from "../../server/elasticsearch/transformers";
 import {
   type Evaluators,
   evaluatorsSchema,
@@ -35,7 +34,6 @@ import {
   evaluatePreconditions,
 } from "../../server/evaluations/preconditions";
 import type { CheckPreconditions } from "../../server/evaluations/types";
-import type { ElasticSearchSpan } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { formatMoney } from "../../utils/formatMoney";
 import type { Money } from "../../utils/types";
@@ -110,16 +108,7 @@ export function TryItOut({
     tracesPassingPreconditionsOnLoad.data?.map((trace) =>
       (() => {
         if (!evaluatorType) return false;
-        const spans = (trace.spans ?? []).map((span) =>
-          transformElasticSearchSpanToSpan(
-            {
-              canSeeCapturedInput: false,
-              canSeeCapturedOutput: false,
-              canSeeCosts: false,
-            },
-            new Set(),
-          )(span as ElasticSearchSpan),
-        );
+        const spans = trace.spans ?? [];
         const requiredFieldsMet = checkEvaluatorRequiredFields({
           evaluatorType,
           spans,

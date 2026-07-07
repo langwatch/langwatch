@@ -26,10 +26,13 @@ var modelAliases = map[string]string{
 
 // providersNeedingDotToDash is the allowlist for the dot→dash rewrite. Only
 // these providers get their model ids transformed — applying it to OpenAI's
-// `gpt-3.5-turbo` would break that model name.
+// `gpt-3.5-turbo` would break that model name. Custom providers are
+// excluded: their model ids are arbitrary customer strings (e.g. vLLM
+// serving "Qwen/Qwen2.5-32B-Instruct") and rewriting dots would send a
+// model id the endpoint doesn't recognize. Mirrors
+// PROVIDERS_NEEDING_TRANSLATION in modelIdBoundary.ts.
 var providersNeedingDotToDash = map[string]bool{
 	"anthropic": true,
-	"custom":    true,
 }
 
 // reasoningModelPattern catches the reasoning-class models that pin

@@ -16,6 +16,28 @@ export const generatedScenarioSchema = z.object({
  */
 export type GeneratedScenario = z.infer<typeof generatedScenarioSchema>;
 
+/** Serialized DomainError shape the generate endpoint attaches to handled failures */
+const serializedDomainErrorSchema = z.object({
+  kind: z.string(),
+  meta: z.record(z.string(), z.unknown()).optional(),
+});
+
+/**
+ * A handled generation failure with a stable `kind` discriminant
+ * (e.g. "missing_provider") so the UI can react beyond showing the
+ * message — see ScenarioAIGeneration's settings-link state.
+ */
+export class ScenarioGenerationError extends Error {
+  constructor(
+    message: string,
+    public readonly kind: string,
+    public readonly meta: Record<string, unknown> = {},
+  ) {
+    super(message);
+    this.name = "ScenarioGenerationError";
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Service
 // ─────────────────────────────────────────────────────────────────────────────
@@ -49,6 +71,16 @@ export async function generateScenarioWithAI(
 
   if (!response.ok) {
     const error = await response.json();
+    const domainError = serializedDomainErrorSchema.safeParse(
+      error.domainError,
+    );
+    if (domainError.success) {
+      throw new ScenarioGenerationError(
+        error.error || "Failed to generate scenario",
+        domainError.data.kind,
+        domainError.data.meta,
+      );
+    }
     throw new Error(error.error || "Failed to generate scenario");
   }
 
