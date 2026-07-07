@@ -247,16 +247,18 @@ export type PairwiseAggregate = {
 /**
  * Compute a TargetAggregate-shaped object for a pairwise column-target so
  * the workbench header can render the same Rows / Avg Latency / Total Cost /
- * Execution Time popover it renders for prompt/agent targets (dogfood ask).
+ * Execution Time chip prompt/agent columns render (dogfood ask "reuse the
+ * same two components — one play button, one time/cost").
  *
- * Pairwise column-targets don't emit `targetOutputs` — their per-row cost
- * and duration live on the pairwise verdict stored at
+ * Reads the JUDGE's own cost / duration — not the two variants' averages.
+ * The pairwise column's metrics are the metrics of the comparison itself
+ * ("the metrics of that comparison itself" — dogfood), which is the judge
+ * LLM call. Variant cost/latency already surfaces on the variant columns.
+ *
+ * Pairwise column-targets don't emit `targetOutputs`; the judge's per-row
+ * cost and duration live on the pairwise verdict at
  * `evaluatorResults[target.id][target.id][rowIndex]` (per orchestrator
- * convention, the synthetic evaluator's id equals the target id). Reads
- * cost/duration from those verdicts and returns a subset-populated
- * TargetAggregate — evaluator/pass-rate/score fields stay empty because
- * pairwise doesn't emit them, but the popover only surfaces the fields
- * used below.
+ * convention, synthetic evaluator id equals target id).
  */
 export const computePairwiseColumnTargetAggregate = (
   targetId: string,
@@ -282,9 +284,6 @@ export const computePairwiseColumnTargetAggregate = (
     completedRows++;
     const costAmount = readCostAmount(raw);
     if (costAmount > 0) costValues.push(costAmount);
-    // Prefer the top-level `duration` when the runtime attaches it (staged
-    // fetch path); fall back to nothing if the verdict shape doesn't carry
-    // per-row latency.
     const duration = (raw as { duration?: unknown }).duration;
     if (typeof duration === "number" && Number.isFinite(duration)) {
       latencyValues.push(duration);

@@ -535,6 +535,8 @@ const detectPairwiseColumns = (
       evaluatorId: string;
       name: string;
       seenLabels: Set<string>;
+      observedCandidateAIds: Set<string>;
+      observedCandidateBIds: Set<string>;
       verdicts: BatchPairwiseVerdict[];
     }
   >();
@@ -594,11 +596,24 @@ const detectPairwiseColumns = (
         evaluatorId: ev.evaluator,
         name: ev.name ?? targetName ?? ev.evaluator,
         seenLabels: new Set<string>(),
+        observedCandidateAIds: new Set<string>(),
+        observedCandidateBIds: new Set<string>(),
         verdicts: [],
       };
       buckets.set(key, bucket);
     }
     bucket.seenLabels.add(label);
+    // Also snapshot the pairwise judge's own view of which candidate is
+    // A and which is B from the evaluation inputs. The orchestrator pushes
+    // `candidate_a_id` / `candidate_b_id` on every row's evaluator call, so
+    // this gives us both variant identities even in a run where only one
+    // variant ever won (that case used to leave variantB = "Variant B"
+    // fallback because seenLabels only contained the winning variant).
+    const inputs = (ev.inputs ?? {}) as Record<string, unknown>;
+    const candA = inputs.candidate_a_id;
+    const candB = inputs.candidate_b_id;
+    if (typeof candA === "string") bucket.observedCandidateAIds.add(candA);
+    if (typeof candB === "string") bucket.observedCandidateBIds.add(candB);
     bucket.verdicts.push({
       rowIndex: ev.index,
       // Normalized to slot letter here; when the label is a target id we
@@ -628,7 +643,23 @@ const detectPairwiseColumns = (
       .map((id) => resolveToTargetId(id) ?? id)
       .filter((id, i, arr) => arr.indexOf(id) === i);
 
-    if (resolvedCandidateIds.length >= 2) {
+    // Prefer the identities the judge itself was called with (from
+    // `inputs.candidate_a_id` / `candidate_b_id`). This is authoritative:
+    // even when only one variant ever wins, both slots still have a name.
+    // Falls through to the seenLabels heuristic when inputs aren't populated
+    // (legacy runs, evaluator paths that don't stash candidate ids).
+    const observedA = [...bucket.observedCandidateAIds]
+      .map((id) => resolveToTargetId(id) ?? id)
+      .find(Boolean);
+    const observedB = [...bucket.observedCandidateBIds]
+      .map((id) => resolveToTargetId(id) ?? id)
+      .find(Boolean);
+    if (observedA && observedB) {
+      variantAId = observedA;
+      variantBId = observedB;
+      variantAName = targetNameById.get(variantAId) || variantAName;
+      variantBName = targetNameById.get(variantBId) || variantBName;
+    } else if (resolvedCandidateIds.length >= 2) {
       // Winner-by-id contract. Two distinct winners observed across the
       // run — assign A/B by target-column order so the labeling is stable.
       const orderedIds = targetColumns

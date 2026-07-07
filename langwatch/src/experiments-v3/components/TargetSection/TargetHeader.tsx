@@ -504,15 +504,14 @@ export const TargetHeader = memo(function TargetHeader({
             const { a, b, tie } = pairwiseAggregate.counts;
             const isTie = a === b;
             const winnerName = a > b ? variantAName : variantBName;
-            const winnerCount = Math.max(a, b);
             const shortName = (s: string) =>
               s.length > 18 ? `${s.slice(0, 17)}…` : s;
-            const summary = isTie
-              ? tie > 0
-                ? `Tied · ${tie} tie${tie === 1 ? "" : "s"}`
-                : "Tied"
-              : `${shortName(winnerName)} wins ${winnerCount}` +
-                (tie > 0 ? ` · ${tie} tie${tie === 1 ? "" : "s"}` : "");
+            // Show only the qualitative outcome ("<winner> wins" / "Tied")
+            // in the header — the exact per-variant counts live in the
+            // hover tooltip so numerically-curious users get details, but
+            // the header itself stays uncluttered (dogfood: "structured-
+            // demo-a wins 3 — random number, not useful in the header").
+            const summary = isTie ? "Tied" : `${shortName(winnerName)} wins`;
             return (
               <Tooltip
                 content={`${variantAName}: ${a} wins · ${variantBName}: ${b} wins${
@@ -521,7 +520,12 @@ export const TargetHeader = memo(function TargetHeader({
                 positioning={{ placement: "top" }}
                 openDelay={200}
               >
-                <Text fontSize="11px" color="fg.muted" whiteSpace="nowrap">
+                <Text
+                  fontSize="11px"
+                  color="fg.muted"
+                  whiteSpace="nowrap"
+                  cursor="help"
+                >
                   {summary}
                 </Text>
               </Tooltip>
