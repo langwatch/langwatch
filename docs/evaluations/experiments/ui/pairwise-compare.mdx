@@ -1,0 +1,72 @@
+---
+title: How to compare two prompts or models head-to-head
+sidebarTitle: Pairwise Compare
+description: Use the Pairwise Compare evaluator to judge two candidate outputs against each other, with built-in position-bias mitigation.
+---
+
+When you're deciding between two prompts, two models, or two agent configurations, a single-output score can be noisy and hard to compare across runs. **Pairwise Compare** takes a different approach: it shows an LLM judge both candidate outputs side by side for the same input and asks it to pick the better one.
+
+## When to use it
+
+- You have two versions of a prompt, model, or agent and want to know which one is better for each row.
+- A direct head-to-head comparison is more useful than an absolute rubric score.
+- You want to reduce position bias. Pairwise Compare can run the comparison twice with the candidates swapped and only declare a winner if both calls agree.
+
+If you need to score a single target against a reference answer instead, see [Expected Answer Evaluation](/evaluations/experiments/ui/answer-correctness). If you do not have a known answer and are not comparing two existing targets, see [LLM-as-a-Judge](/evaluations/experiments/ui/llm-as-a-judge).
+
+## Setting it up
+
+1. In your [Experiments Workbench](https://app.langwatch.ai/@project/evaluations), add the two prompts, agents, or models you want to compare as separate targets.
+2. Click **Add** in the "Prompts or Agents" header and choose **Pairwise Compare** from the comparison section.
+3. Select **Variant A** and **Variant B** from your existing targets.
+4. If you have a ground-truth answer column, select it as the **Golden field**. If your deployment includes the latest Pairwise Compare settings, you can also disable **Has golden answer** to compare the two candidates directly without a reference answer.
+5. Run the evaluation. Pairwise Compare runs after both variants have produced outputs for that row.
+
+## How the verdict works
+
+Pairwise Compare can use `swap_and_confirm` to reduce first-position bias:
+
+1. Judge call one compares Candidate A vs Candidate B.
+2. Judge call two repeats the comparison with the candidates swapped.
+3. If both calls agree on the same winner, that candidate wins.
+4. If the two calls disagree, the evaluator returns a tie instead of forcing a winner.
+
+This means `swap_and_confirm` uses two judge calls per row.
+
+## No golden answer
+
+When `has_golden_answer` is enabled, the evaluator judges both candidates relative to the reference answer. When it is disabled, the evaluator compares Candidate A and Candidate B directly on their own merits.
+
+That is useful for preference-style tasks where there is no single correct answer, such as tone, style, or creative quality.
+
+## Settings
+
+| Setting | Default | Description |
+| ------- | ------- | ----------- |
+| `model` | — | The judge model. |
+| `has_golden_answer` | `true` | Compare each candidate against a reference answer. Disable it to compare the candidates directly. |
+| `swap_and_confirm` | `true` | Run two judge calls with the candidates swapped, and return a tie if the calls disagree. |
+| `allow_tie` | `true` | Allow the judge to return a tie when the candidates are effectively equivalent. |
+| `include_metrics` | `[]` | Include per-candidate metrics such as cost or duration in the judge context. |
+| `prompt` | — | Optional custom judge instructions. |
+
+## Reading the results
+
+Each row shows a verdict strip with the winning variant, the losing variant, or a tie. Click **why?** to inspect the judge reasoning.
+
+The column header also keeps a scoreboard tally across the full run. For example, you might see `variant-a wins 12 · 2 ties`. Hover the header to see the full tooltip breakdown for both variants and ties.
+
+## Using it from the SDK
+
+Pairwise Compare is a regular built-in evaluator under the hood: `langevals/pairwise_compare`. You can call it from the SDK the same way you call any other evaluator. See [Experiments via SDK](/evaluations/experiments/sdk#pairwise-compare) for a concrete example.
+
+## What's Next?
+
+<CardGroup cols={2}>
+  <Card title="Experiments via SDK" icon="code" href="/evaluations/experiments/sdk">
+    Run Pairwise Compare programmatically from notebooks or scripts.
+  </Card>
+  <Card title="View Evaluators" icon="list" href="/evaluations/evaluators/list">
+    Explore all available evaluation metrics.
+  </Card>
+</CardGroup>

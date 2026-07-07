@@ -479,6 +479,58 @@ await evaluation.run(dataset, async ({ item, index }) => {
   Browse our complete list of [available evaluators](/evaluations/evaluators/list) including metrics for RAG quality, hallucination detection, safety, and more.
 </Info>
 
+### Pairwise Compare
+
+`langevals/pairwise_compare` compares two candidate outputs for the same input and asks a judge model to pick the better one. This is useful when you want to compare two prompts, models, or agent configurations directly instead of scoring each one independently.
+
+The example below was verified against the live SDK path using `evaluation.evaluate("langevals/pairwise_compare", ...)`.
+
+<Tabs>
+  <Tab title="Python">
+```python
+import langwatch
+
+ROWS = [
+    {
+        "input": "Write a function that checks if a given integer is a prime number.",
+        "golden": "def is_prime(n): ...",
+        "candidate_a_id": "variant-a",
+        "candidate_a_output": "def is_prime(n: int) -> bool: ...",
+        "candidate_b_id": "variant-b",
+        "candidate_b_output": "def is_prime(n: int) -> bool: ...",
+    }
+]
+
+evaluation = langwatch.experiment.init("pairwise-sdk-verification")
+
+for index, row in evaluation.loop(list(enumerate(ROWS))):
+    evaluation.evaluate(
+        "langevals/pairwise_compare",
+        index=index,
+        data={
+            "input": row["input"],
+            "golden": row["golden"],
+            "candidate_a_id": row["candidate_a_id"],
+            "candidate_a_output": row["candidate_a_output"],
+            "candidate_b_id": row["candidate_b_id"],
+            "candidate_b_output": row["candidate_b_output"],
+        },
+        settings={
+            "model": "openai/gpt-5-mini",
+            "has_golden_answer": True,
+            "swap_and_confirm": True,
+            "allow_tie": True,
+            "include_metrics": ["cost", "duration"],
+        },
+    )
+
+evaluation.print_summary()
+```
+  </Tab>
+</Tabs>
+
+`swap_and_confirm` performs two judge calls with A/B order reversed on the second pass. If the two calls disagree, the evaluator returns a tie. Set `has_golden_answer` to `false` when you want a pure head-to-head comparison without a reference answer.
+
 ## Complete Example
 
 <Tabs>
