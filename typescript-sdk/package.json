@@ -109,7 +109,7 @@
     "chalk": "^5.6.2",
     "commander": "^15.0.0",
     "dotenv": "^17.3.1",
-    "js-yaml": "^4.1.0",
+    "js-yaml": "^5.2.0",
     "liquidjs": "^10.27.0",
     "open": "^11.0.0",
     "openapi-fetch": "^0.17.0",
