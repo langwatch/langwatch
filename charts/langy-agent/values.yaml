@@ -79,8 +79,10 @@ workspaceVolume: {}
 ## and steal worker B's project API key + GitHub token (PR #4913 review).
 ##
 ## Mitigations that keep the blast radius small even with root in the pod:
-##   - Drop ALL caps and add back ONLY what's strictly required: the four
-##     per-UID-handoff caps (SETUID/SETGID/CHOWN/DAC_OVERRIDE) plus
+##   - Drop ALL caps and add back ONLY what's strictly required: the five
+##     per-UID-handoff caps (SETUID/SETGID/CHOWN/DAC_OVERRIDE/FOWNER —
+##     FOWNER lets root chmod a per-worker dir it has already chowned away
+##     to the worker UID) plus
 ##     NET_ADMIN for the iptables OUTPUT-OWNER drop on loopback that
 ##     closes the worker→worker exfil hole at the kernel layer (see
 ##     services/langy-agent/iptables.go). No SYS_*.
@@ -108,6 +110,14 @@ containerSecurityContext:
     # chown per-session dirs to a unique UID, write 0600 config blobs as
     # that UID, and spawn the OpenCode subprocess directly into it.
     #
+    # FOWNER is required because setupWorkerHome (services/langy-agent/worker.go)
+    # chowns the per-worker home to the worker UID and THEN chmods it 0700.
+    # Once the dir is owned by the worker UID, root (UID 0) can only chmod it
+    # with CAP_FOWNER — DAC_OVERRIDE does not cover the chmod ownership check.
+    # Without FOWNER every spawn dies with "chmod home: operation not
+    # permitted" (verified live on the dev gVisor node 2026-07-07). Not
+    # gVisor-specific: the same EPERM occurs on runc under drop-ALL.
+    #
     # NET_ADMIN was added on 2026-06-30 so the manager can install an
     # iptables OUTPUT rule at startup that drops loopback-TCP packets
     # from non-root UIDs to the locked opencode internal port range
@@ -120,7 +130,7 @@ containerSecurityContext:
     #
     # Any addition beyond this needs to be justified in the
     # SecurityContext header above.
-    add: ["CHOWN", "DAC_OVERRIDE", "SETUID", "SETGID", "NET_ADMIN"]
+    add: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETUID", "SETGID", "NET_ADMIN"]
 
 # Sandboxed container runtime for this pod. The agent runs LLM-driven
 # arbitrary code (opencode workers shell out to git/npm/gh), so the headline
