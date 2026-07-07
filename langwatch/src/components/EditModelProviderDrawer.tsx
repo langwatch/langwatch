@@ -18,13 +18,15 @@ export const EditModelProviderDrawer = (
 ) => {
   const { projectId, organizationId, modelProviderId, providerKey } = props;
   const { closeDrawer } = useDrawer();
-  const { providers, isLoading } = useModelProvidersSettings({ projectId });
+  const { providers, providersList, isLoading } = useModelProvidersSettings({ projectId });
 
-  // Get provider - by id or provider key
+  // Get provider - by id (uses the flat list so multi-instance providers with
+  // the same provider string, e.g. several "custom" rows, are all findable)
+  // or fall back to provider key lookup when no id is given.
   const provider =
     providers &&
     (modelProviderId
-      ? Object.values(providers).find((p) => p.id === modelProviderId)
+      ? providersList?.find((p) => p.id === modelProviderId)
       : providers[providerKey]);
 
   // Get provider name for the title

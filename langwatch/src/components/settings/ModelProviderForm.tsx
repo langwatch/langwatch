@@ -46,7 +46,7 @@ export const EditModelProviderForm = ({
   modelProviderId,
   providerKey,
 }: EditModelProviderFormProps) => {
-  const { providers } = useModelProvidersSettings({
+  const { providers, providersList } = useModelProvidersSettings({
     projectId: projectId,
   });
   const { closeDrawer } = useDrawer();
@@ -104,10 +104,10 @@ export const EditModelProviderForm = ({
   //   - `modelProviderId` undefined → no specific target, fresh blank
   //     (deep-link from evaluator selector or similar).
   const provider: MaybeStoredModelProvider = useMemo(() => {
-    if (providers && modelProviderId && modelProviderId !== "new") {
-      const existing = Object.values(providers).find(
-        (p) => p.id === modelProviderId,
-      );
+    if (modelProviderId && modelProviderId !== "new") {
+      // Use the flat list so multi-instance providers sharing the same provider
+      // string (e.g. several "custom" rows) are all findable by their db id.
+      const existing = providersList?.find((p) => p.id === modelProviderId);
       if (existing) return existing;
     }
     return {
@@ -120,7 +120,7 @@ export const EditModelProviderForm = ({
       deploymentMapping: null,
       extraHeaders: [],
     };
-  }, [modelProviderId, providerKey, providers]);
+  }, [modelProviderId, providerKey, providersList]);
 
   // Detect if provider is using environment variables (enabled but no stored customKeys)
   // Must be computed before the hook call so we can pass it to the hook
