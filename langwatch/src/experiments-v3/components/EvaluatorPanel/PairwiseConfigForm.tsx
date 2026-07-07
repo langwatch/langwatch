@@ -209,38 +209,56 @@ function GoldenAnswerSection({
     control: formContext?.control,
     name: "settings.has_golden_answer",
   }) as boolean | undefined;
+  const watchedPrompt = useWatch({
+    control: formContext?.control,
+    name: "settings.prompt",
+  }) as string | undefined;
   const hasGoldenAnswer =
     (watchedHasGoldenAnswer ?? draft.hasGoldenAnswer) !== false;
+
+  // Keep the judge prompt in sync with the has_golden_answer toggle
+  // REACTIVELY — running on every change of either field (not just on the
+  // toggle click) so the correct prompt is enforced regardless of HOW the
+  // state changed: click, form init from a saved config, external
+  // `setValue`, or a load from persistence. Only swap when the current
+  // prompt exactly matches one of our shipped defaults so hand-tuned
+  // prompts survive toggling. Fuzzy-compare on trimmed strings so subtle
+  // whitespace drift (Windows CRLF, editor auto-trim) doesn't break the
+  // equality check.
+  const isDefaultPrompt = useCallback(
+    (value: string | undefined, target: string): boolean =>
+      typeof value === "string" && value.trim() === target.trim(),
+    [],
+  );
+  useEffect(() => {
+    if (!formContext) return;
+    if (typeof watchedHasGoldenAnswer !== "boolean") return;
+    if (typeof watchedPrompt !== "string") return;
+    const shouldBeGoldenAware = watchedHasGoldenAnswer !== false;
+    const nextPrompt = shouldBeGoldenAware
+      ? isDefaultPrompt(watchedPrompt, GOLDEN_FREE_JUDGE_PROMPT)
+        ? GOLDEN_AWARE_JUDGE_PROMPT
+        : null
+      : isDefaultPrompt(watchedPrompt, GOLDEN_AWARE_JUDGE_PROMPT)
+        ? GOLDEN_FREE_JUDGE_PROMPT
+        : null;
+    if (nextPrompt && nextPrompt !== watchedPrompt) {
+      formContext.setValue("settings.prompt", nextPrompt, {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+    }
+  }, [formContext, watchedHasGoldenAnswer, watchedPrompt, isDefaultPrompt]);
 
   const setHasGoldenAnswer = (on: boolean) => {
     formContext?.setValue("settings.has_golden_answer", on, {
       shouldDirty: true,
       shouldTouch: true,
     });
-    // If the user hasn't customized the judge prompt, swap it to match the
-    // new mode — a golden-aware prompt is nonsense when we're comparing A
-    // vs B with no reference, and vice versa. Only swap when the current
-    // prompt is one of our known defaults so hand-tuned prompts survive
-    // toggling.
-    const currentPrompt = formContext?.getValues("settings.prompt");
-    if (typeof currentPrompt === "string") {
-      const nextPrompt = on
-        ? currentPrompt === GOLDEN_FREE_JUDGE_PROMPT
-          ? GOLDEN_AWARE_JUDGE_PROMPT
-          : null
-        : currentPrompt === GOLDEN_AWARE_JUDGE_PROMPT
-          ? GOLDEN_FREE_JUDGE_PROMPT
-          : null;
-      if (nextPrompt) {
-        formContext?.setValue("settings.prompt", nextPrompt, {
-          shouldDirty: true,
-          shouldTouch: true,
-        });
-      }
-    }
-    // Clearing goldenField when turning the toggle off isn't strictly
-    // necessary (an unused golden field is harmless), but it avoids a
-    // stale selection resurfacing confusingly if the user toggles back on.
+    // Prompt-swap now lives in the useEffect above so it always fires
+    // regardless of HOW has_golden_answer changed. Only clear goldenField
+    // here — that's toggle-specific UX (a stale golden mapping resurfacing
+    // is confusing, so we drop it when turning golden OFF).
     update({ hasGoldenAnswer: on, ...(on ? {} : { goldenField: "" }) });
   };
 
