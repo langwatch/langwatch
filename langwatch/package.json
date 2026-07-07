@@ -290,7 +290,7 @@
     "@vitest/browser": "^4.1.8",
     "@vitest/browser-playwright": "^4.1.8",
     "@vitest/coverage-v8": "^4.1.5",
-    "@vitest/ui": "^4.1.5",
+    "@vitest/ui": "^4.1.9",
     "babel-plugin-react-compiler": "^1.0.0",
     "concurrently": "^9.2.1",
     "encoding": "^0.1.13",
