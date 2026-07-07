@@ -80,6 +80,12 @@ Feature: Analytics Chart Rendering
   # ---------------------------------------------------------------------------
 
   @unit
+  # KEPT @unimplemented: the original binding tested the Elasticsearch
+  # aggregation-key builders, which were deleted with the ES analytics
+  # backend. In ClickHouse, events.event_details is not yet supported
+  # (the metric translator throws), so the behaviour cannot be exercised
+  # until that metric is implemented.
+  @unimplemented
   Scenario: Event details and event score metrics use distinct aggregation keys
     Given a dashboard with both event score and event details metrics
     When both metrics query the same event key and subkey

@@ -46,6 +46,7 @@ describe("TraceUsageService", () => {
     });
 
     describe("when result is cached", () => {
+      /** @scenario "Uses cached count within TTL" */
       it("returns cached value without querying ClickHouse", async () => {
         mockQueryTraceSummariesTotalUniq.mockResolvedValue(300);
 
