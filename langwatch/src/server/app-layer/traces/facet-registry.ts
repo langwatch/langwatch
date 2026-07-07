@@ -205,6 +205,14 @@ export const FACET_REGISTRY: readonly FacetDefinition[] = [
     expression: "if(HasAnnotation, 'annotated', 'unannotated')",
   },
   {
+    key: "pinned",
+    kind: "categorical",
+    label: "Pinned",
+    group: "trace",
+    table: "trace_summaries",
+    expression: "if(PinnedSource != '', 'pinned', 'unpinned')",
+  },
+  {
     key: "containsAi",
     kind: "categorical",
     label: "Contains AI",

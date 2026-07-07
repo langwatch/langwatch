@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { TRACE_NAME_MAX_LENGTH, TRACE_NAME_MIN_LENGTH } from "./constants";
+import {
+  TRACE_NAME_MAX_LENGTH,
+  TRACE_NAME_MIN_LENGTH,
+  TRACE_PIN_REASON_MAX_LENGTH,
+} from "./constants";
 import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./otlp";
 
 export const piiRedactionLevelSchema = z.enum(["STRICT", "ESSENTIAL", "DISABLED"]);
@@ -110,4 +114,14 @@ export const changeTraceNameInputSchema = z.object({
 });
 
 export type ChangeTraceNameInput = z.infer<typeof changeTraceNameInputSchema>;
+
+/**
+ * Strict input shape for the user-facing pin API. Only the optional reason is
+ * user-supplied; provenance (`source`) is set by the service, not the client.
+ */
+export const pinTraceInputSchema = z.object({
+  reason: z.string().max(TRACE_PIN_REASON_MAX_LENGTH).optional(),
+});
+
+export type PinTraceInput = z.infer<typeof pinTraceInputSchema>;
 

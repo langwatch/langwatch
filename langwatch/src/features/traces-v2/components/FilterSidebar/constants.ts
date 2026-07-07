@@ -20,6 +20,7 @@ import {
   History,
   type LucideIcon,
   MessageSquare,
+  Pin,
   Server,
   Shield,
   Sparkles,
@@ -120,6 +121,7 @@ export const FACET_DEFAULTS: Record<string, string[]> = {
   spanStatus: ["ok", "error", "unset"],
   guardrail: ["blocked", "allowed"],
   annotation: ["annotated", "unannotated"],
+  pinned: ["pinned", "unpinned"],
   containsAi: ["yes", "no"],
   tokensEstimated: ["estimated", "actual"],
   // Open-ended categoricals: seed with empty values so the sidebar renders
@@ -154,6 +156,7 @@ export const FACET_ICONS: Record<string, LucideIcon> = {
   traceName: FileText,
   guardrail: Shield,
   annotation: Bookmark,
+  pinned: Pin,
   containsAi: Brain,
   errorMessage: AlertCircle,
   tokensEstimated: Calculator,
@@ -255,6 +258,7 @@ export const FACET_GROUPS: FacetGroupDef[] = [
       "origin",
       "rootSpanType",
       "traceName",
+      "pinned",
       METADATA_SECTION_KEY,
       ATTRIBUTES_SECTION_KEY,
     ],
@@ -592,4 +596,5 @@ export const COMFORTABLE_DEFAULT_SECTIONS: ReadonlySet<string> = new Set([
   "cost",
   "tokens",
   "evaluator",
+  "pinned",
 ]);

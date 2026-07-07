@@ -1,5 +1,4 @@
 import { Button } from "@chakra-ui/react";
-import { PinSource } from "@prisma/client";
 import { Pin, PinOff } from "lucide-react";
 import { api } from "~/utils/api";
 import { toaster } from "~/components/ui/toaster";
@@ -19,11 +18,14 @@ export function PinButton({
   // deleting a still-shared trace. The user can't unpin it manually — they
   // have to disable sharing first, which runs `autoUnpin` and clears the
   // pin cleanly. The router rejects the unpin too (defense in depth).
-  const isSharePin = pinQuery.data?.source === PinSource.share;
+  const isSharePin = pinQuery.data?.source === "share";
 
   const pinMutation = api.pinnedTrace.pin.useMutation({
-    onSuccess: () => {
-      utils.pinnedTrace.getPin.invalidate({ projectId, traceId });
+    // Pin writes are event-sourced; seed the cache with the optimistic view the
+    // mutation returns rather than invalidating, so a refetch that still reads
+    // the pre-pin projection doesn't flip the button back.
+    onSuccess: (pin) => {
+      utils.pinnedTrace.getPin.setData({ projectId, traceId }, pin);
       toaster.create({ title: "Trace pinned", type: "success" });
     },
     onError: (error) => {
@@ -37,7 +39,7 @@ export function PinButton({
 
   const unpinMutation = api.pinnedTrace.unpin.useMutation({
     onSuccess: () => {
-      utils.pinnedTrace.getPin.invalidate({ projectId, traceId });
+      utils.pinnedTrace.getPin.setData({ projectId, traceId }, null);
       toaster.create({ title: "Trace unpinned", type: "success" });
     },
     onError: (error) => {

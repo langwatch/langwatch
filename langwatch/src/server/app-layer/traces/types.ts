@@ -88,6 +88,21 @@ export const traceSummaryDataSchema = z.object({
   subTopicId: z.string().nullable(),
   annotationIds: z.array(z.string()),
   /**
+   * Pin state, projected onto the summary (replacing the legacy `PinnedTrace`
+   * Postgres table). `pinnedSource` is null/absent when the trace is not
+   * pinned; `"manual"` is a user pin, `"share"` an auto-pin created on share.
+   * The fold projection runs the pin state machine — see the
+   * `TracePinned`/`TraceUnpinned` handlers. `pinnedReason` / `pinnedByUserId`
+   * only carry meaning for manual pins. `pinnedAt` is the event `occurredAt`
+   * (ms since epoch) of the pin. Optional so pre-existing callers/fixtures that
+   * predate pins still satisfy the type (mirrors `sizeBytes` etc.); the fold
+   * and read mappers always populate them.
+   */
+  pinnedSource: z.enum(["manual", "share"]).nullable().optional(),
+  pinnedReason: z.string().nullable().optional(),
+  pinnedByUserId: z.string().nullable().optional(),
+  pinnedAt: z.number().nullable().optional(),
+  /**
    * Stored payload size of the trace in bytes, read from the MATERIALIZED
    * `_size_bytes` column (CH-native `byteSize(...)`; see migration 00032).
    * Read-only projection: it is computed server-side and never written in

@@ -23,6 +23,8 @@ import type {
   AnnotationRemovedEvent,
   AnnotationsBulkSyncedEvent,
   TraceNameChangedEvent,
+  TracePinnedEvent,
+  TraceUnpinnedEvent,
 } from "../schemas/events";
 import {
   spanReceivedEventSchema,
@@ -34,6 +36,8 @@ import {
   annotationRemovedEventSchema,
   annotationsBulkSyncedEventSchema,
   traceNameChangedEventSchema,
+  tracePinnedEventSchema,
+  traceUnpinnedEventSchema,
 } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
 import {
@@ -246,6 +250,8 @@ const traceSummaryEvents = [
   annotationRemovedEventSchema,
   annotationsBulkSyncedEventSchema,
   traceNameChangedEventSchema,
+  tracePinnedEventSchema,
+  traceUnpinnedEventSchema,
 ] as const;
 
 /**
@@ -307,6 +313,10 @@ export class TraceSummaryFoldProjection
       topicId: null,
       subTopicId: null,
       annotationIds: [],
+      pinnedSource: null,
+      pinnedReason: null,
+      pinnedByUserId: null,
+      pinnedAt: null,
       traceName: "",
       rootSpanStartTimeMs: undefined,
       traceNameUserOverridden: false,
@@ -608,4 +618,48 @@ export class TraceSummaryFoldProjection
     };
   }
 
+  handleTraceTracePinned(
+    event: TracePinnedEvent,
+    state: TraceSummaryData,
+  ): TraceSummaryData {
+    // Pin state machine (replaces the legacy PinnedTrace upsert):
+    // - a manual pin always wins — it sets/overrides the current pin and can
+    //   promote an existing share pin to manual.
+    // - a share auto-pin only takes effect on an unpinned trace; if a pin
+    //   already exists (manual or share) it is left untouched, mirroring the
+    //   old upsert's `update: {}` no-op so a manual pin is never demoted and
+    //   a repeat share-pin keeps the original pinnedAt.
+    if (event.data.source === "share" && state.pinnedSource !== null) {
+      return state;
+    }
+    return {
+      ...state,
+      traceId: state.traceId || event.data.traceId,
+      pinnedSource: event.data.source,
+      pinnedReason: event.data.reason,
+      pinnedByUserId: event.data.pinnedByUserId,
+      pinnedAt: event.occurredAt,
+    };
+  }
+
+  handleTraceTraceUnpinned(
+    event: TraceUnpinnedEvent,
+    state: TraceSummaryData,
+  ): TraceSummaryData {
+    // A share-sourced unpin (from unshare) must not clear a user's manual
+    // pin — only clear when the current pin is still share-sourced. A manual
+    // unpin (user action) clears unconditionally; the active-share guard for
+    // that case lives in the app-layer service, before dispatch.
+    if (event.data.source === "share" && state.pinnedSource !== "share") {
+      return state;
+    }
+    return {
+      ...state,
+      traceId: state.traceId || event.data.traceId,
+      pinnedSource: null,
+      pinnedReason: null,
+      pinnedByUserId: null,
+      pinnedAt: null,
+    };
+  }
 }

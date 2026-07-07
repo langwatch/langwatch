@@ -7,6 +7,7 @@ import type { ReactorDefinition } from "../../reactors/reactor.types";
 import { AddAnnotationCommand, BulkSyncAnnotationsCommand, RemoveAnnotationCommand } from "./commands/annotationCommands";
 import { AssignTopicCommand } from "./commands/assignTopicCommand";
 import { ChangeTraceNameCommand } from "./commands/changeTraceNameCommand";
+import { PinTraceCommand, UnpinTraceCommand } from "./commands/pinTraceCommands";
 import { RecordLogCommand } from "./commands/recordLogCommand";
 import { RecordMetricCommand } from "./commands/recordMetricCommand";
 import {
@@ -150,5 +151,7 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withCommand("removeAnnotation", RemoveAnnotationCommand)
     .withCommand("bulkSyncAnnotations", BulkSyncAnnotationsCommand)
     .withCommand("changeTraceName", ChangeTraceNameCommand)
+    .withCommand("pinTrace", PinTraceCommand)
+    .withCommand("unpinTrace", UnpinTraceCommand)
     .build();
 }

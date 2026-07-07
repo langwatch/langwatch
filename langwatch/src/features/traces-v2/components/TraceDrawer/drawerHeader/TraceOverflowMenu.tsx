@@ -73,9 +73,15 @@ export function TraceOverflowMenu({
   const isSharePin = pinQuery.data?.source === "share";
 
   const pinMutation = api.pinnedTrace.pin.useMutation({
-    onSuccess: () => {
+    // Pin writes are event-sourced, so a refetch can momentarily still read the
+    // pre-pin projection. Seed the cache with the optimistic view the mutation
+    // returns instead of invalidating, so the menu reflects the pin immediately.
+    onSuccess: (pin) => {
       if (project) {
-        utils.pinnedTrace.getPin.invalidate({ projectId: project.id, traceId });
+        utils.pinnedTrace.getPin.setData(
+          { projectId: project.id, traceId },
+          pin,
+        );
       }
       toaster.create({ title: "Trace pinned", type: "success" });
     },
@@ -90,7 +96,10 @@ export function TraceOverflowMenu({
   const unpinMutation = api.pinnedTrace.unpin.useMutation({
     onSuccess: () => {
       if (project) {
-        utils.pinnedTrace.getPin.invalidate({ projectId: project.id, traceId });
+        utils.pinnedTrace.getPin.setData(
+          { projectId: project.id, traceId },
+          null,
+        );
       }
       toaster.create({ title: "Trace unpinned", type: "success" });
     },
