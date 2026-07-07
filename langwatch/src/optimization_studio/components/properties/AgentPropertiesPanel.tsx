@@ -40,6 +40,11 @@ import { api } from "~/utils/api";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type { AgentComponent, Field as DslField } from "../../types/dsl";
 import {
+  DEFAULT_CODE,
+  buildCodeConfig,
+  getCodeFromConfig,
+} from "~/optimization_studio/utils/codeAgentConfig";
+import {
   buildAgentNodeData,
   nodeMatchesAgent,
   readCodeSnapshot,
@@ -96,38 +101,6 @@ function buildHttpConfig(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Code Config helpers
-// ---------------------------------------------------------------------------
-
-const DEFAULT_CODE = `class Code:
-    def __call__(self, input: str):
-        # Your code goes here
-
-        return {"output": input.upper()}
-`;
-
-function getCodeFromConfig(config: AgentComponentConfig): string {
-  const codeConfig = config as CodeComponentConfig;
-  const codeParam = codeConfig.parameters?.find(
-    (p) => p.identifier === "code" && p.type === "code",
-  );
-  return (codeParam?.value as string) ?? DEFAULT_CODE;
-}
-
-function buildCodeConfig(
-  code: string,
-  inputs: DslField[],
-  outputs: DslField[],
-): CodeComponentConfig {
-  return {
-    name: "Code",
-    description: "Python code block",
-    parameters: [{ identifier: "code", type: "code", value: code }],
-    inputs: inputs as CodeComponentConfig["inputs"],
-    outputs: outputs as CodeComponentConfig["outputs"],
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Entry component
@@ -523,17 +496,17 @@ function DbAgentPanel({
         auth,
       );
     } else if (agentType === "code") {
-      config = buildCodeConfig(
+      config = buildCodeConfig({
         code,
-        (node.data.inputs ?? []).map((i) => ({
+        inputs: (node.data.inputs ?? []).map((i) => ({
           identifier: i.identifier,
           type: i.type,
         })),
-        (node.data.outputs ?? []).map((o) => ({
+        outputs: (node.data.outputs ?? []).map((o) => ({
           identifier: o.identifier,
           type: o.type,
         })),
-      );
+      });
     }
 
     updateMutation.mutate(
