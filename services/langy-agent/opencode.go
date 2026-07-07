@@ -61,28 +61,6 @@ func getFreePort() (int, error) {
 	return port, nil
 }
 
-// getFreePortInRange asks the kernel for a free port WITHIN [min, max].
-// Used for the INTERNAL opencode listen so the iptables loopback-lockdown
-// rule can target a known port range. The kernel picks an ephemeral port
-// (range governed by /proc/sys/net/ipv4/ip_local_port_range, usually
-// 32768-60999) which overlaps our locked window; we retry until the pick
-// falls inside [min, max]. Bounded loop — with a 10k-slot range and ~36%
-// overlap, rarely loops more than twice.
-func getFreePortInRange(minPort, maxPort int) (int, error) {
-	for try := 0; try < 64; try++ {
-		l, err := net.Listen("tcp", "127.0.0.1:0")
-		if err != nil {
-			return 0, err
-		}
-		port := l.Addr().(*net.TCPAddr).Port
-		_ = l.Close()
-		if port >= minPort && port <= maxPort {
-			return port, nil
-		}
-	}
-	return 0, fmt.Errorf("no free port in range %d-%d after 64 tries", minPort, maxPort)
-}
-
 // waitForReadiness polls the worker's HTTP root until any response comes
 // back. opencode answers 404 on /, which is fine — any HTTP status means
 // the server is listening. Connection refused is the "not yet" state we
@@ -93,9 +71,15 @@ func getFreePortInRange(minPort, maxPort int) (int, error) {
 // (the proxy is up); we treat it as a non-error status code along with
 // 2xx/3xx/4xx/5xx — anything other than transport failure means a
 // listener answered.
-func waitForReadiness(ctx context.Context, port int, bearerToken string, deadline time.Duration) error {
+//
+// Once the proxy chain answers, this additionally requires opencode's
+// internal port to actually enforce OPENCODE_SERVER_PASSWORD (ADR-033
+// Fix A′ fail-closed guard) — see requireOpenCodeAuthEnforced. The
+// sibling-isolation guarantee this PR adds rests entirely on that
+// enforcement; if it's ever not there, the worker must not start.
+func waitForReadiness(ctx context.Context, externalPort, internalPort int, bearerToken string, deadline time.Duration) error {
 	dl := time.Now().Add(deadline)
-	url := fmt.Sprintf("http://127.0.0.1:%d/", port)
+	url := fmt.Sprintf("http://127.0.0.1:%d/", externalPort)
 	for time.Now().Before(dl) {
 		reqCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 		req, _ := http.NewRequestWithContext(reqCtx, http.MethodGet, url, nil)
@@ -104,7 +88,7 @@ func waitForReadiness(ctx context.Context, port int, bearerToken string, deadlin
 		cancel()
 		if err == nil {
 			_ = resp.Body.Close()
-			return nil
+			return requireOpenCodeAuthEnforced(ctx, internalPort)
 		}
 		select {
 		case <-ctx.Done():
@@ -112,7 +96,32 @@ func waitForReadiness(ctx context.Context, port int, bearerToken string, deadlin
 		case <-time.After(100 * time.Millisecond):
 		}
 	}
-	return fmt.Errorf("opencode not ready on port %d after %s", port, deadline)
+	return fmt.Errorf("opencode not ready on port %d after %s", externalPort, deadline)
+}
+
+// requireOpenCodeAuthEnforced is the Fix A′ fail-closed guard: a bare,
+// unauthenticated request straight to opencode's internal port must be
+// rejected with 401. Anything else — 200 above all — means
+// OPENCODE_SERVER_PASSWORD is not being enforced, so a sibling worker could
+// already reach this worker's controls unauthenticated. The caller must not
+// let the worker serve traffic in that state.
+func requireOpenCodeAuthEnforced(ctx context.Context, internalPort int) error {
+	reqCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	defer cancel()
+	url := fmt.Sprintf("http://127.0.0.1:%d/", internalPort)
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, url, nil)
+	if err != nil {
+		return fmt.Errorf("build auth-enforcement probe: %w", err)
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("auth-enforcement probe: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		return fmt.Errorf("opencode did not require auth on internal port %d (got %d, want 401) — refusing to start worker unsecured", internalPort, resp.StatusCode)
+	}
+	return nil
 }
 
 // createOpenCodeSession posts a fresh session to the worker. Returns the

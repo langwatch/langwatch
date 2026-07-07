@@ -15,30 +15,37 @@ Feature: Langy worker network isolation under a sandboxed runtime
   # Today, sibling isolation on the NETWORK is enforced by an iptables OUTPUT
   # OWNER-match DROP rule on the shared pod loopback (services/langy-agent/
   # iptables.go, from PR #4913). That rule requires the kernel netfilter
-  # subsystem.
+  # subsystem, which is unavailable under gVisor (runtimeClassName: gvisor —
+  # the required posture for this workload per langwatch-saas#620): gVisor's
+  # Sentry does not implement iptables / nftables in ANY backend or network
+  # mode. The rule cannot be installed, and the manager aborts startup.
+  # Verified on dev EKS (ARM64) 2026-07-02; see langwatch-saas#620 for the
+  # full capability matrix.
   #
-  # When the pod runs under gVisor (runtimeClassName: gvisor — the required
-  # posture for this workload per the reference chart and langwatch-saas#620),
-  # netfilter is unavailable: gVisor's Sentry does not implement iptables /
-  # nftables in ANY backend or network mode. The rule cannot be installed, and
-  # the manager aborts startup. Verified on dev EKS (ARM64) 2026-07-02; see
-  # langwatch-saas#620 for the full capability matrix.
+  # Root cause (established 2026-07-07): the iptables rule was treating a
+  # symptom. Opencode's HTTP control server has no authentication by default,
+  # so any sibling that can reach a worker's loopback port can drive that
+  # worker's opencode to run shell as it and exfiltrate its live credentials.
+  # The port being reachable was never the vulnerability — the port being
+  # unauthenticated was.
   #
-  # This feature replaces the netfilter-based network wall with per-worker
-  # network namespaces, which gVisor DOES implement. Isolation is then a
-  # property of the topology (a sibling has no route to reach the port at all)
-  # rather than a filtering rule layered over a shared network.
+  # This feature closes the hole by giving every worker's opencode a distinct,
+  # random OPENCODE_SERVER_PASSWORD (HTTP Basic auth). The manager's
+  # authenticated proxy knows the password and can reach the worker; a sibling
+  # that never learns the password gets 401. Isolation becomes a property of
+  # authentication rather than network topology, so it no longer depends on
+  # netfilter and works unchanged under gVisor.
   # ---------------------------------------------------------------------------
 
   # ===========================================================================
   # Sibling isolation (the core security property — must hold under gVisor)
   # ===========================================================================
 
-  Scenario: A worker cannot reach a sibling worker's opencode port
+  Scenario: A worker cannot authenticate to a sibling worker's opencode port
     Given two workers A and B are running for different conversations
-    And each worker's opencode listens on its own loopback port
-    When worker A attempts to connect to worker B's opencode port
-    Then the connection does not succeed
+    And each worker's opencode is secured by its own random password
+    When worker A attempts to connect to worker B's opencode port without B's password
+    Then the request is rejected with 401 Unauthorized
     And worker A cannot read worker B's session or credentials
 
   Scenario: A worker can still reach its own opencode port
@@ -48,12 +55,12 @@ Feature: Langy worker network isolation under a sandboxed runtime
     And the response is returned to the caller
 
   # ===========================================================================
-  # Required connectivity is preserved (the hard part of the design)
+  # Required connectivity is preserved
   #
-  # Isolating the worker's network must NOT cut off the connectivity it
-  # legitimately needs. These scenarios are the acceptance bar for whatever
-  # connectivity mechanism the implementation chooses (veth pair, proxied
-  # egress, etc.).
+  # Securing the worker's opencode port must NOT cut off the connectivity it
+  # legitimately needs. These scenarios are the acceptance bar regardless of
+  # mechanism — under the current password-based design the network topology
+  # never changes, so they hold by construction.
   # ===========================================================================
 
   Scenario: An isolated worker can still reach the control plane and gateway

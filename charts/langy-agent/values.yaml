@@ -80,10 +80,11 @@ workspaceVolume: {}
 ##
 ## Mitigations that keep the blast radius small even with root in the pod:
 ##   - Drop ALL caps and add back ONLY what's strictly required: the four
-##     per-UID-handoff caps (SETUID/SETGID/CHOWN/DAC_OVERRIDE) plus
-##     NET_ADMIN for the iptables OUTPUT-OWNER drop on loopback that
-##     closes the worker→worker exfil hole at the kernel layer (see
-##     services/langy-agent/iptables.go). No SYS_*.
+##     per-UID-handoff caps (SETUID/SETGID/CHOWN/DAC_OVERRIDE). NET_ADMIN is
+##     also still present below but is no longer load-bearing — the
+##     worker→worker exfil hole it guarded is now closed by opencode's own
+##     per-worker password (ADR-033 Fix A′); its removal is a separate
+##     follow-up audit, not part of this change. No SYS_*.
 ##   - allowPrivilegeEscalation: false → no_new_privs is set, so children
 ##     cannot regain caps via setuid binaries.
 ##   - readOnlyRootFilesystem stays on so a worker can't pivot through
@@ -108,15 +109,12 @@ containerSecurityContext:
     # chown per-session dirs to a unique UID, write 0600 config blobs as
     # that UID, and spawn the OpenCode subprocess directly into it.
     #
-    # NET_ADMIN was added on 2026-06-30 so the manager can install an
-    # iptables OUTPUT rule at startup that drops loopback-TCP packets
-    # from non-root UIDs to the locked opencode internal port range
-    # (40000-49999). Without that rule, a prompt-injected worker scans
-    # /proc/net/tcp, connects to a sibling worker's unauthenticated
-    # opencode TCP as the victim's UID, and `env` exfiltrates the
-    # victim's LANGWATCH_API_KEY / GH_TOKEN / OPENAI_API_KEY out of the
-    # victim's own process. See services/langy-agent/iptables.go for
-    # the exact rule and Sergio's P1 review on PR #4913 for the threat.
+    # NET_ADMIN was added on 2026-06-30 so the manager could install an
+    # iptables OUTPUT rule dropping loopback-TCP from non-root UIDs to the
+    # opencode internal port range — dead under gVisor (no netfilter) and
+    # superseded by ADR-033 Fix A′ (per-worker OPENCODE_SERVER_PASSWORD).
+    # The capability is kept here for now; dropping it is a separate
+    # follow-up audit rather than part of this change.
     #
     # Any addition beyond this needs to be justified in the
     # SecurityContext header above.
