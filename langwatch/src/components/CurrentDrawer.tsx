@@ -150,8 +150,20 @@ export function CurrentDrawer({ marginTop }: { marginTop?: number }) {
 }
 
 function DrawerLoadingFallback() {
+  // CurrentDrawer is mounted in the page's normal flow; the real drawers
+  // render through a portal, so this fallback is the only piece that
+  // would take layout space. Keep it position-fixed (where the drawer
+  // will appear) or the whole page jumps down while the chunk loads.
   return (
-    <Center height="200px">
+    <Center
+      position="fixed"
+      top={0}
+      right={0}
+      bottom={0}
+      width="120px"
+      zIndex="overlay"
+      pointerEvents="none"
+    >
       <Spinner size="lg" color="blue.500" />
     </Center>
   );

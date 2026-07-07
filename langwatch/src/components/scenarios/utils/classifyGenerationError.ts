@@ -4,6 +4,7 @@
  * Tier-1: known error shapes → specific, actionable copy.
  * Tier-2 (unknown): generic copy + raw backend message verbatim.
  */
+import { ScenarioGenerationError } from "../services/scenarioGeneration";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -28,8 +29,30 @@ export type GenerationErrorClass =
  * - Plain strings
  * - Everything else via String()
  */
+/**
+ * Formats a typed generation error for display: its kind, the message
+ * when it adds information beyond the kind, and every meta entry —
+ * e.g. `bad_request (reason: missing_provider)`. This is what the
+ * tier-2 raw-message surface shows for handled backend failures, so
+ * the user sees the discriminant, not just an opaque status word.
+ */
+function describeGenerationError(error: ScenarioGenerationError): string {
+  const head =
+    error.message && error.message !== error.kind
+      ? `${error.kind}: ${error.message}`
+      : error.kind;
+  const meta = Object.entries(error.meta)
+    .map(([k, v]) => `${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`)
+    .join(", ");
+  return meta ? `${head} (${meta})` : head;
+}
+
 function extractMessage(error: unknown): string {
   if (typeof error === "string") return error;
+
+  if (error instanceof ScenarioGenerationError) {
+    return describeGenerationError(error);
+  }
 
   if (error instanceof Error) {
     // TRPCClientError stores the server message in error.message already,
@@ -51,11 +74,37 @@ function extractMessage(error: unknown): string {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Maps a `ScenarioGenerationError.kind` (the stable discriminant the
+ * generate endpoint forwards from handled gateway failures) to a
+ * classified tier. Returns null for kinds without tailored copy so
+ * they fall through to message matching.
+ */
+function classifyByKind(error: ScenarioGenerationError): GenerationErrorClass | null {
+  switch (error.kind) {
+    case "missing_provider":
+      return {
+        tier: "config",
+        cta: "configure",
+        copy: "The default model's provider isn't supported for generation. Choose a different default model to continue.",
+      };
+    default:
+      return null;
+  }
+}
+
+/**
  * Maps a generation error to a classified tier with tailored copy and a recovery CTA.
  *
- * Regex matching is performed case-insensitively against the extracted message string.
+ * Typed errors from the generate endpoint are matched on their `kind`
+ * first; everything else falls back to case-insensitive regex matching
+ * against the extracted message string.
  */
 export function classifyGenerationError(error: unknown): GenerationErrorClass {
+  if (error instanceof ScenarioGenerationError) {
+    const byKind = classifyByKind(error);
+    if (byKind) return byKind;
+  }
+
   const message = extractMessage(error);
 
   if (/no default model/i.test(message)) {

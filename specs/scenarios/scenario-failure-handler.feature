@@ -14,13 +14,13 @@ Feature: Scenario Failure Handler
   # ============================================================================
   # ScenarioFailureHandler Service - Unit Tests
   # ============================================================================
-  # The handler ensures failure events are emitted to Elasticsearch when
-  # scenario jobs fail (child process crash, timeout, prefetch error).
+  # The handler ensures failure events are emitted when scenario jobs fail
+  # (child process crash, timeout, prefetch error).
 
   @unit @unimplemented
   Scenario: Emit both RUN_STARTED and RUN_FINISHED when no events exist
     Given a scenario job failed with error "Child process exited with code 1"
-    And no events exist in Elasticsearch for this batchRunId
+    And no events exist for this batchRunId
     When ScenarioFailureHandler.ensureFailureEventsEmitted is called
     Then a RUN_STARTED event is emitted with a synthetic scenarioRunId
     And a RUN_FINISHED event is emitted with status ERROR
@@ -28,9 +28,9 @@ Feature: Scenario Failure Handler
     And both events share the same scenarioRunId
 
   @unit @unimplemented
-  Scenario: Use pre-assigned scenarioRunId when no events exist in Elasticsearch
+  Scenario: Use pre-assigned scenarioRunId when no events exist for the batch run
     Given a scenario job failed with error "Child process exited with code 1"
-    And no events exist in Elasticsearch for this batchRunId
+    And no events exist for this batchRunId
     And the job data includes a pre-assigned scenarioRunId
     When ScenarioFailureHandler.ensureFailureEventsEmitted is called
     Then the pre-assigned scenarioRunId is used for both events

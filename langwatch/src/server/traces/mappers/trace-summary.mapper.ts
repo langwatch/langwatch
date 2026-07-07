@@ -484,7 +484,7 @@ export function extractEventsFromSpans({
 
 /**
  * Maps a TraceSummaryData (from ClickHouse trace_summaries) and its associated spans
- * to the legacy Trace type used by the Elasticsearch-based system.
+ * to the legacy Trace type used by the pre-ClickHouse trace system.
  */
 export function mapTraceSummaryToTrace(
   summary: TraceSummaryData,

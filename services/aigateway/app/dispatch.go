@@ -72,16 +72,21 @@ func findCredential(creds []domain.Credential, id string) domain.Credential {
 
 func classifyProviderError(err error) retry.Reason {
 	// A forwarded upstream response classifies by its real HTTP status: a
-	// terminal client error (4xx other than 429) must NOT trigger credential
-	// fallback — retrying a "credit balance too low" or "invalid request" on
-	// the next key is pointless and only delays the terminal error reaching
-	// the client. Rate-limit (429) and server errors (5xx) stay retryable so
-	// the gateway still falls back across the credential chain.
+	// terminal client error (4xx other than 429/404) must NOT trigger
+	// credential fallback — retrying a "credit balance too low" or "invalid
+	// request" on the next key is pointless and only delays the terminal
+	// error reaching the client. 404 IS fallback-eligible: in multi-provider
+	// chains it usually means "this provider doesn't serve that model"
+	// (common with custom/OpenAI-compatible providers), and the next slot
+	// may. Rate-limit (429) and server errors (5xx) stay retryable so the
+	// gateway still falls back across the credential chain.
 	var ue *domain.UpstreamError
 	if errors.As(err, &ue) {
 		switch {
 		case ue.StatusCode == http.StatusTooManyRequests:
 			return retry.ReasonRateLimit
+		case ue.StatusCode == http.StatusNotFound:
+			return retry.ReasonNotFound
 		case ue.StatusCode >= 500:
 			return retry.ReasonRetryable5xx
 		default:

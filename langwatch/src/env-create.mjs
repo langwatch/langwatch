@@ -142,7 +142,11 @@ export function createEnvConfig() {
       // hourly cap, bounding the aggregate trigger-email volume a whole project
       // can emit in 24h (SES sender-reputation protection). Counts RECIPIENTS
       // (actual outbound email volume), not dispatches.
-      TRIGGER_EMAIL_TENANT_DAILY_CAP: z.coerce.number().int().positive().default(10000),
+      TRIGGER_EMAIL_TENANT_DAILY_CAP: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(10000),
       DEMO_PROJECT_ID: z.string().optional(),
       DEMO_PROJECT_USER_ID: z.string().optional(),
       DEMO_PROJECT_SLUG: z.string().optional(),
@@ -329,7 +333,8 @@ export function createEnvConfig() {
       EVAL_MAX_PAYLOAD_BYTES: process.env.EVAL_MAX_PAYLOAD_BYTES,
       TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES: process.env.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES,
       TRIGGER_EMAIL_HOURLY_CAP: process.env.TRIGGER_EMAIL_HOURLY_CAP,
-      TRIGGER_EMAIL_TENANT_DAILY_CAP: process.env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
+      TRIGGER_EMAIL_TENANT_DAILY_CAP:
+        process.env.TRIGGER_EMAIL_TENANT_DAILY_CAP,
       DEMO_PROJECT_ID: process.env.DEMO_PROJECT_ID,
       DEMO_PROJECT_USER_ID: process.env.DEMO_PROJECT_USER_ID,
       DEMO_PROJECT_SLUG: process.env.DEMO_PROJECT_SLUG,

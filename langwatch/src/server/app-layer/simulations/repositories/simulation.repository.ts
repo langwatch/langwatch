@@ -20,6 +20,8 @@ export type AllSuitesRunDataResult =
 export interface SimulationRepository {
   getScenarioSetsData(params: {
     projectId: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<ScenarioSetData[]>;
 
   getScenarioRunData(params: {
@@ -32,6 +34,8 @@ export interface SimulationRepository {
     scenarioSetId: string;
     limit?: number;
     cursor?: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<BatchHistoryResult>;
 
   getRunDataForBatchRun(params: {
@@ -67,6 +71,8 @@ export interface SimulationRepository {
   getBatchRunCountForScenarioSet(params: {
     projectId: string;
     scenarioSetId: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<number>;
 
   getExternalSetSummaries(params: {

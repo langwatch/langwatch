@@ -5,7 +5,7 @@
 # to TARGETARCH natively. This avoids QEMU emulation when buildx is producing
 # images for an arch different from the host, which is the difference between
 # a 30-second compile and a 30-minute one.
-FROM --platform=$BUILDPLATFORM golang:1.26.2-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.26.4-alpine AS build
 WORKDIR /src
 RUN apk add --no-cache git ca-certificates tzdata
 

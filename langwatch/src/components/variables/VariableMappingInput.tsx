@@ -103,7 +103,7 @@ type VariableMappingInputProps = {
   disabled?: boolean;
   /** Whether this mapping is missing and should be highlighted */
   isMissing?: boolean;
-  /** When true, shows yellow background but not "Required" placeholder (for optional fields) */
+  /** When true, shows the missing-highlight background but not the "Required" placeholder (for optional fields) */
   optionalHighlighting?: boolean;
   /** Identifier used for data-testid on the underlying input element */
   inputTestId?: string;
@@ -654,14 +654,14 @@ export const VariableMappingInput = ({
       {/* Container with full-width bottom border */}
       <Box
         borderBottom="1px solid"
-        borderColor={isMissing ? "yellow.500" : "border"}
-        background={isMissing ? "orange.50" : undefined}
+        borderColor={isMissing ? "orange.emphasized" : "border"}
+        background={isMissing ? "orange.subtle" : undefined}
         // borderRadius={isMissing ? "md" : undefined}
         paddingX={isMissing ? 1 : undefined}
         _focusWithin={{
-          borderColor: isMissing ? "yellow.600" : "blue.500",
+          borderColor: isMissing ? "orange.fg" : "blue.500",
           boxShadow: isMissing
-            ? "var(--chakra-colors-yellow-400) 0px 1px 0px 0px"
+            ? "var(--chakra-colors-orange-emphasized) 0px 1px 0px 0px"
             : "var(--chakra-colors-blue-500) 0px 1px 0px 0px",
         }}
         cursor={disabled ? "not-allowed" : "text"}
@@ -743,7 +743,7 @@ export const VariableMappingInput = ({
                 {index < inProgressPath.path.length - 1 && (
                   <ChevronRight
                     size={12}
-                    color="var(--chakra-colors-gray-400)"
+                    color="var(--chakra-colors-fg-muted)"
                   />
                 )}
               </HStack>
@@ -767,7 +767,7 @@ export const VariableMappingInput = ({
                     ? "Select nested field..."
                     : placeholder
             }
-            _placeholder={{ color: isMissing ? "yellow.600" : undefined }}
+            _placeholder={{ color: isMissing ? "orange.fg" : undefined }}
             size="sm"
             border="none"
             outline="none"
@@ -818,7 +818,7 @@ export const VariableMappingInput = ({
                     paddingX={2}
                     paddingY={1}
                     gap={1}
-                    background="blue.50"
+                    background="blue.subtle"
                     borderRadius="4px"
                     marginBottom={1}
                   >
@@ -843,9 +843,9 @@ export const VariableMappingInput = ({
                       cursor="pointer"
                       borderRadius="4px"
                       background={
-                        highlightedIndex === -1 ? "blue.50" : "transparent"
+                        highlightedIndex === -1 ? "blue.subtle" : "transparent"
                       }
-                      _hover={{ background: "blue.50" }}
+                      _hover={{ background: "blue.subtle" }}
                       onClick={handleSelectCurrentPath}
                       onMouseMove={() => {
                         if (isKeyboardNav || highlightedIndex !== -1) {
@@ -855,14 +855,14 @@ export const VariableMappingInput = ({
                       }}
                       data-testid="use-all-option"
                       borderBottom="1px solid"
-                      borderColor="gray.100"
+                      borderColor="border.muted"
                       marginBottom={1}
                     >
-                      <Check size={12} color="var(--chakra-colors-green-500)" />
+                      <Check size={12} color="var(--chakra-colors-green-fg)" />
                       <Text
                         fontSize="13px"
                         fontWeight="medium"
-                        color="green.600"
+                        color="green.fg"
                       >
                         {currentDropdownContext.parentIsCompleteLabel ??
                           `Use all ${currentDropdownContext.parentFieldName}`}
@@ -908,7 +908,7 @@ export const VariableMappingInput = ({
                           gap={2}
                           cursor="pointer"
                           borderRadius="4px"
-                          background={isHighlighted ? "blue.50" : "transparent"}
+                          background={isHighlighted ? "blue.subtle" : "transparent"}
                           onMouseMove={() => {
                             if (
                               isKeyboardNav ||
@@ -940,7 +940,7 @@ export const VariableMappingInput = ({
                                 return (
                                   <>
                                     *{" "}
-                                    <Text as="span" color="gray.400">
+                                    <Text as="span" color="fg.muted">
                                       {parenContent}
                                     </Text>
                                   </>
@@ -952,7 +952,7 @@ export const VariableMappingInput = ({
                           {fieldHasChildren ? (
                             <ChevronRight
                               size={14}
-                              color="var(--chakra-colors-gray-400)"
+                              color="var(--chakra-colors-fg-muted)"
                             />
                           ) : (
                             <VariableTypeBadge type={field.type} size="xs" />
@@ -977,7 +977,7 @@ export const VariableMappingInput = ({
                       borderRadius="4px"
                       background={
                         highlightedIndex === allOptions.length - 1
-                          ? "blue.50"
+                          ? "blue.subtle"
                           : "transparent"
                       }
                       onMouseMove={() => {

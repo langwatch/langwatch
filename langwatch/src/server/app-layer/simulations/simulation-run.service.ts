@@ -27,6 +27,8 @@ export class SimulationRunService {
 
   async getScenarioSetsData(params: {
     projectId: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<ScenarioSetData[]> {
     return this.repository.getScenarioSetsData(params);
   }
@@ -43,6 +45,8 @@ export class SimulationRunService {
     scenarioSetId: string;
     limit?: number;
     cursor?: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<BatchHistoryResult> {
     return this.repository.getBatchHistoryForScenarioSet(params);
   }
@@ -88,6 +92,8 @@ export class SimulationRunService {
   async getBatchRunCountForScenarioSet(params: {
     projectId: string;
     scenarioSetId: string;
+    startDate?: number;
+    endDate?: number;
   }): Promise<number> {
     return this.repository.getBatchRunCountForScenarioSet(params);
   }

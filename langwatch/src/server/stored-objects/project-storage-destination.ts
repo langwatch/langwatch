@@ -79,14 +79,19 @@ export function redactStorageUri(uri: string): string {
     const colonSlashSlash = uri.indexOf("://");
     if (colonSlashSlash === -1) return uri;
     const scheme = uri.slice(0, colonSlashSlash);
+    // Schemes are case-insensitive in URI syntax; an SDK that quotes
+    // `S3://bucket/key` must still be redacted (text-level redactor uses /i).
+    const schemeLower = scheme.toLowerCase();
     const rest = uri.slice(colonSlashSlash + 3);
 
-    if (scheme === "s3") {
+    if (schemeLower === "s3" || schemeLower === "gs") {
+      // s3://bucket/projectId/sha256 and gs://bucket/projectId/sha256 — bucket
+      // identifies the tenant's storage account; the rest is content-addressed.
       const slash = rest.indexOf("/");
       if (slash === -1) return `${scheme}://***`;
       return `${scheme}://***${rest.slice(slash)}`;
     }
-    if (scheme === "azure-blob") {
+    if (schemeLower === "azure-blob") {
       // azure-blob://account/container/projectId/sha256 — first 2 path
       // segments identify the tenant's storage account; rest is content-
       // addressed and safe.
@@ -94,20 +99,29 @@ export function redactStorageUri(uri: string): string {
       const safe = segments.slice(2).join("/");
       return `${scheme}://***/***${safe ? "/" + safe : ""}`;
     }
-    if (scheme === "file") {
+    if (schemeLower === "file") {
       // file:///<root>/<projectId>/<sha256> — root may encode the install
       // path of a self-host tenant; treat as sensitive.
       const slash = rest.indexOf("/", 1);
       if (slash === -1) return `${scheme}:///***`;
       const tail = rest.slice(slash);
-      const lastTwoSlashes = tail.lastIndexOf(
-        "/",
-        tail.lastIndexOf("/") - 1,
-      );
+      const lastTwoSlashes = tail.lastIndexOf("/", tail.lastIndexOf("/") - 1);
       return `${scheme}:///***${lastTwoSlashes !== -1 ? tail.slice(lastTwoSlashes) : ""}`;
     }
     return uri;
   } catch {
     return "<unredactable-uri>";
   }
+}
+
+const STORAGE_URI_IN_TEXT = /\b(?:s3|azure-blob|gs|file):\/\/[^\s'"]+/gi;
+
+/**
+ * Redacts every storage URI embedded in a free-text string — e.g. an object-
+ * store SDK error message that quotes the failing `s3://bucket/key`. Use on any
+ * error text that ships to a shared log sink: a BYOC tenant's bucket / account
+ * is a cross-tenant disclosure channel otherwise.
+ */
+export function redactStorageUrisInText(text: string): string {
+  return text.replace(STORAGE_URI_IN_TEXT, (uri) => redactStorageUri(uri));
 }

@@ -35,7 +35,7 @@ import {
 
 /**
  * Read-facing Organization shape — intentionally does NOT include
- * elasticsearchNodeUrl / elasticsearchApiKey / s3Endpoint / s3AccessKeyId /
+ * s3Endpoint / s3AccessKeyId /
  * s3SecretAccessKey / s3Bucket. Those are credentials and the admin Hono
  * route strips them from every list / getOne response (see
  * ee/admin/safeSelects.ts). The edit drawer still accepts *new* values for
@@ -56,7 +56,6 @@ interface AdminOrganization {
   pricingModel: PricingModel;
   license: string | null;
   licenseExpiresAt: string | null;
-  useCustomElasticsearch: boolean;
   useCustomS3: boolean;
   createdAt: string;
 }
@@ -189,9 +188,6 @@ interface FormState {
   pricingModel: PricingModel;
   license: string;
   licenseExpiresAt: string;
-  useCustomElasticsearch: boolean;
-  elasticsearchNodeUrl: string;
-  elasticsearchApiKey: string;
   useCustomS3: boolean;
   s3Endpoint: string;
   s3AccessKeyId: string;
@@ -243,14 +239,11 @@ function OrganizationEditDrawer({
       pricingModel: organization.pricingModel,
       license: organization.license ?? "",
       licenseExpiresAt: toDateInputValue(organization.licenseExpiresAt),
-      useCustomElasticsearch: !!organization.useCustomElasticsearch,
       useCustomS3: !!organization.useCustomS3,
       // Credentials are write-only: the server doesn't echo them back in
       // list/getOne responses (see ee/admin/safeSelects.ts), so the form
       // always starts empty. A non-empty value on save is the user typing
       // a *new* secret; an empty value is left unchanged.
-      elasticsearchNodeUrl: "",
-      elasticsearchApiKey: "",
       s3Endpoint: "",
       s3AccessKeyId: "",
       s3SecretAccessKey: "",
@@ -291,22 +284,11 @@ function OrganizationEditDrawer({
     if (nextExpires !== organization.licenseExpiresAt) {
       data.licenseExpiresAt = nextExpires;
     }
-    if (
-      form.useCustomElasticsearch !== !!organization.useCustomElasticsearch
-    ) {
-      data.useCustomElasticsearch = form.useCustomElasticsearch;
-    }
     if (form.useCustomS3 !== !!organization.useCustomS3)
       data.useCustomS3 = form.useCustomS3;
     // Credentials are write-only — the form starts empty and the server
     // never echoes the stored value. Only forward fields the user typed
     // into; an empty input is treated as "leave the stored secret alone".
-    if (form.elasticsearchNodeUrl.trim() !== "") {
-      data.elasticsearchNodeUrl = form.elasticsearchNodeUrl;
-    }
-    if (form.elasticsearchApiKey.trim() !== "") {
-      data.elasticsearchApiKey = form.elasticsearchApiKey;
-    }
     if (form.s3Endpoint.trim() !== "") data.s3Endpoint = form.s3Endpoint;
     if (form.s3AccessKeyId.trim() !== "")
       data.s3AccessKeyId = form.s3AccessKeyId;
@@ -480,43 +462,6 @@ function OrganizationEditDrawer({
                   onChange={(e) =>
                     setField("licenseExpiresAt", e.target.value)
                   }
-                />
-              </Field.Root>
-
-              <SectionHeading>Custom Elasticsearch</SectionHeading>
-              <Text fontSize="xs" color="fg.muted">
-                Credentials below are write-only — the server never reads them
-                back. Leave blank to keep the stored value; type to replace.
-              </Text>
-              <ToggleRow
-                label="Use custom Elasticsearch"
-                hint="Override the platform-managed ClickHouse/ES cluster for this tenant."
-                checked={form.useCustomElasticsearch}
-                onChange={(v) => setField("useCustomElasticsearch", v)}
-              />
-              <Field.Root>
-                <Field.Label>Node URL</Field.Label>
-                <Input
-                  type="url"
-                  value={form.elasticsearchNodeUrl}
-                  onChange={(e) =>
-                    setField("elasticsearchNodeUrl", e.target.value)
-                  }
-                  placeholder="Leave blank to keep current"
-                  disabled={!form.useCustomElasticsearch}
-                />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>API key</Field.Label>
-                <Input
-                  type="password"
-                  value={form.elasticsearchApiKey}
-                  onChange={(e) =>
-                    setField("elasticsearchApiKey", e.target.value)
-                  }
-                  placeholder="Leave blank to keep current"
-                  disabled={!form.useCustomElasticsearch}
-                  autoComplete="new-password"
                 />
               </Field.Root>
 

@@ -1,8 +1,11 @@
 import crypto from "node:crypto";
-import { evaluationNameAutoslug } from "~/server/background/workers/collector/evaluationNameAutoslug";
-import type { ReportEvaluationCommandData } from "../../evaluation-processing/schemas/commands";
+import { evaluationNameAutoslug } from "~/server/tracer/collector/evaluationNameAutoslug";
 import { createLogger } from "../../../../../utils/logger/server";
-import type { ReactorContext, ReactorDefinition } from "../../../reactors/reactor.types";
+import type {
+  ReactorContext,
+  ReactorDefinition,
+} from "../../../reactors/reactor.types";
+import type { ReportEvaluationCommandData } from "../../evaluation-processing/schemas/commands";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import { STALE_TRACE_THRESHOLD_MS } from "../schemas/constants";
 import type { TraceProcessingEvent } from "../schemas/events";
@@ -174,8 +177,7 @@ export function createCustomEvaluationSyncReactor(
         const evaluatorId =
           evaluation.evaluator_id ?? evaluationNameAutoslug(evaluation.name);
         const status =
-          evaluation.status ??
-          (evaluation.error ? "error" : "processed");
+          evaluation.status ?? (evaluation.error ? "error" : "processed");
         const occurredAt = event.occurredAt;
 
         try {
@@ -208,12 +210,19 @@ export function createCustomEvaluationSyncReactor(
             },
             "Failed to sync custom evaluation",
           );
-          errors.push(error instanceof Error ? error : new Error(String(error)));
+          errors.push(
+            error instanceof Error ? error : new Error(String(error)),
+          );
         }
       }
 
       logger.debug(
-        { tenantId, traceId, evaluationCount: evaluations.length, failedCount: errors.length },
+        {
+          tenantId,
+          traceId,
+          evaluationCount: evaluations.length,
+          failedCount: errors.length,
+        },
         "Custom SDK evaluations synced",
       );
 

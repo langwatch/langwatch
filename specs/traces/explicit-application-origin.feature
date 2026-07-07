@@ -43,11 +43,6 @@ Feature: Explicit application origin for race condition prevention
   #   untagged traces must be regular application traces. No 5-min delay
   #   needed — infer "application" at normal debounce time.
   #
-  # Elasticsearch path:
-  #   The legacy ES path does not implement origin filtering. Null origin
-  #   continues to pass through. Only the event-sourcing pipeline applies
-  #   origin guards.
-  #
   # =========================================================================
 
   Background:

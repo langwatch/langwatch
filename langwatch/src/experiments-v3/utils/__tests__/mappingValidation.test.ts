@@ -64,12 +64,15 @@ describe("mappingValidation", () => {
           httpConfig: {
             url: "https://api.example.com/chat",
             method: "POST",
-            bodyTemplate: '{"query": "{{user_query}}", "context": "{{context}}"}',
+            bodyTemplate:
+              '{"query": "{{user_query}}", "context": "{{context}}"}',
           },
         });
 
         // No mapping yet → invalid
-        expect(getTargetMissingMappings(target, "dataset-1").isValid).toBe(false);
+        expect(getTargetMissingMappings(target, "dataset-1").isValid).toBe(
+          false,
+        );
 
         // Map one of the custom variables → valid
         const targetWithMapping = createHttpAgentTargetConfig({
@@ -77,7 +80,8 @@ describe("mappingValidation", () => {
           httpConfig: {
             url: "https://api.example.com/chat",
             method: "POST",
-            bodyTemplate: '{"query": "{{user_query}}", "context": "{{context}}"}',
+            bodyTemplate:
+              '{"query": "{{user_query}}", "context": "{{context}}"}',
           },
           mappings: {
             "dataset-1": {
@@ -108,10 +112,12 @@ describe("mappingValidation", () => {
             method: "POST",
             bodyTemplate: '{"static": "payload"}',
           },
-      });
+        });
 
-      // No variables at all → valid (nothing to map)
-      expect(getTargetMissingMappings(target, "dataset-1").isValid).toBe(true);
+        // No variables at all → valid (nothing to map)
+        expect(getTargetMissingMappings(target, "dataset-1").isValid).toBe(
+          true,
+        );
       });
     });
   });
@@ -209,9 +215,9 @@ describe("mappingValidation", () => {
       expect(result.isValid).toBe(false);
       // Should have both required fields missing
       expect(result.missingMappings).toHaveLength(2);
-      expect(
-        result.missingMappings.some((m) => m.fieldId === "output"),
-      ).toBe(true);
+      expect(result.missingMappings.some((m) => m.fieldId === "output")).toBe(
+        true,
+      );
       expect(
         result.missingMappings.some((m) => m.fieldId === "expected_output"),
       ).toBe(true);
@@ -255,9 +261,9 @@ describe("mappingValidation", () => {
 
       expect(result.isValid).toBe(false);
       // Should list both required fields as missing
-      expect(
-        result.missingMappings.some((m) => m.fieldId === "output"),
-      ).toBe(true);
+      expect(result.missingMappings.some((m) => m.fieldId === "output")).toBe(
+        true,
+      );
       expect(
         result.missingMappings.some((m) => m.fieldId === "expected_output"),
       ).toBe(true);
@@ -352,6 +358,111 @@ describe("mappingValidation", () => {
 
       // Invalid because at least one field must be mapped
       expect(result.isValid).toBe(false);
+    });
+  });
+
+  describe("pairwise column-target validation (#5378)", () => {
+    const createPairwiseTargetConfig = (
+      overrides: Partial<TargetConfig> = {},
+    ): TargetConfig => ({
+      id: "target-pairwise-1",
+      type: "evaluator",
+      targetEvaluatorId: "eval-db-pairwise",
+      inputs: [],
+      outputs: [
+        { identifier: "score", type: "float" },
+        { identifier: "label", type: "str" },
+      ],
+      mappings: {},
+      pairwise: {
+        variantA: "target-a",
+        variantB: "target-b",
+        hasGoldenAnswer: true,
+        goldenField: "expected_output",
+        includeMetrics: [],
+      },
+      ...overrides,
+    });
+
+    describe("given hasGoldenAnswer is true", () => {
+      describe("when goldenField is set", () => {
+        it("returns valid with no missing mappings", () => {
+          const target = createPairwiseTargetConfig();
+
+          const result = getTargetMissingMappings(target, "dataset-1");
+
+          expect(result.isValid).toBe(true);
+          expect(result.missingMappings).toHaveLength(0);
+        });
+      });
+
+      describe("when goldenField is unset", () => {
+        it("returns invalid with a goldenField entry", () => {
+          const target = createPairwiseTargetConfig({
+            pairwise: {
+              variantA: "target-a",
+              variantB: "target-b",
+              hasGoldenAnswer: true,
+              goldenField: "",
+              includeMetrics: [],
+            },
+          });
+
+          const result = getTargetMissingMappings(target, "dataset-1");
+
+          expect(result.isValid).toBe(false);
+          expect(
+            result.missingMappings.some((m) => m.fieldId === "goldenField"),
+          ).toBe(true);
+        });
+      });
+    });
+
+    describe("given hasGoldenAnswer is false", () => {
+      describe("when goldenField is unset", () => {
+        it("returns valid without requiring goldenField", () => {
+          const target = createPairwiseTargetConfig({
+            pairwise: {
+              variantA: "target-a",
+              variantB: "target-b",
+              hasGoldenAnswer: false,
+              goldenField: "",
+              includeMetrics: [],
+            },
+          });
+
+          const result = getTargetMissingMappings(target, "dataset-1");
+
+          expect(result.isValid).toBe(true);
+          expect(
+            result.missingMappings.some((m) => m.fieldId === "goldenField"),
+          ).toBe(false);
+        });
+      });
+
+      describe("when variantA/variantB are unset", () => {
+        it("still requires variantA/variantB", () => {
+          const target = createPairwiseTargetConfig({
+            pairwise: {
+              variantA: "",
+              variantB: "",
+              hasGoldenAnswer: false,
+              goldenField: "",
+              includeMetrics: [],
+            },
+          });
+
+          const result = getTargetMissingMappings(target, "dataset-1");
+
+          expect(result.isValid).toBe(false);
+          expect(
+            result.missingMappings.some((m) => m.fieldId === "variantA"),
+          ).toBe(true);
+          expect(
+            result.missingMappings.some((m) => m.fieldId === "variantB"),
+          ).toBe(true);
+        });
+      });
     });
   });
 });

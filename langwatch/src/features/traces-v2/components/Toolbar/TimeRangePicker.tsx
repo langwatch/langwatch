@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import { Check, Clock, Copy } from "lucide-react";
 import type React from "react";
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { Popover } from "../../../../components/ui/popover";
 import { Tooltip } from "../../../../components/ui/tooltip";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
@@ -68,18 +69,20 @@ export const TimeRangePicker: React.FC<{ compact?: boolean }> = ({
         content={`Time range: ${triggerLabel}`}
         positioning={{ placement: "bottom" }}
       >
-        <Popover.Trigger asChild>
-          <Button
-            size="xs"
-            variant="outline"
-            fontWeight="medium"
-            gap={compact ? 0 : 1.5}
-            aria-label={`Time range: ${triggerLabel}`}
-          >
-            <Clock size={14} />
-            {!compact && triggerLabel}
-          </Button>
-        </Popover.Trigger>
+        <TriggerAnchor>
+          <Popover.Trigger asChild>
+            <Button
+              size="xs"
+              variant="outline"
+              fontWeight="medium"
+              gap={compact ? 0 : 1.5}
+              aria-label={`Time range: ${triggerLabel}`}
+            >
+              <Clock size={14} />
+              {!compact && triggerLabel}
+            </Button>
+          </Popover.Trigger>
+        </TriggerAnchor>
       </Tooltip>
       <Popover.Content width="auto" minWidth="420px">
         <Popover.Body padding={0}>

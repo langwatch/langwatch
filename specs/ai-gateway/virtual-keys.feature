@@ -63,6 +63,35 @@ Feature: AI Gateway — Virtual Keys
     And after dismissal the full secret can never be retrieved again
     And only the key prefix "vk-lw-xxxx…" is visible in the list
 
+  # ============================================================================
+  # Usage-snippet default model. The copy-paste example must name a model the
+  # key can actually serve. A key bound to a self-hosted OpenAI-compatible
+  # provider (vLLM, LiteLLM) that shows the OpenAI drop-in "gpt-5-mini" sends a
+  # model the endpoint has never heard of, so the first copy-paste call 404s.
+  # The gateway strips the provider prefix before dispatch, so the
+  # "<provider>/<model>" form is always safe: it selects the provider, then
+  # forwards the bare model name upstream.
+  # ============================================================================
+
+  @integration
+  Scenario: Usage example defaults to a model the key can serve
+    Given a virtual key scoped to a custom provider whose model is "Qwen2.5-0.5B-Instruct"
+    When the secret-reveal dialog shows the usage example after create
+    Then the example calls model "custom/Qwen2.5-0.5B-Instruct"
+    And it does not fall back to "gpt-5-mini"
+
+  @integration
+  Scenario: Usage example on the key detail page matches the key's provider
+    Given a virtual key scoped only to a custom provider whose model is "Qwen2.5-0.5B-Instruct"
+    When I open the key detail page usage example
+    Then the example calls model "custom/Qwen2.5-0.5B-Instruct"
+
+  @integration
+  Scenario: Usage example falls back to a safe placeholder when no provider is resolvable
+    Given a virtual key whose eligible providers cannot be resolved on the client
+    When the usage example renders
+    Then the example calls model "gpt-5-mini" as a safe placeholder
+
   @integration
   Scenario: Virtual key secret is stored as peppered HMAC-SHA256 hash
     Given I created a virtual key "demo-key" with secret "vk-lw-01HZX9K3M…"

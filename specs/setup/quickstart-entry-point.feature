@@ -52,7 +52,7 @@ Feature: make quickstart is the single dev environment entry point with intent-b
   Scenario: frontend-only pins host-side Redis for in-process workers, no other compose
     When write_overrides is called with mode=frontend-only
     Then langwatch/.env.dev-up contains NEXTAUTH_PROVIDER=email
-    And REDIS_URL pointing at localhost:6379 (for the in-process BullMQ workers)
+    And REDIS_URL pointing at localhost:6379 (for the in-process workers)
     And it does NOT override DATABASE_URL, CLICKHOUSE_URL, or LANGWATCH_NLP_SERVICE
 
   @integration @unimplemented
@@ -61,7 +61,7 @@ Feature: make quickstart is the single dev environment entry point with intent-b
     Then the command completes in under 5 seconds with a hint to run "pnpm dev"
 
   # --- Host-Redis verification before reuse (#5143, CodeRabbit 4579126710) ---
-  # frontend-only runs the BullMQ workers in-process under `pnpm dev`, so it
+  # frontend-only runs the workers in-process under `pnpm dev`, so it
   # needs a usable local Redis on host :6379. A bare port-in-use check is not
   # enough — the listener might be a non-Redis process or a Redis that needs
   # auth/TLS. dev.sh verifies the listener with `redis-cli ... ping` (PONG)

@@ -31,6 +31,11 @@ import * as readline from "node:readline";
 
 import chalk from "chalk";
 
+import {
+  appEnvHasAllVars,
+  appSettingsTargetFor,
+  installAppEnv,
+} from "./app-settings";
 import { type GovernanceConfig, saveConfig } from "./config";
 import { envForTool, type ToolEnv } from "./wrapper";
 
@@ -246,17 +251,26 @@ export async function askPersistChoice(
 }
 
 /**
- * Ingestion-mode (Path B) variant of the shell-rc persist offer. Called
- * by the `langwatch <tool>` wrapper AFTER it resolves to ingestion mode,
- * so the user can install the tool's OTLP telemetry exports into their
- * shell rc. Once persisted, a plain `<tool>` invocation (without the
- * `langwatch` wrapper) inherits the OTEL_EXPORTER_OTLP_* env and captures
- * automatically - which is the whole point of "installing" the telemetry.
+ * Ingestion-mode (Path B) persist offer. Called by the
+ * `langwatch <tool>` wrapper AFTER it resolves to ingestion mode,
+ * so the user can install the tool's OTLP telemetry exports into
+ * whatever the target for `<tool>` is. Once persisted, a plain
+ * `<tool>` invocation (without the `langwatch` wrapper) inherits
+ * the OTEL_EXPORTER_OTLP_* env and captures automatically - which
+ * is the whole point of "installing" the telemetry.
  *
- * Unlike the login-time gateway offer, this persists the exact OTEL env
- * the wrapper just computed for this run (`vars`), not the gateway block.
- * Y / n / never, same `shell_rc_preference=skip` opt-out. Stays quiet when
- * the shell already has the OTLP exporter env set.
+ * The target depends on the tool:
+ *   - `claude` writes to `~/.claude/settings.json`'s `env` block
+ *     — Claude Code loads that on every invocation, so the vars
+ *     stay scoped to `claude` runs and don't leak into every
+ *     other shell child.
+ *   - Every other supported wrapper (codex, cursor, gemini,
+ *     opencode) falls back to the detected shell rc file.
+ *
+ * Persists the exact OTEL env the wrapper just computed for this
+ * run (`vars`), not the gateway block. Y / n / never, same
+ * `shell_rc_preference=skip` opt-out. Stays quiet when the target
+ * already carries the current export set.
  */
 export async function maybeOfferIngestionShellRcPersist({
   cfg,
@@ -270,9 +284,37 @@ export async function maybeOfferIngestionShellRcPersist({
   if (cfg.shell_rc_preference === "skip") return;
   // Already wired up - the OTLP exporter env is present in this shell.
   if (process.env.OTEL_EXPORTER_OTLP_ENDPOINT) return;
+  if (Object.keys(vars).length === 0) return;
+
+  const appTarget = appSettingsTargetFor(tool);
+  if (appTarget) {
+    if (appEnvHasAllVars(appTarget, vars)) return;
+    console.log();
+    const choice = await askPersistChoice(appTarget.displayPath, tool);
+    if (choice === "skip" || choice === "no") return;
+    if (choice === "never") {
+      recordNeverChoice(cfg);
+      return;
+    }
+    try {
+      installAppEnv(appTarget, vars);
+      console.log(
+        chalk.green(
+          `  ✓ Installed langwatch telemetry exports to ${appTarget.displayPath}`,
+        ),
+      );
+    } catch (err) {
+      console.log(
+        chalk.yellow(
+          `  ! Couldn't write to ${appTarget.displayPath}: ${(err as Error).message}`,
+        ),
+      );
+    }
+    return;
+  }
+
   const shell = detectShell();
   if (!shell) return;
-  if (Object.keys(vars).length === 0) return;
   // Already installed in the rc file, even if this shell hasn't sourced it
   // yet (so the OTEL env isn't in process.env). Keyed on the current vars so
   // a stale / different export block doesn't suppress installing this one.
@@ -285,15 +327,9 @@ export async function maybeOfferIngestionShellRcPersist({
   const choice = await askPersistChoice(target, tool);
   if (choice === "skip" || choice === "no") return;
   if (choice === "never") {
-    cfg.shell_rc_preference = "skip";
-    try {
-      saveConfig(cfg);
-    } catch {
-      // best effort
-    }
+    recordNeverChoice(cfg);
     return;
   }
-  // "yes"
   try {
     const wrote = persistBlockToRc(shell, block);
     console.log(
@@ -303,5 +339,14 @@ export async function maybeOfferIngestionShellRcPersist({
     console.log(
       chalk.yellow(`  ! Couldn't write to ${target}: ${(err as Error).message}`),
     );
+  }
+}
+
+function recordNeverChoice(cfg: GovernanceConfig): void {
+  cfg.shell_rc_preference = "skip";
+  try {
+    saveConfig(cfg);
+  } catch {
+    // best effort — a config write failure just means the next run re-asks.
   }
 }
