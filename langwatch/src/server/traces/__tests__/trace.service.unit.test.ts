@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Protections } from "~/server/elasticsearch/protections";
 import type { Trace } from "~/server/tracer/types";
+import type { Protections } from "~/server/traces/protections";
 import { AmbiguousTraceIdPrefixError, TraceService } from "../trace.service";
 import type { GetAllTracesForProjectInput } from "../types";
 
@@ -9,12 +9,10 @@ import type { GetAllTracesForProjectInput } from "../types";
 // ---------------------------------------------------------------------------
 const {
   mockGetAllTracesForProjectCH,
-  mockGetAllTracesForProjectES,
   mockGetTracesWithSpansCH,
   mockResolveTraceIdByPrefixCH,
 } = vi.hoisted(() => ({
   mockGetAllTracesForProjectCH: vi.fn(),
-  mockGetAllTracesForProjectES: vi.fn(),
   mockGetTracesWithSpansCH: vi.fn(),
   mockResolveTraceIdByPrefixCH: vi.fn(),
 }));
@@ -25,21 +23,11 @@ const mockClickHouseInstance = {
   resolveTraceIdByPrefix: mockResolveTraceIdByPrefixCH,
 };
 
-const mockElasticInstance = {
-  getAllTracesForProject: mockGetAllTracesForProjectES,
-};
-
 const mockEvalInstance = {};
 
 vi.mock("../clickhouse-trace.service", () => ({
   ClickHouseTraceService: Object.assign(vi.fn(), {
     create: () => mockClickHouseInstance,
-  }),
-}));
-
-vi.mock("../elasticsearch-trace.service", () => ({
-  ElasticsearchTraceService: Object.assign(vi.fn(), {
-    create: () => mockElasticInstance,
   }),
 }));
 
@@ -120,15 +108,6 @@ describe("TraceService", () => {
       );
     });
 
-    it("throws when ClickHouse returns null", async () => {
-      mockGetAllTracesForProjectCH.mockResolvedValue(null);
-
-      await expect(
-        service.getAllTracesForProject(input, protections),
-      ).rejects.toThrow(
-        "ClickHouse is enabled but returned null for getAllTracesForProject",
-      );
-    });
   });
 
   describe("getById()", () => {

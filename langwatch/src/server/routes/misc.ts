@@ -8,8 +8,6 @@
  * - src/pages/api/experiment/init.ts
  * - src/pages/api/mcp/authorize.ts
  * - src/pages/api/optimization/[...params].ts
- * - src/pages/api/rerun_checks.ts
- * - src/pages/api/start_workers.ts
  * - src/pages/api/track_event.ts
  * - src/pages/api/track_usage.ts
  * - src/pages/api/trigger/slack.ts
@@ -21,7 +19,6 @@ import type { Project } from "@prisma/client";
 import { AlertType, ExperimentType, TriggerAction } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
-import type { Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { nanoid } from "nanoid";
 import { OpenAI } from "openai";
@@ -35,6 +32,7 @@ import {
   timeseriesSeriesInput,
 } from "~/server/analytics/registry";
 import { sharedFiltersInputSchema } from "~/server/analytics/types";
+import { getAnalyticsService } from "~/server/app-layer/analytics";
 import { hasProjectPermission, isDemoProject } from "~/server/api/rbac";
 import {
   createServiceApp,
@@ -47,7 +45,6 @@ import {
   requireApiKeyPermission,
   type UnifiedAuthVariables,
 } from "~/server/api-key/auth-middleware";
-import { getAnalyticsService } from "~/server/app-layer/analytics";
 import { getApp } from "~/server/app-layer/app";
 import type { DspyStepData } from "~/server/app-layer/dspy-steps/types";
 import {
@@ -59,11 +56,6 @@ import {
 import { ProjectService } from "~/server/app-layer/projects/project.service";
 import { PrismaProjectRepository } from "~/server/app-layer/projects/repositories/project.prisma.repository";
 import { getServerAuthSession } from "~/server/auth";
-import { start } from "~/server/background/worker";
-import {
-  estimateCost,
-  matchModelCostWithFallbacks,
-} from "~/server/background/workers/collector/cost";
 import { prisma } from "~/server/db";
 import {
   type DSPyLLMCall,
@@ -71,7 +63,6 @@ import {
   dSPyStepRESTParamsSchema,
 } from "~/server/experiments/types";
 import { filterFieldsEnum } from "~/server/filters/types";
-import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
 import { buildResourceLimitMessage } from "~/server/license-enforcement/limit-message";
 import { getPayloadSizeHistogram } from "~/server/metrics";
@@ -82,6 +73,10 @@ import {
 import { getPostHogInstance } from "~/server/posthog";
 import { connection as redis } from "~/server/redis";
 import {
+  estimateCost,
+  matchModelCostWithFallbacks,
+} from "~/server/tracer/collector/cost";
+import {
   type TrackEventRESTParamsValidator,
   trackEventRESTParamsValidatorSchema,
 } from "~/server/tracer/types";
@@ -89,8 +84,7 @@ import { runWorkflow as runWorkflowFn } from "~/server/workflows/runWorkflow";
 import { encrypt } from "~/utils/encryption";
 import { createLogger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
-import { slugify } from "~/utils/slugify";
-import { validateInternalSecret } from "./_lib/internal-secret";
+import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 
 const logger = createLogger("langwatch:misc");
 // Shared auth middlewares for every API-key-aware handler in this file.
@@ -130,9 +124,6 @@ const secured = createServiceApp<{ Variables: UnifiedAuthVariables }>({
 // documented at their route.
 const inRouteAuth = handlerManagedAuth(
   "project auth + permission ceiling enforced by in-route middleware",
-);
-const internalAuth = internalSecret(
-  "internal shared secret validated in-handler via validateInternalSecret",
 );
 
 // =============================================
@@ -657,67 +648,10 @@ secured
   );
 
 // =============================================
-// GET /api/rerun_checks
-// =============================================
-const rerunChecksHandler = async (c: Context) => {
-  if (!validateInternalSecret(c)) {
-    return c.body(null, 401);
-  }
-  try {
-    const checkId = c.req.query("checkId") as string;
-    const projectId = c.req.query("projectId") as string;
-
-    const { default: rerunChecks } = await import("~/tasks/rerunChecks");
-    await rerunChecks(checkId, projectId);
-
-    return c.json({ message: "Checks rescheduled" });
-  } catch (error: any) {
-    return c.json(
-      {
-        message: "Error starting worker",
-        error: error?.message ? error?.message.toString() : `${error}`,
-      },
-      500,
-    );
-  }
-};
-secured.access(internalAuth).get("/rerun_checks", rerunChecksHandler);
-secured.access(internalAuth).post("/rerun_checks", rerunChecksHandler);
-
-// =============================================
-// GET /api/start_workers
-// =============================================
-const MAX_WORKER_DURATION = 300;
-
-const startWorkersHandler = async (c: Context) => {
-  if (!validateInternalSecret(c)) {
-    return c.body(null, 401);
-  }
-  try {
-    const maxRuntimeMs = (MAX_WORKER_DURATION - 60) * 1000;
-    await start(undefined, maxRuntimeMs);
-    return c.json({ message: "Worker done" });
-  } catch (error: any) {
-    return c.json(
-      {
-        message: "Error starting worker",
-        error: error?.message ? error?.message.toString() : `${error}`,
-      },
-      500,
-    );
-  }
-};
-secured.access(internalAuth).get("/start_workers", startWorkersHandler);
-secured.access(internalAuth).post("/start_workers", startWorkersHandler);
-
-// =============================================
 // POST /api/track_event
 // =============================================
-//
-// Legacy URL kept for backwards compatibility. The canonical endpoint is
-// `POST /api/events/track` (src/app/api/events/[[...route]]/app.ts). Both
-// routes share `recordTrackedEventSpan` so behaviour stays identical.
-
+// Both this legacy URL and the canonical POST /api/events/track route
+// through track-event.service so behaviour stays identical between them.
 secured
   .access(inRouteAuth)
   .post("/track_event", authMiddleware, requireTracesCreate, async (c) => {
@@ -1296,7 +1230,6 @@ secured
     }
 
     try {
-      const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
       const response = await ssrfSafeFetch(url);
 
       if (!response.ok) {

@@ -60,7 +60,7 @@ func TestBedrockVPCE_DispatchHitsEndpointAndShapesResponse(t *testing.T) {
 		Body:  []byte(`{"messages":[{"role":"user","content":"what is the answer?"}]}`),
 	}
 
-	provider := mapProvider(cred.ProviderID)
+	provider := mapProvider(cred)
 	endpoint := bedrockRuntimeEndpoint(cred)
 	if endpoint == "" {
 		t.Fatal("bedrockRuntimeEndpoint returned empty for a cred carrying the endpoint")
@@ -234,7 +234,7 @@ func TestBedrockVPCE_DispatchHonorsAWSStyleCredentialKeys(t *testing.T) {
 	if endpoint == "" {
 		t.Fatal("bedrockRuntimeEndpoint returned empty for the aws_* fallback key")
 	}
-	resp, err := router.dispatchBedrockVPCE(context.Background(), req, mapProvider(cred.ProviderID), req.Model, cred, endpoint)
+	resp, err := router.dispatchBedrockVPCE(context.Background(), req, mapProvider(cred), req.Model, cred, endpoint)
 	if err != nil {
 		t.Fatalf("dispatchBedrockVPCE returned error: %v", err)
 	}

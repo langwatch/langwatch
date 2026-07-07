@@ -178,6 +178,30 @@ func TestExecute_CustomEmitsBareModelInBody(t *testing.T) {
 	}
 }
 
+func TestExecute_CustomModelWithSlashUsesRequestProvider(t *testing.T) {
+	// The engine strips the "custom/" prefix and stores it on
+	// req.Provider — a custom model id containing its own slash
+	// ("Qwen/Qwen2.5-32B-Instruct") must not have "Qwen" mis-derived
+	// as the provider, and the full id (dots included) must survive
+	// onto the wire.
+	gw := &fakeGateway{respStatus: 200, respBody: successResponse("ok")}
+	exec := New(gw)
+	_, err := exec.Execute(context.Background(), app.LLMRequest{
+		Model:    "Qwen/Qwen2.5-32B-Instruct",
+		Provider: "custom",
+		LiteLLMParams: map[string]any{
+			"api_base": "http://llm-server:8000/v1",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := bodyField(t, gw.lastReq.Body, "model")
+	if got != "Qwen/Qwen2.5-32B-Instruct" {
+		t.Errorf("expected full custom model id on the wire, got %q", got)
+	}
+}
+
 func TestExecute_ReasoningModelOverridesTempAndMaxTokens(t *testing.T) {
 	gw := &fakeGateway{respStatus: 200, respBody: successResponse("ok")}
 	exec := New(gw)

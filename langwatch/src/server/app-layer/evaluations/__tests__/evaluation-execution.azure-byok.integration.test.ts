@@ -15,8 +15,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators";
 import type { Trace } from "~/server/tracer/types";
-import type { LangEvalsClient } from "../../clients/langevals/langevals.client";
 import type { TraceService } from "~/server/traces/trace.service";
+import type { LangEvalsClient } from "../../clients/langevals/langevals.client";
 
 const { getProjectModelProvidersMock } = vi.hoisted(() => ({
   getProjectModelProvidersMock: vi.fn(),
@@ -35,8 +35,8 @@ vi.mock("~/server/api/routers/modelProviders.utils", async (importOriginal) => {
 
 import { createDefaultModelEnvResolver } from "../evaluation-execution.factories";
 import {
-  EvaluationExecutionService,
   type EvaluationExecutionDeps,
+  EvaluationExecutionService,
   type WorkflowExecutor,
 } from "../evaluation-execution.service";
 
@@ -54,15 +54,18 @@ function buildTrace(overrides?: Partial<Trace>): Trace {
   } as Trace;
 }
 
-function createService(overrides: {
-  clientEvaluate?: (...args: unknown[]) => Promise<SingleEvaluationResult>;
-  trace?: Trace;
-} = {}) {
+function createService(
+  overrides: {
+    clientEvaluate?: (...args: unknown[]) => Promise<SingleEvaluationResult>;
+    trace?: Trace;
+  } = {},
+) {
   const trace = overrides.trace ?? buildTrace();
 
   const mockTraceService = {
     getTracesWithSpans: vi.fn().mockResolvedValue([trace]),
     getTracesWithSpansByThreadIds: vi.fn().mockResolvedValue([]),
+    getEvaluationsMultiple: vi.fn().mockResolvedValue({}),
   } as unknown as TraceService;
 
   const mockWorkflowExecutor: WorkflowExecutor = {

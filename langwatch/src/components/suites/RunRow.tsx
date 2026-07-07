@@ -191,13 +191,13 @@ function RunRowData({
               paddingY={0.5}
               borderRadius="md"
               border="1px solid"
-              borderColor="gray.300"
+              borderColor="border"
               fontSize="xs"
-              color="fg.default"
+              color="fg"
               cursor={isCancellingBatch ? "default" : "pointer"}
               flexShrink={0}
               opacity={isCancellingBatch ? 0.6 : 1}
-              _hover={isCancellingBatch ? undefined : { bg: "gray.100", borderColor: "gray.400" }}
+              _hover={isCancellingBatch ? undefined : { bg: "bg.muted", borderColor: "border.emphasized" }}
               onClick={(e: React.MouseEvent) => {
                 e.stopPropagation();
                 if (!isCancellingBatch) setIsCancelAllDialogOpen(true);

@@ -17,6 +17,7 @@ const (
 	ReasonSuccess        Reason = "success"
 	ReasonFallback       Reason = "fallback_success"
 	ReasonRetryable5xx   Reason = "retryable_5xx"
+	ReasonNotFound       Reason = "not_found"
 	ReasonRateLimit      Reason = "rate_limit"
 	ReasonTimeout        Reason = "timeout"
 	ReasonNetwork        Reason = "network"
@@ -88,6 +89,7 @@ var eventsPool = sync.Pool{
 // allocate a new map on every Walk call.
 var defaultTriggers = map[Reason]bool{
 	ReasonRetryable5xx: true,
+	ReasonNotFound:     true,
 	ReasonRateLimit:    true,
 	ReasonTimeout:      true,
 	ReasonNetwork:      true,

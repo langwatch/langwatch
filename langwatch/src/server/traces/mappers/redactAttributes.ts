@@ -2,7 +2,7 @@ import {
   type CompiledAttributeMatcher,
   compileAttributePatterns,
 } from "~/server/data-privacy/attributePatternMatcher";
-import type { Protections } from "~/server/elasticsearch/protections";
+import type { Protections } from "~/server/traces/protections";
 
 /**
  * Read-time enforcement for RESTRICTED custom attribute rules: replaces the

@@ -224,7 +224,7 @@ Feature: Evaluation execution - Backend
   Scenario: Abort saves partial results
     Given 5 cells completed before abort
     When abort is processed
-    Then the 5 completed results are saved to Elasticsearch
+    Then the 5 completed results are persisted and visible in the run history
     And stopped_at timestamp is set
 
   # A cell blocked waiting on a slow model must not keep running until that

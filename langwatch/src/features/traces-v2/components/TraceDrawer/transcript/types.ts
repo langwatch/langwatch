@@ -1,3 +1,5 @@
+import type { MediaPartData } from "~/components/simulations/MediaPart";
+
 export interface ChatMessage {
   role: string;
   content: string | null | Array<Record<string, unknown> | string>;
@@ -35,6 +37,7 @@ export type ContentBlock =
       content: unknown;
       isError?: boolean;
     }
+  | { kind: "media"; part: MediaPartData }
   | { kind: "raw"; data: unknown };
 
 export type ConversationTurn =

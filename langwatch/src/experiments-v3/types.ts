@@ -183,18 +183,43 @@ export type LocalEvaluatorConfig = z.infer<typeof localEvaluatorConfigSchema>;
  *
  * - variantA / variantB: TargetConfig ids whose per-row outputs are
  *   the two candidates.
+ * - hasGoldenAnswer: whether the judge compares against a reference
+ *   answer at all (#5378). When false, goldenField is not required —
+ *   the judge compares the two candidates directly on their own merits.
+ *   Mirrors the evaluator's `settings.has_golden_answer` (source of
+ *   truth the judge reads), same dual-representation pattern as
+ *   includeMetrics/settings.include_metrics below.
  * - goldenField: dataset field name whose value is the reference answer.
+ *   Only meaningful when hasGoldenAnswer is true.
  * - includeMetrics: per-candidate metrics injected into the judge prompt.
  */
 export const pairwiseEvaluatorConfigSchema = z.object({
   variantA: z.string(),
   variantB: z.string(),
+  hasGoldenAnswer: z.boolean().default(true),
   goldenField: z.string(),
   includeMetrics: z.array(z.enum(["cost", "duration"])).default([]),
 });
 export type PairwiseEvaluatorConfig = z.infer<
   typeof pairwiseEvaluatorConfigSchema
 >;
+
+/**
+ * Whether a pairwise config's golden-field requirement is satisfied: either
+ * a golden field is set, or the user has explicitly opted out of
+ * golden-answer comparison (#5378). `hasGoldenAnswer !== false` (rather than
+ * `=== true`) is deliberate — old saved configs that predate this field have
+ * `hasGoldenAnswer` undefined and must still default to golden-required.
+ * Single source of truth for the UI gating (EvaluationsV3Table), client
+ * validation (mappingValidation), and server cell-generation (orchestrator)
+ * call sites — they must never drift from each other.
+ */
+export function isGoldenFieldSatisfied(pairwise: {
+  goldenField?: string;
+  hasGoldenAnswer?: boolean;
+}): boolean {
+  return !!pairwise.goldenField || pairwise.hasGoldenAnswer === false;
+}
 
 export const evaluatorConfigSchema = z.object({
   id: z.string(),

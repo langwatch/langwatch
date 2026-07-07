@@ -1,4 +1,10 @@
 import type { Monaco } from "@monaco-editor/react";
+import type {
+  editor,
+  languages,
+  Position,
+  Uri,
+} from "monaco-editor";
 import { substituteLiquidForJsonValidation } from "./liquidJsonSubstitution";
 import { registerJsonSchema } from "./monacoSchemas";
 
@@ -23,9 +29,7 @@ export interface VariableInfo {
  * comes from the server (`getTemplates.variables`) so editor and renderer agree.
  */
 
-export type MonacoTextModel = Parameters<
-  Monaco["editor"]["setModelMarkers"]
->[0];
+export type MonacoTextModel = editor.ITextModel;
 
 export const LIQUID_LANGUAGE_ID = "liquid";
 /** Hybrid JSON + Liquid: full JSON tokenization (strings, brackets, numbers,
@@ -194,9 +198,7 @@ export function registerLiquidLanguage(monaco: Monaco): void {
   }
 
   if (!providersRegistered) {
-    const completionProvider: Parameters<
-      Monaco["languages"]["registerCompletionItemProvider"]
-    >[1] = {
+    const completionProvider: languages.CompletionItemProvider = {
       triggerCharacters: [".", " ", "{", "%"],
       provideCompletionItems: (model, position) => {
         // For `liquid-json`, surface Liquid completions only when the cursor
@@ -254,9 +256,7 @@ export function registerLiquidLanguage(monaco: Monaco): void {
       },
     };
 
-    const hoverProvider: Parameters<
-      Monaco["languages"]["registerHoverProvider"]
-    >[1] = {
+    const hoverProvider: languages.HoverProvider = {
       provideHover: (model, position) => {
         if (model.getLanguageId() === LIQUID_JSON_LANGUAGE_ID) {
           const offset = model.getOffsetAt(position);
@@ -365,7 +365,7 @@ export function validateLiquidModel(
   model: MonacoTextModel,
   variables: VariableInfo[],
 ): void {
-  const markers: Parameters<Monaco["editor"]["setModelMarkers"]>[2] =
+  const markers: editor.IMarkerData[] =
     detectUnknownVariables(model.getValue(), variables).map((unknown) => {
       const start = model.getPositionAt(unknown.index);
       const end = model.getPositionAt(unknown.index + unknown.token.length);
@@ -500,7 +500,10 @@ function registerLiquidJsonBridges(monaco: Monaco): void {
 
   monaco.languages.registerCompletionItemProvider(LIQUID_JSON_LANGUAGE_ID, {
     triggerCharacters: COMPLETION_TRIGGER_CHARACTERS,
-    provideCompletionItems: async (model, position) => {
+    provideCompletionItems: async (
+      model: editor.ITextModel,
+      position: Position,
+    ) => {
       const offset = model.getOffsetAt(position);
       if (positionInsideLiquid(model.getValue(), offset)) return null;
 
@@ -560,7 +563,7 @@ function registerLiquidJsonBridges(monaco: Monaco): void {
   });
 
   monaco.languages.registerHoverProvider(LIQUID_JSON_LANGUAGE_ID, {
-    provideHover: async (model, position) => {
+    provideHover: async (model: editor.ITextModel, position: Position) => {
       const offset = model.getOffsetAt(position);
       if (positionInsideLiquid(model.getValue(), offset)) return null;
 
@@ -648,8 +651,8 @@ export function setupLiquidJsonSchema(params: {
     const shadowMarkers = monaco.editor.getModelMarkers({
       resource: shadowResource,
     });
-    const mapped: Parameters<Monaco["editor"]["setModelMarkers"]>[2] =
-      shadowMarkers.map((m) => ({
+    const mapped: editor.IMarkerData[] =
+      shadowMarkers.map((m: editor.IMarker) => ({
         severity: m.severity,
         message: m.message,
         startLineNumber: m.startLineNumber,
@@ -660,11 +663,15 @@ export function setupLiquidJsonSchema(params: {
     monaco.editor.setModelMarkers(realModel, SCHEMA_MARKER_OWNER, mapped);
   };
 
-  const onShadowMarkers = monaco.editor.onDidChangeMarkers((resources) => {
-    if (resources.some((r) => r.toString() === shadowResource.toString())) {
-      mirrorMarkers();
-    }
-  });
+  const onShadowMarkers = monaco.editor.onDidChangeMarkers(
+    (resources: readonly Uri[]) => {
+      if (
+        resources.some((r) => r.toString() === shadowResource.toString())
+      ) {
+        mirrorMarkers();
+      }
+    },
+  );
 
   const onRealChange = realModel.onDidChangeContent(() => {
     const next = substituteLiquidForJsonValidation(realModel.getValue());

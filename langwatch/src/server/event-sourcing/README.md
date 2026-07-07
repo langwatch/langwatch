@@ -30,7 +30,7 @@ const registered = eventSourcing.register(pipeline);
 await registered.commands.doSomething.add({ tenantId: "acme", /* payload */ });
 ```
 
-Registration connects the static definition to ClickHouse, Redis, and BullMQ. This happens in the composition root (`pipelineRegistry.ts`).
+Registration connects the static definition to ClickHouse, Redis, and the in-house [GroupQueue](./queues/groupQueue/README.md) (no BullMQ). This happens in the composition root (`pipelineRegistry.ts`).
 
 ## Builder API
 
@@ -229,7 +229,7 @@ All paths below are relative to `src/server/event-sourcing/`.
 | `services/` | `EventSourcingService` (main orchestration), `CommandDispatcher`, `QueueManager` |
 | `projections/` | Projection executors: `FoldProjectionExecutor`, `MapProjectionExecutor`, `ProjectionRouter`, `ProjectionRegistry` |
 | `reactors/` | Reactor type definitions |
-| `queues/` | Queue implementations: `GroupQueue` (BullMQ), `MemoryQueue` |
+| `queues/` | Queue implementations: `GroupQueue` (in-house, Redis + Lua — see [`queues/groupQueue/README.md`](./queues/groupQueue/README.md)) and `MemoryQueue` (in-process dev/test fallback) |
 | `stores/` | Event store implementations: `EventStoreClickHouse`, `EventStoreMemory`, projection store interfaces |
 | `utils/` | `EventUtils` (event creation, validation), `KillSwitch` |
 | `schemas/` | Shared type identifiers |
@@ -283,6 +283,6 @@ SaaS-only cross-pipeline fold projections live in `projections/global/`:
 
 1. **Missing tenant validation**: Always call `EventUtils.validateTenantId()` in store implementations.
 2. **Reactor without fold**: Reactors must be registered on an existing fold projection (`withReactor(foldName, ...)`). The builder will throw if the fold does not exist.
-3. **Fold store failures**: If `store.store()` fails, BullMQ retries the entire event. Make sure your store is idempotent or uses upsert semantics.
+3. **Fold store failures**: If `store.store()` fails, GroupQueue retries the entire event (with exponential backoff in front of the same group, preserving FIFO). Make sure your store is idempotent or uses upsert semantics.
 4. **Map projection ordering**: Map projections have no ordering guarantees. Do not rely on event order in append stores.
 5. **Process role mismatch**: Commands dispatched in a `web` process are enqueued but not processed until a `worker` process picks them up. Ensure workers are running.

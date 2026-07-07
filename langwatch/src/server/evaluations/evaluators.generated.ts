@@ -852,6 +852,12 @@ export const evaluatorsSchema = z.object({
         .default(
           'Compare two candidate outputs against a known-good reference (golden answer).\n\nTask:           {input}\nGolden answer:  {golden}\n\nCandidate A:    {candidate_a_output}\nCandidate B:    {candidate_b_output}\n\nReason step-by-step about how closely each candidate matches the\ngolden answer in correctness, completeness, and style. Then pick\nthe better candidate, or "tie" if equivalent.\nPrefer cheaper/faster only when quality is comparable.\n',
         ),
+      has_golden_answer: z
+        .boolean()
+        .describe(
+          "Compare each candidate against a reference answer. Turn off to have the judge compare Candidate A and Candidate B directly on their own merits, with no reference answer involved.",
+        )
+        .default(true),
       swap_and_confirm: z
         .boolean()
         .describe(
@@ -2262,6 +2268,11 @@ position-bias mitigation.
         description: "Judge prompt template (golden-aware by default)",
         default:
           'Compare two candidate outputs against a known-good reference (golden answer).\n\nTask:           {input}\nGolden answer:  {golden}\n\nCandidate A:    {candidate_a_output}\nCandidate B:    {candidate_b_output}\n\nReason step-by-step about how closely each candidate matches the\ngolden answer in correctness, completeness, and style. Then pick\nthe better candidate, or "tie" if equivalent.\nPrefer cheaper/faster only when quality is comparable.\n',
+      },
+      has_golden_answer: {
+        description:
+          "Compare each candidate against a reference answer. Turn off to have the judge compare Candidate A and Candidate B directly on their own merits, with no reference answer involved.",
+        default: true,
       },
       swap_and_confirm: {
         description:

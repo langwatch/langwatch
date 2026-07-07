@@ -442,12 +442,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         s3SecretAccessKey: input.s3SecretAccessKey
           ? encrypt(input.s3SecretAccessKey)
           : null,
-        elasticsearchNodeUrl: input.elasticsearchNodeUrl
-          ? encrypt(input.elasticsearchNodeUrl)
-          : null,
-        elasticsearchApiKey: input.elasticsearchApiKey
-          ? encrypt(input.elasticsearchApiKey)
-          : null,
         s3Bucket: input.s3Bucket,
         ...(input.presenceEnabled !== undefined
           ? { presenceEnabled: input.presenceEnabled }
