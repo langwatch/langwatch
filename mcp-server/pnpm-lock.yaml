@@ -67,9 +67,6 @@ importers:
       '@types/debug':
         specifier: ^4.1.12
         version: 4.1.13
-      '@types/eslint__js':
-        specifier: ^8.42.3
-        version: 8.42.3
       '@types/express':
         specifier: ^5.0.6
         version: 5.0.6
@@ -1260,12 +1257,6 @@ packages:
 
   '@types/deep-eql@4.0.2':
     resolution: {integrity: sha512-c9h9dVVMigMPc4bwTvC5dxqtqJZwQPePsWjPlpSOnojbor6pGqdk541lfA7AqFQr5pB1BRdq0juY9db81BwyFw==}
-
-  '@types/eslint@9.6.1':
-    resolution: {integrity: sha512-FXx2pKgId/WyYo2jXw63kk7/+TY7u7AziEJxJAnSFzHlqTAS3Ync6SvgYAN/k4/PQpnnVuzoMuVnByKK2qp0ag==}
-
-  '@types/eslint__js@8.42.3':
-    resolution: {integrity: sha512-alfG737uhmPdnvkrLdZLcEKJ/B8s9Y4hrZ+YAdzUeoArBlSUERA2E87ROfOaS4jd/C45fzOoZzidLc1IPwLqOw==}
 
   '@types/esrecurse@4.3.1':
     resolution: {integrity: sha512-xJBAbDifo5hpffDBuHl0Y8ywswbiAp/Wi7Y/GtAgSlZyIABppyurxVueOPE8LUQOxdlgi6Zqce7uoEpqNTeiUw==}
@@ -4155,15 +4146,6 @@ snapshots:
       '@types/ms': 2.1.0
 
   '@types/deep-eql@4.0.2': {}
-
-  '@types/eslint@9.6.1':
-    dependencies:
-      '@types/estree': 1.0.9
-      '@types/json-schema': 7.0.15
-
-  '@types/eslint__js@8.42.3':
-    dependencies:
-      '@types/eslint': 9.6.1
 
   '@types/esrecurse@4.3.1': {}
 
