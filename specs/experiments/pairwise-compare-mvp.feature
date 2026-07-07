@@ -53,13 +53,13 @@ Feature: Pairwise compare evaluator (MVP)
     And the evaluator can be saved without a golden field selected
 
   Scenario: Judge prompt drops golden framing when Has Golden Answer is off
-    Given has_golden_answer is false
+    Given Has Golden Answer is toggled off
     And the prompt has not been customized by the user
     When a row is evaluated
     Then the rendered judge prompt contains no "golden answer" framing
     And the judge compares Candidate A and Candidate B on their own merits
 
   Scenario: Judge prompt keeps golden framing when Has Golden Answer is on
-    Given has_golden_answer is true (default)
+    Given Has Golden Answer is toggled on (default)
     When a row is evaluated
     Then the rendered judge prompt asks the judge to compare both candidates against the golden answer
