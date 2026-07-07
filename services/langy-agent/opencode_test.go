@@ -2,12 +2,16 @@ package langyagent
 
 import (
 	"context"
+	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 func portOf(t *testing.T, serverURL string) int {
@@ -82,6 +86,61 @@ func TestWaitForReadiness_SucceedsWhenProxyUpAndInternalPortEnforcesAuth(t *test
 	err := waitForReadiness(context.Background(), portOf(t, external.URL), portOf(t, internal.URL), "bearer", time.Second)
 	if err != nil {
 		t.Fatalf("expected success, got %v", err)
+	}
+}
+
+// Regression test for the spawn race in manager.go: startAuthProxy binds and
+// starts serving :externalPort synchronously, but opencode's actual listener
+// on :internalPort comes up later (it's a separate process). Before it's
+// listening, the proxy's own rev.ErrorHandler answers polls with a genuine
+// "502 Bad Gateway" -- a real, err==nil HTTP response, not a transport
+// failure. waitForReadiness must not mistake that for "ready": doing so
+// triggers a one-shot requireOpenCodeAuthEnforced probe against a port
+// nothing is listening on yet, which fails and aborts the spawn. In
+// production the proxy always wins this race against opencode's startup, so
+// this used to fail almost every spawn.
+//
+// This drives waitForReadiness through the real startAuthProxy reverse-proxy
+// chain (unlike the tests above, which poll two independent, already-up
+// httptest servers and so never produce an actual 502).
+func TestWaitForReadiness_SurvivesProxy502BeforeBackendListens(t *testing.T) {
+	internalPort, err := getFreePort()
+	if err != nil {
+		t.Fatalf("reserve internal port: %v", err)
+	}
+	externalPort, err := getFreePort()
+	if err != nil {
+		t.Fatalf("reserve external port: %v", err)
+	}
+
+	proxy, err := startAuthProxy(externalPort, internalPort, "bearer", "opencode-pw", zap.NewNop())
+	if err != nil {
+		t.Fatalf("start auth proxy: %v", err)
+	}
+	defer proxy.shutdown()
+
+	// Nothing listens on internalPort yet -- the proxy's first polls hit
+	// connection-refused and answer 502. Only after a delay does the
+	// "opencode" backend start listening, simulating its real startup time.
+	backend := &http.Server{
+		Addr: fmt.Sprintf("127.0.0.1:%d", internalPort),
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusUnauthorized)
+		}),
+	}
+	defer backend.Close()
+	go func() {
+		time.Sleep(150 * time.Millisecond)
+		l, err := net.Listen("tcp", backend.Addr)
+		if err != nil {
+			return
+		}
+		_ = backend.Serve(l)
+	}()
+
+	err = waitForReadiness(context.Background(), externalPort, internalPort, "bearer", 2*time.Second)
+	if err != nil {
+		t.Fatalf("expected waitForReadiness to survive the proxy's pre-backend 502s and succeed once opencode starts listening, got %v", err)
 	}
 }
 

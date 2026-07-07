@@ -69,14 +69,25 @@ func getFreePort() (int, error) {
 // Probed via the authProxy port so a successful poll also proves the
 // proxy chain is wired correctly. 401 from the proxy counts as ready
 // (the proxy is up); we treat it as a non-error status code along with
-// 2xx/3xx/4xx/5xx — anything other than transport failure means a
-// listener answered.
+// 2xx/3xx/4xx — anything other than transport failure means a listener
+// answered.
 //
-// Once the proxy chain answers, this additionally requires opencode's
-// internal port to actually enforce OPENCODE_SERVER_PASSWORD (ADR-033
-// Fix A′ fail-closed guard) — see requireOpenCodeAuthEnforced. The
-// sibling-isolation guarantee this PR adds rests entirely on that
-// enforcement; if it's ever not there, the worker must not start.
+// One exception: 502 from the proxy is not readiness, it's
+// authproxy.go's own rev.ErrorHandler reporting that opencode's listener
+// isn't up yet. startAuthProxy binds and starts serving synchronously,
+// but opencode is a separate process that takes real time to start
+// listening — the proxy answers 502 to every poll in that window. Treating
+// that as "ready" would immediately race requireOpenCodeAuthEnforced below
+// against a backend that isn't there yet (it always loses in production,
+// since the proxy is always first). So we keep polling through 502 the
+// same way we poll through a transport error.
+//
+// Once the proxy chain answers with something other than 502, this
+// additionally requires opencode's internal port to actually enforce
+// OPENCODE_SERVER_PASSWORD (ADR-033 Fix A′ fail-closed guard) — see
+// requireOpenCodeAuthEnforced. The sibling-isolation guarantee this PR
+// adds rests entirely on that enforcement; if it's ever not there, the
+// worker must not start.
 func waitForReadiness(ctx context.Context, externalPort, internalPort int, bearerToken string, deadline time.Duration) error {
 	dl := time.Now().Add(deadline)
 	url := fmt.Sprintf("http://127.0.0.1:%d/", externalPort)
@@ -85,10 +96,15 @@ func waitForReadiness(ctx context.Context, externalPort, internalPort int, beare
 		req, _ := http.NewRequestWithContext(reqCtx, http.MethodGet, url, nil)
 		addBearer(req, bearerToken)
 		resp, err := httpClient.Do(req)
-		cancel()
 		if err == nil {
+			status := resp.StatusCode
 			_ = resp.Body.Close()
-			return requireOpenCodeAuthEnforced(ctx, internalPort)
+			cancel()
+			if status != http.StatusBadGateway {
+				return requireOpenCodeAuthEnforced(ctx, internalPort)
+			}
+		} else {
+			cancel()
 		}
 		select {
 		case <-ctx.Done():
