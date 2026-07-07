@@ -128,8 +128,20 @@ export const afterUserCreate = async ({
   const domain = extractEmailDomain(user.email);
   if (!domain) return;
 
+  // ADR-027 site #4: domain auto-join is federation and rides the platform
+  // gate. When it denies (unlicensed deployment), skip the join — but log it,
+  // because on an email-mode install the gate-resolution warning is suppressed
+  // (sso-gate.ts), so a staff-set ssoDomain silently losing auto-join would
+  // otherwise leave zero trace for an operator debugging "why wasn't this user
+  // added to the org".
   const ssoAllowed = await platformSSOAllowed();
-  if (!ssoAllowed) return;
+  if (!ssoAllowed) {
+    logger.info(
+      { domain },
+      "Skipped ssoDomain auto-join: platform SSO gate denies (no genuine license)",
+    );
+    return;
+  }
 
   try {
     const org = await prisma.organization.findUnique({
@@ -268,6 +280,15 @@ export const beforeAccountCreate = async ({
       message: "USER_DEACTIVATED",
     });
   }
+
+  // ADR-027: when the platform SSO gate denies, all ssoDomain enforcement is
+  // off (site #4, mirroring `afterUserCreate`). Critically, this stops the
+  // `pendingSsoSetup=true` soft-flag below from being written when the v6
+  // reset-recovery path creates a `credential` account for an OAuth-born user
+  // on an unlicensed install — that flag would otherwise strand them behind a
+  // permanent "Link your SSO account" banner they can never clear (every SSO
+  // path 403s on a denied deployment).
+  if (!(await platformSSOAllowed())) return;
 
   const domain = extractEmailDomain(user.email);
   if (!domain) return;

@@ -241,10 +241,14 @@ export const userRouter = createTRPCRouter({
     )
     .use(skipPermissionCheck)
     .mutation(async ({ ctx, input }) => {
-      if (
-        env.NEXTAUTH_PROVIDER !== "email" &&
-        env.NEXTAUTH_PROVIDER !== "auth0"
-      ) {
+      // Resolved provider, not raw env (ADR-027): on a denied SSO deployment
+      // the platform gate coerces to email mode, and a user who recovered via
+      // the v6 password-reset path owns a `credential` account — they must be
+      // able to change it (the coerced UI offers the button). `changePassword`
+      // requires the current password, so this is not the takeover vector
+      // Decision 4's all-states block guards against.
+      const provider = await resolveAuthProvider();
+      if (provider !== "email" && provider !== "auth0") {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Password changes are not available for this auth provider",
@@ -273,7 +277,7 @@ export const userRouter = createTRPCRouter({
         });
       }
 
-      if (env.NEXTAUTH_PROVIDER === "auth0") {
+      if (provider === "auth0") {
         // Only the Auth0 database connection (`auth0|<id>` providerAccountId)
         // has a password we can update via the Management API. Social
         // identities linked through Auth0 (google-oauth2|..., github|...,
