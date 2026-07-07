@@ -20,7 +20,12 @@ import {
 } from "recharts";
 
 import { ChartTooltip } from "../analytics/ChartTooltip";
-import type { BatchEvaluationData, ComparisonRunData } from "./types";
+import { PairwiseWinRateChart } from "./PairwiseWinRateChart";
+import type {
+  BatchEvaluationData,
+  BatchPairwiseColumn,
+  ComparisonRunData,
+} from "./types";
 import { RUN_COLORS } from "./useMultiRunData";
 
 /** Metric types that can be displayed */
@@ -123,6 +128,13 @@ type ComparisonChartsProps = {
    * preserving pre-existing behavior.
    */
   suppressedScoreEvaluatorIds?: Set<string>;
+  /**
+   * Pairwise columns detected in the run. Rendered as extra chart cards
+   * inside the same flex row as Cost / Latency so the pairwise win-rate
+   * shows up at parity size with its siblings — not as a separate row
+   * below.
+   */
+  pairwiseColumns?: BatchPairwiseColumn[];
 };
 
 type EvaluatorMetrics = {
@@ -312,6 +324,7 @@ export const ComparisonCharts = ({
   onXAxisOptionChange,
   onTargetColorsChange,
   suppressedScoreEvaluatorIds,
+  pairwiseColumns,
 }: ComparisonChartsProps) => {
   // Determine default visibility based on target count
   const shouldShowByDefault = useMemo(() => {
@@ -1327,6 +1340,17 @@ export const ComparisonCharts = ({
                   </Box>
                 ),
             )}
+
+            {/* Pairwise win-rate charts — one per detected pairwise
+                evaluator. Rendered inside the same flex row as Cost / Latency
+                so they read as siblings, not a separate section below. */}
+            {pairwiseColumns?.map((column) => (
+              <PairwiseWinRateChart
+                key={`pairwise-${column.evaluatorId}`}
+                column={column}
+                chartHeight={chartHeight}
+              />
+            ))}
 
             {/* Per-evaluator pass rate charts */}
             {passRateEvaluators.map(
