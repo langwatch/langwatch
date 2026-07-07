@@ -17,11 +17,13 @@ Two ClickHouse projections off the event log, per aggregate.
 
 ### 1. Slim table — `<x>_analytics` (the per-aggregate truth)
 
-A **fold projection** writes the latest state per aggregate into a slim, time-sorted `ReplacingMergeTree(Version)`. **Idempotent and replay-safe by construction** (re-fold → same canonical state → dedup by version) — the platform's required contract, and identical to how `trace_summaries` already behaves. Holds **every dimension** (including the late/derived ones — topic, origin, user, conversation, model, …) and every metric scalar. Serves **percentiles, min/max, any dim-grouped query, arbitrary filters** — ~10–50× cheaper to scan than `trace_summaries` (slim rows, time-leading sort).
+A **fold projection** writes the latest state per aggregate into a slim, time-sorted `ReplacingMergeTree(UpdatedAt)` (the sketch said `Version`; ClickHouse rejects `LowCardinality(String)` as a version column, and `UpdatedAt` matches `trace_summaries`'s convention — `Version` stays as a schema-snapshot tag). **Idempotent and replay-safe by construction** (re-fold → same canonical state → readers dedup by latest UpdatedAt per aggregate id) — the platform's required contract, and identical to how `trace_summaries` already behaves. Holds **every dimension** (including the late/derived ones — topic, origin, user, conversation, model, …) and every metric scalar. Serves **percentiles, min/max, any dim-grouped query, arbitrary filters** — ~10–50× cheaper to scan than `trace_summaries` (slim rows, time-leading sort).
+
+**Fold-state continuity.** The slim row is deliberately lossy (trimmed attributes, booleans), so the fold cannot read its state back from its own table the way the trace-summary fold does. Continuity comes from two layers instead: a Redis cache in front of the store (warm path) and the framework's `refoldOnStoreMiss` fold option — on a cache miss the executor rebuilds state **from the event log** up to the delivered event (log-order bounded, so a persisted-but-still-queued event is never pre-applied). This keeps the slim fold an independent projection with its own queue/retry lifecycle — one event fans out to two projections at the dispatch layer, each owning its own store — while the event log remains the source of truth for state reconstruction.
 
 ### 2. Rollup — `<x>_analytics_rollup` (the additive fast-path)
 
-An `AggregatingMergeTree` fed by **per-span increments** — `sumState`/`uniqState`. Each span contributes its own metric value; trace count = `uniqState(TraceId)` (every span shares the trace id, so it collapses to one); trace duration = the root span's value, 0 on the rest. **No signs, no collapsing, no settle.**
+An `AggregatingMergeTree` fed by **per-span increments** — `SimpleAggregateFunction(sum, …)` (the sketch said `sumState`/`uniqState`; the simple variant lets the app insert plain numbers and read plain `sum(…)`, no binary state on the wire). Each span contributes its own metric value; trace count = `TraceCount` summed as **1 per root span** (root-ness is final at span-write and a trace has exactly one root, so no uniq state is needed); trace duration = the root span's value, 0 on the rest. True distinct-counts over arbitrary dims (users, conversations) have no simple-sum form and live on the slim table instead. **No signs, no collapsing, no settle.**
 
 **Why per-span (not per-trace).** A per-trace source *mutates* — a trace becomes N versions as spans land, an MV over it fires N times → every trace N×-wrong (systematic). A **span is a single immutable event**, processed once; the only repeat is a rare crash/retry re-delivery → a fraction-of-a-percent of buckets, transient, non-systematic. **We accept that** (explicitly — it's negligible). Replay re-fires everything, so **replay = truncate the rollup and rebuild**, a deliberate op, not steady-state.
 
@@ -29,8 +31,9 @@ An `AggregatingMergeTree` fed by **per-span increments** — `sumState`/`uniqSta
 
 ### Read routing (`getTimeseries`)
 
-- additive (sum/count/avg/distinct) **and** group-by ∈ {none, `Model`, `SpanType`} **and** no exotic filter → **rollup**
-- percentiles, min/max, any other group-by (topic/origin/user/…), arbitrary filters → **slim table**
+- additive `sum` **and** group-by ∈ {none, `Model`, `SpanType`} **and** no filter → **rollup**
+- `avg` → **rollup only ungrouped and only for metrics whose legacy column is non-nullable** (today: completion_time), computed as `sum(MetricSum) / sum(TraceCount)`; nullable-metric avgs (cost, tokens) stay on slim, whose one-row-per-aggregate shape reproduces CH `avg`'s NULL-skipping denominator
+- percentiles, min/max, any other group-by (topic/origin/user/…), arbitrary filters, distinct-counts → **slim table**
 - else → `trace_summaries` (the drawer's table, untouched)
 - default to slim/raw on any doubt.
 
@@ -40,23 +43,22 @@ Generic fold + per-span-increment + read-routing machinery, parameterised per pi
 
 ## Trace fields
 
-**`trace_analytics`** — `ReplacingMergeTree(Version)`, `ORDER BY (TenantId, OccurredAt, TraceId)`:
+**`trace_analytics`** — `ReplacingMergeTree(UpdatedAt)`, `ORDER BY (TenantId, OccurredAt, TraceId)`:
 ```
-keys:   TenantId, TraceId, OccurredAt, Version
+keys:   TenantId, TraceId, OccurredAt, UpdatedAt (dedup), Version (schema tag)
 dims:   TraceName, TopicId, SubTopicId, UserId, ConversationId, CustomerId, Origin, Models[], Labels[]
 values: TotalCost, NonBilledCost, TotalDurationMs, TimeToFirstTokenMs,
         PromptTokens, CompletionTokens, CacheReadTokens, CacheWriteTokens, ReasoningTokens,
         TokensPerSecond, HasError, HasAnnotation
 ```
 
-**`trace_analytics_rollup`** — `AggregatingMergeTree`, `ORDER BY (TenantId, BucketStart, Model, SpanType)`, fed per-span:
+**`trace_analytics_rollup`** — `AggregatingMergeTree`, `ORDER BY (TenantId, BucketStart, Model, SpanType)`, fed per-span via an app-side map projection; every column `SimpleAggregateFunction(sum, …)`:
 ```
-counts:  TraceUniq = uniqState(TraceId), SpanCount, ErrorCount (root span)
-sums:    CostSum, NonBilledCostSum, DurationSum (root span), FirstTokenSum (root span),
+counts:  SpanCount, TraceCount (1 per root span), ErrorCount (root span)
+sums:    CostSum, NonBilledCostSum, DurationSum (root span),
          PromptTokensSum, CompletionTokensSum, CacheReadTokensSum, CacheWriteTokensSum, ReasoningTokensSum
-distinct: UserUniq, ConversationUniq   (uniqState)
 ```
-Averages derived at read (`CostSum / TraceUniq`, …).
+`TraceUniq`/`UserUniq`/`ConversationUniq` (uniq state) and `FirstTokenSum` (fold-time, not per-span) were dropped — distinct-counts and TTFT route to the slim table. Per-trace averages derive at read as `sum(MetricSum) / sum(TraceCount)` for the non-nullable metrics (see Read routing); `TraceCount` is also the future error-RATE denominator.
 
 ## Consequences
 

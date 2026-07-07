@@ -39,11 +39,10 @@
 -- MIGRATION_DEFAULT_RETENTION_DAYS) matches every other 00032-managed table.
 --
 -- Deliberately omitted vs the ADR's full sketch:
---   * TraceUniq — moved to the slim trace_analytics table (Phase 2). The slim
---     table is one row per trace, so a distinct-trace count is just `count()`
---     there. Routing exotic aggregates (incl. distinct-counts) to the slim
---     table is already what ADR-034's read-routing prescribes — the rollup
---     only carries plain additive sums / counts.
+--   * TraceUniq — replaced by the additive TraceCount below (1 per root span;
+--     no uniq state needed because a trace has exactly one root). True
+--     distinct-counts over arbitrary dims still live on the slim
+--     trace_analytics table (one row per trace, so `count()`/`uniq()` there).
 --   * FirstTokenSum — time-to-first-token is resolved at fold time across the
 --     trace's spans (stream events / timing fallbacks), not reliable per span.
 --   * UserUniq / ConversationUniq — user and conversation are late trace-level
@@ -67,6 +66,16 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.trace_analytics_rollup
 
     -- Raw span count in the bucket. Inserted as `1` per row.
     SpanCount SimpleAggregateFunction(sum, UInt64),
+    -- Trace count: 1 per ROOT span, 0 on the rest. Root-ness is final at
+    -- span-write (ParentSpanId never changes), so this is a legal rollup
+    -- column, and `sum(TraceCount)` = the number of traces in the bucket.
+    -- It is the denominator that turns the additive sums into per-trace
+    -- averages (avg duration = sum(DurationSum) / sum(TraceCount)) and,
+    -- later, error RATE (sum(ErrorCount) / sum(TraceCount)). NOTE it counts
+    -- only rooted traces — a trace whose root span never arrives contributes
+    -- sums but no TraceCount, so per-trace averages exclude it (documented
+    -- divergence vs the slim/legacy per-row avg; see route-table.ts).
+    TraceCount SimpleAggregateFunction(sum, UInt64),
     -- Root-span errors only (StatusCode = NormalizedStatusCode.ERROR = 2). 1
     -- per erroring root span, 0 otherwise.
     ErrorCount SimpleAggregateFunction(sum, UInt64),

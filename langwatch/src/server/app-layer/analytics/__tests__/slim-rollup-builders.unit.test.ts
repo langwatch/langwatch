@@ -57,6 +57,62 @@ describe("buildRollupTimeseriesQuery", () => {
     expect(params.tenantId).toBe("tenant-rollup");
   });
 
+  describe("when the series is an ungrouped avg on completion_time", () => {
+    it("divides the duration sum by the TraceCount denominator", () => {
+      const { sql: avgSql } = buildRollupTimeseriesQuery({
+        projectId: "tenant-rollup",
+        ...baseDates,
+        series: [
+          { metric: "performance.completion_time", aggregation: "avg" },
+        ],
+        timeScale: 60,
+      });
+      expect(avgSql).toContain(
+        "sum(ra.DurationSum) / nullIf(sum(ra.TraceCount), 0)",
+      );
+    });
+  });
+
+  describe("when a shape the router excludes reaches the builder", () => {
+    it("throws on avg of a nullable metric instead of returning wrong numbers", () => {
+      expect(() =>
+        buildRollupTimeseriesQuery({
+          projectId: "tenant-rollup",
+          ...baseDates,
+          series: [{ metric: "performance.total_cost", aggregation: "avg" }],
+          timeScale: 60,
+        }),
+      ).toThrow(/avg\(performance\.total_cost\)/);
+    });
+
+    it("throws on a GROUPED avg — the TraceCount denominator only exists ungrouped", () => {
+      expect(() =>
+        buildRollupTimeseriesQuery({
+          projectId: "tenant-rollup",
+          ...baseDates,
+          series: [
+            { metric: "performance.completion_time", aggregation: "avg" },
+          ],
+          groupBy: "metadata.model",
+          timeScale: 60,
+        }),
+      ).toThrow(/GROUPED avg/);
+    });
+
+    it("throws on min/max — min/max of per-part sums is merge-state-dependent", () => {
+      for (const aggregation of ["min", "max"] as const) {
+        expect(() =>
+          buildRollupTimeseriesQuery({
+            projectId: "tenant-rollup",
+            ...baseDates,
+            series: [{ metric: "performance.total_cost", aggregation }],
+            timeScale: 60,
+          }),
+        ).toThrow(/cannot serve aggregation/);
+      }
+    });
+  });
+
   it("uses toStartOfInterval on BucketStart for hourly buckets", () => {
     expect(sql).toMatch(
       /toStartOfInterval\(ra\.BucketStart,\s*INTERVAL\s*1\s*HOUR/,
