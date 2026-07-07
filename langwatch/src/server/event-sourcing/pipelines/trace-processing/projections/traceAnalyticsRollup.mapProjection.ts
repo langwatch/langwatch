@@ -37,6 +37,9 @@ export interface TraceAnalyticsRollupRow {
   spanType: string;
   /** Always 1 (one row per span). */
   spanCount: number;
+  /** 1 on the root span, 0 on the rest — `sum(TraceCount)` = traces in the
+   *  bucket, the per-trace-average denominator. */
+  traceCount: number;
   /** 1 when this is an erroring root span, else 0. */
   errorCount: number;
   /** Per-span cost (USD). */
@@ -164,6 +167,7 @@ export class TraceAnalyticsRollupMapProjection
       model,
       spanType,
       spanCount: 1,
+      traceCount: isRoot ? 1 : 0,
       errorCount: isError ? 1 : 0,
       costSum: span.cost ?? 0,
       nonBilledCostSum: span.nonBilledCost ?? 0,

@@ -24,6 +24,7 @@
 import { buildMetricAlias } from "~/server/analytics/clickhouse/metric-translator";
 import type { AggregationTypes } from "~/server/analytics/types";
 import {
+  isRollupAvgMetricKey,
   isRollupRollableTraceMetricKey,
   type TraceRollupMetricKey,
 } from "../routing/route-table";
@@ -36,11 +37,15 @@ import { dateTrunc } from "./_shared";
 const ROLLUP_TABLE = "trace_analytics_rollup" as const;
 const ra = "ra";
 
-/** Aggregations the rollup can serve from its SimpleAggregateFunction(sum, …) columns. */
-export type RollupAggregation = Extract<
-  AggregationTypes,
-  "sum" | "avg" | "min" | "max"
->;
+/**
+ * Aggregations the rollup can serve from its SimpleAggregateFunction(sum, …)
+ * columns. Exactly mirrors the router's eligibility (route-table.ts): `sum`
+ * for every rollable metric; `avg` only for ROLLUP_AVG_METRIC_KEYS and only
+ * ungrouped (TraceCount denominator — see rollupAggExpression). min/max are
+ * NOT servable (min/max of per-part sums is merge-state-dependent) and THROW
+ * here rather than silently returning wrong numbers if routing ever regresses.
+ */
+export type RollupAggregation = Extract<AggregationTypes, "sum" | "avg">;
 
 /** Group-by columns the rollup is keyed by. */
 export type RollupGroupByKey = "metadata.model" | "metadata.span_type";
@@ -118,29 +123,52 @@ function rollupGroupByExpression(groupBy?: string): string | null {
 }
 
 function isRollupAggregation(agg: AggregationTypes): agg is RollupAggregation {
-  return agg === "sum" || agg === "avg" || agg === "min" || agg === "max";
+  return agg === "sum" || agg === "avg";
 }
 
 /**
- * Aggregations supported by the rollup. The rollup column is already a
- * per-span SimpleAggregateFunction(sum, …), so `sum(col)` = the additive sum,
- * `avg(col)` = arithmetic mean of bucket-summed values, etc. NO `*Merge`
- * combinator — the simple variant takes plain `sum(col)`/`avg(col)`.
+ * Aggregations supported by the rollup. NO `*Merge` combinator — the simple
+ * variant takes plain `sum(col)`.
+ *
+ *   - `sum` → the additive total over every span increment in range.
+ *   - `avg` → a true PER-TRACE mean: `sum(col) / nullIf(sum(TraceCount), 0)`.
+ *     TraceCount is 1 per root span (migration 00038), so the denominator is
+ *     the number of rooted traces in the bucket. Guarded to the router's
+ *     eligibility (avg-eligible metric, ungrouped) — a grouped avg would
+ *     divide by the ROOT span's (Model, SpanType) bucket only, a wrong
+ *     denominator, so it throws instead.
  */
-function rollupAggExpression(agg: RollupAggregation, column: string): string {
+function rollupAggExpression({
+  agg,
+  column,
+  metric,
+  grouped,
+}: {
+  agg: RollupAggregation;
+  column: string;
+  metric: TraceRollupMetricKey;
+  grouped: boolean;
+}): string {
   switch (agg) {
     case "sum":
       return `coalesce(sum(${column}), 0)`;
-    case "avg":
-      return `avg(${column})`;
-    case "min":
-      return `min(${column})`;
-    case "max":
-      return `max(${column})`;
+    case "avg": {
+      if (!isRollupAvgMetricKey(metric)) {
+        throw new Error(
+          `Rollup builder cannot serve avg(${metric}) — only non-nullable legacy columns divide correctly by TraceCount. The router should have routed this to slim.`,
+        );
+      }
+      if (grouped) {
+        throw new Error(
+          `Rollup builder cannot serve a GROUPED avg — TraceCount lands in the root span's bucket, so a grouped division uses the wrong denominator. The router should have routed this to slim or trace_summaries.`,
+        );
+      }
+      return `sum(${column}) / nullIf(sum(${ra}.TraceCount), 0)`;
+    }
     default: {
       const _exhaustive: never = agg;
       throw new Error(
-        `Rollup builder cannot serve aggregation "${String(_exhaustive)}". Percentiles + distinct counts go to slim.`,
+        `Rollup builder cannot serve aggregation "${String(_exhaustive)}". Percentiles, min/max + distinct counts go to slim.`,
       );
     }
   }
@@ -196,11 +224,16 @@ export function buildRollupTimeseriesQuery(
     }
     if (!isRollupAggregation(s.aggregation)) {
       throw new Error(
-        `Rollup builder cannot serve aggregation "${s.aggregation}". Percentiles + distinct counts go to slim.`,
+        `Rollup builder cannot serve aggregation "${s.aggregation}". Percentiles, min/max + distinct counts go to slim.`,
       );
     }
     const alias = buildMetricAlias(i, s.metric, s.aggregation, s.key, s.subkey);
-    const expr = rollupAggExpression(s.aggregation, rollupColumnFor(s.metric));
+    const expr = rollupAggExpression({
+      agg: s.aggregation,
+      column: rollupColumnFor(s.metric),
+      metric: s.metric,
+      grouped: groupByColumn !== null,
+    });
     selectExprs.push(`${expr} AS ${alias}`);
   }
 

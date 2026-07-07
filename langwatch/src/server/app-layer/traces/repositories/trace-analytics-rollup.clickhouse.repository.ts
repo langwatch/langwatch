@@ -30,6 +30,7 @@ interface ClickHouseRollupWriteRecord {
   SpanType: string;
   // UInt64 columns — serialize as strings.
   SpanCount: string;
+  TraceCount: string;
   ErrorCount: string;
   PromptTokensSum: string;
   CompletionTokensSum: string;
@@ -55,6 +56,7 @@ function toClickHouseRecord(
     Model: row.model,
     SpanType: row.spanType,
     SpanCount: String(row.spanCount),
+    TraceCount: String(row.traceCount),
     ErrorCount: String(row.errorCount),
     CostSum: row.costSum,
     NonBilledCostSum: row.nonBilledCostSum,

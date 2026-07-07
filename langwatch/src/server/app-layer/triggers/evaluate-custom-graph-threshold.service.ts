@@ -8,11 +8,10 @@
  * Prisma or ClickHouse — so it composes into both paths and is trivial
  * to unit-test.
  *
- * `isNoDataPredicate` recognises the "fire when the metric drops to
- * zero" shape — the case the event-driven path cannot reach (there is,
- * by definition, no event to react to), so the heartbeat scans for it
- * periodically. Operators express it as `operator ∈ {"lt","lte","eq"}`
- * AND `threshold ≤ 1` so a threshold of 0 / "<=1" both qualify.
+ * `isNoDataPredicate` recognises every trigger shape that fires on total
+ * silence — the case the event-driven path cannot reach (there is, by
+ * definition, no event to react to), so the heartbeat scans for it
+ * periodically.
  */
 
 export type CustomGraphOperator = "gt" | "gte" | "lt" | "lte" | "eq";
@@ -53,15 +52,18 @@ export function evaluateCustomGraphThreshold({
 }
 
 /**
- * Returns true when the trigger's operator/threshold combination
- * expresses "fire when the metric drops to ~zero". These are the
+ * Returns true when the trigger would BREACH on total silence — i.e. a
+ * zero value satisfies its operator/threshold pair. These are the
  * triggers the event-driven path cannot fire on its own (an absence of
  * events produces no event), so the heartbeat scans for them.
  *
- * Threshold ≤ 1 captures the operator-intent we care about — `lt 1`,
- * `lte 0`, `eq 0` all qualify. A `lt 100` is still a real "below"
- * trigger but is driven by the real-time path: each new event re-runs
- * the threshold check and fires/resolves accordingly.
+ * Defined as literally "does 0 breach?" for exact parity with the
+ * legacy cron, which evaluated EVERY trigger each tick and therefore
+ * fired any below-style rule on silence: `lt 10` fired (0 < 10), and
+ * an earlier `threshold ≤ 1` cut-off here silently regressed exactly
+ * those alerts — a metric going quiet never woke the real-time path
+ * ("each new event re-runs the check" assumes events keep arriving),
+ * and the heartbeat excluded them, so they never fired at all.
  */
 export function isNoDataPredicate({
   operator,
@@ -70,8 +72,6 @@ export function isNoDataPredicate({
   operator: string;
   threshold: number;
 }): boolean {
-  if (operator !== "lt" && operator !== "lte" && operator !== "eq") {
-    return false;
-  }
-  return threshold <= 1;
+  return evaluateCustomGraphThreshold({ value: 0, threshold, operator })
+    .breached;
 }

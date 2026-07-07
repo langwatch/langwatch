@@ -45,11 +45,15 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
       });
     });
 
-    describe("when the aggregation is avg", () => {
-      // Regression (trace5012-P0): avg over the rollup's SimpleAggregateFunction(sum)
-      // columns is the mean of per-bucket sums, not the per-trace mean — so avg must
-      // NEVER route to trace_analytics_rollup. With a slim-eligible group-by it goes
-      // to slim; with a rollup-only group-by (span_type, not on slim) it falls to legacy.
+    describe("when the aggregation is avg on a NULLABLE metric (cost, tokens)", () => {
+      // Regression (trace5012-P0): naive avg over the rollup's
+      // SimpleAggregateFunction(sum) columns is the mean of per-bucket sums,
+      // not the per-trace mean. TraceCount gives the rollup a per-trace
+      // denominator, but only NON-nullable legacy columns divide correctly
+      // (CH `avg` skips NULLs; sum/TraceCount counts every rooted trace) —
+      // so nullable-metric avgs stay off the rollup. With a slim-eligible
+      // group-by they go to slim; with a rollup-only group-by (span_type,
+      // not on slim) they fall to legacy.
       it("routes to trace_analytics (slim) when grouped by a slim-eligible dim", () => {
         const table = pickAnalyticsTable({
           series: [series("performance.total_cost", "avg")],
@@ -71,6 +75,37 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
           series: [series("performance.total_cost", "avg")],
         });
         expect(table).toBe("trace_analytics");
+      });
+    });
+
+    describe("when the aggregation is avg on completion_time (non-nullable)", () => {
+      // avg(completion_time) = sum(DurationSum) / sum(TraceCount) — a true
+      // per-trace mean, servable from the rollup because TotalDurationMs is
+      // NOT NULL on the legacy path too (every trace counts on both sides).
+      it("routes to trace_analytics_rollup with no group-by", () => {
+        const table = pickAnalyticsTable({
+          series: [series("performance.completion_time", "avg")],
+        });
+        expect(table).toBe("trace_analytics_rollup");
+      });
+
+      it("routes alongside rollable sums in the same query", () => {
+        const table = pickAnalyticsTable({
+          series: [
+            series("performance.total_cost", "sum"),
+            series("performance.completion_time", "avg"),
+          ],
+        });
+        expect(table).toBe("trace_analytics_rollup");
+      });
+
+      it("does NOT use the rollup when grouped — TraceCount lands in the root span's bucket, so a grouped division has the wrong denominator", () => {
+        const table = pickAnalyticsTable({
+          series: [series("performance.completion_time", "avg")],
+          groupBy: "metadata.model",
+        });
+        // metadata.model is deliberately not on slim either → legacy.
+        expect(table).toBe("trace_summaries");
       });
     });
 
