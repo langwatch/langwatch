@@ -14,8 +14,17 @@ export function useModelProvidersSettings(params: {
     { enabled: Boolean(projectId) },
   );
 
+  // Full list (one entry per stored row) used for ID-based lookups in the
+  // edit drawer. The Record shape above collapses multiple rows with the same
+  // provider string (e.g. four "custom" rows) into one, so ID lookups for
+  // non-winning rows return undefined and the form renders blank.
+  const providersList = api.modelProvider.listAllForProjectForFrontend.useQuery(
+    { projectId },
+    { enabled: Boolean(projectId) },
+  );
+
   const providers = modelProviders.data?.providers;
-  const isLoading = modelProviders.isLoading;
+  const isLoading = modelProviders.isLoading || providersList.isLoading;
 
   const hasEnabledProviders = useMemo(() => {
     // Default to true while loading or if providers data is not yet available
@@ -34,6 +43,10 @@ export function useModelProvidersSettings(params: {
   return {
     /** Model providers configuration (enabled/disabled, custom keys, etc.) */
     providers,
+    /** Flat list of every stored provider row — use this for ID-based lookups
+     *  when multi-instance providers (multiple rows sharing the same provider
+     *  string, e.g. "custom") must be distinguished by their database id. */
+    providersList: providersList.data?.providers,
     /** Metadata for all available models (supportedParameters, contextLength, etc.) */
     modelMetadata: modelProviders.data?.modelMetadata,
     isLoading,
