@@ -48,12 +48,13 @@ export interface ReplayMarkerChecker {
  * live event handler's Redis check.
  */
 /** Minimal Redis surface: a pipeline that batches the two marker reads. */
+interface ReplayMarkerPipeline {
+  hget(key: string, field: string): ReplayMarkerPipeline;
+  get(key: string): ReplayMarkerPipeline;
+  exec(): Promise<Array<[Error | null, unknown]> | null>;
+}
 interface ReplayMarkerRedis {
-  pipeline(): {
-    hget(key: string, field: string): unknown;
-    get(key: string): unknown;
-    exec(): Promise<Array<[Error | null, unknown]> | null>;
-  };
+  pipeline(): ReplayMarkerPipeline;
 }
 
 export class RedisReplayMarkerChecker implements ReplayMarkerChecker {
