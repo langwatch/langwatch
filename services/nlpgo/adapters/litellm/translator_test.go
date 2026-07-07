@@ -329,6 +329,26 @@ func TestFromLiteLLMParams_OpenAI(t *testing.T) {
 	}
 }
 
+func TestFromLiteLLMParams_GenericAPIKeyProviders(t *testing.T) {
+	for _, provider := range []string{"xai", "groq", "cerebras", "deepseek"} {
+		t.Run(provider, func(t *testing.T) {
+			ic, err := FromLiteLLMParams(provider, map[string]any{
+				"api_key": "gen-key",
+				"model":   provider + "/some-model",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if ic.Provider != provider {
+				t.Errorf("expected provider %q, got %q", provider, ic.Provider)
+			}
+			if ic.Generic["api_key"] != "gen-key" {
+				t.Errorf("expected api_key gen-key, got %q", ic.Generic["api_key"])
+			}
+		})
+	}
+}
+
 func TestFromLiteLLMParams_Anthropic(t *testing.T) {
 	ic, err := FromLiteLLMParams("anthropic", map[string]any{"api_key": "k"})
 	if err != nil {
