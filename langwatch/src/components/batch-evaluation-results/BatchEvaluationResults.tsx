@@ -37,6 +37,7 @@ import { ComparisonCharts, type XAxisOption } from "./ComparisonCharts";
 import { downloadCsv } from "./csvExport";
 import { getRunDisplayName } from "./getRunDisplayName";
 import { isRunFinished } from "./isRunFinished";
+import { PairwiseWinRateChart } from "./PairwiseWinRateChart";
 import { TableSkeleton } from "./TableSkeleton";
 import {
   type BatchEvaluationData,
@@ -546,8 +547,32 @@ export function BatchEvaluationResults({
             isVisible={chartsVisible}
             onVisibilityChange={setChartsVisible}
             onTargetColorsChange={setTargetColors}
+            suppressedScoreEvaluatorIds={
+              new Set(
+                (transformedData?.pairwiseColumns ?? []).map(
+                  (c) => c.evaluatorId,
+                ),
+              )
+            }
           />
         )}
+
+        {/* Pairwise win-rate charts — one per detected pairwise evaluator,
+            replacing the generic "avg score" bar the ComparisonCharts above
+            used to emit for the same evaluator (misleading empty bars for
+            non-scored prompt targets). */}
+        {chartsVisible &&
+          transformedData?.pairwiseColumns &&
+          transformedData.pairwiseColumns.length > 0 && (
+            <HStack gap={4} paddingX={2} align="stretch" flexWrap="wrap">
+              {transformedData.pairwiseColumns.map((pairwiseCol) => (
+                <PairwiseWinRateChart
+                  key={pairwiseCol.evaluatorId}
+                  column={pairwiseCol}
+                />
+              ))}
+            </HStack>
+          )}
 
         {/* Table container - fills remaining space */}
         {runsQuery.isLoading ? (

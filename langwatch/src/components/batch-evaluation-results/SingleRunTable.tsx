@@ -67,6 +67,14 @@ const buildColumns = (
   hiddenColumns: Set<string>,
   targetColors?: Record<string, string>,
 ) => {
+  // Evaluator ids whose per-row chip is redundant with the dedicated Winner
+  // column below — the generic `EvaluatorResultChip` renders the pairwise
+  // verdict as `<target_XYZ> 1.00`, which reads as noise to users (dogfood
+  // report). Suppressing them in the target cell keeps the Winner column
+  // the single source of the pairwise result.
+  const pairwiseEvaluatorIds = new Set(
+    pairwiseColumns.map((p) => p.evaluatorId),
+  );
   const columns = [];
 
   // Row number column
@@ -168,7 +176,12 @@ const buildColumns = (
               </Text>
             );
           }
-          return <BatchTargetCell targetOutput={targetOutput} />;
+          return (
+            <BatchTargetCell
+              targetOutput={targetOutput}
+              suppressedEvaluatorIds={pairwiseEvaluatorIds}
+            />
+          );
         },
       }),
     );

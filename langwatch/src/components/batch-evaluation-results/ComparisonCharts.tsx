@@ -114,6 +114,15 @@ type ComparisonChartsProps = {
   onXAxisOptionChange?: (option: XAxisOption) => void;
   /** Callback to provide target color map when X-axis is "target" */
   onTargetColorsChange?: (colors: Record<string, string>) => void;
+  /**
+   * Evaluator ids to exclude from the auto-generated `<name> (Score)` bar
+   * chart list. Pairwise evaluators emit a 0/1 label chip that reads as a
+   * misleading "score 0" for non-scored prompt targets on the same axis;
+   * BatchEvaluationResults suppresses them here and renders a dedicated
+   * PairwiseWinRateChart instead. Optional — undefined = no suppression,
+   * preserving pre-existing behavior.
+   */
+  suppressedScoreEvaluatorIds?: Set<string>;
 };
 
 type EvaluatorMetrics = {
@@ -302,6 +311,7 @@ export const ComparisonCharts = ({
   xAxisOption: controlledXAxisOption,
   onXAxisOptionChange,
   onTargetColorsChange,
+  suppressedScoreEvaluatorIds,
 }: ComparisonChartsProps) => {
   // Determine default visibility based on target count
   const shouldShowByDefault = useMemo(() => {
@@ -708,6 +718,7 @@ export const ComparisonCharts = ({
     const seen = new Set<string>();
     for (const run of runMetrics) {
       for (const evalId of Object.keys(run.metrics.avgScores)) {
+        if (suppressedScoreEvaluatorIds?.has(evalId)) continue;
         if (!seen.has(evalId)) {
           seen.add(evalId);
           evaluators.push({
@@ -718,7 +729,7 @@ export const ComparisonCharts = ({
       }
     }
     return evaluators;
-  }, [runMetrics]);
+  }, [runMetrics, suppressedScoreEvaluatorIds]);
 
   // Get all evaluators with pass rates (for pass rate chart)
   const passRateEvaluators = useMemo(() => {
