@@ -514,6 +514,24 @@ export const generatePairwiseCells = (
         continue;
       }
 
+      // `input` falls back to the golden field for datasets with no literal
+      // "input" column — a pre-existing convention (#5100) that predates
+      // the golden-answer toggle. Since #5378 lets goldenField be "" when
+      // hasGoldenAnswer is off, that fallback is now a no-op for such rows;
+      // log it so a silently-empty judge prompt is at least diagnosable
+      // instead of indistinguishable from "row has no input, by design."
+      const resolvedInput = datasetEntry.input ?? datasetEntry[cfg.goldenField];
+      if (
+        resolvedInput === undefined &&
+        !cfg.hasGoldenAnswer &&
+        rowIndex === 0
+      ) {
+        logger.debug(
+          { targetId: target.id },
+          "Pairwise column-target: no 'input' dataset column and no golden field to fall back on (has_golden_answer is off) — judge prompt will render an empty task/input",
+        );
+      }
+
       // Per-row synthetic evaluator with PRE-RESOLVED value mappings for
       // every pairwise input field. Pre-fix (#5131) the synthetic was
       // shared across rows with `mappings: {}`, leaving the candidate_*
@@ -568,7 +586,7 @@ export const generatePairwiseCells = (
                 : { type: "value", value: undefined },
             input: {
               type: "value",
-              value: datasetEntry.input ?? datasetEntry[cfg.goldenField],
+              value: resolvedInput,
             },
             golden: {
               type: "value",
