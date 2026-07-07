@@ -37,7 +37,6 @@ import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import { useTargetName } from "../../hooks/useTargetName";
 import type { TargetConfig } from "../../types";
 import {
-  computePairwiseColumnTargetAggregate,
   computePairwiseTargetAggregate,
   computeTargetAggregates,
 } from "../../utils/computeAggregates";
@@ -219,34 +218,22 @@ export const TargetHeader = memo(function TargetHeader({
   }, [results.executingCells, isRunning, target.id, nonEmptyRowCount]);
 
   // Compute aggregate statistics using effective row count. Pairwise
-  // column-targets don't emit target outputs, so `computeTargetAggregates`
-  // returns zeros for them (cost / duration live on the verdict, not the
-  // target-output store). Route those through the pairwise-aware helper so
-  // the workbench header still surfaces the same Rows / Avg Latency / Total
-  // Cost / Execution Time popover as prompt / agent columns — dogfood ask
-  // per the "4.3s $0.000967" chip on prompt headers.
+  // column-targets go through the SAME helper as prompt/agent columns so
+  // the workbench popover surfaces the exact set of rows the results-page
+  // popover shows (Rows / Avg Score / Avg Latency / Total Cost /
+  // Execution Time / Evaluators). Pairwise column-targets DO emit
+  // target_result events with cost + duration for the full comparison, and
+  // their synthetic evaluator flows through the same evaluators pipeline,
+  // so no pairwise-specific aggregation is needed here.
   const aggregates = useMemo(
     () =>
-      target.type === "evaluator" && target.pairwise
-        ? computePairwiseColumnTargetAggregate(
-            target.id,
-            results,
-            effectiveRowCount,
-          )
-        : computeTargetAggregates(
-            target.id,
-            results,
-            evaluators,
-            effectiveRowCount,
-          ),
-    [
-      target.id,
-      target.type,
-      target.pairwise,
-      results,
-      evaluators,
-      effectiveRowCount,
-    ],
+      computeTargetAggregates(
+        target.id,
+        results,
+        evaluators,
+        effectiveRowCount,
+      ),
+    [target.id, results, evaluators, effectiveRowCount],
   );
 
   const pairwiseAggregate = useMemo(() => {
