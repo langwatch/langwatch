@@ -37,6 +37,7 @@ import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import { useTargetName } from "../../hooks/useTargetName";
 import type { TargetConfig } from "../../types";
 import {
+  computePairwiseColumnTargetAggregate,
   computePairwiseTargetAggregate,
   computeTargetAggregates,
 } from "../../utils/computeAggregates";
@@ -217,16 +218,27 @@ export const TargetHeader = memo(function TargetHeader({
     return nonEmptyRowCount;
   }, [results.executingCells, isRunning, target.id, nonEmptyRowCount]);
 
-  // Compute aggregate statistics using effective row count
+  // Compute aggregate statistics using effective row count.
+  // Pairwise column-targets don't emit `targetOutputs` (their per-row cost /
+  // duration live on the verdict), so the default aggregator returns zeros
+  // and hides the Rows / Avg Latency / Total Cost / Execution Time popover.
+  // Route them through a dedicated helper that reads from the verdict store
+  // so the popover renders exactly like it does for prompt / agent columns.
   const aggregates = useMemo(
     () =>
-      computeTargetAggregates(
-        target.id,
-        results,
-        evaluators,
-        effectiveRowCount,
-      ),
-    [target.id, results, evaluators, effectiveRowCount],
+      target.type === "evaluator" && target.pairwise
+        ? computePairwiseColumnTargetAggregate(
+            target.id,
+            results,
+            effectiveRowCount,
+          )
+        : computeTargetAggregates(
+            target.id,
+            results,
+            evaluators,
+            effectiveRowCount,
+          ),
+    [target.id, target.type, target.pairwise, results, evaluators, effectiveRowCount],
   );
 
   const pairwiseAggregate = useMemo(() => {
@@ -469,39 +481,52 @@ export const TargetHeader = memo(function TargetHeader({
 
       <Spacer />
 
-      {/* Summary statistics (positioned on the right before play button) */}
+      {/* Summary statistics (positioned on the right before play button).
+          For pairwise columns we render BOTH the "winner wins X" text AND
+          the shared Rows / Avg Latency / Total Cost / Execution Time popover
+          — pre-fix pairwise only got the win text and users lost the same
+          per-target diagnostics prompt columns already had (dogfood ask). */}
       {pairwiseAggregate &&
       pairwiseAggregate.counts.a +
         pairwiseAggregate.counts.b +
         pairwiseAggregate.counts.tie >
         0 ? (
-        (() => {
-          const { a, b, tie } = pairwiseAggregate.counts;
-          const isTie = a === b;
-          const winnerName = a > b ? variantAName : variantBName;
-          const winnerCount = Math.max(a, b);
-          const shortName = (s: string) =>
-            s.length > 18 ? `${s.slice(0, 17)}…` : s;
-          const summary = isTie
-            ? tie > 0
-              ? `Tied · ${tie} tie${tie === 1 ? "" : "s"}`
-              : "Tied"
-            : `${shortName(winnerName)} wins ${winnerCount}` +
-              (tie > 0 ? ` · ${tie} tie${tie === 1 ? "" : "s"}` : "");
-          return (
-            <Tooltip
-              content={`${variantAName}: ${a} wins · ${variantBName}: ${b} wins${
-                tie > 0 ? ` · ${tie} ${tie === 1 ? "tie" : "ties"}` : ""
-              }`}
-              positioning={{ placement: "top" }}
-              openDelay={200}
-            >
-              <Text fontSize="11px" color="fg.muted" whiteSpace="nowrap">
-                {summary}
-              </Text>
-            </Tooltip>
-          );
-        })()
+        <HStack gap={2}>
+          {(() => {
+            const { a, b, tie } = pairwiseAggregate.counts;
+            const isTie = a === b;
+            const winnerName = a > b ? variantAName : variantBName;
+            const winnerCount = Math.max(a, b);
+            const shortName = (s: string) =>
+              s.length > 18 ? `${s.slice(0, 17)}…` : s;
+            const summary = isTie
+              ? tie > 0
+                ? `Tied · ${tie} tie${tie === 1 ? "" : "s"}`
+                : "Tied"
+              : `${shortName(winnerName)} wins ${winnerCount}` +
+                (tie > 0 ? ` · ${tie} tie${tie === 1 ? "" : "s"}` : "");
+            return (
+              <Tooltip
+                content={`${variantAName}: ${a} wins · ${variantBName}: ${b} wins${
+                  tie > 0 ? ` · ${tie} ${tie === 1 ? "tie" : "ties"}` : ""
+                }`}
+                positioning={{ placement: "top" }}
+                openDelay={200}
+              >
+                <Text fontSize="11px" color="fg.muted" whiteSpace="nowrap">
+                  {summary}
+                </Text>
+              </Tooltip>
+            );
+          })()}
+          {hasAggregates && (
+            <TargetSummary
+              aggregates={aggregates}
+              evaluators={evaluators}
+              isRunning={isRunning}
+            />
+          )}
+        </HStack>
       ) : hasAggregates ? (
         <TargetSummary
           aggregates={aggregates}

@@ -244,6 +244,73 @@ export type PairwiseAggregate = {
   perRow: Array<PairwiseVerdict | null>;
 };
 
+/**
+ * Compute a TargetAggregate-shaped object for a pairwise column-target so
+ * the workbench header can render the same Rows / Avg Latency / Total Cost /
+ * Execution Time popover it renders for prompt/agent targets (dogfood ask).
+ *
+ * Pairwise column-targets don't emit `targetOutputs` — their per-row cost
+ * and duration live on the pairwise verdict stored at
+ * `evaluatorResults[target.id][target.id][rowIndex]` (per orchestrator
+ * convention, the synthetic evaluator's id equals the target id). Reads
+ * cost/duration from those verdicts and returns a subset-populated
+ * TargetAggregate — evaluator/pass-rate/score fields stay empty because
+ * pairwise doesn't emit them, but the popover only surfaces the fields
+ * used below.
+ */
+export const computePairwiseColumnTargetAggregate = (
+  targetId: string,
+  results: EvaluationResults,
+  rowCount: number,
+): TargetAggregate => {
+  const verdicts = results.evaluatorResults[targetId]?.[targetId] ?? [];
+
+  let completedRows = 0;
+  let errorRows = 0;
+  const costValues: number[] = [];
+  const latencyValues: number[] = [];
+
+  for (let i = 0; i < rowCount; i++) {
+    const raw = verdicts[i];
+    if (raw === undefined || raw === null) continue;
+    const parsed = parseEvaluationResult(raw);
+    if (parsed.status === "pending" || parsed.status === "running") continue;
+    if (parsed.status === "error") {
+      errorRows++;
+      continue;
+    }
+    completedRows++;
+    const costAmount = readCostAmount(raw);
+    if (costAmount > 0) costValues.push(costAmount);
+    // Prefer the top-level `duration` when the runtime attaches it (staged
+    // fetch path); fall back to nothing if the verdict shape doesn't carry
+    // per-row latency.
+    const duration = (raw as { duration?: unknown }).duration;
+    if (typeof duration === "number" && Number.isFinite(duration)) {
+      latencyValues.push(duration);
+    }
+  }
+
+  const costStats = computeMetricStats(costValues);
+  const latencyStats = computeMetricStats(latencyValues);
+
+  return {
+    targetId,
+    completedRows,
+    totalRows: rowCount,
+    errorRows,
+    evaluators: [],
+    overallPassRate: null,
+    overallAverageScore: null,
+    averageCost: costStats?.avg ?? null,
+    totalCost: costStats?.total ?? null,
+    averageLatency: latencyStats?.avg ?? null,
+    totalDuration: latencyStats?.total ?? null,
+    latencyStats,
+    costStats,
+  };
+};
+
 const isPairwiseLegacyLabel = (
   value: unknown,
 ): value is PairwiseVerdict["label"] =>
