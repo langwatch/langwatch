@@ -171,6 +171,28 @@ export class EventSourcingService<
     // Register map projections
     if (mapProjections) {
       for (const mapProj of mapProjections) {
+        // Auto-wire the log-ordered history loader for
+        // `options.dedupeByIdempotencyKey` — same shape as the fold
+        // projections' eventLoaderUpTo.
+        if (!mapProj.eventLoaderUpTo && eventStore) {
+          const capturedAggregateType = aggregateType;
+          const capturedEventStore = eventStore;
+          mapProj.eventLoaderUpTo = async (ctx: {
+            tenantId: string;
+            aggregateId: string;
+            upToEvent: Event;
+          }) => {
+            const events = await capturedEventStore.getEventsUpTo(
+              ctx.aggregateId,
+              { tenantId: createTenantId(ctx.tenantId) },
+              capturedAggregateType,
+              ctx.upToEvent as EventType,
+            );
+            return [...events].sort(
+              (a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0),
+            );
+          };
+        }
         this.router.registerMapProjection(mapProj);
       }
     }

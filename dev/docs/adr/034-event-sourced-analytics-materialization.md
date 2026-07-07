@@ -41,6 +41,16 @@ An `AggregatingMergeTree` fed by **per-span increments** — `SimpleAggregateFun
 
 Generic fold + per-span-increment + read-routing machinery, parameterised per pipeline by field extractors. Traces first; evaluations, scenarios, experiments each plug in with their own `<x>_analytics` + `<x>_analytics_rollup`. Our own copy — **not** the governance substrate (ADR-018 maps to a *flat* table; we map-with-aggregate, deliberately divergent).
 
+> **Scope note (2026-07-07):** traces + evaluations ship; the
+> scenario / experiment / suite write-side (the original Phase 7) was
+> **pulled back** during stack review. Nothing reads those tables yet, and
+> two of the three schemas already contained their own re-migration seed
+> (the suite rollup keyed on BatchRunId because SuiteId is unavailable on
+> the item event; the slim tables anchored on a per-event moving
+> timestamp). Since replay rebuilds these tables from the event log
+> whenever a real consumer lands, accumulating data early buys nothing —
+> re-add each aggregate when a consumer names its columns.
+
 ## Trace fields
 
 **`trace_analytics`** — `ReplacingMergeTree(UpdatedAt)`, `ORDER BY (TenantId, OccurredAt, TraceId)`:

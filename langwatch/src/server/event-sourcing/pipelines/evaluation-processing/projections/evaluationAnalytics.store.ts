@@ -85,9 +85,12 @@ export class EvaluationAnalyticsStore
   }
 
   /**
-   * Phase 6 has no slim read-back path — the executor always re-folds from
-   * the event log when the slim cache misses, rather than reading slim
-   * back. Same Phase 2/3 contract the trace slim store applies.
+   * No read-back, by design: the eval slim row is lossy, so fold state
+   * cannot be reconstructed from it. Returning null here means fold-state
+   * continuity comes from the two layers above this store — the
+   * RedisCachedFoldStore wrapped around it at registration (warm path) and
+   * the fold's `refoldOnStoreMiss` option (event-log rebuild on a miss).
+   * Same contract as the trace slim store.
    */
   async get(
     _aggregateId: string,

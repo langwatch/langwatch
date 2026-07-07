@@ -9,14 +9,6 @@ import {
   StartExperimentRunCommand,
 } from "./commands";
 import {
-  type ExperimentAnalyticsData,
-  ExperimentAnalyticsFoldProjection,
-} from "./projections/experimentAnalytics.foldProjection";
-import {
-  ExperimentAnalyticsRollupMapProjection,
-  type ExperimentAnalyticsRollupRow,
-} from "./projections/experimentAnalyticsRollup.mapProjection";
-import {
   type ClickHouseExperimentRunResultRecord,
   ExperimentRunResultStorageMapProjection,
 } from "./projections/experimentRunResultStorage.mapProjection";
@@ -29,10 +21,6 @@ import type { ExperimentRunProcessingEvent } from "./schemas/events";
 export interface ExperimentRunProcessingPipelineDeps {
   experimentRunStateFoldStore: FoldProjectionStore<ExperimentRunStateData>;
   experimentRunItemAppendStore: AppendStore<ClickHouseExperimentRunResultRecord>;
-  /** ADR-034 Phase 7: slim per-experiment-run fold writer. */
-  experimentAnalyticsStore: FoldProjectionStore<ExperimentAnalyticsData>;
-  /** ADR-034 Phase 7: per-experiment-run rollup writer. */
-  experimentAnalyticsRollupAppendStore: AppendStore<ExperimentAnalyticsRollupRow>;
 }
 
 /**
@@ -68,23 +56,12 @@ export function createExperimentRunProcessingPipeline(
         store: deps.experimentRunStateFoldStore,
       }),
     )
-    .withFoldProjection(
-      "experimentAnalytics",
-      new ExperimentAnalyticsFoldProjection({
-        store: deps.experimentAnalyticsStore,
-      }),
-    )
     .withMapProjection(
       "experimentRunResultStorage",
       new ExperimentRunResultStorageMapProjection({
         store: deps.experimentRunItemAppendStore,
       }),
     )
-    .withMapProjection(
-      "experimentAnalyticsRollup",
-      new ExperimentAnalyticsRollupMapProjection({
-        store: deps.experimentAnalyticsRollupAppendStore,
-      }),
     );
 
   return builder

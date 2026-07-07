@@ -3,7 +3,10 @@ import {
   AbstractFoldProjection,
   type FoldEventHandlers,
 } from "../../../projections/abstractFoldProjection";
-import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
+import type {
+  FoldProjectionOptions,
+  FoldProjectionStore,
+} from "../../../projections/foldProjection.types";
 import type {
   EvaluationCompletedEvent,
   EvaluationReportedEvent,
@@ -285,6 +288,16 @@ export class EvaluationAnalyticsFoldProjection
   readonly store: FoldProjectionStore<EvaluationAnalyticsData>;
 
   protected readonly events = evaluationAnalyticsEvents;
+
+  /**
+   * The eval slim row has no read-back (lossy, like the trace slim), so
+   * `store.get()` only ever serves from the Redis cache in front of it. On
+   * a cache miss the executor rebuilds state from the event log — without
+   * this option a miss folds ONLY the delivered events, so the terminal
+   * event of a scheduled→completed pair arriving after cache expiry would
+   * overwrite the row with a state missing the scheduled-time fields.
+   */
+  override options: FoldProjectionOptions = { refoldOnStoreMiss: true };
 
   constructor(deps: { store: FoldProjectionStore<EvaluationAnalyticsData> }) {
     super({
