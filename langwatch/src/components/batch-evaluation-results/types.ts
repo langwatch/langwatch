@@ -460,6 +460,17 @@ const detectPairwiseColumns = (
 ): BatchPairwiseColumn[] => {
   const targetIds = new Set(targetColumns.map((t) => t.id));
   const targetNameById = new Map(targetColumns.map((t) => [t.id, t.name]));
+  // Every target column with `type: "evaluator"` is treated as a pairwise
+  // column-target — the synthetic evaluator generated for it stores
+  // evaluator id == target id, and no scalar evaluator ever ends up as a
+  // top-level target column in this UI. Pre-populating buckets from these
+  // means chip suppression + win-rate chart wire up even when the run's
+  // evaluations echo an unusual label shape (dogfood: label sometimes echoes
+  // an identifier we don't have in `targetColumns` — the strict shape check
+  // dropped whole evaluators on the floor and both fixes silently no-op'd).
+  const forcedPairwiseEvaluatorIds = new Set(
+    targetColumns.filter((t) => t.type === "evaluator").map((t) => t.id),
+  );
 
   // Group by evaluator id + name so different pairwise instances (same
   // evaluator type wired against different variant pairs) stay separate.
@@ -493,23 +504,36 @@ const detectPairwiseColumns = (
 
   for (const ev of evaluations) {
     if (ev.status !== "processed") continue;
+    const isForced = forcedPairwiseEvaluatorIds.has(ev.evaluator);
     if (typeof ev.label !== "string" || ev.label.length === 0) {
       // If we can't read a label but the evaluator is clearly pairwise, still
       // bucket it so the chip + chart get suppressed — the verdict just won't
       // contribute to the win-rate totals.
-      if (!isPairwiseEvaluator(ev)) continue;
+      if (!isPairwiseEvaluator(ev) && !isForced) continue;
     }
     const label = ev.label ?? "";
     const isLegacySlot = isSlotLabel(label);
     const isTargetId = targetIds.has(label);
-    if (!isLegacySlot && !isTargetId && !isPairwiseEvaluator(ev)) continue;
+    if (
+      !isLegacySlot &&
+      !isTargetId &&
+      !isPairwiseEvaluator(ev) &&
+      !isForced
+    ) {
+      continue;
+    }
 
     const key = ev.name ? `${ev.evaluator}::${ev.name}` : ev.evaluator;
     let bucket = buckets.get(key);
     if (!bucket) {
+      // Prefer the target column's display name when the evaluator id
+      // matches a column-target (pairwise column-target case) — this keeps
+      // the chart / winner column labeled "Pairwise Compare" instead of the
+      // raw `target_XYZ` id when ev.name is null.
+      const targetName = targetNameById.get(ev.evaluator);
       bucket = {
         evaluatorId: ev.evaluator,
-        name: ev.name ?? ev.evaluator,
+        name: ev.name ?? targetName ?? ev.evaluator,
         seenLabels: new Set<string>(),
         verdicts: [],
       };
