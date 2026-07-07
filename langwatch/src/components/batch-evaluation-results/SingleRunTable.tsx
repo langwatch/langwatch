@@ -176,10 +176,22 @@ const buildColumns = (
               </Text>
             );
           }
+          // For evaluator-type target columns (pairwise column-targets),
+          // the cell text already carries the judge's reasoning — every
+          // chip renders the same verdict as `<targetId> 1.00` and reads
+          // as pure noise. Suppress ALL evaluator chips there. For
+          // prompt / agent columns we only suppress the specific pairwise
+          // evaluator ids so downstream (non-pairwise) chips still show.
+          const suppressAll = targetCol.type === "evaluator";
+          const suppressed = suppressAll
+            ? new Set(
+                targetOutput.evaluatorResults.map((r) => r.evaluatorId),
+              )
+            : pairwiseEvaluatorIds;
           return (
             <BatchTargetCell
               targetOutput={targetOutput}
-              suppressedEvaluatorIds={pairwiseEvaluatorIds}
+              suppressedEvaluatorIds={suppressed}
             />
           );
         },

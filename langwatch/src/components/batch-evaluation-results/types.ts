@@ -476,13 +476,33 @@ const detectPairwiseColumns = (
   const isSlotLabel = (v: string): v is "A" | "B" | "tie" =>
     v === "A" || v === "B" || v === "tie";
 
+  // Also treat any evaluator whose display name looks like Pairwise Compare
+  // as pairwise, even if this row's label doesn't match a known target id
+  // or slot letter. Real-world dogfood found the label sometimes echoes an
+  // identifier we don't have in `targetColumns` (e.g. a prompt handle
+  // resolved by langevals but not reflected in the run's targets snapshot),
+  // and the strict shape check silently dropped the whole evaluator on the
+  // floor — chip suppression + win-rate chart both no-op'd.
+  const isPairwiseEvaluator = (ev: ExperimentRunWithItems["evaluations"][number]) => {
+    const evaluatorField = (ev.evaluator ?? "").toLowerCase();
+    const nameField = (ev.name ?? "").toLowerCase();
+    return (
+      evaluatorField.includes("pairwise") || nameField.includes("pairwise")
+    );
+  };
+
   for (const ev of evaluations) {
     if (ev.status !== "processed") continue;
-    if (typeof ev.label !== "string" || ev.label.length === 0) continue;
-    const label = ev.label;
+    if (typeof ev.label !== "string" || ev.label.length === 0) {
+      // If we can't read a label but the evaluator is clearly pairwise, still
+      // bucket it so the chip + chart get suppressed — the verdict just won't
+      // contribute to the win-rate totals.
+      if (!isPairwiseEvaluator(ev)) continue;
+    }
+    const label = ev.label ?? "";
     const isLegacySlot = isSlotLabel(label);
     const isTargetId = targetIds.has(label);
-    if (!isLegacySlot && !isTargetId) continue;
+    if (!isLegacySlot && !isTargetId && !isPairwiseEvaluator(ev)) continue;
 
     const key = ev.name ? `${ev.evaluator}::${ev.name}` : ev.evaluator;
     let bucket = buckets.get(key);

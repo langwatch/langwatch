@@ -9,19 +9,9 @@
  * width is preserved and the table doesn't reflow between reruns.
  */
 
-import { Badge, Box, HStack, Text, VStack } from "@chakra-ui/react";
-
-import { Tooltip } from "~/components/ui/tooltip";
+import { Badge, HStack, Text, VStack } from "@chakra-ui/react";
 
 import type { BatchPairwiseColumn, BatchPairwiseVerdict } from "./types";
-
-const REASONING_PREVIEW_CHARS = 80;
-
-const truncateForPreview = (value: string) => {
-  const trimmed = value.trim();
-  if (trimmed.length <= REASONING_PREVIEW_CHARS) return trimmed;
-  return `${trimmed.slice(0, REASONING_PREVIEW_CHARS).trimEnd()}…`;
-};
 
 type WinnerVisual = {
   label: string;
@@ -64,8 +54,6 @@ export function BatchPairwiseWinnerCell({
 
   const winner = resolveWinner(column, verdict);
   const reasoning = verdict.reasoning?.trim();
-  const preview = reasoning ? truncateForPreview(reasoning) : null;
-  const hasOverflow = !!reasoning && reasoning.length > REASONING_PREVIEW_CHARS;
 
   const badge = (
     <Badge
@@ -79,35 +67,18 @@ export function BatchPairwiseWinnerCell({
   );
 
   return (
-    <VStack align="start" gap={1}>
+    <VStack align="start" gap={2}>
       <HStack gap={1.5}>{badge}</HStack>
-      {preview && (
-        <Tooltip
-          content={
-            <Text
-              fontSize="12px"
-              whiteSpace="pre-wrap"
-              wordBreak="break-word"
-              maxWidth="480px"
-            >
-              {reasoning}
-            </Text>
-          }
-          positioning={{ placement: "top" }}
-          openDelay={hasOverflow ? 100 : 400}
-          disabled={!hasOverflow}
+      {reasoning && (
+        <Text
+          fontSize="12px"
+          color="fg.muted"
+          whiteSpace="pre-wrap"
+          wordBreak="break-word"
+          data-testid="pairwise-winner-reasoning"
         >
-          <Box>
-            <Text
-              fontSize="12px"
-              color="fg.muted"
-              cursor={hasOverflow ? "help" : "default"}
-              data-testid="pairwise-winner-reasoning"
-            >
-              {preview}
-            </Text>
-          </Box>
-        </Tooltip>
+          {reasoning}
+        </Text>
       )}
     </VStack>
   );
