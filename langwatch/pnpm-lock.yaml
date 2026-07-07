@@ -378,8 +378,8 @@ importers:
         specifier: ^6.0.1
         version: 6.0.1
       geoip-country:
-        specifier: ^5.0.202605012358
-        version: 5.0.202605012358
+        specifier: ^5.0.202605270000
+        version: 5.0.202605270000
       handlebars:
         specifier: ^4.7.9
         version: 4.7.9
@@ -7887,8 +7887,8 @@ packages:
     resolution: {integrity: sha512-3hN7NaskYvMDLQY55gnW3NQ+mesEAepTqlg+VEbj7zzqEMBVNhzcGYYeqFo/TlYz6eQiFcp1HcsCZO+nGgS8zg==}
     engines: {node: '>=6.9.0'}
 
-  geoip-country@5.0.202605012358:
-    resolution: {integrity: sha512-qjuBxQJZjF8orH2Mk1kEwhjQm9gL4ad+SHvRPd6DJF5R7KKDiV/ws0iCIBG+7roDlQsPzJenzk08PGyqAX8e0A==}
+  geoip-country@5.0.202605270000:
+    resolution: {integrity: sha512-e+vPy8BmgH6vRzGUIv/hWFaKBHiAtU67HFZx0xeHtQaEYjPa7G9EBUknyNCMd4V0L2ETXLP0MzR1MZsMq9VbcA==}
     engines: {node: '>=10.20.0'}
 
   get-caller-file@2.0.5:
@@ -20514,7 +20514,7 @@ snapshots:
 
   gensync@1.0.0-beta.2: {}
 
-  geoip-country@5.0.202605012358:
+  geoip-country@5.0.202605270000:
     dependencies:
       async: 2.6.4
       countries-list: 3.3.0
