@@ -479,6 +479,62 @@ await evaluation.run(dataset, async ({ item, index }) => {
   Browse our complete list of [available evaluators](/evaluations/evaluators/list) including metrics for RAG quality, hallucination detection, safety, and more.
 </Info>
 
+### Pairwise Compare
+
+`langevals/pairwise_compare` compares two candidate outputs for the same input and asks a judge model to pick the better one. This is useful when you want to compare two prompts, models, or agent configurations directly instead of scoring each one independently.
+
+The example below was verified against the live SDK path using `evaluation.evaluate("langevals/pairwise_compare", ...)`.
+
+<Tabs>
+  <Tab title="Python">
+```python
+import langwatch
+
+ROWS = [
+    {
+        "input": "Write a function that checks if a given integer is a prime number.",
+        "golden": "def is_prime(n): ...",
+        "candidate_a_id": "variant-a",
+        "candidate_a_output": "def is_prime(n: int) -> bool: ...",
+        "candidate_b_id": "variant-b",
+        "candidate_b_output": "def is_prime(n: int) -> bool: ...",
+    }
+]
+
+evaluation = langwatch.experiment.init("pairwise-sdk-verification")
+
+for index, row in evaluation.loop(list(enumerate(ROWS))):
+    evaluation.evaluate(
+        "langevals/pairwise_compare",
+        index=index,
+        data={
+            "input": row["input"],
+            "golden": row["golden"],
+            "candidate_a_id": row["candidate_a_id"],
+            "candidate_a_output": row["candidate_a_output"],
+            "candidate_b_id": row["candidate_b_id"],
+            "candidate_b_output": row["candidate_b_output"],
+        },
+        settings={
+            "model": "openai/gpt-5-mini",
+            "has_golden_answer": True,
+            "swap_and_confirm": True,
+            "allow_tie": True,
+            "include_metrics": ["cost", "duration"],
+        },
+    )
+
+evaluation.print_summary()
+```
+  </Tab>
+</Tabs>
+
+`swap_and_confirm` performs two judge calls with A/B order reversed on the second pass. If the two calls disagree, the evaluator returns a tie. Set `has_golden_answer` to `false` when you want a pure head-to-head comparison without a reference answer.
+
+The SDK result also records the pairwise judge's own evaluator cost and duration. In exported results, those appear under the evaluator columns for `langevals/pairwise_compare`; they are separate from `include_metrics`, which injects each candidate target's cost or duration into the judge prompt.
+
+If you already have your own local pairwise judge, publish its result with `evaluation.log(...)` by sending a `score`, `label`, and `details`. Those custom results are tracked like any other SDK metric. The dedicated pairwise column visualization currently comes from the built-in Pairwise Compare evaluator configuration.
+
 ## Complete Example
 
 <Tabs>
@@ -674,6 +730,8 @@ For each evaluator applied to a target:
 | `{target}_{evaluator}_details` | Additional details or explanation | `gpt-4_faithfulness_details` → `"All claims supported"` |
 | `{target}_{evaluator}_cost` | Cost of running the evaluator | `gpt-4_faithfulness_cost` → `0.0005` |
 | `{target}_{evaluator}_duration_ms` | Evaluator execution time | `gpt-4_faithfulness_duration_ms` → `850` |
+
+For `langevals/pairwise_compare`, the evaluator cost and duration columns describe the pairwise judge run itself. When `swap_and_confirm` is enabled, that judge run may include two model calls.
 
 ### Example CSV Output
 
