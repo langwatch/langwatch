@@ -1,4 +1,4 @@
-import { type Job, Worker } from "bullmq";
+import { type ConnectionOptions, type Job, Worker } from "bullmq";
 import { BullMQOtel } from "bullmq-otel";
 
 import { withJobContext } from "../../context/asyncContext";
@@ -82,7 +82,7 @@ export const startAnomalyDetectionWorker = () => {
     ANOMALY_DETECTION_QUEUE.NAME,
     withJobContext(runAnomalyDetectionJob),
     {
-      connection,
+      connection: connection as ConnectionOptions,
       concurrency: 1,
       telemetry: new BullMQOtel(ANOMALY_DETECTION_QUEUE.NAME),
     },

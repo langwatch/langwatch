@@ -10,12 +10,10 @@ import type { z } from "zod";
 // ---------------------------------------------------------------------------
 
 /** Extract the literal event type string from a Zod schema's output type. */
-export type EventTypeOf<S> = S extends z.ZodType<
-  { type: infer T extends string },
-  any,
-  any
->
-  ? T
+export type EventTypeOf<S> = S extends z.ZodType<infer O>
+  ? O extends { type: infer T extends string }
+    ? T
+    : never
   : never;
 
 // ---------------------------------------------------------------------------

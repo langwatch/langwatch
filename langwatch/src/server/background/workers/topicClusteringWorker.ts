@@ -1,4 +1,4 @@
-import { type Job, Worker } from "bullmq";
+import { type ConnectionOptions, type Job, Worker } from "bullmq";
 import { BullMQOtel } from "bullmq-otel";
 import type { TopicClusteringJob } from "~/server/background/types";
 import { withJobContext } from "../../context/asyncContext";
@@ -42,7 +42,7 @@ export const startTopicClusteringWorker = () => {
     TOPIC_CLUSTERING_QUEUE.NAME,
     withJobContext(runTopicClusteringJob),
     {
-      connection,
+      connection: connection as ConnectionOptions,
       concurrency: 3,
       telemetry: new BullMQOtel(TOPIC_CLUSTERING_QUEUE.NAME),
     },

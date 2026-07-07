@@ -64,7 +64,7 @@ function extractToolCalls(
       traceId?: string;
     } = new ActionExecutionMessage({
       id: `${message.id}-tool-${toolCall.function?.name}`,
-      name: toolCall.function?.name,
+      name: toolCall.function?.name ?? "",
       arguments: safeJsonParseOrStringFallback(
         toolCall.function?.arguments ?? "{}",
       ),

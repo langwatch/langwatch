@@ -1241,7 +1241,9 @@ export const seriesInput = z.object({
     }),
   ),
   filters: z.optional(
-    z.record(
+    // zod 4: z.record(enum, V) is exhaustive; z.partialRecord preserves the
+    // zod 3 optional-key behavior.
+    z.partialRecord(
       filterFieldsEnum,
       z.union([
         z.array(z.string()),

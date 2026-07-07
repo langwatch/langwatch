@@ -1,4 +1,4 @@
-import { type Job, Worker } from "bullmq";
+import { type ConnectionOptions, type Job, Worker } from "bullmq";
 import { BullMQOtel } from "bullmq-otel";
 import { env } from "~/env.mjs";
 import type { UsageStatsJob } from "~/server/background/types";
@@ -82,7 +82,7 @@ export const startUsageStatsWorker = () => {
     USAGE_STATS_QUEUE.NAME,
     withJobContext(runUsageStatsJob),
     {
-      connection,
+      connection: connection as ConnectionOptions,
       concurrency: 1, // Only one job at a time since it's a daily task
       telemetry: new BullMQOtel(USAGE_STATS_QUEUE.NAME),
     },

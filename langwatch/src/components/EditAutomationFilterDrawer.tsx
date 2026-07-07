@@ -63,7 +63,7 @@ function parseCodeFilters(value: string): ParsedCodeFilters {
     if (!result.success) {
       return {
         success: false,
-        message: result.error.errors[0]?.message ?? "Invalid filter structure",
+        message: result.error.issues[0]?.message ?? "Invalid filter structure",
       };
     }
 

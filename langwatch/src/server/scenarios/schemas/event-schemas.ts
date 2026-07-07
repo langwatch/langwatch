@@ -2,11 +2,7 @@
  * Scenario event schemas
  * Extends the AG-UI base event schema to add scenario-specific fields.
  */
-import {
-  EventType,
-  MessageSchema,
-  MessagesSnapshotEventSchema,
-} from "@ag-ui/core";
+import { EventType, type Message, MessageSchema } from "@ag-ui/core";
 import { z } from "zod";
 import { chatMessageSchema } from "~/server/tracer/types";
 import { ScenarioEventType, ScenarioRunStatus, Verdict } from "../scenario-event.enums";
@@ -156,20 +152,29 @@ const scenarioAudioMessageSchema = z.object({
  * Captures the conversation state at a specific point during scenario execution.
  * Includes searchable_content and payload for full message functionality.
  */
-export const scenarioMessageSnapshotSchema = MessagesSnapshotEventSchema.merge(
-  baseScenarioEventSchema.extend({
-    type: z.literal(ScenarioEventType.MESSAGE_SNAPSHOT),
-    messages: z.array(
-      z.intersection(
-        z.union([MessageSchema, chatMessageSchema, scenarioAudioMessageSchema]),
-        z.object({
-          id: z.string().optional(),
-          trace_id: z.string().optional(),
-        }),
-      ),
+// Built from baseScenarioEventSchema (app zod 4) so it keeps a precise type and
+// a clean `type` discriminator for scenarioEventSchema below. @ag-ui/core's
+// MessagesSnapshotEventSchema only adds timestamp/rawEvent/messages — all
+// already covered by baseScenarioEventSchema (and messages is overridden here),
+// so we don't compose it. @ag-ui/core runs on the app's zod 4 via the
+// "@ag-ui/core>zod" override, but ships zod-3-shaped .d.ts types, so MessageSchema
+// is cast at the boundary (single runtime zod instance — types only).
+export const scenarioMessageSnapshotSchema = baseScenarioEventSchema.extend({
+  type: z.literal(ScenarioEventType.MESSAGE_SNAPSHOT),
+  messages: z.array(
+    z.intersection(
+      z.union([
+        MessageSchema as unknown as z.ZodType<Message>,
+        chatMessageSchema,
+        scenarioAudioMessageSchema,
+      ]),
+      z.object({
+        id: z.string().optional(),
+        trace_id: z.string().optional(),
+      }),
     ),
-  }),
-);
+  ),
+});
 
 /**
  * Scenario Text Message Start Event Schema

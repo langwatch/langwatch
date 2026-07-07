@@ -20,9 +20,32 @@ export type ScenarioRunStartedEvent = z.infer<typeof scenarioRunStartedSchema>;
 export type ScenarioRunFinishedEvent = z.infer<
   typeof scenarioRunFinishedSchema
 >;
-export type ScenarioMessageSnapshotEvent = z.infer<
-  typeof scenarioMessageSnapshotSchema
->;
+/**
+ * A single message inside a MESSAGE_SNAPSHOT. The runtime schema validates it as
+ * an @ag-ui/core `Message` | tracer chat message | scenario audio message,
+ * intersected with `{ id?, trace_id? }`. Under zod 4 that intersection-of-union
+ * no longer infers a usable type through the @ag-ui boundary (@ag-ui ships
+ * zod-3-shaped .d.ts), and the consumers here are defensive/dynamic anyway
+ * (runtime `typeof` / `in` checks, `role as MessageRole` casts), so we describe
+ * the accessed surface explicitly. Type-only — the runtime schema is unchanged.
+ */
+export type ScenarioSnapshotMessage = {
+  id?: string;
+  trace_id?: string;
+  role?: string;
+  content?: unknown;
+  toolCallId?: string;
+  toolCalls?: Array<{
+    id?: string;
+    type?: string;
+    function?: { name?: string; arguments?: string };
+  }>;
+};
+
+export type ScenarioMessageSnapshotEvent = Omit<
+  z.infer<typeof scenarioMessageSnapshotSchema>,
+  "messages"
+> & { messages: ScenarioSnapshotMessage[] };
 export type ScenarioTextMessageStartEvent = z.infer<typeof scenarioTextMessageStartSchema>;
 export type ScenarioTextMessageEndEvent = z.infer<typeof scenarioTextMessageEndSchema>;
 export type ScenarioTextMessageContentEvent = z.infer<typeof scenarioTextMessageContentSchema>;

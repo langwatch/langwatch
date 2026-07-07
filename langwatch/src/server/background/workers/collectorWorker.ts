@@ -1,6 +1,6 @@
 import { SpanStatusCode, trace } from "@opentelemetry/api";
 import type { Project } from "@prisma/client";
-import { Worker } from "bullmq";
+import { type ConnectionOptions, Worker } from "bullmq";
 import { BullMQOtel } from "bullmq-otel";
 import type {
   CollectorCheckAndAdjustJob,
@@ -793,7 +793,7 @@ export const startCollectorWorker = () => {
       }
     }),
     {
-      connection,
+      connection: connection as ConnectionOptions,
       concurrency: 20,
       telemetry: new BullMQOtel(COLLECTOR_QUEUE.NAME),
     },

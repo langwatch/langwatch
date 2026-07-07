@@ -1,5 +1,5 @@
 import { CostReferenceType, CostType } from "@prisma/client";
-import { type Job, Worker } from "bullmq";
+import { type ConnectionOptions, type Job, Worker } from "bullmq";
 import { BullMQOtel } from "bullmq-otel";
 import { nanoid } from "nanoid";
 import { getProtectionsForProject } from "~/server/api/utils";
@@ -875,7 +875,7 @@ export const startEvaluationsWorker = (
       }
     }),
     {
-      connection,
+      connection: connection as ConnectionOptions,
       concurrency: 3,
       stalledInterval: 10 * 60 * 1000, // 10 minutes
       telemetry: new BullMQOtel(EVALUATIONS_QUEUE.NAME),

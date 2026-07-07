@@ -105,7 +105,10 @@ export const sharedFiltersInputSchema = z.object({
   endDate: z.number().positive(),
   query: z.string().optional(),
   filters: z
-    .record(
+    // zod 4: z.record(enum, V) is exhaustive (all keys required) at both the
+    // type and runtime level; zod 3 treated it as a partial record. Use
+    // z.partialRecord to preserve the original optional-key behavior.
+    .partialRecord(
       filterFieldsEnum,
       z.union([
         z.array(z.string()),

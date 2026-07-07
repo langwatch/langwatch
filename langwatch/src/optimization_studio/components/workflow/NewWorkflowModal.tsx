@@ -106,7 +106,7 @@ export const NewWorkflowModal = ({
           const result = workflowJsonSchema.safeParse(jsonContent);
 
           if (!result.success) {
-            const errorMessage = result.error.errors
+            const errorMessage = result.error.issues
               .map((err) => `${err.path.join(".")}: ${err.message}`)
               .join("\n");
             throw new Error(errorMessage);

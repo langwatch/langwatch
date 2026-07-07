@@ -132,7 +132,7 @@ export function salvageValidData<T extends z.ZodObject<any>>(
             salvaged[key] = salvageValidData(
               objectSchema,
               value,
-              nestedDefaultValue,
+              nestedDefaultValue as Record<string, unknown>,
             );
           } else {
             // No defaults at all - try direct parse

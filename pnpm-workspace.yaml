@@ -65,6 +65,14 @@ packageExtensions:
 # Adding an unscoped `zod`/`@opentelemetry/*` override here would force one
 # onto the other and break it.
 overrides:
+  # @ag-ui/core is locked to zod ^3.22.4 (no zod-4 release yet), but the app is
+  # on zod 4. Without this, pnpm gives @ag-ui/core its own nested zod 3 and the
+  # two zod instances collide when the app composes @ag-ui schemas (see
+  # server/scenarios/schemas/event-schemas.ts). @ag-ui/core's runtime code only
+  # uses zod builders that are compatible with zod 4 (verified: it loads +
+  # parses under zod 4), so pin it to the app's zod. Drop this once @ag-ui/core
+  # ships a zod-4 release.
+  "@ag-ui/core>zod": "^4.4.3"
   # OpenTelemetry — align the APP's transitive OTel to its 0.217 line. The SDK
   # declares its OTel deps exactly in its own package.json, within these ranges.
   "@opentelemetry/sdk-node": ">=0.217.0"
