@@ -108,6 +108,13 @@ export type BatchPairwiseVerdict = {
   rowIndex: number;
   label: "A" | "B" | "tie";
   reasoning?: string | null;
+  /**
+   * Text of the winning variant's actual output for this row, so the row
+   * cell can surface "what was right" alongside "why". Empty for `tie`
+   * (nothing definitively won) or when the variant's row output can't be
+   * looked up (missing target / unresolved variant).
+   */
+  winnerOutput?: string | null;
 };
 
 /**
@@ -438,7 +445,7 @@ export const transformBatchEvaluationData = (
     targetColumns,
     evaluatorIds: Array.from(evaluatorMap.keys()),
     evaluatorNames: Object.fromEntries(evaluatorMap),
-    pairwiseColumns: detectPairwiseColumns(evaluations, targetColumns),
+    pairwiseColumns: detectPairwiseColumns(evaluations, targetColumns, rows),
     rows,
   };
 };
@@ -457,6 +464,7 @@ export const transformBatchEvaluationData = (
 const detectPairwiseColumns = (
   evaluations: ExperimentRunWithItems["evaluations"],
   targetColumns: BatchTargetColumn[],
+  rows: BatchResultRow[],
 ): BatchPairwiseColumn[] => {
   const targetIds = new Set(targetColumns.map((t) => t.id));
   const targetNameById = new Map(targetColumns.map((t) => [t.id, t.name]));
@@ -589,10 +597,46 @@ const detectPairwiseColumns = (
       else if (variantAId && raw === variantAId) normalized = "A";
       else if (variantBId && raw === variantBId) normalized = "B";
       else continue; // orphan id we couldn't classify
+
+      // Look up the winning variant's actual output text so the row cell can
+      // show "what was right" alongside "why". Ties get no winner output —
+      // there was no definitively-right answer to surface.
+      let winnerOutput: string | null = null;
+      if (normalized !== "tie") {
+        const winnerId = normalized === "A" ? variantAId : variantBId;
+        if (winnerId) {
+          const winnerCell = rows[v.rowIndex]?.targets[winnerId];
+          const raw = winnerCell?.output;
+          if (raw !== null && raw !== undefined) {
+            // Single-output-field targets get unwrapped to a scalar at
+            // storage time; multi-field targets stay as objects. Prefer the
+            // `output` key when present (that's the conventional field
+            // name), otherwise stringify the whole payload — either way the
+            // cell renderer just needs a display string.
+            if (typeof raw === "string") {
+              winnerOutput = raw;
+            } else if (typeof raw === "object") {
+              const asObj = raw as Record<string, unknown>;
+              const candidate = asObj.output ?? asObj.answer;
+              if (typeof candidate === "string") {
+                winnerOutput = candidate;
+              } else {
+                try {
+                  winnerOutput = JSON.stringify(raw);
+                } catch {
+                  winnerOutput = null;
+                }
+              }
+            }
+          }
+        }
+      }
+
       verdictsByRow[v.rowIndex] = {
         rowIndex: v.rowIndex,
         label: normalized,
         reasoning: v.reasoning,
+        winnerOutput,
       };
     }
 

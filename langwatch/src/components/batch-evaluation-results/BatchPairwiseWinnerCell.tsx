@@ -2,14 +2,22 @@
  * BatchPairwiseWinnerCell - Renders the per-row pairwise verdict in the
  * batch results table's dedicated "Winner" column (#5100 follow-up).
  *
- * Each cell shows "Winner: <name>" (or "Tie") plus a short preview of the
- * judge's reasoning; the full reasoning is available on hover so the row
- * height stays predictable. When a row has no verdict for this evaluator
- * (skipped / error / not-yet-run), we render a subtle dash so the column
- * width is preserved and the table doesn't reflow between reruns.
+ * Each row shows THREE things — the biggest-value framing per dogfood:
+ * "what was right, and why".
+ *   1. `Winner: <variant name>` badge (green / purple / gray for tie).
+ *   2. The winning variant's actual output text ("What was right") in a
+ *      quoted callout, so the reviewer can see the content that won
+ *      without cross-referencing the other columns.
+ *   3. The judge's reasoning text ("Why") in full — no truncation, no
+ *      hover tooltip; the results page is where users actually read
+ *      long-form verdicts.
+ *
+ * When a row has no verdict for this evaluator (skipped / error /
+ * not-yet-run), we render a subtle dash so the column width is preserved
+ * and the table doesn't reflow between reruns.
  */
 
-import { Badge, HStack, Text, VStack } from "@chakra-ui/react";
+import { Badge, Box, HStack, Text, VStack } from "@chakra-ui/react";
 
 import type { BatchPairwiseColumn, BatchPairwiseVerdict } from "./types";
 
@@ -54,6 +62,7 @@ export function BatchPairwiseWinnerCell({
 
   const winner = resolveWinner(column, verdict);
   const reasoning = verdict.reasoning?.trim();
+  const winnerOutput = verdict.winnerOutput?.trim();
 
   const badge = (
     <Badge
@@ -69,6 +78,32 @@ export function BatchPairwiseWinnerCell({
   return (
     <VStack align="start" gap={2}>
       <HStack gap={1.5}>{badge}</HStack>
+      {/* What was right — the winning variant's actual output. Rendered as
+          a bordered-left "quote" so it visually separates from the judge's
+          reasoning below (they carry different weight for the reader). */}
+      {winnerOutput && (
+        <Box
+          borderLeftWidth="3px"
+          borderLeftColor={
+            verdict.label === "A" ? "green.subtle" : "purple.subtle"
+          }
+          paddingLeft={2}
+          paddingY={1}
+          maxWidth="100%"
+        >
+          <Text
+            fontSize="12px"
+            color="fg"
+            whiteSpace="pre-wrap"
+            wordBreak="break-word"
+            data-testid="pairwise-winner-output"
+          >
+            {winnerOutput}
+          </Text>
+        </Box>
+      )}
+      {/* Why — the judge's reasoning. Muted so it reads as the annotation
+          layer rather than the answer itself. */}
       {reasoning && (
         <Text
           fontSize="12px"
