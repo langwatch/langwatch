@@ -527,6 +527,49 @@ for index, row in evaluation.loop(list(enumerate(ROWS))):
 evaluation.print_summary()
 ```
   </Tab>
+  <Tab title="TypeScript">
+```typescript
+import { LangWatch } from 'langwatch';
+
+const langwatch = new LangWatch();
+
+const rows = [
+  {
+    input: "Write a function that checks if a given integer is a prime number.",
+    golden: "function isPrime(n) { ... }",
+    candidateAId: "variant-a",
+    candidateAOutput: "function isPrime(n) { ... }",
+    candidateBId: "variant-b",
+    candidateBOutput: "function isPrime(n) { ... }",
+  },
+];
+
+const evaluation = await langwatch.experiments.init("pairwise-sdk-verification");
+
+await evaluation.run(rows, async ({ item, index }) => {
+  await evaluation.evaluate("langevals/pairwise_compare", {
+    index,
+    data: {
+      input: item.input,
+      golden: item.golden,
+      candidate_a_id: item.candidateAId,
+      candidate_a_output: item.candidateAOutput,
+      candidate_b_id: item.candidateBId,
+      candidate_b_output: item.candidateBOutput,
+    },
+    settings: {
+      model: "openai/gpt-5-mini",
+      has_golden_answer: true,
+      swap_and_confirm: true,
+      allow_tie: true,
+      include_metrics: ["cost", "duration"],
+    },
+  });
+});
+
+evaluation.printSummary();
+```
+  </Tab>
 </Tabs>
 
 `swap_and_confirm` performs two judge calls with A/B order reversed on the second pass. If the two calls disagree, the evaluator returns a tie. Set `has_golden_answer` to `false` when you want a pure head-to-head comparison without a reference answer.
