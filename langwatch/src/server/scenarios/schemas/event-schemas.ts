@@ -2,12 +2,12 @@
  * Scenario event schemas
  * Extends the AG-UI base event schema to add scenario-specific fields.
  */
+import { z } from "zod";
 import {
   EventType,
   MessageSchema,
   MessagesSnapshotEventSchema,
-} from "@ag-ui/core";
-import { z } from "zod";
+} from "./ag-ui-core";
 import { chatMessageSchema } from "~/server/tracer/types";
 import { ScenarioEventType, ScenarioRunStatus, Verdict } from "../scenario-event.enums";
 

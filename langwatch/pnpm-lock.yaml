@@ -56,9 +56,6 @@ importers:
 
   .:
     dependencies:
-      '@ag-ui/core':
-        specifier: ~0.0.57
-        version: 0.0.57
       '@ai-sdk/amazon-bedrock':
         specifier: ^4.0.100
         version: 4.0.100(zod@3.25.76)
