@@ -593,21 +593,54 @@ export const TargetHeader = memo(function TargetHeader({
     </HStack>
   );
 
-  if (isPairwiseColumn && pairwiseSubtitle) {
+  if (isPairwiseColumn) {
     return (
       <VStack align="stretch" gap={1} width="full">
         {headerRow}
-        <Text
-          fontSize="12px"
-          color="fg.muted"
-          fontWeight="medium"
-          lineHeight="1.2"
+        {/* Cleaner "who vs who" — small colored dots on each side (green =
+            A, purple = B — matches the winner badge palette in the row
+            cells + win-rate chart), variant name in medium weight, "vs"
+            in a subtle color. Reads at a glance without a wall of grey
+            text. */}
+        <HStack
+          gap={2}
           paddingLeft={7}
-          truncate
+          minWidth={0}
           data-testid="pairwise-variants-subtitle"
         >
-          {pairwiseSubtitle}
-        </Text>
+          <HStack gap={1.5} minWidth={0} flex="0 1 auto">
+            <Circle size="6px" bg="green.solid" flexShrink={0} />
+            <Text
+              fontSize="11px"
+              color="fg"
+              fontWeight="medium"
+              lineHeight="1.2"
+              truncate
+            >
+              {variantAName}
+            </Text>
+          </HStack>
+          <Text
+            fontSize="10px"
+            color="fg.subtle"
+            fontWeight="normal"
+            flexShrink={0}
+          >
+            vs
+          </Text>
+          <HStack gap={1.5} minWidth={0} flex="0 1 auto">
+            <Circle size="6px" bg="purple.solid" flexShrink={0} />
+            <Text
+              fontSize="11px"
+              color="fg"
+              fontWeight="medium"
+              lineHeight="1.2"
+              truncate
+            >
+              {variantBName}
+            </Text>
+          </HStack>
+        </HStack>
       </VStack>
     );
   }
