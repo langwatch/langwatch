@@ -40,6 +40,8 @@ export interface AICreateModalProps {
   onSkip: () => void;
   /** Text shown during generation (default: "Generating...") */
   generatingText?: string;
+  /** Rendered on the left of the idle footer, e.g. which model generation uses */
+  footerHint?: React.ReactNode;
 }
 
 type ModalState = "idle" | "generating" | "error";
@@ -66,6 +68,7 @@ export function AICreateModal({
   onGenerate,
   onSkip,
   generatingText = DEFAULT_GENERATING_TEXT,
+  footerHint,
 }: AICreateModalProps) {
   const [description, setDescription] = useState("");
   const [modalState, setModalState] = useState<ModalState>("idle");
@@ -181,6 +184,7 @@ export function AICreateModal({
               onSkip={handleSkip}
               onGenerate={handleGenerate}
               isGenerateDisabled={!description.trim()}
+              footerHint={footerHint}
             />
           )}
 
@@ -302,22 +306,35 @@ interface IdleFooterProps {
   onSkip: () => void;
   onGenerate: () => void;
   isGenerateDisabled: boolean;
+  footerHint?: React.ReactNode;
 }
 
-function IdleFooter({ onSkip, onGenerate, isGenerateDisabled }: IdleFooterProps) {
+function IdleFooter({
+  onSkip,
+  onGenerate,
+  isGenerateDisabled,
+  footerHint,
+}: IdleFooterProps) {
   return (
-    <HStack gap={2} justify="flex-end">
-      <Button variant="ghost" onClick={onSkip}>
-        I'll write it myself
-      </Button>
-      <Button
-        colorPalette="blue"
-        onClick={onGenerate}
-        disabled={isGenerateDisabled}
-      >
-        <Sparkles size={14} />
-        Generate with AI
-      </Button>
+    <HStack
+      gap={2}
+      width="full"
+      justify={footerHint ? "space-between" : "flex-end"}
+    >
+      {footerHint}
+      <HStack gap={2}>
+        <Button variant="ghost" onClick={onSkip}>
+          I'll write it myself
+        </Button>
+        <Button
+          colorPalette="blue"
+          onClick={onGenerate}
+          disabled={isGenerateDisabled}
+        >
+          <Sparkles size={14} />
+          Generate with AI
+        </Button>
+      </HStack>
     </HStack>
   );
 }

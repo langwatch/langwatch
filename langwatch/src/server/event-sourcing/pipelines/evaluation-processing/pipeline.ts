@@ -15,10 +15,6 @@ import type { EvaluationProcessingEvent } from "./schemas/events";
 export interface EvaluationProcessingPipelineDeps {
   evalRunStore: FoldProjectionStore<EvaluationRunData>;
   executeEvaluationCommand: ExecuteEvaluationCommand;
-  esSyncReactor: ReactorDefinition<
-    EvaluationProcessingEvent,
-    EvaluationRunData
-  >;
   /** PERSIST-class branch of the evaluation alert trigger, routed
    *  through the framework's `.withOutbox` plumbing (ADR-030 + ADR-035).
    *  Emits settle payloads stamped `actionClass: "persist"`. */
@@ -46,7 +42,7 @@ export interface EvaluationProcessingPipelineDeps {
  * and enables detection of stuck evaluations.
  *
  * Commands:
- * - executeEvaluation: Preconditions + sampling + run eval + ES write + emit events (reactor path)
+ * - executeEvaluation: Preconditions + sampling + run eval + emit events (reactor path)
  * - startEvaluation: Records eval start to CH (API handler path)
  * - completeEvaluation: Records eval result to CH (API handler path)
  */
@@ -62,7 +58,6 @@ export function createEvaluationProcessingPipeline(
         store: deps.evalRunStore,
       }),
     )
-    .withReactor("evaluationRun", "evaluationEsSync", deps.esSyncReactor)
     .withOutbox(
       "evaluationRun",
       "evaluationAlertTrigger",

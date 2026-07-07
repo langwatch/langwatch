@@ -406,6 +406,10 @@ export interface TimeseriesQueryInput {
   groupByKey?: string;
   timeScale?: number | "full";
   timeZone?: string;
+  /** Restrict the query to these trace IDs (parameterized IN clause). */
+  traceIds?: string[];
+  /** Invert the filter conditions (NOT wrap), matching the UI's negate toggle. */
+  negateFilters?: boolean;
 }
 
 /**
@@ -607,7 +611,13 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   const joinClauses = Array.from(allJoins)
     .map((table) => {
       const requiredColumns = resolveRequiredColumns(table, allExpressions);
-      return buildJoinClause(table, requiredColumns);
+      // Both-periods regime: bound the stored_spans JOIN to the same StartTime
+      // envelope as the outer OccurredAt filter so it prunes partitions.
+      return buildJoinClause({
+        table,
+        requiredColumns,
+        spanTimeFilter: SPAN_TIME_FILTER_BOTH_PERIODS,
+      });
     })
     .join("\n");
 
@@ -621,10 +631,24 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
     )
   `;
 
-  let filterWhere =
-    filterTranslation.whereClause !== "1=1"
-      ? `AND ${filterTranslation.whereClause}`
-      : "";
+  // Assemble the filter conditions appended to every builder path's WHERE.
+  // negateFilters inverts the user's filter selection (NOT wrap), matching the
+  // UI's negate toggle. traceIds narrows the scan to an explicit trace set —
+  // it is a scope restriction, so it is never negated.
+  const filterConditions: string[] = [];
+  if (filterTranslation.whereClause !== "1=1") {
+    filterConditions.push(
+      input.negateFilters
+        ? `NOT (${filterTranslation.whereClause})`
+        : filterTranslation.whereClause,
+    );
+  }
+  if (input.traceIds && input.traceIds.length > 0) {
+    filterConditions.push(`${ts}.TraceId IN ({traceIds:Array(String)})`);
+    allTranslationParams.traceIds = input.traceIds;
+  }
+  const filterWhere =
+    filterConditions.length > 0 ? `AND ${filterConditions.join(" AND ")}` : "";
 
   // When using arrayJoin for grouping (like labels) or span-level groupBy (like model),
   // we need a CTE approach to avoid trace duplication affecting counts. The CTE deduplicates
@@ -1939,7 +1963,12 @@ function buildDateBucketedPipelineQuery({
     const simpleJoinClauses = Array.from(simpleJoins)
       .map((table) => {
         const requiredColumns = resolveRequiredColumns(table, allSimpleExprs);
-        return buildJoinClause(table, requiredColumns);
+        // Both-periods regime: bound the stored_spans JOIN to the date envelope.
+        return buildJoinClause({
+          table,
+          requiredColumns,
+          spanTimeFilter: SPAN_TIME_FILTER_BOTH_PERIODS,
+        });
       })
       .join("\n");
 
@@ -2350,7 +2379,12 @@ export function buildDataForFilterQuery(
   const filterJoins = Array.from(filterTranslation.requiredJoins)
     .map((table) => {
       const requiredColumns = resolveRequiredColumns(table, filterExpressions);
-      return buildJoinClause(table, requiredColumns);
+      // Start/end regime: bound the stored_spans JOIN to the date envelope.
+      return buildJoinClause({
+        table,
+        requiredColumns,
+        spanTimeFilter: SPAN_TIME_FILTER_START_END,
+      });
     })
     .join("\n");
 
@@ -2442,7 +2476,11 @@ export function buildDataForFilterQuery(
       break;
 
     case "spans.model":
-      joins = buildJoinClause("stored_spans", new Set(["SpanAttributes"]));
+      joins = buildJoinClause({
+        table: "stored_spans",
+        requiredColumns: new Set(["SpanAttributes"]),
+        spanTimeFilter: SPAN_TIME_FILTER_START_END,
+      });
       sql = `
         SELECT
           ${ss}.SpanAttributes['gen_ai.request.model'] AS field,
@@ -2464,7 +2502,11 @@ export function buildDataForFilterQuery(
       break;
 
     case "spans.type":
-      joins = buildJoinClause("stored_spans", new Set(["SpanAttributes"]));
+      joins = buildJoinClause({
+        table: "stored_spans",
+        requiredColumns: new Set(["SpanAttributes"]),
+        spanTimeFilter: SPAN_TIME_FILTER_START_END,
+      });
       sql = `
         SELECT
           ${ss}.SpanAttributes['langwatch.span.type'] AS field,
@@ -2487,7 +2529,7 @@ export function buildDataForFilterQuery(
 
     case "evaluations.evaluator_id":
     case "evaluations.evaluator_id.guardrails_only":
-      joins = buildJoinClause("evaluation_runs");
+      joins = buildJoinClause({ table: "evaluation_runs" });
       sql = `
         SELECT
           ${es}.EvaluatorId AS field,

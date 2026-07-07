@@ -683,6 +683,7 @@ describe("computePairwiseAggregate", () => {
     pairwise: {
       variantA: "target-a",
       variantB: "target-b",
+      hasGoldenAnswer: true,
       goldenField: "expected_output",
       includeMetrics: [],
     },

@@ -38,12 +38,7 @@ import {
 import { TokenResolver } from "~/server/api-key/token-resolver";
 import { getApp } from "~/server/app-layer/app";
 import { DomainError } from "~/server/app-layer/domain-error";
-import { evaluationNameAutoslug } from "~/server/background/workers/collector/evaluationNameAutoslug";
-import { extractChunkTextualContent } from "~/server/background/workers/collector/rag";
-import {
-  type DataForEvaluation,
-  runEvaluation,
-} from "~/server/background/workers/evaluationsWorker";
+import { EvaluatorMissingFieldError } from "~/server/app-layer/evaluations/errors";
 import { prisma } from "~/server/db";
 import {
   AVAILABLE_EVALUATORS,
@@ -54,6 +49,10 @@ import {
   type SingleEvaluationResult,
 } from "~/server/evaluations/evaluators";
 import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
+import {
+  type DataForEvaluation,
+  runEvaluation,
+} from "~/server/evaluations/runEvaluation";
 import {
   type EvaluationRESTParams,
   type EvaluationRESTResult,
@@ -75,6 +74,8 @@ import {
 } from "~/server/experiments/types";
 import { mapEsTargetsToTargets } from "~/server/experiments-v3/services/mappers";
 import { getPayloadSizeHistogram } from "~/server/metrics";
+import { evaluationNameAutoslug } from "~/server/tracer/collector/evaluationNameAutoslug";
+import { extractChunkTextualContent } from "~/server/tracer/collector/rag";
 import { rAGChunkSchema } from "~/server/tracer/types";
 import { coerceEvaluatorScalar } from "~/server/utils/coerceEvaluatorScalar";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -895,11 +896,30 @@ async function handleEvaluatorCall(
       data.data[requiredField] === undefined ||
       data.data[requiredField] === null
     ) {
+      const domainError = new EvaluatorMissingFieldError(
+        requiredField,
+        evaluatorDefinition.name,
+      );
+      logger.warn(
+        {
+          kind: domainError.kind,
+          meta: domainError.meta,
+          projectId: project.id,
+        },
+        "missing required field for evaluator",
+      );
       return c.json(
         {
-          error: `${requiredField} is required for ${evaluatorDefinition.name} evaluator`,
+          // `error` keeps carrying the human-readable message, matching
+          // this endpoint's existing wire shape for external API consumers.
+          // `kind`/`meta` are additive so the workbench client can build a
+          // friendly message (e.g. map candidate_a_id -> "Variant A")
+          // without depending on the message being a specific string.
+          error: domainError.message,
+          kind: domainError.kind,
+          meta: domainError.meta,
         },
-        400,
+        domainError.httpStatus as 400,
       );
     }
   }
@@ -1080,7 +1100,7 @@ const processBatchEvaluation = async (
   project: Project,
   param: ESBatchEvaluationRESTParams,
 ) => {
-  const { run_id, experiment_id, experiment_slug } = param;
+  const { experiment_id, experiment_slug } = param;
 
   const experiment = await findOrCreateExperiment({
     project,

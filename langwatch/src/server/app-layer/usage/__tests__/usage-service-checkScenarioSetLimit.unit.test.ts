@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { TtlCache } from "~/server/utils/ttlCache";
-import type { PlanResolver } from "../../subscription/plan-provider";
-import type { OrganizationService } from "../../organizations/organization.service";
-import { UsageService } from "../usage.service";
-import { ScenarioSetLimitExceededError } from "../errors";
+import type { TtlCache } from "~/server/utils/ttlCache";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
+import type { OrganizationService } from "../../organizations/organization.service";
 import type { SimulationRunService } from "../../simulations/simulation-run.service";
+import type { PlanResolver } from "../../subscription/plan-provider";
+import { ScenarioSetLimitExceededError } from "../errors";
+import { UsageService } from "../usage.service";
 
 const { mockRedisStore } = vi.hoisted(() => {
   const mockRedisStore = new Map<string, string>();
@@ -19,7 +19,9 @@ vi.mock("~/server/redis", () => {
     setex: vi.fn(async (_key: string, _ttl: number, value: string) => {
       mockRedisStore.set(_key, value);
     }),
-    del: vi.fn(async (key: string) => { mockRedisStore.delete(key); }),
+    del: vi.fn(async (key: string) => {
+      mockRedisStore.delete(key);
+    }),
   };
   return { isBuildOrNoRedis: false, connection: fakeRedis };
 });
@@ -74,7 +76,10 @@ describe("UsageService.checkScenarioSetLimit", () => {
   const mockPlanResolver = vi.fn() as unknown as PlanResolver;
 
   const mockGetDistinctExternalSetIds = vi.fn();
-  const mockSimulationRunService: Pick<SimulationRunService, "getDistinctExternalSetIds"> = {
+  const mockSimulationRunService: Pick<
+    SimulationRunService,
+    "getDistinctExternalSetIds"
+  > = {
     getDistinctExternalSetIds: mockGetDistinctExternalSetIds,
   };
 
@@ -96,7 +101,6 @@ describe("UsageService.checkScenarioSetLimit", () => {
       mockPlanResolver,
       mockOrgRepo as never,
       mockSimulationRunService,
-      false,
     );
   });
 

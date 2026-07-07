@@ -1,21 +1,19 @@
 import type { Cluster, Redis as IORedis } from "ioredis";
 
+import { GQ1_BLOB_BACKSTOP_TTL_SECONDS } from "./blobConstants";
+import { redisBlobKeyPrefix } from "./blobKeys";
 import type { JobBlobStore } from "./jobEnvelope";
-
-/**
- * Safety-net TTL for offloaded bodies. Deletion is best-effort at job
- * completion/restage; this bounds how long an orphan (dedup-squashed job,
- * crash between stage and delete) lingers. Must comfortably exceed the
- * longest plausible staged residence — retry backoff chains and paused
- * pipelines hold jobs for hours, not days.
- */
-const BLOB_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 /**
  * Stores offloaded envelope bodies as raw gzip binary under standalone keys,
  * read and written directly by the client (never through Lua, so ioredis's
  * UTF-8 script-reply decoding is not a constraint). Keys share the queue
  * name's hash tag so they land in the queue's cluster slot.
+ *
+ * A staged-but-not-yet-dispatched job (long retry backoff, paused pipeline,
+ * delayed schedule) sees NO intervening read between the producer's `put` and
+ * the dispatcher's `get`, so the TTL is set to comfortably outlive the longest
+ * plausible staged residence (7 days, see {@link GQ1_BLOB_BACKSTOP_TTL_SECONDS}).
  */
 export class RedisJobBlobStore implements JobBlobStore {
   private readonly redis: IORedis | Cluster;
@@ -29,14 +27,38 @@ export class RedisJobBlobStore implements JobBlobStore {
     queueName: string;
   }) {
     this.redis = redis;
-    this.keyPrefix = `${queueName}:gq:blob:`;
+    this.keyPrefix = redisBlobKeyPrefix(queueName);
   }
 
   async put({ id, data }: { id: string; data: Buffer }): Promise<void> {
-    await this.redis.set(this.keyPrefix + id, data, "EX", BLOB_TTL_SECONDS);
+    await this.redis.set(
+      this.keyPrefix + id,
+      data,
+      "EX",
+      GQ1_BLOB_BACKSTOP_TTL_SECONDS,
+    );
   }
 
+  /**
+   * Reads the blob and refreshes its TTL (GETEX). Worker hot path only — see
+   * {@link peek} for the inspection path that must NOT extend the backstop TTL.
+   * A missing key returns null.
+   */
   async get({ id }: { id: string }): Promise<Buffer | null> {
+    return await this.redis.getexBuffer(
+      this.keyPrefix + id,
+      "EX",
+      GQ1_BLOB_BACKSTOP_TTL_SECONDS,
+    );
+  }
+
+  /**
+   * Reads the blob WITHOUT refreshing its TTL. Use from the ops dashboard and
+   * any other non-worker inspection path so a repeatedly-viewed blocked group
+   * doesn't keep its orphan blobs alive indefinitely (2026-06-24 review).
+   * A missing key returns null.
+   */
+  async peek({ id }: { id: string }): Promise<Buffer | null> {
     return await this.redis.getBuffer(this.keyPrefix + id);
   }
 

@@ -13,6 +13,7 @@ import { hasProjectPermission } from "~/server/api/rbac";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
+import { nlpgoHandledErrorFrom } from "~/server/nlpgo/goHandledError";
 import { createLogger } from "~/utils/logger/server";
 import type { NextRequestShim as any } from "./types";
 
@@ -125,6 +126,21 @@ secured.access(
 
     return c.json({ scenario: result.object });
   } catch (error) {
+    // Handled Go-side failures (nlpgo / AI Gateway) arrive as a typed
+    // envelope on the AI SDK error — forward them with their kind so
+    // the browser can react (e.g. missing_provider → settings link).
+    const handled = nlpgoHandledErrorFrom(error);
+    if (handled) {
+      logger.warn(
+        { error: handled.serialize() },
+        "Scenario generation rejected by LLM gateway",
+      );
+      return c.json(
+        { error: handled.message, domainError: handled.serialize() },
+        { status: handled.httpStatus as 400 },
+      );
+    }
+
     logger.error({ error }, "Error generating scenario");
 
     const errorMessage =

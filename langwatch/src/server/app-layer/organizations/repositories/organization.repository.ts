@@ -170,8 +170,6 @@ export interface UpdateOrganizationInput {
   s3Endpoint?: string | null;
   s3AccessKeyId?: string | null;
   s3SecretAccessKey?: string | null;
-  elasticsearchNodeUrl?: string | null;
-  elasticsearchApiKey?: string | null;
   s3Bucket?: string | null;
   presenceEnabled?: boolean;
   supportContact?: string | null;

@@ -179,6 +179,29 @@ func TestCredentialFromHeaders_Gemini(t *testing.T) {
 	}
 }
 
+func TestCredentialFromHeaders_GenericAPIKeyProviders(t *testing.T) {
+	// xai/groq/cerebras/deepseek share the Generic slot; Provider
+	// disambiguates and maps 1:1 onto the domain provider id.
+	for _, provider := range []string{"xai", "groq", "cerebras", "deepseek"} {
+		t.Run(provider, func(t *testing.T) {
+			hdr := encodeCreds(t, inlineCreds{
+				Provider: provider,
+				Generic:  map[string]string{"api_key": "gen-key"},
+			})
+			cred, err := credentialFromHeaders(map[string]string{headerInlineCredentials: hdr})
+			if err != nil {
+				t.Fatalf("err: %v", err)
+			}
+			if cred.ProviderID != domain.ProviderID(provider) {
+				t.Errorf("ProviderID: %q, want %q", cred.ProviderID, provider)
+			}
+			if cred.APIKey != "gen-key" {
+				t.Errorf("APIKey: %q", cred.APIKey)
+			}
+		})
+	}
+}
+
 func TestCredentialFromHeaders_Custom(t *testing.T) {
 	hdr := encodeCreds(t, inlineCreds{
 		Provider: "custom",

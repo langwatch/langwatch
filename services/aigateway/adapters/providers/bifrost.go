@@ -842,8 +842,15 @@ func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProv
 		// vLLM provider has no provider-level URL fallback. The API key
 		// may legitimately be empty (unauthenticated self-hosted server).
 		k.Value = envVar(cred.APIKey)
+		url := credBaseURL(cred)
+		if url == "" && cred.ProviderID == domain.ProviderDeepSeek {
+			// DeepSeek rides the openai-compat path (no Bifrost-native
+			// provider) but is a hosted API, not a customer endpoint —
+			// customers configure only an API key, so default the URL.
+			url = deepseekBaseURL
+		}
 		k.VLLMKeyConfig = &bfschemas.VLLMKeyConfig{
-			URL: envVar(normalizeOpenAICompatBaseURL(credBaseURL(cred))),
+			URL: envVar(normalizeOpenAICompatBaseURL(url)),
 		}
 
 	default:
@@ -872,6 +879,12 @@ func mapProvider(cred domain.Credential) bfschemas.ModelProvider {
 		return bfschemas.Gemini
 	case domain.ProviderAnthropic:
 		return bfschemas.Anthropic
+	case domain.ProviderDeepSeek:
+		// DeepSeek is not in Bifrost's ModelProvider enum; its API is
+		// OpenAI-compatible, so route it through the vLLM adapter. The
+		// base URL defaults to DeepSeek's public endpoint in
+		// credentialToBifrostKey.
+		return bfschemas.VLLM
 	case domain.ProviderCustom:
 		// Customer-hosted OpenAI-compatible endpoint. Bifrost's vLLM
 		// provider is its generic OpenAI-compat adapter with a per-key
@@ -888,9 +901,15 @@ func mapProvider(cred domain.Credential) bfschemas.ModelProvider {
 		}
 		return bfschemas.OpenAI
 	default:
+		// Bifrost-native providers whose enum value matches our
+		// ProviderID string verbatim (xai, groq, cerebras, ...).
 		return bfschemas.ModelProvider(string(cred.ProviderID))
 	}
 }
+
+// deepseekBaseURL is DeepSeek's public OpenAI-compatible endpoint, used
+// when a DeepSeek credential arrives without an explicit base URL.
+const deepseekBaseURL = "https://api.deepseek.com"
 
 // credBaseURL returns the customer-configured endpoint override for
 // OpenAI-compatible credentials. The control-plane wire names it

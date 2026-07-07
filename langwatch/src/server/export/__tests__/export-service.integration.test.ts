@@ -7,9 +7,9 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import type { Protections } from "~/server/elasticsearch/protections";
+import type { Evaluation, LLMSpan, Trace } from "~/server/tracer/types";
+import type { Protections } from "~/server/traces/protections";
 import type { TraceService } from "~/server/traces/trace.service";
-import type { Trace, LLMSpan, Evaluation } from "~/server/tracer/types";
 import type { TracesForProjectResult } from "~/server/traces/types";
 import { ExportService } from "../export.service";
 import type { ExportRequest } from "../types";
@@ -94,12 +94,14 @@ function buildMockTraceService(options: {
         groups: batch.map((t) => [t as any]),
         totalHits: options.totalHits,
         traceChecks: options.evaluations ?? {},
-        scrollId: callIndex < options.batches.length - 1 ? `scroll-${callIndex + 1}` : undefined,
+        scrollId:
+          callIndex < options.batches.length - 1
+            ? `scroll-${callIndex + 1}`
+            : undefined,
       };
       callIndex++;
       return Promise.resolve(result);
     }),
-    getEvaluationsMultiple: vi.fn().mockResolvedValue(options.evaluations ?? {}),
   } as unknown as TraceService;
 }
 
@@ -121,8 +123,14 @@ describe("ExportService", () => {
         });
         const service = new ExportService({ traceService });
 
-        const chunks: Array<{ chunk: string; progress: { exported: number; total: number } }> = [];
-        for await (const item of service.exportTraces({ request: buildExportRequest(), protections: fullProtections })) {
+        const chunks: Array<{
+          chunk: string;
+          progress: { exported: number; total: number };
+        }> = [];
+        for await (const item of service.exportTraces({
+          request: buildExportRequest(),
+          protections: fullProtections,
+        })) {
           chunks.push(item);
         }
 
@@ -149,8 +157,14 @@ describe("ExportService", () => {
         });
         const service = new ExportService({ traceService });
 
-        const chunks: Array<{ chunk: string; progress: { exported: number; total: number } }> = [];
-        for await (const item of service.exportTraces({ request: buildExportRequest(), protections: fullProtections })) {
+        const chunks: Array<{
+          chunk: string;
+          progress: { exported: number; total: number };
+        }> = [];
+        for await (const item of service.exportTraces({
+          request: buildExportRequest(),
+          protections: fullProtections,
+        })) {
           chunks.push(item);
         }
 
@@ -171,7 +185,10 @@ describe("ExportService", () => {
         const traces = [
           buildTrace({
             trace_id: "t1",
-            spans: [buildLLMSpan({ span_id: "s1" }), buildLLMSpan({ span_id: "s2" })],
+            spans: [
+              buildLLMSpan({ span_id: "s1" }),
+              buildLLMSpan({ span_id: "s2" }),
+            ],
           }),
         ];
         const traceService = buildMockTraceService({
@@ -180,7 +197,10 @@ describe("ExportService", () => {
         });
         const service = new ExportService({ traceService });
 
-        const chunks: Array<{ chunk: string; progress: { exported: number; total: number } }> = [];
+        const chunks: Array<{
+          chunk: string;
+          progress: { exported: number; total: number };
+        }> = [];
         for await (const item of service.exportTraces({
           request: buildExportRequest({ mode: "full" }),
           protections: fullProtections,
@@ -208,7 +228,10 @@ describe("ExportService", () => {
         });
         const service = new ExportService({ traceService });
 
-        const chunks: Array<{ chunk: string; progress: { exported: number; total: number } }> = [];
+        const chunks: Array<{
+          chunk: string;
+          progress: { exported: number; total: number };
+        }> = [];
         for await (const item of service.exportTraces({
           request: buildExportRequest({ format: "json" }),
           protections: fullProtections,
@@ -254,7 +277,10 @@ describe("ExportService", () => {
         });
         const service = new ExportService({ traceService });
 
-        const chunks: Array<{ chunk: string; progress: { exported: number; total: number } }> = [];
+        const chunks: Array<{
+          chunk: string;
+          progress: { exported: number; total: number };
+        }> = [];
         for await (const item of service.exportTraces({
           request: buildExportRequest({ mode: "full", format: "json" }),
           protections: fullProtections,
@@ -276,8 +302,14 @@ describe("ExportService", () => {
         });
         const service = new ExportService({ traceService });
 
-        const chunks: Array<{ chunk: string; progress: { exported: number; total: number } }> = [];
-        for await (const item of service.exportTraces({ request: buildExportRequest(), protections: fullProtections })) {
+        const chunks: Array<{
+          chunk: string;
+          progress: { exported: number; total: number };
+        }> = [];
+        for await (const item of service.exportTraces({
+          request: buildExportRequest(),
+          protections: fullProtections,
+        })) {
           chunks.push(item);
         }
 
@@ -318,7 +350,10 @@ describe("ExportService", () => {
         const service = new ExportService({ traceService });
 
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        for await (const _ of service.exportTraces({ request: buildExportRequest(), protections: fullProtections })) {
+        for await (const _ of service.exportTraces({
+          request: buildExportRequest(),
+          protections: fullProtections,
+        })) {
           // consume
         }
 

@@ -129,6 +129,8 @@ export class ClickHouseAnalyticsService {
           groupByKey: input.groupByKey,
           timeScale: adjustedTimeScale,
           timeZone: input.timeZone,
+          traceIds: input.traceIds,
+          negateFilters: input.negateFilters,
         });
 
         this.logger.debug({ sql, params }, "Executing timeseries query");

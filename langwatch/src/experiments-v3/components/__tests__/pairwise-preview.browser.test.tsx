@@ -11,13 +11,24 @@ import { ChakraProvider, HStack } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { system as langwatchSystem } from "~/pages/_app";
 import "@testing-library/jest-dom/vitest";
-import { afterEach, describe, it, vi } from "vitest";
+import { FormProvider, useForm } from "react-hook-form";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { page } from "vitest/browser";
 
 vi.mock("../../hooks/useEvaluatorName", () => ({
   useEvaluatorName: () => "Pairwise Compare",
   useEvaluatorNames: () => new Map(),
   useCodeEvaluatorIds: () => new Set(),
+}));
+
+// PairwiseConfigForm's variant pickers resolve display names via
+// useTargetName, which reaches into useOrganizationTeamProject ->
+// useRequiredSession -> the Next.js router. None of that exists in this
+// router-less component-preview harness, so it's mocked the same way
+// useEvaluatorName is above.
+vi.mock("../../hooks/useTargetName", () => ({
+  useTargetName: (target: { promptId?: string; id: string }) =>
+    target.promptId ?? target.id,
 }));
 
 import type { EvaluatorConfig } from "../../types";
@@ -50,30 +61,87 @@ const datasetColumns = [
   { id: "c3", name: "context" },
 ];
 
+/**
+ * Real usage always renders PairwiseConfigForm inside the evaluator-editor's
+ * FormProvider (see EvaluatorEditorShared.tsx) — the "Has golden answer"
+ * switch reads/writes `settings.has_golden_answer` on that shared form via
+ * useFormContext/useWatch. Reproduce that here so the toggle's rendering
+ * logic runs the same code path it does in the app instead of falling back
+ * to `draft.hasGoldenAnswer` only.
+ */
+const FormProviderWrapper = ({
+  hasGoldenAnswer,
+  children,
+}: {
+  hasGoldenAnswer: boolean;
+  children: React.ReactNode;
+}) => {
+  const form = useForm({
+    defaultValues: { settings: { has_golden_answer: hasGoldenAnswer } },
+  });
+  return <FormProvider {...form}>{children}</FormProvider>;
+};
+
 describe("Pairwise compare UI preview (PR #5106)", () => {
   it("PairwiseConfigForm — initial state with metrics checked", async () => {
     await page.viewport(520, 600);
     render(
       <ChakraProvider value={langwatchSystem}>
-        <div style={{ width: 480, padding: 16, background: "white" }}>
-          <PairwiseConfigForm
-            value={{
-              variantA: "variant_a",
-              variantB: "variant_b",
-              goldenField: "expected_output",
-              includeMetrics: ["cost", "duration"],
-            }}
-            onChange={() => {}}
-            targets={targets}
-            datasetColumns={datasetColumns}
-          />
-        </div>
+        <FormProviderWrapper hasGoldenAnswer={true}>
+          <div style={{ width: 480, padding: 16, background: "white" }}>
+            <PairwiseConfigForm
+              value={{
+                variantA: "variant_a",
+                variantB: "variant_b",
+                hasGoldenAnswer: true,
+                goldenField: "expected_output",
+                includeMetrics: ["cost", "duration"],
+              }}
+              onChange={() => {}}
+              targets={targets}
+              datasetColumns={datasetColumns}
+            />
+          </div>
+        </FormProviderWrapper>
       </ChakraProvider>,
     );
 
     await screen.findByText(/Variant A/);
     await page.screenshot({
       path: "/tmp/pr5106/01-pairwise-config-form.png",
+    });
+  });
+
+  it("PairwiseConfigForm — has golden answer turned off (#5378)", async () => {
+    await page.viewport(520, 520);
+    render(
+      <ChakraProvider value={langwatchSystem}>
+        <FormProviderWrapper hasGoldenAnswer={false}>
+          <div style={{ width: 480, padding: 16, background: "white" }}>
+            <PairwiseConfigForm
+              value={{
+                variantA: "variant_a",
+                variantB: "variant_b",
+                hasGoldenAnswer: false,
+                goldenField: "",
+                includeMetrics: ["cost", "duration"],
+              }}
+              onChange={() => {}}
+              targets={targets}
+              datasetColumns={datasetColumns}
+            />
+          </div>
+        </FormProviderWrapper>
+      </ChakraProvider>,
+    );
+
+    await screen.findByText(/Variant A/);
+    // The toggle being off must hide the Golden field picker entirely (#5378).
+    expect(
+      screen.queryByTestId("pairwise-golden-field"),
+    ).not.toBeInTheDocument();
+    await page.screenshot({
+      path: "/tmp/pr5381/02-pairwise-config-form-golden-off.png",
     });
   });
 
@@ -152,6 +220,7 @@ describe("Pairwise compare UI preview (PR #5106)", () => {
       pairwise: {
         variantA: "variant_a",
         variantB: "variant_b",
+        hasGoldenAnswer: true,
         goldenField: "expected_output",
         includeMetrics: [],
       },
