@@ -61,7 +61,6 @@ export function createExperimentRunProcessingPipeline(
       new ExperimentRunResultStorageMapProjection({
         store: deps.experimentRunItemAppendStore,
       }),
-    )
     );
 
   return builder
