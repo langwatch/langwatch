@@ -61,11 +61,11 @@ export function useInviteActions({
     | { mutateAsync: (input: Record<string, unknown>) => Promise<unknown> }
     | undefined;
 
-  const createInvitesMutation = api.organization.createInvites.useMutation();
+  const createInvitesMutation = api.invite.createInvites.useMutation();
   const createInviteRequestMutation =
-    api.organization.createInviteRequest.useMutation();
-  const approveInviteMutation = api.organization.approveInvite.useMutation();
-  const deleteInviteMutation = api.organization.deleteInvite.useMutation();
+    api.invite.createInviteRequest.useMutation();
+  const approveInviteMutation = api.invite.approveInvite.useMutation();
+  const deleteInviteMutation = api.invite.deleteInvite.useMutation();
 
   const performAdminInvite = (data: MembersForm) => {
     createInvitesMutation.mutate(

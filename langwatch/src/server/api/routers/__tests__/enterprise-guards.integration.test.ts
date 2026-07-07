@@ -18,513 +18,486 @@ import {
   it,
   vi,
 } from "vitest";
-import { prisma } from "../../../db";
-import { appRouter } from "../../root";
-import { createInnerTRPCContext } from "../../trpc";
-import { createTestApp } from "~/server/app-layer/presets";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
 import {
-  PlanProviderService,
   type PlanProvider,
+  PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import type { PlanInfo } from "../../../../../ee/licensing/planInfo";
+import { prisma } from "../../../db";
 import { ENTERPRISE_FEATURE_ERRORS } from "../../enterprise";
+import { appRouter } from "../../root";
+import { createInnerTRPCContext } from "../../trpc";
 
 const isTestcontainersOnly = !!process.env.TEST_CLICKHOUSE_URL;
 
-describe.skipIf(isTestcontainersOnly)(
-  "enterprise feature guards",
-  () => {
-    const testNamespace = `ent-guard-${nanoid(8)}`;
-    let organizationId: string;
-    let userId: string;
-    let teamId: string;
-    let customRoleId: string;
-    let mockGetActivePlan: ReturnType<typeof vi.fn>;
+describe.skipIf(isTestcontainersOnly)("enterprise feature guards", () => {
+  const testNamespace = `ent-guard-${nanoid(8)}`;
+  let organizationId: string;
+  let userId: string;
+  let teamId: string;
+  let customRoleId: string;
+  let mockGetActivePlan: ReturnType<typeof vi.fn>;
 
-    const enterprisePlan: PlanInfo = {
-      ...FREE_PLAN,
-      type: "ENTERPRISE",
-      overrideAddingLimitations: true,
-      maxTeams: Number.MAX_SAFE_INTEGER,
-      maxMembers: Number.MAX_SAFE_INTEGER,
-      maxMembersLite: Number.MAX_SAFE_INTEGER,
-      maxProjects: Number.MAX_SAFE_INTEGER,
-    };
+  const enterprisePlan: PlanInfo = {
+    ...FREE_PLAN,
+    type: "ENTERPRISE",
+    overrideAddingLimitations: true,
+    maxTeams: Number.MAX_SAFE_INTEGER,
+    maxMembers: Number.MAX_SAFE_INTEGER,
+    maxMembersLite: Number.MAX_SAFE_INTEGER,
+    maxProjects: Number.MAX_SAFE_INTEGER,
+  };
 
-    const freePlan: PlanInfo = {
-      ...FREE_PLAN,
-      type: "FREE",
-      overrideAddingLimitations: true,
-      maxTeams: Number.MAX_SAFE_INTEGER,
-      maxMembers: Number.MAX_SAFE_INTEGER,
-      maxMembersLite: Number.MAX_SAFE_INTEGER,
-      maxProjects: Number.MAX_SAFE_INTEGER,
-    };
+  const freePlan: PlanInfo = {
+    ...FREE_PLAN,
+    type: "FREE",
+    overrideAddingLimitations: true,
+    maxTeams: Number.MAX_SAFE_INTEGER,
+    maxMembers: Number.MAX_SAFE_INTEGER,
+    maxMembersLite: Number.MAX_SAFE_INTEGER,
+    maxProjects: Number.MAX_SAFE_INTEGER,
+  };
 
-    beforeAll(async () => {
-      const organization = await prisma.organization.create({
-        data: {
-          name: "Test Enterprise Org",
-          slug: `--test-org-${testNamespace}`,
+  beforeAll(async () => {
+    const organization = await prisma.organization.create({
+      data: {
+        name: "Test Enterprise Org",
+        slug: `--test-org-${testNamespace}`,
+      },
+    });
+    organizationId = organization.id;
+
+    const user = await prisma.user.create({
+      data: {
+        name: "Test User",
+        email: `test-${testNamespace}@example.com`,
+      },
+    });
+    userId = user.id;
+
+    await prisma.organizationUser.create({
+      data: {
+        userId: user.id,
+        organizationId: organization.id,
+        role: OrganizationUserRole.ADMIN,
+      },
+    });
+
+    const team = await prisma.team.create({
+      data: {
+        name: "Test Team",
+        slug: `--test-team-${testNamespace}`,
+        organizationId: organization.id,
+      },
+    });
+    teamId = team.id;
+
+    await prisma.teamUser.create({
+      data: {
+        userId: user.id,
+        teamId: team.id,
+        role: TeamUserRole.ADMIN,
+      },
+    });
+
+    // Create a custom role for tests that need one
+    const role = await prisma.customRole.create({
+      data: {
+        name: `Test Role ${testNamespace}`,
+        description: "Test role for enterprise guard tests",
+        permissions: ["analytics:view"],
+        organizationId: organization.id,
+      },
+    });
+    customRoleId = role.id;
+  });
+
+  beforeEach(async () => {
+    await resetApp();
+    mockGetActivePlan = vi.fn();
+    globalForApp.__langwatch_app = createTestApp({
+      planProvider: PlanProviderService.create({
+        getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
+      }),
+    });
+  });
+
+  afterEach(async () => {
+    await resetApp();
+  });
+
+  afterAll(async () => {
+    await prisma.teamUser
+      .deleteMany({
+        where: {
+          team: { slug: { startsWith: `--test-team-${testNamespace}` } },
         },
-      });
-      organizationId = organization.id;
-
-      const user = await prisma.user.create({
-        data: {
-          name: "Test User",
-          email: `test-${testNamespace}@example.com`,
+      })
+      .catch(() => {});
+    await prisma.team
+      .deleteMany({
+        where: { slug: { startsWith: `--test-team-${testNamespace}` } },
+      })
+      .catch(() => {});
+    await prisma.customRole
+      .deleteMany({
+        where: {
+          organization: { slug: `--test-org-${testNamespace}` },
         },
-      });
-      userId = user.id;
+      })
+      .catch(() => {});
+    await prisma.organizationUser
+      .deleteMany({
+        where: { organization: { slug: `--test-org-${testNamespace}` } },
+      })
+      .catch(() => {});
+    await prisma.organization
+      .deleteMany({
+        where: { slug: `--test-org-${testNamespace}` },
+      })
+      .catch(() => {});
+    await prisma.user
+      .deleteMany({
+        where: { email: `test-${testNamespace}@example.com` },
+      })
+      .catch(() => {});
+  });
 
-      await prisma.organizationUser.create({
-        data: {
-          userId: user.id,
-          organizationId: organization.id,
-          role: OrganizationUserRole.ADMIN,
-        },
-      });
+  function createCaller() {
+    const ctx = createInnerTRPCContext({
+      session: {
+        user: { id: userId },
+        expires: "1",
+      },
+    });
+    return appRouter.createCaller(ctx);
+  }
 
-      const team = await prisma.team.create({
-        data: {
-          name: "Test Team",
-          slug: `--test-team-${testNamespace}`,
-          organizationId: organization.id,
-        },
-      });
-      teamId = team.id;
+  // --- role.create ---
 
-      await prisma.teamUser.create({
-        data: {
-          userId: user.id,
-          teamId: team.id,
-          role: TeamUserRole.ADMIN,
-        },
-      });
+  describe("role.create", () => {
+    describe("when plan is not enterprise", () => {
+      /** @scenario Non-enterprise org cannot create custom roles */
+      it("rejects with FORBIDDEN", async () => {
+        mockGetActivePlan.mockResolvedValue(freePlan);
+        const caller = createCaller();
 
-      // Create a custom role for tests that need one
-      const role = await prisma.customRole.create({
-        data: {
-          name: `Test Role ${testNamespace}`,
-          description: "Test role for enterprise guard tests",
+        await expect(
+          caller.role.create({
+            organizationId,
+            name: `Blocked Role ${nanoid(4)}`,
+            permissions: ["analytics:view"],
+          }),
+        ).rejects.toMatchObject({
+          code: "FORBIDDEN",
+          message: ENTERPRISE_FEATURE_ERRORS.RBAC,
+        });
+      });
+    });
+
+    describe("when plan is enterprise", () => {
+      /** @scenario Enterprise org can create custom roles */
+      it("allows creation", async () => {
+        mockGetActivePlan.mockResolvedValue(enterprisePlan);
+        const caller = createCaller();
+
+        const result = await caller.role.create({
+          organizationId,
+          name: `Allowed Role ${nanoid(4)}`,
           permissions: ["analytics:view"],
-          organizationId: organization.id,
-        },
-      });
-      customRoleId = role.id;
-    });
-
-    beforeEach(async () => {
-      await resetApp();
-      mockGetActivePlan = vi.fn();
-      globalForApp.__langwatch_app = createTestApp({
-        planProvider: PlanProviderService.create({
-          getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
-        }),
-      });
-    });
-
-    afterEach(async () => {
-      await resetApp();
-    });
-
-    afterAll(async () => {
-      await prisma.teamUser
-        .deleteMany({
-          where: {
-            team: { slug: { startsWith: `--test-team-${testNamespace}` } },
-          },
-        })
-        .catch(() => {});
-      await prisma.team
-        .deleteMany({
-          where: { slug: { startsWith: `--test-team-${testNamespace}` } },
-        })
-        .catch(() => {});
-      await prisma.customRole
-        .deleteMany({
-          where: {
-            organization: { slug: `--test-org-${testNamespace}` },
-          },
-        })
-        .catch(() => {});
-      await prisma.organizationUser
-        .deleteMany({
-          where: { organization: { slug: `--test-org-${testNamespace}` } },
-        })
-        .catch(() => {});
-      await prisma.organization
-        .deleteMany({
-          where: { slug: `--test-org-${testNamespace}` },
-        })
-        .catch(() => {});
-      await prisma.user
-        .deleteMany({
-          where: { email: `test-${testNamespace}@example.com` },
-        })
-        .catch(() => {});
-    });
-
-    function createCaller() {
-      const ctx = createInnerTRPCContext({
-        session: {
-          user: { id: userId },
-          expires: "1",
-        },
-      });
-      return appRouter.createCaller(ctx);
-    }
-
-    // --- role.create ---
-
-    describe("role.create", () => {
-      describe("when plan is not enterprise", () => {
-        /** @scenario Non-enterprise org cannot create custom roles */
-        it("rejects with FORBIDDEN", async () => {
-          mockGetActivePlan.mockResolvedValue(freePlan);
-          const caller = createCaller();
-
-          await expect(
-            caller.role.create({
-              organizationId,
-              name: `Blocked Role ${nanoid(4)}`,
-              permissions: ["analytics:view"],
-            }),
-          ).rejects.toMatchObject({
-            code: "FORBIDDEN",
-            message: ENTERPRISE_FEATURE_ERRORS.RBAC,
-          });
         });
-      });
 
-      describe("when plan is enterprise", () => {
-        /** @scenario Enterprise org can create custom roles */
-        it("allows creation", async () => {
-          mockGetActivePlan.mockResolvedValue(enterprisePlan);
-          const caller = createCaller();
-
-          const result = await caller.role.create({
-            organizationId,
-            name: `Allowed Role ${nanoid(4)}`,
-            permissions: ["analytics:view"],
-          });
-
-          expect(result).toBeDefined();
-          expect(result.name).toContain("Allowed Role");
-        });
+        expect(result).toBeDefined();
+        expect(result.name).toContain("Allowed Role");
       });
     });
+  });
 
-    // --- role.update ---
+  // --- role.update ---
 
-    describe("role.update", () => {
-      describe("when plan is not enterprise", () => {
-        /** @scenario Non-enterprise org cannot update custom roles */
-        it("rejects with FORBIDDEN", async () => {
-          mockGetActivePlan.mockResolvedValue(freePlan);
-          const caller = createCaller();
+  describe("role.update", () => {
+    describe("when plan is not enterprise", () => {
+      /** @scenario Non-enterprise org cannot update custom roles */
+      it("rejects with FORBIDDEN", async () => {
+        mockGetActivePlan.mockResolvedValue(freePlan);
+        const caller = createCaller();
 
-          await expect(
-            caller.role.update({
-              roleId: customRoleId,
-              name: "Updated Name",
-            }),
-          ).rejects.toMatchObject({
-            code: "FORBIDDEN",
-            message: ENTERPRISE_FEATURE_ERRORS.RBAC,
-          });
-        });
-      });
-
-      describe("when plan is enterprise", () => {
-        it("allows update", async () => {
-          mockGetActivePlan.mockResolvedValue(enterprisePlan);
-          const caller = createCaller();
-
-          const result = await caller.role.update({
+        await expect(
+          caller.role.update({
             roleId: customRoleId,
-            name: `Updated Role ${nanoid(4)}`,
-          });
-
-          expect(result).toBeDefined();
+            name: "Updated Name",
+          }),
+        ).rejects.toMatchObject({
+          code: "FORBIDDEN",
+          message: ENTERPRISE_FEATURE_ERRORS.RBAC,
         });
       });
     });
 
-    // --- role.assignToUser ---
+    describe("when plan is enterprise", () => {
+      it("allows update", async () => {
+        mockGetActivePlan.mockResolvedValue(enterprisePlan);
+        const caller = createCaller();
 
-    describe("role.assignToUser", () => {
-      describe("when plan is not enterprise", () => {
-        /** @scenario Non-enterprise org cannot assign custom roles to users */
-        it("rejects with FORBIDDEN", async () => {
-          mockGetActivePlan.mockResolvedValue(freePlan);
-          const caller = createCaller();
-
-          await expect(
-            caller.role.assignToUser({
-              userId,
-              teamId,
-              customRoleId,
-            }),
-          ).rejects.toMatchObject({
-            code: "FORBIDDEN",
-            message: ENTERPRISE_FEATURE_ERRORS.RBAC,
-          });
+        const result = await caller.role.update({
+          roleId: customRoleId,
+          name: `Updated Role ${nanoid(4)}`,
         });
+
+        expect(result).toBeDefined();
       });
+    });
+  });
 
-      describe("when plan is enterprise", () => {
-        it("allows assignment", async () => {
-          mockGetActivePlan.mockResolvedValue(enterprisePlan);
-          const caller = createCaller();
+  // --- role.assignToUser ---
 
-          const result = await caller.role.assignToUser({
+  describe("role.assignToUser", () => {
+    describe("when plan is not enterprise", () => {
+      /** @scenario Non-enterprise org cannot assign custom roles to users */
+      it("rejects with FORBIDDEN", async () => {
+        mockGetActivePlan.mockResolvedValue(freePlan);
+        const caller = createCaller();
+
+        await expect(
+          caller.role.assignToUser({
             userId,
             teamId,
             customRoleId,
-          });
-
-          expect(result).toBeDefined();
+          }),
+        ).rejects.toMatchObject({
+          code: "FORBIDDEN",
+          message: ENTERPRISE_FEATURE_ERRORS.RBAC,
         });
       });
     });
 
-    // --- role.removeFromUser is NOT gated ---
+    describe("when plan is enterprise", () => {
+      it("allows assignment", async () => {
+        mockGetActivePlan.mockResolvedValue(enterprisePlan);
+        const caller = createCaller();
 
-    describe("role.removeFromUser", () => {
-      describe("when plan is not enterprise", () => {
-        /** @scenario Non-enterprise org can remove custom roles from users */
-        it("allows removal on free plan", async () => {
-          mockGetActivePlan.mockResolvedValue(freePlan);
-
-          // First assign the role on enterprise
-          mockGetActivePlan.mockResolvedValueOnce(enterprisePlan);
-          const setupCaller = createCaller();
-          await setupCaller.role.assignToUser({
-            userId,
-            teamId,
-            customRoleId,
-          });
-
-          // Now switch to free plan and remove
-          mockGetActivePlan.mockResolvedValue(freePlan);
-          const caller = createCaller();
-
-          const result = await caller.role.removeFromUser({
-            userId,
-            teamId,
-            customRoleId,
-          });
-
-          expect(result).toBeDefined();
+        const result = await caller.role.assignToUser({
+          userId,
+          teamId,
+          customRoleId,
         });
+
+        expect(result).toBeDefined();
       });
     });
+  });
 
-    // --- role.delete is NOT gated ---
+  // --- role.removeFromUser is NOT gated ---
 
-    describe("role.delete", () => {
-      describe("when plan is not enterprise", () => {
-        /** @scenario Non-enterprise org can delete custom roles for cleanup */
-        it("allows deletion on free plan", async () => {
-          // Create a role to delete (needs enterprise)
-          mockGetActivePlan.mockResolvedValue(enterprisePlan);
-          const setupCaller = createCaller();
-          const role = await setupCaller.role.create({
+  describe("role.removeFromUser", () => {
+    describe("when plan is not enterprise", () => {
+      /** @scenario Non-enterprise org can remove custom roles from users */
+      it("allows removal on free plan", async () => {
+        mockGetActivePlan.mockResolvedValue(freePlan);
+
+        // First assign the role on enterprise
+        mockGetActivePlan.mockResolvedValueOnce(enterprisePlan);
+        const setupCaller = createCaller();
+        await setupCaller.role.assignToUser({
+          userId,
+          teamId,
+          customRoleId,
+        });
+
+        // Now switch to free plan and remove
+        mockGetActivePlan.mockResolvedValue(freePlan);
+        const caller = createCaller();
+
+        const result = await caller.role.removeFromUser({
+          userId,
+          teamId,
+          customRoleId,
+        });
+
+        expect(result).toBeDefined();
+      });
+    });
+  });
+
+  // --- role.delete is NOT gated ---
+
+  describe("role.delete", () => {
+    describe("when plan is not enterprise", () => {
+      /** @scenario Non-enterprise org can delete custom roles for cleanup */
+      it("allows deletion on free plan", async () => {
+        // Create a role to delete (needs enterprise)
+        mockGetActivePlan.mockResolvedValue(enterprisePlan);
+        const setupCaller = createCaller();
+        const role = await setupCaller.role.create({
+          organizationId,
+          name: `Deletable Role ${nanoid(4)}`,
+          permissions: ["analytics:view"],
+        });
+
+        // Now switch to free plan and delete
+        mockGetActivePlan.mockResolvedValue(freePlan);
+        const caller = createCaller();
+
+        const result = await caller.role.delete({ roleId: role.id });
+        expect(result).toBeDefined();
+      });
+    });
+  });
+
+  // --- role.getAll is NOT gated ---
+
+  describe("role.getAll", () => {
+    describe("when plan is not enterprise", () => {
+      /** @scenario Non-enterprise org can list custom roles */
+      it("allows listing on free plan", async () => {
+        mockGetActivePlan.mockResolvedValue(freePlan);
+        const caller = createCaller();
+
+        const result = await caller.role.getAll({ organizationId });
+        expect(Array.isArray(result)).toBe(true);
+      });
+    });
+  });
+
+  // --- getAuditLogs ---
+
+  describe("organization.getAuditLogs", () => {
+    describe("when plan is not enterprise", () => {
+      /** @scenario Non-enterprise org cannot access audit logs */
+      it("rejects with FORBIDDEN", async () => {
+        mockGetActivePlan.mockResolvedValue(freePlan);
+        const caller = createCaller();
+
+        await expect(
+          caller.organization.getAuditLogs({
             organizationId,
-            name: `Deletable Role ${nanoid(4)}`,
-            permissions: ["analytics:view"],
-          });
-
-          // Now switch to free plan and delete
-          mockGetActivePlan.mockResolvedValue(freePlan);
-          const caller = createCaller();
-
-          const result = await caller.role.delete({ roleId: role.id });
-          expect(result).toBeDefined();
+          }),
+        ).rejects.toMatchObject({
+          code: "FORBIDDEN",
+          message: ENTERPRISE_FEATURE_ERRORS.AUDIT_LOGS,
         });
       });
     });
 
-    // --- role.getAll is NOT gated ---
+    describe("when plan is enterprise", () => {
+      /** @scenario Enterprise org can access audit logs */
+      it("allows access", async () => {
+        mockGetActivePlan.mockResolvedValue(enterprisePlan);
+        const caller = createCaller();
 
-    describe("role.getAll", () => {
-      describe("when plan is not enterprise", () => {
-        /** @scenario Non-enterprise org can list custom roles */
-        it("allows listing on free plan", async () => {
-          mockGetActivePlan.mockResolvedValue(freePlan);
-          const caller = createCaller();
-
-          const result = await caller.role.getAll({ organizationId });
-          expect(Array.isArray(result)).toBe(true);
+        const result = await caller.organization.getAuditLogs({
+          organizationId,
         });
+
+        expect(result).toBeDefined();
       });
     });
+  });
 
-    // --- getAuditLogs ---
+  // --- team.createTeamWithMembers conditional guard ---
 
-    describe("organization.getAuditLogs", () => {
-      describe("when plan is not enterprise", () => {
-        /** @scenario Non-enterprise org cannot access audit logs */
-        it("rejects with FORBIDDEN", async () => {
-          mockGetActivePlan.mockResolvedValue(freePlan);
-          const caller = createCaller();
+  describe("team.createTeamWithMembers", () => {
+    describe("when members include custom role on non-enterprise plan", () => {
+      /** @scenario Non-enterprise org cannot create teams with custom role members */
+      it("rejects with FORBIDDEN", async () => {
+        mockGetActivePlan.mockResolvedValue(freePlan);
+        const caller = createCaller();
 
-          await expect(
-            caller.organization.getAuditLogs({
-              organizationId,
-            }),
-          ).rejects.toMatchObject({
-            code: "FORBIDDEN",
-            message: ENTERPRISE_FEATURE_ERRORS.AUDIT_LOGS,
-          });
-        });
-      });
-
-      describe("when plan is enterprise", () => {
-        /** @scenario Enterprise org can access audit logs */
-        it("allows access", async () => {
-          mockGetActivePlan.mockResolvedValue(enterprisePlan);
-          const caller = createCaller();
-
-          const result = await caller.organization.getAuditLogs({
+        await expect(
+          caller.team.createTeamWithMembers({
             organizationId,
-          });
-
-          expect(result).toBeDefined();
+            name: `Guarded Team ${nanoid(4)}`,
+            members: [
+              {
+                userId,
+                role: `custom:${customRoleId}`,
+                customRoleId,
+              },
+            ],
+          }),
+        ).rejects.toMatchObject({
+          code: "FORBIDDEN",
+          message: ENTERPRISE_FEATURE_ERRORS.RBAC,
         });
       });
     });
 
-    // --- team.createTeamWithMembers conditional guard ---
+    describe("when members use only built-in roles on non-enterprise plan", () => {
+      it("allows creation", async () => {
+        mockGetActivePlan.mockResolvedValue(freePlan);
+        const caller = createCaller();
 
-    describe("team.createTeamWithMembers", () => {
-      describe("when members include custom role on non-enterprise plan", () => {
-        /** @scenario Non-enterprise org cannot create teams with custom role members */
-        it("rejects with FORBIDDEN", async () => {
-          mockGetActivePlan.mockResolvedValue(freePlan);
-          const caller = createCaller();
-
-          await expect(
-            caller.team.createTeamWithMembers({
-              organizationId,
-              name: `Guarded Team ${nanoid(4)}`,
-              members: [
-                {
-                  userId,
-                  role: `custom:${customRoleId}`,
-                  customRoleId,
-                },
-              ],
-            }),
-          ).rejects.toMatchObject({
-            code: "FORBIDDEN",
-            message: ENTERPRISE_FEATURE_ERRORS.RBAC,
-          });
+        const result = await caller.team.createTeamWithMembers({
+          organizationId,
+          name: `Builtin Team ${nanoid(4)}`,
+          members: [{ userId, role: "ADMIN" }],
         });
-      });
 
-      describe("when members use only built-in roles on non-enterprise plan", () => {
-        it("allows creation", async () => {
-          mockGetActivePlan.mockResolvedValue(freePlan);
-          const caller = createCaller();
-
-          const result = await caller.team.createTeamWithMembers({
-            organizationId,
-            name: `Builtin Team ${nanoid(4)}`,
-            members: [{ userId, role: "ADMIN" }],
-          });
-
-          expect(result).toBeDefined();
-          expect(result.name).toContain("Builtin Team");
-        });
+        expect(result).toBeDefined();
+        expect(result.name).toContain("Builtin Team");
       });
     });
+  });
 
-    // --- team.update conditional guard ---
+  // --- team.update conditional guard ---
 
-    describe("team.update", () => {
-      describe("when members include custom role on non-enterprise plan", () => {
-        /** @scenario Non-enterprise org cannot assign custom roles via team update */
-        it("rejects with FORBIDDEN", async () => {
-          mockGetActivePlan.mockResolvedValue(freePlan);
-          const caller = createCaller();
+  describe("team.update", () => {
+    describe("when members include custom role on non-enterprise plan", () => {
+      /** @scenario Non-enterprise org cannot assign custom roles via team update */
+      it("rejects with FORBIDDEN", async () => {
+        mockGetActivePlan.mockResolvedValue(freePlan);
+        const caller = createCaller();
 
-          await expect(
-            caller.team.update({
-              teamId,
-              name: "Updated Team",
-              members: [
-                {
-                  userId,
-                  role: `custom:${customRoleId}`,
-                  customRoleId,
-                },
-              ],
-            }),
-          ).rejects.toMatchObject({
-            code: "FORBIDDEN",
-            message: ENTERPRISE_FEATURE_ERRORS.RBAC,
-          });
-        });
-      });
-
-      describe("when members use only built-in roles on non-enterprise plan", () => {
-        /** @scenario Non-enterprise org can update team members with built-in roles */
-        it("allows update", async () => {
-          mockGetActivePlan.mockResolvedValue(freePlan);
-          const caller = createCaller();
-
-          const result = await caller.team.update({
+        await expect(
+          caller.team.update({
             teamId,
-            name: "Updated Team Name",
-            members: [{ userId, role: "ADMIN" }],
-          });
-
-          expect(result).toMatchObject({ success: true });
+            name: "Updated Team",
+            members: [
+              {
+                userId,
+                role: `custom:${customRoleId}`,
+                customRoleId,
+              },
+            ],
+          }),
+        ).rejects.toMatchObject({
+          code: "FORBIDDEN",
+          message: ENTERPRISE_FEATURE_ERRORS.RBAC,
         });
       });
     });
 
-    // --- updateMemberRole conditional guard ---
+    describe("when members use only built-in roles on non-enterprise plan", () => {
+      /** @scenario Non-enterprise org can update team members with built-in roles */
+      it("allows update", async () => {
+        mockGetActivePlan.mockResolvedValue(freePlan);
+        const caller = createCaller();
 
-    describe("organization.updateMemberRole", () => {
-      describe("when teamRoleUpdates include custom role on non-enterprise plan", () => {
-        /** @scenario Non-enterprise org cannot assign custom roles via member role update */
-        it("rejects with FORBIDDEN", async () => {
-          mockGetActivePlan.mockResolvedValue(freePlan);
-          const caller = createCaller();
-
-          await expect(
-            caller.organization.updateMemberRole({
-              userId,
-              organizationId,
-              role: OrganizationUserRole.ADMIN,
-              teamRoleUpdates: [
-                {
-                  teamId,
-                  userId,
-                  role: `custom:${customRoleId}`,
-                  customRoleId,
-                },
-              ],
-            }),
-          ).rejects.toMatchObject({
-            code: "FORBIDDEN",
-            message: ENTERPRISE_FEATURE_ERRORS.RBAC,
-          });
+        const result = await caller.team.update({
+          teamId,
+          name: "Updated Team Name",
+          members: [{ userId, role: "ADMIN" }],
         });
+
+        expect(result).toMatchObject({ success: true });
       });
+    });
+  });
 
-      describe("when teamRoleUpdates use only built-in roles on non-enterprise plan", () => {
-        it("allows update", async () => {
-          mockGetActivePlan.mockResolvedValue(freePlan);
-          const caller = createCaller();
+  // --- updateMemberRole conditional guard ---
 
-          const result = await caller.organization.updateMemberRole({
+  describe("organization.updateMemberRole", () => {
+    describe("when teamRoleUpdates include custom role on non-enterprise plan", () => {
+      /** @scenario Non-enterprise org cannot assign custom roles via member role update */
+      it("rejects with FORBIDDEN", async () => {
+        mockGetActivePlan.mockResolvedValue(freePlan);
+        const caller = createCaller();
+
+        await expect(
+          caller.organization.updateMemberRole({
             userId,
             organizationId,
             role: OrganizationUserRole.ADMIN,
@@ -532,193 +505,217 @@ describe.skipIf(isTestcontainersOnly)(
               {
                 teamId,
                 userId,
-                role: TeamUserRole.ADMIN,
+                role: `custom:${customRoleId}`,
+                customRoleId,
               },
             ],
-          });
-
-          expect(result).toBeDefined();
+          }),
+        ).rejects.toMatchObject({
+          code: "FORBIDDEN",
+          message: ENTERPRISE_FEATURE_ERRORS.RBAC,
         });
       });
     });
 
-    // --- createInvites conditional guard ---
+    describe("when teamRoleUpdates use only built-in roles on non-enterprise plan", () => {
+      it("allows update", async () => {
+        mockGetActivePlan.mockResolvedValue(freePlan);
+        const caller = createCaller();
 
-    describe("organization.createInvites", () => {
-      describe("when invites include custom role on non-enterprise plan", () => {
-        /** @scenario Non-enterprise org cannot invite members with custom roles */
-        /** @scenario Batch invite rejects entirely when any invite has a custom role */
-        it("rejects the entire batch", async () => {
-          mockGetActivePlan.mockResolvedValue(freePlan);
-          const caller = createCaller();
-
-          await expect(
-            caller.organization.createInvites({
-              organizationId,
-              invites: [
-                {
-                  email: `invite-${nanoid(4)}@example.com`,
-                  role: OrganizationUserRole.MEMBER,
-                  teams: [
-                    {
-                      teamId,
-                      role: `custom:${customRoleId}`,
-                      customRoleId,
-                    },
-                  ],
-                },
-              ],
-            }),
-          ).rejects.toMatchObject({
-            code: "FORBIDDEN",
-            message: ENTERPRISE_FEATURE_ERRORS.RBAC,
-          });
+        const result = await caller.organization.updateMemberRole({
+          userId,
+          organizationId,
+          role: OrganizationUserRole.ADMIN,
+          teamRoleUpdates: [
+            {
+              teamId,
+              userId,
+              role: TeamUserRole.ADMIN,
+            },
+          ],
         });
+
+        expect(result).toBeDefined();
       });
+    });
+  });
 
-      describe("when invites use only built-in roles on non-enterprise plan", () => {
-        /** @scenario Non-enterprise org can invite members with built-in roles */
-        it("allows creation", async () => {
-          mockGetActivePlan.mockResolvedValue(freePlan);
-          const caller = createCaller();
+  // --- createInvites conditional guard ---
 
-          const result = await caller.organization.createInvites({
+  describe("invite.createInvites", () => {
+    describe("when invites include custom role on non-enterprise plan", () => {
+      /** @scenario Non-enterprise org cannot invite members with custom roles */
+      /** @scenario Batch invite rejects entirely when any invite has a custom role */
+      it("rejects the entire batch", async () => {
+        mockGetActivePlan.mockResolvedValue(freePlan);
+        const caller = createCaller();
+
+        await expect(
+          caller.invite.createInvites({
             organizationId,
             invites: [
               {
-                email: `invite-builtin-${nanoid(4)}@example.com`,
+                email: `invite-${nanoid(4)}@example.com`,
                 role: OrganizationUserRole.MEMBER,
                 teams: [
                   {
                     teamId,
-                    role: TeamUserRole.MEMBER,
+                    role: `custom:${customRoleId}`,
+                    customRoleId,
                   },
                 ],
               },
             ],
-          });
-
-          expect(result).toBeDefined();
+          }),
+        ).rejects.toMatchObject({
+          code: "FORBIDDEN",
+          message: ENTERPRISE_FEATURE_ERRORS.RBAC,
         });
       });
     });
 
-    // --- updateTeamMemberRole conditional guard ---
+    describe("when invites use only built-in roles on non-enterprise plan", () => {
+      /** @scenario Non-enterprise org can invite members with built-in roles */
+      it("allows creation", async () => {
+        mockGetActivePlan.mockResolvedValue(freePlan);
+        const caller = createCaller();
 
-    describe("organization.updateTeamMemberRole", () => {
-      describe("when assigning custom role on non-enterprise plan", () => {
-        /** @scenario Non-enterprise org cannot update team member role to custom role */
-        it("rejects with FORBIDDEN", async () => {
-          mockGetActivePlan.mockResolvedValue(freePlan);
-          const caller = createCaller();
-
-          await expect(
-            caller.organization.updateTeamMemberRole({
-              teamId,
-              userId,
-              role: `custom:${customRoleId}`,
-              customRoleId,
-            }),
-          ).rejects.toMatchObject({
-            code: "FORBIDDEN",
-            message: ENTERPRISE_FEATURE_ERRORS.RBAC,
-          });
-        });
-      });
-
-      describe("when assigning built-in role on non-enterprise plan", () => {
-        it("allows update", async () => {
-          mockGetActivePlan.mockResolvedValue(freePlan);
-          const caller = createCaller();
-
-          const result = await caller.organization.updateTeamMemberRole({
-            teamId,
-            userId,
-            role: TeamUserRole.MEMBER,
-          });
-
-          expect(result).toBeDefined();
-        });
-      });
-    });
-
-    // --- createInviteRequest conditional guard ---
-
-    describe("organization.createInviteRequest", () => {
-      describe("when invites include custom role on non-enterprise plan", () => {
-        /** @scenario Non-enterprise org cannot create invite requests with custom roles */
-        it("rejects with FORBIDDEN", async () => {
-          mockGetActivePlan.mockResolvedValue(freePlan);
-          const caller = createCaller();
-
-          await expect(
-            caller.organization.createInviteRequest({
-              organizationId,
-              invites: [
+        const result = await caller.invite.createInvites({
+          organizationId,
+          invites: [
+            {
+              email: `invite-builtin-${nanoid(4)}@example.com`,
+              role: OrganizationUserRole.MEMBER,
+              teams: [
                 {
-                  email: `invite-req-${nanoid(4)}@example.com`,
-                  role: "MEMBER",
-                  teams: [
-                    {
-                      teamId,
-                      role: `custom:${customRoleId}`,
-                      customRoleId,
-                    },
-                  ],
+                  teamId,
+                  role: TeamUserRole.MEMBER,
                 },
               ],
-            }),
-          ).rejects.toMatchObject({
-            code: "FORBIDDEN",
-            message: ENTERPRISE_FEATURE_ERRORS.RBAC,
-          });
+            },
+          ],
+        });
+
+        expect(result).toBeDefined();
+      });
+    });
+  });
+
+  // --- updateTeamMemberRole conditional guard ---
+
+  describe("organization.updateTeamMemberRole", () => {
+    describe("when assigning custom role on non-enterprise plan", () => {
+      /** @scenario Non-enterprise org cannot update team member role to custom role */
+      it("rejects with FORBIDDEN", async () => {
+        mockGetActivePlan.mockResolvedValue(freePlan);
+        const caller = createCaller();
+
+        await expect(
+          caller.organization.updateTeamMemberRole({
+            teamId,
+            userId,
+            role: `custom:${customRoleId}`,
+            customRoleId,
+          }),
+        ).rejects.toMatchObject({
+          code: "FORBIDDEN",
+          message: ENTERPRISE_FEATURE_ERRORS.RBAC,
         });
       });
+    });
 
-      describe("when invites use only built-in roles on non-enterprise plan", () => {
-        it("allows creation", async () => {
-          mockGetActivePlan.mockResolvedValue(freePlan);
-          const caller = createCaller();
+    describe("when assigning built-in role on non-enterprise plan", () => {
+      it("allows update", async () => {
+        mockGetActivePlan.mockResolvedValue(freePlan);
+        const caller = createCaller();
 
-          const result = await caller.organization.createInviteRequest({
+        const result = await caller.organization.updateTeamMemberRole({
+          teamId,
+          userId,
+          role: TeamUserRole.MEMBER,
+        });
+
+        expect(result).toBeDefined();
+      });
+    });
+  });
+
+  // --- createInviteRequest conditional guard ---
+
+  describe("invite.createInviteRequest", () => {
+    describe("when invites include custom role on non-enterprise plan", () => {
+      /** @scenario Non-enterprise org cannot create invite requests with custom roles */
+      it("rejects with FORBIDDEN", async () => {
+        mockGetActivePlan.mockResolvedValue(freePlan);
+        const caller = createCaller();
+
+        await expect(
+          caller.invite.createInviteRequest({
             organizationId,
             invites: [
               {
-                email: `invite-req-builtin-${nanoid(4)}@example.com`,
+                email: `invite-req-${nanoid(4)}@example.com`,
                 role: "MEMBER",
                 teams: [
                   {
                     teamId,
-                    role: TeamUserRole.MEMBER,
+                    role: `custom:${customRoleId}`,
+                    customRoleId,
                   },
                 ],
               },
             ],
-          });
-
-          expect(result).toBeDefined();
+          }),
+        ).rejects.toMatchObject({
+          code: "FORBIDDEN",
+          message: ENTERPRISE_FEATURE_ERRORS.RBAC,
         });
       });
     });
 
-    // --- Fail closed behavior ---
-
-    describe("when plan provider fails", () => {
-      /** @scenario Guard fails closed when plan lookup fails */
-      it("denies access to role.create", async () => {
-        mockGetActivePlan.mockRejectedValue(
-          new Error("Plan provider unavailable"),
-        );
+    describe("when invites use only built-in roles on non-enterprise plan", () => {
+      it("allows creation", async () => {
+        mockGetActivePlan.mockResolvedValue(freePlan);
         const caller = createCaller();
 
-        await expect(
-          caller.role.create({
-            organizationId,
-            name: `Fail Closed Role ${nanoid(4)}`,
-            permissions: ["analytics:view"],
-          }),
-        ).rejects.toThrow();
+        const result = await caller.invite.createInviteRequest({
+          organizationId,
+          invites: [
+            {
+              email: `invite-req-builtin-${nanoid(4)}@example.com`,
+              role: "MEMBER",
+              teams: [
+                {
+                  teamId,
+                  role: TeamUserRole.MEMBER,
+                },
+              ],
+            },
+          ],
+        });
+
+        expect(result).toBeDefined();
       });
     });
-  },
-);
+  });
+
+  // --- Fail closed behavior ---
+
+  describe("when plan provider fails", () => {
+    /** @scenario Guard fails closed when plan lookup fails */
+    it("denies access to role.create", async () => {
+      mockGetActivePlan.mockRejectedValue(
+        new Error("Plan provider unavailable"),
+      );
+      const caller = createCaller();
+
+      await expect(
+        caller.role.create({
+          organizationId,
+          name: `Fail Closed Role ${nanoid(4)}`,
+          permissions: ["analytics:view"],
+        }),
+      ).rejects.toThrow();
+    });
+  });
+});
