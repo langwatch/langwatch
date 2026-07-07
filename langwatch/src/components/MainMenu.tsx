@@ -123,13 +123,37 @@ export const MainMenu = React.memo(function MainMenu({
               isActive={router.pathname.includes("/analytics")}
               showLabel={showExpanded}
             />
-            <PageMenuLink
-              path={projectRoutes.traces_v2.path}
+            <CollapsibleMenuGroup
               icon={featureIcons.traces_v2.icon}
-              label={projectRoutes.traces_v2.title}
+              label={featureIcons.traces.label}
               project={project}
-              isActive={router.pathname.includes("/traces")}
               showLabel={showExpanded}
+              children={[
+                {
+                  icon: featureIcons.traces_v2.icon,
+                  label: projectRoutes.traces_v2.title,
+                  href: project
+                    ? projectRoutes.traces_v2.path.replace(
+                        "[project]",
+                        project.slug,
+                      )
+                    : "/auth/signin",
+                  isActive: router.pathname.includes("/traces"),
+                },
+                {
+                  icon: featureIcons.evaluations.icon,
+                  label: projectRoutes.evaluations.title,
+                  href: project
+                    ? projectRoutes.evaluations.path.replace(
+                        "[project]",
+                        project.slug,
+                      )
+                    : "/auth/signin",
+                  isActive:
+                    router.pathname.includes("/evaluations") &&
+                    !router.pathname.includes("/analytics"),
+                },
+              ]}
             />
             <PageMenuLink
               path={projectRoutes.messages.path}
@@ -160,6 +184,17 @@ export const MainMenu = React.memo(function MainMenu({
               showLabel={showExpanded}
               children={[
                 {
+                  icon: featureIcons.experiments.icon,
+                  label: projectRoutes.experiments.title,
+                  href: project
+                    ? projectRoutes.experiments.path.replace(
+                        "[project]",
+                        project.slug,
+                      )
+                    : "/auth/signin",
+                  isActive: router.pathname.includes("/experiments"),
+                },
+                {
                   icon: featureIcons.scenarios.icon,
                   label: projectRoutes.scenarios.title,
                   href: project
@@ -184,18 +219,6 @@ export const MainMenu = React.memo(function MainMenu({
                     !router.pathname.includes("/simulations/scenarios"),
                 },
               ]}
-            />
-
-            <PageMenuLink
-              path={projectRoutes.evaluations.path}
-              icon={featureIcons.evaluations.icon}
-              label={projectRoutes.evaluations.title}
-              project={project}
-              isActive={
-                router.pathname.includes("/evaluations") &&
-                !router.pathname.includes("/analytics")
-              }
-              showLabel={showExpanded}
             />
 
             <PageMenuLink

@@ -46,12 +46,12 @@ export const projectRoutes = {
   experiments_workbench: {
     path: "/[project]/experiments/workbench/[slug]",
     title: "Experiments Workbench",
-    parent: "evaluations",
+    parent: "experiments",
   },
   evaluations_wizard: {
     path: "/[project]/evaluations/wizard/[slug]",
     title: "Evaluation Wizard",
-    parent: "evaluations",
+    parent: "experiments",
   },
   experiments: {
     path: "/[project]/experiments",

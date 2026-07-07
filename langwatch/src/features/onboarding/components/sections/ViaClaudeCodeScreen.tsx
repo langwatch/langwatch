@@ -12,6 +12,7 @@ import { useActiveProject } from "../../contexts/ActiveProjectContext";
 import {
   PROMPT_ANALYTICS,
   PROMPT_EVALUATIONS,
+  PROMPT_EXPERIMENTS,
   PROMPT_LEVEL_UP,
   PROMPT_PROMPTS,
   PROMPT_SCENARIOS,
@@ -42,10 +43,17 @@ interface SkillItem {
 const SKILLS: SkillItem[] = [
   {
     id: "evaluations",
-    label: "Set up evaluations for your agent",
+    label: "Set up online evaluations for your agent",
     prompt: PROMPT_EVALUATIONS,
     installCommand: "npx skills add langwatch/skills/evaluations",
     slashCommand: "/evaluations",
+  },
+  {
+    id: "experiments",
+    label: "Set up experiments for your agent",
+    prompt: PROMPT_EXPERIMENTS,
+    installCommand: "npx skills add langwatch/skills/experiments",
+    slashCommand: "/experiments",
   },
   {
     id: "scenarios",

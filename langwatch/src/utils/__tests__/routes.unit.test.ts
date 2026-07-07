@@ -18,6 +18,16 @@ describe("projectRoutes", () => {
       expect(projectRoutes.simulation_runs.title).toBe("Runs");
     });
   });
+
+  describe("when evaluation and experiment routes are read", () => {
+    /** @see specs/experiments-v3/navigation-split.feature */
+    it("keeps evaluations separate from experiments in route parents", () => {
+      expect(projectRoutes.evaluations.title).toBe("Evaluations");
+      expect(projectRoutes.experiments.title).toBe("Experiments");
+      expect(projectRoutes.experiments_workbench.parent).toBe("experiments");
+      expect(projectRoutes.evaluations_wizard.parent).toBe("experiments");
+    });
+  });
 });
 
 describe("buildProjectSwitchHref", () => {

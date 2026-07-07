@@ -1,52 +1,63 @@
 ---
 name: evaluations
-user-prompt: "Set up evaluations for my agent"
-description: Set up comprehensive evaluations for your AI agent with LangWatch — experiments (batch testing), evaluators (scoring functions), datasets, online evaluation (production monitoring), and guardrails (real-time blocking). Supports both code (SDK) and platform (CLI) approaches. Use when the user wants to evaluate, test, benchmark, monitor, or safeguard their agent.
+user-prompt: "Set up online evaluations for my agent"
+description: Set up LangWatch online evaluations for production monitoring, including monitors, reusable evaluators for live traces, and guardrails for synchronous blocking. Use when the user wants to monitor production quality, track live trace scores, alert on regressions, or block unsafe inputs/outputs. If they want batch tests, benchmarks, model comparisons, datasets, or CI quality gates, route them to the experiments skill.
 license: MIT
 compatibility: Works with Claude Code and similar AI assistants. The `langwatch` CLI is the only interface for platform operations and documentation.
 ---
 
-import CliSetup from '../_shared/cli-setup.mdx'
-import ProjectsAndApiKeys from '../_shared/projects-and-api-keys.mdx'
-import PlanLimits from '../_shared/plan-limits.mdx'
-import ConsultantMode from '../_shared/consultant-mode.mdx'
+import CliSetup from "../_shared/cli-setup.mdx";
+import ProjectsAndApiKeys from "../_shared/projects-and-api-keys.mdx";
+import PlanLimits from "../_shared/plan-limits.mdx";
+import ConsultantMode from "../_shared/consultant-mode.mdx";
 
-# Set Up Evaluations for Your Agent
+# Set Up Online Evaluations for Your Agent
 
-LangWatch Evaluations is a comprehensive QA system. Map the user's request to one branch:
+LangWatch online evaluations monitor production traces. They are different from **experiments**, which batch test prompts, models, and agents before production.
 
-| User says... | They need... | Go to... |
-|---|---|---|
-| "test my agent", "benchmark", "compare models" | **Experiments** | Step A |
-| "monitor production", "track quality", "block harmful content", "safety" | **Online Evaluation** (includes guardrails) | Step B |
-| "create an evaluator", "scoring function" | **Evaluators** | Step C |
-| "create a dataset", "test data" | **Datasets** | Step D |
-| "evaluate" (ambiguous) | Ask: "batch test or production monitoring?" | - |
+## Choose the Right Skill
 
-## Where Evaluations Fit
+| User says...                                               | They need...               | What to do                                                |
+| ---------------------------------------------------------- | -------------------------- | --------------------------------------------------------- |
+| "monitor production", "track quality", "score live traces" | **Online evaluations**     | Continue with this skill                                  |
+| "guardrail", "block harmful content", "safety enforcement" | **Guardrails**             | Continue with this skill                                  |
+| "create an evaluator", "scoring function for live traces"  | **Evaluator for monitors** | Continue with this skill                                  |
+| "test my agent", "benchmark", "compare models", "CI gate"  | **Experiments**            | Load the `experiments` skill instead                      |
+| "evaluate" (ambiguous)                                     | Clarify intent             | Ask: "production monitoring or batch experiment testing?" |
 
-Evaluations sit at the **component level** of the testing pyramid — they test specific aspects of an agent with many input/output examples. Different from scenarios (end-to-end multi-turn).
+If the `experiments` skill is installed, load and follow it when the user means batch testing. If it is not installed, tell the user to install it:
 
-Use evaluations when you have many examples with clear correct answers, or for CI quality gates. Use scenarios for multi-turn behavior and tool-calling sequences.
+```bash
+npx skills add langwatch/skills/experiments
+```
+
+## Where Online Evaluations Fit
+
+Online evaluations run against **live traces** after your application sends them to LangWatch. Use them to measure quality over time, build dashboards, trigger alerts, and catch regressions in production.
+
+Use **guardrails** when the user needs synchronous enforcement before a request or response reaches the end user.
+
+Use **experiments** instead when the user wants repeatable batch testing against a dataset before deployment.
 
 ## Determine Scope
 
-If the user's request is **general** ("set up evaluations"):
-- Read the codebase to understand the agent
-- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
-- Set up an experiment + evaluator + dataset
-- After the experiment is working, summarize results and suggest improvements (consultant mode — see end of skill).
+If the user's request is **general** ("set up online evaluations"):
 
-If the user's request is **specific** ("add a faithfulness evaluator"):
-- Focus on the specific need
-- Create the targeted evaluator, dataset, or experiment
-- Verify it works
+- Read the codebase to understand the agent's inputs, outputs, and risk profile.
+- Confirm LangWatch tracing is already present or add a short note that traces are required before monitors can produce scores.
+- Set up at least one monitor or guardrail that matches the agent's real domain.
+- After it works, summarize what is being monitored and suggest 2-3 improvements.
+
+If the user's request is **specific** ("add a jailbreak guardrail" or "monitor faithfulness"):
+
+- Focus on that monitor, evaluator, or guardrail.
+- Verify it is wired to the correct project and uses the project key from `.env` when present.
 
 ## Detect Context
 
-If you're in a codebase (`package.json`, `pyproject.toml`, etc.) — use the SDK for experiments and guardrails; use the CLI for evaluators, datasets, monitors. If there is no codebase, drive everything via the CLI. If ambiguous, ask the user.
+If you are in a codebase, use code changes for guardrails and SDK-level custom scores. Use the CLI for platform monitors, reusable evaluators, and project operations.
 
-Some features are code-only (experiments, guardrails) and some are platform-only (monitors). Evaluators work on both surfaces.
+If there is no codebase, drive platform setup through the CLI. Do not invent MCP operations.
 
 ## Plan Limits
 
@@ -58,87 +69,59 @@ Some features are code-only (experiments, guardrails) and some are platform-only
 
 <ProjectsAndApiKeys />
 
-Then read the evaluations overview:
-
-```bash
-langwatch docs evaluations/overview
-```
-
-## Step A: Experiments (Batch Testing) — Code Approach
-
-Create a script or notebook that runs the agent against a dataset and measures quality.
-
-1. Read the SDK docs:
-   ```bash
-   langwatch docs evaluations/experiments/sdk
-   ```
-2. Analyze the agent code to understand its inputs/outputs.
-3. Create a dataset with examples that look like real production data — domain-realistic, not generic.
-4. Create the experiment file:
-
-**Python (Jupyter):**
-```python
-import langwatch
-import pandas as pd
-
-data = {
-    "input": ["domain-specific question 1", "domain-specific question 2"],
-    "expected_output": ["expected answer 1", "expected answer 2"],
-}
-df = pd.DataFrame(data)
-
-evaluation = langwatch.experiment.init("agent-evaluation")
-
-for index, row in evaluation.loop(df.iterrows()):
-    response = my_agent(row["input"])
-    evaluation.evaluate(
-        "ragas/answer_relevancy",
-        index=index,
-        data={"input": row["input"], "output": response},
-        settings={"model": "openai/gpt-5-mini", "max_tokens": 2048},
-    )
-```
-
-**TypeScript:**
-```typescript
-import { LangWatch } from "langwatch";
-
-const langwatch = new LangWatch();
-const dataset = [
-  { input: "domain-specific question", expectedOutput: "expected answer" },
-];
-
-const evaluation = await langwatch.experiments.init("agent-evaluation");
-
-await evaluation.run(dataset, async ({ item, index }) => {
-  const response = await myAgent(item.input);
-  await evaluation.evaluate("ragas/answer_relevancy", {
-    index,
-    data: { input: item.input, output: response },
-    settings: { model: "openai/gpt-5-mini", max_tokens: 2048 },
-  });
-});
-```
-
-5. Run it. ALWAYS execute the experiment after creating it — an unrun experiment is useless. For Python notebooks: run the cells, or `jupyter nbconvert --to notebook --execute`. For TypeScript: `npx tsx experiment.ts`.
-
-## Step B: Online Evaluation (Production Monitoring & Guardrails)
-
-### Platform mode: Monitors (continuous async scoring)
+Then read the online evaluation docs:
 
 ```bash
 langwatch docs evaluations/online-evaluation/overview
+langwatch docs evaluations/online-evaluation/setup-monitors
+langwatch docs evaluations/guardrails/overview
 ```
 
-Create monitors via the CLI (`langwatch monitor --help` for the flag set). Optionally configure further at https://app.langwatch.ai → Evaluations → Monitors.
+## Step A: Ensure Production Traces Exist
 
-### Code mode: Guardrails (synchronous blocking)
+Online evaluations need traces. Check the application uses LangWatch tracing before creating monitors:
 
 ```bash
-langwatch docs evaluations/guardrails/code-integration
+langwatch trace search --limit 5
 ```
 
-Add guardrail checks in agent code:
+If no traces exist, tell the user tracing is required and either add tracing if asked or suggest installing the tracing skill:
+
+```bash
+npx skills add langwatch/skills/tracing
+```
+
+## Step B: Set Up Monitors (Async Live Scoring)
+
+Monitors continuously score live traces. They measure production quality and feed dashboards or alerts.
+
+1. Read the monitor docs:
+   ```bash
+   langwatch docs evaluations/online-evaluation/setup-monitors
+   ```
+2. Inspect available CLI flags:
+   ```bash
+   langwatch monitor --help
+   langwatch monitor create --help
+   ```
+3. Choose evaluators that fit the agent's real domain. Do not use generic examples.
+4. Create the monitor with the CLI. Prefer project credentials already present in `.env`.
+5. Verify the monitor exists:
+   ```bash
+   langwatch monitor list
+   ```
+
+Key distinction: monitors **measure** asynchronously after traces are ingested. They do not block end users.
+
+## Step C: Set Up Guardrails (Synchronous Blocking)
+
+Guardrails block, modify, or fail unsafe traffic in the request path.
+
+1. Read the guardrails code docs:
+   ```bash
+   langwatch docs evaluations/guardrails/code-integration
+   ```
+2. Add guardrail checks in the application code:
 
 ```python
 import langwatch
@@ -156,58 +139,43 @@ def my_agent(user_input):
     ...
 ```
 
-Key distinction: Monitors **measure** (async). Guardrails **act** (sync via `as_guardrail=True`).
+3. Run the application or a small script that exercises both pass and block paths.
+4. Confirm traces show guardrail results.
 
-## Step C: Evaluators (Scoring Functions)
+Key distinction: guardrails **act** synchronously via code, usually with `as_guardrail=True`.
 
-Read the docs first:
+## Step D: Evaluators for Online Evaluations
+
+Read the evaluator docs first:
 
 ```bash
 langwatch docs evaluations/evaluators/overview
-langwatch docs evaluations/evaluators/list      # Browse available evaluators
+langwatch docs evaluations/evaluators/list
 ```
 
-In code, call evaluators via the SDK as shown in Step A. To create or manage evaluators on the platform, use `langwatch evaluator --help`. If unsure which `--type` values are valid, run `langwatch evaluator create --help` first.
-
-If you need an LLM-as-judge evaluator, verify a model provider is configured (`langwatch model-provider list`).
-
-## Step D: Datasets
-
-Read the docs first:
+To create or manage reusable evaluators for monitors, use the CLI:
 
 ```bash
-langwatch docs datasets/overview
-langwatch docs datasets/programmatic-access
-langwatch docs datasets/ai-dataset-generation
+langwatch evaluator --help
+langwatch evaluator create --help
 ```
 
-Use `langwatch dataset --help` for create/upload/download. Generate data tailored to the agent:
+If an evaluator needs an LLM judge, verify a model provider is configured:
 
-| Agent type | Dataset examples |
-|---|---|
-| Chatbot | Realistic user questions matching the bot's persona |
-| RAG pipeline | Questions with expected answers testing retrieval quality |
-| Classifier | Inputs with expected category labels |
-| Code assistant | Coding tasks with expected outputs |
-| Customer support | Support tickets and customer questions |
-| Summarizer | Documents with expected summaries |
-
-CRITICAL: The dataset MUST be specific to what the agent ACTUALLY does. Before generating any data:
-1. Read the agent's system prompt word by word
-2. Read the agent's function signatures and tool definitions
-3. Understand the agent's domain, persona, and constraints
-
-Then generate data reflecting EXACTLY this agent's real-world usage. NEVER use generic examples like "What is 2+2?", "What is the capital of France?", or "Explain quantum computing" — every example must be something a real user of THIS specific agent would say.
+```bash
+langwatch model-provider list
+```
 
 ## Consultant Mode
 
-Once the experiment is working, summarize results and suggest 2-3 domain-specific improvements based on what you learned from the codebase.
+Once online evaluations or guardrails are working, summarize the coverage and suggest 2-3 domain-specific improvements based on what you learned from the codebase.
 
 <ConsultantMode />
 
 ## Common Mistakes
 
-- Do NOT say "run an evaluation" — be specific: experiment, monitor, or guardrail
-- Do NOT use generic/placeholder datasets — generate domain-specific examples
-- Do NOT skip running the experiment to verify it works
-- Monitors **measure** (async), guardrails **act** (sync, via code with `as_guardrail=True`)
+- Do NOT use this skill for batch experiments. Load `experiments` for datasets, benchmarks, CI gates, or model comparisons.
+- Do NOT say "run an evaluation" when you mean monitor, guardrail, or experiment.
+- Do NOT create generic monitors that do not match the agent's real domain.
+- Do NOT run `langwatch login --device` when a project `LANGWATCH_API_KEY` already exists in `.env`.
+- Monitors measure asynchronously. Guardrails act synchronously.

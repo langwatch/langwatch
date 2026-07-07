@@ -42,7 +42,7 @@ Feature: Skills integration across all platform touchpoints
     Then they see goal-based options:
       | goal                                     |
       | Instrument my code with LangWatch        |
-      | Create an evaluation experiment           |
+      | Create an experiment           |
       | Add agent simulation tests                |
       | Version my agent prompts                  |
       | Red team my agent for vulnerabilities     |

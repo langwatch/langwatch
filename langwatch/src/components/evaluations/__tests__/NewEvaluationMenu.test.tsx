@@ -211,6 +211,38 @@ describe("NewEvaluationMenu", () => {
         ).toBeInTheDocument();
       });
     });
+
+    it("shows only online evaluation and guardrail actions in online evaluations mode", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<NewEvaluationMenu mode="onlineEvaluations" />, {
+        wrapper: Wrapper,
+      });
+
+      await user.click(screen.getByText("New Evaluation"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Add Online Evaluation")).toBeInTheDocument();
+        expect(screen.getByText("Setup Guardrail")).toBeInTheDocument();
+      });
+      expect(screen.queryByText("Create Experiment")).not.toBeInTheDocument();
+      expect(screen.queryByText("Evaluate via SDK")).not.toBeInTheDocument();
+    });
+
+    it("shows only experiment actions in experiments mode", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<NewEvaluationMenu mode="experiments" />, { wrapper: Wrapper });
+
+      await user.click(screen.getByText("New Experiment"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Create Experiment")).toBeInTheDocument();
+        expect(screen.getByText("Evaluate via SDK")).toBeInTheDocument();
+      });
+      expect(
+        screen.queryByText("Add Online Evaluation"),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Setup Guardrail")).not.toBeInTheDocument();
+    });
   });
 
   describe("Create Experiment option", () => {
@@ -465,13 +497,11 @@ describe("NewEvaluationMenu", () => {
       await user.click(screen.getByText("Create Experiment"));
 
       // Verify the callback passed to checkAndProceed actually triggers mutation
-      await waitFor(() => {
-        expect(mockCheckAndProceed).toHaveBeenCalled();
-        // The callback should have been executed since license is allowed
-        expect(mockLicenseCallbackExecuted).toBe(true);
-        // And the mutation should have been called
-        expect(mutateWasCalled).toBe(true);
-      });
+      expect(mockCheckAndProceed).toHaveBeenCalled();
+      // The callback should have been executed since license is allowed
+      expect(mockLicenseCallbackExecuted).toBe(true);
+      // And the mutation should have been called
+      expect(mutateWasCalled).toBe(true);
     });
   });
 });

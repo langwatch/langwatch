@@ -1,0 +1,206 @@
+---
+name: experiments
+user-prompt: "Set up experiments for my agent"
+description: Set up LangWatch experiments for batch testing before production: datasets, experiment scripts or notebooks, evaluators, CI quality gates, and result analysis. Use when the user wants to test, benchmark, compare prompts or models, evaluate a dataset, or prevent regressions before deployment. If they want production monitoring, live trace scoring, alerts, or guardrails, route them to the evaluations skill.
+license: MIT
+compatibility: Works with Claude Code and similar AI assistants. The `langwatch` CLI is the only interface for platform operations and documentation.
+---
+
+import CliSetup from "../_shared/cli-setup.mdx";
+import ProjectsAndApiKeys from "../_shared/projects-and-api-keys.mdx";
+import PlanLimits from "../_shared/plan-limits.mdx";
+import ConsultantMode from "../_shared/consultant-mode.mdx";
+
+# Set Up Experiments for Your Agent
+
+LangWatch experiments are repeatable batch tests. They run prompts, models, or agents against datasets and score the outputs before production.
+
+## Choose the Right Skill
+
+| User says...                                               | They need...                  | What to do                                                |
+| ---------------------------------------------------------- | ----------------------------- | --------------------------------------------------------- |
+| "test my agent", "benchmark", "compare models"             | **Experiments**               | Continue with this skill                                  |
+| "CI gate", "quality gate", "prevent regressions"           | **Experiments**               | Continue with this skill                                  |
+| "create a dataset", "test data"                            | **Dataset for an experiment** | Continue with this skill                                  |
+| "monitor production", "track live quality", "alerts"       | **Online evaluations**        | Load the `evaluations` skill instead                      |
+| "guardrail", "block harmful content", "safety enforcement" | **Guardrails**                | Load the `evaluations` skill instead                      |
+| "evaluate" (ambiguous)                                     | Clarify intent                | Ask: "batch experiment testing or production monitoring?" |
+
+If the `evaluations` skill is installed, load and follow it when the user means production monitoring or guardrails. If it is not installed, tell the user to install it:
+
+```bash
+npx skills add langwatch/skills/evaluations
+```
+
+## Where Experiments Fit
+
+Experiments sit at the **component level** of the testing pyramid. They test a prompt, model, retrieval pipeline, evaluator, or agent over many input/output examples.
+
+Use **scenarios** for end-to-end multi-turn behavior and tool-calling sequences.
+
+Use **online evaluations** after deployment to monitor live traces.
+
+## Determine Scope
+
+If the user's request is **general** ("set up experiments"):
+
+- Read the codebase to understand the agent.
+- Study git history for recent behavior, prompt, or model changes.
+- Create a domain-specific dataset.
+- Create an experiment script or notebook.
+- Run the experiment for real.
+- Summarize results and suggest improvements.
+
+If the user's request is **specific** ("add a faithfulness evaluator" or "benchmark two models"):
+
+- Focus on the targeted experiment.
+- Still make the dataset specific to the agent's real domain.
+- Run the experiment or explain the exact blocker if credentials or dependencies are missing.
+
+## Detect Context
+
+If you are in a codebase (`package.json`, `pyproject.toml`, etc.), create an SDK-based experiment in the repo. If there is no codebase, use the CLI to inspect projects, datasets, and existing experiments, then explain what code is needed to run a target.
+
+Experiments are code-first because the target under test must execute. The CLI helps with docs, auth, datasets, and platform inspection.
+
+## Plan Limits
+
+<PlanLimits />
+
+## Prerequisites
+
+<CliSetup />
+
+<ProjectsAndApiKeys />
+
+Then read the experiments docs:
+
+```bash
+langwatch docs evaluations/experiments/overview
+langwatch docs evaluations/experiments/sdk
+```
+
+## Step A: Understand the Agent
+
+Before generating data:
+
+1. Read the agent's system prompt word by word.
+2. Read function signatures, tool definitions, retrieval code, and model calls.
+3. Understand the agent's domain, persona, constraints, and expected outputs.
+4. Check recent git history for behavior changes that should be covered.
+
+Never use generic examples like "What is 2+2?", "What is the capital of France?", or "Explain quantum computing" unless that is genuinely the agent's domain.
+
+## Step B: Create a Domain-Specific Dataset
+
+Generate examples that look like real production traffic for this specific agent.
+
+| Agent type       | Dataset examples                                      |
+| ---------------- | ----------------------------------------------------- |
+| Chatbot          | Realistic user questions matching the bot's persona   |
+| RAG pipeline     | Questions with expected answers and relevant contexts |
+| Classifier       | Inputs with expected category labels                  |
+| Code assistant   | Coding tasks with expected output properties          |
+| Customer support | Support tickets and customer questions                |
+| Summarizer       | Documents with expected summary qualities             |
+
+If the repo already has test fixtures, docs, transcripts, or seed data, use them as the basis for the dataset.
+
+## Step C: Create the Experiment
+
+Read the SDK docs first:
+
+```bash
+langwatch docs evaluations/experiments/sdk
+```
+
+**Python:**
+
+```python
+import langwatch
+import pandas as pd
+
+data = {
+    "input": ["domain-specific question 1", "domain-specific question 2"],
+    "expected_output": ["expected answer 1", "expected answer 2"],
+}
+df = pd.DataFrame(data)
+
+experiment = langwatch.experiment.init("agent-experiment")
+
+for index, row in experiment.loop(df.iterrows()):
+    response = my_agent(row["input"])
+    experiment.evaluate(
+        "ragas/answer_relevancy",
+        index=index,
+        data={"input": row["input"], "output": response},
+        settings={"model": "openai/gpt-5-mini", "max_tokens": 2048},
+    )
+```
+
+**TypeScript:**
+
+```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+const dataset = [
+  { input: "domain-specific question", expectedOutput: "expected answer" },
+];
+
+const experiment = await langwatch.experiments.init("agent-experiment");
+
+await experiment.run(dataset, async ({ item, index }) => {
+  const response = await myAgent(item.input);
+  await experiment.evaluate("ragas/answer_relevancy", {
+    index,
+    data: { input: item.input, output: response },
+    settings: { model: "openai/gpt-5-mini", max_tokens: 2048 },
+  });
+});
+```
+
+## Step D: Run and Verify
+
+Always execute the experiment after creating it. An unrun experiment is not useful.
+
+- Python script: `python experiment.py`
+- Python notebook: `jupyter nbconvert --to notebook --execute experiment.ipynb`
+- TypeScript: `npx tsx experiment.ts`
+
+Then verify results exist:
+
+```bash
+langwatch experiment list
+```
+
+If the CLI has different command names, inspect help first:
+
+```bash
+langwatch experiment --help
+langwatch experiments --help
+```
+
+## Step E: CI/CD Gates
+
+For CI quality gates, read:
+
+```bash
+langwatch docs evaluations/experiments/ci-cd
+```
+
+Add a command that runs the experiment and fails the pipeline when required metrics fall below threshold. Keep thresholds realistic and explain how to tune them.
+
+## Consultant Mode
+
+Once the experiment is working, summarize results and suggest 2-3 domain-specific improvements based on what you learned from the codebase.
+
+<ConsultantMode />
+
+## Common Mistakes
+
+- Do NOT use this skill for production monitors or guardrails. Load `evaluations` for those.
+- Do NOT use generic datasets. Every example must match the agent's real usage.
+- Do NOT skip running the experiment.
+- Do NOT run `langwatch login --device` when a project `LANGWATCH_API_KEY` already exists in `.env`.
+- Do NOT confuse scenarios with experiments. Use scenarios for multi-turn agent behavior.

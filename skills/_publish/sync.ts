@@ -18,6 +18,7 @@ const skillsRoot = path.resolve(__dirname, "..");
 const FEATURE_SKILLS = [
   "tracing",
   "evaluations",
+  "experiments",
   "scenarios",
   "prompts",
   "analytics",
@@ -48,7 +49,7 @@ export function sync(targetDir: string): void {
     // path, typo). The workflow has its own guard but it runs after sync.
     throw new Error(
       `Refusing to sync into ${targetDir}: no .git directory. ` +
-        `Target must be a checkout of langwatch/skills.`
+        `Target must be a checkout of langwatch/skills.`,
     );
   }
   console.log(`Syncing skills to ${targetDir}...`);
@@ -73,7 +74,7 @@ export function sync(targetDir: string): void {
 
   fs.copyFileSync(
     path.join(skillsRoot, "version.txt"),
-    path.join(targetDir, "version.txt")
+    path.join(targetDir, "version.txt"),
   );
   console.log("  ✓ version.txt");
   console.log("Done.");

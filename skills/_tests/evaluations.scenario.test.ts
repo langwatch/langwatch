@@ -21,16 +21,18 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const isCI = !!process.env.CI;
-
 const judgeModel = openai("gpt-5-mini");
 
 function copySkillToWorkDir(tempFolder: string) {
-  installSkillToWorkDir({ workingDirectory: tempFolder, skillSubpath: "evaluations" });
+  installSkillToWorkDir({
+    workingDirectory: tempFolder,
+    skillSubpath: "evaluations",
+  });
 }
 
-function findNewPythonFiles(dir: string, excludeNames: string[] = ["main.py"]): string[] {
-  const results: string[] = [];
-  if (!fs.existsSync(dir)) return results;
+function readAllSourceFiles(dir: string): string {
+  const chunks: string[] = [];
+  if (!fs.existsSync(dir)) return "";
 
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const fullPath = path.join(dir, entry.name);
@@ -40,74 +42,58 @@ function findNewPythonFiles(dir: string, excludeNames: string[] = ["main.py"]): 
       entry.name !== "node_modules" &&
       entry.name !== ".venv"
     ) {
-      results.push(...findNewPythonFiles(fullPath, []));
-    } else if (
-      entry.isFile() &&
-      !excludeNames.includes(entry.name) &&
-      (/\.ipynb$/.test(entry.name) || /\.py$/.test(entry.name))
-    ) {
-      results.push(fullPath);
+      chunks.push(readAllSourceFiles(fullPath));
+    } else if (entry.isFile() && /\.(py|ts|tsx|js|jsx|md)$/.test(entry.name)) {
+      chunks.push(fs.readFileSync(fullPath, "utf8"));
     }
   }
-  return results;
+
+  return chunks.join("\n");
 }
 
-describe("Evaluations Skill", () => {
+describe("Online Evaluations Skill", () => {
   it.skipIf(isCI)(
-    "creates an evaluation experiment for a Python OpenAI bot",
+    "adds a guardrail for a Python OpenAI bot without creating a batch experiment",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-evaluation-py-")
+        path.join(os.tmpdir(), "langwatch-skill-online-evaluation-py-"),
       );
 
       execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
+        `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`,
       );
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,
-        name: "Python OpenAI evaluation experiment",
+        name: "Python OpenAI online evaluation guardrail",
         description:
-          "Creating an evaluation experiment for a Python OpenAI chatbot that replies with tweet-like responses and emojis.",
+          "Adding a production guardrail to a Python OpenAI chatbot without creating a batch experiment.",
         agents: [
           createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
             criteria: [
-              "Agent created an evaluation experiment file (notebook or script)",
-              "Agent generated a dataset that is specific to the agent's domain — for this tweet-like emoji bot, the dataset should contain inputs that real users would send to this bot, NOT generic trivia like 'What is 2+2?' or 'Capital of France'",
+              "Agent added or proposed a LangWatch online evaluation or guardrail flow for production traffic",
+              "Agent did NOT create a batch experiment script or notebook",
+              "Agent made the distinction between online evaluations/guardrails and experiments clear",
             ],
           }),
         ],
         script: [
           scenario.user(
-            "create a batch evaluation experiment for my agent using langwatch.experiment SDK (not scenario tests). Read my agent code first to understand what it does and generate a dataset that matches its actual purpose."
+            "Set up an online evaluation guardrail for my production chatbot to block jailbreak attempts. This is not a batch experiment. Read my agent code first and wire the guardrail into the request path.",
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
             assertSkillWasRead(state, "evaluations");
 
-            const newFiles = findNewPythonFiles(tempFolder);
-            expect(
-              newFiles.length,
-              `Expected at least one new .py or .ipynb file created in ${tempFolder}`
-            ).toBeGreaterThan(0);
-
-            const fileContents = newFiles
-              .map((f) => fs.readFileSync(f, "utf8"))
-              .join("\n")
-              .toLowerCase();
-
-            expect(fileContents).toContain("langwatch");
-
-            // Verify the dataset is NOT generic — should NOT have trivia-style examples
-            expect(
-              fileContents,
-              "Dataset should not contain generic trivia like 'capital of france' — it should be specific to the tweet-like emoji bot"
-            ).not.toMatch(/capital of france|what is 2 ?\+ ?2|quantum computing|photosynthesis/);
+            const content = readAllSourceFiles(tempFolder).toLowerCase();
+            expect(content).toContain("langwatch");
+            expect(content).toMatch(/guardrail|as_guardrail|jailbreak/);
+            expect(content).not.toMatch(/experiment\.init|experiments\.init/);
           },
           scenario.judge(),
         ],
@@ -115,236 +101,68 @@ describe("Evaluations Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
-    "creates an evaluation experiment for a TypeScript Vercel AI bot",
+    "routes batch testing requests to the experiments skill",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-evaluations-ts-")
+        path.join(
+          os.tmpdir(),
+          "langwatch-skill-evaluations-routes-experiment-",
+        ),
       );
 
       execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/typescript-vercel")}/* ${tempFolder}/`
+        `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`,
       );
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,
-        name: "TypeScript Vercel AI evaluation experiment",
+        name: "Online evaluations skill routes batch experiment intent",
         description:
-          "Creating an evaluation experiment for a TypeScript Vercel AI chatbot.",
+          "User asks for batch testing while the online evaluations skill is installed. The agent should redirect to the experiments skill instead of misusing online evaluations.",
         agents: [
           createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
             criteria: [
-              "Agent created an evaluation experiment file (script or test)",
-              "Agent generated a dataset relevant to the agent's functionality",
+              "Agent recognized that benchmarking or batch testing belongs to experiments",
+              "Agent told an installed agent to load the experiments skill or told the user how to install it",
+              "Agent did not claim online evaluations are the same as experiments",
             ],
           }),
         ],
         script: [
           scenario.user(
-            "create a batch evaluation experiment for my agent using langwatch experiments SDK"
+            "I want to benchmark my agent over a dataset and compare models. Use the right LangWatch workflow.",
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
             assertSkillWasRead(state, "evaluations");
-            // Find new TypeScript files (not index.ts)
-            const files = fs
-              .readdirSync(tempFolder)
-              .filter((f) => f.endsWith(".ts") && f !== "index.ts");
-            expect(
-              files.length,
-              "Expected at least one new .ts file"
-            ).toBeGreaterThan(0);
-            const content = files
-              .map((f) =>
-                fs.readFileSync(path.join(tempFolder, f), "utf8")
+            const allContent = state.messages
+              .map((m) =>
+                typeof m.content === "string"
+                  ? m.content
+                  : JSON.stringify(m.content),
               )
-              .join("\n");
-            expect(content).toContain("langwatch");
-          },
-          scenario.judge(),
-        ],
-      });
-
-      expect(result.success).toBe(true);
-    },
-    900_000
-  );
-
-  it.skipIf(isCI)(
-    "creates an evaluation experiment for a Python LangGraph agent",
-    async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-evaluations-langgraph-")
-      );
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/python-langgraph")}/* ${tempFolder}/`
-      );
-      copySkillToWorkDir(tempFolder);
-
-      const result = await scenario.run({
-        setId: SKILL_TESTS_SET_ID,
-        name: "Python LangGraph evaluation experiment",
-        description:
-          "Creating an evaluation experiment for a Python LangGraph agent.",
-        agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
-          scenario.userSimulatorAgent({ model: judgeModel }),
-          scenario.judgeAgent({
-            model: judgeModel,
-            criteria: [
-              "Agent created an evaluation experiment file",
-              "Agent generated a dataset relevant to the LangGraph agent functionality",
-            ],
-          }),
-        ],
-        script: [
-          scenario.user(
-            "create a batch evaluation experiment for my agent using langwatch.experiment SDK"
-          ),
-          scenario.agent(),
-          (state) => {
-            toolCallFix(state);
-            assertSkillWasRead(state, "evaluations");
-            const newFiles = findNewPythonFiles(tempFolder);
-            expect(
-              newFiles.length,
-              "Expected at least one new .py file"
-            ).toBeGreaterThan(0);
-            const content = newFiles
-              .map((f) => fs.readFileSync(f, "utf8"))
-              .join("\n");
-            expect(content).toContain("langwatch");
-          },
-          scenario.judge(),
-        ],
-      });
-      expect(result.success).toBe(true);
-    },
-    900_000
-  );
-
-  it.skipIf(isCI)(
-    "creates a targeted evaluation for RAG faithfulness",
-    async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-evaluations-targeted-")
-      );
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
-      );
-      copySkillToWorkDir(tempFolder);
-
-      const result = await scenario.run({
-        setId: SKILL_TESTS_SET_ID,
-        name: "Targeted RAG faithfulness evaluation",
-        description:
-          "Adding a specific evaluation for checking if the agent's responses are faithful to the context provided.",
-        agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
-          scenario.userSimulatorAgent({ model: judgeModel }),
-          scenario.judgeAgent({
-            model: judgeModel,
-            criteria: [
-              "Agent created an evaluation focused specifically on faithfulness or hallucination detection",
-              "The evaluation is targeted, not a generic test suite",
-            ],
-          }),
-        ],
-        script: [
-          scenario.user(
-            "create an evaluation that checks if my agent hallucinates, use langwatch experiments SDK with a faithfulness evaluator"
-          ),
-          scenario.agent(),
-          (state) => {
-            toolCallFix(state);
-            assertSkillWasRead(state, "evaluations");
-            const newFiles = findNewPythonFiles(tempFolder);
-            expect(newFiles.length).toBeGreaterThan(0);
-            const content = newFiles
-              .map((f) => fs.readFileSync(f, "utf8"))
-              .join("\n");
-            expect(content).toContain("langwatch");
-          },
-          scenario.judge(),
-        ],
-      });
-      expect(result.success).toBe(true);
-    },
-    900_000
-  );
-
-  it.skipIf(isCI)(
-    "creates domain-specific evaluation for a RAG agent",
-    async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-evaluations-rag-")
-      );
-      execSync(
-        `cp -r ${path.resolve(__dirname, "fixtures/python-rag-agent")}/* ${tempFolder}/`
-      );
-      copySkillToWorkDir(tempFolder);
-
-      const result = await scenario.run({
-        setId: SKILL_TESTS_SET_ID,
-        name: "RAG agent domain-specific evaluation",
-        description:
-          "Creating an evaluation experiment for a TerraVerde farm advisory RAG agent.",
-        agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
-          scenario.userSimulatorAgent({ model: judgeModel }),
-          scenario.judgeAgent({
-            model: judgeModel,
-            criteria: [
-              "Agent created an evaluation experiment with domain-specific data about agriculture, irrigation, frost protection, or pest management",
-              "Dataset does NOT contain generic trivia — it has realistic agronomic questions",
-            ],
-          }),
-        ],
-        script: [
-          scenario.user(
-            "create a batch evaluation experiment for my farm advisory RAG agent. Read the codebase to understand the knowledge base and domain. Generate a dataset with realistic agronomic questions. Use langwatch.experiment SDK."
-          ),
-          scenario.agent(),
-          (state) => {
-            toolCallFix(state);
-            assertSkillWasRead(state, "evaluations");
-            const newFiles = findNewPythonFiles(tempFolder);
-            expect(newFiles.length).toBeGreaterThan(0);
-            const content = newFiles
-              .map((f) => fs.readFileSync(f, "utf8"))
               .join("\n")
               .toLowerCase();
-            expect(content).toContain("langwatch");
-
-            // Verify domain specificity
-            const hasDomainTerms =
-              content.includes("irrigation") ||
-              content.includes("frost") ||
-              content.includes("pest") ||
-              content.includes("soil") ||
-              content.includes("crop");
-            expect(
-              hasDomainTerms,
-              "Expected dataset to contain agricultural domain terms"
-            ).toBe(true);
-
-            expect(content).not.toMatch(
-              /capital of france|what is 2 ?\+ ?2|quantum computing/
+            expect(allContent).toContain("experiments");
+            expect(allContent).toMatch(
+              /npx skills add langwatch\/skills\/experiments|load.*experiments/,
             );
           },
           scenario.judge(),
         ],
       });
+
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 });

@@ -1,19 +1,19 @@
 ---
 name: level-up
 user-prompt: "Take my agent to the next level"
-description: Take your AI agent to the next level with full LangWatch integration. Adds tracing, prompt versioning, evaluation experiments, and simulation tests in one go. Use when the user wants comprehensive observability, testing, and prompt management for their agent.
+description: Take your AI agent to the next level with full LangWatch integration. Adds tracing, prompt versioning, experiments, online evaluations, and simulation tests in one go. Use when the user wants comprehensive observability, testing, and prompt management for their agent.
 license: MIT
 compatibility: Works with Claude Code and similar coding agents. The `langwatch` CLI is the only interface.
 ---
 
-import CliSetup from '../_shared/cli-setup.mdx'
-import ProjectsAndApiKeys from '../_shared/projects-and-api-keys.mdx'
-import PlanLimits from '../_shared/plan-limits.mdx'
-import ConsultantMode from '../_shared/consultant-mode.mdx'
+import CliSetup from "../_shared/cli-setup.mdx";
+import ProjectsAndApiKeys from "../_shared/projects-and-api-keys.mdx";
+import PlanLimits from "../_shared/plan-limits.mdx";
+import ConsultantMode from "../_shared/consultant-mode.mdx";
 
 # Take Your Agent to the Next Level
 
-This skill sets up your agent with the full LangWatch stack: tracing, prompt versioning, evaluation experiments, and agent simulation tests. Each step builds on the previous one.
+This skill sets up your agent with the full LangWatch stack: tracing, prompt versioning, experiments, optional online evaluations, and agent simulation tests. Each step builds on the previous one.
 
 ## Plan Limits
 
@@ -46,6 +46,7 @@ Add LangWatch tracing to capture all LLM calls, costs, and latency.
 4. Add `LANGWATCH_API_KEY` to `.env`
 
 **Verify**: Run the application briefly and confirm traces appear:
+
 ```bash
 langwatch trace search --limit 5
 ```
@@ -67,7 +68,7 @@ Move hardcoded prompts to LangWatch Prompts CLI for version control and collabor
 
 Do NOT hardcode prompts in code. Do NOT add try/catch fallbacks around `prompts.get()`.
 
-## Step 3: Create an Evaluation Experiment
+## Step 3: Create an Experiment
 
 Build a batch evaluation to measure your agent's quality across many examples.
 
@@ -84,7 +85,21 @@ Build a batch evaluation to measure your agent's quality across many examples.
 
 **Verify**: Run the experiment (`jupyter nbconvert --to notebook --execute experiment.ipynb` or `npx tsx experiment.ts`) and check results appear in the LangWatch Experiments view.
 
-## Step 4: Add Agent Simulation Tests
+## Step 4: Add Online Evaluations When Production Monitoring Is Needed
+
+If the user wants production monitoring, live quality tracking, alerts, or guardrails, use the `evaluations` skill. Otherwise keep experiments as the pre-production quality gate and continue to scenarios.
+
+1. Read the online evaluation docs:
+   ```bash
+   langwatch docs evaluations/online-evaluation/overview
+   langwatch docs evaluations/guardrails/overview
+   ```
+2. For monitors, configure live trace scoring with the CLI.
+3. For guardrails, add synchronous SDK checks in code with `as_guardrail=True`.
+
+**Verify**: Confirm monitors or guardrail results appear in the Evaluations view.
+
+## Step 5: Add Agent Simulation Tests
 
 Create scenario tests to validate agent behavior in realistic multi-turn conversations.
 

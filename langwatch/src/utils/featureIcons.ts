@@ -3,11 +3,12 @@
  * This ensures consistency between the sidebar, quick access links, and recent items.
  */
 import {
+  Bird,
   BookText,
   Bot,
   CheckSquare,
   Drama,
-  Bird,
+  FlaskConical,
   FolderOpen,
   Home,
   KeyRound,
@@ -35,6 +36,7 @@ export type FeatureKey =
   | "simulation_runs"
   | "suites"
   | "evaluations"
+  | "experiments"
   | "workflows"
   | "prompts"
   | "datasets"
@@ -100,6 +102,11 @@ export const featureIcons: Record<FeatureKey, FeatureConfig> = {
     color: "green.500",
     label: "Evaluations",
   },
+  experiments: {
+    icon: FlaskConical,
+    color: "pink.500",
+    label: "Experiments",
+  },
   workflows: {
     icon: Workflow,
     color: "blue.500",
@@ -150,6 +157,7 @@ export const recentItemTypeToFeature: Record<string, FeatureKey> = {
   workflow: "workflows",
   dataset: "datasets",
   evaluation: "evaluations",
+  experiment: "experiments",
   annotation: "annotations",
   simulation: "simulations",
 };

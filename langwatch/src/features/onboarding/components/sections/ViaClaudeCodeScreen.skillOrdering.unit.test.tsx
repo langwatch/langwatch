@@ -15,7 +15,7 @@ import { PromptList, SkillList, TRACING_SKILL_ID } from "./ViaClaudeCodeScreen";
 
 const TRACING_LABEL = "Add LangWatch tracing to your code";
 // The default-first skill in the shared list — used as the ordering anchor.
-const DEFAULT_FIRST_LABEL = "Set up evaluations for your agent";
+const DEFAULT_FIRST_LABEL = "Set up online evaluations for your agent";
 
 afterEach(cleanup);
 

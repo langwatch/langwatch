@@ -77,13 +77,13 @@ describe("LangWatch CLI Auth Discovery — bare CLI, no skill", () => {
 
 /**
  * Regression for the customer report: a coding agent setting up experiments
- * ran `langwatch login`, signed in to a personal project, and the evaluations
- * went there. With the evaluations skill (and the projects-and-api-keys shared
+ * ran `langwatch login`, signed in to a personal project, and the experiment
+ * went there. With the experiments skill (and the projects-and-api-keys shared
  * snippet), the agent must use the project API key already in `.env` and must
  * never run the AI-tools / device login or target a personal project.
  */
-describe("given the evaluations skill installed with a project key in .env", () => {
-  describe("when the agent is asked to set up an evaluation", () => {
+describe("given the experiments skill installed with a project key in .env", () => {
+  describe("when the agent is asked to set up an experiment", () => {
     it.skipIf(isCI)(
       "uses the .env project key and never device / personal login",
       async () => {
@@ -108,14 +108,14 @@ describe("given the evaluations skill installed with a project key in .env", () 
         );
         installSkillToWorkDir({
           workingDirectory: tempFolder,
-          skillSubpath: "evaluations",
+          skillSubpath: "experiments",
         });
 
         const result = await scenario.run({
           setId: SKILL_TESTS_SET_ID,
-          name: "Evaluation setup stays on a real project",
+          name: "Experiment setup stays on a real project",
           description:
-            "User asks the agent (with the evaluations skill installed) to set up a batch evaluation. A project API key is already in .env. The agent must use that real project key and must NOT run an AI-tools/device login or create/target a personal project.",
+            "User asks the agent (with the experiments skill installed) to set up a batch experiment. A project API key is already in .env. The agent must use that real project key and must NOT run an AI-tools/device login or create/target a personal project.",
           agents: [
             createClaudeCodeAgent({ workingDirectory: tempFolder }),
             scenario.userSimulatorAgent({ model: judgeModel }),
@@ -130,12 +130,12 @@ describe("given the evaluations skill installed with a project key in .env", () 
           ],
           script: [
             scenario.user(
-              "Set up a batch evaluation experiment for my agent using langwatch: create the experiment script and wire up auth from the project's existing .env. Do NOT run it, install dependencies, or start any containers yet.",
+              "Set up a batch experiment for my agent using langwatch: create the experiment script and wire up auth from the project's existing .env. Do NOT run it, install dependencies, or start any containers yet.",
             ),
             scenario.agent(),
             (state) => {
               toolCallFix(state);
-              assertSkillWasRead(state, "evaluations");
+              assertSkillWasRead(state, "experiments");
               // Hard guardrail: the agent must never EXECUTE the AI-tools / device
               // login (that is what routes evaluations to a personal project). We
               // scan the executed tool-call command fields, not the whole
@@ -153,7 +153,7 @@ describe("given the evaluations skill installed with a project key in .env", () 
               });
               expect(
                 ranDeviceLogin,
-                "agent must not execute `langwatch login --device` for evaluation setup",
+                "agent must not execute `langwatch login --device` for experiment setup",
               ).toBe(false);
             },
             scenario.judge(),

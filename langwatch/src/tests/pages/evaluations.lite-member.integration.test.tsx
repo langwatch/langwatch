@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Integration tests for the Evaluations page permission-based UI visibility.
+ * Integration tests for the Experiments page permission-based UI visibility.
  *
  * Verifies that delete and replicate menu items are gated behind
  * the `evaluations:manage` permission for lite members.
@@ -220,19 +220,19 @@ vi.mock("@prisma/client", () => ({
 }));
 
 // Lazy import to ensure mocks are set up first
-const { default: EvaluationsPage } = await import(
-  "~/pages/[project]/evaluations"
+const { default: ExperimentsPage } = await import(
+  "~/pages/[project]/experiments/index"
 );
 
 function renderPage() {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <EvaluationsPage />
+      <ExperimentsPage />
     </ChakraProvider>,
   );
 }
 
-describe("Evaluations page permission visibility", () => {
+describe("Experiments page permission visibility", () => {
   afterEach(() => {
     cleanup();
   });
@@ -243,8 +243,8 @@ describe("Evaluations page permission visibility", () => {
     mockExperimentsList.current = [
       {
         id: "exp-1",
-        name: "Test Evaluation",
-        slug: "test-evaluation",
+        name: "Test Experiment",
+        slug: "test-experiment",
         type: "BATCH_EVALUATION" as const,
         createdAt: new Date().toISOString(),
         updatedAt: Date.now(),

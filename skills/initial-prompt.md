@@ -13,7 +13,7 @@ We want to renovate our onboarding to have four paths, and in each of those four
 
 - Devs using claude code
     - "Instrument my code with LangWatch"
-    - "Create an evaluation experiment for my agent" (jupyter notebooks if in python, script if typescript)
+    - "Create an experiment for my agent" (jupyter notebooks if in python, script if typescript)
     - "Add agent simulation tests for my agent"
     - "Version my agent prompts"
     - "Red team my agent for vulnerabilities"

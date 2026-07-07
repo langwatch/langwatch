@@ -11,7 +11,7 @@ skills/
 ├── instrument/                     # "Instrument my code with LangWatch"
 │   └── SKILL.md                    # AgentSkills-compliant skill file
 │
-├── evaluation/                     # "Create an evaluation experiment"
+├── experiments/                     # "Create an experiment"
 │   └── SKILL.md
 │
 ├── scenario-test/                  # "Add agent simulation tests"

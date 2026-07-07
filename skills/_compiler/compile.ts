@@ -4,7 +4,7 @@
  *
  * Usage:
  *   tsx skills/_compiler/compile.ts --skills tracing --mode platform
- *   tsx skills/_compiler/compile.ts --skills tracing,evaluations --mode docs
+ *   tsx skills/_compiler/compile.ts --skills tracing,experiments --mode docs
  *   tsx skills/_compiler/compile.ts --skills level-up --mode platform --api-key sk-lw-xxx
  */
 
@@ -25,7 +25,10 @@ interface CompileOptions {
   apiKey?: string;
 }
 
-function splitFrontmatter(raw: string): { frontmatter: Record<string, string>; body: string } {
+function splitFrontmatter(raw: string): {
+  frontmatter: Record<string, string>;
+  body: string;
+} {
   const m = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
   if (!m) return { frontmatter: {}, body: raw };
   const fm: Record<string, string> = {};
@@ -36,7 +39,11 @@ function splitFrontmatter(raw: string): { frontmatter: Record<string, string>; b
   return { frontmatter: fm, body: m[2]!.trim() };
 }
 
-function handleApiKey(content: string, mode: CompileMode, apiKey?: string): string {
+function handleApiKey(
+  content: string,
+  mode: CompileMode,
+  apiKey?: string,
+): string {
   if (mode === "platform") {
     const key = apiKey || "{{LANGWATCH_API_KEY}}";
     return content
@@ -56,7 +63,13 @@ Once they provide it, use it wherever you see a placeholder below.`;
     .replace(/your-key-here/g, "ASK_USER_FOR_LANGWATCH_API_KEY");
 }
 
-const LEVEL_UP_SKILLS = ["tracing", "prompts", "evaluations", "scenarios"];
+const LEVEL_UP_SKILLS = [
+  "tracing",
+  "prompts",
+  "experiments",
+  "evaluations",
+  "scenarios",
+];
 
 function expandSkill(name: string): string[] {
   return name === "level-up" ? LEVEL_UP_SKILLS : [name];
@@ -64,14 +77,21 @@ function expandSkill(name: string): string[] {
 
 function compileSkill(
   skillName: string,
-  seenShared: Set<string>
+  seenShared: Set<string>,
 ): { body: string; userPrompt?: string } {
   const skillMdxPath = path.join(skillsRoot, skillName, "SKILL.mdx");
   if (!fs.existsSync(skillMdxPath)) {
-    throw new Error(`Skill not found: ${skillName} (looked at ${skillMdxPath})`);
+    throw new Error(
+      `Skill not found: ${skillName} (looked at ${skillMdxPath})`,
+    );
   }
-  const inlined = inlineMdx(skillMdxPath, { seenShared, stripFrontmatter: true });
-  const { frontmatter } = splitFrontmatter(fs.readFileSync(skillMdxPath, "utf8"));
+  const inlined = inlineMdx(skillMdxPath, {
+    seenShared,
+    stripFrontmatter: true,
+  });
+  const { frontmatter } = splitFrontmatter(
+    fs.readFileSync(skillMdxPath, "utf8"),
+  );
   const userPrompt = frontmatter["user-prompt"]?.replace(/^["']|["']$/g, "");
   return { body: inlined.trim(), userPrompt };
 }
@@ -89,7 +109,9 @@ function compile(options: CompileOptions): string {
   // Single-skill calls take their user-prompt from the original skill (not the
   // expansion). Use a throwaway seen-set so it doesn't affect the real run.
   const originalUserPrompt =
-    skills.length === 1 ? compileSkill(skills[0]!, new Set()).userPrompt : undefined;
+    skills.length === 1
+      ? compileSkill(skills[0]!, new Set()).userPrompt
+      : undefined;
 
   const compiledResults = unique.map((s) => compileSkill(s, seenShared));
   const compiledSections = compiledResults.map((r) => r.body);
@@ -98,7 +120,7 @@ function compile(options: CompileOptions): string {
   const combined = handleApiKey(
     compiledSections.join("\n\n---\n\n"),
     mode,
-    apiKey
+    apiKey,
   );
 
   const header = userPrompt
@@ -110,7 +132,9 @@ function compile(options: CompileOptions): string {
   // platform pre-populates a key, an agent that falls back to the CLI still
   // needs to know LANGWATCH_API_KEY conventions.
   const readSharedNote = (filename: string): string =>
-    inlineMdx(path.join(skillsRoot, "_shared", filename), { stripFrontmatter: true }).trim();
+    inlineMdx(path.join(skillsRoot, "_shared", filename), {
+      stripFrontmatter: true,
+    }).trim();
 
   const apiKeyNote = `\n\n${readSharedNote("api-key-setup.mdx")}`;
   const cliNote = `\n${readSharedNote("cli-install.mdx")}\n`;
@@ -139,12 +163,12 @@ function parseArgs(): CompileOptions {
         console.log(`Usage: compile.ts --skills <skill1,skill2> --mode <platform|docs> [--api-key <key>]
 
 Options:
-  --skills    Comma-separated skill names (e.g., tracing,evaluations)
+  --skills    Comma-separated skill names (e.g., tracing,experiments)
   --mode      Output mode: "platform" (injects API key) or "docs" (asks for API key)
   --api-key   API key to inject (platform mode only; defaults to {{LANGWATCH_API_KEY}})
 
 Available skills:
-  tracing, evaluations, scenarios, prompts, analytics, level-up
+  tracing, experiments, evaluations, scenarios, prompts, analytics, level-up
 
 Examples:
   tsx compile.ts --skills tracing --mode platform --api-key sk-lw-xxx

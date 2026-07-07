@@ -21318,7 +21318,7 @@ Test your LLM on a dataset using the Experiments via UI or via code:
 
   ### Platform
 
-    Go to [Experiments](https://app.langwatch.ai/@project/evaluations) and click "New Experiment" to get started with the UI.
+    Go to [Experiments](https://app.langwatch.ai/@project/experiments) and click "New Experiment" to get started with the UI.
 
   ### Python
 
@@ -21352,7 +21352,7 @@ await evaluation.run(dataset, async ({ item, index }) => {
 
 Monitor your production traffic with evaluators that run on every trace:
 
-1. Go to [Monitors](https://app.langwatch.ai/@project/evaluations)
+1. Go to [Evaluations](https://app.langwatch.ai/@project/evaluations)
 2. Create a new monitor with "When a message arrives" trigger
 3. Select evaluators (e.g., PII Detection, Faithfulness)
 4. Enable monitoring

@@ -6,7 +6,7 @@ Feature: Scenario tests for skills quality assurance
 
   # All `@unimplemented` scenarios in this file describe live Claude
   # Code-driven scenario tests under `skills/_tests/*.scenario.test.ts`
-  # (e.g. `tracing.scenario.test.ts`, `evaluations.scenario.test.ts`,
+  # (e.g. `tracing.scenario.test.ts`, `experiments.scenario.test.ts`, `evaluations.scenario.test.ts`,
   # `level-up.scenario.test.ts`, `analytics.scenario.test.ts`,
   # `prompts*.scenario.test.ts`, `scenarios.scenario.test.ts`). The
   # tests exist and are skipped in CI (`it.skipIf(isCI)`) — they
@@ -80,28 +80,37 @@ Feature: Scenario tests for skills quality assurance
     And the agent used the `langwatch docs` CLI to read LangGraph integration docs
 
   # ──────────────────────────────────────────────────
-  # Evaluations skill tests
+  # Experiments and online evaluations skill tests
   # ──────────────────────────────────────────────────
 
-  @evaluations @integration @unimplemented
-  Scenario: Evaluations skill creates a Jupyter notebook for Python
+  @experiments @integration @unimplemented
+  Scenario: Experiments skill creates a Jupyter notebook for Python
     Given the fixture "python-openai" is copied to a temp directory
-    And the skill "evaluations" is loaded
-    When Claude Code receives "create an evaluation experiment for my agent"
+    And the skill "experiments" is loaded
+    When Claude Code receives "create an experiment for my agent"
     Then the agent creates a Jupyter notebook (.ipynb) file
     And the notebook imports langwatch
     And the notebook uses langwatch.experiment.init()
     And the agent generates a dataset tailored to the fixture's domain
     And the notebook includes at least one evaluator
 
-  @evaluations @integration @unimplemented
-  Scenario: Evaluations skill creates a script for TypeScript
+  @experiments @integration @unimplemented
+  Scenario: Experiments skill creates a script for TypeScript
     Given the fixture "typescript-vercel" is copied to a temp directory
-    And the skill "evaluations" is loaded
-    When Claude Code receives "create an evaluation experiment for my agent"
+    And the skill "experiments" is loaded
+    When Claude Code receives "create an experiment for my agent"
     Then the agent creates a TypeScript script file
     And the script imports from "langwatch"
     And the script uses langwatch.experiments.init()
+
+  @evaluations @integration @unimplemented
+  Scenario: Evaluations skill configures online evaluations and guardrails
+    Given the fixture "python-openai" is copied to a temp directory
+    And the skill "evaluations" is loaded
+    When Claude Code receives "set up an online evaluation guardrail for my production chatbot"
+    Then the agent wires a LangWatch guardrail or monitor flow
+    And the agent does not create a batch experiment
+    And the agent explains that experiments are separate from online evaluations
 
   # ──────────────────────────────────────────────────
   # Scenarios skill tests
@@ -197,7 +206,8 @@ Feature: Scenario tests for skills quality assurance
     When Claude Code receives "take my agent to the next level"
     Then the agent adds tracing to the code
     And the agent sets up prompt versioning
-    And the agent creates an evaluation experiment
+    And the agent creates an experiment
+    And the agent adds online evaluations when production monitoring is requested
     And the agent creates scenario tests
     And each step verifies its output before proceeding
 
@@ -208,7 +218,8 @@ Feature: Scenario tests for skills quality assurance
     When Claude Code receives "take my agent to the next level"
     Then the agent adds tracing to the code
     And the agent sets up prompt versioning
-    And the agent creates an evaluation experiment
+    And the agent creates an experiment
+    And the agent adds online evaluations when production monitoring is requested
     And the agent creates scenario tests
 
   # ──────────────────────────────────────────────────
