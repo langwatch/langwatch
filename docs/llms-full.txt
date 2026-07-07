@@ -19858,6 +19858,8 @@ evaluation.print_summary()
 
 `swap_and_confirm` performs two judge calls with A/B order reversed on the second pass. If the two calls disagree, the evaluator returns a tie. Set `has_golden_answer` to `false` when you want a pure head-to-head comparison without a reference answer.
 
+If you already have your own local pairwise judge, publish its result with `evaluation.log(...)` by sending a `score`, `label`, and `details`. Those custom results are tracked like any other SDK metric. The dedicated pairwise column visualization currently comes from the built-in Pairwise Compare evaluator configuration.
+
 ## Complete Example
 
 
@@ -20413,6 +20415,8 @@ The column header also keeps a scoreboard tally across the full run. For example
 ## Using it from the SDK
 
 Pairwise Compare is a regular built-in evaluator under the hood: `langevals/pairwise_compare`. You can call it from the SDK the same way you call any other evaluator. See [Experiments via SDK](/evaluations/experiments/sdk#pairwise-compare) for a concrete example.
+
+If you run your own pairwise judge locally, you can still publish its score, label, and reasoning with the SDK. Those custom results render as standard evaluator results today. The dedicated pairwise column visualization is driven by LangWatch's Pairwise Compare configuration.
 
 ## What's Next?
 
