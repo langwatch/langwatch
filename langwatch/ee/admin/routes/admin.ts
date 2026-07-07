@@ -161,7 +161,7 @@ secured.access(adminAuth).post("/admin/:resource", async (c) => {
 
     const result = await getListHandler<Prisma.UserFindManyArgs>(
       body as GetListRequest,
-      prisma.user,
+      prisma,
       {
         ...(query
           ? {
@@ -228,7 +228,7 @@ secured.access(adminAuth).post("/admin/:resource", async (c) => {
             }
           : {}),
         include: USER_BACKOFFICE_INCLUDE,
-        map: (users: UserWithBackofficeIncludes[]) =>
+        transformRows: (users: UserWithBackofficeIncludes[]) =>
           users.map(mapUserToBackofficeRow),
       },
     );
@@ -241,7 +241,7 @@ secured.access(adminAuth).post("/admin/:resource", async (c) => {
 
     const result = await getListHandler<Prisma.OrganizationFindManyArgs>(
       body as GetListRequest,
-      prisma.organization,
+      prisma,
       {
         select: ORGANIZATION_SAFE_SELECT,
         ...(query
@@ -265,7 +265,7 @@ secured.access(adminAuth).post("/admin/:resource", async (c) => {
   if (body.resource === "organization" && body.method === "getOne") {
     const result = await getOneHandler<Prisma.OrganizationFindUniqueArgs>(
       body as GetOneRequest,
-      prisma.organization,
+      prisma,
       { select: ORGANIZATION_SAFE_SELECT },
     );
     return c.json(result);
@@ -277,7 +277,7 @@ secured.access(adminAuth).post("/admin/:resource", async (c) => {
 
     const result = await getListHandler<Prisma.ProjectFindManyArgs>(
       body as GetListRequest,
-      prisma.project,
+      prisma,
       {
         select: PROJECT_SAFE_SELECT,
         ...(query
@@ -299,7 +299,7 @@ secured.access(adminAuth).post("/admin/:resource", async (c) => {
   if (body.resource === "project" && body.method === "getOne") {
     const result = await getOneHandler<Prisma.ProjectFindUniqueArgs>(
       body as GetOneRequest,
-      prisma.project,
+      prisma,
       { select: PROJECT_SAFE_SELECT },
     );
     return c.json(result);
@@ -437,7 +437,7 @@ secured.access(adminAuth).post("/admin/:resource", async (c) => {
 
     const result = await getListHandler<Prisma.SubscriptionFindManyArgs>(
       body as GetListRequest,
-      prisma.subscription,
+      prisma,
       {
         where: orFilters.length > 0 ? { OR: orFilters } : {},
         include: {
