@@ -58,6 +58,7 @@ import type {
   TableRowData,
   TargetConfig,
 } from "../types";
+import { isGoldenFieldSatisfied } from "../types";
 import { convertInlineToRowRecords } from "../utils/datasetConversion";
 import { isRowEmpty } from "../utils/emptyRowDetection";
 import { createEvaluatorEditorCallbacks } from "../utils/evaluatorEditorCallbacks";
@@ -102,6 +103,17 @@ type EvaluatorDbConfig = {
   evaluatorType?: EvaluatorTypes;
   settings?: Record<string, unknown>;
 };
+
+// A pairwise evaluator is ready to render its own result column once both
+// variants are picked and the golden-field requirement is satisfied (see
+// isGoldenFieldSatisfied). Exported so it can be unit-tested directly
+// instead of only through a full table render.
+export const isPairwiseConfigured = (e: EvaluatorConfig) =>
+  e.evaluatorType === "langevals/pairwise_compare" &&
+  !!e.pairwise?.variantA &&
+  !!e.pairwise?.variantB &&
+  !!e.pairwise &&
+  isGoldenFieldSatisfied(e.pairwise);
 
 // ============================================================================
 // Main Component
@@ -299,6 +311,7 @@ export function EvaluationsV3Table({
   const pendingPairwiseRef = useRef<{
     variantA: string;
     variantB: string;
+    hasGoldenAnswer: boolean;
     goldenField: string;
     includeMetrics: ("cost" | "duration")[];
   } | null>(null);
@@ -416,6 +429,7 @@ export function EvaluationsV3Table({
           pairwise: pendingPairwiseRef.current ?? {
             variantA: "",
             variantB: "",
+            hasGoldenAnswer: true,
             goldenField: "",
             includeMetrics: [],
           },
@@ -1190,27 +1204,15 @@ export function EvaluationsV3Table({
     [datasetColumnsKey],
   );
 
-  // Stabilize pairwise evaluators — only those with both variants configured.
-  // Only recreate columns when the set of configured pairwise evaluators changes.
+  // Stabilize pairwise evaluators — only those considered configured (see
+  // isPairwiseConfigured above). Only recreate columns when the set of
+  // configured pairwise evaluators changes.
   const pairwiseEvaluatorsKey = evaluators
-    .filter(
-      (e) =>
-        e.evaluatorType === "langevals/pairwise_compare" &&
-        e.pairwise?.variantA &&
-        e.pairwise?.variantB &&
-        e.pairwise?.goldenField,
-    )
+    .filter(isPairwiseConfigured)
     .map((e) => `${e.id}:${e.pairwise?.variantA}:${e.pairwise?.variantB}`)
     .join(",");
   const stablePairwiseEvaluators = useMemo(
-    () =>
-      evaluators.filter(
-        (e) =>
-          e.evaluatorType === "langevals/pairwise_compare" &&
-          e.pairwise?.variantA &&
-          e.pairwise?.variantB &&
-          e.pairwise?.goldenField,
-      ),
+    () => evaluators.filter(isPairwiseConfigured),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [pairwiseEvaluatorsKey],
   );

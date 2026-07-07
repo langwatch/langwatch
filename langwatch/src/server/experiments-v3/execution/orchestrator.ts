@@ -17,6 +17,7 @@ import type {
   EvaluatorConfig,
   TargetConfig,
 } from "~/experiments-v3/types";
+import { isGoldenFieldSatisfied } from "~/experiments-v3/types";
 import { isRowEmpty } from "~/experiments-v3/utils/emptyRowDetection";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
@@ -461,16 +462,19 @@ export const generatePairwiseCells = (
     if (!cfg || !target.targetEvaluatorId) continue;
 
     // Skip column-style pairwise targets where the user hasn't finished
-    // configuring the form. Without all three the judge endpoint would
-    // 400 with "<field> is required" and the cell would render that as
-    // a verdict-shaped error — confusing for users who haven't opened
-    // the drawer yet.
-    if (!cfg.variantA || !cfg.variantB || !cfg.goldenField) {
+    // configuring the form (see isGoldenFieldSatisfied for the golden-field
+    // rule, #5378). Without variantA/variantB (or golden when required) the
+    // judge endpoint would 400 with "<field> is required" and the cell would
+    // render that as a verdict-shaped error — confusing for users who
+    // haven't opened the drawer yet.
+    const goldenFieldMissing = !isGoldenFieldSatisfied(cfg);
+    if (!cfg.variantA || !cfg.variantB || goldenFieldMissing) {
       logger.debug(
         {
           targetId: target.id,
           variantA: cfg.variantA,
           variantB: cfg.variantB,
+          hasGoldenAnswer: cfg.hasGoldenAnswer,
           goldenField: cfg.goldenField,
         },
         "Pairwise column-target skipped: variants or golden field not configured",
@@ -508,6 +512,24 @@ export const generatePairwiseCells = (
           missing: !a && !b ? "both" : !a ? "A" : "B",
         });
         continue;
+      }
+
+      // `input` falls back to the golden field for datasets with no literal
+      // "input" column — a pre-existing convention (#5100) that predates
+      // the golden-answer toggle. Since #5378 lets goldenField be "" when
+      // hasGoldenAnswer is off, that fallback is now a no-op for such rows;
+      // log it so a silently-empty judge prompt is at least diagnosable
+      // instead of indistinguishable from "row has no input, by design."
+      const resolvedInput = datasetEntry.input ?? datasetEntry[cfg.goldenField];
+      if (
+        resolvedInput === undefined &&
+        !cfg.hasGoldenAnswer &&
+        rowIndex === 0
+      ) {
+        logger.debug(
+          { targetId: target.id },
+          "Pairwise column-target: no 'input' dataset column and no golden field to fall back on (has_golden_answer is off) — judge prompt will render an empty task/input",
+        );
       }
 
       // Per-row synthetic evaluator with PRE-RESOLVED value mappings for
@@ -564,7 +586,7 @@ export const generatePairwiseCells = (
                 : { type: "value", value: undefined },
             input: {
               type: "value",
-              value: datasetEntry.input ?? datasetEntry[cfg.goldenField],
+              value: resolvedInput,
             },
             golden: {
               type: "value",
