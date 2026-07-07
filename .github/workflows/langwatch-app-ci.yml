@@ -126,7 +126,7 @@ jobs:
         run: |
           pnpm test:unit --run --shard=${{ matrix.shard }}/4 \
             --coverage --coverage.reporter=lcov --coverage.reporter=text \
-            --reporter=default --reporter=json --outputFile=test-results.json \
+            --reporter=default \
             --dangerouslyIgnoreUnhandledErrors
 
       - name: Extract test failures
