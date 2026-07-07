@@ -70,6 +70,24 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("StartTime < {currentEnd:DateTime64(3)}");
     });
 
+    // A span groupBy (e.g. metadata.span_type) resolves to a `JOIN (... FROM
+    // stored_spans ...)` rather than a filter subquery. That JOIN path was
+    // previously unbounded and cold-scanned every weekly partition. It must
+    // carry the same StartTime envelope.
+    it("bounds the stored_spans JOIN to the date envelope by StartTime", () => {
+      const input = {
+        ...baseInput,
+        groupBy: "metadata.span_type" as const,
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // The JOIN subquery filters stored_spans by StartTime, not just TenantId.
+      expect(result.sql).toMatch(
+        /JOIN \(SELECT[\s\S]*FROM stored_spans WHERE TenantId = \{tenantId:String\} AND StartTime >= \{previousStart:DateTime64\(3\)\}/,
+      );
+      expect(result.sql).toContain("StartTime < {currentEnd:DateTime64(3)}");
+    });
+
     it("includes date truncation for timescale", () => {
       const result = buildTimeseriesQuery(baseInput);
 

@@ -489,11 +489,22 @@ export function getTableAlias(table: CHTable): string {
  * @param requiredColumns - Optional set of columns needed by the query.
  *   When provided, only these columns (plus identity columns) are selected.
  *   When omitted, all analytics columns for the table are selected.
+ * @param spanTimeFilter - Optional SQL fragment bounding `StartTime` on the
+ *   `stored_spans` subquery (e.g. `AND StartTime >= {startDate} - INTERVAL 2 DAY
+ *   AND StartTime < {endDate} + INTERVAL 2 DAY`). Without it the subquery filters
+ *   on `TenantId` only and cold-scans every weekly partition (incl. S3-tiered
+ *   ones). The caller passes the fragment matching its date regime; the referenced
+ *   params are bound by the outer query. Ignored for non-`stored_spans` tables.
  */
-export function buildJoinClause(
-  table: CHTable,
-  requiredColumns?: ReadonlySet<string>,
-): string {
+export function buildJoinClause({
+  table,
+  requiredColumns,
+  spanTimeFilter,
+}: {
+  table: CHTable;
+  requiredColumns?: ReadonlySet<string>;
+  spanTimeFilter?: string;
+}): string {
   const alias = tableAliases[table];
   const baseAlias = tableAliases.trace_summaries;
 
@@ -502,7 +513,8 @@ export function buildJoinClause(
       const columns = requiredColumns
         ? mergeWithIdentity(requiredColumns, SPAN_IDENTITY_COLUMNS)
         : SPAN_ANALYTICS_COLUMNS;
-      return `JOIN (SELECT ${Array.from(columns).join(", ")} FROM stored_spans WHERE TenantId = {tenantId:String}) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
+      const timeBound = spanTimeFilter ? ` ${spanTimeFilter}` : "";
+      return `JOIN (SELECT ${Array.from(columns).join(", ")} FROM stored_spans WHERE TenantId = {tenantId:String}${timeBound}) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
     }
     case "evaluation_runs": {
       const columns = requiredColumns
