@@ -102,8 +102,8 @@ importers:
         specifier: ^3.35.0
         version: 3.35.0(@emotion/react@11.14.0(@types/react@19.2.14)(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@clickhouse/client':
-        specifier: ^1.18.3
-        version: 1.18.3
+        specifier: ^1.22.0
+        version: 1.22.0
       '@copilotkit/react-core':
         specifier: ~1.8.14
         version: 1.8.14(@types/react@19.2.14)(encoding@0.1.13)(graphql@16.13.2)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -112,7 +112,7 @@ importers:
         version: 1.8.14(@types/react@19.2.14)(encoding@0.1.13)(graphql@16.13.2)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@copilotkit/runtime':
         specifier: ~1.8.14
-        version: 1.8.14(9f162009aeb3ce42bda626c72e07b42c)
+        version: 1.8.14(7d88b343ec6c57992fd51b641a2845c7)
       '@copilotkit/runtime-client-gql':
         specifier: 1.8.13
         version: 1.8.13(encoding@0.1.13)(graphql@16.13.2)(react@19.2.5)
@@ -1715,12 +1715,12 @@ packages:
   '@chevrotain/types@11.1.2':
     resolution: {integrity: sha512-U+HFai5+zmJCkK86QsaJtoITlboZHBqrVketcO2ROv865xfCMSFpELQoz1GkX5GzME8pTa+3kbKrZHQtI0gdbw==}
 
-  '@clickhouse/client-common@1.18.3':
-    resolution: {integrity: sha512-3axzO3zvrsGT5PzDenxgWscltYCNRDbhaHWUgdsmcM9OnW/VnZn9EarOcZogr9P82Z0mQh+Jd2x+p2K4TFD2fA==}
+  '@clickhouse/client-common@1.22.0':
+    resolution: {integrity: sha512-MQgXRhoYXut6GhRrTJlub42bnPX7+5Vm+5gHNR0zZXU5+EwZKsBgMXiWXPOerAmQd3weGKm8hzoeZJCfU3Cw2w==}
     deprecated: 'Deprecated: import from @clickhouse/client or @clickhouse/client-web instead.'
 
-  '@clickhouse/client@1.18.3':
-    resolution: {integrity: sha512-340ngdYktL8PLUBK2QKSwe0o02tYfZSz1mSn1uXCEU8TxHvwh9pnQxElf9YHumDGj5gX/IdgxPsJTGMs82Hgug==}
+  '@clickhouse/client@1.22.0':
+    resolution: {integrity: sha512-iQAAM4VT9fO7mYVOkGB/Ul9Xxuf0atKn+GFceZqfE8xFakV8KOAQxR3tfNrXFMlJ8T+Q3gbrpfLFyj7/TbOwyA==}
     engines: {node: '>=16'}
 
   '@copilotkit/react-core@1.8.14':
@@ -6754,8 +6754,8 @@ packages:
   caniuse-lite@1.0.30001793:
     resolution: {integrity: sha512-iwSsYWaCOoh26cV8NwNRViHlrfUvYsHDfRVcbtmw0Kg6PJIZZXwMkj1442FYLBGkeUf1juAsU3DTfxW579mrPA==}
 
-  caniuse-lite@1.0.30001799:
-    resolution: {integrity: sha512-hG1bReV+OUU+MOqK4t/ZWI0tZOyz3rqS9XuhOUz1cIcbwBKjOyJEJuw9ER5JuNyqxNk8u/JUVbGibBOL1yrjFw==}
+  caniuse-lite@1.0.30001800:
+    resolution: {integrity: sha512-MMHtuAz9Ys840zAY5F4k6fV5GaivZ9sPk+nz0mY+GYVzRBnYkN0mpqkSR92oWRQ19yQWo4HvBV/FnC16AJX8MA==}
 
   ccount@2.0.1:
     resolution: {integrity: sha512-eyrF0jiFpY+3drT6383f1qhkbGsLSifNAjA61IUjZjmLCWjItY6LB9ft9YhoDgwfmclB2zhu51Lc7+95b8NRAg==}
@@ -7435,8 +7435,8 @@ packages:
   electron-to-chromium@1.5.364:
     resolution: {integrity: sha512-G/dYE3+AYhyHwzTwg8UbnXf7zqMERYh7l2jJ3QujhFsH8agSYwtnGAR2aZ7f0AakIKJXd5En/Hre4igIUrdlYw==}
 
-  electron-to-chromium@1.5.381:
-    resolution: {integrity: sha512-n9Wa6yB+vDsGuA8AKbl/0z7HbvWqt5jxIdvr1IUicd0ryPrk7/xzwqLv8D9AbbvZ6avVNtXYLTfmgFHkwkyelg==}
+  electron-to-chromium@1.5.382:
+    resolution: {integrity: sha512-8ETaWbV6SZOrno+G93Ffd9ENsMtetqdnqj4nlfxFW90Sm5GgnuV28Kf62hqQVD6VUgzm7qFQKsTsAPmeUiU3Ug==}
 
   emittery@0.13.1:
     resolution: {integrity: sha512-DeWwawk6r5yR9jFgnDKYt4sLS0LmHJJi3ZOnb5/JdbYwj3nW+FxQnHIjhBKz8YLC7oRNPVM9NQ47I3CVx34eqQ==}
@@ -13425,11 +13425,11 @@ snapshots:
 
   '@chevrotain/types@11.1.2': {}
 
-  '@clickhouse/client-common@1.18.3': {}
+  '@clickhouse/client-common@1.22.0': {}
 
-  '@clickhouse/client@1.18.3':
+  '@clickhouse/client@1.22.0':
     dependencies:
-      '@clickhouse/client-common': 1.18.3
+      '@clickhouse/client-common': 1.22.0
 
   '@copilotkit/react-core@1.8.14(@types/react@19.2.14)(encoding@0.1.13)(graphql@16.13.2)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
     dependencies:
@@ -13487,7 +13487,7 @@ snapshots:
       - encoding
       - graphql
 
-  '@copilotkit/runtime@1.8.14(9f162009aeb3ce42bda626c72e07b42c)':
+  '@copilotkit/runtime@1.8.14(7d88b343ec6c57992fd51b641a2845c7)':
     dependencies:
       '@ag-ui/client': 0.0.47
       '@ag-ui/core': 0.0.57
@@ -13496,7 +13496,7 @@ snapshots:
       '@anthropic-ai/sdk': 0.27.3(encoding@0.1.13)
       '@copilotkit/shared': 1.8.14(encoding@0.1.13)
       '@graphql-yoga/plugin-defer-stream': 3.21.0(graphql-yoga@5.21.0(graphql@16.13.2))(graphql@16.13.2)
-      '@langchain/community': 0.3.59(68938f4bff76db6c5b1a50fd9af8dd6e)
+      '@langchain/community': 0.3.59(388b8d0ab684037a124a1a2a9046641c)
       '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.219.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.7.1(@opentelemetry/api@1.9.1))(openai@4.104.0(encoding@0.1.13)(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.0(bufferutil@4.1.0))
       '@langchain/google-gauth': 0.1.8(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.219.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.7.1(@opentelemetry/api@1.9.1))(openai@5.23.2(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.0(bufferutil@4.1.0)))(encoding@0.1.13)(zod@3.25.76)
       '@langchain/langgraph-sdk': 0.0.70(@langchain/core@0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.219.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.7.1(@opentelemetry/api@1.9.1))(openai@5.23.2(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76))(ws@8.21.0(bufferutil@4.1.0)))(react@19.2.5)
@@ -14417,7 +14417,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@langchain/community@0.3.59(68938f4bff76db6c5b1a50fd9af8dd6e)':
+  '@langchain/community@0.3.59(388b8d0ab684037a124a1a2a9046641c)':
     dependencies:
       '@browserbasehq/stagehand': 1.14.0(@playwright/test@1.61.1)(bufferutil@4.1.0)(deepmerge@4.3.1)(dotenv@17.4.2)(encoding@0.1.13)(openai@5.23.2(ws@8.21.0(bufferutil@4.1.0))(zod@3.25.76))(zod@3.25.76)
       '@ibm-cloud/watsonx-ai': 1.7.9
@@ -14441,7 +14441,7 @@ snapshots:
       '@aws-sdk/client-s3': 3.1041.0
       '@aws-sdk/credential-provider-node': 3.972.39
       '@browserbasehq/sdk': 2.14.1(encoding@0.1.13)
-      '@clickhouse/client': 1.18.3
+      '@clickhouse/client': 1.22.0
       '@elastic/elasticsearch': 8.15.3
       '@opensearch-project/opensearch': 2.13.0
       '@smithy/util-utf8': 2.3.0
@@ -19261,8 +19261,8 @@ snapshots:
   browserslist@4.28.4:
     dependencies:
       baseline-browser-mapping: 2.10.40
-      caniuse-lite: 1.0.30001799
-      electron-to-chromium: 1.5.381
+      caniuse-lite: 1.0.30001800
+      electron-to-chromium: 1.5.382
       node-releases: 2.0.50
       update-browserslist-db: 1.2.3(browserslist@4.28.4)
 
@@ -19378,7 +19378,7 @@ snapshots:
 
   caniuse-lite@1.0.30001793: {}
 
-  caniuse-lite@1.0.30001799: {}
+  caniuse-lite@1.0.30001800: {}
 
   ccount@2.0.1: {}
 
@@ -20034,7 +20034,7 @@ snapshots:
 
   electron-to-chromium@1.5.364: {}
 
-  electron-to-chromium@1.5.381: {}
+  electron-to-chromium@1.5.382: {}
 
   emittery@0.13.1: {}
 
