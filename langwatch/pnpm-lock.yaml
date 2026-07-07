@@ -864,8 +864,8 @@ importers:
         specifier: ^0.4.6
         version: 0.4.10(9642c16056bf1f9c1c5862310c699bdb)
       '@types/debug':
-        specifier: ^4.1.12
-        version: 4.1.12
+        specifier: ^4.1.13
+        version: 4.1.13
       '@types/eslint__js':
         specifier: ^8.42.3
         version: 8.42.3
@@ -5337,9 +5337,6 @@ packages:
   '@types/d3@7.4.3':
     resolution: {integrity: sha512-lZXZ9ckh5R8uiFVt8ogUNf+pIrK4EsWrx2Np75WvF/eTpJ0FMHNhjXk8CKEx/+gpHbNQyJWehbFaTvqmHWB3ww==}
 
-  '@types/debug@4.1.12':
-    resolution: {integrity: sha512-vIChWdVG3LG1SMxEvI/AK+FWJthlrqlTu7fbrlywTkkaONwk/UAGaULXRlf8vkzFBLVm0zkMdCquhL5aOjhXPQ==}
-
   '@types/debug@4.1.13':
     resolution: {integrity: sha512-KSVgmQmzMwPlmtljOomayoR89W4FynCAi3E8PPs7vmDVPe84hT+vGPKkJfThkmXs0x0jAaa9U8uW8bbfyS2fWw==}
 
@@ -5446,9 +5443,6 @@ packages:
   '@types/mermaid@9.2.0':
     resolution: {integrity: sha512-AlvLWYer6u4BkO4QzMkHo0t9RkvVIgqggVZmO+5snUiuX2caTKqtdqygX6GeE1VQa/TnXw9WoH0spcmHtG0inQ==}
     deprecated: This is a stub types definition. mermaid provides its own type definitions, so you do not need this installed.
-
-  '@types/ms@0.7.33':
-    resolution: {integrity: sha512-AuHIyzR5Hea7ij0P9q7vx7xu4z0C28ucwjAZC0ja7JhINyCnOw8/DnvAPQQ9TfOlCtZAmCERKQX9+o1mgQhuOQ==}
 
   '@types/ms@2.1.0':
     resolution: {integrity: sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==}
@@ -17462,10 +17456,6 @@ snapshots:
       '@types/d3-transition': 3.0.9
       '@types/d3-zoom': 3.0.8
 
-  '@types/debug@4.1.12':
-    dependencies:
-      '@types/ms': 0.7.33
-
   '@types/debug@4.1.13':
     dependencies:
       '@types/ms': 2.1.0
@@ -17595,8 +17585,6 @@ snapshots:
   '@types/mermaid@9.2.0':
     dependencies:
       mermaid: 11.15.0
-
-  '@types/ms@0.7.33': {}
 
   '@types/ms@2.1.0': {}
 

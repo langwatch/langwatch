@@ -65,7 +65,7 @@ importers:
         specifier: ^0.4.6
         version: 0.4.15(668bbc6991063a13cac3c4f471982977)
       '@types/debug':
-        specifier: ^4.1.12
+        specifier: ^4.1.13
         version: 4.1.13
       '@types/eslint__js':
         specifier: ^8.42.3
