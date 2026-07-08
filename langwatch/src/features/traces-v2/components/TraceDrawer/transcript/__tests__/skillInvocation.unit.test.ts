@@ -46,6 +46,10 @@ describe("skillInvocation", () => {
           "code-review",
         );
       });
+
+      it("honors the name alias", () => {
+        expect(skillSlugFromInput({ name: "code-review" })).toBe("code-review");
+      });
     });
 
     describe("when the slug is absent or unusable", () => {
