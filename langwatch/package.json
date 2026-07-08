@@ -175,7 +175,7 @@
     "jsonwebtoken": "^9.0.3",
     "langwatch": "0.27.0",
     "libphonenumber-js": "^1.13.7",
-    "liqe": "^3.8.5",
+    "liqe": "^3.8.7",
     "liquidjs": "^10.27.1",
     "lodash-es": "^4.18.1",
     "lodash.clonedeep": "^4.5.0",
