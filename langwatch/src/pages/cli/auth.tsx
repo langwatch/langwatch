@@ -33,6 +33,7 @@ import Head from "~/utils/compat/next-head";
 import { useRouter } from "~/utils/compat/next-router";
 
 import { useSession } from "~/utils/auth-client";
+import { setAttributionIfAbsent } from "~/utils/attribution";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { resolveCliAuthProjects } from "./cliAuthProjects";
 import { ScopeChipPicker } from "~/components/settings/ScopeChipPicker";
@@ -106,6 +107,15 @@ export default function CliAuthPage() {
       setSelectedOrgId(organizations[0]!.id);
     }
   }, [organizations, selectedOrgId]);
+
+  // First-touch acquisition source: a browser opened by `langwatch login`
+  // carries no utm/ref params, so stamp the CLI as lead source here. The
+  // round-trip through onboarding then lands it in signupData and the
+  // Customer.io lead_source trait. First-touch semantics: a user who
+  // originally arrived via a campaign keeps their real source.
+  useEffect(() => {
+    setAttributionIfAbsent("leadSource", "cli");
+  }, []);
 
   // Brand-new user (signed up mid-CLI-login, no org yet): approval needs an
   // organization, so round-trip through onboarding and come straight back —
