@@ -230,7 +230,7 @@
     "react-router": "^7.15.0",
     "react-select": "^5.10.2",
     "react-spinners": "^0.17.0",
-    "recharts": "^3.8.1",
+    "recharts": "^3.9.0",
     "remark-gfm": "^4.0.1",
     "require-in-the-middle": "8.0.1",
     "rich-textarea": "^0.27.0",
