@@ -48,6 +48,16 @@ export interface TraceSummaryFieldsBase {
   SubTopicId: string | null;
   AnnotationIds: string[];
   /**
+   * Pin state (migration 00037). `PinnedSource` is '' when unpinned, else
+   * 'manual' / 'share'. `PinnedAt` is ms-since-epoch (read via
+   * `toUnixTimestamp64Milli`), null when unpinned. Both read paths project
+   * these; the "pinned" facet derives from `PinnedSource != ''`.
+   */
+  PinnedSource: string;
+  PinnedReason: string;
+  PinnedByUserId: string;
+  PinnedAt: number | null;
+  /**
    * Stored payload size of the trace in bytes — the MATERIALIZED
    * `_size_bytes` column (CH-native `byteSize(...)`; see migration 00032).
    * SELECT-only: never written in INSERTs. Optional because only the list

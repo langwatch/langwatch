@@ -8,7 +8,10 @@ import { createLogger } from "~/utils/logger/server";
 import { validateBatchTenants } from "../../_shared/clickhouse-batch";
 import type { TraceSummaryData } from "../types";
 import type { TraceSummaryFieldsBase } from "./_summary-fields.types";
-import type { TraceSummaryRepository } from "./trace-summary.repository";
+import type {
+  PinnedTraceSummary,
+  TraceSummaryRepository,
+} from "./trace-summary.repository";
 
 const TABLE_NAME = "trace_summaries" as const;
 
@@ -16,9 +19,20 @@ const logger = createLogger(
   "langwatch:app-layer:traces:trace-summary-repository",
 );
 
+/**
+ * Maps the stored `PinnedSource` column ('' | 'manual' | 'share') to the
+ * domain pin source. Shared by the summary and list read paths so an
+ * unexpected legacy value degrades to "unpinned" rather than leaking through.
+ */
+export function pinnedSourceFromColumn(
+  value: string | null | undefined,
+): "manual" | "share" | null {
+  return value === "manual" || value === "share" ? value : null;
+}
+
 type ClickHouseSummaryWriteRecord = WithDateWrites<
   ClickHouseSummaryRecord,
-  "OccurredAt" | "CreatedAt" | "UpdatedAt" | "LastEventOccurredAt"
+  "OccurredAt" | "CreatedAt" | "UpdatedAt" | "LastEventOccurredAt" | "PinnedAt"
 >;
 
 interface ClickHouseSummaryRecord extends TraceSummaryFieldsBase {
@@ -167,6 +181,72 @@ export class TraceSummaryClickHouseRepository
     }
   }
 
+  async findPinnedTraces(tenantId: string): Promise<PinnedTraceSummary[]> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "TraceSummaryClickHouseRepository.findPinnedTraces",
+    );
+
+    try {
+      const client = await this.resolveClient(tenantId);
+      // IN-tuple dedup over the ReplacingMergeTree: pick the latest version per
+      // trace, then keep the ones whose latest version is pinned. Filtering on
+      // the outer row (not the inner subquery) is what makes an unpin correctly
+      // drop the trace — the newest version has PinnedSource ''.
+      const result = await client.query({
+        query: `
+          SELECT
+            t.TraceId AS TraceId,
+            t.PinnedSource AS PinnedSource,
+            t.PinnedReason AS PinnedReason,
+            t.PinnedByUserId AS PinnedByUserId,
+            toUnixTimestamp64Milli(t.PinnedAt) AS PinnedAt
+          FROM ${TABLE_NAME} AS t
+          WHERE t.TenantId = {tenantId:String}
+            AND t.PinnedSource != ''
+            AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
+              SELECT TenantId, TraceId, max(UpdatedAt)
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+              GROUP BY TenantId, TraceId
+            )
+        `,
+        query_params: { tenantId },
+        format: "JSONEachRow",
+      });
+
+      const rows = await result.json<{
+        TraceId: string;
+        PinnedSource: string;
+        PinnedReason: string;
+        PinnedByUserId: string;
+        PinnedAt: number | null;
+      }>();
+
+      return rows.flatMap((row) => {
+        const source = pinnedSourceFromColumn(row.PinnedSource);
+        if (source === null) return [];
+        return [
+          {
+            traceId: row.TraceId,
+            source,
+            reason: row.PinnedReason ? row.PinnedReason : null,
+            pinnedByUserId: row.PinnedByUserId ? row.PinnedByUserId : null,
+            pinnedAt: row.PinnedAt != null ? Number(row.PinnedAt) : null,
+          },
+        ];
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error(
+        { tenantId, error: errorMessage },
+        "Failed to list pinned traces from ClickHouse",
+      );
+      throw error;
+    }
+  }
+
   private async queryByTraceId(
     tenantId: string,
     traceId: string,
@@ -231,6 +311,10 @@ export class TraceSummaryClickHouseRepository
           t.SubTopicId AS SubTopicId,
           t.AnnotationIds AS AnnotationIds,
           t.HasAnnotation AS HasAnnotation,
+          t.PinnedSource AS PinnedSource,
+          t.PinnedReason AS PinnedReason,
+          t.PinnedByUserId AS PinnedByUserId,
+          toUnixTimestamp64Milli(t.PinnedAt) AS PinnedAt,
           t.TraceName AS TraceName
         FROM ${TABLE_NAME} AS t
         WHERE t.TenantId = {tenantId:String}
@@ -298,6 +382,10 @@ export class TraceSummaryClickHouseRepository
       topicId: record.TopicId,
       subTopicId: record.SubTopicId,
       annotationIds: record.AnnotationIds ?? [],
+      pinnedSource: pinnedSourceFromColumn(record.PinnedSource),
+      pinnedReason: record.PinnedReason ? record.PinnedReason : null,
+      pinnedByUserId: record.PinnedByUserId ? record.PinnedByUserId : null,
+      pinnedAt: record.PinnedAt != null ? Number(record.PinnedAt) : null,
       traceName: record.TraceName ?? "",
       attributes: record.Attributes ?? {},
       occurredAt: record.OccurredAt,
@@ -366,6 +454,10 @@ export class TraceSummaryClickHouseRepository
       SubTopicId: data.subTopicId,
       AnnotationIds: data.annotationIds,
       HasAnnotation: data.annotationIds.length > 0 ? 1 : 0,
+      PinnedSource: data.pinnedSource ?? "",
+      PinnedReason: data.pinnedReason ?? "",
+      PinnedByUserId: data.pinnedByUserId ?? "",
+      PinnedAt: data.pinnedAt != null ? new Date(data.pinnedAt) : null,
       TraceName: data.traceName,
       _retention_days: retentionDays,
     };

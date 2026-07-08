@@ -14,6 +14,10 @@ import {
   TRACE_NAME_CHANGED_EVENT_TYPE,
   TRACE_NAME_MAX_LENGTH,
   TRACE_NAME_MIN_LENGTH,
+  TRACE_PINNED_EVENT_TYPE,
+  TRACE_UNPINNED_EVENT_TYPE,
+  TRACE_PIN_SOURCES,
+  TRACE_PIN_REASON_MAX_LENGTH,
 } from "./constants";
 import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./otlp";
 
@@ -386,6 +390,88 @@ export function isTraceNameChangedEvent(
 }
 
 /**
+ * Zod schema for TracePinnedEvent metadata.
+ */
+export const tracePinnedEventMetadataSchema = z
+  .object({
+    processingTraceparent: z.string().optional(),
+  })
+  .passthrough();
+
+/**
+ * Zod schema for TracePinnedEvent data.
+ *
+ * `source` records provenance so the fold projection can run the pin state
+ * machine (a `manual` pin overrides a `share` pin). `reason` / `pinnedByUserId`
+ * only carry meaning for manual pins; the share auto-pin leaves them null.
+ */
+export const tracePinnedEventDataSchema = z.object({
+  traceId: z.string(),
+  source: z.enum(TRACE_PIN_SOURCES),
+  reason: z.string().max(TRACE_PIN_REASON_MAX_LENGTH).nullable(),
+  pinnedByUserId: z.string().nullable(),
+});
+
+export const tracePinnedEventSchema = EventSchema.extend({
+  type: z.literal(TRACE_PINNED_EVENT_TYPE),
+  data: tracePinnedEventDataSchema,
+  metadata: tracePinnedEventMetadataSchema,
+});
+
+export type TracePinnedEventData = z.infer<typeof tracePinnedEventDataSchema>;
+export type TracePinnedEvent = z.infer<typeof tracePinnedEventSchema>;
+
+/**
+ * Type guard for TracePinnedEvent.
+ */
+export function isTracePinnedEvent(
+  event: TraceProcessingEvent,
+): event is TracePinnedEvent {
+  return event.type === TRACE_PINNED_EVENT_TYPE;
+}
+
+/**
+ * Zod schema for TraceUnpinnedEvent metadata.
+ */
+export const traceUnpinnedEventMetadataSchema = z
+  .object({
+    processingTraceparent: z.string().optional(),
+  })
+  .passthrough();
+
+/**
+ * Zod schema for TraceUnpinnedEvent data.
+ *
+ * `source` is who is unpinning: a `manual` unpin (user action) clears the pin
+ * unconditionally, while a `share` unpin (from unshare) only clears a
+ * still-`share`-sourced pin so a user's manual pin survives.
+ */
+export const traceUnpinnedEventDataSchema = z.object({
+  traceId: z.string(),
+  source: z.enum(TRACE_PIN_SOURCES),
+});
+
+export const traceUnpinnedEventSchema = EventSchema.extend({
+  type: z.literal(TRACE_UNPINNED_EVENT_TYPE),
+  data: traceUnpinnedEventDataSchema,
+  metadata: traceUnpinnedEventMetadataSchema,
+});
+
+export type TraceUnpinnedEventData = z.infer<
+  typeof traceUnpinnedEventDataSchema
+>;
+export type TraceUnpinnedEvent = z.infer<typeof traceUnpinnedEventSchema>;
+
+/**
+ * Type guard for TraceUnpinnedEvent.
+ */
+export function isTraceUnpinnedEvent(
+  event: TraceProcessingEvent,
+): event is TraceUnpinnedEvent {
+  return event.type === TRACE_UNPINNED_EVENT_TYPE;
+}
+
+/**
  * Union of all trace processing event types.
  */
 export type TraceProcessingEvent =
@@ -397,4 +483,6 @@ export type TraceProcessingEvent =
   | AnnotationAddedEvent
   | AnnotationRemovedEvent
   | AnnotationsBulkSyncedEvent
-  | TraceNameChangedEvent;
+  | TraceNameChangedEvent
+  | TracePinnedEvent
+  | TraceUnpinnedEvent;

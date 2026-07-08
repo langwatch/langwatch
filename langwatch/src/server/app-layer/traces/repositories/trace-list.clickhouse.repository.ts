@@ -2,6 +2,7 @@ import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseCli
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import type { TraceSummaryData } from "../types";
 import type { TraceSummaryFieldsBase } from "./_summary-fields.types";
+import { pinnedSourceFromColumn } from "./trace-summary.clickhouse.repository";
 import type {
   BatchedFacetResult,
   CategoricalFacetResult,
@@ -195,6 +196,10 @@ export class TraceListClickHouseRepository implements TraceListRepository {
           TopicId,
           SubTopicId,
           AnnotationIds,
+          PinnedSource,
+          PinnedReason,
+          PinnedByUserId,
+          toUnixTimestamp64Milli(PinnedAt) AS PinnedAt,
           SizeBytes,
           toUnixTimestamp64Milli(LastEventOccurredAt) AS LastEventOccurredAt
         FROM (
@@ -247,6 +252,10 @@ export class TraceListClickHouseRepository implements TraceListRepository {
             TopicId,
             SubTopicId,
             AnnotationIds,
+            PinnedSource,
+            PinnedReason,
+            PinnedByUserId,
+            PinnedAt,
             _size_bytes AS SizeBytes,
             LastEventOccurredAt
           FROM ${TABLE_NAME}
@@ -962,6 +971,10 @@ export class TraceListClickHouseRepository implements TraceListRepository {
       topicId: row.TopicId,
       subTopicId: row.SubTopicId,
       annotationIds: row.AnnotationIds ?? [],
+      pinnedSource: pinnedSourceFromColumn(row.PinnedSource),
+      pinnedReason: row.PinnedReason ? row.PinnedReason : null,
+      pinnedByUserId: row.PinnedByUserId ? row.PinnedByUserId : null,
+      pinnedAt: row.PinnedAt != null ? Number(row.PinnedAt) : null,
       sizeBytes: Number(row.SizeBytes ?? 0),
       attributes: buildListAttributes(row),
       occurredAt: Number(row.OccurredAt),

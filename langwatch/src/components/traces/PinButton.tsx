@@ -1,5 +1,4 @@
 import { Button } from "@chakra-ui/react";
-import { PinSource } from "@prisma/client";
 import { Pin, PinOff } from "lucide-react";
 import { api } from "~/utils/api";
 import { toaster } from "~/components/ui/toaster";
@@ -13,17 +12,27 @@ export function PinButton({
   traceId: string;
 }) {
   const utils = api.useUtils();
-  const pinQuery = api.pinnedTrace.getPin.useQuery({ projectId, traceId });
+  // Pin writes are eventually consistent (event-sourced). Keep the optimistic
+  // `setData` seed authoritative for a short window instead of letting a
+  // focus/remount refetch read the pre-projection summary and flip the button
+  // back to "unpinned" until the fold catches up.
+  const pinQuery = api.pinnedTrace.getPin.useQuery(
+    { projectId, traceId },
+    { staleTime: 10_000, refetchOnWindowFocus: false },
+  );
   const isPinned = !!pinQuery.data;
   // A `source=share` pin is the system's protection against retention TTL
   // deleting a still-shared trace. The user can't unpin it manually — they
   // have to disable sharing first, which runs `autoUnpin` and clears the
   // pin cleanly. The router rejects the unpin too (defense in depth).
-  const isSharePin = pinQuery.data?.source === PinSource.share;
+  const isSharePin = pinQuery.data?.source === "share";
 
   const pinMutation = api.pinnedTrace.pin.useMutation({
-    onSuccess: () => {
-      utils.pinnedTrace.getPin.invalidate({ projectId, traceId });
+    // Pin writes are event-sourced; seed the cache with the optimistic view the
+    // mutation returns rather than invalidating, so a refetch that still reads
+    // the pre-pin projection doesn't flip the button back.
+    onSuccess: (pin) => {
+      utils.pinnedTrace.getPin.setData({ projectId, traceId }, pin);
       toaster.create({ title: "Trace pinned", type: "success" });
     },
     onError: (error) => {
@@ -37,7 +46,7 @@ export function PinButton({
 
   const unpinMutation = api.pinnedTrace.unpin.useMutation({
     onSuccess: () => {
-      utils.pinnedTrace.getPin.invalidate({ projectId, traceId });
+      utils.pinnedTrace.getPin.setData({ projectId, traceId }, null);
       toaster.create({ title: "Trace unpinned", type: "success" });
     },
     onError: (error) => {

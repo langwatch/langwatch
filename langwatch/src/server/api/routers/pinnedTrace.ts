@@ -4,6 +4,7 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { checkProjectPermission } from "../rbac";
 import { getApp } from "~/server/app-layer/app";
 import { PinnedToActiveShareError } from "~/server/data-retention/pinning/pinnedTrace.service";
+import { TRACE_PIN_REASON_MAX_LENGTH } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 
 export const pinnedTraceRouter = createTRPCRouter({
   pin: protectedProcedure
@@ -11,7 +12,7 @@ export const pinnedTraceRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         traceId: z.string(),
-        reason: z.string().optional(),
+        reason: z.string().max(TRACE_PIN_REASON_MAX_LENGTH).optional(),
       }),
     )
     .use(checkProjectPermission("project:update"))

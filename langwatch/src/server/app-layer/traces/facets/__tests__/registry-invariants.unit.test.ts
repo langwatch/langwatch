@@ -132,6 +132,21 @@ describe("FACET_REGISTRY shape", () => {
     });
   });
 
+  describe("Pinned facet", () => {
+    it("registers `pinned` as an expression-categorical on trace_summaries", () => {
+      const def = FACET_REGISTRY.find((d) => d.key === "pinned");
+      expect(def?.kind).toBe("categorical");
+      expect(def?.table).toBe("trace_summaries");
+      // The auto-derived filter handler builds `<expression> = {value}`, so the
+      // predicate must reduce the pin column to the pinned/unpinned values the
+      // sidebar offers. Inverting this (e.g. `PinnedSource == ''`) would flip
+      // the whole filter.
+      expect(def && "expression" in def && def.expression).toBe(
+        "if(PinnedSource != '', 'pinned', 'unpinned')",
+      );
+    });
+  });
+
   describe("event-attribute discovery", () => {
     it("registers `eventAttributeKeys` as a dynamic_keys facet on stored_spans", () => {
       const def = FACET_REGISTRY.find((d) => d.key === "eventAttributeKeys");

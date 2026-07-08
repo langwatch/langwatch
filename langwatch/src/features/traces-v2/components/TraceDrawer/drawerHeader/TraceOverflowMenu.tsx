@@ -60,9 +60,13 @@ export function TraceOverflowMenu({
   const { project } = useOrganizationTeamProject();
 
   const utils = api.useUtils();
+  // Pin writes are eventually consistent (event-sourced); hold the optimistic
+  // `setData` seed for a short window so a focus/remount refetch doesn't read
+  // the pre-projection summary and flip the menu item back before the fold
+  // catches up.
   const pinQuery = api.pinnedTrace.getPin.useQuery(
     project ? { projectId: project.id, traceId } : (undefined as never),
-    { enabled: !!project },
+    { enabled: !!project, staleTime: 10_000, refetchOnWindowFocus: false },
   );
   const isPinned = !!pinQuery.data;
   // Pins are UI annotations only and do not exempt CH rows from TTL. While a
@@ -73,9 +77,15 @@ export function TraceOverflowMenu({
   const isSharePin = pinQuery.data?.source === "share";
 
   const pinMutation = api.pinnedTrace.pin.useMutation({
-    onSuccess: () => {
+    // Pin writes are event-sourced, so a refetch can momentarily still read the
+    // pre-pin projection. Seed the cache with the optimistic view the mutation
+    // returns instead of invalidating, so the menu reflects the pin immediately.
+    onSuccess: (pin) => {
       if (project) {
-        utils.pinnedTrace.getPin.invalidate({ projectId: project.id, traceId });
+        utils.pinnedTrace.getPin.setData(
+          { projectId: project.id, traceId },
+          pin,
+        );
       }
       toaster.create({ title: "Trace pinned", type: "success" });
     },
@@ -90,7 +100,10 @@ export function TraceOverflowMenu({
   const unpinMutation = api.pinnedTrace.unpin.useMutation({
     onSuccess: () => {
       if (project) {
-        utils.pinnedTrace.getPin.invalidate({ projectId: project.id, traceId });
+        utils.pinnedTrace.getPin.setData(
+          { projectId: project.id, traceId },
+          null,
+        );
       }
       toaster.create({ title: "Trace unpinned", type: "success" });
     },

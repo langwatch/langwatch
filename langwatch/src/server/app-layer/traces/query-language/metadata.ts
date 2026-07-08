@@ -176,6 +176,13 @@ export const SEARCH_FIELDS: Readonly<Record<string, SearchFieldMeta>> = {
     valueType: "categorical",
     group: "trace",
   },
+  pinned: {
+    label: "Pinned",
+    hasSidebar: true,
+    facetField: "pinned",
+    valueType: "categorical",
+    group: "trace",
+  },
   errorMessage: {
     label: "Error message",
     hasSidebar: true,
@@ -494,4 +501,5 @@ export const FIELD_VALUES: Record<string, string[]> = {
   // bucket by design — it's reachable by typing the filter by hand.
   evaluatorVerdict: ["pass", "fail", "error", "unknown"],
   spanStatus: ["ok", "error", "unset"],
+  pinned: ["pinned", "unpinned"],
 };

@@ -36,8 +36,8 @@ import { createStripeClient } from "../../../ee/billing/stripe/stripeClient";
 import { meters } from "../../../ee/billing/stripe/stripePriceCatalog";
 import { FREE_PLAN } from "../../../ee/licensing/constants";
 import { StorageMeterService } from "../data-retention/metering/storageMeter.service";
-import { PinnedTraceRepository } from "../data-retention/pinning/pinnedTrace.repository";
 import { PinnedTraceService } from "../data-retention/pinning/pinnedTrace.service";
+import { createInMemoryPinnedTraceService } from "../data-retention/pinning/inMemoryPinnedTraceService";
 import { DataRetentionPolicyRepository } from "../data-retention/policy/dataRetentionPolicy.repository";
 import { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
 import { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
@@ -456,40 +456,17 @@ export function initializeDefaultApp(options?: {
     dataRetentionPolicyRepo,
     retentionPolicyCache,
   );
-  const pinnedTraceRepo = new PinnedTraceRepository(prisma);
   // Construct the share repo here (not inside ShareService) so the pinning
   // service can ask "is this trace still shared?" without depending on
   // ShareService — that would close the cycle: ShareService already depends
   // on PinnedTraceService for auto(un)pin.
   const shareRepo = new PrismaShareRepository(prisma);
-  const pinnedTraceService = new PinnedTraceService(
-    pinnedTraceRepo,
-    async ({ projectId, traceId }) => {
-      const share = await shareRepo.findByResource({
-        projectId,
-        resourceType: "TRACE",
-        resourceId: traceId,
-      });
-      return share !== null;
-    },
-  );
   const retroactiveUpdateService = new RetroactiveUpdateService(
     clickhouseEnabled ? resolveClickHouseClient : null,
   );
   const storageMeterService = new StorageMeterService({
     resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
   });
-  const dataRetention: DataRetentionDependencies = {
-    policy: dataRetentionPolicyService,
-    pinning: pinnedTraceService,
-    retroactive: retroactiveUpdateService,
-    metering: storageMeterService,
-  };
-
-  const share = traced(
-    new ShareService(shareRepo, pinnedTraceService),
-    "ShareService",
-  );
 
   const es = new EventSourcing({
     clickhouse: clickhouseEnabled ? resolveClickHouseClient : void 0,
@@ -576,6 +553,37 @@ export function initializeDefaultApp(options?: {
   const commands = registry.registerAll();
   (globalForApp as any).__scenarioExecutionHandle =
     commands.scenarioExecutionHandle;
+
+  // Pins are event-sourced onto the trace summary: writes dispatch pin/unpin
+  // commands, reads project the pin fields off `trace_summaries`. Constructed
+  // after `commands` and `repositories` so both are available. The share repo
+  // predicate keeps the manual-unpin guard without depending on ShareService.
+  const pinnedTraceService = new PinnedTraceService(
+    {
+      pinTrace: (input) => commands.traces.pinTrace(input),
+      unpinTrace: (input) => commands.traces.unpinTrace(input),
+    },
+    repositories.traceSummaryFold,
+    async ({ projectId, traceId }) => {
+      const share = await shareRepo.findByResource({
+        projectId,
+        resourceType: "TRACE",
+        resourceId: traceId,
+      });
+      return share !== null;
+    },
+  );
+  const dataRetention: DataRetentionDependencies = {
+    policy: dataRetentionPolicyService,
+    pinning: pinnedTraceService,
+    retroactive: retroactiveUpdateService,
+    metering: storageMeterService,
+  };
+
+  const share = traced(
+    new ShareService(shareRepo, pinnedTraceService),
+    "ShareService",
+  );
 
   const suiteRunService = SuiteRunService.create({
     resolveClickHouseClient: clickhouseEnabled ? resolveClickHouseClient : null,
@@ -776,9 +784,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
   // and share, mirroring the production wiring (presets.ts above). Without
   // this, tests that auto-pin via share would see a different repo state
   // than tests that pin directly through dataRetention.pinning.
-  const testPinnedTraceService = new PinnedTraceService(
-    new PinnedTraceRepository(testPrisma),
-  );
+  const testPinnedTraceService = createInMemoryPinnedTraceService();
   const noop = async () => {
     /* noop */
   };
@@ -927,6 +933,8 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         removeAnnotation: noop,
         bulkSyncAnnotations: noop,
         changeTraceName: noop,
+        pinTrace: noop,
+        unpinTrace: noop,
       } satisfies AppCommands["traces"],
       evaluations: {
         executeEvaluation: noop,
