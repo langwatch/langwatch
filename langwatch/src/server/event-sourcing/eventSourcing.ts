@@ -165,6 +165,21 @@ export class EventSourcing {
   }
 
   /**
+   * Whether an outbox runtime is wired into this instance.
+   *
+   * This is the exact invariant that silently broke trigger dispatch: on a
+   * worker the outbox must be present so `.withOutbox` reactors enqueue settle
+   * payloads instead of hitting the no-op drop path. It is set once, from the
+   * constructor `outbox` option — passing the runtime anywhere else (e.g. only
+   * to the pipeline registry) leaves this `false` and every trigger silently
+   * drops. Exposed so the composition root's wiring can be asserted in tests
+   * and surfaced as a worker health signal rather than failing invisibly.
+   */
+  get isOutboxWired(): boolean {
+    return !!this._outbox;
+  }
+
+  /**
    * Register a reactor on a global fold projection.
    *
    * Must be called before the projection registry is initialized

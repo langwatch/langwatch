@@ -1,8 +1,11 @@
+import type { MouseEvent } from "react";
 import { Box, HStack, Icon, Popover, Text, VStack } from "@chakra-ui/react";
 import { CircleAlert, Equal, Trophy } from "lucide-react";
 import { parseEvaluationResult } from "~/utils/evaluationResults";
+import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useTargetName } from "../hooks/useTargetName";
 import type { TargetConfig } from "../types";
+import { disambiguateVariantNames } from "../utils/variantDisambiguation";
 
 type PairwiseCompareCellProps = {
   result: unknown;
@@ -187,8 +190,29 @@ function ResolvedVerdict({
 }) {
   const aHandle = useTargetName(variantATarget);
   const bHandle = useTargetName(variantBTarget);
-  const aNameFinal = aHandle || fallbackA;
-  const bNameFinal = bHandle || fallbackB;
+  // Display-only: disambiguate when both variants share a name. Matching
+  // below still uses the raw `aHandle`/`bHandle`, never these.
+  const { variantAName: aNameFinal, variantBName: bNameFinal } =
+    disambiguateVariantNames({
+      variantAName: aHandle || fallbackA,
+      variantBName: bHandle || fallbackB,
+    });
+
+  const highlightedVariantTargetId = useEvaluationsV3Store(
+    (state) => state.ui.highlightedVariantTargetId,
+  );
+  const setHighlightedVariantTargetId = useEvaluationsV3Store(
+    (state) => state.setHighlightedVariantTargetId,
+  );
+  const toggleHighlight = (targetId: string) => {
+    setHighlightedVariantTargetId(
+      highlightedVariantTargetId === targetId ? undefined : targetId,
+    );
+  };
+  // The enclosing TableCell has its own onClick/onDoubleClick (cell
+  // selection / edit mode) — stop propagation so clicking a name only
+  // toggles the highlight instead of also selecting or editing the cell.
+  const stopPropagation = (e: MouseEvent) => e.stopPropagation();
 
   let winnerSide: "a" | "b" | "tie" | undefined;
   if (label === "tie") winnerSide = "tie";
@@ -221,6 +245,10 @@ function ResolvedVerdict({
   const isTie = winnerSide === "tie";
   const winnerName = winnerSide === "a" ? aNameFinal : bNameFinal;
   const loserName = winnerSide === "a" ? bNameFinal : aNameFinal;
+  const winnerTargetId =
+    winnerSide === "a" ? variantATarget.id : variantBTarget.id;
+  const loserTargetId =
+    winnerSide === "a" ? variantBTarget.id : variantATarget.id;
 
   return (
     <VStack align="stretch" gap={1.5}>
@@ -232,11 +260,34 @@ function ResolvedVerdict({
       ) : (
         <HStack gap={1.5} fontSize="13px" flexWrap="wrap">
           <Icon as={Trophy} color="yellow.fg" boxSize="14px" />
-          <Text fontWeight="semibold" color="green.fg">
+          <Text
+            as="button"
+            fontWeight="semibold"
+            color="green.fg"
+            cursor="pointer"
+            _hover={{ textDecoration: "underline" }}
+            onClick={(e) => {
+              stopPropagation(e);
+              toggleHighlight(winnerTargetId);
+            }}
+            onDoubleClick={stopPropagation}
+          >
             {winnerName}
           </Text>
           <Text color="fg.muted">vs</Text>
-          <Text color="fg.muted">{loserName}</Text>
+          <Text
+            as="button"
+            color="fg.muted"
+            cursor="pointer"
+            _hover={{ textDecoration: "underline" }}
+            onClick={(e) => {
+              stopPropagation(e);
+              toggleHighlight(loserTargetId);
+            }}
+            onDoubleClick={stopPropagation}
+          >
+            {loserName}
+          </Text>
         </HStack>
       )}
       {reasoning ? (

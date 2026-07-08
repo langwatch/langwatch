@@ -261,5 +261,30 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
       expect(result.ids).toEqual(["e1", "e2", "e3"]);
       expect(store.store).toHaveBeenCalledWith(result, context);
     });
+
+    it("merges a delivered event missing from the middle of the history back into occurredAt order", async () => {
+      const e1 = makeEvent("e1", 1000);
+      const e2 = makeEvent("e2", 2000);
+      const e3 = makeEvent("e3", 3000);
+      const store = createMockFoldProjectionStore<CountState>();
+      (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+
+      const foldDef = createMockFoldProjectionDefinition("slim", {
+        store,
+        init,
+        apply,
+        options: { refoldOnStoreMiss: true },
+      });
+      // The history read lags on e2 only — it must NOT be applied last.
+      foldDef.eventLoaderUpTo = vi.fn().mockResolvedValue([e1, e3]);
+
+      const result = (await executor.executeBatch(
+        foldDef,
+        [e1, e2, e3],
+        context,
+      )) as CountState;
+
+      expect(result.ids).toEqual(["e1", "e2", "e3"]);
+    });
   });
 });

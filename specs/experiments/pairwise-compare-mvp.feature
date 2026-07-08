@@ -37,6 +37,24 @@ Feature: Pairwise compare evaluator (MVP)
     When I view the Pairwise Compare column header
     Then I see "variant_a wins 12 · 2 ties" with the full breakdown in the tooltip
 
+  # Customer feedback, 2026-07-08 call: reusing the same prompt as both
+  # variants (e.g. re-testing gpt-4.1 vs gpt-5-mini) made both variants
+  # indistinguishable in the scoreboard and per-row verdicts. What actually
+  # differs between two same-name variants isn't always the model (could be
+  # temperature, a prompt edit, anything) — so this doesn't try to guess a
+  # differentiator, it just numbers them.
+  Scenario: Same-name variants fall back to numbering
+    Given variant A and variant B are both named "AI search system"
+    When I view the Pairwise Compare column header or a row verdict
+    Then variant A is shown as "AI search system (1)"
+    And variant B is shown as "AI search system (2)"
+
+  Scenario: Clicking a variant name highlights its source column
+    Given a pairwise verdict shows variant A's name in a row or the column header
+    When I click on variant A's name
+    Then variant A's source column header shows a highlight
+    And clicking variant A's name again clears the highlight
+
   # Issue: #5378
   # Golden answer is opt-in, not mandatory — some datasets have no
   # reference answer, and picking a fake golden field (like "input")

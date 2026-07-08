@@ -242,7 +242,14 @@ describe("SpanStorageClickHouseRepository single-trace reads", () => {
   describe("when reading a trace's full-attribute spans", () => {
     it("caps query memory so one heavy trace cannot pressure the whole server", async () => {
       const { repo, query } = repoWithSpyClient();
-      await repo.getSpansByTraceId({ tenantId: "p-1", traceId: "t-1" });
+      // Pass an occurredAtMs hint so the read goes straight to the span query;
+      // the hint-less path first issues a trace_summaries time-resolve query
+      // (covered by the integration suite), which is not what this asserts.
+      await repo.getSpansByTraceId({
+        tenantId: "p-1",
+        traceId: "t-1",
+        occurredAtMs: Date.now(),
+      });
 
       const settings = query.mock.calls[0]?.[0]?.clickhouse_settings;
       expect(settings?.max_memory_usage).toBe(String(2 * 1024 * 1024 * 1024));
@@ -253,6 +260,7 @@ describe("SpanStorageClickHouseRepository single-trace reads", () => {
       await repo.getNormalizedSpansByTraceId({
         tenantId: "p-1",
         traceId: "t-1",
+        occurredAtMs: Date.now(),
       });
 
       const settings = query.mock.calls[0]?.[0]?.clickhouse_settings;
@@ -265,6 +273,7 @@ describe("SpanStorageClickHouseRepository single-trace reads", () => {
         tenantId: "p-1",
         traceId: "t-1",
         spanId: "s-1",
+        occurredAtMs: Date.now(),
       });
 
       const settings = query.mock.calls[0]?.[0]?.clickhouse_settings;
