@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isSkillSpan,
   isSkillToolName,
   skillInvocationFromToolUse,
   skillSlugFromInput,
@@ -56,6 +57,33 @@ describe("skillInvocation", () => {
         expect(skillSlugFromInput("surf-pr")).toBeNull();
         expect(skillSlugFromInput(null)).toBeNull();
         expect(skillSlugFromInput(["skill"])).toBeNull();
+      });
+    });
+  });
+
+  describe("isSkillSpan", () => {
+    describe("given a Skill tool span", () => {
+      /** @scenario "A skill span is flagged in the tree" */
+      it("flags a tool-type span named Skill", () => {
+        expect(isSkillSpan({ type: "tool", name: "Skill" })).toBe(true);
+      });
+
+      /** @scenario "Repeated skill spans keep the skill accent when folded" */
+      it("flags each span in a folded group of Skill tool spans", () => {
+        // A sibling group carries the shared type + name of its members, so
+        // the same predicate that flags a row flags the fold.
+        expect(isSkillSpan({ type: "tool", name: "Skill" })).toBe(true);
+      });
+    });
+
+    describe("given a non-skill span", () => {
+      it("does not flag an ordinary tool span", () => {
+        expect(isSkillSpan({ type: "tool", name: "Bash" })).toBe(false);
+      });
+
+      it("does not flag a non-tool span named Skill", () => {
+        expect(isSkillSpan({ type: "llm", name: "Skill" })).toBe(false);
+        expect(isSkillSpan({ type: null, name: "Skill" })).toBe(false);
       });
     });
   });

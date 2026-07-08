@@ -19,7 +19,7 @@ import {
   formatDuration,
 } from "../../../utils/formatters";
 import { LangwatchSignalBadges } from "../LangwatchSignalBadges";
-import { isSkillToolName } from "../transcript/skillInvocation";
+import { isSkillSpan } from "../transcript/skillInvocation";
 import { TipCell } from "./TipCell";
 import {
   getSpanPalette,
@@ -97,7 +97,7 @@ export const TreeRow = memo(function TreeRow({
   // it stands out from ordinary tool spans in the tree — the waterfall node
   // carries no input, so this flags the invocation without naming the skill
   // (the transcript card shows the slug). Mirrors ADR-033's skill_invocation.
-  const isSkill = span.type === "tool" && isSkillToolName(span.name);
+  const isSkill = isSkillSpan({ type: span.type, name: span.name });
   const TypeIcon = isSkill
     ? LuSparkles
     : SPAN_TYPE_ICONS[span.type ?? "span"] ?? SPAN_TYPE_ICONS.span!;

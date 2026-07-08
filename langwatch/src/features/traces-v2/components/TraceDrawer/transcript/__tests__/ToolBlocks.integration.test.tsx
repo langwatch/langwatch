@@ -16,7 +16,7 @@ describe("<ToolPairCard />", () => {
   afterEach(() => cleanup());
 
   describe("when the tool_use is a skill invocation", () => {
-    /** @scenario the transcript promotes a skill run with its name */
+    /** @scenario "A skill run shows the invoked skill name" */
     it("renders the invoked skill name in the header", () => {
       renderWithProviders(
         <ToolPairCard
@@ -29,6 +29,7 @@ describe("<ToolPairCard />", () => {
       expect(screen.getByText("Skill · surf-pr")).toBeInTheDocument();
     });
 
+    /** @scenario "A skill run without a resolvable slug falls back to a bare label" */
     it("falls back to the bare Skill label when no slug is present", () => {
       renderWithProviders(
         <ToolPairCard name="Skill" input={{}} result={null} />,
@@ -39,6 +40,7 @@ describe("<ToolPairCard />", () => {
   });
 
   describe("when the tool_use is an ordinary tool", () => {
+    /** @scenario "An ordinary tool call is not treated as a skill" */
     it("renders the tool name plainly, not as a skill", () => {
       renderWithProviders(
         <ToolPairCard

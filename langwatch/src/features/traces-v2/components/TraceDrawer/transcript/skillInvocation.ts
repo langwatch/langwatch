@@ -22,6 +22,21 @@ export function isSkillToolName(name: string | null | undefined): boolean {
 }
 
 /**
+ * True when a span is a skill run — a `tool`-type span named `Skill`. Drives
+ * the waterfall's skill glyph + accent (TreeRow / GroupRow). The type guard
+ * keeps a user-named non-tool span called "Skill" from being mis-flagged.
+ */
+export function isSkillSpan({
+  type,
+  name,
+}: {
+  type: string | null | undefined;
+  name: string | null | undefined;
+}): boolean {
+  return type === "tool" && isSkillToolName(name);
+}
+
+/**
  * The invoked skill's slug (e.g. `"surf-pr"`), pulled from a `Skill`
  * tool_use's input. Returns null when the block isn't a skill invocation or
  * the slug is absent/blank, so callers fall back to the bare "Skill" label.

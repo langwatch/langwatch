@@ -3,7 +3,7 @@ import { memo, useCallback } from "react";
 import { LuLayers } from "react-icons/lu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { formatDuration, SPAN_TYPE_COLORS } from "../../../utils/formatters";
-import { isSkillToolName } from "../transcript/skillInvocation";
+import { isSkillSpan } from "../transcript/skillInvocation";
 import {
   GROUP_ROW_HEIGHT,
   getSpanPalette,
@@ -36,7 +36,7 @@ export const GroupRow = memo(function GroupRow({
   );
   // Skill runs fold like any repeated tool, but keep the purple skill accent
   // so a folded row of skill invocations still reads as skills (see TreeRow).
-  const isSkill = group.type === "tool" && isSkillToolName(group.name);
+  const isSkill = isSkillSpan({ type: group.type, name: group.name });
   const color = isSkill
     ? "purple.solid"
     : (SPAN_TYPE_COLORS[group.type] as string) ?? "gray.solid";
