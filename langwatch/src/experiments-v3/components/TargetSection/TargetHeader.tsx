@@ -172,10 +172,7 @@ export const TargetHeader = memo(function TargetHeader({
   const {
     variantAName: variantADisplayName,
     variantBName: variantBDisplayName,
-  } = disambiguateVariantNames(
-    variantAName,
-    variantBName,
-  );
+  } = disambiguateVariantNames({ variantAName, variantBName });
 
   // Get results, evaluators, and dataset for computing aggregates
   const { results, evaluators, activeDataset } = useEvaluationsV3Store(

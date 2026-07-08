@@ -192,7 +192,10 @@ function ResolvedVerdict({
   // Display-only: disambiguate when both variants share a name. Matching
   // below still uses the raw `aHandle`/`bHandle`, never these.
   const { variantAName: aNameFinal, variantBName: bNameFinal } =
-    disambiguateVariantNames(aHandle || fallbackA, bHandle || fallbackB);
+    disambiguateVariantNames({
+      variantAName: aHandle || fallbackA,
+      variantBName: bHandle || fallbackB,
+    });
 
   const highlightedVariantTargetId = useEvaluationsV3Store(
     (state) => state.ui.highlightedVariantTargetId,

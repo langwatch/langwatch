@@ -16,10 +16,13 @@ export type DisambiguatedVariantNames = {
  * suffix; the rendered comparison view separately lets you click a variant
  * name to highlight its source column.
  */
-export const disambiguateVariantNames = (
-  variantAName: string,
-  variantBName: string,
-): DisambiguatedVariantNames => {
+export const disambiguateVariantNames = ({
+  variantAName,
+  variantBName,
+}: {
+  variantAName: string;
+  variantBName: string;
+}): DisambiguatedVariantNames => {
   if (!variantAName || variantAName !== variantBName) {
     return { variantAName, variantBName };
   }

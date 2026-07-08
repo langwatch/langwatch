@@ -52,7 +52,7 @@ export function PairwiseVerdictRow({
   // Display-only: disambiguate when both variants share a name. The
   // normalization above already matched against the raw names.
   const { variantAName: displayAName, variantBName: displayBName } =
-    disambiguateVariantNames(variantAName, variantBName);
+    disambiguateVariantNames({ variantAName, variantBName });
 
   return (
     <RowVerdictStrip
