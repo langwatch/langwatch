@@ -176,6 +176,11 @@ function getTabStorageKey(projectId: string, tabId: string) {
   return `${projectId}:tab:${tabId}`;
 }
 
+/** The light index key holding tab identity/order (not per-tab data). */
+function getStorageKey(projectId: string) {
+  return `${projectId}:draggable-tabs-browser-store`;
+}
+
 /**
  * Removes every localStorage key belonging to a project's draggable tabs
  * browser store: each per-tab `${projectId}:tab:${tabId}` key plus the
@@ -190,7 +195,7 @@ function getTabStorageKey(projectId: string, tabId: string) {
  * error/inconsistency recovery paths in `onRehydrateStorage`.
  */
 function clearAllPersistedDataForProject(projectId: string) {
-  const storageKey = `${projectId}:draggable-tabs-browser-store`;
+  const storageKey = getStorageKey(projectId);
   const tabKeyPrefix = `${projectId}:tab:`;
   try {
     const tabKeysToRemove: string[] = [];
@@ -328,18 +333,19 @@ function createTabAwarePersistStorage(
       }
     },
 
-    removeItem: (name) => {
-      for (const tabId of lastPersistedDataRefs.keys()) {
-        localStorage.removeItem(getTabStorageKey(projectId, tabId));
-      }
+    removeItem: () => {
+      // Delegate to the prefix-scan cleanup so this doesn't rely on the
+      // in-memory ref map being populated — otherwise per-tab keys written
+      // by another store instance (e.g. the same project open in a second
+      // browser tab) would be orphaned. Also drop our own tracked refs.
+      clearAllPersistedDataForProject(projectId);
       lastPersistedDataRefs.clear();
-      localStorage.removeItem(name);
     },
   };
 }
 
 function createDraggableTabsBrowserStore(projectId: string) {
-  const storageKey = `${projectId}:draggable-tabs-browser-store`;
+  const storageKey = getStorageKey(projectId);
 
   return create<DraggableTabsBrowserState>()(
     persist(
@@ -653,11 +659,12 @@ function createDraggableTabsBrowserStore(projectId: string) {
          */
         reset: () => {
           set(initialState);
-          try {
-            localStorage.removeItem(storageKey);
-          } catch (error) {
-            logger.error({ error }, "Failed to clear localStorage");
-          }
+          // Remove the light index key AND every per-tab key. A bare
+          // removeItem(storageKey) would strand the `${projectId}:tab:*`
+          // keys (the leak this store split introduced), so delegate to the
+          // prefix-scan cleanup, which is robust even for per-tab keys this
+          // instance never tracked in memory.
+          clearAllPersistedDataForProject(projectId);
         },
 
         /**

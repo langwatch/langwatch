@@ -590,6 +590,32 @@ describe("DraggableTabsBrowserStore", () => {
       expect(store.getState().windows).toEqual([]);
       expect(store.getState().activeWindowId).toBeNull();
     });
+
+    it("removes the per-tab localStorage keys of its own tabs", () => {
+      store.getState().addTab({ data: createTabData() });
+      const tabId = store.getState().windows[0]?.tabs[0]?.id;
+      expect(localStorage.getItem(`${TEST_PROJECT_ID}:tab:${tabId}`)).not.toBeNull();
+
+      store.getState().reset();
+
+      expect(localStorage.getItem(`${TEST_PROJECT_ID}:tab:${tabId}`)).toBeNull();
+      expect(
+        localStorage.getItem(`${TEST_PROJECT_ID}:draggable-tabs-browser-store`),
+      ).toBeNull();
+    });
+
+    it("removes orphaned per-tab keys this instance never tracked", () => {
+      // Simulates the same project open in a second browser tab: another
+      // store instance wrote a per-tab key that this instance's in-memory
+      // ref map never saw. reset() must still clear it via the prefix scan.
+      const orphanKey = `${TEST_PROJECT_ID}:tab:orphan-from-other-instance`;
+      localStorage.setItem(orphanKey, JSON.stringify(createTabData()));
+
+      store.getState().addTab({ data: createTabData() });
+      store.getState().reset();
+
+      expect(localStorage.getItem(orphanKey)).toBeNull();
+    });
   });
 
   describe("variableValues", () => {
