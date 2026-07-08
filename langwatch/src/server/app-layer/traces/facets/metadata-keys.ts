@@ -3,7 +3,7 @@ import type {
   FacetQuery,
   FacetQueryContext,
 } from "../facet-registry";
-import { baseParams, buildTimeWhere } from "./helpers";
+import { baseParams, buildTimeWhere, KEY_DISCOVERY_SETTINGS } from "./helpers";
 
 /**
  * Discover query for trace metadata attribute keys: every distinct
@@ -50,6 +50,7 @@ export function buildMetadataKeysFacetQuery(
       ...baseParams(ctx),
       ...(ctx.prefix ? { prefix: ctx.prefix } : {}),
     },
+    settings: KEY_DISCOVERY_SETTINGS,
   };
 }
 

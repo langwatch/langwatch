@@ -939,4 +939,99 @@ describe("SimulationClickHouseRepository (integration)", () => {
       });
     });
   });
+
+  describe("getBatchHistoryForScenarioSet()", () => {
+    describe("when a page spans batches from different weeks", () => {
+      it("returns every batch's items and bounds the heavy read to the page's StartedAt window", async () => {
+        const setId = `set-history-${nanoid()}`;
+        const eightWeeksMs = 8 * 7 * 24 * 60 * 60 * 1000;
+        const oldStartedAtMs = now - eightWeeksMs;
+        const oldDate = new Date(oldStartedAtMs);
+
+        // Older batch (a different weekly partition than the recent one).
+        const oldBatchRunId = `batch-old-${nanoid()}`;
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioSetId: setId,
+            BatchRunId: oldBatchRunId,
+            StartedAt: oldDate,
+            CreatedAt: oldDate,
+            UpdatedAt: new Date(oldStartedAtMs + 1000),
+            FinishedAt: new Date(oldStartedAtMs + 1000),
+            "Messages.Id": ["msg-1", "msg-2"],
+            "Messages.Role": ["user", "assistant"],
+            "Messages.Content": ["old question", "old answer"],
+            "Messages.TraceId": ["trace-1", "trace-2"],
+            "Messages.Rest": ["{}", "{}"],
+          }),
+        );
+
+        // Recent batch (current weekly partition).
+        const recentBatchRunId = `batch-recent-${nanoid()}`;
+        await insertRow(
+          ch,
+          makeInsertRow({
+            ScenarioSetId: setId,
+            BatchRunId: recentBatchRunId,
+            "Messages.Id": ["msg-1", "msg-2"],
+            "Messages.Role": ["user", "assistant"],
+            "Messages.Content": ["new question", "new answer"],
+            "Messages.TraceId": ["trace-1", "trace-2"],
+            "Messages.Rest": ["{}", "{}"],
+          }),
+        );
+
+        // Capture the SQL the repository actually issues so we can assert the
+        // preview read is bounded (partition-pruned) rather than unconstrained.
+        const captured: { query: string; query_params?: Record<string, unknown> }[] =
+          [];
+        const recordingClient = new Proxy(ch, {
+          get(target, prop, receiver) {
+            if (prop === "query") {
+              return (args: { query: string; query_params?: Record<string, unknown> }) => {
+                captured.push({ query: args.query, query_params: args.query_params });
+                return (target.query as typeof target.query).call(target, args);
+              };
+            }
+            return Reflect.get(target, prop, receiver);
+          },
+        });
+        const recordingResilient = createResilientClickHouseClient({
+          client: recordingClient,
+        });
+        const recordingRepo = new SimulationClickHouseRepository(
+          async () => recordingResilient,
+        );
+
+        const result = await recordingRepo.getBatchHistoryForScenarioSet({
+          projectId: tenantId,
+          scenarioSetId: setId,
+          limit: 10,
+        });
+
+        // Both batches (across both weeks) come back with their preview items.
+        const byId = new Map(result.batches.map((b) => [b.batchRunId, b]));
+        expect(byId.has(oldBatchRunId)).toBe(true);
+        expect(byId.has(recentBatchRunId)).toBe(true);
+        expect(byId.get(oldBatchRunId)!.items).toHaveLength(1);
+        expect(byId.get(recentBatchRunId)!.items).toHaveLength(1);
+        expect(
+          byId.get(oldBatchRunId)!.items[0]!.messagePreview.map((m) => m.content),
+        ).toEqual(["old question", "old answer"]);
+
+        // The heavy preview read carries an exact StartedAt envelope that spans
+        // both weeks (min = the old batch), so the older batch is not dropped.
+        const previewQuery = captured.find((c) =>
+          c.query.includes("MessagePreviewRoles"),
+        );
+        expect(previewQuery).toBeDefined();
+        expect(previewQuery!.query).toContain("StartedAt >=");
+        expect(previewQuery!.query).toContain("StartedAt <=");
+        expect(previewQuery!.query_params?.minStartedAtMs).toBe(
+          String(oldStartedAtMs),
+        );
+      });
+    });
+  });
 });
