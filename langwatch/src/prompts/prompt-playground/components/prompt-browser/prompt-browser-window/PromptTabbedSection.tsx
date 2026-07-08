@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Tabs, Text } from "@chakra-ui/react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFormContext } from "react-hook-form";
 import { LuEraser } from "react-icons/lu";
 import { useDebounceCallback } from "usehooks-ts";
@@ -99,6 +99,15 @@ export function PromptTabbedSection({
     },
     300,
   );
+
+  // Flush any pending variable-value write before unmount. useDebounceCallback
+  // cancels on unmount, so without this a value typed just before switching
+  // prompt tabs (which unmounts this tab) would be lost.
+  useEffect(() => {
+    return () => {
+      debouncedPersistToStore.flush();
+    };
+  }, [debouncedPersistToStore]);
 
   // Convert inputs to Variable[] format
   const variables: Variable[] = inputs.map((input) => ({

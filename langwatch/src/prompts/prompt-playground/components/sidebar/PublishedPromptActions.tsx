@@ -102,7 +102,11 @@ export function PublishedPromptActions({
     },
   );
 
-  const canDelete = permission?.hasPermission ?? true;
+  // Default to NOT deletable until the permission query resolves. The query is
+  // gated on the menu being open, so there is a brief loading window on first
+  // open; defaulting to `true` there would enable the destructive Delete action
+  // before we know the caller is actually allowed.
+  const canDelete = permission?.hasPermission === true;
 
   const handleDelete = useCallback(async () => {
     if (!project?.id) return;

@@ -168,6 +168,46 @@ describe("PublishedPromptActions", () => {
           expect.objectContaining({ enabled: true }),
         );
       });
+
+      it("keeps Delete disabled while the permission query is still loading", async () => {
+        const user = userEvent.setup();
+        // Query gated on open resolves asynchronously, so on first open the
+        // permission is undefined. Delete must NOT be enabled in that window.
+        mockCheckModifyPermission.mockReturnValue({ data: undefined });
+        renderWithChakra(
+          <PublishedPromptActions
+            promptId="prompt-1"
+            promptHandle="test-prompt"
+          />,
+        );
+
+        await user.click(screen.getByRole("button"));
+
+        const deleteItem = screen
+          .getByText("Delete prompt")
+          .closest('[role="menuitem"]');
+        expect(deleteItem).toHaveAttribute("data-disabled");
+      });
+
+      it("enables Delete once the permission query resolves as allowed", async () => {
+        const user = userEvent.setup();
+        mockCheckModifyPermission.mockReturnValue({
+          data: { hasPermission: true },
+        });
+        renderWithChakra(
+          <PublishedPromptActions
+            promptId="prompt-1"
+            promptHandle="test-prompt"
+          />,
+        );
+
+        await user.click(screen.getByRole("button"));
+
+        const deleteItem = screen
+          .getByText("Delete prompt")
+          .closest('[role="menuitem"]');
+        expect(deleteItem).not.toHaveAttribute("data-disabled");
+      });
     });
   });
 });

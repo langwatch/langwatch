@@ -398,9 +398,13 @@ describe("PromptTabbedSection Store Integration", () => {
   });
 });
 
-// Mock TabIdContext
+// Mock TabIdContext. tabIdRef lets a test point the component at a real store
+// tab id (defaults to a fixed value for tests that don't touch the store).
+const { tabIdRef } = vi.hoisted(() => ({
+  tabIdRef: { current: "test-tab-id" },
+}));
 vi.mock("../../ui/TabContext", () => ({
-  useTabId: () => "test-tab-id",
+  useTabId: () => tabIdRef.current,
 }));
 
 // Mock CopilotKit
@@ -597,6 +601,48 @@ describe("PromptTabbedSection Layout Modes", () => {
       expect(
         screen.getByText(/variables are substituted into the prompt/i),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("when a variable value is edited and the tab unmounts immediately", () => {
+    it("flushes the pending write so the edit is not lost", async () => {
+      const user = userEvent.setup();
+      const store = getStoreForTesting(TEST_PROJECT_ID);
+      const tabId = store.getState().windows[0]?.tabs[0]?.id;
+      // Point the component's useTabId() at the real store tab so its writes land.
+      tabIdRef.current = tabId!;
+
+      const { unmount } = renderPromptTabbedSection(
+        { layoutMode: "vertical" },
+        {
+          version: {
+            parameters: {},
+            configData: {
+              inputs: [{ identifier: "topic", type: "str" }],
+              demonstrations: { inline: { records: {} } },
+            },
+          } as any,
+        },
+      );
+
+      await user.click(screen.getByRole("tab", { name: /variables/i }));
+      const textboxes = await screen.findAllByRole("textbox");
+      const valueInput = textboxes.find(
+        (el) => (el as HTMLInputElement).value === "",
+      );
+      expect(valueInput).toBeDefined();
+      await user.type(valueInput!, "flushed");
+
+      // The 300ms debounce has NOT fired yet (test is faster). Unmounting the
+      // tab (as switching prompt tabs does) must flush the pending write rather
+      // than cancel it — otherwise the edit is lost.
+      unmount();
+
+      expect(store.getState().getByTabId(tabId!)?.variableValues.topic).toBe(
+        "flushed",
+      );
+
+      tabIdRef.current = "test-tab-id";
     });
   });
 });
