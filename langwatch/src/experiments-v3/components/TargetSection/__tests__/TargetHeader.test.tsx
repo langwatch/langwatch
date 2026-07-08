@@ -641,6 +641,7 @@ describe("TargetHeader", () => {
       useEvaluationsV3Store.getState().reset?.();
     });
 
+    /** @scenario Same-name variants fall back to numbering */
     it("shows numbered names instead of two identical labels", () => {
       renderWithProviders(
         <TargetHeader
@@ -668,6 +669,7 @@ describe("TargetHeader", () => {
       useEvaluationsV3Store.getState().reset?.();
     });
 
+    /** @scenario Clicking a variant name highlights its source column */
     it("glows the header when this target is the highlighted variant", () => {
       useEvaluationsV3Store.setState({
         ui: {

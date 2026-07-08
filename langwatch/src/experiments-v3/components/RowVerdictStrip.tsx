@@ -1,3 +1,4 @@
+import type { MouseEvent } from "react";
 import { Box, HStack, Icon, Popover, Text } from "@chakra-ui/react";
 import { Equal, Trophy } from "lucide-react";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
@@ -55,6 +56,10 @@ export function RowVerdictStrip({
       highlightedVariantTargetId === targetId ? undefined : targetId,
     );
   };
+  // The enclosing TableCell has its own onClick/onDoubleClick (cell
+  // selection / edit mode) — stop propagation so clicking a name only
+  // toggles the highlight instead of also selecting or editing the cell.
+  const stopPropagation = (e: MouseEvent) => e.stopPropagation();
 
   const isTie = label === "tie";
   const winnerName = label === "A" ? variantAName : variantBName;
@@ -86,7 +91,11 @@ export function RowVerdictStrip({
             color="green.fg"
             cursor={winnerTargetId ? "pointer" : undefined}
             _hover={winnerTargetId ? { textDecoration: "underline" } : undefined}
-            onClick={() => toggleHighlight(winnerTargetId)}
+            onClick={(e) => {
+              stopPropagation(e);
+              toggleHighlight(winnerTargetId);
+            }}
+            onDoubleClick={stopPropagation}
           >
             {winnerName}
           </Text>
@@ -96,7 +105,11 @@ export function RowVerdictStrip({
             color="fg.muted"
             cursor={loserTargetId ? "pointer" : undefined}
             _hover={loserTargetId ? { textDecoration: "underline" } : undefined}
-            onClick={() => toggleHighlight(loserTargetId)}
+            onClick={(e) => {
+              stopPropagation(e);
+              toggleHighlight(loserTargetId);
+            }}
+            onDoubleClick={stopPropagation}
           >
             {loserName}
           </Text>

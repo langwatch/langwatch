@@ -1,3 +1,4 @@
+import type { MouseEvent } from "react";
 import { Box, HStack, Icon, Popover, Text, VStack } from "@chakra-ui/react";
 import { CircleAlert, Equal, Trophy } from "lucide-react";
 import { parseEvaluationResult } from "~/utils/evaluationResults";
@@ -208,6 +209,10 @@ function ResolvedVerdict({
       highlightedVariantTargetId === targetId ? undefined : targetId,
     );
   };
+  // The enclosing TableCell has its own onClick/onDoubleClick (cell
+  // selection / edit mode) — stop propagation so clicking a name only
+  // toggles the highlight instead of also selecting or editing the cell.
+  const stopPropagation = (e: MouseEvent) => e.stopPropagation();
 
   let winnerSide: "a" | "b" | "tie" | undefined;
   if (label === "tie") winnerSide = "tie";
@@ -261,7 +266,11 @@ function ResolvedVerdict({
             color="green.fg"
             cursor="pointer"
             _hover={{ textDecoration: "underline" }}
-            onClick={() => toggleHighlight(winnerTargetId)}
+            onClick={(e) => {
+              stopPropagation(e);
+              toggleHighlight(winnerTargetId);
+            }}
+            onDoubleClick={stopPropagation}
           >
             {winnerName}
           </Text>
@@ -271,7 +280,11 @@ function ResolvedVerdict({
             color="fg.muted"
             cursor="pointer"
             _hover={{ textDecoration: "underline" }}
-            onClick={() => toggleHighlight(loserTargetId)}
+            onClick={(e) => {
+              stopPropagation(e);
+              toggleHighlight(loserTargetId);
+            }}
+            onDoubleClick={stopPropagation}
           >
             {loserName}
           </Text>
