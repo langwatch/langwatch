@@ -83,7 +83,10 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
   );
 
   return (
-    <Box w="full" minH="100dvh" bg="bg.page" position="relative" style={{ scrollbarGutter: "stable" }} overflowY="auto">
+    // "stable both-edges" keeps the reserved scrollbar gutter symmetric so
+    // the logo/card column stays visually centered even with always-visible
+    // scrollbars (one-edge "stable" shifted everything left).
+    <Box w="full" minH="100dvh" bg="bg.page" position="relative" style={{ scrollbarGutter: "stable both-edges" }} overflowY="auto">
       <OnboardingMeshBackground />
 
       {showBackButton && onBack && (
