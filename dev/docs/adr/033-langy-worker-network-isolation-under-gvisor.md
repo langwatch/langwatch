@@ -194,9 +194,16 @@ The bar is the scenarios in `specs/langy/langy-worker-isolation.feature`:
 sibling isolation (a worker cannot drive another worker's opencode) **and**
 required connectivity preserved (authProxy → opencode still works, worker egress
 to control plane / gateway / git still works). Under Fix A′ the connectivity
-scenarios are satisfied by construction (no topology change); the isolation
-scenario is satisfied by the `401` results above and must be reproduced as an
-automated test against a running worker pair.
+scenarios are satisfied by construction (no topology change). The isolation
+scenario is covered by automated Go tests: `authproxy_test.go`
+(`TestWorkerIsolation_SiblingCannotAuthenticateWithoutPassword`,
+`TestAuthProxy_*`) proves a sibling with no/incorrect credential is rejected
+`401`, and `opencode_test.go` (`TestRequireOpenCodeAuthEnforced_*`,
+`TestWaitForReadiness_*`) proves the fail-closed guard refuses to start a worker
+whose opencode isn't enforcing the password on its control API. It was also
+reproduced live against a running gVisor worker on the dev cluster (the `401`
+results above). A full two-real-worker integration harness remains follow-up;
+the feature scenarios stay `@unimplemented` until bound to it.
 
 ## References
 
