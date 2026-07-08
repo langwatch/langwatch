@@ -54,6 +54,14 @@ let cpBudgetResponse: { status: number; body: unknown } = {
 let tmpRoot: string;
 let toolStubsDir: string;
 let configPath: string;
+// Hermetic HOME for the spawned CLI. The wrapper resolves the tool through the
+// user's interactive login shell (`$SHELL -i -c`) so aliases are honored. That
+// re-sources the shell rc, which on a real machine restores the real PATH and
+// finds the REAL claude/codex/etc. installed on the box — defeating our stub.
+// Pointing HOME at a tmp dir whose seeded `.zshrc`/`.bashrc` prepend the stub
+// dir keeps resolution deterministic (and keeps any settings-file writes off
+// the developer's real ~/.claude).
+let fakeHome: string;
 const cliPath = path.resolve(__dirname, "../../../dist/cli/index.js");
 
 const TEST_VK = "vk-lw-test_xyz_phase11";
@@ -311,6 +319,11 @@ function runCli(args: string[], opts: RunOpts = {}): Promise<RunResult> {
     if (v !== undefined) env[k] = v;
   }
   env.PATH = pathValue;
+  // Override the inherited HOME with the hermetic one so the wrapper's
+  // interactive-shell tool resolver sources our seeded rc (stub dir first),
+  // never the real profile. Keeps the suite deterministic on machines that
+  // have the real claude/codex/etc. installed.
+  env.HOME = fakeHome;
   env.LANGWATCH_CLI_CONFIG = configPath;
   env.LANGWATCH_ENDPOINT = cpUrl;
   env.LANGWATCH_GATEWAY_URL = gwUrl;
@@ -399,6 +412,17 @@ beforeAll(async () => {
   toolStubsDir = path.join(tmpRoot, "stubs");
   fs.mkdirSync(toolStubsDir, { recursive: true });
   configPath = path.join(tmpRoot, "config.json");
+
+  // Seed a hermetic HOME so `$SHELL -i -c` (the wrapper's alias-aware tool
+  // resolver) sources OUR rc — which puts the stub dir first on PATH — instead
+  // of the developer's / runner's real profile (which would resolve the real
+  // installed tools). Both zsh and bash interactive rc files are seeded so the
+  // resolution is deterministic regardless of the runner's default shell.
+  fakeHome = path.join(tmpRoot, "home");
+  fs.mkdirSync(fakeHome, { recursive: true });
+  const rc = `export PATH="${toolStubsDir}:$PATH"\n`;
+  fs.writeFileSync(path.join(fakeHome, ".zshrc"), rc);
+  fs.writeFileSync(path.join(fakeHome, ".bashrc"), rc);
 
   const gw = await startFakeGateway();
   gwServer = gw.server;

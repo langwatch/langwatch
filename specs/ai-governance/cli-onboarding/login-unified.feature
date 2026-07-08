@@ -336,8 +336,8 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
   # ─────────────────────────────────────────────────────────────────────
 
   @bdd @cli @logout @existing
-  Scenario: `langwatch logout-device` clears only the user-global config
+  Scenario: `langwatch logout` clears the device session, not the project key
     Given the user has both a device session AND a project API key
-    When the user runs `langwatch logout-device`
+    When the user runs `langwatch logout`
     Then `~/.langwatch/config.json` is removed (or access_token cleared)
     And `$CWD/.env`'s `LANGWATCH_API_KEY` is NOT touched

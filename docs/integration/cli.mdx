@@ -49,7 +49,7 @@ The browser shows an "Approve" or "Generate API key" button (depending on the ch
 | Project | `$CWD/.env` | `LANGWATCH_API_KEY`, used by SDK consumers + `langwatch sync`, `eval`, `prompt` |
 | User-global | `~/.langwatch/config.json` (mode `0600`) | Device session (`access_token` + `refresh_token`), control-plane URL, gateway URL, default org, used by `langwatch claude/codex/cursor/gemini/opencode`, `langwatch whoami`, `langwatch request-increase` |
 
-The two stores serve different audiences and never leak into each other. Logging out of one (`langwatch logout-device` clears `~/.langwatch/config.json`) doesn't touch the other.
+The two stores serve different audiences and never leak into each other. Logging out of one (`langwatch logout` clears `~/.langwatch/config.json`) doesn't touch the other, the project API key in `.env` stays put.
 
 ### Self-hosted
 
