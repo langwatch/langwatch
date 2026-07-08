@@ -97,6 +97,19 @@ export interface SimulationRepository {
   }): Promise<AllSuitesRunDataResult>;
 
   /**
+   * Returns the latest UpdatedAt (Unix ms) across the project's runs in the
+   * given window — a cheap freshness signal the UI polls instead of re-reading
+   * run payloads. Includes archived rows on purpose: archiving bumps UpdatedAt,
+   * and the list must refresh to drop the archived run.
+   */
+  findLastUpdatedAt(params: {
+    projectId: string;
+    scenarioSetId?: string;
+    startDate?: number;
+    endDate?: number;
+  }): Promise<number>;
+
+  /**
    * Returns the run ids for a SPECIFIC scenario set — never the whole project.
    * `scenarioSetId` is required so callers cannot address every run in a tenant
    * with one unqualified request. Results are capped; `reachedCap` signals that
@@ -169,6 +182,10 @@ export class NullSimulationRepository implements SimulationRepository {
       scenarioSetIds: {},
       hasMore: false,
     };
+  }
+
+  async findLastUpdatedAt(): Promise<number> {
+    return 0;
   }
 
   async findAllRunIdsForSet(): Promise<{

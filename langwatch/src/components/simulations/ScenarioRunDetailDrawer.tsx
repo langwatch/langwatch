@@ -29,6 +29,7 @@ import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { TraceDetails } from "../traces/TraceDetails";
 import { Link } from "../ui/link";
 import { hasNoResults } from "./scenario-run-status.utils";
+import { getRunStatePollInterval } from "./run-state-polling";
 import { Drawer } from "../ui/drawer";
 import { ScenarioMessageRenderer } from "./ScenarioMessageRenderer";
 import { ScenarioRunActions } from "./ScenarioRunActions";
@@ -64,28 +65,32 @@ export function ScenarioRunDetailDrawer({
     tenantId: project?.id,
   });
 
-  const { data: scenarioState, error: runStateError, refetch } = api.scenarios.getRunState.useQuery(
+  const { streamingMessages, handleStreamingEvent, clearCompleted } =
+    useSimulationStreamingState(scenarioRunId ?? undefined);
+
+  // Live updates: matching SSE events selectively invalidate getRunState for
+  // this run, and streaming deltas flow through the streaming state above.
+  const { isConnected: sseConnected } = useSimulationUpdateListener({
+    projectId: project?.id ?? "",
+    enabled: !!project?.id && !!scenarioRunId && !!open,
+    debounceMs: 300,
+    filter: scenarioRunId ? { scenarioRunId } : undefined,
+    onStreamingEvent: handleStreamingEvent,
+  });
+
+  const { data: scenarioState, error: runStateError } = api.scenarios.getRunState.useQuery(
     {
       scenarioRunId: scenarioRunId ?? "",
       projectId: project?.id ?? "",
     },
     {
       enabled: !!project?.id && !!scenarioRunId && !!open,
-      refetchInterval: 3000,
+      // Finished runs never change — stop polling entirely. Live runs poll
+      // fast only while the event stream is down.
+      refetchInterval: (data) =>
+        getRunStatePollInterval({ status: data?.status, sseConnected }),
     },
   );
-
-  const { streamingMessages, handleStreamingEvent, clearCompleted } =
-    useSimulationStreamingState(scenarioRunId ?? undefined);
-
-  useSimulationUpdateListener({
-    projectId: project?.id ?? "",
-    refetch,
-    enabled: !!project?.id && !!scenarioRunId && !!open,
-    debounceMs: 300,
-    filter: scenarioRunId ? { scenarioRunId } : undefined,
-    onStreamingEvent: handleStreamingEvent,
-  });
 
   // Clear streaming messages once server data includes them
   useEffect(() => {

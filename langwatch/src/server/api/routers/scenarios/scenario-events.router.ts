@@ -155,6 +155,28 @@ export const scenarioEventsRouter = createTRPCRouter({
       });
     }),
 
+  // Cheap freshness probe for the run history views: returns only the latest
+  // UpdatedAt across the project's runs in the window. Clients poll this tiny
+  // response and invalidate getSuiteRunData only when the value advances,
+  // instead of re-downloading run payloads on a timer.
+  getSuiteRunFreshness: protectedProcedure
+    .input(
+      projectSchema
+        .extend({ scenarioSetId: z.string().optional() })
+        .extend(dateRangeFields),
+    )
+    .use(checkProjectPermission("scenarios:view"))
+    .query(async ({ input, ctx }) => {
+      const service = getApp().simulations.runs;
+      const dates = resolveDateRange(input);
+      const lastUpdatedAt = await service.getLastUpdatedAt({
+        projectId: input.projectId,
+        scenarioSetId: input.scenarioSetId,
+        ...dates,
+      });
+      return { lastUpdatedAt };
+    }),
+
   // Get all run data for a scenario set (paginated, no BullMQ merge)
   getScenarioSetRunData: protectedProcedure
     .input(

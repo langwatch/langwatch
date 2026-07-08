@@ -110,6 +110,15 @@ export function RunHistoryPanel({
     }
   }, [groupBy, filters, syncToUrl, router]);
 
+  // Live updates: SSE invalidates getSuiteRunData directly (no refetch
+  // callback needed). Its connection state disables fallback polling.
+  const { isConnected: sseConnected } = useSimulationUpdateListener({
+    projectId: project?.id ?? "",
+    enabled: !!project?.id,
+    debounceMs: 500,
+    filter: scenarioSetId ? { scenarioSetId } : undefined,
+  });
+
   // Pagination
   const startDateMs = period.startDate.getTime();
   const {
@@ -120,15 +129,7 @@ export function RunHistoryPanel({
     isLoading,
     error,
     refetch,
-  } = useRunHistoryPagination({ scenarioSetId, startDateMs });
-
-  useSimulationUpdateListener({
-    projectId: project?.id ?? "",
-    refetch,
-    enabled: !!project?.id,
-    debounceMs: 500,
-    filter: scenarioSetId ? { scenarioSetId } : undefined,
-  });
+  } = useRunHistoryPagination({ scenarioSetId, startDateMs, sseConnected });
 
   // Fetch scenarios for filter options
   const { data: scenarios } = api.scenarios.getAll.useQuery(

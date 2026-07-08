@@ -16,6 +16,10 @@ import { ScenarioRunStatus, Verdict } from "~/server/scenarios/scenario-event.en
 import { ScenarioTargetRow } from "../ScenarioTargetRow";
 import { makeScenarioRunData } from "./test-helpers";
 
+vi.mock("../usePrefetchRunState", () => ({
+  usePrefetchRunState: () => vi.fn(),
+}));
+
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
