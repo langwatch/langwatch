@@ -20,7 +20,6 @@ import {
   Box,
   Button,
   Card,
-  Code,
   Container,
   Heading,
   HStack,
@@ -78,49 +77,32 @@ type ActionState =
 
 /**
  * Action row for terminal states (approved, denied, expired, error): the
- * flow is over either way, so offer the two sensible exits. Browsers only
- * honor window.close() for tabs they consider script-owned — after the
- * in-tab signin/onboarding round-trip they refuse — so when the attempt
- * is blocked we show the keyboard shortcut instead.
+ * flow is over either way, so offer the two places to go next. Closing the
+ * tab is the user's own gesture — browsers block window.close() on tabs
+ * with navigation history, so we don't pretend to offer it.
  */
 function TerminalActions({ tracesHref }: { tracesHref: string }) {
-  const [closeBlocked, setCloseBlocked] = useState(false);
-
-  const handleClose = () => {
-    window.close();
-    // Still running? The browser refused; tell the user how.
-    setTimeout(() => setCloseBlocked(true), 150);
-  };
-
   return (
-    <VStack align="stretch" gap={2}>
-      <Stack direction={{ base: "column", sm: "row" }} gap={3}>
-        <Button variant="outline" flex={1} onClick={handleClose}>
-          Close this window
-        </Button>
-        <Button
-          colorPalette="blue"
-          flex={1}
-          onClick={() => {
-            window.location.href = tracesHref;
-          }}
-        >
-          Go to traces
-        </Button>
-      </Stack>
-      {closeBlocked && (
-        <Text fontSize="xs" color="fg.muted" textAlign="center">
-          Your browser blocked closing this tab — press{" "}
-          <Code fontSize="xs">
-            {typeof navigator !== "undefined" &&
-            navigator.platform.startsWith("Mac")
-              ? "⌘W"
-              : "Ctrl+W"}
-          </Code>{" "}
-          to close it.
-        </Text>
-      )}
-    </VStack>
+    <Stack direction={{ base: "column", sm: "row" }} gap={3}>
+      <Button
+        variant="outline"
+        flex={1}
+        onClick={() => {
+          window.location.href = "/";
+        }}
+      >
+        Go Home
+      </Button>
+      <Button
+        colorPalette="blue"
+        flex={1}
+        onClick={() => {
+          window.location.href = tracesHref;
+        }}
+      >
+        Check Traces
+      </Button>
+    </Stack>
   );
 }
 
