@@ -91,11 +91,10 @@ workspaceVolume: {}
 ##   - Drop ALL caps and add back ONLY what's strictly required: the five
 ##     per-UID-handoff caps (SETUID/SETGID/CHOWN/DAC_OVERRIDE/FOWNER —
 ##     FOWNER lets root chmod a per-worker dir it has already chowned away
-##     to the worker UID). NET_ADMIN is
-##     also still present below but is no longer load-bearing — the
-##     worker→worker exfil hole it guarded is now closed by opencode's own
-##     per-worker password (ADR-033 Fix A′); its removal is a separate
-##     follow-up audit, not part of this change. No SYS_*.
+##     to the worker UID). NET_ADMIN was dropped alongside the iptables
+##     lockdown it existed for — the worker→worker exfil hole it guarded is
+##     now closed by opencode's own per-worker password (ADR-033 Fix A′),
+##     which needs no netfilter. No SYS_*.
 ##   - allowPrivilegeEscalation: false → no_new_privs is set, so children
 ##     cannot regain caps via setuid binaries.
 ##   - readOnlyRootFilesystem stays on so a worker can't pivot through
@@ -128,16 +127,16 @@ containerSecurityContext:
     # permitted" (verified live on the dev gVisor node 2026-07-07). Not
     # gVisor-specific: the same EPERM occurs on runc under drop-ALL.
     #
-    # NET_ADMIN was added on 2026-06-30 so the manager could install an
-    # iptables OUTPUT rule dropping loopback-TCP from non-root UIDs to the
-    # opencode internal port range — dead under gVisor (no netfilter) and
-    # superseded by ADR-033 Fix A′ (per-worker OPENCODE_SERVER_PASSWORD).
-    # The capability is kept here for now; dropping it is a separate
-    # follow-up audit rather than part of this change.
+    # NET_ADMIN was previously added (2026-06-30) for an iptables OUTPUT rule
+    # dropping loopback-TCP from non-root UIDs to the opencode internal port
+    # range. That rule (services/langy-agent/iptables.go) is deleted in this
+    # change — dead under gVisor (no netfilter) and superseded by the
+    # per-worker OPENCODE_SERVER_PASSWORD (ADR-033 Fix A′) — so NET_ADMIN is
+    # dropped here too. Nothing else in the manager touches the network stack.
     #
     # Any addition beyond this needs to be justified in the
     # SecurityContext header above.
-    add: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETUID", "SETGID", "NET_ADMIN"]
+    add: ["CHOWN", "DAC_OVERRIDE", "FOWNER", "SETUID", "SETGID"]
 
 # Sandboxed container runtime for this pod. The agent runs LLM-driven
 # arbitrary code (opencode workers shell out to git/npm/gh), so the headline
