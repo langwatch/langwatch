@@ -227,7 +227,7 @@ export class TraceSummaryClickHouseRepository
     const rowCountRaw = rows[0]?.rowCount;
     const raw = rows[0]?.occurredAtMs;
     const rowCount =
-      typeof rowCountRaw === "string" ? Number(rowCountRaw) : rowCountRaw;
+      typeof rowCountRaw === "string" ? Number(rowCountRaw) : rowCountRaw ?? NaN;
     if (!Number.isFinite(rowCount) || rowCount <= 0) {
       return { found: false };
     }
