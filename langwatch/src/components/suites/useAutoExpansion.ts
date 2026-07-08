@@ -1,11 +1,17 @@
 /**
  * Auto-expansion logic for run history rows.
  *
- * Expands all rows on first load for a given panel, auto-expands new arrivals,
- * and resets when groupBy changes.
+ * Expands only the most recent row on first load for a given panel (mounting
+ * every batch's card grid at once made large sets laggy), auto-expands new
+ * arrivals, and resets when groupBy changes.
  *
  * Expansion state is keyed by `panelKey` (e.g., scenarioSetId or "all-runs")
- * so that switching between panels preserves which rows were manually collapsed.
+ * so that switching between panels preserves which rows were manually
+ * collapsed. "Seen" ids are tracked separately from expanded ids so that
+ * rows present-but-collapsed on first load are not mistaken for new arrivals
+ * on the next refresh.
+ *
+ * @see specs/suites/simulations-performance.feature
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -20,27 +26,38 @@ interface UseAutoExpansionOptions {
 
 const STORAGE_KEY = "langwatch:run-history-expanded";
 
-/**
- * Module-level cache of which panels have already had their initial auto-expand.
- * Survives component remounts so switching panels doesn't re-expand everything.
- */
-const autoExpandedPanels = new Set<string>();
+type PanelState = { expanded: Set<string>; seen: Set<string> };
 
 /**
- * Module-level cache of expanded/collapsed state per panel+groupBy.
- * Preserves user's manual collapse/expand across panel switches and navigation.
- * Synced to localStorage so state persists across page transitions.
+ * Module-level cache of expanded/seen state per panel+groupBy.
+ * Preserves the user's manual collapse/expand across panel switches and
+ * navigation. Synced to localStorage so state persists across page loads.
  */
-const expandedStateCache = new Map<string, Set<string>>();
+const panelStateCache = new Map<string, PanelState>();
 
-// Hydrate from localStorage on module load
+// Hydrate from localStorage on module load. Supports the legacy format where
+// each entry was a plain array of expanded ids (treated as both expanded and
+// seen, matching the old expand-all behavior those entries were saved under).
 try {
-  const stored = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
+  const stored =
+    typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
   if (stored) {
-    const parsed = JSON.parse(stored) as Record<string, string[]>;
-    for (const [k, ids] of Object.entries(parsed)) {
-      expandedStateCache.set(k, new Set(ids));
-      autoExpandedPanels.add(k);
+    const parsed = JSON.parse(stored) as Record<
+      string,
+      string[] | { expanded: string[]; seen: string[] }
+    >;
+    for (const [k, value] of Object.entries(parsed)) {
+      if (Array.isArray(value)) {
+        panelStateCache.set(k, {
+          expanded: new Set(value),
+          seen: new Set(value),
+        });
+      } else {
+        panelStateCache.set(k, {
+          expanded: new Set(value.expanded),
+          seen: new Set(value.seen),
+        });
+      }
     }
   }
 } catch {
@@ -49,9 +66,9 @@ try {
 
 function persistToStorage() {
   try {
-    const obj: Record<string, string[]> = {};
-    for (const [k, ids] of expandedStateCache) {
-      obj[k] = [...ids];
+    const obj: Record<string, { expanded: string[]; seen: string[] }> = {};
+    for (const [k, state] of panelStateCache) {
+      obj[k] = { expanded: [...state.expanded], seen: [...state.seen] };
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
   } catch {
@@ -71,7 +88,7 @@ export function useAutoExpansion({
 }: UseAutoExpansionOptions) {
   const key = cacheKey(panelKey, groupBy);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
-    () => expandedStateCache.get(key) ?? new Set(),
+    () => panelStateCache.get(key)?.expanded ?? new Set(),
   );
   const prevGroupBy = useRef(groupBy);
   const prevPanelKey = useRef(panelKey);
@@ -80,64 +97,72 @@ export function useAutoExpansion({
   useEffect(() => {
     if (prevGroupBy.current !== groupBy || prevPanelKey.current !== panelKey) {
       const newKey = cacheKey(panelKey, groupBy);
-      const cached = expandedStateCache.get(newKey);
-      if (cached) {
-        setExpandedIds(cached);
-      } else {
-        setExpandedIds(new Set());
-        // Mark as not-yet-auto-expanded for this new key so first data triggers expansion
-        autoExpandedPanels.delete(newKey);
-      }
+      setExpandedIds(panelStateCache.get(newKey)?.expanded ?? new Set());
       prevGroupBy.current = groupBy;
       prevPanelKey.current = panelKey;
     }
   }, [groupBy, panelKey]);
 
-  // Auto-expand: all rows on first load, and only newly arriving rows after that
+  // Auto-expand: only the most recent row on first load (items arrive sorted
+  // newest-first), and only genuinely new arrivals after that.
   useEffect(() => {
     const items = groupBy === "none" ? batchRuns : groups;
     if (items.length === 0) return;
 
-    const currentIds = new Set(
-      items.map((item) =>
-        "batchRunId" in item ? item.batchRunId : (item as { groupKey: string }).groupKey,
-      ),
+    const currentIds = items.map((item) =>
+      "batchRunId" in item
+        ? item.batchRunId
+        : (item as { groupKey: string }).groupKey,
     );
 
-    if (!autoExpandedPanels.has(key)) {
-      // First load — expand all
-      setExpandedIds(currentIds);
-      expandedStateCache.set(key, currentIds);
-      autoExpandedPanels.add(key);
+    const cached = panelStateCache.get(key);
+
+    if (!cached) {
+      // First load — expand only the newest row, mark everything as seen
+      const newestId = currentIds[0];
+      const state: PanelState = {
+        expanded: new Set(newestId ? [newestId] : []),
+        seen: new Set(currentIds),
+      };
+      panelStateCache.set(key, state);
+      setExpandedIds(state.expanded);
       persistToStorage();
     } else {
-      // Subsequent updates — only add genuinely new rows
-      setExpandedIds((prev) => {
-        const newIds = [...currentIds].filter((id) => !prev.has(id));
-        if (newIds.length === 0) return prev;
-        const next = new Set(prev);
-        for (const id of newIds) next.add(id);
-        expandedStateCache.set(key, next);
-        persistToStorage();
-        return next;
-      });
+      // Subsequent updates — expand only rows never seen before
+      const newIds = currentIds.filter((id) => !cached.seen.has(id));
+      if (newIds.length === 0) return;
+      for (const id of newIds) {
+        cached.seen.add(id);
+        cached.expanded.add(id);
+      }
+      setExpandedIds(new Set(cached.expanded));
+      persistToStorage();
     }
   }, [groupBy, batchRuns, groups, key]);
 
   // Sync cache on toggle
-  const toggleExpanded = useCallback((id: string) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      expandedStateCache.set(key, next);
-      persistToStorage();
-      return next;
-    });
-  }, [key]);
+  const toggleExpanded = useCallback(
+    (id: string) => {
+      setExpandedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) {
+          next.delete(id);
+        } else {
+          next.add(id);
+        }
+        const cached = panelStateCache.get(key) ?? {
+          expanded: new Set<string>(),
+          seen: new Set<string>(),
+        };
+        cached.expanded = next;
+        cached.seen.add(id);
+        panelStateCache.set(key, cached);
+        persistToStorage();
+        return next;
+      });
+    },
+    [key],
+  );
 
   return { expandedIds, toggleExpanded };
 }

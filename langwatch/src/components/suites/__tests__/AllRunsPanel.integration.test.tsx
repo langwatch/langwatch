@@ -27,7 +27,16 @@ vi.mock("~/hooks/useDrawer", () => ({
 }));
 
 vi.mock("~/hooks/useSSESubscription", () => ({
-  useSSESubscription: vi.fn(),
+  useSSESubscription: vi.fn(() => ({
+    connectionState: "disconnected",
+    isConnected: false,
+    isConnecting: false,
+    hasError: false,
+    isDisconnected: true,
+    retryCount: 0,
+    lastData: undefined,
+    lastError: undefined,
+  })),
 }));
 
 vi.mock("~/hooks/usePageVisibility", () => ({
@@ -52,11 +61,18 @@ vi.mock("~/utils/compat/next-router", () => ({
 vi.mock("~/utils/api", () => ({
   api: {
     useContext: () => ({
-      scenarios: { getScenarioSetBatchHistory: { invalidate: vi.fn() } },
+      scenarios: {
+        getSuiteRunData: { invalidate: vi.fn() },
+        getRunState: { invalidate: vi.fn(), prefetch: vi.fn() },
+        getScenarioSetBatchHistory: { invalidate: vi.fn() },
+      },
     }),
     scenarios: {
       getSuiteRunData: {
         useQuery: mockRunDataQuery,
+      },
+      getSuiteRunFreshness: {
+        useQuery: vi.fn(() => ({ data: undefined })),
       },
       getAll: {
         useQuery: mockScenariosQuery,

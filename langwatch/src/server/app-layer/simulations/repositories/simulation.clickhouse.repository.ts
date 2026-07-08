@@ -160,7 +160,10 @@ const RUN_COLUMNS = `
 /**
  * Columns for list/grid views — truncated messages and no heavy JSON blobs.
  * Keeps first 6 messages (3 turns) for grid card previews.
- * Omits Messages.Rest (tool call JSON) and Messages.TraceId.
+ * Omits Messages.Rest (tool call JSON), Messages.TraceId, TraceIds,
+ * Reasoning and Error (detail-drawer-only payloads; Reasoning is the judge's
+ * multi-paragraph rationale and Error can carry stack traces). MetCriteria /
+ * UnmetCriteria stay: the list renders "Passed (met/total)" from their counts.
  */
 const LIST_COLUMNS = `
   ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
@@ -170,8 +173,11 @@ const LIST_COLUMNS = `
   arraySlice(\`Messages.Content\`, 1, 6) AS \`Messages.Content\`,
   CAST([] AS Array(String)) AS \`Messages.TraceId\`,
   CAST([] AS Array(String)) AS \`Messages.Rest\`,
-  TraceIds,
-  Verdict, Reasoning, MetCriteria, UnmetCriteria, Error,
+  CAST([] AS Array(String)) AS TraceIds,
+  Verdict,
+  CAST(NULL AS Nullable(String)) AS Reasoning,
+  MetCriteria, UnmetCriteria,
+  CAST(NULL AS Nullable(String)) AS Error,
   toString(DurationMs) AS DurationMs,
   TotalCost, RoleCosts, RoleLatencies,
   toString(toUnixTimestamp64Milli(StartedAt)) AS StartedAt,
@@ -910,6 +916,44 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       nextCursor,
       hasMore,
     };
+  }
+
+  async findLastUpdatedAt({
+    projectId,
+    scenarioSetId,
+    startDate,
+    endDate,
+  }: {
+    projectId: string;
+    scenarioSetId?: string;
+    startDate?: number;
+    endDate?: number;
+  }): Promise<number> {
+    const dateFilter = buildDateFilter({ startDate, endDate });
+    const setFilter = scenarioSetId
+      ? "AND ScenarioSetId IN ({scenarioSetIds:Array(String)})"
+      : "";
+
+    // max(UpdatedAt) over all versions equals the latest version's UpdatedAt
+    // (ReplacingMergeTree version column), so no dedup subquery is needed.
+    // Reads only light columns; the StartedAt window prunes partitions.
+    const rows = await this.queryRows<{ LastUpdatedAt: string | null }>(
+      `SELECT toString(toUnixTimestamp64Milli(max(UpdatedAt))) AS LastUpdatedAt
+       FROM ${TABLE_NAME}
+       WHERE TenantId = {tenantId:String}
+         ${setFilter}
+         ${dateFilter.whereClause}`,
+      {
+        tenantId: projectId,
+        ...(scenarioSetId
+          ? { scenarioSetIds: expandSetIdFilter(scenarioSetId) }
+          : {}),
+        ...dateFilter.params,
+      },
+      { expectedMaxDurationMs: 1000, expectedMaxReadBytes: 1_000_000 },
+    );
+
+    return Number(rows[0]?.LastUpdatedAt ?? "0");
   }
 
   async getExternalSetSummaries(params: {

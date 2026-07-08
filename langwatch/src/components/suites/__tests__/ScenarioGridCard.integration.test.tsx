@@ -16,6 +16,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScenarioGridCard } from "../ScenarioGridCard";
 import { makeScenarioRunData } from "./test-helpers";
 
+vi.mock("../usePrefetchRunState", () => ({
+  usePrefetchRunState: () => vi.fn(),
+}));
+
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );

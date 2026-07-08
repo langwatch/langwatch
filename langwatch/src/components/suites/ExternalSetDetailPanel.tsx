@@ -18,6 +18,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Period } from "~/components/PeriodSelector";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { api } from "~/utils/api";
@@ -38,6 +39,7 @@ import {
 import { RunRow } from "./RunRow";
 import { GroupRow } from "./GroupRow";
 import { useRunHistoryStore } from "./useRunHistoryStore";
+import { useSuiteRunFreshness } from "./useSuiteRunFreshness";
 
 type ExternalSetDetailPanelProps = {
   scenarioSetId: string;
@@ -74,6 +76,15 @@ export function ExternalSetDetailPanel({
     : "none";
 
 
+  // Live updates: SSE invalidates getSuiteRunData directly; its connection
+  // state disables the fallback freshness polling below.
+  const { isConnected: sseConnected } = useSimulationUpdateListener({
+    projectId: project?.id ?? "",
+    enabled: !!project?.id,
+    debounceMs: 500,
+    filter: { scenarioSetId },
+  });
+
   const {
     data: runDataResult,
     isLoading,
@@ -88,12 +99,22 @@ export function ExternalSetDetailPanel({
     },
     {
       enabled: !!project,
-      refetchInterval: 5000,
+      // No timer on the heavy query: SSE invalidations and the freshness
+      // probe below drive refetches, so quiet sets never re-download runs.
       trpc: { context: { skipBatch: true } },
     },
   );
 
   const runData = runDataResult && "runs" in runDataResult ? runDataResult.runs : undefined;
+
+  useSuiteRunFreshness({
+    scenarioSetId,
+    startDateMs: period.startDate.getTime(),
+    endDateMs: period.endDate.getTime(),
+    runs: runData ?? [],
+    enabled: !!project,
+    sseConnected,
+  });
 
   // Fetch scenarios for filter options
   const { data: scenarios } = api.scenarios.getAll.useQuery(
