@@ -42,9 +42,8 @@ export const useOnboardingFlow = () => {
   // v5): flag off (or loading, which reports enabled=false) = the exact
   // pre-fork flow. User-level evaluation — there is no org yet during
   // onboarding.
-  const { enabled: intentForkEnabled } = useFeatureFlag(
-    "release_ui_ai_governance_enabled",
-  );
+  const { enabled: intentForkEnabled, isLoading: intentForkLoading } =
+    useFeatureFlag("release_ui_ai_governance_enabled");
 
   // Flow configuration — recomputed when the intent changes (ADR-038 fork).
   // Safe mid-flow: intent only changes while ON the INTENT screen, whose
@@ -62,7 +61,14 @@ export const useOnboardingFlow = () => {
   const canProceed = (currentScreenIndex: OnboardingScreenIndex) => {
     switch (currentScreenIndex) {
       case OnboardingScreenIndex.ORGANIZATION:
-        return Boolean(organizationName?.trim() && agreement);
+        // Hold the first screen until the fork flag resolves: advancing
+        // while it loads would take the pre-fork path and, if the flag then
+        // resolves enabled, the (kept) BASIC_INFO position silently skips
+        // the required INTENT screen. Resolution is one query; on error the
+        // flag settles disabled and the pre-fork flow proceeds.
+        return (
+          Boolean(organizationName?.trim() && agreement) && !intentForkLoading
+        );
 
       case OnboardingScreenIndex.INTENT:
         return intent !== void 0;
