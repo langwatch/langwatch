@@ -143,9 +143,12 @@ export const FEATURE_FLAGS = [
   {
     key: "release_ui_ai_governance_enabled",
     scope: "PRODUCT",
-    defaultValue: false,
+    // GA (ADR-038): default-on for everyone; the flag stays as the per-org
+    // kill-switch (a PostHog off-condition re-hides governance UI and
+    // re-arms the CLI device-login gate for that org, no deploy).
+    defaultValue: true,
     description:
-      "Gates the personal keys, admin oversight, RoutingPolicy, and IngestionSource UI surfaces. Distinct from release_ui_ai_gateway_menu_enabled — the existing gateway product ships unblocked while governance keeps cooking.",
+      "Gates the personal keys, admin oversight, RoutingPolicy, and IngestionSource UI surfaces. GA default-on since ADR-038; kept as a per-org kill-switch. Distinct from release_ui_ai_gateway_menu_enabled.",
   },
   {
     key: "release_langy_enabled",
