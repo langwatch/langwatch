@@ -51,6 +51,7 @@ export default function Index() {
         resolveHomeDestination({
           resolverDestination: resolved.data.destination,
           isOverride: resolved.data.isOverride,
+          intentPinned: resolved.data.intentPinned,
           governanceUiEnabled: resolved.data.governanceUiEnabled,
           lastVisitedHomeKind,
           lastProjectSlug: project?.slug ?? null,
