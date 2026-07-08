@@ -34,7 +34,6 @@ import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../constants";
 
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
-import { useTargetModel } from "../../hooks/useTargetModel";
 import { useTargetName } from "../../hooks/useTargetName";
 import type { TargetConfig } from "../../types";
 import {
@@ -127,6 +126,13 @@ export const TargetHeader = memo(function TargetHeader({
   );
   const hasMissingMappings = targetHasMissingMappings(target, activeDatasetId);
 
+  // Glows this column's header when a pairwise verdict's variant name was
+  // clicked, so users can trace an ambiguous "bot (1)" label back to its
+  // source column (customer feedback, 2026-07-08).
+  const isHighlightedVariant = useEvaluationsV3Store(
+    (state) => state.ui.highlightedVariantTargetId === target.id,
+  );
+
   // Get the display name for this target
   const targetName = useTargetName(target);
 
@@ -158,15 +164,8 @@ export const TargetHeader = memo(function TargetHeader({
     ? variantBNameRaw || target.pairwise?.variantB || ""
     : "Variant B";
 
-  // Same rules-of-hooks placeholder trick as the name hooks above.
-  const variantAModel = useTargetModel(
-    variantATarget ?? (PLACEHOLDER_PAIRWISE_VARIANT as TargetConfig),
-  );
-  const variantBModel = useTargetModel(
-    variantBTarget ?? (PLACEHOLDER_PAIRWISE_VARIANT as TargetConfig),
-  );
   // Display-only names: when both variants resolve to the same name (e.g.
-  // the same prompt re-run against a different model), disambiguate so the
+  // the same prompt re-run with a different config), disambiguate so the
   // scoreboard doesn't show two identical labels. The raw names above stay
   // untouched — they're still what's matched against the stored verdict
   // label via `variantAHandle`/`variantBHandle` below.
@@ -176,8 +175,6 @@ export const TargetHeader = memo(function TargetHeader({
   } = disambiguateVariantNames(
     variantAName,
     variantBName,
-    variantAModel,
-    variantBModel,
   );
 
   // Get results, evaluators, and dataset for computing aggregates
@@ -391,7 +388,19 @@ export const TargetHeader = memo(function TargetHeader({
         : "Switch Agent";
 
   const headerRow = (
-    <HStack gap={2} width="full" marginY={-2}>
+    <HStack
+      gap={2}
+      width="full"
+      marginY={-2}
+      borderRadius="md"
+      transition="box-shadow 0.2s ease"
+      boxShadow={
+        isHighlightedVariant ? "0 0 0 2px var(--chakra-colors-blue-400)" : "none"
+      }
+      data-testid={
+        isHighlightedVariant ? "target-header-highlighted" : undefined
+      }
+    >
       <Menu.Root
         positioning={{ placement: "bottom-start" }}
         open={menuOpen}

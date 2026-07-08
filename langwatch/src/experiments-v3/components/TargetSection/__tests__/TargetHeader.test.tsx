@@ -5,7 +5,6 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useEvaluationsV3Store } from "../../../hooks/useEvaluationsV3Store";
-import { useTargetModel } from "../../../hooks/useTargetModel";
 import { useTargetName } from "../../../hooks/useTargetName";
 import {
   createInitialResults,
@@ -41,9 +40,6 @@ vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
 // the implementation for just their own targets.
 vi.mock("../../../hooks/useTargetName", () => ({
   useTargetName: vi.fn((target: { id: string }) => target.id),
-}));
-vi.mock("../../../hooks/useTargetModel", () => ({
-  useTargetModel: vi.fn(() => undefined as string | undefined),
 }));
 vi.mock("../../../hooks/useEvaluatorName", () => ({
   useEvaluatorName: () => "Exact Match",
@@ -642,31 +638,10 @@ describe("TargetHeader", () => {
       vi.mocked(useTargetName).mockImplementation(
         (target: { id: string }) => target.id,
       );
-      vi.mocked(useTargetModel).mockImplementation(() => undefined);
       useEvaluationsV3Store.getState().reset?.();
     });
 
-    it("disambiguates by model when the models differ", () => {
-      vi.mocked(useTargetModel).mockImplementation((target: { id: string }) => {
-        if (target.id === "variant-a-target") return "gpt-4.1";
-        if (target.id === "variant-b-target") return "gpt-5-mini";
-        return undefined;
-      });
-
-      renderWithProviders(
-        <TargetHeader
-          target={pairwiseColumnTarget}
-          onEdit={mockOnEdit}
-          onRemove={mockOnRemove}
-        />,
-      );
-
-      expect(screen.getByText("Bot (gpt-4.1) wins")).toBeInTheDocument();
-    });
-
-    it("falls back to numbering when the models also match", () => {
-      vi.mocked(useTargetModel).mockImplementation(() => "gpt-4.1");
-
+    it("shows numbered names instead of two identical labels", () => {
       renderWithProviders(
         <TargetHeader
           target={pairwiseColumnTarget}
@@ -676,6 +651,63 @@ describe("TargetHeader", () => {
       );
 
       expect(screen.getByText("Bot (1) wins")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a variant target is highlighted via a pairwise verdict click", () => {
+    const promptTarget: TargetConfig = {
+      id: "highlighted-target",
+      type: "prompt",
+      promptId: "prompt-123",
+      inputs: [],
+      outputs: [],
+      mappings: {},
+    };
+
+    afterEach(() => {
+      useEvaluationsV3Store.getState().reset?.();
+    });
+
+    it("glows the header when this target is the highlighted variant", () => {
+      useEvaluationsV3Store.setState({
+        ui: {
+          ...createInitialUIState(),
+          highlightedVariantTargetId: "highlighted-target",
+        },
+      });
+
+      renderWithProviders(
+        <TargetHeader
+          target={promptTarget}
+          onEdit={mockOnEdit}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      expect(
+        screen.getByTestId("target-header-highlighted"),
+      ).toBeInTheDocument();
+    });
+
+    it("does not glow the header when a different target is highlighted", () => {
+      useEvaluationsV3Store.setState({
+        ui: {
+          ...createInitialUIState(),
+          highlightedVariantTargetId: "some-other-target",
+        },
+      });
+
+      renderWithProviders(
+        <TargetHeader
+          target={promptTarget}
+          onEdit={mockOnEdit}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      expect(
+        screen.queryByTestId("target-header-highlighted"),
+      ).not.toBeInTheDocument();
     });
   });
 });

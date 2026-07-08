@@ -53,9 +53,6 @@ vi.mock("../hooks/useTargetName", () => ({
   useTargetName: (target: { id: string }) =>
     target.id === "target-1" ? "My Prompt" : "Other Prompt",
 }));
-vi.mock("../hooks/useTargetModel", () => ({
-  useTargetModel: () => undefined,
-}));
 vi.mock("../hooks/useEvaluatorName", () => ({
   useEvaluatorName: () => "Exact Match",
   useEvaluatorNames: () => new Map(),

@@ -12,7 +12,6 @@
  * the strip exactly once per row (next to variantA's output column).
  */
 
-import { useTargetModel } from "../hooks/useTargetModel";
 import { useTargetName } from "../hooks/useTargetName";
 import type { TargetConfig } from "../types";
 import { normalizePairwiseLabel } from "../utils/computeAggregates";
@@ -40,8 +39,6 @@ export function PairwiseVerdictRow({
 }: PairwiseVerdictRowProps) {
   const variantAName = useTargetName(variantA);
   const variantBName = useTargetName(variantB);
-  const variantAModel = useTargetModel(variantA);
-  const variantBModel = useTargetModel(variantB);
 
   const normalized = normalizePairwiseLabel(
     label,
@@ -55,18 +52,15 @@ export function PairwiseVerdictRow({
   // Display-only: disambiguate when both variants share a name. The
   // normalization above already matched against the raw names.
   const { variantAName: displayAName, variantBName: displayBName } =
-    disambiguateVariantNames(
-      variantAName,
-      variantBName,
-      variantAModel,
-      variantBModel,
-    );
+    disambiguateVariantNames(variantAName, variantBName);
 
   return (
     <RowVerdictStrip
       label={normalized}
       variantAName={displayAName}
       variantBName={displayBName}
+      variantAId={variantA.id}
+      variantBId={variantB.id}
       reasoning={reasoning}
     />
   );
