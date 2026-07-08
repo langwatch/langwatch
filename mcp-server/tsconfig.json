@@ -20,6 +20,10 @@
     // package's own copy (a declared dependency) so the type-checker resolves it.
     // Paths are resolved relative to this tsconfig (no baseUrl — tsgo removed it).
     "paths": { "zod": ["./node_modules/zod"] },
+    // tsup's DTS bundler injects `baseUrl` to resolve the `paths` mapping above,
+    // which TypeScript 6.0 flags as deprecated (removed in 7.0). Silence it for
+    // the 6.x line; revisit when moving to TS 7.
+    "ignoreDeprecations": "6.0",
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
