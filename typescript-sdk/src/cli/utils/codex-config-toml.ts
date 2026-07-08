@@ -183,7 +183,7 @@ export function writeCodexOtelBlock(
 
   if (!fs.existsSync(filePath)) {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, block, { mode: 0o600 });
+    writeFile0600(filePath, block);
     return { action: "created", path: filePath };
   }
 
@@ -195,17 +195,29 @@ export function writeCodexOtelBlock(
   if (re.test(prior)) {
     const next = prior.replace(re, block);
     if (next === prior) return { action: "unchanged", path: filePath };
-    fs.writeFileSync(filePath, next, { mode: 0o600 });
+    writeFile0600(filePath, next);
     return { action: "updated", path: filePath };
   }
 
   const sep = prior.endsWith("\n") ? "\n" : "\n\n";
-  fs.writeFileSync(filePath, prior + sep + block, { mode: 0o600 });
+  writeFile0600(filePath, prior + sep + block);
   return { action: "updated", path: filePath };
 }
 
 function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Write `content` and enforce `0600`. `writeFileSync`'s `mode` option is
+ * only honored when CREATING the file — on an existing file it is silently
+ * ignored, leaving whatever permissions the file already had. Codex may
+ * have created `config.toml` at `0644`, and these blocks can carry a bearer
+ * token, so chmod explicitly to keep the secret owner-only on every write.
+ */
+function writeFile0600(filePath: string, content: string): void {
+  fs.writeFileSync(filePath, content, { mode: 0o600 });
+  fs.chmodSync(filePath, 0o600);
 }
 
 const GW_BEGIN = "# >>> langwatch gateway begin >>>";
@@ -349,7 +361,7 @@ export function writeCodexGatewayBlock(
   let action: CodexOtelWriteAction;
   if (!fs.existsSync(filePath)) {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, block, { mode: 0o600 });
+    writeFile0600(filePath, block);
     action = "created";
   } else {
     const prior = fs.readFileSync(filePath, "utf8");
@@ -362,12 +374,12 @@ export function writeCodexGatewayBlock(
       if (next === prior) {
         action = "unchanged";
       } else {
-        fs.writeFileSync(filePath, next, { mode: 0o600 });
+        writeFile0600(filePath, next);
         action = "updated";
       }
     } else {
       const sep = prior.endsWith("\n") ? "\n" : "\n\n";
-      fs.writeFileSync(filePath, prior + sep + block, { mode: 0o600 });
+      writeFile0600(filePath, prior + sep + block);
       action = "updated";
     }
   }
@@ -375,14 +387,14 @@ export function writeCodexGatewayBlock(
   let profileAction: CodexOtelWriteAction;
   if (!fs.existsSync(profilePath)) {
     fs.mkdirSync(path.dirname(profilePath), { recursive: true });
-    fs.writeFileSync(profilePath, profileBody, { mode: 0o600 });
+    writeFile0600(profilePath, profileBody);
     profileAction = "created";
   } else {
     const priorProfile = fs.readFileSync(profilePath, "utf8");
     if (priorProfile === profileBody) {
       profileAction = "unchanged";
     } else {
-      fs.writeFileSync(profilePath, profileBody, { mode: 0o600 });
+      writeFile0600(profilePath, profileBody);
       profileAction = "updated";
     }
   }

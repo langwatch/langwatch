@@ -167,6 +167,22 @@ describe("writeCodexOtelBlock", () => {
       );
       expect(codexOtelBlockHasAuthHeader(filePath)).toBe(true);
     });
+
+    it("tightens a pre-existing 0644 config.toml to 0600 when writing the header", () => {
+      const filePath = path.join(tmp, "config.toml");
+      // codex may have created config.toml world-readable; writeFileSync's
+      // `mode` is ignored on an existing file, so the write must chmod.
+      fs.writeFileSync(filePath, 'model = "gpt-5"\n', { mode: 0o644 });
+      expect(fs.statSync(filePath).mode & 0o777).toBe(0o644);
+      writeCodexOtelBlock(
+        {
+          endpoint: "https://app.langwatch.ai/api/otel/v1/traces",
+          ingestionToken: "sk-lw-SECRET",
+        },
+        { filePath, persistAuthHeader: true },
+      );
+      expect(fs.statSync(filePath).mode & 0o777).toBe(0o600);
+    });
   });
 
   describe("when a header was persisted and the wrapper rewrites the block", () => {
