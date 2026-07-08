@@ -77,32 +77,22 @@ type ActionState =
 
 /**
  * Action row for terminal states (approved, denied, expired, error): the
- * flow is over either way, so offer the two places to go next. Closing the
- * tab is the user's own gesture — browsers block window.close() on tabs
- * with navigation history, so we don't pretend to offer it.
+ * flow is over either way — Go Home lands on "/" and the resolver picks
+ * the right surface per org intent. Closing the tab is the user's own
+ * gesture; browsers block window.close() on tabs with navigation history,
+ * so we don't pretend to offer it.
  */
-function TerminalActions({ tracesHref }: { tracesHref: string }) {
+function TerminalActions() {
   return (
-    <Stack direction={{ base: "column", sm: "row" }} gap={3}>
-      <Button
-        variant="outline"
-        flex={1}
-        onClick={() => {
-          window.location.href = "/";
-        }}
-      >
-        Go Home
-      </Button>
-      <Button
-        colorPalette="blue"
-        flex={1}
-        onClick={() => {
-          window.location.href = tracesHref;
-        }}
-      >
-        Check Traces
-      </Button>
-    </Stack>
+    <Button
+      colorPalette="blue"
+      width="full"
+      onClick={() => {
+        window.location.href = "/";
+      }}
+    >
+      Go Home
+    </Button>
   );
 }
 
@@ -138,16 +128,6 @@ export default function CliAuthPage() {
       setSelectedOrgId(organizations[0]!.id);
     }
   }, [organizations, selectedOrgId]);
-
-  // Where "Check Traces" points: the first shared project's traces view,
-  // or "/" (the home resolver picks the right surface) when the org has no
-  // shared project yet. Personal workspaces are never a target (ADR-038 v6).
-  const tracesHref = useMemo(() => {
-    const slug = organizations
-      ?.flatMap((org) => org.teams.filter((t) => !t.isPersonal))
-      .flatMap((t) => t.projects)[0]?.slug;
-    return slug ? `/${slug}/traces` : "/";
-  }, [organizations]);
 
   // First-touch acquisition source: a browser opened by `langwatch login`
   // carries no utm/ref params, so stamp the CLI as lead source here. The
@@ -406,7 +386,7 @@ export default function CliAuthPage() {
                       </Alert.Description>
                     </Alert.Content>
                   </Alert.Root>
-                  <TerminalActions tracesHref={tracesHref} />
+                  <TerminalActions />
                 </>
               )}
 
@@ -419,7 +399,7 @@ export default function CliAuthPage() {
                       <Alert.Description>{lookup.message}</Alert.Description>
                     </Alert.Content>
                   </Alert.Root>
-                  <TerminalActions tracesHref={tracesHref} />
+                  <TerminalActions />
                 </>
               )}
 
@@ -584,7 +564,7 @@ export default function CliAuthPage() {
                       )}
                     </Alert.Content>
                   </Alert.Root>
-                  <TerminalActions tracesHref={tracesHref} />
+                  <TerminalActions />
                 </>
               )}
 
@@ -600,7 +580,7 @@ export default function CliAuthPage() {
                       </Alert.Description>
                     </Alert.Content>
                   </Alert.Root>
-                  <TerminalActions tracesHref={tracesHref} />
+                  <TerminalActions />
                 </>
               )}
             </VStack>
