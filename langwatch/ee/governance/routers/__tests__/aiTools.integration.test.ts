@@ -1331,6 +1331,20 @@ describe("aiToolsRouter integration", () => {
     describe("when every catalog entry is disabled", () => {
       /** @scenario a curated catalog the member cannot see never falls back to suggestions */
       it("still returns no suggestions - disabling is curation, not absence", async () => {
+        // Self-contained fixture: seed an org-wide entry here rather than
+        // relying on the sibling test's row, then disable everything.
+        const created = await callerFor(freshAdminUserId).aiTools.create({
+          organizationId: freshOrgId,
+          type: "coding_assistant",
+          displayName: `Codex - to disable ${nanoid(4)}`,
+          iconAsset: "preset:codex",
+          config: {
+            assistantKind: "codex",
+            setupCommand: "langwatch codex",
+          },
+        });
+        expect(created.id).toBeTruthy();
+
         await prisma.aiToolEntry.updateMany({
           where: { organizationId: freshOrgId },
           data: { enabled: false },
