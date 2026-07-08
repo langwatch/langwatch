@@ -139,14 +139,14 @@ export default function CliAuthPage() {
     }
   }, [organizations, selectedOrgId]);
 
-  // Where "Go to traces" points: the first shared project's messages view,
+  // Where "Check Traces" points: the first shared project's traces view,
   // or "/" (the home resolver picks the right surface) when the org has no
   // shared project yet. Personal workspaces are never a target (ADR-038 v6).
   const tracesHref = useMemo(() => {
     const slug = organizations
       ?.flatMap((org) => org.teams.filter((t) => !t.isPersonal))
       .flatMap((t) => t.projects)[0]?.slug;
-    return slug ? `/${slug}/messages` : "/";
+    return slug ? `/${slug}/traces` : "/";
   }, [organizations]);
 
   // First-touch acquisition source: a browser opened by `langwatch login`
