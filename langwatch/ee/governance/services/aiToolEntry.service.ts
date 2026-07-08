@@ -421,6 +421,26 @@ export class AiToolEntryService {
   }
 
   /**
+   * Suggested tiles for the /me portal, gated on the ORG having no
+   * catalog at all: any non-archived entry — enabled or not, visible to
+   * the caller or not — means an admin has curated, so suggestions must
+   * not advertise tools past that curation (a department-scoped catalog
+   * returns an empty user-facing list for outside members, which is NOT
+   * the same as an untouched org).
+   */
+  async listSuggestedTilesForOrg({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<ReturnType<typeof AiToolEntryService.listSuggestedPortalTiles>> {
+    const curatedEntries = await this.prisma.aiToolEntry.count({
+      where: { organizationId, archivedAt: null },
+    });
+    if (curatedEntries > 0) return [];
+    return AiToolEntryService.listSuggestedPortalTiles();
+  }
+
+  /**
    * The suggested tiles the /me portal renders when an org has published
    * no catalog yet: the starter pack's coding assistants, render-ready
    * (icon + setup command included), Claude Code first per pack order.

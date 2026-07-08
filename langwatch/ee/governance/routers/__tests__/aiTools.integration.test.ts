@@ -1186,4 +1186,161 @@ describe("aiToolsRouter integration", () => {
       ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     });
   });
+
+  /**
+   * Spec: specs/ai-governance/personal-portal/portal-grid.feature
+   *   "brand-new org suggests the default coding assistants to a member"
+   *   "a curated catalog the member cannot see never falls back to suggestions"
+   *
+   * Dedicated fresh org: the shared suite org accumulates catalog entries
+   * from earlier describes, and the whole point here is the org-level
+   * (not caller-visible) emptiness gate.
+   */
+  describe("suggestedTiles", () => {
+    const ns2 = `aitools-sugg-${nanoid(8)}`;
+    let freshOrgId: string;
+    let freshDeptId: string;
+    let freshAdminUserId: string;
+    let freshMemberUserId: string;
+
+    beforeAll(async () => {
+      const organization = await prisma.organization.create({
+        data: { name: `AiTools Sugg Org ${ns2}`, slug: `--ait-sugg-${ns2}` },
+      });
+      freshOrgId = organization.id;
+
+      const dept = await prisma.department.create({
+        data: { organizationId: freshOrgId, name: `Sugg Dept ${ns2}` },
+      });
+      freshDeptId = dept.id;
+
+      const admin = await prisma.user.create({
+        data: { name: "Sugg Admin", email: `ait-sugg-admin-${ns2}@example.com` },
+      });
+      freshAdminUserId = admin.id;
+      await prisma.organizationUser.create({
+        data: {
+          userId: admin.id,
+          organizationId: freshOrgId,
+          role: OrganizationUserRole.ADMIN,
+        },
+      });
+      await prisma.roleBinding.create({
+        data: {
+          organizationId: freshOrgId,
+          userId: admin.id,
+          role: TeamUserRole.ADMIN,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: freshOrgId,
+        },
+      });
+
+      // Member with no department: outside any department-scoped tile.
+      const member = await prisma.user.create({
+        data: { name: "Sugg Member", email: `ait-sugg-mem-${ns2}@example.com` },
+      });
+      freshMemberUserId = member.id;
+      await prisma.organizationUser.create({
+        data: {
+          userId: member.id,
+          organizationId: freshOrgId,
+          role: OrganizationUserRole.MEMBER,
+        },
+      });
+      await prisma.roleBinding.create({
+        data: {
+          organizationId: freshOrgId,
+          userId: member.id,
+          role: TeamUserRole.MEMBER,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: freshOrgId,
+        },
+      });
+    });
+
+    afterAll(async () => {
+      await prisma.aiToolEntry
+        .deleteMany({ where: { organizationId: freshOrgId } })
+        .catch(() => {});
+      await prisma.roleBinding
+        .deleteMany({ where: { organizationId: freshOrgId } })
+        .catch(() => {});
+      await prisma.organizationUser
+        .deleteMany({ where: { organizationId: freshOrgId } })
+        .catch(() => {});
+      await prisma.department
+        .deleteMany({ where: { organizationId: freshOrgId } })
+        .catch(() => {});
+      await prisma.organization
+        .deleteMany({ where: { slug: `--ait-sugg-${ns2}` } })
+        .catch(() => {});
+      await prisma.user
+        .deleteMany({
+          where: {
+            email: {
+              in: [
+                `ait-sugg-admin-${ns2}@example.com`,
+                `ait-sugg-mem-${ns2}@example.com`,
+              ],
+            },
+          },
+        })
+        .catch(() => {});
+    });
+
+    describe("when the org has no catalog at all", () => {
+      /** @scenario brand-new org suggests the default coding assistants to a member */
+      it("returns the starter-pack coding assistants with Claude Code first", async () => {
+        const suggested = await callerFor(freshMemberUserId).aiTools.suggestedTiles({
+          organizationId: freshOrgId,
+        });
+
+        expect(suggested.length).toBeGreaterThan(0);
+        expect(suggested[0]?.slug).toBe("claude-code");
+        expect(suggested.every((t) => t.type === "coding_assistant")).toBe(true);
+      });
+    });
+
+    describe("when the org catalog has an entry the member cannot see", () => {
+      /** @scenario a curated catalog the member cannot see never falls back to suggestions */
+      it("returns no suggestions even though the member's visible list is empty", async () => {
+        await callerFor(freshAdminUserId).aiTools.create({
+          organizationId: freshOrgId,
+          departmentIds: [freshDeptId],
+          type: "coding_assistant",
+          displayName: `Claude Code - dept only ${nanoid(4)}`,
+          iconAsset: "preset:claude_code",
+          config: {
+            assistantKind: "claude_code",
+            setupCommand: "langwatch claude",
+          },
+        });
+
+        const visible = await callerFor(freshMemberUserId).aiTools.list({
+          organizationId: freshOrgId,
+        });
+        expect(visible).toHaveLength(0);
+
+        const suggested = await callerFor(freshMemberUserId).aiTools.suggestedTiles({
+          organizationId: freshOrgId,
+        });
+        expect(suggested).toHaveLength(0);
+      });
+    });
+
+    describe("when every catalog entry is disabled", () => {
+      /** @scenario a curated catalog the member cannot see never falls back to suggestions */
+      it("still returns no suggestions - disabling is curation, not absence", async () => {
+        await prisma.aiToolEntry.updateMany({
+          where: { organizationId: freshOrgId },
+          data: { enabled: false },
+        });
+
+        const suggested = await callerFor(freshMemberUserId).aiTools.suggestedTiles({
+          organizationId: freshOrgId,
+        });
+        expect(suggested).toHaveLength(0);
+      });
+    });
+  });
 });

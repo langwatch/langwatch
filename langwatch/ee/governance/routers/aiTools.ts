@@ -327,15 +327,19 @@ export const aiToolsRouter = createTRPCRouter({
 
   /**
    * The suggested coding-assistant tiles the /me portal renders while the
-   * org's catalog is still empty. Static org-agnostic projection of the
-   * starter pack, gated on `aiTools:view` so every org member gets a
-   * working portal from day one.
+   * org has no catalog at all. Empty once ANY entry exists (enabled or
+   * not, visible to the caller or not) so suggestions never advertise
+   * tools past an admin's curation. Gated on `aiTools:view` so every org
+   * member gets a working portal from day one.
    */
   suggestedTiles: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
     .use(checkOrganizationPermission("aiTools:view"))
-    .query(() => {
-      return AiToolEntryService.listSuggestedPortalTiles();
+    .query(async ({ ctx, input }) => {
+      const service = AiToolEntryService.create(ctx.prisma);
+      return await service.listSuggestedTilesForOrg({
+        organizationId: input.organizationId,
+      });
     }),
 
   /**

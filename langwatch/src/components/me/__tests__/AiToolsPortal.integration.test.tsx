@@ -60,6 +60,12 @@ const SUGGESTED_TILES = [
 
 // Catalog contents per test; empty by default (fresh org).
 let mockCatalogEntries: unknown[] = [];
+// Suggestions server response per test; the starter pack by default
+// (untouched org). [] simulates a curated catalog the member can't see.
+let mockSuggested: { data: unknown[] | undefined; isLoading: boolean } = {
+  data: SUGGESTED_TILES,
+  isLoading: false,
+};
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -71,9 +77,10 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({ data: { configuredProviders: [] } }),
       },
       suggestedTiles: {
-        useQuery: (_input: unknown, opts?: { enabled?: boolean }) => ({
-          data: opts?.enabled === false ? undefined : SUGGESTED_TILES,
-        }),
+        useQuery: (_input: unknown, opts?: { enabled?: boolean }) =>
+          opts?.enabled === false
+            ? { data: undefined, isLoading: false }
+            : mockSuggested,
       },
     },
     publicEnv: {
@@ -94,6 +101,7 @@ describe("<AiToolsPortal /> empty state", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCatalogEntries = [];
+    mockSuggested = { data: SUGGESTED_TILES, isLoading: false };
   });
 
   afterEach(() => {
@@ -171,6 +179,35 @@ describe("<AiToolsPortal /> empty state", () => {
       fireEvent.click(screen.getByText("Claude Code"));
 
       expect(screen.getByText("langwatch claude")).toBeInTheDocument();
+    });
+
+    it("never shows the nothing-here note while suggestions are loading", () => {
+      mockSuggested = { data: undefined, isLoading: true };
+
+      renderWithProviders(<AiToolsPortal />);
+
+      expect(screen.queryByText(/admin hasn.t added any AI tools/i)).toBeNull();
+      expect(screen.queryByText("Claude Code")).toBeNull();
+    });
+  });
+
+  describe("when the org has a curated catalog the member cannot see", () => {
+    beforeEach(() => {
+      mockCanManage = false;
+      // Visible slice is empty but the server withholds suggestions
+      // because the org's catalog is curated (e.g. department-scoped).
+      mockSuggested = { data: [], isLoading: false };
+    });
+
+    /** @scenario a curated catalog the member cannot see never falls back to suggestions */
+    it("renders the nothing-here note and no suggested tiles", () => {
+      renderWithProviders(<AiToolsPortal />);
+
+      expect(
+        screen.getByText(/admin hasn.t added any AI tools/i),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Claude Code")).toBeNull();
+      expect(screen.queryByText("Suggested")).toBeNull();
     });
   });
 

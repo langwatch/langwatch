@@ -67,15 +67,19 @@ export function AiToolsPortal() {
   );
 
   const entries = (listQuery.data ?? []) as unknown as AiToolEntry[];
-  const catalogIsEmpty =
-    !listQuery.isLoading && entries.filter((e) => e.enabled).length === 0;
+  const totalEnabled = entries.filter((e) => e.enabled).length;
 
   // Starter-pack coding assistants shown while the org has no catalog yet,
   // so a fresh /me starts with working tiles (Claude Code first) instead of
-  // a bare hero. Published entries replace them the moment they exist.
+  // a bare hero. The server returns none once ANY catalog entry exists —
+  // even one the caller can't see — so suggestions never advertise tools
+  // past an admin's curation.
   const suggestedQuery = api.aiTools.suggestedTiles.useQuery(
     { organizationId: orgId },
-    { enabled: !!orgId && catalogIsEmpty, refetchOnWindowFocus: false },
+    {
+      enabled: !!orgId && !listQuery.isLoading && totalEnabled === 0,
+      refetchOnWindowFocus: false,
+    },
   );
 
   const grouped = useMemo(() => {
@@ -93,8 +97,6 @@ export function AiToolsPortal() {
     }
     return byType;
   }, [entries]);
-
-  const totalEnabled = entries.filter((e) => e.enabled).length;
 
   if (listQuery.isLoading) {
     return (
@@ -143,7 +145,18 @@ export function AiToolsPortal() {
               ))}
             </SimpleGrid>
           </VStack>
+        ) : suggestedQuery.isLoading ? (
+          // Suggestions are still resolving: a skeleton row, never the
+          // "nothing here yet" note — the copy would contradict the tiles
+          // about to replace it.
+          <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={3}>
+            {Array.from({ length: 3 }).map((_, idx) => (
+              <Skeleton key={idx} height="60px" borderRadius="md" />
+            ))}
+          </SimpleGrid>
         ) : (
+          // Terminal empty: the org has a curated catalog the member just
+          // can't see (or the suggestions call failed) — the honest note.
           !canManageCatalog && (
             <Box
               borderWidth="1px"

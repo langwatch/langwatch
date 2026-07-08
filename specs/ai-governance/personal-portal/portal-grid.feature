@@ -67,6 +67,13 @@ Feature: AI Tools Portal — Grid layout on /me
     Then only the published Codex tile renders
     And no section is marked as suggested
 
+  Scenario: a curated catalog the member cannot see never falls back to suggestions
+    Given the org catalog publishes "Claude Code" bound to department "engineering" only
+    And user "jane@acme.com" is not a member of department "engineering"
+    When user "jane@acme.com" loads "/me"
+    Then no suggested tiles render
+    And the empty-state callout tells the member their admin has not added any tools for them yet
+
   Scenario: team-scoped entries override org-scoped entries by slug
     Given the org-scoped catalog publishes "Claude Code" with `setupCommand=langwatch claude`
     And the team-scoped catalog for team "engineering" publishes "Claude Code" with `setupCommand=langwatch claude --team-engineering`
