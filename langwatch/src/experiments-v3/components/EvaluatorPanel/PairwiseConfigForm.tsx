@@ -1,15 +1,42 @@
 import { Box, Button, Field, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 
 import { Menu } from "~/components/ui/menu";
 import { Switch } from "~/components/ui/switch";
+import {
+  type AvailableSource,
+  type FieldMapping as UIFieldMapping,
+  VariableMappingInput,
+} from "~/components/variables";
+import type { Field as DSLField } from "~/optimization_studio/types/dsl";
 
 import { useTargetName } from "../../hooks/useTargetName";
 import type { PairwiseEvaluatorConfig, TargetConfig } from "../../types";
 
 type Metric = "cost" | "duration";
+
+/**
+ * Default judge prompt when Has Golden Answer is ON — mirrors the langevals
+ * evaluator schema's default. Kept verbatim (including whitespace) so the
+ * equality check in `setHasGoldenAnswer` recognizes an untouched prompt
+ * against the exact string the evaluator ships with. Any drift here would
+ * silently disable the auto-swap for users who kept the default.
+ */
+const GOLDEN_AWARE_JUDGE_PROMPT =
+  'Compare two candidate outputs against a known-good reference (golden answer).\n\nTask:           {input}\nGolden answer:  {golden}\n\nCandidate A:    {candidate_a_output}\nCandidate B:    {candidate_b_output}\n\nReason step-by-step about how closely each candidate matches the\ngolden answer in correctness, completeness, and style. Then pick\nthe better candidate, or "tie" if equivalent.\nPrefer cheaper/faster only when quality is comparable.\n';
+
+/**
+ * Default judge prompt when Has Golden Answer is OFF — no {golden} slot,
+ * comparison is A vs B on their own merits given the task. Kept in sync
+ * with the langevals evaluator's `has_golden_answer=false` handling —
+ * langevals just ignores {golden} in that mode, but the prompt still reads
+ * as if there's a reference, which confuses the judge and biases the
+ * verdict. This template drops the reference entirely.
+ */
+const GOLDEN_FREE_JUDGE_PROMPT =
+  'Compare two candidate outputs directly, on their own merits — there is no reference answer.\n\nTask:         {input}\n\nCandidate A:  {candidate_a_output}\nCandidate B:  {candidate_b_output}\n\nReason step-by-step about which candidate better answers the task in\ncorrectness, completeness, and style. Then pick the better candidate,\nor "tie" if equivalent. Prefer cheaper/faster only when quality is\ncomparable.\n';
 
 /**
  * Configuration form for the langevals/pairwise_compare evaluator
@@ -42,43 +69,6 @@ export type PairwiseConfigFormProps = {
   targets: TargetConfig[];
   /** Active dataset columns the user can pick the golden field from. */
   datasetColumns: DatasetColumn[];
-};
-
-/**
- * One row inside a Variant A/B menu. Lives in its own component so each
- * row owns its own `useTargetName` hook call — calling the hook inside
- * a .map() over `targets` would break the rules of hooks when the list
- * grows or shrinks between renders.
- */
-const VariantMenuItem = ({
-  target,
-  onSelect,
-  testId,
-}: {
-  target: TargetConfig;
-  onSelect: (id: string) => void;
-  testId?: string;
-}) => {
-  const name = useTargetName(target);
-  const label = name || target.id;
-  return (
-    <Menu.Item
-      value={target.id}
-      onClick={() => onSelect(target.id)}
-      data-testid={testId}
-    >
-      <Text fontSize="13px">{label}</Text>
-    </Menu.Item>
-  );
-};
-
-/**
- * Inline label for the selected variant inside the picker trigger. Same
- * reactive name resolution as VariantMenuItem.
- */
-const SelectedVariantLabel = ({ target }: { target: TargetConfig }) => {
-  const name = useTargetName(target);
-  return <>{name || target.id}</>;
 };
 
 type PickerProps = {
@@ -170,62 +160,18 @@ export function PairwiseConfigForm({
   // target twice (a pairwise comparison of X vs X is always a tie).
   const variantBOptions = targets.filter((t) => t.id !== draft.variantA);
 
-  const selectedA = targets.find((t) => t.id === draft.variantA);
-  const selectedB = targets.find((t) => t.id === draft.variantB);
-
   return (
     // No horizontal padding here — the drawer body (EvaluatorEditorShared)
     // already applies paddingX to its content, same as the boolean settings
     // section above us. Adding our own here previously double-inset this
     // section relative to Swap And Confirm / Allow Tie / Include metrics.
     <VStack align="stretch" gap={3}>
-      <HStack align="end" gap={3}>
-        <Picker
-          label="Variant A"
-          placeholder="Select a target…"
-          isEmpty={!selectedA}
-          selectedDisplay={
-            selectedA ? <SelectedVariantLabel target={selectedA} /> : null
-          }
-          testId="pairwise-variant-a"
-        >
-          {targets.length === 0 ? (
-            <EmptyMenuItem />
-          ) : (
-            targets.map((t) => (
-              <VariantMenuItem
-                key={t.id}
-                target={t}
-                onSelect={(id) => update({ variantA: id })}
-                testId={`pairwise-variant-a-option-${t.id}`}
-              />
-            ))
-          )}
-        </Picker>
-
-        <Picker
-          label="Variant B"
-          placeholder="Select a target…"
-          isEmpty={!selectedB}
-          selectedDisplay={
-            selectedB ? <SelectedVariantLabel target={selectedB} /> : null
-          }
-          testId="pairwise-variant-b"
-        >
-          {variantBOptions.length === 0 ? (
-            <EmptyMenuItem />
-          ) : (
-            variantBOptions.map((t) => (
-              <VariantMenuItem
-                key={t.id}
-                target={t}
-                onSelect={(id) => update({ variantB: id })}
-                testId={`pairwise-variant-b-option-${t.id}`}
-              />
-            ))
-          )}
-        </Picker>
-      </HStack>
+      <VariantMappingRow
+        draft={draft}
+        update={update}
+        targets={targets}
+        variantBOptions={variantBOptions}
+      />
 
       <GoldenAnswerSection
         draft={draft}
@@ -257,23 +203,62 @@ function GoldenAnswerSection({
   datasetColumns: DatasetColumn[];
 }) {
   const formContext = useFormContext<{
-    settings?: { has_golden_answer?: boolean };
+    settings?: { has_golden_answer?: boolean; prompt?: string };
   }>();
   const watchedHasGoldenAnswer = useWatch({
     control: formContext?.control,
     name: "settings.has_golden_answer",
   }) as boolean | undefined;
+  const watchedPrompt = useWatch({
+    control: formContext?.control,
+    name: "settings.prompt",
+  }) as string | undefined;
   const hasGoldenAnswer =
     (watchedHasGoldenAnswer ?? draft.hasGoldenAnswer) !== false;
+
+  // Keep the judge prompt in sync with the has_golden_answer toggle
+  // REACTIVELY — running on every change of either field (not just on the
+  // toggle click) so the correct prompt is enforced regardless of HOW the
+  // state changed: click, form init from a saved config, external
+  // `setValue`, or a load from persistence. Only swap when the current
+  // prompt exactly matches one of our shipped defaults so hand-tuned
+  // prompts survive toggling. Fuzzy-compare on trimmed strings so subtle
+  // whitespace drift (Windows CRLF, editor auto-trim) doesn't break the
+  // equality check.
+  const isDefaultPrompt = useCallback(
+    (value: string | undefined, target: string): boolean =>
+      typeof value === "string" && value.trim() === target.trim(),
+    [],
+  );
+  useEffect(() => {
+    if (!formContext) return;
+    if (typeof watchedHasGoldenAnswer !== "boolean") return;
+    if (typeof watchedPrompt !== "string") return;
+    const shouldBeGoldenAware = watchedHasGoldenAnswer !== false;
+    const nextPrompt = shouldBeGoldenAware
+      ? isDefaultPrompt(watchedPrompt, GOLDEN_FREE_JUDGE_PROMPT)
+        ? GOLDEN_AWARE_JUDGE_PROMPT
+        : null
+      : isDefaultPrompt(watchedPrompt, GOLDEN_AWARE_JUDGE_PROMPT)
+        ? GOLDEN_FREE_JUDGE_PROMPT
+        : null;
+    if (nextPrompt && nextPrompt !== watchedPrompt) {
+      formContext.setValue("settings.prompt", nextPrompt, {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+    }
+  }, [formContext, watchedHasGoldenAnswer, watchedPrompt, isDefaultPrompt]);
 
   const setHasGoldenAnswer = (on: boolean) => {
     formContext?.setValue("settings.has_golden_answer", on, {
       shouldDirty: true,
       shouldTouch: true,
     });
-    // Clearing goldenField when turning the toggle off isn't strictly
-    // necessary (an unused golden field is harmless), but it avoids a
-    // stale selection resurfacing confusingly if the user toggles back on.
+    // Prompt-swap now lives in the useEffect above so it always fires
+    // regardless of HOW has_golden_answer changed. Only clear goldenField
+    // here — that's toggle-specific UX (a stale golden mapping resurfacing
+    // is confusing, so we drop it when turning golden OFF).
     update({ hasGoldenAnswer: on, ...(on ? {} : { goldenField: "" }) });
   };
 
@@ -411,3 +396,155 @@ function MetricsSection({
     </Box>
   );
 }
+
+/**
+ * Reuse the app-wide mappings widget (`VariableMappingInput`) for both
+ * Variant A and Variant B (#5100 dogfood follow-up — Rogerio).
+ *
+ * The bespoke Menu-based picker forced the user to reason in two steps
+ * ("pick a target", "pick an output field of that target") and diverged
+ * from the mappings picker's `<target>.<field>` pill shape everywhere
+ * else in the app. Structured outputs also had no natural home.
+ * `VariableMappingInput` handles both concerns natively via grouped
+ * sources → fields dropdowns.
+ *
+ * Storage stays the same: `variantA` = target id, `variantAOutputPath` =
+ * the selected field path. Whole-output selection stays representable as
+ * an empty / omitted path so previously saved configs keep working.
+ */
+function VariantMappingRow({
+  draft,
+  update,
+  targets,
+  variantBOptions,
+}: {
+  draft: PairwiseEvaluatorConfig;
+  update: (patch: Partial<PairwiseEvaluatorConfig>) => void;
+  targets: TargetConfig[];
+  variantBOptions: TargetConfig[];
+}) {
+  // A→B and B→A must reflect fresh names as targets are added / renamed;
+  // the contributor pattern below lifts each target's `useTargetName`
+  // result into a plain map so the two mapping pickers can render a stable
+  // AvailableSource[] without violating hooks rules over a dynamic array.
+  const [nameById, setNameById] = useState<Record<string, string>>({});
+  const setName = useCallback((id: string, name: string) => {
+    setNameById((prev) => (prev[id] === name ? prev : { ...prev, [id]: name }));
+  }, []);
+
+  const sourcesForVariantA = useMemo(
+    () => targets.map((t) => targetToSource(t, nameById[t.id] ?? t.id)),
+    [targets, nameById],
+  );
+  const sourcesForVariantB = useMemo(
+    () => variantBOptions.map((t) => targetToSource(t, nameById[t.id] ?? t.id)),
+    [variantBOptions, nameById],
+  );
+
+  return (
+    <VStack align="stretch" gap={3}>
+      <HStack align="end" gap={3}>
+        <Field.Root required flex="1">
+          <Field.Label fontSize="13px" color="fg.muted" marginBottom={1}>
+            Variant A
+          </Field.Label>
+          <VariableMappingInput
+            mapping={buildUIMapping(draft.variantA, draft.variantAOutputPath)}
+            onMappingChange={(mapping) =>
+              update(mappingToVariantPatch(mapping, "A"))
+            }
+            availableSources={sourcesForVariantA}
+            placeholder="Select a target field"
+            inputTestId="pairwise-variant-a"
+          />
+        </Field.Root>
+        <Field.Root required flex="1">
+          <Field.Label fontSize="13px" color="fg.muted" marginBottom={1}>
+            Variant B
+          </Field.Label>
+          <VariableMappingInput
+            mapping={buildUIMapping(draft.variantB, draft.variantBOutputPath)}
+            onMappingChange={(mapping) =>
+              update(mappingToVariantPatch(mapping, "B"))
+            }
+            availableSources={sourcesForVariantB}
+            placeholder="Select a target field"
+            inputTestId="pairwise-variant-b"
+          />
+        </Field.Root>
+      </HStack>
+      {targets.map((t) => (
+        <TargetNameContributor key={t.id} target={t} onName={setName} />
+      ))}
+    </VStack>
+  );
+}
+
+/**
+ * Non-rendering hook consumer: resolves this target's display name via
+ * `useTargetName` and reports it up to the parent. Split into its own
+ * component so `useTargetName` (which needs a concrete target) is called
+ * at a stable hook position even as the targets list grows / shrinks.
+ */
+function TargetNameContributor({
+  target,
+  onName,
+}: {
+  target: TargetConfig;
+  onName: (id: string, name: string) => void;
+}) {
+  const name = useTargetName(target);
+  useEffect(() => {
+    if (name) onName(target.id, name);
+  }, [name, target.id, onName]);
+  return null;
+}
+
+const targetToSource = (
+  target: TargetConfig,
+  displayName: string,
+): AvailableSource => ({
+  id: target.id,
+  name: displayName,
+  // "signature" matches the source type the evaluator mappings drawer uses
+  // for its target source (see useOpenEvaluatorEditor) — same widget, same
+  // icon, same tree shape.
+  type: "signature",
+  fields: (target.outputs ?? []).map((o) => ({
+    name: o.identifier,
+    type: o.type as DSLField["type"],
+  })),
+});
+
+const buildUIMapping = (
+  variantId: string | undefined,
+  path: string[] | undefined,
+): UIFieldMapping | undefined => {
+  if (!variantId) return undefined;
+  return { type: "source", sourceId: variantId, path: path ?? [] };
+};
+
+const mappingToVariantPatch = (
+  mapping: UIFieldMapping | undefined,
+  slot: "A" | "B",
+): Partial<PairwiseEvaluatorConfig> => {
+  if (!mapping || mapping.type !== "source") {
+    // Clearing / a stray hardcoded-value mapping both reset to unset.
+    return slot === "A"
+      ? { variantA: "", variantAOutputPath: undefined }
+      : { variantB: "", variantBOutputPath: undefined };
+  }
+  const patch: Partial<PairwiseEvaluatorConfig> =
+    slot === "A"
+      ? {
+          variantA: mapping.sourceId,
+          variantAOutputPath:
+            mapping.path.length > 0 ? mapping.path : undefined,
+        }
+      : {
+          variantB: mapping.sourceId,
+          variantBOutputPath:
+            mapping.path.length > 0 ? mapping.path : undefined,
+        };
+  return patch;
+};

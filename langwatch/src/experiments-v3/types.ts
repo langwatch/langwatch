@@ -196,6 +196,15 @@ export type LocalEvaluatorConfig = z.infer<typeof localEvaluatorConfigSchema>;
 export const pairwiseEvaluatorConfigSchema = z.object({
   variantA: z.string(),
   variantB: z.string(),
+  /**
+   * Optional output-field path for variant A. When the picked variant emits
+   * a structured object (e.g. `{answer, confidence}`), the judge shouldn't
+   * see the full blob — pick a single subfield here. Empty / omitted means
+   * "use the whole output" (the pre-existing behavior — orchestrator paths
+   * predating this field must continue to work unchanged).
+   */
+  variantAOutputPath: z.array(z.string()).optional(),
+  variantBOutputPath: z.array(z.string()).optional(),
   hasGoldenAnswer: z.boolean().default(true),
   goldenField: z.string(),
   includeMetrics: z.array(z.enum(["cost", "duration"])).default([]),
