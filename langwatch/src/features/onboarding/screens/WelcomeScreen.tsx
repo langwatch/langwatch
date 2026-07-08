@@ -14,6 +14,7 @@ import { OnboardingContainer } from "../components/containers/OnboardingContaine
 import { OnboardingNavigation } from "../components/navigation/OnboardingNavigation";
 import { OnboardingFormProvider } from "../contexts/form-context";
 import { useOnboardingFlow } from "../hooks/use-onboarding-flow";
+import { resolveWelcomeRedirect } from "../utils/welcome-redirect";
 import { useCreateWelcomeScreens } from "./create-welcome-screens";
 
 export const WelcomeScreen: React.FC = () => {
@@ -49,46 +50,17 @@ export const WelcomeScreen: React.FC = () => {
     // Wait until org data has finished loading before deciding
     if (organizationIsLoading) return;
 
-    // Personal-workspace teams don't count as onboarded projects: they are
-    // provisioned lazily for governance users and must never satisfy (or
-    // become the target of) the "already has a project" redirect.
-    const sharedTeams = (org: NonNullable<typeof organizations>[number]) =>
-      org.teams.filter((t) => !t.isPersonal);
+    const decision = resolveWelcomeRedirect({
+      organizations,
+      currentProjectSlug: project?.slug ?? null,
+    });
 
-    const hasAnyProject =
-      organizations?.some((org) =>
-        sharedTeams(org).some((t) => t.projects.length > 0),
-      ) ?? false;
-
-    // ADR-038 v6: a governance-intent org has no project by design, but its
-    // owner is fully onboarded — re-running the welcome flow here would mint
-    // a duplicate organization. Send them home instead (resolver → /me).
-    const hasGovernanceOrg =
-      organizations?.some(
-        (org) => org.primaryIntent === "AGENT_GOVERNANCE",
-      ) ?? false;
-    if (!hasAnyProject && hasGovernanceOrg) {
-      setOnboardingNeeded(false);
-      void router.push("/");
-      return;
-    }
-
-    if (!hasAnyProject) {
+    if (decision.kind === "onboard") {
       setOnboardingNeeded(true);
       return;
     }
-
-    const slug =
-      project?.slug ??
-      organizations
-        ?.flatMap((o) => sharedTeams(o))
-        .flatMap((t) => t.projects)[0]?.slug;
-    if (slug) {
-      setOnboardingNeeded(false);
-      void router.push(`/${slug}`);
-    } else {
-      setOnboardingNeeded(true);
-    }
+    setOnboardingNeeded(false);
+    void router.push(decision.kind === "home" ? "/" : `/${decision.slug}`);
   }, [organizationIsLoading, organizations, project?.slug]);
 
   function handleFinalizeSubmit() {

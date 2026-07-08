@@ -21,22 +21,28 @@ describe("governance flag defaults (ADR-038, pre-GA: ships dark)", () => {
   });
 
   describe("when the CLI device-login gate evaluates its fallback", () => {
-    it("defaults closed, matching the registry", () => {
+    it("defaults closed at every call site, matching the registry", () => {
       // The gate lives in a 1700-line Hono route file; asserting on the
-      // source keeps the pin without spinning up the whole route. The
-      // literal under test is the isEnabled defaultValue right after the
-      // governance-gate comment block.
+      // source keeps the pin without spinning up the whole route (the
+      // gate's runtime behavior is covered by
+      // auth-cli-personal-guard.integration.test.ts). Every occurrence of
+      // the flag key is checked so an added second call site can't slip
+      // past with a different default.
       const source = readFileSync(
         join(__dirname, "../../routes/auth-cli.ts"),
         "utf-8",
       );
-      const gateBlock = source.slice(
-        source.indexOf('"release_ui_ai_governance_enabled"'),
-      );
-      const defaultLine = gateBlock
-        .split("\n")
-        .find((line) => line.includes("defaultValue:"));
-      expect(defaultLine).toContain("defaultValue: false");
+      const occurrences = [
+        ...source.matchAll(/"release_ui_ai_governance_enabled"/g),
+      ];
+      expect(occurrences.length).toBeGreaterThan(0);
+      for (const match of occurrences) {
+        const windowAfter = source.slice(match.index, match.index! + 400);
+        const defaultLine = windowAfter
+          .split("\n")
+          .find((line) => line.includes("defaultValue:"));
+        expect(defaultLine).toContain("defaultValue: false");
+      }
     });
   });
 });

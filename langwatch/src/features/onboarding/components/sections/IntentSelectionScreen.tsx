@@ -40,7 +40,14 @@ export const IntentSelectionScreen: React.FC = () => {
   const { emit } = useAnalytics();
 
   return (
-    <VStack gap={3} align="stretch" w="full" minW="0">
+    <VStack
+      gap={3}
+      align="stretch"
+      w="full"
+      minW="0"
+      role="radiogroup"
+      aria-label="What do you want to do?"
+    >
       {intentOptions.map((opt) => {
         const isSelected = intent === opt.value;
         return (
