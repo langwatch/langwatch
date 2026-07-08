@@ -4,12 +4,14 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useEvaluationsV3Store } from "../../../hooks/useEvaluationsV3Store";
+import { useTargetModel } from "../../../hooks/useTargetModel";
+import { useTargetName } from "../../../hooks/useTargetName";
 import {
   createInitialResults,
   createInitialUIState,
   type TargetConfig,
 } from "../../../types";
-import { useEvaluationsV3Store } from "../../../hooks/useEvaluationsV3Store";
 import { TargetHeader } from "../../TargetSection/TargetHeader";
 
 // Mock next/router
@@ -34,9 +36,14 @@ vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
   }),
 }));
 
-// Mock name hooks to avoid tRPC queries
+// Mock name hooks to avoid tRPC queries. Wrapped in vi.fn() so individual
+// tests (e.g. the pairwise same-name-variant scoreboard tests) can override
+// the implementation for just their own targets.
 vi.mock("../../../hooks/useTargetName", () => ({
-  useTargetName: (target: { id: string }) => target.id,
+  useTargetName: vi.fn((target: { id: string }) => target.id),
+}));
+vi.mock("../../../hooks/useTargetModel", () => ({
+  useTargetModel: vi.fn(() => undefined as string | undefined),
 }));
 vi.mock("../../../hooks/useEvaluatorName", () => ({
   useEvaluatorName: () => "Exact Match",
@@ -564,6 +571,111 @@ describe("TargetHeader", () => {
       // The summary should still be visible, showing latency, pass rate, etc.
       // Even though savedRecords hasn't loaded yet, we have results so we know the row count
       expect(screen.getByTestId("target-summary")).toBeInTheDocument();
+    });
+  });
+
+  describe("given variant A and variant B share the same display name", () => {
+    const variantATarget: TargetConfig = {
+      id: "variant-a-target",
+      type: "prompt",
+      promptId: "prompt-a",
+      inputs: [],
+      outputs: [],
+      mappings: {},
+    };
+    const variantBTarget: TargetConfig = {
+      id: "variant-b-target",
+      type: "prompt",
+      promptId: "prompt-b",
+      inputs: [],
+      outputs: [],
+      mappings: {},
+    };
+    const pairwiseColumnTarget: TargetConfig = {
+      id: "pairwise-col",
+      type: "evaluator",
+      pairwise: {
+        variantA: "variant-a-target",
+        variantB: "variant-b-target",
+        hasGoldenAnswer: true,
+        goldenField: "expected",
+        includeMetrics: [],
+      },
+      inputs: [],
+      outputs: [],
+      mappings: {},
+    };
+
+    beforeEach(() => {
+      // Both variants resolve to the same name ("Bot") — only the mocked
+      // model differs between them.
+      vi.mocked(useTargetName).mockImplementation((target: { id: string }) =>
+        target.id === "variant-a-target" || target.id === "variant-b-target"
+          ? "Bot"
+          : target.id,
+      );
+
+      useEvaluationsV3Store.setState({
+        name: "Test Evaluation",
+        datasets: [],
+        activeDatasetId: undefined,
+        evaluators: [],
+        targets: [variantATarget, variantBTarget, pairwiseColumnTarget],
+        results: {
+          ...createInitialResults(),
+          // Fallback row-count path: one persisted output row for the
+          // pairwise column target.
+          targetOutputs: { "pairwise-col": ["n/a"] },
+          evaluatorResults: {
+            "pairwise-col": {
+              // Variant A wins the only row.
+              "pairwise-col": [{ label: "variant-a-target" }],
+            },
+          },
+        },
+        pendingSavedChanges: {},
+        ui: createInitialUIState(),
+      });
+    });
+
+    afterEach(() => {
+      vi.mocked(useTargetName).mockImplementation(
+        (target: { id: string }) => target.id,
+      );
+      vi.mocked(useTargetModel).mockImplementation(() => undefined);
+      useEvaluationsV3Store.getState().reset?.();
+    });
+
+    it("disambiguates by model when the models differ", () => {
+      vi.mocked(useTargetModel).mockImplementation((target: { id: string }) => {
+        if (target.id === "variant-a-target") return "gpt-4.1";
+        if (target.id === "variant-b-target") return "gpt-5-mini";
+        return undefined;
+      });
+
+      renderWithProviders(
+        <TargetHeader
+          target={pairwiseColumnTarget}
+          onEdit={mockOnEdit}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      expect(screen.getByText("Bot (gpt-4.1) wins")).toBeInTheDocument();
+    });
+
+    it("falls back to numbering when the models also match", () => {
+      vi.mocked(useTargetModel).mockImplementation(() => "gpt-4.1");
+
+      renderWithProviders(
+        <TargetHeader
+          target={pairwiseColumnTarget}
+          onEdit={mockOnEdit}
+          onRemove={mockOnRemove}
+        />,
+      );
+
+      expect(screen.getByText("Bot (1) wins")).toBeInTheDocument();
     });
   });
 });

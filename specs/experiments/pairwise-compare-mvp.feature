@@ -37,6 +37,23 @@ Feature: Pairwise compare evaluator (MVP)
     When I view the Pairwise Compare column header
     Then I see "variant_a wins 12 · 2 ties" with the full breakdown in the tooltip
 
+  # Customer feedback, 2026-07-08 call: same prompt name reused with a
+  # different model (e.g. re-testing gpt-4.1 vs gpt-5-mini) made both
+  # variants indistinguishable in the scoreboard and per-row verdicts.
+  Scenario: Same-name variants are disambiguated by model
+    Given variant A and variant B are both named "AI search system"
+    And variant A uses model "gpt-4.1" and variant B uses model "gpt-5-mini"
+    When I view the Pairwise Compare column header or a row verdict
+    Then variant A is shown as "AI search system (gpt-4.1)"
+    And variant B is shown as "AI search system (gpt-5-mini)"
+
+  Scenario: Identical same-name variants fall back to numbering
+    Given variant A and variant B are both named "AI search system"
+    And variant A and variant B use the same model
+    When I view the Pairwise Compare column header or a row verdict
+    Then variant A is shown as "AI search system (1)"
+    And variant B is shown as "AI search system (2)"
+
   # Issue: #5378
   # Golden answer is opt-in, not mandatory — some datasets have no
   # reference answer, and picking a fake golden field (like "input")

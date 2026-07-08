@@ -34,6 +34,7 @@ import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../constants";
 
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
+import { useTargetModel } from "../../hooks/useTargetModel";
 import { useTargetName } from "../../hooks/useTargetName";
 import type { TargetConfig } from "../../types";
 import {
@@ -44,6 +45,7 @@ import {
 import { isRowEmpty } from "../../utils/emptyRowDetection";
 import { countCellsForTarget } from "../../utils/executionScope";
 import { targetHasMissingMappings } from "../../utils/mappingValidation";
+import { disambiguateVariantNames } from "../../utils/variantDisambiguation";
 import { TargetSummary } from "./TargetSummary";
 
 // Stable reference fed to useTargetName when a pairwise variant target hasn't
@@ -155,6 +157,28 @@ export const TargetHeader = memo(function TargetHeader({
   const variantBName = variantBTarget
     ? variantBNameRaw || target.pairwise?.variantB || ""
     : "Variant B";
+
+  // Same rules-of-hooks placeholder trick as the name hooks above.
+  const variantAModel = useTargetModel(
+    variantATarget ?? (PLACEHOLDER_PAIRWISE_VARIANT as TargetConfig),
+  );
+  const variantBModel = useTargetModel(
+    variantBTarget ?? (PLACEHOLDER_PAIRWISE_VARIANT as TargetConfig),
+  );
+  // Display-only names: when both variants resolve to the same name (e.g.
+  // the same prompt re-run against a different model), disambiguate so the
+  // scoreboard doesn't show two identical labels. The raw names above stay
+  // untouched — they're still what's matched against the stored verdict
+  // label via `variantAHandle`/`variantBHandle` below.
+  const {
+    variantAName: variantADisplayName,
+    variantBName: variantBDisplayName,
+  } = disambiguateVariantNames(
+    variantAName,
+    variantBName,
+    variantAModel,
+    variantBModel,
+  );
 
   // Get results, evaluators, and dataset for computing aggregates
   const { results, evaluators, activeDataset } = useEvaluationsV3Store(
@@ -497,7 +521,8 @@ export const TargetHeader = memo(function TargetHeader({
           {(() => {
             const { a, b, tie } = pairwiseAggregate.counts;
             const isTie = a === b;
-            const winnerName = a > b ? variantAName : variantBName;
+            const winnerName =
+              a > b ? variantADisplayName : variantBDisplayName;
             const shortName = (s: string) =>
               s.length > 18 ? `${s.slice(0, 17)}…` : s;
             // Show only the qualitative outcome ("<winner> wins" / "Tied")
@@ -508,7 +533,7 @@ export const TargetHeader = memo(function TargetHeader({
             const summary = isTie ? "Tied" : `${shortName(winnerName)} wins`;
             return (
               <Tooltip
-                content={`${variantAName}: ${a} wins · ${variantBName}: ${b} wins${
+                content={`${variantADisplayName}: ${a} wins · ${variantBDisplayName}: ${b} wins${
                   tie > 0 ? ` · ${tie} ${tie === 1 ? "tie" : "ties"}` : ""
                 }`}
                 positioning={{ placement: "top" }}

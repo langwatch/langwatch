@@ -1,8 +1,10 @@
 import { Box, HStack, Icon, Popover, Text, VStack } from "@chakra-ui/react";
 import { CircleAlert, Equal, Trophy } from "lucide-react";
 import { parseEvaluationResult } from "~/utils/evaluationResults";
+import { useTargetModel } from "../hooks/useTargetModel";
 import { useTargetName } from "../hooks/useTargetName";
 import type { TargetConfig } from "../types";
+import { disambiguateVariantNames } from "../utils/variantDisambiguation";
 
 type PairwiseCompareCellProps = {
   result: unknown;
@@ -187,8 +189,18 @@ function ResolvedVerdict({
 }) {
   const aHandle = useTargetName(variantATarget);
   const bHandle = useTargetName(variantBTarget);
-  const aNameFinal = aHandle || fallbackA;
-  const bNameFinal = bHandle || fallbackB;
+  const aModel = useTargetModel(variantATarget);
+  const bModel = useTargetModel(variantBTarget);
+  // Display-only: disambiguate when both variants share a name (e.g. same
+  // prompt re-run against a different model). Matching below still uses the
+  // raw `aHandle`/`bHandle`, never these.
+  const { variantAName: aNameFinal, variantBName: bNameFinal } =
+    disambiguateVariantNames(
+      aHandle || fallbackA,
+      bHandle || fallbackB,
+      aModel,
+      bModel,
+    );
 
   let winnerSide: "a" | "b" | "tie" | undefined;
   if (label === "tie") winnerSide = "tie";
