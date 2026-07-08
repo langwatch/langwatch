@@ -25,6 +25,7 @@
  */
 
 import {
+  codexTraceEndpoint,
   writeCodexGatewayBlock,
   writeCodexOtelBlock,
 } from "@/cli/utils/codex-config-toml";
@@ -305,7 +306,7 @@ export async function resolveWrapperMode(
     // out here so the POST lands on the real handler. codex only
     // emits traces today (no logs/metrics), so one suffix suffices.
     const result = writeCodexOtelBlock({
-      endpoint: `${endpoint}/v1/traces`,
+      endpoint: codexTraceEndpoint(endpoint),
       ingestionToken: token,
       environment: cfg.organization?.slug ?? "langwatch",
     });

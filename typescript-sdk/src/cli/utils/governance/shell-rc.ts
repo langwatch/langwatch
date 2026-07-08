@@ -32,6 +32,13 @@ import * as readline from "node:readline";
 import chalk from "chalk";
 
 import {
+  codexOtelBlockHasAuthHeader,
+  codexTraceEndpoint,
+  defaultCodexConfigPath,
+  displayCodexConfigPath,
+  writeCodexOtelBlock,
+} from "../codex-config-toml";
+import {
   appEnvHasAllVars,
   appSettingsTargetFor,
   installAppEnv,
@@ -313,6 +320,52 @@ export async function maybeOfferIngestionShellRcPersist({
     return;
   }
 
+  // codex has a native app-scoped target too: its [otel] block in
+  // ~/.codex/config.toml takes an inline Authorization header, so the
+  // ingest token scopes to codex runs instead of leaking into every
+  // shell child via the profile rc. The wrapper already wrote the
+  // endpoint-only block during setup; persisting adds the header so a
+  // plain `codex` captures.
+  if (tool === "codex") {
+    const configPath = defaultCodexConfigPath();
+    // Already persisted on a prior run — stay quiet.
+    if (codexOtelBlockHasAuthHeader(configPath)) return;
+
+    const endpointBase = vars.OTEL_EXPORTER_OTLP_ENDPOINT;
+    const token = bearerFromHeaders(vars.OTEL_EXPORTER_OTLP_HEADERS);
+    if (!endpointBase || !token) return;
+
+    console.log();
+    const choice = await askPersistChoice(displayCodexConfigPath(), tool);
+    if (choice === "skip" || choice === "no") return;
+    if (choice === "never") {
+      recordNeverChoice(cfg);
+      return;
+    }
+    try {
+      writeCodexOtelBlock(
+        {
+          endpoint: codexTraceEndpoint(endpointBase),
+          ingestionToken: token,
+          environment: cfg.organization?.slug ?? "langwatch",
+        },
+        { persistAuthHeader: true },
+      );
+      console.log(
+        chalk.green(
+          `  ✓ Installed langwatch telemetry exports to ${displayCodexConfigPath()}`,
+        ),
+      );
+    } catch (err) {
+      console.log(
+        chalk.yellow(
+          `  ! Couldn't write to ${displayCodexConfigPath()}: ${(err as Error).message}`,
+        ),
+      );
+    }
+    return;
+  }
+
   const shell = detectShell();
   if (!shell) return;
   // Already installed in the rc file, even if this shell hasn't sourced it
@@ -349,4 +402,15 @@ function recordNeverChoice(cfg: GovernanceConfig): void {
   } catch {
     // best effort — a config write failure just means the next run re-asks.
   }
+}
+
+/**
+ * Pull the bearer token out of an `OTEL_EXPORTER_OTLP_HEADERS` value
+ * shaped like `Authorization=Bearer <token>`. Returns null when the
+ * header is absent or malformed.
+ */
+function bearerFromHeaders(headers: string | undefined): string | null {
+  if (!headers) return null;
+  const m = /Bearer\s+(\S+)/.exec(headers);
+  return m ? m[1]! : null;
 }

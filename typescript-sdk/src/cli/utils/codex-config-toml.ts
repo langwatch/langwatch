@@ -44,6 +44,28 @@ export function defaultCodexConfigPath(): string {
   return path.join(os.homedir(), ".codex", "config.toml");
 }
 
+/** Path shown in the persist prompt (`~/.codex/config.toml`). */
+export function displayCodexConfigPath(): string {
+  const codexHome = process.env.CODEX_HOME;
+  if (codexHome) return path.join(codexHome, "config.toml");
+  return "~/.codex/config.toml";
+}
+
+/**
+ * The trace-signal endpoint codex's otlp-http exporter posts to. codex
+ * (unlike the Node/Python/Go OTel SDKs) does NOT append `/v1/traces` to
+ * the configured endpoint, so the suffix is spelled out here. Callers
+ * pass the bare ingestion base (e.g. https://app.langwatch.ai/api/otel).
+ */
+export function codexTraceEndpoint(baseEndpoint: string): string {
+  return `${baseEndpoint.replace(/\/+$/, "")}/v1/traces`;
+}
+
+/** Escape a value for a TOML basic (double-quoted) string. */
+function tomlStr(s: string): string {
+  return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
 /**
  * Build the bracketed [otel] + [otel.trace_exporter.otlp-http] block.
  * Returned WITH leading + trailing markers and a trailing newline.
@@ -52,29 +74,76 @@ export function defaultCodexConfigPath(): string {
  * (logs) in its config schema. We emit the trace_exporter form so
  * Path B span ingestion fires; the older `[otel.exporter.otlp-http]`
  * form is silently ignored on traces in the current schema.
+ *
+ * `includeAuthHeader` controls whether the write-only ingest key is
+ * inlined as a `headers` entry on the trace exporter. codex reads that
+ * header on every run, so persisting it makes a plain `codex` (no
+ * langwatch wrapper) capture without leaking OTEL vars into the shell
+ * rc. When false, the header comes from OTEL_EXPORTER_OTLP_HEADERS at
+ * runtime instead (the wrapper-only default that keeps the secret off
+ * disk until the user opts in).
  */
-export function buildCodexOtelBlock(inputs: CodexOtelBlockInputs): string {
+export function buildCodexOtelBlock(
+  inputs: CodexOtelBlockInputs,
+  options: { includeAuthHeader?: boolean } = {},
+): string {
   const env = inputs.environment ?? "langwatch";
-  // The header key is sent via OTEL_EXPORTER_OTLP_HEADERS at runtime so
-  // the toml block never persists the secret; the user only commits
-  // the endpoint + environment. We embed a note pointing at the env
-  // var so a reader of config.toml can audit the wiring.
+  const includeAuthHeader = options.includeAuthHeader ?? false;
+
+  const authNote = includeAuthHeader
+    ? [
+        `# The Authorization header below carries a write-only ingest key so`,
+        `# a plain 'codex' (without the langwatch wrapper) captures too. The`,
+        `# file is written 0600; remove the marker pair to opt back out.`,
+      ]
+    : [
+        `# Authorization header lives in OTEL_EXPORTER_OTLP_HEADERS;`,
+        `# this file persists only the endpoint + environment label.`,
+      ];
+
+  const exporter = [
+    "[otel.trace_exporter.otlp-http]",
+    `endpoint = "${tomlStr(inputs.endpoint)}"`,
+    `protocol = "json"`,
+  ];
+  if (includeAuthHeader) {
+    exporter.push(
+      `headers = { "Authorization" = "Bearer ${tomlStr(inputs.ingestionToken)}" }`,
+    );
+  }
+
   return [
     BEGIN,
-    `# Managed by 'langwatch ingest install codex'. Re-running the`,
-    `# command updates this block in place; remove the marker pair`,
-    `# above and below to opt back out.`,
-    `# Authorization header lives in OTEL_EXPORTER_OTLP_HEADERS;`,
-    `# this file persists only the endpoint + environment label.`,
+    `# Managed by 'langwatch codex'. Re-running the command updates this`,
+    `# block in place; remove the marker pair above and below to opt out.`,
+    ...authNote,
     "[otel]",
-    `environment = "${env}"`,
+    `environment = "${tomlStr(env)}"`,
     "",
-    "[otel.trace_exporter.otlp-http]",
-    `endpoint = "${inputs.endpoint}"`,
-    `protocol = "json"`,
+    ...exporter,
     END,
     "",
   ].join("\n");
+}
+
+/**
+ * Whether the current langwatch [otel] block in the file already
+ * carries a persisted `headers` line (the inlined Authorization
+ * header). Used to (a) stay quiet in the persist offer once the header
+ * is installed and (b) let the unconditional setup write preserve it.
+ */
+export function codexOtelBlockHasAuthHeader(filePath: string): boolean {
+  let content: string;
+  try {
+    content = fs.readFileSync(filePath, "utf8");
+  } catch {
+    return false;
+  }
+  const begin = content.indexOf(BEGIN);
+  const end = content.indexOf(END);
+  if (begin === -1 || end === -1 || end < begin) return false;
+  const block = content.slice(begin, end);
+  return /^\s*headers\s*=/m.test(block);
 }
 
 /**
@@ -101,10 +170,16 @@ export interface CodexOtelWriteResult {
  */
 export function writeCodexOtelBlock(
   inputs: CodexOtelBlockInputs,
-  options: { filePath?: string } = {},
+  options: { filePath?: string; persistAuthHeader?: boolean } = {},
 ): CodexOtelWriteResult {
   const filePath = options.filePath ?? defaultCodexConfigPath();
-  const block = buildCodexOtelBlock(inputs);
+  // Emit the Authorization header when explicitly asked (the persist
+  // opt-in); otherwise preserve whatever the current block has, so the
+  // unconditional setup write never strips a header a prior persist
+  // installed.
+  const includeAuthHeader =
+    options.persistAuthHeader ?? codexOtelBlockHasAuthHeader(filePath);
+  const block = buildCodexOtelBlock(inputs, { includeAuthHeader });
 
   if (!fs.existsSync(filePath)) {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
