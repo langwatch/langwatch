@@ -77,8 +77,8 @@ importers:
         specifier: ^2.0.55
         version: 2.0.55(zod@3.25.76)
       '@ai-sdk/react':
-        specifier: ^3.0.219
-        version: 3.0.219(react@19.2.7)(zod@3.25.76)
+        specifier: ^4.0.9
+        version: 4.0.9(react@19.2.7)(zod@3.25.76)
       '@aws-sdk/client-bedrock-runtime':
         specifier: ^3.1077.0
         version: 3.1077.0
@@ -990,6 +990,12 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
+  '@ai-sdk/mcp@2.0.4':
+    resolution: {integrity: sha512-o5edIxgQrssKl/DABaXOzTUG/DUOyn25ilnnczQeLpnlSEUNXqYc3TSOZ7u6aBB+vkersQ7MXkfNMzqulR6CKw==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
   '@ai-sdk/openai-compatible@2.0.55':
     resolution: {integrity: sha512-9mVpNCWw02GHZrCoeUig9IK203UdQ+mIdeou2sfnvq2JEjevODZlVsP9s6VDSbJ4vYdHXKMZDXJzckrCn5KMIg==}
     engines: {node: '>=18'}
@@ -1020,6 +1026,12 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
+  '@ai-sdk/provider-utils@5.0.2':
+    resolution: {integrity: sha512-EcmdjJb7yggsZPCbS3MFBpvAUnKaPW+QvanU5GzF00XCq0bqqAmvJ3MN19ejlmOETbW8sJNiq6qam48wTcbUNw==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
   '@ai-sdk/provider@3.0.13':
     resolution: {integrity: sha512-ZPtVYt5QIJzOta1kdUiDuCx4HhFkvNPv/rvmZ2b1iXwybYjJsCnNYR4PAw4kW7rgVfDARvHXcU64efWuqNp6bw==}
     engines: {node: '>=18'}
@@ -1028,9 +1040,13 @@ packages:
     resolution: {integrity: sha512-oGMAgGoQdBXbZqNG0Ze56CHjDZ1IDYOwGYxYjO5KLSlz5HiNQ9udIXsPZ61VWaHGZ5XW/jyjmr6t2xz2jGVwbQ==}
     engines: {node: '>=18'}
 
-  '@ai-sdk/react@3.0.219':
-    resolution: {integrity: sha512-yzU0HAlDo0tEm6jQD3jTGTKvDs0k6Bm3ls5dvUwuqxgZ0Hnt4NK3C8NOxljxUWNkJsQve595X5ifCH7Gxhyf1A==}
-    engines: {node: '>=18'}
+  '@ai-sdk/provider@4.0.1':
+    resolution: {integrity: sha512-6p3C/vGqVIjcptBu1DnVd/BZJ2wWmV9TUv9192vT6ZvT9KNED8EwRTqyqFpoQZKgSbMDSvBSq3dqR524Nt/Crw==}
+    engines: {node: '>=22'}
+
+  '@ai-sdk/react@4.0.9':
+    resolution: {integrity: sha512-KJ/b9OOHgWHIwugupb+ARBlfh1dqBJhO1hEPzLmlp5R0yD9kARSO0JZxS7a9MFoFML/DytHbcFUUbIuUMAvmsA==}
+    engines: {node: '>=22'}
     peerDependencies:
       react: ^19.2.7
 
@@ -5437,6 +5453,9 @@ packages:
   '@whatwg-node/server@0.11.0':
     resolution: {integrity: sha512-VSdkwnJRr8Yv9UgB2aXB3VUPWwd6Oqnn0hycFwhg9pZgWxJXb7JmhsiXe9tmpMwjHFxli12PGcz9aI63YYloGQ==}
     engines: {node: '>=18.0.0'}
+
+  '@workflow/serde@4.1.0':
+    resolution: {integrity: sha512-pav4F2BoirECWR7Nf1TKt+2eETcBj7jj4cBefQ8VXQCA6NPkaKeLfj/zMgi+3zYV5ZIBT4GuUiphsj0/b9hPQQ==}
 
   '@xtuc/ieee754@1.2.0':
     resolution: {integrity: sha512-DX8nKgqcGwsc0eJSqYt5lwP4DH5FlHnmuWWBRy7X0NcaGR0ZtuyeESgMwTYVEtxmsNGY+qit4QYT/MIYTOTPeA==}
@@ -11472,6 +11491,13 @@ snapshots:
       '@ai-sdk/provider-utils': 4.0.34(zod@3.25.76)
       zod: 3.25.76
 
+  '@ai-sdk/mcp@2.0.4(zod@3.25.76)':
+    dependencies:
+      '@ai-sdk/provider': 4.0.1
+      '@ai-sdk/provider-utils': 5.0.2(zod@3.25.76)
+      pkce-challenge: 5.0.1
+      zod: 3.25.76
+
   '@ai-sdk/openai-compatible@2.0.55(zod@3.25.76)':
     dependencies:
       '@ai-sdk/provider': 3.0.13
@@ -11511,6 +11537,14 @@ snapshots:
       eventsource-parser: 3.1.0
       zod: 3.25.76
 
+  '@ai-sdk/provider-utils@5.0.2(zod@3.25.76)':
+    dependencies:
+      '@ai-sdk/provider': 4.0.1
+      '@standard-schema/spec': 1.1.0
+      '@workflow/serde': 4.1.0
+      eventsource-parser: 3.1.0
+      zod: 3.25.76
+
   '@ai-sdk/provider@3.0.13':
     dependencies:
       json-schema: 0.4.0
@@ -11519,9 +11553,15 @@ snapshots:
     dependencies:
       json-schema: 0.4.0
 
-  '@ai-sdk/react@3.0.219(react@19.2.7)(zod@3.25.76)':
+  '@ai-sdk/provider@4.0.1':
     dependencies:
-      '@ai-sdk/provider-utils': 4.0.34(zod@3.25.76)
+      json-schema: 0.4.0
+
+  '@ai-sdk/react@4.0.9(react@19.2.7)(zod@3.25.76)':
+    dependencies:
+      '@ai-sdk/mcp': 2.0.4(zod@3.25.76)
+      '@ai-sdk/provider': 4.0.1
+      '@ai-sdk/provider-utils': 5.0.2(zod@3.25.76)
       ai: 6.0.217(zod@3.25.76)
       react: 19.2.7
       swr: 2.4.2(react@19.2.7)
@@ -16834,6 +16874,8 @@ snapshots:
       '@whatwg-node/fetch': 0.10.13
       '@whatwg-node/promise-helpers': 1.3.2
       tslib: 2.8.1
+
+  '@workflow/serde@4.1.0': {}
 
   '@xtuc/ieee754@1.2.0': {}
 
