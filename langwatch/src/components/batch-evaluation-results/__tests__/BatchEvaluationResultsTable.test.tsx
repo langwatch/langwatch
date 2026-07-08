@@ -52,6 +52,7 @@ const createTestData = (
   ],
   evaluatorIds: ["eval-1"],
   evaluatorNames: { "eval-1": "Exact Match" },
+  pairwiseColumns: [],
   rows: [
     {
       index: 0,
