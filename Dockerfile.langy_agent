@@ -19,7 +19,7 @@
 # -----------------------------------------------------------------------------
 # Pin the Go toolchain to the version recorded in go.mod (`go 1.26.2`) so
 # CI and local builds produce byte-identical binaries. Bump in lockstep.
-FROM golang:1.26.4-bookworm AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26.4-bookworm AS builder
 
 WORKDIR /src
 
@@ -44,8 +44,15 @@ COPY services ./services
 # any glibc the Ubuntu base ships with no surprise dynamic-link issues.
 # -trimpath drops the host build path from binary metadata for cleaner
 # diffs across reproducible builds.
-ARG TARGETOS=linux
-ARG TARGETARCH=amd64
+#
+# TARGETOS/TARGETARCH are left WITHOUT defaults on purpose: BuildKit fills them
+# from the target platform (`--platform`), and the builder runs on the native
+# BUILDPLATFORM (above) to cross-compile. A hardcoded `=amd64` default here
+# silently overrode BuildKit's value, so `--platform linux/arm64` (the
+# Graviton/gVisor publish matrix, which passes NO build-args) produced an amd64
+# binary in an arm64 image — dead on arrival with `exec format error`.
+ARG TARGETOS
+ARG TARGETARCH
 ARG SERVICE_VERSION=dev
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
