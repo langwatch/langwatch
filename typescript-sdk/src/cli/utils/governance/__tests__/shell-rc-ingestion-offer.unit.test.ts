@@ -387,6 +387,92 @@ describe("maybeOfferIngestionShellRcPersist", () => {
     });
   });
 
+  describe("when the tool is `opencode` (scoped shell function, no global export)", () => {
+    describe("and the user answers 'y'", () => {
+      it("writes a scoped opencode() wrapper, not bare exports", async () => {
+        answers.push("y");
+        const { maybeOfferIngestionShellRcPersist } = await import(
+          "../shell-rc.js"
+        );
+        await maybeOfferIngestionShellRcPersist({
+          cfg: cfg(),
+          tool: "opencode",
+          vars: otelVars,
+        });
+        const rc = fs.readFileSync(path.join(tmpHome, ".zshrc"), "utf8");
+        expect(rc).toContain("# >>> langwatch opencode begin >>>");
+        expect(rc).toContain("opencode() {");
+        expect(rc).toContain('command opencode "$@"');
+        expect(rc).toContain(
+          "OTEL_EXPORTER_OTLP_ENDPOINT=http://app.example.com/api/otel",
+        );
+        // NOT a bare global export — that's the leak we're avoiding.
+        expect(rc).not.toContain("export OTEL_TRACES_EXPORTER");
+        // Claude Code settings file untouched.
+        expect(fs.existsSync(claudeSettingsPath())).toBe(false);
+      });
+
+      it("names the shell rc in the prompt", async () => {
+        answers.push("y");
+        const { maybeOfferIngestionShellRcPersist } = await import(
+          "../shell-rc.js"
+        );
+        await maybeOfferIngestionShellRcPersist({
+          cfg: cfg(),
+          tool: "opencode",
+          vars: otelVars,
+        });
+        expect(lastPrompts).toHaveLength(1);
+        expect(lastPrompts[0]).toContain(".zshrc");
+      });
+    });
+
+    describe("and ~/.zshrc already has an export block from another tool", () => {
+      it("adds the opencode wrapper under its own markers, leaving the export block", async () => {
+        const rcFile = path.join(tmpHome, ".zshrc");
+        const priorExport =
+          "# >>> langwatch begin >>>\nexport OTEL_EXPORTER_OTLP_ENDPOINT=http://gemini\n# <<< langwatch end <<<\n";
+        fs.writeFileSync(rcFile, priorExport);
+        answers.push("y");
+        const { maybeOfferIngestionShellRcPersist } = await import(
+          "../shell-rc.js"
+        );
+        await maybeOfferIngestionShellRcPersist({
+          cfg: cfg(),
+          tool: "opencode",
+          vars: otelVars,
+        });
+        const rc = fs.readFileSync(rcFile, "utf8");
+        // both blocks present, neither clobbered
+        expect(rc).toContain("# >>> langwatch begin >>>");
+        expect(rc).toContain("export OTEL_EXPORTER_OTLP_ENDPOINT=http://gemini");
+        expect(rc).toContain("# >>> langwatch opencode begin >>>");
+        expect(rc).toContain("opencode() {");
+      });
+    });
+
+    describe("and the opencode wrapper already targets this endpoint", () => {
+      it("stays quiet — no prompt, no rewrite", async () => {
+        const rcFile = path.join(tmpHome, ".zshrc");
+        const installed =
+          "# >>> langwatch opencode begin >>>\nopencode() {\n    OTEL_EXPORTER_OTLP_ENDPOINT=http://app.example.com/api/otel \\\n    command opencode \"$@\"\n}\n# <<< langwatch opencode end <<<\n";
+        fs.writeFileSync(rcFile, installed);
+        // No answer queued: a fired prompt would read "" → "yes" → rewrite.
+        const { maybeOfferIngestionShellRcPersist } = await import(
+          "../shell-rc.js"
+        );
+        await maybeOfferIngestionShellRcPersist({
+          cfg: cfg(),
+          tool: "opencode",
+          vars: otelVars,
+        });
+        expect(lastPrompts).toHaveLength(0);
+        expect(saveConfigMock).not.toHaveBeenCalled();
+        expect(fs.readFileSync(rcFile, "utf8")).toBe(installed);
+      });
+    });
+  });
+
   describe("when shell_rc_preference is 'skip' (any tool)", () => {
     it("does not prompt or write for claude", async () => {
       const { maybeOfferIngestionShellRcPersist } = await import(

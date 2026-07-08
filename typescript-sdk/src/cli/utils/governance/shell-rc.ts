@@ -52,6 +52,13 @@ const TOOLS = ["claude", "codex", "cursor", "gemini", "opencode"] as const;
 const BLOCK_BEGIN = "# >>> langwatch begin >>>";
 const BLOCK_END = "# <<< langwatch end <<<";
 
+// Separate marker pair for the opencode wrapper function. opencode has no
+// config-file env block and its OTEL vars use generic names, so instead of
+// a global `export` (which leaks into every shell child) we install a shell
+// function that sets the telemetry env ONLY for `opencode` invocations.
+const OPENCODE_BEGIN = "# >>> langwatch opencode begin >>>";
+const OPENCODE_END = "# <<< langwatch opencode end <<<";
+
 export type DetectedShell = "zsh" | "bash" | "fish";
 
 /**
@@ -109,14 +116,16 @@ export function isShellAlreadyConfigured(): boolean {
 export function rcHasLangwatchBlock({
   shell,
   requiredKeys,
+  markers = { begin: BLOCK_BEGIN, end: BLOCK_END },
 }: {
   shell: DetectedShell;
   requiredKeys?: string[];
+  markers?: { begin: string; end: string };
 }): boolean {
   try {
     const content = fs.readFileSync(rcPath(shell), "utf8");
-    const begin = content.indexOf(BLOCK_BEGIN);
-    const end = content.indexOf(BLOCK_END);
+    const begin = content.indexOf(markers.begin);
+    const end = content.indexOf(markers.end);
     if (begin === -1 || end === -1 || end < begin) return false;
     if (!requiredKeys || requiredKeys.length === 0) return true;
     const block = content.slice(begin, end);
@@ -182,6 +191,36 @@ export function buildOtelExportBlock(
 }
 
 /**
+ * Build a shell function that wraps `opencode` so the OTEL telemetry env
+ * is set ONLY for `opencode` invocations, not exported into every shell
+ * child. This is the "alias hack" for a tool with no config-file env
+ * block: `command opencode` inside the function bypasses the function
+ * itself (no recursion) and runs the real binary.
+ *
+ * posix (zsh/bash) uses a function with an env-prefix; fish uses a
+ * function with block-local `set -lx`. The body (no begin/end markers)
+ * is returned for `persistBlockToRc` to bracket with the opencode markers.
+ */
+export function buildOpencodeAliasBlock(
+  vars: Record<string, string>,
+  shell: DetectedShell,
+): string {
+  const entries = Object.entries(vars);
+  if (shell === "fish") {
+    const sets = entries
+      .map(([k, v]) => `    set -lx ${k} ${quote(v)}`)
+      .join("\n");
+    return ["function opencode", sets, "    command opencode $argv", "end"].join(
+      "\n",
+    );
+  }
+  const assigns = entries
+    .map(([k, v]) => `    ${k}=${quote(v)} \\`)
+    .join("\n");
+  return ["opencode() {", assigns, '    command opencode "$@"', "}"].join("\n");
+}
+
+/**
  * Append (or replace, if the marker block already exists) the
  * export block to the shell rc file. Creates the file if missing.
  * Idempotent: a second run replaces the block in place rather
@@ -192,11 +231,15 @@ export function buildOtelExportBlock(
 export function persistBlockToRc(
   shell: DetectedShell,
   block: string,
+  markers: { begin: string; end: string } = {
+    begin: BLOCK_BEGIN,
+    end: BLOCK_END,
+  },
 ): string {
   const file = rcPath(shell);
   const dir = path.dirname(file);
   fs.mkdirSync(dir, { recursive: true });
-  const wrapped = `${BLOCK_BEGIN}\n${block}\n${BLOCK_END}\n`;
+  const wrapped = `${markers.begin}\n${block}\n${markers.end}\n`;
 
   let existing = "";
   try {
@@ -206,7 +249,7 @@ export function persistBlockToRc(
   }
 
   const marker = new RegExp(
-    `${escapeRegex(BLOCK_BEGIN)}[\\s\\S]*?${escapeRegex(BLOCK_END)}\\n?`,
+    `${escapeRegex(markers.begin)}[\\s\\S]*?${escapeRegex(markers.end)}\\n?`,
     "m",
   );
   let next: string;
@@ -368,6 +411,53 @@ export async function maybeOfferIngestionShellRcPersist({
 
   const shell = detectShell();
   if (!shell) return;
+
+  // opencode has no config-file env block, and its OTEL vars are generic
+  // names, so a global `export` would leak into every shell child. Install a
+  // scoped wrapper function instead: it sets the telemetry env only for
+  // `opencode` runs. Kept under its own marker pair so it coexists with any
+  // export block for the other shell-rc tools.
+  if (tool === "opencode") {
+    if (
+      rcHasLangwatchBlock({
+        shell,
+        requiredKeys: [vars.OTEL_EXPORTER_OTLP_ENDPOINT].filter(
+          Boolean,
+        ) as string[],
+        markers: { begin: OPENCODE_BEGIN, end: OPENCODE_END },
+      })
+    ) {
+      return;
+    }
+    const target = rcPath(shell);
+    console.log();
+    const choice = await askPersistChoice(target, tool);
+    if (choice === "skip" || choice === "no") return;
+    if (choice === "never") {
+      recordNeverChoice(cfg);
+      return;
+    }
+    try {
+      const wrote = persistBlockToRc(
+        shell,
+        buildOpencodeAliasBlock(vars, shell),
+        { begin: OPENCODE_BEGIN, end: OPENCODE_END },
+      );
+      console.log(
+        chalk.green(
+          `  ✓ Installed a scoped \`opencode\` telemetry wrapper in ${wrote}`,
+        ),
+      );
+    } catch (err) {
+      console.log(
+        chalk.yellow(
+          `  ! Couldn't write to ${target}: ${(err as Error).message}`,
+        ),
+      );
+    }
+    return;
+  }
+
   // Already installed in the rc file, even if this shell hasn't sourced it
   // yet (so the OTEL env isn't in process.env). Keyed on the current vars so
   // a stale / different export block doesn't suppress installing this one.
