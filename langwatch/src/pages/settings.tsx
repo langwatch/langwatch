@@ -32,6 +32,7 @@ import { Select } from "../components/ui/select";
 import { Switch } from "../components/ui/switch";
 import { toaster } from "../components/ui/toaster";
 import { withPermissionGuard } from "../components/WithPermissionGuard";
+import { useDrawer } from "../hooks/useDrawer";
 import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
@@ -78,7 +79,9 @@ function AdminOnlyBadge() {
 function Settings() {
   const { organization, project } = useOrganizationTeamProject();
 
-  if (!organization || !project) return null;
+  // Project is optional: a governance-intent org has none by design
+  // (ADR-038 v6) and still needs its organization settings.
+  if (!organization) return null;
 
   return <SettingsForm organization={organization} project={project} />;
 }
@@ -92,10 +95,11 @@ function SettingsForm({
   project,
 }: {
   organization: FullyLoadedOrganization;
-  project: Project;
+  project: Project | undefined;
 }) {
   const { hasPermission } = useOrganizationTeamProject();
   const { isLiteMember } = useLiteMemberGuard();
+  const { openDrawer } = useDrawer();
   // ADR-038 ships dark: the Primary use setting only exists where the
   // governance surface it routes to is reachable.
   const { enabled: governanceEnabled } = useFeatureFlag(
@@ -144,15 +148,23 @@ function SettingsForm({
         onSuccess: () => {
           void apiContext.organization.getAll.refetch();
           void apiContext.governance.resolveHome.invalidate();
-          // ADR-038 F9: a governance org flipping to LLMOps would land
-          // everyone on the silent, never-integrated default project —
-          // offer its setup instead of a dead surface.
+          // ADR-038 F9/v6: a governance org flipping to LLMOps needs a
+          // project to land on. No project yet (v6 skips it at signup) →
+          // open the create-project drawer right here; a never-integrated
+          // project → offer its setup instead of a dead surface.
           if (
             previousIntent === "AGENT_GOVERNANCE" &&
-            data.primaryIntent === "LLM_OPS" &&
-            !project.firstMessage
+            data.primaryIntent === "LLM_OPS"
           ) {
-            setShowLlmOpsSetupDialog(true);
+            if (!project) {
+              openDrawer("createProject", {
+                navigateOnCreate: true,
+                organizationId: organization.id,
+                defaultTeamId: organization.teams[0]?.id,
+              });
+            } else if (!project.firstMessage) {
+              setShowLlmOpsSetupDialog(true);
+            }
           }
           toaster.create({
             title: "Organization updated",
@@ -228,12 +240,19 @@ function SettingsForm({
                   <Text>{organization.slug}</Text>
                 )}
               </HorizontalFormControl>
-              <HorizontalFormControl
-                label="Project ID"
-                helper="Use this ID when authenticating with API Keys"
-              >
-                <Input width="full" disabled type="text" value={project.id} />
-              </HorizontalFormControl>
+              {project && (
+                <HorizontalFormControl
+                  label="Project ID"
+                  helper="Use this ID when authenticating with API Keys"
+                >
+                  <Input
+                    width="full"
+                    disabled
+                    type="text"
+                    value={project.id}
+                  />
+                </HorizontalFormControl>
+              )}
 
               <HorizontalFormControl
                 label="Support contact"
@@ -413,14 +432,14 @@ function SettingsForm({
           </VStack>
         </form>
 
-        {hasPermission("project:update") && (
+        {project && hasPermission("project:update") && (
           <ProjectSettingsForm project={project} />
         )}
       </VStack>
 
       {/* ADR-038 F9: governance -> LLMOps flip offers the project setup */}
       <Dialog.Root
-        open={showLlmOpsSetupDialog}
+        open={showLlmOpsSetupDialog && !!project}
         onOpenChange={({ open }) => setShowLlmOpsSetupDialog(open)}
       >
         <Dialog.Content bg="bg">
@@ -446,7 +465,8 @@ function SettingsForm({
               <Button
                 colorPalette="orange"
                 onClick={() => {
-                  window.location.href = `/onboarding/product?projectSlug=${project.slug}`;
+                  // Dialog only opens when a project exists (see open guard).
+                  window.location.href = `/onboarding/product?projectSlug=${project?.slug ?? ""}`;
                 }}
               >
                 Set up the project
