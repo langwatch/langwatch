@@ -85,6 +85,7 @@ describe("trace-processing pipeline span-command sharding", () => {
       expect(getGroupKey(p)).toBe(getGroupKey(p));
     });
 
+    /** @scenario "The pipeline shards the command while leaving the fold per-trace" */
     it("keeps the trace-summary fold keyed per trace, not per span", () => {
       const definition = createTraceProcessingPipeline(
         buildTraceDeps({ spanCommandShardCount: 8 }),
@@ -99,6 +100,7 @@ describe("trace-processing pipeline span-command sharding", () => {
   });
 
   describe("given the pipeline is built with sharding disabled", () => {
+    /** @scenario "The pipeline preserves the trace-only key when sharding is off" */
     it("returns the bare trace id, identical to before sharding existed", () => {
       const getGroupKey = recordSpanGroupKeyFn({ spanCommandShardCount: 1 });
       expect(getGroupKey(payload(TRACE_ID, "abc"))).toBe(TRACE_ID);

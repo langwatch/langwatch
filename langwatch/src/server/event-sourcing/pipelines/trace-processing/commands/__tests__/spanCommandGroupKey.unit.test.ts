@@ -18,6 +18,7 @@ function makeSpanIds(n: number): string[] {
 describe("spanCommandGroupKey", () => {
   describe("given sharding is disabled", () => {
     describe("when the shard count is one, zero, or negative", () => {
+      /** @scenario "Sharding disabled keeps the historic trace-only group key" */
       it("returns the bare trace id, identical to the historic key", () => {
         for (const shardCount of [1, 0, -4]) {
           expect(
@@ -53,6 +54,7 @@ describe("spanCommandGroupKey", () => {
         expect(Number(shard)).toBeLessThan(8);
       });
 
+      /** @scenario "A span always maps to the same shard" */
       it("derives the same group for the same span every time", () => {
         const spanId = "0a1b2c3d4e5f6071";
         const first = spanCommandGroupKey({
@@ -70,6 +72,7 @@ describe("spanCommandGroupKey", () => {
     });
 
     describe("when deriving keys for many spans of one trace", () => {
+      /** @scenario "Sharding spreads a trace's spans across groups" */
       it("spreads them across more than one group", () => {
         const groups = new Set(
           makeSpanIds(64).map((spanId) =>
@@ -204,6 +207,7 @@ describe("resolveSpanCommandShardCount", () => {
   });
 
   describe("given a value above the maximum", () => {
+    /** @scenario "The configured shard count is clamped to a safe range" */
     it("clamps down to the maximum", () => {
       expect(resolveSpanCommandShardCount("100000")).toBe(MAX_SPAN_SHARD_COUNT);
     });

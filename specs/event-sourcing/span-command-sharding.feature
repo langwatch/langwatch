@@ -67,7 +67,12 @@ Feature: Sharded span-command processing
     When the recordSpan command's group key is derived for any span of a trace
     Then the group key is the trace id alone, identical to before sharding existed
 
-  @integration @sharding @correctness
+  # Correctness here is structural: the fold runs on its own trace-keyed queue,
+  # unaffected by the command shard key (see the scenario above), and existing
+  # fold coverage (fold-coalescing.feature) already proves the accumulated count
+  # is exact. A dedicated end-to-end parallel-drain test through the live
+  # GroupQueue + ClickHouse is a tracked gap.
+  @integration @sharding @correctness @unimplemented
   Scenario: The trace summary is exact regardless of sharding
     Given many spans recorded for one trace with sharding enabled
     When the spans are processed in parallel across shards
