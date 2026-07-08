@@ -876,6 +876,42 @@ export const evaluatorsSchema = z.object({
         .default([]),
     }),
   }),
+  "langevals/select_best_compare": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation")
+        .default("openai/gpt-5-mini"),
+      max_tokens: z
+        .number()
+        .describe("Max tokens allowed for evaluation")
+        .default(128000),
+      prompt: z
+        .string()
+        .describe(
+          "Judge prompt template. Placeholders: {input}, {golden}, {candidates} (a pre-rendered bulleted list with slot labels and optional per-candidate metrics).",
+        )
+        .default(
+          'Pick the best of N candidate outputs against a known-good reference (golden answer).\n\nTask:           {input}\nGolden answer:  {golden}\n\nCandidates:\n{candidates}\n\nReason step-by-step about how closely each candidate matches the\ngolden answer in correctness, completeness, and style. Then pick\nthe best candidate by its slot label, or "tie" if no clear winner.\nPrefer cheaper/faster only when quality is comparable.\n',
+        ),
+      randomize_order: z
+        .boolean()
+        .describe(
+          "Shuffle candidate order per row (deterministically, seeded by row_index) before presenting them to the judge. Reduces position bias when the judge is called once per row.",
+        )
+        .default(true),
+      allow_tie: z
+        .boolean()
+        .describe(
+          "Allow the judge to return 'tie' when candidates are equivalent",
+        )
+        .default(true),
+      include_metrics: z
+        .array(z.union([z.literal("cost"), z.literal("duration")]))
+        .describe("Per-candidate metrics to inject into the judge prompt")
+        .default([]),
+    }),
+  }),
   "langevals/query_resolution": z.object({
     settings: z.object({
       model: z
@@ -2297,6 +2333,59 @@ position-bias mitigation.
       label: {
         description:
           "Winner identifier: candidate_a_id, candidate_b_id, or 'tie'. Programmatic consumers can read this directly without dereferencing the evaluator's candidate slot mapping.",
+      },
+    },
+  },
+  "langevals/select_best_compare": {
+    name: `N-way Compare`,
+    description: `
+Native N-way LLM-as-judge evaluator. Picks the best of 3+ candidate
+outputs against a golden reference in a single judge call, with
+deterministic candidate-order shuffling for position-bias mitigation.
+`,
+    category: "quality",
+    docsUrl: "",
+    isGuardrail: false,
+    requiredFields: ["candidates"],
+    optionalFields: ["input", "golden", "row_index"],
+    settings: {
+      model: {
+        description: "The model to use for evaluation",
+        default: "openai/gpt-5-mini",
+      },
+      max_tokens: {
+        description: "Max tokens allowed for evaluation",
+        default: 128000,
+      },
+      prompt: {
+        description:
+          "Judge prompt template. Placeholders: {input}, {golden}, {candidates} (a pre-rendered bulleted list with slot labels and optional per-candidate metrics).",
+        default:
+          'Pick the best of N candidate outputs against a known-good reference (golden answer).\n\nTask:           {input}\nGolden answer:  {golden}\n\nCandidates:\n{candidates}\n\nReason step-by-step about how closely each candidate matches the\ngolden answer in correctness, completeness, and style. Then pick\nthe best candidate by its slot label, or "tie" if no clear winner.\nPrefer cheaper/faster only when quality is comparable.\n',
+      },
+      randomize_order: {
+        description:
+          "Shuffle candidate order per row (deterministically, seeded by row_index) before presenting them to the judge. Reduces position bias when the judge is called once per row.",
+        default: true,
+      },
+      allow_tie: {
+        description:
+          "Allow the judge to return 'tie' when candidates are equivalent",
+        default: true,
+      },
+      include_metrics: {
+        description: "Per-candidate metrics to inject into the judge prompt",
+        default: [],
+      },
+    },
+    envVars: [],
+    result: {
+      score: {
+        description: "1.0 when a winner was picked, 0.5 for tie",
+      },
+      label: {
+        description:
+          "The winning candidate id (matches the id supplied in entry.candidates), or 'tie'.",
       },
     },
   },

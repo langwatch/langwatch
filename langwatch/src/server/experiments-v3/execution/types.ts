@@ -277,6 +277,22 @@ export type ExecutionCell = {
       duration?: number;
     };
   };
+  /**
+   * N-way (select-best) candidates baked into the cell after Phase 1
+   * target execution. Set ONLY for synthetic select-best cells (#5101);
+   * targetId on those cells points at the first variant so the workflow
+   * builder has a real TargetConfig to lean on, but the target step is
+   * skipped via `skipTarget`. Independent from `pairwise` — the two
+   * shapes never coexist on the same cell.
+   */
+  selectBest?: {
+    candidates: Array<{
+      id: string;
+      output: unknown;
+      cost?: number;
+      duration?: number;
+    }>;
+  };
 };
 
 /**

@@ -700,6 +700,114 @@ export const generatePairwiseCells = (
 };
 
 /**
+ * Phase 2 cell generator for N-way (select-best) evaluators (#5101).
+ *
+ * Sibling of `generatePairwiseCells`, intentionally kept fully separate:
+ * the two evaluators live side-by-side in the catalog, so the orchestrator
+ * treats them as independent generators too. Called AFTER Phase 1
+ * (per-target) cells complete. For each select-best evaluator and each
+ * rowIndex where ALL configured variant outputs exist in
+ * `completedTargetOutputs`, emit one synthetic cell whose `selectBest`
+ * field carries the candidates list.
+ *
+ * Rows where any candidate is missing an output are silently skipped —
+ * a select-best verdict is meaningless without every candidate present,
+ * and no PairwiseSkipReason-shaped fallback exists for N variants.
+ */
+export const generateSelectBestCells = (
+  state: Pick<
+    EvaluationsV3State,
+    "datasets" | "activeDatasetId" | "targets" | "evaluators"
+  >,
+  datasetRows: Array<Record<string, unknown>>,
+  completedTargetOutputs: Map<
+    string,
+    { output: unknown; cost?: number; duration?: number }
+  >,
+  loadedPrompts?: Map<string, VersionedPrompt>,
+): { cells: ExecutionCell[] } => {
+  const cells: ExecutionCell[] = [];
+  const datasetId =
+    state.datasets[0]?.id ?? state.activeDatasetId ?? "dataset-1";
+
+  const selectBestEvaluators = state.evaluators.filter((e) => e.selectBest);
+  if (selectBestEvaluators.length === 0) {
+    return { cells };
+  }
+
+  // Same handle-first identifier rule as generatePairwiseCells — the
+  // Python evaluator echoes candidate.id back as the verdict `label`,
+  // and downstream aggregation matches by (a) target.id or (b) the
+  // supplied handle. Raw promptId KSUIDs never normalize.
+  const variantIdentifierFor = (t: TargetConfig): string => {
+    if (t.type === "prompt" && t.promptId) {
+      const handle = loadedPrompts?.get(t.promptId)?.handle;
+      if (handle) return handle;
+    }
+    return t.id;
+  };
+
+  for (const evaluator of selectBestEvaluators) {
+    const cfg = evaluator.selectBest;
+    if (!cfg) continue;
+    if (!cfg.variants || cfg.variants.length < 2) {
+      logger.warn(
+        { evaluatorId: evaluator.id, variants: cfg.variants },
+        "Select-best evaluator skipped: fewer than 2 variants configured",
+      );
+      continue;
+    }
+
+    const resolvedVariants = cfg.variants.map((id) =>
+      state.targets.find((t) => t.id === id),
+    );
+    if (resolvedVariants.some((t) => !t)) {
+      logger.warn(
+        { evaluatorId: evaluator.id, variants: cfg.variants },
+        "Select-best evaluator skipped: one or more variant targets not found",
+      );
+      continue;
+    }
+    const firstVariant = resolvedVariants[0]!;
+
+    for (let rowIndex = 0; rowIndex < datasetRows.length; rowIndex++) {
+      const datasetEntry = datasetRows[rowIndex];
+      if (!datasetEntry) continue;
+
+      const outputs = cfg.variants.map((id) =>
+        completedTargetOutputs.get(`${rowIndex}:${id}`),
+      );
+      if (outputs.some((o) => !o)) continue;
+
+      const candidates = cfg.variants.map((id, i) => ({
+        id: variantIdentifierFor(resolvedVariants[i]!),
+        output: outputs[i]!.output,
+        cost: outputs[i]!.cost,
+        duration: outputs[i]!.duration,
+      }));
+
+      cells.push({
+        rowIndex,
+        // Point at the first variant so the workflow builder has a real
+        // TargetConfig. The target step itself is skipped via `skipTarget`.
+        targetId: firstVariant.id,
+        targetConfig: firstVariant,
+        evaluatorConfigs: [evaluator],
+        datasetEntry: {
+          _datasetId: datasetId,
+          ...datasetEntry,
+        },
+        skipTarget: true,
+        precomputedTargetOutput: candidates[0]!.output,
+        selectBest: { candidates },
+      });
+    }
+  }
+
+  return { cells };
+};
+
+/**
  * Prices an LLM node's token usage at the project's canonical model rate.
  *
  * The engine surfaces token counts + the resolved model on the execution state
@@ -1214,6 +1322,37 @@ const buildEvaluatorInputs = (
         inputs[field] = mapping.value;
       }
     }
+
+    return inputs;
+  }
+
+  // N-way select-best branch (#5101): sibling of the pairwise branch
+  // above, kept fully separate so the two evaluator paths stay
+  // independent. Pumps the generalized `candidates` list + `row_index`
+  // seed to the Python evaluator; `input` reuses the first variant's
+  // existing mapping (if any) so dataset-side input renaming still
+  // works, otherwise falls back to the dataset's `input` column.
+  if (evaluator.selectBest && cell.selectBest) {
+    const cfg = evaluator.selectBest;
+    const firstVariantId = cfg.variants[0];
+    const firstVariantMappings = firstVariantId
+      ? evaluator.mappings[datasetId]?.[firstVariantId] ?? {}
+      : {};
+    const inputMapping = firstVariantMappings.input;
+    if (inputMapping?.type === "source" && inputMapping.source === "dataset") {
+      inputs.input = cell.datasetEntry[inputMapping.sourceField];
+    } else if (cell.datasetEntry.input !== undefined) {
+      inputs.input = cell.datasetEntry.input;
+    }
+
+    inputs.golden = cell.datasetEntry[cfg.goldenField];
+    inputs.candidates = cell.selectBest.candidates.map((c) => ({
+      id: c.id,
+      output: c.output,
+      cost: c.cost,
+      duration: c.duration,
+    }));
+    inputs.row_index = cell.rowIndex;
 
     return inputs;
   }
@@ -1885,10 +2024,14 @@ export async function* runOrchestrator(
       // Wait for all Phase 1 cells to complete
       await Promise.all(activeCells);
 
-      // Phase 2: pairwise cells (#5100). Generated AFTER Phase 1 finishes,
-      // because each pairwise cell needs both variants' outputs to exist.
-      // We reuse the same semaphore + executeCell loop; the new cells get
-      // appended to totalCells dynamically so progress events stay honest.
+      // Phase 2: pairwise (#5100) + N-way select-best (#5101) cells.
+      // Generated AFTER Phase 1 finishes because each Phase 2 cell needs
+      // its variants' outputs to exist. We reuse the same semaphore +
+      // executeCell loop; the new cells get appended to totalCells
+      // dynamically so progress events stay honest. Pairwise and
+      // select-best are generated by independent sibling functions
+      // (they're two separate evaluators in the catalog) but share the
+      // same execution loop, since the loop is per-cell not per-mode.
       if (!aborted) {
         const { cells: pairwiseCells, skipReasons: pairwiseSkipReasons } =
           generatePairwiseCells(
@@ -1898,6 +2041,12 @@ export async function* runOrchestrator(
             completedTargetEvaluatorScores,
             loadedPrompts,
           );
+        const { cells: selectBestCells } = generateSelectBestCells(
+          state,
+          datasetRows,
+          completedTargetOutputs,
+          loadedPrompts,
+        );
 
         // Emit a synthetic evaluator_result error event for each row we had
         // to skip because a variant didn't produce output. Without this the
@@ -1937,13 +2086,18 @@ export async function* runOrchestrator(
           await processEventForStorage(skipEvent);
         }
 
-        if (pairwiseCells.length > 0) {
+        const phase2Cells = [...pairwiseCells, ...selectBestCells];
+        if (phase2Cells.length > 0) {
           logger.info(
-            { runId, count: pairwiseCells.length },
-            "Starting Phase 2 (pairwise) cells",
+            {
+              runId,
+              pairwise: pairwiseCells.length,
+              selectBest: selectBestCells.length,
+            },
+            "Starting Phase 2 (pairwise + select-best) cells",
           );
 
-          for (const cell of pairwiseCells) {
+          for (const cell of phase2Cells) {
             if (await abortManager.isAborted(runId)) {
               aborted = true;
               break;
@@ -1987,7 +2141,7 @@ export async function* runOrchestrator(
                 pushEvent({
                   type: "progress",
                   completed,
-                  total: totalCells + pairwiseCells.length,
+                  total: totalCells + phase2Cells.length,
                 });
               } finally {
                 semaphore.release();

@@ -26,9 +26,11 @@ import type {
   FieldMapping as UIFieldMapping,
 } from "~/components/variables";
 import { PairwiseConfigForm } from "~/experiments-v3/components/EvaluatorPanel/PairwiseConfigForm";
+import { SelectBestConfigForm } from "~/experiments-v3/components/EvaluatorPanel/SelectBestConfigForm";
 import type {
   LocalEvaluatorConfig,
   PairwiseEvaluatorConfig,
+  SelectBestEvaluatorConfig,
   TargetConfig,
 } from "~/experiments-v3/types";
 import {
@@ -69,6 +71,16 @@ const EMPTY_PAIRWISE_CONFIG: PairwiseEvaluatorConfig = {
   includeMetrics: [],
 };
 
+// Same "stable default for new N-way config" pattern — see the pairwise
+// comment above. Kept module-level so a fresh `{...}` literal each render
+// doesn't wipe SelectBestConfigForm's in-progress draft.
+const EMPTY_SELECT_BEST_CONFIG: SelectBestEvaluatorConfig = {
+  variants: [],
+  goldenField: "",
+  includeMetrics: [],
+  randomizeOrder: true,
+};
+
 export type EvaluatorMappingsConfig = {
   level?: "trace" | "thread";
   availableSources?: AvailableSource[];
@@ -105,6 +117,17 @@ export type EvaluatorEditorDrawerProps = {
    */
   pairwiseContext?: {
     initialPairwise?: PairwiseEvaluatorConfig;
+    targets: { id: string }[];
+    datasetColumns: { id: string; name: string }[];
+  };
+  /**
+   * N-way (select-best) drawer context (#5101). Non-serializable; flows
+   * through complexProps. Sibling of pairwiseContext — kept separate so
+   * the two evaluator paths stay independent. When present, the drawer
+   * renders SelectBestConfigForm in place of the per-row mappings section.
+   */
+  selectBestContext?: {
+    initialSelectBest?: SelectBestEvaluatorConfig;
     targets: { id: string }[];
     datasetColumns: { id: string; name: string }[];
   };
@@ -155,6 +178,17 @@ export type EvaluatorEditorController = {
       }
     | undefined;
   onPairwiseChange: ((config: PairwiseEvaluatorConfig) => void) | undefined;
+  /** N-way (select-best) drawer context (#5101). Set only for select-best evaluator types. */
+  selectBestContext:
+    | {
+        initialSelectBest?: SelectBestEvaluatorConfig;
+        targets: TargetConfig[];
+        datasetColumns: { id: string; name: string }[];
+      }
+    | undefined;
+  onSelectBestChange:
+    | ((config: SelectBestEvaluatorConfig) => void)
+    | undefined;
   onLocalConfigChange:
     | ((config: LocalEvaluatorConfig | undefined) => void)
     | undefined;
@@ -212,6 +246,22 @@ export function useEvaluatorEditorController(
         }
       | undefined
   )?.onPairwiseChange;
+  // N-way select-best (#5101): sibling of pairwiseContext above, entirely
+  // separate wiring so the two evaluator paths don't couple.
+  const selectBestContext = complexProps.selectBestContext as
+    | {
+        initialSelectBest?: SelectBestEvaluatorConfig;
+        targets: TargetConfig[];
+        datasetColumns: { id: string; name: string }[];
+      }
+    | undefined;
+  const onSelectBestChange = (
+    flowCallbacks as
+      | {
+          onSelectBestChange?: (config: SelectBestEvaluatorConfig) => void;
+        }
+      | undefined
+  )?.onSelectBestChange;
 
   const saveButtonText =
     props.saveButtonText ?? (complexProps.saveButtonText as string | undefined);
@@ -646,6 +696,8 @@ export function useEvaluatorEditorController(
     onMappingChange,
     pairwiseContext,
     onPairwiseChange,
+    selectBestContext,
+    onSelectBestChange,
     onLocalConfigChange,
     title,
     handleSave,
@@ -681,11 +733,17 @@ export function EvaluatorEditorBody({
     onMappingChange,
     pairwiseContext,
     onPairwiseChange,
+    selectBestContext,
+    onSelectBestChange,
   } = controller;
 
   // Pairwise (#5100): if the caller passed pairwise context, ignore the
   // generic mappings UI entirely and render the targets+golden picker.
   const isPairwise = !!(pairwiseContext && onPairwiseChange);
+  // N-way select-best (#5101): sibling branch of isPairwise, mutually
+  // exclusive by construction (useOpenEvaluatorEditor only sets one
+  // context per evaluator type).
+  const isSelectBest = !!(selectBestContext && onSelectBestChange);
 
   if (evaluatorId && isLoadingEvaluator) {
     return (
@@ -731,9 +789,14 @@ export function EvaluatorEditorBody({
             // inline controls in PairwiseConfigForm (the latter sits right
             // next to the Golden field picker it toggles, #5378); suppress
             // the generic renderers here so the user doesn't see two
-            // competing UIs for the same fields.
+            // competing UIs for the same fields. Same for select-best's
+            // inline include_metrics toggles.
             skipFields={
-              isPairwise ? ["include_metrics", "has_golden_answer"] : undefined
+              isPairwise
+                ? ["include_metrics", "has_golden_answer"]
+                : isSelectBest
+                  ? ["include_metrics"]
+                  : undefined
             }
           />
         )}
@@ -767,6 +830,7 @@ export function EvaluatorEditorBody({
 
         {!hasSettings &&
           !isPairwise &&
+          !isSelectBest &&
           (!mappingsConfig || !onMappingChange) &&
           !isWorkflowEvaluator && (
             <Text fontSize="sm" color="fg.muted">
@@ -785,18 +849,34 @@ export function EvaluatorEditorBody({
           </Box>
         )}
 
-        {!isPairwise && mappingsConfig && onMappingChange && (
+        {isSelectBest && selectBestContext && onSelectBestChange && (
           <Box paddingTop={4}>
-            <EvaluatorMappingsSection
-              evaluatorDef={effectiveEvaluatorDef}
-              level={mappingsConfig.level}
-              providedSources={mappingsConfig.availableSources}
-              initialMappings={mappingsConfig.initialMappings}
-              onMappingChange={onMappingChange}
-              scrollToMissingOnMount={true}
+            <SelectBestConfigForm
+              value={
+                selectBestContext.initialSelectBest ?? EMPTY_SELECT_BEST_CONFIG
+              }
+              onChange={onSelectBestChange}
+              targets={selectBestContext.targets}
+              datasetColumns={selectBestContext.datasetColumns}
             />
           </Box>
         )}
+
+        {!isPairwise &&
+          !isSelectBest &&
+          mappingsConfig &&
+          onMappingChange && (
+            <Box paddingTop={4}>
+              <EvaluatorMappingsSection
+                evaluatorDef={effectiveEvaluatorDef}
+                level={mappingsConfig.level}
+                providedSources={mappingsConfig.availableSources}
+                initialMappings={mappingsConfig.initialMappings}
+                onMappingChange={onMappingChange}
+                scrollToMissingOnMount={true}
+              />
+            </Box>
+          )}
       </VStack>
     </FormProvider>
   );

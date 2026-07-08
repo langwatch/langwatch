@@ -9,7 +9,11 @@
  */
 
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
-import type { LocalEvaluatorConfig, PairwiseEvaluatorConfig } from "../types";
+import type {
+  LocalEvaluatorConfig,
+  PairwiseEvaluatorConfig,
+  SelectBestEvaluatorConfig,
+} from "../types";
 
 /**
  * Parameters to create evaluator editor callbacks.
@@ -56,6 +60,12 @@ export type CreateEvaluatorEditorCallbacksParams = {
    * outputs that the user picks via this form.
    */
   onPairwiseChange?: (config: PairwiseEvaluatorConfig) => void;
+  /**
+   * N-way (select-best) evaluator config sink (#5101). Sibling of
+   * `onPairwiseChange` — when present, the drawer renders
+   * SelectBestConfigForm instead of the generic mappings section.
+   */
+  onSelectBestChange?: (config: SelectBestEvaluatorConfig) => void;
   onSave?: (evaluator: {
     id: string;
     name: string;
@@ -76,6 +86,7 @@ export type EvaluatorEditorCallbacksForTarget = {
     mapping: UIFieldMapping | undefined,
   ) => void;
   onPairwiseChange?: (config: PairwiseEvaluatorConfig) => void;
+  onSelectBestChange?: (config: SelectBestEvaluatorConfig) => void;
   onSave?: (evaluator: {
     id: string;
     name: string;
@@ -121,6 +132,7 @@ export const createEvaluatorEditorCallbacks = ({
   updateTarget,
   onMappingChange,
   onPairwiseChange,
+  onSelectBestChange,
   onSave,
 }: CreateEvaluatorEditorCallbacksParams): EvaluatorEditorCallbacksForTarget => {
   const callbacks: EvaluatorEditorCallbacksForTarget = {};
@@ -133,6 +145,7 @@ export const createEvaluatorEditorCallbacks = ({
   }
   if (onMappingChange) callbacks.onMappingChange = onMappingChange;
   if (onPairwiseChange) callbacks.onPairwiseChange = onPairwiseChange;
+  if (onSelectBestChange) callbacks.onSelectBestChange = onSelectBestChange;
   if (onSave) callbacks.onSave = onSave;
   return callbacks;
 };

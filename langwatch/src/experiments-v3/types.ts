@@ -230,6 +230,33 @@ export function isGoldenFieldSatisfied(pairwise: {
   return !!pairwise.goldenField || pairwise.hasGoldenAnswer === false;
 }
 
+/**
+ * N-way (select-best) evaluator config. Set only for evaluators of type
+ * "langevals/select_best_compare" (#5101). Picks 2+ existing target
+ * columns to compare against a dataset golden field in a single judge
+ * call. Fully separate from the 2-way `pairwiseEvaluatorConfigSchema`
+ * — the two evaluators live side-by-side in the catalog instead of
+ * sharing one schema with a mode flag.
+ *
+ * - variants: ordered TargetConfig ids whose per-row outputs are the
+ *   candidates. At least 2 entries required.
+ * - goldenField: dataset field name whose value is the reference answer.
+ * - includeMetrics: per-candidate metrics injected into the judge prompt.
+ * - randomizeOrder: when true (default), candidate order in the prompt
+ *   is shuffled deterministically per row (seeded by rowIndex) to
+ *   mitigate position bias. Mirrors the Python evaluator's
+ *   `randomize_order` setting.
+ */
+export const selectBestEvaluatorConfigSchema = z.object({
+  variants: z.array(z.string()).default([]),
+  goldenField: z.string(),
+  includeMetrics: z.array(z.enum(["cost", "duration"])).default([]),
+  randomizeOrder: z.boolean().default(true),
+});
+export type SelectBestEvaluatorConfig = z.infer<
+  typeof selectBestEvaluatorConfigSchema
+>;
+
 export const evaluatorConfigSchema = z.object({
   id: z.string(),
   evaluatorType: z.string(),
@@ -247,6 +274,8 @@ export const evaluatorConfigSchema = z.object({
   localEvaluatorConfig: localEvaluatorConfigSchema.optional(),
   /** Set only for pairwise / n-way evaluators (#5100, #5101). */
   pairwise: pairwiseEvaluatorConfigSchema.optional(),
+  /** Set only for N-way select-best evaluators (#5101). Independent from `pairwise`. */
+  selectBest: selectBestEvaluatorConfigSchema.optional(),
 });
 export type EvaluatorConfig = Omit<
   z.infer<typeof evaluatorConfigSchema>,

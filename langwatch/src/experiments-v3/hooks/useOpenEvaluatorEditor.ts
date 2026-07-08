@@ -181,6 +181,41 @@ export const useOpenEvaluatorEditor = () => {
         return;
       }
 
+      // N-way select-best evaluator (#5101): sibling of the pairwise
+      // branch above. Kept fully separate so the two evaluator paths
+      // never couple. The orchestrator's `generateSelectBestCells`
+      // reads `evaluator.selectBest` at run time to assemble the
+      // per-row candidates list from the picked variants' outputs.
+      if (evaluator.evaluatorType === "langevals/select_best_compare") {
+        const activeDataset = datasets.find((d) => d.id === activeDatasetId);
+        setFlowCallbacks(
+          "evaluatorEditor",
+          createEvaluatorEditorCallbacks({
+            onLocalConfigChange: (localEvaluatorConfig) => {
+              updateEvaluator(evaluator.id, { localEvaluatorConfig });
+            },
+            onSelectBestChange: (selectBest) => {
+              updateEvaluator(evaluator.id, { selectBest });
+            },
+          }),
+        );
+        openDrawer("evaluatorEditor", {
+          evaluatorId: evaluator.dbEvaluatorId,
+          evaluatorType: evaluator.evaluatorType,
+          initialLocalConfig: evaluator.localEvaluatorConfig,
+          selectBestContext: {
+            initialSelectBest: evaluator.selectBest,
+            targets,
+            datasetColumns:
+              activeDataset?.columns.map((c) => ({
+                id: c.id,
+                name: c.name,
+              })) ?? [],
+          },
+        });
+        return;
+      }
+
       // Route all non-serializable callbacks through setFlowCallbacks.
       // onMappingChange + onLocalConfigChange must live here (not in
       // mappingsConfig) so the drawer's mappings section renders — see
