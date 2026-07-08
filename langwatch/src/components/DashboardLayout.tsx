@@ -549,9 +549,10 @@ export const DashboardLayout = ({
       (!isOpsRoute &&
         !isPersonalScopeRoute &&
         !isOrgScopeRoute &&
-        // ADR-038 v6: governance-intent orgs have no project by design;
-        // org-level chrome (e.g. /settings) must still render for them.
-        organization?.primaryIntent !== "AGENT_GOVERNANCE" &&
+        // ADR-038 v6: intent-set orgs can legitimately have no project
+        // (governance by design; LLMOps until its first project is
+        // created) — org-level chrome (e.g. /settings) must still render.
+        !organization?.primaryIntent &&
         (!team || !project)))
   ) {
     return <LoadingScreen />;

@@ -300,11 +300,13 @@ export const useOrganizationTeamProject = (
       org.teams.filter((team) => team.projects.length > 0),
     );
 
-    // ADR-038 v6: a governance-intent org deliberately has no project —
-    // its users live on /me and data flows through personal workspaces.
-    // Never bounce them into onboarding or to another org's project;
-    // a project appears only when the org flips to LLMOps in settings.
-    if (organization?.primaryIntent === "AGENT_GOVERNANCE") {
+    // ADR-038 v6: an intent-set org is onboarded, period. Governance orgs
+    // deliberately have no project (users live on /me, data flows through
+    // personal workspaces); an LLMOps org that postponed project creation
+    // recovers via /settings. Never bounce either into onboarding — the
+    // welcome screen would offer to create a duplicate org — or to another
+    // org's project.
+    if (organization?.primaryIntent) {
       return;
     }
 

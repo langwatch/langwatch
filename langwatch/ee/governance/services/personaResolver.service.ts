@@ -121,14 +121,15 @@ export function resolvePersonaHome(
   // hasGovernanceUi check is the I8 kill-switch guard: a flag-off
   // AGENT_GOVERNANCE org falls back to the project home, never a 404'd /me.
   if (input.organizationIntent) {
-    // An LLMOps org with no project yet (flipped from governance, project
-    // creation postponed) lands on settings — where the project gets
-    // created — never on the governance-personal /me.
+    // An intent-set org is onboarded, period: with no shared project it
+    // lands on settings — where the project gets created — never on the
+    // governance-personal /me and never back in /onboarding/welcome
+    // (which would loop: the welcome screen sends onboarded orgs home).
+    // Covers both the LLMOps org that postponed project creation and the
+    // kill-switched governance org that never had one.
     const projectHome = input.firstProjectSlug
       ? `/${input.firstProjectSlug}`
-      : input.organizationIntent === "LLM_OPS"
-        ? "/settings"
-        : noProjectFallback(input.hasGovernanceUi);
+      : "/settings";
     const destination =
       input.organizationIntent === "AGENT_GOVERNANCE" && input.hasGovernanceUi
         ? "/me"

@@ -283,6 +283,20 @@ describe("resolvePersonaHome", () => {
       expect(result.intentPinned).toBe(true);
     });
 
+    it("sends a kill-switched governance org with no project to settings, never onboarding", () => {
+      // Regression: /onboarding/welcome here loops — the welcome screen
+      // treats an intent-set org as onboarded and pushes back to "/".
+      const result = resolvePersonaHome({
+        ...baseInput,
+        organizationIntent: "AGENT_GOVERNANCE",
+        hasGovernanceUi: false,
+        firstProjectSlug: null,
+      });
+      expect(result.destination).toBe("/settings");
+      expect(result.destination).not.toBe("/onboarding/welcome");
+      expect(result.destination).not.toBe("/me");
+    });
+
     it("keeps intentPinned false on every intent-less path", () => {
       const plain = resolvePersonaHome({ ...baseInput });
       const pinned = resolvePersonaHome({
