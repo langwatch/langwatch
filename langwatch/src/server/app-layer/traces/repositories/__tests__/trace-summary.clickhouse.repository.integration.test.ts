@@ -20,7 +20,6 @@ import { TraceSummaryClickHouseRepository } from "../trace-summary.clickhouse.re
 
 const tenantId = `test-tsumm-resolve-${nanoid()}`;
 const presentTraceId = `trace-${nanoid()}`;
-const logsOnlyTraceId = `logs-only-${nanoid()}`;
 const base = Date.now() - 60 * 60 * 1000;
 
 let ch: ClickHouseClient;
@@ -83,7 +82,7 @@ beforeAll(async () => {
 
   await ch.insert({
     table: "trace_summaries",
-    values: [makeRow(presentTraceId, base), makeLogsOnlyRow(logsOnlyTraceId)],
+    values: [makeRow(presentTraceId, base)],
     format: "JSONEachRow",
     clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
   });
@@ -159,12 +158,23 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (integration)", () => {
   });
 
   it("still returns a logs-only trace that carries the OccurredAt=0 sentinel", async () => {
+    // Insert a dedicated sentinel row for this test rather than sharing the
+    // beforeAll row, so the assertion never depends on cross-test container
+    // state (the epoch partition is easy to disturb under a busy CI shard).
+    const sentinelTraceId = `logs-only-sentinel-${nanoid()}`;
+    await ch.insert({
+      table: "trace_summaries",
+      values: [makeLogsOnlyRow(sentinelTraceId)],
+      format: "JSONEachRow",
+      clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+    });
+
     const { repo: rec, queries } = recordingRepo();
 
-    const result = await rec.findByTraceId(tenantId, logsOnlyTraceId);
+    const result = await rec.findByTraceId(tenantId, sentinelTraceId);
 
     expect(result).not.toBeNull();
-    expect(result?.traceId).toBe(logsOnlyTraceId);
+    expect(result?.traceId).toBe(sentinelTraceId);
     expect(result?.spanCount).toBe(0);
     expect(result?.computedInput).toBe("log-input");
     const resolveQuery = queries.find((q) => q.includes("count() AS rowCount"));
