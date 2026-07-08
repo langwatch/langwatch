@@ -2,7 +2,10 @@
 
 import { describe, expect, it } from "vitest";
 
-import { STARTER_PACK_TILES } from "../aiToolEntry.service";
+import {
+  AiToolEntryService,
+  STARTER_PACK_TILES,
+} from "../aiToolEntry.service";
 
 /**
  * Regression guard for specs/ai-gateway/governance/ingestion-templates-catalog.feature
@@ -36,5 +39,28 @@ describe("STARTER_PACK_TILES", () => {
         expect(codingTiles).toContain(slug);
       }
     });
+  });
+});
+
+/**
+ * Contract for specs/ai-governance/personal-portal/portal-grid.feature
+ * scenario "brand-new org suggests the default coding assistants to a
+ * member": the empty-catalog /me portal renders this projection as
+ * functional suggested tiles.
+ */
+describe("AiToolEntryService.listSuggestedPortalTiles", () => {
+  const suggested = AiToolEntryService.listSuggestedPortalTiles();
+
+  /** @scenario brand-new org suggests the default coding assistants to a member */
+  it("returns only coding assistants, Claude Code first", () => {
+    expect(suggested.every((t) => t.type === "coding_assistant")).toBe(true);
+    expect(suggested[0]?.slug).toBe("claude-code");
+  });
+
+  it("returns render-ready tiles with icon and setup command", () => {
+    for (const tile of suggested) {
+      expect(tile.iconAsset).toMatch(/^preset:/);
+      expect(tile.config.setupCommand).toMatch(/^langwatch /);
+    }
   });
 });

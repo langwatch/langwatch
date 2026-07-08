@@ -326,6 +326,19 @@ export const aiToolsRouter = createTRPCRouter({
     }),
 
   /**
+   * The suggested coding-assistant tiles the /me portal renders while the
+   * org's catalog is still empty. Static org-agnostic projection of the
+   * starter pack, gated on `aiTools:view` so every org member gets a
+   * working portal from day one.
+   */
+  suggestedTiles: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .use(checkOrganizationPermission("aiTools:view"))
+    .query(() => {
+      return AiToolEntryService.listSuggestedPortalTiles();
+    }),
+
+  /**
    * Admin drawer dropdown source for the model_provider tile's
    * `providerKey`. Returns every provider the org has any
    * `ModelProvider` row for, with a `configured: boolean` flag the

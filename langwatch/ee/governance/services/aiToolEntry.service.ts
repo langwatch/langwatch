@@ -421,6 +421,35 @@ export class AiToolEntryService {
   }
 
   /**
+   * The suggested tiles the /me portal renders when an org has published
+   * no catalog yet: the starter pack's coding assistants, render-ready
+   * (icon + setup command included), Claude Code first per pack order.
+   *
+   * Coding assistants only — they work out of the box on a fresh org
+   * (tool policies default to permissive when no tile exists, and the
+   * CLI falls back to direct ingestion when no gateway provider is
+   * configured). Model-provider tiles are excluded: minting a personal
+   * VK dead-ends until an admin configures a provider.
+   */
+  static listSuggestedPortalTiles(): {
+    slug: string;
+    displayName: string;
+    type: AiToolType;
+    iconAsset: string;
+    config: { setupCommand: string; setupDocsUrl?: string };
+  }[] {
+    return STARTER_PACK_TILES.filter(
+      (t) => t.type === "coding_assistant",
+    ).map((t) => ({
+      slug: t.slug,
+      displayName: t.displayName,
+      type: t.type,
+      iconAsset: t.iconAsset,
+      config: t.config as { setupCommand: string; setupDocsUrl?: string },
+    }));
+  }
+
+  /**
    * Per-tool CLI path overrides derived from the coding_assistant tiles
    * the calling user can actually see. For each visible tile whose
    * `assistantKind` maps to a CLI slug ({@link ASSISTANT_KIND_TO_TOOL_SLUG}),

@@ -1,6 +1,8 @@
 import {
+  Badge,
   Box,
   Heading,
+  HStack,
   SimpleGrid,
   Skeleton,
   Text,
@@ -65,6 +67,16 @@ export function AiToolsPortal() {
   );
 
   const entries = (listQuery.data ?? []) as unknown as AiToolEntry[];
+  const catalogIsEmpty =
+    !listQuery.isLoading && entries.filter((e) => e.enabled).length === 0;
+
+  // Starter-pack coding assistants shown while the org has no catalog yet,
+  // so a fresh /me starts with working tiles (Claude Code first) instead of
+  // a bare hero. Published entries replace them the moment they exist.
+  const suggestedQuery = api.aiTools.suggestedTiles.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId && catalogIsEmpty, refetchOnWindowFocus: false },
+  );
 
   const grouped = useMemo(() => {
     const byType: Record<AiToolEntry["type"], AiToolEntry[]> = {
@@ -102,31 +114,59 @@ export function AiToolsPortal() {
   }
 
   if (totalEnabled === 0) {
-    // Admins get the getting-started hero pointing at the tool catalog;
-    // members (who cannot publish tools) get a plain "nothing here yet" note.
-    if (canManageCatalog) {
-      return <GovernanceGettingStartedBanner />;
-    }
+    // No catalog yet: suggest the starter-pack coding assistants so the
+    // portal works from day one. Admins additionally get the
+    // getting-started hero pointing at the tool catalog; publishing any
+    // entry replaces the suggestions with the curated grid.
+    const suggested = suggestedQuery.data ?? [];
     return (
-      <Box
-        borderWidth="1px"
-        borderColor="border.muted"
-        borderRadius="md"
-        padding={6}
-        backgroundColor="bg.subtle"
-        width="full"
-      >
-        <VStack align="start" gap={2}>
-          <Heading as="h3" size="md">
-            Your AI tools portal
-          </Heading>
-          <Text fontSize="sm" color="fg.muted">
-            Your admin hasn&apos;t added any AI tools to your portal yet. Check
-            back once they publish your team&apos;s coding assistants and model
-            providers.
-          </Text>
-        </VStack>
-      </Box>
+      <VStack align="stretch" gap={6} width="full">
+        {canManageCatalog && <GovernanceGettingStartedBanner />}
+        {suggested.length > 0 ? (
+          <VStack align="stretch" gap={3}>
+            <HStack gap={2}>
+              <Heading as="h3" size="sm" color="fg.muted">
+                Coding assistants
+              </Heading>
+              <Badge size="sm" colorPalette="orange" variant="subtle">
+                Suggested
+              </Badge>
+            </HStack>
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={3}>
+              {suggested.map((tile) => (
+                <CodingAssistantTile
+                  key={tile.slug}
+                  displayName={tile.displayName}
+                  config={tile.config}
+                  iconAsset={tile.iconAsset}
+                />
+              ))}
+            </SimpleGrid>
+          </VStack>
+        ) : (
+          !canManageCatalog && (
+            <Box
+              borderWidth="1px"
+              borderColor="border.muted"
+              borderRadius="md"
+              padding={6}
+              backgroundColor="bg.subtle"
+              width="full"
+            >
+              <VStack align="start" gap={2}>
+                <Heading as="h3" size="md">
+                  Your AI tools portal
+                </Heading>
+                <Text fontSize="sm" color="fg.muted">
+                  Your admin hasn&apos;t added any AI tools to your portal yet.
+                  Check back once they publish your team&apos;s coding
+                  assistants and model providers.
+                </Text>
+              </VStack>
+            </Box>
+          )
+        )}
+      </VStack>
     );
   }
 
