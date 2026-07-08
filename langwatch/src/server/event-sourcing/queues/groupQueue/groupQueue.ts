@@ -9,7 +9,7 @@ import fastq from "fastq";
 import { Cluster, Redis as IORedis } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
 import type { SemConvAttributes } from "langwatch/observability";
-import { createLogger } from "../../../../utils/logger/server";
+import { createLogger } from "~/utils/logger/server";
 import {
   createContextFromJobData,
   getJobContextMetadata,
