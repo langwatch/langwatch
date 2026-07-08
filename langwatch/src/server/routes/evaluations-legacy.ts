@@ -868,12 +868,13 @@ async function handleEvaluatorCall(
 
   let settings: any = ((evaluatorSettings ?? monitor?.parameters) as any) ?? {};
 
-  const resolved = await resolveEvaluatorSettingsDefaults(project.id);
-
   try {
     settings = evaluatorSettingSchema?.parse({
       ...(!workflowEvaluatorDef
-        ? getEvaluatorDefaultSettings(evaluatorDefinition as any, resolved)
+        ? getEvaluatorDefaultSettings(
+            evaluatorDefinition as any,
+            await resolveEvaluatorSettingsDefaults(project.id),
+          )
         : {}),
       ...(evaluatorSettings ?? (monitor ? (monitor.parameters as object) : {})),
       ...(params.settings ? params.settings : {}),
