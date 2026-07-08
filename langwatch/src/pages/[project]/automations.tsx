@@ -1,37 +1,23 @@
 import {
   Box,
   Button,
-  Card,
   Container,
   Heading,
   HStack,
-  Input,
-  NativeSelect,
   Spacer,
   Table,
   Text,
-  Textarea,
-  useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import type { AlertType, Monitor, TriggerAction } from "@prisma/client";
-import { Bell, Edit2, Filter, MoreVertical, Trash } from "react-feather";
-import {
-  type Control,
-  Controller,
-  type SubmitHandler,
-  type UseFormHandleSubmit,
-  useForm,
-} from "react-hook-form";
-import { z } from "zod";
+import type { Monitor, TriggerAction } from "@prisma/client";
+import { Bell, Edit2, Filter, MoreVertical, Plus, Trash } from "react-feather";
+import { CLIENT_PROVIDERS } from "~/automations/providers/client";
+import { FilterDisplay } from "~/components/automations/FilterDisplay";
 import { HoverableBigText } from "~/components/HoverableBigText";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
-import { SmallLabel } from "~/components/SmallLabel";
-import { FilterDisplay } from "~/components/automations/FilterDisplay";
 import { useDrawer } from "~/hooks/useDrawer";
 import { ProjectSelector } from "../../components/DashboardLayout";
 import SettingsLayout from "../../components/SettingsLayout";
-import { Drawer } from "../../components/ui/drawer";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { Switch } from "../../components/ui/switch";
@@ -44,7 +30,6 @@ import { formatTimeAgo } from "../../utils/formatTimeAgo";
 
 function Automations() {
   const { project, organizations } = useOrganizationTeamProject();
-  const { open, onOpen, onClose } = useDisclosure();
   const { openDrawer } = useDrawer();
 
   const triggers = api.automation.getTriggers.useQuery(
@@ -58,15 +43,6 @@ function Automations() {
 
   const getDatasets = api.dataset.getAll.useQuery({
     projectId: project?.id ?? "",
-  });
-
-  const { setValue, ...formMethods } = useForm({
-    defaultValues: {
-      triggerId: "",
-      customMessage: "",
-      alertType: "",
-      name: "",
-    },
   });
 
   const toggleTrigger = api.automation.toggleTrigger.useMutation();
@@ -137,18 +113,10 @@ function Automations() {
     );
   };
 
-  const triggerActionName = (action: TriggerAction) => {
-    switch (action) {
-      case "SEND_SLACK_MESSAGE":
-        return "Slack";
-      case "SEND_EMAIL":
-        return "Email";
-      case "ADD_TO_DATASET":
-        return "Add to dataset";
-      case "ADD_TO_ANNOTATION_QUEUE":
-        return "Add to annotation queue";
-    }
-  };
+  // Pull from the provider registry so adding a new TriggerAction doesn't
+  // need a parallel switch here.
+  const triggerActionName = (action: TriggerAction) =>
+    CLIENT_PROVIDERS[action]?.shared.label ?? action;
 
   interface ActionParams {
     slackWebhook?: string;
@@ -175,11 +143,6 @@ function Automations() {
     }
   };
 
-  const handleCloseModal = () => {
-    onClose();
-    void triggers.refetch();
-  };
-
   const FilterContainer = ({
     children,
     fontSize = "sm",
@@ -188,7 +151,8 @@ function Automations() {
     fontSize?: string;
   }) => (
     <HStack
-      border="1px solid lightgray"
+      border="1px solid"
+      borderColor="border"
       borderRadius="4px"
       fontSize={fontSize}
       width="100%"
@@ -257,6 +221,12 @@ function Automations() {
           {organizations && project && (
             <ProjectSelector organizations={organizations} project={project} />
           )}
+          <Button
+            colorPalette="orange"
+            onClick={() => openDrawer("automation", {})}
+          >
+            <Plus size={14} /> Add automation
+          </Button>
         </HStack>
         {triggers.data && triggers.data.length == 0 ? (
           <NoDataInfoBlock
@@ -281,148 +251,135 @@ function Automations() {
           <VStack align="stretch" gap={4}>
             <Box
               border="1px solid"
-              borderColor="gray.200"
+              borderColor="border"
               borderRadius="lg"
               overflow="hidden"
             >
               <Table.Root variant="line" width="full">
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader>Name</Table.ColumnHeader>
-                  <Table.ColumnHeader>Action</Table.ColumnHeader>
-                  <Table.ColumnHeader>Destination</Table.ColumnHeader>
-                  <Table.ColumnHeader>Filters</Table.ColumnHeader>
-                  <Table.ColumnHeader whiteSpace="nowrap">
-                    Last Triggered At
-                  </Table.ColumnHeader>
-                  <Table.ColumnHeader>Active</Table.ColumnHeader>
-                  <Table.ColumnHeader>Actions</Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-              {triggers.isLoading ? (
-                <Table.Row>
-                  <Table.Cell colSpan={5}>Loading...</Table.Cell>
-                </Table.Row>
-              ) : (
-                triggers.data?.map((trigger) => {
-                  return (
-                    <Table.Row key={trigger.id} data-trigger-id={trigger.id}>
-                      <Table.Cell>{trigger.name}</Table.Cell>
-                      <Table.Cell>
-                        {triggerActionName(trigger.action)}
-                      </Table.Cell>
-                      <Table.Cell>
-                        {actionItems(
-                          trigger.action,
-                          trigger.actionParams as ActionParams,
-                        )}
-                      </Table.Cell>
-
-                      <Table.Cell maxWidth="500px">
-                        <VStack gap={2}>
-                          {applyChecks(
-                            trigger.checks?.filter(
-                              (check): check is Monitor => !!check,
-                            ) ?? [],
-                          )}
-
-                          {trigger.filters &&
-                          typeof trigger.filters === "string" ? (
-                            <FilterDisplay
-                              filters={trigger.filters}
-                              hasBorder={true}
-                            />
-                          ) : null}
-                        </VStack>
-                      </Table.Cell>
-                      <Table.Cell whiteSpace="nowrap">
-                        {formatTimeAgo(trigger.lastRunAt)}
-                      </Table.Cell>
-                      <Table.Cell textAlign="center">
-                        <Switch
-                          checked={trigger.active}
-                          onChange={() => {
-                            handleToggleTrigger(trigger.id, !trigger.active);
-                          }}
-                        />
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Menu.Root>
-                          <Menu.Trigger asChild>
-                            <Button
-                              variant={"ghost"}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                              }}
-                            >
-                              <MoreVertical />
-                            </Button>
-                          </Menu.Trigger>
-                          <Menu.Content>
-                            {trigger.action != "ADD_TO_DATASET" && (
-                              <Menu.Item
-                                value="customize"
-                                onClick={() => {
-                                  setValue("triggerId", trigger.id);
-                                  setValue(
-                                    "customMessage",
-                                    trigger.message ?? "",
-                                  );
-                                  setValue(
-                                    "alertType",
-                                    trigger.alertType ?? "",
-                                  );
-                                  setValue("name", trigger.name ?? "");
-                                  onOpen();
-                                }}
-                              >
-                                <Box display="flex" alignItems="center" gap={2}>
-                                  <Edit2 size={14} />
-                                  Customize Message
-                                </Box>
-                              </Menu.Item>
-                            )}
-                            <Menu.Item
-                              value="edit"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                openDrawer("editAutomationFilter", {
-                                  automationId: trigger.id,
-                                });
-                              }}
-                            >
-                              <Box display="flex" alignItems="center" gap={2}>
-                                <Filter size={14} />
-                                Edit Filters
-                              </Box>
-                            </Menu.Item>
-                            <Menu.Item
-                              value="delete"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                deleteTrigger(trigger.id);
-                              }}
-                            >
-                              <Box
-                                display="flex"
-                                alignItems="center"
-                                gap={2}
-                                color="red.600"
-                              >
-                                <Trash size={14} />
-                                Delete
-                              </Box>
-                            </Menu.Item>
-                          </Menu.Content>
-                        </Menu.Root>
-                      </Table.Cell>
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader>Name</Table.ColumnHeader>
+                    <Table.ColumnHeader>Action</Table.ColumnHeader>
+                    <Table.ColumnHeader>Destination</Table.ColumnHeader>
+                    <Table.ColumnHeader>Filters</Table.ColumnHeader>
+                    <Table.ColumnHeader whiteSpace="nowrap">
+                      Last Triggered At
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader>Active</Table.ColumnHeader>
+                    <Table.ColumnHeader>Actions</Table.ColumnHeader>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {triggers.isLoading ? (
+                    <Table.Row>
+                      <Table.Cell colSpan={7}>Loading...</Table.Cell>
                     </Table.Row>
-                  );
-                })
-              )}
-              </Table.Body>
-            </Table.Root>
+                  ) : (
+                    triggers.data?.map((trigger) => {
+                      return (
+                        <Table.Row
+                          key={trigger.id}
+                          data-trigger-id={trigger.id}
+                        >
+                          <Table.Cell>{trigger.name}</Table.Cell>
+                          <Table.Cell>
+                            {triggerActionName(trigger.action)}
+                          </Table.Cell>
+                          <Table.Cell>
+                            {actionItems(
+                              trigger.action,
+                              trigger.actionParams as ActionParams,
+                            )}
+                          </Table.Cell>
+
+                          <Table.Cell maxWidth="500px">
+                            <VStack gap={2}>
+                              {applyChecks(
+                                trigger.checks?.filter(
+                                  (check): check is Monitor => !!check,
+                                ) ?? [],
+                              )}
+
+                              {trigger.filters &&
+                              typeof trigger.filters === "string" ? (
+                                <FilterDisplay
+                                  filters={trigger.filters}
+                                  hasBorder={true}
+                                />
+                              ) : null}
+                            </VStack>
+                          </Table.Cell>
+                          <Table.Cell whiteSpace="nowrap">
+                            {formatTimeAgo(trigger.lastRunAt)}
+                          </Table.Cell>
+                          <Table.Cell textAlign="center">
+                            <Switch
+                              checked={trigger.active}
+                              onChange={() => {
+                                handleToggleTrigger(
+                                  trigger.id,
+                                  !trigger.active,
+                                );
+                              }}
+                            />
+                          </Table.Cell>
+                          <Table.Cell>
+                            <Menu.Root>
+                              <Menu.Trigger asChild>
+                                <Button
+                                  variant={"ghost"}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                  }}
+                                >
+                                  <MoreVertical />
+                                </Button>
+                              </Menu.Trigger>
+                              <Menu.Content>
+                                <Menu.Item
+                                  value="edit"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    openDrawer("automation", {
+                                      automationId: trigger.id,
+                                    });
+                                  }}
+                                >
+                                  <Box
+                                    display="flex"
+                                    alignItems="center"
+                                    gap={2}
+                                  >
+                                    <Edit2 size={14} />
+                                    Edit
+                                  </Box>
+                                </Menu.Item>
+                                <Menu.Item
+                                  value="delete"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    deleteTrigger(trigger.id);
+                                  }}
+                                >
+                                  <Box
+                                    display="flex"
+                                    alignItems="center"
+                                    gap={2}
+                                    color="red.600"
+                                  >
+                                    <Trash size={14} />
+                                    Delete
+                                  </Box>
+                                </Menu.Item>
+                              </Menu.Content>
+                            </Menu.Root>
+                          </Table.Cell>
+                        </Table.Row>
+                      );
+                    })
+                  )}
+                </Table.Body>
+              </Table.Root>
             </Box>
             <Text fontSize="sm" color="fg.muted">
               Learn more about creating automations on our{" "}
@@ -438,29 +395,6 @@ function Automations() {
           </VStack>
         )}
       </Container>
-      <Drawer.Root
-        open={open}
-        onOpenChange={({ open }) => (open ? onOpen() : handleCloseModal())}
-        size="lg"
-      >
-        <Drawer.Content bg="bg">
-          <Drawer.Header>
-            <Drawer.Title>Alert Message</Drawer.Title>
-          </Drawer.Header>
-          <Drawer.CloseTrigger />
-          <Drawer.Body>
-            <TriggerForm
-              control={
-                formMethods.control as unknown as Control<TriggerFormData>
-              }
-              handleSubmit={
-                formMethods.handleSubmit as unknown as UseFormHandleSubmit<TriggerFormData>
-              }
-              onClose={handleCloseModal}
-            />
-          </Drawer.Body>
-        </Drawer.Content>
-      </Drawer.Root>
     </SettingsLayout>
   );
 }
@@ -468,113 +402,3 @@ function Automations() {
 export default withPermissionGuard("triggers:view", {
   layoutComponent: SettingsLayout,
 })(Automations);
-
-const triggerFormSchema = z.object({
-  alertType: z.enum(["CRITICAL", "WARNING", "INFO", ""]),
-  customMessage: z.string().optional(),
-  triggerId: z.string(),
-  name: z.string().optional(),
-});
-
-type TriggerFormData = z.infer<typeof triggerFormSchema>;
-
-const TriggerForm = ({
-  control,
-  handleSubmit,
-  onClose,
-}: {
-  control: Control<TriggerFormData>;
-  handleSubmit: UseFormHandleSubmit<TriggerFormData>;
-  onClose: () => void;
-}) => {
-  const addCustomMessageMutation = api.automation.addCustomMessage.useMutation();
-  const { project } = useOrganizationTeamProject();
-
-  const onSubmit: SubmitHandler<TriggerFormData> = (data) => {
-    addCustomMessageMutation.mutate(
-      {
-        triggerId: data.triggerId,
-        message: data.customMessage ?? "",
-        alertType: data.alertType as AlertType,
-        projectId: project?.id ?? "",
-        name: data.name ?? "",
-      },
-      {
-        onSuccess: () => {
-          toaster.create({
-            title: "Custom message",
-            type: "success",
-            description: "Custom message added",
-            meta: {
-              closable: true,
-            },
-          });
-          onClose();
-        },
-        onError: () => {
-          toaster.create({
-            title: "Custom message",
-            type: "error",
-            description: "Failed to add custom message",
-            meta: {
-              closable: true,
-            },
-          });
-        },
-      },
-    );
-  };
-
-  return (
-    //eslint-disable-next-line @typescript-eslint/no-misused-promises
-    <form onSubmit={handleSubmit(onSubmit)}>
-      <VStack gap={4} align="start" width="full">
-        <Text>
-          Customize the notification message that will be sent when this automation
-          activates. This will replace the default message.
-        </Text>
-        <VStack width="full" align="start">
-          <SmallLabel>Title</SmallLabel>
-          <Controller
-            name="name"
-            control={control}
-            render={({ field }) => <Input {...field} />}
-          />
-        </VStack>
-        <VStack width="full" align="start">
-          <SmallLabel>Alert Type</SmallLabel>
-          <Controller
-            name="alertType"
-            control={control}
-            render={({ field }) => (
-              <NativeSelect.Root>
-                <NativeSelect.Field {...field} placeholder="Select Alert Type">
-                  <option value="INFO">Info</option>
-                  <option value="WARNING">Warning</option>
-                  <option value="CRITICAL">Critical</option>
-                </NativeSelect.Field>
-                <NativeSelect.Indicator />
-              </NativeSelect.Root>
-            )}
-          />
-        </VStack>
-        <VStack width="full" align="start">
-          <SmallLabel>Alert Message</SmallLabel>
-          <Controller
-            name="customMessage"
-            control={control}
-            render={({ field }) => (
-              <Textarea {...field} placeholder="Your message" />
-            )}
-          />
-        </VStack>
-        <HStack width="full">
-          <Spacer />
-          <Button type="submit" colorPalette="orange">
-            Save Automation
-          </Button>
-        </HStack>
-      </VStack>
-    </form>
-  );
-};

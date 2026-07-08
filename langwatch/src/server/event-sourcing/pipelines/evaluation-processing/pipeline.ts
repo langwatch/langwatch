@@ -1,5 +1,6 @@
 import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import { definePipeline } from "../../";
+import type { OutboxReactorDefinition } from "../../outbox/outboxReactor.types";
 import type { FoldProjectionStore } from "../../projections/foldProjection.types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
 import {
@@ -14,7 +15,16 @@ import type { EvaluationProcessingEvent } from "./schemas/events";
 export interface EvaluationProcessingPipelineDeps {
   evalRunStore: FoldProjectionStore<EvaluationRunData>;
   executeEvaluationCommand: ExecuteEvaluationCommand;
-  evaluationAlertTriggerReactor: ReactorDefinition<
+  /** PERSIST-class branch of the evaluation alert trigger, routed
+   *  through the framework's `.withOutbox` plumbing (ADR-030 + ADR-035).
+   *  Emits settle payloads stamped `actionClass: "persist"`. */
+  evaluationAlertTriggerReactor: OutboxReactorDefinition<
+    EvaluationProcessingEvent,
+    EvaluationRunData
+  >;
+  /** NOTIFY-class branch of the evaluation alert trigger, routed
+   *  through the framework's `.withOutbox` plumbing (ADR-030). */
+  evaluationAlertTriggerNotifyOutboxReactor: OutboxReactorDefinition<
     EvaluationProcessingEvent,
     EvaluationRunData
   >;
@@ -48,10 +58,15 @@ export function createEvaluationProcessingPipeline(
         store: deps.evalRunStore,
       }),
     )
-    .withReactor(
+    .withOutbox(
       "evaluationRun",
       "evaluationAlertTrigger",
       deps.evaluationAlertTriggerReactor,
+    )
+    .withOutbox(
+      "evaluationRun",
+      "evaluationAlertTriggerNotifyOutbox",
+      deps.evaluationAlertTriggerNotifyOutboxReactor,
     );
 
   if (deps.customerIoEvaluationSyncReactor) {

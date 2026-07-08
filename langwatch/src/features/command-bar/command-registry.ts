@@ -480,6 +480,22 @@ export const actionCommands: Command[] = [
     keywords: ["create", "add", "data", "records"],
   },
   {
+    id: "action-new-automation",
+    label: "New Automation",
+    description: "Create a notification or action triggered by trace filters",
+    icon: Bell,
+    category: "actions",
+    keywords: [
+      "create",
+      "add",
+      "automation",
+      "trigger",
+      "alert",
+      "slack",
+      "email",
+    ],
+  },
+  {
     id: "action-new-scenario",
     label: "New Scenario",
     description: "Create a new scenario",
@@ -663,7 +679,7 @@ const topLevelNavIds = new Set([
   "nav-workflows",
   "nav-evaluators",
   "nav-datasets",
-  "nav-triggers",
+  "nav-automations",
   "nav-settings",
 ]);
 

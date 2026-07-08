@@ -61,6 +61,7 @@ import { app as scimApp } from "./routes/scim";
 import { app as sseApp } from "./routes/sse";
 import { app as tracesLegacyApp } from "./routes/traces-legacy";
 import { app as trpcApp } from "./routes/trpc";
+import { app as unsubscribeApp } from "./routes/unsubscribe";
 import { app as webhooksApp } from "./routes/webhooks";
 import { app as workflowsApp } from "./routes/workflows";
 
@@ -167,6 +168,7 @@ export function createApiRouter() {
   api.route("/", sseApp);
   api.route("/", tracesLegacyApp);
   api.route("/", trpcApp);
+  api.route("/", unsubscribeApp); // /api/unsubscribe — RFC 8058 one-click POST
 
   return api;
 }

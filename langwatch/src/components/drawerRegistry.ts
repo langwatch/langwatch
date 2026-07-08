@@ -47,7 +47,7 @@ const AddOrEditDatasetDrawer = lazyDefault({
   key: "AddOrEditDatasetDrawer",
 });
 const AutomationDrawer = lazyDefault({
-  factory: () => import("./AddAutomationDrawer"),
+  factory: () => import("~/features/automations/AutomationDrawer"),
   key: "AutomationDrawer",
 });
 const AgentHistoryDrawer = lazyDefault({

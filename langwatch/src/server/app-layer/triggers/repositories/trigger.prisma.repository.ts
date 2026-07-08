@@ -1,9 +1,10 @@
 import type { PrismaClient } from "@prisma/client";
+import {
+  NOTIFICATION_CADENCES,
+  type NotificationCadence,
+} from "~/automations/cadences";
 import type { TriggerFilters } from "~/server/filters/types";
-import type {
-  TriggerRepository,
-  TriggerSummary,
-} from "./trigger.repository";
+import type { TriggerRepository, TriggerSummary } from "./trigger.repository";
 
 export class PrismaTriggerRepository implements TriggerRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -21,14 +22,35 @@ export class PrismaTriggerRepository implements TriggerRepository {
         alertType: true,
         message: true,
         customGraphId: true,
+        notificationCadence: true,
+        traceDebounceMs: true,
+        slackTemplateType: true,
+        slackTemplate: true,
+        emailSubjectTemplate: true,
+        emailBodyTemplate: true,
       },
     });
 
-    return triggers.map((t) => ({
-      ...t,
-      actionParams: t.actionParams ?? {},
-      filters: parseFilters(t.filters),
-    }));
+    return triggers.map(
+      ({
+        slackTemplateType,
+        slackTemplate,
+        emailSubjectTemplate,
+        emailBodyTemplate,
+        ...t
+      }) => ({
+        ...t,
+        actionParams: t.actionParams ?? {},
+        filters: parseFilters(t.filters),
+        notificationCadence: parseCadence(t.notificationCadence),
+        templates: {
+          slackTemplateType: slackTemplateType ?? null,
+          slackTemplate: slackTemplate ?? null,
+          emailSubjectTemplate: emailSubjectTemplate ?? null,
+          emailBodyTemplate: emailBodyTemplate ?? null,
+        },
+      }),
+    );
   }
 
   async claimSend({
@@ -50,10 +72,23 @@ export class PrismaTriggerRepository implements TriggerRepository {
     return result.count === 1;
   }
 
-  async updateLastRunAt(
-    triggerId: string,
-    projectId: string,
-  ): Promise<void> {
+  async isSendClaimed({
+    triggerId,
+    traceId,
+    projectId,
+  }: {
+    triggerId: string;
+    traceId: string;
+    projectId: string;
+  }): Promise<boolean> {
+    const existing = await this.prisma.triggerSent.findFirst({
+      where: { triggerId, traceId, projectId },
+      select: { id: true },
+    });
+    return existing !== null;
+  }
+
+  async updateLastRunAt(triggerId: string, projectId: string): Promise<void> {
     await this.prisma.trigger.update({
       where: { id: triggerId, projectId },
       data: { lastRunAt: Date.now() },
@@ -73,4 +108,13 @@ function parseFilters(raw: unknown): TriggerFilters {
     return raw as TriggerFilters;
   }
   return {};
+}
+
+// Defensive narrow: column is a free-form TEXT so an upstream write of an
+// unknown value (e.g. a future cadence not yet shipped) must not throw —
+// fall back to "immediate" so the trigger keeps firing.
+function parseCadence(raw: string): NotificationCadence {
+  return (NOTIFICATION_CADENCES as readonly string[]).includes(raw)
+    ? (raw as NotificationCadence)
+    : "immediate";
 }

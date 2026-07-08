@@ -40,6 +40,7 @@ export const KSUID_RESOURCES = {
   SCENARIO_RUN: "scenariorun",
   SPAN: "span",
   TEAM: "team",
+  TRIGGER: "trigger",
   LOG_RECORD: "logrecord",
   METRIC_RECORD: "metricrecord",
   TRACE_SUMMARY: "tracesummary",

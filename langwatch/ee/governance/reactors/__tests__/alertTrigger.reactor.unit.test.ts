@@ -4,89 +4,49 @@ import { TriggerAction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TriggerSummary } from "~/server/app-layer/triggers/repositories/trigger.repository";
-import type { DerivedTraceEvent } from "~/server/event-sourcing/pipelines/trace-processing/projections/services/trace-events.derivation";
-import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
-import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
-import { SPAN_RECEIVED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
 import {
-  createAlertTriggerReactor,
+  ORIGIN_RESOLVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_TYPE,
+} from "~/server/event-sourcing/pipelines/trace-processing/schemas/constants";
+import type { TraceProcessingEvent } from "~/server/event-sourcing/pipelines/trace-processing/schemas/events";
+import type { ReactorContext } from "~/server/event-sourcing/reactors/reactor.types";
+import {
   type AlertTriggerReactorDeps,
+  createAlertTriggerReactor,
 } from "../alertTrigger.reactor";
 
-vi.mock("~/utils/logger/server", () => ({
-  createLogger: () => ({
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  }),
-}));
-
-vi.mock("~/utils/posthogErrorCapture", () => ({
-  captureException: vi.fn(),
-  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
-}));
-
-// Heavy I/O bound dependencies pulled in transitively via dispatchTriggerAction
-// (email render + SES, Slack webhook). They throw on any unconfigured env in
-// CI, which would short-circuit dispatch before `updateLastRunAt`. Stub them
-// out so dispatch can complete its bookkeeping.
-vi.mock("~/server/mailer/triggerEmail", () => ({
-  sendTriggerEmail: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock("~/server/triggers/sendSlackWebhook", () => ({
-  sendSlackWebhook: vi.fn().mockResolvedValue(undefined),
-}));
-
-function createTraceSummary(
+function createFoldState(
   overrides: Partial<TraceSummaryData> = {},
 ): TraceSummaryData {
   return {
     traceId: "trace-1",
-    traceName: "",
-    spanCount: 2,
-    totalDurationMs: 500,
+    spanCount: 1,
+    totalDurationMs: 100,
     computedIOSchemaVersion: "1",
-    computedInput: "test input",
-    computedOutput: "test output",
+    computedInput: "hello",
+    computedOutput: "world",
     timeToFirstTokenMs: null,
     timeToLastTokenMs: null,
     tokensPerSecond: null,
     containsErrorStatus: false,
     containsOKStatus: true,
     errorMessage: null,
-    models: ["gpt-5-mini"],
-    totalCost: 0.01,
-    nonBilledCost: null,
+    models: [],
+    totalCost: null,
     tokensEstimated: false,
-    totalPromptTokenCount: 100,
-    totalCompletionTokenCount: 50,
-    outputFromRootSpan: true,
-    outputSpanEndTimeMs: 500,
+    totalPromptTokenCount: null,
+    totalCompletionTokenCount: null,
+    outputFromRootSpan: false,
+    outputSpanEndTimeMs: 0,
     blockedByGuardrail: false,
-    rootSpanType: null,
-    containsAi: false,
     topicId: null,
     subTopicId: null,
     annotationIds: [],
-    containsPrompt: false,
-    selectedPromptId: null,
-    selectedPromptSpanId: null,
-    selectedPromptStartTimeMs: null,
-    lastUsedPromptId: null,
-    lastUsedPromptVersionNumber: null,
-    lastUsedPromptVersionId: null,
-    lastUsedPromptSpanId: null,
-    lastUsedPromptStartTimeMs: null,
-    attributes: {
-      "langwatch.origin": "application",
-      "langwatch.user_id": "user-1",
-    },
     occurredAt: Date.now(),
     createdAt: Date.now(),
     updatedAt: Date.now(),
     LastEventOccurredAt: Date.now(),
+    attributes: { "langwatch.origin": "application" },
     ...overrides,
   } as TraceSummaryData;
 }
@@ -98,55 +58,52 @@ function createEvent(
     id: "event-1",
     aggregateId: "trace-1",
     aggregateType: "trace",
+    tenantId: "tenant-1",
+    createdAt: Date.now(),
+    occurredAt: Date.now(),
     type: SPAN_RECEIVED_EVENT_TYPE,
     version: "2025-01-14",
-    tenantId: "tenant-1",
-    occurredAt: Date.now(),
     data: {},
     ...overrides,
-  } as TraceProcessingEvent;
+  } as unknown as TraceProcessingEvent;
 }
 
 function createContext(
-  foldState: TraceSummaryData = createTraceSummary(),
+  foldState: TraceSummaryData,
 ): ReactorContext<TraceSummaryData> {
-  return {
-    tenantId: "tenant-1",
-    aggregateId: "trace-1",
-    foldState,
-  };
+  return { tenantId: "tenant-1", aggregateId: "trace-1", foldState };
 }
 
-/** A thumbs-down automation: fires when a thumbs_up_down event has vote == -1. */
-function thumbsDownTrigger(
+function createTrigger(
   overrides: Partial<TriggerSummary> = {},
 ): TriggerSummary {
+  // Default to ADD_TO_DATASET (persist-class) so these tests exercise
+  // the persist branch this reactor now owns. NOTIFY-class actions
+  // (SEND_EMAIL / SEND_SLACK_MESSAGE) flow through the
+  // alertTriggerNotifyOutbox reactor; eval-filter triggers flow through
+  // the evaluation pipeline.
   return {
     id: "trigger-1",
     projectId: "tenant-1",
-    name: "Thumbs Down Alert",
-    action: TriggerAction.SEND_EMAIL,
-    actionParams: { members: ["user@example.com"] },
-    filters: {
-      "events.metrics.value": { thumbs_up_down: { vote: ["-1", "-1"] } },
+    name: "Latency Alert",
+    action: TriggerAction.ADD_TO_DATASET,
+    actionParams: {
+      datasetId: "dataset-1",
+      datasetMapping: { mapping: {}, expansions: [] },
     },
+    filters: {},
     alertType: "WARNING",
-    message: "User gave a thumbs down",
+    message: "",
     customGraphId: null,
-    ...overrides,
-  };
-}
-
-/** A derived thumbs_up_down span event carrying the given vote metric. */
-function voteEvent(vote: number): DerivedTraceEvent {
-  return {
-    spanId: "span-1",
-    timestamp: Date.now(),
-    name: "thumbs_up_down",
-    attributes: {
-      "event.type": "thumbs_up_down",
-      "event.metrics.vote": String(vote),
+    notificationCadence: "immediate",
+    traceDebounceMs: 30000,
+    templates: {
+      slackTemplateType: null,
+      slackTemplate: null,
+      emailSubjectTemplate: null,
+      emailBodyTemplate: null,
     },
+    ...overrides,
   };
 }
 
@@ -156,25 +113,12 @@ function createDeps(
   return {
     triggers: {
       getActiveTraceTriggersForProject: vi.fn().mockResolvedValue([]),
-      claimSend: vi.fn().mockResolvedValue(true),
-      updateLastRunAt: vi.fn().mockResolvedValue(undefined),
-      invalidate: vi.fn(),
     } as any,
-    projects: {
-      getById: vi.fn().mockResolvedValue({
-        id: "tenant-1",
-        slug: "test-project",
-      }),
-    } as any,
-    traceById: vi.fn().mockResolvedValue(undefined),
-    addToAnnotationQueue: vi.fn().mockResolvedValue(undefined),
-    addToDataset: vi.fn().mockResolvedValue(undefined),
-    deriveEvents: vi.fn().mockResolvedValue([]),
     ...overrides,
   };
 }
 
-describe("alertTrigger reactor", () => {
+describe("alertTrigger reactor (persist outbox)", () => {
   let deps: AlertTriggerReactorDeps;
 
   beforeEach(() => {
@@ -182,89 +126,191 @@ describe("alertTrigger reactor", () => {
     vi.clearAllMocks();
   });
 
-  describe("given a thumbs-down automation", () => {
-    describe("when the trace has no down-vote", () => {
-      it("does not dispatch the trigger action", async () => {
+  describe("given an active persist-class trace-only trigger", () => {
+    describe("when the reactor decides", () => {
+      it("emits a settle-stage request stamped actionClass=persist with the per-trigger debounce TTL", async () => {
+        const trigger = createTrigger({ traceDebounceMs: 45_000 });
         (
           deps.triggers.getActiveTraceTriggersForProject as any
-        ).mockResolvedValue([thumbsDownTrigger()]);
-        // No thumbs_up_down event at all → condition unmet.
-        (deps.deriveEvents as any).mockResolvedValue([]);
+        ).mockResolvedValue([trigger]);
 
         const reactor = createAlertTriggerReactor(deps);
-        await reactor.handle(createEvent(), createContext());
+        const requests = await reactor.decide(
+          createEvent(),
+          createContext(createFoldState()),
+        );
 
-        expect(deps.triggers.claimSend).not.toHaveBeenCalled();
-        expect(deps.triggers.updateLastRunAt).not.toHaveBeenCalled();
-      });
-    });
-
-    describe("when the trace has an up-vote", () => {
-      it("does not dispatch the trigger action", async () => {
-        (
-          deps.triggers.getActiveTraceTriggersForProject as any
-        ).mockResolvedValue([thumbsDownTrigger()]);
-        (deps.deriveEvents as any).mockResolvedValue([voteEvent(1)]);
-
-        const reactor = createAlertTriggerReactor(deps);
-        await reactor.handle(createEvent(), createContext());
-
-        expect(deps.triggers.claimSend).not.toHaveBeenCalled();
-      });
-    });
-
-    describe("when the trace has a down-vote", () => {
-      it("dispatches the trigger action exactly once", async () => {
-        (
-          deps.triggers.getActiveTraceTriggersForProject as any
-        ).mockResolvedValue([thumbsDownTrigger()]);
-        (deps.deriveEvents as any).mockResolvedValue([voteEvent(-1)]);
-
-        const reactor = createAlertTriggerReactor(deps);
-        await reactor.handle(createEvent(), createContext());
-
-        expect(deps.triggers.claimSend).toHaveBeenCalledTimes(1);
-        expect(deps.triggers.claimSend).toHaveBeenCalledWith({
-          triggerId: "trigger-1",
-          traceId: "trace-1",
-          projectId: "tenant-1",
+        expect(requests).toHaveLength(1);
+        const [request] = requests;
+        expect(request!.dedupKey).toBe("tenant-1/trigger-1:trace:trace-1");
+        expect(request!.groupKey).toBe("tenant-1/triggerNotify:trigger-1");
+        expect(request!.enqueueOptions).toEqual({ ttlMs: 45_000 });
+        const payload = request!.payload as unknown as {
+          stage: string;
+          actionClass: string;
+          projectId: string;
+          triggerId: string;
+          traceId: string;
+          foldSnapshotAtEnqueue: {
+            computedInput: string;
+            computedOutput: string;
+          };
+        };
+        expect(payload.stage).toBe("settle");
+        // The marker the cadence handler reads to pick dispatchTriggerAction.
+        expect(payload.actionClass).toBe("persist");
+        expect(payload.projectId).toBe("tenant-1");
+        expect(payload.triggerId).toBe("trigger-1");
+        expect(payload.traceId).toBe("trace-1");
+        expect(payload.foldSnapshotAtEnqueue).toEqual({
+          computedInput: "hello",
+          computedOutput: "world",
         });
-        expect(deps.triggers.updateLastRunAt).toHaveBeenCalledTimes(1);
       });
     });
 
-    describe("when the trigger was already sent for this trace", () => {
-      it("respects at-most-once and does not dispatch", async () => {
+    describe("when the trigger filters on event fields", () => {
+      it("still emits a settle request without deriving events itself (the settle stage re-reads + filters)", async () => {
+        const trigger = createTrigger({
+          filters: {
+            "events.metrics.value": { thumbs_up_down: { vote: ["-1", "-1"] } },
+          },
+        });
         (
           deps.triggers.getActiveTraceTriggersForProject as any
-        ).mockResolvedValue([thumbsDownTrigger()]);
-        (deps.deriveEvents as any).mockResolvedValue([voteEvent(-1)]);
-        // Lost the claim race (another reactor already sent).
-        (deps.triggers.claimSend as any).mockResolvedValue(false);
+        ).mockResolvedValue([trigger]);
 
         const reactor = createAlertTriggerReactor(deps);
-        await reactor.handle(createEvent(), createContext());
+        const requests = await reactor.decide(
+          createEvent(),
+          createContext(createFoldState()),
+        );
 
-        expect(deps.triggers.claimSend).toHaveBeenCalledTimes(1);
-        expect(deps.triggers.updateLastRunAt).not.toHaveBeenCalled();
+        // The reactor no longer evaluates filters or derives events — it
+        // only enqueues; the settle dispatcher re-reads the settled fold
+        // and runs the filters against the complete state.
+        expect(requests).toHaveLength(1);
+        expect(
+          (requests[0]!.payload as unknown as { actionClass: string })
+            .actionClass,
+        ).toBe("persist");
       });
     });
   });
 
-  describe("given a thumbs-down automation that references event fields", () => {
-    describe("when the trace has a down-vote", () => {
-      it("derives the trace events list before matching", async () => {
+  describe("given a NOTIFY-class trigger", () => {
+    describe("when the reactor decides", () => {
+      it("emits nothing (the notify outbox reactor owns notify)", async () => {
         (
           deps.triggers.getActiveTraceTriggersForProject as any
-        ).mockResolvedValue([thumbsDownTrigger()]);
-        (deps.deriveEvents as any).mockResolvedValue([voteEvent(-1)]);
+        ).mockResolvedValue([
+          createTrigger({
+            action: TriggerAction.SEND_EMAIL,
+            actionParams: { members: ["ops@example.com"] },
+          }),
+          createTrigger({
+            id: "trigger-slack",
+            action: TriggerAction.SEND_SLACK_MESSAGE,
+            actionParams: { slackWebhook: "https://hooks.slack.com/x" },
+          }),
+        ]);
 
         const reactor = createAlertTriggerReactor(deps);
-        await reactor.handle(createEvent(), createContext());
-
-        expect(deps.deriveEvents).toHaveBeenCalledWith(
-          expect.objectContaining({ tenantId: "tenant-1", traceId: "trace-1" }),
+        const requests = await reactor.decide(
+          createEvent(),
+          createContext(createFoldState()),
         );
+
+        expect(requests).toHaveLength(0);
+      });
+    });
+  });
+
+  describe("given a trigger with evaluation filters", () => {
+    describe("when the reactor decides", () => {
+      it("emits nothing (the evaluation pipeline owns those triggers)", async () => {
+        (
+          deps.triggers.getActiveTraceTriggersForProject as any
+        ).mockResolvedValue([
+          createTrigger({
+            filters: { "evaluations.passed": { "evaluator-1": ["true"] } },
+          }),
+        ]);
+
+        const reactor = createAlertTriggerReactor(deps);
+        const requests = await reactor.decide(
+          createEvent(),
+          createContext(createFoldState()),
+        );
+
+        expect(requests).toHaveLength(0);
+      });
+    });
+  });
+
+  describe("given several persist triggers on the same trace", () => {
+    describe("when the reactor decides", () => {
+      it("emits one settle request per trigger so each gets its own debounce window", async () => {
+        const a = createTrigger({ id: "trig-a", traceDebounceMs: 30_000 });
+        const b = createTrigger({ id: "trig-b", traceDebounceMs: 60_000 });
+        (
+          deps.triggers.getActiveTraceTriggersForProject as any
+        ).mockResolvedValue([a, b]);
+
+        const reactor = createAlertTriggerReactor(deps);
+        const requests = await reactor.decide(
+          createEvent(),
+          createContext(createFoldState()),
+        );
+
+        expect(requests).toHaveLength(2);
+        expect(requests.map((r) => r.enqueueOptions?.ttlMs)).toEqual([
+          30_000, 60_000,
+        ]);
+      });
+    });
+  });
+
+  describe("given the origin guard", () => {
+    describe("when the trace origin is not resolved", () => {
+      it("suppresses the decide() body so no request emits", async () => {
+        (
+          deps.triggers.getActiveTraceTriggersForProject as any
+        ).mockResolvedValue([createTrigger()]);
+
+        const reactor = createAlertTriggerReactor(deps);
+        const requests = await reactor.decide(
+          createEvent(),
+          createContext(createFoldState({ attributes: {} })),
+        );
+
+        expect(requests).toHaveLength(0);
+        // Origin gate runs before the trigger fetch.
+        expect(
+          deps.triggers.getActiveTraceTriggersForProject,
+        ).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the event is a derived (non-message) event", () => {
+      it("rejects topic_assigned but still fires on origin_resolved", async () => {
+        (
+          deps.triggers.getActiveTraceTriggersForProject as any
+        ).mockResolvedValue([createTrigger()]);
+
+        const reactor = createAlertTriggerReactor(deps);
+
+        const rejected = await reactor.decide(
+          createEvent({ type: "lw.obs.trace.topic_assigned" }),
+          createContext(createFoldState()),
+        );
+        expect(rejected).toHaveLength(0);
+
+        const fired = await reactor.decide(
+          createEvent({ type: ORIGIN_RESOLVED_EVENT_TYPE }),
+          createContext(createFoldState()),
+        );
+        expect(fired).toHaveLength(1);
       });
     });
   });

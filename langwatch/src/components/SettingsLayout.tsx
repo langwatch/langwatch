@@ -171,11 +171,17 @@ export default function SettingsLayout({
               "/settings/annotation-scores",
               "/settings/topic-clustering",
               "/settings/data-retention",
+              "/settings/email-suppressions",
               "/settings/integrations",
               "/settings/data-privacy",
             ]}
           >
             <MenuLink href="/settings/data-retention">Data Retention</MenuLink>
+            {hasPermission("triggers:view") && (
+              <MenuLink href="/settings/email-suppressions">
+                Email Suppressions
+              </MenuLink>
+            )}
             <MenuLink href="/settings/data-privacy">Data Privacy</MenuLink>
             <MenuLink href="/settings/annotation-scores">
               Annotation Scores
