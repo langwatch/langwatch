@@ -5,6 +5,7 @@ import react from "@vitejs/plugin-react";
 import path from "path";
 import { generate as generateSelfsigned } from "selfsigned";
 import { shikiManualChunk } from "./src/features/traces-v2/components/TraceDrawer/markdownView/shikiChunking";
+import { ASSET_URL_GLOBAL } from "./src/server/asset-base";
 
 // Load `.env` into the Vite config's process environment. Vite normally
 // only exposes `VITE_*` vars to client code — but this config itself
@@ -185,6 +186,23 @@ export default defineConfig(async (): Promise<UserConfig> => {
           return shikiManualChunk(id);
         },
       },
+    },
+  },
+  experimental: {
+    // ADR-038: the base for content-hashed assets is chosen at container start,
+    // not build time — one image serves self-host same-origin and SaaS from a
+    // commit-prefixed CDN. Emit every JS-referenced asset URL as a call to the
+    // runtime resolver defined by the served HTML shell (src/server/asset-base.ts);
+    // keep CSS-referenced assets relative to the CSS file (which lives under the
+    // same base, so fonts/images resolve on the CDN); leave HTML entry refs
+    // base-absolute for the server to rewrite; leave public/ assets same-origin.
+    renderBuiltUrl(filename, { type, hostType }) {
+      if (type === "public") return undefined;
+      if (hostType === "js") {
+        return { runtime: `window.${ASSET_URL_GLOBAL}(${JSON.stringify(filename)})` };
+      }
+      if (hostType === "css") return { relative: true };
+      return undefined;
     },
   },
   server: {
