@@ -171,6 +171,99 @@ describe("onboarding.initializeOrganization", () => {
     });
   });
 
+  describe("when the caller declares a primary intent (ADR-038)", () => {
+    it("forwards the intent to organization creation as a sibling of signUpData", async () => {
+      const caller = createCaller();
+
+      await caller.initializeOrganization({
+        orgName: "Acme Corp",
+        primaryIntent: "AGENT_GOVERNANCE",
+        signUpData: { terms: true },
+        projectName: "Acme Project",
+      });
+
+      expect(mockCreateAndAssign).toHaveBeenCalledWith({
+        orgName: "Acme Corp",
+        phoneNumber: undefined,
+        signUpData: { terms: true },
+        primaryIntent: "AGENT_GOVERNANCE",
+      });
+    });
+
+    it("passes the intent to nurturing as an explicit trait", async () => {
+      const caller = createCaller();
+
+      await caller.initializeOrganization({
+        orgName: "Acme Corp",
+        primaryIntent: "AGENT_GOVERNANCE",
+        projectName: "Acme Project",
+      });
+
+      expect(mockIdentifyUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          traits: expect.objectContaining({
+            primary_intent: "agent_governance",
+          }),
+        }),
+      );
+      expect(mockTrackEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          properties: expect.objectContaining({
+            primary_intent: "agent_governance",
+          }),
+        }),
+      );
+    });
+  });
+
+  describe("when the caller declares the LLMOps intent", () => {
+    it("keeps the signUpData payload byte-identical to today — intent never leaks into it", async () => {
+      const caller = createCaller();
+      const llmOpsSignUpData = {
+        usage: "For my company",
+        solution: "SaaS",
+        terms: true,
+        companySize: "11_to_50",
+        yourRole: "Engineer",
+        featureUsage: "Evaluations",
+        utmCampaign: "launch-week",
+      };
+
+      await caller.initializeOrganization({
+        orgName: "Acme Corp",
+        phoneNumber: "+31 20 123 4567",
+        primaryIntent: "LLM_OPS",
+        signUpData: llmOpsSignUpData,
+        projectName: "Acme Project",
+      });
+
+      // I2 snapshot: the exact object today's flow sends, with intent as a
+      // SIBLING field only — any drift here breaks Customer.io/HubSpot
+      // segmentation (C2).
+      expect(mockCreateAndAssign).toHaveBeenCalledWith({
+        orgName: "Acme Corp",
+        phoneNumber: "+31 20 123 4567",
+        signUpData: llmOpsSignUpData,
+        primaryIntent: "LLM_OPS",
+      });
+    });
+  });
+
+  describe("when no intent is provided (legacy callers)", () => {
+    it("forwards undefined so the organization persists NULL", async () => {
+      const caller = createCaller();
+
+      await caller.initializeOrganization({
+        orgName: "Acme Corp",
+        projectName: "Acme Project",
+      });
+
+      expect(mockCreateAndAssign).toHaveBeenCalledWith(
+        expect.objectContaining({ primaryIntent: undefined }),
+      );
+    });
+  });
+
   describe("when sending the signup notification fails", () => {
     it("captures the error and still returns onboarding success", async () => {
       const error = new Error("Slack down");

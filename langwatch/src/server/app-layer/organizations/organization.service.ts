@@ -177,6 +177,7 @@ export class OrganizationService {
     orgName?: string;
     phoneNumber?: string;
     signUpData?: Record<string, unknown>;
+    primaryIntent?: OrganizationIntent | null;
     userDisplayName?: string | null;
   }): Promise<CreateAndAssignResult> {
     const orgName =
@@ -202,6 +203,7 @@ export class OrganizationService {
       teamSlug,
       phoneNumber: params.phoneNumber,
       signUpData: params.signUpData,
+      primaryIntent: params.primaryIntent,
       pricingModel: PricingModel.SEAT_EVENT,
     });
 

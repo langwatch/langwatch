@@ -93,6 +93,8 @@ export interface CreateAndAssignInput {
   teamSlug: string;
   phoneNumber?: string;
   signUpData?: Record<string, unknown>;
+  /** ADR-038 signup intent; undefined/null persists NULL (legacy default). */
+  primaryIntent?: OrganizationIntent | null;
   pricingModel: PricingModel;
 }
 

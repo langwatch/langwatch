@@ -232,6 +232,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           slug: input.orgSlug,
           phoneNumber: input.phoneNumber,
           signupData: input.signUpData as Prisma.InputJsonValue | undefined,
+          primaryIntent: input.primaryIntent ?? null,
           pricingModel: input.pricingModel,
         },
       });

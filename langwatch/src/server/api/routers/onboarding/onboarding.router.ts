@@ -33,6 +33,9 @@ export const onboardingRouter = createTRPCRouter({
         orgName: z.string().optional(),
         phoneNumber: z.string().optional(),
         signUpData: signUpDataSchema.optional(),
+        // ADR-038: declared signup intent. Optional for rolling-deploy
+        // tolerance; absent means NULL, the safe legacy default.
+        primaryIntent: z.enum(["AGENT_GOVERNANCE", "LLM_OPS"]).optional(),
 
         // Project details
         projectName: z.string().optional(),
@@ -49,6 +52,7 @@ export const onboardingRouter = createTRPCRouter({
           orgName: input.orgName,
           phoneNumber: input.phoneNumber,
           signUpData: input.signUpData,
+          primaryIntent: input.primaryIntent,
         });
         if (!orgResult.success) {
           throw new TRPCError({
@@ -101,6 +105,7 @@ export const onboardingRouter = createTRPCRouter({
           organizationId: orgResult.organization.id,
           organizationName: orgResult.organization.name,
           signUpData: input.signUpData,
+          primaryIntent: input.primaryIntent,
         });
 
         // Return success response with team and project slugs
