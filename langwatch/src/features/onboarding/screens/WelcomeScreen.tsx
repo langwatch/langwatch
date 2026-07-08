@@ -112,8 +112,10 @@ export const WelcomeScreen: React.FC = () => {
             return;
           }
 
+          // LLMOps signups always get a project; the null case is the
+          // governance track, which returned above.
           const params = new URLSearchParams({
-            projectSlug: response.projectSlug,
+            projectSlug: response.projectSlug ?? "",
           });
 
           window.location.href = `/onboarding/product?${params.toString()}`;

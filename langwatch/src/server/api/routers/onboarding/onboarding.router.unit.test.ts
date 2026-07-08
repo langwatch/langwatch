@@ -190,6 +190,46 @@ describe("onboarding.initializeOrganization", () => {
       });
     });
 
+    /** @scenario "Governance signup creates organization and team, but no project" */
+    it("skips project creation and returns a null projectSlug", async () => {
+      const caller = createCaller();
+
+      const result = await caller.initializeOrganization({
+        orgName: "Acme Corp",
+        primaryIntent: "AGENT_GOVERNANCE",
+        projectName: "Acme Project",
+      });
+
+      expect(mockCreateProject).not.toHaveBeenCalled();
+      expect(result.projectSlug).toBeNull();
+      expect(result.success).toBe(true);
+      expect(result.organizationId).toBe("org_1");
+    });
+
+    it("still creates a project for LLMOps signups", async () => {
+      const caller = createCaller();
+
+      const result = await caller.initializeOrganization({
+        orgName: "Acme Corp",
+        primaryIntent: "LLM_OPS",
+        projectName: "Acme Project",
+      });
+
+      expect(mockCreateProject).toHaveBeenCalledOnce();
+      expect(result.projectSlug).toBe("acme-project");
+    });
+
+    it("still creates a project when no intent is given (legacy callers)", async () => {
+      const caller = createCaller();
+
+      await caller.initializeOrganization({
+        orgName: "Acme Corp",
+        projectName: "Acme Project",
+      });
+
+      expect(mockCreateProject).toHaveBeenCalledOnce();
+    });
+
     /** @scenario "Nurturing receives the intent as an explicit trait" */
     it("passes the intent to nurturing as an explicit trait", async () => {
       const caller = createCaller();
