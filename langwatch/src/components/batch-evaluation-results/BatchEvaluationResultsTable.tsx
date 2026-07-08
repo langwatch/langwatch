@@ -7,8 +7,8 @@
  *
  * The actual table implementations are in separate files for better maintainability.
  */
-import { Box, Button, HStack, Text } from "@chakra-ui/react";
-import { Columns3 } from "lucide-react";
+import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { Columns3, Eye } from "lucide-react";
 import { Checkbox } from "~/components/ui/checkbox";
 import {
   PopoverArrow,
@@ -38,6 +38,10 @@ type BatchEvaluationResultsTableProps = {
   comparisonData?: ComparisonRunData[] | null;
   /** Target colors for when X-axis is "target" in charts */
   targetColors?: Record<string, string>;
+  /** Whether to render target output values (default true) */
+  showOutputs?: boolean;
+  /** Whether to render evaluator score chips (default true) */
+  showEvaluations?: boolean;
   /** Disable virtualization (for tests) */
   disableVirtualization?: boolean;
 };
@@ -95,6 +99,105 @@ export const ColumnVisibilityButton = ({
 };
 
 /**
+ * Which result sections the table renders. Lets users dial the detail level
+ * up or down — e.g. read outputs without the evaluator-score noise, or scan
+ * scores without the outputs. Dataset columns stay controlled by
+ * {@link ColumnVisibilityButton}.
+ */
+export type ViewSections = {
+  /** Show the target/model output values */
+  outputs: boolean;
+  /** Show the evaluator score chips */
+  evaluations: boolean;
+};
+
+export const DEFAULT_VIEW_SECTIONS: ViewSections = {
+  outputs: true,
+  evaluations: true,
+};
+
+/** Quick "lenses" that map to common section combinations. */
+const VIEW_PRESETS: { id: string; label: string; sections: ViewSections }[] = [
+  { id: "all", label: "Everything", sections: { outputs: true, evaluations: true } },
+  { id: "data", label: "Data only", sections: { outputs: true, evaluations: false } },
+  { id: "scores", label: "Scores only", sections: { outputs: false, evaluations: true } },
+];
+
+/**
+ * View lens control — quick presets plus per-section toggles for tuning how
+ * much detail the results table shows. Exported for use in the page header.
+ */
+export type ViewLensButtonProps = {
+  sections: ViewSections;
+  onChange: (sections: ViewSections) => void;
+};
+
+export const ViewLensButton = ({ sections, onChange }: ViewLensButtonProps) => {
+  const activePreset = VIEW_PRESETS.find(
+    (preset) =>
+      preset.sections.outputs === sections.outputs &&
+      preset.sections.evaluations === sections.evaluations,
+  );
+
+  return (
+    <PopoverRoot>
+      <PopoverTrigger asChild>
+        <Button size="sm" variant="outline" aria-label="Change results view">
+          <Eye size={16} />
+          {activePreset?.label ?? "View"}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent width="220px">
+        <PopoverArrow />
+        <PopoverBody>
+          <VStack align="stretch" gap={2}>
+            <Text fontSize="xs" color="fg.muted" fontWeight="medium">
+              Quick views
+            </Text>
+            <HStack gap={1} flexWrap="wrap">
+              {VIEW_PRESETS.map((preset) => (
+                <Button
+                  key={preset.id}
+                  size="xs"
+                  variant={activePreset?.id === preset.id ? "solid" : "outline"}
+                  onClick={() => onChange(preset.sections)}
+                >
+                  {preset.label}
+                </Button>
+              ))}
+            </HStack>
+            <Box borderTopWidth="1px" borderColor="border" marginY={1} />
+            <Text fontSize="xs" color="fg.muted" fontWeight="medium">
+              Sections
+            </Text>
+            <HStack paddingY={1}>
+              <Checkbox
+                checked={sections.outputs}
+                onCheckedChange={() =>
+                  onChange({ ...sections, outputs: !sections.outputs })
+                }
+              >
+                <Text fontSize="sm">Outputs</Text>
+              </Checkbox>
+            </HStack>
+            <HStack paddingY={1}>
+              <Checkbox
+                checked={sections.evaluations}
+                onCheckedChange={() =>
+                  onChange({ ...sections, evaluations: !sections.evaluations })
+                }
+              >
+                <Text fontSize="sm">Evaluations</Text>
+              </Checkbox>
+            </HStack>
+          </VStack>
+        </PopoverBody>
+      </PopoverContent>
+    </PopoverRoot>
+  );
+};
+
+/**
  * Main table component that chooses between single run and comparison modes
  */
 export function BatchEvaluationResultsTable({
@@ -103,6 +206,8 @@ export function BatchEvaluationResultsTable({
   hiddenColumns = new Set(),
   comparisonData,
   targetColors = {},
+  showOutputs = true,
+  showEvaluations = true,
   disableVirtualization = false,
 }: BatchEvaluationResultsTableProps) {
   // Determine if we're in comparison mode
@@ -114,6 +219,8 @@ export function BatchEvaluationResultsTable({
         comparisonData={comparisonData}
         isLoading={isLoading}
         hiddenColumns={hiddenColumns}
+        showOutputs={showOutputs}
+        showEvaluations={showEvaluations}
         disableVirtualization={disableVirtualization}
       />
     );
@@ -125,6 +232,8 @@ export function BatchEvaluationResultsTable({
       isLoading={isLoading}
       hiddenColumns={hiddenColumns}
       targetColors={targetColors}
+      showOutputs={showOutputs}
+      showEvaluations={showEvaluations}
       disableVirtualization={disableVirtualization}
     />
   );

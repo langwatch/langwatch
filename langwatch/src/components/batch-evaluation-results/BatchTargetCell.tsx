@@ -30,11 +30,17 @@ type BatchTargetCellProps = {
   getEvaluatorResult?: (
     evaluatorId: string,
   ) => BatchEvaluatorResult | undefined;
+  /** Whether to render the target's output (default true) */
+  showOutput?: boolean;
+  /** Whether to render the evaluator score chips (default true) */
+  showEvaluations?: boolean;
 };
 
 export function BatchTargetCell({
   targetOutput,
   getEvaluatorResult,
+  showOutput = true,
+  showEvaluations = true,
 }: BatchTargetCellProps) {
   const { openDrawer } = useDrawer();
 
@@ -350,9 +356,9 @@ export function BatchTargetCell({
         gap={2}
         css={{ "&:hover .cell-action-btn": { opacity: 1 } }}
       >
-        {renderActionButtons(false)}
-        {renderOutput(false)}
-        {renderEvaluatorChips()}
+        {showOutput && renderActionButtons(false)}
+        {showOutput && renderOutput(false)}
+        {showEvaluations && renderEvaluatorChips()}
       </VStack>
 
       {/* Expanded cell overlay */}
@@ -387,9 +393,9 @@ export function BatchTargetCell({
             }}
           >
             <VStack align="stretch" gap={2} height="100%" position="relative">
-              {renderActionButtons(true)}
-              {renderOutput(true)}
-              {renderEvaluatorChips()}
+              {showOutput && renderActionButtons(true)}
+              {showOutput && renderOutput(true)}
+              {showEvaluations && renderEvaluatorChips()}
             </VStack>
           </Box>
         </Portal>
