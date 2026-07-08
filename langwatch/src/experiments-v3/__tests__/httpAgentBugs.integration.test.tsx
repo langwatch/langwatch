@@ -75,6 +75,7 @@ vi.mock("../hooks/useEvaluationsV3Store", () => ({
       evaluators: [],
       activeDatasetId: "test-dataset-id",
       datasets: [],
+      ui: { highlightedVariantTargetId: undefined },
     };
     return selector(mockState);
   }),

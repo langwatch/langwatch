@@ -44,6 +44,7 @@ import {
 import { isRowEmpty } from "../../utils/emptyRowDetection";
 import { countCellsForTarget } from "../../utils/executionScope";
 import { targetHasMissingMappings } from "../../utils/mappingValidation";
+import { disambiguateVariantNames } from "../../utils/variantDisambiguation";
 import { TargetSummary } from "./TargetSummary";
 
 // Stable reference fed to useTargetName when a pairwise variant target hasn't
@@ -125,6 +126,13 @@ export const TargetHeader = memo(function TargetHeader({
   );
   const hasMissingMappings = targetHasMissingMappings(target, activeDatasetId);
 
+  // Glows this column's header when a pairwise verdict's variant name was
+  // clicked, so users can trace an ambiguous "bot (1)" label back to its
+  // source column (customer feedback, 2026-07-08).
+  const isHighlightedVariant = useEvaluationsV3Store(
+    (state) => state.ui.highlightedVariantTargetId === target.id,
+  );
+
   // Get the display name for this target
   const targetName = useTargetName(target);
 
@@ -155,6 +163,16 @@ export const TargetHeader = memo(function TargetHeader({
   const variantBName = variantBTarget
     ? variantBNameRaw || target.pairwise?.variantB || ""
     : "Variant B";
+
+  // Display-only names: when both variants resolve to the same name (e.g.
+  // the same prompt re-run with a different config), disambiguate so the
+  // scoreboard doesn't show two identical labels. The raw names above stay
+  // untouched — they're still what's matched against the stored verdict
+  // label via `variantAHandle`/`variantBHandle` below.
+  const {
+    variantAName: variantADisplayName,
+    variantBName: variantBDisplayName,
+  } = disambiguateVariantNames({ variantAName, variantBName });
 
   // Get results, evaluators, and dataset for computing aggregates
   const { results, evaluators, activeDataset } = useEvaluationsV3Store(
@@ -367,7 +385,17 @@ export const TargetHeader = memo(function TargetHeader({
         : "Switch Agent";
 
   const headerRow = (
-    <HStack gap={2} width="full" marginY={-2}>
+    <HStack
+      gap={2}
+      width="full"
+      marginY={-2}
+      // Glow lives on the <th> itself (EvaluationsV3Table.tsx) so the whole
+      // column reads as highlighted, not just this inner content row. Keep
+      // the marker attribute only, for tests.
+      data-testid={
+        isHighlightedVariant ? "target-header-highlighted" : undefined
+      }
+    >
       <Menu.Root
         positioning={{ placement: "bottom-start" }}
         open={menuOpen}
@@ -497,7 +525,8 @@ export const TargetHeader = memo(function TargetHeader({
           {(() => {
             const { a, b, tie } = pairwiseAggregate.counts;
             const isTie = a === b;
-            const winnerName = a > b ? variantAName : variantBName;
+            const winnerName =
+              a > b ? variantADisplayName : variantBDisplayName;
             const shortName = (s: string) =>
               s.length > 18 ? `${s.slice(0, 17)}…` : s;
             // Show only the qualitative outcome ("<winner> wins" / "Tied")
@@ -508,7 +537,7 @@ export const TargetHeader = memo(function TargetHeader({
             const summary = isTie ? "Tied" : `${shortName(winnerName)} wins`;
             return (
               <Tooltip
-                content={`${variantAName}: ${a} wins · ${variantBName}: ${b} wins${
+                content={`${variantADisplayName}: ${a} wins · ${variantBDisplayName}: ${b} wins${
                   tie > 0 ? ` · ${tie} ${tie === 1 ? "tie" : "ties"}` : ""
                 }`}
                 positioning={{ placement: "top" }}
