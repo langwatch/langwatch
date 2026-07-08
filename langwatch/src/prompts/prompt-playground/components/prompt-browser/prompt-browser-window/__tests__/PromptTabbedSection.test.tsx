@@ -647,4 +647,41 @@ describe("PromptTabbedSection Layout Modes", () => {
       // (afterEach restores tabIdRef even if the assertion above throws)
     });
   });
+
+  describe("when a tab is switched away from and reopened", () => {
+    it("restores the variable value the user had typed", async () => {
+      const user = userEvent.setup();
+      const store = getStoreForTesting(TEST_PROJECT_ID);
+      const tabId = store.getState().windows[0]?.tabs[0]?.id;
+      tabIdRef.current = tabId!;
+
+      const formValues = {
+        version: {
+          parameters: {},
+          configData: {
+            inputs: [{ identifier: "topic", type: "str" }],
+            demonstrations: { inline: { records: {} } },
+          },
+        } as any,
+      };
+
+      // Mount, type a value, then unmount — this is "switch away".
+      const first = renderPromptTabbedSection({ layoutMode: "vertical" }, formValues);
+      await user.click(screen.getByRole("tab", { name: /variables/i }));
+      const emptyInput = (await screen.findAllByRole("textbox")).find(
+        (el) => (el as HTMLInputElement).value === "",
+      );
+      await user.type(emptyInput!, "kept");
+      first.unmount();
+
+      // "Switch back": a fresh mount of the same tab must show the value again,
+      // proving the full round-trip (flush on unmount -> restore from store).
+      renderPromptTabbedSection({ layoutMode: "vertical" }, formValues);
+      await user.click(screen.getByRole("tab", { name: /variables/i }));
+      const restored = (await screen.findAllByRole("textbox")).find(
+        (el) => (el as HTMLInputElement).value === "kept",
+      );
+      expect(restored).toBeDefined();
+    });
+  });
 });
