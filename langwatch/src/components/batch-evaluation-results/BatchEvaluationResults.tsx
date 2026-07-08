@@ -359,6 +359,17 @@ export function BatchEvaluationResults({
   // 1. In compare mode with 2+ runs selected
   // 2. Not in compare mode but with 2+ targets in single run
   const targetCount = transformedData?.targetColumns.length ?? 0;
+
+  // Memoize the pairwise evaluator ids set — passing a fresh `new Set(...)`
+  // into ComparisonCharts on every render defeats React.memo downstream and
+  // triggers unnecessary re-renders of the charts row.
+  const suppressedScoreEvaluatorIds = useMemo(
+    () =>
+      new Set(
+        (transformedData?.pairwiseColumns ?? []).map((c) => c.evaluatorId),
+      ),
+    [transformedData?.pairwiseColumns],
+  );
   const canShowCharts =
     (compareMode && (comparisonData?.length ?? 0) >= 2) || targetCount >= 2;
 
@@ -539,13 +550,18 @@ export function BatchEvaluationResults({
           )}
         </PageLayout.Header>
 
-        {/* Charts (comparison or single-run with multiple targets) - auto height */}
+        {/* Charts (comparison or single-run with multiple targets) - auto height.
+            The pairwise win-rate chart lives INSIDE this component alongside
+            Cost / Latency / (non-pairwise) score charts, so the results
+            header reads as one row of siblings rather than a stacked mixture. */}
         {canShowCharts && chartDisplayData && chartDisplayData.length > 0 && (
           <ComparisonCharts
             comparisonData={chartDisplayData}
             isVisible={chartsVisible}
             onVisibilityChange={setChartsVisible}
             onTargetColorsChange={setTargetColors}
+            suppressedScoreEvaluatorIds={suppressedScoreEvaluatorIds}
+            pairwiseColumns={transformedData?.pairwiseColumns}
           />
         )}
 

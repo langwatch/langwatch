@@ -320,6 +320,40 @@ export const generatePairwiseCells = (
   // scores so the pairwise judge can factor them into the verdict. Skips
   // silently when there are no scores, when the output isn't string-ish, or
   // when the scores map isn't provided.
+  /**
+   * Structured-output narrowing: when the pairwise config carries an
+   * `output_path` for this variant, dig into the candidate's output and
+   * return just that field. This is the fix for pairwise-vs-structured
+   * outputs — otherwise the judge sees the whole JSON blob (or a raw
+   * `[object Object]` in the score-appended path) instead of the single
+   * text the user actually wants to compare. An empty or missing path is
+   * a no-op so pre-existing single-field configs keep working.
+   */
+  const pickOutputPath = (output: unknown, path?: string[]): unknown => {
+    if (!path || path.length === 0) return output;
+    let cursor: unknown = output;
+    for (const segment of path) {
+      if (
+        cursor === null ||
+        typeof cursor !== "object" ||
+        Array.isArray(cursor)
+      ) {
+        // LangWatch's runtime unwraps a single-output-field target's dict
+        // back to a scalar at storage time, so a target declared with one
+        // `output` field ends up stored as the plain string value. The
+        // mappings picker still records the path as `["output"]` in that
+        // case (it's the only field to point at), so a strict object-only
+        // walk here would surface as "Variant outputs missing" for every
+        // single-field prompt / agent. Return the scalar itself when the
+        // remaining path is exactly one segment — this matches the runtime
+        // unwrap and keeps single-field targets usable in pairwise.
+        return path.length === 1 && path[0] === segment ? cursor : undefined;
+      }
+      cursor = (cursor as Record<string, unknown>)[segment];
+    }
+    return cursor;
+  };
+
   const withEvaluatorScores = (
     output: unknown,
     rowIndex: number,
@@ -437,13 +471,21 @@ export const generatePairwiseCells = (
         pairwise: {
           candidateA: {
             id: variantIdentifierFor(variantA),
-            output: withEvaluatorScores(a.output, rowIndex, cfg.variantA),
+            output: withEvaluatorScores(
+              pickOutputPath(a.output, cfg.variantAOutputPath),
+              rowIndex,
+              cfg.variantA,
+            ),
             cost: a.cost,
             duration: a.duration,
           },
           candidateB: {
             id: variantIdentifierFor(variantB),
-            output: withEvaluatorScores(b.output, rowIndex, cfg.variantB),
+            output: withEvaluatorScores(
+              pickOutputPath(b.output, cfg.variantBOutputPath),
+              rowIndex,
+              cfg.variantB,
+            ),
             cost: b.cost,
             duration: b.duration,
           },
@@ -559,7 +601,11 @@ export const generatePairwiseCells = (
             },
             candidate_a_output: {
               type: "value",
-              value: withEvaluatorScores(a.output, rowIndex, cfg.variantA),
+              value: withEvaluatorScores(
+                pickOutputPath(a.output, cfg.variantAOutputPath),
+                rowIndex,
+                cfg.variantA,
+              ),
             },
             candidate_a_cost:
               a.cost !== undefined
@@ -575,7 +621,11 @@ export const generatePairwiseCells = (
             },
             candidate_b_output: {
               type: "value",
-              value: withEvaluatorScores(b.output, rowIndex, cfg.variantB),
+              value: withEvaluatorScores(
+                pickOutputPath(b.output, cfg.variantBOutputPath),
+                rowIndex,
+                cfg.variantB,
+              ),
             },
             candidate_b_cost:
               b.cost !== undefined
@@ -623,13 +673,21 @@ export const generatePairwiseCells = (
         pairwise: {
           candidateA: {
             id: variantIdentifierFor(variantA),
-            output: withEvaluatorScores(a.output, rowIndex, cfg.variantA),
+            output: withEvaluatorScores(
+              pickOutputPath(a.output, cfg.variantAOutputPath),
+              rowIndex,
+              cfg.variantA,
+            ),
             cost: a.cost,
             duration: a.duration,
           },
           candidateB: {
             id: variantIdentifierFor(variantB),
-            output: withEvaluatorScores(b.output, rowIndex, cfg.variantB),
+            output: withEvaluatorScores(
+              pickOutputPath(b.output, cfg.variantBOutputPath),
+              rowIndex,
+              cfg.variantB,
+            ),
             cost: b.cost,
             duration: b.duration,
           },
