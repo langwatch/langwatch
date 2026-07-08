@@ -31,7 +31,7 @@ interface OnboardingContainerProps extends React.PropsWithChildren {
   onBack?: () => void;
   skipHref?: string;
   /** Render the logo inside the card, above the title, instead of floating above it. */
-  logoInside?: boolean;
+  isLogoInside?: boolean;
 }
 
 export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
@@ -44,7 +44,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
   showBackButton,
   onBack,
   skipHref,
-  logoInside,
+  isLogoInside,
 }) => {
   const { emit } = useAnalytics();
   const isFullWidth = widthVariant === "full";
@@ -189,8 +189,8 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
         </MotionBox>
       )}
 
-      {/* Logo (floating above the card unless logoInside) */}
-      {!logoInside && (
+      {/* Logo (floating above the card unless isLogoInside) */}
+      {!isLogoInside && (
         <MotionCenter
           pt={compressedHeader ? "6vh" : "10vh"}
           pb={compressedHeader ? "2vh" : "4vh"}
@@ -206,7 +206,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
       <Container
         width="full"
         mx="auto"
-        pt={logoInside ? (compressedHeader ? "8vh" : "14vh") : undefined}
+        pt={isLogoInside ? (compressedHeader ? "8vh" : "14vh") : undefined}
         pb={16}
         maxW={
           isFullWidth
@@ -233,7 +233,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
           }}
         >
           <VStack gap={isFullWidth ? 8 : 6} align="stretch" w="full">
-            {logoInside && (
+            {isLogoInside && (
               <Center pt={1}>
                 <FullLogo width={130} />
               </Center>

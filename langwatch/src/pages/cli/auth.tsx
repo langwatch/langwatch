@@ -389,7 +389,7 @@ export default function CliAuthPage() {
             : "Signs in this device for AI-tool wrappers and governance commands"
         }
         showBackButton={false}
-        logoInside
+        isLogoInside
       >
             <VStack align="stretch" gap={6}>
               {!userCode && (
@@ -632,7 +632,7 @@ export default function CliAuthPage() {
 
 function FullPageSpinner() {
   return (
-    <OnboardingContainer title="Authorize the LangWatch CLI" loading logoInside>
+    <OnboardingContainer title="Authorize the LangWatch CLI" loading isLogoInside>
       {null}
     </OnboardingContainer>
   );

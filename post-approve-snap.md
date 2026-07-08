@@ -1,0 +1,19 @@
+- generic [active] [ref=f10e1]:
+  - generic [ref=f10e32]:
+    - button "Sign out" [ref=f10e34] [cursor=pointer]:
+      - img [ref=f10e35]
+    - generic [ref=f10e40]:
+      - img [ref=f10e42]
+      - generic [ref=f10e47]:
+        - paragraph [ref=f10e48]: Authorize the LangWatch CLI
+        - paragraph [ref=f10e49]: Signs in this device for AI-tool wrappers and governance commands
+      - generic [ref=f10e50]:
+        - paragraph [ref=f10e51]: Approving signs in this device for AI-tool wrappers (Claude, Codex, etc.) and governance commands.
+        - generic [ref=f10e52]: DCJV-Z3Y3
+        - paragraph [ref=f10e53]:
+          - text: Confirm this matches the code shown in your terminal.
+          - text: Expires in ~8 min.
+        - generic [ref=f10e54]:
+          - button "Approve" [ref=f10e55] [cursor=pointer]
+          - button "Deny" [ref=f10e56] [cursor=pointer]
+  - region "Notifications, top-end (alt+T)"
