@@ -496,7 +496,7 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
       expect(spans.map((s) => s.spanId)).toEqual([spanIdFor(0)]);
     });
 
-    it("returns no spans for a trace without any, without an unbounded rescan", async () => {
+it("returns no spans for a trace without any, via the bounded-then-unbounded fallback", async () => {
       const storedSpansQueries: { query: string; params: unknown }[] = [];
       const recordingClient = new Proxy(ch, {
         get(target, prop, receiver) {
