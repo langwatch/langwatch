@@ -305,12 +305,27 @@ func (m *Manager) spawn(ctx context.Context, conversationID string, creds Creden
 	}
 	// Any free port works: sibling isolation is now enforced by opencode's
 	// own per-worker password (ADR-033 Fix A′), not by pinning the internal
-	// listen into an iptables-locked range.
-	internalPort, err := getFreePort()
-	if err != nil {
+	// listen into an iptables-locked range. getFreePort closes its listener
+	// before returning, so two independent calls can (rarely) hand back the
+	// SAME ephemeral port — which would make the proxy bind externalPort first
+	// and opencode then fail to listen, burning the whole readiness timeout.
+	// Re-roll until the internal port differs from the external one.
+	var internalPort int
+	for attempt := 0; attempt < 8; attempt++ {
+		internalPort, err = getFreePort()
+		if err != nil {
+			_ = os.RemoveAll(workerHome)
+			cleanupUID()
+			return nil, err
+		}
+		if internalPort != externalPort {
+			break
+		}
+	}
+	if internalPort == externalPort {
 		_ = os.RemoveAll(workerHome)
 		cleanupUID()
-		return nil, err
+		return nil, fmt.Errorf("could not allocate a distinct internal port (kept colliding with external port %d)", externalPort)
 	}
 
 	bearerToken, err := generateBearerToken()
