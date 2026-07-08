@@ -169,7 +169,7 @@
     "hono": "^4.12.25",
     "hono-openapi": "^0.4.8",
     "immer": "^11.1.8",
-    "import-in-the-middle": "1.15.0",
+    "import-in-the-middle": "3.2.0",
     "ioredis": "^5.10.1",
     "jsonpath-plus": "^10.4.0",
     "jsonwebtoken": "^9.0.3",
