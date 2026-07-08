@@ -52,6 +52,9 @@ const TOOLS = ["claude", "codex", "cursor", "gemini", "opencode"] as const;
 const BLOCK_BEGIN = "# >>> langwatch begin >>>";
 const BLOCK_END = "# <<< langwatch end <<<";
 
+/** Markers for the global gateway export block (init-shell / legacy persist). */
+export const GATEWAY_RC_MARKERS = { begin: BLOCK_BEGIN, end: BLOCK_END };
+
 /**
  * Per-tool marker pair for a scoped wrapper function. Tools without a
  * config-file env target (gemini, opencode, …) get a shell function that
@@ -59,7 +62,7 @@ const BLOCK_END = "# <<< langwatch end <<<";
  * `export` that leaks into every shell child. Each tool gets its own marker
  * pair so multiple wrappers coexist in one rc file.
  */
-function toolMarkers(tool: string): { begin: string; end: string } {
+export function toolMarkers(tool: string): { begin: string; end: string } {
   return {
     begin: `# >>> langwatch ${tool} begin >>>`,
     end: `# <<< langwatch ${tool} end <<<`,
@@ -253,6 +256,36 @@ export function persistBlockToRc(
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Remove a marker-bracketed langwatch block from the shell rc file, if
+ * present. Removes at most one leading + one trailing newline around the
+ * block, so the blank line the install path inserts before it goes with it
+ * while unrelated user whitespace is left alone. Returns true when a block
+ * was removed (idempotent — false when the file or the block was absent).
+ */
+export function removeBlockFromRc(
+  shell: DetectedShell,
+  markers: { begin: string; end: string } = {
+    begin: BLOCK_BEGIN,
+    end: BLOCK_END,
+  },
+): boolean {
+  const file = rcPath(shell);
+  let content: string;
+  try {
+    content = fs.readFileSync(file, "utf8");
+  } catch {
+    return false; // ENOENT
+  }
+  const re = new RegExp(
+    `\\n?${escapeRegex(markers.begin)}[\\s\\S]*?${escapeRegex(markers.end)}\\n?`,
+    "m",
+  );
+  if (!re.test(content)) return false;
+  fs.writeFileSync(file, content.replace(re, ""));
+  return true;
 }
 
 /**

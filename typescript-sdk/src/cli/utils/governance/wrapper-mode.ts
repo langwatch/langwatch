@@ -353,6 +353,16 @@ export async function resolveWrapperMode(
   };
 }
 
+/**
+ * The env var names langwatch persists for `tool`'s Path B telemetry.
+ * Derived from the same builder that installs them, so the logout /
+ * removal path can strip exactly the keys the install path wrote (no
+ * drift). Values are irrelevant here, so placeholders are passed in.
+ */
+export function telemetryEnvVarNames(tool: string): string[] {
+  return Object.keys(buildOtelEnvBlock(tool, "", ""));
+}
+
 function buildOtelEnvBlock(
   tool: string,
   endpoint: string,

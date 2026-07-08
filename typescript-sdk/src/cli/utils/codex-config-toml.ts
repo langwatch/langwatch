@@ -410,3 +410,99 @@ export function writeCodexGatewayBlock(
 
 /** Exported so callers + tests can reference the profile name from one place. */
 export const CODEX_GATEWAY_PROFILE_NAME = PROFILE_NAME;
+
+/**
+ * Cut a marker-bracketed langwatch block out of `content`. Removes at most
+ * one leading newline and one trailing newline around the block so the
+ * blank line the install path inserts before the block goes with it, but
+ * unrelated user whitespace is left alone. Returns the stripped content, or
+ * null when no such block is present.
+ */
+function stripMarkerBlock(
+  content: string,
+  begin: string,
+  end: string,
+): string | null {
+  const re = new RegExp(
+    `\\n?${escapeRe(begin)}[\\s\\S]*?${escapeRe(end)}\\n?`,
+    "m",
+  );
+  if (!re.test(content)) return null;
+  return content.replace(re, "");
+}
+
+function removeMarkerBlockFromFile(
+  filePath: string,
+  begin: string,
+  end: string,
+): boolean {
+  let content: string;
+  try {
+    content = fs.readFileSync(filePath, "utf8");
+  } catch {
+    return false; // ENOENT
+  }
+  const next = stripMarkerBlock(content, begin, end);
+  if (next === null) return false;
+  // Plain write preserves the file's existing mode (writeFileSync's `mode`
+  // is ignored on an existing file) — removal strips our block, adding no
+  // secret, so a pre-existing 0600 stays 0600.
+  fs.writeFileSync(filePath, next);
+  return true;
+}
+
+function fileHasMarker(filePath: string, begin: string): boolean {
+  try {
+    return fs.readFileSync(filePath, "utf8").includes(begin);
+  } catch {
+    return false;
+  }
+}
+
+/** Whether config.toml currently carries the langwatch `[otel]` block. */
+export function codexHasOtelBlock(
+  filePath: string = defaultCodexConfigPath(),
+): boolean {
+  return fileHasMarker(filePath, BEGIN);
+}
+
+/** Whether config.toml currently carries the langwatch gateway block. */
+export function codexHasGatewayBlock(
+  filePath: string = defaultCodexConfigPath(),
+): boolean {
+  return fileHasMarker(filePath, GW_BEGIN);
+}
+
+/**
+ * Remove the langwatch `[otel]` (Path B) marker block from config.toml, if
+ * present. User config outside the marker pair is preserved. Returns true
+ * when a block was removed (idempotent — false when absent).
+ */
+export function removeCodexOtelBlock(
+  filePath: string = defaultCodexConfigPath(),
+): boolean {
+  return removeMarkerBlockFromFile(filePath, BEGIN, END);
+}
+
+/**
+ * Remove the langwatch gateway (Path A) provider marker block from
+ * config.toml, if present. Returns true when a block was removed.
+ */
+export function removeCodexGatewayBlock(
+  filePath: string = defaultCodexConfigPath(),
+): boolean {
+  return removeMarkerBlockFromFile(filePath, GW_BEGIN, GW_END);
+}
+
+/**
+ * Delete the sibling `<profile>.config.toml` file, which is entirely
+ * owned by langwatch. Returns true when a file was deleted (idempotent —
+ * false when it was already absent).
+ */
+export function removeCodexGatewayProfileFile(
+  profilePath: string = defaultCodexProfilePath(),
+): boolean {
+  if (!fs.existsSync(profilePath)) return false;
+  fs.rmSync(profilePath, { force: true });
+  return true;
+}

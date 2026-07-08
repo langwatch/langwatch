@@ -9,9 +9,14 @@ import {
   buildCodexGatewayProfileFile,
   buildCodexOtelBlock,
   CODEX_GATEWAY_PROFILE_NAME,
+  codexHasGatewayBlock,
+  codexHasOtelBlock,
   codexOtelBlockHasAuthHeader,
   codexTraceEndpoint,
   defaultCodexProfilePath,
+  removeCodexGatewayBlock,
+  removeCodexGatewayProfileFile,
+  removeCodexOtelBlock,
   writeCodexGatewayBlock,
   writeCodexOtelBlock,
 } from "../codex-config-toml";
@@ -511,5 +516,90 @@ describe("codexOtelBlockHasAuthHeader", () => {
       { filePath, persistAuthHeader: true },
     );
     expect(codexOtelBlockHasAuthHeader(filePath)).toBe(true);
+  });
+});
+
+describe("removeCodexOtelBlock", () => {
+  describe("when config.toml carries the [otel] block beside user config", () => {
+    it("removes the langwatch block and preserves the user config verbatim", () => {
+      const filePath = path.join(tmp, "config.toml");
+      fs.writeFileSync(filePath, 'model = "gpt-5"\n');
+      writeCodexOtelBlock(
+        {
+          endpoint: "https://app.langwatch.ai/api/otel/v1/traces",
+          ingestionToken: "sk-lw-SECRET",
+        },
+        { filePath, persistAuthHeader: true },
+      );
+      expect(codexHasOtelBlock(filePath)).toBe(true);
+
+      const removed = removeCodexOtelBlock(filePath);
+
+      expect(removed).toBe(true);
+      const contents = fs.readFileSync(filePath, "utf8");
+      expect(contents).toContain('model = "gpt-5"');
+      expect(contents).not.toContain("langwatch otel begin");
+      expect(contents).not.toContain("sk-lw-SECRET");
+      expect(codexHasOtelBlock(filePath)).toBe(false);
+    });
+  });
+
+  describe("when there is no block to remove", () => {
+    it("returns false for a file without the block", () => {
+      const filePath = path.join(tmp, "config.toml");
+      fs.writeFileSync(filePath, 'model = "gpt-5"\n');
+      expect(removeCodexOtelBlock(filePath)).toBe(false);
+    });
+
+    it("returns false when the file does not exist (idempotent)", () => {
+      expect(removeCodexOtelBlock(path.join(tmp, "nope.toml"))).toBe(false);
+    });
+  });
+});
+
+describe("removeCodexGatewayBlock / removeCodexGatewayProfileFile", () => {
+  it("removes the gateway block and deletes the profile file", () => {
+    const filePath = path.join(tmp, "config.toml");
+    const profilePath = path.join(tmp, "langwatch-gateway.config.toml");
+    writeCodexGatewayBlock(
+      { gatewayUrl: "https://gateway.langwatch.ai" },
+      { filePath, profilePath },
+    );
+    expect(codexHasGatewayBlock(filePath)).toBe(true);
+    expect(fs.existsSync(profilePath)).toBe(true);
+
+    expect(removeCodexGatewayBlock(filePath)).toBe(true);
+    expect(removeCodexGatewayProfileFile(profilePath)).toBe(true);
+
+    expect(codexHasGatewayBlock(filePath)).toBe(false);
+    expect(fs.existsSync(profilePath)).toBe(false);
+  });
+
+  it("is idempotent when nothing is installed", () => {
+    const filePath = path.join(tmp, "config.toml");
+    expect(removeCodexGatewayBlock(filePath)).toBe(false);
+    expect(
+      removeCodexGatewayProfileFile(path.join(tmp, "langwatch-gateway.config.toml")),
+    ).toBe(false);
+  });
+
+  it("keeps the [otel] block when only the gateway block is removed", () => {
+    const filePath = path.join(tmp, "config.toml");
+    writeCodexOtelBlock(
+      {
+        endpoint: "https://app.langwatch.ai/api/otel/v1/traces",
+        ingestionToken: "sk-lw-x",
+      },
+      { filePath },
+    );
+    writeCodexGatewayBlock(
+      { gatewayUrl: "https://gateway.langwatch.ai" },
+      { filePath, profilePath: path.join(tmp, "langwatch-gateway.config.toml") },
+    );
+
+    removeCodexGatewayBlock(filePath);
+
+    expect(codexHasGatewayBlock(filePath)).toBe(false);
+    expect(codexHasOtelBlock(filePath)).toBe(true);
   });
 });
