@@ -30,6 +30,8 @@ interface OnboardingContainerProps extends React.PropsWithChildren {
   showBackButton?: boolean;
   onBack?: () => void;
   skipHref?: string;
+  /** Render the logo inside the card, above the title, instead of floating above it. */
+  logoInside?: boolean;
 }
 
 export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
@@ -42,6 +44,7 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
   showBackButton,
   onBack,
   skipHref,
+  logoInside,
 }) => {
   const { emit } = useAnalytics();
   const isFullWidth = widthVariant === "full";
@@ -186,21 +189,24 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
         </MotionBox>
       )}
 
-      {/* Logo */}
-      <MotionCenter
-        pt={compressedHeader ? "6vh" : "10vh"}
-        pb={compressedHeader ? "2vh" : "4vh"}
-        initial={{ opacity: 0, scale: 0.96 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-      >
-        <FullLogo width={150} />
-      </MotionCenter>
+      {/* Logo (floating above the card unless logoInside) */}
+      {!logoInside && (
+        <MotionCenter
+          pt={compressedHeader ? "6vh" : "10vh"}
+          pb={compressedHeader ? "2vh" : "4vh"}
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+        >
+          <FullLogo width={150} />
+        </MotionCenter>
+      )}
 
       {/* Content */}
       <Container
         width="full"
         mx="auto"
+        pt={logoInside ? (compressedHeader ? "8vh" : "14vh") : undefined}
         pb={16}
         maxW={
           isFullWidth
@@ -227,6 +233,11 @@ export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
           }}
         >
           <VStack gap={isFullWidth ? 8 : 6} align="stretch" w="full">
+            {logoInside && (
+              <Center pt={1}>
+                <FullLogo width={130} />
+              </Center>
+            )}
             {titleBlock}
             {loading ? <SpookyScarySkeleton loading /> : children}
           </VStack>
