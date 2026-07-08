@@ -208,6 +208,7 @@ describe("resolvePersonaHome", () => {
   });
 
   describe("when the organization has a primary intent (ADR-038)", () => {
+    /** @scenario "Agent-governance organization lands on the personal usage page" */
     it("lands an AGENT_GOVERNANCE org on /me", () => {
       const result = resolvePersonaHome({
         ...baseInput,
@@ -219,6 +220,7 @@ describe("resolvePersonaHome", () => {
       expect(result.isOverride).toBe(false);
     });
 
+    /** @scenario "LLMOps organization lands on the project home" */
     it("lands an LLM_OPS org on the project home", () => {
       const result = resolvePersonaHome({
         ...baseInput,
@@ -231,6 +233,7 @@ describe("resolvePersonaHome", () => {
       expect(result.intentPinned).toBe(true);
     });
 
+    /** @scenario "An explicit user pin does not override the organization intent" */
     it("beats an explicit user pin", () => {
       const result = resolvePersonaHome({
         ...baseInput,
@@ -256,6 +259,7 @@ describe("resolvePersonaHome", () => {
       expect(result.destination).not.toBe("/governance");
     });
 
+    /** @scenario "Agent-governance intent with governance disabled falls back to the project home" */
     it("falls back to the project home when AGENT_GOVERNANCE is kill-switched off (I8)", () => {
       const result = resolvePersonaHome({
         ...baseInput,
@@ -286,6 +290,68 @@ describe("resolvePersonaHome", () => {
       });
       expect(plain.intentPinned).toBe(false);
       expect(pinned.intentPinned).toBe(false);
+    });
+
+    /** @scenario "Each organization routes by its own intent" */
+    it("routes each organization by its own intent value", () => {
+      const governanceOrg = resolvePersonaHome({
+        ...baseInput,
+        organizationIntent: "AGENT_GOVERNANCE",
+        firstProjectSlug: "team-prod",
+      });
+      const llmOpsOrg = resolvePersonaHome({
+        ...baseInput,
+        organizationIntent: "LLM_OPS",
+        firstProjectSlug: "team-prod",
+      });
+      expect(governanceOrg.destination).toBe("/me");
+      expect(llmOpsOrg.destination).toBe("/team-prod");
+    });
+  });
+
+  describe("when the organization has no intent (legacy orgs, ADR-038 I1)", () => {
+    /** @scenario "Every legacy persona resolves as it does today" */
+    it("resolves every legacy persona exactly as before the intent column existed", () => {
+      const personalOnly = resolvePersonaHome({
+        ...baseInput,
+        setupState: { ...baseInput.setupState, hasPersonalVKs: true },
+      });
+      const mixed = resolvePersonaHome({
+        ...baseInput,
+        setupState: { ...baseInput.setupState, hasPersonalVKs: true },
+        firstProjectSlug: "team-prod",
+      });
+      const projectOnly = resolvePersonaHome({
+        ...baseInput,
+        hasApplicationTraces: true,
+        firstProjectSlug: "team-prod",
+      });
+      const governanceAdmin = resolvePersonaHome({
+        ...baseInput,
+        hasOrganizationManagePermission: true,
+        isEnterprise: true,
+        setupState: { ...baseInput.setupState, hasIngestionSources: true },
+      });
+
+      expect(personalOnly.destination).toBe("/me");
+      expect(mixed.destination).toBe("/me");
+      expect(projectOnly.destination).toBe("/team-prod");
+      expect(governanceAdmin.destination).toBe("/governance");
+      for (const result of [personalOnly, mixed, projectOnly, governanceAdmin]) {
+        expect(result.intentPinned).toBe(false);
+      }
+    });
+
+    /** @scenario "Legacy organizations keep pin and stickiness behavior" */
+    it("keeps the explicit pin override exactly as today for intent-less orgs", () => {
+      const result = resolvePersonaHome({
+        ...baseInput,
+        userLastHomePath: "/team-prod",
+        setupState: { ...baseInput.setupState, hasPersonalVKs: true },
+        firstProjectSlug: "team-prod",
+      });
+      expect(result.destination).toBe("/team-prod");
+      expect(result.isOverride).toBe(true);
     });
   });
 

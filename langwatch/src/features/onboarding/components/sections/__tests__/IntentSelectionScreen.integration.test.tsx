@@ -75,6 +75,7 @@ describe("IntentSelectionScreen", () => {
       ).toBeDefined();
     });
 
+    /** @scenario "Coding-agent product builders are steered to the LLMOps card" */
     it("pins the LLMOps card copy to explicitly claim coding agents the user is building", () => {
       renderScreen();
       expect(screen.getByText("Monitor & evaluate my LLM app")).toBeDefined();

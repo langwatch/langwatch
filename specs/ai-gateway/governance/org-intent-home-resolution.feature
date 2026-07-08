@@ -116,7 +116,7 @@ Feature: Organization primary intent decides the "/" landing
       When the user lands on "/" with the LLMOps organization selected
       Then the destination is a project home
 
-    @unit
+    @unit @unimplemented
     Scenario: A fresh device with no stored selection uses the first organization
       Given the user belongs to multiple organizations
       And the device has no stored organization selection

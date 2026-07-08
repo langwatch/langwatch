@@ -190,6 +190,7 @@ describe("onboarding.initializeOrganization", () => {
       });
     });
 
+    /** @scenario "Nurturing receives the intent as an explicit trait" */
     it("passes the intent to nurturing as an explicit trait", async () => {
       const caller = createCaller();
 
@@ -217,6 +218,7 @@ describe("onboarding.initializeOrganization", () => {
   });
 
   describe("when the caller declares the LLMOps intent", () => {
+    /** @scenario "LLMOps signup produces the same marketing data as today" */
     it("keeps the signUpData payload byte-identical to today — intent never leaks into it", async () => {
       const caller = createCaller();
       const llmOpsSignUpData = {

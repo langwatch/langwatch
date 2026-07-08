@@ -42,7 +42,7 @@ Feature: Onboarding forks on declared intent — Agent Governance vs LLMOps
       # Guards the S1 misroute: someone SHIPPING a coding agent wants LLMOps.
       # Exact copy is pinned by this test per copywriting standards.
 
-    @unit
+    @unit @unimplemented
     Scenario: Intent screen is required
       Given the user is on the intent screen
       When the user has not selected an intent
@@ -61,7 +61,7 @@ Feature: Onboarding forks on declared intent — Agent Governance vs LLMOps
       Then the intent screen is the final step
       And the basic-info, desires, and role screens are not part of the track
 
-    @integration
+    @integration @unimplemented
     Scenario: Finishing the governance track lands on the personal usage page
       Given the user selected the coding-agent tracking intent
       When onboarding finishes
@@ -105,7 +105,7 @@ Feature: Onboarding forks on declared intent — Agent Governance vs LLMOps
       Then the recorded signup marketing data is identical to what today's flow records
       And the organization's primary intent is LLMOps
 
-    @integration
+    @integration @unimplemented
     Scenario: LLMOps track continues to the flavour selection as today
       Given the user selected the LLM-app intent
       When the welcome screens complete
@@ -123,7 +123,7 @@ Feature: Onboarding forks on declared intent — Agent Governance vs LLMOps
       When the signup nurturing hooks fire
       Then the primary intent is included as an explicit trait
 
-    @integration
+    @integration @unimplemented
     Scenario: Funnel analytics carry the intent on every screen event
       Given a user selected an intent
       When any subsequent onboarding screen emits an analytics event

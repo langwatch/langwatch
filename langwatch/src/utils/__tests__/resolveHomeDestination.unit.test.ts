@@ -103,6 +103,7 @@ describe("resolveHomeDestination", () => {
       ).toBe("/me");
     });
 
+    /** @scenario "The resolver tells the client when intent decided the destination" */
     it("keeps a project-kind destination when the user last sat on /me", () => {
       expect(
         resolveHomeDestination({

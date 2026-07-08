@@ -23,6 +23,7 @@ describe("getOnboardingFlowConfig", () => {
       expect(flow.last).not.toBe(OnboardingScreenIndex.INTENT);
     });
 
+    /** @scenario "Intent screen appears as the second step" */
     it("places the intent screen second, right after the organization screen", () => {
       const flow = getOnboardingFlowConfig(true, undefined);
       expect(flow.visibleScreens[1]).toBe(OnboardingScreenIndex.INTENT);
@@ -30,6 +31,7 @@ describe("getOnboardingFlowConfig", () => {
   });
 
   describe("when the LLMOps intent is selected on SaaS", () => {
+    /** @scenario "LLMOps track keeps today's screens in today's order" */
     it("keeps today's screens in today's order after the intent screen (I2)", () => {
       const flow = getOnboardingFlowConfig(true, "LLM_OPS");
       expect(flow.visibleScreens).toEqual([
@@ -45,6 +47,7 @@ describe("getOnboardingFlowConfig", () => {
   });
 
   describe("when the governance intent is selected on SaaS", () => {
+    /** @scenario "Governance track has no screens after the intent" */
     it("ends the track at the intent screen — two screens, no LLMOps questions, no CLI screen (I3)", () => {
       const flow = getOnboardingFlowConfig(true, "AGENT_GOVERNANCE");
       expect(flow.visibleScreens).toEqual([
@@ -57,6 +60,7 @@ describe("getOnboardingFlowConfig", () => {
   });
 
   describe("when self-hosted (I7)", () => {
+    /** @scenario "Self-hosted welcome includes the intent screen" */
     it("includes the intent screen after the organization screen", () => {
       const flow = getOnboardingFlowConfig(false, undefined);
       expect(flow.visibleScreens).toEqual([

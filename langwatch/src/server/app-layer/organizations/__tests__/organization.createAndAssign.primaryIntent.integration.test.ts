@@ -68,6 +68,7 @@ describe("PrismaOrganizationRepository.createAndAssign — primaryIntent", () =>
   });
 
   describe("when the governance intent is declared", () => {
+    /** @scenario "Governance signup records the organization's primary intent" */
     it("persists the intent on the organization row within the create", async () => {
       const result = await createOrg({ primaryIntent: "AGENT_GOVERNANCE" });
 
@@ -126,6 +127,7 @@ describe("PrismaOrganizationRepository.createAndAssign — primaryIntent", () =>
   });
 
   describe("result shape parity across intents (I4)", () => {
+    /** @scenario "Governance signup creates organization, team, and default project" */
     it("returns the same shape regardless of declared intent", async () => {
       const governance = await createOrg({
         primaryIntent: "AGENT_GOVERNANCE",
