@@ -487,6 +487,9 @@ describe("PromptTabbedSection Layout Modes", () => {
     cleanup();
     clearStoreInstances();
     localStorage.clear();
+    // Always restore the shared useTabId mock, even if a test asserted and
+    // threw before its own reset, so it can't leak a stale id into later tests.
+    tabIdRef.current = "test-tab-id";
   });
 
   describe("vertical layout mode", () => {
@@ -641,8 +644,7 @@ describe("PromptTabbedSection Layout Modes", () => {
       expect(store.getState().getByTabId(tabId!)?.variableValues.topic).toBe(
         "flushed",
       );
-
-      tabIdRef.current = "test-tab-id";
+      // (afterEach restores tabIdRef even if the assertion above throws)
     });
   });
 });
