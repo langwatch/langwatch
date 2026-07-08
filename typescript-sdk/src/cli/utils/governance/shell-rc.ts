@@ -52,12 +52,19 @@ const TOOLS = ["claude", "codex", "cursor", "gemini", "opencode"] as const;
 const BLOCK_BEGIN = "# >>> langwatch begin >>>";
 const BLOCK_END = "# <<< langwatch end <<<";
 
-// Separate marker pair for the opencode wrapper function. opencode has no
-// config-file env block and its OTEL vars use generic names, so instead of
-// a global `export` (which leaks into every shell child) we install a shell
-// function that sets the telemetry env ONLY for `opencode` invocations.
-const OPENCODE_BEGIN = "# >>> langwatch opencode begin >>>";
-const OPENCODE_END = "# <<< langwatch opencode end <<<";
+/**
+ * Per-tool marker pair for a scoped wrapper function. Tools without a
+ * config-file env target (gemini, opencode, …) get a shell function that
+ * sets the telemetry env ONLY for `<tool>` invocations, instead of a global
+ * `export` that leaks into every shell child. Each tool gets its own marker
+ * pair so multiple wrappers coexist in one rc file.
+ */
+function toolMarkers(tool: string): { begin: string; end: string } {
+  return {
+    begin: `# >>> langwatch ${tool} begin >>>`,
+    end: `# <<< langwatch ${tool} end <<<`,
+  };
+}
 
 export type DetectedShell = "zsh" | "bash" | "fish";
 
@@ -168,40 +175,18 @@ function quote(s: string): string {
 }
 
 /**
- * Format an env-var map into a shell export block (body only, no
- * begin/end markers) for the given shell. fish uses `set -gx KEY VALUE`;
- * posix shells (zsh / bash) use `export KEY=VALUE`. Values are quoted via
- * the same posix-safe quoter the rest of this module uses.
- *
- * Used for the Path B (ingestion) telemetry exports: pass the exact
- * OTEL_EXPORTER_OTLP_* env the wrapper computed for the run so a plain
- * `<tool>` (without the `langwatch` prefix) inherits it. Order follows
- * the map's insertion order so the block is stable across runs.
- */
-export function buildOtelExportBlock(
-  vars: Record<string, string>,
-  shell: DetectedShell,
-): string {
-  const entries = Object.entries(vars);
-  const fmt =
-    shell === "fish"
-      ? ([k, v]: [string, string]) => `set -gx ${k} ${quote(v)}`
-      : ([k, v]: [string, string]) => `export ${k}=${quote(v)}`;
-  return entries.map(fmt).join("\n");
-}
-
-/**
- * Build a shell function that wraps `opencode` so the OTEL telemetry env
- * is set ONLY for `opencode` invocations, not exported into every shell
- * child. This is the "alias hack" for a tool with no config-file env
- * block: `command opencode` inside the function bypasses the function
+ * Build a shell function that wraps `<tool>` so the OTEL telemetry env is
+ * set ONLY for `<tool>` invocations, not exported into every shell child.
+ * This is the fallback for any tool with no config-file env target (gemini,
+ * opencode, …): `command <tool>` inside the function bypasses the function
  * itself (no recursion) and runs the real binary.
  *
- * posix (zsh/bash) uses a function with an env-prefix; fish uses a
- * function with block-local `set -lx`. The body (no begin/end markers)
- * is returned for `persistBlockToRc` to bracket with the opencode markers.
+ * posix (zsh/bash) uses a function with an env-prefix; fish uses a function
+ * with block-local `set -lx`. The body (no begin/end markers) is returned
+ * for `persistBlockToRc` to bracket with the tool's markers.
  */
-export function buildOpencodeAliasBlock(
+export function buildScopedToolFunction(
+  tool: string,
   vars: Record<string, string>,
   shell: DetectedShell,
 ): string {
@@ -210,14 +195,17 @@ export function buildOpencodeAliasBlock(
     const sets = entries
       .map(([k, v]) => `    set -lx ${k} ${quote(v)}`)
       .join("\n");
-    return ["function opencode", sets, "    command opencode $argv", "end"].join(
-      "\n",
-    );
+    return [
+      `function ${tool}`,
+      sets,
+      `    command ${tool} $argv`,
+      "end",
+    ].join("\n");
   }
   const assigns = entries
     .map(([k, v]) => `    ${k}=${quote(v)} \\`)
     .join("\n");
-  return ["opencode() {", assigns, '    command opencode "$@"', "}"].join("\n");
+  return [`${tool}() {`, assigns, `    command ${tool} "$@"`, "}"].join("\n");
 }
 
 /**
@@ -412,59 +400,27 @@ export async function maybeOfferIngestionShellRcPersist({
   const shell = detectShell();
   if (!shell) return;
 
-  // opencode has no config-file env block, and its OTEL vars are generic
-  // names, so a global `export` would leak into every shell child. Install a
-  // scoped wrapper function instead: it sets the telemetry env only for
-  // `opencode` runs. Kept under its own marker pair so it coexists with any
-  // export block for the other shell-rc tools.
-  if (tool === "opencode") {
-    if (
-      rcHasLangwatchBlock({
-        shell,
-        requiredKeys: [vars.OTEL_EXPORTER_OTLP_ENDPOINT].filter(
-          Boolean,
-        ) as string[],
-        markers: { begin: OPENCODE_BEGIN, end: OPENCODE_END },
-      })
-    ) {
-      return;
-    }
-    const target = rcPath(shell);
-    console.log();
-    const choice = await askPersistChoice(target, tool);
-    if (choice === "skip" || choice === "no") return;
-    if (choice === "never") {
-      recordNeverChoice(cfg);
-      return;
-    }
-    try {
-      const wrote = persistBlockToRc(
-        shell,
-        buildOpencodeAliasBlock(vars, shell),
-        { begin: OPENCODE_BEGIN, end: OPENCODE_END },
-      );
-      console.log(
-        chalk.green(
-          `  ✓ Installed a scoped \`opencode\` telemetry wrapper in ${wrote}`,
-        ),
-      );
-    } catch (err) {
-      console.log(
-        chalk.yellow(
-          `  ! Couldn't write to ${target}: ${(err as Error).message}`,
-        ),
-      );
-    }
+  // Every remaining tool (gemini, opencode, …) has no config-file env target
+  // and rides on generic OTEL_* names, so a global `export` would leak into
+  // every shell child. Install a scoped wrapper function that sets the
+  // telemetry env only for `<tool>` runs, under the tool's own marker pair so
+  // multiple wrappers coexist. (cursor never reaches here — it's gateway-only
+  // via allow_otel_direct=false, so Path B ingestion never resolves for it.)
+  const markers = toolMarkers(tool);
+  // Already installed for this endpoint, even if this shell hasn't sourced the
+  // rc yet (so the OTEL env isn't in process.env). Keyed on the endpoint so a
+  // stale wrapper for a different endpoint doesn't suppress installing this one.
+  if (
+    rcHasLangwatchBlock({
+      shell,
+      requiredKeys: [vars.OTEL_EXPORTER_OTLP_ENDPOINT].filter(
+        Boolean,
+      ) as string[],
+      markers,
+    })
+  ) {
     return;
   }
-
-  // Already installed in the rc file, even if this shell hasn't sourced it
-  // yet (so the OTEL env isn't in process.env). Keyed on the current vars so
-  // a stale / different export block doesn't suppress installing this one.
-  if (rcHasLangwatchBlock({ shell, requiredKeys: Object.keys(vars) })) return;
-
-  const block = buildOtelExportBlock(vars, shell);
-
   const target = rcPath(shell);
   console.log();
   const choice = await askPersistChoice(target, tool);
@@ -474,9 +430,15 @@ export async function maybeOfferIngestionShellRcPersist({
     return;
   }
   try {
-    const wrote = persistBlockToRc(shell, block);
+    const wrote = persistBlockToRc(
+      shell,
+      buildScopedToolFunction(tool, vars, shell),
+      markers,
+    );
     console.log(
-      chalk.green(`  ✓ Installed langwatch telemetry exports to ${wrote}`),
+      chalk.green(
+        `  ✓ Installed a scoped \`${tool}\` telemetry wrapper in ${wrote}`,
+      ),
     );
   } catch (err) {
     console.log(

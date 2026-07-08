@@ -473,6 +473,25 @@ describe("maybeOfferIngestionShellRcPersist", () => {
     });
   });
 
+  describe("when the tool is `gemini` (same scoped-function pattern)", () => {
+    it("writes a scoped gemini() wrapper under its own markers, no global export", async () => {
+      answers.push("y");
+      const { maybeOfferIngestionShellRcPersist } = await import(
+        "../shell-rc.js"
+      );
+      await maybeOfferIngestionShellRcPersist({
+        cfg: cfg(),
+        tool: "gemini",
+        vars: otelVars,
+      });
+      const rc = fs.readFileSync(path.join(tmpHome, ".zshrc"), "utf8");
+      expect(rc).toContain("# >>> langwatch gemini begin >>>");
+      expect(rc).toContain("gemini() {");
+      expect(rc).toContain('command gemini "$@"');
+      expect(rc).not.toContain("export OTEL_TRACES_EXPORTER");
+    });
+  });
+
   describe("when shell_rc_preference is 'skip' (any tool)", () => {
     it("does not prompt or write for claude", async () => {
       const { maybeOfferIngestionShellRcPersist } = await import(

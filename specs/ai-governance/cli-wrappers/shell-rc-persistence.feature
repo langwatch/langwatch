@@ -18,12 +18,12 @@ Feature: Persist the OTLP telemetry exports so `<tool>` captures automatically
     - `codex` → `~/.codex/config.toml`'s `[otel.trace_exporter.otlp-http]`
       block, which takes an inline `headers` field, so the ingest token
       lives beside the endpoint in one 0600 file.
-  `opencode` has no config-file env block, and its OTEL vars use generic
-  names, so instead of a global `export` (which would leak into every shell
-  child) the wrapper installs a shell function in the rc that sets the
-  telemetry env ONLY for `opencode` invocations. The remaining tools
-  (cursor, gemini) fall back to a plain export block in the detected shell
-  rc file.
+  Tools with no config-file env target (`gemini`, `opencode`) instead get a
+  shell function installed in the rc that sets the telemetry env ONLY for that
+  tool's invocations, since their OTEL vars use generic names a global
+  `export` would otherwise leak into every shell child. `cursor` is
+  gateway-only (`allow_otel_direct=false`), so Path B ingestion never resolves
+  for it and it never persists a telemetry env block.
 
   As a developer running `langwatch claude` over a subscription (Path B),
   I want to optionally install the telemetry exports once, idempotently,
@@ -145,45 +145,45 @@ Feature: Persist the OTLP telemetry exports so `<tool>` captures automatically
       When `langwatch codex` resolves to ingestion mode
       Then the CLI does NOT prompt to persist
 
-  Rule: `langwatch opencode` installs a scoped shell function, not a global export
+  Rule: Tools without a config-file env target install a scoped shell function
 
-    Scenario: Accept Y — write a scoped `opencode` wrapper function
-      Given `langwatch opencode` resolves to ingestion mode
+    Scenario Outline: Accept Y — write a scoped `<tool>` wrapper function
+      Given `langwatch <tool>` resolves to ingestion mode
       When the user types "y" at the persistence prompt
-      Then the shell rc gains a marker-bracketed `opencode()` function (or a
-        fish `function opencode`) that sets the OTEL_EXPORTER_OTLP_* env and
-        then runs `command opencode`
+      Then the shell rc gains a marker-bracketed `<tool>()` function (or a
+        fish `function <tool>`) that sets the OTEL_EXPORTER_OTLP_* env and
+        then runs `command <tool>`
       And the OTEL vars are NOT written as bare top-level `export`s
-      And running a plain `opencode` captures telemetry, while other shell
+      And running a plain `<tool>` captures telemetry, while other shell
         children do not inherit the OTEL env
-      # Rationale: opencode's OTEL vars are generic OpenTelemetry names, so a
-      # global export would capture telemetry from every OTEL-aware process
-      # in the shell. The wrapper scopes them to `opencode` runs only.
-
-    Scenario: The scoped wrapper coexists with the export block for other tools
-      Given ~/.zshrc already carries a langwatch export block from a prior
-        `langwatch gemini` run
-      When the user types "y" at the opencode persistence prompt
-      Then the `opencode` wrapper lands under its own marker pair
-      And the prior export block is left intact
-
-    Scenario: Skip the prompt when the scoped wrapper already targets this endpoint
-      Given ~/.zshrc already carries the `opencode` wrapper for the current
-        OTLP endpoint
-      When `langwatch opencode` resolves to ingestion mode
-      Then the CLI does NOT prompt to persist
-
-  Rule: Other wrappers still fall back to a shell-rc export block
-
-    Scenario Outline: Tools without an app-scoped env block use the shell rc
-      Given the user runs `langwatch <tool>` and it resolves to ingestion mode
-      When the wrapper offers to persist telemetry exports
-      Then the prompt names the detected shell rc file as the target
+      # Rationale: these tools' OTEL vars are generic OpenTelemetry names, so a
+      # global export would capture telemetry from every OTEL-aware process in
+      # the shell. The wrapper scopes them to `<tool>` runs only.
 
       Examples:
-        | tool      |
-        | cursor    |
-        | gemini    |
+        | tool     |
+        | gemini   |
+        | opencode |
+
+    Scenario: Each tool's scoped wrapper lands under its own marker pair
+      Given ~/.zshrc already carries a scoped `gemini` wrapper from a prior run
+      When the user types "y" at the `opencode` persistence prompt
+      Then the `opencode` wrapper lands under its own marker pair
+      And the prior `gemini` wrapper is left intact
+
+    Scenario: Skip the prompt when the scoped wrapper already targets this endpoint
+      Given ~/.zshrc already carries the `<tool>` wrapper for the current
+        OTLP endpoint
+      When `langwatch <tool>` resolves to ingestion mode
+      Then the CLI does NOT prompt to persist
+
+  Rule: cursor never persists telemetry env (gateway-only)
+
+    Scenario: cursor resolves to the gateway path, so no persist prompt fires
+      Given cursor's policy has `allow_otel_direct=false`
+      When the user runs `langwatch cursor`
+      Then it resolves to the gateway path (Path A)
+      And the CLI does NOT prompt to persist a telemetry env block
 
   Rule: The prompt is Y / n / never
 

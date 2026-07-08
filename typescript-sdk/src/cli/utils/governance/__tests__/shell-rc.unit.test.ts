@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { GovernanceConfig } from "../config";
 import {
   buildExportBlock,
-  buildOtelExportBlock,
+  buildScopedToolFunction,
   detectShell,
   isShellAlreadyConfigured,
   persistBlockToRc,
@@ -102,50 +102,38 @@ describe("buildExportBlock", () => {
   });
 });
 
-describe("buildOtelExportBlock", () => {
-  // The exact OTEL_* env block the Path B wrapper computes for a claude
-  // run. Shape mirrors buildOtelEnvBlock in wrapper-mode.ts.
+describe("buildScopedToolFunction", () => {
   const otelVars: Record<string, string> = {
-    CLAUDE_CODE_ENABLE_TELEMETRY: "1",
     OTEL_TRACES_EXPORTER: "otlp",
     OTEL_EXPORTER_OTLP_ENDPOINT: "http://app.example.com/api/otel",
     OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer sk-lw-token",
-    OTEL_RESOURCE_ATTRIBUTES: "service.name=claude-code",
+    OTEL_RESOURCE_ATTRIBUTES: "service.name=gemini-cli",
   };
 
   describe("given a zsh shell", () => {
-    it("emits one export line per env var, order preserved, header value quoted", () => {
-      const block = buildOtelExportBlock(otelVars, "zsh");
-      const lines = block.split("\n");
-      expect(lines[0]).toBe("export CLAUDE_CODE_ENABLE_TELEMETRY=1");
-      expect(lines).toContain("export OTEL_TRACES_EXPORTER=otlp");
-      expect(lines).toContain(
-        "export OTEL_EXPORTER_OTLP_ENDPOINT=http://app.example.com/api/otel",
-      );
-      // The header value has a space, so it must be single-quoted.
+    it("wraps <tool> in a function that scopes the env and runs `command <tool>`", () => {
+      const block = buildScopedToolFunction("gemini", otelVars, "zsh");
+      expect(block).toContain("gemini() {");
+      expect(block).toContain('command gemini "$@"');
       expect(block).toContain(
-        "export OTEL_EXPORTER_OTLP_HEADERS='Authorization=Bearer sk-lw-token'",
+        "OTEL_EXPORTER_OTLP_ENDPOINT=http://app.example.com/api/otel",
       );
-      // service.name attr has no whitespace -> no quoting needed.
+      // header value has a space -> single-quoted
       expect(block).toContain(
-        "export OTEL_RESOURCE_ATTRIBUTES=service.name=claude-code",
+        "OTEL_EXPORTER_OTLP_HEADERS='Authorization=Bearer sk-lw-token'",
       );
+      // scoped, NOT a bare global export
+      expect(block).not.toContain("export OTEL");
     });
   });
 
   describe("given a fish shell", () => {
-    it("emits set -gx lines instead of export", () => {
-      const block = buildOtelExportBlock(otelVars, "fish");
-      expect(block).toMatch(/^set -gx CLAUDE_CODE_ENABLE_TELEMETRY 1/m);
-      expect(block).toContain(
-        "set -gx OTEL_EXPORTER_OTLP_HEADERS 'Authorization=Bearer sk-lw-token'",
-      );
-    });
-  });
-
-  describe("given an empty env map", () => {
-    it("returns an empty string", () => {
-      expect(buildOtelExportBlock({}, "zsh")).toBe("");
+    it("uses `function <tool>` with block-local set -lx and `command <tool>`", () => {
+      const block = buildScopedToolFunction("opencode", otelVars, "fish");
+      expect(block).toContain("function opencode");
+      expect(block).toContain("command opencode $argv");
+      expect(block).toContain("set -lx OTEL_TRACES_EXPORTER otlp");
+      expect(block.endsWith("end")).toBe(true);
     });
   });
 });
@@ -224,15 +212,17 @@ describe("persistBlockToRc", () => {
     expect(content).not.toMatch(/export FOO=bar/);
   });
 
-  it("re-writing the OTEL telemetry block replaces it in place, never duplicating", () => {
-    const first = buildOtelExportBlock(
+  it("re-writing the scoped tool wrapper replaces it in place, never duplicating", () => {
+    const first = buildScopedToolFunction(
+      "gemini",
       {
         OTEL_EXPORTER_OTLP_ENDPOINT: "http://app.example.com/api/otel",
         OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer sk-lw-old",
       },
       "zsh",
     );
-    const second = buildOtelExportBlock(
+    const second = buildScopedToolFunction(
+      "gemini",
       {
         OTEL_EXPORTER_OTLP_ENDPOINT: "http://app.example.com/api/otel",
         OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer sk-lw-new",
