@@ -289,6 +289,12 @@ function createTabAwarePersistStorage(
           activeTabId: w.activeTabId,
           tabs: w.tabs.map((t) => {
             currentTabIds.add(t.id);
+            // Reference equality is sufficient (not deep-equal) only because
+            // this store is wrapped in Immer: `produce` structurally shares
+            // untouched branches, so an unedited tab's `data` object keeps
+            // the exact same reference across `set()` calls. If this store
+            // is ever updated outside Immer's `set()`, this check silently
+            // degrades to "always write" for every tab.
             if (lastPersistedDataRefs.get(t.id) !== t.data) {
               localStorage.setItem(
                 getTabStorageKey(projectId, t.id),
