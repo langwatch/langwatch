@@ -25,6 +25,13 @@ images:
 # ── App (1 replica) ─────────────────────────────────────────────────────────
 app:
   replicaCount: 1
+  # Local-FS stored objects requires workers.replicaCount=1 (single-node RWO
+  # PVC shared with the app) — this suite deliberately runs 2 workers to
+  # validate the multi-replica tier, so disable local-FS (multi-replica
+  # customers use S3/dataplane). See the _helpers.tpl guard.
+  storedObjects:
+    localFilesystem:
+      enabled: false
   features:
     skipEnvValidation: true
   service:
@@ -44,6 +51,12 @@ workers:
   resources:
     requests: { cpu: 100m, memory: 1Gi }
     limits:   { cpu: 1000m, memory: 2Gi }
+
+# No writable stored-objects backend above → the dataset backfill hook has
+# nowhere to migrate to; keep it out of the full-stack run (covered by the
+# local-FS upgrade path instead).
+datasetS3Migration:
+  enabled: false
 
 # ── NLP ──────────────────────────────────────────────────────────────────────
 langwatch_nlp:

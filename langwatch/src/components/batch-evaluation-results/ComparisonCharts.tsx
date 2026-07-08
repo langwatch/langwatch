@@ -20,17 +20,27 @@ import {
 } from "recharts";
 
 import { ChartTooltip } from "../analytics/ChartTooltip";
-import type { BatchEvaluationData, ComparisonRunData } from "./types";
+import { PairwiseWinRateChart } from "./PairwiseWinRateChart";
+import type {
+  BatchEvaluationData,
+  BatchPairwiseColumn,
+  ComparisonRunData,
+} from "./types";
 import { RUN_COLORS } from "./useMultiRunData";
 
 /** Metric types that can be displayed */
-type MetricType = "cost" | "latency" | `score_${string}` | `pass_${string}`;
+type MetricType =
+  | "cost"
+  | "latency"
+  | `score_${string}`
+  | `pass_${string}`
+  | `pairwise_${string}`;
 
 /** Available metric definition */
 type MetricDefinition = {
   id: MetricType;
   name: string;
-  type: "cost" | "latency" | "score" | "passRate";
+  type: "cost" | "latency" | "score" | "passRate" | "pairwise";
   evaluatorId?: string;
 };
 
@@ -114,6 +124,22 @@ type ComparisonChartsProps = {
   onXAxisOptionChange?: (option: XAxisOption) => void;
   /** Callback to provide target color map when X-axis is "target" */
   onTargetColorsChange?: (colors: Record<string, string>) => void;
+  /**
+   * Evaluator ids to exclude from the auto-generated `<name> (Score)` bar
+   * chart list. Pairwise evaluators emit a 0/1 label chip that reads as a
+   * misleading "score 0" for non-scored prompt targets on the same axis;
+   * BatchEvaluationResults suppresses them here and renders a dedicated
+   * PairwiseWinRateChart instead. Optional — undefined = no suppression,
+   * preserving pre-existing behavior.
+   */
+  suppressedScoreEvaluatorIds?: Set<string>;
+  /**
+   * Pairwise columns detected in the run. Rendered as extra chart cards
+   * inside the same flex row as Cost / Latency so the pairwise win-rate
+   * shows up at parity size with its siblings — not as a separate row
+   * below.
+   */
+  pairwiseColumns?: BatchPairwiseColumn[];
 };
 
 type EvaluatorMetrics = {
@@ -302,6 +328,8 @@ export const ComparisonCharts = ({
   xAxisOption: controlledXAxisOption,
   onXAxisOptionChange,
   onTargetColorsChange,
+  suppressedScoreEvaluatorIds,
+  pairwiseColumns,
 }: ComparisonChartsProps) => {
   // Determine default visibility based on target count
   const shouldShowByDefault = useMemo(() => {
@@ -708,6 +736,7 @@ export const ComparisonCharts = ({
     const seen = new Set<string>();
     for (const run of runMetrics) {
       for (const evalId of Object.keys(run.metrics.avgScores)) {
+        if (suppressedScoreEvaluatorIds?.has(evalId)) continue;
         if (!seen.has(evalId)) {
           seen.add(evalId);
           evaluators.push({
@@ -718,7 +747,7 @@ export const ComparisonCharts = ({
       }
     }
     return evaluators;
-  }, [runMetrics]);
+  }, [runMetrics, suppressedScoreEvaluatorIds]);
 
   // Get all evaluators with pass rates (for pass rate chart)
   const passRateEvaluators = useMemo(() => {
@@ -765,8 +794,20 @@ export const ComparisonCharts = ({
       });
     }
 
+    // Add per-pairwise-evaluator win-rate metrics so users can toggle
+    // pairwise charts through the same Metrics visibility system as their
+    // siblings (Cost / Latency / Score / Pass Rate).
+    for (const column of pairwiseColumns ?? []) {
+      metrics.push({
+        id: `pairwise_${column.evaluatorId}` as MetricType,
+        name: `${column.name} (Win Rate)`,
+        type: "pairwise",
+        evaluatorId: column.evaluatorId,
+      });
+    }
+
     return metrics;
-  }, [scoreEvaluators, passRateEvaluators]);
+  }, [scoreEvaluators, passRateEvaluators, pairwiseColumns]);
 
   // Initialize visible metrics to include all available metrics on first load
   useEffect(() => {
@@ -1314,6 +1355,24 @@ export const ComparisonCharts = ({
                       </BarChart>
                     </ResponsiveContainer>
                   </Box>
+                ),
+            )}
+
+            {/* Pairwise win-rate charts — one per detected pairwise
+                evaluator. Rendered inside the same flex row as Cost / Latency
+                so they read as siblings, not a separate section below.
+                Gated on `visibleMetrics` so users can hide it via the
+                Metrics dropdown alongside the sibling metric types. */}
+            {pairwiseColumns?.map(
+              (column) =>
+                visibleMetrics.has(
+                  `pairwise_${column.evaluatorId}` as MetricType,
+                ) && (
+                  <PairwiseWinRateChart
+                    key={`pairwise-${column.evaluatorId}`}
+                    column={column}
+                    chartHeight={chartHeight}
+                  />
                 ),
             )}
 

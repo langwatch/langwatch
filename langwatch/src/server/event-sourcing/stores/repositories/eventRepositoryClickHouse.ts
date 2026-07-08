@@ -1,7 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "~/server/data-retention/retentionPolicy.schema";
-import { createLogger } from "../../../../utils/logger/server";
+import { createLogger } from "~/utils/logger/server";
 import type { EventRecord, EventRepository } from "./eventRepository.types";
 
 const NUMERIC_STRING_REGEX = /^-?\d+(\.\d+)?$/;

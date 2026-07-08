@@ -112,7 +112,8 @@
                     "group": "Via UI",
                     "pages": [
                       "evaluations/experiments/ui/answer-correctness",
-                      "evaluations/experiments/ui/llm-as-a-judge"
+                      "evaluations/experiments/ui/llm-as-a-judge",
+                      "evaluations/experiments/ui/pairwise-compare"
                     ]
                   },
                   "evaluations/experiments/ci-cd",
@@ -1242,7 +1243,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1783418011",
+      "source": "/ci/cache/busted/1783433080",
       "destination": "/"
     },
     {

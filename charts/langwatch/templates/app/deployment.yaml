@@ -17,8 +17,34 @@ metadata:
 spec:
   replicas: {{ .Values.app.replicaCount }}
   {{- if .Values.app.deployment.strategy }}
-  strategy: 
+  strategy:
     {{- toYaml .Values.app.deployment.strategy | nindent 8 }}
+  {{- else if eq (include "langwatch.storedObjects.localFilesystemIsActive" .) "true" }}
+  {{/* Default kill-then-start under local-FS: the pod holds the RWO
+       stored-objects PVC, and the k8s default RollingUpdate (25% surge) starts
+       the new pod BEFORE the old one releases the volume — on a multi-node
+       cluster the new pod can land on another node and wedge Pending on a
+       multi-attach error (the scheduler does not avoid RWO conflicts for CSI
+       volumes). maxSurge=0/maxUnavailable=1 at replicas=1 behaves exactly like
+       Recreate (old pod terminates and releases the volume before the new one
+       schedules), at the cost of a brief downtime — honest for the
+       single-replica local-FS tier.
+
+       Deliberately NOT `type: Recreate`: switching a live Deployment from the
+       k8s-defaulted RollingUpdate to Recreate requires DELETING the live
+       `rollingUpdate` struct, and Helm's 3-way merge cannot emit that deletion
+       when the previous release's manifest never had a `strategy` key (the
+       pre-#5083 chart) — the API then rejects the patch with
+       "spec.strategy.rollingUpdate: Forbidden: may not be specified when
+       strategy `type` is 'Recreate'", failing every upgrade across this
+       boundary. Setting maxSurge/maxUnavailable only UPDATES existing fields,
+       which the merge applies cleanly. An explicit app.deployment.strategy
+       overrides this. */}}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
   {{- end }}
   {{- if hasKey (default (dict) .Values.app.deployment) "revisionHistoryLimit" }}
   revisionHistoryLimit: {{ .Values.app.deployment.revisionHistoryLimit }}
@@ -228,30 +254,10 @@ spec:
               value: {{ $gwPublic | quote }}
             {{- end }}
 
-            # NextAuth configuration
+            # NextAuth configuration (NEXTAUTH_SECRET lives in sharedEnv —
+            # every app-image consumer needs it, see _helpers.tpl)
             - name: NEXTAUTH_PROVIDER
               value: {{ .Values.app.nextAuth.provider | quote }}
-
-            # NextAuth secret
-            {{- if .Values.app.nextAuth.secret.secretKeyRef.name }}
-            - name: NEXTAUTH_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.app.nextAuth.secret.secretKeyRef.name }}
-                  key: {{ .Values.app.nextAuth.secret.secretKeyRef.key }}
-            {{- else if .Values.secrets.existingSecret }}
-            - name: NEXTAUTH_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.secrets.existingSecret }}
-                  key: {{ .Values.secrets.secretKeys.nextAuthSecret | default "nextAuthSecret" }}
-            {{- else if .Values.autogen.enabled }}
-            - name: NEXTAUTH_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "langwatch.appSecretName" . }}
-                  key: nextAuthSecret
-            {{- end }}
 
             # NextAuth - SSO OAuth providers (auth0, azureAd, cognito, github, gitlab, google, okta)
             {{- $oauthProviders := list

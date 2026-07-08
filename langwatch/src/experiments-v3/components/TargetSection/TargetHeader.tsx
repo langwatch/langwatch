@@ -37,6 +37,7 @@ import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import { useTargetName } from "../../hooks/useTargetName";
 import type { TargetConfig } from "../../types";
 import {
+  computePairwiseColumnTargetAggregate,
   computePairwiseTargetAggregate,
   computeTargetAggregates,
 } from "../../utils/computeAggregates";
@@ -217,16 +218,29 @@ export const TargetHeader = memo(function TargetHeader({
     return nonEmptyRowCount;
   }, [results.executingCells, isRunning, target.id, nonEmptyRowCount]);
 
-  // Compute aggregate statistics using effective row count
+  // Compute aggregate statistics using effective row count. Pairwise
+  // column-targets hit the orchestrator's `skipTarget: true` branch — no
+  // target execution → target_result fires with undefined cost/duration →
+  // targetMetadata for the pairwise id carries no metrics. Route those
+  // through the pairwise-aware helper that reconstructs cost/duration
+  // from the two variants' metadata + judge cost, the same "cost of the
+  // whole comparison" the results-page popover surfaces (dogfood: "I want
+  // the same in the workbench").
   const aggregates = useMemo(
     () =>
-      computeTargetAggregates(
-        target.id,
-        results,
-        evaluators,
-        effectiveRowCount,
-      ),
-    [target.id, results, evaluators, effectiveRowCount],
+      target.type === "evaluator" && target.pairwise
+        ? computePairwiseColumnTargetAggregate(
+            target,
+            results,
+            effectiveRowCount,
+          )
+        : computeTargetAggregates(
+            target.id,
+            results,
+            evaluators,
+            effectiveRowCount,
+          ),
+    [target, results, evaluators, effectiveRowCount],
   );
 
   const pairwiseAggregate = useMemo(() => {
@@ -352,7 +366,7 @@ export const TargetHeader = memo(function TargetHeader({
         ? "Switch Evaluator"
         : "Switch Agent";
 
-  return (
+  const headerRow = (
     <HStack gap={2} width="full" marginY={-2}>
       <Menu.Root
         positioning={{ placement: "bottom-start" }}
@@ -469,39 +483,56 @@ export const TargetHeader = memo(function TargetHeader({
 
       <Spacer />
 
-      {/* Summary statistics (positioned on the right before play button) */}
+      {/* Summary statistics (positioned on the right before play button).
+          Pairwise columns surface BOTH the "<winner> wins N" summary AND
+          the shared Rows / Avg Latency / Total Cost / Execution Time
+          popover — dogfood ask "I also want the cost metric in pairwise
+          compare in v3". Non-pairwise columns keep the single popover. */}
       {pairwiseAggregate &&
       pairwiseAggregate.counts.a +
         pairwiseAggregate.counts.b +
         pairwiseAggregate.counts.tie >
         0 ? (
-        (() => {
-          const { a, b, tie } = pairwiseAggregate.counts;
-          const isTie = a === b;
-          const winnerName = a > b ? variantAName : variantBName;
-          const winnerCount = Math.max(a, b);
-          const shortName = (s: string) =>
-            s.length > 18 ? `${s.slice(0, 17)}…` : s;
-          const summary = isTie
-            ? tie > 0
-              ? `Tied · ${tie} tie${tie === 1 ? "" : "s"}`
-              : "Tied"
-            : `${shortName(winnerName)} wins ${winnerCount}` +
-              (tie > 0 ? ` · ${tie} tie${tie === 1 ? "" : "s"}` : "");
-          return (
-            <Tooltip
-              content={`${variantAName}: ${a} wins · ${variantBName}: ${b} wins${
-                tie > 0 ? ` · ${tie} ${tie === 1 ? "tie" : "ties"}` : ""
-              }`}
-              positioning={{ placement: "top" }}
-              openDelay={200}
-            >
-              <Text fontSize="11px" color="fg.muted" whiteSpace="nowrap">
-                {summary}
-              </Text>
-            </Tooltip>
-          );
-        })()
+        <HStack gap={2}>
+          {(() => {
+            const { a, b, tie } = pairwiseAggregate.counts;
+            const isTie = a === b;
+            const winnerName = a > b ? variantAName : variantBName;
+            const shortName = (s: string) =>
+              s.length > 18 ? `${s.slice(0, 17)}…` : s;
+            // Show only the qualitative outcome ("<winner> wins" / "Tied")
+            // in the header — the exact per-variant counts live in the
+            // hover tooltip so numerically-curious users get details, but
+            // the header itself stays uncluttered (dogfood: "structured-
+            // demo-a wins 3 — random number, not useful in the header").
+            const summary = isTie ? "Tied" : `${shortName(winnerName)} wins`;
+            return (
+              <Tooltip
+                content={`${variantAName}: ${a} wins · ${variantBName}: ${b} wins${
+                  tie > 0 ? ` · ${tie} ${tie === 1 ? "tie" : "ties"}` : ""
+                }`}
+                positioning={{ placement: "top" }}
+                openDelay={200}
+              >
+                <Text
+                  fontSize="11px"
+                  color="fg.muted"
+                  whiteSpace="nowrap"
+                  cursor="help"
+                >
+                  {summary}
+                </Text>
+              </Tooltip>
+            );
+          })()}
+          {hasAggregates && (
+            <TargetSummary
+              aggregates={aggregates}
+              evaluators={evaluators}
+              isRunning={isRunning}
+            />
+          )}
+        </HStack>
       ) : hasAggregates ? (
         <TargetSummary
           aggregates={aggregates}
@@ -548,4 +579,6 @@ export const TargetHeader = memo(function TargetHeader({
       </Tooltip>
     </HStack>
   );
+
+  return headerRow;
 });
