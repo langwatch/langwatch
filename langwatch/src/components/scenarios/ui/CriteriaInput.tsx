@@ -86,7 +86,7 @@ export function CriteriaInput({
   };
 
   return (
-    <VStack align="stretch" gap={2}>
+    <VStack align="stretch" gap={2} data-testid="criteria-list">
       {/* Existing criteria */}
       {value.map((criterion, index) =>
         editingIndex === index ? (
