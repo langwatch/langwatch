@@ -103,7 +103,17 @@ export function Composer({
           visibility={collapsedProviderIcon ? "visible" : "hidden"}
           aria-hidden={!collapsedProviderIcon}
           onMouseEnter={() => setPickerExpanded(true)}
-          onMouseLeave={collapsePicker}
+          // Mirror the onBlur portal guard below for the pointer path: the
+          // model dropdown's popover is portaled to <body>, a sibling of
+          // this wrapper, so moving the mouse from the pill toward the
+          // option list necessarily fires mouseleave here. Collapsing on
+          // that would close the dropdown the instant the user reaches for
+          // it. While the dropdown is open, leave collapse to onOpenChange
+          // (fires when it actually closes — option picked or click-away).
+          onMouseLeave={() => {
+            if (pickerDropdownOpen) return;
+            collapsePicker();
+          }}
           onFocus={() => setPickerExpanded(true)}
           // Mirror onFocus: collapse when focus moves OUT of the wrapper —
           // BUT not when focus is moving into the Select's own portaled
@@ -181,7 +191,15 @@ export function Composer({
                 mode="chat"
                 size="sm"
                 open={pickerDropdownOpen}
-                onOpenChange={setPickerDropdownOpen}
+                onOpenChange={(open) => {
+                  setPickerDropdownOpen(open);
+                  // When the dropdown closes (option picked or click-away),
+                  // collapse the pill too. The mouse is over the portaled
+                  // popover (outside this wrapper) at that point, so there's
+                  // no mouseleave here to retract it — without this it would
+                  // be left orphaned-expanded.
+                  if (!open) setPickerExpanded(false);
+                }}
               />
             </Box>
           </Box>
