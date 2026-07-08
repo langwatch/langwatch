@@ -17,6 +17,10 @@ import {
 } from "../personaResolver.service";
 
 const baseInput: PersonaResolverInput = {
+  // ADR-038 I1: null = legacy org. Every pre-existing case below must pass
+  // unchanged with this line as the ONLY fixture edit — that is the
+  // bit-identity proof for intent-less orgs.
+  organizationIntent: null,
   userLastHomePath: null,
   setupState: {
     hasPersonalVKs: false,
@@ -200,6 +204,88 @@ describe("resolvePersonaHome", () => {
       // A pin can only have been set while the surface was reachable; keep it.
       expect(result.destination).toBe("/me");
       expect(result.isOverride).toBe(true);
+    });
+  });
+
+  describe("when the organization has a primary intent (ADR-038)", () => {
+    it("lands an AGENT_GOVERNANCE org on /me", () => {
+      const result = resolvePersonaHome({
+        ...baseInput,
+        organizationIntent: "AGENT_GOVERNANCE",
+        firstProjectSlug: "team-prod",
+      });
+      expect(result.destination).toBe("/me");
+      expect(result.intentPinned).toBe(true);
+      expect(result.isOverride).toBe(false);
+    });
+
+    it("lands an LLM_OPS org on the project home", () => {
+      const result = resolvePersonaHome({
+        ...baseInput,
+        organizationIntent: "LLM_OPS",
+        setupState: { ...baseInput.setupState, hasPersonalVKs: true },
+        firstProjectSlug: "team-prod",
+      });
+      // Personal VK would make this persona "mixed" (/me) — intent wins.
+      expect(result.destination).toBe("/team-prod");
+      expect(result.intentPinned).toBe(true);
+    });
+
+    it("beats an explicit user pin", () => {
+      const result = resolvePersonaHome({
+        ...baseInput,
+        organizationIntent: "LLM_OPS",
+        userLastHomePath: "/me",
+        firstProjectSlug: "team-prod",
+      });
+      expect(result.destination).toBe("/team-prod");
+      expect(result.isOverride).toBe(false);
+      expect(result.intentPinned).toBe(true);
+    });
+
+    it("ignores governance-admin signals under an LLM_OPS intent", () => {
+      const result = resolvePersonaHome({
+        ...baseInput,
+        organizationIntent: "LLM_OPS",
+        hasOrganizationManagePermission: true,
+        isEnterprise: true,
+        setupState: { ...baseInput.setupState, hasIngestionSources: true },
+        firstProjectSlug: "team-prod",
+      });
+      expect(result.destination).toBe("/team-prod");
+      expect(result.destination).not.toBe("/governance");
+    });
+
+    it("falls back to the project home when AGENT_GOVERNANCE is kill-switched off (I8)", () => {
+      const result = resolvePersonaHome({
+        ...baseInput,
+        organizationIntent: "AGENT_GOVERNANCE",
+        hasGovernanceUi: false,
+        firstProjectSlug: "team-prod",
+      });
+      expect(result.destination).toBe("/team-prod");
+      expect(result.destination).not.toBe("/me");
+      // Still intent-pinned: the client must not re-flip the kind either.
+      expect(result.intentPinned).toBe(true);
+    });
+
+    it("sends an LLM_OPS user with no project membership to the no-project fallback", () => {
+      const result = resolvePersonaHome({
+        ...baseInput,
+        organizationIntent: "LLM_OPS",
+        firstProjectSlug: null,
+      });
+      expect(result.destination).toBe("/me");
+    });
+
+    it("keeps intentPinned false on every intent-less path", () => {
+      const plain = resolvePersonaHome({ ...baseInput });
+      const pinned = resolvePersonaHome({
+        ...baseInput,
+        userLastHomePath: "/me",
+      });
+      expect(plain.intentPinned).toBe(false);
+      expect(pinned.intentPinned).toBe(false);
     });
   });
 

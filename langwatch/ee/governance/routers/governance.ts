@@ -22,6 +22,7 @@ import {
   resolvePersonaHomeSafe,
   type PersonaResolution,
 } from "@ee/governance/services/personaResolver.service";
+import { getApp } from "~/server/app-layer/app";
 import { UsageStatsService } from "~/server/license-enforcement/usage-stats.service";
 import { featureFlagService } from "~/server/featureFlag";
 import { GovernanceOcsfExportService } from "@ee/governance/services/governanceOcsfExport.service";
@@ -97,6 +98,7 @@ export const governanceRouter = createTRPCRouter({
         hasManage,
         userPin,
         hasGovernanceUi,
+        organizationIntent,
       ] = await Promise.all([
         // hasApplicationTraces is part of setupState as of 9d2688c84.
         setupService.resolve(input.organizationId),
@@ -134,9 +136,13 @@ export const governanceRouter = createTRPCRouter({
             organizationId: input.organizationId,
           })
           .catch(() => false),
+        // ADR-038: the org's declared intent, when set, decides the landing
+        // kind before persona detection and the user pin.
+        getApp().organizations.getPrimaryIntent(input.organizationId),
       ]);
 
       return resolvePersonaHomeSafe({
+        organizationIntent,
         userLastHomePath: userPin?.lastHomePath ?? null,
         setupState: {
           hasPersonalVKs: setupState.hasPersonalVKs,

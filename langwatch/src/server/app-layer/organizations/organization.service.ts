@@ -1,6 +1,7 @@
 import { generate } from "@langwatch/ksuid";
 import type { User } from "@prisma/client";
 import {
+  type OrganizationIntent,
   type OrganizationUserRole,
   PricingModel,
   RoleBindingScopeType,
@@ -130,6 +131,16 @@ export class OrganizationService {
 
   async getProjectIds(organizationId: string): Promise<string[]> {
     return this.repo.getProjectIds(organizationId);
+  }
+
+  /**
+   * The org's declared primary intent (ADR-038); null = intent unset
+   * (legacy org). Consumed by the home resolver to pin the "/" landing.
+   */
+  async getPrimaryIntent(
+    organizationId: string,
+  ): Promise<OrganizationIntent | null> {
+    return this.repo.findPrimaryIntentById(organizationId);
   }
 
   async findWithAdmins(

@@ -1,6 +1,7 @@
 import type {
   CustomRole,
   Organization,
+  OrganizationIntent,
   OrganizationUser,
   OrganizationUserRole,
   PricingModel,
@@ -243,6 +244,9 @@ export interface OrganizationRepository {
   findNameById(
     organizationId: string,
   ): Promise<{ id: string; name: string } | null>;
+  findPrimaryIntentById(
+    organizationId: string,
+  ): Promise<OrganizationIntent | null>;
   getOrganizationForBilling(
     organizationId: string,
   ): Promise<OrganizationForBilling | null>;
@@ -353,6 +357,12 @@ export class NullOrganizationRepository implements OrganizationRepository {
   async findNameById(
     _organizationId: string,
   ): Promise<{ id: string; name: string } | null> {
+    return null;
+  }
+
+  async findPrimaryIntentById(
+    _organizationId: string,
+  ): Promise<OrganizationIntent | null> {
     return null;
   }
 
