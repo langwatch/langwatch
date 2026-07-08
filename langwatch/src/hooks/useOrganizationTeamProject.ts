@@ -320,10 +320,15 @@ export const useOrganizationTeamProject = (
       !hasTeamsWithProjectsOnCurrentOrg &&
       teamsWithProjectsOnAnyOrg.length > 0
     ) {
-      const availableProjectSlug =
-        teamsWithProjectsOnAnyOrg[0]!.projects[0]!.slug;
-      void router.push(`/${availableProjectSlug}`);
-      return;
+      // Personal workspaces are never a valid project-home target — only
+      // redirect when a shared team's project exists (ADR-038 v6).
+      const availableProjectSlug = teamsWithProjectsOnAnyOrg.find(
+        (team) => !team.isPersonal,
+      )?.projects[0]?.slug;
+      if (availableProjectSlug) {
+        void router.push(`/${availableProjectSlug}`);
+        return;
+      }
     }
 
     if (redirectToProjectOnboarding && !teamsWithProjectsOnAnyOrg.length) {

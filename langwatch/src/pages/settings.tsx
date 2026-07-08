@@ -80,10 +80,14 @@ function Settings() {
   const { organization, project } = useOrganizationTeamProject();
 
   // Project is optional: a governance-intent org has none by design
-  // (ADR-038 v6) and still needs its organization settings.
+  // (ADR-038 v6) and still needs its organization settings. A personal
+  // workspace project counts as absent here — org settings must never
+  // surface (or offer to "set up") someone's personal workspace.
+  const sharedProject = project && !project.isPersonal ? project : undefined;
+
   if (!organization) return null;
 
-  return <SettingsForm organization={organization} project={project} />;
+  return <SettingsForm organization={organization} project={sharedProject} />;
 }
 
 export default withPermissionGuard("organization:view", {
@@ -123,6 +127,8 @@ function SettingsForm({
   const updateOrganization = api.organization.update.useMutation();
   const apiContext = api.useContext();
   const [showLlmOpsSetupDialog, setShowLlmOpsSetupDialog] = useState(false);
+  const [showCreateProjectDialog, setShowCreateProjectDialog] =
+    useState(false);
 
   const onSubmit: SubmitHandler<OrganizationFormData> = (
     data: OrganizationFormData,
@@ -148,21 +154,23 @@ function SettingsForm({
         onSuccess: () => {
           void apiContext.organization.getAll.refetch();
           void apiContext.governance.resolveHome.invalidate();
-          // ADR-038 F9/v6: a governance org flipping to LLMOps needs a
-          // project to land on. No project yet (v6 skips it at signup) →
-          // open the create-project drawer right here; a never-integrated
-          // project → offer its setup instead of a dead surface.
+          // ADR-038 F9/v6: switching to LLMOps points "/" at the project
+          // home, so the change is checked for what's missing — and the
+          // user is only interrupted when something actually is. The save
+          // itself always goes through first.
           if (
-            previousIntent === "AGENT_GOVERNANCE" &&
-            data.primaryIntent === "LLM_OPS"
+            data.primaryIntent === "LLM_OPS" &&
+            previousIntent !== "LLM_OPS"
           ) {
             if (!project) {
-              openDrawer("createProject", {
-                navigateOnCreate: true,
-                organizationId: organization.id,
-                defaultTeamId: organization.teams[0]?.id,
-              });
-            } else if (!project.firstMessage) {
+              // No project at all (governance orgs skip it at signup):
+              // alert, then offer to create it.
+              setShowCreateProjectDialog(true);
+            } else if (
+              previousIntent === "AGENT_GOVERNANCE" &&
+              !project.firstMessage
+            ) {
+              // Project exists but never received data: offer its setup.
               setShowLlmOpsSetupDialog(true);
             }
           }
@@ -436,6 +444,51 @@ function SettingsForm({
           <ProjectSettingsForm project={project} />
         )}
       </VStack>
+
+      {/* ADR-038 v6: governance -> LLMOps flip on a project-less org — the
+          user must know a project is required before the drawer opens */}
+      <Dialog.Root
+        open={showCreateProjectDialog}
+        onOpenChange={({ open }) => setShowCreateProjectDialog(open)}
+      >
+        <Dialog.Content bg="bg">
+          <Dialog.Header>
+            <Dialog.Title>A project is needed</Dialog.Title>
+          </Dialog.Header>
+          <Dialog.Body>
+            <Text>
+              Your changes are saved. Monitoring LLM apps happens inside a
+              project, and this organization doesn&apos;t have one yet —
+              create your first project so everyone has somewhere to land.
+            </Text>
+          </Dialog.Body>
+          <Dialog.Footer>
+            <HStack gap={2}>
+              <Button
+                variant="outline"
+                onClick={() => setShowCreateProjectDialog(false)}
+              >
+                Later
+              </Button>
+              <Button
+                colorPalette="orange"
+                onClick={() => {
+                  setShowCreateProjectDialog(false);
+                  openDrawer("createProject", {
+                    navigateOnCreate: true,
+                    organizationId: organization.id,
+                    defaultTeamId: organization.teams.find(
+                      (t) => !t.isPersonal,
+                    )?.id,
+                  });
+                }}
+              >
+                Set up project
+              </Button>
+            </HStack>
+          </Dialog.Footer>
+        </Dialog.Content>
+      </Dialog.Root>
 
       {/* ADR-038 F9: governance -> LLMOps flip offers the project setup */}
       <Dialog.Root

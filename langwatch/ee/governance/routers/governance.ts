@@ -107,6 +107,10 @@ export const governanceRouter = createTRPCRouter({
             team: {
               organizationId: input.organizationId,
               members: { some: { userId } },
+              // Personal workspaces must never become the "/" project home
+              // (ADR-038 v6: they are the governance data home, not a
+              // navigable org project).
+              isPersonal: false,
             },
             archivedAt: null,
           },
