@@ -1,6 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
-import { SimulationClickHouseRepository } from "../simulation.clickhouse.repository";
+import {
+  SimulationClickHouseRepository,
+  buildStartedAtWindowForPage,
+} from "../simulation.clickhouse.repository";
 import { DEFAULT_SET_ID } from "~/server/scenarios/internal-set-id";
 
 function makeMockClient(rows: unknown[] = []): ClickHouseClient {
@@ -175,6 +178,51 @@ describe("SimulationClickHouseRepository", () => {
           /any\(IF\(ScenarioSetId[^)]*\)\)\s+AS\s+NormalizedSetId\b/
         );
       });
+    });
+  });
+
+  describe("buildStartedAtWindowForPage()", () => {
+    it("spans the min and max StartedAt across the page rows", () => {
+      const { whereClause, params } = buildStartedAtWindowForPage([
+        { MinStartedAt: "3000", MaxStartedAt: "5000" },
+        { MinStartedAt: "1000", MaxStartedAt: "9000" },
+      ]);
+      expect(whereClause).toContain("StartedAt >=");
+      expect(whereClause).toContain("StartedAt <=");
+      expect(params.minStartedAtMs).toBe("1000");
+      expect(params.maxStartedAtMs).toBe("9000");
+    });
+
+    it("handles a single row", () => {
+      const { params } = buildStartedAtWindowForPage([
+        { MinStartedAt: "1500", MaxStartedAt: "1500" },
+      ]);
+      expect(params.minStartedAtMs).toBe("1500");
+      expect(params.maxStartedAtMs).toBe("1500");
+    });
+
+    it("returns an empty clause for an empty page (fall back to unbounded)", () => {
+      const result = buildStartedAtWindowForPage([]);
+      expect(result.whereClause).toBe("");
+      expect(result.params).toEqual({});
+    });
+
+    it("ignores non-finite and non-positive bounds", () => {
+      const result = buildStartedAtWindowForPage([
+        { MinStartedAt: "not-a-number", MaxStartedAt: "0" },
+        { MinStartedAt: "", MaxStartedAt: "NaN" },
+      ]);
+      expect(result.whereClause).toBe("");
+      expect(result.params).toEqual({});
+    });
+
+    it("still bounds when some rows have invalid values but others are valid", () => {
+      const { params } = buildStartedAtWindowForPage([
+        { MinStartedAt: "0", MaxStartedAt: "invalid" },
+        { MinStartedAt: "2000", MaxStartedAt: "4000" },
+      ]);
+      expect(params.minStartedAtMs).toBe("2000");
+      expect(params.maxStartedAtMs).toBe("4000");
     });
   });
 });

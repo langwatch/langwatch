@@ -24,6 +24,30 @@ export function buildTimeWhere(timeColumn: string): string {
 }
 
 /**
+ * Per-query memory guard for the unbounded key-discovery facets
+ * (`metadata-keys`, `span-attribute-keys`, `event-attribute-keys`). Each
+ * flattens an attribute-map's keys with `arrayJoin` and groups by key over the
+ * whole time window. A tenant that stuffs high-cardinality data into key names
+ * (per-user / UUID keys) turns the GROUP BY into millions of groups, and the
+ * read of the keys subcolumn can allocate gigabytes — observed tripping
+ * `MEMORY_LIMIT_EXCEEDED` in prod.
+ *
+ * `max_bytes_before_external_group_by` spills that aggregation to disk so the
+ * facet completes instead of OOMing, and `max_memory_usage` caps the read so a
+ * pathological tenant fails its own discovery query rather than allocating
+ * against the server total — where the OvercommitTracker resolves the pressure
+ * by killing whichever query is allocating, degrading unrelated requests. Same
+ * rationale as the span repo's `SINGLE_TRACE_READ_SETTINGS`. The ceiling sits
+ * above any normal facet read and below the global per-query limit, so it only
+ * trips on the pathological tail.
+ */
+export const KEY_DISCOVERY_SETTINGS: Record<string, string> = {
+  // ClickHouse settings are string-typed over the wire.
+  max_bytes_before_external_group_by: String(512 * 1024 * 1024), // 512 MiB
+  max_memory_usage: String(2 * 1024 * 1024 * 1024), // 2 GiB
+};
+
+/**
  * The bound-parameter tuple every facet query relies on. Helpers that need
  * `prefix` add it on top, since not every builder supports key/value
  * prefix-filtering.
