@@ -15,6 +15,7 @@
 import { useTargetName } from "../hooks/useTargetName";
 import type { TargetConfig } from "../types";
 import { normalizePairwiseLabel } from "../utils/computeAggregates";
+import { disambiguateVariantNames } from "../utils/variantDisambiguation";
 import { RowVerdictStrip } from "./RowVerdictStrip";
 
 export type PairwiseVerdictRowProps = {
@@ -48,11 +49,18 @@ export function PairwiseVerdictRow({
   );
   if (!normalized) return null;
 
+  // Display-only: disambiguate when both variants share a name. The
+  // normalization above already matched against the raw names.
+  const { variantAName: displayAName, variantBName: displayBName } =
+    disambiguateVariantNames({ variantAName, variantBName });
+
   return (
     <RowVerdictStrip
       label={normalized}
-      variantAName={variantAName}
-      variantBName={variantBName}
+      variantAName={displayAName}
+      variantBName={displayBName}
+      variantAId={variantA.id}
+      variantBId={variantB.id}
       reasoning={reasoning}
     />
   );

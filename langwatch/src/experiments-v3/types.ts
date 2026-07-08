@@ -451,6 +451,9 @@ export type UIState = {
   overlayEvaluatorId?: string; // which evaluator within the target (for evaluator overlay)
   selectedCell?: CellPosition;
   editingCell?: CellPosition;
+  // Which target column is highlighted via clicking a variant name in a
+  // pairwise verdict (glow effect on that column's header).
+  highlightedVariantTargetId?: string;
   selectedRows: Set<number>;
   expandedEvaluator?: {
     targetId: string;
@@ -626,6 +629,7 @@ export type EvaluationsV3Actions = {
   closeOverlay: () => void;
   setSelectedCell: (cell: CellPosition | undefined) => void;
   setEditingCell: (cell: CellPosition | undefined) => void;
+  setHighlightedVariantTargetId: (targetId: string | undefined) => void;
   toggleRowSelection: (row: number) => void;
   selectAllRows: (rowCount: number) => void;
   clearRowSelection: () => void;

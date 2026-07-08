@@ -8,7 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useEffect, useMemo } from "react";
-import { SiSlack } from "react-icons/si";
+import { FaSlack } from "react-icons/fa";
 import { Select } from "~/components/ui/select";
 import { VariableInfoIcon } from "~/features/automations/components/VariableInfoIcon";
 import { LIQUID_JSON_LANGUAGE_ID } from "~/features/automations/editors/liquidMonaco";
@@ -351,7 +351,7 @@ function ReuseSlackWebhook({
 }
 
 const client: NotifyClientDef<SlackSlice, SlackPreview> = {
-  Icon: SiSlack,
+  Icon: FaSlack,
   channel: "slack",
   initialSlice,
   isComplete,

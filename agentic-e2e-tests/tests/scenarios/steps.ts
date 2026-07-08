@@ -45,7 +45,9 @@ export async function givenIAmOnTheScenariosListPage(page: Page) {
 export async function givenIAmOnTheSimulationsPage(page: Page) {
   const projectSlug = await getProjectSlug(page);
   await page.goto(`/${projectSlug}/simulations`);
-  await expect(page).toHaveURL(/simulations/, { timeout: 10000 });
+  await expect
+    .poll(() => new URL(page.url()).pathname, { timeout: 10000 })
+    .toBe(`/${projectSlug}/simulations`);
 }
 
 /**
@@ -144,12 +146,11 @@ export async function whenIAddCriterion(page: Page, criterion: string) {
  * Then the criterion appears in the criteria list
  */
 export async function thenCriterionAppearsInList(page: Page, criterion: string) {
-  // Criteria appear as textbox inputs with the criterion as their value
-  const criterionInput = page
-    .getByRole("textbox")
-    .filter({ hasText: criterion })
-    .last();
-  await expect(criterionInput).toBeVisible({ timeout: 5000 });
+  // Scope to the criteria list container so we only match rendered criteria items.
+  // Saved criteria render as plain text (not inputs), so we assert visibility of
+  // the criterion text within the container rather than an input value.
+  const criteriaList = page.getByTestId("criteria-list");
+  await expect(criteriaList.getByText(criterion)).toBeVisible({ timeout: 5000 });
 }
 
 /**
@@ -167,7 +168,12 @@ export async function whenIClickSave(page: Page) {
   await expect(saveWithoutRunning).toBeVisible({ timeout: 5000 });
   await saveWithoutRunning.click();
 
-  // Wait for save to complete by checking dialog closes or list updates
+  // Wait for save to complete, then let the drawer close itself.
+  // ScenarioFormDrawer calls onClose() automatically after the success toast,
+  // so clicking Close here would race the auto-close and cause flakiness.
+  const successToast = page.getByText(/scenario (created|updated)/i);
+  await expect(successToast).toBeVisible({ timeout: 10000 });
+
   await expect(saveButton).not.toBeVisible({ timeout: 10000 });
 }
 
