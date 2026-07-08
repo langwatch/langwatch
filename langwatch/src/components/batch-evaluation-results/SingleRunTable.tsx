@@ -16,6 +16,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useCallback, useMemo, useState } from "react";
 import { ExternalImage, getImageUrl } from "~/components/ExternalImage";
 import { ColumnTypeIcon } from "~/components/shared/ColumnTypeIcon";
+import { BatchPairwiseWinnerCell } from "./BatchPairwiseWinnerCell";
 import { BatchTargetCell } from "./BatchTargetCell";
 import { BatchTargetHeader } from "./BatchTargetHeader";
 import {
@@ -33,6 +34,7 @@ import {
 import type {
   BatchDatasetColumn,
   BatchEvaluationData,
+  BatchPairwiseColumn,
   BatchResultRow,
   BatchTargetColumn,
 } from "./types";
@@ -59,11 +61,20 @@ const columnHelper = createColumnHelper<BatchResultRow>();
 const buildColumns = (
   datasetColumns: BatchDatasetColumn[],
   targetColumns: BatchTargetColumn[],
+  pairwiseColumns: BatchPairwiseColumn[],
   aggregatesMap: Map<string, BatchTargetAggregate>,
   rows: BatchResultRow[],
   hiddenColumns: Set<string>,
   targetColors?: Record<string, string>,
 ) => {
+  // Evaluator ids whose per-row chip is redundant with the dedicated Winner
+  // column below — the generic `EvaluatorResultChip` renders the pairwise
+  // verdict as `<target_XYZ> 1.00`, which reads as noise to users (dogfood
+  // report). Suppressing them in the target cell keeps the Winner column
+  // the single source of the pairwise result.
+  const pairwiseEvaluatorIds = new Set(
+    pairwiseColumns.map((p) => p.evaluatorId),
+  );
   const columns = [];
 
   // Row number column
@@ -139,10 +150,19 @@ const buildColumns = (
     );
   }
 
+  // Map each pairwise column-target to its detected pairwise metadata so we
+  // can render the winner cell (badge + winning output + reasoning) INSIDE
+  // the pairwise column's own cell — the user wants everything in one
+  // place, not split across a target column and a trailing Winner column.
+  const pairwiseByTargetId = new Map(
+    pairwiseColumns.map((p) => [p.evaluatorId, p]),
+  );
+
   // Target columns with headers that include summary
   for (const targetCol of targetColumns) {
     const aggregates = aggregatesMap.get(targetCol.id) ?? null;
     const targetColor = targetColors?.[targetCol.id];
+    const pairwiseMeta = pairwiseByTargetId.get(targetCol.id);
 
     columns.push(
       columnHelper.accessor((row) => row.targets[targetCol.id], {
@@ -156,8 +176,20 @@ const buildColumns = (
         ),
         size: 300,
         minSize: 200,
-        cell: ({ getValue }) => {
+        cell: ({ getValue, row }) => {
           const targetOutput = getValue();
+          // Pairwise column-target cell: render the dedicated Winner cell
+          // (badge + winning output + reasoning) instead of the generic
+          // target output. That keeps everything the reader wants in one
+          // column so they don't need to scroll to a trailing Winner column.
+          if (pairwiseMeta) {
+            return (
+              <BatchPairwiseWinnerCell
+                column={pairwiseMeta}
+                verdict={pairwiseMeta.verdictsByRow[row.original.index]}
+              />
+            );
+          }
           if (!targetOutput) {
             return (
               <Text fontSize="13px" color="fg.subtle">
@@ -165,7 +197,12 @@ const buildColumns = (
               </Text>
             );
           }
-          return <BatchTargetCell targetOutput={targetOutput} />;
+          return (
+            <BatchTargetCell
+              targetOutput={targetOutput}
+              suppressedEvaluatorIds={pairwiseEvaluatorIds}
+            />
+          );
         },
       }),
     );
@@ -196,6 +233,7 @@ export function SingleRunTable({
     return buildColumns(
       data.datasetColumns,
       data.targetColumns,
+      data.pairwiseColumns ?? [],
       aggregatesMap,
       data.rows,
       hiddenColumns,
@@ -267,7 +305,12 @@ export function SingleRunTable({
     (c) => !hiddenColumns.has(c.name),
   ).length;
   const targetColCount = data.targetColumns.length;
-  const minTableWidth = calculateMinTableWidth(datasetColCount, targetColCount);
+  const pairwiseColCount = data.pairwiseColumns?.length ?? 0;
+  const minTableWidth = calculateMinTableWidth(
+    datasetColCount,
+    targetColCount,
+    pairwiseColCount,
+  );
 
   const tableStyles = getTableStyles(minTableWidth);
   const virtualRows = rowVirtualizer.getVirtualItems();
