@@ -480,6 +480,45 @@ describe("DraggableTabsBrowserStore", () => {
   });
 
   describe("rehydration recovery", () => {
+    describe("when one tab's per-tab data key is missing", () => {
+      it("drops only that tab and keeps the rest instead of wiping the store", async () => {
+        const lightKey = `${TEST_PROJECT_ID}:draggable-tabs-browser-store`;
+        const tab1Key = `${TEST_PROJECT_ID}:tab:tab-1`;
+
+        // Index references two tabs, but only tab-1's data key exists — tab-2's
+        // per-tab key is absent (e.g. evicted, or a partial write). tab-1 must
+        // survive; fabricating tab-2 would fail whole-state validation and lose
+        // tab-1 too.
+        localStorage.setItem(
+          lightKey,
+          JSON.stringify({
+            state: {
+              windows: [
+                {
+                  id: "window-1",
+                  tabs: [{ id: "tab-1" }, { id: "tab-2" }],
+                  activeTabId: "tab-1",
+                },
+              ],
+              activeWindowId: "window-1",
+            },
+            version: 0,
+          }),
+        );
+        localStorage.setItem(
+          tab1Key,
+          JSON.stringify(createTabData({ meta: { title: "Survivor" } })),
+        );
+
+        await store.persist.rehydrate();
+
+        const state = store.getState();
+        expect(state.windows).toHaveLength(1);
+        expect(state.windows[0]?.tabs.map((t) => t.id)).toEqual(["tab-1"]);
+        expect(state.getByTabId("tab-1")?.meta.title).toBe("Survivor");
+      });
+    });
+
     describe("when a persisted tab fails schema validation", () => {
       it("removes all per-tab keys along with the light index key", async () => {
         const lightKey = `${TEST_PROJECT_ID}:draggable-tabs-browser-store`;

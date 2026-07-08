@@ -260,15 +260,36 @@ function createTabAwarePersistStorage(
         const windows: Window[] = parsed.state.windows.map((w) => ({
           id: w.id,
           activeTabId: w.activeTabId,
-          tabs: w.tabs.map((t) => {
+          // Drop any tab whose per-tab data key is missing or corrupt rather
+          // than fabricating an invalid tab. Fabricating `undefined` data
+          // would fail whole-state validation in onRehydrateStorage and wipe
+          // *every* tab, and letting JSON.parse throw would reject the entire
+          // store — either way one bad key loses all tabs. Downstream
+          // rehydration validation prunes now-empty windows and repairs a
+          // dangling activeTabId.
+          tabs: w.tabs.flatMap((t) => {
             const tabRaw = localStorage.getItem(
               getTabStorageKey(projectId, t.id),
             );
-            const data = tabRaw
-              ? (JSON.parse(tabRaw) as TabData)
-              : (undefined as unknown as TabData);
+            if (!tabRaw) {
+              logger.warn(
+                { tabId: t.id },
+                "Missing per-tab data key during rehydration, dropping tab",
+              );
+              return [];
+            }
+            let data: TabData;
+            try {
+              data = JSON.parse(tabRaw) as TabData;
+            } catch (parseError) {
+              logger.warn(
+                { tabId: t.id, error: parseError },
+                "Corrupt per-tab data during rehydration, dropping tab",
+              );
+              return [];
+            }
             lastPersistedDataRefs.set(t.id, data);
-            return { id: t.id, data };
+            return [{ id: t.id, data }];
           }),
         }));
 

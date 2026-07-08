@@ -151,8 +151,13 @@ export function PromptTabbedSection({
       size="sm"
       minHeight={0}
       paddingTop={1}
+      // lazyMount (no unmountOnExit): a sub-tab isn't rendered until first
+      // opened, but once mounted it stays. Critically, this keeps the chat
+      // (inside the Conversation panel) alive when the user switches to
+      // Variables/Parameters — unmounting it would abort an in-flight
+      // generation. Inactive *prompt* tabs still fully unmount via the outer
+      // DraggableTabsBrowser, which is where the memory win comes from.
       lazyMount
-      unmountOnExit
     >
       <Tabs.List
         display="flex"
