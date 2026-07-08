@@ -75,6 +75,31 @@ type ActionState =
   | { kind: "error"; message: string }
   | { kind: "denied" };
 
+/**
+ * Action row for terminal states (approved, denied, expired, error): the
+ * flow is over either way, so offer the two sensible exits. window.close()
+ * only works for script-opened tabs; when the browser refuses, the tab
+ * simply stays open and the user closes it manually.
+ */
+function TerminalActions({ tracesHref }: { tracesHref: string }) {
+  return (
+    <Stack direction={{ base: "column", sm: "row" }} gap={3}>
+      <Button variant="outline" flex={1} onClick={() => window.close()}>
+        Close this window
+      </Button>
+      <Button
+        colorPalette="blue"
+        flex={1}
+        onClick={() => {
+          window.location.href = tracesHref;
+        }}
+      >
+        Go to traces
+      </Button>
+    </Stack>
+  );
+}
+
 export default function CliAuthPage() {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
@@ -107,6 +132,16 @@ export default function CliAuthPage() {
       setSelectedOrgId(organizations[0]!.id);
     }
   }, [organizations, selectedOrgId]);
+
+  // Where "Go to traces" points: the first shared project's messages view,
+  // or "/" (the home resolver picks the right surface) when the org has no
+  // shared project yet. Personal workspaces are never a target (ADR-038 v6).
+  const tracesHref = useMemo(() => {
+    const slug = organizations
+      ?.flatMap((org) => org.teams.filter((t) => !t.isPersonal))
+      .flatMap((t) => t.projects)[0]?.slug;
+    return slug ? `/${slug}/messages` : "/";
+  }, [organizations]);
 
   // First-touch acquisition source: a browser opened by `langwatch login`
   // carries no utm/ref params, so stamp the CLI as lead source here. The
@@ -354,26 +389,32 @@ export default function CliAuthPage() {
               )}
 
               {lookup.kind === "expired" && (
-                <Alert.Root status="error">
-                  <Alert.Indicator />
-                  <Alert.Content>
-                    <Alert.Title>Code expired</Alert.Title>
-                    <Alert.Description>
-                      Restart <code>langwatch login</code> in your terminal to
-                      get a new code.
-                    </Alert.Description>
-                  </Alert.Content>
-                </Alert.Root>
+                <>
+                  <Alert.Root status="error">
+                    <Alert.Indicator />
+                    <Alert.Content>
+                      <Alert.Title>Code expired</Alert.Title>
+                      <Alert.Description>
+                        Restart <code>langwatch login</code> in your terminal
+                        to get a new code.
+                      </Alert.Description>
+                    </Alert.Content>
+                  </Alert.Root>
+                  <TerminalActions tracesHref={tracesHref} />
+                </>
               )}
 
               {lookup.kind === "error" && (
-                <Alert.Root status="error">
-                  <Alert.Indicator />
-                  <Alert.Content>
-                    <Alert.Title>Something went wrong</Alert.Title>
-                    <Alert.Description>{lookup.message}</Alert.Description>
-                  </Alert.Content>
-                </Alert.Root>
+                <>
+                  <Alert.Root status="error">
+                    <Alert.Indicator />
+                    <Alert.Content>
+                      <Alert.Title>Something went wrong</Alert.Title>
+                      <Alert.Description>{lookup.message}</Alert.Description>
+                    </Alert.Content>
+                  </Alert.Root>
+                  <TerminalActions tracesHref={tracesHref} />
+                </>
               )}
 
               {lookup.kind === "ready" && action.kind !== "success" && action.kind !== "denied" && (
@@ -506,47 +547,55 @@ export default function CliAuthPage() {
               )}
 
               {action.kind === "success" && (
-                <Alert.Root status="success">
-                  <Alert.Indicator />
-                  <Alert.Content>
-                    {action.credentialType === "project_api_key" ? (
-                      <>
-                        <Alert.Title>API key generated!</Alert.Title>
-                        <Alert.Description>
-                          A fresh project API key has been minted for{" "}
-                          <strong>
-                            {action.projectName ?? "your project"}
-                          </strong>{" "}
-                          ({action.organizationName}). The key flowed back to
-                          your terminal automatically, and your{" "}
-                          <code>.env</code> is updated. You can close this tab.
-                        </Alert.Description>
-                      </>
-                    ) : (
-                      <>
-                        <Alert.Title>You&apos;re signed in!</Alert.Title>
-                        <Alert.Description>
-                          LangWatch CLI is now authorized for{" "}
-                          <strong>{action.organizationName}</strong> using the{" "}
-                          <code>{action.vkLabel}</code> personal key. You can
-                          close this tab and return to your terminal.
-                        </Alert.Description>
-                      </>
-                    )}
-                  </Alert.Content>
-                </Alert.Root>
+                <>
+                  <Alert.Root status="success">
+                    <Alert.Indicator />
+                    <Alert.Content>
+                      {action.credentialType === "project_api_key" ? (
+                        <>
+                          <Alert.Title>API key generated!</Alert.Title>
+                          <Alert.Description>
+                            A fresh project API key has been minted for{" "}
+                            <strong>
+                              {action.projectName ?? "your project"}
+                            </strong>{" "}
+                            ({action.organizationName}). The key flowed back to
+                            your terminal automatically, and your{" "}
+                            <code>.env</code> is updated. You can close this
+                            tab.
+                          </Alert.Description>
+                        </>
+                      ) : (
+                        <>
+                          <Alert.Title>You&apos;re signed in!</Alert.Title>
+                          <Alert.Description>
+                            LangWatch CLI is now authorized for{" "}
+                            <strong>{action.organizationName}</strong> using
+                            the <code>{action.vkLabel}</code> personal key. You
+                            can close this tab and return to your terminal.
+                          </Alert.Description>
+                        </>
+                      )}
+                    </Alert.Content>
+                  </Alert.Root>
+                  <TerminalActions tracesHref={tracesHref} />
+                </>
               )}
 
               {action.kind === "denied" && (
-                <Alert.Root status="info">
-                  <Alert.Indicator />
-                  <Alert.Content>
-                    <Alert.Title>Authorization denied</Alert.Title>
-                    <Alert.Description>
-                      The CLI session has been rejected. You can close this tab.
-                    </Alert.Description>
-                  </Alert.Content>
-                </Alert.Root>
+                <>
+                  <Alert.Root status="info">
+                    <Alert.Indicator />
+                    <Alert.Content>
+                      <Alert.Title>Authorization denied</Alert.Title>
+                      <Alert.Description>
+                        The CLI session has been rejected. You can close this
+                        tab.
+                      </Alert.Description>
+                    </Alert.Content>
+                  </Alert.Root>
+                  <TerminalActions tracesHref={tracesHref} />
+                </>
               )}
             </VStack>
           </Card.Body>
