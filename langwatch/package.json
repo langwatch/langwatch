@@ -75,7 +75,7 @@
     "@chakra-ui/react": "^3.36.0",
     "@clickhouse/client": "^1.23.0",
     "@copilotkit/react-core": "~1.8.14",
-    "@copilotkit/react-ui": "~1.8.14",
+    "@copilotkit/react-ui": "~1.61.2",
     "@copilotkit/runtime": "~1.8.14",
     "@copilotkit/runtime-client-gql": "1.8.13",
     "@copilotkit/shared": "1.8.13",
