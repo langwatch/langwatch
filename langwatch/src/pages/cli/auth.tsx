@@ -16,18 +16,25 @@
  * Mirrors the screens-1-thru-4 storyboard in gateway.md.
  */
 import {
-  Alert,
   Box,
   Button,
   Card,
   Container,
   Heading,
   HStack,
+  Icon,
   Spinner,
   Stack,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import {
+  CheckCircle2,
+  CircleAlert,
+  Clock3,
+  Info,
+  TriangleAlert,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import Head from "~/utils/compat/next-head";
 import { useRouter } from "~/utils/compat/next-router";
@@ -74,6 +81,58 @@ type ActionState =
     }
   | { kind: "error"; message: string }
   | { kind: "denied" };
+
+/**
+ * Status card in the traces-v2 visual language (semantic palette tokens,
+ * lucide icon in a subtle tinted container — see
+ * features/traces-v2/docs/STANDARDS.md §4): replaces the stock Alert for
+ * this page's states.
+ */
+function StatusCard({
+  palette,
+  icon,
+  title,
+  children,
+}: {
+  palette: "green" | "red" | "orange" | "blue";
+  icon: React.ElementType;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor={`${palette}.muted`}
+      borderRadius="lg"
+      bg={`${palette}.subtle`}
+      paddingX={5}
+      paddingY={4}
+    >
+      <HStack align="flex-start" gap={3}>
+        <Icon
+          as={icon}
+          boxSize={5}
+          color={`${palette}.fg`}
+          flexShrink={0}
+          marginTop={0.5}
+        />
+        <VStack align="stretch" gap={1} flex={1}>
+          <Text
+            textStyle="sm"
+            fontWeight="semibold"
+            color="fg"
+            lineHeight="snug"
+          >
+            {title}
+          </Text>
+          <Text textStyle="xs" color="fg.muted" lineHeight="tall">
+            {children}
+          </Text>
+        </VStack>
+      </HStack>
+    </Box>
+  );
+}
 
 /**
  * Action row for terminal states (approved, denied, expired, error): the
@@ -342,87 +401,106 @@ export default function CliAuthPage() {
         <title>Authorize CLI · LangWatch</title>
       </Head>
       <Container maxWidth="540px" paddingTop="80px" paddingBottom="80px">
-        <Card.Root>
-          <Card.Header>
-            <HStack width="full" align="center">
-              <Heading as="h1" size="md">
-                {requiresProject
-                  ? "Generate an SDK key for the LangWatch CLI"
-                  : "Authorize the LangWatch CLI"}
-              </Heading>
-            </HStack>
-          </Card.Header>
+        <VStack align="stretch" gap={8}>
+          <VStack align="center" gap={2} textAlign="center">
+            <Heading
+              as="h1"
+              fontSize={{ base: "2xl", md: "3xl" }}
+              letterSpacing="-0.035em"
+              fontWeight={400}
+              lineHeight="1.1"
+              color="fg"
+            >
+              {requiresProject
+                ? "Generate an SDK key"
+                : "Authorize the LangWatch CLI"}
+            </Heading>
+            <Text color="fg.muted" textStyle="sm" lineHeight="1.65">
+              {requiresProject
+                ? "The CLI is requesting a project SDK API key"
+                : "Signs in this device for AI-tool wrappers and governance commands"}
+            </Text>
+          </VStack>
+
+          <Card.Root
+            bg="bg.panel"
+            borderWidth="1px"
+            borderColor="border.muted"
+            borderRadius="lg"
+            boxShadow="sm"
+          >
           <Card.Body>
             <VStack align="stretch" gap={6}>
               {!userCode && (
-                <Alert.Root status="warning">
-                  <Alert.Indicator />
-                  <Alert.Content>
-                    <Alert.Title>No code provided</Alert.Title>
-                    <Alert.Description>
-                      Run <code>langwatch login</code> in your terminal, it
-                      will print a link with your code embedded.
-                    </Alert.Description>
-                  </Alert.Content>
-                </Alert.Root>
+                <StatusCard
+                  palette="orange"
+                  icon={CircleAlert}
+                  title="No code provided"
+                >
+                  Run <code>langwatch login</code> in your terminal, it will
+                  print a link with your code embedded.
+                </StatusCard>
               )}
 
               {userCode && lookup.kind === "loading" && (
                 <HStack>
                   <Spinner size="sm" />
-                  <Text>Looking up code…</Text>
+                  <Text textStyle="sm" color="fg.muted">
+                    Looking up code…
+                  </Text>
                 </HStack>
               )}
 
               {lookup.kind === "expired" && (
                 <>
-                  <Alert.Root status="error">
-                    <Alert.Indicator />
-                    <Alert.Content>
-                      <Alert.Title>Code expired</Alert.Title>
-                      <Alert.Description>
-                        Restart <code>langwatch login</code> in your terminal
-                        to get a new code.
-                      </Alert.Description>
-                    </Alert.Content>
-                  </Alert.Root>
+                  <StatusCard
+                    palette="orange"
+                    icon={Clock3}
+                    title="Code expired"
+                  >
+                    Restart <code>langwatch login</code> in your terminal to
+                    get a new code.
+                  </StatusCard>
                   <TerminalActions />
                 </>
               )}
 
               {lookup.kind === "error" && (
                 <>
-                  <Alert.Root status="error">
-                    <Alert.Indicator />
-                    <Alert.Content>
-                      <Alert.Title>Something went wrong</Alert.Title>
-                      <Alert.Description>{lookup.message}</Alert.Description>
-                    </Alert.Content>
-                  </Alert.Root>
+                  <StatusCard
+                    palette="red"
+                    icon={TriangleAlert}
+                    title="Something went wrong"
+                  >
+                    {lookup.message}
+                  </StatusCard>
                   <TerminalActions />
                 </>
               )}
 
               {lookup.kind === "ready" && action.kind !== "success" && action.kind !== "denied" && (
                 <>
-                  <Text fontSize="sm" color="gray.600">
+                  <Text textStyle="sm" color="fg.muted" lineHeight="tall">
                     {requiresProject
-                      ? "The CLI is requesting a project SDK API key. Pick the project to mint a key for; the key will flow back to your terminal automatically, with no copy-paste."
-                      : "The CLI is requesting a device session. Approving signs in this device for AI-tool wrappers (Claude, Codex, etc.) and governance commands."}
+                      ? "Pick the project to mint a key for; the key will flow back to your terminal automatically, with no copy-paste."
+                      : "Approving signs in this device for AI-tool wrappers (Claude, Codex, etc.) and governance commands."}
                   </Text>
                   <Box
-                    bg="gray.50"
-                    borderRadius="md"
+                    bg="bg.subtle"
+                    borderWidth="1px"
+                    borderColor="border.muted"
+                    borderRadius="lg"
                     p={4}
                     fontFamily="mono"
                     fontSize="2xl"
                     fontWeight="bold"
                     textAlign="center"
                     letterSpacing="0.2em"
+                    color="fg"
                   >
                     {lookup.userCode}
                   </Box>
-                  <Text fontSize="sm" color="gray.600" textAlign="center">
+                  <Text textStyle="xs" color="fg.muted" textAlign="center">
                     Confirm this matches the code shown in your terminal.
                     {expiryText ? (
                       <>
@@ -434,14 +512,25 @@ export default function CliAuthPage() {
 
                   {organizations && organizations.length > 1 && (
                     <Box>
-                      <Text fontWeight="medium" mb={2}>
+                      <Text
+                        textStyle="sm"
+                        fontWeight="semibold"
+                        color="fg"
+                        mb={2}
+                      >
                         Organization
                       </Text>
                       <VStack align="stretch" gap={2}>
                         {organizations.map((org) => (
                           <Button
                             key={org.id}
-                            variant={selectedOrgId === org.id ? "solid" : "outline"}
+                            size="sm"
+                            colorPalette={
+                              selectedOrgId === org.id ? "orange" : "gray"
+                            }
+                            variant={
+                              selectedOrgId === org.id ? "surface" : "outline"
+                            }
                             onClick={() => setSelectedOrgId(org.id)}
                             justifyContent="flex-start"
                           >
@@ -454,22 +543,24 @@ export default function CliAuthPage() {
 
                   {requiresProject && (
                     <Box>
-                      <Text fontWeight="medium" mb={2}>
+                      <Text
+                        textStyle="sm"
+                        fontWeight="semibold"
+                        color="fg"
+                        mb={2}
+                      >
                         Project
                       </Text>
                       {projectsForOrg.length === 0 ? (
-                        <Alert.Root status="warning">
-                          <Alert.Indicator />
-                          <Alert.Content>
-                            <Alert.Title>No shared projects yet</Alert.Title>
-                            <Alert.Description>
-                              Create a team project in this organization first
-                              (personal projects can&apos;t back an SDK key),
-                              then re-run <code>langwatch login</code> in your
-                              terminal.
-                            </Alert.Description>
-                          </Alert.Content>
-                        </Alert.Root>
+                        <StatusCard
+                          palette="orange"
+                          icon={CircleAlert}
+                          title="No shared projects yet"
+                        >
+                          Create a team project in this organization first
+                          (personal projects can&apos;t back an SDK key), then
+                          re-run <code>langwatch login</code> in your terminal.
+                        </StatusCard>
                       ) : (
                         <ScopeChipPicker
                           variant="single-select"
@@ -499,18 +590,18 @@ export default function CliAuthPage() {
                   )}
 
                   {action.kind === "error" && (
-                    <Alert.Root status="error">
-                      <Alert.Indicator />
-                      <Alert.Content>
-                        <Alert.Title>Approval failed</Alert.Title>
-                        <Alert.Description>{action.message}</Alert.Description>
-                      </Alert.Content>
-                    </Alert.Root>
+                    <StatusCard
+                      palette="red"
+                      icon={TriangleAlert}
+                      title="Approval failed"
+                    >
+                      {action.message}
+                    </StatusCard>
                   )}
 
                   <Stack direction={{ base: "column", sm: "row" }} gap={3}>
                     <Button
-                      colorPalette="blue"
+                      colorPalette="orange"
                       flex={1}
                       onClick={handleApprove}
                       loading={action.kind === "submitting"}
@@ -522,7 +613,8 @@ export default function CliAuthPage() {
                       {requiresProject ? "Generate API key" : "Approve"}
                     </Button>
                     <Button
-                      variant="outline"
+                      variant="ghost"
+                      color="fg.muted"
                       onClick={handleDeny}
                       loading={action.kind === "submitting"}
                     >
@@ -534,58 +626,50 @@ export default function CliAuthPage() {
 
               {action.kind === "success" && (
                 <>
-                  <Alert.Root status="success">
-                    <Alert.Indicator />
-                    <Alert.Content>
-                      {action.credentialType === "project_api_key" ? (
-                        <>
-                          <Alert.Title>API key generated!</Alert.Title>
-                          <Alert.Description>
-                            A fresh project API key has been minted for{" "}
-                            <strong>
-                              {action.projectName ?? "your project"}
-                            </strong>{" "}
-                            ({action.organizationName}). The key flowed back to
-                            your terminal automatically, and your{" "}
-                            <code>.env</code> is updated. You can close this
-                            tab.
-                          </Alert.Description>
-                        </>
-                      ) : (
-                        <>
-                          <Alert.Title>You&apos;re signed in!</Alert.Title>
-                          <Alert.Description>
-                            LangWatch CLI is now authorized for{" "}
-                            <strong>{action.organizationName}</strong> using
-                            the <code>{action.vkLabel}</code> personal key. You
-                            can close this tab and return to your terminal.
-                          </Alert.Description>
-                        </>
-                      )}
-                    </Alert.Content>
-                  </Alert.Root>
+                  {action.credentialType === "project_api_key" ? (
+                    <StatusCard
+                      palette="green"
+                      icon={CheckCircle2}
+                      title="API key generated!"
+                    >
+                      A fresh project API key has been minted for{" "}
+                      <strong>{action.projectName ?? "your project"}</strong> (
+                      {action.organizationName}). The key flowed back to your
+                      terminal automatically, and your <code>.env</code> is
+                      updated. You can close this tab.
+                    </StatusCard>
+                  ) : (
+                    <StatusCard
+                      palette="green"
+                      icon={CheckCircle2}
+                      title="You're signed in!"
+                    >
+                      LangWatch CLI is now authorized for{" "}
+                      <strong>{action.organizationName}</strong> using the{" "}
+                      <code>{action.vkLabel}</code> personal key. You can close
+                      this tab and return to your terminal.
+                    </StatusCard>
+                  )}
                   <TerminalActions />
                 </>
               )}
 
               {action.kind === "denied" && (
                 <>
-                  <Alert.Root status="info">
-                    <Alert.Indicator />
-                    <Alert.Content>
-                      <Alert.Title>Authorization denied</Alert.Title>
-                      <Alert.Description>
-                        The CLI session has been rejected. You can close this
-                        tab.
-                      </Alert.Description>
-                    </Alert.Content>
-                  </Alert.Root>
+                  <StatusCard
+                    palette="blue"
+                    icon={Info}
+                    title="Authorization denied"
+                  >
+                    The CLI session has been rejected. You can close this tab.
+                  </StatusCard>
                   <TerminalActions />
                 </>
               )}
             </VStack>
           </Card.Body>
-        </Card.Root>
+          </Card.Root>
+        </VStack>
       </Container>
     </>
   );
@@ -596,7 +680,9 @@ function FullPageSpinner() {
     <Container maxWidth="400px" paddingTop="160px">
       <VStack gap={4}>
         <Spinner size="lg" />
-        <Text color="gray.600">Loading…</Text>
+        <Text textStyle="sm" color="fg.muted">
+          Loading…
+        </Text>
       </VStack>
     </Container>
   );
