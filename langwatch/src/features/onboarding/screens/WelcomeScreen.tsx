@@ -49,9 +49,15 @@ export const WelcomeScreen: React.FC = () => {
     // Wait until org data has finished loading before deciding
     if (organizationIsLoading) return;
 
+    // Personal-workspace teams don't count as onboarded projects: they are
+    // provisioned lazily for governance users and must never satisfy (or
+    // become the target of) the "already has a project" redirect.
+    const sharedTeams = (org: NonNullable<typeof organizations>[number]) =>
+      org.teams.filter((t) => !t.isPersonal);
+
     const hasAnyProject =
       organizations?.some((org) =>
-        org.teams.some((t) => t.projects.length > 0),
+        sharedTeams(org).some((t) => t.projects.length > 0),
       ) ?? false;
 
     // ADR-038 v6: a governance-intent org has no project by design, but its
@@ -74,8 +80,9 @@ export const WelcomeScreen: React.FC = () => {
 
     const slug =
       project?.slug ??
-      organizations?.flatMap((o) => o.teams).flatMap((t) => t.projects)[0]
-        ?.slug;
+      organizations
+        ?.flatMap((o) => sharedTeams(o))
+        .flatMap((t) => t.projects)[0]?.slug;
     if (slug) {
       setOnboardingNeeded(false);
       void router.push(`/${slug}`);

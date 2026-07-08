@@ -206,6 +206,7 @@ describe("onboarding.initializeOrganization", () => {
       expect(result.organizationId).toBe("org_1");
     });
 
+    /** @scenario "LLMOps signup still creates the default project" */
     it("still creates a project for LLMOps signups", async () => {
       const caller = createCaller();
 

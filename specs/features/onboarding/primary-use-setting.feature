@@ -39,11 +39,20 @@ Feature: Organization "Primary use" setting
   Rule: flipping to LLMOps offers the project setup instead of a dead landing
 
     @integration @unimplemented
-    Scenario: Governance organization flips to LLMOps
-      Given the organization has the agent-governance intent
-      And its default project was never integrated
+    Scenario: Governance organization without a project flips to LLMOps
+      Given the organization has the agent-governance intent and no project
       When an org admin changes the primary use to LLMOps
-      Then the admin is offered the LLMOps setup path for the default project
+      Then the admin is prompted to create the organization's first project
+      And subsequent "/" landings go to the project home once it exists
+      # v6: governance orgs are created without a project; the customer
+      # creates one exactly at the moment they need it.
+
+    @integration @unimplemented
+    Scenario: Governance organization with a never-integrated project flips to LLMOps
+      Given the organization has the agent-governance intent
+      And its project was never integrated
+      When an org admin changes the primary use to LLMOps
+      Then the admin is offered the LLMOps setup path for that project
       And subsequent "/" landings go to the project home
       # Guards red-team F9: without the setup offer, everyone lands on an
       # empty, never-onboarded project.

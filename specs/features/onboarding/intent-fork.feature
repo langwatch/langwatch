@@ -81,14 +81,23 @@ Feature: Onboarding forks on declared intent — Agent Governance vs LLMOps
       Then the user is taken to their personal usage page
       And the CLI setup guidance they see there is the existing personal-page surface, unchanged by onboarding
 
-  Rule: the governance track still provisions a complete workspace behind the scenes
+  Rule: the governance track provisions the organization without a project (v6)
 
-    @integration
-    Scenario: Governance signup creates organization, team, and default project
+    @unit
+    Scenario: Governance signup creates organization and team, but no project
       Given the user selected the coding-agent tracking intent
       When onboarding completes
+      Then an organization and a team exist for the user
+      And no project was created
+      # Usage data flows through per-user personal workspaces provisioned at
+      # CLI login; a visible project is created only when the organization
+      # later switches its primary use to LLMOps.
+
+    @unit
+    Scenario: LLMOps signup still creates the default project
+      Given the user selected the LLM-app intent
+      When onboarding completes
       Then an organization, a team, and a default project exist for the user
-      And the created resources have the same shape as an LLMOps signup's resources
 
     @integration
     Scenario: Governance signup records the organization's primary intent
