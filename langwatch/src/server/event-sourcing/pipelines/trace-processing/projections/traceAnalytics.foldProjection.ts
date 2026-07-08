@@ -316,15 +316,11 @@ export function projectAnalyticsStateToRow({
     tokensPerSecond: state.tokensPerSecond,
     promptTokens: state.totalPromptTokenCount,
     completionTokens: state.totalCompletionTokenCount,
-    cacheReadTokens: readReservedTokenSum(
-      attrs["langwatch.reserved.cache_read_tokens"],
-    ),
+    cacheReadTokens: readReservedTokenSum(attrs[RESERVED_CACHE_READ_TOKENS]),
     cacheWriteTokens: readReservedTokenSum(
-      attrs["langwatch.reserved.cache_creation_tokens"],
+      attrs[RESERVED_CACHE_CREATION_TOKENS],
     ),
-    reasoningTokens: readReservedTokenSum(
-      attrs["langwatch.reserved.reasoning_tokens"],
-    ),
+    reasoningTokens: readReservedTokenSum(attrs[RESERVED_REASONING_TOKENS]),
     hasError: state.containsErrorStatus,
     hasAnnotation:
       state.annotationIds && state.annotationIds.length > 0 ? true : null,

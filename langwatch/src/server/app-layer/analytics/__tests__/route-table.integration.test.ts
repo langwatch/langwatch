@@ -2,7 +2,7 @@
  * Integration tests for the Phase 3 read routing (ADR-034).
  *
  * Drives the new slim + rollup SQL builders against a real ClickHouse
- * testcontainer (migrations 00035 + 00037 auto-apply via goose in
+ * testcontainer (migrations 00038 + 00039 auto-apply via goose in
  * `startTestContainers`). Seeds rows directly through the same Phase 1 + Phase 2
  * write-side repositories the projections use, and additionally drives the
  * legacy `trace_summaries` builder for the "no-routing / fallback" case.
