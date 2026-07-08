@@ -10,7 +10,17 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { inlineMdx } from "../_lib/mdx-inline.js";
-import { listPublishedSkills } from "../_lib/feature-skills.js";
+import {
+  listPublishedSkills,
+  type PublishedSkill,
+} from "../_lib/feature-skills.js";
+import { splitFrontmatter } from "../_lib/frontmatter.js";
+import {
+  buildMarketplaceJson,
+  buildPluginJson,
+  buildReadme,
+  type SkillEntry,
+} from "./marketplace.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,6 +37,45 @@ function writeSkill(targetDir: string, name: string, src: string): void {
   const dir = path.join(targetDir, name);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, "SKILL.md"), inlineMdx(src));
+}
+
+function readDescription(src: string): string {
+  const { frontmatter } = splitFrontmatter(fs.readFileSync(src, "utf8"));
+  const description = frontmatter.description;
+  if (!description) {
+    throw new Error(`Skill has no frontmatter description: ${src}`);
+  }
+  return description;
+}
+
+// Emit the Claude Code plugin marketplace: a single `langwatch` plugin whose
+// source is the repo root, its manifest, and a landing README. All three are
+// derived from the same published set as the SKILL.md files above, so the
+// marketplace can never drift from what we actually ship.
+function writeMarketplace(
+  targetDir: string,
+  skills: PublishedSkill[],
+  version: string
+): void {
+  const entries: SkillEntry[] = skills.map((s) => ({
+    slug: s.slug,
+    isRecipe: s.isRecipe,
+    description: readDescription(s.src),
+  }));
+
+  const pluginDir = path.join(targetDir, ".claude-plugin");
+  fs.mkdirSync(pluginDir, { recursive: true });
+
+  const writeJson = (file: string, value: unknown): void =>
+    fs.writeFileSync(path.join(pluginDir, file), JSON.stringify(value, null, 2) + "\n");
+
+  writeJson("marketplace.json", buildMarketplaceJson(entries, version));
+  writeJson("plugin.json", buildPluginJson(entries, version));
+  fs.writeFileSync(path.join(targetDir, "README.md"), buildReadme(entries, version));
+
+  console.log("  ✓ .claude-plugin/marketplace.json");
+  console.log("  ✓ .claude-plugin/plugin.json");
+  console.log("  ✓ README.md");
 }
 
 export function sync(targetDir: string): void {
@@ -48,17 +97,23 @@ export function sync(targetDir: string): void {
   // Same selection Langy's native generator uses (skills/_compiler/native.ts),
   // so the published set and the in-product set can never drift. Recipes nest
   // under recipes/<slug> in the published repo.
-  for (const skill of listPublishedSkills(skillsRoot)) {
+  const skills = listPublishedSkills(skillsRoot);
+  for (const skill of skills) {
     const target = skill.isRecipe ? path.join("recipes", skill.slug) : skill.slug;
     writeSkill(targetDir, target, skill.src);
     console.log(`  ✓ ${target}`);
   }
 
+  const version = fs
+    .readFileSync(path.join(skillsRoot, "version.txt"), "utf8")
+    .trim();
   fs.copyFileSync(
     path.join(skillsRoot, "version.txt"),
     path.join(targetDir, "version.txt")
   );
   console.log("  ✓ version.txt");
+
+  writeMarketplace(targetDir, skills, version);
   console.log("Done.");
 }
 
