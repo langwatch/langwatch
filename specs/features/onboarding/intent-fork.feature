@@ -6,9 +6,11 @@ Feature: Onboarding forks on declared intent — Agent Governance vs LLMOps
   in the wrong surface.
 
   The welcome flow gains an intent screen right after organization
-  creation. The governance track goes straight to CLI setup and lands on
-  the personal usage page. The LLMOps track continues exactly as today.
-  The choice is stored on the organization as its primary intent.
+  creation. The governance track ends right there — finishing creates the
+  workspace and lands on the personal usage page, where the existing CLI
+  install surfaces teach setup (ADR-038 v4: onboarding touches no
+  CLI-related screen or component). The LLMOps track continues exactly as
+  today. The choice is stored on the organization as its primary intent.
 
   ADR: dev/docs/adr/038-intent-forked-onboarding-governance-vs-llmops.md
   Pairs with:
@@ -50,28 +52,21 @@ Feature: Onboarding forks on declared intent — Agent Governance vs LLMOps
   # Governance track
   # ============================================================================
 
-  Rule: the governance track goes straight to CLI setup — no LLMOps questionnaire
+  Rule: the governance track ends at the intent screen — no LLMOps questionnaire, no extra steps
 
     @unit
-    Scenario: Governance track contains no LLMOps questions
+    Scenario: Governance track has no screens after the intent
       Given the user selected the coding-agent tracking intent
       When the flow computes the remaining screens
-      Then the remaining screens are the CLI setup screen only
+      Then the intent screen is the final step
       And the basic-info, desires, and role screens are not part of the track
-
-    @integration
-    Scenario: CLI setup screen shows the three commands
-      Given the user selected the coding-agent tracking intent
-      When the user reaches the CLI setup screen
-      Then the user sees the install, login, and run commands for the langwatch CLI
-      And the commands match the public Claude Code usage-tracking docs
 
     @integration
     Scenario: Finishing the governance track lands on the personal usage page
       Given the user selected the coding-agent tracking intent
-      And the user completed the CLI setup screen
       When onboarding finishes
       Then the user is taken to their personal usage page
+      And the CLI setup guidance they see there is the existing personal-page surface, unchanged by onboarding
 
   Rule: the governance track still provisions a complete workspace behind the scenes
 
@@ -147,10 +142,6 @@ Feature: Onboarding forks on declared intent — Agent Governance vs LLMOps
       Given the app runs in self-hosted mode
       When a new user goes through the welcome flow
       Then the intent screen appears after the organization screen
-
-    @integration
-    Scenario: Self-hosted CLI setup includes the endpoint flag
-      Given the app runs in self-hosted mode
-      And the user selected the coding-agent tracking intent
-      When the user reaches the CLI setup screen
-      Then the login command includes the self-hosted endpoint
+      # Self-hosted endpoint guidance for the CLI remains where it already
+      # lives (specs/ai-governance/cli-onboarding/install-cli-card.feature);
+      # onboarding renders no CLI commands.

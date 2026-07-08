@@ -72,27 +72,45 @@ export const WelcomeScreen: React.FC = () => {
 
   function handleFinalizeSubmit() {
     const form = getFormData();
+    const isGovernanceTrack = form.intent === "AGENT_GOVERNANCE";
 
     initializeOrganization.mutate(
       {
         orgName: form.organizationName ?? "",
         phoneNumber: form.phoneNumber ?? "",
-        signUpData: {
-          usage: form.usageStyle,
-          solution: form.solutionType,
-          terms: form.agreement,
-          companySize: form.companySize,
-          yourRole: form.role,
-          featureUsage: form.selectedDesires.join("\n"),
-          ...form.attribution,
-        },
+        primaryIntent: form.intent,
+        // The governance track never shows the marketing screens, so its
+        // signUpData carries only terms + attribution. The LLMOps payload
+        // stays byte-identical to the pre-fork flow (ADR-038 I2).
+        signUpData: isGovernanceTrack
+          ? {
+              terms: form.agreement,
+              ...form.attribution,
+            }
+          : {
+              usage: form.usageStyle,
+              solution: form.solutionType,
+              terms: form.agreement,
+              companySize: form.companySize,
+              yourRole: form.role,
+              featureUsage: form.selectedDesires.join("\n"),
+              ...form.attribution,
+            },
       },
       {
         onSuccess: (response) => {
           trackEventOnce("organization_initialized", {
             category: "onboarding",
             label: "organization_onboarding_completed",
+            intent: form.intent,
           });
+
+          if (isGovernanceTrack) {
+            // Land via "/" so the home resolver applies the org-intent rule
+            // (including the kill-switch fallback) instead of hardcoding /me.
+            window.location.href = "/";
+            return;
+          }
 
           const params = new URLSearchParams({
             projectSlug: response.projectSlug,
@@ -191,6 +209,8 @@ export const WelcomeScreen: React.FC = () => {
                     total: flow.total,
                     isFirst: isFirstScreen,
                     isLast: isLastScreen,
+                    // Per-track funnel segmentation (ADR-038 I6)
+                    intent: formContextValue.intent ?? null,
                   }}
                   sendViewedEvent
                 >

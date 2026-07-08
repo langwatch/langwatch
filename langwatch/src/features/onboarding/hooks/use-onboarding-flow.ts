@@ -1,3 +1,4 @@
+import type { OrganizationIntent } from "@prisma/client";
 import { useMemo, useState } from "react";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { readAttribution } from "~/utils/attribution";
@@ -22,6 +23,7 @@ export const useOnboardingFlow = () => {
     void 0,
   );
   const [agreement, setAgreement] = useState<boolean>(false);
+  const [intent, setIntent] = useState<OrganizationIntent | undefined>(void 0);
   const [usageStyle, setUsageStyle] = useState<UsageStyle | undefined>(void 0);
   const [phoneNumber, setPhoneNumber] = useState<string | undefined>(void 0);
   const [phoneHasValue, setPhoneHasValue] = useState<boolean>(false);
@@ -35,16 +37,21 @@ export const useOnboardingFlow = () => {
   const [selectedDesires, setDesires] = useState<DesireType[]>([]);
   const [role, setRole] = useState<RoleType | undefined>(void 0);
 
-  // Flow configuration (memoized)
+  // Flow configuration — recomputed when the intent changes (ADR-038 fork).
+  // Safe mid-flow: intent only changes while ON the INTENT screen, whose
+  // index exists in every config variant.
   const flow = useMemo(
-    () => getOnboardingFlowConfig(Boolean(isSaaS)),
-    [isSaaS],
+    () => getOnboardingFlowConfig(Boolean(isSaaS), intent),
+    [isSaaS, intent],
   );
 
   const canProceed = (currentScreenIndex: OnboardingScreenIndex) => {
     switch (currentScreenIndex) {
       case OnboardingScreenIndex.ORGANIZATION:
         return Boolean(organizationName?.trim() && agreement);
+
+      case OnboardingScreenIndex.INTENT:
+        return intent !== void 0;
 
       case OnboardingScreenIndex.BASIC_INFO: {
         if (usageStyle === void 0) return false;
@@ -76,6 +83,7 @@ export const useOnboardingFlow = () => {
   const getFormData = (): OnboardingFormData => ({
     organizationName,
     agreement,
+    intent,
     usageStyle,
     phoneNumber,
     companySize,
@@ -94,6 +102,7 @@ export const useOnboardingFlow = () => {
     () => ({
       organizationName,
       agreement,
+      intent,
       usageStyle,
       phoneNumber,
       companySize,
@@ -103,6 +112,7 @@ export const useOnboardingFlow = () => {
       attribution,
       setOrganizationName,
       setAgreement,
+      setIntent,
       setUsageStyle,
       setPhoneNumber,
       setPhoneHasValue,
@@ -115,6 +125,7 @@ export const useOnboardingFlow = () => {
     [
       organizationName,
       agreement,
+      intent,
       usageStyle,
       phoneNumber,
       companySize,
@@ -130,6 +141,8 @@ export const useOnboardingFlow = () => {
     setOrganizationName,
     agreement,
     setAgreement,
+    intent,
+    setIntent,
     usageStyle,
     setUsageStyle,
     phoneNumber,

@@ -15,6 +15,7 @@ import { Link } from "~/components/ui/link";
 import { IconCheckboxCardGroup } from "../../../components/forms/IconCheckboxCardGroup";
 import { IconRadioCardGroup } from "../../../components/forms/IconRadioCardGroup";
 import { BasicInfoConditionalFields } from "../components/sections/BasicInfoConditionalFields";
+import { IntentSelectionScreen } from "../components/sections/IntentSelectionScreen";
 import {
   desireItems,
   roleItems,
@@ -187,6 +188,13 @@ export const useCreateWelcomeScreens = ({
         heading: "Welcome aboard",
         subHeading: "Let's kick off by creating your organization",
         component: OrganizationScreen,
+      },
+      [OnboardingScreenIndex.INTENT]: {
+        id: "intent",
+        required: true,
+        heading: "What do you want to do?",
+        subHeading: "Pick your starting point — you can explore the rest anytime",
+        component: IntentSelectionScreen,
       },
       [OnboardingScreenIndex.BASIC_INFO]: {
         id: "basic-info",
