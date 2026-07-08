@@ -3,7 +3,8 @@ import cloneDeep from "lodash.clonedeep";
 import type { DeepPartial } from "react-hook-form";
 import { z } from "zod";
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
+import { persist } from "zustand/middleware";
+import type { PersistStorage, StorageValue } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { PromptConfigFormValues } from "~/prompts/types";
@@ -151,8 +152,235 @@ const PersistedStateSchema = z.object({
   activeWindowId: z.string().nullable(),
 });
 
+/** Slice of state that actually gets persisted (no store actions). */
+type PersistedTopLevelState = Pick<
+  DraggableTabsBrowserState,
+  "windows" | "activeWindowId"
+>;
+
+/**
+ * Shape written under the main storage key: tab identity/order only, no data.
+ * `data` is optional purely to read the LEGACY single-key format, where each
+ * tab's full `data` was embedded in the index instead of a per-tab key.
+ */
+interface LightTab {
+  id: string;
+  data?: TabData;
+}
+interface LightWindow {
+  id: string;
+  tabs: LightTab[];
+  activeTabId: string;
+}
+interface LightPersistedState {
+  windows: LightWindow[];
+  activeWindowId: string | null;
+}
+
+function getTabStorageKey(projectId: string, tabId: string) {
+  return `${projectId}:tab:${tabId}`;
+}
+
+/** The light index key holding tab identity/order (not per-tab data). */
+function getStorageKey(projectId: string) {
+  return `${projectId}:draggable-tabs-browser-store`;
+}
+
+/**
+ * Removes every localStorage key belonging to a project's draggable tabs
+ * browser store: each per-tab `${projectId}:tab:${tabId}` key plus the
+ * light index key itself. Per-tab keys are discovered by scanning
+ * localStorage directly for the `${projectId}:tab:` prefix rather than by
+ * parsing the light index key — this makes cleanup independent of the
+ * index's integrity, so it finds and removes every per-tab key regardless
+ * of whether the index is valid, corrupted, or was never written (e.g. if
+ * `setItem` wrote per-tab keys but threw before writing the index).
+ * Single Responsibility: Shared cleanup routine used by the public
+ * `clearDraggableTabsBrowserStore` utility and by the rehydration
+ * error/inconsistency recovery paths in `onRehydrateStorage`.
+ */
+function clearAllPersistedDataForProject(projectId: string) {
+  const storageKey = getStorageKey(projectId);
+  const tabKeyPrefix = `${projectId}:tab:`;
+  try {
+    const tabKeysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith(tabKeyPrefix)) {
+        tabKeysToRemove.push(key);
+      }
+    }
+    for (const key of tabKeysToRemove) {
+      localStorage.removeItem(key);
+    }
+
+    localStorage.removeItem(storageKey);
+  } catch (error) {
+    logger.error({ error, projectId }, "Failed to clear persisted store");
+  }
+}
+
+/**
+ * Strips transient UI flags before writing tab data to localStorage so they
+ * don't re-trigger on page reload.
+ */
+function stripTransientFlags(data: TabData): TabData {
+  return {
+    ...data,
+    meta: {
+      ...data.meta,
+      openHistoryOnLoad: undefined,
+    },
+  };
+}
+
+/**
+ * Custom persist storage that splits the heavy per-tab `data` out of the
+ * single windows/tabs storage key into its own key per tab
+ * (`${projectId}:tab:${tabId}`). Only tabs whose `data` reference actually
+ * changed since the last write are re-serialized/re-written, so editing one
+ * tab no longer re-serializes and writes every open tab's content.
+ *
+ * Single Responsibility: Bridges the in-memory windows/tabs tree to a
+ * per-tab-keyed localStorage representation.
+ */
+function createTabAwarePersistStorage(
+  projectId: string,
+): PersistStorage<PersistedTopLevelState> {
+  // Tracks the last-persisted `data` reference per tab so unchanged tabs
+  // (structurally shared by immer) can be skipped on write.
+  const lastPersistedDataRefs = new Map<string, TabData>();
+
+  return {
+    getItem: (name) => {
+      try {
+        const raw = localStorage.getItem(name);
+        if (!raw) return null;
+
+        const parsed = JSON.parse(raw) as {
+          state: LightPersistedState;
+          version?: number;
+        };
+
+        const windows: Window[] = parsed.state.windows.map((w) => ({
+          id: w.id,
+          activeTabId: w.activeTabId,
+          // Resolve each tab's data from its own per-tab key. Fall back to the
+          // legacy embedded `t.data` (old single-key format) so existing users
+          // don't lose their open tabs on upgrade. Drop a tab only when data is
+          // truly unrecoverable, rather than fabricating an invalid tab:
+          // fabricating `undefined` would fail whole-state validation in
+          // onRehydrateStorage and wipe *every* tab, and letting JSON.parse
+          // throw would reject the entire store — either way one bad key loses
+          // all tabs. Downstream validation prunes now-empty windows and
+          // repairs a dangling activeTabId.
+          tabs: w.tabs.flatMap((t) => {
+            const tabRaw = localStorage.getItem(
+              getTabStorageKey(projectId, t.id),
+            );
+            if (tabRaw) {
+              let data: TabData;
+              try {
+                data = JSON.parse(tabRaw) as TabData;
+              } catch (parseError) {
+                logger.warn(
+                  { tabId: t.id, error: parseError },
+                  "Corrupt per-tab data during rehydration, dropping tab",
+                );
+                return [];
+              }
+              lastPersistedDataRefs.set(t.id, data);
+              return [{ id: t.id, data }];
+            }
+            if (t.data) {
+              // Legacy single-key payload: adopt the embedded data. Do NOT seed
+              // lastPersistedDataRefs so the next persist writes this tab's own
+              // per-tab key (completing the migration) instead of dedup-skipping
+              // it, which would strand the data as the index drops embedded data.
+              return [{ id: t.id, data: t.data }];
+            }
+            logger.warn(
+              { tabId: t.id },
+              "Missing per-tab data key during rehydration, dropping tab",
+            );
+            return [];
+          }),
+        }));
+
+        return {
+          state: {
+            windows,
+            activeWindowId: parsed.state.activeWindowId,
+          },
+          version: parsed.version,
+        };
+      } catch (error) {
+        logger.error({ error }, "Failed to read persisted store");
+        return null;
+      }
+    },
+
+    setItem: (name, value: StorageValue<PersistedTopLevelState>) => {
+      try {
+        const currentTabIds = new Set<string>();
+
+        const lightWindows: LightWindow[] = value.state.windows.map((w) => ({
+          id: w.id,
+          activeTabId: w.activeTabId,
+          tabs: w.tabs.map((t) => {
+            currentTabIds.add(t.id);
+            // Reference equality is sufficient (not deep-equal) only because
+            // this store is wrapped in Immer: `produce` structurally shares
+            // untouched branches, so an unedited tab's `data` object keeps
+            // the exact same reference across `set()` calls. If this store
+            // is ever updated outside Immer's `set()`, this check silently
+            // degrades to "always write" for every tab.
+            if (lastPersistedDataRefs.get(t.id) !== t.data) {
+              localStorage.setItem(
+                getTabStorageKey(projectId, t.id),
+                JSON.stringify(stripTransientFlags(t.data)),
+              );
+              lastPersistedDataRefs.set(t.id, t.data);
+            }
+            return { id: t.id };
+          }),
+        }));
+
+        // Clean up storage for tabs that no longer exist (removed/closed).
+        for (const tabId of lastPersistedDataRefs.keys()) {
+          if (!currentTabIds.has(tabId)) {
+            localStorage.removeItem(getTabStorageKey(projectId, tabId));
+            lastPersistedDataRefs.delete(tabId);
+          }
+        }
+
+        const lightState: LightPersistedState = {
+          windows: lightWindows,
+          activeWindowId: value.state.activeWindowId,
+        };
+
+        localStorage.setItem(
+          name,
+          JSON.stringify({ state: lightState, version: value.version }),
+        );
+      } catch (error) {
+        logger.error({ error }, "Failed to persist store");
+      }
+    },
+
+    removeItem: () => {
+      // Delegate to the prefix-scan cleanup so this doesn't rely on the
+      // in-memory ref map being populated — otherwise per-tab keys written
+      // by another store instance (e.g. the same project open in a second
+      // browser tab) would be orphaned. Also drop our own tracked refs.
+      clearAllPersistedDataForProject(projectId);
+      lastPersistedDataRefs.clear();
+    },
+  };
+}
+
 function createDraggableTabsBrowserStore(projectId: string) {
-  const storageKey = `${projectId}:draggable-tabs-browser-store`;
+  const storageKey = getStorageKey(projectId);
 
   return create<DraggableTabsBrowserState>()(
     persist(
@@ -466,11 +694,12 @@ function createDraggableTabsBrowserStore(projectId: string) {
          */
         reset: () => {
           set(initialState);
-          try {
-            localStorage.removeItem(storageKey);
-          } catch (error) {
-            logger.error({ error }, "Failed to clear localStorage");
-          }
+          // Remove the light index key AND every per-tab key. A bare
+          // removeItem(storageKey) would strand the `${projectId}:tab:*`
+          // keys (the leak this store split introduced), so delegate to the
+          // prefix-scan cleanup, which is robust even for per-tab keys this
+          // instance never tracked in memory.
+          clearAllPersistedDataForProject(projectId);
         },
 
         /**
@@ -485,26 +714,18 @@ function createDraggableTabsBrowserStore(projectId: string) {
       })),
       {
         name: storageKey,
-        storage: createJSONStorage(() => localStorage),
 
-        // Strip transient UI flags before writing to localStorage so they
-        // don't re-trigger on page reload.
+        // Persist per-tab `data` (form values/chat/demonstrations) under its
+        // own localStorage key so editing one tab doesn't re-serialize and
+        // write every other open tab's content. See
+        // createTabAwarePersistStorage for details. Transient UI flags
+        // (meta.openHistoryOnLoad) are stripped there too, right before
+        // each tab's data is written, so they don't re-trigger on reload.
         partialize: (state) => ({
-          ...state,
-          windows: state.windows.map((w) => ({
-            ...w,
-            tabs: w.tabs.map((t) => ({
-              ...t,
-              data: {
-                ...t.data,
-                meta: {
-                  ...t.data.meta,
-                  openHistoryOnLoad: undefined,
-                },
-              },
-            })),
-          })),
+          windows: state.windows,
+          activeWindowId: state.activeWindowId,
         }),
+        storage: createTabAwarePersistStorage(projectId),
 
         // Validate and handle corrupted data during rehydration
         onRehydrateStorage: () => (state, error) => {
@@ -513,11 +734,7 @@ function createDraggableTabsBrowserStore(projectId: string) {
               { error },
               "Failed to rehydrate store, clearing corrupted data",
             );
-            try {
-              localStorage.removeItem(storageKey);
-            } catch (e) {
-              logger.error({ error: e }, "Failed to clear corrupted storage");
-            }
+            clearAllPersistedDataForProject(projectId);
             return;
           }
 
@@ -533,11 +750,7 @@ function createDraggableTabsBrowserStore(projectId: string) {
                 { error: validation.error },
                 "Invalid store data shape, resetting to initial state",
               );
-              try {
-                localStorage.removeItem(storageKey);
-              } catch (e) {
-                logger.error({ error: e }, "Failed to clear invalid storage");
-              }
+              clearAllPersistedDataForProject(projectId);
               // Reset to initial state
               Object.assign(state, initialState);
               return;
@@ -595,11 +808,7 @@ function createDraggableTabsBrowserStore(projectId: string) {
                 "No valid windows after rehydration, resetting to initial state",
               );
               Object.assign(state, initialState);
-              try {
-                localStorage.removeItem(storageKey);
-              } catch (e) {
-                logger.error({ error: e }, "Failed to clear invalid storage");
-              }
+              clearAllPersistedDataForProject(projectId);
             } else if (hasInconsistency) {
               // Log that we fixed inconsistencies
               logger.info("Fixed state inconsistencies during rehydration");
@@ -643,12 +852,7 @@ export function useDraggableTabsBrowserStore<T>(
  * Single Responsibility: Provides emergency recovery mechanism for corrupted store data.
  */
 export function clearDraggableTabsBrowserStore(projectId: string) {
-  const storageKey = `${projectId}:draggable-tabs-browser-store`;
-  try {
-    localStorage.removeItem(storageKey);
-    storeInstances.delete(projectId);
-    logger.info({ projectId }, "Cleared draggable tabs browser store");
-  } catch (error) {
-    logger.error({ error, projectId }, "Failed to clear store");
-  }
+  clearAllPersistedDataForProject(projectId);
+  storeInstances.delete(projectId);
+  logger.info({ projectId }, "Cleared draggable tabs browser store");
 }

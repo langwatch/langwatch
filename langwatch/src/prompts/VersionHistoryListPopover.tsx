@@ -369,7 +369,7 @@ export function VersionHistoryListPopover({
         projectId: project?.id ?? "",
       },
       {
-        enabled: !!project?.id && !!configId,
+        enabled: open && !!project?.id && !!configId,
       },
     );
 
