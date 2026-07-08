@@ -29,6 +29,11 @@ export const publicRoutes = [
  */
 export const noOrgBouncerRoutes = [
   "/invite/accept",
+  // The CLI device-login approval page. The global bouncer (e.g.
+  // CommandBar's useOrganizationTeamProject) must never swallow
+  // /cli/auth?user_code=… into onboarding — the page handles the no-org
+  // case itself by round-tripping through onboarding with return_to.
+  "/cli/auth",
   "/onboarding/welcome",
   "/onboarding/[team]/project",
   "/onboarding/product",

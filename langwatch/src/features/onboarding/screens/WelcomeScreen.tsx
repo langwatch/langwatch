@@ -46,6 +46,17 @@ export const WelcomeScreen: React.FC = () => {
   const initializeOrganization =
     api.onboarding.initializeOrganization.useMutation();
 
+  // Same-origin continuation (e.g. the CLI device-approval page sends a
+  // fresh signup here with return_to=/cli/auth?user_code=… so the approval
+  // survives onboarding). Only relative in-app paths are honored.
+  const rawReturnTo = router.query.return_to;
+  const returnTo =
+    typeof rawReturnTo === "string" &&
+    rawReturnTo.startsWith("/") &&
+    !rawReturnTo.startsWith("//")
+      ? rawReturnTo
+      : null;
+
   useEffect(() => {
     // Wait until org data has finished loading before deciding
     if (organizationIsLoading) return;
@@ -60,8 +71,10 @@ export const WelcomeScreen: React.FC = () => {
       return;
     }
     setOnboardingNeeded(false);
-    void router.push(decision.kind === "home" ? "/" : `/${decision.slug}`);
-  }, [organizationIsLoading, organizations, project?.slug]);
+    void router.push(
+      returnTo ?? (decision.kind === "home" ? "/" : `/${decision.slug}`),
+    );
+  }, [organizationIsLoading, organizations, project?.slug, returnTo]);
 
   function handleFinalizeSubmit() {
     const form = getFormData();
@@ -97,6 +110,13 @@ export const WelcomeScreen: React.FC = () => {
             label: "organization_onboarding_completed",
             intent: form.intent,
           });
+
+          // A pending continuation (CLI device approval) outranks both
+          // track landings: finish what the user actually came to do.
+          if (returnTo) {
+            window.location.href = returnTo;
+            return;
+          }
 
           if (isGovernanceTrack) {
             // Land via "/" so the home resolver applies the org-intent rule
