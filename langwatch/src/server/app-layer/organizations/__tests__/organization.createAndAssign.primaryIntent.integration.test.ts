@@ -91,6 +91,40 @@ describe("PrismaOrganizationRepository.createAndAssign — primaryIntent", () =>
     });
   });
 
+  describe("when the Primary use setting is edited (ADR-038 org setting)", () => {
+    it("sets, clears, and leaves the intent untouched per the update contract", async () => {
+      const result = await createOrg({ primaryIntent: "AGENT_GOVERNANCE" });
+      const orgId = result.organization.id;
+      const readIntent = async () =>
+        (
+          await prisma.organization.findUnique({
+            where: { id: orgId },
+            select: { primaryIntent: true },
+          })
+        )?.primaryIntent;
+
+      // undefined leaves the current value untouched
+      await repository.update({ organizationId: orgId, name: "Renamed" });
+      expect(await readIntent()).toBe("AGENT_GOVERNANCE");
+
+      // a value flips it
+      await repository.update({
+        organizationId: orgId,
+        name: "Renamed",
+        primaryIntent: "LLM_OPS",
+      });
+      expect(await readIntent()).toBe("LLM_OPS");
+
+      // null clears back to legacy behavior
+      await repository.update({
+        organizationId: orgId,
+        name: "Renamed",
+        primaryIntent: null,
+      });
+      expect(await readIntent()).toBeNull();
+    });
+  });
+
   describe("result shape parity across intents (I4)", () => {
     it("returns the same shape regardless of declared intent", async () => {
       const governance = await createOrg({

@@ -2,6 +2,7 @@ import {
   Badge,
   Button,
   Card,
+  createListCollection,
   Field,
   Heading,
   HStack,
@@ -11,7 +12,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Project } from "@prisma/client";
+import type { OrganizationIntent, Project } from "@prisma/client";
 import isEqual from "lodash-es/isEqual";
 import { useState } from "react";
 import { Lock } from "react-feather";
@@ -44,7 +45,20 @@ type OrganizationFormData = {
   s3Bucket: string;
   presenceEnabled: boolean;
   supportContact: string;
+  primaryIntent: "" | OrganizationIntent;
 };
+
+/**
+ * ADR-038 "Primary use": decides where "/" lands for everyone in the org.
+ * "Not set" keeps the pre-fork behavior (legacy resolver).
+ */
+const primaryUseCollection = createListCollection({
+  items: [
+    { label: "Not set", value: "" },
+    { label: "Track AI coding agents", value: "AGENT_GOVERNANCE" },
+    { label: "Monitor & evaluate LLM apps", value: "LLM_OPS" },
+  ],
+});
 
 function Settings() {
   const { organization, project } = useOrganizationTeamProject();
@@ -76,18 +90,21 @@ function SettingsForm({
     presenceEnabled: organization.presenceEnabled,
     supportContact:
       (organization as { supportContact?: string | null }).supportContact ?? "",
+    primaryIntent: organization.primaryIntent ?? "",
   });
   const { register, handleSubmit, getFieldState, control } = useForm({
     defaultValues,
   });
   const updateOrganization = api.organization.update.useMutation();
   const apiContext = api.useContext();
+  const [showLlmOpsSetupDialog, setShowLlmOpsSetupDialog] = useState(false);
 
   const onSubmit: SubmitHandler<OrganizationFormData> = (
     data: OrganizationFormData,
   ) => {
     if (isEqual(data, defaultValues)) return;
 
+    const previousIntent = defaultValues.primaryIntent;
     setDefaultValues(data);
 
     updateOrganization.mutate(
@@ -100,10 +117,22 @@ function SettingsForm({
         s3Bucket: data.s3Bucket,
         presenceEnabled: data.presenceEnabled,
         supportContact: data.supportContact.trim() || null,
+        primaryIntent: data.primaryIntent === "" ? null : data.primaryIntent,
       },
       {
         onSuccess: () => {
           void apiContext.organization.getAll.refetch();
+          void apiContext.governance.resolveHome.invalidate();
+          // ADR-038 F9: a governance org flipping to LLMOps would land
+          // everyone on the silent, never-integrated default project —
+          // offer its setup instead of a dead surface.
+          if (
+            previousIntent === "AGENT_GOVERNANCE" &&
+            data.primaryIntent === "LLM_OPS" &&
+            !project.firstMessage
+          ) {
+            setShowLlmOpsSetupDialog(true);
+          }
           toaster.create({
             title: "Organization updated",
             description: "Your organization settings have been saved",
@@ -214,6 +243,76 @@ function SettingsForm({
               </HorizontalFormControl>
 
               <HorizontalFormControl
+                label="Primary use"
+                helper={
+                  <VStack align="start" gap={1}>
+                    <Text>
+                      What this organization mainly uses LangWatch for. Decides
+                      where everyone lands when opening the app: coding-agent
+                      tracking opens the personal usage page, LLM apps open the
+                      project home. &quot;Not set&quot; keeps the current
+                      behavior.
+                    </Text>
+                    {!hasPermission("organization:manage") && (
+                      <Badge colorPalette="blue" variant="surface" size={"xs"}>
+                        <Tooltip content="Contact your admin to change this setting">
+                          <HStack>
+                            <Lock size={10} />
+                            <Text>Admin only</Text>
+                          </HStack>
+                        </Tooltip>
+                      </Badge>
+                    )}
+                  </VStack>
+                }
+              >
+                {hasPermission("organization:manage") ? (
+                  <Controller
+                    control={control}
+                    name="primaryIntent"
+                    render={({ field }) => (
+                      <Select.Root
+                        collection={primaryUseCollection}
+                        value={[field.value]}
+                        width="full"
+                        onValueChange={(d) =>
+                          field.onChange(
+                            (d.value[0] ?? "") as "" | OrganizationIntent,
+                          )
+                        }
+                      >
+                        <Select.Trigger
+                          background="bg"
+                          aria-label="Primary use"
+                        >
+                          <Select.ValueText />
+                        </Select.Trigger>
+                        <Select.Content>
+                          {primaryUseCollection.items.map((item) => (
+                            <Select.Item key={item.value} item={item}>
+                              {item.label}
+                            </Select.Item>
+                          ))}
+                        </Select.Content>
+                      </Select.Root>
+                    )}
+                  />
+                ) : (
+                  <Text>
+                    {organization.primaryIntent ? (
+                      primaryUseCollection.items.find(
+                        (item) => item.value === organization.primaryIntent,
+                      )?.label
+                    ) : (
+                      <Text as="span" color="fg.subtle">
+                        Not set
+                      </Text>
+                    )}
+                  </Text>
+                )}
+              </HorizontalFormControl>
+
+              <HorizontalFormControl
                 label="Live presence"
                 helper={
                   <VStack align="start" gap={1}>
@@ -309,6 +408,44 @@ function SettingsForm({
           <ProjectSettingsForm project={project} />
         )}
       </VStack>
+
+      {/* ADR-038 F9: governance -> LLMOps flip offers the project setup */}
+      <Dialog.Root
+        open={showLlmOpsSetupDialog}
+        onOpenChange={({ open }) => setShowLlmOpsSetupDialog(open)}
+      >
+        <Dialog.Content bg="bg">
+          <Dialog.Header>
+            <Dialog.Title>Set up your project</Dialog.Title>
+          </Dialog.Header>
+          <Dialog.Body>
+            <Text>
+              Everyone in this organization will now land on the project home,
+              but the project hasn&apos;t received any data yet. Walk through
+              the project setup so there&apos;s something to see when they
+              arrive.
+            </Text>
+          </Dialog.Body>
+          <Dialog.Footer>
+            <HStack gap={2}>
+              <Button
+                variant="outline"
+                onClick={() => setShowLlmOpsSetupDialog(false)}
+              >
+                Later
+              </Button>
+              <Button
+                colorPalette="orange"
+                onClick={() => {
+                  window.location.href = `/onboarding/product?projectSlug=${project.slug}`;
+                }}
+              >
+                Set up the project
+              </Button>
+            </HStack>
+          </Dialog.Footer>
+        </Dialog.Content>
+      </Dialog.Root>
     </SettingsLayout>
   );
 }

@@ -176,6 +176,8 @@ export interface UpdateOrganizationInput {
   s3Bucket?: string | null;
   presenceEnabled?: boolean;
   supportContact?: string | null;
+  /** ADR-038 "Primary use" setting; null clears back to legacy behavior. */
+  primaryIntent?: OrganizationIntent | null;
 }
 
 /**

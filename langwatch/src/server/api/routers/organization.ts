@@ -314,6 +314,10 @@ export const organizationRouter = createTRPCRouter({
           s3Bucket: z.string().optional(),
           presenceEnabled: z.boolean().optional(),
           supportContact: z.string().max(500).nullable().optional(),
+          primaryIntent: z
+            .enum(["AGENT_GOVERNANCE", "LLM_OPS"])
+            .nullable()
+            .optional(),
         })
         .refine(
           (data) => {
@@ -343,6 +347,7 @@ export const organizationRouter = createTRPCRouter({
         s3Bucket: input.s3Bucket,
         presenceEnabled: input.presenceEnabled,
         supportContact: input.supportContact,
+        primaryIntent: input.primaryIntent,
       });
 
       return { success: true };

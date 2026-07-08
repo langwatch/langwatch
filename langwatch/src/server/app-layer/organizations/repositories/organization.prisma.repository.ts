@@ -461,6 +461,9 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         ...(input.supportContact !== undefined
           ? { supportContact: input.supportContact?.trim() || null }
           : {}),
+        ...(input.primaryIntent !== undefined
+          ? { primaryIntent: input.primaryIntent }
+          : {}),
       },
     });
   }
