@@ -87,6 +87,22 @@ import { EvaluatorLLMConfigField } from "./EvaluatorLLMConfigField";
 // is a sticky toggle button with a hover-tooltip explaining what the metric
 // is and why it matters for the judge prompt — replaces the generic dropdown
 // + "Add" array UI for fields where the option set is small and fixed.
+// Some evaluator settings have a long, citation-heavy description that reads
+// as clutter when always shown inline under the field. For those, split the
+// description into a short helper line plus a hover tooltip (little "i" icon)
+// carrying the supporting detail — same pattern as METRIC_META below.
+const FIELD_HELPER_OVERRIDES: Record<
+  string,
+  { helper: string; tooltip: string }
+> = {
+  swap_and_confirm: {
+    helper:
+      "Run two judge calls with A/B positions swapped; tie on disagreement. Doubles judge cost.",
+    tooltip:
+      "Studies show that swapping can reduce position bias from 68% to 51% (PandaLM paper).",
+  },
+};
+
 type MetricMeta = { label: string; tooltip: string };
 const METRIC_META: Record<string, MetricMeta> = {
   cost: {
@@ -608,6 +624,7 @@ const DynamicZodForm = ({
               key as keyof Evaluators[T]["settings"]
             ].description ?? "";
           const isInvalid = errors && key in errors && !!(errors as any)[key];
+          const helperOverride = FIELD_HELPER_OVERRIDES[key];
 
           if (variant === "studio") {
             return (
@@ -648,7 +665,8 @@ const DynamicZodForm = ({
                 label={
                   camelCaseToTitleCase(key) + (isOptional ? " (Optional)" : "")
                 }
-                helper={helperText}
+                helper={helperOverride?.helper ?? helperText}
+                tooltip={helperOverride?.tooltip}
                 invalid={isInvalid}
               >
                 {renderField(

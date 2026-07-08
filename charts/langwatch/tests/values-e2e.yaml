@@ -48,6 +48,16 @@ workers:
   # (validates the gate added in c74fb13a3).
   enabled: false
 
+# ── Dataset PG→S3 migration hook (ADR-032) — needs the private app image ──────
+# It's a BLOCKING post-install hook, so unlike the 0-replica app/workers/nlp
+# Deployments (which helm doesn't --wait on), a failed hook fails the whole
+# release. At `helm install` time (this baseline) the app image isn't loaded
+# yet, so the hook would ErrImageNeverPull under pullPolicy: Never — disable
+# it here. test_dataset_s3_migration_upgrade re-enables it later in the same
+# job, once test_app has proven the image is loaded and running.
+datasetS3Migration:
+  enabled: false
+
 langwatch_nlp:
   replicaCount: 0
 

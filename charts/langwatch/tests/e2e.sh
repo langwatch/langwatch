@@ -26,6 +26,10 @@ source "$(cd "$(dirname "$0")/../../lib" && pwd)/test-helpers.sh"
 trap cleanup_cluster EXIT
 
 # ─── PostgreSQL helper ───────────────────────────────────────────────────────
+# Argv-embedded query — only safe for simple queries with no double quotes or
+# single-quoted literals (its only call site is `SELECT 1`). Suites needing
+# real SQL (double-quoted Prisma identifiers, string literals) use a local
+# stdin-based variant instead — see pg_exec in test_dataset_s3_migration_upgrade.
 pg_query() {
   local pod="$1" query="$2"
   kc exec "$pod" -- \
@@ -382,6 +386,100 @@ test_workers() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# SUITE: dataset S3 migration — real upgrade across the ADR-032 boundary
+#
+# Reproduces the actual customer upgrade path: app/workers are already
+# running from test_app/test_workers with NO strategy key rendered (the
+# pre-#5083 chart never set one, so the live Deployments carry only the
+# k8s-API-server-defaulted RollingUpdate). This suite seeds a legacy
+# `contentLayout=postgres` dataset directly via SQL — the app's own UI/API
+# can no longer create postgres-layout rows (read-only migration source
+# since #4895) — then upgrades with local-FS + the migration hook enabled
+# for the FIRST time, which is exactly when the Deployment strategy flips
+# to the kill-then-start RollingUpdate override. A regression here means
+# `helm upgrade` breaks for every existing self-hosted install.
+# ─────────────────────────────────────────────────────────────────────────────
+test_dataset_s3_migration_upgrade() {
+  sep; info "Suite: dataset S3 migration upgrade"
+
+  local pg_pod="${RELEASE}-postgresql-0"
+
+  # psql over stdin (no `-c "<sql>"` argv layer) so double-quoted identifiers
+  # need no shell escaping at all.
+  pg_exec() {
+    kc exec -i "$pg_pod" -- env PGPASSWORD=e2etest psql -U postgres -d langwatch -v ON_ERROR_STOP=1 "$@"
+  }
+
+  # Minimal org/team/project/dataset graph, inserted directly (no auth flow
+  # needed — this is disposable seed data, not an auth-path test). IDs are
+  # explicit because Prisma's @default(nanoid()) is applied client-side, not
+  # a DB default. Delete-before-insert makes this safe to re-run against a
+  # reused cluster (KEEP_CLUSTER=true local dev loop) — CI always starts from
+  # a fresh Kind cluster, but a local rerun without this would hit a
+  # duplicate-key error on the second pass.
+  pg_exec <<'SQL' >/dev/null
+DELETE FROM "DatasetRecord" WHERE "projectId" = 'e2e_project';
+DELETE FROM "Dataset" WHERE "projectId" = 'e2e_project';
+DELETE FROM "Project" WHERE id = 'e2e_project';
+DELETE FROM "Team" WHERE id = 'e2e_team';
+DELETE FROM "Organization" WHERE id = 'e2e_org';
+INSERT INTO "Organization" (id, name, slug) VALUES ('e2e_org', 'E2E Org', 'e2e-org');
+INSERT INTO "Team" (id, name, slug, "organizationId") VALUES ('e2e_team', 'E2E Team', 'e2e-team', 'e2e_org');
+INSERT INTO "Project" (id, name, slug, "apiKey", "teamId", language, framework) VALUES ('e2e_project', 'E2E Project', 'e2e-project', 'e2e_api_key', 'e2e_team', 'other', 'other');
+INSERT INTO "Dataset" (id, "projectId", name, slug, "columnTypes", "contentLayout", status) VALUES ('e2e_legacy_ds', 'e2e_project', 'Legacy Dataset', 'legacy-dataset', '[{"name":"input","type":"string"}]', 'postgres', 'ready');
+INSERT INTO "DatasetRecord" (id, "datasetId", "projectId", entry)
+  SELECT 'e2e_rec_' || g, 'e2e_legacy_ds', 'e2e_project', jsonb_build_object('input', 'row ' || g)
+  FROM generate_series(1,5) g;
+SQL
+  pass "Seeded legacy contentLayout=postgres dataset (5 records)"
+
+  # The actual regression test: this upgrade is the first to render a
+  # Deployment strategy at all. On the pre-fix chart (`type: Recreate` +
+  # `rollingUpdate: null`) this failed with "spec.strategy.rollingUpdate:
+  # Forbidden" because Helm's 3-way merge can't delete a live
+  # k8s-defaulted field the previous release's manifest never mentioned.
+  hc upgrade "$RELEASE" "$CHART_DIR" \
+    -f "$CHART_DIR/tests/values-e2e.yaml" \
+    --set app.replicaCount=1 \
+    --set workers.enabled=true \
+    --set workers.replicaCount=1 \
+    --set app.storedObjects.localFilesystem.enabled=true \
+    --set datasetS3Migration.enabled=true \
+    --wait --timeout "${TIMEOUT}s"
+  pass "helm upgrade succeeds across the strategy boundary"
+
+  local strategy
+  strategy=$(kc get deploy "${RELEASE}-app" -o jsonpath='{.spec.strategy.rollingUpdate.maxSurge}')
+  assert_eq "app Deployment strategy is kill-then-start (maxSurge=0)" "$strategy" "0"
+
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-app" 180
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-workers" 180
+
+  local job_status
+  job_status=$(kc get job "${RELEASE}-dataset-s3-migration" \
+    -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}')
+  assert_eq "migration Job completed" "$job_status" "True"
+
+  local layout row_count
+  layout=$(pg_exec -tA <<'SQL'
+SELECT "contentLayout" FROM "Dataset" WHERE id='e2e_legacy_ds';
+SQL
+  )
+  row_count=$(pg_exec -tA <<'SQL'
+SELECT "rowCount" FROM "Dataset" WHERE id='e2e_legacy_ds';
+SQL
+  )
+  assert_eq "dataset flipped to s3_jsonl" "$layout" "s3_jsonl"
+  assert_eq "migrated rowCount matches seeded records" "$row_count" "5"
+
+  local app_pod chunk_lines
+  app_pod=$(kc get pod -l "app.kubernetes.io/name=${RELEASE}-app" -o jsonpath='{.items[0].metadata.name}')
+  chunk_lines=$(kc exec "$app_pod" -- sh -c \
+    "wc -l < /var/lib/langwatch/objects/datasets/e2e_project/e2e_legacy_ds/chunk-00000.jsonl" | tr -d ' ')
+  assert_eq "PVC chunk file has all 5 migrated rows" "$chunk_lines" "5"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # SUITE: cold storage + backup (deploys RustFS as S3, verifies actual I/O)
 # ─────────────────────────────────────────────────────────────────────────────
 test_cold_storage_and_backup() {
@@ -557,6 +655,7 @@ main() {
   test_resources
   test_app
   test_workers
+  test_dataset_s3_migration_upgrade
   test_upgrade
   test_external_clickhouse
   test_cold_storage_and_backup
