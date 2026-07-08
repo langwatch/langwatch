@@ -88,6 +88,7 @@ import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processi
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
 import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/schemas/constants";
+import { resolveSpanCommandShardCount } from "./pipelines/trace-processing/commands/spanCommandGroupKey";
 import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
 import { LogRecordAppendStore } from "./pipelines/trace-processing/projections/logRecordStorage.store";
 import { MetricRecordAppendStore } from "./pipelines/trace-processing/projections/metricRecordStorage.store";
@@ -471,6 +472,12 @@ export class PipelineRegistry {
         // ADR-022: Wire BlobStore so RecordSpanCommand can reconstitute
         // oversized commands and best-effort delete the transient S3 spool.
         blobStore: this.deps.blobStore,
+        // Span-command sharding fan-out (env TRACE_SPAN_PROCESSING_SHARDS,
+        // default 1 = disabled). Lets a hot trace's recordSpan commands drain in
+        // parallel across `traceId:<shard>` GroupQueue groups; fold stays per-trace.
+        spanCommandShardCount: resolveSpanCommandShardCount(
+          process.env.TRACE_SPAN_PROCESSING_SHARDS,
+        ),
         governanceKpisSyncReactor,
         governanceOcsfEventsSyncReactor,
       }),
