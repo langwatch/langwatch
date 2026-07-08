@@ -19,7 +19,10 @@ import {
   RecordSpanCommand,
 } from "./commands/recordSpanCommand";
 import { ResolveOriginCommand } from "./commands/resolveOriginCommand";
-import { spanCommandGroupKey } from "./commands/spanCommandGroupKey";
+import {
+  clampSpanShardCount,
+  spanCommandGroupKey,
+} from "./commands/spanCommandGroupKey";
 import { LogRecordStorageMapProjection } from "./projections/logRecordStorage.mapProjection";
 import { MetricRecordStorageMapProjection } from "./projections/metricRecordStorage.mapProjection";
 import { SpanStorageMapProjection } from "./projections/spanStorage.mapProjection";
@@ -236,18 +239,27 @@ export function createTraceProcessingPipeline(
     );
   }
 
-  // Span-command sharding: when shardCount > 1, spread a trace's recordSpan
-  // commands across `traceId:<shard>` GroupQueue groups so a hot trace drains in
-  // parallel instead of one span at a time. Defaults to 1 = the historic
-  // per-trace key. The command handler reads no trace state and the emitted
-  // span_received event still carries aggregateId = traceId, so the trace-summary
-  // fold (its own aggregate-keyed queue) is unaffected and the summary stays
-  // exact. See spanCommandGroupKey.ts and
-  // specs/event-sourcing/span-command-sharding.feature.
-  const spanCommandShardCount = deps.spanCommandShardCount ?? 1;
-  const recordSpanOptions = {
-    deduplication: RECORD_SPAN_DEDUPLICATION,
-    getGroupKey: (payload: RecordSpanCommandData) => {
+  // Span-command sharding: when the shard count is > 1, install a getGroupKey
+  // that spreads a trace's recordSpan commands across `traceId:<shard>`
+  // GroupQueue groups so a hot trace drains in parallel instead of one span at a
+  // time. When disabled (the default), install NO getGroupKey — the command
+  // falls back to getAggregateId, byte-identical to the historic per-trace key
+  // and with zero extra work on the span-ingest hot path. The count is clamped
+  // defensively so a caller constructing the pipeline directly (bypassing
+  // PipelineRegistry's env resolver) can't explode the number of groups. The
+  // command handler reads no trace state and the emitted span_received event
+  // still carries aggregateId = traceId, so the trace-summary fold (its own
+  // aggregate-keyed queue) is unaffected and the summary stays exact. See
+  // spanCommandGroupKey.ts and specs/event-sourcing/span-command-sharding.feature.
+  const spanCommandShardCount = clampSpanShardCount(
+    deps.spanCommandShardCount ?? 1,
+  );
+  const recordSpanOptions: {
+    deduplication: typeof RECORD_SPAN_DEDUPLICATION;
+    getGroupKey?: (payload: RecordSpanCommandData) => string;
+  } = { deduplication: RECORD_SPAN_DEDUPLICATION };
+  if (spanCommandShardCount > 1) {
+    recordSpanOptions.getGroupKey = (payload) => {
       const { traceId, spanId } = TraceRequestUtils.normalizeOtlpSpanIds(
         payload.span,
       );
@@ -256,8 +268,8 @@ export function createTraceProcessingPipeline(
         spanId,
         shardCount: spanCommandShardCount,
       });
-    },
-  };
+    };
+  }
 
   // ADR-022: When blobStore is provided, inject it into a pre-constructed
   // RecordSpanCommand instance so the worker can reconstitute oversized commands

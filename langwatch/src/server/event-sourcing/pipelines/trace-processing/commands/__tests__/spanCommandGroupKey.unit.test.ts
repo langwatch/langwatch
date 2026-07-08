@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  clampSpanShardCount,
   MAX_SPAN_SHARD_COUNT,
   resolveSpanCommandShardCount,
   spanCommandGroupKey,
@@ -48,10 +49,14 @@ describe("spanCommandGroupKey", () => {
           spanId: "00000000000000ff",
           shardCount: 8,
         });
-        const [prefix, shard] = key.split(":");
+        // Extract the suffix from the LAST colon so the assertion holds even for
+        // a colon-bearing trace id (see the non-OTel cases below).
+        const idx = key.lastIndexOf(":");
+        const prefix = key.slice(0, idx);
+        const shard = Number(key.slice(idx + 1));
         expect(prefix).toBe(TRACE_ID);
-        expect(Number(shard)).toBeGreaterThanOrEqual(0);
-        expect(Number(shard)).toBeLessThan(8);
+        expect(shard).toBeGreaterThanOrEqual(0);
+        expect(shard).toBeLessThan(8);
       });
 
       /** @scenario "A span always maps to the same shard" */
@@ -210,6 +215,28 @@ describe("resolveSpanCommandShardCount", () => {
     /** @scenario "The configured shard count is clamped to a safe range" */
     it("clamps down to the maximum", () => {
       expect(resolveSpanCommandShardCount("100000")).toBe(MAX_SPAN_SHARD_COUNT);
+    });
+  });
+});
+
+describe("clampSpanShardCount", () => {
+  describe("given a non-integer or below-one count", () => {
+    it("falls back to one, disabling sharding", () => {
+      for (const n of [0, -5, 1.5, Number.NaN]) {
+        expect(clampSpanShardCount(n)).toBe(1);
+      }
+    });
+  });
+
+  describe("given an in-range count", () => {
+    it("returns it unchanged", () => {
+      expect(clampSpanShardCount(16)).toBe(16);
+    });
+  });
+
+  describe("given a count above the maximum", () => {
+    it("clamps down to the maximum", () => {
+      expect(clampSpanShardCount(100_000)).toBe(MAX_SPAN_SHARD_COUNT);
     });
   });
 });

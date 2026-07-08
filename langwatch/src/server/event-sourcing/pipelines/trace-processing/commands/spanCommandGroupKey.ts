@@ -28,7 +28,7 @@
  * this, and keeping it small bounds the number of GroupQueue groups (and parked
  * entries under the tenant soft-cap) a single trace can create.
  */
-export const MAX_SPAN_SHARD_COUNT = 128;
+export const MAX_SPAN_SHARD_COUNT = 128 as const;
 
 // FNV-1a (32-bit) constants. A span's bucket must be deterministic across
 // processes and restarts — a span's retries and its dedup squash window must
@@ -81,16 +81,28 @@ export function spanCommandGroupKey({
 }
 
 /**
- * Resolve the operator-configured shard count from an env value, clamped to a
- * safe range. Non-integer, below-one, or absent values fall back to `1`
- * (sharding disabled) rather than throwing on the ingest path; values above
- * {@link MAX_SPAN_SHARD_COUNT} are clamped down.
+ * Clamp a numeric shard count to the safe range `[1, MAX_SPAN_SHARD_COUNT]`.
+ * Non-integer or below-one values fall back to `1` (sharding disabled) rather
+ * than throwing on the ingest path; values above {@link MAX_SPAN_SHARD_COUNT}
+ * are clamped down.
+ *
+ * Applied as defense-in-depth wherever a shard count enters the pipeline — not
+ * only from env — so a caller that constructs the pipeline directly (a test or
+ * a future composition root) can't explode the number of GroupQueue groups.
+ */
+export function clampSpanShardCount(shardCount: number): number {
+  if (!Number.isInteger(shardCount) || shardCount < 1) return 1;
+  return Math.min(shardCount, MAX_SPAN_SHARD_COUNT);
+}
+
+/**
+ * Resolve the operator-configured shard count from an env value, clamped to the
+ * safe range. Absent, non-numeric, or out-of-range values fall back to `1`
+ * (sharding disabled).
  *
  * Read once at pipeline composition from `TRACE_SPAN_PROCESSING_SHARDS`,
  * mirroring how `GLOBAL_QUEUE_CONCURRENCY` tunes the GroupQueue.
  */
 export function resolveSpanCommandShardCount(raw: string | undefined): number {
-  const parsed = Number(raw);
-  if (!Number.isInteger(parsed) || parsed < 1) return 1;
-  return Math.min(parsed, MAX_SPAN_SHARD_COUNT);
+  return clampSpanShardCount(Number(raw));
 }
