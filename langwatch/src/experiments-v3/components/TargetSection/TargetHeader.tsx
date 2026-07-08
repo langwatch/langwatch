@@ -389,11 +389,9 @@ export const TargetHeader = memo(function TargetHeader({
       gap={2}
       width="full"
       marginY={-2}
-      borderRadius="md"
-      transition="box-shadow 0.2s ease"
-      boxShadow={
-        isHighlightedVariant ? "0 0 0 2px var(--chakra-colors-blue-400)" : "none"
-      }
+      // Glow lives on the <th> itself (EvaluationsV3Table.tsx) so the whole
+      // column reads as highlighted, not just this inner content row. Keep
+      // the marker attribute only, for tests.
       data-testid={
         isHighlightedVariant ? "target-header-highlighted" : undefined
       }
