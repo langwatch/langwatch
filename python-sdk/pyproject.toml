@@ -124,4 +124,8 @@ exclude-newer = "7 days"
 # pull a vulnerable version back in.
 constraint-dependencies = [
     "jupyter-server>=2.20.0",  # security: CVE-2026-44727 stored XSS in nbconvert handlers (GHSA-fcw5-x6j4-ccmp)
+    "vcrpy>=8.2.1",  # security: vcrpy advisory (#1531)
+    "langsmith>=0.8.18",  # security: langsmith advisory (#1532)
+    "python-engineio>=4.13.2",  # security: python-engineio advisory (#1545, #1546)
+    "python-socketio>=5.16.2",  # security: python-socketio advisory (#1547)
 ]
