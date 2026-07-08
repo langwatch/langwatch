@@ -196,15 +196,22 @@ export default defineConfig(async (): Promise<UserConfig> => {
     // keep CSS-referenced assets relative to the CSS file (which lives under the
     // same base, so fonts/images resolve on the CDN); leave HTML entry refs
     // base-absolute for the server to rewrite; leave public/ assets same-origin.
-    //
-    // LIMITATION (ADR-038): window.__lwAssetUrl only exists in the main document,
-    // not in a Web Worker scope. No bundled worker references a CDN asset today,
-    // but if one ever does the runtime expr below would throw in the worker —
-    // make the resolver worker-aware (self-based bootstrap) before that lands.
     renderBuiltUrl(filename, { type, hostType }) {
       if (type === "public") return undefined;
       if (hostType === "js") {
-        return { runtime: `window.${ASSET_URL_GLOBAL}(${JSON.stringify(filename)})` };
+        // Self-defaulting so the built bundle is usable even when the server
+        // hasn't injected the resolver: `vite preview`, the boot-smoke, and any
+        // raw-`dist/` static server fall back to same-origin ("/"+path). Read
+        // via `globalThis` (defined in the main document AND in Web Worker
+        // scopes, where `window` is undefined) so a worker chunk degrades to
+        // same-origin instead of throwing. The server sets
+        // `globalThis.__lwAssetUrl` to the CDN prefixer when LANGWATCH_ASSET_BASE
+        // is configured.
+        return {
+          runtime: `(globalThis.${ASSET_URL_GLOBAL}||function(p){return "/"+p})(${JSON.stringify(
+            filename,
+          )})`,
+        };
       }
       if (hostType === "css") return { relative: true };
       return undefined;

@@ -118,14 +118,15 @@ Rollouts blue-green) are introduced.
   from the CDN and fail without it. The CSP already admits the CDN origin to
   `connect-src`/`worker-src`/`font-src`; CORS is the server-side half and lives
   in the infra repo.
-- **Limitation — Web Workers.** The runtime resolver (`window.__lwAssetUrl`) is
-  defined only in the main document, so it does not exist inside a Web Worker
-  scope. No bundled worker currently references a CDN-hosted asset (Monaco loads
-  from jsdelivr; Shiki runs on the main thread), so this is latent. If a future
-  worker chunk references a `renderBuiltUrl`'d asset it would throw
-  `__lwAssetUrl is not defined` in the worker — at which point the resolver must
-  be made worker-scope-aware (a `self`-based bootstrap) or that worker's assets
-  kept same-origin. Flagged in `vite.config.ts`.
+- **Self-sufficient artifact / Web Workers.** The `renderBuiltUrl` runtime
+  expression is self-defaulting — `(globalThis.__lwAssetUrl || (p => "/"+p))(…)`
+  — so the built bundle works even when the resolver was never injected: `vite
+  preview`, the CI boot-smoke, and any raw-`dist/` static server all fall back to
+  same-origin. Reading via `globalThis` (defined in Web Worker scopes too, where
+  `window` is not) means a worker chunk degrades to same-origin rather than
+  throwing. The only consequence: a future CDN-hosted worker asset would be
+  served same-origin (from the pod) instead of the CDN until the server-side
+  resolver is made worker-aware — correct, just not edge-cached.
 
 ## References
 
