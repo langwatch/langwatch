@@ -158,9 +158,14 @@ type PersistedTopLevelState = Pick<
   "windows" | "activeWindowId"
 >;
 
-/** Shape written under the main storage key: tab identity/order only, no data. */
+/**
+ * Shape written under the main storage key: tab identity/order only, no data.
+ * `data` is optional purely to read the LEGACY single-key format, where each
+ * tab's full `data` was embedded in the index instead of a per-tab key.
+ */
 interface LightTab {
   id: string;
+  data?: TabData;
 }
 interface LightWindow {
   id: string;
@@ -260,36 +265,45 @@ function createTabAwarePersistStorage(
         const windows: Window[] = parsed.state.windows.map((w) => ({
           id: w.id,
           activeTabId: w.activeTabId,
-          // Drop any tab whose per-tab data key is missing or corrupt rather
-          // than fabricating an invalid tab. Fabricating `undefined` data
-          // would fail whole-state validation in onRehydrateStorage and wipe
-          // *every* tab, and letting JSON.parse throw would reject the entire
-          // store — either way one bad key loses all tabs. Downstream
-          // rehydration validation prunes now-empty windows and repairs a
-          // dangling activeTabId.
+          // Resolve each tab's data from its own per-tab key. Fall back to the
+          // legacy embedded `t.data` (old single-key format) so existing users
+          // don't lose their open tabs on upgrade. Drop a tab only when data is
+          // truly unrecoverable, rather than fabricating an invalid tab:
+          // fabricating `undefined` would fail whole-state validation in
+          // onRehydrateStorage and wipe *every* tab, and letting JSON.parse
+          // throw would reject the entire store — either way one bad key loses
+          // all tabs. Downstream validation prunes now-empty windows and
+          // repairs a dangling activeTabId.
           tabs: w.tabs.flatMap((t) => {
             const tabRaw = localStorage.getItem(
               getTabStorageKey(projectId, t.id),
             );
-            if (!tabRaw) {
-              logger.warn(
-                { tabId: t.id },
-                "Missing per-tab data key during rehydration, dropping tab",
-              );
-              return [];
+            if (tabRaw) {
+              let data: TabData;
+              try {
+                data = JSON.parse(tabRaw) as TabData;
+              } catch (parseError) {
+                logger.warn(
+                  { tabId: t.id, error: parseError },
+                  "Corrupt per-tab data during rehydration, dropping tab",
+                );
+                return [];
+              }
+              lastPersistedDataRefs.set(t.id, data);
+              return [{ id: t.id, data }];
             }
-            let data: TabData;
-            try {
-              data = JSON.parse(tabRaw) as TabData;
-            } catch (parseError) {
-              logger.warn(
-                { tabId: t.id, error: parseError },
-                "Corrupt per-tab data during rehydration, dropping tab",
-              );
-              return [];
+            if (t.data) {
+              // Legacy single-key payload: adopt the embedded data. Do NOT seed
+              // lastPersistedDataRefs so the next persist writes this tab's own
+              // per-tab key (completing the migration) instead of dedup-skipping
+              // it, which would strand the data as the index drops embedded data.
+              return [{ id: t.id, data: t.data }];
             }
-            lastPersistedDataRefs.set(t.id, data);
-            return [{ id: t.id, data }];
+            logger.warn(
+              { tabId: t.id },
+              "Missing per-tab data key during rehydration, dropping tab",
+            );
+            return [];
           }),
         }));
 

@@ -480,6 +480,57 @@ describe("DraggableTabsBrowserStore", () => {
   });
 
   describe("rehydration recovery", () => {
+    describe("when reading the legacy single-key persisted format", () => {
+      it("adopts the embedded tab data and migrates it to per-tab keys", async () => {
+        const lightKey = `${TEST_PROJECT_ID}:draggable-tabs-browser-store`;
+
+        // Legacy format: full tab data embedded in the index, NO per-tab keys.
+        // This is what an existing user's localStorage looks like on upgrade.
+        localStorage.setItem(
+          lightKey,
+          JSON.stringify({
+            state: {
+              windows: [
+                {
+                  id: "window-1",
+                  activeTabId: "tab-1",
+                  tabs: [
+                    { id: "tab-1", data: createTabData({ meta: { title: "Legacy A" } }) },
+                    { id: "tab-2", data: createTabData({ meta: { title: "Legacy B" } }) },
+                  ],
+                },
+              ],
+              activeWindowId: "window-1",
+            },
+            version: 0,
+          }),
+        );
+
+        await store.persist.rehydrate();
+
+        // Both tabs survive the upgrade with their data intact.
+        const state = store.getState();
+        expect(state.windows[0]?.tabs.map((t) => t.id)).toEqual([
+          "tab-1",
+          "tab-2",
+        ]);
+        expect(state.getByTabId("tab-1")?.meta.title).toBe("Legacy A");
+        expect(state.getByTabId("tab-2")?.meta.title).toBe("Legacy B");
+
+        // A subsequent write migrates each tab into its own per-tab key.
+        store.getState().updateTabData({
+          tabId: "tab-1",
+          updater: (data) => ({ ...data, meta: { ...data.meta, title: "A2" } }),
+        });
+        expect(localStorage.getItem(`${TEST_PROJECT_ID}:tab:tab-1`)).toContain(
+          "A2",
+        );
+        expect(
+          localStorage.getItem(`${TEST_PROJECT_ID}:tab:tab-2`),
+        ).not.toBeNull();
+      });
+    });
+
     describe("when one tab's per-tab data key is missing", () => {
       it("drops only that tab and keeps the rest instead of wiping the store", async () => {
         const lightKey = `${TEST_PROJECT_ID}:draggable-tabs-browser-store`;
