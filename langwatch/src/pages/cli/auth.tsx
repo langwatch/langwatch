@@ -132,32 +132,6 @@ function StatusCard({
   );
 }
 
-/**
- * Quiet exit for terminal states (approved, denied, expired, error): the
- * flow is over either way — Go Home lands on "/" and the resolver picks
- * the right surface per org intent. Deliberately understated (like the
- * onboarding Back/Skip secondaries): closing the tab is the primary
- * gesture, this is just the alternative.
- */
-function TerminalActions() {
-  return (
-    <HStack justify="center">
-      <Button
-        variant="ghost"
-        size="sm"
-        color="fg.muted"
-        borderRadius="8px"
-        _hover={{ bg: "bg.muted", color: "fg" }}
-        onClick={() => {
-          window.location.href = "/";
-        }}
-      >
-        Go Home
-      </Button>
-    </HStack>
-  );
-}
-
 export default function CliAuthPage() {
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
@@ -447,7 +421,6 @@ export default function CliAuthPage() {
                     Restart <code>langwatch login</code> in your terminal to
                     get a new code.
                   </StatusCard>
-                  <TerminalActions />
                 </>
               )}
 
@@ -460,7 +433,6 @@ export default function CliAuthPage() {
                   >
                     {lookup.message}
                   </StatusCard>
-                  <TerminalActions />
                 </>
               )}
 
@@ -636,7 +608,6 @@ export default function CliAuthPage() {
                       this tab and return to your terminal.
                     </StatusCard>
                   )}
-                  <TerminalActions />
                 </>
               )}
 
@@ -649,7 +620,6 @@ export default function CliAuthPage() {
                   >
                     The CLI session has been rejected. You can close this tab.
                   </StatusCard>
-                  <TerminalActions />
                 </>
               )}
             </VStack>
