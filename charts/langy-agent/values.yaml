@@ -29,7 +29,16 @@ manager:
   port: 8080
   maxWorkers: 20
   workerIdleMs: 600000        # 10 min — idle workers are reaped
-  readinessTimeoutMs: 15000   # how long to wait for a worker's opencode to bind
+  # How long to wait for a freshly-spawned worker's opencode to bind before
+  # aborting the spawn. Under gVisor (runsc), process/syscall startup is
+  # materially slower than runc: a cold opencode boot on the dev gVisor node
+  # measured ~28s (2026-07-07), so the previous 15s default aborted the FIRST
+  # message of every conversation (and every message after workerIdleMs) with
+  # "context deadline exceeded", surfacing as an empty reply. 60s gives gVisor
+  # cold-boot comfortable headroom. Warm workers are unaffected (this only
+  # gates the spawn). A true fix for first-message latency is a warm pool /
+  # spawn-on-panel-open — tracked separately.
+  readinessTimeoutMs: 60000
 
 service:
   type: ClusterIP
