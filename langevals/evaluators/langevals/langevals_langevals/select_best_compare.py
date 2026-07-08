@@ -18,7 +18,6 @@ import os
 import random
 from typing import Literal, Optional, cast
 
-import litellm
 from langevals_core.base_evaluator import (
     BaseEvaluator,
     EvaluationResult,
@@ -28,7 +27,7 @@ from langevals_core.base_evaluator import (
     Money,
     SingleEvaluationResult,
 )
-from litellm import Choices, Message
+from litellm import Choices, Message, completion
 from litellm.cost_calculator import completion_cost
 from litellm.files.main import ModelResponse
 from pydantic import BaseModel, Field
@@ -195,7 +194,7 @@ class SelectBestCompareEvaluator(
         slot_labels = list(slot_to_candidate.keys())
         winner_enum = slot_labels + (["tie"] if self.settings.allow_tie else [])
 
-        response = litellm.completion(
+        response = completion(
             model=self.settings.model,
             messages=[
                 {

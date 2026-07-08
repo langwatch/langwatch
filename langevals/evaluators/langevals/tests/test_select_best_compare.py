@@ -82,7 +82,7 @@ def test_empty_output_candidates_filtered_but_remainder_kept():
     )
 
     with patch(
-        "langevals_langevals.select_best_compare.litellm.completion",
+        "langevals_langevals.select_best_compare.completion",
         return_value=_mock_completion_response("v0 looks closer", "A"),
     ) as mock_completion, patch(
         "langevals_langevals.select_best_compare.completion_cost",
@@ -107,7 +107,7 @@ def test_returns_winning_candidate_id_not_slot_label():
     entry = _make_entry(num_candidates=3)
 
     with patch(
-        "langevals_langevals.select_best_compare.litellm.completion",
+        "langevals_langevals.select_best_compare.completion",
         return_value=_mock_completion_response("slot A wins", "A"),
     ), patch(
         "langevals_langevals.select_best_compare.completion_cost",
@@ -128,7 +128,7 @@ def test_returns_tie_when_judge_ties():
     entry = _make_entry(num_candidates=3)
 
     with patch(
-        "langevals_langevals.select_best_compare.litellm.completion",
+        "langevals_langevals.select_best_compare.completion",
         return_value=_mock_completion_response("indistinguishable", "tie"),
     ), patch(
         "langevals_langevals.select_best_compare.completion_cost",
@@ -157,7 +157,7 @@ def test_deterministic_shuffle_by_row_index():
         return _mock_completion_response("ok", "A")
 
     with patch(
-        "langevals_langevals.select_best_compare.litellm.completion",
+        "langevals_langevals.select_best_compare.completion",
         side_effect=capture,
     ), patch(
         "langevals_langevals.select_best_compare.completion_cost",
@@ -186,7 +186,7 @@ def test_no_shuffle_when_randomize_order_disabled():
         return _mock_completion_response("ok", "A")
 
     with patch(
-        "langevals_langevals.select_best_compare.litellm.completion",
+        "langevals_langevals.select_best_compare.completion",
         side_effect=capture,
     ), patch(
         "langevals_langevals.select_best_compare.completion_cost",
@@ -223,7 +223,7 @@ def test_metrics_injected_into_prompt_when_requested():
         return _mock_completion_response("ok", "A")
 
     with patch(
-        "langevals_langevals.select_best_compare.litellm.completion",
+        "langevals_langevals.select_best_compare.completion",
         side_effect=capture,
     ), patch(
         "langevals_langevals.select_best_compare.completion_cost",
@@ -249,7 +249,7 @@ def test_metrics_not_injected_by_default():
     )
 
     with patch(
-        "langevals_langevals.select_best_compare.litellm.completion",
+        "langevals_langevals.select_best_compare.completion",
         return_value=_mock_completion_response("ok", "A"),
     ) as mock_completion, patch(
         "langevals_langevals.select_best_compare.completion_cost",
@@ -267,7 +267,7 @@ def test_five_candidates_use_exactly_one_call():
     entry = _make_entry(num_candidates=5)
 
     with patch(
-        "langevals_langevals.select_best_compare.litellm.completion",
+        "langevals_langevals.select_best_compare.completion",
         return_value=_mock_completion_response("ok", "B"),
     ) as mock_completion, patch(
         "langevals_langevals.select_best_compare.completion_cost",
@@ -285,7 +285,7 @@ def test_result_carries_reasoning_and_cost():
     entry = _make_entry(num_candidates=3)
 
     with patch(
-        "langevals_langevals.select_best_compare.litellm.completion",
+        "langevals_langevals.select_best_compare.completion",
         return_value=_mock_completion_response("A is closer", "A"),
     ), patch(
         "langevals_langevals.select_best_compare.completion_cost",
@@ -306,7 +306,7 @@ def test_allow_tie_false_removes_tie_from_enum():
     entry = _make_entry(num_candidates=3)
 
     with patch(
-        "langevals_langevals.select_best_compare.litellm.completion",
+        "langevals_langevals.select_best_compare.completion",
         return_value=_mock_completion_response("ok", "A"),
     ) as mock_completion, patch(
         "langevals_langevals.select_best_compare.completion_cost",
