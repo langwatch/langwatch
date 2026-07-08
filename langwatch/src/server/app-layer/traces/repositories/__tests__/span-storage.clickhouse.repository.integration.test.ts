@@ -411,4 +411,193 @@ describe("SpanStorageClickHouseRepository single-trace reads (integration)", () 
       });
     });
   });
+
+  // The single-trace span readers fire from the same hint-dropping entry points
+  // as the events read (back-stack / conversation jumps / deep links) and from
+  // worker callers that never had an `occurredAtMs`. Without a hint they used to
+  // walk every weekly `stored_spans` partition (incl. cold S3). They now seed
+  // the partition window from the trace's own `trace_summaries.OccurredAt` and
+  // read that window first. Unlike the events read, an empty windowed result is
+  // NOT authoritative for spans (OccurredAt is the trace start and never widens,
+  // so a long-running trace can produce spans past OccurredAt + 2 days): the
+  // reader falls back to an unbounded rescan, and only skips the window entirely
+  // when the trace isn't in `trace_summaries` at all.
+  describe("given a span read without an occurredAtMs hint", () => {
+    const hintlessTenantId = `test-span-read-hintless-${nanoid()}`;
+    const withSpansTraceId = `trace-${nanoid()}`;
+    const emptyTraceId = `trace-${nanoid()}`;
+    const orphanTraceId = `trace-${nanoid()}`;
+    const outOfWindowTraceId = `trace-${nanoid()}`;
+    const summaryOccurredAt = new Date(base);
+    // Five days past the summary's OccurredAt — outside the ±2-day resolved
+    // window, so a long-running trace whose late spans land here must still be
+    // returned via the unbounded fallback rather than silently dropped.
+    const outOfWindowStartTime = new Date(base + 5 * 24 * 60 * 60 * 1000);
+
+    async function insertSummary(tid: string) {
+      await ch.insert({
+        table: "trace_summaries",
+        values: [
+          {
+            ProjectionId: `proj-${nanoid()}`,
+            TenantId: hintlessTenantId,
+            TraceId: tid,
+            Version: "v1",
+            OccurredAt: summaryOccurredAt,
+            CreatedAt: summaryOccurredAt,
+            UpdatedAt: summaryOccurredAt,
+          },
+        ],
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+      });
+    }
+
+    beforeAll(async () => {
+      await insertRows([
+        makeSpanRow(0, {
+          TenantId: hintlessTenantId,
+          TraceId: withSpansTraceId,
+          SpanAttributes: { idx: "0" },
+        }),
+        makeSpanRow(0, {
+          TenantId: hintlessTenantId,
+          TraceId: outOfWindowTraceId,
+          StartTime: outOfWindowStartTime,
+          SpanAttributes: { idx: "0" },
+        }),
+      ]);
+      // `withSpansTraceId`, `emptyTraceId` and `outOfWindowTraceId` are in
+      // trace_summaries (time resolvable); `orphanTraceId` deliberately is not.
+      await insertSummary(withSpansTraceId);
+      await insertSummary(emptyTraceId);
+      await insertSummary(outOfWindowTraceId);
+    });
+
+    afterAll(async () => {
+      await ch.exec({
+        query:
+          "ALTER TABLE stored_spans DELETE WHERE TenantId = {tenantId:String}",
+        query_params: { tenantId: hintlessTenantId },
+      });
+      await ch.exec({
+        query:
+          "ALTER TABLE trace_summaries DELETE WHERE TenantId = {tenantId:String}",
+        query_params: { tenantId: hintlessTenantId },
+      });
+    });
+
+    it("resolves the partition window from trace_summaries and still returns the spans", async () => {
+      const spans = await repo.getNormalizedSpansByTraceId({
+        tenantId: hintlessTenantId,
+        traceId: withSpansTraceId,
+      });
+
+      expect(spans.map((s) => s.spanId)).toEqual([spanIdFor(0)]);
+    });
+
+it("returns no spans for a trace without any, via the bounded-then-unbounded fallback", async () => {
+      const storedSpansQueries: { query: string; params: unknown }[] = [];
+      const recordingClient = new Proxy(ch, {
+        get(target, prop, receiver) {
+          if (prop === "query") {
+            return (args: { query: string; query_params?: unknown }) => {
+              if (args.query.includes("stored_spans")) {
+                storedSpansQueries.push({
+                  query: args.query,
+                  params: args.query_params,
+                });
+              }
+              return (target as ClickHouseClient).query(args as never);
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      }) as ClickHouseClient;
+      const recordingRepo = new SpanStorageClickHouseRepository(
+        async () => recordingClient,
+      );
+
+      const spans = await recordingRepo.getNormalizedSpansByTraceId({
+        tenantId: hintlessTenantId,
+        traceId: emptyTraceId,
+      });
+
+      // A trace's OccurredAt is its start and never widens, so an empty windowed
+      // result is not authoritative for spans: fall back to an unbounded rescan
+      // (bounded read first, then the unbounded one) rather than risk dropping
+      // spans on a long-running trace.
+      expect(spans).toEqual([]);
+      expect(storedSpansQueries).toHaveLength(2);
+      expect(storedSpansQueries[0]!.query).toContain("StartTime >=");
+      expect(storedSpansQueries[1]!.query).not.toContain("StartTime >=");
+    });
+
+    it("returns spans that fall outside the resolved ±2-day window via the unbounded fallback", async () => {
+      const storedSpansQueries: { query: string; params: unknown }[] = [];
+      const recordingClient = new Proxy(ch, {
+        get(target, prop, receiver) {
+          if (prop === "query") {
+            return (args: { query: string; query_params?: unknown }) => {
+              if (args.query.includes("stored_spans")) {
+                storedSpansQueries.push({
+                  query: args.query,
+                  params: args.query_params,
+                });
+              }
+              return (target as ClickHouseClient).query(args as never);
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      }) as ClickHouseClient;
+      const recordingRepo = new SpanStorageClickHouseRepository(
+        async () => recordingClient,
+      );
+
+      const spans = await recordingRepo.getNormalizedSpansByTraceId({
+        tenantId: hintlessTenantId,
+        traceId: outOfWindowTraceId,
+      });
+
+      // The span sits 5 days past OccurredAt, outside the ±2-day window, so the
+      // bounded read misses it and the unbounded fallback recovers it — the
+      // long-running-trace correctness case the resolved window alone breaks.
+      expect(spans.map((s) => s.spanId)).toEqual([spanIdFor(0)]);
+      expect(storedSpansQueries).toHaveLength(2);
+      expect(storedSpansQueries[0]!.query).toContain("StartTime >=");
+      expect(storedSpansQueries[1]!.query).not.toContain("StartTime >=");
+    });
+
+    it("stays unbounded for a trace that is not in trace_summaries", async () => {
+      // No resolvable time: the reader keeps its previous behaviour and scans
+      // unbounded rather than guessing a window.
+      const storedSpansQueries: string[] = [];
+      const recordingClient = new Proxy(ch, {
+        get(target, prop, receiver) {
+          if (prop === "query") {
+            return (args: { query: string; query_params?: unknown }) => {
+              if (args.query.includes("stored_spans")) {
+                storedSpansQueries.push(args.query);
+              }
+              return (target as ClickHouseClient).query(args as never);
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      }) as ClickHouseClient;
+      const recordingRepo = new SpanStorageClickHouseRepository(
+        async () => recordingClient,
+      );
+
+      const spans = await recordingRepo.getNormalizedSpansByTraceId({
+        tenantId: hintlessTenantId,
+        traceId: orphanTraceId,
+      });
+
+      expect(spans).toEqual([]);
+      expect(storedSpansQueries).toHaveLength(1);
+      expect(storedSpansQueries[0]!).not.toContain("StartTime >=");
+    });
+  });
 });
