@@ -128,11 +128,7 @@ export class EventSourcing {
   private readonly _clickhouse?: ClickHouseClientResolver | null;
   private readonly _redis?: IORedis | Cluster | null;
   private readonly _processRole?: ProcessRole;
-  // Not `readonly`: composition-root wiring builds the outbox runtime AFTER
-  // this instance (because the outbox needs repositories which are built
-  // between here and the outbox construction). `attachOutbox` sets this once,
-  // BEFORE any pipeline is registered.
-  private _outbox?: OutboxRuntime;
+  private readonly _outbox?: OutboxRuntime;
   private readonly _retentionPolicyResolver?: RetentionPolicyResolver;
 
   constructor(options: EventSourcingOptions = {}) {
@@ -169,23 +165,18 @@ export class EventSourcing {
   }
 
   /**
-   * Attach the outbox runtime after construction. One-shot: throws on second
-   * call. Must be called BEFORE any `register()` call — pipelines snapshot
-   * `_outbox` at registration time via `buildServiceOptions(definition, this._outbox)`.
+   * Whether an outbox runtime is wired into this instance.
    *
-   * Composition-root wiring uses this because the outbox runtime depends on
-   * repositories that are themselves built after `new EventSourcing(...)`; the
-   * ES constructor's `outbox` option remains available for tests and any
-   * caller that can build the outbox eagerly.
+   * This is the exact invariant that silently broke trigger dispatch: on a
+   * worker the outbox must be present so `.withOutbox` reactors enqueue settle
+   * payloads instead of hitting the no-op drop path. It is set once, from the
+   * constructor `outbox` option — passing the runtime anywhere else (e.g. only
+   * to the pipeline registry) leaves this `false` and every trigger silently
+   * drops. Exposed so the composition root's wiring can be asserted in tests
+   * and surfaced as a worker health signal rather than failing invisibly.
    */
-  attachOutbox(runtime: OutboxRuntime): void {
-    if (this._outbox) {
-      throw new ConfigurationError(
-        "EventSourcing",
-        "Outbox runtime already attached — attachOutbox is one-shot",
-      );
-    }
-    this._outbox = runtime;
+  get isOutboxWired(): boolean {
+    return !!this._outbox;
   }
 
   /**

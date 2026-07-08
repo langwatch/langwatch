@@ -61,7 +61,6 @@ function makeDeps(overrides?: {
 
   return {
     deps: {
-      prisma: {} as never,
       rollupRepository: { run: runRollupTimeseries },
       slimRepository: { run: runSlimTimeseries },
       legacyShim: { run: runLegacy },

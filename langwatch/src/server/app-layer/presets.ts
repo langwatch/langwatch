@@ -534,15 +534,6 @@ export function initializeDefaultApp(options?: {
     "ShareService",
   );
 
-  const es = new EventSourcing({
-    clickhouse: clickhouseEnabled ? resolveClickHouseClient : void 0,
-    redis,
-    enabled: true,
-    isSaas: config.isSaas,
-    processRole: config.processRole,
-    retentionPolicyResolver: retentionPolicyCache,
-  });
-
   // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
   const repositories: PipelineRepositories = {
     suiteRunState: clickhouseEnabled
@@ -607,9 +598,10 @@ export function initializeDefaultApp(options?: {
       }
     : undefined;
 
-  // Outbox stack: worker-only consumer loop, but the send-side handle is
-  // wired into the registry so reactors can enqueue settle payloads. Web
-  // processes don't build this (no settle traffic; no consumer to drain).
+  // Outbox stack: worker-only consumer loop. The send-side handle is wired
+  // into the EventSourcing runtime below (passed to `new EventSourcing`), so
+  // its `.withOutbox` reactors can enqueue settle payloads. Web processes
+  // don't build this (no settle traffic; no consumer to drain).
   const outbox =
     config.processRole === "worker"
       ? buildOutboxRuntime({
@@ -624,14 +616,22 @@ export function initializeDefaultApp(options?: {
         })
       : undefined;
 
-  // Wire the outbox runtime into EventSourcing BEFORE any pipeline registers —
-  // `register()` snapshots `_outbox` via `buildServiceOptions(...)`. Without this,
-  // `EventSourcing.queue`'s outbox-payload handler fails-closed at
-  // `eventSourcing.ts:508` and every settle / cadence / graphEval enqueue
-  // stays retryable forever (found by /review-pr reg5014-001 + dispatch5015-001).
-  if (outbox) {
-    es.attachOutbox(outbox);
-  }
+  // EventSourcing must be constructed AFTER `outbox` and be given it here: the
+  // reactor adapter (`.withOutbox` → enqueueSettle) and the global queue's
+  // settle/cadence routing + audit adapter all read `this._outbox`, set once at
+  // construction. Passing `outbox` anywhere else (e.g. only to the registry)
+  // leaves every outbox reactor on the silent drop path — the trigger dispatch
+  // regression fixed here (also found by /review-pr reg5014-001 +
+  // dispatch5015-001). See presets.outboxWiring.integration.test.ts.
+  const es = new EventSourcing({
+    clickhouse: clickhouseEnabled ? resolveClickHouseClient : void 0,
+    redis,
+    enabled: true,
+    isSaas: config.isSaas,
+    processRole: config.processRole,
+    retentionPolicyResolver: retentionPolicyCache,
+    outbox,
+  });
 
   // Heartbeat scheduler (ADR-034 Phase 4): worker-only periodic source of
   // outbox enqueues for the cases the event-driven outbox path
@@ -694,7 +694,6 @@ export function initializeDefaultApp(options?: {
     blobStore,
     governanceKpisSync,
     governanceOcsfEventsSync,
-    outbox,
   });
   const commands = registry.registerAll();
   (globalForApp as any).__scenarioExecutionHandle =

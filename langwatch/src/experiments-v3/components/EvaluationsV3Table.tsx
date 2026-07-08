@@ -1096,6 +1096,15 @@ export function EvaluationsV3Table({
     getCellValue: state.getCellValue,
   }));
 
+  // Which target column's header cell should glow — set by clicking a
+  // variant name in a pairwise verdict (customer feedback, 2026-07-08).
+  // Applied to the whole `<th>` box, not just the component rendered
+  // inside it, so the highlight reads as "this column" rather than a
+  // border around one label.
+  const highlightedVariantTargetId = useEvaluationsV3Store(
+    (state) => state.ui.highlightedVariantTargetId,
+  );
+
   // Build row data from active dataset records (works for both inline and saved)
   // Note: We include activeDataset in dependencies to ensure re-render when cell values change
   const rowData = useMemo((): TableRowData[] => {
@@ -1823,6 +1832,9 @@ export function EvaluationsV3Table({
                 const columnType = meta?.columnType ?? "unknown";
                 const isFixedWidth = meta?.isFixedWidth ?? false;
 
+                const isHighlightedColumn =
+                  !!targetId && targetId === highlightedVariantTargetId;
+
                 return (
                   <th
                     key={header.id}
@@ -1832,6 +1844,11 @@ export function EvaluationsV3Table({
                         columnType,
                         isFixedWidth,
                       ),
+                      ...(isHighlightedColumn && {
+                        boxShadow:
+                          "inset 0 0 0 2px var(--chakra-colors-blue-400)",
+                        background: "var(--chakra-colors-blue-subtle)",
+                      }),
                     }}
                     // Add data attribute for target columns to enable scroll-to behavior
                     {...(targetId && { "data-target-column": targetId })}

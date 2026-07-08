@@ -11,6 +11,7 @@ const MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR;
 const DAYS_PER_WEEK = 7;
 const DAYS_PER_MONTH = 31;
 
+
 export function validateTimeZone(tz: string): string {
   try {
     Intl.DateTimeFormat(undefined, { timeZone: tz });

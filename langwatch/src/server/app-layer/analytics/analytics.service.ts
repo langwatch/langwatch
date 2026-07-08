@@ -18,7 +18,6 @@
  * `findX` / `runX` (see this module's repositories/ files).
  */
 
-import type { PrismaClient } from "@prisma/client";
 import { createHash } from "crypto";
 import { getLangWatchTracer } from "langwatch";
 import { getClickHouseAnalyticsService } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
@@ -32,7 +31,6 @@ import type {
 import { currentVsPreviousDates } from "~/server/api/routers/analytics/common";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
-import { prisma as defaultPrisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
 import type { FilterField } from "~/server/filters/types";
 import { TtlCache } from "~/server/utils/ttlCache";
@@ -54,7 +52,6 @@ import { compareForTripwire } from "./tripwire/divergence-compare";
 const TIMESERIES_CACHE_TTL_MS = 30_000 as const;
 
 export interface AnalyticsServiceDependencies {
-  prisma: PrismaClient;
   rollupRepository: AnalyticsTimeseriesReadRepository;
   slimRepository: AnalyticsTimeseriesReadRepository;
   /**
@@ -330,15 +327,13 @@ const defaultResolveClient: ClickHouseClientResolver = async (tenantId) => {
 };
 
 /**
- * Factory using production dependencies (real ClickHouse resolver, real
- * Prisma, legacy backend singleton).
+ * Factory using production dependencies (real ClickHouse resolver, legacy
+ * backend singleton).
  */
 export function createAnalyticsService(
-  prisma: PrismaClient = defaultPrisma,
   resolveClient: ClickHouseClientResolver = defaultResolveClient,
 ): AnalyticsService {
   return new AnalyticsService({
-    prisma,
     rollupRepository: createTraceRollupReadRepo(resolveClient),
     slimRepository: createTraceSlimReadRepo(resolveClient),
     legacyShim: new ClickHouseLegacyAnalyticsShim(resolveClient),
@@ -350,9 +345,9 @@ export function createAnalyticsService(
 
 let analyticsService: AnalyticsService | null = null;
 
-export function getAnalyticsService(prisma?: PrismaClient): AnalyticsService {
+export function getAnalyticsService(): AnalyticsService {
   if (!analyticsService) {
-    analyticsService = createAnalyticsService(prisma);
+    analyticsService = createAnalyticsService();
   }
   return analyticsService;
 }

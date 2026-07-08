@@ -860,6 +860,11 @@ describe("ClickHouseTraceService", () => {
         const traceIds = ["trace-0", "trace-1"];
 
         mockClickHouseQuery
+          // resolve: min/max OccurredAt for the ids (no occurredAt passed)
+          .mockResolvedValueOnce({
+            json: () =>
+              Promise.resolve([{ fromMs: 1_000_000, toMs: 2_000_000 }]),
+          })
           // summary query for the full list — OOM
           .mockRejectedValueOnce(
             new Error(
@@ -898,6 +903,11 @@ describe("ClickHouseTraceService", () => {
         const traceIds = Array.from({ length: 30 }, (_, i) => `trace-${i}`);
 
         mockClickHouseQuery
+          // resolve: min/max OccurredAt for the ids (no occurredAt passed)
+          .mockResolvedValueOnce({
+            json: () =>
+              Promise.resolve([{ fromMs: 1_000_000, toMs: 2_000_000 }]),
+          })
           // full-list summary — OOM
           .mockRejectedValueOnce(new Error("MEMORY_LIMIT_EXCEEDED"))
           // batch 1: summary (0-24) then spans
@@ -938,9 +948,10 @@ describe("ClickHouseTraceService", () => {
         );
 
         expect(traces).toHaveLength(30);
-        // call 0 = OOM, 1 = summary batch1, 2 = spans batch1, 3 = summary batch2
-        const batch1Summary = mockClickHouseQuery.mock.calls[1]![0];
-        const batch2Summary = mockClickHouseQuery.mock.calls[3]![0];
+        // call 0 = resolve, 1 = OOM full summary, 2 = summary batch1,
+        // 3 = spans batch1, 4 = summary batch2, 5 = spans batch2
+        const batch1Summary = mockClickHouseQuery.mock.calls[2]![0];
+        const batch2Summary = mockClickHouseQuery.mock.calls[4]![0];
         expect(batch1Summary.query_params.traceIds).toHaveLength(25);
         expect(batch2Summary.query_params.traceIds).toHaveLength(5);
       });
@@ -957,8 +968,9 @@ describe("ClickHouseTraceService", () => {
         await expect(
           service.getTracesWithSpans("proj_123", ["trace-0"], protections),
         ).rejects.toThrow();
-        // The single failed query is not followed by per-batch retries.
-        expect(mockClickHouseQuery).toHaveBeenCalledTimes(1);
+        // The resolve fails open (call 1), then the summary's non-OOM error
+        // propagates without per-batch retries (call 2) — no retry loop.
+        expect(mockClickHouseQuery).toHaveBeenCalledTimes(2);
       });
     });
 
@@ -1002,8 +1014,14 @@ describe("ClickHouseTraceService", () => {
     });
 
     describe("when no occurredAt range is supplied", () => {
-      it("omits the OccurredAt window and keeps the unbounded summary read", async () => {
+      it("resolves the OccurredAt window from a sort-key seek and bounds the summary read", async () => {
+        const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
         mockClickHouseQuery
+          // resolve: min/max OccurredAt for the trace ids (light sort-key seek)
+          .mockResolvedValueOnce({
+            json: () =>
+              Promise.resolve([{ fromMs: 1_000_000, toMs: 2_000_000 }]),
+          })
           .mockResolvedValueOnce({
             json: () => Promise.resolve([makeSummaryRow("trace-0")]),
           })
@@ -1017,13 +1035,76 @@ describe("ClickHouseTraceService", () => {
 
         await service.getTracesWithSpans("proj_123", ["trace-0"], protections);
 
-        const summaryCall = mockClickHouseQuery.mock.calls[0]![0];
+        const resolveCall = mockClickHouseQuery.mock.calls[0]![0];
+        expect(resolveCall.query).toContain("min(OccurredAt)");
+        expect(resolveCall.query).toContain("max(OccurredAt)");
+
+        const summaryCall = mockClickHouseQuery.mock.calls[1]![0];
+        // Bounded to the resolved window (±2 days) in outer scan and inner dedup.
+        expect(
+          summaryCall.query.match(/OccurredAt >= fromUnixTimestamp64Milli/g) ??
+            [],
+        ).toHaveLength(2);
+        expect(summaryCall.query_params.sumFromMs).toBe(
+          1_000_000 - TWO_DAYS_MS,
+        );
+        expect(summaryCall.query_params.sumToMs).toBe(2_000_000 + TWO_DAYS_MS);
+      });
+
+      it("keeps the summary read unbounded when the ids resolve to no rows", async () => {
+        mockClickHouseQuery
+          // resolve finds nothing -> min/max default to epoch (0) = "no window"
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([{ fromMs: 0, toMs: 0 }]),
+          })
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([makeSummaryRow("trace-0")]),
+          })
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([makeSpanRow("trace-0", "trace-0-s")]),
+          });
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        await service.getTracesWithSpans("proj_123", ["trace-0"], protections);
+
+        const summaryCall = mockClickHouseQuery.mock.calls[1]![0];
         // No OccurredAt predicate inlined at all, and no window params.
         expect(summaryCall.query).not.toContain("OccurredAt >=");
         expect(summaryCall.query).not.toContain("OccurredAt <=");
-        expect(summaryCall.query).not.toContain("sumFromMs");
         expect(summaryCall.query_params.sumFromMs).toBeUndefined();
         expect(summaryCall.query_params.sumToMs).toBeUndefined();
+      });
+
+      it("fails open to the unbounded read when the resolve query errors", async () => {
+        mockClickHouseQuery
+          // resolve errors (transient ClickHouse failure)
+          .mockRejectedValueOnce(new Error("resolve boom"))
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([makeSummaryRow("trace-0")]),
+          })
+          .mockResolvedValueOnce({
+            json: () => Promise.resolve([makeSpanRow("trace-0", "trace-0-s")]),
+          });
+
+        const service = new ClickHouseTraceService({
+          project: { findUnique: mockPrismaFindUnique },
+        } as never);
+
+        const traces = await service.getTracesWithSpans(
+          "proj_123",
+          ["trace-0"],
+          protections,
+        );
+
+        // The read still succeeds; the summary just stays unbounded (the
+        // pre-optimization behaviour) rather than propagating the resolve error.
+        expect(traces).toHaveLength(1);
+        const summaryCall = mockClickHouseQuery.mock.calls[1]![0];
+        expect(summaryCall.query).not.toContain("OccurredAt >=");
+        expect(summaryCall.query_params.sumFromMs).toBeUndefined();
       });
     });
   });

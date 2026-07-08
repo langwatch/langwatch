@@ -1,5 +1,7 @@
+import type { MouseEvent } from "react";
 import { Box, HStack, Icon, Popover, Text } from "@chakra-ui/react";
 import { Equal, Trophy } from "lucide-react";
+import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 
 /**
  * Per-row pairwise verdict strip (#5100). Rendered below each row in
@@ -23,6 +25,13 @@ export type RowVerdictStripProps = {
   variantAName: string;
   /** Human-readable variant B name. */
   variantBName: string;
+  /**
+   * TargetConfig ids for each variant. Optional so preview/story callers
+   * can omit them; when present, clicking a variant name highlights its
+   * source column (customer feedback, 2026-07-08).
+   */
+  variantAId?: string;
+  variantBId?: string;
   /** Judge reasoning text. */
   reasoning?: string;
 };
@@ -31,11 +40,32 @@ export function RowVerdictStrip({
   label,
   variantAName,
   variantBName,
+  variantAId,
+  variantBId,
   reasoning,
 }: RowVerdictStripProps) {
+  const highlightedVariantTargetId = useEvaluationsV3Store(
+    (state) => state.ui.highlightedVariantTargetId,
+  );
+  const setHighlightedVariantTargetId = useEvaluationsV3Store(
+    (state) => state.setHighlightedVariantTargetId,
+  );
+  const toggleHighlight = (targetId: string | undefined) => {
+    if (!targetId) return;
+    setHighlightedVariantTargetId(
+      highlightedVariantTargetId === targetId ? undefined : targetId,
+    );
+  };
+  // The enclosing TableCell has its own onClick/onDoubleClick (cell
+  // selection / edit mode) — stop propagation so clicking a name only
+  // toggles the highlight instead of also selecting or editing the cell.
+  const stopPropagation = (e: MouseEvent) => e.stopPropagation();
+
   const isTie = label === "tie";
   const winnerName = label === "A" ? variantAName : variantBName;
   const loserName = label === "A" ? variantBName : variantAName;
+  const winnerTargetId = label === "A" ? variantAId : variantBId;
+  const loserTargetId = label === "A" ? variantBId : variantAId;
 
   return (
     <HStack
@@ -55,10 +85,34 @@ export function RowVerdictStrip({
       ) : (
         <HStack gap={1.5}>
           <Icon as={Trophy} color="yellow.fg" boxSize="14px" />
-          <Text fontWeight="medium" color="green.fg">
+          <Text
+            as="button"
+            fontWeight="medium"
+            color="green.fg"
+            cursor={winnerTargetId ? "pointer" : undefined}
+            _hover={winnerTargetId ? { textDecoration: "underline" } : undefined}
+            onClick={(e) => {
+              stopPropagation(e);
+              toggleHighlight(winnerTargetId);
+            }}
+            onDoubleClick={stopPropagation}
+          >
             {winnerName}
           </Text>
-          <Text color="fg.muted">vs {loserName}</Text>
+          <Text color="fg.muted">vs</Text>
+          <Text
+            as="button"
+            color="fg.muted"
+            cursor={loserTargetId ? "pointer" : undefined}
+            _hover={loserTargetId ? { textDecoration: "underline" } : undefined}
+            onClick={(e) => {
+              stopPropagation(e);
+              toggleHighlight(loserTargetId);
+            }}
+            onDoubleClick={stopPropagation}
+          >
+            {loserName}
+          </Text>
         </HStack>
       )}
       {reasoning ? (

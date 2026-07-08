@@ -20,7 +20,7 @@ Two ClickHouse projections off the event log, per aggregate.
 A **fold projection** writes the latest state per aggregate into a slim, time-sorted `ReplacingMergeTree(UpdatedAt)`.
 > **Shipped divergence:** the sketch called this `ReplacingMergeTree(Version)`; the shipped engine dedups on `UpdatedAt` (ClickHouse rejects `LowCardinality(String)` as a version column, and `UpdatedAt` matches `trace_summaries`'s convention — `Version` stays as a schema-snapshot tag). See Implementation status for details.
 
-**Idempotent and replay-safe by construction** (re-fold → same canonical state → readers dedup by latest UpdatedAt per aggregate id) — the platform's required contract, and identical to how `trace_summaries` already behaves. Holds **every dimension** (including the late/derived ones — topic, origin, user, conversation, model, …) and every metric scalar. Serves **percentiles, min/max, any dim-grouped query, arbitrary filters** — ~10–50× cheaper to scan than `trace_summaries` (slim rows, time-leading sort).
+**Idempotent and replay-safe by construction** (re-fold → same canonical state → readers dedup by latest UpdatedAt per aggregate id) — the platform's required contract, and identical to how `trace_summaries` already behaves. Holds **every dimension** (including the late/derived ones — topic, origin, user, conversation, model, …) and every metric scalar. Serves **percentiles, min/max, any dim-grouped query, slim-supported filters** (unsupported filters fall back to the legacy table — see Read routing) — ~10–50× cheaper to scan than `trace_summaries` (slim rows, time-leading sort).
 
 **Fold-state continuity.** The slim row is deliberately lossy (trimmed attributes, booleans), so the fold cannot read its state back from its own table the way the trace-summary fold does. Continuity comes from two layers instead: a Redis cache in front of the store (warm path) and the framework's `refoldOnStoreMiss` fold option — on a cache miss the executor rebuilds state **from the event log** up to the delivered event (log-order bounded, so a persisted-but-still-queued event is never pre-applied). This keeps the slim fold an independent projection with its own queue/retry lifecycle — one event fans out to two projections at the dispatch layer, each owning its own store — while the event log remains the source of truth for state reconstruction.
 
@@ -39,7 +39,7 @@ Each span contributes its own metric value; trace duration = the root span's val
 
 - additive `sum` **and** group-by ∈ {none, `Model`, `SpanType`} **and** no filter → **rollup**
 - `avg` → **rollup only ungrouped and only for metrics whose legacy column is non-nullable** (today: completion_time), computed as `sum(MetricSum) / sum(TraceCount)`; nullable-metric avgs (cost, tokens) stay on slim, whose one-row-per-aggregate shape reproduces CH `avg`'s NULL-skipping denominator
-- percentiles, min/max, any other group-by (topic/origin/user/…), arbitrary filters, distinct-counts → **slim table**
+- percentiles, min/max, any other group-by (topic/origin/user/…), slim-supported filters, distinct-counts → **slim table**; unsupported metrics/filters (events, blocklisted attribute keys, …) fall back to the legacy tables
 - else → `trace_summaries` (the drawer's table, untouched) or `evaluation_runs` for eval-source metrics
 - default to slim/raw on any doubt.
 
