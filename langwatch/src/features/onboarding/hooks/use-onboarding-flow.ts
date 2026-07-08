@@ -1,5 +1,6 @@
 import type { OrganizationIntent } from "@prisma/client";
 import { useMemo, useState } from "react";
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { readAttribution } from "~/utils/attribution";
 import { getOnboardingFlowConfig } from "../constants/onboarding-flow";
@@ -37,12 +38,20 @@ export const useOnboardingFlow = () => {
   const [selectedDesires, setDesires] = useState<DesireType[]>([]);
   const [role, setRole] = useState<RoleType | undefined>(void 0);
 
+  // The whole intent fork ships dark behind the governance flag (ADR-038
+  // v5): flag off (or loading, which reports enabled=false) = the exact
+  // pre-fork flow. User-level evaluation — there is no org yet during
+  // onboarding.
+  const { enabled: intentForkEnabled } = useFeatureFlag(
+    "release_ui_ai_governance_enabled",
+  );
+
   // Flow configuration — recomputed when the intent changes (ADR-038 fork).
   // Safe mid-flow: intent only changes while ON the INTENT screen, whose
   // index exists in every config variant.
   const flow = useMemo(
-    () => getOnboardingFlowConfig(Boolean(isSaaS), intent),
-    [isSaaS, intent],
+    () => getOnboardingFlowConfig(Boolean(isSaaS), intent, intentForkEnabled),
+    [isSaaS, intent, intentForkEnabled],
   );
 
   const canProceed = (currentScreenIndex: OnboardingScreenIndex) => {

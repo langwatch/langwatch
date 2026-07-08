@@ -32,6 +32,7 @@ import { Select } from "../components/ui/select";
 import { Switch } from "../components/ui/switch";
 import { toaster } from "../components/ui/toaster";
 import { withPermissionGuard } from "../components/WithPermissionGuard";
+import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import type { FullyLoadedOrganization } from "../server/app-layer/organizations/repositories/organization.repository";
@@ -81,6 +82,12 @@ function SettingsForm({
 }) {
   const { hasPermission } = useOrganizationTeamProject();
   const { isLiteMember } = useLiteMemberGuard();
+  // ADR-038 ships dark: the Primary use setting only exists where the
+  // governance surface it routes to is reachable.
+  const { enabled: governanceEnabled } = useFeatureFlag(
+    "release_ui_ai_governance_enabled",
+    { organizationId: organization.id },
+  );
   const [defaultValues, setDefaultValues] = useState<OrganizationFormData>({
     name: organization.name,
     s3Endpoint: organization.s3Endpoint ?? "",
@@ -242,6 +249,7 @@ function SettingsForm({
                 )}
               </HorizontalFormControl>
 
+              {governanceEnabled && (
               <HorizontalFormControl
                 label="Primary use"
                 helper={
@@ -311,6 +319,7 @@ function SettingsForm({
                   </Text>
                 )}
               </HorizontalFormControl>
+              )}
 
               <HorizontalFormControl
                 label="Live presence"

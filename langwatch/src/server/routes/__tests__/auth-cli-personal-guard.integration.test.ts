@@ -144,18 +144,16 @@ describe("CLI login personal-project guards", () => {
     });
   });
 
-  // Reset the governance baseline before every test. Post-GA (ADR-038) the
-  // flag is default-ON, so "without governance" now means an org explicitly
-  // kill-switched off — expressed here via the env override; the
-  // kill-switched case sets it in its own body.
+  // Reset the governance baseline (off) before every test: the dev .env
+  // force-enables the flag, so clearing it BEFORE each case is what guarantees
+  // isolation, and a failed assertion can never leak the forced flag forward.
+  // The one governance-on case opts in explicitly in its own body.
   beforeEach(() => {
     delete process.env.FEATURE_FLAG_FORCE_ENABLE;
-    delete process.env.RELEASE_UI_AI_GOVERNANCE_ENABLED;
   });
 
   afterAll(async () => {
     delete process.env.FEATURE_FLAG_FORCE_ENABLE;
-    delete process.env.RELEASE_UI_AI_GOVERNANCE_ENABLED;
     await prisma.virtualKey.deleteMany({ where: { principalUserId: USER_ID } }).catch(() => {});
     await prisma.project.deleteMany({ where: { teamId: { in: [TEAM_ID, PTEAM_ID, OTHER_TEAM_ID] } } }).catch(() => {});
     await prisma.teamUser.deleteMany({ where: { userId: USER_ID } }).catch(() => {});
@@ -166,13 +164,10 @@ describe("CLI login personal-project guards", () => {
     await stopTestContainers().catch(() => {});
   });
 
-  describe("given an organization kill-switched off governance (post-GA)", () => {
+  describe("given an organization without governance enabled", () => {
     describe("when a device-session approval is requested", () => {
       /** @scenario device-session approval is refused when governance is disabled */
       it("refuses it with governance_required and mints no personal VK", async () => {
-        // ADR-038 GA: governance is default-on; the 403 gate remains as the
-        // enforcement half of the per-org kill-switch.
-        process.env.RELEASE_UI_AI_GOVERNANCE_ENABLED = "0";
         const userCode = await mintDeviceCode("device_session");
 
         const { status, json } = await approve({ user_code: userCode });

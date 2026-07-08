@@ -21,6 +21,19 @@ Feature: Onboarding forks on declared intent — Agent Governance vs LLMOps
     Given a newly signed-up user with no organization
 
   # ============================================================================
+  # Ships dark: the whole fork is gated by the governance feature flag (v5)
+  # ============================================================================
+
+  Rule: without the governance flag, onboarding is exactly the pre-fork flow
+
+    @unit
+    Scenario: With the fork disabled the flow is exactly the pre-fork one
+      Given the governance feature flag is off for the user
+      When the welcome flow computes its screens
+      Then no intent screen exists anywhere in the flow
+      And the screens match the pre-fork flow exactly, on SaaS and self-hosted
+
+  # ============================================================================
   # The intent screen (screen 2)
   # ============================================================================
 
