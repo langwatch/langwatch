@@ -5,7 +5,7 @@
  * Target headers include summary statistics.
  */
 
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Text } from "@chakra-ui/react";
 import {
   createColumnHelper,
   flexRender,

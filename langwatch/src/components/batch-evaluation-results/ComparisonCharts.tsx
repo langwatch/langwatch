@@ -29,13 +29,18 @@ import type {
 import { RUN_COLORS } from "./useMultiRunData";
 
 /** Metric types that can be displayed */
-type MetricType = "cost" | "latency" | `score_${string}` | `pass_${string}`;
+type MetricType =
+  | "cost"
+  | "latency"
+  | `score_${string}`
+  | `pass_${string}`
+  | `pairwise_${string}`;
 
 /** Available metric definition */
 type MetricDefinition = {
   id: MetricType;
   name: string;
-  type: "cost" | "latency" | "score" | "passRate";
+  type: "cost" | "latency" | "score" | "passRate" | "pairwise";
   evaluatorId?: string;
 };
 
@@ -789,8 +794,20 @@ export const ComparisonCharts = ({
       });
     }
 
+    // Add per-pairwise-evaluator win-rate metrics so users can toggle
+    // pairwise charts through the same Metrics visibility system as their
+    // siblings (Cost / Latency / Score / Pass Rate).
+    for (const column of pairwiseColumns ?? []) {
+      metrics.push({
+        id: `pairwise_${column.evaluatorId}` as MetricType,
+        name: `${column.name} (Win Rate)`,
+        type: "pairwise",
+        evaluatorId: column.evaluatorId,
+      });
+    }
+
     return metrics;
-  }, [scoreEvaluators, passRateEvaluators]);
+  }, [scoreEvaluators, passRateEvaluators, pairwiseColumns]);
 
   // Initialize visible metrics to include all available metrics on first load
   useEffect(() => {
@@ -1343,14 +1360,21 @@ export const ComparisonCharts = ({
 
             {/* Pairwise win-rate charts — one per detected pairwise
                 evaluator. Rendered inside the same flex row as Cost / Latency
-                so they read as siblings, not a separate section below. */}
-            {pairwiseColumns?.map((column) => (
-              <PairwiseWinRateChart
-                key={`pairwise-${column.evaluatorId}`}
-                column={column}
-                chartHeight={chartHeight}
-              />
-            ))}
+                so they read as siblings, not a separate section below.
+                Gated on `visibleMetrics` so users can hide it via the
+                Metrics dropdown alongside the sibling metric types. */}
+            {pairwiseColumns?.map(
+              (column) =>
+                visibleMetrics.has(
+                  `pairwise_${column.evaluatorId}` as MetricType,
+                ) && (
+                  <PairwiseWinRateChart
+                    key={`pairwise-${column.evaluatorId}`}
+                    column={column}
+                    chartHeight={chartHeight}
+                  />
+                ),
+            )}
 
             {/* Per-evaluator pass rate charts */}
             {passRateEvaluators.map(

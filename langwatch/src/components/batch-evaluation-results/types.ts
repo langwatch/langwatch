@@ -482,7 +482,7 @@ const extractWinnerOutputText = (raw: unknown): string | null => {
   // pathological shapes.
   let cursor: unknown = raw;
   for (let i = 0; i < 3; i++) {
-    if (cursor === null || typeof cursor !== "object") break;
+    if (!cursor || typeof cursor !== "object") break;
     const asObj = cursor as Record<string, unknown>;
     const candidate = asObj.output ?? asObj.answer;
     if (typeof candidate === "string") return candidate;
