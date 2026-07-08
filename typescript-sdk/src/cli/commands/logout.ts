@@ -26,10 +26,11 @@ export interface LogoutOptions {
  * when the remote revoke fails, so "logout" never leaves a usable token
  * on disk. Idempotent — safe when not logged in.
  *
- * Shared by `langwatch logout` and the credentials-only `logout-device`
- * alias.
+ * Only the device session is cleared; the project SDK key in `$CWD/.env`
+ * (`LANGWATCH_API_KEY`) is a separate, user-managed store and is never
+ * touched.
  */
-export const revokeAndClearSession = async (): Promise<void> => {
+const revokeAndClearSession = async (): Promise<void> => {
   const cfg = loadConfig();
   if (!isLoggedIn(cfg)) {
     clearConfig();

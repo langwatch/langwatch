@@ -343,26 +343,13 @@ program.addHelpText(
 
 program
   .command("logout")
-  .description("Log out: revoke + clear the device session AND remove the telemetry wiring `langwatch <tool>` installed (claude settings.json, codex config.toml, gemini/opencode shell functions). Only langwatch-authored blocks are removed. Idempotent.")
+  .description("Log out: revoke + clear the device session AND remove the telemetry wiring `langwatch <tool>` installed (claude settings.json, codex config.toml, gemini/opencode shell functions). Only langwatch-authored blocks are removed; the project API key in .env is left alone. Idempotent.")
   .option("-y, --yes", "skip the confirmation prompt")
   .option("--keep-credentials", "remove the telemetry wiring but stay logged in")
   .action(async (options: { yes?: boolean; keepCredentials?: boolean }) => {
     try {
       const { logoutCommand } = await import("./commands/logout.js");
       await logoutCommand(options);
-    } catch (error) {
-      console.error(`Error: ${formatApiErrorMessage({ error })}`);
-      process.exit(1);
-    }
-  });
-
-program
-  .command("logout-device", { hidden: true })
-  .description("Credentials-only logout: revoke the device-flow refresh token AND clear ~/.langwatch/config.json, leaving telemetry wiring in place. Prefer `langwatch logout`. Idempotent.")
-  .action(async () => {
-    try {
-      const { logoutDeviceCommand } = await import("./commands/logout-device.js");
-      await logoutDeviceCommand();
     } catch (error) {
       console.error(`Error: ${formatApiErrorMessage({ error })}`);
       process.exit(1);

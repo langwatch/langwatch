@@ -130,8 +130,21 @@ Feature: `langwatch logout` clears credentials AND the telemetry wiring
       Then the telemetry wiring is removed
       And the device session on disk is left intact
 
-    Scenario: `logout-device` stays a credentials-only alias
-      Given the user has a device session and telemetry wiring
-      When the user runs `langwatch logout-device`
-      Then the device session is revoked and cleared
-      And the telemetry wiring is left intact
+  Rule: logout is a single command, symmetric to login
+
+    Scenario: there is exactly one logout command
+      Given the CLI exposes `langwatch login` for signing in
+      Then `langwatch logout` is the only logout command
+      And there is no separate `langwatch logout-device` command
+      # Rationale: one `logout`, mirroring one `login`. The old
+      # credentials-only `logout-device` is folded into `logout`
+      # (full teardown by default; `--keep-credentials` for wiring-only).
+
+    Scenario: logout never touches the project SDK key in .env
+      Given the user has both a device session AND a project API key in
+        `$CWD/.env` (`LANGWATCH_API_KEY`)
+      When the user runs `langwatch logout`
+      Then the device session in `~/.langwatch/config.json` is cleared
+      And `$CWD/.env`'s `LANGWATCH_API_KEY` is NOT touched
+      # The project SDK key is a separate, user-managed store; removing it
+      # is a manual `.env` edit, not part of logout.
