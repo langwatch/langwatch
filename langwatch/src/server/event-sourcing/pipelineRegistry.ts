@@ -50,7 +50,6 @@ import type { RetentionPolicyResolver } from "../data-retention/retentionPolicyR
 import { type CommandDispatcher, Deferred } from "./deferred";
 import type { EventSourcing } from "./eventSourcing";
 import { mapCommands } from "./mapCommands";
-import type { OutboxRuntime } from "./outbox/setup";
 import type { StaticPipelineDefinition } from "./pipeline/staticBuilder.types";
 import { ReportUsageForMonthCommand } from "./pipelines/billing-reporting/commands/reportUsageForMonth.command";
 import {
@@ -214,15 +213,6 @@ export interface PipelineRegistryDeps {
   blobStore?: import("~/server/app-layer/traces/blob-store.service").BlobStore;
   governanceKpisSync?: GovernanceKpisSyncReactorDeps;
   governanceOcsfEventsSync?: GovernanceOcsfEventsSyncReactorDeps;
-  /**
-   * Wired by the worker composition root (`presets.ts`) and `undefined`
-   * on the web process. When set, all four trigger reactors route their
-   * matches into the unified outbox queue's settle stage (ADR-030 +
-   * ADR-026 + ADR-035) — both NOTIFY (email / Slack) and PERSIST
-   * (dataset / annotation) classes now ride settle → cadence; nothing
-   * dispatches inline.
-   */
-  outbox?: OutboxRuntime;
   retentionPolicyResolver?: RetentionPolicyResolver;
 }
 
