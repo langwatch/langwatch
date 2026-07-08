@@ -55,6 +55,22 @@ describe("normalizeAssetBase", () => {
       expect(normalizeAssetBase(`  ${CDN}  `)).toBe(CDN);
     });
   });
+
+  describe("when the value is not an absolute http(s) URL", () => {
+    it("throws on a scheme-less value that would silently break assets", () => {
+      // Without this, the rewrite emits a broken *relative* url and the CSP
+      // (via new URL()) drops the origin — the silent-404 this feature fixes.
+      expect(() => normalizeAssetBase("cdn.langwatch.ai/abc123/")).toThrow(
+        /absolute http\(s\) URL/,
+      );
+    });
+
+    it("throws on a non-http(s) scheme", () => {
+      expect(() =>
+        normalizeAssetBase("ftp://cdn.langwatch.ai/abc123/"),
+      ).toThrow(/http or https/);
+    });
+  });
 });
 
 describe("assetBaseOrigin", () => {
@@ -67,6 +83,12 @@ describe("assetBaseOrigin", () => {
   describe("when the base is an external CDN", () => {
     it("returns just the origin, dropping the commit-prefix path", () => {
       expect(assetBaseOrigin(CDN)).toBe("https://cdn.langwatch.ai");
+    });
+  });
+
+  describe("when the base does not parse as a URL", () => {
+    it("returns null rather than throwing (defensive)", () => {
+      expect(assetBaseOrigin("not a url/")).toBeNull();
     });
   });
 });
@@ -130,15 +152,39 @@ describe("injectAssetBaseIntoHtml", () => {
       );
       expect(withFavicon).toContain('href="/favicon.ico"');
     });
+
+    it("treats a $ in the base literally, not as a replacement token", () => {
+      const out = injectAssetBaseIntoHtml(shell, "https://cdn.example.com/a$1b/");
+      expect(out).toContain(
+        'src="https://cdn.example.com/a$1b/assets/index-deadbeef.js"',
+      );
+    });
   });
 
-  describe("when the shell has no head or html tag", () => {
-    it("still injects the resolver without dropping existing markup", () => {
+  describe("when the shell lacks one of the injection anchors", () => {
+    it("injects after the doctype when there is no head or html tag", () => {
       const out = injectAssetBaseIntoHtml(
         "<!doctype html><body><div id=root></div></body>",
         "/",
       );
       expect(out).toContain(`window.${ASSET_URL_GLOBAL}`);
+      expect(out).toContain("<div id=root>");
+    });
+
+    it("injects after <html> when there is no <head>", () => {
+      const out = injectAssetBaseIntoHtml(
+        "<html><body><div id=root></div></body></html>",
+        "/",
+      );
+      expect(out).toContain(`window.${ASSET_URL_GLOBAL}`);
+      expect(out.indexOf(ASSET_URL_GLOBAL)).toBeLessThan(
+        out.indexOf("<div id=root>"),
+      );
+    });
+
+    it("prepends the bootstrap when there is no doctype/html/head", () => {
+      const out = injectAssetBaseIntoHtml("<div id=root></div>", "/");
+      expect(out.startsWith("<script>")).toBe(true);
       expect(out).toContain("<div id=root>");
     });
   });

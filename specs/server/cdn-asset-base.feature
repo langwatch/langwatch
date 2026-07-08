@@ -16,27 +16,23 @@ Feature: Production HTTP server — runtime-configurable CDN asset base
   # resolve regardless of which pod serves the shell. Self-host leaves it unset
   # and assets resolve same-origin exactly as before. Companion to spa-fallback.feature.
 
-  Rule: The base is normalized so callers never worry about the trailing slash
+  Rule: The asset base is chosen at container start, and a bad one fails fast
 
-    Scenario: An unset base means same-origin
+    Scenario: With no asset base set, assets are served same-origin from the pod
       Given LANGWATCH_ASSET_BASE is unset
-      When the asset base is resolved
-      Then the base is "/"
+      When a client loads the app
+      Then asset URLs are same-origin, under /assets/
 
-    Scenario: A bare "/" means same-origin
-      Given LANGWATCH_ASSET_BASE is "/"
-      When the asset base is resolved
-      Then the base is "/"
+    Scenario: A CDN base resolves assets to the CDN, with or without a trailing slash
+      Given LANGWATCH_ASSET_BASE is "https://cdn.langwatch.ai/abc123" (no trailing slash)
+      When a client loads the app
+      Then assets are requested from https://cdn.langwatch.ai/abc123/assets/
 
-    Scenario: A CDN base without a trailing slash gains one
-      Given LANGWATCH_ASSET_BASE is "https://cdn.langwatch.ai/abc123"
-      When the asset base is resolved
-      Then the base is "https://cdn.langwatch.ai/abc123/"
-
-    Scenario: A CDN base with a trailing slash is left intact
-      Given LANGWATCH_ASSET_BASE is "https://cdn.langwatch.ai/abc123/"
-      When the asset base is resolved
-      Then the base is "https://cdn.langwatch.ai/abc123/"
+    Scenario: A misconfigured base fails fast instead of silently serving 404s
+      Given LANGWATCH_ASSET_BASE has no scheme, e.g. "cdn.langwatch.ai/abc123/"
+      When the app starts
+      Then startup fails with an error naming LANGWATCH_ASSET_BASE
+      And no build is served with broken asset URLs
 
   Rule: The served HTML shell always defines the asset-URL resolver
 

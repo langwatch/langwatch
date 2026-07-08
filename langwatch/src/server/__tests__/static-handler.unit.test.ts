@@ -204,6 +204,17 @@ describe("serveStaticOrFallback", () => {
           'src="https://cdn.langwatch.ai/abc123/assets/index-abc123.js"',
         );
       });
+
+      it("rewrites the root path via the index.html fall-through", async () => {
+        // `/` reaches the shell through a different branch (tryServeFile on the
+        // dist dir returns false → tryServeHtml(index.html)) than the routes above.
+        const res = await fetch(`${baseUrl}/`);
+        const body = await res.text();
+        expect(res.status).toBe(200);
+        expect(body).toContain(
+          'src="https://cdn.langwatch.ai/abc123/assets/index-abc123.js"',
+        );
+      });
     });
   });
 

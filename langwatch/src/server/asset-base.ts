@@ -26,11 +26,35 @@ export const ASSET_BASE_GLOBAL = "__lwAssetBase";
  * Normalize a raw `LANGWATCH_ASSET_BASE` value to a base that always ends in a
  * slash (so `base + "assets/x.js"` concatenates cleanly), collapsing unset and
  * bare "/" to the same-origin sentinel "/".
+ *
+ * A non-"/" value MUST be an absolute http(s) URL. We validate (and throw) here
+ * so the two consumers can never disagree: a scheme-less value like
+ * "cdn.langwatch.ai/x/" would otherwise rewrite asset refs to a broken
+ * *relative* URL (silent 404s on every chunk) while `new URL()` in
+ * `assetBaseOrigin` throws and drops the CSP entry — the exact silent failure
+ * this feature exists to kill. Failing fast at boot surfaces the misconfig in
+ * the pod logs instead. `url.href` also percent-encodes anything unsafe, so a
+ * stray "<" can't break out of the injected `<script>`.
  */
 export function normalizeAssetBase(raw: string | undefined): string {
   const trimmed = (raw ?? "").trim();
   if (!trimmed || trimmed === "/") return "/";
-  return trimmed.endsWith("/") ? trimmed : `${trimmed}/`;
+
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    throw new Error(
+      `LANGWATCH_ASSET_BASE must be an absolute http(s) URL ` +
+        `(e.g. https://cdn.example.com/<tag>/); got ${JSON.stringify(raw)}`,
+    );
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new Error(
+      `LANGWATCH_ASSET_BASE must use http or https; got ${JSON.stringify(raw)}`,
+    );
+  }
+  return url.href.endsWith("/") ? url.href : `${url.href}/`;
 }
 
 /** The effective asset base for this process, read from the environment. */
@@ -57,7 +81,9 @@ export function assetBaseOrigin(base: string): string | null {
  * resolver is defined before the entry chunk's dynamic imports evaluate.
  */
 export function assetBaseBootstrapScript(base: string): string {
-  const json = JSON.stringify(base);
+  // `base` is already URL-validated (no raw "<"), but escape "<" for defence in
+  // depth so the JSON string literal can never terminate the <script> element.
+  const json = JSON.stringify(base).replace(/</g, "\\u003c");
   return (
     `<script>window.${ASSET_BASE_GLOBAL}=${json};` +
     `window.${ASSET_URL_GLOBAL}=function(p){return window.${ASSET_BASE_GLOBAL}+p};</script>`
@@ -67,17 +93,20 @@ export function assetBaseBootstrapScript(base: string): string {
 /**
  * Inject the resolver bootstrap into the HTML shell and rewrite the base-absolute
  * entry references (`<script src>`, `modulepreload`, stylesheet `<link href>`)
- * that Vite baked as `/assets/…` to the runtime base. Idempotent and byte-neutral
- * when the base is same-origin.
+ * that Vite baked as `/assets/…` to the runtime base. The `/assets/` rewrite is
+ * a no-op when the base is same-origin; the resolver bootstrap is always
+ * injected (the built bundle references `window.__lwAssetUrl` regardless of base).
  */
 export function injectAssetBaseIntoHtml(html: string, base: string): string {
   const withBootstrap = insertBootstrap(html, assetBaseBootstrapScript(base));
   if (base === "/") return withBootstrap;
   // Whitespace-anchored so it rewrites the `src`/`href` of Vite's entry
   // `<script>` / `modulepreload` / stylesheet tags but never a `data-src` etc.
+  // Function replacer (not a `$1` string) so a "$" in the base can't be read as
+  // a replacement-pattern token.
   return withBootstrap.replace(
     /(\s(?:src|href))="\/assets\//g,
-    `$1="${base}assets/`,
+    (_match, attr: string) => `${attr}="${base}assets/`,
   );
 }
 

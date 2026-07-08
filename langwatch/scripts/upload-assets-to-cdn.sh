@@ -17,13 +17,20 @@
 # Old prefixes are reaped by an S3 lifecycle rule (infra repo), configured to
 # retain them well beyond the longest realistic browser-tab lifetime.
 #
+# The langwatch-saas build pipeline inlines this `aws s3 sync` rather than
+# calling this script (submodule-pin timing), so if you run it by hand keep the
+# prefix identical to that pipeline: SHA MUST be the deployed image tag
+# (`git-<short-sha>`), because that is the prefix the running app requests via
+# LANGWATCH_ASSET_BASE=https://<cdn-host>/<tag>/. A full `git rev-parse HEAD`
+# would upload to a prefix the app never reads.
+#
 # Usage:
-#   BUCKET=langwatch-cdn SHA=$(git rev-parse HEAD) \
+#   BUCKET=langwatch-frontend-assets SHA="git-$(git rev-parse --short HEAD)" \
 #     langwatch/scripts/upload-assets-to-cdn.sh [--dry-run]
 #
 # Env:
 #   BUCKET      (required) S3 bucket name backing the CDN.
-#   SHA         (required) Commit sha used as the immutable path prefix.
+#   SHA         (required) Path prefix = the deployed image tag (git-<short-sha>).
 #   DIST        (optional) Client build dir. Default: dist/client (cwd-relative).
 #   AWS_REGION  (optional) Passed through to the AWS CLI.
 
@@ -52,10 +59,13 @@ echo "Syncing ${ASSETS_DIR} -> ${DEST} (immutable, no delete)"
 # --size-only avoids re-uploading unchanged content-hashed files on a retry;
 # because filenames are content-addressed, identical name ⇒ identical bytes.
 # Deliberately no --delete: older builds' prefixes must remain reachable.
+# --exclude "*.map": Vite emits sourcemaps into assets/; keep them off the public
+# CDN (the runtime image strips them too) so source isn't disclosed.
 aws s3 sync "${ASSETS_DIR}" "${DEST}" \
   "${DRY_RUN[@]}" \
   --size-only \
   --no-progress \
+  --exclude "*.map" \
   --cache-control "public, max-age=31536000, immutable"
 
 echo "Done. Set LANGWATCH_ASSET_BASE / app.assetBase to:"

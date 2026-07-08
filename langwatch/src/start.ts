@@ -74,7 +74,7 @@ import { createApiRouter } from "./server/api-router";
 import { getApp } from "./server/app-layer/app";
 import { initializeWebApp } from "./server/app-layer/presets";
 import { assetBaseOrigin, getAssetBase } from "./server/asset-base";
-import { buildStorageConnectSrc } from "./server/buildStorageConnectSrc";
+import { buildContentSecurityPolicy } from "./server/csp";
 import { getWorkerMetricsPort, isMetricsAuthorized } from "./server/metrics";
 import { shutdownPostHog } from "./server/posthog";
 import { verifyRedisReady } from "./server/redis";
@@ -152,40 +152,21 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   // In production, resolve the built client assets directory
   const clientDistDir = dev ? null : path.join(dir, "dist/client");
 
-  // ADR-038: when content-hashed assets are served from an external CDN
-  // (LANGWATCH_ASSET_BASE set), admit that origin into the fetch directives so
-  // the browser can load the chunks / styles / fonts / images / workers from it.
-  // Empty for same-origin self-host serving, so nothing changes there.
-  const assetCdnOrigin = assetBaseOrigin(getAssetBase());
-  const cdn = assetCdnOrigin ? ` ${assetCdnOrigin}` : "";
-
-  // Security headers (migrated from next.config.mjs)
-  const cspHeader = [
-    "default-src 'self'",
-    `script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.posthog.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.googletagmanager.com https://*.pendo.io https://client.crisp.chat https://static.hsappstatic.net https://*.google-analytics.com https://www.google.com https://*.reo.dev${cdn}`,
-    `style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.pendo.io https://client.crisp.chat https://*.google.com https://*.reo.dev https://fonts.googleapis.com https://unpkg.com${cdn}`,
-    `img-src 'self' blob: data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://image.crisp.chat https://*.googletagmanager.com https://*.pendo.io https://*.google-analytics.com https://www.google.com https://*.reo.dev${cdn}`,
-    `font-src 'self' data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://client.crisp.chat https://www.google.com https://*.reo.dev https://fonts.gstatic.com${cdn}`,
-    "object-src 'none'",
-    "base-uri 'self'",
-    "form-action 'self'",
-    "frame-ancestors 'none'",
-    ...(!dev ? ["upgrade-insecure-requests"] : []),
-    `worker-src 'self' blob:${cdn}`,
-    // ADR-032: allow the browser's presigned PUT to object storage (derived
-    // from the same env the S3 client uses) — without it the CSP blocks the
-    // upload before it leaves the page and the drawer silently falls back.
-    `connect-src 'self' ${buildStorageConnectSrc({
+  // Security headers (migrated from next.config.mjs). ADR-038: the CDN origin
+  // (when LANGWATCH_ASSET_BASE is set) is admitted into the fetch directives by
+  // buildContentSecurityPolicy. getAssetBase() throws here at boot if the base
+  // is misconfigured — fail fast rather than serve broken asset URLs.
+  const cspHeader = buildContentSecurityPolicy({
+    dev,
+    assetOrigin: assetBaseOrigin(getAssetBase()),
+    storageEnv: {
       S3_ENDPOINT: process.env.S3_ENDPOINT,
       S3_REGION: process.env.S3_REGION,
       S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
       AWS_REGION: process.env.AWS_REGION,
       AZURE_BLOB_ENDPOINT: process.env.AZURE_BLOB_ENDPOINT,
-    }).join(
-      " ",
-    )} https://*.posthog.com https://*.pendo.io wss://*.pendo.io wss://client.relay.crisp.chat https://client.crisp.chat https://*.googletagmanager.com https://analytics.google.com https://stats.g.doubleclick.net https://*.google-analytics.com https://www.google.com https://*.reo.dev${cdn}`,
-    "frame-src 'self' https://*.posthog.com https://*.pendo.io https://www.youtube.com https://get.langwatch.ai https://*.googletagmanager.com https://www.google.com https://*.reo.dev",
-  ].join("; ");
+    },
+  });
 
   const securityHeaders: Record<string, string> = {
     "Referrer-Policy": "no-referrer",

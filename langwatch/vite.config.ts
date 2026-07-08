@@ -196,6 +196,11 @@ export default defineConfig(async (): Promise<UserConfig> => {
     // keep CSS-referenced assets relative to the CSS file (which lives under the
     // same base, so fonts/images resolve on the CDN); leave HTML entry refs
     // base-absolute for the server to rewrite; leave public/ assets same-origin.
+    //
+    // LIMITATION (ADR-038): window.__lwAssetUrl only exists in the main document,
+    // not in a Web Worker scope. No bundled worker references a CDN asset today,
+    // but if one ever does the runtime expr below would throw in the worker —
+    // make the resolver worker-aware (self-based bootstrap) before that lands.
     renderBuiltUrl(filename, { type, hostType }) {
       if (type === "public") return undefined;
       if (hostType === "js") {

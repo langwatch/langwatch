@@ -107,14 +107,25 @@ Rollouts blue-green) are introduced.
   streaming for non-HTML files is unchanged.
 - CSP is now env-derived for the asset origin; misconfiguration surfaces as a
   blocked-resource console error rather than a silent 404.
-- New operational duty (infra repo): the S3 lifecycle rule must retain prefixes
-  longer than the longest realistic tab lifetime, or a very old tab could 404
-  again — at which point `chunkReload` recovers it with a reload.
+- New operational duty (infra repo): the S3 lifecycle retention window is both
+  the max tab lifetime (a tab older than it 404s, then `chunkReload` recovers
+  with a reload) AND the **rollback horizon** — rolling the app back to a tag
+  whose prefix expired, or a pre-CDN tag never uploaded, 404s every chunk with no
+  recovery for the entry script. Retention defaults to 365d; to roll back
+  further, disable the CDN in the same apply so assets fall back to same-origin.
 - CloudFront must send permissive CORS (`Access-Control-Allow-Origin`) for the
-  asset prefix: `crossorigin` module scripts, module workers (Shiki/Monaco), and
-  fonts are fetched cross-origin from the CDN and fail without it. The CSP already
-  admits the CDN origin to `connect-src`/`worker-src`/`font-src`; CORS is the
-  server-side half and lives in the infra repo.
+  asset prefix: `crossorigin` module scripts and fonts are fetched cross-origin
+  from the CDN and fail without it. The CSP already admits the CDN origin to
+  `connect-src`/`worker-src`/`font-src`; CORS is the server-side half and lives
+  in the infra repo.
+- **Limitation — Web Workers.** The runtime resolver (`window.__lwAssetUrl`) is
+  defined only in the main document, so it does not exist inside a Web Worker
+  scope. No bundled worker currently references a CDN-hosted asset (Monaco loads
+  from jsdelivr; Shiki runs on the main thread), so this is latent. If a future
+  worker chunk references a `renderBuiltUrl`'d asset it would throw
+  `__lwAssetUrl is not defined` in the worker — at which point the resolver must
+  be made worker-scope-aware (a `self`-based bootstrap) or that worker's assets
+  kept same-origin. Flagged in `vite.config.ts`.
 
 ## References
 
