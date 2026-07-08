@@ -18,9 +18,6 @@
 import {
   Box,
   Button,
-  Card,
-  Container,
-  Heading,
   HStack,
   Icon,
   Spinner,
@@ -41,6 +38,7 @@ import { useRouter } from "~/utils/compat/next-router";
 
 import { useSession } from "~/utils/auth-client";
 import { setAttributionIfAbsent } from "~/utils/attribution";
+import { OnboardingContainer } from "~/features/onboarding/components/containers/OnboardingContainer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { resolveCliAuthProjects } from "./cliAuthProjects";
 import { ScopeChipPicker } from "~/components/settings/ScopeChipPicker";
@@ -135,23 +133,28 @@ function StatusCard({
 }
 
 /**
- * Action row for terminal states (approved, denied, expired, error): the
+ * Quiet exit for terminal states (approved, denied, expired, error): the
  * flow is over either way — Go Home lands on "/" and the resolver picks
- * the right surface per org intent. Closing the tab is the user's own
- * gesture; browsers block window.close() on tabs with navigation history,
- * so we don't pretend to offer it.
+ * the right surface per org intent. Deliberately understated (like the
+ * onboarding Back/Skip secondaries): closing the tab is the primary
+ * gesture, this is just the alternative.
  */
 function TerminalActions() {
   return (
-    <Button
-      colorPalette="blue"
-      width="full"
-      onClick={() => {
-        window.location.href = "/";
-      }}
-    >
-      Go Home
-    </Button>
+    <HStack justify="center">
+      <Button
+        variant="ghost"
+        size="sm"
+        color="fg.muted"
+        borderRadius="8px"
+        _hover={{ bg: "bg.muted", color: "fg" }}
+        onClick={() => {
+          window.location.href = "/";
+        }}
+      >
+        Go Home
+      </Button>
+    </HStack>
   );
 }
 
@@ -400,36 +403,19 @@ export default function CliAuthPage() {
       <Head>
         <title>Authorize CLI · LangWatch</title>
       </Head>
-      <Container maxWidth="540px" paddingTop="80px" paddingBottom="80px">
-        <VStack align="stretch" gap={8}>
-          <VStack align="center" gap={2} textAlign="center">
-            <Heading
-              as="h1"
-              fontSize={{ base: "2xl", md: "3xl" }}
-              letterSpacing="-0.035em"
-              fontWeight={400}
-              lineHeight="1.1"
-              color="fg"
-            >
-              {requiresProject
-                ? "Generate an SDK key"
-                : "Authorize the LangWatch CLI"}
-            </Heading>
-            <Text color="fg.muted" textStyle="sm" lineHeight="1.65">
-              {requiresProject
-                ? "The CLI is requesting a project SDK API key"
-                : "Signs in this device for AI-tool wrappers and governance commands"}
-            </Text>
-          </VStack>
-
-          <Card.Root
-            bg="bg.panel"
-            borderWidth="1px"
-            borderColor="border.muted"
-            borderRadius="lg"
-            boxShadow="sm"
-          >
-          <Card.Body>
+      <OnboardingContainer
+        title={
+          requiresProject
+            ? "Generate an SDK key"
+            : "Authorize the LangWatch CLI"
+        }
+        subTitle={
+          requiresProject
+            ? "The CLI is requesting a project SDK API key"
+            : "Signs in this device for AI-tool wrappers and governance commands"
+        }
+        showBackButton={false}
+      >
             <VStack align="stretch" gap={6}>
               {!userCode && (
                 <StatusCard
@@ -667,23 +653,15 @@ export default function CliAuthPage() {
                 </>
               )}
             </VStack>
-          </Card.Body>
-          </Card.Root>
-        </VStack>
-      </Container>
+      </OnboardingContainer>
     </>
   );
 }
 
 function FullPageSpinner() {
   return (
-    <Container maxWidth="400px" paddingTop="160px">
-      <VStack gap={4}>
-        <Spinner size="lg" />
-        <Text textStyle="sm" color="fg.muted">
-          Loading…
-        </Text>
-      </VStack>
-    </Container>
+    <OnboardingContainer title="Authorize the LangWatch CLI" loading>
+      {null}
+    </OnboardingContainer>
   );
 }
