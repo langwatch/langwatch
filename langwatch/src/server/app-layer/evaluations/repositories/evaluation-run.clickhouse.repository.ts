@@ -143,6 +143,44 @@ export class EvaluationRunClickHouseRepository
     }
   }
 
+  /**
+   * Resolve an evaluation's ScheduledAt (the `PARTITION BY toYearWeek(...)`
+   * column) so {@link getByEvaluationId} can prune partitions even when the
+   * caller never threaded a `scheduledAt` hint. `evaluation_runs` is
+   * `ORDER BY (TenantId, EvaluationId)`, so this is a sort-key point seek over
+   * a couple of granules of small columns — far cheaper than letting the heavy
+   * read fall back to scanning every weekly partition (incl. cold S3).
+   *
+   * `argMax(ScheduledAt, UpdatedAt)` takes the ScheduledAt of the latest
+   * version (the same row the dedup keeps). Returns undefined when the
+   * evaluation isn't in the table, where the caller stays unbounded.
+   */
+  private async resolveScheduledAtMs(
+    tenantId: string,
+    evaluationId: string,
+  ): Promise<number | undefined> {
+    const client = await this.resolveClient(tenantId);
+    const result = await client.query({
+      query: `
+        SELECT toUnixTimestamp64Milli(argMax(ScheduledAt, UpdatedAt)) AS scheduledAtMs
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND EvaluationId = {evaluationId:String}
+      `,
+      query_params: { tenantId, evaluationId },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Array<{
+      scheduledAtMs: string | number | null;
+    }>;
+    const raw = rows[0]?.scheduledAtMs;
+    if (raw === null || raw === undefined) return undefined;
+    // argMax over no matching rows yields the epoch default (0); treat that —
+    // and any non-positive value — as "unknown" so the caller stays unbounded.
+    const ms = typeof raw === "string" ? Number(raw) : raw;
+    return Number.isFinite(ms) && ms > 0 ? ms : undefined;
+  }
+
   async getByEvaluationId({
     tenantId,
     evaluationId,
@@ -182,7 +220,15 @@ export class EvaluationRunClickHouseRepository
       // dev/docs/best_practices/clickhouse-queries.md.
 
       const slackMs = hints?.scheduledAtSlackMs ?? 7 * 24 * 60 * 60 * 1000;
-      const scheduledAtMs = hints?.scheduledAt?.getTime();
+      // When the caller didn't pass a ScheduledAt hint (event-sourcing
+      // projection reads, internal callers), resolve it from a cheap
+      // sort-key point seek so the heavy read below still prunes partitions
+      // instead of scanning every weekly partition incl. cold S3. Resolves
+      // to undefined only when the evaluation isn't in the table at all,
+      // where the read keeps its previous unbounded behaviour.
+      const scheduledAtMs =
+        hints?.scheduledAt?.getTime() ??
+        (await this.resolveScheduledAtMs(tenantId, evaluationId));
       const partitionPredicate = scheduledAtMs !== undefined
         ? "AND t.ScheduledAt >= fromUnixTimestamp64Milli({scheduledAtFrom:Int64}) AND t.ScheduledAt <= fromUnixTimestamp64Milli({scheduledAtTo:Int64})"
         : "";

@@ -98,6 +98,50 @@ function buildDateFilter({
   };
 }
 
+/**
+ * Builds a StartedAt partition-pruning window from a page of batch aggregates.
+ *
+ * getBatchHistoryForScenarioSet fetches the batch page (step 1) and then reads
+ * the heavy Messages preview columns for those batches (step 2). simulation_runs
+ * is partitioned by toYearWeek(StartedAt), so without a StartedAt predicate the
+ * step-2 read opens every weekly partition (including cold storage) to serve a
+ * single page. Step 1 already aggregated min/max StartedAt for exactly these
+ * batches over the same (deduped, latest-version) rows step 2 returns, so every
+ * page run's latest StartedAt lies inside [min, max]. Bounding step 2 to that
+ * window prunes the heavy read to the page's few weeks without dropping rows.
+ *
+ * The predicate must be applied on the OUTER query only, not inside the
+ * max(UpdatedAt) dedup subquery: StartedAt is not strictly immutable across a
+ * run's ReplacingMergeTree versions (a snapshot arriving before the run-started
+ * event seeds a provisional StartedAt that the started event later overwrites),
+ * so filtering versions by StartedAt before picking the latest could resolve the
+ * wrong version. Filtering the already-deduped outer rows is always correct.
+ *
+ * Returns an empty clause when no valid bound exists (e.g. empty page), so the
+ * read falls back to its prior unbounded behavior rather than dropping rows.
+ */
+export function buildStartedAtWindowForPage(
+  rows: { MinStartedAt: string; MaxStartedAt: string }[],
+): { whereClause: string; params: Record<string, string> } {
+  let minMs = Number.POSITIVE_INFINITY;
+  let maxMs = 0;
+  for (const row of rows) {
+    const lo = Number(row.MinStartedAt);
+    const hi = Number(row.MaxStartedAt);
+    if (Number.isFinite(lo) && lo > 0) minMs = Math.min(minMs, lo);
+    if (Number.isFinite(hi) && hi > 0) maxMs = Math.max(maxMs, hi);
+  }
+  if (!Number.isFinite(minMs) || maxMs <= 0 || minMs > maxMs) {
+    return { whereClause: "", params: {} };
+  }
+  return {
+    whereClause:
+      "AND StartedAt >= fromUnixTimestamp64Milli(toUInt64({minStartedAtMs:String})) " +
+      "AND StartedAt <= fromUnixTimestamp64Milli(toUInt64({maxStartedAtMs:String}))",
+    params: { minStartedAtMs: String(minMs), maxStartedAtMs: String(maxMs) },
+  };
+}
+
 const RUN_COLUMNS = `
   ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
   Status, Name, Description, Metadata,
@@ -334,6 +378,8 @@ export class SimulationClickHouseRepository implements SimulationRepository {
       LastRunAt: string;
       FirstCompletedAt: string;
       AllCompletedAt: string;
+      MinStartedAt: string;
+      MaxStartedAt: string;
     }>(
       `SELECT
         BatchRunId,
@@ -348,7 +394,9 @@ export class SimulationClickHouseRepository implements SimulationRepository {
         )) AS FirstCompletedAt,
         toString(toUnixTimestamp64Milli(
           maxIf(UpdatedAt, Status NOT IN ('STALLED','IN_PROGRESS','PENDING'))
-        )) AS AllCompletedAt
+        )) AS AllCompletedAt,
+        toString(toUnixTimestamp64Milli(min(StartedAt)))                AS MinStartedAt,
+        toString(toUnixTimestamp64Milli(max(StartedAt)))                AS MaxStartedAt
        FROM ${TABLE_NAME}
        WHERE TenantId = {tenantId:String}
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
@@ -396,6 +444,11 @@ export class SimulationClickHouseRepository implements SimulationRepository {
 
     const batchRunIds = pageRows.map((r) => r.BatchRunId);
 
+    // Bound the heavy step-2 read to the StartedAt window of the batches on this
+    // page (aggregated in step 1) so it prunes partitions instead of scanning
+    // every weekly partition including cold storage.
+    const startedAtWindow = buildStartedAtWindowForPage(pageRows);
+
     // Step 2: fetch slim item rows (preview columns only)
     const itemRows = await this.queryRows<{
       ScenarioRunId: string;
@@ -415,12 +468,14 @@ export class SimulationClickHouseRepository implements SimulationRepository {
          AND ScenarioSetId IN ({scenarioSetIds:Array(String)})
          AND BatchRunId IN ({batchRunIds:Array(String)})
          AND ArchivedAt IS NULL
+         ${startedAtWindow.whereClause}
          ${simulationRunDedupPredicate("TenantId = {tenantId:String} AND ScenarioSetId IN ({scenarioSetIds:Array(String)}) AND BatchRunId IN ({batchRunIds:Array(String)})")}
        ORDER BY CreatedAt ASC`,
       {
         tenantId: projectId,
         scenarioSetIds: expandSetIdFilter(scenarioSetId),
         batchRunIds,
+        ...startedAtWindow.params,
       },
     );
 
