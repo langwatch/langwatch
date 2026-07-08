@@ -312,15 +312,20 @@ export class FoldProjectionExecutor {
       "Store miss with refoldOnStoreMiss — re-folding from the event log",
     );
 
+    // Merge delivered events the history read missed back into occurredAt
+    // order before folding — a tail-append would let an event that belongs in
+    // the middle of the history overwrite last-write-wins fields. Stable sort
+    // keeps arrival order for equal occurredAt, same as executeBatch.
     const seen = new Set(history.map((e) => e.id));
+    const missing = delivered.filter((e) => !seen.has(e.id));
+    const combined = [...(history as E[]), ...missing].sort(
+      (a, b) =>
+        (((a as Record<string, unknown>).occurredAt as number) ?? 0) -
+        (((b as Record<string, unknown>).occurredAt as number) ?? 0),
+    );
     let state = projection.init();
-    for (const e of history) {
-      state = projection.apply(state, e as E);
-    }
-    for (const e of delivered) {
-      if (!seen.has(e.id)) {
-        state = projection.apply(state, e);
-      }
+    for (const e of combined) {
+      state = projection.apply(state, e);
     }
     return state;
   }
