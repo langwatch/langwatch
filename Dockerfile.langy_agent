@@ -20,7 +20,7 @@
 # Pin an explicit Go toolchain patch (1.26.4) at or above the go.mod language
 # floor (`go 1.26.2`) so every build uses the same compiler. Bump this tag when
 # raising the go.mod floor.
-FROM --platform=$BUILDPLATFORM golang:1.26.4-bookworm AS builder
+FROM --platform=$BUILDPLATFORM golang:1.27rc2-bookworm AS builder
 
 WORKDIR /src
 
