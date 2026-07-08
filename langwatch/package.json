@@ -186,7 +186,7 @@
     "long": "^5.3.2",
     "lucide-react": "^1.21.0",
     "marked": "^18.0.4",
-    "mermaid": "^11.15.0",
+    "mermaid": "^11.16.0",
     "micro": "^10.0.1",
     "monaco-editor": "^0.55.1",
     "monacopilot": "^1.2.12",
