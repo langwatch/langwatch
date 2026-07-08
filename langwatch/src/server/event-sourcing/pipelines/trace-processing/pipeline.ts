@@ -19,14 +19,17 @@ import {
   RecordSpanCommand,
 } from "./commands/recordSpanCommand";
 import { ResolveOriginCommand } from "./commands/resolveOriginCommand";
+import { spanCommandGroupKey } from "./commands/spanCommandGroupKey";
 import { LogRecordStorageMapProjection } from "./projections/logRecordStorage.mapProjection";
 import { MetricRecordStorageMapProjection } from "./projections/metricRecordStorage.mapProjection";
 import { SpanStorageMapProjection } from "./projections/spanStorage.mapProjection";
 import { TraceSummaryFoldProjection } from "./projections/traceSummary.foldProjection";
+import type { RecordSpanCommandData } from "./schemas/commands";
 import type { TraceProcessingEvent } from "./schemas/events";
 import type { NormalizedLogRecord } from "./schemas/logRecords";
 import type { NormalizedMetricRecord } from "./schemas/metricRecords";
 import type { NormalizedSpan } from "./schemas/spans";
+import { TraceRequestUtils } from "./utils/traceRequest.utils";
 
 export interface TraceProcessingPipelineDeps {
   spanAppendStore: AppendStore<NormalizedSpan>;
@@ -90,6 +93,14 @@ export interface TraceProcessingPipelineDeps {
    * event_log INSERT succeeds. Optional — without it, the spool path is disabled.
    */
   blobStore?: BlobStore;
+  /**
+   * Number of GroupQueue shards for `recordSpan` commands. `1` (default) keeps
+   * the historic per-trace group key; `> 1` spreads a trace's spans across
+   * `traceId:<shard>` groups so a hot trace drains in parallel. The trace-summary
+   * fold is unaffected — it runs on its own aggregate-keyed queue. See
+   * spanCommandGroupKey.ts.
+   */
+  spanCommandShardCount?: number;
   governanceKpisSyncReactor?: ReactorDefinition<
     TraceProcessingEvent,
     TraceSummaryData
@@ -225,21 +236,42 @@ export function createTraceProcessingPipeline(
     );
   }
 
+  // Span-command sharding: when shardCount > 1, spread a trace's recordSpan
+  // commands across `traceId:<shard>` GroupQueue groups so a hot trace drains in
+  // parallel instead of one span at a time. Defaults to 1 = the historic
+  // per-trace key. The command handler reads no trace state and the emitted
+  // span_received event still carries aggregateId = traceId, so the trace-summary
+  // fold (its own aggregate-keyed queue) is unaffected and the summary stays
+  // exact. See spanCommandGroupKey.ts and
+  // specs/event-sourcing/span-command-sharding.feature.
+  const spanCommandShardCount = deps.spanCommandShardCount ?? 1;
+  const recordSpanOptions = {
+    deduplication: RECORD_SPAN_DEDUPLICATION,
+    getGroupKey: (payload: RecordSpanCommandData) => {
+      const { traceId, spanId } = TraceRequestUtils.normalizeOtlpSpanIds(
+        payload.span,
+      );
+      return spanCommandGroupKey({
+        traceId,
+        spanId,
+        shardCount: spanCommandShardCount,
+      });
+    },
+  };
+
   // ADR-022: When blobStore is provided, inject it into a pre-constructed
   // RecordSpanCommand instance so the worker can reconstitute oversized commands
   // (S3 spool fetch + best-effort delete). Falls back to zero-arg construction
   // (no spool support) when blobStore is absent. Either way the recordSpan
-  // command carries the dedup config from main.
+  // command carries the dedup config and span-command sharding from main.
   const recordSpanBuilder = deps.blobStore
     ? builder.withCommandInstance(
         "recordSpan",
         RecordSpanCommand,
         new RecordSpanCommand({ blobStore: deps.blobStore }),
-        { deduplication: RECORD_SPAN_DEDUPLICATION },
+        recordSpanOptions,
       )
-    : builder.withCommand("recordSpan", RecordSpanCommand, {
-        deduplication: RECORD_SPAN_DEDUPLICATION,
-      });
+    : builder.withCommand("recordSpan", RecordSpanCommand, recordSpanOptions);
 
   return recordSpanBuilder
     .withCommand("assignTopic", AssignTopicCommand)
