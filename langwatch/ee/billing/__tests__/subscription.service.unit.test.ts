@@ -76,6 +76,7 @@ const createMockOrganizationRepository = (): {
   getUserOrgRole: vi.fn(),
   getUserOrgRoleByTeamId: vi.fn(),
   getProjectIds: vi.fn(),
+  findPrimaryIntentById: vi.fn(),
   findWithAdmins: vi.fn(),
   updateSentPlanLimitAlert: vi.fn(),
   findProjectsWithName: vi.fn(),

@@ -107,6 +107,19 @@ export default function CliAuthPage() {
     }
   }, [organizations, selectedOrgId]);
 
+  // Brand-new user (signed up mid-CLI-login, no org yet): approval needs an
+  // organization, so round-trip through onboarding and come straight back —
+  // return_to preserves the user_code so the CLI's poll can still succeed.
+  useEffect(() => {
+    if (!session || !organizations) return;
+    if (organizations.length === 0 && userCode) {
+      const returnTo = encodeURIComponent(
+        `/cli/auth?user_code=${encodeURIComponent(userCode)}`,
+      );
+      void router.replace(`/onboarding/welcome?return_to=${returnTo}`);
+    }
+  }, [session, organizations, userCode, router]);
+
   // Projects offered in the project-login picker (project_api_key mode).
   // resolveCliAuthProjects hides personal workspace projects. Project login
   // must target a real, shared project, never a personal one (a coding agent

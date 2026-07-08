@@ -143,9 +143,12 @@ export const FEATURE_FLAGS = [
   {
     key: "release_ui_ai_governance_enabled",
     scope: "PRODUCT",
+    // ADR-038 ships dark behind this flag: it additionally gates the
+    // onboarding intent fork and the org "Primary use" setting. GA is a
+    // later PostHog rollout (SaaS) + flipping this default (self-hosted).
     defaultValue: false,
     description:
-      "Gates the personal keys, admin oversight, RoutingPolicy, and IngestionSource UI surfaces. Distinct from release_ui_ai_gateway_menu_enabled — the existing gateway product ships unblocked while governance keeps cooking.",
+      "Gates the personal keys, admin oversight, RoutingPolicy, IngestionSource UI surfaces, the onboarding intent fork, and the org Primary use setting (ADR-038). Distinct from release_ui_ai_gateway_menu_enabled — the existing gateway product ships unblocked while governance keeps cooking.",
   },
   {
     key: "release_langy_enabled",
