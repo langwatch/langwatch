@@ -252,6 +252,12 @@ model Organization {
   /// instruction. When null, callers fall back to the first ADMIN
   /// member's email (`resolveSupportContact` helper).
   supportContact         String?
+  /// Signup intent, editable later as the org "Primary use" setting.
+  /// AGENT_GOVERNANCE lands "/" on /me, LLM_OPS on the project home.
+  /// NULL means intent unset (every pre-fork org and any org created
+  /// outside onboarding) — the home resolver keeps legacy behavior.
+  /// ADR-038.
+  primaryIntent          OrganizationIntent?
 
   promoCode              String?
   stripeCustomerId       String?                @unique
@@ -312,6 +318,12 @@ enum PlanTypes {
 enum PricingModel {
   TIERED
   SEAT_EVENT
+}
+
+/// Organization signup intent (ADR-038): which product the org came for.
+enum OrganizationIntent {
+  AGENT_GOVERNANCE
+  LLM_OPS
 }
 
 enum SubscriptionStatus {
