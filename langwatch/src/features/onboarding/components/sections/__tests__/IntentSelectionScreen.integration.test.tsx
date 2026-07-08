@@ -65,23 +65,29 @@ describe("IntentSelectionScreen", () => {
       expect(screen.getAllByRole("radio")).toHaveLength(2);
     });
 
+    it("shows the LLMOps option first", () => {
+      renderScreen();
+      const [firstCard] = screen.getAllByRole("radio");
+      expect(firstCard?.textContent).toContain("Monitor & evaluate my LLM app");
+    });
+
     it("pins the governance card copy to the team's coding-tool usage", () => {
       renderScreen();
       expect(screen.getByText("Track AI coding agents")).toBeDefined();
       expect(
         screen.getByText(
-          "Usage, spend, and sessions for the AI coding tools your team uses — Claude Code, Codex, Cursor, and more",
+          "Usage, spend, and sessions for the AI coding tools your team uses, like Claude Code, Codex, and Cursor",
         ),
       ).toBeDefined();
     });
 
     /** @scenario "Coding-agent product builders are steered to the LLMOps card" */
-    it("pins the LLMOps card copy to explicitly claim coding agents the user is building", () => {
+    it("pins the LLMOps card copy to claim the agents the user is building", () => {
       renderScreen();
       expect(screen.getByText("Monitor & evaluate my LLM app")).toBeDefined();
       expect(
         screen.getByText(
-          "Trace, evaluate, and improve the LLM app or agent you're building — including coding agents you ship",
+          "Trace, evaluate, and improve the LLM apps and agents you're building",
         ),
       ).toBeDefined();
     });
@@ -104,7 +110,7 @@ describe("IntentSelectionScreen", () => {
   describe("when an intent is already selected", () => {
     it("marks that card as checked", () => {
       renderScreen({ intent: "AGENT_GOVERNANCE" });
-      const [governanceCard, llmOpsCard] = screen.getAllByRole("radio");
+      const [llmOpsCard, governanceCard] = screen.getAllByRole("radio");
       expect(governanceCard?.getAttribute("aria-checked")).toBe("true");
       expect(llmOpsCard?.getAttribute("aria-checked")).toBe("false");
     });

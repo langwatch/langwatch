@@ -20,18 +20,18 @@ interface IntentOption {
  */
 const intentOptions: IntentOption[] = [
   {
-    value: "AGENT_GOVERNANCE",
-    title: "Track AI coding agents",
-    description:
-      "Usage, spend, and sessions for the AI coding tools your team uses — Claude Code, Codex, Cursor, and more",
-    icon: ChartNoAxesColumn,
-  },
-  {
     value: "LLM_OPS",
     title: "Monitor & evaluate my LLM app",
     description:
-      "Trace, evaluate, and improve the LLM app or agent you're building — including coding agents you ship",
+      "Trace, evaluate, and improve the LLM apps and agents you're building",
     icon: Telescope,
+  },
+  {
+    value: "AGENT_GOVERNANCE",
+    title: "Track AI coding agents",
+    description:
+      "Usage, spend, and sessions for the AI coding tools your team uses, like Claude Code, Codex, and Cursor",
+    icon: ChartNoAxesColumn,
   },
 ];
 
