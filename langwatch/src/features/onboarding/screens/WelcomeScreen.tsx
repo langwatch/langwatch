@@ -53,6 +53,20 @@ export const WelcomeScreen: React.FC = () => {
       organizations?.some((org) =>
         org.teams.some((t) => t.projects.length > 0),
       ) ?? false;
+
+    // ADR-038 v6: a governance-intent org has no project by design, but its
+    // owner is fully onboarded — re-running the welcome flow here would mint
+    // a duplicate organization. Send them home instead (resolver → /me).
+    const hasGovernanceOrg =
+      organizations?.some(
+        (org) => org.primaryIntent === "AGENT_GOVERNANCE",
+      ) ?? false;
+    if (!hasAnyProject && hasGovernanceOrg) {
+      setOnboardingNeeded(false);
+      void router.push("/");
+      return;
+    }
+
     if (!hasAnyProject) {
       setOnboardingNeeded(true);
       return;

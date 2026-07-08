@@ -299,6 +299,15 @@ export const useOrganizationTeamProject = (
     const teamsWithProjectsOnAnyOrg = organizations.data.flatMap((org) =>
       org.teams.filter((team) => team.projects.length > 0),
     );
+
+    // ADR-038 v6: a governance-intent org deliberately has no project —
+    // its users live on /me and data flows through personal workspaces.
+    // Never bounce them into onboarding or to another org's project;
+    // a project appears only when the org flips to LLMOps in settings.
+    if (organization?.primaryIntent === "AGENT_GOVERNANCE") {
+      return;
+    }
+
     if (!organization || !teamsWithProjectsOnAnyOrg.length) {
       void router.push(`/onboarding/welcome${returnTo}`);
       return;
