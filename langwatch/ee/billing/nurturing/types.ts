@@ -22,8 +22,12 @@ export interface CioPersonTraits {
   how_heard: string;
   createdAt: string;
   integration_method: string;
-  /** ADR-038 org intent ("agent_governance" | "llm_ops") — governance-vs-LLMOps segmentation. */
-  primary_intent: string;
+  /**
+   * ADR-038 org intent ("agent_governance" | "llm_ops") for
+   * governance-vs-LLMOps segmentation. Optional: conditionally set via
+   * pickDefined, absent for legacy/no-intent signups.
+   */
+  primary_intent?: string;
 
   // Attribution (first-touch URL params — captured client-side, forwarded
   // via signUpData). Optional because callers always use

@@ -61,6 +61,20 @@ const primaryUseCollection = createListCollection({
   ],
 });
 
+/** "Admin only" lock badge for settings a non-manager can see but not change. */
+function AdminOnlyBadge() {
+  return (
+    <Badge colorPalette="blue" variant="surface" size={"xs"}>
+      <Tooltip content="Contact your admin to change this setting">
+        <HStack>
+          <Lock size={10} />
+          <Text>Admin only</Text>
+        </HStack>
+      </Tooltip>
+    </Badge>
+  );
+}
+
 function Settings() {
   const { organization, project } = useOrganizationTeamProject();
 
@@ -262,14 +276,7 @@ function SettingsForm({
                       behavior.
                     </Text>
                     {!hasPermission("organization:manage") && (
-                      <Badge colorPalette="blue" variant="surface" size={"xs"}>
-                        <Tooltip content="Contact your admin to change this setting">
-                          <HStack>
-                            <Lock size={10} />
-                            <Text>Admin only</Text>
-                          </HStack>
-                        </Tooltip>
-                      </Badge>
+                      <AdminOnlyBadge />
                     )}
                   </VStack>
                 }
@@ -332,14 +339,7 @@ function SettingsForm({
                       organization.
                     </Text>
                     {!hasPermission("organization:manage") && (
-                      <Badge colorPalette="blue" variant="surface" size={"xs"}>
-                        <Tooltip content="Contact your admin to change this setting">
-                          <HStack>
-                            <Lock size={10} />
-                            <Text>Admin only</Text>
-                          </HStack>
-                        </Tooltip>
-                      </Badge>
+                      <AdminOnlyBadge />
                     )}
                   </VStack>
                 }
@@ -657,14 +657,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                     : "Disable to turn presence off for this project only."}
                 </Text>
                 {!userIsAdmin && (
-                  <Badge colorPalette="blue" variant="surface" size={"xs"}>
-                    <Tooltip content="Contact your admin to change this setting">
-                      <HStack>
-                        <Lock size={10} />
-                        <Text>Admin only</Text>
-                      </HStack>
-                    </Tooltip>
-                  </Badge>
+                  <AdminOnlyBadge />
                 )}
               </VStack>
             }
@@ -693,14 +686,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
               <VStack align="start" gap={1}>
                 <Text>Allow users to share traces with public links</Text>
                 {!userIsAdmin && (
-                  <Badge colorPalette="blue" variant="surface" size={"xs"}>
-                    <Tooltip content="Contact your admin to change this setting">
-                      <HStack>
-                        <Lock size={10} />
-                        <Text>Admin only</Text>
-                      </HStack>
-                    </Tooltip>
-                  </Badge>
+                  <AdminOnlyBadge />
                 )}
               </VStack>
             }

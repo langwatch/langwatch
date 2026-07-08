@@ -37,11 +37,15 @@ function buildConfig(
  * and INTENT must not present itself as the final screen before a choice
  * exists on SaaS.
  */
-export function getOnboardingFlowConfig(
-  isSaaS: boolean,
-  intent: OrganizationIntent | undefined,
-  intentForkEnabled: boolean,
-): OnboardingFlowConfig {
+export function getOnboardingFlowConfig({
+  isSaaS,
+  intent,
+  intentForkEnabled,
+}: {
+  isSaaS: boolean;
+  intent: OrganizationIntent | undefined;
+  intentForkEnabled: boolean;
+}): OnboardingFlowConfig {
   if (!intentForkEnabled) {
     return isSaaS
       ? buildConfig("full", [

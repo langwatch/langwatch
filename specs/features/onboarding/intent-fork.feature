@@ -55,7 +55,7 @@ Feature: Onboarding forks on declared intent — Agent Governance vs LLMOps
       # Guards the S1 misroute: someone SHIPPING a coding agent wants LLMOps.
       # Exact copy is pinned by this test per copywriting standards.
 
-    @unit @unimplemented
+    @unit
     Scenario: Intent screen is required
       Given the user is on the intent screen
       When the user has not selected an intent

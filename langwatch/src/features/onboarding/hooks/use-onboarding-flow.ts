@@ -50,7 +50,12 @@ export const useOnboardingFlow = () => {
   // Safe mid-flow: intent only changes while ON the INTENT screen, whose
   // index exists in every config variant.
   const flow = useMemo(
-    () => getOnboardingFlowConfig(Boolean(isSaaS), intent, intentForkEnabled),
+    () =>
+      getOnboardingFlowConfig({
+        isSaaS: Boolean(isSaaS),
+        intent,
+        intentForkEnabled,
+      }),
     [isSaaS, intent, intentForkEnabled],
   );
 

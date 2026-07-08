@@ -137,8 +137,12 @@ export const governanceRouter = createTRPCRouter({
           })
           .catch(() => false),
         // ADR-038: the org's declared intent, when set, decides the landing
-        // kind before persona detection and the user pin.
-        getApp().organizations.getPrimaryIntent(input.organizationId),
+        // kind before persona detection and the user pin. Fail-safe like the
+        // sibling lookups: a transient error means "no intent", which takes
+        // the legacy path instead of 500ing the whole resolve.
+        getApp()
+          .organizations.getPrimaryIntent(input.organizationId)
+          .catch(() => null),
       ]);
 
       return resolvePersonaHomeSafe({
