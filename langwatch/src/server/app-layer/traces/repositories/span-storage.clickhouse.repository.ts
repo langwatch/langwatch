@@ -1147,13 +1147,20 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
    *   - No hint — back-stack / conversation-jump / deep-link drawer opens and
    *     worker callers that never had one: resolve the trace's occurrence time
    *     from `trace_summaries` and bound the read to its ±2-day span window
-   *     instead of letting {@link withPartitionHint} fall back to an unbounded
-   *     scan that walks every weekly partition (incl. the cold S3 tier). The
-   *     window comes from the trace's own time, so an empty result is
-   *     authoritative and we do NOT rescan unbounded.
+   *     instead of scanning every weekly partition (incl. the cold S3 tier).
+   *
+   * Unlike {@link readTraceEvents}, an empty windowed result is NOT treated as
+   * authoritative here: `trace_summaries.OccurredAt` is the trace's *start*
+   * (min over projected rows) and never widens, so a long-running trace can
+   * produce spans well past `OccurredAt + 2 days`. Both branches therefore keep
+   * the {@link withPartitionHint} `isEmpty`-driven fallback: run bounded first,
+   * and only if that comes back empty rescan unbounded, so a trace whose spans
+   * all fall outside the window is still returned correctly (at the cost of one
+   * extra unbounded scan only in that case). Events cluster at the trace start
+   * so they can skip the fallback; spans cannot.
    *
    * Only when the trace time is genuinely unknown (the trace isn't in
-   * `trace_summaries`) do we keep the previous unbounded behaviour.
+   * `trace_summaries`) do we go straight to the unbounded read.
    */
   private async readTraceSpans<T>(
     {
@@ -1169,7 +1176,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     }
     const resolved = await this.resolveTraceOccurredAtMs(tenantId, traceId);
     if (resolved === undefined) return run(undefined);
-    return run(partitionWindowFor({ occurredAtMs: resolved }));
+    return withPartitionHint<T>({ occurredAtMs: resolved }, isEmpty, run);
   }
 
   async getTraceEventsByTraceId({
@@ -1595,7 +1602,6 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     tenantId,
     traceId,
     sinceStartTimeMs,
-    occurredAtMs,
   }: {
     tenantId: string;
     traceId: string;
@@ -1606,39 +1612,30 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       "SpanStorageClickHouseRepository.findSpansSince",
     );
 
-    return this.readTraceSpans<Span[]>(
-      { tenantId, traceId, occurredAtMs },
-      (rows) => rows.length === 0,
-      async (window) => {
-        const partition = partitionFragment(window);
-        const sinceFilter =
-          "AND StartTime > fromUnixTimestamp64Milli({sinceStartTimeMs:Int64})";
-        const innerExtra = `${sinceFilter} ${partition.sqlAndInner}`;
-        const client = await this.resolveClient(tenantId);
-        const result = await client.query({
-          query: `
-            SELECT ${FULL_SPAN_SELECT}
-            FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
-              AND TraceId = {traceId:String}
-              ${sinceFilter}
-              ${partition.sqlAnd}
-              AND ${dedupInTuple(innerExtra)}
-            ORDER BY StartTime ASC
-          `,
-          query_params: {
-            tenantId,
-            traceId,
-            sinceStartTimeMs,
-            ...partition.params,
-          },
-          format: "JSONEachRow",
-        });
+    // Poll reader: `StartTime > sinceStartTimeMs` is already a partition-pruning
+    // lower bound, so this does NOT resolve or clamp to the trace's OccurredAt
+    // window. A `StartTime <= OccurredAt + 2d` upper bound would silently hide
+    // new spans on a trace still active more than 2 days after its
+    // trace_summaries.OccurredAt (the live delta view would just stop updating).
+    const sinceFilter =
+      "AND StartTime > fromUnixTimestamp64Milli({sinceStartTimeMs:Int64})";
+    const client = await this.resolveClient(tenantId);
+    const result = await client.query({
+      query: `
+        SELECT ${FULL_SPAN_SELECT}
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND TraceId = {traceId:String}
+          ${sinceFilter}
+          AND ${dedupInTuple(sinceFilter)}
+        ORDER BY StartTime ASC
+      `,
+      query_params: { tenantId, traceId, sinceStartTimeMs },
+      format: "JSONEachRow",
+    });
 
-        const rows = (await result.json()) as FullSpanRow[];
-        return mapNormalizedSpansToSpans(rows.map(mapChRowToNormalized));
-      },
-    );
+    const rows = (await result.json()) as FullSpanRow[];
+    return mapNormalizedSpansToSpans(rows.map(mapChRowToNormalized));
   }
 
   async findSpanSummariesPaginated({
@@ -1722,7 +1719,6 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     tenantId,
     traceId,
     sinceStartTimeMs,
-    occurredAtMs,
   }: {
     tenantId: string;
     traceId: string;
@@ -1733,39 +1729,29 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       "SpanStorageClickHouseRepository.findSpanSummariesSince",
     );
 
-    return this.readTraceSpans<SpanSummaryRow[]>(
-      { tenantId, traceId, occurredAtMs },
-      (rows) => rows.length === 0,
-      async (window) => {
-        const partition = partitionFragment(window);
-        const sinceFilter =
-          "AND StartTime > fromUnixTimestamp64Milli({sinceStartTimeMs:Int64})";
-        const innerExtra = `${sinceFilter} ${partition.sqlAndInner}`;
-        const client = await this.resolveClient(tenantId);
-        const result = await client.query({
-          query: `
-            SELECT ${SUMMARY_SPAN_SELECT}
-            FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
-              AND TraceId = {traceId:String}
-              ${sinceFilter}
-              ${partition.sqlAnd}
-              AND ${dedupInTuple(innerExtra)}
-            ORDER BY StartTimeMs ASC
-          `,
-          query_params: {
-            tenantId,
-            traceId,
-            sinceStartTimeMs,
-            ...partition.params,
-          },
-          format: "JSONEachRow",
-        });
+    // Poll reader: see findSpansSince — `StartTime > sinceStartTimeMs` already
+    // prunes partitions, so this does NOT resolve or clamp to the trace's
+    // OccurredAt window. An upper bound would silently stop the spanTreeDelta
+    // live view from showing new spans on a long-running trace.
+    const sinceFilter =
+      "AND StartTime > fromUnixTimestamp64Milli({sinceStartTimeMs:Int64})";
+    const client = await this.resolveClient(tenantId);
+    const result = await client.query({
+      query: `
+        SELECT ${SUMMARY_SPAN_SELECT}
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND TraceId = {traceId:String}
+          ${sinceFilter}
+          AND ${dedupInTuple(sinceFilter)}
+        ORDER BY StartTimeMs ASC
+      `,
+      query_params: { tenantId, traceId, sinceStartTimeMs },
+      format: "JSONEachRow",
+    });
 
-        const rows = await result.json<SpanSummaryQueryRow>();
-        return rows.map(mapSpanSummaryRow);
-      },
-    );
+    const rows = await result.json<SpanSummaryQueryRow>();
+    return rows.map(mapSpanSummaryRow);
   }
 
   async findModelUsageStats({
