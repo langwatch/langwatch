@@ -273,13 +273,14 @@ describe("resolvePersonaHome", () => {
       expect(result.intentPinned).toBe(true);
     });
 
-    it("sends an LLM_OPS user with no project membership to the no-project fallback", () => {
+    it("sends an LLM_OPS org with no project to settings, never the governance /me", () => {
       const result = resolvePersonaHome({
         ...baseInput,
         organizationIntent: "LLM_OPS",
         firstProjectSlug: null,
       });
-      expect(result.destination).toBe("/me");
+      expect(result.destination).toBe("/settings");
+      expect(result.intentPinned).toBe(true);
     });
 
     it("keeps intentPinned false on every intent-less path", () => {

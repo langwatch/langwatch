@@ -54,7 +54,11 @@ export default function Index() {
           intentPinned: resolved.data.intentPinned,
           governanceUiEnabled: resolved.data.governanceUiEnabled,
           lastVisitedHomeKind,
-          lastProjectSlug: project?.slug ?? null,
+          // Personal workspaces are never a project-home target (ADR-038
+          // v6) — without this, the last-visited substitution could land
+          // on a personal-… slug.
+          lastProjectSlug:
+            project && !project.isPersonal ? project.slug : null,
         }),
       );
       return;

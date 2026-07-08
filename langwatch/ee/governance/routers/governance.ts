@@ -102,21 +102,41 @@ export const governanceRouter = createTRPCRouter({
       ] = await Promise.all([
         // hasApplicationTraces is part of setupState as of 9d2688c84.
         setupService.resolve(input.organizationId),
-        ctx.prisma.project.findFirst({
-          where: {
-            team: {
-              organizationId: input.organizationId,
-              members: { some: { userId } },
-              // Personal workspaces must never become the "/" project home
-              // (ADR-038 v6: they are the governance data home, not a
-              // navigable org project).
-              isPersonal: false,
+        // The user's first accessible project. Preference order: a project
+        // on a team they are a member of, else any shared project in the
+        // org — org creators/admins routinely have NO TeamUser row on the
+        // default team (createAndAssign never adds one), and without the
+        // fallback every fresh org resolves "no project" and lands /me.
+        // Personal workspaces are excluded outright: they are the
+        // governance data home, never a navigable org project (ADR-038 v6).
+        ctx.prisma.project
+          .findFirst({
+            where: {
+              team: {
+                organizationId: input.organizationId,
+                members: { some: { userId } },
+                isPersonal: false,
+              },
+              archivedAt: null,
             },
-            archivedAt: null,
-          },
-          orderBy: { createdAt: "asc" },
-          select: { slug: true },
-        }),
+            orderBy: { createdAt: "asc" },
+            select: { slug: true },
+          })
+          .then(
+            (memberProject) =>
+              memberProject ??
+              ctx.prisma.project.findFirst({
+                where: {
+                  team: {
+                    organizationId: input.organizationId,
+                    isPersonal: false,
+                  },
+                  archivedAt: null,
+                },
+                orderBy: { createdAt: "asc" },
+                select: { slug: true },
+              }),
+          ),
         usageService
           .getUsageStats(input.organizationId, ctx.session.user)
           .then((u) => u?.activePlan?.type === "ENTERPRISE")
