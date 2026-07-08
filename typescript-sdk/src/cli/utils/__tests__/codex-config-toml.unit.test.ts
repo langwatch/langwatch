@@ -183,6 +183,34 @@ describe("writeCodexOtelBlock", () => {
       );
       expect(fs.statSync(filePath).mode & 0o777).toBe(0o600);
     });
+
+    it("narrows perms BEFORE writing the token, so it never lands in a stale-perm file", () => {
+      // root bypasses permission bits, making the ordering unobservable.
+      if (typeof process.getuid === "function" && process.getuid() === 0) {
+        return;
+      }
+      const filePath = path.join(tmp, "config.toml");
+      // Pre-create read-only (no owner write bit). If writeFile0600 did NOT
+      // chmod to 0600 BEFORE writing, the token write would EACCES against
+      // the stale perms — the exact world-readable window CodeRabbit flagged.
+      // A successful write proves perms were widened first.
+      fs.writeFileSync(filePath, 'model = "gpt-5"\n', { mode: 0o400 });
+      fs.chmodSync(filePath, 0o400);
+      expect(fs.statSync(filePath).mode & 0o777).toBe(0o400);
+
+      expect(() =>
+        writeCodexOtelBlock(
+          {
+            endpoint: "https://app.langwatch.ai/api/otel/v1/traces",
+            ingestionToken: "sk-lw-SECRET",
+          },
+          { filePath, persistAuthHeader: true },
+        ),
+      ).not.toThrow();
+
+      expect(fs.readFileSync(filePath, "utf8")).toContain("sk-lw-SECRET");
+      expect(fs.statSync(filePath).mode & 0o777).toBe(0o600);
+    });
   });
 
   describe("when a header was persisted and the wrapper rewrites the block", () => {

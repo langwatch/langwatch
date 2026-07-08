@@ -213,9 +213,15 @@ function escapeRe(s: string): string {
  * only honored when CREATING the file — on an existing file it is silently
  * ignored, leaving whatever permissions the file already had. Codex may
  * have created `config.toml` at `0644`, and these blocks can carry a bearer
- * token, so chmod explicitly to keep the secret owner-only on every write.
+ * token, so narrow the file to `0600` BEFORE writing when it already exists:
+ * otherwise the token would land in a world-readable file for the window
+ * between the write and a trailing chmod. On create, the `mode` option sets
+ * `0600` up front. The final chmod is a belt-and-suspenders safety check.
  */
 function writeFile0600(filePath: string, content: string): void {
+  if (fs.existsSync(filePath)) {
+    fs.chmodSync(filePath, 0o600);
+  }
   fs.writeFileSync(filePath, content, { mode: 0o600 });
   fs.chmodSync(filePath, 0o600);
 }
