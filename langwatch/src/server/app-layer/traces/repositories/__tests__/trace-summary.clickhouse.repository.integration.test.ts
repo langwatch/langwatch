@@ -14,7 +14,7 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { startTestContainers } from "../../../../event-sourcing/__tests__/integration/testContainers";
 import { TraceSummaryClickHouseRepository } from "../trace-summary.clickhouse.repository";
 
@@ -168,6 +168,23 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (integration)", () => {
       format: "JSONEachRow",
       clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
     });
+
+    // On a loaded CI shard the freshly-inserted row can lag the insert ack;
+    // wait until it is queryable so the read path sees it deterministically
+    // (this is a test-visibility guard, not a product concern).
+    await vi.waitFor(
+      async () => {
+        const check = await ch.query({
+          query:
+            "SELECT count() AS c FROM trace_summaries WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String}",
+          query_params: { tenantId, traceId: sentinelTraceId },
+          format: "JSONEachRow",
+        });
+        const [row] = (await check.json()) as Array<{ c: string | number }>;
+        if (Number(row?.c ?? 0) < 1) throw new Error("sentinel row not visible");
+      },
+      { timeout: 10_000, interval: 100 },
+    );
 
     const { repo: rec, queries } = recordingRepo();
 
