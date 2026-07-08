@@ -571,8 +571,9 @@ export default function CliAuthPage() {
                       {requiresProject ? "Generate API key" : "Approve"}
                     </Button>
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       color="fg.muted"
+                      borderColor="border.emphasized"
                       onClick={handleDeny}
                       loading={action.kind === "submitting"}
                     >
