@@ -136,7 +136,7 @@
     "@tiptap/extension-text": "^3.22.5",
     "@tiptap/pm": "^3.22.5",
     "@tiptap/react": "^3.22.5",
-    "@tiptap/starter-kit": "^3.22.5",
+    "@tiptap/starter-kit": "^3.27.1",
     "@tiptap/suggestion": "^3.22.5",
     "@trpc/client": "^10.45.4",
     "@trpc/react-query": "^10.45.4",
