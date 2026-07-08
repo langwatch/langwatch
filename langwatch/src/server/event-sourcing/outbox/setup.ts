@@ -181,7 +181,7 @@ export function buildOutboxRuntime({
     loadProject: async (projectId) =>
       prisma.project.findUnique({ where: { id: projectId } }),
     getTimeseries: async (input) =>
-      getAnalyticsService(prisma).getTimeseries(input),
+      getAnalyticsService().getTimeseries(input),
     triggerSent: graphTriggerSentRepo,
     updateLastRunAt: async ({ triggerId, projectId }) =>
       triggers.updateLastRunAt(triggerId, projectId),

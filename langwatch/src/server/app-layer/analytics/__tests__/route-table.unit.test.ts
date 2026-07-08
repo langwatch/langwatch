@@ -297,7 +297,12 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
       // sentiment.thumbs_up_down isn't in SLIM_ELIGIBLE_METRIC_KEYS, so it
       // routes to trace_summaries.
       const table = pickAnalyticsTable({
-        series: [series("sentiment.thumbs_up_down" as any, "cardinality")],
+        series: [
+          series(
+            "sentiment.thumbs_up_down" as unknown as SeriesInputType["metric"],
+            "cardinality",
+          ),
+        ],
       });
       expect(table).toBe("trace_summaries");
     });

@@ -3,7 +3,7 @@ import type { Monaco, OnMount } from "@monaco-editor/react";
 import { ExternalLink, Link2 } from "lucide-react";
 import * as React from "react";
 import { useEffect, useMemo, useRef } from "react";
-import { SiSlack } from "react-icons/si";
+import { FaSlack } from "react-icons/fa";
 import { Markdown } from "~/components/Markdown";
 import { Tooltip } from "~/components/ui/tooltip";
 import dynamic from "~/utils/compat/next-dynamic";
@@ -438,7 +438,7 @@ function SlackTextPreviewCard({ text }: { text: string }) {
         bg="bg.subtle"
       >
         <Box color="fg.muted">
-          <SiSlack size={12} />
+          <FaSlack size={12} />
         </Box>
         <Text
           textStyle="xs"

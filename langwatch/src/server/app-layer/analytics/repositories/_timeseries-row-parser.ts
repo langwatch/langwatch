@@ -58,12 +58,15 @@ export function parseTimeseriesRows(
 
   for (const row of rows) {
     const period = typeof row.period === "string" ? row.period : "";
+    // Rows without a date column (shouldn't happen on bucketed queries) share
+    // one stable sentinel bucket — a per-row timestamp would split same-period
+    // rows and break tripwire comparison on the bucket key.
     const dateKey =
       timeScale === "full"
         ? "full"
         : typeof row.date === "string"
           ? row.date
-          : new Date().toISOString();
+          : "";
 
     const targetMap =
       period === "current" ? bucketMap.current : bucketMap.previous;

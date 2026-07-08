@@ -11,6 +11,36 @@ const MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR;
 const DAYS_PER_WEEK = 7;
 const DAYS_PER_MONTH = 31;
 
+/** Maximum number of timeseries buckets before auto-adjusting to daily granularity. */
+const MAX_TIMESERIES_BUCKETS = 1000;
+const MS_PER_MINUTE = 1000 * 60;
+
+/**
+ * Bucket-count safety net (same rule as the legacy CH service): too many
+ * estimated buckets → daily granularity; undefined → the legacy daily
+ * default. Shared by the routed dispatch and the legacy shim — the two paths
+ * MUST bucket identically or the divergence tripwire reports false positives.
+ */
+export function adjustTimeScaleForBucketCount({
+  startDate,
+  endDate,
+  timeScale,
+}: {
+  startDate: Date;
+  endDate: Date;
+  timeScale: number | "full" | undefined;
+}): number | "full" {
+  if (typeof timeScale === "number") {
+    const totalMinutes =
+      (endDate.getTime() - startDate.getTime()) / MS_PER_MINUTE;
+    const estimatedBuckets = totalMinutes / timeScale;
+    return estimatedBuckets > MAX_TIMESERIES_BUCKETS
+      ? MINUTES_PER_DAY
+      : timeScale;
+  }
+  return timeScale ?? MINUTES_PER_DAY;
+}
+
 export function validateTimeZone(tz: string): string {
   try {
     Intl.DateTimeFormat(undefined, { timeZone: tz });

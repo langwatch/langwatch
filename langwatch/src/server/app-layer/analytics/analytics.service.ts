@@ -18,7 +18,6 @@
  * `findX` / `runX` (see this module's repositories/ files).
  */
 
-import type { PrismaClient } from "@prisma/client";
 import { createHash } from "crypto";
 import { getLangWatchTracer } from "langwatch";
 import { getClickHouseAnalyticsService } from "~/server/analytics/clickhouse/clickhouse-analytics.service";
@@ -32,10 +31,10 @@ import type {
 import { currentVsPreviousDates } from "~/server/api/routers/analytics/common";
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
-import { prisma as defaultPrisma } from "~/server/db";
 import { featureFlagService } from "~/server/featureFlag";
 import type { FilterField } from "~/server/filters/types";
 import { TtlCache } from "~/server/utils/ttlCache";
+import { adjustTimeScaleForBucketCount } from "./query-builders/_shared";
 import {
   EvaluationAnalyticsClickHouseReadRepository,
   type EvaluationAnalyticsReadRepository,
@@ -64,13 +63,8 @@ import { type AnalyticsTable, pickAnalyticsTable } from "./routing/route-table";
 import { compareForTripwire } from "./tripwire/divergence-compare";
 
 const TIMESERIES_CACHE_TTL_MS = 30_000 as const;
-/** Bucket-count safety net (same as the legacy CH service). */
-const MAX_TIMESERIES_BUCKETS = 1000;
-const MINUTES_PER_DAY = 24 * 60;
-const MS_PER_MINUTE = 1000 * 60;
 
 export interface AnalyticsServiceDependencies {
-  prisma: PrismaClient;
   rollupRepository: TraceAnalyticsRollupReadRepository;
   slimRepository: TraceAnalyticsReadRepository;
   legacyShim: LegacyTraceSummariesShim;
@@ -265,17 +259,11 @@ export class AnalyticsService {
         typeof input.timeScale === "number" ? input.timeScale : undefined,
       );
 
-    let adjustedTimeScale = input.timeScale;
-    if (typeof input.timeScale === "number") {
-      const totalMinutes =
-        (endDate.getTime() - startDate.getTime()) / MS_PER_MINUTE;
-      const estimatedBuckets = totalMinutes / input.timeScale;
-      if (estimatedBuckets > MAX_TIMESERIES_BUCKETS) {
-        adjustedTimeScale = MINUTES_PER_DAY;
-      }
-    } else if (input.timeScale === undefined) {
-      adjustedTimeScale = MINUTES_PER_DAY;
-    }
+    const adjustedTimeScale = adjustTimeScaleForBucketCount({
+      startDate,
+      endDate,
+      timeScale: input.timeScale,
+    });
 
     const builderInput = {
       projectId: input.projectId,
@@ -359,15 +347,13 @@ const defaultResolveClient: ClickHouseClientResolver = async (tenantId) => {
 };
 
 /**
- * Factory using production dependencies (real ClickHouse resolver, real
- * Prisma, legacy backend singleton).
+ * Factory using production dependencies (real ClickHouse resolver, legacy
+ * backend singleton).
  */
 export function createAnalyticsService(
-  prisma: PrismaClient = defaultPrisma,
   resolveClient: ClickHouseClientResolver = defaultResolveClient,
 ): AnalyticsService {
   return new AnalyticsService({
-    prisma,
     rollupRepository: new TraceAnalyticsRollupClickHouseReadRepository(
       resolveClient,
     ),
@@ -386,9 +372,9 @@ export function createAnalyticsService(
 
 let analyticsService: AnalyticsService | null = null;
 
-export function getAnalyticsService(prisma?: PrismaClient): AnalyticsService {
+export function getAnalyticsService(): AnalyticsService {
   if (!analyticsService) {
-    analyticsService = createAnalyticsService(prisma);
+    analyticsService = createAnalyticsService();
   }
   return analyticsService;
 }
