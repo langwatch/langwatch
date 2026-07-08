@@ -97,8 +97,12 @@ function StatusCard({
   title: string;
   children: React.ReactNode;
 }) {
+  // Match the old Chakra Alert semantics: errors interrupt (role="alert"),
+  // success/info states announce politely (role="status").
+  const role = palette === "red" || palette === "orange" ? "alert" : "status";
   return (
     <Box
+      role={role}
       borderWidth="1px"
       borderColor={`${palette}.muted`}
       borderRadius="lg"
