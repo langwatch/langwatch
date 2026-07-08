@@ -101,7 +101,18 @@ func waitForReadiness(ctx context.Context, externalPort, internalPort int, beare
 			_ = resp.Body.Close()
 			cancel()
 			if status != http.StatusBadGateway {
-				return requireOpenCodeAuthEnforced(ctx, internalPort)
+				// Proxy chain answers → verify opencode actually enforces the
+				// password on its control API. A transport error on the
+				// internal probe (opencode's listener still coming up, a
+				// reset) is retryable — keep polling. Only a definite non-401
+				// *response* from the control endpoint fails the spawn closed.
+				authErr := requireOpenCodeAuthEnforced(ctx, internalPort)
+				if authErr == nil {
+					return nil
+				}
+				if !errors.Is(authErr, errAuthProbeUnreachable) {
+					return authErr
+				}
 			}
 		} else {
 			cancel()
@@ -115,27 +126,45 @@ func waitForReadiness(ctx context.Context, externalPort, internalPort int, beare
 	return fmt.Errorf("opencode not ready on port %d after %s", externalPort, deadline)
 }
 
-// requireOpenCodeAuthEnforced is the Fix A′ fail-closed guard: a bare,
-// unauthenticated request straight to opencode's internal port must be
-// rejected with 401. Anything else — 200 above all — means
-// OPENCODE_SERVER_PASSWORD is not being enforced, so a sibling worker could
-// already reach this worker's controls unauthenticated. The caller must not
-// let the worker serve traffic in that state.
+// errAuthProbeUnreachable marks a transport-level failure of the auth
+// enforcement probe (opencode's internal listener not up yet, a connection
+// reset). It is retryable — waitForReadiness keeps polling. A definite non-401
+// *status* is NOT this error: that's a real security failure and fails closed.
+var errAuthProbeUnreachable = errors.New("opencode-auth-probe-unreachable")
+
+// requireOpenCodeAuthEnforced is the Fix A′ fail-closed guard: an
+// unauthenticated request to a real opencode CONTROL endpoint must be rejected
+// with 401. We probe `POST /session` — the create-session call a sibling would
+// use to hijack a worker — rather than just `GET /`. The production risk this
+// PR closes is direct sibling access to the control API (POST /session,
+// /session/{id}/prompt_async, /event), so proving the root route is protected
+// isn't enough: if opencode ever moved to per-route auth where `/` stays 401
+// while `/session` is reachable, a bare `GET /` probe would be fooled and the
+// worker would start with its control plane exposed. Anything other than 401
+// here means OPENCODE_SERVER_PASSWORD isn't gating the control API; the caller
+// must not let the worker serve traffic in that state.
+//
+// Return contract:
+//   - nil                                   — 401: auth is enforced.
+//   - error wrapping errAuthProbeUnreachable — transport failure: retryable.
+//   - other error                           — a definite non-401 response: fail closed.
 func requireOpenCodeAuthEnforced(ctx context.Context, internalPort int) error {
 	reqCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cancel()
-	url := fmt.Sprintf("http://127.0.0.1:%d/", internalPort)
-	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, url, nil)
+	url := fmt.Sprintf("http://127.0.0.1:%d/session", internalPort)
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, url, bytes.NewBufferString(`{"title":"auth-probe"}`))
 	if err != nil {
 		return fmt.Errorf("build auth-enforcement probe: %w", err)
 	}
+	req.Header.Set("Content-Type", "application/json")
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("auth-enforcement probe: %w", err)
+		// Listener not up yet / reset — retryable, not a security verdict.
+		return fmt.Errorf("%w: %v", errAuthProbeUnreachable, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusUnauthorized {
-		return fmt.Errorf("opencode did not require auth on internal port %d (got %d, want 401) — refusing to start worker unsecured", internalPort, resp.StatusCode)
+		return fmt.Errorf("opencode did not require auth on internal port %d (POST /session got %d, want 401) — refusing to start worker unsecured", internalPort, resp.StatusCode)
 	}
 	return nil
 }

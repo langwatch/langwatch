@@ -2,6 +2,7 @@ package langyagent
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -195,5 +196,41 @@ func TestTerminalEventTypes_Present(t *testing.T) {
 		if _, ok := terminalEventTypes[name]; !ok {
 			t.Errorf("expected %q to be a terminal event type", name)
 		}
+	}
+}
+
+// The guard must probe a real CONTROL endpoint, not just `/`. A worker where
+// the root route returns 401 but the actual control API (POST /session) is
+// reachable unauthenticated is exactly the cross-worker exposure ADR-033
+// closes — the guard must refuse to start it even though `/` looks protected.
+func TestRequireOpenCodeAuthEnforced_FailsWhenControlEndpointReachableEvenIfRootIs401(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && r.URL.Path == "/session" {
+			w.WriteHeader(http.StatusOK) // control plane accidentally exposed
+			return
+		}
+		w.WriteHeader(http.StatusUnauthorized) // root looks protected
+	}))
+	defer backend.Close()
+
+	if err := requireOpenCodeAuthEnforced(context.Background(), portOf(t, backend.URL)); err == nil {
+		t.Fatalf("expected the guard to fail when POST /session is reachable unauthenticated, even though / returns 401")
+	}
+}
+
+// A transport failure on the internal probe (opencode's listener not up yet, a
+// reset) must be classified as retryable — not a security verdict — so
+// waitForReadiness keeps polling instead of aborting the spawn.
+func TestRequireOpenCodeAuthEnforced_TransportErrorIsRetryable(t *testing.T) {
+	port, err := getFreePort() // nothing listening here
+	if err != nil {
+		t.Fatalf("reserve port: %v", err)
+	}
+	err = requireOpenCodeAuthEnforced(context.Background(), port)
+	if err == nil {
+		t.Fatalf("expected an error probing a port with no listener")
+	}
+	if !errors.Is(err, errAuthProbeUnreachable) {
+		t.Fatalf("transport failure must be classified retryable (errAuthProbeUnreachable), got %v", err)
 	}
 }
