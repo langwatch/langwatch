@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FACET_REGISTRY } from "../../facet-registry";
+import { KEY_DISCOVERY_SETTINGS } from "../helpers";
 import {
   SPAN_ATTRIBUTE_KEYS_FACET,
   buildSpanAttributeKeysFacetQuery,
@@ -48,6 +49,15 @@ describe("buildSpanAttributeKeysFacetQuery", () => {
       // S3 cold storage). See the ClickHouse mistakes table in CLAUDE.md.
       expect(query.sql).toContain("StartTime >=");
       expect(query.sql).toContain("StartTime <=");
+    });
+
+    it("carries the key-discovery memory guard", () => {
+      // High-cardinality attribute keys make this arrayJoin/GROUP BY a memory
+      // hog; the guard spills the aggregation and caps the read so a
+      // pathological tenant fails its own facet rather than the whole server.
+      expect(query.settings).toBe(KEY_DISCOVERY_SETTINGS);
+      expect(query.settings?.max_memory_usage).toBeDefined();
+      expect(query.settings?.max_bytes_before_external_group_by).toBeDefined();
     });
 
     it("reads the keys subcolumn directly via `.keys`, never the values side", () => {

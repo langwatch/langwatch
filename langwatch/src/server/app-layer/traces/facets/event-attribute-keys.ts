@@ -3,7 +3,7 @@ import type {
   FacetQuery,
   FacetQueryContext,
 } from "../facet-registry";
-import { baseParams, buildTimeWhere } from "./helpers";
+import { baseParams, buildTimeWhere, KEY_DISCOVERY_SETTINGS } from "./helpers";
 
 /**
  * Discover query for event attribute keys: every distinct key seen across
@@ -51,6 +51,7 @@ export function buildEventAttributeKeysFacetQuery(
       ...baseParams(ctx),
       ...(ctx.prefix ? { prefix: ctx.prefix } : {}),
     },
+    settings: KEY_DISCOVERY_SETTINGS,
   };
 }
 
