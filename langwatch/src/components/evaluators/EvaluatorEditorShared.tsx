@@ -777,38 +777,52 @@ export function EvaluatorEditorBody({
           </Text>
         )}
 
-        {/* Shortcut flows (Pairwise / N-way from Add-to-Evaluation) skip
-            the generic Evaluator Name + Model/Prompt/Swap-and-Confirm/
-            Allow-Tie noise entirely. Those knobs remain editable from
-            the full evaluator editor (click the column chip after
-            creation) — for the create shortcut we jump straight to the
-            fields the user actually needs to pick: Variant A/B (or
-            Variants), Golden, and Include-metrics. Name defaults to the
-            evaluator definition's name (already seeded in form.reset). */}
-        {!isPairwise && !isSelectBest && (
-          <Field.Root required>
-            <Field.Label>Evaluator Name</Field.Label>
-            <Input
-              {...form.register("name")}
-              placeholder="Enter evaluator name"
-              data-testid="evaluator-name-input"
-            />
-          </Field.Root>
-        )}
+        <Field.Root required>
+          <Field.Label>Evaluator Name</Field.Label>
+          <Input
+            {...form.register("name")}
+            placeholder="Enter evaluator name"
+            data-testid="evaluator-name-input"
+          />
+        </Field.Root>
 
-        {hasSettings &&
-          evaluatorType &&
-          settingsSchema &&
-          !isPairwise &&
-          !isSelectBest && (
-            <DynamicZodForm
-              schema={settingsSchema}
-              evaluatorType={evaluatorType as EvaluatorTypes}
-              prefix="settings"
-              errors={form.formState.errors.settings}
-              variant="default"
-            />
-          )}
+        {hasSettings && evaluatorType && settingsSchema && (
+          <DynamicZodForm
+            schema={settingsSchema}
+            evaluatorType={evaluatorType as EvaluatorTypes}
+            prefix="settings"
+            errors={form.formState.errors.settings}
+            variant="default"
+            // For the Pairwise / N-way shortcuts (#5100 / #5101) keep
+            // ONLY the Model picker from the schema-driven form. Every
+            // other field is either duplicated by the inline
+            // PairwiseConfigForm / SelectBestConfigForm (has_golden_answer,
+            // include_metrics) or configurable defaults the user rarely
+            // needs during the "which columns am I comparing" flow
+            // (prompt / swap_and_confirm / allow_tie / randomize_order).
+            // They remain fully editable via the full evaluator editor
+            // (click the column chip on the workbench after creation).
+            skipFields={
+              isPairwise
+                ? [
+                    "prompt",
+                    "swap_and_confirm",
+                    "allow_tie",
+                    "has_golden_answer",
+                    "include_metrics",
+                  ]
+                : isSelectBest
+                  ? [
+                      "prompt",
+                      "randomize_order",
+                      "allow_tie",
+                      "has_golden_answer",
+                      "include_metrics",
+                    ]
+                  : undefined
+            }
+          />
+        )}
 
         {isWorkflowEvaluator && workflowCard && (
           <VStack gap={4} paddingTop={4} align="stretch">
