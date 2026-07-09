@@ -128,4 +128,6 @@ constraint-dependencies = [
     "langsmith>=0.8.18",  # security: langsmith advisory (#1532)
     "python-engineio>=4.13.2",  # security: python-engineio advisory (#1545, #1546)
     "python-socketio>=5.16.2",  # security: python-socketio advisory (#1547)
+    "bleach>=6.4.0",  # security: bleach advisory (#1494)
+    "onnx>=1.22.0",  # security: onnx advisory (#1560)
 ]
