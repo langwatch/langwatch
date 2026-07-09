@@ -9,7 +9,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
-import { Swords } from "lucide-react";
+import { Swords, Trophy } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import {
   LuArrowLeftRight,
@@ -333,6 +333,14 @@ export const TargetHeader = memo(function TargetHeader({
         return (
           <span data-testid="icon-pairwise">
             <Swords size={12} />
+          </span>
+        );
+      }
+      // N-way (#5101) select-best sibling — matches its picker card's Trophy.
+      if (target.selectBest) {
+        return (
+          <span data-testid="icon-nway">
+            <Trophy size={12} />
           </span>
         );
       }

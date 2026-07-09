@@ -379,6 +379,15 @@ export const targetConfigSchema = z
      */
     pairwise: pairwiseEvaluatorConfigSchema.optional(),
     /**
+     * N-way select-best config for column-style N-way targets (#5101).
+     * Sibling of `pairwise` above — set only when type === "evaluator" AND
+     * the underlying evaluator is langevals/select_best_compare. Used by
+     * the target-column icon to render a Trophy instead of the generic
+     * evaluator checkmark, and by the "reuse existing N-way" flow so
+     * clicking the picker card returns to the same target.
+     */
+    selectBest: selectBestEvaluatorConfigSchema.optional(),
+    /**
      * Studio workflow target: the committed studio workflow evaluated as a whole
      * per dataset row (distinct from an "agent" target with agentType "workflow",
      * which is a saved agent built as a single code node). Only set when
