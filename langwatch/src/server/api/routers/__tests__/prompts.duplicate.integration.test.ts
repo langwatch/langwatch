@@ -124,6 +124,39 @@ describe("prompts.duplicate", () => {
         ]);
       });
 
+      // `responseFormat` is not stored — it is derived from a `json_schema`
+      // output at read time. Copying `outputs` is what preserves it.
+      it("carries over a structured output's response format", async () => {
+        const original = await caller.prompts.create({
+          projectId,
+          data: {
+            handle: "structured-bot",
+            scope: "PROJECT",
+            prompt: "Answer as JSON.",
+            model: "gpt-5-mini",
+            inputs: [{ identifier: "question", type: "str" }],
+            outputs: [
+              {
+                identifier: "answer",
+                type: "json_schema",
+                json_schema: {
+                  type: "object",
+                  properties: { text: { type: "string" } },
+                },
+              },
+            ],
+          },
+        });
+
+        const duplicate = await caller.prompts.duplicate({
+          idOrHandle: original.id,
+          projectId,
+        });
+
+        expect(duplicate.responseFormat).toEqual(original.responseFormat);
+        expect(duplicate.responseFormat).toMatchObject({ type: "json_schema" });
+      });
+
       it("starts the duplicate on its own version history", async () => {
         const original = await givenASupportBotPrompt();
 

@@ -43,11 +43,7 @@ function buildService({
   source?: VersionedPrompt | null;
   takenHandles?: string[];
 } = {}) {
-  const prisma = {
-    llmPromptConfig: { update: vi.fn().mockResolvedValue(undefined) },
-  } as unknown as PrismaClient;
-
-  const service = new PromptService(prisma);
+  const service = new PromptService({} as unknown as PrismaClient);
   const taken = new Set(takenHandles);
 
   vi.spyOn(service, "getPromptByIdOrHandle").mockResolvedValue(source);
@@ -59,14 +55,16 @@ function buildService({
     .mockImplementation(async ({ handle }) =>
       handle ? { ...SOURCE_PROMPT, id: "prompt_new", handle } : SOURCE_PROMPT,
     );
+  const setCopiedFromPrompt = vi
+    .spyOn(service.repository, "setCopiedFromPrompt")
+    .mockResolvedValue(undefined);
 
-  return { service, createPrompt, prisma };
+  return { service, createPrompt, setCopiedFromPrompt };
 }
 
-/** The handle the service settled on, as handed to `createPrompt`. */
-function handlePassedToCreate(createPrompt: ReturnType<typeof vi.spyOn>) {
-  return (createPrompt.mock.calls[0]?.[0] as { handle: string }).handle;
-}
+/** Asserts the handle the service settled on, as handed to `createPrompt`. */
+const createdWithHandle = (handle: string) =>
+  expect.objectContaining({ handle });
 
 describe("PromptService", () => {
   beforeEach(() => {
@@ -83,7 +81,9 @@ describe("PromptService", () => {
           projectId: "project-1",
         });
 
-        expect(handlePassedToCreate(createPrompt)).toBe("support-bot-1");
+        expect(createPrompt).toHaveBeenCalledWith(
+          createdWithHandle("support-bot-1"),
+        );
       });
 
       it("records where the duplicate came from", async () => {
@@ -132,7 +132,9 @@ describe("PromptService", () => {
           projectId: "project-1",
         });
 
-        expect(handlePassedToCreate(createPrompt)).toBe("support-bot-3");
+        expect(createPrompt).toHaveBeenCalledWith(
+          createdWithHandle("support-bot-3"),
+        );
       });
     });
 
@@ -147,7 +149,9 @@ describe("PromptService", () => {
           projectId: "project-1",
         });
 
-        expect(handlePassedToCreate(createPrompt)).toBe("my-support-bot-1");
+        expect(createPrompt).toHaveBeenCalledWith(
+          createdWithHandle("my-support-bot-1"),
+        );
       });
     });
 
@@ -212,7 +216,9 @@ describe("PromptService", () => {
           targetProjectId: "project-2",
         });
 
-        expect(handlePassedToCreate(createPrompt)).toBe("support-bot");
+        expect(createPrompt).toHaveBeenCalledWith(
+          createdWithHandle("support-bot"),
+        );
       });
 
       it("creates the copy in the target project", async () => {
@@ -230,8 +236,8 @@ describe("PromptService", () => {
         });
       });
 
-      it("records the prompt it was copied from", async () => {
-        const { service, prisma } = buildService();
+      it("records the prompt it was copied from, scoped to the target project", async () => {
+        const { service, setCopiedFromPrompt } = buildService();
 
         const copy = await service.copyPrompt({
           idOrHandle: "support-bot",
@@ -239,9 +245,10 @@ describe("PromptService", () => {
           targetProjectId: "project-2",
         });
 
-        expect(prisma.llmPromptConfig.update).toHaveBeenCalledWith({
-          where: { id: "prompt_new" },
-          data: { copiedFromPromptId: SOURCE_PROMPT.id },
+        expect(setCopiedFromPrompt).toHaveBeenCalledWith({
+          id: "prompt_new",
+          projectId: "project-2",
+          copiedFromPromptId: SOURCE_PROMPT.id,
         });
         expect(copy.copiedFromPromptId).toBe(SOURCE_PROMPT.id);
       });
@@ -259,7 +266,9 @@ describe("PromptService", () => {
           targetProjectId: "project-2",
         });
 
-        expect(handlePassedToCreate(createPrompt)).toBe("support-bot_copy1");
+        expect(createPrompt).toHaveBeenCalledWith(
+          createdWithHandle("support-bot_copy1"),
+        );
       });
 
       it("counts up until it finds a free suffix", async () => {
@@ -277,7 +286,9 @@ describe("PromptService", () => {
           targetProjectId: "project-2",
         });
 
-        expect(handlePassedToCreate(createPrompt)).toBe("support-bot_copy3");
+        expect(createPrompt).toHaveBeenCalledWith(
+          createdWithHandle("support-bot_copy3"),
+        );
       });
     });
 

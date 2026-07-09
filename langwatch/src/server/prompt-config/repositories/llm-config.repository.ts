@@ -824,6 +824,21 @@ export class LlmConfigRepository {
   }
 
   /**
+   * Records the prompt a copy was made from, so the copy can later be synced
+   * from its source and the source can push updates to its copies.
+   */
+  async setCopiedFromPrompt(params: {
+    id: string;
+    projectId: string;
+    copiedFromPromptId: string;
+  }): Promise<void> {
+    await this.prisma.llmPromptConfig.update({
+      where: { id: params.id, projectId: params.projectId },
+      data: { copiedFromPromptId: params.copiedFromPromptId },
+    });
+  }
+
+  /**
    * Find which of the given IDs exist as non-deleted configs accessible
    * from the specified project or organization.
    * Returns the set of IDs that exist.

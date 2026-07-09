@@ -596,9 +596,10 @@ export class PromptService {
       commitMessage: `Copied from "${baseHandle}"`,
     });
 
-    await this.prisma.llmPromptConfig.update({
-      where: { id: copied.id },
-      data: { copiedFromPromptId: source.id },
+    await this.repository.setCopiedFromPrompt({
+      id: copied.id,
+      projectId: targetProjectId,
+      copiedFromPromptId: source.id,
     });
 
     return { ...copied, copiedFromPromptId: source.id };
