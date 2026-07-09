@@ -801,3 +801,117 @@ describe("project-tenancy regime partition", () => {
     expect(withoutProjectId).toEqual([]);
   });
 });
+
+/**
+ * ShareLink query shapes (ADR-039). Anonymous share resolution presents only a
+ * secret token — the row is what teaches the caller its projectId — so the
+ * token/id lookups are exempt. Every *write*, however, must still be
+ * project-scoped. `incrementViewCount` originally used
+ * `update({ where: { id } })` and blew up at runtime on the first share
+ * resolve; these lock the real repository's query shapes in.
+ */
+describe("guardProjectId — ShareLink", () => {
+  describe("findUnique by token (the anonymous capability lookup)", () => {
+    it("does NOT throw — projectId cannot be known before the row is read", async () => {
+      await expect(
+        runGuard({
+          model: "ShareLink",
+          action: "findUnique",
+          args: { where: { token: "share-lw-abc" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("findUnique by id", () => {
+    it("does NOT throw", async () => {
+      await expect(
+        runGuard({
+          model: "ShareLink",
+          action: "findUnique",
+          args: { where: { id: "share_1" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("updateMany scoped by id + projectId (incrementViewCount)", () => {
+    it("does NOT throw", async () => {
+      await expect(
+        runGuard({
+          model: "ShareLink",
+          action: "updateMany",
+          args: {
+            where: { id: "share_1", projectId: "project_1" },
+            data: { viewCount: { increment: 1 } },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("update scoped only by primary key", () => {
+    it("throws — a write must carry projectId", async () => {
+      await expect(
+        runGuard({
+          model: "ShareLink",
+          action: "update",
+          args: {
+            where: { id: "share_1" },
+            data: { viewCount: { increment: 1 } },
+          },
+        }),
+      ).rejects.toThrow(/requires a 'projectId'/);
+    });
+  });
+
+  describe("create carrying projectId in data", () => {
+    it("does NOT throw", async () => {
+      await expect(
+        runGuard({
+          model: "ShareLink",
+          action: "create",
+          args: {
+            data: {
+              token: "share-lw-abc",
+              projectId: "project_1",
+              resourceType: "TRACE",
+              resourceId: "trace_a",
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("deleteMany scoped by id + projectId (revokeById)", () => {
+    it("does NOT throw", async () => {
+      await expect(
+        runGuard({
+          model: "ShareLink",
+          action: "deleteMany",
+          args: { where: { id: "share_1", projectId: "project_1" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("count scoped by projectId (hasActiveShareForResource)", () => {
+    it("does NOT throw", async () => {
+      await expect(
+        runGuard({
+          model: "ShareLink",
+          action: "count",
+          args: {
+            where: {
+              projectId: "project_1",
+              resourceType: "TRACE",
+              resourceId: "trace_a",
+              OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+});

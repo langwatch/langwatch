@@ -93,9 +93,17 @@ export class PrismaShareRepository implements ShareRepository {
     });
   }
 
-  async incrementViewCount(id: string): Promise<ShareLink> {
-    return this.prisma.shareLink.update({
-      where: { id },
+  async incrementViewCount({
+    id,
+    projectId,
+  }: {
+    id: string;
+    projectId: string;
+  }): Promise<void> {
+    // updateMany (not update) so the where clause can carry projectId — the
+    // multitenancy guard rejects writes scoped only by primary key.
+    await this.prisma.shareLink.updateMany({
+      where: { id, projectId },
       data: { viewCount: { increment: 1 } },
     });
   }

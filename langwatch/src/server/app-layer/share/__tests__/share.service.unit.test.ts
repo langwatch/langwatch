@@ -127,7 +127,10 @@ describe("ShareService", () => {
 
         expect(result.status).toBe("granted");
         expect(result).toMatchObject({ consumed: true });
-        expect(repo.incrementViewCount).toHaveBeenCalledWith("share_1");
+        expect(repo.incrementViewCount).toHaveBeenCalledWith({
+          id: "share_1",
+          projectId: PROJECT_ID,
+        });
       });
     });
 

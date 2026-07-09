@@ -47,7 +47,9 @@ export interface ShareRepository {
 
   create(params: CreateShareLinkParams): Promise<ShareLink>;
 
-  incrementViewCount(id: string): Promise<ShareLink>;
+  /** Project-scoped so the multitenancy guard is satisfied and a view can never
+   *  be counted against another tenant's link. */
+  incrementViewCount(params: { id: string; projectId: string }): Promise<void>;
 
   /** Revoke a single link, scoped to its project. */
   deleteById(params: { id: string; projectId: string }): Promise<void>;

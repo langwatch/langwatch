@@ -112,7 +112,10 @@ export class ShareService {
 
     if (isShareViewExhausted(share)) return { status: "exhausted" };
 
-    await this.repo.incrementViewCount(share.id);
+    await this.repo.incrementViewCount({
+      id: share.id,
+      projectId: share.projectId,
+    });
     return { status: "granted", share, consumed: true };
   }
 
