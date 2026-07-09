@@ -149,7 +149,7 @@ describe("AnalyticsService", () => {
 
         expect(spies.runRollupTimeseries).toHaveBeenCalledTimes(1);
         expect(spies.runSlimTimeseries).not.toHaveBeenCalled();
-        expect(spies.runTraceSummariesTimeseries).not.toHaveBeenCalled();
+        expect(spies.runLegacy).not.toHaveBeenCalled();
         expect(result.currentPeriod[0]?.series_0).toBe(50);
       });
 
@@ -174,7 +174,7 @@ describe("AnalyticsService", () => {
           groupBy: "metadata.span_type",
         });
 
-        expect(spies.runTraceSummariesTimeseries).toHaveBeenCalledTimes(1);
+        expect(spies.runLegacy).toHaveBeenCalledTimes(1);
         expect(spies.runRollupTimeseries).not.toHaveBeenCalled();
         expect(spies.runSlimTimeseries).not.toHaveBeenCalled();
       });
@@ -192,7 +192,7 @@ describe("AnalyticsService", () => {
           ],
         } as never);
 
-        expect(spies.runTraceSummariesTimeseries).toHaveBeenCalledTimes(1);
+        expect(spies.runLegacy).toHaveBeenCalledTimes(1);
       });
     });
 
@@ -212,7 +212,7 @@ describe("AnalyticsService", () => {
         });
 
         expect(spies.runRollupTimeseries).toHaveBeenCalledTimes(1);
-        expect(spies.runTraceSummariesTimeseries).toHaveBeenCalledTimes(1);
+        expect(spies.runLegacy).toHaveBeenCalledTimes(1);
         // The routed value wins — the tripwire only logs.
         expect(result.currentPeriod[0]?.series_0).toBe(50);
       });
