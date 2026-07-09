@@ -1,10 +1,9 @@
 import {
-  Badge,
-  Box,
   Button,
   createListCollection,
   Field,
   HStack,
+  Icon,
   IconButton,
   Separator,
   Spinner,
@@ -12,12 +11,20 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { ShareLink, ShareVisibility } from "@prisma/client";
-import { useState } from "react";
-import { LuTrash2 } from "react-icons/lu";
-import { CopyInput } from "~/components/CopyInput";
+import { useRef, useState } from "react";
+import type { IconType } from "react-icons";
+import {
+  LuBuilding2,
+  LuCopy,
+  LuFolderClosed,
+  LuGlobe,
+  LuTrash2,
+} from "react-icons/lu";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Dialog } from "~/components/ui/dialog";
 import { Select } from "~/components/ui/select";
+import { toaster } from "~/components/ui/toaster";
+import { Tooltip } from "~/components/ui/tooltip";
 import {
   type ShareExpiryOption,
   type ShareVisibilityOption,
@@ -49,13 +56,12 @@ const expiryCollection = createListCollection<{
   ],
 });
 
-const VISIBILITY_BADGE: Record<
-  ShareVisibility,
-  { label: string; colorPalette: string }
-> = {
-  PUBLIC: { label: "Anyone", colorPalette: "orange" },
-  ORGANIZATION: { label: "Organization", colorPalette: "blue" },
-  PROJECT: { label: "Project", colorPalette: "gray" },
+/** Terse labels for the link list — the icon already carries the meaning, and
+ *  the full phrasing lives in the "Who can access" select. */
+const AUDIENCE: Record<ShareVisibility, { label: string; icon: IconType }> = {
+  PUBLIC: { label: "Anyone", icon: LuGlobe },
+  ORGANIZATION: { label: "Organization", icon: LuBuilding2 },
+  PROJECT: { label: "Project", icon: LuFolderClosed },
 };
 
 /** A link stops working once it expires or its view cap is spent. */
@@ -83,6 +89,100 @@ function describeLink(link: ShareLink): string {
   }
 
   return parts.join(" · ");
+}
+
+function ShareLinkRow({
+  link,
+  isFirst,
+  isRevoking,
+  onRevoke,
+}: {
+  link: ShareLink;
+  isFirst: boolean;
+  isRevoking: boolean;
+  onRevoke: () => void;
+}) {
+  const url = shareUrlForToken(link.token);
+  const audience = AUDIENCE[link.visibility];
+  const spent = isSpent(link);
+
+  // Mirrors TraceIdChip's copy: `navigator.clipboard` needs a secure context,
+  // so self-hosted plain-http domains get a hint rather than a silent no-op.
+  const copy = async () => {
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        toaster.create({
+          title: "Link copied",
+          description: url,
+          type: "success",
+          duration: 2500,
+          meta: { closable: true },
+        });
+        return;
+      }
+      throw new Error("clipboard unavailable");
+    } catch {
+      toaster.create({
+        title: "Couldn't copy the link",
+        description:
+          "Clipboard access is restricted. This can happen on non-HTTPS domains.",
+        type: "error",
+        duration: 6000,
+        meta: { closable: true },
+      });
+    }
+  };
+
+  return (
+    <HStack
+      gap={2}
+      paddingY={3}
+      paddingX={2}
+      marginX={-2}
+      borderRadius="md"
+      borderTopWidth={isFirst ? undefined : "1px"}
+      borderColor="border.muted"
+      _hover={{ bg: "bg.muted/50" }}
+      // A spent link stays visible so it can be revoked, but reads as inert.
+      opacity={spent ? 0.55 : 1}
+    >
+      <VStack align="start" gap={0.5} flex="1" minWidth={0}>
+        <Text fontFamily="mono" fontSize="xs" color="fg" truncate width="full">
+          {url}
+        </Text>
+        <HStack gap={1.5} color="fg.muted" fontSize="xs">
+          <Icon as={audience.icon} boxSize={3} />
+          <Text>{audience.label}</Text>
+          <Text aria-hidden>·</Text>
+          <Text>{describeLink(link)}</Text>
+        </HStack>
+      </VStack>
+
+      <Tooltip content="Copy link">
+        <IconButton
+          aria-label="Copy link"
+          variant="ghost"
+          size="sm"
+          onClick={() => void copy()}
+        >
+          <Icon as={LuCopy} boxSize={4} />
+        </IconButton>
+      </Tooltip>
+      <Tooltip content="Revoke link">
+        <IconButton
+          aria-label="Revoke link"
+          variant="ghost"
+          size="sm"
+          colorPalette="red"
+          loading={isRevoking}
+          onClick={onRevoke}
+        >
+          <Icon as={LuTrash2} boxSize={4} />
+        </IconButton>
+      </Tooltip>
+    </HStack>
+  );
 }
 
 export function ShareTraceDialog({
@@ -113,35 +213,42 @@ export function ShareTraceDialog({
   const [singleView, setSingleView] = useState(false);
   const [includeThread, setIncludeThread] = useState(false);
 
+  // Park initial focus on the panel itself. Left to its own devices the dialog
+  // focuses the close button, which opens with a focus ring drawn around it.
+  const contentRef = useRef<HTMLDivElement>(null);
+
   return (
-    <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(e) => !e.open && onClose()}
+      initialFocusEl={() => contentRef.current}
+    >
       <Dialog.Content
+        ref={contentRef}
+        tabIndex={-1}
         // Translucent glass surface, matching the drawer. A solid fill here
         // would render the backdrop blur inert.
         background="bg.surface/80"
         backdropFilter="blur(25px)"
         borderRadius="lg"
+        _focusVisible={{ outline: "none" }}
         onClick={(e) => e.stopPropagation()}
       >
         <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>Share trace</Dialog.Title>
-          <Dialog.Description color="fg.muted" fontSize="sm">
-            Create a link to this trace. Revoke it at any time.
-          </Dialog.Description>
+        <Dialog.Header paddingBottom={0}>
+          <VStack align="start" gap={1}>
+            <Dialog.Title>Share trace</Dialog.Title>
+            <Dialog.Description color="fg.muted" fontSize="sm">
+              Create a link to this trace. Revoke it at any time.
+            </Dialog.Description>
+          </VStack>
         </Dialog.Header>
 
-        <Dialog.Body paddingBottom={6}>
-          <VStack gap={5} align="stretch">
-            <Box
-              bg="bg.panel/60"
-              borderWidth="1px"
-              borderColor="border"
-              borderRadius="md"
-              padding={4}
-            >
-              <VStack gap={4} align="stretch">
-                <Field.Root>
+        <Dialog.Body paddingTop={5} paddingBottom={6}>
+          <VStack gap={6} align="stretch">
+            <VStack gap={4} align="stretch">
+              <HStack gap={3} align="start" flexWrap="wrap">
+                <Field.Root flex="2" minWidth="200px">
                   <Field.Label>Who can access</Field.Label>
                   <Select.Root
                     collection={visibilityCollection}
@@ -163,8 +270,8 @@ export function ShareTraceDialog({
                   </Select.Root>
                 </Field.Root>
 
-                <Field.Root>
-                  <Field.Label>Link expires</Field.Label>
+                <Field.Root flex="1" minWidth="140px">
+                  <Field.Label>Expires</Field.Label>
                   <Select.Root
                     collection={expiryCollection}
                     value={[expiry]}
@@ -184,36 +291,41 @@ export function ShareTraceDialog({
                     </Select.Content>
                   </Select.Root>
                 </Field.Root>
+              </HStack>
 
-                <VStack gap={2} align="stretch">
-                  <Checkbox
-                    checked={singleView}
-                    onCheckedChange={(e) => setSingleView(!!e.checked)}
-                  >
+              <VStack gap={3} align="stretch">
+                <Checkbox
+                  alignItems="flex-start"
+                  checked={singleView}
+                  onCheckedChange={(e) => setSingleView(!!e.checked)}
+                >
+                  <VStack align="start" gap={0}>
                     <Text fontSize="sm">One-time view</Text>
-                  </Checkbox>
-                  <Text fontSize="xs" color="fg.muted" paddingLeft={6}>
-                    The link stops working once it has been opened.
-                  </Text>
+                    <Text fontSize="xs" color="fg.muted">
+                      The link stops working once it has been opened.
+                    </Text>
+                  </VStack>
+                </Checkbox>
 
-                  {canShareThread && (
-                    <>
-                      <Checkbox
-                        checked={includeThread}
-                        onCheckedChange={(e) => setIncludeThread(!!e.checked)}
-                      >
-                        <Text fontSize="sm">Include the conversation</Text>
-                      </Checkbox>
-                      <Text fontSize="xs" color="fg.muted" paddingLeft={6}>
+                {canShareThread && (
+                  <Checkbox
+                    alignItems="flex-start"
+                    checked={includeThread}
+                    onCheckedChange={(e) => setIncludeThread(!!e.checked)}
+                  >
+                    <VStack align="start" gap={0}>
+                      <Text fontSize="sm">Include the conversation</Text>
+                      <Text fontSize="xs" color="fg.muted">
                         Viewers also see the other turns in this thread.
                       </Text>
-                    </>
-                  )}
-                </VStack>
+                    </VStack>
+                  </Checkbox>
+                )}
+              </VStack>
 
+              <HStack justify="end">
                 <Button
                   colorPalette="orange"
-                  alignSelf="start"
                   loading={isCreating}
                   disabled={!projectId}
                   onClick={() =>
@@ -222,84 +334,46 @@ export function ShareTraceDialog({
                 >
                   Create link
                 </Button>
-              </VStack>
-            </Box>
+              </HStack>
+            </VStack>
 
             <Separator />
 
-            <VStack gap={2} align="stretch">
-              <Text fontWeight="600" fontSize="sm">
+            <VStack gap={0} align="stretch">
+              <Text
+                fontSize="xs"
+                fontWeight="600"
+                color="fg.muted"
+                textTransform="uppercase"
+                letterSpacing="wide"
+                marginBottom={1}
+              >
                 Links
               </Text>
 
               {isLoading ? (
-                <HStack color="fg.muted" fontSize="sm" gap={2}>
+                <HStack color="fg.muted" fontSize="sm" gap={2} paddingY={3}>
                   <Spinner size="sm" />
                   <Text>Loading…</Text>
                 </HStack>
               ) : links.length === 0 ? (
-                <Text color="fg.muted" fontSize="sm">
+                <Text color="fg.muted" fontSize="sm" paddingY={3}>
                   No links yet.
                 </Text>
               ) : (
-                links.map((link) => {
-                  const spent = isSpent(link);
-                  const badge = VISIBILITY_BADGE[link.visibility];
-                  return (
-                    <VStack
-                      key={link.id}
-                      align="stretch"
-                      gap={2}
-                      bg="bg.panel/60"
-                      borderWidth="1px"
-                      borderColor="border"
-                      borderRadius="md"
-                      padding={3}
-                      // A spent link is kept visible so it can be revoked, but
-                      // reads as inert.
-                      opacity={spent ? 0.6 : 1}
-                    >
-                      <HStack width="full" gap={2}>
-                        <CopyInput
-                          value={shareUrlForToken(link.token)}
-                          label="Share link"
-                        />
-                        <IconButton
-                          aria-label="Revoke link"
-                          variant="ghost"
-                          size="sm"
-                          colorPalette="red"
-                          loading={revokingId === link.id}
-                          onClick={() => revokeLink(link.id)}
-                        >
-                          <LuTrash2 size={16} />
-                        </IconButton>
-                      </HStack>
-                      <HStack gap={2}>
-                        <Badge
-                          colorPalette={badge.colorPalette}
-                          variant="subtle"
-                          size="sm"
-                        >
-                          {badge.label}
-                        </Badge>
-                        <Text fontSize="xs" color="fg.muted">
-                          {describeLink(link)}
-                        </Text>
-                      </HStack>
-                    </VStack>
-                  );
-                })
+                links.map((link, index) => (
+                  <ShareLinkRow
+                    key={link.id}
+                    link={link}
+                    isFirst={index === 0}
+                    isRevoking={revokingId === link.id}
+                    onRevoke={() => revokeLink(link.id)}
+                  />
+                ))
               )}
             </VStack>
           </VStack>
         </Dialog.Body>
-
-        <Dialog.Footer>
-          <Button variant="ghost" onClick={onClose}>
-            Done
-          </Button>
-        </Dialog.Footer>
       </Dialog.Content>
     </Dialog.Root>
   );
