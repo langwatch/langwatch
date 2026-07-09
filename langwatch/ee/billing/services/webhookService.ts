@@ -1,4 +1,8 @@
-import { Currency, type PrismaClient } from "@prisma/client";
+import {
+  Currency,
+  type PrismaClient,
+  type Subscription,
+} from "@prisma/client";
 import type { PostHog } from "posthog-node";
 import type Stripe from "stripe";
 import { getApp } from "../../../src/server/app-layer/app";
@@ -15,6 +19,7 @@ import {
 } from "../../../src/server/data-retention/retentionPolicy.schema";
 import { createLogger } from "../../../src/utils/logger";
 import { SubscriptionRecordNotFoundError } from "../errors";
+import type { PaymentFailurePrior } from "../types";
 import { fireSubscriptionSyncNurturing } from "../nurturing/hooks/subscriptionSync";
 import { SubscriptionStatus } from "../planTypes";
 import {
@@ -61,6 +66,35 @@ export interface LicensePurchaseHandler {
 export type HandleEventResult =
   | { status: "ok" }
   | { status: "error"; httpStatus: 400 | 500; message: string };
+
+/**
+ * Classifies a previously recorded failure against the failing invoice's
+ * creation date. Elapsed time cannot tell a retry from a new failure (Stripe
+ * retries the same invoice days apart), so the invoice's creation is the
+ * cycle boundary: a prior failure recorded before it carried over from an
+ * earlier dunning cycle; one recorded after it belongs to this invoice's
+ * retries. Without an invoice creation date the earlier-cycle claim cannot
+ * be made truthfully, so the prior failure is treated as a same-invoice
+ * retry.
+ */
+export const classifyPriorFailure = ({
+  previousFailureAt,
+  invoiceCreatedAt,
+}: {
+  previousFailureAt: Date | null;
+  invoiceCreatedAt: Date | null;
+}): PaymentFailurePrior => {
+  if (!previousFailureAt) {
+    return { kind: "no-prior-failure" };
+  }
+  if (
+    invoiceCreatedAt &&
+    previousFailureAt.getTime() < invoiceCreatedAt.getTime()
+  ) {
+    return { kind: "earlier-cycle", at: previousFailureAt };
+  }
+  return { kind: "same-invoice-retry" };
+};
 
 /** Stripe webhooks can arrive before subscription state is fully consistent. */
 const STRIPE_EVENTUAL_CONSISTENCY_DELAY_MS = 2000;
@@ -597,39 +631,69 @@ export class EEWebhookService implements WebhookService {
       return;
     }
 
-    const previousFailureAt = currentSubscription.lastPaymentFailedDate;
+    // Read before recordPaymentFailure stamps a new date over it.
+    const priorFailure = classifyPriorFailure({
+      previousFailureAt: currentSubscription.lastPaymentFailedDate,
+      invoiceCreatedAt: invoice.created
+        ? new Date(invoice.created * 1000)
+        : null,
+    });
 
     await this.subscriptionRepository.recordPaymentFailure({
       id: currentSubscription.id,
       currentStatus: currentSubscription.status,
     });
 
-    // Notification failures must never fail the webhook — Stripe would
-    // retry delivery, and the payment failure has already been recorded.
+    await this.notifyPaymentFailed({
+      subscription: currentSubscription,
+      stripeSubscriptionId: subscriptionId,
+      invoice,
+      livemode,
+      priorFailure,
+    });
+  }
+
+  /**
+   * Best-effort by contract: a notification failure is logged and must never
+   * fail the webhook — Stripe would retry delivery, and the payment failure
+   * has already been recorded.
+   */
+  private async notifyPaymentFailed({
+    subscription,
+    stripeSubscriptionId,
+    invoice,
+    livemode,
+    priorFailure,
+  }: {
+    subscription: Subscription;
+    stripeSubscriptionId: string;
+    invoice: Stripe.Invoice;
+    livemode: boolean;
+    priorFailure: PaymentFailurePrior;
+  }): Promise<void> {
     try {
       const org = await this.organizationRepository.findNameById(
-        currentSubscription.organizationId,
+        subscription.organizationId,
       );
 
       await getApp().notifications.sendSlackSubscriptionEvent({
         type: "payment_failed",
-        organizationId: currentSubscription.organizationId,
+        organizationId: subscription.organizationId,
         organizationName: org?.name ?? "Unknown",
-        plan: currentSubscription.plan,
-        dbSubscriptionId: currentSubscription.id,
-        stripeSubscriptionId: subscriptionId,
+        plan: subscription.plan,
+        subscriptionId: subscription.id,
+        stripeSubscriptionId,
         livemode,
-        amountDueCents: invoice.amount_due ?? null,
-        currency: invoice.currency ?? null,
+        amountDue:
+          invoice.amount_due != null && invoice.currency
+            ? { cents: invoice.amount_due, currency: invoice.currency }
+            : null,
         attemptCount: invoice.attempt_count ?? null,
-        previousFailureAt,
-        invoiceCreatedAt: invoice.created
-          ? new Date(invoice.created * 1000)
-          : null,
+        priorFailure,
       });
     } catch (err) {
       logger.error(
-        { subscriptionId, err },
+        { subscriptionId: stripeSubscriptionId, err },
         "[stripeWebhook] Failed to send payment-failed notification",
       );
     }

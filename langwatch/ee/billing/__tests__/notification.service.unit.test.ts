@@ -355,9 +355,10 @@ describe("NotificationService", () => {
         organizationId: "org_1",
         organizationName: "Acme",
         plan: "LAUNCH",
-        dbSubscriptionId: "sub_db_1",
+        subscriptionId: "sub_db_1",
         stripeSubscriptionId: "sub_stripe_1",
         livemode: true,
+        priorFailure: { kind: "same-invoice-retry" as const },
       };
 
       beforeEach(() => {
@@ -436,12 +437,30 @@ describe("NotificationService", () => {
         );
       });
 
+      /** @scenario Alert links to the test-mode Stripe dashboard for test-mode events */
+      it("labels the alert header as test mode for test-mode events", async () => {
+        await service.sendSlackSubscriptionEvent({
+          ...basePayload,
+          livemode: false,
+        });
+
+        expect(mockSlackSend).toHaveBeenCalledWith({
+          blocks: expect.arrayContaining([
+            expect.objectContaining({
+              type: "header",
+              text: expect.objectContaining({
+                text: "Subscription payment failed (test mode)",
+              }),
+            }),
+          ]),
+        });
+      });
+
       /** @scenario Alert includes the failed amount in the invoice currency */
       it("shows the amount formatted in the invoice currency", async () => {
         await service.sendSlackSubscriptionEvent({
           ...basePayload,
-          amountDueCents: 3400,
-          currency: "eur",
+          amountDue: { cents: 3400, currency: "eur" },
         });
 
         const sentBlocks = mockSlackSend.mock.calls[0]![0].blocks;
@@ -454,8 +473,7 @@ describe("NotificationService", () => {
       it("omits the amount line when no amount due is provided", async () => {
         await service.sendSlackSubscriptionEvent({
           ...basePayload,
-          amountDueCents: null,
-          currency: null,
+          amountDue: null,
         });
 
         expect(mockSlackSend).toHaveBeenCalled();
@@ -466,10 +484,10 @@ describe("NotificationService", () => {
       });
 
       /** @scenario First payment failure signals no prior failure */
-      it("indicates this is the first recorded failure when there is no previous failure", async () => {
+      it("indicates there is no prior unresolved failure", async () => {
         await service.sendSlackSubscriptionEvent({
           ...basePayload,
-          previousFailureAt: null,
+          priorFailure: { kind: "no-prior-failure" },
         });
 
         const sentBlocks = mockSlackSend.mock.calls[0]![0].blocks;
@@ -477,42 +495,35 @@ describe("NotificationService", () => {
         const contextText = contextBlock.elements
           .map((e: any) => e.text)
           .join(" ");
-        expect(contextText.toLowerCase()).toContain("first recorded failure");
+        expect(contextText.toLowerCase()).toContain(
+          "no prior unresolved failure",
+        );
       });
 
       /** @scenario A retry of the same invoice is labelled by its attempt count, not as a repeat failure */
       it("shows the attempt count and does not claim an earlier dunning cycle", async () => {
-        const invoiceCreatedAt = new Date("2026-01-01T00:00:00Z");
-        const laterFailure = new Date("2026-01-02T00:00:00Z");
-
         await service.sendSlackSubscriptionEvent({
           ...basePayload,
           attemptCount: 3,
-          previousFailureAt: laterFailure,
-          invoiceCreatedAt,
+          priorFailure: { kind: "same-invoice-retry" },
         });
 
         const sentBlocks = mockSlackSend.mock.calls[0]![0].blocks;
         const dataBlock = sentBlocks.find((b: any) => b.type === "section");
         const fieldText = dataBlock.fields.map((f: any) => f.text).join(" ");
-        expect(fieldText).toContain("Attempt 3 for this invoice");
+        expect(fieldText).toContain("*Attempt:* 3 for this invoice");
 
         const contextBlock = sentBlocks.find((b: any) => b.type === "context");
-        const contextText = contextBlock
-          ? contextBlock.elements.map((e: any) => e.text).join(" ")
-          : "";
-        expect(contextText).not.toContain("Previous failure:");
+        expect(contextBlock).toBeUndefined();
       });
 
       /** @scenario A failure with a prior failure from before the current invoice surfaces the previous failure date */
-      it("shows the previous failure date when it predates the current invoice", async () => {
+      it("shows the previous failure date for an earlier-cycle failure", async () => {
         const earlierFailure = new Date("2025-12-01T00:00:00Z");
-        const invoiceCreatedAt = new Date("2026-01-01T00:00:00Z");
 
         await service.sendSlackSubscriptionEvent({
           ...basePayload,
-          previousFailureAt: earlierFailure,
-          invoiceCreatedAt,
+          priorFailure: { kind: "earlier-cycle", at: earlierFailure },
         });
 
         const sentBlocks = mockSlackSend.mock.calls[0]![0].blocks;
@@ -521,6 +532,7 @@ describe("NotificationService", () => {
           .map((e: any) => e.text)
           .join(" ");
         expect(contextText).toContain("Previous failure:");
+        expect(contextText).toContain("Dec 1, 2025");
       });
     });
   });

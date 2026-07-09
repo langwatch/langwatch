@@ -40,6 +40,7 @@ Feature: Internal Slack alert on subscription payment failure
     Given the invoice.payment_failed event is a test-mode event
     When the payment failure is processed
     Then the Stripe subscription link points at the test-mode dashboard
+    And the alert is labelled as test mode so it cannot be mistaken for a live incident
 
   @unit
   Scenario: Alert includes the failed amount in the invoice currency
@@ -57,9 +58,9 @@ Feature: Internal Slack alert on subscription payment failure
 
   @unit
   Scenario: First payment failure signals no prior failure
-    Given the subscription has never had a payment failure
+    Given the subscription has no recorded payment failure
     When Stripe fires an invoice.payment_failed event for the subscription
-    Then the payment-failed notification indicates this is the first failure
+    Then the payment-failed notification indicates there is no prior unresolved failure
 
   @unit
   Scenario: A retry of the same invoice is labelled by its attempt count, not as a repeat failure

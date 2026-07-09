@@ -40,6 +40,7 @@ vi.mock("../../../src/utils/logger", () => ({
   }),
 }));
 
+import type Stripe from "stripe";
 import type { OrganizationRepository } from "../../../src/server/app-layer/organizations/repositories/organization.repository";
 import type {
   SubscriptionRepository,
@@ -79,6 +80,7 @@ const createMockOrganizationRepository = () => ({
   getPricingModel: vi.fn(),
   getStripeCustomerId: vi.fn(),
   findNameById: vi.fn(),
+  findByStripeCustomerId: vi.fn(),
 });
 
 const createMockItemCalculator = () => ({
@@ -145,14 +147,15 @@ const makeSubscriptionWithOrg = (
   } as unknown as SubscriptionWithOrg;
 };
 
-const makeInvoice = (overrides: Record<string, unknown> = {}) => ({
-  id: "in_1",
-  amount_due: 5000,
-  currency: "usd",
-  attempt_count: 1,
-  created: Math.floor(new Date("2026-01-01T00:00:00Z").getTime() / 1000),
-  ...overrides,
-});
+const makeInvoice = (overrides: Record<string, unknown> = {}) =>
+  ({
+    id: "in_1",
+    amount_due: 5000,
+    currency: "usd",
+    attempt_count: 1,
+    created: Math.floor(new Date("2026-01-01T00:00:00Z").getTime() / 1000),
+    ...overrides,
+  }) as unknown as Stripe.Invoice;
 
 const createMockStripe = (overrides: Record<string, unknown> = {}) => ({
   subscriptions: {
@@ -833,7 +836,7 @@ describe("webhookService", () => {
 
         const promise = service.handleInvoicePaymentFailed({
           subscriptionId: "sub_missing",
-          invoice: makeInvoice() as any,
+          invoice: makeInvoice(),
           livemode: true,
         });
 
@@ -856,7 +859,7 @@ describe("webhookService", () => {
 
         const promise = service.handleInvoicePaymentFailed({
           subscriptionId: "sub_1",
-          invoice: makeInvoice() as any,
+          invoice: makeInvoice(),
           livemode: true,
         });
 
@@ -880,7 +883,7 @@ describe("webhookService", () => {
 
         const promise = service.handleInvoicePaymentFailed({
           subscriptionId: "sub_1",
-          invoice: makeInvoice() as any,
+          invoice: makeInvoice(),
           livemode: true,
         });
 
@@ -907,7 +910,7 @@ describe("webhookService", () => {
 
         const promise = service.handleInvoicePaymentFailed({
           subscriptionId: "sub_stripe_1",
-          invoice: makeInvoice() as any,
+          invoice: makeInvoice(),
           livemode: true,
         });
 
@@ -920,7 +923,7 @@ describe("webhookService", () => {
             organizationId: "org_123",
             organizationName: "Acme",
             plan: "LAUNCH",
-            dbSubscriptionId: "sub_db_1",
+            subscriptionId: "sub_db_1",
             stripeSubscriptionId: "sub_stripe_1",
             livemode: true,
           }),
@@ -936,7 +939,7 @@ describe("webhookService", () => {
 
         const promise = service.handleInvoicePaymentFailed({
           subscriptionId: "sub_stripe_1",
-          invoice: makeInvoice() as any,
+          invoice: makeInvoice(),
           livemode: false,
         });
 
@@ -957,7 +960,7 @@ describe("webhookService", () => {
 
         const promise = service.handleInvoicePaymentFailed({
           subscriptionId: "sub_stripe_1",
-          invoice: makeInvoice({ amount_due: 3400, currency: "eur" }) as any,
+          invoice: makeInvoice({ amount_due: 3400, currency: "eur" }),
           livemode: true,
         });
 
@@ -965,7 +968,9 @@ describe("webhookService", () => {
         await promise;
 
         expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
-          expect.objectContaining({ amountDueCents: 3400, currency: "eur" }),
+          expect.objectContaining({
+            amountDue: { cents: 3400, currency: "eur" },
+          }),
         );
       });
 
@@ -981,7 +986,7 @@ describe("webhookService", () => {
           invoice: makeInvoice({
             amount_due: null,
             currency: null,
-          }) as any,
+          }),
           livemode: true,
         });
 
@@ -989,14 +994,14 @@ describe("webhookService", () => {
         await promise;
 
         expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
-          expect.objectContaining({ amountDueCents: null, currency: null }),
+          expect.objectContaining({ amountDue: null }),
         );
       });
     });
 
     describe("when the subscription has never had a payment failure", () => {
       /** @scenario First payment failure signals no prior failure */
-      it("passes a null previousFailureAt", async () => {
+      it("classifies the failure as having no prior failure", async () => {
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({
             status: SubscriptionStatus.ACTIVE,
@@ -1007,7 +1012,7 @@ describe("webhookService", () => {
 
         const promise = service.handleInvoicePaymentFailed({
           subscriptionId: "sub_stripe_1",
-          invoice: makeInvoice() as any,
+          invoice: makeInvoice(),
           livemode: true,
         });
 
@@ -1015,7 +1020,9 @@ describe("webhookService", () => {
         await promise;
 
         expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
-          expect.objectContaining({ previousFailureAt: null }),
+          expect.objectContaining({
+            priorFailure: { kind: "no-prior-failure" },
+          }),
         );
       });
     });
@@ -1048,14 +1055,8 @@ describe("webhookService", () => {
         expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
           expect.objectContaining({
             attemptCount: 3,
-            previousFailureAt: laterFailure,
-            invoiceCreatedAt,
+            priorFailure: { kind: "same-invoice-retry" },
           }),
-        );
-        // The recorded failure is AFTER the invoice was created (a retry of
-        // this same invoice), not before it — not an earlier dunning cycle.
-        expect(laterFailure.getTime()).toBeGreaterThan(
-          invoiceCreatedAt.getTime(),
         );
       });
     });
@@ -1086,12 +1087,87 @@ describe("webhookService", () => {
 
         expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
           expect.objectContaining({
-            previousFailureAt: earlierFailure,
-            invoiceCreatedAt,
+            priorFailure: { kind: "earlier-cycle", at: earlierFailure },
           }),
         );
-        expect(earlierFailure.getTime()).toBeLessThan(
-          invoiceCreatedAt.getTime(),
+      });
+    });
+
+    describe("when the recorded failure and the invoice creation share the same timestamp", () => {
+      it("classifies a same-invoice retry, not an earlier cycle", async () => {
+        const boundary = new Date("2026-01-01T00:00:00Z");
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({
+            status: SubscriptionStatus.ACTIVE,
+            lastPaymentFailedDate: boundary,
+          }),
+        );
+        orgRepo.findNameById.mockResolvedValue({ id: "org_123", name: "Acme" });
+
+        const promise = service.handleInvoicePaymentFailed({
+          subscriptionId: "sub_stripe_1",
+          invoice: makeInvoice({
+            created: Math.floor(boundary.getTime() / 1000),
+          }),
+          livemode: true,
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
+          expect.objectContaining({
+            priorFailure: { kind: "same-invoice-retry" },
+          }),
+        );
+      });
+    });
+
+    describe("when the invoice carries no creation date", () => {
+      it("does not claim an earlier cycle without a boundary to compare against", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({
+            status: SubscriptionStatus.ACTIVE,
+            lastPaymentFailedDate: new Date("2025-12-01T00:00:00Z"),
+          }),
+        );
+        orgRepo.findNameById.mockResolvedValue({ id: "org_123", name: "Acme" });
+
+        const promise = service.handleInvoicePaymentFailed({
+          subscriptionId: "sub_stripe_1",
+          invoice: makeInvoice({ created: null }),
+          livemode: true,
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
+          expect.objectContaining({
+            priorFailure: { kind: "same-invoice-retry" },
+          }),
+        );
+      });
+    });
+
+    describe("when the organization lookup returns nothing", () => {
+      it("falls back to an unknown organization name and still alerts", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.ACTIVE }),
+        );
+        orgRepo.findNameById.mockResolvedValue(null);
+
+        const promise = service.handleInvoicePaymentFailed({
+          subscriptionId: "sub_stripe_1",
+          invoice: makeInvoice(),
+          livemode: true,
+        });
+
+        await vi.advanceTimersByTimeAsync(2000);
+        await promise;
+
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith(
+          expect.objectContaining({ organizationName: "Unknown" }),
         );
       });
     });
@@ -1105,7 +1181,7 @@ describe("webhookService", () => {
 
         const promise = service.handleInvoicePaymentFailed({
           subscriptionId: "sub_stripe_1",
-          invoice: makeInvoice() as any,
+          invoice: makeInvoice(),
           livemode: true,
         });
 
@@ -1130,7 +1206,7 @@ describe("webhookService", () => {
 
         const promise = service.handleInvoicePaymentFailed({
           subscriptionId: "sub_stripe_1",
-          invoice: makeInvoice() as any,
+          invoice: makeInvoice(),
           livemode: true,
         });
 
@@ -1143,6 +1219,59 @@ describe("webhookService", () => {
           currentStatus: SubscriptionStatus.ACTIVE,
         });
         expect(mockLoggerError).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("handleEvent() with checkout.session.completed", () => {
+    describe("when the analytics emitter throws", () => {
+      it("still acknowledges the webhook and logs the failure", async () => {
+        subRepo.linkStripeId.mockResolvedValue({ count: 1 });
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        );
+        orgRepo.findByStripeCustomerId.mockResolvedValue({ id: "org_123" });
+
+        const throwingService = new EEWebhookService({
+          subscriptionRepository: subRepo as unknown as SubscriptionRepository,
+          organizationRepository: orgRepo as unknown as OrganizationRepository,
+          stripe: mockStripeInstance as any,
+          itemCalculator,
+          getPostHog: () =>
+            ({
+              capture: () => {
+                throw new Error("posthog down");
+              },
+              groupIdentify: vi.fn(),
+            }) as any,
+        });
+
+        const promise = throwingService.handleEvent({
+          id: "evt_1",
+          type: "checkout.session.completed",
+          livemode: true,
+          data: {
+            object: {
+              subscription: "sub_stripe_1",
+              customer: "cus_1",
+              client_reference_id: "subscription_setup_sub_db_1",
+              metadata: {},
+              created: 1735689600,
+            },
+          },
+        } as unknown as Stripe.Event);
+
+        await vi.advanceTimersByTimeAsync(2000);
+        const result = await promise;
+
+        expect(result).toEqual({ status: "ok" });
+        expect(mockLoggerError).toHaveBeenCalledWith(
+          expect.objectContaining({ err: expect.any(Error) }),
+          expect.stringContaining("checkout analytics"),
+        );
       });
     });
   });

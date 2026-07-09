@@ -86,6 +86,18 @@ const formatDate = (value?: Date | null) =>
       }).format(value)
     : "Now";
 
+const formatCurrencyCents = ({
+  cents,
+  currency,
+}: {
+  cents: number;
+  currency: string;
+}) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+  }).format(cents / 100);
+
 const buildProspectiveBlocks = (
   payload: ProspectiveNotification,
   adminLink: string,
@@ -273,87 +285,90 @@ const getStripeSubscriptionLink = ({
 }): string =>
   `https://dashboard.stripe.com/${livemode ? "" : "test/"}subscriptions/${stripeSubscriptionId}`;
 
+const paymentFailedContextText = (
+  priorFailure: PaymentFailedNotification["priorFailure"],
+): string | null => {
+  switch (priorFailure.kind) {
+    case "no-prior-failure":
+      return "No prior unresolved failure for this subscription.";
+    case "earlier-cycle":
+      return `Previous failure: ${formatDate(priorFailure.at)}`;
+    case "same-invoice-retry":
+      return null;
+  }
+};
+
 const buildPaymentFailedBlocks = (
   payload: PaymentFailedNotification,
   adminLink: string,
-): NonNullable<IncomingWebhookSendArguments["blocks"]> => {
-  const fields: Array<{ type: "mrkdwn"; text: string }> = [
-    { type: "mrkdwn", text: `*Organization:* ${payload.organizationName}` },
-    { type: "mrkdwn", text: `*Plan:* ${payload.plan}` },
-  ];
+): IncomingWebhookSendArguments["blocks"] => {
+  const contextText = paymentFailedContextText(payload.priorFailure);
 
-  if (payload.amountDueCents != null && payload.currency) {
-    const amountFormatted = new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: payload.currency,
-    }).format(payload.amountDueCents / 100);
-    fields.push({ type: "mrkdwn", text: `*Amount due:* ${amountFormatted}` });
-  }
-
-  if (payload.attemptCount != null) {
-    fields.push({
-      type: "mrkdwn",
-      text: `Attempt ${payload.attemptCount} for this invoice`,
-    });
-  }
-
-  // The retry signal comes from the event itself, not elapsed time: a
-  // previous failure recorded before the current invoice was created marks
-  // an earlier dunning cycle. A previous failure recorded after (e.g. a
-  // retry of this same invoice) is already covered by the attempt count
-  // above and must not be mislabelled as an earlier cycle.
-  const isEarlierDunningCycle =
-    !!payload.previousFailureAt &&
-    !!payload.invoiceCreatedAt &&
-    payload.previousFailureAt.getTime() < payload.invoiceCreatedAt.getTime();
-
-  const contextElements: Array<{ type: "mrkdwn"; text: string }> = [];
-  if (!payload.previousFailureAt) {
-    contextElements.push({
-      type: "mrkdwn",
-      text: "First recorded failure for this subscription.",
-    });
-  } else if (isEarlierDunningCycle) {
-    contextElements.push({
-      type: "mrkdwn",
-      text: `Previous failure: ${formatDate(payload.previousFailureAt)}`,
-    });
-  }
-
-  const blocks: NonNullable<IncomingWebhookSendArguments["blocks"]> = [
+  return [
     {
       type: "header",
-      text: { type: "plain_text", text: "Subscription payment failed" },
+      text: {
+        type: "plain_text",
+        text: payload.livemode
+          ? "Subscription payment failed"
+          : "Subscription payment failed (test mode)",
+      },
     },
-    { type: "section", fields },
+    {
+      type: "section",
+      fields: [
+        {
+          type: "mrkdwn",
+          text: `*Organization:* ${payload.organizationName}`,
+        },
+        { type: "mrkdwn", text: `*Plan:* ${payload.plan}` },
+        ...(payload.amountDue
+          ? [
+              {
+                type: "mrkdwn" as const,
+                text: `*Amount due:* ${formatCurrencyCents(payload.amountDue)}`,
+              },
+            ]
+          : []),
+        ...(payload.attemptCount != null
+          ? [
+              {
+                type: "mrkdwn" as const,
+                text: `*Attempt:* ${payload.attemptCount} for this invoice`,
+              },
+            ]
+          : []),
+      ],
+    },
+    ...(contextText
+      ? [
+          {
+            type: "context" as const,
+            elements: [{ type: "mrkdwn" as const, text: contextText }],
+          },
+        ]
+      : []),
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: "Open org in admin" },
+          url: adminLink,
+          action_id: "subscription_payment_failed_admin",
+        },
+        {
+          type: "button",
+          text: { type: "plain_text", text: "Open in Stripe" },
+          url: getStripeSubscriptionLink({
+            stripeSubscriptionId: payload.stripeSubscriptionId,
+            livemode: payload.livemode,
+          }),
+          action_id: "subscription_payment_failed_stripe",
+        },
+      ],
+    },
   ];
-
-  if (contextElements.length > 0) {
-    blocks.push({ type: "context", elements: contextElements });
-  }
-
-  blocks.push({
-    type: "actions",
-    elements: [
-      {
-        type: "button",
-        text: { type: "plain_text", text: "Open org in admin" },
-        url: adminLink,
-        action_id: "subscription_payment_failed_admin",
-      },
-      {
-        type: "button",
-        text: { type: "plain_text", text: "Open in Stripe" },
-        url: getStripeSubscriptionLink({
-          stripeSubscriptionId: payload.stripeSubscriptionId,
-          livemode: payload.livemode,
-        }),
-        action_id: "subscription_payment_failed_stripe",
-      },
-    ],
-  });
-
-  return blocks;
 };
 
 // ---------------------------------------------------------------------------
@@ -569,10 +584,10 @@ export class NotificationService {
   async sendSlackLicensePurchase(
     payload: LicensePurchaseNotificationPayload,
   ): Promise<void> {
-    const amountFormatted = new Intl.NumberFormat("en-US", {
-      style: "currency",
+    const amountFormatted = formatCurrencyCents({
+      cents: payload.amountPaid,
       currency: payload.currency,
-    }).format(payload.amountPaid / 100);
+    });
 
     await this.sendSlackMessage({
       channelUrl: this.config.slackSubscriptionsChannel,
