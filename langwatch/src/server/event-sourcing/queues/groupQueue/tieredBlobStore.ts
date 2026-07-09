@@ -8,7 +8,7 @@ import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
 import type { ProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import { mintFileUri, mintS3Uri } from "~/server/stored-objects/uri";
 
-import { MAX_BLOB_BYTES } from "./blobConstants";
+import { BLOB_BACKSTOP_TTL_SECONDS, MAX_BLOB_BYTES } from "./blobConstants";
 import { blobNamespaceId } from "./blobKeys";
 import type { JobBlobStore } from "./jobEnvelope";
 import { gqBlobDecodeCapExceededTotal } from "./metrics";
@@ -252,7 +252,13 @@ export class TieredBlobStore {
       await this.objectStoreFor(projectId).put(uri, data, "application/gzip");
       return { tier: "s3", projectId, hash };
     }
-    await this.redisBlobs.put({ id: redisBlobId({ projectId, hash }), data });
+    // GQ2 blobs are refcounted (holder-set eager reclaim), so the TTL is only
+    // the orphan backstop — 3 days, not GQ1's 7-day staged-residence window.
+    await this.redisBlobs.put({
+      id: redisBlobId({ projectId, hash }),
+      data,
+      ttlSeconds: BLOB_BACKSTOP_TTL_SECONDS,
+    });
     return { tier: "redis", projectId, hash };
   }
 
@@ -280,7 +286,7 @@ export class TieredBlobStore {
     if (ref.tier === "redis") {
       const id = redisBlobId({ projectId: ref.projectId, hash: ref.hash });
       return refresh
-        ? this.redisBlobs.get({ id })
+        ? this.redisBlobs.get({ id, ttlSeconds: BLOB_BACKSTOP_TTL_SECONDS })
         : this.redisBlobs.peek({ id });
     }
     // Re-mint OUTSIDE the missing-classification: a destination-resolve / mint
