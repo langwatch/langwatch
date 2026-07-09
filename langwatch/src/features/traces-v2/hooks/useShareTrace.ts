@@ -121,7 +121,10 @@ export function useShareTrace({
     createLink,
     isCreating: createMutation.isLoading,
     revokeLink,
-    isRevoking: revokeMutation.isLoading,
+    /** Which link is being revoked, so only that row shows a spinner. */
+    revokingId: revokeMutation.isLoading
+      ? (revokeMutation.variables?.id ?? null)
+      : null,
     canShareThread: !!conversationId,
   };
 }
