@@ -47,9 +47,6 @@ const ra = "ra";
  */
 export type RollupAggregation = Extract<AggregationTypes, "sum" | "avg">;
 
-/** Group-by columns the rollup is keyed by. */
-export type RollupGroupByKey = "metadata.model" | "metadata.span_type";
-
 /**
  * Map an additive registry metric to its rollup column expression.
  *
@@ -95,31 +92,22 @@ function rollupColumnFor(metric: RollupRollableMetricKey): string {
   }
 }
 
-function isRollupGroupByKey(groupBy: string): groupBy is RollupGroupByKey {
-  return groupBy === "metadata.model" || groupBy === "metadata.span_type";
-}
-
 /**
- * Optional GROUP BY column expression for the rollup. Only `Model` and
- * `SpanType` are valid rollup keys; anything else throws.
+ * The rollup serves UNGROUPED queries only.
+ *
+ * Its `Model` / `SpanType` sort keys look like group-by targets but are not:
+ * the rollup attributes metrics per span, while legacy and slim attribute them
+ * per trace, and its `DurationSum` / `TraceCount` / `ErrorCount` columns are
+ * recorded on the root span alone — so any grouping on those keys silently
+ * changes what the number means. The router (`ROLLUP_GROUP_BY_KEYS`) already
+ * sends every grouped query to slim or `trace_summaries`; this throw is the
+ * backstop for a routing regression.
  */
-function rollupGroupByExpression(groupBy?: string): string | null {
-  if (!groupBy) return null;
-  if (!isRollupGroupByKey(groupBy)) {
-    throw new Error(
-      `Rollup builder cannot group by "${groupBy}". The router should have routed this to slim.`,
-    );
-  }
-  switch (groupBy) {
-    case "metadata.model":
-      return `if(${ra}.Model = '', 'unknown', ${ra}.Model)`;
-    case "metadata.span_type":
-      return `if(${ra}.SpanType = '', 'unknown', ${ra}.SpanType)`;
-    default: {
-      const _exhaustive: never = groupBy;
-      throw new Error(`Unhandled rollup group-by: ${String(_exhaustive)}`);
-    }
-  }
+function assertRollupUngrouped(groupBy?: string): void {
+  if (!groupBy) return;
+  throw new Error(
+    `Rollup builder cannot group by "${groupBy}" — the rollup attributes metrics per span and carries root-only Duration/TraceCount/ErrorCount, so grouped reads diverge from legacy. The router should have routed this to slim or trace_summaries.`,
+  );
 }
 
 function isRollupAggregation(agg: AggregationTypes): agg is RollupAggregation {
@@ -133,21 +121,18 @@ function isRollupAggregation(agg: AggregationTypes): agg is RollupAggregation {
  *   - `sum` → the additive total over every span increment in range.
  *   - `avg` → a true PER-TRACE mean: `sum(col) / nullIf(sum(TraceCount), 0)`.
  *     TraceCount is 1 per root span (migration 00038), so the denominator is
- *     the number of rooted traces in the bucket. Guarded to the router's
- *     eligibility (avg-eligible metric, ungrouped) — a grouped avg would
- *     divide by the ROOT span's (Model, SpanType) bucket only, a wrong
- *     denominator, so it throws instead.
+ *     the number of rooted traces in the bucket. Only the metrics in
+ *     `ROLLUP_AVG_METRIC_KEYS` divide correctly. Grouped queries never reach
+ *     here — `assertRollupUngrouped` rejects them first.
  */
 function rollupAggExpression({
   agg,
   column,
   metric,
-  grouped,
 }: {
   agg: RollupAggregation;
   column: string;
   metric: RollupRollableMetricKey;
-  grouped: boolean;
 }): string {
   switch (agg) {
     case "sum":
@@ -156,11 +141,6 @@ function rollupAggExpression({
       if (!isRollupAvgMetricKey(metric)) {
         throw new Error(
           `Rollup builder cannot serve avg(${metric}) — only non-nullable legacy columns divide correctly by TraceCount. The router should have routed this to slim.`,
-        );
-      }
-      if (grouped) {
-        throw new Error(
-          `Rollup builder cannot serve a GROUPED avg — TraceCount lands in the root span's bucket, so a grouped division uses the wrong denominator. The router should have routed this to slim or trace_summaries.`,
         );
       }
       return `sum(${column}) / nullIf(sum(${ra}.TraceCount), 0)`;
@@ -182,14 +162,15 @@ function rollupAggExpression({
  *   SELECT
  *     CASE … END AS period,
  *     <toStartOf… on BucketStart> AS date,        -- when timeScale numeric
- *     <group expr> AS group_key,                  -- when groupBy
  *     <agg(<rollup col>)> AS <alias>,             -- per series
  *     …
  *   FROM trace_analytics_rollup ra
  *   WHERE ra.TenantId = {tenantId:String}
  *     AND BucketStart in [previousStart, currentEnd)
- *   GROUP BY period [, date] [, group_key]
+ *   GROUP BY period [, date]
  *   ORDER BY period [, date]
+ *
+ * Ungrouped only — see `assertRollupUngrouped`.
  */
 export function buildRollupTimeseriesQuery(
   input: AnalyticsTimeseriesBuilderInput,
@@ -210,10 +191,7 @@ export function buildRollupTimeseriesQuery(
     );
   }
 
-  const groupByColumn = rollupGroupByExpression(input.groupBy);
-  if (groupByColumn) {
-    selectExprs.push(`${groupByColumn} AS group_key`);
-  }
+  assertRollupUngrouped(input.groupBy);
 
   for (let i = 0; i < input.series.length; i++) {
     const s = input.series[i]!;
@@ -232,16 +210,12 @@ export function buildRollupTimeseriesQuery(
       agg: s.aggregation,
       column: rollupColumnFor(s.metric),
       metric: s.metric,
-      grouped: groupByColumn !== null,
     });
     selectExprs.push(`${expr} AS ${alias}`);
   }
 
   const groupByExprs: string[] = ["period"];
   if (typeof input.timeScale === "number") groupByExprs.push("date");
-  if (groupByColumn) groupByExprs.push("group_key");
-
-  const havingClause = groupByColumn ? `HAVING group_key != ''` : "";
 
   // Time-range predicate on the partition column BucketStart enables
   // partition pruning across both the current and previous periods.
@@ -256,7 +230,6 @@ export function buildRollupTimeseriesQuery(
         (${ra}.BucketStart >= {previousStart:DateTime64(3)} AND ${ra}.BucketStart < {previousEnd:DateTime64(3)})
       )
     GROUP BY ${groupByExprs.join(", ")}
-    ${havingClause}
     ORDER BY period${typeof input.timeScale === "number" ? ", date" : ""}
   `;
 

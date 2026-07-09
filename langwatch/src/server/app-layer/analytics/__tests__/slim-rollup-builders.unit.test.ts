@@ -27,7 +27,6 @@ describe("buildRollupTimeseriesQuery", () => {
     projectId: "tenant-rollup",
     ...baseDates,
     series: [{ metric: "performance.total_cost", aggregation: "sum" }],
-    groupBy: "metadata.model",
     timeScale: 60,
   });
 
@@ -49,8 +48,9 @@ describe("buildRollupTimeseriesQuery", () => {
     expect(sql).not.toMatch(/sumMerge|avgMerge|countMerge|quantileMerge/);
   });
 
-  it("groups by period + date + group_key for a model-grouped chart", () => {
-    expect(sql).toMatch(/GROUP BY\s+period,\s*date,\s*group_key/);
+  it("groups by period + date only — the rollup is an ungrouped fast-path", () => {
+    expect(sql).toMatch(/GROUP BY\s+period,\s*date\s*$/m);
+    expect(sql).not.toContain("group_key");
   });
 
   it("passes tenantId via the params object", () => {
@@ -85,18 +85,24 @@ describe("buildRollupTimeseriesQuery", () => {
       ).toThrow(/avg\(performance\.total_cost\)/);
     });
 
-    it("throws on a GROUPED avg — the TraceCount denominator only exists ungrouped", () => {
-      expect(() =>
-        buildRollupTimeseriesQuery({
-          projectId: "tenant-rollup",
-          ...baseDates,
-          series: [
-            { metric: "performance.completion_time", aggregation: "avg" },
-          ],
-          groupBy: "metadata.model",
-          timeScale: 60,
-        }),
-      ).toThrow(/GROUPED avg/);
+    it("throws on any group-by — per-span attribution and root-only Duration/TraceCount diverge from legacy", () => {
+      for (const groupBy of [
+        "metadata.model",
+        "metadata.span_type",
+        "topics.topics",
+      ]) {
+        expect(() =>
+          buildRollupTimeseriesQuery({
+            projectId: "tenant-rollup",
+            ...baseDates,
+            series: [
+              { metric: "performance.completion_time", aggregation: "avg" },
+            ],
+            groupBy,
+            timeScale: 60,
+          }),
+        ).toThrow(/cannot group by/);
+      }
     });
 
     it("throws on min/max — min/max of per-part sums is merge-state-dependent", () => {
@@ -150,6 +156,33 @@ describe("buildSlimTimeseriesQuery", () => {
 
   it("uses quantileExact for percentile aggregations on slim", () => {
     expect(sql).toContain("quantileExact(0.95)(ta.TotalDurationMs)");
+  });
+
+  describe("when grouped by metadata.model", () => {
+    const modelGrouped = buildSlimTimeseriesQuery({
+      projectId: "tenant-slim",
+      ...baseDates,
+      series: [{ metric: "performance.total_cost", aggregation: "sum" }],
+      groupBy: "metadata.model",
+      timeScale: 1440,
+    });
+
+    // Byte-for-byte the expression legacy uses in
+    // `aggregation-builder.ts`'s `metadata.model` field definition, so a
+    // routed query buckets multi-model traces identically to trace_summaries.
+    it("arrayJoins the per-trace Models[] exactly as legacy does", () => {
+      expect(modelGrouped.sql).toContain(
+        "arrayJoin(if(empty(ta.Models), ['unknown'], ta.Models))",
+      );
+    });
+
+    it("omits HAVING group_key != '' because the expression already yields 'unknown' (legacy handlesUnknown: true)", () => {
+      expect(modelGrouped.sql).not.toContain("HAVING");
+    });
+
+    it("still emits HAVING for group-bys legacy filters, e.g. topics", () => {
+      expect(sql).toContain("HAVING group_key != ''");
+    });
   });
 
   it("uses sum(ta.TotalCost) for additive aggregations on slim", () => {
