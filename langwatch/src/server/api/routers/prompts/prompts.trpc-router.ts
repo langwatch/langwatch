@@ -14,6 +14,7 @@ import {
 import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
 import { enforceLicenseLimit } from "~/server/license-enforcement";
 import { PromptService } from "~/server/prompt-config";
+import type { VersionedPrompt } from "~/server/prompt-config";
 import { NotFoundError } from "~/server/prompt-config/errors";
 import { TagValidationError } from "~/server/prompt-config/repositories/llm-config-tag.repository";
 import { checkProjectPermission, hasProjectPermission } from "../../rbac";
@@ -60,6 +61,101 @@ function normalizePromptData({
       : undefined;
 
   return { normalizedPrompt, normalizedMessages };
+}
+
+/**
+ * Generates a unique handle for a copied/duplicated prompt by retrying with
+ * an incrementing suffix (built via `suffixFn`) until `checkHandleUniqueness`
+ * reports the candidate is free. Shared between `copy` (cross-project) and
+ * `duplicate` (same-project) since both need this exact retry contract.
+ */
+async function generateUniqueHandle({
+  baseHandle,
+  suffixFn,
+  projectId,
+  scope,
+  service,
+  maxAttempts = 100,
+}: {
+  baseHandle: string;
+  suffixFn: (index: number) => string;
+  projectId: string;
+  scope: PromptScope;
+  service: PromptService;
+  maxAttempts?: number;
+}): Promise<string> {
+  let newHandle = baseHandle;
+  let index = 0;
+  let handleAvailable = await service.checkHandleUniqueness({
+    handle: newHandle,
+    projectId,
+    scope,
+  });
+
+  while (!handleAvailable) {
+    index++;
+    if (index > maxAttempts) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: `Failed to generate unique handle after ${maxAttempts} attempts for base handle "${baseHandle}" in project ${projectId}.`,
+      });
+    }
+    newHandle = suffixFn(index);
+    handleAvailable = await service.checkHandleUniqueness({
+      handle: newHandle,
+      projectId,
+      scope,
+    });
+  }
+
+  return newHandle;
+}
+
+/**
+ * Maps a source prompt's config data into `PromptService.createPrompt` params.
+ * Shared between `copy` and `duplicate` so both stay in sync as the prompt
+ * schema grows new fields.
+ */
+function buildCreatePromptParamsFromSource(
+  source: VersionedPrompt,
+  overrides: {
+    projectId: string;
+    handle: string;
+    authorId?: string;
+    commitMessage: string;
+    prompt?: string;
+    messages?: Array<{ role: "user" | "assistant" | "system"; content: string }>;
+  },
+) {
+  return {
+    projectId: overrides.projectId,
+    handle: overrides.handle,
+    scope: source.scope ?? "PROJECT",
+    authorId: overrides.authorId,
+    commitMessage: overrides.commitMessage,
+    prompt: overrides.prompt,
+    messages: overrides.messages,
+    inputs: source.inputs ?? undefined,
+    outputs: source.outputs ?? undefined,
+    model: source.model ?? undefined,
+    temperature: source.temperature ?? undefined,
+    maxTokens: source.maxTokens ?? undefined,
+    // Traditional sampling parameters
+    topP: source.topP ?? undefined,
+    frequencyPenalty: source.frequencyPenalty ?? undefined,
+    presencePenalty: source.presencePenalty ?? undefined,
+    // Other sampling parameters
+    seed: source.seed ?? undefined,
+    topK: source.topK ?? undefined,
+    minP: source.minP ?? undefined,
+    repetitionPenalty: source.repetitionPenalty ?? undefined,
+    // Reasoning parameter (canonical/unified field)
+    reasoning: source.reasoning ?? undefined,
+    verbosity: source.verbosity ?? undefined,
+    promptingTechnique: source.promptingTechnique ?? undefined,
+    demonstrations: source.demonstrations ?? undefined,
+    parameters: source.parameters ?? undefined,
+  };
 }
 
 /**
@@ -466,40 +562,14 @@ export const promptsRouter = createTRPCRouter({
         });
       }
 
-      // Check handle uniqueness in target project
-      let newHandle = sourcePrompt.handle ?? sourcePrompt.id;
-      let handleAvailable = await service.checkHandleUniqueness({
-        handle: newHandle,
+      const baseHandle = sourcePrompt.handle ?? sourcePrompt.id;
+      const newHandle = await generateUniqueHandle({
+        baseHandle,
+        suffixFn: (i) => `${baseHandle}_copy${i}`,
         projectId: input.projectId,
         scope: sourcePrompt.scope ?? "PROJECT",
+        service,
       });
-
-      // If handle is not available, append a suffix
-      if (!handleAvailable) {
-        let index = 1;
-        const maxAttempts = 100;
-        let attempts = 0;
-        while (!handleAvailable) {
-          attempts++;
-          if (attempts > maxAttempts) {
-            throw new TRPCError({
-              code: "INTERNAL_SERVER_ERROR",
-              message: `Failed to generate unique handle after ${maxAttempts} attempts. Source prompt: ${
-                sourcePrompt.id
-              } (handle: ${sourcePrompt.handle ?? "none"}), target project: ${
-                input.projectId
-              }`,
-            });
-          }
-          newHandle = `${sourcePrompt.handle ?? sourcePrompt.id}_copy${index}`;
-          handleAvailable = await service.checkHandleUniqueness({
-            handle: newHandle,
-            projectId: input.projectId,
-            scope: sourcePrompt.scope ?? "PROJECT",
-          });
-          index++;
-        }
-      }
 
       // Normalize prompt/messages to avoid system prompt conflict
       const { normalizedPrompt, normalizedMessages } = normalizePromptData({
@@ -508,37 +578,16 @@ export const promptsRouter = createTRPCRouter({
       });
 
       // Create the prompt in the target project
-      const copiedPrompt = await service.createPrompt({
-        projectId: input.projectId,
-        handle: newHandle,
-        scope: sourcePrompt.scope ?? "PROJECT",
-        authorId,
-        commitMessage: `Copied from "${
-          sourcePrompt.handle ?? sourcePrompt.id
-        }"`,
-        prompt: normalizedPrompt,
-        messages: normalizedMessages,
-        inputs: sourcePrompt.inputs ?? undefined,
-        outputs: sourcePrompt.outputs ?? undefined,
-        model: sourcePrompt.model ?? undefined,
-        temperature: sourcePrompt.temperature ?? undefined,
-        maxTokens: sourcePrompt.maxTokens ?? undefined,
-        // Traditional sampling parameters
-        topP: sourcePrompt.topP ?? undefined,
-        frequencyPenalty: sourcePrompt.frequencyPenalty ?? undefined,
-        presencePenalty: sourcePrompt.presencePenalty ?? undefined,
-        // Other sampling parameters
-        seed: sourcePrompt.seed ?? undefined,
-        topK: sourcePrompt.topK ?? undefined,
-        minP: sourcePrompt.minP ?? undefined,
-        repetitionPenalty: sourcePrompt.repetitionPenalty ?? undefined,
-        // Reasoning parameter (canonical/unified field)
-        reasoning: sourcePrompt.reasoning ?? undefined,
-        verbosity: sourcePrompt.verbosity ?? undefined,
-        promptingTechnique: sourcePrompt.promptingTechnique ?? undefined,
-        demonstrations: sourcePrompt.demonstrations ?? undefined,
-        parameters: sourcePrompt.parameters ?? undefined,
-      });
+      const copiedPrompt = await service.createPrompt(
+        buildCreatePromptParamsFromSource(sourcePrompt, {
+          projectId: input.projectId,
+          handle: newHandle,
+          authorId,
+          commitMessage: `Copied from "${baseHandle}"`,
+          prompt: normalizedPrompt,
+          messages: normalizedMessages,
+        }),
+      );
 
       // Set the copiedFromPromptId to track the source
       await ctx.prisma.llmPromptConfig.update({
@@ -559,7 +608,12 @@ export const promptsRouter = createTRPCRouter({
    * Duplicate a prompt within the same project.
    * Unlike `copy`, this never crosses project boundaries - it always
    * duplicates into the same project the source prompt lives in, using
-   * the conventional "handle(1)", "handle(2)", ... naming scheme.
+   * a "handle-1", "handle-2", ... naming scheme. (Parentheses would match
+   * common "duplicate" UX conventions more closely, but `handleSchema` only
+   * allows lowercase letters/digits/hyphens/underscores/one slash, and a
+   * handle that fails it gets silently treated as a legacy/invalid handle
+   * and forced into "draft" mode when the prompt is reopened - see
+   * `isHandleValid` in `llmPromptConfigUtils.ts`.)
    */
   duplicate: protectedProcedure
     .input(
@@ -588,66 +642,31 @@ export const promptsRouter = createTRPCRouter({
       }
 
       const baseHandle = sourcePrompt.handle ?? sourcePrompt.id;
-      let newHandle = `${baseHandle}(1)`;
-      let index = 1;
-      const maxAttempts = 100;
-      let attempts = 0;
-      let handleAvailable = await service.checkHandleUniqueness({
-        handle: newHandle,
+      const newHandle = await generateUniqueHandle({
+        baseHandle: `${baseHandle}-1`,
+        // index 1 here means "the base candidate above was taken", so the
+        // next candidate is `-2`, not another `-1`.
+        suffixFn: (i) => `${baseHandle}-${i + 1}`,
         projectId: input.projectId,
         scope: sourcePrompt.scope ?? "PROJECT",
+        service,
       });
-
-      while (!handleAvailable) {
-        attempts++;
-        if (attempts > maxAttempts) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: `Failed to generate unique handle after ${maxAttempts} attempts. Source prompt: ${sourcePrompt.id} (handle: ${
-              sourcePrompt.handle ?? "none"
-            }), project: ${input.projectId}`,
-          });
-        }
-        index++;
-        newHandle = `${baseHandle}(${index})`;
-        handleAvailable = await service.checkHandleUniqueness({
-          handle: newHandle,
-          projectId: input.projectId,
-          scope: sourcePrompt.scope ?? "PROJECT",
-        });
-      }
 
       const { normalizedPrompt, normalizedMessages } = normalizePromptData({
         prompt: sourcePrompt.prompt,
         messages: sourcePrompt.messages,
       });
 
-      const duplicatedPrompt = await service.createPrompt({
-        projectId: input.projectId,
-        handle: newHandle,
-        scope: sourcePrompt.scope ?? "PROJECT",
-        authorId,
-        commitMessage: `Duplicated from "${baseHandle}"`,
-        prompt: normalizedPrompt,
-        messages: normalizedMessages,
-        inputs: sourcePrompt.inputs ?? undefined,
-        outputs: sourcePrompt.outputs ?? undefined,
-        model: sourcePrompt.model ?? undefined,
-        temperature: sourcePrompt.temperature ?? undefined,
-        maxTokens: sourcePrompt.maxTokens ?? undefined,
-        topP: sourcePrompt.topP ?? undefined,
-        frequencyPenalty: sourcePrompt.frequencyPenalty ?? undefined,
-        presencePenalty: sourcePrompt.presencePenalty ?? undefined,
-        seed: sourcePrompt.seed ?? undefined,
-        topK: sourcePrompt.topK ?? undefined,
-        minP: sourcePrompt.minP ?? undefined,
-        repetitionPenalty: sourcePrompt.repetitionPenalty ?? undefined,
-        reasoning: sourcePrompt.reasoning ?? undefined,
-        verbosity: sourcePrompt.verbosity ?? undefined,
-        promptingTechnique: sourcePrompt.promptingTechnique ?? undefined,
-        demonstrations: sourcePrompt.demonstrations ?? undefined,
-        parameters: sourcePrompt.parameters ?? undefined,
-      });
+      const duplicatedPrompt = await service.createPrompt(
+        buildCreatePromptParamsFromSource(sourcePrompt, {
+          projectId: input.projectId,
+          handle: newHandle,
+          authorId,
+          commitMessage: `Duplicated from "${baseHandle}"`,
+          prompt: normalizedPrompt,
+          messages: normalizedMessages,
+        }),
+      );
 
       afterPromptCreated({
         prisma: ctx.prisma,

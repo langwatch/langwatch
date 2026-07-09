@@ -74,6 +74,9 @@ vi.mock("~/utils/api", () => ({
       syncFromSource: {
         useMutation: () => ({ mutateAsync: vi.fn() }),
       },
+      duplicate: {
+        useMutation: () => ({ mutateAsync: vi.fn() }),
+      },
     },
     useContext: () => ({
       prompts: {
