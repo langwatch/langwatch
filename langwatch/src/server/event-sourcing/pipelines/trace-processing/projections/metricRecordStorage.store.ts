@@ -17,4 +17,14 @@ export class MetricRecordAppendStore
       context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
     await this.repo.insertMetricRecord(record, retentionDays);
   }
+
+  async bulkAppend(
+    records: NormalizedMetricRecord[],
+    context: ProjectionStoreContext,
+  ): Promise<void> {
+    if (records.length === 0) return;
+    const retentionDays =
+      context.retentionPolicy?.traces ?? PLATFORM_DEFAULT_RETENTION_DAYS;
+    await this.repo.insertMetricRecords(records, retentionDays);
+  }
 }

@@ -1,7 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
-import { replayEvents, FoldAccumulator } from "../replayExecutor";
+import { replayEvents, FoldAccumulator, MapAccumulator } from "../replayExecutor";
 import type { FoldProjectionDefinition } from "../../projections/foldProjection.types";
+import type { MapProjectionDefinition } from "../../projections/mapProjection.types";
 import type { ReplayEvent } from "../replayEventLoader";
+import { SPAN_RECEIVED_EVENT_TYPE } from "../../pipelines/trace-processing/schemas/constants";
+import type { RetentionPolicyResolver } from "../../../data-retention/retentionPolicyResolver";
+import type { ResolvedRetention } from "../../../data-retention/retentionPolicy.schema";
 
 /**
  * Helper: create a simple test fold projection with a spy store.
@@ -36,15 +40,19 @@ function createTestProjection(opts?: { keyFn?: (event: any) => string }) {
 
 /** Helper: create a ReplayEvent with sensible defaults. */
 function makeEvent(overrides: Partial<ReplayEvent> = {}): ReplayEvent {
+  const id = `evt-${Math.random().toString(36).slice(2, 8)}`;
+  const now = Date.now();
   return {
-    id: `evt-${Math.random().toString(36).slice(2, 8)}`,
+    id,
     aggregateId: "agg-1",
     aggregateType: "test",
     tenantId: "tenant-1",
-    timestamp: Date.now(),
-    occurredAt: Date.now(),
+    createdAt: now,
+    timestamp: now,
+    occurredAt: now,
     type: "test.event",
     version: "2025-01-01",
+    idempotencyKey: id,
     data: { value: 10 },
     ...overrides,
   };
@@ -293,6 +301,389 @@ describe("FoldAccumulator", () => {
 
       expect(accumulator.processed).toBe(0);
       expect(storeBatchSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when fed events of types this projection does not declare", () => {
+    it("ignores them so co-discovered fold + map aggregates do not corrupt state", async () => {
+      // Optimized replay loads events for the union of all projections'
+      // event types per aggregate (one CH query per tenant). Each accumulator
+      // must drop events outside its own declared types — otherwise a fold
+      // co-discovered with a map projection will fold events it never
+      // accepted, corrupting state.
+      const { projection, storeBatchSpy } = createTestProjection();
+      const accumulator = new FoldAccumulator(projection);
+
+      accumulator.apply(makeEvent({ type: "test.event", data: { value: 10 } }));
+      accumulator.apply(makeEvent({ type: "unrelated.event", data: { value: 999 } }));
+      accumulator.apply(makeEvent({ type: "test.event", data: { value: 20 } }));
+
+      expect(accumulator.processed).toBe(2);
+
+      await accumulator.flush();
+
+      const batch = storeBatchSpy.mock.calls[0]![0] as Array<{
+        state: { total: number; count: number };
+      }>;
+      expect(batch[0]!.state).toEqual({ total: 30, count: 2 });
+    });
+  });
+});
+
+function createTestMapProjection(opts?: { eventTypes?: string[] }) {
+  const bulkAppendSpy = vi.fn().mockResolvedValue(undefined);
+  const appendSpy = vi.fn().mockResolvedValue(undefined);
+
+  const projection: MapProjectionDefinition<{ doubled: number }, any> = {
+    name: "testMapProjection",
+    eventTypes: opts?.eventTypes ?? ["test.event"],
+    map: (event: any) => ({ doubled: (event.data?.value ?? 0) * 2 }),
+    store: {
+      append: appendSpy,
+      bulkAppend: bulkAppendSpy,
+    },
+  };
+
+  return { projection, bulkAppendSpy, appendSpy };
+}
+
+describe("MapAccumulator", () => {
+  it("buffers records and flushes via bulkAppend", async () => {
+    const { projection, bulkAppendSpy } = createTestMapProjection();
+    const acc = new MapAccumulator(projection);
+
+    acc.apply(makeEvent({ data: { value: 5 } }));
+    acc.apply(makeEvent({ data: { value: 10 } }));
+    acc.apply(makeEvent({ data: { value: 15 } }));
+
+    expect(acc.processed).toBe(3);
+    expect(bulkAppendSpy).not.toHaveBeenCalled();
+
+    await acc.flush();
+
+    expect(bulkAppendSpy).toHaveBeenCalledOnce();
+    const records = bulkAppendSpy.mock.calls[0]![0] as Array<{ doubled: number }>;
+    expect(records).toEqual([{ doubled: 10 }, { doubled: 20 }, { doubled: 30 }]);
+  });
+
+  describe("when event type does not match", () => {
+    it("skips non-matching events", async () => {
+      const { projection, bulkAppendSpy } = createTestMapProjection({
+        eventTypes: ["test.event"],
+      });
+      const acc = new MapAccumulator(projection);
+
+      acc.apply(makeEvent({ type: "other.event", data: { value: 100 } }));
+      acc.apply(makeEvent({ type: "test.event", data: { value: 5 } }));
+
+      expect(acc.processed).toBe(1);
+
+      await acc.flush();
+
+      const records = bulkAppendSpy.mock.calls[0]![0] as Array<{ doubled: number }>;
+      expect(records).toEqual([{ doubled: 10 }]);
+    });
+  });
+
+  describe("when map returns null", () => {
+    it("skips null records", async () => {
+      const appendSpy = vi.fn().mockResolvedValue(undefined);
+      const projection: MapProjectionDefinition<{ doubled: number }, any> = {
+        name: "nullMap",
+        eventTypes: ["test.event"],
+        map: (event: any) =>
+          (event.data?.value ?? 0) > 10 ? { doubled: (event.data?.value ?? 0) * 2 } : null,
+        store: { append: appendSpy, bulkAppend: vi.fn().mockResolvedValue(undefined) },
+      };
+      const acc = new MapAccumulator(projection);
+
+      acc.apply(makeEvent({ data: { value: 5 } }));
+      acc.apply(makeEvent({ data: { value: 20 } }));
+
+      expect(acc.processed).toBe(1);
+
+      await acc.flush();
+
+      const bulkSpy = projection.store.bulkAppend as ReturnType<typeof vi.fn>;
+      const records = bulkSpy.mock.calls[0]![0] as Array<{ doubled: number }>;
+      expect(records).toEqual([{ doubled: 40 }]);
+    });
+  });
+
+  describe("when events span multiple tenants", () => {
+    it("groups records by tenant for separate bulk inserts", async () => {
+      const { projection, bulkAppendSpy } = createTestMapProjection();
+      const acc = new MapAccumulator(projection);
+
+      acc.apply(makeEvent({ tenantId: "t-A", data: { value: 1 } }));
+      acc.apply(makeEvent({ tenantId: "t-B", data: { value: 2 } }));
+      acc.apply(makeEvent({ tenantId: "t-A", data: { value: 3 } }));
+
+      await acc.flush();
+
+      expect(bulkAppendSpy).toHaveBeenCalledTimes(2);
+
+      const allRecords = bulkAppendSpy.mock.calls.flatMap(
+        (call: unknown[]) => call[0] as Array<{ doubled: number }>,
+      );
+      expect(allRecords).toHaveLength(3);
+      expect(allRecords).toContainEqual({ doubled: 2 });
+      expect(allRecords).toContainEqual({ doubled: 4 });
+      expect(allRecords).toContainEqual({ doubled: 6 });
+    });
+  });
+
+  describe("when bulkAppend is used across multiple aggregates", () => {
+    it("groups records by aggregateId so each call carries the originating context", async () => {
+      const { projection, bulkAppendSpy } = createTestMapProjection();
+      const acc = new MapAccumulator(projection);
+
+      acc.apply(makeEvent({ aggregateId: "agg-A", data: { value: 1 } }));
+      acc.apply(makeEvent({ aggregateId: "agg-B", data: { value: 2 } }));
+      acc.apply(makeEvent({ aggregateId: "agg-A", data: { value: 3 } }));
+
+      await acc.flush();
+
+      expect(bulkAppendSpy).toHaveBeenCalledTimes(2);
+
+      const byAggregate = new Map<string, Array<{ doubled: number }>>();
+      for (const [records, context] of bulkAppendSpy.mock.calls as Array<
+        [Array<{ doubled: number }>, { aggregateId: string }]
+      >) {
+        expect(context.aggregateId).not.toBe("");
+        byAggregate.set(context.aggregateId, records);
+      }
+      expect(byAggregate.get("agg-A")).toEqual([{ doubled: 2 }, { doubled: 6 }]);
+      expect(byAggregate.get("agg-B")).toEqual([{ doubled: 4 }]);
+    });
+  });
+
+  describe("when store has no bulkAppend", () => {
+    it("falls back to sequential append calls preserving per-event context", async () => {
+      const appendSpy = vi.fn().mockResolvedValue(undefined);
+      const projection: MapProjectionDefinition<{ doubled: number }, any> = {
+        name: "noBulk",
+        eventTypes: ["test.event"],
+        map: (event: any) => ({ doubled: (event.data?.value ?? 0) * 2 }),
+        store: { append: appendSpy },
+      };
+      const acc = new MapAccumulator(projection);
+
+      acc.apply(makeEvent({ aggregateId: "agg-A", data: { value: 5 } }));
+      acc.apply(makeEvent({ aggregateId: "agg-B", data: { value: 10 } }));
+
+      await acc.flush();
+
+      expect(appendSpy).toHaveBeenCalledTimes(2);
+      expect(appendSpy.mock.calls[0]![0]).toEqual({ doubled: 10 });
+      expect(appendSpy.mock.calls[1]![0]).toEqual({ doubled: 20 });
+      // Each append fallback call must carry the originating event's
+      // aggregateId — stores keying off context.aggregateId would diverge
+      // from the non-optimized replay path otherwise.
+      expect(appendSpy.mock.calls[0]![1]).toMatchObject({ aggregateId: "agg-A" });
+      expect(appendSpy.mock.calls[1]![1]).toMatchObject({ aggregateId: "agg-B" });
+    });
+  });
+
+  describe("when writeBatchSize chunks the output", () => {
+    it("splits bulk writes by writeBatchSize", async () => {
+      const { projection, bulkAppendSpy } = createTestMapProjection();
+      const acc = new MapAccumulator(projection);
+
+      for (let i = 0; i < 5; i++) {
+        acc.apply(makeEvent({ data: { value: i } }));
+      }
+
+      await acc.flush(2);
+
+      // 5 records / batch of 2 = 3 calls (2 + 2 + 1)
+      expect(bulkAppendSpy).toHaveBeenCalledTimes(3);
+      expect(bulkAppendSpy.mock.calls[0]![0]).toHaveLength(2);
+      expect(bulkAppendSpy.mock.calls[1]![0]).toHaveLength(2);
+      expect(bulkAppendSpy.mock.calls[2]![0]).toHaveLength(1);
+    });
+  });
+
+  describe("when buffered records reach the configured writeBatchSize", () => {
+    it("flushes full chunks via bulkAppend during apply, before flush() is called", async () => {
+      const { projection, bulkAppendSpy } = createTestMapProjection();
+      const acc = new MapAccumulator(projection, { writeBatchSize: 2 });
+
+      await acc.apply(makeEvent({ data: { value: 1 } }));
+      expect(bulkAppendSpy).not.toHaveBeenCalled();
+
+      await acc.apply(makeEvent({ data: { value: 2 } }));
+      expect(bulkAppendSpy).toHaveBeenCalledTimes(1);
+
+      await acc.apply(makeEvent({ data: { value: 3 } }));
+      await acc.apply(makeEvent({ data: { value: 4 } }));
+      expect(bulkAppendSpy).toHaveBeenCalledTimes(2);
+
+      await acc.apply(makeEvent({ data: { value: 5 } }));
+      await acc.flush();
+
+      expect(bulkAppendSpy).toHaveBeenCalledTimes(3);
+      const allRecords = bulkAppendSpy.mock.calls.flatMap(
+        (call: unknown[]) => call[0] as Array<{ doubled: number }>,
+      );
+      expect(allRecords).toEqual([
+        { doubled: 2 },
+        { doubled: 4 },
+        { doubled: 6 },
+        { doubled: 8 },
+        { doubled: 10 },
+      ]);
+
+      // A second flush must not re-write already-flushed records.
+      await acc.flush();
+      expect(bulkAppendSpy).toHaveBeenCalledTimes(3);
+    });
+
+    it("keeps per-aggregate context grouping on incremental writes", async () => {
+      const { projection, bulkAppendSpy } = createTestMapProjection();
+      const acc = new MapAccumulator(projection, { writeBatchSize: 2 });
+
+      await acc.apply(makeEvent({ aggregateId: "agg-A", data: { value: 1 } }));
+      await acc.apply(makeEvent({ aggregateId: "agg-B", data: { value: 2 } }));
+
+      // Incremental write fired: one call per aggregate, each with its context.
+      expect(bulkAppendSpy).toHaveBeenCalledTimes(2);
+      for (const [records, context] of bulkAppendSpy.mock.calls as Array<
+        [Array<{ doubled: number }>, { aggregateId: string }]
+      >) {
+        expect(records).toHaveLength(1);
+        expect(["agg-A", "agg-B"]).toContain(context.aggregateId);
+      }
+    });
+  });
+
+  describe("when no events are applied", () => {
+    it("skips store on flush", async () => {
+      const { projection, bulkAppendSpy, appendSpy } = createTestMapProjection();
+      const acc = new MapAccumulator(projection);
+
+      await acc.flush();
+
+      expect(acc.processed).toBe(0);
+      expect(bulkAppendSpy).not.toHaveBeenCalled();
+      expect(appendSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  // Regression: map replay used to transform the RAW event, so replayed
+  // spans/logs kept oversized full content instead of the previews live
+  // dispatch produces. The accumulator must lean the event before map().
+  describe("when a map event carries an oversized IO attribute", () => {
+    it("leans the event before mapping, matching live dispatch parity", async () => {
+      const bulkAppendSpy = vi.fn().mockResolvedValue(undefined);
+      const projection: MapProjectionDefinition<{ outLen: number }, any> = {
+        name: "spanOutputLen",
+        eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
+        map: (event: any) => {
+          const attrs = event.data?.span?.attributes ?? [];
+          const out =
+            attrs.find((a: any) => a.key === "langwatch.output")?.value
+              ?.stringValue ?? "";
+          return { outLen: out.length };
+        },
+        store: { append: vi.fn(), bulkAppend: bulkAppendSpy },
+      };
+      const acc = new MapAccumulator(projection);
+
+      const oversized = "x".repeat(200_000); // well over the 64 KB IO preview
+      await acc.apply(
+        makeEvent({
+          type: SPAN_RECEIVED_EVENT_TYPE,
+          data: {
+            span: {
+              attributes: [
+                { key: "langwatch.output", value: { stringValue: oversized } },
+              ],
+            },
+          },
+        }),
+      );
+      await acc.flush();
+
+      const record = bulkAppendSpy.mock.calls[0]![0][0] as { outLen: number };
+      // Leaned: the mapped record saw the truncated preview, not the full 200 KB.
+      expect(record.outLen).toBeGreaterThan(0);
+      expect(record.outLen).toBeLessThan(oversized.length);
+    });
+  });
+});
+
+// #3: replay contexts previously omitted retentionPolicy, so replay-rebuilt
+// rows fell back to the store default regardless of the tenant's policy. Both
+// accumulators must resolve retention per tenant and stamp it on write contexts.
+describe("retention policy on replay write contexts", () => {
+  const retention = { traces: 42 } as unknown as ResolvedRetention;
+
+  function makeResolver(): RetentionPolicyResolver & {
+    resolve: ReturnType<typeof vi.fn>;
+  } {
+    return { resolve: vi.fn().mockResolvedValue(retention) };
+  }
+
+  describe("MapAccumulator", () => {
+    it("stamps the resolved retention policy on the bulkAppend context", async () => {
+      const bulkAppendSpy = vi.fn().mockResolvedValue(undefined);
+      const projection: MapProjectionDefinition<{ doubled: number }, any> = {
+        name: "m",
+        eventTypes: ["test.event"],
+        map: (event: any) => ({ doubled: (event.data?.value ?? 0) * 2 }),
+        store: { append: vi.fn(), bulkAppend: bulkAppendSpy },
+      };
+      const resolver = makeResolver();
+      const acc = new MapAccumulator(projection, { retentionResolver: resolver });
+
+      acc.apply(makeEvent({ tenantId: "t-A", data: { value: 5 } }));
+      acc.apply(makeEvent({ tenantId: "t-A", data: { value: 6 } }));
+      await acc.flush();
+
+      const context = bulkAppendSpy.mock.calls[0]![1] as {
+        retentionPolicy?: ResolvedRetention;
+      };
+      expect(context.retentionPolicy).toBe(retention);
+      // Cached: one resolve per tenant, not per event.
+      expect(resolver.resolve).toHaveBeenCalledTimes(1);
+      expect(resolver.resolve).toHaveBeenCalledWith("t-A");
+    });
+
+    it("leaves retentionPolicy null when no resolver is wired", async () => {
+      const bulkAppendSpy = vi.fn().mockResolvedValue(undefined);
+      const projection: MapProjectionDefinition<{ doubled: number }, any> = {
+        name: "m",
+        eventTypes: ["test.event"],
+        map: (event: any) => ({ doubled: (event.data?.value ?? 0) * 2 }),
+        store: { append: vi.fn(), bulkAppend: bulkAppendSpy },
+      };
+      const acc = new MapAccumulator(projection);
+
+      acc.apply(makeEvent({ tenantId: "t-A", data: { value: 5 } }));
+      await acc.flush();
+
+      const context = bulkAppendSpy.mock.calls[0]![1] as {
+        retentionPolicy?: ResolvedRetention | null;
+      };
+      expect(context.retentionPolicy ?? null).toBeNull();
+    });
+  });
+
+  describe("FoldAccumulator", () => {
+    it("stamps the resolved retention policy on the storeBatch context", async () => {
+      const { projection, storeBatchSpy } = createTestProjection();
+      const resolver = makeResolver();
+      const acc = new FoldAccumulator(projection, { retentionResolver: resolver });
+
+      acc.apply(makeEvent({ tenantId: "t-A", data: { value: 10 } }));
+      await acc.flush();
+
+      const batch = storeBatchSpy.mock.calls[0]![0] as Array<{
+        context: { retentionPolicy?: ResolvedRetention };
+      }>;
+      expect(batch[0]!.context.retentionPolicy).toBe(retention);
+      expect(resolver.resolve).toHaveBeenCalledWith("t-A");
     });
   });
 });

@@ -17,6 +17,7 @@ export interface StoredLogRecordRow {
 
 export interface LogRecordStorageRepository {
   insertLogRecord(record: NormalizedLogRecord, retentionDays?: number): Promise<void>;
+  insertLogRecords(records: NormalizedLogRecord[], retentionDays?: number): Promise<void>;
   /**
    * Read the claude_code logs of one trace (turn) that the receiver marked for
    * span synthesis. The span-sync reactor folds these into spans.
@@ -32,6 +33,7 @@ export class NullLogRecordStorageRepository
   implements LogRecordStorageRepository
 {
   async insertLogRecord(_record: NormalizedLogRecord, _retentionDays?: number): Promise<void> {}
+  async insertLogRecords(_records: NormalizedLogRecord[], _retentionDays?: number): Promise<void> {}
   async getMarkedClaudeCodeLogsByTrace(
     _tenantId: string,
     _traceId: string,
