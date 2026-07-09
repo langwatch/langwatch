@@ -20,7 +20,7 @@ Feature: Sidebar Quick Run keeps the user in place
 
   # --- AC1: stays on All Runs after quick-run ---
 
-  @integration @unimplemented
+  @integration
   Scenario: Quick run from the All Runs page keeps the user on All Runs
     Given the user is on the All Runs page at /<projectSlug>/simulations
     When the user clicks the inline Run button on a run plan row in the sidebar
@@ -30,7 +30,7 @@ Feature: Sidebar Quick Run keeps the user in place
 
   # --- AC2: stays on the currently-viewed run plan detail when running a different plan ---
 
-  @integration @unimplemented
+  @integration
   Scenario: Quick run on a different run plan from a run plan detail page keeps the user on the original detail page
     Given the user is on the run plan detail page at /<projectSlug>/simulations/run-plans/<currentSlug>
     When the user clicks the inline Run button on a different run plan row in the sidebar
@@ -40,7 +40,7 @@ Feature: Sidebar Quick Run keeps the user in place
 
   # --- AC3: regression check — running the same plan the user is viewing also stays put ---
 
-  @integration @unimplemented
+  @integration
   Scenario: Quick run on the same run plan the user is viewing keeps the user on that detail page
     Given the user is on the run plan detail page at /<projectSlug>/simulations/run-plans/<slug>
     When the user clicks the inline Run button for that same run plan in the sidebar
@@ -77,14 +77,10 @@ Feature: Sidebar Quick Run keeps the user in place
     And the run is scheduled
     Then the user is navigated to the suite detail page for the saved run plan
 
-  # --- AC7: automated regression test pins the no-navigation invariant ---
-
-  @integration @unimplemented
-  Scenario: useRunSuite onRunScheduled does not call the router push API
-    Given SimulationsPage is rendered with a spied router
-    When useRunSuite's onRunScheduled callback fires for a scheduled run
-    Then the router push API is not called toward /<projectSlug>/simulations/run-plans/<slug>
-    And the run plan summaries query invalidation is still triggered
+  # --- AC7 is a meta-criterion ("an automated test pins the regression") rather
+  # than a distinct user behaviour, so it has no scenario of its own: it is
+  # satisfied by the three @integration no-navigation scenarios above being
+  # bound to real tests. ---
 
   # --- AC8: the success toast offers an explicit, opt-in "View run" action ---
   # Founder (Rogério) compromise: staying in place is kept, but the
@@ -113,6 +109,6 @@ Feature: Sidebar Quick Run keeps the user in place
   # AC 6: "Save-and-Run drawer flow unchanged — still navigates to detail page"
   #   -> Scenario: Save and Run from the suite editor drawer still navigates to the suite detail page
   # AC 7: "automated test covers the no-navigation regression"
-  #   -> Scenario: useRunSuite onRunScheduled does not call the router push API
+  #   -> satisfied by the three bound @integration scenarios for AC 1-3 above
   # AC 8: "success toast carries an opt-in View run action that navigates to the detail page"
   #   -> Scenario: The run-scheduled success toast offers a View run action that navigates to the run plan detail page

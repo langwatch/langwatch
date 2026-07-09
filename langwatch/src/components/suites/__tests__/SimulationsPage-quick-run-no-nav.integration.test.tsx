@@ -261,6 +261,7 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
 
   describe("given a suite with id 'suite_target' and slug 'target-suite-slug'", () => {
     describe("when the user is on All Runs", () => {
+      /** @scenario Quick run from the All Runs page keeps the user on All Runs */
       it("does not call the router push API when a run is scheduled", async () => {
         // All Runs: no path segments
         routerQueryPath.current = undefined;
@@ -289,6 +290,7 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
     });
 
     describe("when the user is on a different suite's detail page", () => {
+      /** @scenario Quick run on a different run plan from a run plan detail page keeps the user on the original detail page */
       it("does not call the router push API when a run is scheduled", async () => {
         // Different suite detail page
         routerQueryPath.current = ["run-plans", "other-suite-slug"];
@@ -305,6 +307,7 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
     });
 
     describe("when the user is on the same suite's detail page", () => {
+      /** @scenario Quick run on the same run plan the user is viewing keeps the user on that detail page */
       it("does not call the router push API when a run is scheduled", async () => {
         // Same suite detail page
         routerQueryPath.current = ["run-plans", "target-suite-slug"];
