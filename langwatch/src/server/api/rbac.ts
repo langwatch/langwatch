@@ -1477,7 +1477,8 @@ type PublicResourceTypes = "TRACE" | "THREAD";
  * share viewers — by possession of a valid share grant covering exactly this
  * resource. The grant is a signed, single-resource cookie minted by
  * `share.resolve` after it validated the token, expiry, view cap and audience;
- * it is read into `ctx.shareGrant` in `createTRPCContext`.
+ * it is parsed into `ctx.shareGrant` by whichever transport built the context
+ * (`src/server/routes/trpc.ts` for HTTP, `createTRPCContext` for websockets).
  *
  * This deliberately does NOT fall back to "a share row exists for this
  * resource id": trace ids are caller-supplied and guessable, so keying

@@ -2,6 +2,7 @@ import jwt from "jsonwebtoken";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
   buildShareGrantCookie,
+  readShareGrantFromCookieHeader,
   SHARE_GRANT_COOKIE,
   type ShareGrantClaims,
   signShareGrant,
@@ -92,6 +93,42 @@ describe("share grant", () => {
       expect(cookie).toContain("HttpOnly");
       expect(cookie).toContain("Path=/");
       expect(cookie).toContain("SameSite=Lax");
+    });
+  });
+
+  /**
+   * The HTTP transport is the tRPC fetch adapter behind Hono, whose request
+   * shim exposes only raw headers — there is no parsed `.cookies` map. Reading
+   * the grant therefore has to parse the `Cookie` header itself.
+   */
+  describe("reading the grant back from a Cookie header", () => {
+    it("round-trips a grant issued via buildShareGrantCookie", () => {
+      const { jwt: token } = signShareGrant(claims);
+      // A Set-Cookie value's first pair is the cookie; a request Cookie header
+      // carries just the name=value pairs.
+      const cookieHeader = `${SHARE_GRANT_COOKIE}=${token}`;
+
+      expect(readShareGrantFromCookieHeader(cookieHeader)).toEqual(claims);
+    });
+
+    it("finds the grant among other cookies", () => {
+      const { jwt: token } = signShareGrant(claims);
+      const header = `foo=bar; ${SHARE_GRANT_COOKIE}=${token}; baz=qux`;
+
+      expect(readShareGrantFromCookieHeader(header)).toEqual(claims);
+    });
+
+    it("returns null when the cookie is absent, empty or malformed", () => {
+      expect(readShareGrantFromCookieHeader(null)).toBeNull();
+      expect(readShareGrantFromCookieHeader("")).toBeNull();
+      expect(readShareGrantFromCookieHeader("foo=bar")).toBeNull();
+      expect(readShareGrantFromCookieHeader("novalue")).toBeNull();
+    });
+
+    it("returns null when the cookie carries a forged grant", () => {
+      const header = `${SHARE_GRANT_COOKIE}=not-a-real-jwt`;
+
+      expect(readShareGrantFromCookieHeader(header)).toBeNull();
     });
   });
 });

@@ -14,6 +14,7 @@ import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import type { Context } from "hono";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { createInnerTRPCContext } from "~/server/api/trpc";
+import { readShareGrantFromCookieHeader } from "~/server/app-layer/share/shareGrant";
 import { getServerAuthSession } from "~/server/auth";
 
 /**
@@ -127,7 +128,10 @@ const handler = async (c: Context) => {
       endpoint: "/api/trpc",
       req: c.req.raw,
       router: await getAppRouter(),
-      createContext: async ({ req }: FetchCreateContextFnOptions) => {
+      createContext: async ({
+        req,
+        resHeaders,
+      }: FetchCreateContextFnOptions) => {
         const reqShim = buildReqShim(req);
 
         const session = await getServerAuthSession({
@@ -139,9 +143,15 @@ const handler = async (c: Context) => {
         return createInnerTRPCContext({
           req: reqShim,
           res: undefined,
+          // The fetch adapter merges these into the response — the only way to
+          // set the share-grant cookie here, since there is no `res`.
+          resHeaders,
           session,
           permissionChecked: false,
           publiclyShared: false,
+          // Anonymous share viewers authorize on grant possession. `buildReqShim`
+          // exposes only headers, so parse the cookie ourselves. See ADR-039.
+          shareGrant: readShareGrantFromCookieHeader(req.headers.get("cookie")),
         });
       },
     });

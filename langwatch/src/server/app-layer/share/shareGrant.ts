@@ -72,6 +72,25 @@ export function verifyShareGrant(token: string): ShareGrantClaims | null {
   }
 }
 
+/**
+ * Reads and verifies the grant from a raw `Cookie` request header. The HTTP
+ * transport is the tRPC fetch adapter behind Hono, whose request shim exposes
+ * only headers — there is no parsed `.cookies` map to read.
+ */
+export function readShareGrantFromCookieHeader(
+  cookieHeader: string | null | undefined,
+): ShareGrantClaims | null {
+  if (!cookieHeader) return null;
+  for (const part of cookieHeader.split(";")) {
+    const separator = part.indexOf("=");
+    if (separator === -1) continue;
+    const name = part.slice(0, separator).trim();
+    if (name !== SHARE_GRANT_COOKIE) continue;
+    return verifyShareGrant(part.slice(separator + 1).trim());
+  }
+  return null;
+}
+
 /** Serializes the Set-Cookie header value carrying a signed grant. */
 export function buildShareGrantCookie(signedJwt: string): string {
   const parts = [

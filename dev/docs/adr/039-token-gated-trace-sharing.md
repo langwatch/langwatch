@@ -53,6 +53,13 @@ a short-lived HS256 JWT (mirroring `gatewayJwt.ts`, signed with
 httpOnly, SameSite=Lax cookie, so every subsequent tRPC call from the share page
 carries it with zero data-plumbing through the shared `TraceDetails` component.
 
+The HTTP transport is the tRPC fetch adapter behind Hono, which passes no `res`
+and whose request shim exposes only raw headers. The cookie is therefore written
+via the adapter's mutable `resHeaders` and read by parsing the `Cookie` header —
+not via `res.setHeader` / `req.cookies`, both of which are silently absent there.
+`share.resolve` fails loudly if it cannot set the grant, rather than returning a
+200 that grants nothing.
+
 **Authorization.** `checkPermissionOrPubliclyShared` is reworked: authenticated
 users pass on their own permission; otherwise the middleware requires a valid
 grant cookie whose claims cover the requested `projectId` + resource. The

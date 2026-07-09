@@ -41,9 +41,8 @@ import { DomainError } from "~/server/app-layer/domain-error";
 import type { Session } from "~/server/auth";
 import { getServerAuthSession } from "~/server/auth";
 import {
-  SHARE_GRANT_COOKIE,
+  readShareGrantFromCookieHeader,
   type ShareGrantClaims,
-  verifyShareGrant,
 } from "~/server/app-layer/share/shareGrant";
 import { prisma } from "~/server/db";
 import { AiCallFailedError } from "~/server/modelProviders/aiCallFailedError";
@@ -67,6 +66,12 @@ const logger = createLogger("langwatch:trpc");
 interface CreateContextOptions {
   req?: NextApiRequest;
   res?: NextApiResponse;
+  /**
+   * Mutable response headers from the tRPC fetch adapter. This is the only way
+   * to set a cookie on the HTTP transport — the Hono handler passes no `res`.
+   * Absent on the websocket transport.
+   */
+  resHeaders?: Headers;
   session: Session | null;
   permissionChecked?: boolean;
   publiclyShared?: boolean;
@@ -90,6 +95,7 @@ export const createInnerTRPCContext = (opts: CreateContextOptions) => {
     session: opts.session,
     req: opts.req,
     res: opts.res,
+    resHeaders: opts.resHeaders,
     prisma,
     permissionChecked: opts.permissionChecked ?? false,
     publiclyShared: opts.publiclyShared ?? false,
@@ -115,8 +121,7 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
   // `share.resolve`. Reading it here lets the rbac middleware authorize
   // anonymous reads on grant possession rather than on the (guessable)
   // resource id. See ADR-039.
-  const grantCookie = req?.cookies?.[SHARE_GRANT_COOKIE];
-  const shareGrant = grantCookie ? verifyShareGrant(grantCookie) : null;
+  const shareGrant = readShareGrantFromCookieHeader(req?.headers?.cookie);
 
   return createInnerTRPCContext({
     req,

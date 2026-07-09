@@ -81,6 +81,15 @@ export const shareRouter = createTRPCRouter({
           });
         case "granted": {
           const { share } = result;
+          // Without the grant cookie the viewer cannot read anything, so a
+          // transport that cannot set it must fail loudly rather than hand back
+          // a 200 that silently grants nothing.
+          if (!ctx.resHeaders) {
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: "Cannot issue a share grant on this transport.",
+            });
+          }
           const { jwt } = signShareGrant({
             share_id: share.id,
             project_id: share.projectId,
@@ -88,7 +97,7 @@ export const shareRouter = createTRPCRouter({
             resource_id: share.resourceId,
             thread_id: share.threadId,
           });
-          ctx.res?.setHeader("Set-Cookie", buildShareGrantCookie(jwt));
+          ctx.resHeaders.append("set-cookie", buildShareGrantCookie(jwt));
           return {
             shareId: share.id,
             projectId: share.projectId,
