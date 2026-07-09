@@ -53,12 +53,17 @@ vi.mock("~/components/ui/toaster", () => ({
   },
 }));
 
-const { mockGetResolvedDefault, mockCheckModifyPermission } = vi.hoisted(
-  () => ({
-    mockGetResolvedDefault: vi.fn(),
-    mockCheckModifyPermission: vi.fn(),
-  }),
-);
+const {
+  mockGetResolvedDefault,
+  mockCheckModifyPermission,
+  mockDuplicate,
+  mockInvalidatePromptList,
+} = vi.hoisted(() => ({
+  mockGetResolvedDefault: vi.fn(),
+  mockCheckModifyPermission: vi.fn(),
+  mockDuplicate: vi.fn(),
+  mockInvalidatePromptList: vi.fn(),
+}));
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -75,22 +80,30 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({ mutateAsync: vi.fn() }),
       },
       duplicate: {
-        useMutation: () => ({ mutateAsync: vi.fn() }),
+        useMutation: () => ({ mutateAsync: mockDuplicate }),
       },
     },
     useContext: () => ({
       prompts: {
-        getAllPromptsForProject: { invalidate: vi.fn() },
+        getAllPromptsForProject: { invalidate: mockInvalidatePromptList },
       },
     }),
   },
 }));
 
 // Import after mocks
+import { toaster } from "~/components/ui/toaster";
+import { markAsHandledByLicenseHandler } from "~/utils/trpcError";
 import { PublishedPromptActions } from "../PublishedPromptActions";
 
 const renderWithChakra = (ui: React.ReactElement) => {
   return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
+};
+
+/** Opens the row menu and clicks "Duplicate prompt". */
+const clickDuplicate = async (user: ReturnType<typeof userEvent.setup>) => {
+  await user.click(screen.getByRole("button"));
+  await user.click(screen.getByText("Duplicate prompt"));
 };
 
 describe("PublishedPromptActions", () => {
@@ -98,6 +111,7 @@ describe("PublishedPromptActions", () => {
     vi.clearAllMocks();
     mockGetResolvedDefault.mockReturnValue({ data: undefined });
     mockCheckModifyPermission.mockReturnValue({ data: undefined });
+    mockDuplicate.mockResolvedValue({ handle: "test-prompt-1" });
   });
 
   afterEach(() => {
@@ -210,6 +224,98 @@ describe("PublishedPromptActions", () => {
           .getByText("Delete prompt")
           .closest('[role="menuitem"]');
         expect(deleteItem).not.toHaveAttribute("data-disabled");
+      });
+    });
+
+    describe("when Duplicate prompt is chosen", () => {
+      it("duplicates the prompt inside the project it belongs to", async () => {
+        const user = userEvent.setup();
+        renderWithChakra(
+          <PublishedPromptActions
+            promptId="prompt-1"
+            promptHandle="test-prompt"
+          />,
+        );
+
+        await clickDuplicate(user);
+
+        expect(mockDuplicate).toHaveBeenCalledWith({
+          idOrHandle: "prompt-1",
+          projectId: "test-project",
+        });
+      });
+
+      it("refreshes the prompt list so the duplicate shows up", async () => {
+        const user = userEvent.setup();
+        renderWithChakra(
+          <PublishedPromptActions
+            promptId="prompt-1"
+            promptHandle="test-prompt"
+          />,
+        );
+
+        await clickDuplicate(user);
+
+        expect(mockInvalidatePromptList).toHaveBeenCalled();
+      });
+
+      it("tells the user what the duplicate was named", async () => {
+        const user = userEvent.setup();
+        renderWithChakra(
+          <PublishedPromptActions
+            promptId="prompt-1"
+            promptHandle="test-prompt"
+          />,
+        );
+
+        await clickDuplicate(user);
+
+        expect(toaster.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: "success",
+            description: '"test-prompt" was duplicated as "test-prompt-1"',
+          }),
+        );
+      });
+    });
+
+    describe("when duplicating fails", () => {
+      it("surfaces the failure to the user", async () => {
+        const user = userEvent.setup();
+        mockDuplicate.mockRejectedValue(new Error("Prompt not found"));
+        renderWithChakra(
+          <PublishedPromptActions
+            promptId="prompt-1"
+            promptHandle="test-prompt"
+          />,
+        );
+
+        await clickDuplicate(user);
+
+        expect(toaster.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: "error",
+            description: "Prompt not found",
+          }),
+        );
+        expect(mockInvalidatePromptList).not.toHaveBeenCalled();
+      });
+
+      it("stays quiet when the prompt-limit dialog already told the user", async () => {
+        const user = userEvent.setup();
+        const limitError = new Error("You have reached the maximum number of prompts");
+        markAsHandledByLicenseHandler(limitError);
+        mockDuplicate.mockRejectedValue(limitError);
+        renderWithChakra(
+          <PublishedPromptActions
+            promptId="prompt-1"
+            promptHandle="test-prompt"
+          />,
+        );
+
+        await clickDuplicate(user);
+
+        expect(toaster.create).not.toHaveBeenCalled();
       });
     });
   });

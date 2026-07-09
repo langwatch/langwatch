@@ -13,149 +13,22 @@ import {
 } from "~/prompts/schemas";
 import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
 import { enforceLicenseLimit } from "~/server/license-enforcement";
-import { PromptService } from "~/server/prompt-config";
-import type { VersionedPrompt } from "~/server/prompt-config";
+import { hoistSystemMessage, PromptService } from "~/server/prompt-config";
 import { NotFoundError } from "~/server/prompt-config/errors";
 import { TagValidationError } from "~/server/prompt-config/repositories/llm-config-tag.repository";
 import { checkProjectPermission, hasProjectPermission } from "../../rbac";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 
 /**
- * Normalizes prompt data by extracting system messages from the messages array
- * into the prompt field to avoid conflicts.
- *
- * @param promptData - Object containing prompt and messages fields
- * @returns Normalized prompt and messages, where system messages are moved to prompt field
+ * Re-raises a prompt service error as the protocol error tRPC speaks.
+ * Anything the service does not model as a domain error travels untouched.
  */
-function normalizePromptData({
-  prompt,
-  messages,
-}: {
-  prompt?: string | null;
-  messages?: Array<{
-    role: "user" | "assistant" | "system";
-    content: string;
-  }> | null;
-}): {
-  normalizedPrompt: string | undefined;
-  normalizedMessages:
-    | Array<{ role: "user" | "assistant" | "system"; content: string }>
-    | undefined;
-} {
-  // Extract system message from messages array
-  const systemMessage = messages?.find((msg) => msg.role === "system");
-  const nonSystemMessages = messages?.filter(
-    (msg): msg is { role: "user" | "assistant"; content: string } =>
-      msg.role !== "system",
-  );
-
-  // Use system message as prompt if it exists, otherwise use the prompt field
-  const normalizedPrompt = systemMessage
-    ? systemMessage.content
-    : (prompt ?? undefined);
-
-  // Only include messages if there are non-system messages
-  const normalizedMessages =
-    nonSystemMessages && nonSystemMessages.length > 0
-      ? nonSystemMessages
-      : undefined;
-
-  return { normalizedPrompt, normalizedMessages };
-}
-
-/**
- * Generates a unique handle for a copied/duplicated prompt by retrying with
- * an incrementing suffix (built via `suffixFn`) until `checkHandleUniqueness`
- * reports the candidate is free. Shared between `copy` (cross-project) and
- * `duplicate` (same-project) since both need this exact retry contract.
- */
-async function generateUniqueHandle({
-  baseHandle,
-  suffixFn,
-  projectId,
-  scope,
-  service,
-  maxAttempts = 100,
-}: {
-  baseHandle: string;
-  suffixFn: (index: number) => string;
-  projectId: string;
-  scope: PromptScope;
-  service: PromptService;
-  maxAttempts?: number;
-}): Promise<string> {
-  let newHandle = baseHandle;
-  let index = 0;
-  let handleAvailable = await service.checkHandleUniqueness({
-    handle: newHandle,
-    projectId,
-    scope,
-  });
-
-  while (!handleAvailable) {
-    index++;
-    if (index > maxAttempts) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: `Failed to generate unique handle after ${maxAttempts} attempts for base handle "${baseHandle}" in project ${projectId}.`,
-      });
-    }
-    newHandle = suffixFn(index);
-    handleAvailable = await service.checkHandleUniqueness({
-      handle: newHandle,
-      projectId,
-      scope,
-    });
+function rethrowAsTRPCError(error: unknown): never {
+  if (error instanceof NotFoundError) {
+    throw new TRPCError({ code: "NOT_FOUND", message: "Prompt not found" });
   }
 
-  return newHandle;
-}
-
-/**
- * Maps a source prompt's config data into `PromptService.createPrompt` params.
- * Shared between `copy` and `duplicate` so both stay in sync as the prompt
- * schema grows new fields.
- */
-function buildCreatePromptParamsFromSource(
-  source: VersionedPrompt,
-  overrides: {
-    projectId: string;
-    handle: string;
-    authorId?: string;
-    commitMessage: string;
-    prompt?: string;
-    messages?: Array<{ role: "user" | "assistant" | "system"; content: string }>;
-  },
-) {
-  return {
-    projectId: overrides.projectId,
-    handle: overrides.handle,
-    scope: source.scope ?? "PROJECT",
-    authorId: overrides.authorId,
-    commitMessage: overrides.commitMessage,
-    prompt: overrides.prompt,
-    messages: overrides.messages,
-    inputs: source.inputs ?? undefined,
-    outputs: source.outputs ?? undefined,
-    model: source.model ?? undefined,
-    temperature: source.temperature ?? undefined,
-    maxTokens: source.maxTokens ?? undefined,
-    // Traditional sampling parameters
-    topP: source.topP ?? undefined,
-    frequencyPenalty: source.frequencyPenalty ?? undefined,
-    presencePenalty: source.presencePenalty ?? undefined,
-    // Other sampling parameters
-    seed: source.seed ?? undefined,
-    topK: source.topK ?? undefined,
-    minP: source.minP ?? undefined,
-    repetitionPenalty: source.repetitionPenalty ?? undefined,
-    // Reasoning parameter (canonical/unified field)
-    reasoning: source.reasoning ?? undefined,
-    verbosity: source.verbosity ?? undefined,
-    promptingTechnique: source.promptingTechnique ?? undefined,
-    demonstrations: source.demonstrations ?? undefined,
-    parameters: source.parameters ?? undefined,
-  };
+  throw error;
 }
 
 /**
@@ -549,51 +422,14 @@ export const promptsRouter = createTRPCRouter({
       const service = new PromptService(ctx.prisma);
       const authorId = ctx.session?.user?.id;
 
-      // Get the source prompt
-      const sourcePrompt = await service.getPromptByIdOrHandle({
-        idOrHandle: input.idOrHandle,
-        projectId: input.sourceProjectId,
-      });
-
-      if (!sourcePrompt) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Prompt not found",
-        });
-      }
-
-      const baseHandle = sourcePrompt.handle ?? sourcePrompt.id;
-      const newHandle = await generateUniqueHandle({
-        baseHandle,
-        suffixFn: (i) => `${baseHandle}_copy${i}`,
-        projectId: input.projectId,
-        scope: sourcePrompt.scope ?? "PROJECT",
-        service,
-      });
-
-      // Normalize prompt/messages to avoid system prompt conflict
-      const { normalizedPrompt, normalizedMessages } = normalizePromptData({
-        prompt: sourcePrompt.prompt,
-        messages: sourcePrompt.messages,
-      });
-
-      // Create the prompt in the target project
-      const copiedPrompt = await service.createPrompt(
-        buildCreatePromptParamsFromSource(sourcePrompt, {
-          projectId: input.projectId,
-          handle: newHandle,
+      const copiedPrompt = await service
+        .copyPrompt({
+          idOrHandle: input.idOrHandle,
+          sourceProjectId: input.sourceProjectId,
+          targetProjectId: input.projectId,
           authorId,
-          commitMessage: `Copied from "${baseHandle}"`,
-          prompt: normalizedPrompt,
-          messages: normalizedMessages,
-        }),
-      );
-
-      // Set the copiedFromPromptId to track the source
-      await ctx.prisma.llmPromptConfig.update({
-        where: { id: copiedPrompt.id },
-        data: { copiedFromPromptId: sourcePrompt.id },
-      });
+        })
+        .catch(rethrowAsTRPCError);
 
       afterPromptCreated({
         prisma: ctx.prisma,
@@ -601,19 +437,12 @@ export const promptsRouter = createTRPCRouter({
         userId: authorId,
       });
 
-      return { ...copiedPrompt, copiedFromPromptId: sourcePrompt.id };
+      return copiedPrompt;
     }),
 
   /**
-   * Duplicate a prompt within the same project.
-   * Unlike `copy`, this never crosses project boundaries - it always
-   * duplicates into the same project the source prompt lives in, using
-   * a "handle-1", "handle-2", ... naming scheme. (Parentheses would match
-   * common "duplicate" UX conventions more closely, but `handleSchema` only
-   * allows lowercase letters/digits/hyphens/underscores/one slash, and a
-   * handle that fails it gets silently treated as a legacy/invalid handle
-   * and forced into "draft" mode when the prompt is reopened - see
-   * `isHandleValid` in `llmPromptConfigUtils.ts`.)
+   * Duplicate a prompt within the project it already belongs to.
+   * Unlike `copy`, this never crosses project boundaries.
    */
   duplicate: protectedProcedure
     .input(
@@ -624,49 +453,19 @@ export const promptsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("prompts:create"))
     .mutation(async ({ ctx, input }) => {
+      // Enforce prompt limit before duplicating
       await enforceLicenseLimit(ctx, input.projectId, "prompts");
 
       const service = new PromptService(ctx.prisma);
       const authorId = ctx.session?.user?.id;
 
-      const sourcePrompt = await service.getPromptByIdOrHandle({
-        idOrHandle: input.idOrHandle,
-        projectId: input.projectId,
-      });
-
-      if (!sourcePrompt) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Prompt not found",
-        });
-      }
-
-      const baseHandle = sourcePrompt.handle ?? sourcePrompt.id;
-      const newHandle = await generateUniqueHandle({
-        baseHandle: `${baseHandle}-1`,
-        // index 1 here means "the base candidate above was taken", so the
-        // next candidate is `-2`, not another `-1`.
-        suffixFn: (i) => `${baseHandle}-${i + 1}`,
-        projectId: input.projectId,
-        scope: sourcePrompt.scope ?? "PROJECT",
-        service,
-      });
-
-      const { normalizedPrompt, normalizedMessages } = normalizePromptData({
-        prompt: sourcePrompt.prompt,
-        messages: sourcePrompt.messages,
-      });
-
-      const duplicatedPrompt = await service.createPrompt(
-        buildCreatePromptParamsFromSource(sourcePrompt, {
+      const duplicatedPrompt = await service
+        .duplicatePrompt({
+          idOrHandle: input.idOrHandle,
           projectId: input.projectId,
-          handle: newHandle,
           authorId,
-          commitMessage: `Duplicated from "${baseHandle}"`,
-          prompt: normalizedPrompt,
-          messages: normalizedMessages,
-        }),
-      );
+        })
+        .catch(rethrowAsTRPCError);
 
       afterPromptCreated({
         prisma: ctx.prisma,
@@ -772,10 +571,11 @@ export const promptsRouter = createTRPCRouter({
       }
 
       // Normalize prompt/messages to avoid system prompt conflict
-      const { normalizedPrompt, normalizedMessages } = normalizePromptData({
-        prompt: sourcePrompt.prompt,
-        messages: sourcePrompt.messages,
-      });
+      const { prompt: normalizedPrompt, messages: normalizedMessages } =
+        hoistSystemMessage({
+          prompt: sourcePrompt.prompt,
+          messages: sourcePrompt.messages,
+        });
 
       // Update the copy with source's data
       return await service.updatePrompt({
@@ -913,10 +713,11 @@ export const promptsRouter = createTRPCRouter({
         }
 
         // Normalize prompt/messages to avoid system prompt conflict
-        const { normalizedPrompt, normalizedMessages } = normalizePromptData({
-          prompt: sourcePrompt.prompt,
-          messages: sourcePrompt.messages,
-        });
+        const { prompt: normalizedPrompt, messages: normalizedMessages } =
+          hoistSystemMessage({
+            prompt: sourcePrompt.prompt,
+            messages: sourcePrompt.messages,
+          });
 
         // Update the copy with source's data
         const updated = await service.updatePrompt({
