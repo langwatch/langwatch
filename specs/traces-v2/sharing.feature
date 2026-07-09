@@ -153,6 +153,30 @@ Feature: Share a trace behind a secret, scoped, expiring link
       When the holder requests the surrounding conversation
       Then the conversation is returned
 
+  Rule: The shared link renders the new Trace Explorer, read-only
+
+    @integration
+    Scenario: A shared trace opens in the new Trace Explorer surface
+      Given a public share link for a trace
+      When an unauthenticated person opens the link
+      Then they see the trace in the new Trace Explorer, filling the page
+      And there is no drawer chrome to close, resize or dock
+
+    @integration
+    Scenario: The shared view offers nothing that needs an account
+      Given a public share link for a trace
+      When an unauthenticated person opens the link
+      Then they cannot rename the trace
+      And they cannot pin it, share it, or add it to a dataset
+      And no request is made that requires them to be signed in
+
+    @integration
+    Scenario: One page load counts as one view
+      Given a share link with a maximum of one view
+      When a viewer opens the link once
+      Then exactly one view is counted
+      And the trace is shown
+
   Rule: Legacy links keep working; the legacy UI no longer offers sharing
 
     @integration

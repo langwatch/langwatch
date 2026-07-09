@@ -76,12 +76,31 @@ re-incrementing), so a page load's several data calls and in-window refreshes
 count once. Re-opening the link after the grant expires re-resolves, which is
 denied once the cap is reached.
 
-**UI split.** The share **creation/management** experience moves to the new Trace
+**UI.** The share **creation/management** experience moves to the new Trace
 Explorer (traces v2), replacing the disabled "Share — soon" placeholder in the
-overflow menu. The legacy trace drawer's Share button is removed. The anonymous
-**viewer** at `/share/<id>` keeps rendering the existing `TraceDetails`; making
-the viewer itself render via traces-v2 would require making ~8 `tracesV2`
-endpoints public-share-aware and is left as follow-up.
+overflow menu. The legacy trace drawer's Share button is removed.
+
+The anonymous **viewer** at `/share/<token>` renders that same Trace Explorer
+surface, full-page. The drawer body is extracted into `TraceDrawerContent`,
+shared by the drawer shell (inside `Drawer.Root`) and the share page (inside a
+plain flex column) — the shell keeps only chrome: width, resize rail, dock,
+keyboard help, close.
+
+Two mechanisms make that safe. `TraceViewerContext` supplies the `traceId`,
+overriding the drawer store so the app-wide `GlobalTraceV2DrawerMount` stays
+inert and no drawer opens over the page. The same context carries `readOnly`,
+which unmounts every affordance that mutates or needs a session (rename,
+refresh, maximize, dock, close, overflow menu, share dialog, back-history) and
+disables the queries behind them (`pinnedTrace.getPin`, `share.listForResource`,
+`scenarios.getRunState`, `prompts.getByIdOrHandle`, `traces.getEvaluationInputs`,
+`ops.getScope`, presence SSE + cursor broadcast). `readOnly` is a *rendering*
+concern, never a security boundary — the server authorizes every read against
+the grant.
+
+Conversation view is suppressed for read-only viewers because it is backed by
+`tracesV2.list`, the traces-table query with arbitrary filters, which must never
+open to a share grant. The summary pane's conversation-context strip still
+renders, since it is backed by the thread-gated `conversationContext`.
 
 ## Rationale / Trade-offs
 
@@ -113,8 +132,13 @@ trivial legacy backfill) rather than an oversight.
 - The `share.getSharedState` and `share.unshareItem` tRPC endpoints are removed —
   their only caller was the deleted legacy Share button. `ShareService.unshare`
   survives; the legacy trace-delete REST route still calls it.
-- Follow-ups: hash tokens at rest; render the shared viewer via traces-v2; offer
-  "revoke all links for this trace" in the management UI.
+- `TraceDrawerContent` is now the seam any future full-page trace surface should
+  reuse; the shell is chrome only.
+- Follow-ups: hash tokens at rest; a thread-gated `conversationTurns` endpoint so
+  shared conversations can render without opening `tracesV2.list`; offer "revoke
+  all links for this trace" in the management UI; the public page still mounts
+  `DashboardLayout`, whose `featureFlag.isEnabled` / `ops.getScope` /
+  `annotation.getPendingItemsCount` probes 401 for anonymous viewers (pre-existing).
 
 ## References
 

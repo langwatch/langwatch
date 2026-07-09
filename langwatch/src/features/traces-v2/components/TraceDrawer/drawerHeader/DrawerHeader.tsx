@@ -86,6 +86,12 @@ interface DrawerHeaderProps {
   trace: TraceHeader;
   /** Parent's drawer-close handler (URL teardown). */
   onClose: () => void;
+  /**
+   * Public share view: no session, no drawer to close. Suppresses every
+   * affordance that mutates, needs a session, or only makes sense inside the
+   * drawer chrome. See TraceViewerContext.
+   */
+  readOnly?: boolean;
 }
 
 /**
@@ -479,6 +485,7 @@ const HOISTED_AUTO_PINS: HoistedPinDef[] = [
 export const DrawerHeader = memo(function DrawerHeader({
   trace: traceProp,
   onClose,
+  readOnly = false,
 }: DrawerHeaderProps) {
   // Retain attribute-derived fields across payload flaps (row-data seed →
   // full summary → refetch) so chips never vanish once shown for the same
@@ -517,6 +524,7 @@ export const DrawerHeader = memo(function DrawerHeader({
   const dejaView = useDejaViewLink({
     aggregateId: trace.traceId,
     tenantId: project?.id,
+    enabled: !readOnly,
   });
 
   // Cache + reasoning are summed across the trace's spans by the fold and
@@ -911,7 +919,7 @@ export const DrawerHeader = memo(function DrawerHeader({
           with hover-to-expand + click-to-copy. */}
       <HStack justify="space-between" align="center" gap={2.5} minWidth={0}>
         <HStack gap={2.5} minWidth={0} flex={1} flexWrap="wrap" align="center">
-          {canGoBack && (
+          {canGoBack && !readOnly && (
             <MenuRoot>
               <Tooltip
                 content={
@@ -975,11 +983,23 @@ export const DrawerHeader = memo(function DrawerHeader({
             </MenuRoot>
           )}
           <TraceIdChip traceId={trace.traceId} />
-          <EditableTraceName
-            traceId={trace.traceId}
-            titleText={titleText}
-            titleIsFallback={titleIsFallback}
-          />
+          {readOnly ? (
+            // Renaming is a mutation; a share viewer has no session to make it.
+            <Text
+              fontSize="sm"
+              fontWeight="600"
+              color={titleIsFallback ? "fg.muted" : "fg"}
+              lineClamp={1}
+            >
+              {titleText}
+            </Text>
+          ) : (
+            <EditableTraceName
+              traceId={trace.traceId}
+              titleText={titleText}
+              titleIsFallback={titleIsFallback}
+            />
+          )}
           <StatusChip trace={trace} statusColor={statusColor} />
           {conversationContext.total > 1 && (
             <ThreadProgressIndicator
@@ -1007,6 +1027,12 @@ export const DrawerHeader = memo(function DrawerHeader({
             button sits ~8px from the top of the drawer chrome, the
             VStack's paddingTop={3} (12px) puts ours too low without
             this offset. */}
+        {/* The whole action cluster is drawer chrome or needs a session:
+            refresh, maximize, the overflow menu (which fires
+            `pinnedTrace.getPin` on mount), dock and close. It must be
+            unmounted, not hidden — `display:none` would still run the menu's
+            queries. */}
+        {!readOnly && (
         <HStack gap={1} flexShrink={0} marginRight={-2} marginTop={-2}>
           <Tooltip
             content={
@@ -1114,6 +1140,7 @@ export const DrawerHeader = memo(function DrawerHeader({
             </Button>
           </Tooltip>
         </HStack>
+        )}
       </HStack>
 
       {/* Row 2: Unified context strip. Three logical sections — performance
@@ -1321,13 +1348,15 @@ export const DrawerHeader = memo(function DrawerHeader({
         onClose={() => setRawOpen(false)}
         trace={trace}
       />
-      <ShareTraceDialog
-        open={shareOpen}
-        onClose={() => setShareOpen(false)}
-        projectId={project?.id}
-        traceId={trace.traceId}
-        conversationId={trace.conversationId}
-      />
+      {!readOnly && (
+        <ShareTraceDialog
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+          projectId={project?.id}
+          traceId={trace.traceId}
+          conversationId={trace.conversationId}
+        />
+      )}
     </VStack>
   );
 });

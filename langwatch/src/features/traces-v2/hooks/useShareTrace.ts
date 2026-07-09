@@ -32,13 +32,18 @@ export function useShareTrace({
   projectId,
   traceId,
   conversationId,
+  active = true,
 }: {
   projectId: string | undefined;
   traceId: string;
   conversationId: string | null;
+  /** Only fetch links while the share surface is open. The dialog is mounted by
+   *  the drawer header on every render, so without this the list query fires for
+   *  every trace anyone opens — including anonymous share viewers, who 401. */
+  active?: boolean;
 }) {
   const utils = api.useUtils();
-  const enabled = !!projectId;
+  const enabled = !!projectId && active;
 
   const linksQuery = api.share.listForResource.useQuery(
     projectId

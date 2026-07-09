@@ -95,7 +95,7 @@ export function ShareTraceDialog({
     revokeLink,
     isRevoking,
     canShareThread,
-  } = useShareTrace({ projectId, traceId, conversationId });
+  } = useShareTrace({ projectId, traceId, conversationId, active: open });
 
   const [visibility, setVisibility] = useState<ShareVisibilityOption>("PUBLIC");
   const [expiry, setExpiry] = useState<ShareExpiryOption>("never");

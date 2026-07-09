@@ -15,8 +15,11 @@ const OPS_SCOPE_STALE_TIME_MS = 5 * 60_000;
  * is exposed via `scope.kind` for callers that want to branch on tier
  * later (e.g. ops:view vs ops:manage if that ever lands).
  */
-export function useOpsPermission() {
+export function useOpsPermission({ enabled = true }: { enabled?: boolean } = {}) {
   const query = api.ops.getScope.useQuery(undefined, {
+    // `getScope` is protected. Surfaces that render for anonymous viewers (the
+    // public share page) must opt out, or the probe 401s on every load.
+    enabled,
     retry: false,
     refetchOnWindowFocus: false,
     staleTime: OPS_SCOPE_STALE_TIME_MS,
