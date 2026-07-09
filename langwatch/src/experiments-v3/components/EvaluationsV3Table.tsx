@@ -848,11 +848,25 @@ export function EvaluationsV3Table({
     const state = useEvaluationsV3Store.getState();
     const variantOptions = state.targets.filter((t) => t.type !== "evaluator");
     const activeDs = state.datasets.find((d) => d.id === state.activeDatasetId);
+    const datasetColumns =
+      activeDs?.columns.map((c) => ({ id: c.id, name: c.name })) ?? [];
     const pairwiseContext = {
       initialPairwise: undefined,
       targets: variantOptions,
-      datasetColumns:
-        activeDs?.columns.map((c) => ({ id: c.id, name: c.name })) ?? [],
+      datasetColumns,
+    };
+
+    // N-way (#5101) sibling of pairwiseContext above. If an N-way evaluator
+    // already exists in the workbench, pre-fill the config from IT so
+    // clicking "N-way Compare" opens the existing one for editing instead
+    // of dropping a fresh blank form and creating a second evaluator every
+    // time. Only the first one is picked up — multiple select-best
+    // evaluators per workbench aren't a supported pattern today.
+    const existingSelectBest = state.evaluators.find((e) => !!e.selectBest);
+    const selectBestContext = {
+      initialSelectBest: existingSelectBest?.selectBest,
+      targets: variantOptions,
+      datasetColumns,
     };
 
     // Set up flow callback for when a NEW evaluator is created during the target flow
@@ -881,7 +895,7 @@ export function EvaluationsV3Table({
         },
       }),
     );
-    openDrawer("targetTypeSelector", { pairwiseContext });
+    openDrawer("targetTypeSelector", { pairwiseContext, selectBestContext });
   }, [
     buildAvailableSources,
     openDrawer,

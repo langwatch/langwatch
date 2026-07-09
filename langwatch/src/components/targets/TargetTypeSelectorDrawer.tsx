@@ -8,12 +8,13 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Bot, CheckCircle, FileText, Swords } from "lucide-react";
+import { Bot, CheckCircle, FileText, Swords, Trophy } from "lucide-react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
 import type {
   PairwiseEvaluatorConfig,
+  SelectBestEvaluatorConfig,
   TargetConfig,
   TargetType,
 } from "~/experiments-v3/types";
@@ -22,10 +23,11 @@ import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
 // Re-export for backward compatibility
 export type { TargetType };
 
-// Card identifiers shown in the picker. "pairwise" is a UI-only shortcut that
-// creates an evaluator-target pre-configured for langevals/pairwise_compare —
+// Card identifiers shown in the picker. "pairwise" and "nway" are UI-only
+// shortcuts that create an evaluator-target pre-configured for
+// langevals/pairwise_compare or langevals/select_best_compare respectively —
 // the underlying TargetConfig is still type: "evaluator".
-type TargetCardKey = TargetType | "pairwise";
+type TargetCardKey = TargetType | "pairwise" | "nway";
 
 export type TargetTypeSelectorDrawerProps = {
   open?: boolean;
@@ -34,6 +36,16 @@ export type TargetTypeSelectorDrawerProps = {
   /** Passed through to evaluatorEditor when "Pairwise Compare" is selected. */
   pairwiseContext?: {
     initialPairwise?: PairwiseEvaluatorConfig;
+    targets: TargetConfig[];
+    datasetColumns: { id: string; name: string }[];
+  };
+  /**
+   * Passed through to evaluatorEditor when "N-way Compare" is selected.
+   * Sibling of pairwiseContext, kept independent so the two shortcut paths
+   * never couple.
+   */
+  selectBestContext?: {
+    initialSelectBest?: SelectBestEvaluatorConfig;
     targets: TargetConfig[];
     datasetColumns: { id: string; name: string }[];
   };
@@ -63,6 +75,13 @@ const targetTypes: Array<{
     title: "Pairwise Compare",
     description:
       "Judge two prior columns head-to-head against a golden reference",
+  },
+  {
+    type: "nway",
+    icon: Trophy,
+    title: "N-way Compare",
+    description:
+      "Judge 2+ prior columns in one call and pick the best — golden reference optional",
   },
   {
     type: "evaluator",
@@ -100,6 +119,23 @@ export function TargetTypeSelectorDrawer(props: TargetTypeSelectorDrawerProps) {
           category: "llm_judge",
           pairwiseContext: (complexProps.pairwiseContext ??
             props.pairwiseContext) as TargetTypeSelectorDrawerProps["pairwiseContext"],
+          saveButtonText: "Add Comparison",
+        },
+        { replace: true },
+      );
+      return;
+    }
+
+    // N-way (#5101) sibling of pairwise above — same "skip category picker,
+    // jump into the config form" shortcut but for langevals/select_best_compare.
+    if (type === "nway") {
+      openDrawer(
+        "evaluatorEditor",
+        {
+          evaluatorType: "langevals/select_best_compare",
+          category: "llm_judge",
+          selectBestContext: (complexProps.selectBestContext ??
+            props.selectBestContext) as TargetTypeSelectorDrawerProps["selectBestContext"],
           saveButtonText: "Add Comparison",
         },
         { replace: true },
@@ -207,7 +243,7 @@ function TargetTypeCard({
       ? "green"
       : type === "evaluator"
         ? "green"
-        : type === "pairwise"
+        : type === "pairwise" || type === "nway"
           ? "purple"
           : "blue";
   const iconBg =
@@ -215,12 +251,14 @@ function TargetTypeCard({
       ? "green.subtle"
       : type === "evaluator"
         ? "green.subtle"
-        : type === "pairwise"
+        : type === "pairwise" || type === "nway"
           ? "purple.subtle"
           : "blue.subtle";
 
   return (
     <VStack align="start">
+      {/* The "Compare existing columns:" header appears only above the first
+          compare card (pairwise); N-way sits under the same header. */}
       {type === "pairwise" && (
         <Text fontSize="13px" color="fg.muted">
           Compare existing columns:
@@ -260,7 +298,7 @@ function TargetTypeCard({
           <VStack align="start" gap={1} flex={1}>
             <HStack gap={2}>
               <Text fontWeight="medium">{title}</Text>
-              {type === "pairwise" && (
+              {(type === "pairwise" || type === "nway") && (
                 <Badge colorPalette="purple" variant="surface" size="sm">
                   New
                 </Badge>
