@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Tabs, Text } from "@chakra-ui/react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFormContext } from "react-hook-form";
 import { LuEraser } from "react-icons/lu";
 import { useDebounceCallback } from "usehooks-ts";
@@ -100,6 +100,15 @@ export function PromptTabbedSection({
     300,
   );
 
+  // Flush any pending variable-value write before unmount. useDebounceCallback
+  // cancels on unmount, so without this a value typed just before switching
+  // prompt tabs (which unmounts this tab) would be lost.
+  useEffect(() => {
+    return () => {
+      debouncedPersistToStore.flush();
+    };
+  }, [debouncedPersistToStore]);
+
   // Convert inputs to Variable[] format
   const variables: Variable[] = inputs.map((input) => ({
     identifier: input.identifier,
@@ -151,6 +160,13 @@ export function PromptTabbedSection({
       size="sm"
       minHeight={0}
       paddingTop={1}
+      // lazyMount (no unmountOnExit): a sub-tab isn't rendered until first
+      // opened, but once mounted it stays. Critically, this keeps the chat
+      // (inside the Conversation panel) alive when the user switches to
+      // Variables/Parameters — unmounting it would abort an in-flight
+      // generation. Inactive *prompt* tabs still fully unmount via the outer
+      // DraggableTabsBrowser, which is where the memory win comes from.
+      lazyMount
     >
       <Tabs.List
         display="flex"

@@ -18,7 +18,7 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildTimeseriesQuery } from "~/server/analytics/clickhouse/aggregation-builder";
 import { TraceAnalyticsClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-analytics.clickhouse.repository";
@@ -36,7 +36,7 @@ import { buildRollupTimeseriesQuery } from "../query-builders/rollup-timeseries-
 import { buildSlimTimeseriesQuery } from "../query-builders/slim-timeseries-query";
 import type { AnalyticsTimeseriesBuilderInput } from "../types";
 
-const tenantId = `test-router-${nanoid()}`;
+const tenantId = `test-router-${generate("tenant").toString()}`;
 
 // All seeded rows land in one minute bucket so the rollup collapses cleanly.
 const bucketMs = new Date("2026-06-15T12:00:00.000Z").getTime();
@@ -74,7 +74,7 @@ function makeSlimRow(
 ): TraceAnalyticsRow {
   return {
     tenantId,
-    traceId: `slim-trace-${nanoid()}`,
+    traceId: `slim-trace-${generate("trace").toString()}`,
     version: TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
     occurredAtMs: bucketMs,
     createdAtMs: bucketMs,

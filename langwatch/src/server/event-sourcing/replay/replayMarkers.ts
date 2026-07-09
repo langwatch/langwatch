@@ -1,5 +1,11 @@
 import type IORedis from "ioredis";
-import { CUTOFF_KEY_PREFIX, COMPLETED_KEY_PREFIX, MARKER_TTL_SECONDS } from "./replayConstants";
+import {
+  CUTOFF_KEY_PREFIX,
+  COMPLETED_KEY_PREFIX,
+  MARKER_TTL_SECONDS,
+  DONE_MARKER_TTL_SECONDS,
+  doneMarkerKey,
+} from "./replayConstants";
 
 /** Throw if any command in a pipeline result has an error. */
 function checkPipelineErrors(results: [error: Error | null, result: unknown][] | null, operation: string): void {
@@ -95,6 +101,51 @@ export async function unmarkBatch({
   }
   const unmarkResults = await pipeline.exec();
   checkPipelineErrors(unmarkResults, "unmarkBatch");
+}
+
+/**
+ * Terminal transition for replayed aggregates. For each aggregate: drop its
+ * active cutoff marker from the cutoff hash, write a separate short-TTL "done"
+ * marker preserving the cutoff boundary, and record it in the completed set.
+ *
+ * Unlike {@link unmarkBatch} (which HDELs the marker, returning the aggregate to
+ * unconditional live processing), this PRESERVES the cutoff boundary. A job that
+ * was staged — but never active — during the replay pause is not drained by
+ * `waitForActiveJobs`; after unpause it runs, and without the boundary it would
+ * re-process events at/before the cutoff and double-write records replay just
+ * rebuilt (and re-fire map reactors). The done-marker keeps the live checker
+ * skipping those events while still letting genuinely newer events through.
+ *
+ * The boundary lives in its own short-TTL key rather than in the cutoff hash so
+ * a giant (all-tenant, multi-month) replay does not retain a marker per
+ * aggregate for its whole duration: the cutoff hash stays bounded to in-flight
+ * aggregates and done markers self-expire after {@link DONE_MARKER_TTL_SECONDS}.
+ */
+export async function markCompletedBatch({
+  redis,
+  projectionName,
+  cutoffs,
+}: {
+  redis: IORedis;
+  projectionName: string;
+  cutoffs: Map<string, { timestamp: number; eventId: string }>;
+}): Promise<void> {
+  if (cutoffs.size === 0) return;
+  const pipeline = redis.pipeline();
+  const cKey = cutoffKey(projectionName);
+  const compKey = completedKey(projectionName);
+  for (const [aggKey, cutoff] of cutoffs) {
+    pipeline.hdel(cKey, aggKey);
+    pipeline.set(
+      doneMarkerKey(projectionName, aggKey),
+      `${cutoff.timestamp}:${cutoff.eventId}`,
+      "EX",
+      DONE_MARKER_TTL_SECONDS,
+    );
+    pipeline.sadd(compKey, aggKey);
+  }
+  const results = await pipeline.exec();
+  checkPipelineErrors(results, "markCompletedBatch");
 }
 
 /** Get the set of completed aggregate keys for a projection. */

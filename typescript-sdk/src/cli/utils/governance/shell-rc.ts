@@ -32,6 +32,13 @@ import * as readline from "node:readline";
 import chalk from "chalk";
 
 import {
+  codexOtelBlockHasAuthHeader,
+  codexTraceEndpoint,
+  defaultCodexConfigPath,
+  displayCodexConfigPath,
+  writeCodexOtelBlock,
+} from "../codex-config-toml";
+import {
   appEnvHasAllVars,
   appSettingsTargetFor,
   installAppEnv,
@@ -44,6 +51,23 @@ const TOOLS = ["claude", "codex", "cursor", "gemini", "opencode"] as const;
 
 const BLOCK_BEGIN = "# >>> langwatch begin >>>";
 const BLOCK_END = "# <<< langwatch end <<<";
+
+/** Markers for the global gateway export block (init-shell / legacy persist). */
+export const GATEWAY_RC_MARKERS = { begin: BLOCK_BEGIN, end: BLOCK_END };
+
+/**
+ * Per-tool marker pair for a scoped wrapper function. Tools without a
+ * config-file env target (gemini, opencode, …) get a shell function that
+ * sets the telemetry env ONLY for `<tool>` invocations, instead of a global
+ * `export` that leaks into every shell child. Each tool gets its own marker
+ * pair so multiple wrappers coexist in one rc file.
+ */
+export function toolMarkers(tool: string): { begin: string; end: string } {
+  return {
+    begin: `# >>> langwatch ${tool} begin >>>`,
+    end: `# <<< langwatch ${tool} end <<<`,
+  };
+}
 
 export type DetectedShell = "zsh" | "bash" | "fish";
 
@@ -102,14 +126,16 @@ export function isShellAlreadyConfigured(): boolean {
 export function rcHasLangwatchBlock({
   shell,
   requiredKeys,
+  markers = { begin: BLOCK_BEGIN, end: BLOCK_END },
 }: {
   shell: DetectedShell;
   requiredKeys?: string[];
+  markers?: { begin: string; end: string };
 }): boolean {
   try {
     const content = fs.readFileSync(rcPath(shell), "utf8");
-    const begin = content.indexOf(BLOCK_BEGIN);
-    const end = content.indexOf(BLOCK_END);
+    const begin = content.indexOf(markers.begin);
+    const end = content.indexOf(markers.end);
     if (begin === -1 || end === -1 || end < begin) return false;
     if (!requiredKeys || requiredKeys.length === 0) return true;
     const block = content.slice(begin, end);
@@ -152,26 +178,37 @@ function quote(s: string): string {
 }
 
 /**
- * Format an env-var map into a shell export block (body only, no
- * begin/end markers) for the given shell. fish uses `set -gx KEY VALUE`;
- * posix shells (zsh / bash) use `export KEY=VALUE`. Values are quoted via
- * the same posix-safe quoter the rest of this module uses.
+ * Build a shell function that wraps `<tool>` so the OTEL telemetry env is
+ * set ONLY for `<tool>` invocations, not exported into every shell child.
+ * This is the fallback for any tool with no config-file env target (gemini,
+ * opencode, …): `command <tool>` inside the function bypasses the function
+ * itself (no recursion) and runs the real binary.
  *
- * Used for the Path B (ingestion) telemetry exports: pass the exact
- * OTEL_EXPORTER_OTLP_* env the wrapper computed for the run so a plain
- * `<tool>` (without the `langwatch` prefix) inherits it. Order follows
- * the map's insertion order so the block is stable across runs.
+ * posix (zsh/bash) uses a function with an env-prefix; fish uses a function
+ * with block-local `set -lx`. The body (no begin/end markers) is returned
+ * for `persistBlockToRc` to bracket with the tool's markers.
  */
-export function buildOtelExportBlock(
+export function buildScopedToolFunction(
+  tool: string,
   vars: Record<string, string>,
   shell: DetectedShell,
 ): string {
   const entries = Object.entries(vars);
-  const fmt =
-    shell === "fish"
-      ? ([k, v]: [string, string]) => `set -gx ${k} ${quote(v)}`
-      : ([k, v]: [string, string]) => `export ${k}=${quote(v)}`;
-  return entries.map(fmt).join("\n");
+  if (shell === "fish") {
+    const sets = entries
+      .map(([k, v]) => `    set -lx ${k} ${quote(v)}`)
+      .join("\n");
+    return [
+      `function ${tool}`,
+      sets,
+      `    command ${tool} $argv`,
+      "end",
+    ].join("\n");
+  }
+  const assigns = entries
+    .map(([k, v]) => `    ${k}=${quote(v)} \\`)
+    .join("\n");
+  return [`${tool}() {`, assigns, `    command ${tool} "$@"`, "}"].join("\n");
 }
 
 /**
@@ -185,11 +222,15 @@ export function buildOtelExportBlock(
 export function persistBlockToRc(
   shell: DetectedShell,
   block: string,
+  markers: { begin: string; end: string } = {
+    begin: BLOCK_BEGIN,
+    end: BLOCK_END,
+  },
 ): string {
   const file = rcPath(shell);
   const dir = path.dirname(file);
   fs.mkdirSync(dir, { recursive: true });
-  const wrapped = `${BLOCK_BEGIN}\n${block}\n${BLOCK_END}\n`;
+  const wrapped = `${markers.begin}\n${block}\n${markers.end}\n`;
 
   let existing = "";
   try {
@@ -199,7 +240,7 @@ export function persistBlockToRc(
   }
 
   const marker = new RegExp(
-    `${escapeRegex(BLOCK_BEGIN)}[\\s\\S]*?${escapeRegex(BLOCK_END)}\\n?`,
+    `${escapeRegex(markers.begin)}[\\s\\S]*?${escapeRegex(markers.end)}\\n?`,
     "m",
   );
   let next: string;
@@ -215,6 +256,36 @@ export function persistBlockToRc(
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Remove a marker-bracketed langwatch block from the shell rc file, if
+ * present. Removes at most one leading + one trailing newline around the
+ * block, so the blank line the install path inserts before it goes with it
+ * while unrelated user whitespace is left alone. Returns true when a block
+ * was removed (idempotent — false when the file or the block was absent).
+ */
+export function removeBlockFromRc(
+  shell: DetectedShell,
+  markers: { begin: string; end: string } = {
+    begin: BLOCK_BEGIN,
+    end: BLOCK_END,
+  },
+): boolean {
+  const file = rcPath(shell);
+  let content: string;
+  try {
+    content = fs.readFileSync(file, "utf8");
+  } catch {
+    return false; // ENOENT
+  }
+  const re = new RegExp(
+    `\\n?${escapeRegex(markers.begin)}[\\s\\S]*?${escapeRegex(markers.end)}\\n?`,
+    "m",
+  );
+  if (!re.test(content)) return false;
+  fs.writeFileSync(file, content.replace(re, ""));
+  return true;
 }
 
 /**
@@ -313,15 +384,76 @@ export async function maybeOfferIngestionShellRcPersist({
     return;
   }
 
+  // codex has a native app-scoped target too: its [otel] block in
+  // ~/.codex/config.toml takes an inline Authorization header, so the
+  // ingest token scopes to codex runs instead of leaking into every
+  // shell child via the profile rc. The wrapper already wrote the
+  // endpoint-only block during setup; persisting adds the header so a
+  // plain `codex` captures.
+  if (tool === "codex") {
+    const configPath = defaultCodexConfigPath();
+    // Already persisted on a prior run — stay quiet.
+    if (codexOtelBlockHasAuthHeader(configPath)) return;
+
+    const endpointBase = vars.OTEL_EXPORTER_OTLP_ENDPOINT;
+    const token = bearerFromHeaders(vars.OTEL_EXPORTER_OTLP_HEADERS);
+    if (!endpointBase || !token) return;
+
+    console.log();
+    const choice = await askPersistChoice(displayCodexConfigPath(), tool);
+    if (choice === "skip" || choice === "no") return;
+    if (choice === "never") {
+      recordNeverChoice(cfg);
+      return;
+    }
+    try {
+      writeCodexOtelBlock(
+        {
+          endpoint: codexTraceEndpoint(endpointBase),
+          ingestionToken: token,
+          environment: cfg.organization?.slug ?? "langwatch",
+        },
+        { persistAuthHeader: true },
+      );
+      console.log(
+        chalk.green(
+          `  ✓ Installed langwatch telemetry exports to ${displayCodexConfigPath()}`,
+        ),
+      );
+    } catch (err) {
+      console.log(
+        chalk.yellow(
+          `  ! Couldn't write to ${displayCodexConfigPath()}: ${(err as Error).message}`,
+        ),
+      );
+    }
+    return;
+  }
+
   const shell = detectShell();
   if (!shell) return;
-  // Already installed in the rc file, even if this shell hasn't sourced it
-  // yet (so the OTEL env isn't in process.env). Keyed on the current vars so
-  // a stale / different export block doesn't suppress installing this one.
-  if (rcHasLangwatchBlock({ shell, requiredKeys: Object.keys(vars) })) return;
 
-  const block = buildOtelExportBlock(vars, shell);
-
+  // Every remaining tool (gemini, opencode, …) has no config-file env target
+  // and rides on generic OTEL_* names, so a global `export` would leak into
+  // every shell child. Install a scoped wrapper function that sets the
+  // telemetry env only for `<tool>` runs, under the tool's own marker pair so
+  // multiple wrappers coexist. (cursor never reaches here — it's gateway-only
+  // via allow_otel_direct=false, so Path B ingestion never resolves for it.)
+  const markers = toolMarkers(tool);
+  // Already installed for this endpoint, even if this shell hasn't sourced the
+  // rc yet (so the OTEL env isn't in process.env). Keyed on the endpoint so a
+  // stale wrapper for a different endpoint doesn't suppress installing this one.
+  if (
+    rcHasLangwatchBlock({
+      shell,
+      requiredKeys: [vars.OTEL_EXPORTER_OTLP_ENDPOINT].filter(
+        Boolean,
+      ) as string[],
+      markers,
+    })
+  ) {
+    return;
+  }
   const target = rcPath(shell);
   console.log();
   const choice = await askPersistChoice(target, tool);
@@ -331,9 +463,15 @@ export async function maybeOfferIngestionShellRcPersist({
     return;
   }
   try {
-    const wrote = persistBlockToRc(shell, block);
+    const wrote = persistBlockToRc(
+      shell,
+      buildScopedToolFunction(tool, vars, shell),
+      markers,
+    );
     console.log(
-      chalk.green(`  ✓ Installed langwatch telemetry exports to ${wrote}`),
+      chalk.green(
+        `  ✓ Installed a scoped \`${tool}\` telemetry wrapper in ${wrote}`,
+      ),
     );
   } catch (err) {
     console.log(
@@ -349,4 +487,15 @@ function recordNeverChoice(cfg: GovernanceConfig): void {
   } catch {
     // best effort — a config write failure just means the next run re-asks.
   }
+}
+
+/**
+ * Pull the bearer token out of an `OTEL_EXPORTER_OTLP_HEADERS` value
+ * shaped like `Authorization=Bearer <token>`. Returns null when the
+ * header is absent or malformed.
+ */
+function bearerFromHeaders(headers: string | undefined): string | null {
+  if (!headers) return null;
+  const m = /Bearer\s+(\S+)/.exec(headers);
+  return m ? m[1]! : null;
 }

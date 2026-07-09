@@ -1,4 +1,5 @@
 import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
+import type { MapProjectionDefinition } from "../projections/mapProjection.types";
 import type { Event } from "../domain/types";
 
 export interface RegisteredFoldProjection {
@@ -7,10 +8,33 @@ export interface RegisteredFoldProjection {
   aggregateType: string;
   source: "pipeline" | "global";
   definition: FoldProjectionDefinition<any, Event>;
+  /**
+   * Pause-set entry consumed by the GroupQueue Lua dispatcher. Folds are
+   * enqueued as `__jobType=projection`, so this is `{pipeline}/projection/{name}`.
+   */
   pauseKey: string;
+  kind: "fold";
   /** ClickHouse table name for OPTIMIZE after replay. Omit for non-CH stores. */
   targetTable?: string;
 }
+
+export interface RegisteredMapProjection {
+  projectionName: string;
+  pipelineName: string;
+  aggregateType: string;
+  source: "pipeline" | "global";
+  definition: MapProjectionDefinition<any, Event>;
+  /**
+   * Pause-set entry consumed by the GroupQueue Lua dispatcher. Maps are
+   * enqueued as `__jobType=handler`, so this is `{pipeline}/handler/{name}`.
+   */
+  pauseKey: string;
+  kind: "map";
+  /** ClickHouse table name for OPTIMIZE after replay. Omit for non-CH stores. */
+  targetTable?: string;
+}
+
+export type ProjectionKind = "fold" | "map";
 
 export type BatchPhase = "mark" | "pause" | "drain" | "cutoff" | "replay" | "write" | "unmark";
 
@@ -19,6 +43,7 @@ export interface ReplayProgress {
 
   // Projection context
   currentProjectionName: string;
+  currentProjectionKind: ProjectionKind;
   currentProjectionIndex: number;
   totalProjections: number;
 
@@ -44,6 +69,7 @@ export interface ReplayProgress {
 
 export interface BatchCompleteInfo {
   projectionName: string;
+  projectionKind: ProjectionKind;
   batchNum: number;
   totalBatches: number;
   aggregatesInBatch: number;
@@ -53,6 +79,7 @@ export interface BatchCompleteInfo {
 
 export interface ReplayConfig {
   projections: RegisteredFoldProjection[];
+  mapProjections?: RegisteredMapProjection[];
   tenantIds: string[];
   since: string;
   aggregateIds?: string[];

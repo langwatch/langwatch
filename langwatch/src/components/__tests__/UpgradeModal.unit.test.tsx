@@ -59,6 +59,7 @@ describe("<UpgradeModal />", () => {
       expect(screen.getByText("Feature Not Available")).toBeDefined();
     });
 
+    /** @scenario "Restriction modal uses role-based messaging" */
     it("renders role-based messaging without billing references", () => {
       renderWithProviders(
         <UpgradeModal open={true} onClose={onClose} variant={variant} />,
@@ -85,6 +86,7 @@ describe("<UpgradeModal />", () => {
       expect(screen.queryByRole("button", { name: /manage plan/i })).toBeNull();
     });
 
+    /** @scenario 'Restriction modal offers "Contact Admin" not "Upgrade your plan"' */
     it("renders a Dismiss button that calls onClose", () => {
       renderWithProviders(
         <UpgradeModal open={true} onClose={onClose} variant={variant} />,

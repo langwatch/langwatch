@@ -1,7 +1,7 @@
 /**
  * Integration tests for the `trace_analytics_rollup` AggregatingMergeTree
  * (ADR-034 Phase 1), exercised against a real ClickHouse testcontainer on the
- * production schema (migration 00037 auto-applies through goose in
+ * production schema (migration 00038 auto-applies through goose in
  * `startTestContainers`).
  *
  * Phase 1 removed the materialized view (an interim materialized-view migration that was never deployed) and
@@ -24,7 +24,7 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TraceAnalyticsRollupClickHouseRepository } from "~/server/app-layer/traces/repositories/trace-analytics-rollup.clickhouse.repository";
 import {
@@ -33,7 +33,7 @@ import {
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import type { TraceAnalyticsRollupRow } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceAnalyticsRollup.mapProjection";
 
-const tenantId = `test-rollup-${nanoid()}`;
+const tenantId = `test-rollup-${generate("tenant").toString()}`;
 // All spans below land in one minute bucket so the rollup collapses to a
 // single (TenantId, BucketStart, Model, SpanType) group per distinct dim pair.
 const baseMs = new Date("2026-06-01T12:00:00.000Z").getTime();
@@ -167,7 +167,7 @@ describe("trace_analytics_rollup app-side projection (integration)", () => {
 });
 
 describe("trace_analytics_rollup root-span duration (integration)", () => {
-  const rootTenantId = `test-rollup-dur-${nanoid()}`;
+  const rootTenantId = `test-rollup-dur-${generate("tenant").toString()}`;
   let durRepo: TraceAnalyticsRollupClickHouseRepository;
 
   beforeAll(async () => {
@@ -203,7 +203,7 @@ describe("trace_analytics_rollup root-span duration (integration)", () => {
 });
 
 describe("trace_analytics_rollup per-trace average via TraceCount (integration)", () => {
-  const avgTenantId = `test-rollup-avg-${nanoid()}`;
+  const avgTenantId = `test-rollup-avg-${generate("tenant").toString()}`;
   let avgRepo: TraceAnalyticsRollupClickHouseRepository;
 
   beforeAll(async () => {
@@ -245,7 +245,7 @@ describe("trace_analytics_rollup per-trace average via TraceCount (integration)"
 });
 
 describe("trace_analytics_rollup re-delivered span (integration)", () => {
-  const dupTenantId = `test-rollup-dup-${nanoid()}`;
+  const dupTenantId = `test-rollup-dup-${generate("tenant").toString()}`;
   let dupRepo: TraceAnalyticsRollupClickHouseRepository;
 
   beforeAll(async () => {

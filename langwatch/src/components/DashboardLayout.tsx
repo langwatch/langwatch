@@ -549,6 +549,10 @@ export const DashboardLayout = ({
       (!isOpsRoute &&
         !isPersonalScopeRoute &&
         !isOrgScopeRoute &&
+        // ADR-038 v6: intent-set orgs can legitimately have no project
+        // (governance by design; LLMOps until its first project is
+        // created) — org-level chrome (e.g. /settings) must still render.
+        !organization?.primaryIntent &&
         (!team || !project)))
   ) {
     return <LoadingScreen />;
@@ -692,6 +696,12 @@ export const DashboardLayout = ({
               <Box display={["none", "none", "flex"]}>
                 <Breadcrumbs currentRoute={currentRoute} />
               </Box>
+            </HStack>
+          ) : organization ? (
+            // Project-less org (governance intent, ADR-038 v6): org-scoped
+            // switcher instead of falling through to the sign-in link.
+            <HStack gap={0} alignItems="center" paddingLeft={2}>
+              <OrganizationScopeHeaderSwitcher />
             </HStack>
           ) : (
             <Text paddingLeft={2}>

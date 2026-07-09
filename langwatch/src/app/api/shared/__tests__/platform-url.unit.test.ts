@@ -1,18 +1,21 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { platformUrl } from "../platform-url";
 
-describe("platformUrl", () => {
-  const originalEnv = process.env.BASE_HOST;
+// vi.mock factories are hoisted above top-level declarations, so the
+// mutable env object must be created via vi.hoisted to be available
+// when the mock factory runs.
+const { mockEnv } = vi.hoisted(() => ({
+  mockEnv: { BASE_HOST: "https://app.langwatch.ai" as string | undefined },
+}));
 
-  afterEach(() => {
-    process.env.BASE_HOST = originalEnv;
+vi.mock("~/env.mjs", () => ({ env: mockEnv }));
+
+describe("platformUrl", () => {
+  beforeEach(() => {
+    mockEnv.BASE_HOST = "https://app.langwatch.ai";
   });
 
   describe("when BASE_HOST is set", () => {
-    beforeEach(() => {
-      process.env.BASE_HOST = "https://app.langwatch.ai";
-    });
-
     it("builds a direct page URL", () => {
       expect(
         platformUrl({ projectSlug: "my-project", path: "/datasets/ds_123" })
@@ -31,7 +34,7 @@ describe("platformUrl", () => {
     });
 
     it("strips trailing slash from BASE_HOST", () => {
-      process.env.BASE_HOST = "https://app.langwatch.ai/";
+      mockEnv.BASE_HOST = "https://app.langwatch.ai/";
       expect(
         platformUrl({ projectSlug: "test", path: "/datasets/ds_1" })
       ).toBe("https://app.langwatch.ai/test/datasets/ds_1");
@@ -40,21 +43,17 @@ describe("platformUrl", () => {
 
   describe("when BASE_HOST is not set", () => {
     beforeEach(() => {
-      delete process.env.BASE_HOST;
+      mockEnv.BASE_HOST = undefined;
     });
 
-    it("falls back to localhost:5560", () => {
+    it("returns a URL with empty base", () => {
       expect(
         platformUrl({ projectSlug: "demo", path: "/agents" })
-      ).toBe("http://localhost:5560/demo/agents");
+      ).toBe("/demo/agents");
     });
   });
 
   describe("resource URL patterns", () => {
-    beforeEach(() => {
-      process.env.BASE_HOST = "https://app.langwatch.ai";
-    });
-
     it("generates correct dataset page URL", () => {
       const url = platformUrl({ projectSlug: "p", path: "/datasets/ds_abc" });
       expect(url).toContain("/p/datasets/ds_abc");

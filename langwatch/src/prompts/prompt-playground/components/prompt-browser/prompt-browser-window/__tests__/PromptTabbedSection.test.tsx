@@ -321,15 +321,16 @@ describe("PromptTabbedSection Store Integration", () => {
     });
 
     it("persists variable values to localStorage", () => {
-      store.getState().addTab({
+      const tabId = store.getState().addTab({
         data: createTabData({
           variableValues: { name: "Persisted" },
         }),
       });
 
-      // Check localStorage contains the value
-      const storageKey = `${TEST_PROJECT_ID}:draggable-tabs-browser-store`;
-      const storedData = localStorage.getItem(storageKey);
+      // Tab data (including variableValues) is persisted under its own
+      // per-tab key, not the top-level window/tab-order index key.
+      const tabStorageKey = `${TEST_PROJECT_ID}:tab:${tabId}`;
+      const storedData = localStorage.getItem(tabStorageKey);
       expect(storedData).toBeDefined();
       expect(storedData).toContain("Persisted");
     });
@@ -397,9 +398,13 @@ describe("PromptTabbedSection Store Integration", () => {
   });
 });
 
-// Mock TabIdContext
+// Mock TabIdContext. tabIdRef lets a test point the component at a real store
+// tab id (defaults to a fixed value for tests that don't touch the store).
+const { tabIdRef } = vi.hoisted(() => ({
+  tabIdRef: { current: "test-tab-id" },
+}));
 vi.mock("../../ui/TabContext", () => ({
-  useTabId: () => "test-tab-id",
+  useTabId: () => tabIdRef.current,
 }));
 
 // Mock CopilotKit
@@ -482,6 +487,9 @@ describe("PromptTabbedSection Layout Modes", () => {
     cleanup();
     clearStoreInstances();
     localStorage.clear();
+    // Always restore the shared useTabId mock, even if a test asserted and
+    // threw before its own reset, so it can't leak a stale id into later tests.
+    tabIdRef.current = "test-tab-id";
   });
 
   describe("vertical layout mode", () => {
@@ -596,6 +604,84 @@ describe("PromptTabbedSection Layout Modes", () => {
       expect(
         screen.getByText(/variables are substituted into the prompt/i),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("when a variable value is edited and the tab unmounts immediately", () => {
+    it("flushes the pending write so the edit is not lost", async () => {
+      const user = userEvent.setup();
+      const store = getStoreForTesting(TEST_PROJECT_ID);
+      const tabId = store.getState().windows[0]?.tabs[0]?.id;
+      // Point the component's useTabId() at the real store tab so its writes land.
+      tabIdRef.current = tabId!;
+
+      const { unmount } = renderPromptTabbedSection(
+        { layoutMode: "vertical" },
+        {
+          version: {
+            parameters: {},
+            configData: {
+              inputs: [{ identifier: "topic", type: "str" }],
+              demonstrations: { inline: { records: {} } },
+            },
+          } as any,
+        },
+      );
+
+      await user.click(screen.getByRole("tab", { name: /variables/i }));
+      const textboxes = await screen.findAllByRole("textbox");
+      const valueInput = textboxes.find(
+        (el) => (el as HTMLInputElement).value === "",
+      );
+      expect(valueInput).toBeDefined();
+      await user.type(valueInput!, "flushed");
+
+      // The 300ms debounce has NOT fired yet (test is faster). Unmounting the
+      // tab (as switching prompt tabs does) must flush the pending write rather
+      // than cancel it — otherwise the edit is lost.
+      unmount();
+
+      expect(store.getState().getByTabId(tabId!)?.variableValues.topic).toBe(
+        "flushed",
+      );
+      // (afterEach restores tabIdRef even if the assertion above throws)
+    });
+  });
+
+  describe("when a tab is switched away from and reopened", () => {
+    it("restores the variable value the user had typed", async () => {
+      const user = userEvent.setup();
+      const store = getStoreForTesting(TEST_PROJECT_ID);
+      const tabId = store.getState().windows[0]?.tabs[0]?.id;
+      tabIdRef.current = tabId!;
+
+      const formValues = {
+        version: {
+          parameters: {},
+          configData: {
+            inputs: [{ identifier: "topic", type: "str" }],
+            demonstrations: { inline: { records: {} } },
+          },
+        } as any,
+      };
+
+      // Mount, type a value, then unmount — this is "switch away".
+      const first = renderPromptTabbedSection({ layoutMode: "vertical" }, formValues);
+      await user.click(screen.getByRole("tab", { name: /variables/i }));
+      const emptyInput = (await screen.findAllByRole("textbox")).find(
+        (el) => (el as HTMLInputElement).value === "",
+      );
+      await user.type(emptyInput!, "kept");
+      first.unmount();
+
+      // "Switch back": a fresh mount of the same tab must show the value again,
+      // proving the full round-trip (flush on unmount -> restore from store).
+      renderPromptTabbedSection({ layoutMode: "vertical" }, formValues);
+      await user.click(screen.getByRole("tab", { name: /variables/i }));
+      const restored = (await screen.findAllByRole("textbox")).find(
+        (el) => (el as HTMLInputElement).value === "kept",
+      );
+      expect(restored).toBeDefined();
     });
   });
 });

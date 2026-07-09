@@ -230,6 +230,35 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
     });
   });
 
+  describe("given the option is enabled but no eventLoaderUpTo is wired", () => {
+    // `shouldRefoldOnMiss` requires BOTH the option and the loader. A
+    // projection that opts in without a loader must degrade to plain
+    // init+apply rather than throw — otherwise a wiring omission takes the
+    // pipeline down instead of merely losing the continuity optimisation.
+    it("degrades gracefully to init+apply on a store miss", async () => {
+      const e2 = makeEvent("e2", 2000);
+      const store = createMockFoldProjectionStore<CountState>();
+      (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+
+      const foldDef = createMockFoldProjectionDefinition("slim", {
+        store,
+        init,
+        apply,
+        options: { refoldOnStoreMiss: true },
+      });
+      foldDef.eventLoaderUpTo = undefined;
+
+      const result = (await executor.execute(
+        foldDef,
+        e2,
+        context,
+      )) as CountState;
+
+      expect(result.ids).toEqual(["e2"]);
+      expect(store.store).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("given a coalesced batch arrives on a store miss", () => {
     it("re-folds once up to the log-latest delivered event and applies none of them twice", async () => {
       const e1 = makeEvent("e1", 1000);

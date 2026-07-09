@@ -157,6 +157,16 @@ function slimGroupByExpression(groupBy?: string): string | null {
   }
 }
 
+/**
+ * Group-bys whose expression resolves empty/NULL to an explicit `'unknown'`
+ * bucket rather than `''`. These mirror the legacy field definitions carrying
+ * `handlesUnknown: true`, and like legacy they must NOT get a
+ * `HAVING group_key != ''` clause.
+ */
+function slimGroupByHandlesUnknown(groupBy?: string): boolean {
+  return groupBy === "metadata.model" || groupBy === "traces.trace_name";
+}
+
 // isPercentile + percentileFor are shared with eval-slim-timeseries-query.ts
 // via ~/analytics/query-builders/_shared.
 
@@ -400,7 +410,15 @@ export function buildSlimTimeseriesQuery(
   const { whereClause: filterWhere, params: filterParams } =
     buildSlimFilterClauses(input.filters);
 
-  const havingClause = groupByColumn ? `HAVING group_key != ''` : "";
+  // Mirror the legacy builder's `handlesUnknown` contract
+  // (`aggregation-builder.ts` → `buildGroupKeyHavingClause`): a group-by whose
+  // expression already folds empty/NULL into an explicit `'unknown'` bucket is
+  // emitted WITHOUT a HAVING, so that bucket survives. Applying the blanket
+  // `group_key != ''` to those would drop rows legacy keeps.
+  const havingClause =
+    groupByColumn && !slimGroupByHandlesUnknown(input.groupBy)
+      ? `HAVING group_key != ''`
+      : "";
 
   const sql = `
     SELECT

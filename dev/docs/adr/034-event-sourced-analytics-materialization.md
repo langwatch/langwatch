@@ -37,13 +37,24 @@ Each span contributes its own metric value; trace duration = the root span's val
 
 ### Read routing (`getTimeseries`)
 
-- additive `sum` **and** group-by ∈ {none, `Model`, `SpanType`} **and** no filter → **rollup**
+- additive `sum` **and ungrouped** **and** no filter → **rollup**
 - `avg` → **rollup only ungrouped and only for metrics whose legacy column is non-nullable** (today: completion_time), computed as `sum(MetricSum) / sum(TraceCount)`; nullable-metric avgs (cost, tokens) stay on slim, whose one-row-per-aggregate shape reproduces CH `avg`'s NULL-skipping denominator
-- percentiles, min/max, any other group-by (topic/origin/user/…), slim-supported filters, distinct-counts → **slim table**; unsupported metrics/filters (events, blocklisted attribute keys, …) fall back to the legacy tables
+- percentiles, min/max, **every** group-by (model/topic/origin/user/…), slim-supported filters, distinct-counts → **slim table**; unsupported metrics/filters (events, blocklisted attribute keys, …) fall back to the legacy tables
 - else → `trace_summaries` (the drawer's table, untouched) or `evaluation_runs` for eval-source metrics
 - default to slim/raw on any doubt.
 
 > **Shipped divergence:** the routing union is 6-way, not 3-way — both trace and eval sources ship with rollup + slim + legacy fallback. Cross-source series mix falls back to `trace_summaries`. Live in `pickAnalyticsTable` (see `routing/route-table.ts`); details in Implementation status.
+
+**The rollup serves ungrouped reads only** (revised 2026-07-09). `Model` and `SpanType` are *sort* keys — they keep the merged row count low — not read contracts. Grouping on them is not parity-safe for two independent reasons:
+
+1. **Attribution flips from per-trace to per-span.** Legacy attributes a trace's *whole* metric to every model the trace used — `arrayJoin(if(empty(Models), ['unknown'], Models))` over trace-level `TotalCost` — a choice `aggregation-builder.ts` documents as deliberate anti-double-counting. The rollup instead splits the metric across each span's own model. Both are defensible readings; they are different numbers, and they don't even agree on the total (legacy over-counts multi-model traces, the rollup totals exactly).
+2. **Root-only columns collapse into one bucket.** `DurationSum`, `TraceCount` and `ErrorCount` are recorded on the *root* span only. Root spans are usually workflow/agent spans carrying no model, so `sum(completion_time)` grouped by model puts ~100% of duration in the `'unknown'` bucket and reports `0` for every real model — and whether that happens depends on whether the customer wraps their LLM call in a parent span. Same query, different answer per SDK usage.
+
+`metadata.model` therefore routes to the **slim** table, which is one row per trace with a `Models Array(String)` and trace-level metric columns — structurally what `trace_summaries` has, so `arrayJoin(Models)` reproduces legacy character-for-character (including the `'unknown'` bucket and legacy's `handlesUnknown` suppression of `HAVING group_key != ''`). `metadata.span_type` has no slim column at all (span type is per-span, slim is per-trace) and falls back to `trace_summaries`.
+
+**Routing invariant:** each rollup's group-by set must remain a subset of its slim table's — trace and eval alike. Slim is strictly more capable; if a rollup can group by a key its slim cannot, the router has no safer table to fall to. Pinned by tests in `route-table.unit.test.ts`.
+
+(The eval rollup keeps its group-bys: `EvaluatorType` and `Status` are final at evaluation-completion time and sit on the rollup's keying tuple, so they carry none of the per-span attribution hazard above.)
 
 ### Shared fleet
 

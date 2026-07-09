@@ -183,14 +183,14 @@ Feature: Credential Validation
     Then the API key is validated against the custom base URL
     And if valid, the provider is saved with the custom base URL
 
-  @unit @unimplemented
+  @unit
   Scenario: Skip validation when no API key provided
     Given I am validating API keys
     When I call validateProviderApiKey with empty API key
     Then validation is skipped
     And the result is valid (schema validation handles required fields)
 
-  @unit @unimplemented
+  @unit
   Scenario: Skip validation for masked placeholder in validation function
     Given I am validating API keys
     When I call validateProviderApiKey with "HAS_KEY••••••••••••••••••••••••"

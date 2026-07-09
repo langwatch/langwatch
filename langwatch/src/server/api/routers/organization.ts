@@ -76,6 +76,7 @@ export const organizationRouter = createTRPCRouter({
         orgName: z.string().optional(),
         phoneNumber: z.string().optional(),
         signUpData: signUpDataSchema.optional(),
+        primaryIntent: z.enum(["AGENT_GOVERNANCE", "LLM_OPS"]).optional(),
       }),
     )
     .use(skipPermissionCheck)
@@ -85,6 +86,7 @@ export const organizationRouter = createTRPCRouter({
         orgName: input.orgName,
         phoneNumber: input.phoneNumber,
         signUpData: input.signUpData,
+        primaryIntent: input.primaryIntent,
         userDisplayName: ctx.session.user.name,
       });
 
@@ -312,6 +314,10 @@ export const organizationRouter = createTRPCRouter({
           s3Bucket: z.string().optional(),
           presenceEnabled: z.boolean().optional(),
           supportContact: z.string().max(500).nullable().optional(),
+          primaryIntent: z
+            .enum(["AGENT_GOVERNANCE", "LLM_OPS"])
+            .nullable()
+            .optional(),
         })
         .refine(
           (data) => {
@@ -341,6 +347,7 @@ export const organizationRouter = createTRPCRouter({
         s3Bucket: input.s3Bucket,
         presenceEnabled: input.presenceEnabled,
         supportContact: input.supportContact,
+        primaryIntent: input.primaryIntent,
       });
 
       return { success: true };

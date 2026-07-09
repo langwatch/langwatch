@@ -177,7 +177,9 @@ describe("onboarding.initializeOrganization integration", () => {
         where: { id: result.organizationId },
       });
       const project = await prisma.project.findFirst({
-        where: { slug: result.projectSlug },
+        // projectSlug is only null for governance-intent signups; this
+        // (skipped) case is an LLMOps-shaped call.
+        where: { slug: result.projectSlug ?? "" },
       });
 
       expect(organization?.name).toBe("Acme Corp");

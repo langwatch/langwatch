@@ -24,7 +24,10 @@ export interface ExecutionJobData {
   batchRunId: string;
   setId: string;
   scenarioName?: string;
-  target: { type: "prompt" | "http" | "code" | "workflow"; referenceId: string };
+  target: {
+    type: "prompt" | "http" | "code" | "workflow";
+    referenceId: string;
+  };
 }
 
 /** Function that spawns a child process for a scenario job. Returns when child exits. */
@@ -35,6 +38,14 @@ export type OnSkipCancelledFn = (jobData: ExecutionJobData) => void;
 
 export class ScenarioExecutionPool {
   private readonly _running = new Map<string, ChildProcess>();
+  /**
+   * In-flight job data keyed by scenarioRunId, tracked from the moment a job
+   * starts (before the child is registered) so the spawn window — where the
+   * child exists but isn't yet in `_running` — is still covered. Used by
+   * `inFlightJobs` so a draining worker can emit a terminal failure for every
+   * run it owns and none orphan at QUEUED.
+   */
+  private readonly _runningJobs = new Map<string, ExecutionJobData>();
   private readonly _pending: ExecutionJobData[] = [];
   private readonly _cancelled = new Set<string>();
   private readonly _concurrency: number;
@@ -71,6 +82,16 @@ export class ScenarioExecutionPool {
   }
 
   /**
+   * Job data for every run still in flight: those running (tracked from
+   * startJob, covering the pre-registration spawn window) plus those buffered
+   * pending. Drained on worker shutdown so each run reaches a terminal state
+   * instead of orphaning at QUEUED.
+   */
+  get inFlightJobs(): ExecutionJobData[] {
+    return [...this._runningJobs.values(), ...this._pending];
+  }
+
+  /**
    * Mark a scenario as cancelled. Called when the cancel subscription receives
    * a message and kills the child. The close handler checks this to distinguish
    * cancellation from crashes.
@@ -98,6 +119,7 @@ export class ScenarioExecutionPool {
    */
   deregisterChild(scenarioRunId: string): void {
     this._running.delete(scenarioRunId);
+    this._runningJobs.delete(scenarioRunId);
     this.dequeueNext();
   }
 
@@ -108,7 +130,10 @@ export class ScenarioExecutionPool {
   submit(jobData: ExecutionJobData): void {
     // Skip if already cancelled before we even start
     if (this._cancelled.has(jobData.scenarioRunId)) {
-      logger.info({ scenarioRunId: jobData.scenarioRunId }, "Skipping cancelled job, dispatching finished(CANCELLED)");
+      logger.info(
+        { scenarioRunId: jobData.scenarioRunId },
+        "Skipping cancelled job, dispatching finished(CANCELLED)",
+      );
       this._onSkipCancelled?.(jobData);
       return;
     }
@@ -116,7 +141,11 @@ export class ScenarioExecutionPool {
       this.startJob(jobData);
     } else {
       logger.info(
-        { scenarioRunId: jobData.scenarioRunId, pendingCount: this._pending.length + 1, activeCount: this._running.size },
+        {
+          scenarioRunId: jobData.scenarioRunId,
+          pendingCount: this._pending.length + 1,
+          activeCount: this._running.size,
+        },
         "Execution pool full, buffering job",
       );
       this._pending.push(jobData);
@@ -133,24 +162,41 @@ export class ScenarioExecutionPool {
   }
 
   private startJob(jobData: ExecutionJobData): void {
+    // Track in-flight job data immediately — before the child is registered —
+    // so a draining worker can emit a terminal failure even if shutdown lands
+    // in the spawn window (child exists but not yet in `_running`).
+    this._runningJobs.set(jobData.scenarioRunId, jobData);
+
     if (!this._spawnFn) {
-      logger.error({ scenarioRunId: jobData.scenarioRunId }, "Spawn function not set on execution pool");
+      logger.error(
+        { scenarioRunId: jobData.scenarioRunId },
+        "Spawn function not set on execution pool",
+      );
+      this._runningJobs.delete(jobData.scenarioRunId);
       return;
     }
 
     logger.info(
-      { scenarioRunId: jobData.scenarioRunId, activeCount: this._running.size + 1, pendingCount: this._pending.length },
+      {
+        scenarioRunId: jobData.scenarioRunId,
+        activeCount: this._running.size + 1,
+        pendingCount: this._pending.length,
+      },
       "Starting scenario execution",
     );
 
     // Fire and forget — the spawn function handles the full lifecycle
     void this._spawnFn(jobData).catch((error) => {
       logger.error(
-        { scenarioRunId: jobData.scenarioRunId, error: error instanceof Error ? error.message : String(error) },
+        {
+          scenarioRunId: jobData.scenarioRunId,
+          error: error instanceof Error ? error.message : String(error),
+        },
         "Scenario execution failed unexpectedly",
       );
       // Ensure we deregister even on unexpected errors
       this._running.delete(jobData.scenarioRunId);
+      this._runningJobs.delete(jobData.scenarioRunId);
       this.dequeueNext();
     });
   }
@@ -161,13 +207,19 @@ export class ScenarioExecutionPool {
 
       // Skip cancelled jobs in the pending queue
       if (this._cancelled.has(next.scenarioRunId)) {
-        logger.info({ scenarioRunId: next.scenarioRunId }, "Skipping cancelled pending job, dispatching finished(CANCELLED)");
+        logger.info(
+          { scenarioRunId: next.scenarioRunId },
+          "Skipping cancelled pending job, dispatching finished(CANCELLED)",
+        );
         this._onSkipCancelled?.(next);
         continue;
       }
 
       logger.debug(
-        { scenarioRunId: next.scenarioRunId, remainingPending: this._pending.length },
+        {
+          scenarioRunId: next.scenarioRunId,
+          remainingPending: this._pending.length,
+        },
         "Dequeuing pending job",
       );
       this.startJob(next);

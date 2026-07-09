@@ -724,6 +724,7 @@ describe("LicenseEnforcementRepository", () => {
   });
 
   describe("getCurrentMonthCost", () => {
+    /** @scenario "getCurrentMonthCost remains available in the repository" */
     it("fetches project IDs and aggregates cost for current month", async () => {
       mockPrisma.project.findMany.mockResolvedValue([
         { id: "proj-1" },

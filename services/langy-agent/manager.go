@@ -303,16 +303,29 @@ func (m *Manager) spawn(ctx context.Context, conversationID string, creds Creden
 		cleanupUID()
 		return nil, err
 	}
-	// Internal opencode listen lives in the iptables-locked port range so
-	// the kernel drops connect() attempts from non-root UIDs at the OUTPUT
-	// chain. See iptables.go::LockdownLoopbackPortRange for the rule and
-	// Sergio's 2026-06-30 P1 for the threat (worker A scans /proc/net/tcp,
-	// connects to worker B's opencode TCP as B's UID, exfiltrates B's env).
-	internalPort, err := getFreePortInRange(InternalPortRangeMin, InternalPortRangeMax)
-	if err != nil {
+	// Any free port works: sibling isolation is now enforced by opencode's
+	// own per-worker password (ADR-033 Fix A′), not by pinning the internal
+	// listen into an iptables-locked range. getFreePort closes its listener
+	// before returning, so two independent calls can (rarely) hand back the
+	// SAME ephemeral port — which would make the proxy bind externalPort first
+	// and opencode then fail to listen, burning the whole readiness timeout.
+	// Re-roll until the internal port differs from the external one.
+	var internalPort int
+	for attempt := 0; attempt < 8; attempt++ {
+		internalPort, err = getFreePort()
+		if err != nil {
+			_ = os.RemoveAll(workerHome)
+			cleanupUID()
+			return nil, err
+		}
+		if internalPort != externalPort {
+			break
+		}
+	}
+	if internalPort == externalPort {
 		_ = os.RemoveAll(workerHome)
 		cleanupUID()
-		return nil, err
+		return nil, fmt.Errorf("could not allocate a distinct internal port (kept colliding with external port %d)", externalPort)
 	}
 
 	bearerToken, err := generateBearerToken()
@@ -322,7 +335,20 @@ func (m *Manager) spawn(ctx context.Context, conversationID string, creds Creden
 		return nil, err
 	}
 
-	proxy, err := startAuthProxy(externalPort, internalPort, bearerToken, m.log)
+	// Distinct per-worker secret opencode itself enforces (ADR-033 Fix A′) —
+	// deliberately generated separately from bearerToken above: bearerToken
+	// gates the external port (caller <-> authProxy), openCodePassword gates
+	// the internal port (authProxy <-> opencode). Reusing one secret for both
+	// would mean any caller holding the external bearer token could also
+	// derive the internal credential.
+	openCodePassword, err := generateBearerToken()
+	if err != nil {
+		_ = os.RemoveAll(workerHome)
+		cleanupUID()
+		return nil, err
+	}
+
+	proxy, err := startAuthProxy(externalPort, internalPort, bearerToken, openCodePassword, m.log)
 	if err != nil {
 		_ = os.RemoveAll(workerHome)
 		cleanupUID()
@@ -332,7 +358,7 @@ func (m *Manager) spawn(ctx context.Context, conversationID string, creds Creden
 	// We pass context.Background() to the worker process — the per-request
 	// context controls a single chat turn, but the worker stays alive across
 	// turns and only dies on idle/shutdown.
-	cmd, err := spawnOpenCode(context.Background(), m.cfg, conversationID, workerHome, uid, internalPort, creds)
+	cmd, err := spawnOpenCode(context.Background(), m.cfg, conversationID, workerHome, uid, internalPort, creds, openCodePassword)
 	if err != nil {
 		proxy.shutdown()
 		_ = os.RemoveAll(workerHome)
@@ -357,7 +383,7 @@ func (m *Manager) spawn(ctx context.Context, conversationID string, creds Creden
 
 	readinessCtx, cancel := context.WithTimeout(ctx, m.cfg.ReadinessTimeout)
 	defer cancel()
-	if err := waitForReadiness(readinessCtx, externalPort, bearerToken, m.cfg.ReadinessTimeout); err != nil {
+	if err := waitForReadiness(readinessCtx, externalPort, internalPort, bearerToken, m.cfg.ReadinessTimeout); err != nil {
 		return nil, failSpawn(err)
 	}
 

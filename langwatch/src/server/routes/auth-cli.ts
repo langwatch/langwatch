@@ -1663,6 +1663,10 @@ secured.access(CLI_POLICY).post("/approve", async (c: Context) => {
   // enabled it silently created a personal project that then captured the
   // user's evaluations (customer report). Refuse it and point at project
   // login, which writes a real project's API key to `.env`.
+  //
+  // ADR-038 GA note: at GA this fallback flips to true together with the
+  // registry default; the gate then only fires for orgs kill-switched off
+  // in PostHog, where /me is a 404 and refusing device login is correct.
   const governanceEnabled = await featureFlagService
     .isEnabled("release_ui_ai_governance_enabled", {
       distinctId: session.user.id,

@@ -265,6 +265,8 @@ function DraggableTabsGroup({
           display="flex"
           flexDirection="column"
           variant="enclosed"
+          lazyMount
+          unmountOnExit
           {...props}
         >
           {children}

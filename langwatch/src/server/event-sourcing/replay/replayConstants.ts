@@ -9,6 +9,36 @@ export const COMPLETED_KEY_PREFIX = "projection-replay:completed:";
 export const MARKER_TTL_SECONDS = 7 * 24 * 3600;
 
 /**
+ * Redis key prefix for terminal "done" markers, one string key per aggregate:
+ * `projection-replay:done:{projectionName}:{aggregateKey}` → `{timestamp}:{eventId}`.
+ *
+ * Written when replay finishes rebuilding an aggregate (see markCompletedBatch)
+ * and read by the live checker alongside the active cutoff marker. Semantics:
+ *   - active cutoff hash `"pending"`      → defer every event
+ *   - active cutoff hash `"{ts}:{eventId}"` → replay in flight: skip ≤ cutoff, defer > cutoff
+ *   - done key `"{ts}:{eventId}"`         → replay finished: skip ≤ cutoff, PROCESS > cutoff
+ *   - neither                             → process
+ *
+ * Kept as a short-TTL key (not left in the cutoff hash) so a giant all-tenant
+ * replay does not retain a marker per aggregate for its whole duration — the
+ * cutoff hash stays bounded to in-flight aggregates and done markers self-expire.
+ */
+export const DONE_KEY_PREFIX = "projection-replay:done:";
+
+/**
+ * TTL for terminal done markers. Long enough to cover a job that was staged
+ * (queued but never active) during a batch's replay pause and only drains after
+ * unpause; short enough that done-marker memory stays bounded to roughly
+ * (replay throughput × this window) rather than the whole run's aggregate count.
+ */
+export const DONE_MARKER_TTL_SECONDS = 15 * 60;
+
+/** Per-aggregate done-marker key: `projection-replay:done:{projectionName}:{aggregateKey}`. */
+export function doneMarkerKey(projectionName: string, aggregateKey: string): string {
+  return `${DONE_KEY_PREFIX}${projectionName}:${aggregateKey}`;
+}
+
+/**
  * Compares an event against a cutoff using the same ordering as ClickHouse:
  * `EventTimestamp ASC, EventId ASC`.
  *
