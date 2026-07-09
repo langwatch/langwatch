@@ -509,7 +509,9 @@ export const getEvaluatorMissingMappings = (
         isRequired: true,
       });
     }
-    if (!sb.goldenField) {
+    // Golden field is only required when the user opted into
+    // golden-answer comparison (parity with pairwise's #5378 opt-out).
+    if (!isGoldenFieldSatisfied(sb)) {
       missingMappings.push({
         fieldId: "goldenField",
         fieldName: "Golden field",

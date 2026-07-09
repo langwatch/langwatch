@@ -36,19 +36,43 @@ from pydantic import BaseModel, Field
 # Braces around placeholders are single-brace (str.format slots).
 # Any literal braces in the template must be doubled. Tool-call schema
 # below drives the response shape, so no JSON example is embedded.
+#
+# Deliberately generic — no correctness/completeness/style rubric baked
+# in. The judge decides what "better" means for the task at hand rather
+# than being forced onto a fixed axis set; users needing a specific
+# rubric edit `settings.prompt` (kept as an escape hatch, not the
+# default chrome).
 DEFAULT_SELECT_BEST_PROMPT = """\
-Pick the best of N candidate outputs against a known-good reference (golden answer).
+Pick the best of N candidate replies to the task.
 
-Task:           {input}
-Golden answer:  {golden}
+Task:       {input}
+Reference:  {golden}
 
 Candidates:
 {candidates}
 
-Reason step-by-step about how closely each candidate matches the
-golden answer in correctness, completeness, and style. Then pick
-the best candidate by its slot label, or "tie" if no clear winner.
-Prefer cheaper/faster only when quality is comparable.
+Look across the candidates and decide which one is the best reply.
+Briefly explain WHY it's better than the others, then pick the winning
+slot label. Use "tie" only when no candidate is clearly better.
+"""
+
+# Used when has_golden_answer is False (parity with #5378 pairwise). No
+# reference answer exists, so the judge compares the candidates directly
+# on their own merits. Kept as its own template rather than blanking the
+# {golden} slot — a prompt that says "Reference: " with nothing after it
+# confuses the judge more than dropping the framing entirely.
+DEFAULT_SELECT_BEST_PROMPT_NO_GOLDEN = """\
+Pick the best of N candidate replies to the task — there is no reference
+answer, so compare them on their own merits.
+
+Task:  {input}
+
+Candidates:
+{candidates}
+
+Look across the candidates and decide which one is the best reply.
+Briefly explain WHY it's better than the others, then pick the winning
+slot label. Use "tie" only when no candidate is clearly better.
 """
 
 
@@ -80,6 +104,14 @@ class SelectBestCompareSettings(LLMEvaluatorSettings):
             "Judge prompt template. Placeholders: {input}, {golden}, "
             "{candidates} (a pre-rendered bulleted list with slot labels "
             "and optional per-candidate metrics)."
+        ),
+    )
+    has_golden_answer: bool = Field(
+        default=True,
+        description=(
+            "Compare each candidate against a reference answer. Turn off "
+            "to have the judge compare the candidates directly on their "
+            "own merits, with no reference answer involved."
         ),
     )
     randomize_order: bool = Field(
@@ -187,7 +219,20 @@ class SelectBestCompareEvaluator(
             _slot_label(i): cand for i, cand in enumerate(ordered)
         }
         candidates_block = self._render_candidates_block(slot_to_candidate)
-        rendered_prompt = self.settings.prompt.format(
+
+        # When has_golden_answer is off AND the user hasn't customized the
+        # prompt, swap in the golden-free template. Mirrors pairwise's
+        # #5378 pattern — the intent is to drop the reference framing
+        # entirely, not just leave "Reference: " with a blank slot.
+        effective_prompt = self.settings.prompt
+        prompt_is_golden_free = (
+            not self.settings.has_golden_answer
+            and effective_prompt == DEFAULT_SELECT_BEST_PROMPT
+        )
+        if prompt_is_golden_free:
+            effective_prompt = DEFAULT_SELECT_BEST_PROMPT_NO_GOLDEN
+
+        rendered_prompt = effective_prompt.format(
             input=entry.input or "",
             golden=entry.golden or "",
             candidates=candidates_block,
@@ -225,8 +270,9 @@ class SelectBestCompareEvaluator(
                                 "reasoning": {
                                     "type": "string",
                                     "description": (
-                                        "Step-by-step comparison of the "
-                                        "candidates against the golden answer."
+                                        "Brief explanation of why the "
+                                        "winning candidate is the best "
+                                        "reply — keep it brief."
                                     ),
                                 },
                                 "winner": {

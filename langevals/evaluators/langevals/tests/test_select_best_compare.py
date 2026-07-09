@@ -17,6 +17,7 @@ import pytest
 from langevals_langevals.select_best_compare import (
     CandidateInput,
     DEFAULT_SELECT_BEST_PROMPT,
+    DEFAULT_SELECT_BEST_PROMPT_NO_GOLDEN,
     SelectBestCompareEntry,
     SelectBestCompareEvaluator,
     SelectBestCompareSettings,
@@ -321,12 +322,61 @@ def test_allow_tie_false_removes_tie_from_enum():
     assert winner_enum == ["A", "B", "C"]
 
 
-def test_default_prompt_constant_mentions_golden_answer():
-    """The default N-way prompt is golden-aware — the evaluator is
-    scoped to the golden-required case; users needing golden-free
-    comparison should customize the prompt (or wait for a follow-up
-    has_golden_answer flag mirroring pairwise_compare)."""
-    assert "golden answer" in DEFAULT_SELECT_BEST_PROMPT.lower()
+def test_has_golden_answer_off_swaps_default_prompt_to_no_golden_variant():
+    """When has_golden_answer=False AND the user hasn't customized the
+    prompt, the evaluator swaps to DEFAULT_SELECT_BEST_PROMPT_NO_GOLDEN
+    so the rendered judge prompt drops the reference framing entirely
+    (parity with pairwise's #5378 behavior). Uses a hand-tuned prompt
+    with a sentinel token to verify user prompts survive the toggle."""
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(has_golden_answer=False)
+    )
+    entry = _make_entry(num_candidates=3, golden=None)
+
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        return_value=_mock_completion_response("looks fine", "A"),
+    ) as mock_completion, patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        evaluator.evaluate(entry)
+
+    rendered = mock_completion.call_args.kwargs["messages"][1]["content"]
+    assert "Reference:" not in rendered
+    assert "there is no reference" in rendered.lower()
+
+    # A custom prompt survives the toggle — auto-swap only happens against
+    # the shipped defaults.
+    custom_prompt = (
+        "CUSTOM MARKER — pick best of:\nTask: {input}\n{candidates}"
+    )
+    evaluator = SelectBestCompareEvaluator(
+        settings=SelectBestCompareSettings(
+            has_golden_answer=False, prompt=custom_prompt
+        )
+    )
+    with patch(
+        "langevals_langevals.select_best_compare.completion",
+        return_value=_mock_completion_response("ok", "A"),
+    ) as mock_completion, patch(
+        "langevals_langevals.select_best_compare.completion_cost",
+        return_value=0.0001,
+    ):
+        evaluator.evaluate(entry)
+    rendered = mock_completion.call_args.kwargs["messages"][1]["content"]
+    assert "CUSTOM MARKER" in rendered
+
+
+def test_default_prompt_carries_golden_slot_and_no_golden_variant_drops_it():
+    """The default N-way prompt has a {golden} slot; the golden-free
+    counterpart used when has_golden_answer is off drops it entirely
+    rather than blanking the value. Locks in the prompt-swap contract
+    the FE auto-swap and _judge selection both depend on."""
+    assert "{golden}" in DEFAULT_SELECT_BEST_PROMPT
+    assert "{candidates}" in DEFAULT_SELECT_BEST_PROMPT
+    assert "{golden}" not in DEFAULT_SELECT_BEST_PROMPT_NO_GOLDEN
+    assert "{candidates}" in DEFAULT_SELECT_BEST_PROMPT_NO_GOLDEN
 
 
 def test_slot_label_helper_covers_alphabet_and_overflow():

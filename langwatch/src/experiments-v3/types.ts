@@ -240,7 +240,14 @@ export function isGoldenFieldSatisfied(pairwise: {
  *
  * - variants: ordered TargetConfig ids whose per-row outputs are the
  *   candidates. At least 2 entries required.
+ * - hasGoldenAnswer: whether the judge compares against a reference
+ *   answer at all. When false, goldenField is not required — the judge
+ *   compares the candidates directly on their own merits (parity with
+ *   pairwise's #5378 opt-out). Mirrors the evaluator's
+ *   `settings.has_golden_answer`, same dual-representation pattern as
+ *   includeMetrics/settings.include_metrics.
  * - goldenField: dataset field name whose value is the reference answer.
+ *   Only meaningful when hasGoldenAnswer is true.
  * - includeMetrics: per-candidate metrics injected into the judge prompt.
  * - randomizeOrder: when true (default), candidate order in the prompt
  *   is shuffled deterministically per row (seeded by rowIndex) to
@@ -249,7 +256,8 @@ export function isGoldenFieldSatisfied(pairwise: {
  */
 export const selectBestEvaluatorConfigSchema = z.object({
   variants: z.array(z.string()).default([]),
-  goldenField: z.string(),
+  hasGoldenAnswer: z.boolean().default(true),
+  goldenField: z.string().optional(),
   includeMetrics: z.array(z.enum(["cost", "duration"])).default([]),
   randomizeOrder: z.boolean().default(true),
 });

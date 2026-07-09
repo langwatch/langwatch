@@ -1397,7 +1397,12 @@ const buildEvaluatorInputs = (
       : {};
     assignMappedInput(inputs, firstVariantMappings, cell.datasetEntry);
 
-    inputs.golden = cell.datasetEntry[cfg.goldenField];
+    // Golden is optional (parity with pairwise's #5378 opt-out). Only send
+    // it when the user actually opted into golden-answer comparison AND
+    // picked a golden column. Missing either → judge sees no reference.
+    if (cfg.hasGoldenAnswer !== false && cfg.goldenField) {
+      inputs.golden = cell.datasetEntry[cfg.goldenField];
+    }
     inputs.candidates = cell.selectBest.candidates.map((c) => ({
       id: c.id,
       output: c.output,
