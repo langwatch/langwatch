@@ -61,10 +61,32 @@ type CancelledSubscriptionNotification = SubscriptionNotificationBase & {
   cancellationDate?: Date | null;
 };
 
+/**
+ * Internal ops alert for a failed Stripe invoice charge. One alert per
+ * `invoice.payment_failed` event is sent (no dedup) — Stripe fires one per
+ * retry attempt and retries of the same invoice can be days apart, so
+ * elapsed time alone cannot tell a retry from a new failure. The retry
+ * signal instead comes from the invoice itself: `attemptCount` says which
+ * attempt this is, and `previousFailureAt` predating `invoiceCreatedAt`
+ * marks a failure carried over from an earlier dunning cycle.
+ */
+type PaymentFailedSubscriptionNotification = SubscriptionNotificationBase & {
+  type: "payment_failed";
+  dbSubscriptionId: string;
+  stripeSubscriptionId: string;
+  livemode: boolean;
+  amountDueCents?: number | null;
+  currency?: string | null;
+  attemptCount?: number | null;
+  previousFailureAt?: Date | null;
+  invoiceCreatedAt?: Date | null;
+};
+
 export type SubscriptionNotificationPayload =
   | ProspectiveSubscriptionNotification
   | ConfirmedSubscriptionNotification
-  | CancelledSubscriptionNotification;
+  | CancelledSubscriptionNotification
+  | PaymentFailedSubscriptionNotification;
 
 export type ResourceLimitNotificationContext = {
   organizationId: string;

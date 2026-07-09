@@ -55,6 +55,11 @@ type CancelledNotification = Extract<
   { type: "cancelled" }
 >;
 
+type PaymentFailedNotification = Extract<
+  SubscriptionNotificationPayload,
+  { type: "payment_failed" }
+>;
+
 type NotificationServiceOptions = {
   config: Pick<
     AppConfig,
@@ -259,6 +264,98 @@ const buildCancelledBlocks = (
   ];
 };
 
+const getStripeSubscriptionLink = ({
+  stripeSubscriptionId,
+  livemode,
+}: {
+  stripeSubscriptionId: string;
+  livemode: boolean;
+}): string =>
+  `https://dashboard.stripe.com/${livemode ? "" : "test/"}subscriptions/${stripeSubscriptionId}`;
+
+const buildPaymentFailedBlocks = (
+  payload: PaymentFailedNotification,
+  adminLink: string,
+): NonNullable<IncomingWebhookSendArguments["blocks"]> => {
+  const fields: Array<{ type: "mrkdwn"; text: string }> = [
+    { type: "mrkdwn", text: `*Organization:* ${payload.organizationName}` },
+    { type: "mrkdwn", text: `*Plan:* ${payload.plan}` },
+  ];
+
+  if (payload.amountDueCents != null && payload.currency) {
+    const amountFormatted = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: payload.currency,
+    }).format(payload.amountDueCents / 100);
+    fields.push({ type: "mrkdwn", text: `*Amount due:* ${amountFormatted}` });
+  }
+
+  if (payload.attemptCount != null) {
+    fields.push({
+      type: "mrkdwn",
+      text: `Attempt ${payload.attemptCount} for this invoice`,
+    });
+  }
+
+  // The retry signal comes from the event itself, not elapsed time: a
+  // previous failure recorded before the current invoice was created marks
+  // an earlier dunning cycle. A previous failure recorded after (e.g. a
+  // retry of this same invoice) is already covered by the attempt count
+  // above and must not be mislabelled as an earlier cycle.
+  const isEarlierDunningCycle =
+    !!payload.previousFailureAt &&
+    !!payload.invoiceCreatedAt &&
+    payload.previousFailureAt.getTime() < payload.invoiceCreatedAt.getTime();
+
+  const contextElements: Array<{ type: "mrkdwn"; text: string }> = [];
+  if (!payload.previousFailureAt) {
+    contextElements.push({
+      type: "mrkdwn",
+      text: "First recorded failure for this subscription.",
+    });
+  } else if (isEarlierDunningCycle) {
+    contextElements.push({
+      type: "mrkdwn",
+      text: `Previous failure: ${formatDate(payload.previousFailureAt)}`,
+    });
+  }
+
+  const blocks: NonNullable<IncomingWebhookSendArguments["blocks"]> = [
+    {
+      type: "header",
+      text: { type: "plain_text", text: "Subscription payment failed" },
+    },
+    { type: "section", fields },
+  ];
+
+  if (contextElements.length > 0) {
+    blocks.push({ type: "context", elements: contextElements });
+  }
+
+  blocks.push({
+    type: "actions",
+    elements: [
+      {
+        type: "button",
+        text: { type: "plain_text", text: "Open org in admin" },
+        url: adminLink,
+        action_id: "subscription_payment_failed_admin",
+      },
+      {
+        type: "button",
+        text: { type: "plain_text", text: "Open in Stripe" },
+        url: getStripeSubscriptionLink({
+          stripeSubscriptionId: payload.stripeSubscriptionId,
+          livemode: payload.livemode,
+        }),
+        action_id: "subscription_payment_failed_stripe",
+      },
+    ],
+  });
+
+  return blocks;
+};
+
 // ---------------------------------------------------------------------------
 // NotificationService - Channel dispatch (HOW to send)
 // ---------------------------------------------------------------------------
@@ -428,6 +525,9 @@ export class NotificationService {
         break;
       case "cancelled":
         blocks = buildCancelledBlocks(payload, adminLink);
+        break;
+      case "payment_failed":
+        blocks = buildPaymentFailedBlocks(payload, adminLink);
         break;
     }
 

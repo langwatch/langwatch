@@ -99,7 +99,11 @@ export type WebhookService = {
     throwOnMissing?: boolean;
   }): Promise<void>;
 
-  handleInvoicePaymentFailed(params: { subscriptionId: string }): Promise<void>;
+  handleInvoicePaymentFailed(params: {
+    subscriptionId: string;
+    invoice: Stripe.Invoice;
+    livemode: boolean;
+  }): Promise<void>;
 
   handleSubscriptionDeleted(params: {
     stripeSubscriptionId: string;
@@ -351,7 +355,11 @@ export class EEWebhookService implements WebhookService {
         return { status: "ok" };
 
       case "invoice.payment_failed":
-        await this.handleInvoicePaymentFailed({ subscriptionId });
+        await this.handleInvoicePaymentFailed({
+          subscriptionId,
+          invoice: event.data.object as Stripe.Invoice,
+          livemode: event.livemode,
+        });
         return { status: "ok" };
     }
   }
@@ -549,8 +557,12 @@ export class EEWebhookService implements WebhookService {
 
   async handleInvoicePaymentFailed({
     subscriptionId,
+    invoice,
+    livemode,
   }: {
     subscriptionId: string;
+    invoice: Stripe.Invoice;
+    livemode: boolean;
   }): Promise<void> {
     await waitForStripeConsistency();
 
@@ -565,10 +577,53 @@ export class EEWebhookService implements WebhookService {
       return;
     }
 
+    // A cancelled subscription can still receive a late invoice.payment_failed
+    // from Stripe's dunning process. Recording it would flip the status from
+    // CANCELLED to FAILED, so skip both the write and the alert entirely.
+    if (currentSubscription.status === SubscriptionStatus.CANCELLED) {
+      logger.info(
+        { subscriptionId },
+        "[stripeWebhook] Subscription already cancelled, skipping payment failure",
+      );
+      return;
+    }
+
+    const previousFailureAt = currentSubscription.lastPaymentFailedDate;
+
     await this.subscriptionRepository.recordPaymentFailure({
       id: currentSubscription.id,
       currentStatus: currentSubscription.status,
     });
+
+    // Notification failures must never fail the webhook — Stripe would
+    // retry delivery, and the payment failure has already been recorded.
+    try {
+      const org = await this.organizationRepository.findNameById(
+        currentSubscription.organizationId,
+      );
+
+      await getApp().notifications.sendSlackSubscriptionEvent({
+        type: "payment_failed",
+        organizationId: currentSubscription.organizationId,
+        organizationName: org?.name ?? "Unknown",
+        plan: currentSubscription.plan,
+        dbSubscriptionId: currentSubscription.id,
+        stripeSubscriptionId: subscriptionId,
+        livemode,
+        amountDueCents: invoice.amount_due ?? null,
+        currency: invoice.currency ?? null,
+        attemptCount: invoice.attempt_count ?? null,
+        previousFailureAt,
+        invoiceCreatedAt: invoice.created
+          ? new Date(invoice.created * 1000)
+          : null,
+      });
+    } catch (err) {
+      logger.error(
+        { subscriptionId, err },
+        "[stripeWebhook] Failed to send payment-failed notification",
+      );
+    }
   }
 
   async handleSubscriptionDeleted({

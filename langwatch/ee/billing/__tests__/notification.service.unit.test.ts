@@ -348,6 +348,181 @@ describe("NotificationService", () => {
         expect(actionsBlock.elements[0].url).toContain("org_1");
       });
     });
+
+    describe("when sending a payment-failed subscription event", () => {
+      const basePayload = {
+        type: "payment_failed" as const,
+        organizationId: "org_1",
+        organizationName: "Acme",
+        plan: "LAUNCH",
+        dbSubscriptionId: "sub_db_1",
+        stripeSubscriptionId: "sub_stripe_1",
+        livemode: true,
+      };
+
+      beforeEach(() => {
+        config.slackSubscriptionsChannel = "https://hooks.slack.com/subs";
+      });
+
+      /** @scenario Payment failure on a known subscription sends a payment-failed Slack alert */
+      it("sends Slack blocks with the 'Subscription payment failed' header", async () => {
+        await service.sendSlackSubscriptionEvent(basePayload);
+
+        expect(mockSlackSend).toHaveBeenCalledWith({
+          blocks: expect.arrayContaining([
+            expect.objectContaining({
+              type: "header",
+              text: expect.objectContaining({
+                text: "Subscription payment failed",
+              }),
+            }),
+          ]),
+        });
+      });
+
+      /** @scenario Payment failure on a known subscription sends a payment-failed Slack alert */
+      it("includes the organization name and plan", async () => {
+        await service.sendSlackSubscriptionEvent(basePayload);
+
+        const sentBlocks = mockSlackSend.mock.calls[0]![0].blocks;
+        const dataBlock = sentBlocks.find((b: any) => b.type === "section");
+        const fieldText = dataBlock.fields.map((f: any) => f.text).join(" ");
+        expect(fieldText).toContain("Acme");
+        expect(fieldText).toContain("LAUNCH");
+      });
+
+      /** @scenario Payment failure on a known subscription sends a payment-failed Slack alert */
+      it("links to the organization admin page", async () => {
+        await service.sendSlackSubscriptionEvent(basePayload);
+
+        const sentBlocks = mockSlackSend.mock.calls[0]![0].blocks;
+        const actionsBlock = sentBlocks.find((b: any) => b.type === "actions");
+        const adminButton = actionsBlock.elements.find((e: any) =>
+          e.url.includes("/organizations/"),
+        );
+        expect(adminButton).toBeDefined();
+        expect(adminButton.url).toContain("org_1");
+      });
+
+      /** @scenario Payment failure on a known subscription sends a payment-failed Slack alert */
+      it("links to the Stripe subscription using the Stripe subscription id", async () => {
+        await service.sendSlackSubscriptionEvent(basePayload);
+
+        const sentBlocks = mockSlackSend.mock.calls[0]![0].blocks;
+        const actionsBlock = sentBlocks.find((b: any) => b.type === "actions");
+        const stripeButton = actionsBlock.elements.find((e: any) =>
+          e.url.includes("dashboard.stripe.com"),
+        );
+        expect(stripeButton).toBeDefined();
+        expect(stripeButton.url).toBe(
+          "https://dashboard.stripe.com/subscriptions/sub_stripe_1",
+        );
+      });
+
+      /** @scenario Alert links to the test-mode Stripe dashboard for test-mode events */
+      it("points the Stripe link at the test-mode dashboard for test-mode events", async () => {
+        await service.sendSlackSubscriptionEvent({
+          ...basePayload,
+          livemode: false,
+        });
+
+        const sentBlocks = mockSlackSend.mock.calls[0]![0].blocks;
+        const actionsBlock = sentBlocks.find((b: any) => b.type === "actions");
+        const stripeButton = actionsBlock.elements.find((e: any) =>
+          e.url.includes("dashboard.stripe.com"),
+        );
+        expect(stripeButton.url).toBe(
+          "https://dashboard.stripe.com/test/subscriptions/sub_stripe_1",
+        );
+      });
+
+      /** @scenario Alert includes the failed amount in the invoice currency */
+      it("shows the amount formatted in the invoice currency", async () => {
+        await service.sendSlackSubscriptionEvent({
+          ...basePayload,
+          amountDueCents: 3400,
+          currency: "eur",
+        });
+
+        const sentBlocks = mockSlackSend.mock.calls[0]![0].blocks;
+        const dataBlock = sentBlocks.find((b: any) => b.type === "section");
+        const fieldText = dataBlock.fields.map((f: any) => f.text).join(" ");
+        expect(fieldText).toContain("€34.00");
+      });
+
+      /** @scenario Alert is still sent when the event payload lacks an invoice amount */
+      it("omits the amount line when no amount due is provided", async () => {
+        await service.sendSlackSubscriptionEvent({
+          ...basePayload,
+          amountDueCents: null,
+          currency: null,
+        });
+
+        expect(mockSlackSend).toHaveBeenCalled();
+        const sentBlocks = mockSlackSend.mock.calls[0]![0].blocks;
+        const dataBlock = sentBlocks.find((b: any) => b.type === "section");
+        const fieldText = dataBlock.fields.map((f: any) => f.text).join(" ");
+        expect(fieldText).not.toContain("Amount due");
+      });
+
+      /** @scenario First payment failure signals no prior failure */
+      it("indicates this is the first recorded failure when there is no previous failure", async () => {
+        await service.sendSlackSubscriptionEvent({
+          ...basePayload,
+          previousFailureAt: null,
+        });
+
+        const sentBlocks = mockSlackSend.mock.calls[0]![0].blocks;
+        const contextBlock = sentBlocks.find((b: any) => b.type === "context");
+        const contextText = contextBlock.elements
+          .map((e: any) => e.text)
+          .join(" ");
+        expect(contextText.toLowerCase()).toContain("first recorded failure");
+      });
+
+      /** @scenario A retry of the same invoice is labelled by its attempt count, not as a repeat failure */
+      it("shows the attempt count and does not claim an earlier dunning cycle", async () => {
+        const invoiceCreatedAt = new Date("2026-01-01T00:00:00Z");
+        const laterFailure = new Date("2026-01-02T00:00:00Z");
+
+        await service.sendSlackSubscriptionEvent({
+          ...basePayload,
+          attemptCount: 3,
+          previousFailureAt: laterFailure,
+          invoiceCreatedAt,
+        });
+
+        const sentBlocks = mockSlackSend.mock.calls[0]![0].blocks;
+        const dataBlock = sentBlocks.find((b: any) => b.type === "section");
+        const fieldText = dataBlock.fields.map((f: any) => f.text).join(" ");
+        expect(fieldText).toContain("Attempt 3 for this invoice");
+
+        const contextBlock = sentBlocks.find((b: any) => b.type === "context");
+        const contextText = contextBlock
+          ? contextBlock.elements.map((e: any) => e.text).join(" ")
+          : "";
+        expect(contextText).not.toContain("Previous failure:");
+      });
+
+      /** @scenario A failure with a prior failure from before the current invoice surfaces the previous failure date */
+      it("shows the previous failure date when it predates the current invoice", async () => {
+        const earlierFailure = new Date("2025-12-01T00:00:00Z");
+        const invoiceCreatedAt = new Date("2026-01-01T00:00:00Z");
+
+        await service.sendSlackSubscriptionEvent({
+          ...basePayload,
+          previousFailureAt: earlierFailure,
+          invoiceCreatedAt,
+        });
+
+        const sentBlocks = mockSlackSend.mock.calls[0]![0].blocks;
+        const contextBlock = sentBlocks.find((b: any) => b.type === "context");
+        const contextText = contextBlock.elements
+          .map((e: any) => e.text)
+          .join(" ");
+        expect(contextText).toContain("Previous failure:");
+      });
+    });
   });
 
   describe("sendSlackSignupEvent()", () => {
