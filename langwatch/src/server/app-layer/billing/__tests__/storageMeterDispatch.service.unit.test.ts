@@ -323,7 +323,7 @@ describe("StorageMeterDispatchService", () => {
   });
 
   describe("given a measured hour whose enqueue never landed", () => {
-    /** @scenario An orphaned unreported hour is re-enqueued, not skipped forever */
+    // Regression tests for a review finding, not new feature scenarios.
     it("re-enqueues a stale unreported hour on the next dispatch", async () => {
       // Simulates: an earlier run's recordHour committed but enqueueReport
       // threw, leaving the hour with reportedAt: null past the grace window.
@@ -356,7 +356,6 @@ describe("StorageMeterDispatchService", () => {
       expect(measureBytesAt).not.toHaveBeenCalled();
     });
 
-    /** @scenario A failed retry is logged and does not abort the run */
     it("does not abort the dispatch when re-enqueuing an orphan fails", async () => {
       const orphanHour = hour("2026-02-15T10:00:00.000Z");
       const { service, measureBytesAt, enqueueReport } = makeService({

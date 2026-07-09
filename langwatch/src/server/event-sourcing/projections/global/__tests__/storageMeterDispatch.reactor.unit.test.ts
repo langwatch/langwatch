@@ -91,7 +91,7 @@ describe("createStorageMeterDispatchReactor", () => {
       await expect(reactor.handle(event, context)).resolves.toBeUndefined();
     });
 
-    /** @scenario A persistent dispatch failure surfaces to Sentry, not just a log */
+    // Regression test for a review finding, not a new feature scenario.
     it("reports the error via captureException", async () => {
       mockResolveOrganizationId.mockResolvedValue("org-1");
       mockCaptureException.mockClear();
