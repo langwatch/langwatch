@@ -76,6 +76,7 @@ const EMPTY_PAIRWISE_CONFIG: PairwiseEvaluatorConfig = {
 // doesn't wipe SelectBestConfigForm's in-progress draft.
 const EMPTY_SELECT_BEST_CONFIG: SelectBestEvaluatorConfig = {
   variants: [],
+  hasGoldenAnswer: true,
   goldenField: "",
   includeMetrics: [],
   randomizeOrder: true,

@@ -39,6 +39,7 @@ const baseConfig = (
   overrides: Partial<SelectBestEvaluatorConfig> = {},
 ): SelectBestEvaluatorConfig => ({
   variants: [],
+  hasGoldenAnswer: true,
   goldenField: "",
   includeMetrics: [],
   randomizeOrder: true,
