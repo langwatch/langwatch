@@ -747,11 +747,14 @@ export function EvaluatorEditorBody({
 
   // Pairwise (#5100): if the caller passed pairwise context, ignore the
   // generic mappings UI entirely and render the targets+golden picker.
-  const isPairwise = !!(pairwiseContext && onPairwiseChange);
-  // N-way select-best (#5101): sibling branch of isPairwise, mutually
-  // exclusive by construction (useOpenEvaluatorEditor only sets one
-  // context per evaluator type).
-  const isSelectBest = !!(selectBestContext && onSelectBestChange);
+  // Derive from evaluatorType alone so the inline UI shows the right
+  // fields even when the drawer navigation transitions between drawer
+  // types wipe flowCallbacks/complexProps mid-flight. Callback presence
+  // (`onPairwiseChange` / `onSelectBestChange`) is still checked at the
+  // render sites below so persistence works when wiring is present, but
+  // it no longer decides which layout to draw.
+  const isPairwise = evaluatorType === "langevals/pairwise_compare";
+  const isSelectBest = evaluatorType === "langevals/select_best_compare";
 
   if (evaluatorId && isLoadingEvaluator) {
     return (
