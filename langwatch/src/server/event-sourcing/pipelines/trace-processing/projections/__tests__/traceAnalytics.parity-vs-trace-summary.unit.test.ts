@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { NormalizedSpan } from "../../schemas/spans";
+import type { TopicAssignedEvent } from "../../schemas/events";
 import {
   applySpanToAnalytics,
   type TraceAnalyticsData,
   TraceAnalyticsFoldProjection,
 } from "../traceAnalytics.foldProjection";
-import { applySpanToSummary } from "../traceSummary.foldProjection";
+import {
+  applySpanToSummary,
+  TraceSummaryFoldProjection,
+} from "../traceSummary.foldProjection";
 import {
   createInitState,
   createTestSpan,
@@ -28,6 +32,25 @@ import {
 const slimProjection = new TraceAnalyticsFoldProjection({
   store: { store: async () => {}, get: async () => null },
 });
+
+const summaryProjection = new TraceSummaryFoldProjection({
+  store: { store: async () => {}, get: async () => null },
+} as never);
+
+/** Minimal TopicAssignedEvent — only `data` is read by either handler. */
+function topicAssignedEvent(
+  topicId: string | null,
+  subtopicId: string | null,
+): TopicAssignedEvent {
+  return {
+    id: "evt-topic-1",
+    type: "trace.topic_assigned",
+    tenantId: "tenant-1",
+    aggregateId: "trace-1",
+    data: { topicId, subtopicId },
+    metadata: {},
+  } as unknown as TopicAssignedEvent;
+}
 
 function createInitSlimState(): TraceAnalyticsData {
   return slimProjection.init();
@@ -295,12 +318,37 @@ describe("traceAnalytics fold projection — parity vs trace-summary fold", () =
       summary = applySpanToSummary({ state: summary, span });
       slim = applySpanToAnalytics({ state: slim, span });
 
-      // Topic-assigned handler on both folds simply sets these fields —
-      // simulate it by editing state directly. The handlers themselves are
-      // structurally identical; this test guards the field shape.
-      summary = { ...summary, topicId: "topic-billing", subTopicId: "sub-x" };
-      slim = { ...slim, topicId: "topic-billing", subTopicId: "sub-x" };
+      // Drive the REAL handlers on both folds. Hand-mutating state here would
+      // make this drift guard assert nothing about the handlers it claims to
+      // guard — the whole point is that a divergent `handleTraceTopicAssigned`
+      // fails loudly.
+      const event = topicAssignedEvent("topic-billing", "sub-x");
+      summary = summaryProjection.handleTraceTopicAssigned(event, summary);
+      slim = slimProjection.handleTraceTopicAssigned(event, slim);
 
+      expect(slim.topicId).toBe("topic-billing");
+      expect(slim.subTopicId).toBe("sub-x");
+      assertSharedFieldsParity({ summary, slim });
+    });
+
+    it("preserves prior topic ids when the event carries nulls, on both folds", () => {
+      let summary = createInitState();
+      let slim = createInitSlimState();
+      const span = createTestSpan({ parentSpanId: null });
+      summary = applySpanToSummary({ state: summary, span });
+      slim = applySpanToAnalytics({ state: slim, span });
+
+      const assign = topicAssignedEvent("topic-billing", "sub-x");
+      summary = summaryProjection.handleTraceTopicAssigned(assign, summary);
+      slim = slimProjection.handleTraceTopicAssigned(assign, slim);
+
+      // `topicId: event.data.topicId ?? state.topicId` — a null must not clear.
+      const nulls = topicAssignedEvent(null, null);
+      summary = summaryProjection.handleTraceTopicAssigned(nulls, summary);
+      slim = slimProjection.handleTraceTopicAssigned(nulls, slim);
+
+      expect(slim.topicId).toBe("topic-billing");
+      expect(slim.subTopicId).toBe("sub-x");
       assertSharedFieldsParity({ summary, slim });
     });
   });

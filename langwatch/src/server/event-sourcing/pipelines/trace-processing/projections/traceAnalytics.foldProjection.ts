@@ -452,6 +452,42 @@ function addReservedTokenSum(
 }
 
 /**
+ * Roll this span's cache / reasoning token counts into the trace-level running
+ * sums stored on reserved attribute keys (the drawer popover and slim's
+ * `cache*` columns both read them).
+ *
+ * A span flagged `skip_token_accumulation` is a redundant copy of another
+ * span's usage, so it contributes nothing — the same gate
+ * `SpanCostService.accumulateTokens` applies to prompt/completion tokens, and
+ * the same one `traceSummary.foldProjection` applies here. Mutates
+ * `attributes` in place, mirroring the trace-summary fold's bookkeeping.
+ */
+function accumulateReservedTokenSums(
+  attributes: Record<string, string>,
+  span: NormalizedSpan,
+): void {
+  const cacheTokens = spanCostService.isTokenAccumulationSkipped(span)
+    ? { cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 }
+    : spanCostService.extractCacheTokens(span);
+
+  addReservedTokenSum(
+    attributes,
+    RESERVED_CACHE_READ_TOKENS,
+    cacheTokens.cacheReadTokens,
+  );
+  addReservedTokenSum(
+    attributes,
+    RESERVED_CACHE_CREATION_TOKENS,
+    cacheTokens.cacheCreationTokens,
+  );
+  addReservedTokenSum(
+    attributes,
+    RESERVED_REASONING_TOKENS,
+    cacheTokens.reasoningTokens,
+  );
+}
+
+/**
  * Apply a normalized span to the slim state — calls ONLY the services slim
  * needs (timing, cost/tokens, status, models, name resolution, attributes
  * + reserved cache/reasoning sums), and updates ONLY slim-relevant fields.
@@ -501,27 +537,7 @@ export function applySpanToAnalytics({
     outputIsFallback: false,
   });
 
-  // Roll per-span cache / reasoning token counts into trace-level sums on
-  // reserved attribute keys (the drawer popover + slim's cache* columns
-  // both read these). Mirrors the trace-summary fold's bookkeeping.
-  const cacheTokens = spanCostService.isTokenAccumulationSkipped(span)
-    ? { cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 }
-    : spanCostService.extractCacheTokens(span);
-  addReservedTokenSum(
-    attributes,
-    RESERVED_CACHE_READ_TOKENS,
-    cacheTokens.cacheReadTokens,
-  );
-  addReservedTokenSum(
-    attributes,
-    RESERVED_CACHE_CREATION_TOKENS,
-    cacheTokens.cacheCreationTokens,
-  );
-  addReservedTokenSum(
-    attributes,
-    RESERVED_REASONING_TOKENS,
-    cacheTokens.reasoningTokens,
-  );
+  accumulateReservedTokenSums(attributes, span);
 
   const newModels = spanCostService.extractModelsFromSpan(span);
   const models = mergeModelsMostRecentFirst(state.models, newModels);

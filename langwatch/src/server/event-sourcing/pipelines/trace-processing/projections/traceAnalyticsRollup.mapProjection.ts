@@ -4,7 +4,6 @@ import {
   enrichRagContextIds,
   SpanNormalizationPipelineService,
 } from "~/server/app-layer/traces/span-normalization.service";
-import { coerceToNumber } from "~/utils/coerceToNumber";
 import {
   AbstractMapProjection,
   type MapEventHandlers,
@@ -15,7 +14,6 @@ import {
   spanReceivedEventSchema,
 } from "../schemas/events";
 import { NormalizedStatusCode } from "../schemas/spans";
-import { deriveSpanCost } from "./services/span-cost.derivation";
 import { SpanCostService } from "./services/span-cost.service";
 
 /**
@@ -31,7 +29,11 @@ export interface TraceAnalyticsRollupRow {
   tenantId: string;
   /** Minute bucket of the span's startTimeUnixMs (toStartOfMinute). */
   bucketStart: Date;
-  /** Response model > request model > '' (mirrors SpanCostService.extractModelsFromSpan). */
+  /** Response model > request model > '', via SpanCostService.extractModelsFromSpan.
+   *  This is a SORT key, not a group-by target — the rollup attributes each
+   *  span's cost to that span's own model, whereas legacy and the slim table
+   *  attribute a trace's whole cost to every model it used. See
+   *  `routing/route-table.ts` → ROLLUP_GROUP_BY_KEYS. */
   model: string;
   /** langwatch.span.type ('' when absent). */
   spanType: string;
@@ -66,12 +68,6 @@ const spanEvents = [spanReceivedEventSchema] as const;
 /** Floor a unix-ms timestamp to the minute boundary (toStartOfMinute equivalent). */
 function toStartOfMinute(unixMs: number): Date {
   return new Date(Math.floor(unixMs / 60_000) * 60_000);
-}
-
-function toNonNegativeUInt(value: unknown): number {
-  const n = coerceToNumber(value);
-  if (n === null || !Number.isFinite(n) || n < 0) return 0;
-  return Math.trunc(n);
 }
 
 /**
@@ -120,66 +116,57 @@ export class TraceAnalyticsRollupMapProjection
       event.data.instrumentationScope,
     );
     enrichRagContextIds(span);
-    const { cost, nonBilledCost } = deriveSpanCost({ span, spanCostService });
-    span.cost = cost;
-    span.nonBilledCost = nonBilledCost;
 
     const isRoot = span.parentSpanId === null;
     const isError = isRoot && span.statusCode === NormalizedStatusCode.ERROR;
 
-    // Model precedence mirrors SpanCostService.extractModelsFromSpan: response
-    // wins over request, fall back to '' for cardinality-friendly LowCardinality
-    // bucketing.
-    const responseModel = span.spanAttributes[ATTR_KEYS.GEN_AI_RESPONSE_MODEL];
-    const requestModel = span.spanAttributes[ATTR_KEYS.GEN_AI_REQUEST_MODEL];
-    const model =
-      (typeof responseModel === "string" && responseModel !== ""
-        ? responseModel
-        : typeof requestModel === "string"
-          ? requestModel
-          : "") || "";
+    // Delegate every extraction to SpanCostService — the SAME calls
+    // `SpanCostService.accumulateTokens` and the two folds make. Re-deriving
+    // any of this from raw attribute reads silently drifts the rollup away
+    // from `trace_summaries`, and the rollup only exists to answer the same
+    // question faster.
+    const model = spanCostService.extractModelsFromSpan(span)[0] ?? "";
+    const spanType = span.spanAttributes[ATTR_KEYS.SPAN_TYPE];
 
-    const spanTypeRaw = span.spanAttributes[ATTR_KEYS.SPAN_TYPE];
-    const spanType = typeof spanTypeRaw === "string" ? spanTypeRaw : "";
-
-    // Token keys mirror SpanCostService.extractTokenMetrics + extractCacheTokens.
-    // Coerce-to-number tolerates Map(String,String) values from CH while staying
-    // strict about non-numeric junk (becomes 0, not NaN).
-    const promptTokensSum = toNonNegativeUInt(
-      span.spanAttributes[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS],
-    );
-    const completionTokensSum = toNonNegativeUInt(
-      span.spanAttributes[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS],
-    );
-    const cacheReadTokensSum = toNonNegativeUInt(
-      span.spanAttributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS],
-    );
-    const cacheWriteTokensSum = toNonNegativeUInt(
-      span.spanAttributes[ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS],
-    );
-    const reasoningTokensSum = toNonNegativeUInt(
-      span.spanAttributes[ATTR_KEYS.GEN_AI_USAGE_REASONING_TOKENS],
-    );
+    // A span flagged as a redundant usage copy (e.g. codex's lower-level
+    // response span echoing the turn rollup's counts) contributes nothing to
+    // the TRACE totals — `accumulateTokens` zeroes it, so `trace_summaries`
+    // counts that usage exactly once. The rollup is a trace-level aggregate
+    // too, so it must apply the same gate. (`stored_spans.Cost` deliberately
+    // does NOT: that column is per-span detail, not a trace total.)
+    const skipTokenAccumulation =
+      spanCostService.isTokenAccumulationSkipped(span);
+    const tokens = skipTokenAccumulation
+      ? { promptTokens: 0, completionTokens: 0, cost: 0 }
+      : spanCostService.extractTokenMetrics(span);
+    const cacheTokens = skipTokenAccumulation
+      ? { cacheReadTokens: 0, cacheCreationTokens: 0, reasoningTokens: 0 }
+      : spanCostService.extractCacheTokens(span);
 
     return {
       tenantId: span.tenantId,
       bucketStart: toStartOfMinute(span.startTimeUnixMs),
       model,
-      spanType,
+      spanType: typeof spanType === "string" ? spanType : "",
       spanCount: 1,
       traceCount: isRoot ? 1 : 0,
       errorCount: isError ? 1 : 0,
-      costSum: span.cost ?? 0,
-      nonBilledCostSum: span.nonBilledCost ?? 0,
+      costSum: tokens.cost,
+      // Mirrors `accumulateTokens`: the bundled portion is this span's own cost
+      // when the span is non-billable, and 0 otherwise. Skipped spans carry
+      // cost 0, so they contribute nothing here either.
+      nonBilledCostSum: spanCostService.isSpanCostNonBillable(span)
+        ? tokens.cost
+        : 0,
       // Root span carries trace wall-clock duration; children contribute 0 so the
       // SimpleAggregateFunction(sum) over a trace's spans equals the trace's
       // duration. (Same gate the prior MV applied via `ParentSpanId IS NULL`.)
       durationSum: isRoot ? Math.round(span.durationMs) : 0,
-      promptTokensSum,
-      completionTokensSum,
-      cacheReadTokensSum,
-      cacheWriteTokensSum,
-      reasoningTokensSum,
+      promptTokensSum: tokens.promptTokens,
+      completionTokensSum: tokens.completionTokens,
+      cacheReadTokensSum: cacheTokens.cacheReadTokens,
+      cacheWriteTokensSum: cacheTokens.cacheCreationTokens,
+      reasoningTokensSum: cacheTokens.reasoningTokens,
     };
   }
 }
