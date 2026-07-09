@@ -16,7 +16,7 @@ import { api } from "~/utils/api";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { toaster } from "../ui/toaster";
 
-interface UseRunSuiteOptions {
+export interface UseRunSuiteOptions {
   onRunScheduled?: (suiteId: string, batchRunId: string) => void;
   /**
    * Invoked when the user clicks the "View run" action on the run-scheduled

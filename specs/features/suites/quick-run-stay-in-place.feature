@@ -49,6 +49,8 @@ Feature: Sidebar Quick Run keeps the user in place
     And no navigation call fires
 
   # --- AC4: sidebar row reflects the new run after quick-run, via SSE/poll cadence ---
+  # @unimplemented: only the invalidation trigger is pinned by a test; the rendered
+  # status icon + timestamp are verified manually. Automated coverage tracked in #5602.
 
   @integration @unimplemented
   Scenario: Sidebar row updates after quick-run without manual refresh
@@ -59,6 +61,8 @@ Feature: Sidebar Quick Run keeps the user in place
     And the sidebar row for that run plan reflects the new pending run within the existing SSE/poll cadence
 
   # --- AC5: All Runs main panel shows the new pending batch row without navigation ---
+  # @unimplemented: RunHistoryPanel is stubbed in the page integration test, so the
+  # pending-row render is verified manually. Automated coverage tracked in #5602.
 
   @integration @unimplemented
   Scenario: All Runs main panel shows the new pending batch after quick-run without page navigation

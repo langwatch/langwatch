@@ -13,6 +13,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { UseRunSuiteOptions } from "~/components/suites/useRunSuite";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks — must be declared before any import that touches the module
@@ -62,9 +63,12 @@ const routerQueryPath = vi.hoisted(() => ({
 }));
 
 /**
- * Hoisted spy on the suites.getSummaries cache invalidator. Pins AC4:
- * onRunScheduled must keep firing the invalidation so the sidebar row
- * refreshes after a quick run.
+ * Hoisted spy on the suites.getSummaries cache invalidator.
+ *
+ * Pins the *trigger* AC4 depends on: dropping the navigation must not also drop
+ * the invalidation, or the sidebar row would never refresh. AC4's rendered
+ * outcome (status icon + last-run timestamp) is not asserted here — the sidebar
+ * is not rendered from live summaries in this test. Tracked in #5602.
  */
 const mockGetSummariesInvalidate = vi.hoisted(() => vi.fn());
 
@@ -90,10 +94,7 @@ vi.mock("~/utils/compat/next-router", () => ({
 // Capture onRunScheduled from useRunSuite — do NOT mock useSuiteRouting so
 // navigateToSuite runs for real and calls router.push (that is what we observe).
 vi.mock("~/components/suites/useRunSuite", () => ({
-  useRunSuite: (opts: {
-    onRunScheduled?: (suiteId: string, batchRunId: string) => void;
-    onViewRun?: (suiteId: string) => void;
-  }) => {
+  useRunSuite: (opts: UseRunSuiteOptions) => {
     capturedOnRunScheduled.current = opts.onRunScheduled ?? null;
     capturedOnViewRun.current = opts.onViewRun ?? null;
     return {
@@ -302,6 +303,17 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
         capturedOnRunScheduled.current!("suite_target", "batch_002");
 
         expect(mockRouterPush).not.toHaveBeenCalled();
+      });
+
+      it("still invalidates the suites.getSummaries cache so the sidebar row refreshes", async () => {
+        routerQueryPath.current = ["run-plans", "other-suite-slug"];
+
+        await renderSimulationsPage();
+
+        expect(capturedOnRunScheduled.current).not.toBeNull();
+
+        capturedOnRunScheduled.current!("suite_target", "batch_002");
+
         expect(mockGetSummariesInvalidate).toHaveBeenCalled();
       });
     });
@@ -319,6 +331,17 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
         capturedOnRunScheduled.current!("suite_target", "batch_003");
 
         expect(mockRouterPush).not.toHaveBeenCalled();
+      });
+
+      it("still invalidates the suites.getSummaries cache so the sidebar row refreshes", async () => {
+        routerQueryPath.current = ["run-plans", "target-suite-slug"];
+
+        await renderSimulationsPage();
+
+        expect(capturedOnRunScheduled.current).not.toBeNull();
+
+        capturedOnRunScheduled.current!("suite_target", "batch_003");
+
         expect(mockGetSummariesInvalidate).toHaveBeenCalled();
       });
     });
@@ -390,7 +413,7 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
    * page. This is the explicit, user-initiated counterpart to the no-auto-nav
    * invariant above: navigation only happens when onViewRun is invoked.
    */
-  describe("given a suite with id 'suite_target' and slug 'target-suite-slug'", () => {
+  describe("given a scheduled run for the suite with slug 'target-suite-slug'", () => {
     describe("when the View run toast action fires for a scheduled run", () => {
       /** @scenario The run-scheduled success toast offers a View run action that navigates to the run plan detail page */
       it("calls router push toward the run plan detail page", async () => {
