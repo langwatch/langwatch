@@ -123,12 +123,45 @@ Feature: GroupQueue blob-handling hardening
     Then the old blob is reclaimed only if its holder set is empty after the transfer
     And a still-needed blob is never reclaimed
 
-  @integration @track4 @unimplemented
-  Scenario: A dedup squash transfers the hold without dropping a shared blob
-    Given two staged jobs on the same content hash
-    When a squash displaces one of them
-    Then the displaced token is transferred in the same atomic step
-    And the blob remains while the surviving job holds it
+  # The 2026-07-09 incident: send() fired the squash's hold transfer after the
+  # stage eval returned, fire-and-forget. Concurrent squashes of the same dedup
+  # id could reorder at Redis — a later transfer re-added a token an earlier
+  # transfer had already displaced — leaving a phantom hold that pinned the
+  # blob until its TTL. At prod fan-out rates that left ~279k orphaned blobs
+  # (~1.9 GB, ~90% of Redis growth). The transfer now happens INSIDE the stage
+  # eval, atomic with the displacement it accounts for.
+  @integration @track4
+  Scenario: A dedup squash transfers the hold inside the stage eval
+    Given a staged offloaded job with a dedup id
+    When a second send with the same dedup id squashes it in place
+    Then the replacement's hold is added and the displaced hold removed in the same stage eval
+    And a displaced blob with no remaining holders is reclaimed immediately
+
+  @integration @track4
+  Scenario: A squash chain never leaves a phantom hold
+    Given a job squashed twice in succession under one dedup id
+    When both squashes have completed
+    Then only the final value's hold remains in its holder set
+    And every displaced blob with no other referents is gone
+
+  # A squash configured not to replace the payload discards the NEW value, not
+  # the stored one. The discarded value was never staged, so nothing may
+  # acquire a hold for it — the old code self-transferred (new == old) and
+  # minted exactly such a phantom hold. Its blob, when content-unique, is left
+  # to the TTL backstop; when shared, the surviving job's hold keeps it alive.
+  @integration @track4
+  Scenario: A squash that keeps the stored payload acquires no hold for the discarded value
+    Given a staged offloaded job whose dedup is configured to keep the stored payload
+    When a second send with the same dedup id is squashed
+    Then the stored job's hold is untouched
+    And no hold is recorded for the discarded value
+
+  @integration @track4
+  Scenario: A post-dispatch survive-dispatch squash acquires no hold for the discarded value
+    Given a dedup id whose job was already dispatched but whose survive-dispatch TTL is alive
+    When a late re-trigger is squashed against it
+    Then no hold is recorded for the discarded value
+    And the discarded value's blob is left to the TTL backstop
 
   # ===========================================================================
   # Track 5 — tamper resistance and tenant isolation

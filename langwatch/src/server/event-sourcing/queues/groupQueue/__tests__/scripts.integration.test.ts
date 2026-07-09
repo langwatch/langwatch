@@ -690,6 +690,375 @@ describe("GroupStagingScripts", () => {
       });
     });
 
+    // GQ2 blob holds move INSIDE the stage eval, atomic with the squash that
+    // displaces the value they guard. The old post-eval fire-and-forget
+    // transfer could reorder against a concurrent squash of the same dedup id
+    // and leave a phantom hold pinning the blob until its TTL — the 2026-07-09
+    // leak (~279k orphaned blobs, ~1.9 GB of prod Redis).
+    describe("given GQ2 offloaded values with blob holds", () => {
+      const TENANT = "project-x";
+      const GROUP = `${TENANT}/group-1`;
+
+      function gq2Value({
+        hash,
+        token,
+        tier = "redis",
+        projectId = TENANT,
+      }: {
+        hash: string;
+        token: string;
+        tier?: "redis" | "s3";
+        projectId?: string;
+      }): string {
+        const header = JSON.stringify({
+          v: 2,
+          e: tier,
+          ref: { tier, projectId, hash },
+          h: token,
+        });
+        return `GQ2|${Buffer.byteLength(header)}|${header}`;
+      }
+
+      function holderKey(hash: string, projectId = TENANT) {
+        return `${keyPrefix()}blobholders:${projectId}/${hash}`;
+      }
+
+      function blobKey(hash: string, projectId = TENANT) {
+        return `${keyPrefix()}blob:${projectId}/${hash}`;
+      }
+
+      /** Simulates the producer's blob write + hold acquire for a staged value. */
+      async function seedBlobAndHold(hash: string, token: string) {
+        await redis.set(blobKey(hash), "gzipped-bytes");
+        await redis.sadd(holderKey(hash), token);
+      }
+
+      describe("when a replace squash displaces a staged GQ2 value", () => {
+        /** @scenario "A dedup squash transfers the hold inside the stage eval" */
+        it("adds the replacement's hold, drops the displaced one, and reclaims its blob in the eval", async () => {
+          const oldValue = gq2Value({ hash: "h1", token: "t1" });
+          await scripts.stage(
+            makeJob({
+              stagedJobId: "j1",
+              groupId: GROUP,
+              dedupId: "hold-replace",
+              dedupTtlMs: 60000,
+              jobDataJson: oldValue,
+            }),
+          );
+          await seedBlobAndHold("h1", "t1");
+          await redis.set(blobKey("h2"), "gzipped-bytes");
+
+          const { isNew, orphanedValue, reclaimS3 } = await scripts.stage(
+            makeJob({
+              stagedJobId: "j2",
+              groupId: GROUP,
+              dedupId: "hold-replace",
+              dedupTtlMs: 60000,
+              jobDataJson: gq2Value({ hash: "h2", token: "t2" }),
+            }),
+          );
+
+          expect(isNew).toBe(false);
+          expect(orphanedValue).toBe(oldValue);
+          expect(reclaimS3).toBe(false);
+          // Replacement holds its blob; the displaced hold and blob are gone.
+          expect(await redis.smembers(holderKey("h2"))).toEqual(["t2"]);
+          expect(await redis.ttl(holderKey("h2"))).toBeGreaterThan(0);
+          expect(await redis.exists(holderKey("h1"))).toBe(0);
+          expect(await redis.exists(blobKey("h1"))).toBe(0);
+        });
+
+        it("keeps a displaced blob other stages still hold", async () => {
+          const shared = gq2Value({ hash: "h-shared", token: "t1" });
+          await scripts.stage(
+            makeJob({
+              stagedJobId: "j1",
+              groupId: GROUP,
+              dedupId: "hold-shared",
+              dedupTtlMs: 60000,
+              jobDataJson: shared,
+            }),
+          );
+          await seedBlobAndHold("h-shared", "t1");
+          // A second staged occupancy (another group) holds the same content.
+          await redis.sadd(holderKey("h-shared"), "t-other");
+
+          await scripts.stage(
+            makeJob({
+              stagedJobId: "j2",
+              groupId: GROUP,
+              dedupId: "hold-shared",
+              dedupTtlMs: 60000,
+              jobDataJson: gq2Value({ hash: "h2", token: "t2" }),
+            }),
+          );
+
+          // t1 released, t-other still holds — the blob must survive.
+          expect(await redis.smembers(holderKey("h-shared"))).toEqual([
+            "t-other",
+          ]);
+          expect(await redis.exists(blobKey("h-shared"))).toBe(1);
+        });
+
+        it("reports an s3-tier displaced blob for out-of-band deletion", async () => {
+          const oldValue = gq2Value({ hash: "h-s3", token: "t1", tier: "s3" });
+          await scripts.stage(
+            makeJob({
+              stagedJobId: "j1",
+              groupId: GROUP,
+              dedupId: "hold-s3",
+              dedupTtlMs: 60000,
+              jobDataJson: oldValue,
+            }),
+          );
+          await redis.sadd(holderKey("h-s3"), "t1");
+
+          const { orphanedValue, reclaimS3 } = await scripts.stage(
+            makeJob({
+              stagedJobId: "j2",
+              groupId: GROUP,
+              dedupId: "hold-s3",
+              dedupTtlMs: 60000,
+              jobDataJson: gq2Value({ hash: "h2", token: "t2" }),
+            }),
+          );
+
+          // Lua cannot reach s3: the holder set is emptied here and the caller
+          // is told to delete the object.
+          expect(orphanedValue).toBe(oldValue);
+          expect(reclaimS3).toBe(true);
+          expect(await redis.exists(holderKey("h-s3"))).toBe(0);
+        });
+
+        it("UNLINKs a displaced GQ1 blob directly (mixed-format rollout)", async () => {
+          const gq1Header = JSON.stringify({ v: 1, e: "ref", r: "legacy-id" });
+          const gq1Value = `GQ1|${Buffer.byteLength(gq1Header)}|${gq1Header}`;
+          await scripts.stage(
+            makeJob({
+              stagedJobId: "j1",
+              groupId: GROUP,
+              dedupId: "hold-gq1",
+              dedupTtlMs: 60000,
+              jobDataJson: gq1Value,
+            }),
+          );
+          await redis.set(`${keyPrefix()}blob:legacy-id`, "gq1-bytes");
+
+          await scripts.stage(
+            makeJob({
+              stagedJobId: "j2",
+              groupId: GROUP,
+              dedupId: "hold-gq1",
+              dedupTtlMs: 60000,
+              jobDataJson: gq2Value({ hash: "h2", token: "t2" }),
+            }),
+          );
+
+          expect(await redis.exists(`${keyPrefix()}blob:legacy-id`)).toBe(0);
+          expect(await redis.smembers(holderKey("h2"))).toEqual(["t2"]);
+        });
+      });
+
+      describe("when a job is squashed twice in succession", () => {
+        /** @scenario "A squash chain never leaves a phantom hold" */
+        it("leaves only the final value's hold and reclaims every displaced blob", async () => {
+          await scripts.stage(
+            makeJob({
+              stagedJobId: "j1",
+              groupId: GROUP,
+              dedupId: "hold-chain",
+              dedupTtlMs: 60000,
+              jobDataJson: gq2Value({ hash: "h1", token: "t1" }),
+            }),
+          );
+          await seedBlobAndHold("h1", "t1");
+
+          for (const [hash, token] of [
+            ["h2", "t2"],
+            ["h3", "t3"],
+          ] as const) {
+            await redis.set(blobKey(hash), "gzipped-bytes");
+            await scripts.stage(
+              makeJob({
+                stagedJobId: `j-${hash}`,
+                groupId: GROUP,
+                dedupId: "hold-chain",
+                dedupTtlMs: 60000,
+                jobDataJson: gq2Value({ hash, token }),
+              }),
+            );
+          }
+
+          expect(await redis.smembers(holderKey("h3"))).toEqual(["t3"]);
+          expect(await redis.exists(holderKey("h1"))).toBe(0);
+          expect(await redis.exists(holderKey("h2"))).toBe(0);
+          expect(await redis.exists(blobKey("h1"))).toBe(0);
+          expect(await redis.exists(blobKey("h2"))).toBe(0);
+          expect(await redis.exists(blobKey("h3"))).toBe(1);
+        });
+      });
+
+      describe("when the squash keeps the stored payload (replace off)", () => {
+        /** @scenario "A squash that keeps the stored payload acquires no hold for the discarded value" */
+        it("leaves the stored hold untouched and records none for the discarded value", async () => {
+          const kept = gq2Value({ hash: "h-kept", token: "t-kept" });
+          await scripts.stage(
+            makeJob({
+              stagedJobId: "j1",
+              groupId: GROUP,
+              dedupId: "hold-keep",
+              dedupTtlMs: 60000,
+              jobDataJson: kept,
+              shouldExtend: false,
+              shouldReplace: false,
+            }),
+          );
+          await seedBlobAndHold("h-kept", "t-kept");
+
+          const discarded = gq2Value({ hash: "h-disc", token: "t-disc" });
+          const { orphanedValue, reclaimS3 } = await scripts.stage(
+            makeJob({
+              stagedJobId: "j2",
+              groupId: GROUP,
+              dedupId: "hold-keep",
+              dedupTtlMs: 60000,
+              jobDataJson: discarded,
+              shouldExtend: false,
+              shouldReplace: false,
+            }),
+          );
+
+          // The discarded value was never staged: no hold may exist for it —
+          // the old code self-transferred and minted a phantom hold here.
+          expect(orphanedValue).toBe(discarded);
+          expect(reclaimS3).toBe(false);
+          expect(await redis.smembers(holderKey("h-kept"))).toEqual(["t-kept"]);
+          expect(await redis.exists(holderKey("h-disc"))).toBe(0);
+        });
+      });
+
+      describe("when a survive-dispatch squash hits an already-dispatched dedup", () => {
+        /** @scenario "A post-dispatch survive-dispatch squash acquires no hold for the discarded value" */
+        it("records no hold for the discarded value", async () => {
+          await scripts.stage(
+            makeJob({
+              stagedJobId: "j1",
+              groupId: GROUP,
+              dedupId: "hold-survive",
+              dedupTtlMs: 60000,
+              dispatchAfterMs: 0,
+              jobDataJson: gq2Value({ hash: "h1", token: "t1" }),
+              shouldSurviveDispatch: true,
+            }),
+          );
+          const dispatched = await scripts.dispatch({
+            nowMs: Date.now(),
+            activeTtlSec: 30,
+          });
+          expect(dispatched?.stagedJobId).toBe("j1");
+
+          const late = gq2Value({ hash: "h-late", token: "t-late" });
+          const { isNew, orphanedValue, reclaimS3 } = await scripts.stage(
+            makeJob({
+              stagedJobId: "j2",
+              groupId: GROUP,
+              dedupId: "hold-survive",
+              dedupTtlMs: 60000,
+              jobDataJson: late,
+              shouldSurviveDispatch: true,
+            }),
+          );
+
+          expect(isNew).toBe(false);
+          expect(orphanedValue).toBe(late);
+          expect(reclaimS3).toBe(false);
+          expect(await redis.exists(holderKey("h-late"))).toBe(0);
+        });
+      });
+
+      describe("when the displaced ref belongs to another tenant", () => {
+        it("skips the foreign hold and leaves it to its TTL", async () => {
+          const foreign = gq2Value({
+            hash: "h-foreign",
+            token: "t-foreign",
+            projectId: "project-other",
+          });
+          await scripts.stage(
+            makeJob({
+              stagedJobId: "j1",
+              groupId: GROUP,
+              dedupId: "hold-foreign",
+              dedupTtlMs: 60000,
+              jobDataJson: foreign,
+            }),
+          );
+          await redis.set(blobKey("h-foreign", "project-other"), "bytes");
+          await redis.sadd(holderKey("h-foreign", "project-other"), "t-foreign");
+
+          await scripts.stage(
+            makeJob({
+              stagedJobId: "j2",
+              groupId: GROUP,
+              dedupId: "hold-foreign",
+              dedupTtlMs: 60000,
+              jobDataJson: gq2Value({ hash: "h2", token: "t2" }),
+            }),
+          );
+
+          // Mirror of the TS release guard (ADR-030 §5): never touch a hold
+          // whose ref is not this group's tenant.
+          expect(
+            await redis.smembers(holderKey("h-foreign", "project-other")),
+          ).toEqual(["t-foreign"]);
+          expect(await redis.exists(blobKey("h-foreign", "project-other"))).toBe(
+            1,
+          );
+        });
+      });
+
+      describe("when the batch script squashes a GQ2 value", () => {
+        it("transfers holds per entry and flags s3 reclaims index-aligned", async () => {
+          const oldS3 = gq2Value({ hash: "hb-s3", token: "tb1", tier: "s3" });
+          await scripts.stage(
+            makeJob({
+              stagedJobId: "j0",
+              groupId: GROUP,
+              dedupId: "batch-hold",
+              dedupTtlMs: 60000,
+              jobDataJson: oldS3,
+            }),
+          );
+          await redis.sadd(holderKey("hb-s3"), "tb1");
+
+          const { orphanedValues, reclaimS3Flags } = await scripts.stageBatch([
+            makeJob({
+              stagedJobId: "j1",
+              groupId: GROUP,
+              dedupId: "batch-hold",
+              dedupTtlMs: 60000,
+              jobDataJson: gq2Value({ hash: "hb2", token: "tb2" }),
+            }),
+            makeJob({
+              stagedJobId: "j2",
+              groupId: `${TENANT}/group-2`,
+              dedupId: "batch-fresh-hold",
+              dedupTtlMs: 60000,
+              jobDataJson: gq2Value({ hash: "hb3", token: "tb3" }),
+            }),
+          ]);
+
+          expect(orphanedValues).toEqual([oldS3, ""]);
+          expect(reclaimS3Flags).toEqual([true, false]);
+          expect(await redis.smembers(holderKey("hb2"))).toEqual(["tb2"]);
+          expect(await redis.exists(holderKey("hb-s3"))).toBe(0);
+          // Entry 1 was a fresh stage: its hold is the PRODUCER's to acquire,
+          // not the eval's.
+          expect(await redis.exists(holderKey("hb3"))).toBe(0);
+        });
+      });
+    });
+
     describe("edge cases", () => {
       it("creates genuinely new job after dedup TTL expires", async () => {
         await scripts.stage(
