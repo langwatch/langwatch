@@ -15,6 +15,7 @@ import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-even
 import type {
   EvaluationsV3State,
   EvaluatorConfig,
+  FieldMapping,
   TargetConfig,
 } from "~/experiments-v3/types";
 import { isGoldenFieldSatisfied } from "~/experiments-v3/types";
@@ -1294,6 +1295,25 @@ export async function* executeWorkflowCell(
   }
 }
 
+// Shared by the pairwise (#5100) and select-best (#5101) branches:
+// resolve `inputs.input` from the variant's dataset mapping, or fall back
+// to the dataset's `input` column. Kept as a mutating helper (rather than
+// a return-then-assign) to preserve the original behavior of setting
+// `inputs.input = undefined` when a mapping matches a missing column,
+// which downstream consumers already tolerate.
+const assignMappedInput = (
+  inputs: Record<string, unknown>,
+  mappings: Record<string, FieldMapping>,
+  datasetEntry: Record<string, unknown>,
+): void => {
+  const inputMapping = mappings.input;
+  if (inputMapping?.type === "source" && inputMapping.source === "dataset") {
+    inputs.input = datasetEntry[inputMapping.sourceField];
+  } else if (datasetEntry.input !== undefined) {
+    inputs.input = datasetEntry.input;
+  }
+};
+
 /**
  * Builds the input values for an evaluator from target output and dataset entry.
  *
@@ -1323,12 +1343,7 @@ const buildEvaluatorInputs = (
     const cfg = evaluator.pairwise;
     const variantAMappings =
       evaluator.mappings[datasetId]?.[cfg.variantA] ?? {};
-    const inputMapping = variantAMappings.input;
-    if (inputMapping?.type === "source" && inputMapping.source === "dataset") {
-      inputs.input = cell.datasetEntry[inputMapping.sourceField];
-    } else if (cell.datasetEntry.input !== undefined) {
-      inputs.input = cell.datasetEntry.input;
-    }
+    assignMappedInput(inputs, variantAMappings, cell.datasetEntry);
 
     inputs.golden = cell.datasetEntry[cfg.goldenField];
 
@@ -1380,12 +1395,7 @@ const buildEvaluatorInputs = (
     const firstVariantMappings = firstVariantId
       ? evaluator.mappings[datasetId]?.[firstVariantId] ?? {}
       : {};
-    const inputMapping = firstVariantMappings.input;
-    if (inputMapping?.type === "source" && inputMapping.source === "dataset") {
-      inputs.input = cell.datasetEntry[inputMapping.sourceField];
-    } else if (cell.datasetEntry.input !== undefined) {
-      inputs.input = cell.datasetEntry.input;
-    }
+    assignMappedInput(inputs, firstVariantMappings, cell.datasetEntry);
 
     inputs.golden = cell.datasetEntry[cfg.goldenField];
     inputs.candidates = cell.selectBest.candidates.map((c) => ({
