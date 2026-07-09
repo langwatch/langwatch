@@ -2,6 +2,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { GovernanceKpisClickHouseRepository } from "@ee/governance/services/governanceKpis.clickhouse.repository";
 import { GovernanceOcsfEventsClickHouseRepository } from "@ee/governance/services/governanceOcsfEvents.clickhouse.repository";
 import type { PrismaClient } from "@prisma/client";
+import { randomUUID } from "crypto";
 import { env } from "~/env.mjs";
 import {
   type ClickHouseClientResolver,
@@ -77,7 +78,10 @@ import { App, getApp, globalForApp, initializeApp } from "./app";
 import { PrismaBillingCheckpointService } from "./billing/billingCheckpoint.service";
 import { PrismaStorageBillingCheckpointService } from "./billing/storageBillingCheckpoint.service";
 import { StorageBillingTripwire } from "./billing/storageBillingTripwire";
-import { StorageMeterDispatchService } from "./billing/storageMeterDispatch.service";
+import {
+  STORAGE_DISPATCH_LOCK_TTL_SECONDS,
+  StorageMeterDispatchService,
+} from "./billing/storageMeterDispatch.service";
 import { PrismaStorageUsageHourlyRepository } from "./billing/storageUsageHourly.repository";
 import { BroadcastService } from "./broadcast/broadcast.service";
 import { createClickHouseClientFromConfig } from "./clients/clickhouse.factory";
@@ -614,6 +618,17 @@ export function initializeDefaultApp(options?: {
   // ADR-027 Phase 4: now that the command pipeline exists, build the storage
   // meter dispatch brain and satisfy the forward reference the ES reactor holds.
   if (config.isSaas) {
+    if (!redis) {
+      // isSaas with no Redis (skipRedis misconfigured for this environment)
+      // silently removes the only guard against the concurrent-heavy-
+      // measurement scenario below (the pattern behind two prior production
+      // OOM incidents) — make that gap visible instead of a silent no-op.
+      createLogger("langwatch:billing:storageMeterDispatch").warn(
+        "storage-billing dispatch has no Redis in a SaaS environment — " +
+          "running WITHOUT the per-org dedup lock; an org with multiple " +
+          "projects can re-run the heavy storage measurement concurrently",
+      );
+    }
     storageMeterDispatchService = new StorageMeterDispatchService({
       isMeteringEnabled: (organizationId) =>
         featureFlagService.isEnabled("release_storage_billing_metering", {
@@ -632,19 +647,33 @@ export function initializeDefaultApp(options?: {
       // Per-org guard: the reactor dedups per project, so without this an org
       // with several projects would re-run the heavy measurement per project.
       // A short-lived Redis lock lets one dispatch win and the rest skip (the
-      // winner covers every sealed hour). No Redis → run unguarded.
+      // winner covers every sealed hour). Fencing token (mirrors
+      // ReplayRedisRepository's acquireLock/releaseLock) so a TTL expiry
+      // during a long catch-up can never make this process delete a
+      // different process's live lock; TTL sized to the worst-case run
+      // (STORAGE_DISPATCH_LOCK_TTL_SECONDS), not a short heartbeat interval.
       runExclusivePerOrg: redis
         ? async (organizationId, fn) => {
             const key = `storage_dispatch_org:${organizationId}`;
-            const acquired = await redis.set(key, "1", "EX", 120, "NX");
+            const token = randomUUID();
+            const acquired = await redis.set(
+              key,
+              token,
+              "EX",
+              STORAGE_DISPATCH_LOCK_TTL_SECONDS,
+              "NX",
+            );
             if (acquired !== "OK") return;
             try {
               await fn();
             } finally {
-              await redis.del(key);
+              const holder = await redis.get(key);
+              if (holder === token) {
+                await redis.del(key);
+              }
             }
           }
-        : undefined,
+        : undefined, // no Redis → run unguarded (warned above, once, at boot)
       // ADR-027 Phase 4.5 drift guard. Reference: the previous sealed hour's
       // recorded bytes — storage changes slowly hour-over-hour, so a gross jump
       // is anomalous. The precise "reference SUM vs measured" check plugs into
