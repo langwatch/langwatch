@@ -145,7 +145,7 @@ export const EditModelProviderForm = ({
   //     list simply failed to load. (An `allProviders.length > 0` proxy
   //     mis-reads a legitimately empty org as "not loaded" and never fires —
   //     the original #5380 stale-miss hole.)
-  const staleMiss = cannotResolveTarget && isAllProvidersReady;
+  const isStaleMiss = cannotResolveTarget && isAllProvidersReady;
 
   // Memoized so the blank template keeps a stable identity across renders:
   // useModelProviderForm's reset effect lists `provider.extraHeaders` in its
@@ -355,7 +355,7 @@ export const EditModelProviderForm = ({
 
   return (
     <VStack gap={4} align="start" width="full">
-      {staleMiss && (
+      {isStaleMiss && (
         <Text color="red.500" fontSize="sm">
           This provider configuration no longer exists. It may have been deleted
           from another session.
