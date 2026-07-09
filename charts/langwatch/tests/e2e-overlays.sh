@@ -367,14 +367,91 @@ test_langy_control_plane_env() {
   assert_contains "langy-agent.controlPlane.langwatchApiUrl override wins" \
     "$ovr" 'value: "http://custom-app:9999"'
 
-  # An external gateway with no internalUrl must not silently fabricate one.
+  # An external gateway with an operator-supplied internal URL must not
+  # fabricate a chart-managed one.
   # @scenario "An operator running the gateway elsewhere supplies the address"
   local ext
   ext=$(tmpl --set autogen.enabled=true \
     --set langy-agent.chartManaged=true \
-    --set gateway.chartManaged=false)
-  assert_not_contains "no LW_GATEWAY_INTERNAL_URL when gateway is external and unset" \
-    "$ext" "- name: LW_GATEWAY_INTERNAL_URL"
+    --set gateway.chartManaged=false \
+    --set gateway.internalUrl=http://gw.other.svc:8080)
+  assert_not_contains "no chart-managed gateway URL when gateway is external" \
+    "$ext" "value: \"http://${RELEASE}-gateway:80\""
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SUITE: langy-gateway-reachability — install-time guard for hybrid installs
+#
+# Resolving a gateway URL and being ALLOWED to reach it are separate things.
+# The agent's NetworkPolicy is deny-by-default, so an external gateway on the
+# public ingress is unreachable unless the operator opts in. Both broken
+# configs used to render fine and fail only at runtime.
+#
+# Binds specs/langy/langy-selfhost-deployment.feature
+# ─────────────────────────────────────────────────────────────────────────────
+test_langy_gateway_reachability() {
+  sep; info "Suite: langy gateway reachability guard"
+
+  # Renders OK: chart-managed gateway (internal URL + podSelector egress rule).
+  if tmpl --set autogen.enabled=true --set langy-agent.chartManaged=true \
+      --set gateway.chartManaged=true > /dev/null 2>&1; then
+    pass "self-hosted (chart-managed gateway) installs"
+  else
+    fail "self-hosted (chart-managed gateway) must install"
+  fi
+
+  # Blocked: no gateway address at all -> app throws on the first chat.
+  # @scenario "An operator running the gateway elsewhere supplies the address"
+  if tmpl --set autogen.enabled=true --set langy-agent.chartManaged=true \
+      --set gateway.chartManaged=false > /dev/null 2>&1; then
+    fail "external gateway with no URL must be rejected at install"
+  else
+    pass "external gateway with no URL is rejected at install"
+  fi
+
+  # Blocked: public gateway, but the worker's egress to it is denied.
+  if tmpl --set autogen.enabled=true --set langy-agent.chartManaged=true \
+      --set gateway.chartManaged=false \
+      --set gateway.publicUrl=https://gateway.langwatch.ai > /dev/null 2>&1; then
+    fail "public gateway with denied egress must be rejected at install"
+  else
+    pass "public gateway with denied egress is rejected at install"
+  fi
+
+  # Each escape hatch unblocks the hybrid install.
+  if tmpl --set autogen.enabled=true --set langy-agent.chartManaged=true \
+      --set gateway.chartManaged=false \
+      --set gateway.publicUrl=https://gateway.langwatch.ai \
+      --set langy-agent.networkPolicy.allowExternalHttps=true > /dev/null 2>&1; then
+    pass "hybrid installs with allowExternalHttps=true"
+  else
+    fail "allowExternalHttps=true must unblock the hybrid install"
+  fi
+
+  if tmpl --set autogen.enabled=true --set langy-agent.chartManaged=true \
+      --set gateway.chartManaged=false \
+      --set gateway.publicUrl=https://gateway.langwatch.ai \
+      --set 'langy-agent.networkPolicy.egressToGateway[0].ipBlock.cidr=203.0.113.7/32' \
+      --set langy-agent.networkPolicy.gatewayPort=443 > /dev/null 2>&1; then
+    pass "hybrid installs with a pinned egressToGateway rule"
+  else
+    fail "egressToGateway must unblock the hybrid install"
+  fi
+
+  if tmpl --set autogen.enabled=true --set langy-agent.chartManaged=true \
+      --set gateway.chartManaged=false \
+      --set gateway.internalUrl=http://gw.other.svc:8080 > /dev/null 2>&1; then
+    pass "hybrid installs with an in-cluster gateway.internalUrl"
+  else
+    fail "gateway.internalUrl must unblock the hybrid install"
+  fi
+
+  # The guard must never fire when Langy is off (the default).
+  if tmpl --set autogen.enabled=true --set gateway.chartManaged=false > /dev/null 2>&1; then
+    pass "guard does not fire when Langy is disabled"
+  else
+    fail "guard must not fire when Langy is disabled"
+  fi
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -594,6 +671,7 @@ main() {
   test_infra_overlays
   test_overlay_stacking
   test_langy_control_plane_env
+  test_langy_gateway_reachability
 
   # Phase 2: Live installs (slower, needs Kind + images)
   load_images
