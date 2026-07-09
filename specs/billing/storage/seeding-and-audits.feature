@@ -74,6 +74,13 @@ Feature: Storage billing seeding and audits
     Then that organization remains on the daily audit tier
 
   @integration @unimplemented
+  Scenario: An organization with a stuck retention change stays on daily audit until it completes
+    Given an organization whose retention-change data relabeling is stuck partway
+    When audit schedules are next computed
+    Then that organization is on the daily audit tier
+    And it returns to its normal tier once the relabeling is confirmed complete
+
+  @integration @unimplemented
   Scenario: Operator re-seed corrects a broken gauge with a full audit trail
     Given an organization flagged by an audit alarm
     When the operator re-runs the seeding path for it
