@@ -42,7 +42,10 @@ describe("<ScenarioRunActions/>", () => {
         expect(runAgainButton).toBeDisabled();
       });
 
-      it("displays a message indicating the scenario has been archived", () => {
+      // The always-visible archived notice moved out of the action cluster:
+      // the run detail drawer shows an "Archived" chip in its header strip,
+      // and the disabled Run again button explains itself via tooltip.
+      it("keeps the disabled Run again affordance visible", () => {
         render(
           <ScenarioRunActions
             scenario={archivedScenario}
@@ -54,8 +57,8 @@ describe("<ScenarioRunActions/>", () => {
         );
 
         expect(
-          screen.getByText("This scenario has been archived"),
-        ).toBeInTheDocument();
+          screen.getByRole("button", { name: /run again/i }),
+        ).toBeVisible();
       });
 
       it("does not show the Edit Scenario button", () => {

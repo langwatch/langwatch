@@ -25,9 +25,15 @@ const TRACE_QUERY_CONFIG = {
 
 interface TraceMessageProps extends StackProps {
   traceId: string;
+  /**
+   * "solid" is the classic gray button. "subtle" is the compact ghost
+   * affordance used inside chat bubbles/threads (Traces V2 language),
+   * where a full button would compete with the message content.
+   */
+  variant?: "solid" | "subtle";
 }
 
-export function TraceMessage({ traceId, ...props }: TraceMessageProps) {
+export function TraceMessage({ traceId, variant, ...props }: TraceMessageProps) {
   const { project } = useOrganizationTeamProject();
 
   const traceQuery = api.traces.getById.useQuery(
@@ -42,35 +48,51 @@ export function TraceMessage({ traceId, ...props }: TraceMessageProps) {
     return null;
   }
 
-  return <TraceSuccessState {...props} traceId={traceId} />;
+  return <TraceSuccessState {...props} traceId={traceId} variant={variant} />;
 }
 
 // Success state component
 function TraceSuccessState({
   traceId,
+  variant = "solid",
   ...props
-}: { traceId: string } & StackProps) {
+}: { traceId: string; variant?: "solid" | "subtle" } & StackProps) {
   // useTraceDetailsDrawer routes to v1 or v2 based on the operator's
   // localStorage opt-in (see `useTracesV2Preference`). The hover-peek
   // popover is the same in both worlds.
   const { openTraceDetailsDrawer } = useTraceDetailsDrawer();
 
   return (
-    <HStack paddingBottom={4} {...props}>
+    <HStack paddingBottom={variant === "subtle" ? 0 : 4} {...props}>
       {/* Hover-peek now wraps the button itself — the standalone eye
           icon was visually orphaned and the affordance was unclear.
           Click still opens the trace drawer; hover shows the same
           compact summary popover. */}
       <TracePreviewHoverCard traceId={traceId}>
-        <Button
-          colorPalette="gray"
-          onClick={() =>
-            openTraceDetailsDrawer({ traceId, selectedTab: "traceDetails" })
-          }
-        >
-          <LuListTree />
-          View Trace
-        </Button>
+        {variant === "subtle" ? (
+          <Button
+            size="xs"
+            variant="ghost"
+            color="fg.muted"
+            _hover={{ color: "fg", bg: "bg.muted" }}
+            onClick={() =>
+              openTraceDetailsDrawer({ traceId, selectedTab: "traceDetails" })
+            }
+          >
+            <LuListTree />
+            View trace
+          </Button>
+        ) : (
+          <Button
+            colorPalette="gray"
+            onClick={() =>
+              openTraceDetailsDrawer({ traceId, selectedTab: "traceDetails" })
+            }
+          >
+            <LuListTree />
+            View Trace
+          </Button>
+        )}
       </TracePreviewHoverCard>
     </HStack>
   );

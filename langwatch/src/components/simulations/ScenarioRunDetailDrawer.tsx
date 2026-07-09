@@ -1,16 +1,16 @@
 import {
   Accordion,
   Box,
-  Button,
   Heading,
   HStack,
   Skeleton,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ExternalLink } from "lucide-react";
+import { ChevronsDownUp, ChevronsUpDown } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CopyButton } from "~/components/CopyButton";
+import { ConversationExpandContext } from "~/features/traces-v2/components/TraceDrawer/conversationView/expandContext";
 import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
 import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
@@ -29,11 +29,11 @@ import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { formatCost, formatLatency } from "~/components/shared/formatters";
 import { Chip } from "~/features/traces-v2/components/TraceDrawer/Chip";
 import { TraceDetails } from "../traces/TraceDetails";
-import { Link } from "../ui/link";
 import { hasNoResults } from "./scenario-run-status.utils";
 import { getRunStatePollInterval } from "./run-state-polling";
 import { Drawer } from "../ui/drawer";
 import { CopyIdChip } from "./CopyIdChip";
+import { RunCriteriaChip } from "./RunCriteriaChip";
 import { RunDetailSection } from "./RunDetailSection";
 import { ScenarioMessageRenderer } from "./ScenarioMessageRenderer";
 import { ScenarioRunActions } from "./ScenarioRunActions";
@@ -46,11 +46,6 @@ export interface ScenarioRunDetailDrawerProps {
 
 function formatResultsForCopy(results: unknown): string {
   return JSON.stringify(results, null, 2);
-}
-
-function computeSuccessRate(met: number, unmet: number): string {
-  const total = met + unmet;
-  return total > 0 ? ((met / total) * 100).toFixed(1) : "0.0";
 }
 
 export function ScenarioRunDetailDrawer({
@@ -220,6 +215,10 @@ export function ScenarioRunDetailDrawer({
     "results",
   ]);
 
+  // Long messages truncate by default; this seeds every bubble's expand
+  // state via the shared conversation-expand context (Traces V2 mechanism).
+  const [expandAllMessages, setExpandAllMessages] = useState(false);
+
   return (
     <>
       <Drawer.Root
@@ -228,9 +227,18 @@ export function ScenarioRunDetailDrawer({
         placement="end"
         size="lg"
       >
-        <Drawer.Content bg="bg" paddingX={0} maxWidth="720px" overflow="hidden">
+        {/* Transparent at the Content level so the header band below can run
+            its own translucent + backdrop-blur fill over the drawer's
+            scrolling content — same recipe as the Traces V2 drawer shell. */}
+        <Drawer.Content
+          bg="transparent"
+          paddingX={0}
+          maxWidth="720px"
+          overflow="hidden"
+          borderRadius="lg"
+        >
           {!scenarioState && open && (
-            <Drawer.Body>
+            <Drawer.Body bg={{ base: "bg.surface", _dark: "bg.panel" }}>
               {runStateError ? (
                 runStateError.data?.code === "NOT_FOUND" ? (
                   <VStack gap={2} align="start" w="100%" pt={4}>
@@ -262,80 +270,67 @@ export function ScenarioRunDetailDrawer({
                 display="flex"
                 flexDirection="column"
                 width="full"
+                bg={{ base: "bg.surface", _dark: "bg.panel" }}
               >
-              {/* Sticky header — inside scroll container for correct sticky behavior */}
+              {/* Sticky header — inside scroll container for correct sticky
+                  behavior. Translucent fill + backdrop blur matches the
+                  Traces V2 drawer header band. */}
               <VStack
+                align="stretch"
                 w="100%"
-                gap={0}
+                gap={2}
+                paddingX={4}
+                paddingTop={3}
+                paddingBottom={3}
                 position="sticky"
                 top={0}
                 zIndex={2}
-                background="bg.panel/75"
-                backdropFilter="blur(8px)"
+                background="bg.panel/70"
+                backdropFilter="blur(20px) saturate(150%)"
                 borderTopRadius="lg"
+                borderBottomWidth="1px"
+                borderColor="border"
               >
                 <HStack
                   w="100%"
-                  paddingTop={2}
-                  paddingBottom={4}
-                  paddingLeft={6}
-                  paddingRight={12}
                   justify="space-between"
+                  gap={2.5}
+                  minWidth={0}
+                  paddingEnd={8}
                 >
                   <HStack gap={3} flex={1} minWidth={0}>
                     <ScenarioRunStatusIcon status={scenarioState.status} />
-                    <Heading size="md" lineClamp={2}>
+                    <Heading size="md" truncate title={displayTitle}>
                       {displayTitle}
                     </Heading>
                   </HStack>
-                  <HStack gap={2} flexShrink={0}>
+                  <HStack gap={1} flexShrink={0}>
                     <ScenarioRunActions
                       scenario={scenarioData}
                       isRunning={isRunning}
                       onRunAgain={handleRunAgainClick}
                       onEditScenario={() => setScenarioEditorOpen(true)}
+                      onOpenThread={
+                        firstTraceId && !hasNoResults(scenarioState.status)
+                          ? () => setTraceDrawerTraceId(firstTraceId)
+                          : null
+                      }
+                      dejaViewHref={dejaView.href ?? null}
                     />
-                    {firstTraceId && !hasNoResults(scenarioState.status) && (
-                      <Button
-                        colorPalette="gray"
-                        size="sm"
-                        onClick={() => setTraceDrawerTraceId(firstTraceId)}
-                      >
-                        <ExternalLink size={14} />
-                        Open Thread
-                      </Button>
-                    )}
-                    {dejaView.href && (
-                      <Link href={dejaView.href}>
-                        <Button colorPalette="gray" size="sm">
-                          DejaView
-                        </Button>
-                      </Link>
-                    )}
                     <Drawer.CloseTrigger />
                   </HStack>
                 </HStack>
 
                 {/* Chip strip — metrics + copyable ids, one visual language
                     with the Traces V2 drawer header */}
-                <HStack
-                  w="100%"
-                  paddingX={6}
-                  paddingBottom={3}
-                  gap={1.5}
-                  flexWrap="wrap"
-                >
-                  {criteria &&
-                    criteria.total > 0 &&
+                <HStack w="100%" gap={1.5} flexWrap="wrap">
+                  {scenarioState.results &&
                     !hasNoResults(scenarioState.status) && (
-                      <Chip
-                        label="Criteria"
-                        value={`${criteria.met}/${criteria.total}`}
-                        tone={criteria.met === criteria.total ? "green" : "red"}
-                        tooltip={`${computeSuccessRate(
-                          criteria.met,
-                          criteria.total - criteria.met,
-                        )}% of success criteria met`}
+                      <RunCriteriaChip
+                        metCriteria={scenarioState.results.metCriteria ?? []}
+                        unmetCriteria={
+                          scenarioState.results.unmetCriteria ?? []
+                        }
                       />
                     )}
                   {scenarioState.durationInMs > 0 && (
@@ -351,6 +346,9 @@ export function ScenarioRunDetailDrawer({
                     />
                   )}
                   {timeAgo && <Chip label="Ran" value={timeAgo} />}
+                  {scenarioData?.archivedAt && (
+                    <Chip value="Archived" tone="yellow" />
+                  )}
                   {copyableIds?.map((id) => (
                     <CopyIdChip
                       key={id.label}
@@ -374,12 +372,46 @@ export function ScenarioRunDetailDrawer({
                     title="Conversation"
                     count={conversationCount}
                     isFirst
+                    actions={
+                      <HStack
+                        as="span"
+                        role="button"
+                        tabIndex={0}
+                        gap={1}
+                        color="fg.muted"
+                        cursor="pointer"
+                        _hover={{ color: "fg" }}
+                        transition="color 0.12s ease"
+                        onClick={() => setExpandAllMessages((v) => !v)}
+                        onKeyDown={(e: React.KeyboardEvent) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setExpandAllMessages((v) => !v);
+                          }
+                        }}
+                        aria-label={
+                          expandAllMessages
+                            ? "Collapse all messages"
+                            : "Expand all messages"
+                        }
+                      >
+                        {expandAllMessages ? (
+                          <ChevronsDownUp size={12} />
+                        ) : (
+                          <ChevronsUpDown size={12} />
+                        )}
+                        <Text textStyle="2xs" fontWeight="500">
+                          {expandAllMessages ? "Collapse all" : "Expand all"}
+                        </Text>
+                      </HStack>
+                    }
                   >
-                    <Box
-                      background="bg.muted"
-                      borderRadius="lg"
-                      overflow="hidden"
-                      padding={4}
+                    <ConversationExpandContext.Provider
+                      value={{
+                        isExpandable: true,
+                        shouldExpandAll: expandAllMessages,
+                      }}
                     >
                       <ScenarioMessageRenderer
                         messages={scenarioState.messages ?? []}
@@ -387,7 +419,7 @@ export function ScenarioRunDetailDrawer({
                         variant="drawer"
                         projectId={project?.id ?? ""}
                       />
-                    </Box>
+                    </ConversationExpandContext.Provider>
                   </RunDetailSection>
                 )}
 
@@ -396,9 +428,16 @@ export function ScenarioRunDetailDrawer({
                   title="Results"
                   count={criteria?.total}
                   isFirst={!hasConversation}
-                  contentPadding={false}
                 >
-                  <Box position="relative" className="group">
+                  <Box
+                    position="relative"
+                    className="group"
+                    borderRadius="xl"
+                    overflow="hidden"
+                    borderWidth="1px"
+                    borderColor="border.muted"
+                    boxShadow="sm"
+                  >
                     <SimulationConsole
                       results={scenarioState.results}
                       scenarioName={scenarioState.name ?? undefined}

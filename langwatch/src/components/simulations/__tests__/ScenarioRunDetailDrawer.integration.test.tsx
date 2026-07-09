@@ -33,14 +33,6 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-vi.mock("../../copilot-kit/TraceMessage", () => ({
-  TraceMessage: ({ traceId }: { traceId: string }) => (
-    <button data-testid="trace-message" data-trace-id={traceId}>
-      View Trace
-    </button>
-  ),
-}));
-
 const DrawerWrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>
     <Drawer.Root open={true} placement="end">
@@ -137,9 +129,7 @@ describe("ScenarioRunDetailDrawer", () => {
           { wrapper: Wrapper },
         );
 
-        expect(
-          screen.getByText("=== Scenario Test Report ==="),
-        ).toBeInTheDocument();
+        expect(screen.getByText("simulation.sh")).toBeInTheDocument();
         expect(screen.getByText(/Must repeat verbatim/)).toBeInTheDocument();
       });
     });
@@ -154,9 +144,7 @@ describe("ScenarioRunDetailDrawer", () => {
           { wrapper: Wrapper },
         );
 
-        expect(
-          screen.getByText("=== Scenario Test Report ==="),
-        ).toBeInTheDocument();
+        expect(screen.getByText("simulation.sh")).toBeInTheDocument();
       });
     });
   });

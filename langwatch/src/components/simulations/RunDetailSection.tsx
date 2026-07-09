@@ -17,6 +17,7 @@ export function RunDetailSection({
   count,
   isFirst,
   contentPadding = true,
+  actions,
   children,
 }: {
   value: string;
@@ -25,6 +26,12 @@ export function RunDetailSection({
   isFirst?: boolean;
   /** Set false for full-bleed content like the results console. */
   contentPadding?: boolean;
+  /**
+   * Inline controls rendered at the trigger's right edge, before the
+   * chevron. The trigger is a <button>, so actions must use span-based
+   * controls (role="button"), never nested <button> elements.
+   */
+  actions?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -33,7 +40,7 @@ export function RunDetailSection({
         width="100%"
         display="flex"
         alignItems="center"
-        paddingX={6}
+        paddingX={4}
         paddingY={2.5}
         color="fg.muted"
         borderTopWidth={isFirst ? "0" : "1px"}
@@ -58,6 +65,15 @@ export function RunDetailSection({
             </Badge>
           )}
         </HStack>
+        {actions && (
+          <Box
+            as="span"
+            marginEnd={2}
+            onClick={(e: React.MouseEvent) => e.stopPropagation()}
+          >
+            {actions}
+          </Box>
+        )}
         <Accordion.ItemIndicator
           color="inherit"
           display="flex"
@@ -74,7 +90,7 @@ export function RunDetailSection({
       </Accordion.ItemTrigger>
       <Accordion.ItemContent>
         <Box
-          paddingX={contentPadding ? 6 : 0}
+          paddingX={contentPadding ? 4 : 0}
           paddingY={contentPadding ? 3 : 0}
         >
           {children}
