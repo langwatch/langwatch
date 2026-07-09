@@ -2,6 +2,16 @@ import type { MaybeStoredModelProvider } from "../server/modelProviders/registry
 import { api } from "../utils/api";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 
+// A fresh `[]` on every render with no data (a disabled, in-flight, or
+// errored query) hands each render a new array reference. Any consumer that
+// lists `providers` in an effect or memo dependency then re-fires every
+// render — the render-loop class behind #5380, the same one
+// `useModelProviderForm`'s reset effect trips on through `provider.extraHeaders`.
+// A module-level constant keeps the empty-list identity stable so those
+// dependency arrays don't churn. Non-readonly so it stays assignable to
+// `findModelProviderById`, which the row-by-id consumers feed this list into.
+const NO_PROVIDERS: MaybeStoredModelProvider[] = [];
+
 /**
  * Flat (uncollapsed) list of every stored ModelProvider row the caller can
  * see — one entry per row, never deduped by provider type. Canonical
@@ -73,7 +83,7 @@ export function useAllModelProvidersList() {
   // types on both branches), so tRPC's inference already gives
   // `activeQuery.data?.providers` the right type here with no cast needed.
   return {
-    providers: activeQuery.data?.providers ?? [],
+    providers: activeQuery.data?.providers ?? NO_PROVIDERS,
     // The flat list definitively arrived (see the "Note on the loading
     // signal" block above): false for disabled, in-flight, and errored
     // queries.

@@ -177,6 +177,46 @@ Feature: Model Provider Scope and Multi-Instance
     Then the organization-scoped row is updated with the new key
     And exactly two "OpenAI" ModelProvider rows still exist for "acme"
 
+  @regression @integration
+  Scenario: Editing a provider that was deleted in another session shows it no longer exists
+    Given the org "acme" already has a ModelProvider named "OpenAI" scoped to project "web-app"
+    And a second "OpenAI" scoped to organization "acme" was deleted from another session
+    When I open the edit drawer for that organization-scoped "OpenAI" row
+    Then the drawer tells me this provider configuration no longer exists
+    And "Save" is unavailable
+    And no new provider is created
+
+  @regression @integration
+  Scenario: A stale edit link still blocks save when the organization has no providers at all
+    Given the org "acme" has no model providers configured
+    When I open a stale edit link for an "OpenAI" row that no longer exists
+    Then the drawer tells me this provider configuration no longer exists
+    And "Save" is unavailable
+    And no new provider is created
+
+  @regression @integration
+  Scenario: While the provider list is still loading the drawer does not claim the provider is missing
+    Given my model providers are still loading
+    When I open the edit drawer for an "OpenAI" row
+    Then the drawer does not yet say the provider no longer exists
+    And "Save" stays unavailable until the row is resolved
+
+  # An edit that targets a specific row must resolve THAT row or surface a
+  # clear "no longer exists" miss — it must never silently fall back to the
+  # create path. That fallback is exactly what wrote the duplicate rows in
+  # #5380: a stale or unresolved id sailed through as an id-less save, which
+  # the server upserts as a brand-new provider instead of updating in place.
+  # The empty-organization case is called out on its own because the first
+  # attempt proxied "list has loaded" as "list is non-empty", so a legitimately
+  # empty org read as "still loading" and the miss never fired.
+
+  @regression @integration
+  Scenario: Adding a new provider does not wipe the credentials I am typing
+    When I open the Create Model Provider drawer for "openai"
+    And I enter an OPENAI_API_KEY
+    Then the field keeps the value I entered while I keep working in the drawer
+    And my key is not silently cleared
+
   # ────────────────────────────────────────────────────────────────────────────
   # Model Providers page becomes org-level
   # ────────────────────────────────────────────────────────────────────────────
