@@ -17,7 +17,7 @@
  *
  *   - `trace_analytics` — slim `ReplacingMergeTree(UpdatedAt)`, one row per
  *     trace, hoisted dim columns + a heuristically-trimmed `Attributes` map
- *     (migration 00038). Serves percentiles, late/rich-dim group-bys,
+ *     (migration 00039). Serves percentiles, late/rich-dim group-bys,
  *     hoisted-column filters, metadata.* / langwatch.reserved.* attribute reads,
  *     arbitrary attribute keys whose values are known to fit ≤ 256 chars.
  *
@@ -25,9 +25,9 @@
  *
  *   EVAL-source paths (Phase 6):
  *   - `evaluation_analytics_rollup` — additive `SimpleAggregateFunction(sum, …)`
- *     bucketed by `(TenantId, BucketStart, EvaluatorType, Status)` (00038).
+ *     bucketed by `(TenantId, BucketStart, EvaluatorType, Status)` (00040).
  *   - `evaluation_analytics` — slim `ReplacingMergeTree(UpdatedAt)`, one row
- *     per evaluation, hoisted dim columns + trimmed Attributes (00039).
+ *     per evaluation, hoisted dim columns + trimmed Attributes (00041).
  *   - `evaluation_runs` — legacy fallback for the eval pipeline, the
  *     pre-rewrite per-evaluation ReplacingMergeTree.
  *
@@ -141,7 +141,7 @@ export type TraceRollupMetricKey =
  * Registry metric keys that can be served from `evaluation_analytics_rollup`
  * for additive aggregations. The rollup carries pass/fail/error/skipped
  * counters, a score sum + count pair (for true avg), and total eval count;
- * see migration 00039 + `evaluationAnalyticsRollup.mapProjection.ts`.
+ * see migration 00040 + `evaluationAnalyticsRollup.mapProjection.ts`.
  *
  * `evaluations.evaluation_runs` rolls up to `EvalCount` (additive sum) —
  * the registry's `cardinality` aggregation maps to `sum(EvalCount)`. Score
@@ -260,7 +260,7 @@ export type SlimTraceMetricKey =
 /**
  * Registry metric keys that can be served from the slim
  * `evaluation_analytics` table. Each has a typed column on the slim row;
- * see migration 00040 + `evaluationAnalytics.foldProjection.ts`.
+ * see migration 00041 + `evaluationAnalytics.foldProjection.ts`.
  */
 const SLIM_ELIGIBLE_EVAL_METRIC_KEYS_LIST = [
   "evaluations.evaluation_score",
@@ -332,7 +332,7 @@ const ROLLUP_TRACE_GROUP_BY_KEYS: ReadonlySet<string> = new Set<string>();
 
 /**
  * Eval-rollup group-by keys — the dims final at evaluation-completion time
- * AND on the rollup's keying tuple (see migration 00039):
+ * AND on the rollup's keying tuple (see migration 00040):
  *   {none, EvaluatorType, Status}.
  */
 const ROLLUP_EVAL_GROUP_BY_KEYS: ReadonlySet<string> = new Set([

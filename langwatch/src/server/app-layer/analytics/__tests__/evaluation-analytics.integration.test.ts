@@ -1,7 +1,7 @@
 /**
  * ADR-034 Phase 6 integration tests for eval analytics — drives the
  * write-side eval repositories against a real ClickHouse testcontainer
- * (migrations 00038 + 00039 auto-apply via goose in `startTestContainers`)
+ * (migrations 00040 + 00041 auto-apply via goose in `startTestContainers`)
  * and validates:
  *
  *   - JSONEachRow + UInt64/Int64 stringification + async_insert flow
