@@ -170,7 +170,16 @@ export function LLMMetrics() {
         <GridItem colSpan={2}>
           <Card.Root>
             <Card.Body>
-              <Tabs.Root variant="plain" defaultValue="llmCallsGraph">
+              <Tabs.Root
+                variant="plain"
+                defaultValue="llmCallsGraph"
+                // Every panel here is a read-only CustomGraph analytics
+                // query with no user-entered state, so fully unmounting
+                // inactive tabs is safe and avoids firing/holding queries
+                // for graphs the user never looks at.
+                lazyMount
+                unmountOnExit
+              >
                 <Tabs.List gap={12}>
                   <Tabs.Trigger
                     value="llmCallsGraph"
