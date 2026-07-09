@@ -33,9 +33,12 @@ tmpl() {
 }
 
 # Check rendered YAML contains a string (uses <<< to avoid broken pipe with large output)
+# `--` terminates grep's option parsing: a needle like "- name: FOO" (YAML list
+# item) would otherwise be read as a flag, and grep's usage error would make
+# assert_not_contains report a silent false PASS.
 assert_contains() {
   local label="$1" haystack="$2" needle="$3"
-  if grep -qF "$needle" <<< "$haystack"; then
+  if grep -qF -- "$needle" <<< "$haystack"; then
     pass "$label"
   else
     fail "$label: expected to find '$needle'"
@@ -45,7 +48,7 @@ assert_contains() {
 # Check rendered YAML does NOT contain a string
 assert_not_contains() {
   local label="$1" haystack="$2" needle="$3"
-  if grep -qF "$needle" <<< "$haystack"; then
+  if grep -qF -- "$needle" <<< "$haystack"; then
     fail "$label: expected NOT to find '$needle'"
   else
     pass "$label"
@@ -301,6 +304,80 @@ test_overlay_stacking() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# SUITE: langy-control-plane-env — the two envs LangyCredentialService reads
+#
+# Both must resolve to CLUSTER-INTERNAL Services: the langy-agent
+# NetworkPolicy denies external HTTPS egress and permits only the app pod
+# (networkPolicy.controlPlanePort) and the gateway pod (networkPolicy.gatewayPort).
+#
+# Binds specs/langy/langy-selfhost-deployment.feature
+# ─────────────────────────────────────────────────────────────────────────────
+test_langy_control_plane_env() {
+  sep; info "Suite: langy control-plane env wiring"
+
+  local out
+  out=$(tmpl --set autogen.enabled=true \
+    --set langy-agent.chartManaged=true \
+    --set gateway.chartManaged=true)
+
+  # Without these the app throws "<VAR> is not configured on the control plane"
+  # on every Langy chat (LangyCredentialService.getOrProvision).
+  # @scenario "Langy reaches the LangWatch API without leaving the cluster"
+  assert_contains "LANGWATCH_API_URL points at the internal app Service" \
+    "$out" "value: \"http://${RELEASE}-app:5560\""
+  # @scenario "Langy reaches the AI gateway without leaving the cluster"
+  assert_contains "LW_GATEWAY_INTERNAL_URL points at the internal gateway Service" \
+    "$out" "value: \"http://${RELEASE}-gateway:80\""
+
+  # Both addresses must land on pod ports the agent's NetworkPolicy permits:
+  # the app Service forwards :5560 -> pod :5560 (controlPlanePort) and the
+  # gateway Service forwards :80 -> pod :5563 (gatewayPort).
+  assert_contains "agent policy permits the app pod port" "$out" "port: 5560"
+  assert_contains "agent policy permits the gateway pod port" "$out" "port: 5563"
+
+  # The public hostname still reaches CLI users, it just never becomes the
+  # worker's gateway address.
+  # @scenario "The public gateway address is never used for worker traffic"
+  local pub
+  pub=$(tmpl --set autogen.enabled=true \
+    --set langy-agent.chartManaged=true \
+    --set gateway.chartManaged=true \
+    --set gateway.publicUrl=https://gateway.acme.example)
+  assert_contains "public URL still offered to CLI users" \
+    "$pub" 'value: "https://gateway.acme.example"'
+  assert_contains "worker gateway address stays in-cluster" \
+    "$pub" "value: \"http://${RELEASE}-gateway:80\""
+
+  # LW_GATEWAY_BASE_URL names the CONTROL PLANE (the Go gateway dials back at
+  # us on it), so it must never be set on the app as if it were the gateway.
+  # @scenario "The gateway's own call-back address is never mistaken for the gateway"
+  assert_not_contains "app never receives LW_GATEWAY_BASE_URL" \
+    "$out" "- name: LW_GATEWAY_BASE_URL"
+
+  # Operator overrides win, for split installs / external gateways.
+  # @scenario "Operator-supplied addresses win"
+  local ovr
+  ovr=$(tmpl --set autogen.enabled=true \
+    --set langy-agent.chartManaged=true \
+    --set gateway.chartManaged=false \
+    --set gateway.internalUrl=http://gw.other.svc:8080 \
+    --set langy-agent.controlPlane.langwatchApiUrl=http://custom-app:9999)
+  assert_contains "gateway.internalUrl override wins" \
+    "$ovr" 'value: "http://gw.other.svc:8080"'
+  assert_contains "langy-agent.controlPlane.langwatchApiUrl override wins" \
+    "$ovr" 'value: "http://custom-app:9999"'
+
+  # An external gateway with no internalUrl must not silently fabricate one.
+  # @scenario "An operator running the gateway elsewhere supplies the address"
+  local ext
+  ext=$(tmpl --set autogen.enabled=true \
+    --set langy-agent.chartManaged=true \
+    --set gateway.chartManaged=false)
+  assert_not_contains "no LW_GATEWAY_INTERNAL_URL when gateway is external and unset" \
+    "$ext" "- name: LW_GATEWAY_INTERNAL_URL"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # SUITE: Install — deploy size-dev + nodeport and verify live resources
 # ─────────────────────────────────────────────────────────────────────────────
 test_install_dev_nodeport() {
@@ -516,6 +593,7 @@ main() {
   test_size_overlays
   test_infra_overlays
   test_overlay_stacking
+  test_langy_control_plane_env
 
   # Phase 2: Live installs (slower, needs Kind + images)
   load_images
