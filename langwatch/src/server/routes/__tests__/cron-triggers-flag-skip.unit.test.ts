@@ -6,6 +6,7 @@
  * event-sourced real-time reactor + heartbeat. When OFF, cron continues
  * processing as today. This test verifies the per-trigger flag check.
  */
+import type { Hono } from "hono";
 import {
   afterEach,
   beforeAll,
@@ -70,7 +71,7 @@ vi.mock("~/server/featureFlag", () => ({
 const CRON_KEY = "test-cron-secret";
 
 describe("cron flag-skip for event-sourced graph triggers", () => {
-  let app: any;
+  let app: Hono;
   let processCustomGraphTriggerMock: ReturnType<typeof vi.fn>;
   let isEnabledMock: ReturnType<typeof vi.fn>;
   let originalKey: string | undefined;

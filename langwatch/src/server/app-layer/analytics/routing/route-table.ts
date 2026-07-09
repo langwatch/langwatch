@@ -555,15 +555,14 @@ function rollupHandlesSeries(
   source: AnalyticsMetricSource,
   groupBy?: string,
 ): boolean {
-  if (s.key !== undefined || s.subkey !== undefined) {
-    // `requiresKey` metrics in the eval domain (every entry in
-    // `evaluations.*`) carry a key — they STILL route to the rollup as long
-    // as the key is a single evaluator-id filter the rollup's EvaluatorType
-    // column can serve via WHERE. We accept `key` for eval-source metrics
-    // only; trace-source rollup metrics reject `key` (none of them
-    // requireKey today).
-    if (source !== "evaluation") return false;
-  }
+  // A `key` on an eval series is an evaluator ID. NEITHER fast-path table can
+  // filter by it: the rollup is keyed on `EvaluatorType` (a slug, which an ID
+  // never equals) and the slim row hoists `EvaluatorType` too — neither
+  // carries an `EvaluatorId` column (migrations 00040 / 00041). Serving a
+  // keyed series from either would silently aggregate across every evaluator
+  // in the project, so keyed series fall to `evaluation_runs`, the only table
+  // that can express the predicate. Trace-source metrics carry no key today.
+  if (s.key !== undefined || s.subkey !== undefined) return false;
   if (source === "evaluation") {
     if (!ROLLUP_EVAL_AGGREGATIONS.has(s.aggregation)) return false;
     return ROLLUP_ROLLABLE_EVAL_METRIC_KEYS.has(s.metric);
@@ -628,10 +627,10 @@ function slimHandlesSeries(
   // grows real pipeline support, route ALL pipeline series to the legacy
   // fallback, which computes the two-level aggregation correctly.
   if (s.pipeline) return false;
-  if (s.key !== undefined || s.subkey !== undefined) {
-    // Same eval-domain `requiresKey` allowance as the rollup branch.
-    if (source !== "evaluation") return false;
-  }
+  // Same reasoning as the rollup branch: an eval `key` is an evaluator ID and
+  // the slim row has no `EvaluatorId` column, so keyed series go to
+  // `evaluation_runs` rather than being silently blended across evaluators.
+  if (s.key !== undefined || s.subkey !== undefined) return false;
   const keys =
     source === "trace"
       ? SLIM_ELIGIBLE_TRACE_METRIC_KEYS

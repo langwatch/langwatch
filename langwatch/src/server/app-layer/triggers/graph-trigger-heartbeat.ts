@@ -35,7 +35,7 @@ import {
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma as defaultPrisma } from "~/server/db";
-import { outboxHeartbeatRegistry } from "~/server/event-sourcing/outbox/heartbeat";
+import { outboxHeartbeatRegistry } from "~/server/event-sourcing/outbox/heartbeat/heartbeat.registry";
 import type { OutboxEnqueueRequest } from "~/server/event-sourcing/outbox/outboxReactor.types";
 import {
   GRAPH_TRIGGER_EVAL_REACTOR_NAME,
@@ -254,79 +254,50 @@ export async function decideGraphTriggerHeartbeat({
 
   const flaggedProjects: string[] = [];
   for (const projectId of projectIds) {
-    const enabled = await deps.featureFlagService.isEnabled(
-      "release_es_graph_triggers_firing",
-      { distinctId: projectId, projectId },
-    );
-    if (enabled) flaggedProjects.push(projectId);
+    try {
+      const enabled = await deps.featureFlagService.isEnabled(
+        "release_es_graph_triggers_firing",
+        { distinctId: projectId, projectId },
+      );
+      if (enabled) flaggedProjects.push(projectId);
+    } catch (error) {
+      // Treat an unreadable flag as OFF: the cron still owns this project
+      // (it fails the same way, in the same direction), so the alert is
+      // evaluated by exactly one path rather than none.
+      logger.error(
+        {
+          projectId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "graphTriggerHeartbeat: flag lookup failed, leaving project on the cron path",
+      );
+    }
   }
   if (flaggedProjects.length === 0) return [];
 
   const requests: OutboxEnqueueRequest[] = [];
   for (const projectId of flaggedProjects) {
-    const candidates = await loadCandidatesForProject({
-      deps,
-      projectId,
-      hasOpenSent: openSentProjects.has(projectId),
-    });
-    if (candidates.length === 0) continue;
-
-    // Step 2: per-project, per-source pre-filter — ONE batched slim
-    // query per (project, source) per tick (at most 2 queries per
-    // project per tick: one against `trace_analytics`, one against
-    // `evaluation_analytics`). If the project's recent qualifying
-    // activity for the trigger's source is fresher than the
-    // candidate's window, the real-time path is already handling it
-    // and we skip the enqueue.
-    const candidatesBySource = groupCandidatesBySource(candidates);
-    const recencyBySource = new Map<AnalyticsMetricSource, ProjectRecency>();
-    for (const [source, sourceCandidates] of candidatesBySource.entries()) {
-      const boundMs = Math.max(...sourceCandidates.map((c) => c.windowMs));
-      const recency = await loadProjectRecency({
-        deps,
-        projectId,
-        source,
-        boundWindowMs: Math.max(MIN_BOUND_WINDOW_MS, boundMs),
-        now,
-      });
-      recencyBySource.set(source, recency);
-    }
-
-    for (const candidate of candidates) {
-      const recency = recencyBySource.get(candidate.source);
-      if (!recency) continue;
-      const cutoff = now.getTime() - candidate.windowMs;
-      if (
-        recency.lastOccurredAtMs !== null &&
-        recency.lastOccurredAtMs > cutoff
-      ) {
-        // Real-time path is firing for this trigger; skip.
-        continue;
-      }
-      const reason: GraphEvalStagePayload["reason"] =
-        candidate.reasonKind === "absence"
-          ? "heartbeat-absence"
-          : "heartbeat-resolve";
-      const payload: GraphEvalStagePayload = {
-        stage: "graphEval",
-        projectId,
-        triggerId: candidate.triggerId,
-        reactorName: GRAPH_TRIGGER_EVAL_REACTOR_NAME,
-        reason,
-      };
-      requests.push({
-        dedupKey: graphEvalDedupId({
+    try {
+      requests.push(
+        ...(await collectRequestsForProject({
+          deps,
           projectId,
-          triggerId: candidate.triggerId,
-          suffix: "hb",
-        }),
-        groupKey: graphEvalGroupKey({
+          hasOpenSent: openSentProjects.has(projectId),
+          now,
+        })),
+      );
+    } catch (error) {
+      // One project's failure must not abort the tick for the others: the
+      // heartbeat is the ONLY path that fires no-data alerts, so a single
+      // project's transient DB error would otherwise silence every flagged
+      // project's absence alerts for as long as it persists.
+      logger.error(
+        {
           projectId,
-          triggerId: candidate.triggerId,
-        }),
-        payload: payload as unknown as OutboxEnqueueRequest["payload"],
-        enqueueOptions: { ttlMs: GRAPH_TRIGGER_HEARTBEAT_INTERVAL_MS },
-      });
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "graphTriggerHeartbeat: project tick failed, continuing with other projects",
+      );
     }
   }
 
@@ -335,6 +306,88 @@ export async function decideGraphTriggerHeartbeat({
       { count: requests.length },
       "graphTriggerHeartbeat enqueueing absence/resolve evaluations",
     );
+  }
+  return requests;
+}
+
+/**
+ * Per-project, per-source pre-filter — ONE batched slim query per
+ * (project, source) per tick (at most two per project: `trace_analytics` and
+ * `evaluation_analytics`). If the project's recent qualifying activity for a
+ * trigger's source is fresher than that trigger's window, the real-time path
+ * is already handling it and the enqueue is skipped.
+ *
+ * Throws on an unreadable project; `decideGraphTriggerHeartbeat` isolates that
+ * so the remaining projects still get their absence/resolve evaluations.
+ */
+async function collectRequestsForProject({
+  deps,
+  projectId,
+  hasOpenSent,
+  now,
+}: {
+  deps: GraphTriggerHeartbeatDeps;
+  projectId: string;
+  hasOpenSent: boolean;
+  now: Date;
+}): Promise<OutboxEnqueueRequest[]> {
+  const candidates = await loadCandidatesForProject({
+    deps,
+    projectId,
+    hasOpenSent,
+  });
+  if (candidates.length === 0) return [];
+
+  const candidatesBySource = groupCandidatesBySource(candidates);
+  const recencyBySource = new Map<AnalyticsMetricSource, ProjectRecency>();
+  for (const [source, sourceCandidates] of candidatesBySource.entries()) {
+    const boundMs = Math.max(...sourceCandidates.map((c) => c.windowMs));
+    const recency = await loadProjectRecency({
+      deps,
+      projectId,
+      source,
+      boundWindowMs: Math.max(MIN_BOUND_WINDOW_MS, boundMs),
+      now,
+    });
+    recencyBySource.set(source, recency);
+  }
+
+  const requests: OutboxEnqueueRequest[] = [];
+  for (const candidate of candidates) {
+    const recency = recencyBySource.get(candidate.source);
+    if (!recency) continue;
+    const cutoff = now.getTime() - candidate.windowMs;
+    if (
+      recency.lastOccurredAtMs !== null &&
+      recency.lastOccurredAtMs > cutoff
+    ) {
+      // Real-time path is firing for this trigger; skip.
+      continue;
+    }
+    const reason: GraphEvalStagePayload["reason"] =
+      candidate.reasonKind === "absence"
+        ? "heartbeat-absence"
+        : "heartbeat-resolve";
+    const payload: GraphEvalStagePayload = {
+      stage: "graphEval",
+      projectId,
+      triggerId: candidate.triggerId,
+      reactorName: GRAPH_TRIGGER_EVAL_REACTOR_NAME,
+      reason,
+    };
+    requests.push({
+      dedupKey: graphEvalDedupId({
+        projectId,
+        triggerId: candidate.triggerId,
+        suffix: "hb",
+      }),
+      groupKey: graphEvalGroupKey({
+        projectId,
+        triggerId: candidate.triggerId,
+      }),
+      payload: payload as unknown as OutboxEnqueueRequest["payload"],
+      enqueueOptions: { ttlMs: GRAPH_TRIGGER_HEARTBEAT_INTERVAL_MS },
+    });
   }
   return requests;
 }

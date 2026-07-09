@@ -194,7 +194,7 @@ export interface PipelineRepositories {
   metricRecordStorage: MetricRecordStorageRepository;
   /** ADR-034 Phase 1: per-span rollup repository (app-side, replaces the MV). */
   traceAnalyticsRollup: TraceAnalyticsRollupRepository;
-  /** ADR-034 Phase 2: slim per-trace analytics repository (dual-tap, no read path yet). */
+  /** ADR-034 Phase 2: slim per-trace analytics repository (dual-tap). */
   traceAnalytics: TraceAnalyticsRepository;
   /** ADR-034 Phase 6: per-evaluation rollup repository. */
   evaluationAnalyticsRollup: EvaluationAnalyticsRollupRepository;

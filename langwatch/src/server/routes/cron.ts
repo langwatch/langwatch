@@ -248,11 +248,23 @@ secured.access(cronPolicy()).get("/cron/triggers", async (c) => {
   const esFlaggedProjectIds = new Set<string>();
   await Promise.all(
     distinctProjectIds.map(async (projectId) => {
-      const onEsPath = await featureFlagService.isEnabled(
-        "release_es_graph_triggers_firing",
-        { distinctId: projectId, projectId },
-      );
-      if (onEsPath) esFlaggedProjectIds.add(projectId);
+      try {
+        const onEsPath = await featureFlagService.isEnabled(
+          "release_es_graph_triggers_firing",
+          { distinctId: projectId, projectId },
+        );
+        if (onEsPath) esFlaggedProjectIds.add(projectId);
+      } catch (error) {
+        // A flag lookup failing (Redis blip) must not reject the whole
+        // Promise.all — that would abort this tick for EVERY project, not
+        // just this one. Leave the project unflagged so the cron keeps
+        // evaluating it: a duplicate notification is deduped by TriggerSent,
+        // whereas skipping it would silently drop the alert.
+        logger.error(
+          { projectId, error },
+          "[graph-trigger] flag lookup failed; leaving project on the cron path",
+        );
+      }
     }),
   );
 

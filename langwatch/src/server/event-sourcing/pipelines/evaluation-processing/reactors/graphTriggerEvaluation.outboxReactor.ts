@@ -9,7 +9,6 @@ import type {
 import {
   GRAPH_TRIGGER_EVAL_REACTOR_NAME,
   type GraphEvalStagePayload,
-  graphEvalAuditDedupKey,
   graphEvalDedupId,
   graphEvalGroupKey,
 } from "../../../outbox/payload";
@@ -132,10 +131,6 @@ export function createEvaluationGraphTriggerEvaluationOutboxReactor(
         "graphTriggerEvaluation reactor (eval pipeline) decided enqueues",
       );
 
-      // Carry the audit key on the reactor's logs so an operator
-      // grepping for one is one query away — same pattern as the trace
-      // reactor.
-      void graphEvalAuditDedupKey;
 
       return requests;
     },

@@ -234,13 +234,38 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
   describe("given an evaluation metric", () => {
     it("routes to evaluation_analytics_rollup (ADR-034 Phase 6 — eval fast-path)", () => {
       const table = pickAnalyticsTable({
-        series: [
-          series("evaluations.evaluation_score", "avg", {
-            key: "evaluator-x",
-          }),
-        ],
+        series: [series("evaluations.evaluation_score", "avg")],
       });
       expect(table).toBe("evaluation_analytics_rollup");
+    });
+
+    describe("when the series names a specific evaluator", () => {
+      // An eval `key` is an evaluator ID. Neither fast-path table carries an
+      // EvaluatorId column (00040 / 00041 hoist EvaluatorType, a slug), so
+      // serving a keyed series from either would silently aggregate across
+      // every evaluator in the project. Only `evaluation_runs` can express
+      // the predicate.
+      it("falls back to evaluation_runs rather than blending evaluators on the rollup", () => {
+        const table = pickAnalyticsTable({
+          series: [
+            series("evaluations.evaluation_score", "avg", {
+              key: "evaluator-x",
+            }),
+          ],
+        });
+        expect(table).toBe("evaluation_runs");
+      });
+
+      it("falls back to evaluation_runs for a percentile that would otherwise hit slim", () => {
+        const table = pickAnalyticsTable({
+          series: [
+            series("evaluations.evaluation_score", "p95", {
+              key: "evaluator-x",
+            }),
+          ],
+        });
+        expect(table).toBe("evaluation_runs");
+      });
     });
   });
 

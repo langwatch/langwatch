@@ -42,7 +42,7 @@
 -- days after its `BucketStart`. Default 308 (`MIGRATION_DEFAULT_RETENTION_DAYS`)
 -- matches every other 00032-managed table.
 --
--- Deliberately omitted vs the trace-rollup (00035) sketch:
+-- Deliberately omitted vs the trace-rollup (00038) sketch:
 --   * EvalUniq — moved to the slim evaluation_analytics table. Slim is one row
 --     per evaluation, so a distinct-evaluation count is just `count()` there.
 --   * Per-eval token sums — evaluations carry their own COST (via CostId FK)
@@ -114,7 +114,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.evaluation_analytics_rollup
 )
 ENGINE = AggregatingMergeTree()
 -- Partition weekly on the same column the ORDER BY (and time-range reads) lead
--- with. Matches trace_analytics_rollup (00035) — `BucketStart` is
+-- with. Matches trace_analytics_rollup (00038) — `BucketStart` is
 -- `DateTime64(3)`; wrap to `Date` so the partition expression is anchored on a
 -- concrete date type and partition pruning stays sharp on
 -- `WHERE BucketStart BETWEEN ...` reads. Retention is also stamped in whole
@@ -126,7 +126,7 @@ ORDER BY (TenantId, BucketStart, EvaluatorType, Status)
 -- TenantId == projectId, so each bucket is per-project and the project's
 -- retention applies cleanly. `BucketStart` is DateTime64(3), so the TTL
 -- expression wraps it in `toDateTime` (CH rejects DateTime64 directly in TTL
--- arithmetic). Mirrors trace_analytics_rollup (00035) exactly.
+-- arithmetic). Mirrors trace_analytics_rollup (00038) exactly.
 TTL IF(_retention_days > 0, toDateTime(BucketStart) + toIntervalDay(_retention_days), toDateTime('2106-01-01')) DELETE
 SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
