@@ -13,6 +13,7 @@ describe("featureIcons", () => {
   });
 
   describe("when the simulation runs feature icon configuration is read", () => {
+    /** @scenario 'Feature icon label for simulation runs is "Runs"' */
     it("has label 'Runs'", () => {
       expect(featureIcons.simulation_runs.label).toBe("Runs");
     });

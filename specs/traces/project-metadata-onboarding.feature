@@ -8,7 +8,7 @@ Feature: Project becomes integrated after first trace ingestion
   # in `langwatch/src/server/event-sourcing/pipelines/trace-processing/`
   # for the project.firstMessage projection.
 
-  @integration @unimplemented
+  @integration
   Scenario: Project marks as integrated after first trace ingestion
     Given a project with firstMessage set to false
     And the project uses event-sourcing ingestion
