@@ -94,7 +94,13 @@ describe("cron flag-skip for event-sourced graph triggers", () => {
     originalKey = process.env.CRON_API_KEY;
     process.env.CRON_API_KEY = CRON_KEY;
     processCustomGraphTriggerMock.mockClear();
-    isEnabledMock.mockClear();
+    // mockClear() keeps the implementation, so restore the default here —
+    // the throwing cases below would otherwise leak into later tests.
+    isEnabledMock.mockReset();
+    isEnabledMock.mockImplementation(
+      async (_key: string, opts: { projectId: string }) =>
+        opts.projectId === "p-on",
+    );
   });
 
   afterEach(() => {
@@ -134,6 +140,60 @@ describe("cron flag-skip for event-sourced graph triggers", () => {
         (call) => (call[0] as { id: string }).id,
       );
       expect(calledTriggerIds).toContain("t-off");
+    });
+
+    it("resolves the flag once per distinct project, not once per trigger", async () => {
+      await app.request("/api/cron/triggers", {
+        headers: { authorization: `Bearer ${CRON_KEY}` },
+      });
+
+      const onCalls = isEnabledMock.mock.calls.filter(
+        (call) => (call[1] as { projectId: string }).projectId === "p-on",
+      );
+      expect(onCalls).toHaveLength(1);
+    });
+  });
+
+  describe("when the flag lookup throws for one project", () => {
+    // A bare `Promise.all` over the flag fan-out would reject the whole
+    // handler, dropping EVERY project's graph triggers for this tick — not
+    // just the one whose Redis call blipped.
+    it("still processes the other projects' graph triggers", async () => {
+      isEnabledMock.mockImplementation(
+        async (_key: string, opts: { projectId: string }) => {
+          if (opts.projectId === "p-on") throw new Error("redis blip");
+          return false;
+        },
+      );
+
+      const res = await app.request("/api/cron/triggers", {
+        headers: { authorization: `Bearer ${CRON_KEY}` },
+      });
+      expect(res.status).toBe(200);
+
+      const calledTriggerIds = processCustomGraphTriggerMock.mock.calls.map(
+        (call) => (call[0] as { id: string }).id,
+      );
+      expect(calledTriggerIds).toContain("t-off");
+    });
+
+    it("leaves the unreadable project on the cron path rather than dropping its alert", async () => {
+      isEnabledMock.mockImplementation(
+        async (_key: string, opts: { projectId: string }) => {
+          if (opts.projectId === "p-on") throw new Error("redis blip");
+          return false;
+        },
+      );
+
+      await app.request("/api/cron/triggers", {
+        headers: { authorization: `Bearer ${CRON_KEY}` },
+      });
+
+      const calledTriggerIds = processCustomGraphTriggerMock.mock.calls.map(
+        (call) => (call[0] as { id: string }).id,
+      );
+      // Silence is worse than a duplicate: TriggerSent dedups the latter.
+      expect(calledTriggerIds).toContain("t-on");
     });
   });
 });

@@ -1,10 +1,9 @@
 import type { HeartbeatDefinition } from "./heartbeat.types";
 
 /**
- * Process-singleton registry of outbox heartbeats. Registration is
- * idempotent on `name`: a second `register(...)` with the same name
- * throws so accidental double-registration is loud rather than silently
- * shadowing.
+ * Process-singleton registry of outbox heartbeats. A second `register(...)`
+ * under the same name THROWS, so an accidental double-registration is loud
+ * rather than silently shadowing the first definition.
  *
  * Registration is passive data — safe to call from any process role.
  * Only `OutboxHeartbeatScheduler.start()` (worker-only) actually does
@@ -24,6 +23,16 @@ export class OutboxHeartbeatRegistry {
 
   getAll(): HeartbeatDefinition[] {
     return [...this.heartbeats.values()];
+  }
+
+  /**
+   * Drop every registration. The registry is a module singleton that outlives
+   * the App, so `resetApp()` must clear it — otherwise re-initialising a
+   * worker-role App (as the integration suites do) hits the
+   * already-registered throw above.
+   */
+  clear(): void {
+    this.heartbeats.clear();
   }
 }
 
