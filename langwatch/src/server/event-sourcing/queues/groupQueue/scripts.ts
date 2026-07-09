@@ -1,6 +1,8 @@
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 
+import { CachedLuaScript } from "./cachedLuaScript";
+
 // Lua scripts inlined as string constants.
 // This avoids loader incompatibilities across turbopack, webpack, vitest, and tsx.
 
@@ -1509,6 +1511,19 @@ export const GROUP_QUEUE_REGISTRY_KEY = "{gq-registry}:names";
  * instead of passing them via KEYS[]; this is safe because keyPrefix includes the hash
  * tag, so all derived keys hash to the same Redis Cluster slot.
  */
+// EVALSHA-cached forms of the scripts above: the source is sent to Redis
+// once per node, every later call ships a 40-byte sha instead of the full
+// 11-23 KB script body (see CachedLuaScript).
+const stageScript = new CachedLuaScript(STAGE_LUA);
+const stageBatchScript = new CachedLuaScript(STAGE_BATCH_LUA);
+const dispatchScript = new CachedLuaScript(DISPATCH_LUA);
+const dispatchBatchScript = new CachedLuaScript(DISPATCH_BATCH_LUA);
+const drainGroupScript = new CachedLuaScript(DRAIN_GROUP_LUA);
+const completeScript = new CachedLuaScript(COMPLETE_LUA);
+const refreshScript = new CachedLuaScript(REFRESH_LUA);
+const restageAndBlockScript = new CachedLuaScript(RESTAGE_AND_BLOCK_LUA);
+const retryRestageScript = new CachedLuaScript(RETRY_RESTAGE_LUA);
+
 export class GroupStagingScripts {
   private readonly keyPrefix: string;
   private readonly queueName: string;
@@ -1580,8 +1595,8 @@ export class GroupStagingScripts {
     const activeKey = `${this.keyPrefix}group:${groupId}:active`;
     const blockedKey = `${this.keyPrefix}blocked`;
 
-    const result = await this.redis.eval(
-      STAGE_LUA,
+    const result = await stageScript.run(
+      this.redis,
       8,
       groupJobsKey,
       readyKey,
@@ -1665,8 +1680,8 @@ export class GroupStagingScripts {
     args.push(String(Date.now()));
     args.push(String(readGlobalBudget()));
 
-    const result = await this.redis.eval(
-      STAGE_BATCH_LUA,
+    const result = await stageBatchScript.run(
+      this.redis,
       3,
       readyKey,
       signalKey,
@@ -1709,8 +1724,8 @@ export class GroupStagingScripts {
     // Env var lets operators flip on per-environment without redeploy.
     const tenantCap = readTenantCap();
 
-    const result = await this.redis.eval(
-      DISPATCH_LUA,
+    const result = await dispatchScript.run(
+      this.redis,
       4,
       readyKey,
       blockedKey,
@@ -1755,8 +1770,8 @@ export class GroupStagingScripts {
 
     const tenantCap = readTenantCap();
 
-    const result = await this.redis.eval(
-      DISPATCH_BATCH_LUA,
+    const result = await dispatchBatchScript.run(
+      this.redis,
       4,
       readyKey,
       blockedKey,
@@ -1808,8 +1823,8 @@ export class GroupStagingScripts {
     const statsKey = `${this.keyPrefix}stats:completed`;
     const errorKey = `${this.keyPrefix}group:${groupId}:error`;
 
-    const result = await this.redis.eval(
-      COMPLETE_LUA,
+    const result = await completeScript.run(
+      this.redis,
       6,
       activeKey,
       jobsKey,
@@ -1848,8 +1863,8 @@ export class GroupStagingScripts {
     const dataKey = `${this.keyPrefix}group:${groupId}:data`;
     const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
 
-    const result = await this.redis.eval(
-      DRAIN_GROUP_LUA,
+    const result = await drainGroupScript.run(
+      this.redis,
       3,
       jobsKey,
       dataKey,
@@ -1891,8 +1906,8 @@ export class GroupStagingScripts {
     const activeKey = `${this.keyPrefix}group:${groupId}:active`;
     const readyKey = `${this.keyPrefix}ready`;
 
-    const result = await this.redis.eval(
-      REFRESH_LUA,
+    const result = await refreshScript.run(
+      this.redis,
       2,
       activeKey,
       readyKey,
@@ -1930,8 +1945,8 @@ export class GroupStagingScripts {
     const statsKey = `${this.keyPrefix}stats:failed`;
     const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
 
-    await this.redis.eval(
-      RESTAGE_AND_BLOCK_LUA,
+    await restageAndBlockScript.run(
+      this.redis,
       4,
       blockedKey,
       readyKey,
@@ -1979,8 +1994,8 @@ export class GroupStagingScripts {
     // TTL = backoff + 2s buffer so the key expires just after the job becomes eligible
     const retryTtlSec = Math.ceil(backoffMs / 1000) + 2;
 
-    const result = await this.redis.eval(
-      RETRY_RESTAGE_LUA,
+    const result = await retryRestageScript.run(
+      this.redis,
       2,
       activeKey,
       totalPendingKey,
