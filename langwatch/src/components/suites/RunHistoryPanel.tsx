@@ -6,7 +6,16 @@
  * Both paths use cursor-based pagination with Load More.
  */
 
-import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  EmptyState,
+  HStack,
+  Skeleton,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { FlaskConical, RefreshCw, TriangleAlert } from "lucide-react";
 import { toaster } from "~/components/ui/toaster";
 import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -24,6 +33,7 @@ import {
 } from "./RunHistoryFilters";
 import { RunRow } from "./RunRow";
 import { GroupRow } from "./GroupRow";
+import { RunHistorySkeleton } from "./RunHistorySkeleton";
 import { ShadowDivider } from "~/components/ui/ShadowDivider";
 import { RunSummaryCounts } from "./RunSummaryCounts";
 import { useRunHistoryStore } from "./useRunHistoryStore";
@@ -319,17 +329,20 @@ export function RunHistoryPanel({
 
   if (error) {
     return (
-      <Box padding={6}>
-        <Text color="red.fg">Error loading runs: {error.message}</Text>
-      </Box>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <Box padding={6} display="flex" justifyContent="center">
-        <Spinner size="lg" data-testid="loading-spinner" />
-      </Box>
+      <EmptyState.Root paddingY={12}>
+        <EmptyState.Content>
+          <EmptyState.Indicator color="red.fg">
+            <TriangleAlert size={28} />
+          </EmptyState.Indicator>
+          <EmptyState.Title>Couldn&apos;t load runs</EmptyState.Title>
+          <EmptyState.Description maxWidth="360px" textAlign="center">
+            {error.message}
+          </EmptyState.Description>
+          <Button size="sm" variant="outline" onClick={() => void refetch()}>
+            <RefreshCw size={14} /> Try again
+          </Button>
+        </EmptyState.Content>
+      </EmptyState.Root>
     );
   }
 
@@ -339,12 +352,16 @@ export function RunHistoryPanel({
 
   return (
     <VStack align="stretch" gap={0} height="100%">
-      {/* Header: only shown in all-runs view */}
+      {/* Header: only shown in all-runs view. Rendered during loading too
+          (with a totals placeholder) so the skeleton doesn't shift layout. */}
       {!isSingleSuiteView && (
         <Box paddingX={6} paddingY={4}>
           <Text fontSize="xl" fontWeight="semibold">
             All Runs
           </Text>
+          {isLoading ? (
+            <Skeleton height="20px" width="220px" marginTop={0.5} />
+          ) : (
           <HStack gap={2} data-testid="all-runs-header-totals">
             <Text fontSize="sm" color="fg.muted">
               {groupBy === "none"
@@ -372,14 +389,18 @@ export function RunHistoryPanel({
               }}
             />
           </HStack>
+          )}
         </Box>
       )}
 
-      {/* Filters — fixed above the scrollable run list */}
+      {/* Filters — fixed above the scrollable run list. position=relative
+          anchors the _after divider; without it the pseudo resolves against
+          the document and adds phantom scroll height to the page container. */}
       <Box
         paddingX={6}
         paddingY={4}
         bg="bg"
+        position="relative"
         _after={{
           content: '""',
           position: "absolute",
@@ -405,17 +426,30 @@ export function RunHistoryPanel({
 
       <ShadowDivider scrollRef={runListRef} />
 
-      {/* Run list — own scroll container so RunRow sticky headers don't clash with filters */}
-      {itemCount === 0 && !showInitPlaceholder ? (
-        <Box paddingX={6} paddingY={8} textAlign="center">
-          <Text color="fg.muted">
-            {hasFiltersApplied
-              ? "No runs match the selected filters."
-              : isSingleSuiteView
-                ? "Run this suite to see results here."
-                : "No runs yet. Execute a suite to see results here."}
-          </Text>
-        </Box>
+      {/* Run list — own scroll container so RunRow sticky headers don't clash with filters.
+          Skeleton renders in the list slot only while nothing has been fetched
+          yet (the hook's isLoading is gated on zero fetched pages), keeping
+          the header and filter bar in place so nothing shifts when data lands. */}
+      {isLoading ? (
+        <RunHistorySkeleton />
+      ) : itemCount === 0 && !showInitPlaceholder ? (
+        <EmptyState.Root paddingY={12}>
+          <EmptyState.Content>
+            <EmptyState.Indicator>
+              <FlaskConical size={28} />
+            </EmptyState.Indicator>
+            <EmptyState.Title>
+              {hasFiltersApplied ? "No matching runs" : "No runs yet"}
+            </EmptyState.Title>
+            <EmptyState.Description>
+              {hasFiltersApplied
+                ? "No runs match the selected filters."
+                : isSingleSuiteView
+                  ? "Run this suite to see results here."
+                  : "Execute a suite to see results here."}
+            </EmptyState.Description>
+          </EmptyState.Content>
+        </EmptyState.Root>
       ) : (
         <VStack ref={runListRef} align="stretch" gap={0} flex={1} minH={0} overflow="auto">
           {showInitPlaceholder && (

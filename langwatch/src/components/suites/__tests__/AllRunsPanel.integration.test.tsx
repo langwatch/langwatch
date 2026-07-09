@@ -109,7 +109,7 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
   });
 
   describe("given loading state", () => {
-    it("displays loading spinner", () => {
+    it("displays skeleton placeholders in the list slot without dropping the header", () => {
       mockRunDataQuery.mockReturnValue({
         data: undefined,
         isLoading: true,
@@ -119,12 +119,15 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
 
       render(<RunHistoryPanel period={defaultPeriod} />, { wrapper: Wrapper });
 
-      expect(screen.getByTestId("loading-spinner")).toBeInTheDocument();
+      expect(screen.getByTestId("run-history-skeleton")).toBeInTheDocument();
+      // Header and filters stay mounted so data landing causes no layout shift
+      expect(screen.getByText("All Runs")).toBeInTheDocument();
+      expect(screen.getByLabelText("Filter by scenario")).toBeInTheDocument();
     });
   });
 
   describe("given error state", () => {
-    it("displays error message", () => {
+    it("displays error message with a retry affordance", () => {
       mockRunDataQuery.mockReturnValue({
         data: undefined,
         isLoading: false,
@@ -134,8 +137,11 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
 
       render(<RunHistoryPanel period={defaultPeriod} />, { wrapper: Wrapper });
 
-      expect(screen.getByText(/Error loading runs/i)).toBeInTheDocument();
+      expect(screen.getByText(/Couldn't load runs/i)).toBeInTheDocument();
       expect(screen.getByText(/Network error/i)).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Try again/i }),
+      ).toBeInTheDocument();
     });
   });
 
@@ -150,8 +156,9 @@ describe("<RunHistoryPanel/> (all-runs view)", () => {
 
       render(<RunHistoryPanel period={defaultPeriod} />, { wrapper: Wrapper });
 
+      expect(screen.getByText(/No runs yet/i)).toBeInTheDocument();
       expect(
-        screen.getByText(/No runs yet. Execute a suite to see results here./i),
+        screen.getByText(/Execute a suite to see results here./i),
       ).toBeInTheDocument();
     });
   });

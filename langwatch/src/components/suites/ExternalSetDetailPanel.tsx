@@ -9,11 +9,12 @@
 
 import {
   Box,
+  EmptyState,
   HStack,
-  Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { FlaskConical, TriangleAlert } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { Period } from "~/components/PeriodSelector";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -36,6 +37,7 @@ import {
   RunHistoryFilters,
   type RunHistoryFilterValues,
 } from "./RunHistoryFilters";
+import { RunHistorySkeleton } from "./RunHistorySkeleton";
 import { RunRow } from "./RunRow";
 import { GroupRow } from "./GroupRow";
 import { useRunHistoryStore } from "./useRunHistoryStore";
@@ -237,6 +239,7 @@ export function ExternalSetDetailPanel({
           paddingY={4}
           bg="bg"
           flexShrink={0}
+          position="relative"
           _after={{
             content: '""',
             position: "absolute",
@@ -266,22 +269,20 @@ export function ExternalSetDetailPanel({
 
       {/* Content — scrollable */}
       <VStack ref={runListRef} align="stretch" gap={0} flex={1} overflow="auto">
-        {isLoading && (
-          <VStack paddingY={8}>
-            <Spinner />
-            <Text fontSize="sm" color="fg.muted">
-              Loading run data...
-            </Text>
-          </VStack>
-        )}
+        {isLoading && <RunHistorySkeleton />}
 
         {error && (
-          <VStack paddingY={8}>
-            <Text color="red.500">Error loading run data</Text>
-            <Text fontSize="sm" color="fg.muted">
-              {error.message}
-            </Text>
-          </VStack>
+          <EmptyState.Root paddingY={12}>
+            <EmptyState.Content>
+              <EmptyState.Indicator color="red.fg">
+                <TriangleAlert size={28} />
+              </EmptyState.Indicator>
+              <EmptyState.Title>Couldn&apos;t load run data</EmptyState.Title>
+              <EmptyState.Description maxWidth="360px" textAlign="center">
+                {error.message}
+              </EmptyState.Description>
+            </EmptyState.Content>
+          </EmptyState.Root>
         )}
 
         {!isLoading && !error && runData && runData.length > 0 && (
@@ -335,11 +336,17 @@ export function ExternalSetDetailPanel({
         )}
 
         {!isLoading && !error && (!runData || runData.length === 0) && (
-          <VStack paddingY={8}>
-            <Text fontSize="sm" color="fg.muted">
-              No run data found for this set.
-            </Text>
-          </VStack>
+          <EmptyState.Root paddingY={12}>
+            <EmptyState.Content>
+              <EmptyState.Indicator>
+                <FlaskConical size={28} />
+              </EmptyState.Indicator>
+              <EmptyState.Title>No runs yet</EmptyState.Title>
+              <EmptyState.Description>
+                No run data found for this set.
+              </EmptyState.Description>
+            </EmptyState.Content>
+          </EmptyState.Root>
         )}
       </VStack>
     </VStack>

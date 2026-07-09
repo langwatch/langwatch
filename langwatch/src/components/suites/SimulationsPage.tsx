@@ -11,9 +11,9 @@
  * Layout: sidebar (search, +New Run Plan, All Runs, suite list) + main panel.
  */
 
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, EmptyState, HStack, Text, VStack } from "@chakra-ui/react";
 import { subDays } from "date-fns";
-import { Plus } from "lucide-react";
+import { Plus, TriangleAlert } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -344,6 +344,7 @@ export default function SimulationsPage() {
             onSelectSuite={navigateToSuite}
             onRunSuite={handleRunSuite}
             onContextMenu={handleContextMenu}
+            onNewSuite={handleNewSuite}
             isLoading={isLoading || isExternalSetsLoading}
           />
 
@@ -445,12 +446,17 @@ function MainPanel({
 }) {
   if (error) {
     return (
-      <VStack gap={4} align="center" py={8}>
-        <Text color="red.500">Error loading simulations</Text>
-        <Text fontSize="sm" color="fg.muted">
-          {error.message}
-        </Text>
-      </VStack>
+      <EmptyState.Root paddingY={12}>
+        <EmptyState.Content>
+          <EmptyState.Indicator color="red.fg">
+            <TriangleAlert size={28} />
+          </EmptyState.Indicator>
+          <EmptyState.Title>Couldn&apos;t load simulations</EmptyState.Title>
+          <EmptyState.Description maxWidth="360px" textAlign="center">
+            {error.message}
+          </EmptyState.Description>
+        </EmptyState.Content>
+      </EmptyState.Root>
     );
   }
 

@@ -24,6 +24,7 @@ import { useScenarioTarget } from "~/hooks/useScenarioTarget";
 import { useSimulationStreamingState } from "~/hooks/useSimulationStreamingState";
 import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener";
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
+import { useRouter } from "~/utils/compat/next-router";
 import { api } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { formatCost, formatLatency } from "~/components/shared/formatters";
@@ -172,6 +173,17 @@ export function ScenarioRunDetailDrawer({
     return undefined;
   }, [scenarioState?.messages]);
 
+  // Whole-conversation view in Trace Explorer: every trace of this run
+  // carries the scenario.run_id attribute, so a scenarioRun:"<id>" search
+  // shows the full conversation. Same #<lens>?q= fragment contract as the
+  // command bar's trace links.
+  const router = useRouter();
+  const handleOpenInTraces = useCallback(() => {
+    if (!project?.slug || !scenarioRunId) return;
+    const query = encodeURIComponent(`scenarioRun:"${scenarioRunId}"`);
+    void router.push(`/${project.slug}/traces#all-traces?q=${query}`);
+  }, [project?.slug, scenarioRunId, router]);
+
   // Relative time that auto-updates every 30s while the drawer is open
   const [timeAgo, setTimeAgo] = useState<string | undefined>(undefined);
   useEffect(() => {
@@ -313,6 +325,11 @@ export function ScenarioRunDetailDrawer({
                       onOpenThread={
                         firstTraceId && !hasNoResults(scenarioState.status)
                           ? () => setTraceDrawerTraceId(firstTraceId)
+                          : null
+                      }
+                      onOpenInTraces={
+                        firstTraceId && !hasNoResults(scenarioState.status)
+                          ? handleOpenInTraces
                           : null
                       }
                       dejaViewHref={dejaView.href ?? null}

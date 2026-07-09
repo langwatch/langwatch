@@ -63,20 +63,17 @@ describe("getOverlayConfig()", () => {
         expect(config.isComplete).toBe(true);
       });
 
-      it("provides stalled gradient values", () => {
+      it("provides a stalled scrim in the warning hue", () => {
         const config = getOverlayConfig(ScenarioRunStatus.STALLED);
-        expect(config.gradientLight).toContain("radial-gradient");
-        expect(config.gradientDark).toContain("radial-gradient");
+        expect(config.scrim).toContain("yellow");
       });
     });
 
     describe("when compared to ERROR overlay", () => {
-      it("uses a different gradient", () => {
+      it("uses a different scrim", () => {
         const stalledConfig = getOverlayConfig(ScenarioRunStatus.STALLED);
         const errorConfig = getOverlayConfig(ScenarioRunStatus.ERROR);
-        expect(stalledConfig.gradientLight).not.toBe(
-          errorConfig.gradientLight,
-        );
+        expect(stalledConfig.scrim).not.toBe(errorConfig.scrim);
       });
     });
   });

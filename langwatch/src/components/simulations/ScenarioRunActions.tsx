@@ -2,6 +2,7 @@ import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
 import {
   Edit2,
   ExternalLink,
+  ListTree,
   MessagesSquare,
   MoreVertical,
   Play,
@@ -20,6 +21,11 @@ interface ScenarioRunActionsProps {
   onEditScenario: () => void;
   /** When set, the overflow menu offers "Open thread". */
   onOpenThread?: (() => void) | null;
+  /**
+   * When set, the overflow menu offers "View conversation in Trace
+   * Explorer" — the traces view filtered to this run's traces.
+   */
+  onOpenInTraces?: (() => void) | null;
   /** When set, the overflow menu offers "Open in DejaView". */
   dejaViewHref?: string | null;
 }
@@ -36,10 +42,11 @@ export function ScenarioRunActions({
   onRunAgain,
   onEditScenario,
   onOpenThread,
+  onOpenInTraces,
   dejaViewHref,
 }: ScenarioRunActionsProps) {
   const isArchived = !!scenario && scenario.archivedAt !== null;
-  const hasOverflow = !!onOpenThread || !!dejaViewHref;
+  const hasOverflow = !!onOpenThread || !!onOpenInTraces || !!dejaViewHref;
 
   if (!scenario && !hasOverflow) {
     return null;
@@ -88,6 +95,14 @@ export function ScenarioRunActions({
             </Button>
           </Menu.Trigger>
           <Menu.Content minWidth="200px">
+            {onOpenInTraces && (
+              <Menu.Item value="open-in-traces" onClick={onOpenInTraces}>
+                <HStack gap={2}>
+                  <Icon as={ListTree} boxSize={3.5} />
+                  <Text>View conversation in Trace Explorer</Text>
+                </HStack>
+              </Menu.Item>
+            )}
             {onOpenThread && (
               <Menu.Item value="open-thread" onClick={onOpenThread}>
                 <HStack gap={2}>

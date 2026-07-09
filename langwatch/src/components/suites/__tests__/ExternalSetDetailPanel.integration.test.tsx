@@ -130,18 +130,18 @@ describe("<ExternalSetDetailPanel/>", () => {
   });
 
   describe("given loading state", () => {
-    it("displays loading spinner", () => {
+    it("displays skeleton placeholders", () => {
       mockRunDataQuery.mockReturnValue({
         data: undefined,
         isLoading: true,
         error: null,
       });
 
-      const { container } = render(<ExternalSetDetailPanel scenarioSetId="ext-set-1" period={{ startDate: new Date("2025-01-01"), endDate: new Date("2025-01-31") }} />, {
+      render(<ExternalSetDetailPanel scenarioSetId="ext-set-1" period={{ startDate: new Date("2025-01-01"), endDate: new Date("2025-01-31") }} />, {
         wrapper: Wrapper,
       });
 
-      expect(container.querySelector(".chakra-spinner")).toBeInTheDocument();
+      expect(screen.getByTestId("run-history-skeleton")).toBeInTheDocument();
     });
   });
 });
