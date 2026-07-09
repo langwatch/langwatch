@@ -362,22 +362,29 @@ export function useEvaluatorEditorController(
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
+  // `defaultSettings` depends on the cascade-resolved model/embeddings queries,
+  // which can resolve (new object reference) *after* the user has already
+  // started filling out the form — e.g. Pairwise Compare's Include cost /
+  // duration toggles. `form.formState.isDirty` alone doesn't survive that
+  // race reliably (RHF batches its dirty flag; the effect body may read a
+  // stale value before the toggle-flip flushes), so cost gets a resolved
+  // default that stomps duration back to `[]`. Latch a ref to "already done
+  // the initial reset" for this evaluator so late-resolving defaults never
+  // re-fire the reset once the form is live.
+  const didInitializeCreateFormRef = useRef<string | null>(null);
   useEffect(() => {
-    // `defaultSettings` depends on the cascade-resolved model/embeddings
-    // queries, which can resolve (new object reference) *after* the user has
-    // already started filling out the form — e.g. Pairwise Compare's Include
-    // cost/duration toggles. Without the isDirty guard, that async resolve
-    // re-fires this effect and form.reset() silently wipes whatever the user
-    // already touched ("resetting out of the blue").
-    if (evaluatorDef && !evaluatorId && !form.formState.isDirty) {
-      form.reset({
-        name: forceUserToDecideAName ? "" : evaluatorDef.name,
-        settings: defaultSettings,
-      });
-    }
+    if (!evaluatorDef || evaluatorId) return;
+    const key = evaluatorType ?? evaluatorDef.name ?? "unknown";
+    if (didInitializeCreateFormRef.current === key) return;
+    form.reset({
+      name: forceUserToDecideAName ? "" : evaluatorDef.name,
+      settings: defaultSettings,
+    });
+    didInitializeCreateFormRef.current = key;
   }, [
     evaluatorDef,
     evaluatorId,
+    evaluatorType,
     defaultSettings,
     form,
     forceUserToDecideAName,
