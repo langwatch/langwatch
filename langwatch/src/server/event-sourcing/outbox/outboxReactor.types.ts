@@ -83,6 +83,13 @@ export interface OutboxReactorDefinition<
 > {
   name: string;
   /**
+   * Optional pure predicate evaluated at dispatch time, before any job is
+   * enqueued — the same contract as `ReactorDefinition.shouldReact`, forwarded
+   * verbatim by `adaptOutboxReactor`. Return false to skip this reactor for the
+   * event and spare the queue a payload that `decide()` would only discard.
+   */
+  shouldReact?(event: E, context: ReactorContext<FoldState>): boolean;
+  /**
    * Decide which (if any) outbox rows to enqueue for this event.
    * Returns an empty array when nothing matches. Replay-safe — the
    * outbox dedupes on (name, dedupKey) so callers do not need to

@@ -87,16 +87,34 @@ function passesTraceOriginGuards(
   return true;
 }
 
+/**
+ * An extra pure guard, ANDed with the origin guards. Must be synchronous and
+ * side-effect free: it runs pre-enqueue via `shouldReact` on the fold's hot
+ * path. Guards needing IO belong in `handle`.
+ */
+type ExtraGuard = (
+  event: TraceProcessingEvent,
+  context: ReactorContext<TraceSummaryData>,
+) => boolean;
+
 export function defineOriginGuardedTraceReactor(opts: {
   name: string;
   jobIdPrefix: string;
   ttl?: number;
   delay?: number;
+  isRelevant?: ExtraGuard;
   handle: (
     event: TraceProcessingEvent,
     context: ReactorContext<TraceSummaryData>,
   ) => Promise<void>;
 }): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
+  const passes = (
+    event: TraceProcessingEvent,
+    context: ReactorContext<TraceSummaryData>,
+  ): boolean =>
+    passesTraceOriginGuards(event, context.foldState) &&
+    (opts.isRelevant?.(event, context) ?? true);
+
   return {
     name: opts.name,
     options: {
@@ -106,8 +124,17 @@ export function defineOriginGuardedTraceReactor(opts: {
       delay: opts.delay ?? 30_000,
     },
 
+    // Pre-enqueue (ADR-026). The guards are pure and read only the payload the
+    // handler would receive, so evaluating them here is equivalent to the
+    // early-return in `handle` — except a filtered event never pays a
+    // serialize + gzip + blob write that the queue's dedup would then discard.
+    // A 10k-span trace fans this reactor out once per span; the guards reject
+    // nearly all of it. Kept in `handle` too: the queue is not the only caller
+    // (inline mode), and a fail-open `shouldReact` may dispatch anyway.
+    shouldReact: passes,
+
     async handle(event, context) {
-      if (!passesTraceOriginGuards(event, context.foldState)) return;
+      if (!passes(event, context)) return;
       await opts.handle(event, context);
     },
   };
@@ -125,11 +152,19 @@ export function defineOriginGuardedTraceOutboxReactor(opts: {
   jobIdPrefix: string;
   ttl?: number;
   delay?: number;
+  isRelevant?: ExtraGuard;
   decide: (
     event: TraceProcessingEvent,
     context: ReactorContext<TraceSummaryData>,
   ) => Promise<OutboxEnqueueRequest[]>;
 }): OutboxReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
+  const passes = (
+    event: TraceProcessingEvent,
+    context: ReactorContext<TraceSummaryData>,
+  ): boolean =>
+    passesTraceOriginGuards(event, context.foldState) &&
+    (opts.isRelevant?.(event, context) ?? true);
+
   return {
     name: opts.name,
     options: {
@@ -139,8 +174,11 @@ export function defineOriginGuardedTraceOutboxReactor(opts: {
       delay: opts.delay ?? 30_000,
     },
 
+    // See the `.withReactor` twin above for why this is also a shouldReact.
+    shouldReact: passes,
+
     async decide(event, context) {
-      if (!passesTraceOriginGuards(event, context.foldState)) return [];
+      if (!passes(event, context)) return [];
       return opts.decide(event, context);
     },
   };
