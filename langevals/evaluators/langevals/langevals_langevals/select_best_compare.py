@@ -66,8 +66,10 @@ class SelectBestCompareEntry(EvaluatorEntry, allow_extra=True):
     golden: Optional[str] = None
     candidates: list[CandidateInput] = []
 
-    # Deterministic seed for candidate-order shuffling. When None, order
-    # is left as-is (callers wanting reproducibility should always set it).
+    # Deterministic seed for candidate-order shuffling. When None the
+    # shuffle falls back to seed 0 (stable across rows), so callers that
+    # want per-row position-bias mitigation should pass the actual row
+    # index rather than leaving it unset.
     row_index: Optional[int] = None
 
 

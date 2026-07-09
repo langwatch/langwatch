@@ -748,63 +748,105 @@ export const generateSelectBestCells = (
   };
 
   for (const evaluator of selectBestEvaluators) {
-    const cfg = evaluator.selectBest;
-    if (!cfg) continue;
-    if (!cfg.variants || cfg.variants.length < 2) {
-      logger.warn(
-        { evaluatorId: evaluator.id, variants: cfg.variants },
-        "Select-best evaluator skipped: fewer than 2 variants configured",
-      );
-      continue;
-    }
-
-    const resolvedVariants = cfg.variants.map((id) =>
-      state.targets.find((t) => t.id === id),
-    );
-    if (resolvedVariants.some((t) => !t)) {
-      logger.warn(
-        { evaluatorId: evaluator.id, variants: cfg.variants },
-        "Select-best evaluator skipped: one or more variant targets not found",
-      );
-      continue;
-    }
-    const firstVariant = resolvedVariants[0]!;
+    const resolvedVariants = resolveSelectBestVariants(evaluator, state.targets);
+    if (!resolvedVariants) continue;
 
     for (let rowIndex = 0; rowIndex < datasetRows.length; rowIndex++) {
       const datasetEntry = datasetRows[rowIndex];
       if (!datasetEntry) continue;
 
-      const outputs = cfg.variants.map((id) =>
-        completedTargetOutputs.get(`${rowIndex}:${id}`),
-      );
-      if (outputs.some((o) => !o)) continue;
-
-      const candidates = cfg.variants.map((id, i) => ({
-        id: variantIdentifierFor(resolvedVariants[i]!),
-        output: outputs[i]!.output,
-        cost: outputs[i]!.cost,
-        duration: outputs[i]!.duration,
-      }));
-
-      cells.push({
+      const cell = buildSelectBestCell({
+        evaluator,
         rowIndex,
-        // Point at the first variant so the workflow builder has a real
-        // TargetConfig. The target step itself is skipped via `skipTarget`.
-        targetId: firstVariant.id,
-        targetConfig: firstVariant,
-        evaluatorConfigs: [evaluator],
-        datasetEntry: {
-          _datasetId: datasetId,
-          ...datasetEntry,
-        },
-        skipTarget: true,
-        precomputedTargetOutput: candidates[0]!.output,
-        selectBest: { candidates },
+        datasetEntry,
+        datasetId,
+        resolvedVariants,
+        completedTargetOutputs,
+        variantIdentifierFor,
       });
+      if (cell) cells.push(cell);
     }
   }
 
   return { cells };
+};
+
+const resolveSelectBestVariants = (
+  evaluator: EvaluatorConfig,
+  targets: TargetConfig[],
+): TargetConfig[] | null => {
+  const cfg = evaluator.selectBest;
+  if (!cfg || !cfg.variants || cfg.variants.length < 2) {
+    if (cfg) {
+      logger.warn(
+        { evaluatorId: evaluator.id, variants: cfg.variants },
+        "Select-best evaluator skipped: fewer than 2 variants configured",
+      );
+    }
+    return null;
+  }
+  const resolved = cfg.variants.map((id) => targets.find((t) => t.id === id));
+  if (resolved.some((t) => !t)) {
+    logger.warn(
+      { evaluatorId: evaluator.id, variants: cfg.variants },
+      "Select-best evaluator skipped: one or more variant targets not found",
+    );
+    return null;
+  }
+  return resolved as TargetConfig[];
+};
+
+const buildSelectBestCell = (args: {
+  evaluator: EvaluatorConfig;
+  rowIndex: number;
+  datasetEntry: Record<string, unknown>;
+  datasetId: string;
+  resolvedVariants: TargetConfig[];
+  completedTargetOutputs: Map<
+    string,
+    { output: unknown; cost?: number; duration?: number }
+  >;
+  variantIdentifierFor: (t: TargetConfig) => string;
+}): ExecutionCell | null => {
+  const {
+    evaluator,
+    rowIndex,
+    datasetEntry,
+    datasetId,
+    resolvedVariants,
+    completedTargetOutputs,
+    variantIdentifierFor,
+  } = args;
+  const variants = evaluator.selectBest!.variants;
+
+  const outputs = variants.map((id) =>
+    completedTargetOutputs.get(`${rowIndex}:${id}`),
+  );
+  if (outputs.some((o) => !o)) return null;
+
+  const candidates = variants.map((_, i) => ({
+    id: variantIdentifierFor(resolvedVariants[i]!),
+    output: outputs[i]!.output,
+    cost: outputs[i]!.cost,
+    duration: outputs[i]!.duration,
+  }));
+  const firstVariant = resolvedVariants[0]!;
+
+  return {
+    rowIndex,
+    // Point at the first variant so the workflow builder has a real
+    // TargetConfig. The target step itself is skipped via `skipTarget`.
+    targetId: firstVariant.id,
+    targetConfig: firstVariant,
+    evaluatorConfigs: [evaluator],
+    datasetEntry: {
+      _datasetId: datasetId,
+      ...datasetEntry,
+    },
+    skipTarget: true,
+    precomputedTargetOutput: candidates[0]!.output,
+    selectBest: { candidates },
+  };
 };
 
 /**

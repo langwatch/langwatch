@@ -462,6 +462,66 @@ export const getEvaluatorMissingMappings = (
   const missingMappings: MissingMapping[] = [];
   const targetMappings = evaluator.mappings[datasetId]?.[targetId] ?? {};
 
+  // Pairwise / N-way evaluator chips (#5100, #5101): the high-level
+  // PairwiseConfigForm / SelectBestConfigForm replace the per-row mappings
+  // UI, writing their config to `evaluator.pairwise` / `evaluator.selectBest`
+  // instead of `evaluator.mappings`. Validate against those configs directly
+  // — otherwise the evaluator's required fields (e.g. "candidates",
+  // "candidate_a_id") never get an `evaluator.mappings` entry and are
+  // permanently reported missing, which forces every Run/Rerun/Run-on-all-
+  // rows click to reopen the config editor instead of executing. Mirrors
+  // the analogous target-level exemption in getTargetMissingMappings.
+  if (evaluator.pairwise) {
+    const pw = evaluator.pairwise;
+    if (!pw.variantA) {
+      missingMappings.push({
+        fieldId: "variantA",
+        fieldName: "Variant A",
+        isRequired: true,
+      });
+    }
+    if (!pw.variantB) {
+      missingMappings.push({
+        fieldId: "variantB",
+        fieldName: "Variant B",
+        isRequired: true,
+      });
+    }
+    if (!isGoldenFieldSatisfied(pw)) {
+      missingMappings.push({
+        fieldId: "goldenField",
+        fieldName: "Golden field",
+        isRequired: true,
+      });
+    }
+    return {
+      isValid: missingMappings.length === 0,
+      missingMappings,
+    };
+  }
+
+  if (evaluator.selectBest) {
+    const sb = evaluator.selectBest;
+    if (!sb.variants || sb.variants.length < 2) {
+      missingMappings.push({
+        fieldId: "variants",
+        fieldName: "Variants",
+        isRequired: true,
+      });
+    }
+    if (!sb.goldenField) {
+      missingMappings.push({
+        fieldId: "goldenField",
+        fieldName: "Golden field",
+        isRequired: true,
+      });
+    }
+    return {
+      isValid: missingMappings.length === 0,
+      missingMappings,
+    };
+  }
+
   // Get the evaluator definition to know which fields are required vs optional
   const evaluatorDef =
     AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes];
