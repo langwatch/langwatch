@@ -291,6 +291,7 @@ describe("Feature: editing a model-provider row resolves the correct row by id",
        * longer names a row must surface the miss and block Save, never
        * silently degrade to the create path and write a duplicate row.
        */
+      /** @scenario Editing a provider that was deleted in another session shows it no longer exists */
       it("shows the provider-no-longer-exists error copy", () => {
         expect(screen.getByText(/no longer exists/i)).toBeInTheDocument();
       });
@@ -319,6 +320,7 @@ describe("Feature: editing a model-provider row resolves the correct row by id",
         expect(screen.getByText(/no longer exists/i)).toBeInTheDocument();
       });
 
+      /** @scenario A stale edit link still blocks save when the organization has no providers at all */
       it("keeps Save disabled and never calls mutateAsync", () => {
         expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
         expect(mockMutateAsync).not.toHaveBeenCalled();
@@ -336,6 +338,7 @@ describe("Feature: editing a model-provider row resolves the correct row by id",
        * arrives, so the error copy must not flash mid-load — yet Save still
        * stays blocked so an unresolved target can never submit.
        */
+      /** @scenario While the provider list is still loading the drawer does not claim the provider is missing */
       it("does not render the no-longer-exists error copy while loading", () => {
         expect(screen.queryByText(/no longer exists/i)).toBeNull();
       });
@@ -403,6 +406,7 @@ describe("Feature: editing a model-provider row resolves the correct row by id",
      * text.
      */
     describe("when the parent re-renders with unchanged props after the user typed", () => {
+      /** @scenario Adding a new provider does not wipe the credentials I am typing */
       it("retains the user's typed key (the blank template is not re-seeded per render)", async () => {
         primeQueries();
         const user = userEvent.setup();

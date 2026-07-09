@@ -8,9 +8,10 @@ import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 // render — the render-loop class behind #5380, the same one
 // `useModelProviderForm`'s reset effect trips on through `provider.extraHeaders`.
 // A module-level constant keeps the empty-list identity stable so those
-// dependency arrays don't churn. Non-readonly so it stays assignable to
-// `findModelProviderById`, which the row-by-id consumers feed this list into.
-const NO_PROVIDERS: MaybeStoredModelProvider[] = [];
+// dependency arrays don't churn. `readonly` because every caller shares this
+// one instance: a stray `push`/`sort` on a "local" copy would corrupt the
+// empty list for everyone.
+const NO_PROVIDERS: readonly MaybeStoredModelProvider[] = [];
 
 /**
  * Flat (uncollapsed) list of every stored ModelProvider row the caller can
@@ -29,7 +30,8 @@ const NO_PROVIDERS: MaybeStoredModelProvider[] = [];
  * list instead, via `findModelProviderById` below.
  *
  * Note on the loading signal: the flat list answers two different questions,
- * so this hook exposes two flags rather than one overloaded `isLoading`:
+ * so this hook exposes two flags. They are NOT complementary — both go false
+ * once the query errors — so do not "simplify" either into `!other`.
  *
  *   - `isReady` (≡ react-query `isSuccess`) means the list *definitively
  *     arrived*: the query ran and resolved. It is false for a disabled query
@@ -37,15 +39,22 @@ const NO_PROVIDERS: MaybeStoredModelProvider[] = [];
  *     one. A caller that must tell "genuinely empty" apart from "not loaded
  *     yet" — e.g. deciding an id lookup is a real stale miss rather than a
  *     not-ready list — gates on `isReady`, so an empty array only counts as
- *     empty once `isReady` is true.
- *   - `isLoading` here is a *spinner* signal: `!isSuccess && !isError`, i.e.
- *     "no definitive answer yet". It stays true for a disabled query — in
- *     react-query v4 a disabled query still reports `status: 'loading'`, and
- *     a surface like `EditModelProviderDrawer` genuinely should keep spinning
- *     until org/project hydrate rather than mount a form off an empty list.
- *     It flips to false the moment the query *errors* (a 403 with
- *     `retry:false`), so a permission failure shows the (empty) surface
- *     instead of spinning forever.
+ *     empty once `isReady` is true. (Opposite direction to the `isReady` in
+ *     `features/traces-v2/hooks/useTraceQueryArgs.ts`, which is a *pre-fetch*
+ *     gate meaning "we have enough input to enable the query at all". Same
+ *     word, different question.)
+ *   - `isLoading` is react-query's own flag, forwarded unchanged
+ *     (`status === 'loading'`). It stays true for a *disabled* query — v4
+ *     leaves a never-fetched query at `status: 'loading'` — which is what
+ *     `EditModelProviderDrawer` wants: keep spinning until org/project
+ *     hydrate rather than mount a form off an empty list. It flips false the
+ *     moment the query *errors* (a 403 under `retry: false`), so a permission
+ *     failure shows the (empty) surface instead of spinning forever.
+ *
+ *     Deliberately NOT `isInitialLoading` (`isLoading && isFetching`), which
+ *     is false for a disabled query and would make the drawer skip its
+ *     spinner and mount the form off an empty list — the exact failure this
+ *     signal exists to prevent.
  */
 export function useAllModelProvidersList() {
   const { project, organization, hasPermission } = useOrganizationTeamProject();
@@ -84,13 +93,10 @@ export function useAllModelProvidersList() {
   // `activeQuery.data?.providers` the right type here with no cast needed.
   return {
     providers: activeQuery.data?.providers ?? NO_PROVIDERS,
-    // The flat list definitively arrived (see the "Note on the loading
-    // signal" block above): false for disabled, in-flight, and errored
-    // queries.
+    // See the "Note on the loading signal" block above for what each of these
+    // answers, and why they are not complementary.
     isReady: activeQuery.isSuccess,
-    // Spinner signal — "no definitive answer yet". True while the query is
-    // disabled or fetching; false once it resolves OR errors.
-    isLoading: !activeQuery.isSuccess && !activeQuery.isError,
+    isLoading: activeQuery.isLoading,
     refetch: activeQuery.refetch,
   } as const;
 }
@@ -117,7 +123,7 @@ export function findModelProviderById({
   providers,
   modelProviderId,
 }: {
-  providers: MaybeStoredModelProvider[];
+  providers: readonly MaybeStoredModelProvider[];
   modelProviderId: string | undefined;
 }): MaybeStoredModelProvider | undefined {
   if (!isResolvableProviderId(modelProviderId)) return undefined;

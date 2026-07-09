@@ -138,15 +138,14 @@ export const EditModelProviderForm = ({
   //     server treats it as a create, and a phantom duplicate row is written
   //     (#5380 P2).
   const cannotResolveTarget = isTargetingSpecificRow && !existingRow;
-  //   - Whether to show the "no longer exists" copy. Only truthful on a
-  //     DEFINITIVE miss: the flat list has actually arrived
-  //     (`isAllProvidersReady`) and the row is still absent. Gating on
-  //     readiness stops the copy flashing mid-load and stops it lying when
-  //     the list merely failed to load. (An `allProviders.length > 0` proxy
+  //   - Whether to show the "no longer exists" copy. This is the subset of
+  //     `cannotResolveTarget` where the flat list has DEFINITIVELY arrived, so
+  //     the row is known absent rather than merely unresolved. Gating on
+  //     readiness stops the copy flashing mid-load and stops it lying when the
+  //     list simply failed to load. (An `allProviders.length > 0` proxy
   //     mis-reads a legitimately empty org as "not loaded" and never fires —
   //     the original #5380 stale-miss hole.)
-  const staleMiss =
-    isTargetingSpecificRow && isAllProvidersReady && !existingRow;
+  const staleMiss = cannotResolveTarget && isAllProvidersReady;
 
   // Memoized so the blank template keeps a stable identity across renders:
   // useModelProviderForm's reset effect lists `provider.extraHeaders` in its
