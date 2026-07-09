@@ -777,37 +777,38 @@ export function EvaluatorEditorBody({
           </Text>
         )}
 
-        <Field.Root required>
-          <Field.Label>Evaluator Name</Field.Label>
-          <Input
-            {...form.register("name")}
-            placeholder="Enter evaluator name"
-            data-testid="evaluator-name-input"
-          />
-        </Field.Root>
-
-        {hasSettings && evaluatorType && settingsSchema && (
-          <DynamicZodForm
-            schema={settingsSchema}
-            evaluatorType={evaluatorType as EvaluatorTypes}
-            prefix="settings"
-            errors={form.formState.errors.settings}
-            variant="default"
-            // Pairwise renders include_metrics and has_golden_answer as
-            // inline controls in PairwiseConfigForm (the latter sits right
-            // next to the Golden field picker it toggles, #5378); suppress
-            // the generic renderers here so the user doesn't see two
-            // competing UIs for the same fields. Same for select-best's
-            // inline include_metrics toggles.
-            skipFields={
-              isPairwise
-                ? ["include_metrics", "has_golden_answer"]
-                : isSelectBest
-                  ? ["include_metrics"]
-                  : undefined
-            }
-          />
+        {/* Shortcut flows (Pairwise / N-way from Add-to-Evaluation) skip
+            the generic Evaluator Name + Model/Prompt/Swap-and-Confirm/
+            Allow-Tie noise entirely. Those knobs remain editable from
+            the full evaluator editor (click the column chip after
+            creation) — for the create shortcut we jump straight to the
+            fields the user actually needs to pick: Variant A/B (or
+            Variants), Golden, and Include-metrics. Name defaults to the
+            evaluator definition's name (already seeded in form.reset). */}
+        {!isPairwise && !isSelectBest && (
+          <Field.Root required>
+            <Field.Label>Evaluator Name</Field.Label>
+            <Input
+              {...form.register("name")}
+              placeholder="Enter evaluator name"
+              data-testid="evaluator-name-input"
+            />
+          </Field.Root>
         )}
+
+        {hasSettings &&
+          evaluatorType &&
+          settingsSchema &&
+          !isPairwise &&
+          !isSelectBest && (
+            <DynamicZodForm
+              schema={settingsSchema}
+              evaluatorType={evaluatorType as EvaluatorTypes}
+              prefix="settings"
+              errors={form.formState.errors.settings}
+              variant="default"
+            />
+          )}
 
         {isWorkflowEvaluator && workflowCard && (
           <VStack gap={4} paddingTop={4} align="stretch">
