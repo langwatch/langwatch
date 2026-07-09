@@ -227,6 +227,23 @@ describe("ReportStorageForHourCommand", () => {
     });
   });
 
+  describe("given a zero-megabyte hour", () => {
+    /** @scenario A zero-megabyte hour is marked reported without a billing call */
+    it("stamps the cursor without calling Stripe", async () => {
+      mockStorageUsageHourly.findHour.mockResolvedValue({
+        megabytes: 0,
+        reportedAt: null,
+      });
+      const handler = await createHandler();
+
+      const result = await handler.handle(makeCommand());
+
+      expect(result).toEqual([]);
+      expect(mockReportUsageDelta).not.toHaveBeenCalled();
+      expect(mockStorageUsageHourly.markReported).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("when the meter event already exists on Stripe", () => {
     /** @scenario A Stripe duplicate is treated as already reported */
     it("treats the duplicate as reported and stamps the cursor without a failure", async () => {
@@ -345,6 +362,54 @@ describe("ReportStorageForHourCommand", () => {
       expect(
         mockStorageBillingCheckpoints.recordFailure,
       ).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a single permanently-rejected hour then a healthy hour", () => {
+    // Anti-starvation guard: one poison hour cannot trip the breaker. A permanent
+    // rejection is one-shot (no self-dispatch), and nothing re-drives an
+    // unreported hour — the dispatcher advances by max(measured hour), not by
+    // reportedAt — so the failure count only ever reaches 1 from it, and the next
+    // healthy hour clears it. The breaker only trips on *systemic* failure.
+    it("bumps the breaker to one, then the next success clears it", async () => {
+      // 1st hour: permanent rejection from a clean breaker → failures = 1.
+      mockStorageBillingCheckpoints.getCheckpoint.mockResolvedValueOnce(null);
+      mockStorageUsageHourly.findHour.mockResolvedValueOnce({
+        megabytes: 42,
+        reportedAt: null,
+      });
+      mockReportUsageDelta.mockResolvedValueOnce([
+        { reported: false, error: "invalid_request" },
+      ]);
+
+      await (await createHandler()).handle(makeCommand("org-1", SEALED_HOUR));
+
+      expect(mockStorageBillingCheckpoints.recordFailure).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        billingMonth: EXPECTED_MONTH,
+        consecutiveFailures: 1,
+      });
+
+      // 2nd hour: healthy, breaker now at 1 → success clears it to 0.
+      mockStorageBillingCheckpoints.getCheckpoint.mockResolvedValueOnce({
+        lastReportedTotal: 0,
+        pendingReportedTotal: null,
+        consecutiveFailures: 1,
+      });
+      mockStorageUsageHourly.findHour.mockResolvedValueOnce({
+        megabytes: 7,
+        reportedAt: null,
+      });
+      mockReportUsageDelta.mockResolvedValueOnce([{ reported: true }]);
+
+      await (await createHandler()).handle(
+        makeCommand("org-1", "2026-02-15T13:00:00.000Z"),
+      );
+
+      expect(mockStorageBillingCheckpoints.recordSuccess).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        billingMonth: EXPECTED_MONTH,
+      });
     });
   });
 

@@ -15,6 +15,14 @@ const BYTES_PER_MIB = 1024 * 1024;
  */
 export const STORAGE_BACKFILL_MAX_HOURS = 840;
 
+/**
+ * Most hours measured in a single dispatch run. Bounds how many heavy
+ * `byteSize()` measurements one worker job runs back-to-back; a larger backlog
+ * (post-outage) drains across successive events. One week keeps steady-state
+ * (a 1-hour gap) unaffected while capping recovery bursts.
+ */
+export const STORAGE_MAX_HOURS_PER_RUN = 168;
+
 /** Narrow contracts so the service depends on capabilities, not whole services. */
 export interface StorageMeterDispatchDeps {
   isMeteringEnabled: (organizationId: string) => Promise<boolean>;
@@ -40,6 +48,17 @@ export interface StorageMeterDispatchDeps {
     organizationId: string,
     fn: () => Promise<void>,
   ) => Promise<void>;
+  /**
+   * Optional measure-time drift guard (ADR-027 Phase 4.5). Observational only —
+   * its `check` never throws and never alters the billed value.
+   */
+  tripwire?: {
+    check: (params: {
+      organizationId: string;
+      sealedHour: Date;
+      measuredBytes: number;
+    }) => Promise<void>;
+  };
   /** Injectable wall clock for deterministic tests. */
   now?: () => Date;
 }
@@ -119,14 +138,38 @@ export class StorageMeterDispatchService {
       firstMs = earliestAllowedMs;
     }
 
-    // 5. Measure → persist → enqueue, one sealed hour at a time. A measurement
+    // 5. Cap the hours measured in ONE run so a large catch-up (e.g. after an
+    //    outage) doesn't run hundreds of heavy measurements back-to-back in a
+    //    single worker job; the remainder catches up on subsequent events.
+    const runEndMs = Math.min(
+      sealBoundaryMs,
+      firstMs + (STORAGE_MAX_HOURS_PER_RUN - 1) * MS_PER_HOUR,
+    );
+    if (runEndMs < sealBoundaryMs) {
+      logger.info(
+        {
+          organizationId,
+          measuringHours: (runEndMs - firstMs) / MS_PER_HOUR + 1,
+          remainingHours: (sealBoundaryMs - runEndMs) / MS_PER_HOUR,
+        },
+        "storage catch-up capped this run; remainder resumes on the next event",
+      );
+    }
+
+    // 6. Measure → persist → enqueue, one sealed hour at a time. A measurement
     //    that throws aborts the loop (no silent under-bill); progress is durable
     //    per hour, so the next wake-up resumes from the last recorded hour.
-    for (let ms = firstMs; ms <= sealBoundaryMs; ms += MS_PER_HOUR) {
+    for (let ms = firstMs; ms <= runEndMs; ms += MS_PER_HOUR) {
       const sealedHour = new Date(ms);
       const bytes = await this.deps.measureBytesAt({
         organizationId,
         sealedHour,
+      });
+      // Observational drift guard — never throws, never changes the billed value.
+      await this.deps.tripwire?.check({
+        organizationId,
+        sealedHour,
+        measuredBytes: bytes,
       });
       const megabytes = Math.ceil(bytes / BYTES_PER_MIB);
 
