@@ -36,13 +36,16 @@ export function SaveAndRunMenu({
 }: SaveAndRunMenuProps) {
   const { project } = useOrganizationTeamProject();
   const { data: prompts } = useAllPromptsForProject();
-  const { data: agents } = api.agents.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
-  );
 
   const [searchValue, setSearchValue] = useState("");
   const [open, setOpen] = useState(false);
+
+  // Agents are only shown inside the popover, and the trigger is static —
+  // don't fetch them until the menu is opened.
+  const { data: agents } = api.agents.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: open && !!project?.id },
+  );
   const inputRef = useRef<HTMLInputElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
