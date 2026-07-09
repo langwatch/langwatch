@@ -1,8 +1,17 @@
-import { Box, Button, Field, HStack, Input, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Field,
+  HStack,
+  Input,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import {
   findModelProviderById,
+  isResolvableProviderId,
   useAllModelProvidersList,
 } from "../../hooks/useAllModelProvidersList";
 import { useDrawer } from "../../hooks/useDrawer";
@@ -55,7 +64,11 @@ export const EditModelProviderForm = ({
   });
   // Flat, uncollapsed list — see useAllModelProvidersList for why the
   // lookup below can't use the collapsed `providers` Record above.
-  const { providers: allProviders } = useAllModelProvidersList();
+  // `isAllProvidersReady` is the hook's "the list definitively arrived"
+  // signal (react-query isSuccess), used below to tell a real stale miss
+  // apart from a list that simply hasn't loaded.
+  const { providers: allProviders, isReady: isAllProvidersReady } =
+    useAllModelProvidersList();
   const { closeDrawer } = useDrawer();
   const { project, team, organization, hasPermission } =
     useOrganizationTeamProject();
@@ -108,23 +121,53 @@ export const EditModelProviderForm = ({
   //     Record above is the wrong source for this lookup (#5380).
   //   - `modelProviderId` undefined → no specific target, fresh blank
   //     (deep-link from evaluator selector or similar).
-  const provider: MaybeStoredModelProvider = useMemo(() => {
-    const existing = findModelProviderById({
-      providers: allProviders,
-      modelProviderId,
-    });
-    if (existing) return existing;
-    return {
-      provider: providerKey,
-      enabled: false,
-      customKeys: null,
-      models: null,
-      embeddingsModels: null,
-      disabledByDefault: true,
-      deploymentMapping: null,
-      extraHeaders: [],
-    };
-  }, [allProviders, modelProviderId, providerKey]);
+  const isTargetingSpecificRow = isResolvableProviderId(modelProviderId);
+  const existingRow = useMemo(
+    () =>
+      isTargetingSpecificRow
+        ? findModelProviderById({ providers: allProviders, modelProviderId })
+        : undefined,
+    [isTargetingSpecificRow, allProviders, modelProviderId],
+  );
+
+  // Two DISTINCT concerns, deliberately not collapsed into one flag:
+  //   - Whether we can SUBMIT. An id-targeted edit that didn't resolve to a
+  //     real row must never submit, in EVERY load state (loading, disabled,
+  //     errored, or genuinely empty), so this gates purely on "targeting a
+  //     row we couldn't resolve". Otherwise Save ships `id: undefined`, the
+  //     server treats it as a create, and a phantom duplicate row is written
+  //     (#5380 P2).
+  const cannotResolveTarget = isTargetingSpecificRow && !existingRow;
+  //   - Whether to show the "no longer exists" copy. Only truthful on a
+  //     DEFINITIVE miss: the flat list has actually arrived
+  //     (`isAllProvidersReady`) and the row is still absent. Gating on
+  //     readiness stops the copy flashing mid-load and stops it lying when
+  //     the list merely failed to load. (An `allProviders.length > 0` proxy
+  //     mis-reads a legitimately empty org as "not loaded" and never fires —
+  //     the original #5380 stale-miss hole.)
+  const staleMiss =
+    isTargetingSpecificRow && isAllProvidersReady && !existingRow;
+
+  // Memoized so the blank template keeps a stable identity across renders:
+  // useModelProviderForm's reset effect lists `provider.extraHeaders` in its
+  // deps, so a fresh `{ ..., extraHeaders: [] }` literal on every render would
+  // refire that effect each render → setState → re-render → "Maximum update
+  // depth exceeded" and a wiped-out Add form. Keyed on the resolved row (or
+  // its absence) and the provider key only.
+  const provider: MaybeStoredModelProvider = useMemo(
+    () =>
+      existingRow ?? {
+        provider: providerKey,
+        enabled: false,
+        customKeys: null,
+        models: null,
+        embeddingsModels: null,
+        disabledByDefault: true,
+        deploymentMapping: null,
+        extraHeaders: [],
+      },
+    [existingRow, providerKey],
+  );
 
   // Detect if provider is using environment variables (enabled but no stored customKeys)
   // Must be computed before the hook call so we can pass it to the hook
@@ -313,6 +356,12 @@ export const EditModelProviderForm = ({
 
   return (
     <VStack gap={4} align="start" width="full">
+      {staleMiss && (
+        <Text color="red.500" fontSize="sm">
+          This provider configuration no longer exists. It may have been deleted
+          from another session.
+        </Text>
+      )}
       <VStack align="start" width="full" gap={4}>
         <Field.Root width="full" required>
           <SmallLabel>
@@ -432,7 +481,9 @@ export const EditModelProviderForm = ({
             size="sm"
             colorPalette="orange"
             loading={state.isSaving || isValidatingApiKey}
-            disabled={!state.isDirty && !isAdvancedDirty}
+            disabled={
+              cannotResolveTarget || (!state.isDirty && !isAdvancedDirty)
+            }
             onClick={handleSave}
           >
             Save

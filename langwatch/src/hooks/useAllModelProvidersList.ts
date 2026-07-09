@@ -18,14 +18,24 @@ import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
  * looks up a row by id — not by provider key — must read from this flat
  * list instead, via `findModelProviderById` below.
  *
- * Note on the loading signal: a disabled query (the org/project id is
- * momentarily unresolved, e.g. before the app-shell context hydrates)
- * reports `isLoading: false` with `providers: []` — react-query only
- * reports `isLoading` for a query that's actually enabled and fetching.
- * Consumers that gate a seed-once form on "don't mount off an empty list"
- * (`EditModelProviderDrawer`) rely on the surrounding settings page having
- * already hydrated org/project before the drawer can even open; this hook
- * does not itself distinguish "genuinely empty" from "not ready yet".
+ * Note on the loading signal: the flat list answers two different questions,
+ * so this hook exposes two flags rather than one overloaded `isLoading`:
+ *
+ *   - `isReady` (≡ react-query `isSuccess`) means the list *definitively
+ *     arrived*: the query ran and resolved. It is false for a disabled query
+ *     (org/project id not yet hydrated), an in-flight fetch, AND an errored
+ *     one. A caller that must tell "genuinely empty" apart from "not loaded
+ *     yet" — e.g. deciding an id lookup is a real stale miss rather than a
+ *     not-ready list — gates on `isReady`, so an empty array only counts as
+ *     empty once `isReady` is true.
+ *   - `isLoading` here is a *spinner* signal: `!isSuccess && !isError`, i.e.
+ *     "no definitive answer yet". It stays true for a disabled query — in
+ *     react-query v4 a disabled query still reports `status: 'loading'`, and
+ *     a surface like `EditModelProviderDrawer` genuinely should keep spinning
+ *     until org/project hydrate rather than mount a form off an empty list.
+ *     It flips to false the moment the query *errors* (a 403 with
+ *     `retry:false`), so a permission failure shows the (empty) surface
+ *     instead of spinning forever.
  */
 export function useAllModelProvidersList() {
   const { project, organization, hasPermission } = useOrganizationTeamProject();
@@ -64,7 +74,13 @@ export function useAllModelProvidersList() {
   // `activeQuery.data?.providers` the right type here with no cast needed.
   return {
     providers: activeQuery.data?.providers ?? [],
-    isLoading: activeQuery.isLoading,
+    // The flat list definitively arrived (see the "Note on the loading
+    // signal" block above): false for disabled, in-flight, and errored
+    // queries.
+    isReady: activeQuery.isSuccess,
+    // Spinner signal — "no definitive answer yet". True while the query is
+    // disabled or fetching; false once it resolves OR errors.
+    isLoading: !activeQuery.isSuccess && !activeQuery.isError,
     refetch: activeQuery.refetch,
   } as const;
 }

@@ -195,48 +195,60 @@ const rowB: MaybeStoredModelProvider = {
   scopeId: "proj-1",
 };
 
-/** Collapsed record has only rowB; flat list has both rows; nothing loading. */
+/**
+ * Minimal but *realistic* TanStack Query v4 result. `useAllModelProvidersList`
+ * derives its spinner signal from `isSuccess`/`isError`, not just `isLoading`
+ * — a mock that omits them leaves those gates `undefined` (silently falsy), so
+ * the drawer's spinner/mount gate would be exercised by accident. These
+ * helpers set the full status triplet.
+ */
+function readyQueryResult<T>(data: T) {
+  return {
+    data,
+    isSuccess: true,
+    isError: false,
+    isLoading: false,
+    status: "success" as const,
+    refetch: vi.fn(),
+  };
+}
+
+function notReadyQueryResult() {
+  return {
+    data: undefined,
+    isSuccess: false,
+    isError: false,
+    isLoading: true,
+    status: "loading" as const,
+    refetch: vi.fn(),
+  };
+}
+
+/** Collapsed record has only rowB; flat list has both rows; every query resolved. */
 function primeQueriesLoaded() {
-  mockGetAllForProjectForFrontendQuery.mockReturnValue({
-    data: { providers: { openai: rowB }, modelMetadata: {} },
-    isLoading: false,
-    refetch: vi.fn(),
-  });
-  mockListAllForOrganizationForFrontendQuery.mockReturnValue({
-    data: { providers: [rowA, rowB], modelMetadata: {} },
-    isLoading: false,
-    refetch: vi.fn(),
-  });
-  mockListAllForProjectForFrontendQuery.mockReturnValue({
-    data: { providers: [rowA, rowB], modelMetadata: {} },
-    isLoading: false,
-    refetch: vi.fn(),
-  });
+  mockGetAllForProjectForFrontendQuery.mockReturnValue(
+    readyQueryResult({ providers: { openai: rowB }, modelMetadata: {} }),
+  );
+  const flat = readyQueryResult({ providers: [rowA, rowB], modelMetadata: {} });
+  mockListAllForOrganizationForFrontendQuery.mockReturnValue(flat);
+  mockListAllForProjectForFrontendQuery.mockReturnValue(flat);
 }
 
 /**
- * Collapsed record loaded normally; BOTH flat-list queries (org and
- * project variants) still loading with no data — `hasPermission` mocks
- * true for everything, so `useAllModelProvidersList` reads the org
- * variant, but priming both keeps this fixture correct regardless of
- * which branch is active.
+ * Collapsed record resolved normally; BOTH flat-list queries (org and project
+ * variants) still in-flight — no definitive answer yet (`isSuccess: false,
+ * isError: false`), so the hook's spinner signal stays true and the drawer
+ * must keep spinning rather than mount the form off an empty list.
+ * `hasPermission` mocks true, so `useAllModelProvidersList` reads the org
+ * variant; priming both keeps this fixture correct regardless of branch.
  */
 function primeQueriesFlatListLoading() {
-  mockGetAllForProjectForFrontendQuery.mockReturnValue({
-    data: { providers: { openai: rowB }, modelMetadata: {} },
-    isLoading: false,
-    refetch: vi.fn(),
-  });
-  mockListAllForOrganizationForFrontendQuery.mockReturnValue({
-    data: undefined,
-    isLoading: true,
-    refetch: vi.fn(),
-  });
-  mockListAllForProjectForFrontendQuery.mockReturnValue({
-    data: undefined,
-    isLoading: true,
-    refetch: vi.fn(),
-  });
+  mockGetAllForProjectForFrontendQuery.mockReturnValue(
+    readyQueryResult({ providers: { openai: rowB }, modelMetadata: {} }),
+  );
+  const flat = notReadyQueryResult();
+  mockListAllForOrganizationForFrontendQuery.mockReturnValue(flat);
+  mockListAllForProjectForFrontendQuery.mockReturnValue(flat);
 }
 
 function renderDrawer(

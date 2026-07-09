@@ -175,22 +175,58 @@ const rowB: MaybeStoredModelProvider = {
   scopeId: "proj-1",
 };
 
-function primeQueries() {
-  mockGetAllForProjectForFrontendQuery.mockReturnValue({
-    data: { providers: { openai: rowB }, modelMetadata: {} },
+/**
+ * Minimal but *realistic* TanStack Query v4 result. `useAllModelProvidersList`
+ * gates on `isSuccess`/`isError` (not just `isLoading`) to tell "the list
+ * definitively arrived" apart from "not loaded yet". A mock that returns only
+ * `{ data, isLoading }` leaves those gates `undefined` — silently falsy — so
+ * every `isReady`-derived branch would be untested by accident. These helpers
+ * set the full status triplet so the gates actually run.
+ */
+function readyQueryResult<T>(data: T) {
+  return {
+    data,
+    isSuccess: true,
+    isError: false,
     isLoading: false,
+    status: "success" as const,
     refetch: vi.fn(),
-  });
-  mockListAllForOrganizationForFrontendQuery.mockReturnValue({
-    data: { providers: [rowA, rowB], modelMetadata: {} },
-    isLoading: false,
+  };
+}
+
+function notReadyQueryResult() {
+  return {
+    data: undefined,
+    isSuccess: false,
+    isError: false,
+    isLoading: true,
+    status: "loading" as const,
     refetch: vi.fn(),
-  });
-  mockListAllForProjectForFrontendQuery.mockReturnValue({
-    data: { providers: [rowA, rowB], modelMetadata: {} },
-    isLoading: false,
-    refetch: vi.fn(),
-  });
+  };
+}
+
+/**
+ * Primes the collapsed-record query and BOTH flat-list queries (org and
+ * project variants). `flatList` drives the uncollapsed list the row-by-id
+ * resolution reads: an explicit row array (ready), `[]` (ready but empty),
+ * or "not-ready" (query still disabled/in-flight, no definitive answer).
+ */
+function primeQueries({
+  flatList = [rowA, rowB],
+  collapsed = { openai: rowB },
+}: {
+  flatList?: MaybeStoredModelProvider[] | "not-ready";
+  collapsed?: Record<string, MaybeStoredModelProvider>;
+} = {}) {
+  mockGetAllForProjectForFrontendQuery.mockReturnValue(
+    readyQueryResult({ providers: collapsed, modelMetadata: {} }),
+  );
+  const flatResult =
+    flatList === "not-ready"
+      ? notReadyQueryResult()
+      : readyQueryResult({ providers: flatList, modelMetadata: {} });
+  mockListAllForOrganizationForFrontendQuery.mockReturnValue(flatResult);
+  mockListAllForProjectForFrontendQuery.mockReturnValue(flatResult);
 }
 
 /**
@@ -229,6 +265,172 @@ describe("Feature: editing a model-provider row resolves the correct row by id",
 
   afterEach(() => {
     cleanup();
+  });
+
+  describe("given an id-targeted edit whose row is absent from the flat list", () => {
+    const renderStale = () =>
+      render(
+        <Wrapper>
+          <EditModelProviderForm
+            projectId="proj-1"
+            organizationId="org-1"
+            modelProviderId="row-stale"
+            providerKey="openai"
+          />
+        </Wrapper>,
+      );
+
+    describe("when the flat list has arrived and is non-empty", () => {
+      beforeEach(() => {
+        primeQueries({ flatList: [rowA, rowB] });
+        renderStale();
+      });
+
+      /**
+       * @regression #5380 P2 stale-id phantom-row: a resolvable id that no
+       * longer names a row must surface the miss and block Save, never
+       * silently degrade to the create path and write a duplicate row.
+       */
+      it("shows the provider-no-longer-exists error copy", () => {
+        expect(screen.getByText(/no longer exists/i)).toBeInTheDocument();
+      });
+
+      it("keeps Save disabled and never calls mutateAsync", () => {
+        expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
+        expect(mockMutateAsync).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the flat list has arrived and is empty", () => {
+      beforeEach(() => {
+        primeQueries({ flatList: [], collapsed: {} });
+        renderStale();
+      });
+
+      /**
+       * @regression #5380 P2 empty-org hole: a stale deep-link into an org
+       * with zero providers must STILL block Save. The pre-fix guard proxied
+       * "list loaded" as `allProviders.length > 0`, which reads a legitimately
+       * empty org as "not loaded" — the miss never fired and the phantom
+       * duplicate slipped through. This is the exact hole: it fails against
+       * the pre-fix draft (empty list → no error copy).
+       */
+      it("shows the provider-no-longer-exists error copy", () => {
+        expect(screen.getByText(/no longer exists/i)).toBeInTheDocument();
+      });
+
+      it("keeps Save disabled and never calls mutateAsync", () => {
+        expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
+        expect(mockMutateAsync).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the flat list has not arrived yet", () => {
+      beforeEach(() => {
+        primeQueries({ flatList: "not-ready" });
+        renderStale();
+      });
+
+      /**
+       * @regression #5380 P2: the miss is not *definitive* until the list
+       * arrives, so the error copy must not flash mid-load — yet Save still
+       * stays blocked so an unresolved target can never submit.
+       */
+      it("does not render the no-longer-exists error copy while loading", () => {
+        expect(screen.queryByText(/no longer exists/i)).toBeNull();
+      });
+
+      it("keeps Save disabled while the target is unresolved", () => {
+        expect(screen.getByRole("button", { name: /^save$/i })).toBeDisabled();
+      });
+    });
+  });
+
+  describe("given a brand-new provider (modelProviderId=new)", () => {
+    const renderNew = () =>
+      render(
+        <Wrapper>
+          <EditModelProviderForm
+            projectId="proj-1"
+            organizationId="org-1"
+            modelProviderId="new"
+            providerKey="openai"
+          />
+        </Wrapper>,
+      );
+
+    describe("when the form first renders", () => {
+      beforeEach(() => {
+        primeQueries();
+        renderNew();
+      });
+
+      it("renders a blank credential field and no stale-miss error", () => {
+        expect(getInputNearLabel("OPENAI_API_KEY").value).toBe("");
+        expect(screen.queryByText(/no longer exists/i)).toBeNull();
+      });
+    });
+
+    describe("when the user enters a key and clicks Save", () => {
+      beforeEach(async () => {
+        primeQueries();
+        renderNew();
+        const user = userEvent.setup();
+        const input = getInputNearLabel("OPENAI_API_KEY");
+        await user.clear(input);
+        await user.type(input, "sk-brand-new-key");
+        await user.click(screen.getByRole("button", { name: /^save$/i }));
+      });
+
+      it("submits a create with no id (server upserts a fresh row)", async () => {
+        await waitFor(() => {
+          expect(mockMutateAsync).toHaveBeenCalledTimes(1);
+        });
+        expect(mockMutateAsync).toHaveBeenCalledWith(
+          expect.not.objectContaining({ id: expect.anything() }),
+        );
+      });
+    });
+
+    /**
+     * @regression #5380 add-flow render loop: the blank template must keep a
+     * stable reference across renders. The pre-fix draft dropped the
+     * `useMemo`, so `extraHeaders: []` was reallocated every render;
+     * useModelProviderForm's reset effect (deps include `provider.extraHeaders`)
+     * then refired on every render — "Maximum update depth exceeded" — and
+     * re-seeded the form, wiping the user's input. Re-rendering with unchanged
+     * props exercises the runtime path and observes the clobber, not source
+     * text.
+     */
+    describe("when the parent re-renders with unchanged props after the user typed", () => {
+      it("retains the user's typed key (the blank template is not re-seeded per render)", async () => {
+        primeQueries();
+        const user = userEvent.setup();
+        const { rerender } = renderNew();
+
+        const input = getInputNearLabel("OPENAI_API_KEY");
+        await user.clear(input);
+        await user.type(input, "sk-survives-rerender");
+        expect(getInputNearLabel("OPENAI_API_KEY").value).toBe(
+          "sk-survives-rerender",
+        );
+
+        rerender(
+          <Wrapper>
+            <EditModelProviderForm
+              projectId="proj-1"
+              organizationId="org-1"
+              modelProviderId="new"
+              providerKey="openai"
+            />
+          </Wrapper>,
+        );
+
+        expect(getInputNearLabel("OPENAI_API_KEY").value).toBe(
+          "sk-survives-rerender",
+        );
+      });
+    });
   });
 
   describe("given two openai rows exist at different scopes (org-wide and project-scoped)", () => {

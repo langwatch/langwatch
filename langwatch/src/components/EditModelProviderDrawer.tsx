@@ -25,7 +25,12 @@ export const EditModelProviderDrawer = (
   const { closeDrawer } = useDrawer();
   const { providers, isLoading } = useModelProvidersSettings({ projectId });
   // Resolve by id from the flat list — see useAllModelProvidersList for
-  // why the collapsed Record is wrong here (#5380).
+  // why the collapsed Record is wrong here (#5380). `isAllProvidersLoading`
+  // is that hook's spinner signal ("no definitive answer yet"): true while
+  // the flat-list query is disabled or in-flight, false once it resolves OR
+  // errors — so the gate below keeps spinning until the list is genuinely
+  // ready instead of mounting the form off an empty list, but does not spin
+  // forever if the query 403s.
   const { providers: allProviders, isLoading: isAllProvidersLoading } =
     useAllModelProvidersList();
 
