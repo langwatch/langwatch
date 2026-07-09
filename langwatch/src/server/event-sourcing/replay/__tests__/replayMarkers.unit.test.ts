@@ -3,12 +3,14 @@ import {
   aggregateKey,
   markPendingBatch,
   markCutoffBatch,
+  markCompletedBatch,
   unmarkBatch,
   getCompletedSet,
   getCutoffMarkers,
   cleanupAll,
   hasPreviousRun,
 } from "../replayMarkers";
+import { DONE_MARKER_TTL_SECONDS, doneMarkerKey } from "../replayConstants";
 
 /**
  * Create a minimal Redis mock with pipeline support.
@@ -20,6 +22,7 @@ import {
 function createRedisMock() {
   const store = new Map<string, Map<string, string>>(); // HSET storage
   const sets = new Map<string, Set<string>>(); // SADD storage
+  const strings = new Map<string, string>(); // SET storage
   const ttls = new Map<string, number>();
 
   const redis = {
@@ -53,6 +56,13 @@ function createRedisMock() {
           });
           return pipe;
         },
+        set: (key: string, value: string, mode?: string, seconds?: number) => {
+          pipelineOps.push(() => {
+            strings.set(key, value);
+            if (mode === "EX" && typeof seconds === "number") ttls.set(key, seconds);
+          });
+          return pipe;
+        },
         exec: async () => {
           for (const op of pipelineOps) op();
           pipelineOps.length = 0;
@@ -79,12 +89,17 @@ function createRedisMock() {
     hlen: async (key: string) => {
       return store.get(key)?.size ?? 0;
     },
+    get: async (key: string) => {
+      return strings.get(key) ?? null;
+    },
     del: async (key: string) => {
       store.delete(key);
       sets.delete(key);
+      strings.delete(key);
     },
     _store: store,
     _sets: sets,
+    _strings: strings,
     _ttls: ttls,
   };
 
@@ -217,6 +232,49 @@ describe("replayMarkers", () => {
           projectionName: "x",
           aggKeys: [],
         });
+        expect(await redis.hlen("projection-replay:cutoff:x")).toBe(0);
+      });
+    });
+  });
+
+  describe("markCompletedBatch", () => {
+    it("drops the active cutoff marker, writes a short-TTL done marker, and records completion", async () => {
+      const redis = createRedisMock();
+      const cutoffs = new Map([
+        ["t1:trace:a1", { timestamp: 1700000001000, eventId: "evt-010" }],
+        ["t1:trace:a2", { timestamp: 1700000002000, eventId: "evt-020" }],
+      ]);
+
+      // Active cutoff markers exist before completion.
+      await markCutoffBatch({ redis, projectionName: "traceSummary", cutoffs });
+
+      await markCompletedBatch({ redis, projectionName: "traceSummary", cutoffs });
+
+      // Cutoff hash is drained (stays bounded to in-flight aggregates)...
+      const markers = await redis.hgetall("projection-replay:cutoff:traceSummary");
+      expect(Object.keys(markers)).toHaveLength(0);
+
+      // ...the boundary lives in a separate short-TTL done key per aggregate...
+      expect(
+        await redis.get(doneMarkerKey("traceSummary", "t1:trace:a1")),
+      ).toBe("1700000001000:evt-010");
+      expect(
+        await redis.get(doneMarkerKey("traceSummary", "t1:trace:a2")),
+      ).toBe("1700000002000:evt-020");
+      expect(redis._ttls.get(doneMarkerKey("traceSummary", "t1:trace:a1"))).toBe(
+        DONE_MARKER_TTL_SECONDS,
+      );
+
+      // ...and completion is recorded for resume accounting.
+      const completed = await redis.smembers("projection-replay:completed:traceSummary");
+      expect(completed).toContain("t1:trace:a1");
+      expect(completed).toContain("t1:trace:a2");
+    });
+
+    describe("when cutoffs map is empty", () => {
+      it("skips without errors", async () => {
+        const redis = createRedisMock();
+        await markCompletedBatch({ redis, projectionName: "x", cutoffs: new Map() });
         expect(await redis.hlen("projection-replay:cutoff:x")).toBe(0);
       });
     });

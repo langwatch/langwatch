@@ -64,6 +64,7 @@ describe("Evaluators Endpoints", () => {
       expect(result.archivedAt).toBeNull();
     });
 
+    /** @scenario "Generate slug from evaluator name on creation" */
     it("auto-generates slug from evaluator name", async () => {
       const result = await caller.evaluators.create({
         projectId,
@@ -76,6 +77,7 @@ describe("Evaluators Endpoints", () => {
       expect(result.slug).toMatch(/^my-custom-evaluator-[a-zA-Z0-9_-]{5}$/);
     });
 
+    /** @scenario "Slug uniqueness within project" */
     it("generates unique slugs for evaluators with same name", async () => {
       const result1 = await caller.evaluators.create({
         projectId,

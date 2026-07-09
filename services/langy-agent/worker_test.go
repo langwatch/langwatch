@@ -10,13 +10,13 @@ import (
 func TestFilterSensitiveEnv_RemovesManagerSecrets(t *testing.T) {
 	// Snapshot original env so we can restore after the test.
 	for k, v := range map[string]string{
-		"LANGY_INTERNAL_SECRET":      "must-not-leak",
-		"GITHUB_LANGY_APP_ID":        "must-not-leak",
-		"CREDENTIALS_SECRET":         "must-not-leak",
-		"NEXTAUTH_URL":               "must-not-leak",
-		"NEXTAUTH_SECRET":            "must-not-leak",
-		"DATABASE_URL":               "must-not-leak",
-		"AWS_SECRET_ACCESS_KEY":      "must-not-leak",
+		"LANGY_INTERNAL_SECRET": "must-not-leak",
+		"GITHUB_LANGY_APP_ID":   "must-not-leak",
+		"CREDENTIALS_SECRET":    "must-not-leak",
+		"NEXTAUTH_URL":          "must-not-leak",
+		"NEXTAUTH_SECRET":       "must-not-leak",
+		"DATABASE_URL":          "must-not-leak",
+		"AWS_SECRET_ACCESS_KEY": "must-not-leak",
 		// Suffix patterns: any *_API_KEY / *_KEY / *_SECRET inherited from a
 		// local-dev .env must not reach the worker. The worker gets its own
 		// llmVirtualKey + langwatchApiKey injected via Credentials.* after.
@@ -32,23 +32,23 @@ func TestFilterSensitiveEnv_RemovesManagerSecrets(t *testing.T) {
 		// New suffix patterns: credential-bearing connection strings, DSNs,
 		// and the AWS_ACCESS_KEY_ID half of an AWS credential pair (ends in
 		// `_ID`, not `_KEY`, so the suffix block needs an explicit literal).
-		"REDIS_URL":                  "redis://user:secret@host:6379/0",
-		"POSTGRES_URL":               "postgres://user:secret@host:5432/db",
-		"CLICKHOUSE_URL":             "https://user:secret@host:8443/db",
-		"MONGODB_URI":                "mongodb://user:secret@host:27017/db",
-		"SENTRY_DSN":                 "https://abc123@o123.ingest.sentry.io/456",
-		"AWS_ACCESS_KEY_ID":          "AKIA_must_not_leak",
-		"GH_TOKEN":                   "ghp_inherited_must_not_leak",
-		"GITHUB_TOKEN":               "ghp_ci_token_must_not_leak",
-		"POSTGRES_PASSWORD":          "must-not-leak",
+		"REDIS_URL":         "redis://user:secret@host:6379/0",
+		"POSTGRES_URL":      "postgres://user:secret@host:5432/db",
+		"CLICKHOUSE_URL":    "https://user:secret@host:8443/db",
+		"MONGODB_URI":       "mongodb://user:secret@host:27017/db",
+		"SENTRY_DSN":        "https://abc123@o123.ingest.sentry.io/456",
+		"AWS_ACCESS_KEY_ID": "AKIA_must_not_leak",
+		"GH_TOKEN":          "ghp_inherited_must_not_leak",
+		"GITHUB_TOKEN":      "ghp_ci_token_must_not_leak",
+		"POSTGRES_PASSWORD": "must-not-leak",
 		// PASS-THROUGH cases: only entries WITHOUT credentials and without a
 		// blocked suffix. The OPENCODE_* env values the worker actually needs
 		// (OPENCODE_OTLP_ENDPOINT etc.) are explicitly re-injected by
 		// spawnOpenCode AFTER this filter runs, so filtering the inherited
 		// variants is correct.
-		"LANGY_MAX_WORKERS":          "keep-me", // LANGY_ prefix but not the secret one
-		"HOME":                       "keep-me",
-		"LANGWATCH_API_KEY_OUTER":    "keep-me", // worker injects its own LANGWATCH_API_KEY after; the _OUTER suffix is neither _KEY nor _SECRET
+		"LANGY_MAX_WORKERS":       "keep-me", // LANGY_ prefix but not the secret one
+		"HOME":                    "keep-me",
+		"LANGWATCH_API_KEY_OUTER": "keep-me", // worker injects its own LANGWATCH_API_KEY after; the _OUTER suffix is neither _KEY nor _SECRET
 	} {
 		t.Setenv(k, v)
 	}
@@ -115,6 +115,49 @@ func TestFilterSensitiveEnv_RemovesManagerSecrets(t *testing.T) {
 	if len(env) == 0 {
 		t.Fatalf("filterSensitiveEnv returned empty slice; PATH was %q", os.Getenv("PATH"))
 	}
+}
+
+// buildWorkerEnv must inject a distinct OPENCODE_SERVER_PASSWORD per worker.
+// A shared password would mean worker A's authProxy credential also
+// unlocks worker B's opencode — the exact hole Fix A′ (ADR-033) closes.
+func TestBuildWorkerEnv_InjectsUniqueOpenCodePassword(t *testing.T) {
+	creds := Credentials{
+		LangwatchAPIKey:   "lw-key",
+		GatewayBaseURL:    "https://gateway.internal",
+		LangwatchEndpoint: "https://app.langwatch.ai",
+	}
+
+	pwA, err := generateBearerToken()
+	if err != nil {
+		t.Fatalf("generateBearerToken: %v", err)
+	}
+	pwB, err := generateBearerToken()
+	if err != nil {
+		t.Fatalf("generateBearerToken: %v", err)
+	}
+
+	envA := buildWorkerEnv("conv-a", "/workspace/sessions/conv-a", creds, pwA)
+	envB := buildWorkerEnv("conv-b", "/workspace/sessions/conv-b", creds, pwB)
+
+	if got := valueOfEnv(envA, "OPENCODE_SERVER_PASSWORD"); got != pwA {
+		t.Fatalf("worker A env OPENCODE_SERVER_PASSWORD = %q, want %q", got, pwA)
+	}
+	if got := valueOfEnv(envB, "OPENCODE_SERVER_PASSWORD"); got != pwB {
+		t.Fatalf("worker B env OPENCODE_SERVER_PASSWORD = %q, want %q", got, pwB)
+	}
+	if pwA == pwB {
+		t.Fatalf("two workers must not share an OPENCODE_SERVER_PASSWORD")
+	}
+}
+
+func valueOfEnv(env []string, key string) string {
+	prefix := key + "="
+	for _, e := range env {
+		if strings.HasPrefix(e, prefix) {
+			return strings.TrimPrefix(e, prefix)
+		}
+	}
+	return ""
 }
 
 func TestOpenCodeSkillsDir_UnderOpenCodeConfig(t *testing.T) {

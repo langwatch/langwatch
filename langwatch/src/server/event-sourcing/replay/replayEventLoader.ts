@@ -12,18 +12,23 @@ export interface ClickHouseEventRow {
   EventVersion?: string;
   EventPayload: string;
   ProcessingTraceparent?: string;
+  IdempotencyKey?: string;
 }
 
-/** Simplified event type matching what fold projections consume. */
+/** Simplified event type matching what fold and map projections consume. */
 export interface ReplayEvent {
   id: string;
   aggregateId: string;
   aggregateType: string;
   tenantId: string;
+  /** Alias of `timestamp`; matches the canonical domain `Event.createdAt`. */
+  createdAt: number;
+  /** Retained for backwards-compat with replay-internal call sites. */
   timestamp: number;
   occurredAt: number;
   type: string;
   version: string;
+  idempotencyKey: string;
   data: unknown;
   metadata?: { processingTraceparent?: string };
 }
@@ -33,6 +38,11 @@ export interface DiscoveredAggregate {
   tenantId: string;
   aggregateType: string;
   aggregateId: string;
+}
+
+/** Discovered aggregate plus the distinct event types found on it. */
+export interface DiscoveredAggregateWithEventTypes extends DiscoveredAggregate {
+  eventTypes: string[];
 }
 
 function rowToEvent(row: ClickHouseEventRow): ReplayEvent {
@@ -51,10 +61,12 @@ function rowToEvent(row: ClickHouseEventRow): ReplayEvent {
     aggregateId: row.AggregateId,
     aggregateType: row.AggregateType,
     tenantId: row.TenantId,
+    createdAt: row.EventTimestamp,
     timestamp: row.EventTimestamp,
     occurredAt,
     type: row.EventType,
     version: row.EventVersion ?? "2025-01-01",
+    idempotencyKey: row.IdempotencyKey ?? row.EventId,
     data,
     metadata: row.ProcessingTraceparent
       ? { processingTraceparent: row.ProcessingTraceparent }
@@ -76,28 +88,30 @@ export async function discoverAffectedAggregates({
   eventTypes: readonly string[];
   sinceMs: number;
   tenantId?: string;
-}): Promise<DiscoveredAggregate[]> {
+}): Promise<DiscoveredAggregateWithEventTypes[]> {
   const tenantFilter = tenantId ? "AND TenantId = {tenantId:String}" : "";
   const params: Record<string, unknown> = { eventTypes: [...eventTypes], sinceMs };
   if (tenantId) params.tenantId = tenantId;
 
   const result = await client.query({
     query: `
-      SELECT DISTINCT
+      SELECT
         TenantId AS tenantId,
         AggregateType AS aggregateType,
-        AggregateId AS aggregateId
+        AggregateId AS aggregateId,
+        groupUniqArray(EventType) AS eventTypes
       FROM event_log
       WHERE EventType IN ({eventTypes:Array(String)})
         AND EventTimestamp >= {sinceMs:UInt64}
         ${tenantFilter}
+      GROUP BY TenantId, AggregateType, AggregateId
       ORDER BY TenantId
     `,
     query_params: params,
     format: "JSONEachRow",
   });
 
-  return (await result.json()) as DiscoveredAggregate[];
+  return (await result.json()) as DiscoveredAggregateWithEventTypes[];
 }
 
 /**
@@ -214,7 +228,8 @@ export async function loadEventsForAggregatesBulk({
   const result = await client.query({
     query: `
       SELECT EventId, EventTimestamp, EventOccurredAt, EventType, EventPayload,
-             EventVersion, TenantId, AggregateType, AggregateId, ProcessingTraceparent
+             EventVersion, TenantId, AggregateType, AggregateId, ProcessingTraceparent,
+             IdempotencyKey
       FROM event_log
       WHERE TenantId = {tenantId:String}
         AND AggregateId IN ({aggregateIds:Array(String)})
@@ -276,7 +291,8 @@ export async function batchLoadAggregateEvents({
 
   const query = `
     SELECT EventId, EventTimestamp, EventOccurredAt, EventType, EventPayload,
-           EventVersion, TenantId, AggregateType, AggregateId, ProcessingTraceparent
+           EventVersion, TenantId, AggregateType, AggregateId, ProcessingTraceparent,
+           IdempotencyKey
     FROM event_log
     WHERE TenantId = {tenantId:String}
       AND EventType IN ({eventTypes:Array(String)})

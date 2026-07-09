@@ -1,6 +1,7 @@
 import { generate } from "@langwatch/ksuid";
 import type { User } from "@prisma/client";
 import {
+  type OrganizationIntent,
   type OrganizationUserRole,
   PricingModel,
   RoleBindingScopeType,
@@ -132,6 +133,16 @@ export class OrganizationService {
     return this.repo.getProjectIds(organizationId);
   }
 
+  /**
+   * The org's declared primary intent (ADR-038); null = intent unset
+   * (legacy org). Consumed by the home resolver to pin the "/" landing.
+   */
+  async getPrimaryIntent(
+    organizationId: string,
+  ): Promise<OrganizationIntent | null> {
+    return this.repo.findPrimaryIntentById(organizationId);
+  }
+
   async findWithAdmins(
     organizationId: string,
   ): Promise<OrganizationWithAdmins | null> {
@@ -166,6 +177,7 @@ export class OrganizationService {
     orgName?: string;
     phoneNumber?: string;
     signUpData?: Record<string, unknown>;
+    primaryIntent?: OrganizationIntent | null;
     userDisplayName?: string | null;
   }): Promise<CreateAndAssignResult> {
     const orgName =
@@ -191,6 +203,7 @@ export class OrganizationService {
       teamSlug,
       phoneNumber: params.phoneNumber,
       signUpData: params.signUpData,
+      primaryIntent: params.primaryIntent,
       pricingModel: PricingModel.SEAT_EVENT,
     });
 

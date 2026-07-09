@@ -62,30 +62,56 @@ describe("isAtOrBeforeCutoffMarker", () => {
 });
 
 describe("RedisReplayMarkerChecker", () => {
+  // The checker reads the active cutoff marker (cutoff hash) and the terminal
+  // short-TTL "done" marker (separate key) in one pipeline. Mock that pipeline
+  // and let each test set the two returned values independently.
   function createChecker() {
-    const hget = vi.fn<(key: string, field: string) => Promise<string | null>>();
-    const redis = { hget };
+    const markers = { cutoff: null as string | null, done: null as string | null };
+    const hget = vi.fn<(key: string, field: string) => void>();
+    const get = vi.fn<(key: string) => void>();
+    const exec = vi.fn(async () => [
+      [null, markers.cutoff] as [Error | null, unknown],
+      [null, markers.done] as [Error | null, unknown],
+    ]);
+    const pipelineObj = {
+      hget: (key: string, field: string) => {
+        hget(key, field);
+        return pipelineObj;
+      },
+      get: (key: string) => {
+        get(key);
+        return pipelineObj;
+      },
+      exec,
+    };
+    const redis = { pipeline: () => pipelineObj };
     const checker = new RedisReplayMarkerChecker(redis);
-    return { checker, hget };
+    const setMarkers = (opts: { cutoff?: string | null; done?: string | null }) => {
+      markers.cutoff = opts.cutoff ?? null;
+      markers.done = opts.done ?? null;
+    };
+    return { checker, hget, get, setMarkers };
   }
 
   describe("when no marker exists", () => {
     it("returns 'process'", async () => {
-      const { checker, hget } = createChecker();
-      hget.mockResolvedValue(null);
+      const { checker, hget, get } = createChecker();
 
       await expect(checker.check("traceSummary", makeEvent())).resolves.toBe("process");
       expect(hget).toHaveBeenCalledWith(
         "projection-replay:cutoff:traceSummary",
         "tenant-1:trace:agg-1",
       );
+      expect(get).toHaveBeenCalledWith(
+        "projection-replay:done:traceSummary:tenant-1:trace:agg-1",
+      );
     });
   });
 
   describe("when marker is 'pending'", () => {
     it("throws ReplayDeferralError", async () => {
-      const { checker, hget } = createChecker();
-      hget.mockResolvedValue("pending");
+      const { checker, setMarkers } = createChecker();
+      setMarkers({ cutoff: "pending" });
 
       await expect(checker.check("traceSummary", makeEvent())).rejects.toThrow(ReplayDeferralError);
       await expect(checker.check("traceSummary", makeEvent())).rejects.toThrow("cutoff being recorded");
@@ -94,10 +120,10 @@ describe("RedisReplayMarkerChecker", () => {
 
   describe("when event is at or before cutoff", () => {
     it("returns 'skip' (replay handles it)", async () => {
-      const { checker, hget } = createChecker();
+      const { checker, setMarkers } = createChecker();
       // Cutoff: timestamp 1700000001000, eventId evt-010
       // Event:  timestamp 1700000000000, eventId evt-001 → before cutoff
-      hget.mockResolvedValue("1700000001000:evt-010");
+      setMarkers({ cutoff: "1700000001000:evt-010" });
 
       await expect(
         checker.check("traceSummary", makeEvent({ createdAt: 1700000000000, id: "evt-001" })),
@@ -107,10 +133,10 @@ describe("RedisReplayMarkerChecker", () => {
 
   describe("when event is after cutoff", () => {
     it("throws ReplayDeferralError", async () => {
-      const { checker, hget } = createChecker();
+      const { checker, setMarkers } = createChecker();
       // Cutoff: timestamp 1700000000000, eventId evt-001
       // Event:  timestamp 1700000002000, eventId evt-999 → after cutoff
-      hget.mockResolvedValue("1700000000000:evt-001");
+      setMarkers({ cutoff: "1700000000000:evt-001" });
 
       await expect(
         checker.check("traceSummary", makeEvent({ createdAt: 1700000002000, id: "evt-999" })),
@@ -123,8 +149,8 @@ describe("RedisReplayMarkerChecker", () => {
 
   describe("when event has same timestamp but later eventId", () => {
     it("throws ReplayDeferralError", async () => {
-      const { checker, hget } = createChecker();
-      hget.mockResolvedValue("1700000000000:evt-001");
+      const { checker, setMarkers } = createChecker();
+      setMarkers({ cutoff: "1700000000000:evt-001" });
 
       await expect(
         checker.check("traceSummary", makeEvent({ createdAt: 1700000000000, id: "evt-002" })),
@@ -134,8 +160,8 @@ describe("RedisReplayMarkerChecker", () => {
 
   describe("when event has same timestamp and same eventId", () => {
     it("returns 'skip' (at cutoff boundary)", async () => {
-      const { checker, hget } = createChecker();
-      hget.mockResolvedValue("1700000000000:evt-001");
+      const { checker, setMarkers } = createChecker();
+      setMarkers({ cutoff: "1700000000000:evt-001" });
 
       await expect(
         checker.check("traceSummary", makeEvent({ createdAt: 1700000000000, id: "evt-001" })),
@@ -143,9 +169,49 @@ describe("RedisReplayMarkerChecker", () => {
     });
   });
 
+  // Terminal "done" marker: replay has finished rebuilding this aggregate. The
+  // boundary must still skip events at/before the cutoff (a job staged but never
+  // active during the pause must not re-run and double-write) while letting
+  // genuinely newer events process live.
+  describe("when a done marker exists (replay finished) and no active cutoff", () => {
+    describe("and the event is at or before the cutoff", () => {
+      it("returns 'skip' so a staged late job does not double-write", async () => {
+        const { checker, setMarkers } = createChecker();
+        setMarkers({ cutoff: null, done: "1700000001000:evt-010" });
+
+        await expect(
+          checker.check("traceSummary", makeEvent({ createdAt: 1700000000000, id: "evt-001" })),
+        ).resolves.toBe("skip");
+      });
+    });
+
+    describe("and the event is after the cutoff", () => {
+      it("returns 'process' so genuinely newer events are not deferred forever", async () => {
+        const { checker, setMarkers } = createChecker();
+        setMarkers({ cutoff: null, done: "1700000000000:evt-001" });
+
+        await expect(
+          checker.check("traceSummary", makeEvent({ createdAt: 1700000002000, id: "evt-999" })),
+        ).resolves.toBe("process");
+      });
+    });
+  });
+
+  describe("when both an active cutoff and a done marker exist", () => {
+    it("the active cutoff takes precedence (a new replay is in flight)", async () => {
+      const { checker, setMarkers } = createChecker();
+      // Active replay defers a post-cutoff event even though a stale done marker
+      // from a prior run would have processed it.
+      setMarkers({ cutoff: "1700000000000:evt-001", done: "1600000000000:evt-000" });
+
+      await expect(
+        checker.check("traceSummary", makeEvent({ createdAt: 1700000002000, id: "evt-999" })),
+      ).rejects.toThrow(ReplayDeferralError);
+    });
+  });
+
   it("constructs the correct aggregate key from event fields", async () => {
-    const { checker, hget } = createChecker();
-    hget.mockResolvedValue(null);
+    const { checker, hget, get } = createChecker();
 
     await checker.check(
       "evalRun",
@@ -155,6 +221,9 @@ describe("RedisReplayMarkerChecker", () => {
     expect(hget).toHaveBeenCalledWith(
       "projection-replay:cutoff:evalRun",
       "proj_abc:evaluation:eval-42",
+    );
+    expect(get).toHaveBeenCalledWith(
+      "projection-replay:done:evalRun:proj_abc:evaluation:eval-42",
     );
   });
 });

@@ -316,19 +316,12 @@ func setupWorkerHome(workerHome string, creds Credentials, uid uint32, otelPlugi
 	return nil
 }
 
-// spawnOpenCode starts the opencode subprocess with the per-worker env and
-// drops into the per-conversation UID before exec. Combined with mode 0700
-// on workerHome and mode 0600 on config.json, this makes a sibling worker's
-// files unreachable to this process at the kernel level — open(2) returns
-// EACCES regardless of how the path is constructed.
-func spawnOpenCode(
-	ctx context.Context,
-	cfg Config,
-	conversationID, workerHome string,
-	uid uint32,
-	port int,
-	creds Credentials,
-) (*exec.Cmd, error) {
+// buildWorkerEnv assembles the environment for a worker's opencode
+// subprocess: the filtered inherited env plus per-worker credentials and
+// the per-worker OPENCODE_SERVER_PASSWORD. Pure and side-effect free —
+// factored out of spawnOpenCode so it's unit-testable without spawning a
+// real subprocess.
+func buildWorkerEnv(conversationID, workerHome string, creds Credentials, openCodePassword string) []string {
 	env := filterSensitiveEnv()
 	env = append(env,
 		"HOME="+workerHome,
@@ -346,6 +339,13 @@ func spawnOpenCode(
 		"OPENCODE_OTLP_PROTOCOL=http/protobuf",
 		"OPENCODE_OTLP_HEADERS=Authorization=Bearer "+creds.LangwatchAPIKey,
 		"OPENCODE_RESOURCE_ATTRIBUTES=tag.tags=langy,service.name=langy-agent,langwatch.thread.id="+conversationID,
+		// Requires opencode's HTTP control server to authenticate with HTTP
+		// Basic (user "opencode", this password) instead of serving every
+		// request unauthenticated. This is the sibling-isolation guarantee
+		// (ADR-033 Fix A′): env-injected, not a CLI flag, so it never lands
+		// in the world-readable /proc/<pid>/cmdline — only in
+		// /proc/<pid>/environ, which is 0400 and UID-gated.
+		"OPENCODE_SERVER_PASSWORD="+openCodePassword,
 	)
 	if creds.GithubToken != "" {
 		env = append(env,
@@ -353,11 +353,27 @@ func spawnOpenCode(
 			"GITHUB_LOGIN="+creds.GithubLogin,
 		)
 	}
+	return env
+}
 
+// spawnOpenCode starts the opencode subprocess with the per-worker env and
+// drops into the per-conversation UID before exec. Combined with mode 0700
+// on workerHome and mode 0600 on config.json, this makes a sibling worker's
+// files unreachable to this process at the kernel level — open(2) returns
+// EACCES regardless of how the path is constructed.
+func spawnOpenCode(
+	ctx context.Context,
+	cfg Config,
+	conversationID, workerHome string,
+	uid uint32,
+	port int,
+	creds Credentials,
+	openCodePassword string,
+) (*exec.Cmd, error) {
 	cmd := exec.CommandContext(ctx, cfg.OpenCodeBinaryPath,
 		"serve", "--port", fmt.Sprintf("%d", port), "--hostname", "127.0.0.1",
 	)
-	cmd.Env = env
+	cmd.Env = buildWorkerEnv(conversationID, workerHome, creds, openCodePassword)
 	cmd.Dir = workerHome
 	// Discard opencode's stdout/stderr. opencode emits LLM completions, tool
 	// outputs (env dumps, file contents), and the raw user prompt — all of

@@ -22,6 +22,7 @@ import {
   resolvePersonaHomeSafe,
   type PersonaResolution,
 } from "@ee/governance/services/personaResolver.service";
+import { getApp } from "~/server/app-layer/app";
 import { UsageStatsService } from "~/server/license-enforcement/usage-stats.service";
 import { featureFlagService } from "~/server/featureFlag";
 import { GovernanceOcsfExportService } from "@ee/governance/services/governanceOcsfExport.service";
@@ -97,14 +98,19 @@ export const governanceRouter = createTRPCRouter({
         hasManage,
         userPin,
         hasGovernanceUi,
+        organizationIntent,
       ] = await Promise.all([
         // hasApplicationTraces is part of setupState as of 9d2688c84.
         setupService.resolve(input.organizationId),
+        // The user's first project via team membership. Personal workspaces
+        // are excluded outright: they are the governance data home, never a
+        // navigable org project (ADR-038 v6).
         ctx.prisma.project.findFirst({
           where: {
             team: {
               organizationId: input.organizationId,
               members: { some: { userId } },
+              isPersonal: false,
             },
             archivedAt: null,
           },
@@ -134,9 +140,37 @@ export const governanceRouter = createTRPCRouter({
             organizationId: input.organizationId,
           })
           .catch(() => false),
+        // ADR-038: the org's declared intent, when set, decides the landing
+        // kind before persona detection and the user pin. Fail-safe like the
+        // sibling lookups: a transient error means "no intent", which takes
+        // the legacy path instead of 500ing the whole resolve.
+        getApp()
+          .organizations.getPrimaryIntent(input.organizationId)
+          .catch(() => null),
       ]);
 
+      // Org managers routinely have NO TeamUser row on the default team
+      // (createAndAssign never adds one) — without this fallback every
+      // fresh org resolves "no project" for its own creator. Scoped to
+      // organization:manage so a low-privilege member is never routed to
+      // a project home they cannot open.
+      let firstProjectSlug = firstProject?.slug ?? null;
+      if (!firstProjectSlug && hasManage) {
+        const orgWideProject = await ctx.prisma.project
+          .findFirst({
+            where: {
+              team: { organizationId: input.organizationId, isPersonal: false },
+              archivedAt: null,
+            },
+            orderBy: { createdAt: "asc" },
+            select: { slug: true },
+          })
+          .catch(() => null);
+        firstProjectSlug = orgWideProject?.slug ?? null;
+      }
+
       return resolvePersonaHomeSafe({
+        organizationIntent,
         userLastHomePath: userPin?.lastHomePath ?? null,
         setupState: {
           hasPersonalVKs: setupState.hasPersonalVKs,
@@ -147,7 +181,7 @@ export const governanceRouter = createTRPCRouter({
         hasOrganizationManagePermission: hasManage,
         isEnterprise,
         hasGovernanceUi,
-        firstProjectSlug: firstProject?.slug ?? null,
+        firstProjectSlug,
       });
     }),
 

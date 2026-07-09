@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/subtle"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"net"
@@ -37,13 +38,12 @@ func generateBearerToken() (string, error) {
 // announced port — the request needs the per-worker bearer token, which
 // only the manager process holds.
 //
-// Residual: the underlying opencode TCP listener on 127.0.0.1:internalPort
-// is still reachable from any process in the pod netns via /proc/net/tcp
-// scanning. Closing that hole requires either patching opencode to listen
-// on a UNIX domain socket (Bun.serve supports `unix:`, opencode does not
-// expose a flag for it today) or running each opencode in its own network
-// namespace (CAP_NET_ADMIN, broader cap surface than we want). Documented
-// as a follow-up in specs/langy/langy-worker-isolation.feature.
+// The underlying opencode TCP listener on 127.0.0.1:internalPort is still
+// reachable from any process in the pod netns via /proc/net/tcp scanning —
+// that reachability is no longer the vulnerability. Every opencode is
+// started with its own random OPENCODE_SERVER_PASSWORD (ADR-033 Fix A′),
+// and this proxy is the only holder of it: a sibling that connects directly
+// to internalPort has no credential and gets 401 from opencode itself.
 type authProxy struct {
 	server *http.Server
 	listen net.Listener
@@ -52,7 +52,7 @@ type authProxy struct {
 // startAuthProxy binds 127.0.0.1:externalPort and reverse-proxies authorised
 // requests to 127.0.0.1:internalPort. The returned proxy is already serving
 // in a goroutine; the caller closes it via shutdown(ctx).
-func startAuthProxy(externalPort, internalPort int, bearerToken string, log *zap.Logger) (*authProxy, error) {
+func startAuthProxy(externalPort, internalPort int, bearerToken, openCodePassword string, log *zap.Logger) (*authProxy, error) {
 	target := &url.URL{
 		Scheme: "http",
 		Host:   fmt.Sprintf("127.0.0.1:%d", internalPort),
@@ -70,15 +70,21 @@ func startAuthProxy(externalPort, internalPort int, bearerToken string, log *zap
 	// Constant-time compare on the credential to avoid leaking the token
 	// via response timing. Build the expected header once.
 	expected := []byte("Bearer " + bearerToken)
+	// opencode requires HTTP Basic auth (user "opencode") when
+	// OPENCODE_SERVER_PASSWORD is set — see ADR-033 Fix A′. Precompute the
+	// header once so every forwarded request presents it.
+	openCodeAuth := "Basic " + base64.StdEncoding.EncodeToString([]byte("opencode:"+openCodePassword))
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		got := []byte(r.Header.Get("Authorization"))
 		if len(got) != len(expected) || subtle.ConstantTimeCompare(got, expected) != 1 {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
-		// Strip the credential before it reaches opencode; opencode does
-		// not need it and would log it. Keep this AFTER the compare.
-		r.Header.Del("Authorization")
+		// Replace the caller's bearer credential with opencode's own Basic
+		// credential. This is the sibling-isolation guarantee itself: a
+		// sibling connecting straight to internalPort never has this
+		// header and gets 401 from opencode; only this proxy knows it.
+		r.Header.Set("Authorization", openCodeAuth)
 		rev.ServeHTTP(w, r)
 	})
 

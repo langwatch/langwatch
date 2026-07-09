@@ -848,6 +848,112 @@ describe("RBAC Integration Tests", () => {
         expect(mockCtx.publiclyShared).toBe(true);
       });
 
+      describe("when scoping the public-share fallback to the project", () => {
+        // A share row that only exists in project-a. The findFirst mock honors
+        // the where clause's projectId so the query scoping is actually
+        // exercised (a `mockResolvedValue` would pass regardless of the fix).
+        function seedShareForProject(projectId: string) {
+          mockPrisma.project.findUnique.mockResolvedValue({
+            team: {
+              id: "team-123",
+              members: [],
+              organization: { members: [] },
+            },
+          });
+          mockPrisma.publicShare.findFirst.mockImplementation(
+            async ({ where }: { where: any }) =>
+              where.projectId === projectId &&
+              where.resourceType === "TRACE" &&
+              where.resourceId === "trace-123"
+                ? {
+                    id: "share-123",
+                    projectId,
+                    resourceType: "TRACE",
+                    resourceId: "trace-123",
+                  }
+                : null,
+          );
+        }
+
+        it("scopes the public-share lookup by the calling project", async () => {
+          seedShareForProject("project-a");
+
+          const middleware = checkPermissionOrPubliclyShared(
+            checkProjectPermission("workflows:view" as Permission),
+            { resourceType: "TRACE", resourceParam: "traceId" },
+          );
+
+          await middleware({
+            ctx: mockCtx,
+            input: { projectId: "project-a", traceId: "trace-123" },
+            next: mockNext,
+          });
+
+          expect(mockPrisma.publicShare.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+              where: expect.objectContaining({ projectId: "project-a" }),
+            }),
+          );
+        });
+
+        it("authorizes a same-project share (regression-safe)", async () => {
+          seedShareForProject("project-a");
+
+          const middleware = checkPermissionOrPubliclyShared(
+            checkProjectPermission("workflows:view" as Permission),
+            { resourceType: "TRACE", resourceParam: "traceId" },
+          );
+
+          const result = await middleware({
+            ctx: mockCtx,
+            input: { projectId: "project-a", traceId: "trace-123" },
+            next: mockNext,
+          });
+
+          expect(result).toBe("success");
+          expect(mockCtx.publiclyShared).toBe(true);
+        });
+
+        it("denies a cross-project read of a share that belongs to another project", async () => {
+          // Share lives in project-a; caller reads the same trace id under project-b.
+          seedShareForProject("project-a");
+
+          const middleware = checkPermissionOrPubliclyShared(
+            checkProjectPermission("workflows:view" as Permission),
+            { resourceType: "TRACE", resourceParam: "traceId" },
+          );
+
+          await expect(
+            middleware({
+              ctx: mockCtx,
+              input: { projectId: "project-b", traceId: "trace-123" },
+              next: mockNext,
+            }),
+          ).rejects.toThrow(TRPCError);
+        });
+
+        it("denies a stale share row from another project for a re-created same-id trace", async () => {
+          // A lingering share for trace-123 in project-a must not authorize a
+          // newly created trace-123 living under project-b.
+          seedShareForProject("project-a");
+
+          const middleware = checkPermissionOrPubliclyShared(
+            checkProjectPermission("workflows:view" as Permission),
+            { resourceType: "TRACE", resourceParam: "traceId" },
+          );
+
+          await expect(
+            middleware({
+              ctx: mockCtx,
+              input: { projectId: "project-b", traceId: "trace-123" },
+              next: mockNext,
+            }),
+          ).rejects.toThrow(
+            "You do not have permission and this resource is not publicly shared",
+          );
+        });
+      });
+
       it("should throw UNAUTHORIZED when no permission and not shared", async () => {
         mockPrisma.project.findUnique.mockResolvedValue({
           team: {

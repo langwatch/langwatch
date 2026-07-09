@@ -7,6 +7,7 @@ import {
 const base: HomeDestinationInput = {
   resolverDestination: "/me",
   isOverride: false,
+  intentPinned: false,
   governanceUiEnabled: true,
   lastVisitedHomeKind: "",
   lastProjectSlug: null,
@@ -83,6 +84,59 @@ describe("resolveHomeDestination", () => {
           resolverDestination: "/acme",
           lastVisitedHomeKind: "personal",
           governanceUiEnabled: false,
+        }),
+      ).toBe("/acme");
+    });
+  });
+
+  describe("when the org intent pinned the destination (ADR-038)", () => {
+    /** @scenario "Last-visited stickiness does not override the organization intent" */
+    it("keeps /me even when the user last opened a project", () => {
+      expect(
+        resolveHomeDestination({
+          ...base,
+          resolverDestination: "/me",
+          intentPinned: true,
+          lastVisitedHomeKind: "project",
+          lastProjectSlug: "inbox-narrator",
+        }),
+      ).toBe("/me");
+    });
+
+    /** @scenario "The resolver tells the client when intent decided the destination" */
+    it("keeps a project-kind destination when the user last sat on /me", () => {
+      expect(
+        resolveHomeDestination({
+          ...base,
+          resolverDestination: "/acme",
+          intentPinned: true,
+          lastVisitedHomeKind: "personal",
+        }),
+      ).toBe("/acme");
+    });
+
+    it("still substitutes the last-visited project within the project kind", () => {
+      // Intent decides the KIND of home, not which project (Decision 3).
+      expect(
+        resolveHomeDestination({
+          ...base,
+          resolverDestination: "/first-membership-project",
+          intentPinned: true,
+          lastVisitedHomeKind: "project",
+          lastProjectSlug: "inbox-narrator",
+        }),
+      ).toBe("/inbox-narrator");
+    });
+
+    it("keeps the resolver's project fallback for a kill-switched governance org", () => {
+      // I8: server already resolved the fallback; nothing may re-flip to /me.
+      expect(
+        resolveHomeDestination({
+          ...base,
+          resolverDestination: "/acme",
+          intentPinned: true,
+          governanceUiEnabled: false,
+          lastVisitedHomeKind: "personal",
         }),
       ).toBe("/acme");
     });

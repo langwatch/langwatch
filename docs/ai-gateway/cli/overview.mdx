@@ -55,6 +55,15 @@ A workable pattern used by several early customers:
 
 Then every engineer gets a one-time setup (env vars in their shell rc) and never touches provider keys again.
 
+## Cleaning up a machine
+
+`langwatch logout` reverses the setup. It revokes and clears your device session, then removes the telemetry wiring the wrappers installed so a plain `claude`, `codex`, `gemini`, or `opencode` stops sending traces. It only touches the blocks LangWatch wrote (the OTEL env keys in `~/.claude/settings.json`, the `[otel]` block in `~/.codex/config.toml`, and the scoped shell functions in your shell rc), leaving the rest of each file untouched. It scans first, shows you what it found, and asks before removing anything.
+
+- `langwatch logout --yes` skips the confirmation, for scripts and machine teardown.
+- `langwatch logout --keep-credentials` removes the telemetry wiring but stays signed in.
+
+Handing a laptop back or switching accounts is one command.
+
 ## Real-time feedback
 
 Each CLI's trace lands in LangWatch live. You can:

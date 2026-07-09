@@ -25,6 +25,7 @@
  */
 
 import {
+  codexTraceEndpoint,
   writeCodexGatewayBlock,
   writeCodexOtelBlock,
 } from "@/cli/utils/codex-config-toml";
@@ -305,7 +306,7 @@ export async function resolveWrapperMode(
     // out here so the POST lands on the real handler. codex only
     // emits traces today (no logs/metrics), so one suffix suffices.
     const result = writeCodexOtelBlock({
-      endpoint: `${endpoint}/v1/traces`,
+      endpoint: codexTraceEndpoint(endpoint),
       ingestionToken: token,
       environment: cfg.organization?.slug ?? "langwatch",
     });
@@ -350,6 +351,16 @@ export async function resolveWrapperMode(
     endpoint,
     ingestionToken: token,
   };
+}
+
+/**
+ * The env var names langwatch persists for `tool`'s Path B telemetry.
+ * Derived from the same builder that installs them, so the logout /
+ * removal path can strip exactly the keys the install path wrote (no
+ * drift). Values are irrelevant here, so placeholders are passed in.
+ */
+export function telemetryEnvVarNames(tool: string): string[] {
+  return Object.keys(buildOtelEnvBlock(tool, "", ""));
 }
 
 function buildOtelEnvBlock(

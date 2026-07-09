@@ -19,7 +19,7 @@ Feature: Remove dead cost-checking code from worker paths
 
   # ── Preserve repository method for dashboard ───────────────────────────
 
-  @integration @unimplemented
+  @integration
   Scenario: getCurrentMonthCost remains available in the repository
     Given a LicenseEnforcementRepository instance
     When getCurrentMonthCost is called with an organization ID
