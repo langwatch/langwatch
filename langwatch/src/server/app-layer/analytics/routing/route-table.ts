@@ -6,10 +6,14 @@
  *
  *   TRACE-source paths:
  *   - `trace_analytics_rollup` — additive `SimpleAggregateFunction(sum, …)`
- *     bucketed by `(TenantId, BucketStart, Model, SpanType)` (migration 00037).
- *     Cheap, but only ever serves additive sums/avgs/mins/maxes on metrics that
- *     live as a column on the rollup AND group-by ∈ {none, Model, SpanType} AND
- *     no filters on dimensions the rollup is not keyed by.
+ *     bucketed by `(TenantId, BucketStart, Model, SpanType)` (migration 00038).
+ *     Cheap, but only ever serves UNGROUPED additive sums (plus the one
+ *     avg in `ROLLUP_AVG_METRIC_KEYS`) on metrics that live as a column on
+ *     the rollup, with no filters on dimensions the rollup is not keyed by.
+ *     Its `Model` / `SpanType` keys exist to keep the merged row count low;
+ *     they are NOT group-by targets, because the rollup attributes metrics
+ *     per SPAN while every other path attributes them per TRACE (see
+ *     `ROLLUP_TRACE_GROUP_BY_KEYS`).
  *
  *   - `trace_analytics` — slim `ReplacingMergeTree(UpdatedAt)`, one row per
  *     trace, hoisted dim columns + a heuristically-trimmed `Attributes` map
@@ -289,12 +293,42 @@ const SLIM_ELIGIBLE_EVAL_METRIC_KEYS: ReadonlySet<string> = new Set<string>(
 // ─── Group-by eligibility ────────────────────────────────────────────
 
 /**
- * Trace-rollup group-by keys — {none, Model, SpanType}.
+ * Group-by keys the trace rollup may serve: NONE. The rollup is an ungrouped
+ * fast-path only.
+ *
+ * It is *keyed* by `(…, Model, SpanType)` so that same-minute spans sharing a
+ * model and span type merge into one row — that is a storage concern, not a
+ * read contract. Grouping on those keys is not parity-safe:
+ *
+ *   - **Attribution flips from per-trace to per-span.** Legacy attributes a
+ *     trace's WHOLE metric to every model the trace used
+ *     (`arrayJoin(if(empty(Models), ['unknown'], Models))` over trace-level
+ *     `TotalCost` — see `aggregation-builder.ts`, whose comment records this
+ *     as a deliberate anti-double-counting choice). The rollup instead splits
+ *     the metric across each span's own model. Both are defensible; they are
+ *     not the same number, and `sum` over all buckets differs too (legacy
+ *     over-counts multi-model traces; the rollup totals exactly).
+ *   - **Root-only columns collapse into one bucket.** `DurationSum`,
+ *     `TraceCount` and `ErrorCount` are recorded on the ROOT span only. A root
+ *     span is usually a workflow/agent span carrying no model, so grouping
+ *     `sum(performance.completion_time)` by model puts ~100% of duration in
+ *     the `'unknown'` bucket and reports 0 for every real model. Whether that
+ *     happens depends on whether the customer wraps their LLM call in a parent
+ *     span — i.e. the same query returns different shapes for different SDK
+ *     usage.
+ *
+ * `metadata.model` therefore routes to slim, which is one row per trace with a
+ * `Models Array(String)` and trace-level metric columns — structurally the
+ * same shape `trace_summaries` has, so it reproduces legacy exactly.
+ * `metadata.span_type` has no slim column at all (span type is per-span; slim
+ * is per-trace) and so falls back to `trace_summaries`.
+ *
+ * INVARIANT: this set must stay a subset of `SLIM_TRACE_GROUP_BY_KEYS` —
+ * anything the rollup can group by, slim must also be able to group by, since
+ * slim is the strictly more capable table. The same invariant binds the eval
+ * pair below. Pinned by a test in `route-table.unit.test.ts`.
  */
-const ROLLUP_TRACE_GROUP_BY_KEYS: ReadonlySet<string> = new Set([
-  "metadata.model",
-  "metadata.span_type",
-]);
+const ROLLUP_TRACE_GROUP_BY_KEYS: ReadonlySet<string> = new Set<string>();
 
 /**
  * Eval-rollup group-by keys — the dims final at evaluation-completion time
@@ -309,9 +343,14 @@ const ROLLUP_EVAL_GROUP_BY_KEYS: ReadonlySet<string> = new Set([
 /**
  * Group-by keys the slim trace table carries (typed columns + Attributes reads).
  *
- * `metadata.model` is DELIBERATELY EXCLUDED — see the trace slim builder's
- * doc for the per-trace dedup'd `Models` array vs per-span rollup `Model`
- * semantic-mismatch reasoning.
+ * `metadata.model` belongs HERE, not on the rollup. Slim's `Models` is a
+ * per-trace deduplicated array and its metric columns are trace-level, so
+ * `arrayJoin(if(empty(Models), ['unknown'], Models))` reproduces the legacy
+ * expression character-for-character (`aggregation-builder.ts`) — same
+ * buckets, same `'unknown'` label, same whole-trace attribution to every model
+ * the trace used. Routing model group-bys to slim is therefore parity-safe AND
+ * still a fast path. The rollup's per-span `Model` is the odd one out; see
+ * `ROLLUP_TRACE_GROUP_BY_KEYS`.
  *
  * `metadata.span_type` requires a stored_spans join (not on slim).
  */
@@ -322,6 +361,7 @@ const SLIM_TRACE_GROUP_BY_KEYS: ReadonlySet<string> = new Set([
   "metadata.thread_id",
   "metadata.customer_id",
   "metadata.labels",
+  "metadata.model",
 ]);
 
 /**

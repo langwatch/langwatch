@@ -10,6 +10,7 @@
 import { describe, expect, it } from "vitest";
 import type { SeriesInputType } from "~/server/analytics/registry";
 import {
+  __testOnly__,
   pickAnalyticsTable,
   ROLLUP_ROLLABLE_METRIC_KEYS,
   SLIM_ELIGIBLE_METRIC_KEYS,
@@ -36,12 +37,16 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
 
   describe("given an additive metric on total cost", () => {
     describe("when grouped by model and the aggregation is sum", () => {
-      it("routes to trace_analytics_rollup", () => {
+      // The rollup's `Model` is per-SPAN, so it splits a multi-model trace's
+      // cost across models; legacy attributes the whole-trace cost to every
+      // model in `Models[]`. Slim carries the same per-trace `Models[]` array
+      // and the same trace-level columns, so it reproduces legacy exactly.
+      it("routes to trace_analytics (slim), never the rollup", () => {
         const table = pickAnalyticsTable({
           series: [series("performance.total_cost", "sum")],
           groupBy: "metadata.model",
         });
-        expect(table).toBe("trace_analytics_rollup");
+        expect(table).toBe("trace_analytics");
       });
     });
 
@@ -104,8 +109,9 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
           series: [series("performance.completion_time", "avg")],
           groupBy: "metadata.model",
         });
-        // metadata.model is deliberately not on slim either → legacy.
-        expect(table).toBe("trace_summaries");
+        // Slim's avg(TotalDurationMs) over arrayJoin(Models) is exactly what
+        // legacy computes, so slim serves it rather than falling to legacy.
+        expect(table).toBe("trace_analytics");
       });
     });
 
@@ -140,12 +146,12 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
     });
 
     describe("when grouped by model", () => {
-      it("falls back to trace_summaries (rollup can't do percentiles; slim's per-trace Models[] would re-attribute multi-model traces wrongly vs the rollup's per-span split)", () => {
+      it("routes to trace_analytics (slim) — rollup can't do percentiles, and slim's per-trace Models[] matches legacy's arrayJoin(Models)", () => {
         const table = pickAnalyticsTable({
           series: [series("performance.completion_time", "median")],
           groupBy: "metadata.model",
         });
-        expect(table).toBe("trace_summaries");
+        expect(table).toBe("trace_analytics");
       });
     });
   });
@@ -358,6 +364,48 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
         SLIM_ELIGIBLE_METRIC_KEYS.has("performance.tokens_per_second"),
       ).toBe(true);
       expect(SLIM_ELIGIBLE_METRIC_KEYS.has("metadata.trace_id")).toBe(true);
+    });
+  });
+
+  describe("group-by capability invariant", () => {
+    // Slim is strictly more capable than the rollup: one row per trace, every
+    // hoisted dim, trace-level metric columns. If the rollup can group by a
+    // key that slim cannot, the router is forced to serve that shape from the
+    // rollup's per-span attribution with no safer table to fall to — which is
+    // exactly how `metadata.model` ended up on the rollup.
+    it("every trace-rollup group-by key is also a trace-slim group-by key", () => {
+      for (const key of __testOnly__.ROLLUP_TRACE_GROUP_BY_KEYS) {
+        expect(__testOnly__.SLIM_TRACE_GROUP_BY_KEYS.has(key)).toBe(true);
+      }
+    });
+
+    it("every eval-rollup group-by key is also an eval-slim group-by key", () => {
+      for (const key of __testOnly__.ROLLUP_EVAL_GROUP_BY_KEYS) {
+        expect(__testOnly__.SLIM_EVAL_GROUP_BY_KEYS.has(key)).toBe(true);
+      }
+    });
+
+    it("keeps the trace rollup ungrouped — its Model/SpanType sort keys are not read contracts", () => {
+      expect(__testOnly__.ROLLUP_TRACE_GROUP_BY_KEYS.size).toBe(0);
+    });
+
+    it("serves metadata.model from slim, matching legacy's arrayJoin(Models)", () => {
+      expect(__testOnly__.SLIM_TRACE_GROUP_BY_KEYS.has("metadata.model")).toBe(
+        true,
+      );
+    });
+  });
+
+  describe("given a group-by on span_type", () => {
+    // Slim has no SpanType column (span type is per-span; slim is per-trace),
+    // and the rollup's per-span attribution diverges from legacy's
+    // stored_spans join. Nothing safe to route to but legacy.
+    it("falls back to trace_summaries for an additive sum", () => {
+      const table = pickAnalyticsTable({
+        series: [series("performance.total_cost", "sum")],
+        groupBy: "metadata.span_type",
+      });
+      expect(table).toBe("trace_summaries");
     });
   });
 });

@@ -12,6 +12,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TimeseriesResult } from "~/server/analytics/types";
+import { featureFlagService } from "~/server/featureFlag";
 import {
   AnalyticsService,
   getAnalyticsService,
@@ -23,6 +24,21 @@ vi.mock("~/server/featureFlag", () => ({
     isEnabled: vi.fn().mockResolvedValue(false),
   },
 }));
+
+const isEnabled = vi.mocked(featureFlagService.isEnabled);
+
+/**
+ * Turn the read flag on (and, optionally, the tripwire flag). The service
+ * resolves them by name, so key off the flag string rather than call order.
+ */
+function enableReadFlag({ tripwire = false }: { tripwire?: boolean } = {}) {
+  isEnabled.mockImplementation(async (flag: string) => {
+    if (flag === "release_event_sourced_analytics_read") return true;
+    if (flag === "release_event_sourced_analytics_read_tripwire")
+      return tripwire;
+    return false;
+  });
+}
 
 function fakeResult(value: number): TimeseriesResult {
   return {
@@ -112,6 +128,94 @@ describe("AnalyticsService", () => {
       expect(spies.runTraceSummariesTimeseries).toHaveBeenCalledTimes(1);
       expect(spies.runRollupTimeseries).not.toHaveBeenCalled();
       expect(spies.runSlimTimeseries).not.toHaveBeenCalled();
+    });
+
+    describe("when release_event_sourced_analytics_read is ON", () => {
+      const sumCost = {
+        ...input,
+        series: [
+          {
+            metric: "performance.total_cost" as const,
+            aggregation: "sum" as const,
+          },
+        ],
+      };
+
+      beforeEach(() => enableReadFlag());
+
+      it("dispatches an ungrouped additive sum to the rollup repository", async () => {
+        const { deps, spies } = makeDeps();
+        const result = await new AnalyticsService(deps).getTimeseries(sumCost);
+
+        expect(spies.runRollupTimeseries).toHaveBeenCalledTimes(1);
+        expect(spies.runSlimTimeseries).not.toHaveBeenCalled();
+        expect(spies.runTraceSummariesTimeseries).not.toHaveBeenCalled();
+        expect(result.currentPeriod[0]?.series_0).toBe(50);
+      });
+
+      // Pins the ADR-034 group-by-model decision end-to-end: the rollup's
+      // per-span Model attribution never serves a model-grouped read.
+      it("dispatches a model-grouped sum to the slim repository, not the rollup", async () => {
+        const { deps, spies } = makeDeps();
+        const result = await new AnalyticsService(deps).getTimeseries({
+          ...sumCost,
+          groupBy: "metadata.model",
+        });
+
+        expect(spies.runSlimTimeseries).toHaveBeenCalledTimes(1);
+        expect(spies.runRollupTimeseries).not.toHaveBeenCalled();
+        expect(result.currentPeriod[0]?.series_0).toBe(60);
+      });
+
+      it("dispatches a span_type-grouped sum to the legacy shim", async () => {
+        const { deps, spies } = makeDeps();
+        await new AnalyticsService(deps).getTimeseries({
+          ...sumCost,
+          groupBy: "metadata.span_type",
+        });
+
+        expect(spies.runTraceSummariesTimeseries).toHaveBeenCalledTimes(1);
+        expect(spies.runRollupTimeseries).not.toHaveBeenCalled();
+        expect(spies.runSlimTimeseries).not.toHaveBeenCalled();
+      });
+
+      it("still uses the legacy shim for a shape neither table can serve", async () => {
+        const { deps, spies } = makeDeps();
+        await new AnalyticsService(deps).getTimeseries({
+          ...input,
+          series: [
+            {
+              metric: "performance.total_cost" as const,
+              aggregation: "sum" as const,
+              pipeline: { field: "user_id", aggregation: "avg" },
+            },
+          ],
+        } as never);
+
+        expect(spies.runTraceSummariesTimeseries).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when the tripwire flag is ON", () => {
+      beforeEach(() => enableReadFlag({ tripwire: true }));
+
+      it("runs BOTH the routed query and the legacy query, returning the routed one", async () => {
+        const { deps, spies } = makeDeps();
+        const result = await new AnalyticsService(deps).getTimeseries({
+          ...input,
+          series: [
+            {
+              metric: "performance.total_cost" as const,
+              aggregation: "sum" as const,
+            },
+          ],
+        });
+
+        expect(spies.runRollupTimeseries).toHaveBeenCalledTimes(1);
+        expect(spies.runTraceSummariesTimeseries).toHaveBeenCalledTimes(1);
+        // The routed value wins — the tripwire only logs.
+        expect(result.currentPeriod[0]?.series_0).toBe(50);
+      });
     });
   });
 
