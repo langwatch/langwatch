@@ -421,24 +421,33 @@ export class EEWebhookService implements WebhookService {
     const posthog = this.getPostHog?.() ?? null;
     if (!posthog) return;
 
-    posthog.capture({
-      distinctId: organizationId,
-      event: "subscription_created",
-      properties: {
-        subscriptionId,
-        $groups: { organization: organizationId },
-      },
-    });
-    posthog.groupIdentify({
-      groupType: "organization",
-      groupKey: organizationId,
-      properties: {
-        subscriptionCreatedAt: new Date(
-          checkoutSession.created * 1000,
-        ).toISOString(),
-        hasActiveSubscription: true,
-      },
-    });
+    // Analytics failures must never fail the webhook — the checkout has
+    // already been linked and activated, and a 500 would make Stripe retry.
+    try {
+      posthog.capture({
+        distinctId: organizationId,
+        event: "subscription_created",
+        properties: {
+          subscriptionId,
+          $groups: { organization: organizationId },
+        },
+      });
+      posthog.groupIdentify({
+        groupType: "organization",
+        groupKey: organizationId,
+        properties: {
+          subscriptionCreatedAt: new Date(
+            checkoutSession.created * 1000,
+          ).toISOString(),
+          hasActiveSubscription: true,
+        },
+      });
+    } catch (err) {
+      logger.error(
+        { subscriptionId, err },
+        "[stripeWebhook] Failed to emit checkout analytics",
+      );
+    }
   }
 
   private async routeSubscriptionLifecycle(
