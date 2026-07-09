@@ -102,8 +102,15 @@ export class LangyCredentialService {
     }
 
     const langwatchEndpoint = process.env.LANGWATCH_API_URL;
+    // The worker's NetworkPolicy blocks external HTTPS egress, so it can
+    // only ever reach the gateway's internal ClusterIP — LW_GATEWAY_PUBLIC_URL
+    // (the browser/CLI-facing URL, see gatewayUrl.ts) would be unreachable
+    // and must never be used here. LW_GATEWAY_INTERNAL_URL is the same
+    // internal-only var ottlGatewayClient.ts already established for the
+    // control-plane -> gateway direction; LW_GATEWAY_BASE_URL is kept only
+    // as a legacy fallback for deploys that haven't set the new var yet.
     const gatewayBaseUrl =
-      process.env.LW_GATEWAY_PUBLIC_URL ?? process.env.LW_GATEWAY_BASE_URL;
+      process.env.LW_GATEWAY_INTERNAL_URL ?? process.env.LW_GATEWAY_BASE_URL;
     if (!langwatchEndpoint) {
       throw new LangyCredentialResolutionError(
         "LANGWATCH_API_URL is not configured on the control plane.",
@@ -111,7 +118,7 @@ export class LangyCredentialService {
     }
     if (!gatewayBaseUrl) {
       throw new LangyCredentialResolutionError(
-        "LW_GATEWAY_BASE_URL is not configured on the control plane.",
+        "LW_GATEWAY_INTERNAL_URL is not configured on the control plane.",
       );
     }
 

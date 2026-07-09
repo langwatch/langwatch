@@ -69,12 +69,15 @@ beforeEach(() => {
   provisionLangyApiKey.mockResolvedValue(undefined);
   process.env.LANGWATCH_API_URL = "https://api.langwatch.test";
   process.env.LW_GATEWAY_BASE_URL = "http://gateway.test:5563/v1";
-  // Clear LW_GATEWAY_PUBLIC_URL so it doesn't leak in from the developer's
-  // shell (`pnpm dev` setups pre-source .env to dodge the start.sh defaulting
-  // bug, and that .env now carries LW_GATEWAY_PUBLIC_URL on the WSL+minikube
-  // layout). The credential service prefers PUBLIC over BASE, so an inherited
-  // value would shadow whatever the test pins via LW_GATEWAY_BASE_URL above.
+  // Clear LW_GATEWAY_PUBLIC_URL / LW_GATEWAY_INTERNAL_URL so neither leaks in
+  // from the developer's shell (`pnpm dev` setups pre-source .env to dodge
+  // the start.sh defaulting bug, and that .env now carries these on the
+  // WSL+minikube layout). The credential service prefers INTERNAL over BASE
+  // (never PUBLIC — the worker's NetworkPolicy blocks external HTTPS, see
+  // LangyCredentialService.ts), so an inherited value would shadow whatever
+  // the test pins via LW_GATEWAY_BASE_URL above.
   delete process.env.LW_GATEWAY_PUBLIC_URL;
+  delete process.env.LW_GATEWAY_INTERNAL_URL;
 });
 
 describe("LangyCredentialService", () => {
@@ -224,16 +227,44 @@ describe("LangyCredentialService", () => {
   });
 
   describe("given env config is incomplete", () => {
-    describe("when LW_GATEWAY_BASE_URL is unset", () => {
+    describe("when both LW_GATEWAY_INTERNAL_URL and LW_GATEWAY_BASE_URL are unset", () => {
       it("throws LangyCredentialResolutionError before any provisioning", async () => {
+        delete process.env.LW_GATEWAY_INTERNAL_URL;
         delete process.env.LW_GATEWAY_BASE_URL;
         const prisma = makePrisma();
         const svc = new LangyCredentialService(prisma);
 
         await expect(
           svc.getOrProvision({ projectId: "p1", actorUserId: "u1" }),
-        ).rejects.toThrow(/LW_GATEWAY_BASE_URL/);
+        ).rejects.toThrow(/LW_GATEWAY_INTERNAL_URL/);
         expect(vkCreate).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given both LW_GATEWAY_INTERNAL_URL and LW_GATEWAY_BASE_URL are set", () => {
+    describe("when getOrProvision is called", () => {
+      it("prefers LW_GATEWAY_INTERNAL_URL — LW_GATEWAY_BASE_URL is the public/browser-facing var", async () => {
+        process.env.LW_GATEWAY_INTERNAL_URL = "http://langwatch-gateway-internal:80/v1";
+        process.env.LW_GATEWAY_BASE_URL = "https://gateway.langwatch.ai/v1";
+        const prisma = makePrisma({
+          projectSecret: {
+            findFirst: vi
+              .fn()
+              .mockResolvedValue({ encryptedValue: "enc:lw_vk_live_stored" }),
+            create: vi.fn().mockResolvedValue({}),
+          },
+        });
+        const svc = new LangyCredentialService(prisma);
+
+        const creds = await svc.getOrProvision({
+          projectId: "p1",
+          actorUserId: "u1",
+        });
+
+        expect(creds.gatewayBaseUrl).toBe(
+          "http://langwatch-gateway-internal:80/v1",
+        );
       });
     });
   });
