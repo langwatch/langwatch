@@ -58,8 +58,12 @@ Feature: Per-tenant rate anomaly detection
     And the result is written to Redis with a 1h TTL
 
   @unit @anomaly-detection @baseline-cache
-  Scenario: Insufficient history is NOT cached so the tenant is re-checked soon
+  # A fleet of quiet tenants re-reading its full minute series every 1-minute
+  # tick was the dominant Redis engine-CPU cost (2026-07-09). The verdict is
+  # cached briefly — far shorter than the 1h baseline TTL — so a ramping tenant
+  # still gets its first baseline within minutes.
+  Scenario: Insufficient history is cached briefly so quiet tenants are not re-read every tick
     Given tenant "proj_new" has only 3 minutes of activity
     When the AnomalyDetector tick runs
-    Then no baseline is cached for "proj_new"
-    And the tenant is skipped this tick
+    Then the tenant is skipped this tick
+    And the not-enough-data verdict is cached with a short expiry, well under the baseline's

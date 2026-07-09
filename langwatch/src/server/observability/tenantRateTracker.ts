@@ -38,8 +38,8 @@ export const GLOBAL_KILL_SWITCH_DISTINCT_ID = "global";
  *  - The active-tenants index `obs:tenant_rate:active` is a SET — fast
  *    SMEMBERS for the periodic anomaly sweep, no key SCAN required.
  *  - `obs:tenant_rate:baseline:<tenantId>` caches the computed p95
- *    baseline for ~1h so the worker tick does not redo a 10080-field
- *    HMGET for every tenant every minute.
+ *    baseline for ~1h so the worker tick does not redo the full-series
+ *    HGETALL for every tenant every minute.
  *
  * Why minute-bucketed (not per-event ZSET):
  *  - O(1) write per enqueue (HINCRBY) vs O(log N) for ZADD with random nonce
@@ -56,7 +56,7 @@ export class TenantRateTracker {
    * Baseline cache TTL. The p95 of a 7-day window does not move
    * meaningfully in an hour — caching this is the single biggest
    * tick-cost reduction available, dropping per-tenant tick cost from
-   * one 10080-field HMGET to one HGET.
+   * one full-series HGETALL to one HGET.
    */
   public static readonly BASELINE_TTL_SECONDS = 60 * 60; // 1h
 
@@ -145,9 +145,18 @@ export class TenantRateTracker {
   }
 
   /**
-   * Per-minute rates across the last `lookbackSeconds`. Sorted oldest-first.
-   * Used by the anomaly detector to compute rolling p95 baselines without
-   * fetching unbounded data.
+   * Per-minute rates across the last `lookbackSeconds`. Sorted oldest-first,
+   * zero-padded for silent minutes. Used by the anomaly detector to compute
+   * rolling p95 baselines without fetching unbounded data.
+   *
+   * Reads via HGETALL, not an HMGET enumerating every minute of the window:
+   * the hash only holds minutes with activity, so HGETALL's cost scales with
+   * the tenant's actual traffic, while a 7-day window HMGET forced Redis to
+   * look up 10,080 requested fields (~1.8 ms of engine CPU each) regardless
+   * of how sparse the hash was — measured as the single largest engine-CPU
+   * consumer on prod (2026-07-09). The hash is bounded at one field per
+   * active minute over the 8-day TTL, so the reply can never exceed ~11.5k
+   * fields.
    */
   async perMinuteSeries(
     tenantId: string,
@@ -155,13 +164,18 @@ export class TenantRateTracker {
   ): Promise<number[]> {
     const minuteNow = Math.floor(this.nowFn() / 60_000);
     const minutesBack = Math.max(1, Math.ceil(lookbackSeconds / 60));
-    const fields: string[] = [];
-    for (let i = minutesBack - 1; i >= 0; i--) {
-      fields.push(String(minuteNow - i));
-    }
+    const oldestMinute = minuteNow - (minutesBack - 1);
     const key = `${TenantRateTracker.KEY_PREFIX}${tenantId}`;
-    const values = await this.redis.hmget(key, ...fields);
-    return values.map((v) => (v ? Number.parseInt(v, 10) || 0 : 0));
+    const entries = await this.redis.hgetall(key);
+    const series = new Array<number>(minutesBack).fill(0);
+    for (const [field, value] of Object.entries(entries)) {
+      const minute = Number.parseInt(field, 10);
+      if (!Number.isFinite(minute)) continue;
+      const index = minute - oldestMinute;
+      if (index < 0 || index >= minutesBack) continue;
+      series[index] = Number.parseInt(value, 10) || 0;
+    }
+    return series;
   }
 
   /**
@@ -194,16 +208,22 @@ export class TenantRateTracker {
   }
 
   /**
-   * Persist a fresh baseline with the standard 1h TTL. Called once per
-   * tenant per tick at most when the cache is cold or stale.
+   * Persist a fresh baseline with the standard 1h TTL (or a caller-chosen
+   * shorter one — the detector caches its "not enough data yet" verdict
+   * briefly so quiet tenants don't re-pay the full-series read every tick).
+   * Called once per tenant per tick at most when the cache is cold or stale.
    */
-  async setCachedBaseline(tenantId: string, baseline: number): Promise<void> {
+  async setCachedBaseline(
+    tenantId: string,
+    baseline: number,
+    ttlSeconds: number = TenantRateTracker.BASELINE_TTL_SECONDS,
+  ): Promise<void> {
     try {
       await this.redis.set(
         `${TenantRateTracker.BASELINE_PREFIX}${tenantId}`,
         baseline.toString(),
         "EX",
-        TenantRateTracker.BASELINE_TTL_SECONDS,
+        ttlSeconds,
       );
     } catch (err) {
       logger.debug(

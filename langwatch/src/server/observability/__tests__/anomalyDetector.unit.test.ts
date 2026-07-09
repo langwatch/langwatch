@@ -3,12 +3,14 @@ import {
   AnomalyDetector,
   HARD_TIER_MULTIPLIER,
   HARD_TIER_SUSTAIN_MINUTES,
+  INSUFFICIENT_DATA_RECHECK_SECONDS,
   MIN_BASELINE_RATE,
   SURFACE_TIER_MULTIPLIER,
   SURFACE_TIER_SUSTAIN_MINUTES,
   percentile,
 } from "../anomalyDetector";
 import type { Anomaly } from "../anomalyState";
+import { TenantRateTracker } from "../tenantRateTracker";
 
 function makeFakes() {
   const stored = new Map<string, Anomaly>();
@@ -313,8 +315,8 @@ describe("AnomalyDetector.tick", () => {
       expect(fakes.rateTracker.perMinuteSeries).not.toHaveBeenCalled();
     });
 
-    /** @scenario Insufficient history is NOT cached so the tenant is re-checked soon */
-    it("does NOT cache when there is insufficient history (we want to retry soon)", async () => {
+    /** @scenario Insufficient history is cached briefly so quiet tenants are not re-read every tick */
+    it("caches the not-enough-data verdict with a short TTL instead of re-reading every tick", async () => {
       const fakes = makeFakes();
       fakes.rateTracker.listActiveTenants.mockResolvedValue(["proj_new"]);
       fakes.rateTracker.perMinuteSeries.mockResolvedValue([5, 10, 5]); // <60 min
@@ -322,7 +324,16 @@ describe("AnomalyDetector.tick", () => {
       const detector = new AnomalyDetector(fakes);
       await detector.tick();
 
-      expect(fakes.rateTracker.setCachedBaseline).not.toHaveBeenCalled();
+      expect(fakes.rateTracker.setCachedBaseline).toHaveBeenCalledWith(
+        "proj_new",
+        0,
+        INSUFFICIENT_DATA_RECHECK_SECONDS,
+      );
+      // The verdict re-check window must stay well under the 1h baseline TTL
+      // so a ramping tenant gets its first baseline within minutes.
+      expect(INSUFFICIENT_DATA_RECHECK_SECONDS).toBeLessThan(
+        TenantRateTracker.BASELINE_TTL_SECONDS / 2,
+      );
     });
   });
 

@@ -82,6 +82,12 @@ function fakeRedis() {
     async hmget(key: string, ...fields: string[]) {
       return ops.hmget(key, ...fields);
     },
+    async hgetall(key: string) {
+      const h = hashes.get(key);
+      const out: Record<string, string> = {};
+      if (h) for (const [f, v] of h) out[f] = String(v);
+      return out;
+    },
     async smembers(key: string) {
       return ops.smembers(key);
     },
@@ -264,5 +270,42 @@ describe("TenantRateTracker", () => {
 
     const series = await tracker.perMinuteSeries("proj_acme", 180);
     expect(series).toEqual([1, 2, 3]);
+  });
+
+  it("perMinuteSeries ignores activity outside the lookback window", async () => {
+    const redis = fakeRedis();
+    const tracker = new TenantRateTracker(redis, () => now);
+
+    // Two minutes of old traffic, then a 3-minute gap, then fresh traffic.
+    await tracker.record("proj_acme", 7);
+    now += 60_000;
+    await tracker.record("proj_acme", 8);
+    now += 4 * 60_000;
+    await tracker.record("proj_acme", 9);
+
+    // 3-minute window: the HGETALL reply still contains the old fields, but
+    // they must be dropped and the silent minutes zero-padded.
+    const series = await tracker.perMinuteSeries("proj_acme", 180);
+    expect(series).toEqual([0, 0, 9]);
+  });
+
+  it("setCachedBaseline honours a caller-provided TTL", async () => {
+    const setCalls: unknown[][] = [];
+    const redis = fakeRedis();
+    const originalSet = redis.set.bind(redis);
+    redis.set = async (...args: unknown[]) => {
+      setCalls.push(args);
+      return originalSet(...(args as [string, string]));
+    };
+    const tracker = new TenantRateTracker(redis, () => now);
+
+    await tracker.setCachedBaseline("proj_acme", 0, 600);
+
+    expect(setCalls[0]).toEqual([
+      "obs:tenant_rate:baseline:proj_acme",
+      "0",
+      "EX",
+      600,
+    ]);
   });
 });
