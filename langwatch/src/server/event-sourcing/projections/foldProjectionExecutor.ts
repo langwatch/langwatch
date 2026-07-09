@@ -1,9 +1,38 @@
+import { incrementEsFoldRefoldTotal } from "~/server/metrics";
 import { createLogger } from "~/utils/logger/server";
 import type { Event } from "../domain/types";
 import type { FoldProjectionDefinition } from "./foldProjection.types";
 import type { ProjectionStoreContext } from "./projectionStoreContext";
 
 const logger = createLogger("langwatch:event-sourcing:fold-executor");
+
+/**
+ * Whether an out-of-order event should replay the aggregate's history rather
+ * than being applied on top of the state already loaded.
+ *
+ * See `FoldProjectionOptions.refoldOnOutOfOrder` for why an order-insensitive
+ * fold must opt out. Either way the caller still applies the events in
+ * occurredAt order, so declining costs nothing but the replay.
+ */
+function canRefold<State, E extends Event>(
+  projection: FoldProjectionDefinition<State, E>,
+  context: ProjectionStoreContext,
+): boolean {
+  if (projection.options?.refoldOnOutOfOrder === false) {
+    incrementEsFoldRefoldTotal(projection.name, "declined");
+    return false;
+  }
+  if (!projection.eventLoader) {
+    incrementEsFoldRefoldTotal(projection.name, "unavailable");
+    logger.warn(
+      { projection: projection.name, aggregateId: context.aggregateId },
+      "Out-of-order event detected but no eventLoader available — cannot re-fold",
+    );
+    return false;
+  }
+  incrementEsFoldRefoldTotal(projection.name, "performed");
+  return true;
+}
 
 /**
  * Returns a context carrying the event's occurredAt as a store read hint, or
@@ -26,13 +55,14 @@ function withOccurredAtHint(
  * 2. If the store missed and `options.refoldOnStoreMiss` is set → re-fold
  *    from the event log up to the delivered event (see below)
  * 3. `state = projection.apply(state, event)`
- * 4. If out-of-order detected and `eventLoader` available → re-fold from scratch
+ * 4. If out-of-order detected and the projection admits a re-fold → re-fold from scratch
  * 5. `projection.store.store(state, context)`
  *
  * Out-of-order detection: compares event.occurredAt against the state's
  * LastEventOccurredAt (tracked by AbstractFoldProjection). If the event
  * occurred earlier than what we've already seen, all events are re-loaded
- * in occurredAt order and replayed from init().
+ * in occurredAt order and replayed from init() — unless the projection set
+ * `options.refoldOnOutOfOrder` to false (see {@link canRefold}).
  *
  * Store-miss re-fold (`options.refoldOnStoreMiss`): a fold whose persisted
  * row cannot be read back into fold state (lossy analytics rows) returns
@@ -75,14 +105,15 @@ export class FoldProjectionExecutor {
       }
     }
 
-    let state = loaded ?? projection.init();
+    const loadedState = loaded ?? projection.init();
 
     // Capture the highest occurredAt before applying the new event.
     const prevLastOccurred =
-      (state as Record<string, unknown>)[projection.LastEventOccurredAtKey] ??
-      0;
+      (loadedState as Record<string, unknown>)[
+        projection.LastEventOccurredAtKey
+      ] ?? 0;
 
-    state = projection.apply(state, event);
+    let state = projection.apply(loadedState, event);
 
     // Detect out-of-order: event's occurredAt is STRICTLY LESS than what we've already seen.
     // Same occurredAt (==) does NOT trigger re-fold — arrival order is the correct
@@ -94,21 +125,14 @@ export class FoldProjectionExecutor {
       typeof eventOccurredAt === "number" &&
       eventOccurredAt > 0 &&
       typeof prevLastOccurred === "number" &&
-      eventOccurredAt < prevLastOccurred
+      eventOccurredAt < prevLastOccurred &&
+      canRefold(projection, context)
     ) {
-      if (!projection.eventLoader) {
-        logger.warn(
-          { projection: projection.name, aggregateId: context.aggregateId },
-          "Out-of-order event detected but no eventLoader available — cannot re-fold",
-        );
-        await projection.store.store(state, context);
-        return state;
-      }
-      const allEvents = await projection.eventLoader({
+      // biome-ignore lint/style/noNonNullAssertion: canRefold returns false without an eventLoader.
+      const allEvents = await projection.eventLoader!({
         tenantId: context.tenantId,
         aggregateId: context.aggregateId,
-        occurredAtMs:
-          typeof eventOccurredAt === "number" ? eventOccurredAt : undefined,
+        occurredAtMs: eventOccurredAt,
       });
 
       logger.info(
@@ -144,7 +168,8 @@ export class FoldProjectionExecutor {
    *
    * Out-of-order handling matches `execute()`: if the earliest event in the
    * batch occurred before the persisted checkpoint, the aggregate is re-folded
-   * from scratch via `eventLoader` (when available).
+   * from scratch via `eventLoader` — when one exists and the projection has not
+   * opted out via `options.refoldOnOutOfOrder` (see {@link canRefold}).
    */
   async executeBatch<State, E extends Event>(
     projection: FoldProjectionDefinition<State, E>,
@@ -189,32 +214,33 @@ export class FoldProjectionExecutor {
       }
     }
 
-    let state = loaded ?? projection.init();
+    const loadedState = loaded ?? projection.init();
 
     const prevLastOccurred =
-      (state as Record<string, unknown>)[projection.LastEventOccurredAtKey] ??
-      0;
+      (loadedState as Record<string, unknown>)[
+        projection.LastEventOccurredAtKey
+      ] ?? 0;
     const earliestOccurredAt = (ordered[0] as Record<string, unknown>)
       .occurredAt;
 
     // Out-of-order vs the persisted checkpoint: the batch starts earlier than
     // what we've already folded. Re-fold from scratch when we can load the full
-    // history; otherwise fall through and apply the batch on top (matches the
-    // single-event executor's degraded behavior when no eventLoader exists).
+    // history AND the projection still gains something by replaying it;
+    // otherwise apply the batch on top (matches the single-event executor's
+    // degraded behavior when no eventLoader exists).
     const outOfOrder =
       typeof earliestOccurredAt === "number" &&
       earliestOccurredAt > 0 &&
       typeof prevLastOccurred === "number" &&
       earliestOccurredAt < prevLastOccurred;
 
-    if (outOfOrder && projection.eventLoader) {
-      const allEvents = await projection.eventLoader({
+    let state = loadedState;
+    if (outOfOrder && canRefold(projection, context)) {
+      // biome-ignore lint/style/noNonNullAssertion: canRefold returns false without an eventLoader.
+      const allEvents = await projection.eventLoader!({
         tenantId: context.tenantId,
         aggregateId: context.aggregateId,
-        occurredAtMs:
-          typeof earliestOccurredAt === "number"
-            ? earliestOccurredAt
-            : undefined,
+        occurredAtMs: earliestOccurredAt,
       });
       logger.info(
         {
@@ -233,12 +259,6 @@ export class FoldProjectionExecutor {
         state = projection.apply(state, e as E);
       }
     } else {
-      if (outOfOrder) {
-        logger.warn(
-          { projection: projection.name, aggregateId: context.aggregateId },
-          "Out-of-order batch detected but no eventLoader available — cannot re-fold",
-        );
-      }
       for (const event of ordered) {
         state = projection.apply(state, event);
       }

@@ -6,7 +6,10 @@ import { createLogger } from "../../../../../utils/logger/server";
 import { featureFlagService } from "../../../../featureFlag";
 import { evaluatorLoopBlockedCounter } from "../../../../metrics";
 import type { QueueSendOptions } from "../../../queues";
-import type { ReactorDefinition } from "../../../reactors/reactor.types";
+import type {
+  ReactorContext,
+  ReactorDefinition,
+} from "../../../reactors/reactor.types";
 import { ExecuteEvaluationCommand } from "../../evaluation-processing/commands/executeEvaluation.command";
 import type { ExecuteEvaluationCommandData } from "../../evaluation-processing/schemas/commands";
 import {
@@ -36,6 +39,57 @@ export interface EvaluationTriggerReactorDeps {
 }
 
 /**
+ * Pure relevance guard, evaluated pre-enqueue via `shouldReact` (and again in
+ * `handle`, which stays the fail-open path). Both checks read only the payload
+ * the handler would receive, so hoisting them out of `handle` changes nothing
+ * but where the work is skipped — before the queue serializes, gzips and blobs a
+ * payload it would immediately dedup away, rather than after.
+ */
+function isDispatchableEvaluationEvent(
+  event: TraceProcessingEvent,
+  context: ReactorContext<TraceSummaryData>,
+): boolean {
+  // Bug 2 / #3875: synthetic event spans (e.g. thumbs-up/down feedback via /api/track_event)
+  // do not contribute to fold IO and must not re-trigger ON_MESSAGE evaluator runs. We
+  // share `SYNTHETIC_SPAN_NAMES` with the trace-summary fold (foldProjection.ts:88) so a
+  // future synthetic name updates both sites at once.
+  if (
+    isSpanReceivedEvent(event) &&
+    SYNTHETIC_SPAN_NAMES.has(event.data.span.name)
+  ) {
+    return false;
+  }
+
+  // Oversized-trace guard (2026-05-28 incident follow-up). Past the same
+  // processing cap the fold uses to stop deriving the summary
+  // (MAX_PROCESSED_SPANS), a trace is a runaway / reused trace_id and is too
+  // large to keep evaluating: re-running every ON_MESSAGE monitor per span
+  // on a 26k-span trace is pure amplification for no added signal. Skip the
+  // eval dispatch (lighter processing). The span itself is still stored and
+  // the trace stays fully queryable: we drop the WORK, never the DATA.
+  const { foldState } = context;
+  if (foldState.spanCount >= MAX_PROCESSED_SPANS) {
+    // Log once, on the first crossing only. This is a per-span hot path: a
+    // runaway trace would otherwise emit thousands of identical warns, the
+    // very per-span amplification we are skipping the eval to avoid.
+    if (foldState.spanCount === MAX_PROCESSED_SPANS) {
+      logger.warn(
+        {
+          tenantId: context.tenantId,
+          observedTraceId: context.aggregateId,
+          spanCount: foldState.spanCount,
+          cap: MAX_PROCESSED_SPANS,
+        },
+        "Skipping evaluation dispatch: trace reached the processing cap (spans still stored)",
+      );
+    }
+    return false;
+  }
+
+  return true;
+}
+
+/**
  * Dispatches evaluation commands for traces that have a resolved origin.
  *
  * Fires on every trace event (via traceSummary fold). If origin is absent,
@@ -49,43 +103,9 @@ export function createEvaluationTriggerReactor(
   return defineOriginGuardedTraceReactor({
     name: "evaluationTrigger",
     jobIdPrefix: "eval-trigger",
+    isRelevant: isDispatchableEvaluationEvent,
     async handle(event, context) {
-      // Bug 2 / #3875: synthetic event spans (e.g. thumbs-up/down feedback via /api/track_event)
-      // do not contribute to fold IO and must not re-trigger ON_MESSAGE evaluator runs. We
-      // share `SYNTHETIC_SPAN_NAMES` with the trace-summary fold (foldProjection.ts:88) so a
-      // future synthetic name updates both sites at once.
-      if (
-        isSpanReceivedEvent(event) &&
-        SYNTHETIC_SPAN_NAMES.has(event.data.span.name)
-      ) {
-        return;
-      }
       const { tenantId, aggregateId: traceId, foldState } = context;
-
-      // Oversized-trace guard (2026-05-28 incident follow-up). Past the same
-      // processing cap the fold uses to stop deriving the summary
-      // (MAX_PROCESSED_SPANS), a trace is a runaway / reused trace_id and is too
-      // large to keep evaluating: re-running every ON_MESSAGE monitor per span
-      // on a 26k-span trace is pure amplification for no added signal. Skip the
-      // eval dispatch (lighter processing). The span itself is still stored and
-      // the trace stays fully queryable: we drop the WORK, never the DATA.
-      if (foldState.spanCount >= MAX_PROCESSED_SPANS) {
-        // Log once, on the first crossing only. This is a per-span hot path: a
-        // runaway trace would otherwise emit thousands of identical warns, the
-        // very per-span amplification we are skipping the eval to avoid.
-        if (foldState.spanCount === MAX_PROCESSED_SPANS) {
-          logger.warn(
-            {
-              tenantId,
-              observedTraceId: traceId,
-              spanCount: foldState.spanCount,
-              cap: MAX_PROCESSED_SPANS,
-            },
-            "Skipping evaluation dispatch: trace reached the processing cap (spans still stored)",
-          );
-        }
-        return;
-      }
 
       // Infinite-loop prevention (post-2026-05-11 incident). See
       // specs/monitors/online-evaluator-loop-prevention.feature.

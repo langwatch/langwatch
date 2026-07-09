@@ -132,6 +132,27 @@ export interface FoldProjectionOptions {
    * cache expiry/eviction/restart, not on every event.
    */
   refoldOnStoreMiss?: boolean;
+  /**
+   * Re-fold the aggregate's whole history from the event log when an event
+   * arrives having occurred BEFORE the persisted checkpoint. Defaults to true.
+   *
+   * Set false when `apply` is order-insensitive — its accumulators commute
+   * (sums, counters, min/max) and any precedence rule keys on data carried by
+   * the event rather than on arrival order. Such a fold reaches the same state
+   * whichever order it sees events in, so replaying the history derives nothing.
+   *
+   * The replay is not merely wasted there, it is actively harmful: it reads
+   * EVERY event for the aggregate, and since `apply` raises the checkpoint to
+   * the highest occurredAt it has seen, one replay pins the checkpoint at the
+   * aggregate's maximum event time — making every later batch look out of order
+   * too. A hot trace re-folded 730 times in two hours, re-reading 5.66M event
+   * rows, and never caught up (2026-07-09; see
+   * specs/event-sourcing/hot-trace-fold-amplification.feature).
+   *
+   * Turning it off never drops events: the executor applies them in occurredAt
+   * order on top of the state it loaded.
+   */
+  refoldOnOutOfOrder?: boolean;
 }
 
 /**

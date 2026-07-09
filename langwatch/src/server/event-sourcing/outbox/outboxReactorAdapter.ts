@@ -43,6 +43,9 @@ export function adaptOutboxReactor<E extends Event, FoldState>(
     return {
       name: definition.name,
       options: definition.options,
+      ...(definition.shouldReact
+        ? { shouldReact: definition.shouldReact.bind(definition) }
+        : {}),
       async handle(event: E) {
         // No outbox runtime wired for this process role. The handle only
         // fires on processes that actually consume events, so reaching
@@ -64,6 +67,9 @@ export function adaptOutboxReactor<E extends Event, FoldState>(
   return {
     name: definition.name,
     options: definition.options,
+    ...(definition.shouldReact
+      ? { shouldReact: definition.shouldReact.bind(definition) }
+      : {}),
     async handle(event: E, context: ReactorContext<FoldState>) {
       // Replay short-circuit (ADR-030 / `specs/event-sourcing/reactor-outbox-dispatch.feature`).
       // When the runtime is replaying historical events, the audit row

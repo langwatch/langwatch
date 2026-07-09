@@ -263,6 +263,29 @@ export class TraceSummaryFoldProjection
   readonly version = TRACE_SUMMARY_PROJECTION_VERSION_LATEST;
   readonly store: FoldProjectionStore<TraceSummaryData>;
 
+  /**
+   * A span can be folded whenever it arrives — the trace summary reaches the
+   * same state either way, so an out-of-order span never needs the history
+   * replayed. Every accumulator commutes (spanCount and the token/cost totals
+   * are sums, timing is min/max, status is an OR), and every precedence rule
+   * decides from data the span itself carries — output selection compares span
+   * end times (`shouldOverrideOutput`), trace naming compares root-span start
+   * times — never from the order spans were applied in.
+   *
+   * The single exception is `mergeModelsMostRecentFirst`, which orders
+   * `models` by application order so `models[0]` is the trace's primary model.
+   * `executeBatch` folds each batch in occurredAt order, so that holds within a
+   * batch and only relaxes across batch boundaries: a display nicety, not a
+   * correctness property, and not worth an event_log replay.
+   *
+   * Leaving the replay on was ruinous once recordSpan sharded across GroupQueue
+   * lanes, because a hot trace's spans then arrive out of order constantly: one
+   * trace re-folded 730 times in two hours, re-reading 5.66M event rows, and
+   * never caught up (2026-07-09 —
+   * specs/event-sourcing/hot-trace-fold-amplification.feature).
+   */
+  readonly options = { refoldOnOutOfOrder: false } as const;
+
   protected readonly events = traceSummaryEvents;
 
   constructor(deps: { store: FoldProjectionStore<TraceSummaryData> }) {

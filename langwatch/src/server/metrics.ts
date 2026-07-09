@@ -375,6 +375,25 @@ export const observeEsFoldProjectionDuration = (
     .labels(pipelineName, projectionName)
     .observe(durationMs);
 
+register.removeSingleMetric("es_fold_refold_total");
+const esFoldRefoldTotal = new Counter({
+  name: "es_fold_refold_total",
+  help: "Out-of-order fold re-folds, by whether the aggregate's history was replayed from the event log",
+  labelNames: ["projection_name", "outcome"] as const,
+});
+
+/**
+ * `performed` — the aggregate's full history was re-read and replayed.
+ * `declined` — the projection's `shouldRefold` said replaying would change
+ * nothing, so the batch was applied on top instead (the events are never lost;
+ * only the replay is skipped).
+ * `unavailable` — no eventLoader was wired, so a re-fold was impossible.
+ */
+export const incrementEsFoldRefoldTotal = (
+  projectionName: string,
+  outcome: "performed" | "declined" | "unavailable",
+) => esFoldRefoldTotal.labels(projectionName, outcome).inc();
+
 // --- Map projection metrics ---
 register.removeSingleMetric("es_map_projection_total");
 const esMapProjectionTotal = new Counter({

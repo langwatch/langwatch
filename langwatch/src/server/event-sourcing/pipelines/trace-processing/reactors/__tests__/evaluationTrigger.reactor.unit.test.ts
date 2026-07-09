@@ -548,3 +548,61 @@ describe("evaluationTrigger reactor", () => {
     });
   });
 });
+
+/**
+ * The guards below used to live inside `handle`, so every span of a 10k-span
+ * trace was serialized, gzipped and blobbed into Redis before the queue's dedup
+ * threw the job away. They are pure and read only the payload `handle` receives,
+ * so `shouldReact` rejects them pre-enqueue instead (ADR-026). See
+ * specs/event-sourcing/hot-trace-fold-amplification.feature.
+ */
+describe("evaluationTrigger relevance check", () => {
+  const withOrigin = (overrides: Partial<TraceSummaryData> = {}) =>
+    createFoldState({
+      attributes: { "langwatch.origin": "application" },
+      ...overrides,
+    });
+
+  const shouldReact = (
+    event: TraceProcessingEvent,
+    state: TraceSummaryData,
+  ): boolean => {
+    const reactor = createEvaluationTriggerReactor(createDeps());
+    // biome-ignore lint/style/noNonNullAssertion: the reactor always declares one.
+    return reactor.shouldReact!(event, createContext(state));
+  };
+
+  describe("given a trace with a resolved origin", () => {
+    /** @scenario "The origin guard admits a genuine message event before enqueue" */
+    it("agrees to react to a recent span event", () => {
+      expect(shouldReact(createSpanEvent(), withOrigin())).toBe(true);
+    });
+
+    /** @scenario "The origin guard filters a non-message event before enqueue" */
+    it("declines a topic-assigned event", () => {
+      expect(shouldReact(createTopicAssignedEvent(), withOrigin())).toBe(false);
+    });
+
+    /** @scenario "The evaluation trigger declines a synthetic span before enqueue" */
+    it("declines a synthetic span", () => {
+      const synthetic = createSpanEvent({ spanName: TRACK_EVENT_SPAN_NAME });
+      expect(shouldReact(synthetic, withOrigin())).toBe(false);
+    });
+
+    /** @scenario "The evaluation trigger declines past the span processing cap before enqueue" */
+    it("declines once the span count reaches the processing cap", () => {
+      const atCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS });
+      expect(shouldReact(createSpanEvent(), atCap)).toBe(false);
+
+      const belowCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS - 1 });
+      expect(shouldReact(createSpanEvent(), belowCap)).toBe(true);
+    });
+  });
+
+  describe("given a trace whose origin is unresolved", () => {
+    /** @scenario "The origin guard filters a trace with no resolved origin before enqueue" */
+    it("declines a span event", () => {
+      expect(shouldReact(createSpanEvent(), createFoldState())).toBe(false);
+    });
+  });
+});
