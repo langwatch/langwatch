@@ -54,6 +54,7 @@ import type {
   EvaluatorConfig,
   FieldMapping,
   SavedRecord,
+  SelectBestEvaluatorConfig,
   TableMeta,
   TableRowData,
   TargetConfig,
@@ -315,6 +316,13 @@ export function EvaluationsV3Table({
     goldenField: string;
     includeMetrics: ("cost" | "duration")[];
   } | null>(null);
+
+  // Sibling of pendingPairwiseRef for N-way (#5101). Also acts as the
+  // signal that lifts `isSelectBest` to true in EvaluatorEditorShared —
+  // when the ref-setter is wired via createEvaluatorEditorCallbacks the
+  // schema-driven `include_metrics` renderer is suppressed and the inline
+  // MetricsSection (with working cost + duration toggles) renders instead.
+  const pendingSelectBestRef = useRef<SelectBestEvaluatorConfig | null>(null);
 
   // Track target being switched (null when adding new, target ID when switching)
   const switchingTargetIdRef = useRef<string | null>(null);
@@ -892,6 +900,14 @@ export function EvaluationsV3Table({
         },
         onPairwiseChange: (next) => {
           pendingPairwiseRef.current = next;
+        },
+        // Wire onSelectBestChange so isSelectBest evaluates true in
+        // EvaluatorEditorShared for the create flow — without this the
+        // DynamicZodForm's schema-driven `include_metrics` renderer runs
+        // instead of SelectBestConfigForm's inline MetricsSection, and
+        // "Include duration" doesn't toggle correctly.
+        onSelectBestChange: (next) => {
+          pendingSelectBestRef.current = next;
         },
       }),
     );
