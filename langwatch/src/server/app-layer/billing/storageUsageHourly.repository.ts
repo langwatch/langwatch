@@ -43,6 +43,22 @@ export interface StorageUsageHourlyRepository {
    * and stays correct across pods without in-memory state.
    */
   getLastMeasuredHour(params: { organizationId: string }): Promise<Date | null>;
+
+  /**
+   * Measured hours whose enqueue was never confirmed durable: `recordHour`
+   * succeeded but the hour is still `reportedAt: null` a full grace window
+   * later. `getLastMeasuredHour` only checks row existence, so if the
+   * dispatcher's `enqueueReport` call failed right after `recordHour`
+   * committed, the cursor would otherwise skip past the hour forever — this is
+   * the sweep that gives it a second chance. Bounded by `createdAt` so hours
+   * still legitimately in flight (enqueued moments ago, not yet processed)
+   * aren't matched.
+   */
+  findStaleUnreportedHours(params: {
+    organizationId: string;
+    olderThan: Date;
+    limit: number;
+  }): Promise<Date[]>;
 }
 
 export class PrismaStorageUsageHourlyRepository
@@ -108,5 +124,23 @@ export class PrismaStorageUsageHourlyRepository
       select: { sealedHour: true },
     });
     return row?.sealedHour ?? null;
+  }
+
+  async findStaleUnreportedHours(params: {
+    organizationId: string;
+    olderThan: Date;
+    limit: number;
+  }): Promise<Date[]> {
+    const rows = await this.prisma.storageUsageHourly.findMany({
+      where: {
+        organizationId: params.organizationId,
+        reportedAt: null,
+        createdAt: { lt: params.olderThan },
+      },
+      orderBy: { sealedHour: "asc" },
+      take: params.limit,
+      select: { sealedHour: true },
+    });
+    return rows.map((row) => row.sealedHour);
   }
 }

@@ -23,6 +23,35 @@ export const STORAGE_BACKFILL_MAX_HOURS = 840;
  */
 export const STORAGE_MAX_HOURS_PER_RUN = 168;
 
+/**
+ * Grace window before an unenqueued measured hour is considered orphaned
+ * rather than merely in flight. An hour enqueued moments ago that hasn't been
+ * processed yet is normal; one still unreported after this long means the
+ * `enqueueReport` call itself likely never landed.
+ */
+const STALE_UNREPORTED_GRACE_MS = 10 * 60 * 1000;
+
+/**
+ * Worst-case seconds a single heavy `byteSize()` ClickHouse measurement can
+ * take — `storageMeter.service.ts`'s `METERING_MAX_EXECUTION_SECONDS` query
+ * cap. Duplicated as a literal (not imported) because that constant is
+ * private to its module; this is the one place outside it that needs the
+ * number, purely to size the lock TTL below.
+ */
+const MAX_SINGLE_MEASUREMENT_SECONDS = 45;
+
+/**
+ * TTL for the per-org dispatch lock. Fixed TTL (not a heartbeat/renewal
+ * scheme) mirrors `ReplayRedisRepository.acquireLock`'s convention for the
+ * same class of problem — but sized to the TRUE worst case, not a round
+ * guess: up to {@link STORAGE_MAX_HOURS_PER_RUN} sequential measurements,
+ * each pathologically pegging {@link MAX_SINGLE_MEASUREMENT_SECONDS}, with 2x
+ * margin so a genuinely-slow-but-not-pathological run never outlives the
+ * lock (168 * 45 * 2 = 15,120s, ~4.2h).
+ */
+export const STORAGE_DISPATCH_LOCK_TTL_SECONDS =
+  STORAGE_MAX_HOURS_PER_RUN * MAX_SINGLE_MEASUREMENT_SECONDS * 2;
+
 /** Narrow contracts so the service depends on capabilities, not whole services. */
 export interface StorageMeterDispatchDeps {
   isMeteringEnabled: (organizationId: string) => Promise<boolean>;
@@ -112,6 +141,9 @@ export class StorageMeterDispatchService {
     // Window: catch up to the last COMPLETE wall-clock hour. The triggering
     // event is only a wake-up; what we measure is "sealed hours not yet done".
     const now = (this.deps.now ?? (() => new Date()))();
+
+    await this.healOrphanedUnreportedHours(organizationId, now);
+
     const sealBoundaryMs = floorToHourMs(now.getTime()) - MS_PER_HOUR;
 
     const last = await this.deps.storageUsageHourly.getLastMeasuredHour({
@@ -184,6 +216,46 @@ export class StorageMeterDispatchService {
         tenantId: organizationId,
         occurredAt: now.getTime(),
       });
+    }
+  }
+
+  /**
+   * Re-enqueues measured hours whose report was never confirmed durable
+   * (`reportedAt` still null past the grace window) — the fix for the gap
+   * where `recordHour` commits but the subsequent `enqueueReport` throws
+   * (Redis blip, ES validation error): the cursor below only checks row
+   * existence, so without this the hour would silently never be retried.
+   * Re-enqueuing is safe even if the hour is actually still in flight — the
+   * report command is idempotent on its own `reportedAt` cursor and Stripe's
+   * deterministic per-hour identifier.
+   */
+  private async healOrphanedUnreportedHours(
+    organizationId: string,
+    now: Date,
+  ): Promise<void> {
+    const staleHours =
+      await this.deps.storageUsageHourly.findStaleUnreportedHours({
+        organizationId,
+        olderThan: new Date(now.getTime() - STALE_UNREPORTED_GRACE_MS),
+        limit: STORAGE_MAX_HOURS_PER_RUN,
+      });
+
+    for (const sealedHour of staleHours) {
+      try {
+        await this.deps.enqueueReport({
+          organizationId,
+          sealedHour: sealedHour.toISOString(),
+          tenantId: organizationId,
+          occurredAt: now.getTime(),
+        });
+      } catch (error) {
+        // Best-effort: leave the row unreported and retry on the next wake-up
+        // rather than aborting the whole catch-up over an orphan repair.
+        logger.warn(
+          { organizationId, sealedHour, error },
+          "failed to re-enqueue an orphaned unreported storage hour, will retry next run",
+        );
+      }
     }
   }
 }

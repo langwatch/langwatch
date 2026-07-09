@@ -53,6 +53,7 @@ function makeService(
       organizationId: string,
       fn: () => Promise<void>,
     ) => Promise<void>;
+    staleUnreportedHours: Date[];
   }> = {},
 ) {
   const isMeteringEnabled = vi
@@ -73,6 +74,9 @@ function makeService(
     .mockResolvedValue(overrides.lastMeasured ?? null);
   const recordHour = vi.fn().mockResolvedValue(undefined);
   const enqueueReport = vi.fn().mockResolvedValue(undefined);
+  const findStaleUnreportedHours = vi
+    .fn()
+    .mockResolvedValue(overrides.staleUnreportedHours ?? []);
 
   const service = new StorageMeterDispatchService({
     isMeteringEnabled,
@@ -83,6 +87,7 @@ function makeService(
       recordHour,
       findHour: vi.fn(),
       markReported: vi.fn(),
+      findStaleUnreportedHours,
     },
     enqueueReport,
     runExclusivePerOrg: overrides.runExclusivePerOrg,
@@ -97,6 +102,7 @@ function makeService(
     getLastMeasuredHour,
     recordHour,
     enqueueReport,
+    findStaleUnreportedHours,
   };
 }
 
@@ -313,6 +319,59 @@ describe("StorageMeterDispatchService", () => {
       expect(measureBytesAt).toHaveBeenCalledTimes(2); // 09:00, 10:00 (failed)
       expect(recordHour).toHaveBeenCalledTimes(1); // only 09:00
       expect(enqueueReport).toHaveBeenCalledTimes(1); // only 09:00
+    });
+  });
+
+  describe("given a measured hour whose enqueue never landed", () => {
+    /** @scenario An orphaned unreported hour is re-enqueued, not skipped forever */
+    it("re-enqueues a stale unreported hour on the next dispatch", async () => {
+      // Simulates: an earlier run's recordHour committed but enqueueReport
+      // threw, leaving the hour with reportedAt: null past the grace window.
+      // getLastMeasuredHour already reflects that hour as measured (caught
+      // up), so the forward gap-fill alone would never retry it.
+      const orphanHour = hour("2026-02-15T10:00:00.000Z");
+      const {
+        service,
+        measureBytesAt,
+        enqueueReport,
+        findStaleUnreportedHours,
+      } = makeService({
+        lastMeasured: SEAL_BOUNDARY,
+        staleUnreportedHours: [orphanHour],
+      });
+
+      await service.dispatchForOrg({ organizationId: "org-1" });
+
+      expect(findStaleUnreportedHours).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: "org-1" }),
+      );
+      expect(enqueueReport).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: "org-1",
+          sealedHour: "2026-02-15T10:00:00.000Z",
+        }),
+      );
+      // Re-enqueuing an already-measured orphan must not re-run the heavy
+      // measurement or write a duplicate row.
+      expect(measureBytesAt).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A failed retry is logged and does not abort the run */
+    it("does not abort the dispatch when re-enqueuing an orphan fails", async () => {
+      const orphanHour = hour("2026-02-15T10:00:00.000Z");
+      const { service, measureBytesAt, enqueueReport } = makeService({
+        lastMeasured: hour("2026-02-15T10:00:00.000Z"), // one real gap hour: 11:00
+        staleUnreportedHours: [orphanHour],
+      });
+      enqueueReport.mockRejectedValueOnce(new Error("redis blip"));
+
+      await service.dispatchForOrg({ organizationId: "org-1" });
+
+      // The orphan retry failed, but the forward gap-fill for 11:00 still ran.
+      expect(measureBytesAt).toHaveBeenCalledTimes(1);
+      expect(measureBytesAt.mock.calls[0]![0].sealedHour.toISOString()).toBe(
+        "2026-02-15T11:00:00.000Z",
+      );
     });
   });
 });
