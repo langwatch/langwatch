@@ -72,10 +72,9 @@ beforeEach(() => {
   // Clear LW_GATEWAY_PUBLIC_URL / LW_GATEWAY_INTERNAL_URL so neither leaks in
   // from the developer's shell (`pnpm dev` setups pre-source .env to dodge
   // the start.sh defaulting bug, and that .env now carries these on the
-  // WSL+minikube layout). The credential service prefers INTERNAL over BASE
-  // (never PUBLIC — the worker's NetworkPolicy blocks external HTTPS, see
-  // LangyCredentialService.ts), so an inherited value would shadow whatever
-  // the test pins via LW_GATEWAY_BASE_URL above.
+  // WSL+minikube layout). Resolution is INTERNAL -> PUBLIC -> BASE, so an
+  // inherited value of either would shadow what the test pins via
+  // LW_GATEWAY_BASE_URL above.
   delete process.env.LW_GATEWAY_PUBLIC_URL;
   delete process.env.LW_GATEWAY_INTERNAL_URL;
 });
@@ -227,9 +226,10 @@ describe("LangyCredentialService", () => {
   });
 
   describe("given env config is incomplete", () => {
-    describe("when both LW_GATEWAY_INTERNAL_URL and LW_GATEWAY_BASE_URL are unset", () => {
+    describe("when no gateway URL env is set at all", () => {
       it("throws LangyCredentialResolutionError before any provisioning", async () => {
         delete process.env.LW_GATEWAY_INTERNAL_URL;
+        delete process.env.LW_GATEWAY_PUBLIC_URL;
         delete process.env.LW_GATEWAY_BASE_URL;
         const prisma = makePrisma();
         const svc = new LangyCredentialService(prisma);
@@ -238,6 +238,65 @@ describe("LangyCredentialService", () => {
           svc.getOrProvision({ projectId: "p1", actorUserId: "u1" }),
         ).rejects.toThrow(/LW_GATEWAY_INTERNAL_URL/);
         expect(vkCreate).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a self-hosted deploy that sets only LW_GATEWAY_PUBLIC_URL", () => {
+    describe("when getOrProvision is called", () => {
+      // Regression guard. LW_GATEWAY_BASE_URL names the CONTROL PLANE on a
+      // modern deploy (the Go gateway dials back on it — see the
+      // naming-collision note in scripts/start.sh), so falling through to it
+      // here would hand the worker the app's own URL and every completion
+      // would POST at :5560 instead of the gateway's :5563.
+      it("uses the public gateway URL, never falling through to the control-plane LW_GATEWAY_BASE_URL", async () => {
+        delete process.env.LW_GATEWAY_INTERNAL_URL;
+        process.env.LW_GATEWAY_PUBLIC_URL = "https://gateway.acme.internal";
+        process.env.LW_GATEWAY_BASE_URL = "http://langwatch-app:5560";
+        const prisma = makePrisma({
+          projectSecret: {
+            findFirst: vi
+              .fn()
+              .mockResolvedValue({ encryptedValue: "enc:lw_vk_live_stored" }),
+            create: vi.fn().mockResolvedValue({}),
+          },
+        });
+        const svc = new LangyCredentialService(prisma);
+
+        const creds = await svc.getOrProvision({
+          projectId: "p1",
+          actorUserId: "u1",
+        });
+
+        expect(creds.gatewayBaseUrl).toBe("https://gateway.acme.internal/v1");
+      });
+    });
+  });
+
+  describe("given an in-cluster deploy that sets INTERNAL alongside PUBLIC", () => {
+    describe("when getOrProvision is called", () => {
+      it("prefers LW_GATEWAY_INTERNAL_URL — the worker's NetworkPolicy blocks the public ingress", async () => {
+        process.env.LW_GATEWAY_INTERNAL_URL =
+          "http://langwatch-gateway-internal:80";
+        process.env.LW_GATEWAY_PUBLIC_URL = "https://gateway.langwatch.ai";
+        const prisma = makePrisma({
+          projectSecret: {
+            findFirst: vi
+              .fn()
+              .mockResolvedValue({ encryptedValue: "enc:lw_vk_live_stored" }),
+            create: vi.fn().mockResolvedValue({}),
+          },
+        });
+        const svc = new LangyCredentialService(prisma);
+
+        const creds = await svc.getOrProvision({
+          projectId: "p1",
+          actorUserId: "u1",
+        });
+
+        expect(creds.gatewayBaseUrl).toBe(
+          "http://langwatch-gateway-internal:80/v1",
+        );
       });
     });
   });
