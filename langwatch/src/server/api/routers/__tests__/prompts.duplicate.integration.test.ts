@@ -81,6 +81,7 @@ describe("prompts.duplicate", () => {
 
   describe("given a prompt exists in the project", () => {
     describe("when it is duplicated", () => {
+      /** @scenario A user duplicates a prompt from the prompt row menu */
       it("creates a new prompt numbered from one and leaves the original alone", async () => {
         const original = await givenASupportBotPrompt();
 
@@ -94,6 +95,7 @@ describe("prompts.duplicate", () => {
         expect(await promptHandles()).toEqual(["support-bot", "support-bot-1"]);
       });
 
+      /** @scenario A duplicated prompt stays in the project it was duplicated from */
       it("keeps the duplicate in the project it was duplicated from", async () => {
         const original = await givenASupportBotPrompt();
 
@@ -105,6 +107,7 @@ describe("prompts.duplicate", () => {
         expect(duplicate.projectId).toBe(projectId);
       });
 
+      /** @scenario A duplicated prompt keeps the original's configuration */
       it("carries over the model, system prompt and input variables", async () => {
         const original = await givenASupportBotPrompt();
 
@@ -195,6 +198,7 @@ describe("prompts.duplicate", () => {
     });
 
     describe("when it is duplicated twice", () => {
+      /** @scenario Duplicating the same prompt twice produces two distinct prompts */
       it("numbers the second duplicate past the first", async () => {
         const original = await givenASupportBotPrompt();
 
@@ -220,6 +224,7 @@ describe("prompts.duplicate", () => {
 
   describe("given the organization has used up the prompt allowance its plan grants", () => {
     describe("when a duplicate is attempted", () => {
+      /** @scenario Duplicating is blocked when the plan's prompt allowance is used up */
       it("reports the limit and creates no prompt", async () => {
         const original = await givenASupportBotPrompt();
 
@@ -241,6 +246,7 @@ describe("prompts.duplicate", () => {
 
   describe("given the prompt has been deleted", () => {
     describe("when a duplicate is attempted", () => {
+      /** @scenario Duplicating a prompt that no longer exists reports it as missing */
       it("reports the prompt as not found", async () => {
         const original = await givenASupportBotPrompt();
         await caller.prompts.delete({ idOrHandle: original.id, projectId });
