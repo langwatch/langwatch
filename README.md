@@ -180,3 +180,4 @@ Please refer to our Security page for more information. Contact us at [security@
 ### Vulnerability Disclosure
 
 If you need to do a responsible disclosure of a security vulnerability, you may do so by email to [security@langwatch.ai](mailto:security@langwatch.ai), or if you prefer you can reach out to one of our team privately on [Discord](https://discord.com/invite/kT4PhDS2gH).
+
