@@ -602,6 +602,14 @@ describe("evaluationTrigger relevance check", () => {
       await reactor.handle(createSpanEvent(), createContext(atCap));
       expect(deps.evaluation).not.toHaveBeenCalled();
 
+      // A coalesced batch can jump the span count clean past the cap without
+      // ever landing on it, so the guard is `>=`, not `===`.
+      const pastCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS + 1 });
+      const depsPast = createDeps();
+      const reactorPast = createEvaluationTriggerReactor(depsPast);
+      await reactorPast.handle(createSpanEvent(), createContext(pastCap));
+      expect(depsPast.evaluation).not.toHaveBeenCalled();
+
       const belowCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS - 1 });
       const depsBelow = createDeps();
       const reactorBelow = createEvaluationTriggerReactor(depsBelow);
