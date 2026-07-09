@@ -556,6 +556,109 @@ export const promptsRouter = createTRPCRouter({
     }),
 
   /**
+   * Duplicate a prompt within the same project.
+   * Unlike `copy`, this never crosses project boundaries - it always
+   * duplicates into the same project the source prompt lives in, using
+   * the conventional "handle(1)", "handle(2)", ... naming scheme.
+   */
+  duplicate: protectedProcedure
+    .input(
+      z.object({
+        idOrHandle: z.string(),
+        projectId: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("prompts:create"))
+    .mutation(async ({ ctx, input }) => {
+      await enforceLicenseLimit(ctx, input.projectId, "prompts");
+
+      const service = new PromptService(ctx.prisma);
+      const authorId = ctx.session?.user?.id;
+
+      const sourcePrompt = await service.getPromptByIdOrHandle({
+        idOrHandle: input.idOrHandle,
+        projectId: input.projectId,
+      });
+
+      if (!sourcePrompt) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Prompt not found",
+        });
+      }
+
+      const baseHandle = sourcePrompt.handle ?? sourcePrompt.id;
+      let newHandle = `${baseHandle}(1)`;
+      let index = 1;
+      const maxAttempts = 100;
+      let attempts = 0;
+      let handleAvailable = await service.checkHandleUniqueness({
+        handle: newHandle,
+        projectId: input.projectId,
+        scope: sourcePrompt.scope ?? "PROJECT",
+      });
+
+      while (!handleAvailable) {
+        attempts++;
+        if (attempts > maxAttempts) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `Failed to generate unique handle after ${maxAttempts} attempts. Source prompt: ${sourcePrompt.id} (handle: ${
+              sourcePrompt.handle ?? "none"
+            }), project: ${input.projectId}`,
+          });
+        }
+        index++;
+        newHandle = `${baseHandle}(${index})`;
+        handleAvailable = await service.checkHandleUniqueness({
+          handle: newHandle,
+          projectId: input.projectId,
+          scope: sourcePrompt.scope ?? "PROJECT",
+        });
+      }
+
+      const { normalizedPrompt, normalizedMessages } = normalizePromptData({
+        prompt: sourcePrompt.prompt,
+        messages: sourcePrompt.messages,
+      });
+
+      const duplicatedPrompt = await service.createPrompt({
+        projectId: input.projectId,
+        handle: newHandle,
+        scope: sourcePrompt.scope ?? "PROJECT",
+        authorId,
+        commitMessage: `Duplicated from "${baseHandle}"`,
+        prompt: normalizedPrompt,
+        messages: normalizedMessages,
+        inputs: sourcePrompt.inputs ?? undefined,
+        outputs: sourcePrompt.outputs ?? undefined,
+        model: sourcePrompt.model ?? undefined,
+        temperature: sourcePrompt.temperature ?? undefined,
+        maxTokens: sourcePrompt.maxTokens ?? undefined,
+        topP: sourcePrompt.topP ?? undefined,
+        frequencyPenalty: sourcePrompt.frequencyPenalty ?? undefined,
+        presencePenalty: sourcePrompt.presencePenalty ?? undefined,
+        seed: sourcePrompt.seed ?? undefined,
+        topK: sourcePrompt.topK ?? undefined,
+        minP: sourcePrompt.minP ?? undefined,
+        repetitionPenalty: sourcePrompt.repetitionPenalty ?? undefined,
+        reasoning: sourcePrompt.reasoning ?? undefined,
+        verbosity: sourcePrompt.verbosity ?? undefined,
+        promptingTechnique: sourcePrompt.promptingTechnique ?? undefined,
+        demonstrations: sourcePrompt.demonstrations ?? undefined,
+        parameters: sourcePrompt.parameters ?? undefined,
+      });
+
+      afterPromptCreated({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
+        userId: authorId,
+      });
+
+      return duplicatedPrompt;
+    }),
+
+  /**
    * Sync a copied prompt from its source
    */
   syncFromSource: protectedProcedure

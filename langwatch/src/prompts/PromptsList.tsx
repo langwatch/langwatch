@@ -17,7 +17,7 @@ import {
   RefreshCw,
   Trash2,
 } from "react-feather";
-import { LuBuilding } from "react-icons/lu";
+import { LuBuilding, LuCopyPlus } from "react-icons/lu";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -86,6 +86,7 @@ export function PromptsList({
   } | null>(null);
 
   const syncFromSource = api.prompts.syncFromSource.useMutation();
+  const duplicatePrompt = api.prompts.duplicate.useMutation();
   const utils = api.useContext();
 
   const onSyncFromSource = useCallback(
@@ -130,6 +131,41 @@ export function PromptsList({
     });
     setPushToCopiesDialogOpen(true);
   }, []);
+
+  const onDuplicate = useCallback(
+    async (config: PromptListItem) => {
+      if (!project) return;
+
+      try {
+        const duplicated = await duplicatePrompt.mutateAsync({
+          idOrHandle: config.id,
+          projectId: project.id,
+        });
+        await utils.prompts.getAllPromptsForProject.invalidate();
+        toaster.create({
+          title: "Prompt duplicated",
+          description: `"${
+            config.handle ?? config.name ?? config.id
+          }" was duplicated as "${duplicated.handle}"`,
+          type: "success",
+          meta: {
+            closable: true,
+          },
+        });
+      } catch (error) {
+        toaster.create({
+          title: "Error duplicating prompt",
+          description:
+            error instanceof Error ? error.message : "Please try again later.",
+          type: "error",
+          meta: {
+            closable: true,
+          },
+        });
+      }
+    },
+    [duplicatePrompt, project, utils],
+  );
 
   if (!project || isLoading) {
     return <Text>Loading prompts...</Text>;
@@ -296,6 +332,12 @@ export function PromptsList({
                           }}
                         >
                           <Copy size={16} /> Replicate to another project
+                        </Menu.Item>
+                        <Menu.Item
+                          value="duplicate"
+                          onClick={() => void onDuplicate(config)}
+                        >
+                          <LuCopyPlus size={16} /> Duplicate prompt
                         </Menu.Item>
                         <Menu.Item
                           value="delete"
