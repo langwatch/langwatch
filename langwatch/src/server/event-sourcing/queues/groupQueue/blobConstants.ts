@@ -20,12 +20,13 @@ export const GQ1_BLOB_BACKSTOP_TTL_SECONDS = 7 * 24 * 60 * 60;
  * Backstop TTL for a GQ2 (content-addressed, refcounted) offloaded blob,
  * refreshed on access. The holder-set TTL is set to at least this (see
  * {@link BlobHolders}); both reclaim eagerly on the happy path, so this only
- * bounds genuine orphans — sized to outlive a weekend. The GQ2 blob has an
+ * bounds genuine orphans — sized at 4 days so a Friday-evening incident still
+ * has its blobs on Monday plus a day of catch-up. The GQ2 blob has an
  * accompanying holder set (per-stage tokens with atomic reclaim in Lua), so
- * the 3-day window here is the safety net for missed releases (crash mid-
+ * the window here is the safety net for missed releases (crash mid-
  * completion), not the primary reclaim mechanism.
  */
-export const BLOB_BACKSTOP_TTL_SECONDS = 3 * 24 * 60 * 60;
+export const BLOB_BACKSTOP_TTL_SECONDS = 4 * 24 * 60 * 60;
 
 /**
  * TTL on a blob's holder set — deliberately longer than the blob TTL so the

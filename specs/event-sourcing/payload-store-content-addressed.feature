@@ -11,7 +11,7 @@ Feature: GroupQueue content-addressed tiered payload store
   # Builds on ADR-026's GQ1 envelope (specs/event-sourcing/payload-envelope.feature).
   # Supersedes ADR-026's blob-lifecycle scenarios: random blob ids become content
   # hashes; best-effort-delete + 7-day pure-backstop TTL becomes holder-set eager
-  # reclaim + 3-day refreshed backstop. The GQ1 envelope/header/routing/two-phase
+  # reclaim + 4-day refreshed backstop. The GQ1 envelope/header/routing/two-phase
   # rollout decisions carry forward unchanged.
   #
   # TWO mechanisms share the word "dedup" — this spec keeps them apart:
@@ -40,7 +40,7 @@ Feature: GroupQueue content-addressed tiered payload store
   #   - Holder set {queue}:gq:blobholders:<hash> tracks references by stagedJobId;
   #     SADD at stage, SREM at every retire edge, atomic with the job-entry write.
   #     Empties -> eager UNLINK (redis) / reclaim-list sweep (s3).
-  #   - 3-day TTL on blob + holder set, refreshed on access, is the orphan
+  #   - 4-day TTL on blob + holder set, refreshed on access, is the orphan
   #     backstop only. A missing blob completes the slot without the handler
   #     (recoverable via replay) — a fail-safe, never a wedge.
   #
@@ -61,7 +61,7 @@ Feature: GroupQueue content-addressed tiered payload store
     And envelope v2 writes are enabled for the deployment
     And the inline tier ceiling is configured at 4 KiB
     And the S3 tier threshold is configured at 256 KiB
-    And the blob TTL backstop is configured at 3 days
+    And the blob TTL backstop is configured at 4 days
 
   # ===========================================================================
   # Track 1 — content-addressed tiers
@@ -142,7 +142,7 @@ Feature: GroupQueue content-addressed tiered payload store
   # s3://{bucket}/{projectId}/<hash>. Isolation is structural — in the key path —
   # not incidental to content. This also makes a project purge a delete-by-prefix
   # over .../{projectId}/* (driven by the platform's project-delete cascade); the
-  # redis tier needs none, its 3-day TTL clears once the project's jobs drain.
+  # redis tier needs none, its 4-day TTL clears once the project's jobs drain.
   Scenario: Blob keys are namespaced by tenant so tenants never share a blob
     Given two tenants whose jobs carry byte-identical user content
     When each payload is offloaded

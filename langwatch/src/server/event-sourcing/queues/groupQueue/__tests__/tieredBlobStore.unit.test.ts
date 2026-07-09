@@ -52,11 +52,11 @@ describe("TieredBlobStore", () => {
       /**
        * Regression: TieredBlobStore wrote through RedisJobBlobStore's default
        * (GQ1's 7-day staged-residence backstop) instead of the refcounted GQ2
-       * 3-day orphan backstop the spec configures ("the blob TTL backstop is
-       * configured at 3 days"), so every leaked blob lived 4 days longer than
+       * GQ2 orphan backstop the spec configures ("the blob TTL backstop is
+       * configured at 4 days"), so every leaked blob lived days longer than
        * designed (2026-07-09 Redis memory investigation).
        */
-      it("writes and refreshes with the 3-day GQ2 backstop, not GQ1's 7-day default", async () => {
+      it("writes and refreshes with the 4-day GQ2 backstop, not GQ1's 7-day default", async () => {
         const { store, redisBlobs } = makeStore();
         const data = Buffer.from("ttl pinning payload");
 

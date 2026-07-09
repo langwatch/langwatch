@@ -33,7 +33,7 @@ Feature: GroupQueue blob-handling hardening
   Background:
     Given a GroupQueue with GQ2 content-addressed offload enabled
     And the absolute ceiling is configured at 50 MiB
-    And the blob backstop TTL is configured at 3 days
+    And the blob backstop TTL is configured at 4 days
 
   # ===========================================================================
   # Track 1 — bounded-memory offload (cap + hash-over-raw)

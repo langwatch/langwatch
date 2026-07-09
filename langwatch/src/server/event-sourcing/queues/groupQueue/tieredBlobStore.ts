@@ -253,7 +253,7 @@ export class TieredBlobStore {
       return { tier: "s3", projectId, hash };
     }
     // GQ2 blobs are refcounted (holder-set eager reclaim), so the TTL is only
-    // the orphan backstop — 3 days, not GQ1's 7-day staged-residence window.
+    // the orphan backstop — 4 days, not GQ1's 7-day staged-residence window.
     await this.redisBlobs.put({
       id: redisBlobId({ projectId, hash }),
       data,

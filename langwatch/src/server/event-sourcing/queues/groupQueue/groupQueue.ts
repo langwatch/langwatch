@@ -966,7 +966,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
                 // can't proceed. Release the OLD hold explicitly and fall
                 // through to the non-retryable fail-safe (complete the slot,
                 // recover via event replay) — otherwise the old hold token
-                // stays in the holder set until the 3-day TTL backstop reclaims
+                // stays in the holder set until the 4-day TTL backstop reclaims
                 // it, leaking the blob for that whole window.
                 let retryJobData: string;
                 try {
