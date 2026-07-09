@@ -129,7 +129,7 @@ describe("ScenarioRunDetailDrawer", () => {
           { wrapper: Wrapper },
         );
 
-        expect(screen.getByText("simulation.sh")).toBeInTheDocument();
+        expect(screen.getByText("simulation-results.log")).toBeInTheDocument();
         expect(screen.getByText(/Must repeat verbatim/)).toBeInTheDocument();
       });
     });
@@ -144,7 +144,7 @@ describe("ScenarioRunDetailDrawer", () => {
           { wrapper: Wrapper },
         );
 
-        expect(screen.getByText("simulation.sh")).toBeInTheDocument();
+        expect(screen.getByText("simulation-results.log")).toBeInTheDocument();
       });
     });
   });

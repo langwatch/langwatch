@@ -11,8 +11,13 @@ import { StatusDisplay } from "./StatusDisplay";
 /** Width of the traffic-light cluster — mirrored on the right so the filename centers. */
 const TRAFFIC_LIGHTS_WIDTH = "44px";
 
-/** macOS-style terminal title bar with traffic lights and a filename. */
-function ConsoleTitleBar() {
+/**
+ * macOS-style terminal title bar. Traffic lights render greyscale — the
+ * unfocused-window treatment — since they're decoration, not controls.
+ * The right slot hosts actions (e.g. copy results) at the same width as
+ * the light cluster so the filename stays centered.
+ */
+function ConsoleTitleBar({ actions }: { actions?: React.ReactNode }) {
   return (
     <HStack
       paddingX={4}
@@ -24,9 +29,9 @@ function ConsoleTitleBar() {
       top={0}
     >
       <HStack gap={1.5} width={TRAFFIC_LIGHTS_WIDTH} flexShrink={0}>
-        <Circle size="10px" bg="red.400" />
-        <Circle size="10px" bg="yellow.400" />
-        <Circle size="10px" bg="green.400" />
+        <Circle size="10px" bg="gray.600" />
+        <Circle size="10px" bg="gray.600" />
+        <Circle size="10px" bg="gray.600" />
       </HStack>
       <Text
         flex={1}
@@ -35,9 +40,16 @@ function ConsoleTitleBar() {
         color="gray.400"
         fontFamily="mono"
       >
-        simulation.sh
+        simulation-results.log
       </Text>
-      <Box width={TRAFFIC_LIGHTS_WIDTH} flexShrink={0} />
+      <HStack
+        width={TRAFFIC_LIGHTS_WIDTH}
+        flexShrink={0}
+        justify="flex-end"
+        gap={0}
+      >
+        {actions}
+      </HStack>
     </HStack>
   );
 }
@@ -51,11 +63,14 @@ export function SimulationConsole({
   scenarioName,
   status,
   durationInMs,
+  titleBarActions,
 }: {
   results?: ScenarioResults | null;
   scenarioName?: string;
   status?: ScenarioRunStatus;
   durationInMs?: number;
+  /** Rendered in the title bar's right slot (e.g. a copy-results button). */
+  titleBarActions?: React.ReactNode;
 }) {
   const isPending =
     status === ScenarioRunStatus.IN_PROGRESS ||
@@ -72,7 +87,7 @@ export function SimulationConsole({
       overflow="auto"
       width="full"
     >
-      <ConsoleTitleBar />
+      <ConsoleTitleBar actions={titleBarActions} />
       <Box paddingX={5} paddingY={4}>
         <Code
           colorPalette="green"

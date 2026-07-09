@@ -430,8 +430,6 @@ export function ScenarioRunDetailDrawer({
                   isFirst={!hasConversation}
                 >
                   <Box
-                    position="relative"
-                    className="group"
                     borderRadius="xl"
                     overflow="hidden"
                     borderWidth="1px"
@@ -443,22 +441,18 @@ export function ScenarioRunDetailDrawer({
                       scenarioName={scenarioState.name ?? undefined}
                       status={scenarioState.status}
                       durationInMs={scenarioState.durationInMs}
+                      titleBarActions={
+                        scenarioState.results ? (
+                          <CopyButton
+                            value={formatResultsForCopy(scenarioState.results)}
+                            label="Results"
+                            size="2xs"
+                            color="gray.500"
+                            _hover={{ color: "gray.200", bg: "gray.800" }}
+                          />
+                        ) : undefined
+                      }
                     />
-                    {scenarioState.results && (
-                      <Box
-                        position="absolute"
-                        top={2}
-                        right={2}
-                        opacity={0}
-                        _groupHover={{ opacity: 1 }}
-                        transition="opacity 0.2s"
-                      >
-                        <CopyButton
-                          value={formatResultsForCopy(scenarioState.results)}
-                          label="Results"
-                        />
-                      </Box>
-                    )}
                   </Box>
                 </RunDetailSection>
               </Accordion.Root>
