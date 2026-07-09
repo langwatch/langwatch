@@ -275,6 +275,31 @@ describe("LangyCredentialService", () => {
     });
   });
 
+  describe("given only the legacy LW_GATEWAY_BASE_URL is set", () => {
+    describe("when getOrProvision is called", () => {
+      it("falls back to LW_GATEWAY_BASE_URL so deploys predating the rename keep working", async () => {
+        delete process.env.LW_GATEWAY_INTERNAL_URL;
+        process.env.LW_GATEWAY_BASE_URL = "http://langwatch-gateway:80";
+        const prisma = makePrisma({
+          projectSecret: {
+            findFirst: vi
+              .fn()
+              .mockResolvedValue({ encryptedValue: "enc:lw_vk_live_stored" }),
+            create: vi.fn().mockResolvedValue({}),
+          },
+        });
+        const svc = new LangyCredentialService(prisma);
+
+        const creds = await svc.getOrProvision({
+          projectId: "p1",
+          actorUserId: "u1",
+        });
+
+        expect(creds.gatewayBaseUrl).toBe("http://langwatch-gateway:80/v1");
+      });
+    });
+  });
+
   describe("given two simultaneous first-use requests for the same project", () => {
     describe("when the ProjectSecret.create loses the race with P2002", () => {
       it("re-reads the winner's encrypted secret and returns the decrypted plaintext", async () => {

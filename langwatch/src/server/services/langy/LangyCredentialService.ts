@@ -118,7 +118,7 @@ export class LangyCredentialService {
     }
     if (!gatewayBaseUrl) {
       throw new LangyCredentialResolutionError(
-        "LW_GATEWAY_INTERNAL_URL is not configured on the control plane.",
+        "LW_GATEWAY_INTERNAL_URL (or legacy LW_GATEWAY_BASE_URL) is not configured on the control plane.",
       );
     }
 
