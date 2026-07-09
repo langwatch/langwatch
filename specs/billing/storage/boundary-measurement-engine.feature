@@ -18,6 +18,12 @@ Feature: Storage billing boundary measurement engine
     Then no additional measurement work is performed
 
   @integration @unimplemented
+  Scenario: The once-per-hour guarantee survives a process restart
+    Given the current sealed hour was swept before a worker restart
+    When an ingest event wakes the restarted worker within the same hour
+    Then no additional measurement work is performed
+
+  @integration @unimplemented
   Scenario: Ingest from any organization triggers measurement for all billable organizations
     Given two billable organizations where only one is actively ingesting
     When a new sealed hour is swept
@@ -34,6 +40,13 @@ Feature: Storage billing boundary measurement engine
     Given an organization with 6 hours of unsampled gauge history
     When the sweep runs
     Then all 6 hourly rows are produced in order from a single replay
+
+  @integration @unimplemented
+  Scenario: A caught-up hour records its true historical value, never the current one
+    Given the gauge changed between a missed hour and now
+    When the missed hour is caught up
+    Then its hourly row records the gauge value as of that hour
+    And not the gauge value at catch-up time
 
   # Entries
 
@@ -59,13 +72,6 @@ Feature: Storage billing boundary measurement engine
     Then a mirroring exit event is recorded without querying ClickHouse
     And the gauge decreases by the recorded entry amount
 
-  @integration @unimplemented
-  Scenario: Evaluation run exits are measured with a fresh bounded query
-    Given evaluation run data whose partition placement can change after ingestion
-    When its exit boundary is reached
-    Then the exit amount comes from a fresh single-partition measurement
-    And not from the recorded entry mirror
-
   # Corrections
 
   @integration @unimplemented
@@ -74,6 +80,13 @@ Feature: Storage billing boundary measurement engine
     When the project is deleted
     Then negative events for the affected partitions are recorded before deletion
     And the next hourly sample reflects the 5 GiB drop
+
+  @integration @unimplemented
+  Scenario: A privacy erasure request lowers the bill before the data is erased
+    Given an erasure request covering billable data
+    When the erasure is executed
+    Then the affected partitions are measured and negative events recorded before deletion
+    And the gauge decreases by the erased amount
 
   @integration @unimplemented
   Scenario: A retention policy change re-books affected data under the new retention
@@ -89,6 +102,13 @@ Feature: Storage billing boundary measurement engine
     Given an organization gauge that folded to a negative value due to a defect
     When the hour is sampled
     Then the hourly row records zero megabytes
+
+  @integration @unimplemented
+  Scenario: A gauge negative beyond tolerance raises a drift alarm without blocking sampling
+    Given an organization gauge far below zero
+    When the hour is sampled
+    Then a drift alarm is raised for that organization
+    And the hourly row is still written as zero megabytes
 
   @integration @unimplemented
   Scenario: With the metering flag off the engine stays fully dark

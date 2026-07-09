@@ -38,6 +38,16 @@ Feature: Storage billing boundary calendar and gauge fold
     When crossing dates are computed
     Then each exit date is exactly 28 days after its matching entry date
 
+  # Billable-table set
+
+  @unit @unimplemented
+  Scenario: Derived analytics tables and evaluation runs are excluded from billable storage
+    Given the retention system manages 13 tables
+    When the billable-table set is resolved
+    Then it contains exactly 10 tables
+    And the two derived analytics tables and evaluation runs are not in it
+    And every table in the set carries per-row size accounting
+
   # Event identity and deduplication
 
   @unit @unimplemented
