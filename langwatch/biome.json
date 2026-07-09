@@ -183,10 +183,7 @@
 			}
 		},
 		{
-			"includes": [
-				"src/server/elasticsearch/transformers.ts",
-				"src/server/evaluations/preconditions.ts"
-			],
+			"includes": ["src/server/evaluations/preconditions.ts"],
 			"linter": {
 				"rules": {
 					"style": {
