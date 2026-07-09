@@ -1108,73 +1108,31 @@ export class ProjectionRouter<
 
     if (hasReactorQueues) {
       const queueProcessor = this.queueManager.getReactorQueue(reactor.name);
-        if (queueProcessor) {
-          try {
-            await queueProcessor.send({ event, foldState });
-          } catch (error) {
-            this.logger.error(
-              {
-                reactorName: reactor.name,
-                foldName,
-                eventId: event.id,
-                error: error instanceof Error ? error.message : String(error),
-              },
-              "Failed to dispatch event to reactor queue",
-            );
-            errors.push(toError(error));
-          }
-        } else {
-          // Queue expected but not found — fall back to inline execution
-          this.logger.warn(
+      if (queueProcessor) {
+        try {
+          await queueProcessor.send({ event, foldState });
+        } catch (error) {
+          this.logger.error(
             {
               reactorName: reactor.name,
               foldName,
               eventId: event.id,
+              error: error instanceof Error ? error.message : String(error),
             },
-            "Reactor queue not found, falling back to inline execution",
+            "Failed to dispatch event to reactor queue",
           );
-          try {
-            await withMetrics({
-              fn: () =>
-                reactor.handle(
-                  event,
-                  this.buildReactorContext({ event, foldState }),
-                ),
-              onComplete: (ms) => {
-                incrementEsReactorTotal(
-                  this.pipelineName,
-                  reactor.name,
-                  "completed",
-                );
-                observeEsReactorDuration(this.pipelineName, reactor.name, ms);
-              },
-              onFail: (ms) => {
-                incrementEsReactorTotal(
-                  this.pipelineName,
-                  reactor.name,
-                  "failed",
-                );
-                observeEsReactorDuration(this.pipelineName, reactor.name, ms);
-              },
-            });
-          } catch (error) {
-            this.logger.error(
-              {
-                reactorName: reactor.name,
-                foldName,
-                eventId: event.id,
-                eventType: event.type,
-                aggregateId: String(event.aggregateId),
-                tenantId: event.tenantId,
-                error: error instanceof Error ? error.message : String(error),
-              },
-              "Reactor failed during inline fallback execution",
-            );
-            errors.push(toError(error));
-          }
+          errors.push(toError(error));
         }
       } else {
-        // Inline mode: call reactor directly
+        // Queue expected but not found — fall back to inline execution
+        this.logger.warn(
+          {
+            reactorName: reactor.name,
+            foldName,
+            eventId: event.id,
+          },
+          "Reactor queue not found, falling back to inline execution",
+        );
         try {
           await withMetrics({
             fn: () =>
@@ -1210,11 +1168,53 @@ export class ProjectionRouter<
               tenantId: event.tenantId,
               error: error instanceof Error ? error.message : String(error),
             },
-            "Reactor failed during inline execution — fold state persisted in CH but reactor side-effect (e.g. ES sync) was lost",
+            "Reactor failed during inline fallback execution",
           );
           errors.push(toError(error));
         }
       }
+    } else {
+      // Inline mode: call reactor directly
+      try {
+        await withMetrics({
+          fn: () =>
+            reactor.handle(
+              event,
+              this.buildReactorContext({ event, foldState }),
+            ),
+          onComplete: (ms) => {
+            incrementEsReactorTotal(
+              this.pipelineName,
+              reactor.name,
+              "completed",
+            );
+            observeEsReactorDuration(this.pipelineName, reactor.name, ms);
+          },
+          onFail: (ms) => {
+            incrementEsReactorTotal(
+              this.pipelineName,
+              reactor.name,
+              "failed",
+            );
+            observeEsReactorDuration(this.pipelineName, reactor.name, ms);
+          },
+        });
+      } catch (error) {
+        this.logger.error(
+          {
+            reactorName: reactor.name,
+            foldName,
+            eventId: event.id,
+            eventType: event.type,
+            aggregateId: String(event.aggregateId),
+            tenantId: event.tenantId,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "Reactor failed during inline execution — fold state persisted in CH but reactor side-effect (e.g. ES sync) was lost",
+        );
+        errors.push(toError(error));
+      }
+    }
   }
 
   /**

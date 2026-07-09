@@ -384,9 +384,8 @@ const esFoldRefoldTotal = new Counter({
 
 /**
  * `performed` — the aggregate's full history was re-read and replayed.
- * `declined` — the projection's `shouldRefold` said replaying would change
- * nothing, so the batch was applied on top instead (the events are never lost;
- * only the replay is skipped).
+ * `declined` — the projection set `refoldOnOutOfOrder: false`, so the batch was
+ * applied on top instead (the events are never lost; only the replay is skipped).
  * `unavailable` — no eventLoader was wired, so a re-fold was impossible.
  */
 export const incrementEsFoldRefoldTotal = (

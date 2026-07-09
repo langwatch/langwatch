@@ -264,19 +264,30 @@ export class TraceSummaryFoldProjection
   readonly store: FoldProjectionStore<TraceSummaryData>;
 
   /**
-   * A span can be folded whenever it arrives — the trace summary reaches the
-   * same state either way, so an out-of-order span never needs the history
-   * replayed. Every accumulator commutes (spanCount and the token/cost totals
-   * are sums, timing is min/max, status is an OR), and every precedence rule
-   * decides from data the span itself carries — output selection compares span
-   * end times (`shouldOverrideOutput`), trace naming compares root-span start
-   * times — never from the order spans were applied in.
+   * A span is folded whenever it arrives; an out-of-order span never replays the
+   * trace's history. Nearly every field is order-free: spanCount and the
+   * token/cost totals are sums, timing is min/max, status is an OR, the semantic
+   * output override compares span end times (`shouldOverrideOutput`), and trace
+   * naming compares root-span start times.
    *
-   * The single exception is `mergeModelsMostRecentFirst`, which orders
-   * `models` by application order so `models[0]` is the trace's primary model.
-   * `executeBatch` folds each batch in occurredAt order, so that holds within a
-   * batch and only relaxes across batch boundaries: a display nicety, not a
-   * correctness property, and not worth an event_log replay.
+   * Three fields ARE resolved in fold order, and we accept that:
+   *   - `models` — `mergeModelsMostRecentFirst` puts the last-folded model first,
+   *     so `models[0]` is the trace's primary model.
+   *   - `computedInput` — among several parentless "root" spans the last-folded
+   *     one wins; among non-root spans the first-folded one wins
+   *     (`trace-io-accumulation.service.ts`, the `isRoot || computedInput === null`
+   *     branch). There is no timestamp tiebreak.
+   *   - `computedOutput` when only a *fallback* (non-semantic) extraction exists —
+   *     the first-folded fallback wins. A later semantic match still overrides it.
+   *
+   * This costs less than it reads. `occurredAt` on a span event is the INGEST
+   * wall-clock (`trace-request-collection.service.ts` stamps `Date.now()`), not
+   * the span's own start time — so the replay never restored span-time order
+   * either, only global ingest order. `executeBatch` folds each batch in
+   * occurredAt order, so within a batch nothing changes; across batches these
+   * three fields may resolve differently than a full replay would, on
+   * multi-root traces. That is a display-level difference in fields whose
+   * selection was already ingest-order dependent, not a lost invariant.
    *
    * Leaving the replay on was ruinous once recordSpan sharded across GroupQueue
    * lanes, because a hot trace's spans then arrive out of order constantly: one

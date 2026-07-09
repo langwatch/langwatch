@@ -589,13 +589,24 @@ describe("evaluationTrigger relevance check", () => {
       expect(shouldReact(synthetic, withOrigin())).toBe(false);
     });
 
-    /** @scenario "The evaluation trigger declines past the span processing cap before enqueue" */
-    it("declines once the span count reaches the processing cap", () => {
+    /** @scenario "The evaluation trigger dispatches nothing past the span processing cap" */
+    it("dispatches no evaluation once the span count reaches the processing cap", async () => {
+      // The cap guard deliberately lives in handle, not shouldReact: shouldReact
+      // runs once per event of a coalesced batch and would multiply the
+      // once-per-crossing warn by the batch size.
       const atCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS });
-      expect(shouldReact(createSpanEvent(), atCap)).toBe(false);
+      expect(shouldReact(createSpanEvent(), atCap)).toBe(true);
+
+      const deps = createDeps();
+      const reactor = createEvaluationTriggerReactor(deps);
+      await reactor.handle(createSpanEvent(), createContext(atCap));
+      expect(deps.evaluation).not.toHaveBeenCalled();
 
       const belowCap = withOrigin({ spanCount: MAX_PROCESSED_SPANS - 1 });
-      expect(shouldReact(createSpanEvent(), belowCap)).toBe(true);
+      const depsBelow = createDeps();
+      const reactorBelow = createEvaluationTriggerReactor(depsBelow);
+      await reactorBelow.handle(createSpanEvent(), createContext(belowCap));
+      expect(depsBelow.evaluation).toHaveBeenCalledTimes(1);
     });
   });
 

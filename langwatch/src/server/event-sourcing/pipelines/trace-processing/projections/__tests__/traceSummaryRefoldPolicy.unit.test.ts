@@ -50,13 +50,24 @@ function spanEventAt(occurredAt: number, id: string): TraceProcessingEvent {
 }
 
 describe("TraceSummaryFoldProjection re-fold policy", () => {
-  /** @scenario "The trace summary is an order-insensitive fold" */
-  it("has opted out of re-folding on out-of-order events", () => {
-    const projection = new TraceSummaryFoldProjection({
-      store: {} as FoldProjectionStore<TraceSummaryData>,
-    });
+  /** @scenario "The trace summary folds an earlier span without reading the event log" */
+  it("folds a span that occurred before the checkpoint without reading the event log", async () => {
+    const store: FoldProjectionStore<TraceSummaryData> = {
+      get: vi.fn().mockResolvedValue(stateWithSpanCount(MAX_PROCESSED_SPANS + 1)),
+      store: vi.fn().mockResolvedValue(undefined),
+    };
+    const projection = new TraceSummaryFoldProjection({ store });
+    const eventLoader = vi.fn().mockResolvedValue([]);
+    projection.eventLoader = eventLoader;
 
-    expect(projection.options.refoldOnOutOfOrder).toBe(false);
+    const result = await new FoldProjectionExecutor().execute(
+      projection,
+      spanEventAt(1_000, "a"),
+      { aggregateId: TRACE_ID, tenantId: TENANT_ID },
+    );
+
+    expect(eventLoader).not.toHaveBeenCalled();
+    expect(result.spanCount).toBe(MAX_PROCESSED_SPANS + 2);
   });
 
   describe("given a trace summary with spans already folded", () => {

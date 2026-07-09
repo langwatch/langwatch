@@ -1,4 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { incrementEsFoldRefoldTotal } from "~/server/metrics";
+
+vi.mock("~/server/metrics", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/server/metrics")>();
+  return { ...actual, incrementEsFoldRefoldTotal: vi.fn() };
+});
+
 import type { Event } from "../../domain/types";
 import {
   createMockFoldProjectionDefinition,
@@ -27,10 +34,13 @@ function makeFold({
   storedState,
   loadedEvents,
   refoldOnOutOfOrder,
+  withEventLoader = true,
 }: {
   storedState: CounterState | null;
   loadedEvents?: Event[];
   refoldOnOutOfOrder?: boolean;
+  /** Omit the loader to exercise the degraded "unavailable" path. */
+  withEventLoader?: boolean;
 }) {
   const store = createMockFoldProjectionStore<CounterState>();
   (store.get as ReturnType<typeof vi.fn>).mockResolvedValue(storedState);
@@ -48,11 +58,16 @@ function makeFold({
   }) as FoldProjectionDefinition<CounterState, Event>;
 
   const eventLoader = vi.fn().mockResolvedValue(loadedEvents ?? []);
-  fold.eventLoader = eventLoader;
+  if (withEventLoader) fold.eventLoader = eventLoader;
+  else fold.eventLoader = undefined;
   if (refoldOnOutOfOrder !== undefined) fold.options = { refoldOnOutOfOrder };
 
   return { fold, store, eventLoader };
 }
+
+const refoldMetric = incrementEsFoldRefoldTotal as unknown as ReturnType<
+  typeof vi.fn
+>;
 
 describe("FoldProjectionExecutor out-of-order re-fold", () => {
   const tenantId = createTestTenantId();
@@ -75,6 +90,7 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
     vi.useFakeTimers();
     vi.setSystemTime(TEST_CONSTANTS.BASE_TIMESTAMP);
     executor = new FoldProjectionExecutor();
+    refoldMetric.mockClear();
   });
 
   afterEach(() => {
@@ -106,6 +122,7 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
         // Replayed from init(), so the stored count of 99 is discarded entirely.
         expect(result.count).toBe(history.length);
         expect(store.store).toHaveBeenCalledOnce();
+        expect(refoldMetric).toHaveBeenCalledWith("counter", "performed");
       });
     });
 
@@ -128,6 +145,7 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
         expect(result.count).toBe(101);
         // The batch was folded oldest-first, so the checkpoint never regresses.
         expect(result.LastEventOccurredAt).toBe(CHECKPOINT_MS);
+        expect(refoldMetric).toHaveBeenCalledWith("counter", "declined");
       });
 
       /** @scenario "A single out-of-order event honours the same opt-out" */
@@ -145,6 +163,24 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
       });
     });
 
+    describe("when no event loader is wired", () => {
+      /** @scenario "An out-of-order batch with no event loader applies on top instead" */
+      it("applies the batch on top and records the re-fold as unavailable", async () => {
+        const { fold } = makeFold({
+          storedState: { count: 99, LastEventOccurredAt: CHECKPOINT_MS },
+          withEventLoader: false,
+        });
+
+        const result = await executor.executeBatch(
+          fold,
+          [eventAt(1_000), eventAt(2_000)],
+          context,
+        );
+
+        expect(result.count).toBe(101);
+        expect(refoldMetric).toHaveBeenCalledWith("counter", "unavailable");
+      });
+    });
   });
 
   describe("given a batch that starts at or after the persisted checkpoint", () => {

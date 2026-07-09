@@ -16,9 +16,13 @@ Feature: Hot-trace fold amplification
   # batch looked out of order too. One trace re-folded 730 times in two hours,
   # re-reading 5.66 million event rows out of ClickHouse to fold 73k spans.
   #
-  # None of it bought anything. The trace summary is an order-insensitive fold:
-  # its accumulators commute and its precedence rules read span timestamps, not
-  # arrival order. A span can simply be folded when it arrives.
+  # None of it bought anything. Nearly every trace-summary field is order-free:
+  # the counters and totals are sums, timing is min/max, status is an OR, and the
+  # semantic output override compares span end times. A span can simply be folded
+  # when it arrives. Three fields (models order, computedInput on multi-root
+  # traces, and a fallback-only computedOutput) do resolve in fold order — and
+  # already did, because a span event's occurredAt is the ingest wall-clock, so
+  # the replay only ever restored global INGEST order, never span-time order.
   #
   # Underneath it, each coalesced batch dispatched every reactor once per event.
   # Reactors keyed on the trace (evaluation trigger, trace-update broadcast,
@@ -47,9 +51,11 @@ Feature: Hot-trace fold amplification
     And the batch is applied on top of the existing state in occurredAt order
 
   @unit @fold @refold
-  Scenario: The trace summary is an order-insensitive fold
-    Given the trace summary fold projection
-    Then it has opted out of re-folding on out-of-order events
+  Scenario: The trace summary folds an earlier span without reading the event log
+    Given a trace summary with spans already folded
+    And a span event that occurred before the checkpoint
+    When the event is folded
+    Then the event log is never read
 
   @unit @fold @refold
   Scenario: Folding out-of-order spans without a re-fold still counts every span
@@ -67,6 +73,14 @@ Feature: Hot-trace fold amplification
     When the event is folded
     Then the event log is never read
     And the event is applied on top of the existing state
+
+  @unit @fold @refold
+  Scenario: An out-of-order batch with no event loader applies on top instead
+    Given a fold with no event loader wired
+    And a persisted checkpoint later than the batch's earliest event
+    When the batch is folded
+    Then the batch is applied on top of the existing state
+    And the re-fold is recorded as unavailable
 
   # ── Collapsing the per-batch reactor fan-out ───────────────────────
 
@@ -118,11 +132,18 @@ Feature: Hot-trace fold amplification
     Then the origin-guarded reactor agrees to react
 
   @unit @reactors
-  Scenario: The evaluation trigger declines past the span processing cap before enqueue
+  Scenario: The evaluation trigger dispatches nothing past the span processing cap
     Given a span event on a trace whose span count has passed the span processing cap
-    Then the evaluation trigger declines to react
+    When the evaluation trigger runs
+    Then no evaluation is dispatched
 
   @unit @reactors
   Scenario: The evaluation trigger declines a synthetic span before enqueue
     Given a synthetic span event on a trace with a resolved origin
     Then the evaluation trigger declines to react
+
+  @unit @reactors
+  Scenario: An outbox reactor's relevance check reaches the dispatcher
+    Given an outbox reactor that declines to react
+    When it is adapted for the pipeline, with and without an outbox runtime
+    Then the adapted reactor declines to react as well
