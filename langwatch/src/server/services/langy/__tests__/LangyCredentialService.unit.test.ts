@@ -245,7 +245,13 @@ describe("LangyCredentialService", () => {
   describe("given both LW_GATEWAY_INTERNAL_URL and LW_GATEWAY_BASE_URL are set", () => {
     describe("when getOrProvision is called", () => {
       it("prefers LW_GATEWAY_INTERNAL_URL — LW_GATEWAY_BASE_URL is the public/browser-facing var", async () => {
-        process.env.LW_GATEWAY_INTERNAL_URL = "http://langwatch-gateway-internal:80/v1";
+        // Exactly the values prod ships: infrastructure/langwatch.tf sets
+        // LW_GATEWAY_INTERNAL_URL to the ClusterIP with no /v1 suffix, while
+        // LW_GATEWAY_BASE_URL (when a deploy sets it at all) carries the
+        // public gateway the browser/CLI use. Picking the public one here
+        // would hand the worker a URL its NetworkPolicy cannot reach.
+        process.env.LW_GATEWAY_INTERNAL_URL =
+          "http://langwatch-gateway-internal:80";
         process.env.LW_GATEWAY_BASE_URL = "https://gateway.langwatch.ai/v1";
         const prisma = makePrisma({
           projectSecret: {
