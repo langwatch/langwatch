@@ -2,7 +2,7 @@
  * Analytics table routing — ADR-034 Phase 3 (app-layer module), extended in
  * Phase 6 to cover the eval pipeline.
  *
- * Picks ONE of five ClickHouse tables to serve a `getTimeseries` query:
+ * Picks ONE of six ClickHouse tables to serve a `getTimeseries` query:
  *
  *   TRACE-source paths:
  *   - `trace_analytics_rollup` — additive `SimpleAggregateFunction(sum, …)`
@@ -52,7 +52,7 @@ import {
   getMetricSource,
 } from "./field-availability";
 
-/** The five destination tables routed between. */
+/** The six destination tables routed between. */
 export type AnalyticsTable =
   | "trace_analytics_rollup"
   | "trace_analytics"

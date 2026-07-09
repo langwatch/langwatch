@@ -47,6 +47,7 @@ import { featureFlagService as defaultFeatureFlagService } from "~/server/featur
 import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
 import { createLogger } from "~/utils/logger/server";
 import { isNoDataPredicate } from "./evaluate-custom-graph-threshold.service";
+import { parseSeriesIndex } from "./seriesName";
 import type { TriggerService } from "./trigger.service";
 
 const logger = createLogger(
@@ -82,16 +83,21 @@ export interface GraphTriggerHeartbeatDeps {
   featureFlagService: FeatureFlagServiceInterface;
   /**
    * ADR-034 Phase 6: look up the upstream pipeline source for a graph
-   * trigger by reading its underlying custom-graph's first series'
-   * metric key. Returns `undefined` when the source can't be
-   * determined (graph missing, metric not in field-availability) — the
-   * heartbeat treats those as `"trace"` so behaviour is unchanged for
-   * unknown-source triggers (the cron has always handled them).
+   * trigger by reading the metric key of the series the trigger actually
+   * watches — the one named by `seriesName`, NOT series 0. A graph may mix
+   * trace-backed and eval-backed series, and classifying from the wrong one
+   * points the recency probe at the wrong slim table. Returns `undefined`
+   * when the source can't be determined (graph missing, series index out of
+   * range, metric not in field-availability) — the heartbeat treats those as
+   * `"trace"` so behaviour is unchanged for unknown-source triggers (the cron
+   * has always handled them).
    */
   lookupTriggerSource(params: {
     triggerId: string;
     customGraphId: string;
     projectId: string;
+    /** `"<index>/<key>/<aggregation>"`; see `parseSeriesIndex`. */
+    seriesName?: string;
   }): Promise<AnalyticsMetricSource | undefined>;
 }
 
@@ -376,6 +382,7 @@ async function loadCandidatesForProject({
       triggerId: trigger.id,
       customGraphId: trigger.customGraphId,
       projectId,
+      seriesName: params.seriesName,
     });
     const source: AnalyticsMetricSource = lookedUp ?? "trace";
 
@@ -524,10 +531,12 @@ export function defaultGraphTriggerHeartbeatDeps({
       return client;
     },
     featureFlagService: defaultFeatureFlagService,
-    lookupTriggerSource: async ({ customGraphId, projectId }) => {
-      // Read the graph's first series' metric and map to a source. The
-      // graph is the only place the metric key lives — the trigger's
-      // `actionParams.seriesName` carries only the series INDEX.
+    lookupTriggerSource: async ({ customGraphId, projectId, seriesName }) => {
+      // The graph is the only place the metric key lives; the trigger's
+      // `actionParams.seriesName` carries the series INDEX. Classify from the
+      // series the trigger actually watches — a graph may mix trace-backed and
+      // eval-backed series, and reading series 0 for a trigger on series 1
+      // probes the wrong slim table's recency, which suppresses the alert.
       const graph = await prisma.customGraph.findFirst({
         where: { id: customGraphId, projectId },
         select: { graph: true },
@@ -536,11 +545,23 @@ export function defaultGraphTriggerHeartbeatDeps({
       const blob = graph.graph as {
         series?: Array<{ metric?: string }>;
       } | null;
-      const firstMetric = blob?.series?.[0]?.metric;
-      if (typeof firstMetric !== "string" || firstMetric.length === 0) {
+      const series = blob?.series;
+      if (!series) return undefined;
+
+      const seriesIndex = parseSeriesIndex(seriesName);
+      if (
+        !Number.isInteger(seriesIndex) ||
+        seriesIndex < 0 ||
+        seriesIndex >= series.length
+      ) {
         return undefined;
       }
-      return getMetricSource(firstMetric);
+
+      const metric = series[seriesIndex]?.metric;
+      if (typeof metric !== "string" || metric.length === 0) {
+        return undefined;
+      }
+      return getMetricSource(metric);
     },
   };
 }

@@ -23,9 +23,11 @@
  *   - Apply `isNoDataPredicate` to recognise the "fire when zero" shape.
  *   - On breach: insert a `TriggerSent` row (cron's EXACT dedup pattern
  *     — `triggerId/projectId/customGraphId, resolvedAt:null`) and
- *     dispatch via existing `handleSendEmail` / `handleSendSlackMessage`
- *     (which now pick the alert-default template since `customGraphId`
- *     is set).
+ *     dispatch via existing `handleSendEmail` / `handleSendSlackMessage`,
+ *     which render exactly as the cron does today. Routing graph alerts
+ *     through the Liquid alert-default templates (`ALERT_TRIGGER_DEFAULTS`,
+ *     added here but not yet consumed) lands with the graph-alert dispatcher
+ *     in the follow-up PR.
  *   - On no-longer-breach: resolve any open `TriggerSent` for the
  *     trigger.
  *
@@ -63,6 +65,7 @@ import type {
   GraphTriggerSentRepository,
   OpenGraphTriggerSent,
 } from "./repositories/trigger.repository";
+import { parseSeriesIndex } from "./seriesName";
 
 /**
  * What woke the evaluator up. Carried into logs + telemetry so operators can
@@ -221,9 +224,7 @@ export async function evaluateGraphTrigger({
     });
   }
 
-  // seriesName format: "index/key/aggregation" — same parsing as cron.
-  const [indexStr] = seriesName.split("/");
-  const seriesIndex = Number.parseInt(indexStr ?? "0", 10);
+  const seriesIndex = parseSeriesIndex(seriesName);
   if (
     Number.isNaN(seriesIndex) ||
     seriesIndex < 0 ||
