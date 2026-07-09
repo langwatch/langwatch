@@ -36,27 +36,32 @@ const ORPHAN_LOOKBACK_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const ORPHAN_SWEEP_LIMIT = 1000;
 
 /**
- * Terminal run statuses — never reconciled. These are the statuses the finish
- * handler persists (SUCCESS/FAILURE/FAILED/ERROR/CANCELLED) plus STALLED. A
- * terminal status is always written together with FinishedAt, so the
- * `FinishedAt IS NULL` gate below already excludes these rows; this filter is a
- * defensive belt-and-suspenders against a future path that writes a terminal
- * status without a FinishedAt. (The same literals are duplicated inline as
- * `completedStatuses` in scenario-event.service.ts — extracting a shared
- * exported constant is a worthwhile follow-up.) Everything else —
- * PENDING/QUEUED/IN_PROGRESS — is in-flight and a reconciliation candidate.
+ * The only status this sweep reconciles.
+ *
+ * IN_PROGRESS means a worker called `startRun` — it had the run in hand. A live
+ * worker hard-caps every child at CHILD_PROCESS.TIMEOUT_MS and emits its own
+ * terminal event at the cap, so an IN_PROGRESS run with no activity for longer
+ * than 2× that cap provably has no live worker. That inference is what licenses
+ * writing a terminal ERROR.
+ *
+ * The inference does NOT hold for QUEUED (or PENDING). Nothing caps how long a
+ * run waits in the queue: the execution pool is concurrency-bounded, so a run
+ * sitting behind a large batch/suite backlog can exceed any staleness threshold
+ * while a perfectly healthy worker is still working toward it. Failing it would
+ * be a false positive on a run that is about to execute — the one outcome this
+ * reconciler must never produce.
+ *
+ * QUEUED orphans are a genuinely different problem (no worker ever picked the
+ * run up, rather than a worker died holding it) and are owned by
+ * `scenario-orphan-reconciler.ts` (#3365). Keeping the two sweeps disjoint means
+ * neither double-writes the other's runs.
+ *
+ * @see ./scenario-orphan-reconciler.ts
  */
-const TERMINAL_STATUSES = [
-  "SUCCESS",
-  "FAILURE",
-  "FAILED",
-  "ERROR",
-  "CANCELLED",
-  "STALLED",
-] as const;
+const ORPHANABLE_STATUS = "IN_PROGRESS" as const;
 
 /**
- * Finds the latest version of every non-terminal run whose last activity is
+ * Finds the latest version of every IN_PROGRESS run whose last activity is
  * older than `now - thresholdMs`, across all tenants on the shared client.
  *
  * - Dedups the ReplacingMergeTree(UpdatedAt) to the latest version per run via
@@ -64,6 +69,10 @@ const TERMINAL_STATUSES = [
  *   so the scan is memory-bounded).
  * - Prunes partitions on StartedAt.
  * - Filters on UpdatedAt (the field the read-path stall detection also uses).
+ * - Returns oldest-first, so the most urgent orphans survive the sweep cap
+ *   rather than an arbitrary slice of the backlog.
+ *
+ * QUEUED runs are deliberately excluded — see ORPHANABLE_STATUS.
  */
 export class ClickHouseOrphanedRunFinder implements OrphanedRunFinder {
   constructor(private readonly client: ClickHouseClient) {}
@@ -108,13 +117,14 @@ export class ClickHouseOrphanedRunFinder implements OrphanedRunFinder {
           AND UpdatedAt < fromUnixTimestamp64Milli({staleBeforeMs:Int64})
           AND FinishedAt IS NULL
           AND ArchivedAt IS NULL
-          AND NOT has({terminalStatuses:Array(String)}, Status)
+          AND Status = {orphanableStatus:String}
+        ORDER BY UpdatedAt ASC
         LIMIT {limit:UInt32}
       `,
       query_params: {
         lookbackStartMs,
         staleBeforeMs,
-        terminalStatuses: TERMINAL_STATUSES,
+        orphanableStatus: ORPHANABLE_STATUS,
         limit: ORPHAN_SWEEP_LIMIT,
       },
       format: "JSONEachRow",

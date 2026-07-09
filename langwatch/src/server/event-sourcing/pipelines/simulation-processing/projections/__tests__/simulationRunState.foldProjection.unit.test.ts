@@ -918,6 +918,80 @@ describe("simulationRunStateFoldProjection finalized-status guard", () => {
         expect(state.FinishedAt).toBe(3000);
       });
     });
+
+    // A late child that outlived the parent this run's reconciliation already
+    // failed must not rewrite the terminal record the downstream reactors have
+    // already acted on -- nor split it into an ERROR status carrying the late
+    // child's SUCCESS verdict.
+    describe("when a second finished event arrives", () => {
+      it("keeps the first terminal record and ignores the late one", () => {
+        const state = foldEvents([
+          createRunFinishedEvent({ status: "ERROR" }, { occurredAt: 3000 }),
+          createRunFinishedEvent(
+            {
+              status: "SUCCESS",
+              results: {
+                verdict: "success",
+                reasoning: "late child finished for real",
+                metCriteria: [],
+                unmetCriteria: [],
+              },
+            },
+            { occurredAt: 5000, id: "event-late-finish" },
+          ),
+        ]);
+
+        expect(state.Status).toBe("ERROR");
+        expect(state.Verdict).toBeNull();
+        expect(state.FinishedAt).toBe(3000);
+      });
+    });
+  });
+
+  // The scenario-events ingest route types the finished status as the full
+  // ScenarioRunStatus enum, non-terminal members included. Writing one straight
+  // through would set a non-terminal Status alongside FinishedAt -- a run the
+  // orphan reconciler skips (FinishedAt IS NULL) and read-time stall detection
+  // skips (it only resolves unfinished runs). Nothing could ever recover it.
+  describe("given a finished event carrying a non-terminal status", () => {
+    describe("when it is folded", () => {
+      it("refuses the non-terminal status and finishes the run terminally", () => {
+        const state = foldEvents([
+          createRunStartedEvent({}, { occurredAt: 1000 }),
+          createRunFinishedEvent(
+            { status: "IN_PROGRESS" },
+            { occurredAt: 3000 },
+          ),
+        ]);
+
+        expect(state.Status).not.toBe("IN_PROGRESS");
+        expect(state.Status).toBe("FAILURE");
+        expect(state.FinishedAt).toBe(3000);
+      });
+    });
+
+    describe("when it carries a success verdict", () => {
+      it("derives the terminal status from the verdict", () => {
+        const state = foldEvents([
+          createRunStartedEvent({}, { occurredAt: 1000 }),
+          createRunFinishedEvent(
+            {
+              status: "QUEUED",
+              results: {
+                verdict: "success",
+                reasoning: "ok",
+                metCriteria: [],
+                unmetCriteria: [],
+              },
+            },
+            { occurredAt: 3000 },
+          ),
+        ]);
+
+        expect(state.Status).toBe("SUCCESS");
+        expect(state.FinishedAt).toBe(3000);
+      });
+    });
   });
 
   describe("given a run that has not finished", () => {

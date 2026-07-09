@@ -631,22 +631,13 @@ export async function startScenarioProcessor(
     }).catch((err) => logger.warn({ err }, "orphan reconciler failed"));
   }
 
-  // The sweep above only takes QUEUED runs terminal — a run that a dead worker
-  // had already started (PENDING/IN_PROGRESS) is invisible to it and spins in
-  // the UI forever (#3195). This second sweep covers every non-terminal run
-  // whose last activity predates any window a live worker could still hold it.
+  // The sweep above only takes QUEUED runs terminal — a run nobody ever picked
+  // up. A run a dead worker had already STARTED is invisible to it and spins in
+  // the UI forever (#3195), so this second sweep takes the IN_PROGRESS orphans
+  // terminal. The two are disjoint by status and never touch the same run:
+  // queue wait cannot be read as worker death (nothing bounds it), while an
+  // idle IN_PROGRESS run past 2× the child timeout provably has no live worker.
   // Fire-and-forget so a large/slow sweep never blocks worker startup.
-  //
-  // The two sweeps overlap on QUEUED orphans. Both reach the terminal state
-  // through the same FinishRunCommand, whose idempotency key is derived solely
-  // from (tenantId, scenarioRunId), so a duplicate finish never changes the
-  // resulting Status: whichever sweep lands first, the run ends ERROR. The one
-  // observable divergence is the Error string, which reads as whichever sweep's
-  // message was folded last.
-  //
-  // The two sweeps disagree on the QUEUED slice by design — that slice is owned
-  // by scenario-orphan-reconciler (#3365); this one exists for the started-but-
-  // abandoned slice (#3195). See the PR discussion for why they are not merged.
   void reconcileOrphanedRunsOnBoot({
     failureEmitter: deps.failureEmitter,
   }).catch((err: unknown) =>

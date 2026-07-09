@@ -12,8 +12,11 @@ const tenantId = `test-orphan-${nanoid()}`;
 const NOW = Date.now();
 const minutesAgo = (m: number) => new Date(NOW - m * 60_000);
 
-// Default row: a STALE, non-terminal (QUEUED) run — i.e. an orphan. Override
-// timestamps / Status / FinishedAt / ArchivedAt to build the other cases.
+// Default row: a STALE, IN_PROGRESS run — i.e. an orphan a dead worker had
+// already started. Override timestamps / Status / FinishedAt / ArchivedAt to
+// build the other cases. A stale QUEUED run is deliberately NOT an orphan here:
+// nothing caps queue wait, so a run behind a large backlog looks identical to
+// an abandoned one. QUEUED is owned by scenario-orphan-reconciler.ts (#3365).
 function makeRow(overrides: Record<string, unknown> = {}) {
   return {
     ProjectionId: `proj-${nanoid()}`,
@@ -23,7 +26,7 @@ function makeRow(overrides: Record<string, unknown> = {}) {
     BatchRunId: `batch-${nanoid()}`,
     ScenarioSetId: `set-${nanoid()}`,
     Version: "v1",
-    Status: "QUEUED",
+    Status: "IN_PROGRESS",
     Name: "Test run",
     Description: null,
     Metadata: null,
@@ -89,13 +92,13 @@ afterAll(async () => {
 
 describe("ClickHouseOrphanedRunFinder.findOrphanedRuns (integration)", () => {
   describe("given a mix of stale, healthy, terminal and archived runs", () => {
-    it("surfaces only the stale non-terminal run, with the ids needed to finish it", async () => {
+    it("surfaces only the stale started run, with the ids needed to finish it", async () => {
       const orphan = makeRow({
         ScenarioRunId: "orphan-stale",
         ScenarioId: "scenario-orphan",
         BatchRunId: "batch-orphan",
         ScenarioSetId: "set-orphan",
-        Status: "QUEUED",
+        Status: "IN_PROGRESS",
       });
       const healthy = makeRow({
         ScenarioRunId: "healthy-recent",
@@ -112,7 +115,7 @@ describe("ClickHouseOrphanedRunFinder.findOrphanedRuns (integration)", () => {
       });
       const archived = makeRow({
         ScenarioRunId: "archived-run",
-        Status: "QUEUED",
+        Status: "IN_PROGRESS",
         ArchivedAt: minutesAgo(60),
       });
 
@@ -137,18 +140,45 @@ describe("ClickHouseOrphanedRunFinder.findOrphanedRuns (integration)", () => {
         scenarioId: "scenario-orphan",
         batchRunId: "batch-orphan",
         scenarioSetId: "set-orphan",
-        status: "QUEUED",
+        status: "IN_PROGRESS",
       });
     });
   });
 
-  describe("given a run that was queued long ago but later finished", () => {
+  // The false-positive this sweep must never produce. A QUEUED run behind a
+  // large batch/suite backlog goes stale while a healthy worker is still
+  // working toward it -- nothing caps queue wait the way the child timeout caps
+  // execution. QUEUED orphans belong to scenario-orphan-reconciler.ts (#3365).
+  describe("given a stale QUEUED run waiting behind a backlog", () => {
+    it("does not surface it — queue wait is not evidence the worker died", async () => {
+      const queuedBehindBacklog = makeRow({
+        ScenarioRunId: "queued-behind-backlog",
+        Status: "QUEUED",
+        StartedAt: minutesAgo(90),
+        CreatedAt: minutesAgo(90),
+        UpdatedAt: minutesAgo(90),
+      });
+
+      await insertRows(ch, [queuedBehindBacklog]);
+
+      const result = await finder.findOrphanedRuns({
+        now: NOW,
+        thresholdMs: STALL_THRESHOLD_MS,
+      });
+
+      expect(result.map((r) => r.scenarioRunId)).not.toContain(
+        "queued-behind-backlog",
+      );
+    });
+  });
+
+  describe("given a run that was started long ago but later finished", () => {
     it("does not surface it — the latest version decides", async () => {
       const scenarioRunId = `multiversion-${nanoid()}`;
       await insertRows(ch, [
         makeRow({
           ScenarioRunId: scenarioRunId,
-          Status: "QUEUED",
+          Status: "IN_PROGRESS",
           UpdatedAt: minutesAgo(60),
         }),
         makeRow({

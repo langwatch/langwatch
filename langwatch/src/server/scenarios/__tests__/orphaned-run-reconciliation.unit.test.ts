@@ -16,7 +16,7 @@ function makeOrphan(overrides: Partial<OrphanedRun> = {}): OrphanedRun {
     scenarioId: "scenario-1",
     batchRunId: "batch-1",
     scenarioSetId: "set-1",
-    status: "QUEUED",
+    status: "IN_PROGRESS",
     ...overrides,
   };
 }

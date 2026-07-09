@@ -8,11 +8,36 @@
 
 The scenario execution pool is in-process and per worker pod — it holds no cross-process record of which run a worker is executing. When a worker dies mid-run (OOM, crash, deploy, container restart), the in-process `ScenarioFailureHandler` that would emit the terminal `finished` event dies with it. The run is left non-terminal in ClickHouse forever: the UI spins at "Starting"/"Running" and downstream reactors (suite aggregates, metrics, customer.io) never fire. Read-time stall detection (in `stall-detection.ts`) paints the run STALLED cosmetically but never writes a terminal event, so the run never actually leaves the in-flight state.
 
-The fix: every scenarios worker reconciles orphaned runs when it boots. It asks ClickHouse for non-terminal runs whose last activity is older than any live worker could still be holding them, and emits a terminal failure event through the existing idempotent finish path so they go terminal for good and downstream reactors fire.
+The fix: every scenarios worker reconciles orphaned runs when it boots. It asks ClickHouse for `IN_PROGRESS` runs whose last activity is older than any live worker could still be holding them, and emits a terminal failure event through the existing idempotent finish path so they go terminal for good and downstream reactors fire.
 
 Related: issue [#3195](https://github.com/langwatch/langwatch/issues/3195), PR [#5006](https://github.com/langwatch/langwatch/pull/5006), spec `langwatch/specs/scenarios/orphaned-run-reconciliation.feature`.
 
 ## What we considered
+
+### Decision 0: Which runs this sweep may reconcile
+
+**Option A: `IN_PROGRESS` only — chosen.**
+`IN_PROGRESS` means a worker called `startRun`; it had the run in hand. A live
+worker hard-caps every child at `CHILD_PROCESS.TIMEOUT_MS` and emits its own
+terminal event at the cap, so an `IN_PROGRESS` run idle past 2× that cap
+provably has no live worker. That inference is the entire licence to write a
+terminal ERROR, and it depends on the run having been *started*.
+
+**Option B: every non-terminal status (`PENDING`/`QUEUED`/`IN_PROGRESS`).**
+Rejected — this was the original shape of this ADR, and it was wrong. Nothing
+bounds how long a run waits in the queue: the execution pool is
+concurrency-bounded, so a run behind a large batch/suite backlog goes stale
+while a perfectly healthy worker is still working toward it. Reconciling it
+would fail a run that is about to execute — the one outcome this reconciler
+must never produce. Staleness is evidence of worker death only *after* the run
+was started.
+
+`QUEUED` orphans are a genuinely different failure — no worker ever picked the
+run up — and are owned by `scenario-orphan-reconciler.ts` (#3365,
+`queued-run-orphan-recovery.feature`). Keeping the two sweeps disjoint by status
+means neither can double-write the other's runs, and each can evolve its own
+liveness argument. Note the same backlog false-positive applies to that sweep's
+`QUEUED` gate; it is pre-existing and tracked there, not fixed here.
 
 ### Decision 1: Reconcile threshold
 
@@ -21,17 +46,16 @@ A run is only reconciled once its last activity is older than the longest a live
 **Option A: Reuse `STALL_THRESHOLD_MS` (2× the child-process timeout = 30 min) — chosen.**
 A live worker hard-caps every child at `CHILD_PROCESS.TIMEOUT_MS` (15 min,
 `scenario.constants.ts` line 38) and emits its own terminal event at the cap.
-A non-terminal run quiet for longer than 2× that cap provably has no live
+An `IN_PROGRESS` run quiet for longer than 2× that cap provably has no live
 worker. Reusing the read-path's own STALLED boundary (`STALL_THRESHOLD_MS`,
 `stall-detection.ts` line 9) keeps read and write paths consistent and leaves
-margin past the hard cap for clock skew and queued-but-imminent jobs. The
+margin past the hard cap for clock skew. The
 equality is explicit and co-located:
-`orphaned-run-reconciliation.ts` line 39 —
+`orphaned-run-reconciliation.ts` —
 `export const ORPHAN_RECONCILE_THRESHOLD_MS = STALL_THRESHOLD_MS`.
 
 **Option B: A tighter or independent threshold.**
-Rejected. A booting pod that is about to pick up a queued job could find that
-job quiet for well under 30 min. A threshold below the stall boundary risks
+Rejected. A threshold below the stall boundary risks
 reconciling a run a live pod still owns — the one outcome that must never happen.
 
 ### Decision 2: Terminal state written on reconciliation
@@ -73,22 +97,33 @@ an unrecoverable zombie the read-time stall path cannot rescue (it only resolves
 runs with no `FinishedAt`). With the guard, a late non-terminal event can no
 longer resurrect `Status`.
 
-The guard's scope is exactly those three sites. `handleSimulationRunFinished` is
-NOT routed through it and still assigns `Status` unconditionally, so two paths
-remain open, both deliberate for now:
+The guard alone was not enough. `handleSimulationRunFinished` sets `FinishedAt`,
+so it is the one handler the guard cannot cover, and it left two ways to
+reproduce the very zombie the guard exists to prevent. Both were found by
+executing the fold rather than reading it, and both are closed here:
 
-1. A later `finished` overwrites an earlier one (ERROR → SUCCESS when a child
-   outlives a parent this reconciler already failed). This is the self-heal that
-   limits the blast radius of a false-positive reconciliation, so closing it
-   trades one failure mode for another.
-2. The scenario-events ingest schema types the `finished` status as
-   `z.nativeEnum(ScenarioRunStatus)`, which admits `IN_PROGRESS`. A client
-   POSTing `finished(status=IN_PROGRESS)` writes a non-terminal `Status`
-   alongside `FinishedAt` — reproducing the zombie above through the one door
-   the guard does not cover.
+1. **A second `finished` rewrote the first.** A child that outlived the parent
+   this reconciler already failed would take the run ERROR → SUCCESS, and could
+   split the record (an ERROR `Status` carrying the late child's SUCCESS
+   `Verdict`). `handleSimulationRunFinished` now returns early once `FinishedAt`
+   is set: a run finishes exactly once. The alternative — leaving the overwrite
+   in as a "self-heal" for a falsely-reconciled run — is unnecessary now that
+   Decision 0 restricts the sweep to runs no live worker can hold, and it
+   silently discarded the reconciled state downstream reactors had already acted
+   on.
+2. **A `finished` event could carry a non-terminal status.** The scenario-events
+   ingest schema types it as `z.nativeEnum(ScenarioRunStatus)`, which admits
+   `IN_PROGRESS`, and the handler wrote it straight through alongside
+   `FinishedAt` — a run the reconciler skips (`FinishedAt IS NULL`) and read-time
+   stall detection skips (it only resolves unfinished runs). Nothing could
+   recover it. A non-terminal explicit status is now rejected in favour of the
+   verdict-derived one.
 
-Both are recorded here rather than silently fixed because (1) is entangled with
-the reconciliation threshold's false-positive behaviour, which is under review.
+So the invariant *"once `FinishedAt` is set, `Status` is terminal and stays
+terminal"* is held by three things together: this guard at the non-terminal
+transition sites, the finish-once early return, and the terminal-status check.
+Each is covered by a regression test in
+`simulationRunState.foldProjection.unit.test.ts`.
 
 **Option B: Rely on event ordering alone.**
 Rejected. Client-supplied `occurredAt` can legitimately post-date the

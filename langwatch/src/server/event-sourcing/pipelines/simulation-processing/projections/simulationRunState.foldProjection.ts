@@ -172,17 +172,14 @@ export interface SimulationRunState extends Projection<SimulationRunStateData> {
  * read-time stall path can no longer rescue (it only resolves runs with no
  * FinishedAt).
  *
- * Scope: this guards the non-terminal transition sites (started/snapshot/
- * message) only. `handleSimulationRunFinished` deliberately does NOT route
- * through it, so a `finished` event still sets Status unconditionally. Two
- * consequences, both intentional-for-now and tracked on the PR:
- *   - A later `finished` overwrites an earlier one, so a child that outlives a
- *     reconciled parent can take an ERROR back to SUCCESS. That self-heal is
- *     what protects a run the reconciler failed early by mistake.
- *   - The ingest route's `finished` schema accepts any ScenarioRunStatus, so a
- *     client POSTing `finished(status=IN_PROGRESS)` writes a non-terminal Status
- *     alongside FinishedAt — the very zombie described above, through the one
- *     door this guard does not cover.
+ * Once FinishedAt is set, Status stays terminal. Three things hold that line
+ * together, and all three are load-bearing:
+ *   1. this guard, at the non-terminal transition sites (started/snapshot/
+ *      message);
+ *   2. `handleSimulationRunFinished` returning early once FinishedAt is set, so
+ *      a run finishes exactly once;
+ *   3. that same handler refusing a non-terminal explicit status, since the
+ *      ingest schema types it as the full ScenarioRunStatus enum.
  */
 function statusAfter({
   state,
@@ -192,6 +189,25 @@ function statusAfter({
   candidate: string;
 }): string {
   return state.FinishedAt != null ? state.Status : candidate;
+}
+
+/**
+ * The statuses a run may hold once FinishedAt is set. A `finished` event whose
+ * explicit status is outside this set is not describing a finished run, so its
+ * status is discarded in favour of the verdict-derived one — writing it would
+ * strand the run non-terminal but finished, which nothing reconciles.
+ */
+const TERMINAL_STATUSES = new Set([
+  "SUCCESS",
+  "FAILURE",
+  "FAILED",
+  "ERROR",
+  "CANCELLED",
+  "STALLED",
+]);
+
+function isTerminalStatus(status: string): boolean {
+  return TERMINAL_STATUSES.has(status);
 }
 
 const simulationRunEvents = [
@@ -482,13 +498,26 @@ export class SimulationRunStateFoldProjection
     event: SimulationRunFinishedEvent,
     state: SimulationRunStateData,
   ): SimulationRunStateData {
+    // A run finishes exactly once. A second `finished` — a child that outlived
+    // the parent this run's orphan reconciliation already failed — must not
+    // rewrite a terminal record the downstream reactors have already acted on,
+    // nor split it (an ERROR Status carrying the late child's SUCCESS Verdict).
+    if (state.FinishedAt != null) return state;
+
     const results = event.data.results;
     const verdict = results?.verdict ?? null;
 
-    // Derive status: explicit status takes priority, otherwise derive from verdict
+    // Derive status: an explicit TERMINAL status takes priority, otherwise
+    // derive from verdict. The explicit status arrives from the scenario-events
+    // ingest route, whose schema types it as the full ScenarioRunStatus enum —
+    // non-terminal members included. Taking it at face value would write a
+    // non-terminal Status alongside FinishedAt below, which is the one state
+    // nothing can recover: the orphan reconciler skips it (FinishedAt IS NULL)
+    // and read-time stall detection skips it (it only resolves unfinished runs).
     let status: string;
-    if (event.data.status) {
-      status = event.data.status.toUpperCase();
+    const explicit = event.data.status?.toUpperCase();
+    if (explicit && isTerminalStatus(explicit)) {
+      status = explicit;
     } else if (verdict === "success") {
       status = "SUCCESS";
     } else if (verdict === "failure" || verdict === "inconclusive") {

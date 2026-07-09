@@ -11,11 +11,18 @@
  * a terminal event, so the run never actually leaves the in-flight state.
  *
  * Every scenarios worker reconciles orphaned runs when it boots: it asks for
- * non-terminal runs whose last activity is older than any live worker could
+ * IN_PROGRESS runs whose last activity is older than any live worker could
  * still be holding them, and emits a terminal failure event (reusing the same
  * idempotent finish path as in-process child failures) so they go terminal for
  * good and the downstream reactors run.
  *
+ * Scope is deliberately IN_PROGRESS — a run a worker actually started. Runs
+ * abandoned at QUEUED are a different failure (no worker ever picked them up)
+ * whose staleness cannot be read as worker death, and they belong to
+ * `scenario-orphan-reconciler.ts` (#3365). See ORPHANABLE_STATUS.
+ *
+ * @see ./orphaned-run-reconciliation.clickhouse.ts
+ * @see ./scenario-orphan-reconciler.ts
  * @see specs/scenarios/orphaned-run-reconciliation.feature
  * @see https://github.com/langwatch/langwatch/issues/3195
  */
@@ -29,12 +36,16 @@ const logger = createLogger("langwatch:scenarios:orphan-reconciliation");
  * A run is only reconciled once its last activity is older than the longest a
  * live worker could still legitimately be holding it. We reuse the read-path's
  * stall threshold (2× the child-process timeout): a worker hard-caps every
- * child at the timeout and emits its own terminal event at the cap, so a
- * non-terminal run quiet for longer than the stall threshold provably has no
+ * child at the timeout and emits its own terminal event at the cap, so an
+ * IN_PROGRESS run quiet for longer than the stall threshold provably has no
  * live worker. Filtering at the same boundary the read-path already calls
  * STALLED keeps the write-path consistent and leaves margin past the hard cap
- * for clock skew and buffered-but-imminent queued jobs — reconciling a run a
- * live pod still owns is the one outcome we must never produce.
+ * for clock skew — reconciling a run a live pod still owns is the one outcome
+ * we must never produce.
+ *
+ * Note the argument only closes because the run was STARTED: the child timeout
+ * bounds execution, nothing bounds queue wait. That is why QUEUED is out of
+ * scope here (see ORPHANABLE_STATUS in the ClickHouse finder).
  */
 export const ORPHAN_RECONCILE_THRESHOLD_MS = STALL_THRESHOLD_MS;
 
