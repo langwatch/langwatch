@@ -33,9 +33,11 @@ An `AggregatingMergeTree` fed by **per-span increments** — `SimpleAggregateFun
 
 - additive `sum` **and ungrouped** **and** no filter → **rollup**
 - `avg` → **rollup only ungrouped and only for metrics whose legacy column is non-nullable** (today: completion_time), computed as `sum(MetricSum) / sum(TraceCount)`; nullable-metric avgs (cost, tokens) stay on slim, whose one-row-per-aggregate shape reproduces CH `avg`'s NULL-skipping denominator
-- percentiles, min/max, **every** group-by (model/topic/origin/user/…), slim-supported filters, distinct-counts → **slim table**; unsupported metrics/filters (evaluations, events, blocklisted attribute keys, …) fall back to `trace_summaries`
-- else → `trace_summaries` (the drawer's table, untouched)
+- percentiles, min/max, **every** group-by (model/topic/origin/user/…), slim-supported filters, distinct-counts → **slim table**; unsupported metrics/filters (events, blocklisted attribute keys, …) fall back to the legacy tables
+- else → `trace_summaries` (the drawer's table, untouched) or `evaluation_runs` for eval-source metrics
 - default to slim/raw on any doubt.
+
+> **Shipped divergence:** the routing union is 6-way, not 3-way — both trace and eval sources ship with rollup + slim + legacy fallback. Cross-source series mix falls back to `trace_summaries`. Live in `pickAnalyticsTable` (see `routing/route-table.ts`); details in Implementation status.
 
 **The rollup serves ungrouped reads only** (revised 2026-07-09). `Model` and `SpanType` are *sort* keys — they keep the merged row count low — not read contracts. Grouping on them is not parity-safe for two independent reasons:
 
@@ -44,7 +46,9 @@ An `AggregatingMergeTree` fed by **per-span increments** — `SimpleAggregateFun
 
 `metadata.model` therefore routes to the **slim** table, which is one row per trace with a `Models Array(String)` and trace-level metric columns — structurally what `trace_summaries` has, so `arrayJoin(Models)` reproduces legacy character-for-character (including the `'unknown'` bucket and legacy's `handlesUnknown` suppression of `HAVING group_key != ''`). `metadata.span_type` has no slim column at all (span type is per-span, slim is per-trace) and falls back to `trace_summaries`.
 
-**Routing invariant:** the rollup's group-by set must remain a subset of slim's. Slim is strictly more capable; if the rollup can group by a key slim cannot, the router has no safer table to fall to. Pinned by a test in `route-table.unit.test.ts`.
+**Routing invariant:** each rollup's group-by set must remain a subset of its slim table's — trace and eval alike. Slim is strictly more capable; if a rollup can group by a key its slim cannot, the router has no safer table to fall to. Pinned by tests in `route-table.unit.test.ts`.
+
+(The eval rollup keeps its group-bys: `EvaluatorType` and `Status` are final at evaluation-completion time and sit on the rollup's keying tuple, so they carry none of the per-span attribution hazard above.)
 
 ### Shared fleet
 
