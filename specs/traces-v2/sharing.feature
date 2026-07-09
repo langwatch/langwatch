@@ -128,6 +128,31 @@ Feature: Share a trace behind a secret, scoped, expiring link
       When a viewer opens the link
       Then the trace is not shown, exactly as it would not be shown in-app
 
+    @integration
+    Scenario: An anonymous viewer is never shown costs
+      Given a public share link for a trace with recorded costs
+      When an unauthenticated person opens the link
+      Then the trace is shown without any cost figures
+
+    @integration
+    Scenario: A member resolving a scoped link sees costs only if they may in-app
+      Given an organization share link for a trace with recorded costs
+      When a member who may view costs opens the link
+      Then the costs are shown
+      When a member who may not view costs opens the link
+      Then the trace is shown without any cost figures
+
+  Rule: A trace-scoped link does not unlock the surrounding conversation
+
+    @integration
+    Scenario: The conversation is revealed only when the link was created with its thread
+      Given a share link created for a trace without its thread
+      When the holder requests the surrounding conversation
+      Then access is denied
+      Given a share link created for the same trace with its thread
+      When the holder requests the surrounding conversation
+      Then the conversation is returned
+
   Rule: Legacy links keep working; the legacy UI no longer offers sharing
 
     @integration

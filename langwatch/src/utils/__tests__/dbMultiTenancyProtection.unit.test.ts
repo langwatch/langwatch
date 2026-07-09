@@ -817,7 +817,7 @@ describe("guardProjectId — ShareLink", () => {
         runGuard({
           model: "ShareLink",
           action: "findUnique",
-          args: { where: { token: "share-lw-abc" } },
+          args: { where: { token: "tok_abc" } },
         }),
       ).resolves.toBe("ok");
     });
@@ -873,7 +873,7 @@ describe("guardProjectId — ShareLink", () => {
           action: "create",
           args: {
             data: {
-              token: "share-lw-abc",
+              token: "tok_abc",
               projectId: "project_1",
               resourceType: "TRACE",
               resourceId: "trace_a",

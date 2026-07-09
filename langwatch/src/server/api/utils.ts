@@ -219,11 +219,12 @@ export async function getUserProtectionsForProject(
   },
   { projectId }: { projectId: string } & Record<string, unknown>,
 ): Promise<Protections> {
-  // TODO(afr): Should we show cost if public? I would assume the opposite.
-  const canSeeCosts =
-    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-    ctx.publiclyShared ||
-    (await hasProjectPermission(ctx, projectId, "cost:view"));
+  // Cost visibility follows the caller's own permission, never the fact that a
+  // share link was presented. An anonymous viewer of a public link sees no
+  // costs; a member resolving an org/project-scoped link sees them only if they
+  // hold `cost:view` in-app. Sharing a trace must not disclose spend. See
+  // ADR-039.
+  const canSeeCosts = await hasProjectPermission(ctx, projectId, "cost:view");
 
   // The plan-based visibility window applies to every user-facing read,
   // including public shares — sharing must not be the bypass.

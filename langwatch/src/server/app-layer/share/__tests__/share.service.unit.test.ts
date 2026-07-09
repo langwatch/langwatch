@@ -12,7 +12,7 @@ const PROJECT_ID = "project_1";
 function buildShare(overrides: Partial<ShareWithProject> = {}): ShareWithProject {
   return {
     id: "share_1",
-    token: "share-lw-abc",
+    token: "tok_abc",
     resourceType: "TRACE",
     resourceId: "trace_a",
     threadId: null,
@@ -72,7 +72,7 @@ describe("ShareService", () => {
         vi.mocked(repo.findByToken).mockResolvedValue(null);
 
         const result = await service.resolveForViewer({
-          token: "share-lw-nope",
+          token: "tok_nope",
           viewer: buildViewer(),
         });
 
@@ -92,7 +92,7 @@ describe("ShareService", () => {
         );
 
         const result = await service.resolveForViewer({
-          token: "share-lw-abc",
+          token: "tok_abc",
           viewer: buildViewer(),
         });
 
@@ -107,7 +107,7 @@ describe("ShareService", () => {
         );
 
         const result = await service.resolveForViewer({
-          token: "share-lw-abc",
+          token: "tok_abc",
           viewer: buildViewer(),
         });
 
@@ -121,7 +121,7 @@ describe("ShareService", () => {
         vi.mocked(repo.findByToken).mockResolvedValue(buildShare());
 
         const result = await service.resolveForViewer({
-          token: "share-lw-abc",
+          token: "tok_abc",
           viewer: buildViewer(),
         });
 
@@ -141,7 +141,7 @@ describe("ShareService", () => {
         );
 
         const result = await service.resolveForViewer({
-          token: "share-lw-abc",
+          token: "tok_abc",
           viewer: buildViewer({ isOrgMember: vi.fn().mockResolvedValue(false) }),
         });
 
@@ -156,7 +156,7 @@ describe("ShareService", () => {
         const isOrgMember = vi.fn().mockResolvedValue(true);
 
         const result = await service.resolveForViewer({
-          token: "share-lw-abc",
+          token: "tok_abc",
           viewer: buildViewer({ isOrgMember }),
         });
 
@@ -173,7 +173,7 @@ describe("ShareService", () => {
         const isProjectMember = vi.fn().mockResolvedValue(true);
 
         const result = await service.resolveForViewer({
-          token: "share-lw-abc",
+          token: "tok_abc",
           viewer: buildViewer({ isProjectMember }),
         });
 
@@ -187,7 +187,7 @@ describe("ShareService", () => {
         );
 
         const result = await service.resolveForViewer({
-          token: "share-lw-abc",
+          token: "tok_abc",
           viewer: buildViewer(),
         });
 
@@ -202,7 +202,7 @@ describe("ShareService", () => {
         );
 
         const result = await service.resolveForViewer({
-          token: "share-lw-abc",
+          token: "tok_abc",
           viewer: buildViewer(),
         });
 
@@ -216,7 +216,7 @@ describe("ShareService", () => {
         );
 
         const result = await service.resolveForViewer({
-          token: "share-lw-abc",
+          token: "tok_abc",
           viewer: buildViewer(),
         });
 
@@ -236,7 +236,7 @@ describe("ShareService", () => {
           );
 
           const result = await service.resolveForViewer({
-            token: "share-lw-abc",
+            token: "tok_abc",
             viewer: buildViewer({ grantedShareId: "share_1" }),
           });
 
@@ -261,7 +261,7 @@ describe("ShareService", () => {
       });
 
       const created = vi.mocked(repo.create).mock.calls[0]![0];
-      expect(created.token).toMatch(/^share-lw-[0-9A-Za-z]{32}$/);
+      expect(created.token).toMatch(/^[0-9A-Za-z]{32}$/);
       expect(pinnedTraces.autoPin).toHaveBeenCalledWith({
         projectId: PROJECT_ID,
         traceId: "trace_a",

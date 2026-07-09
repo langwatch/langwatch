@@ -1537,6 +1537,50 @@ export const checkPermissionOrPubliclyShared =
     return next();
   };
 
+/**
+ * Sibling of `checkPermissionOrPubliclyShared` for reads keyed by conversation
+ * rather than trace id. Only a share created *with* its surrounding thread
+ * carries a `thread_id` claim, so a trace-scoped link cannot pull the whole
+ * conversation. See ADR-039.
+ */
+export const checkPermissionOrSharedThread =
+  <InputType extends { projectId: string; conversationId: string }>(
+    permissionCheck: PermissionMiddleware<InputType>,
+  ) =>
+  async ({ ctx, input, next }: PermissionMiddlewareParams<InputType>) => {
+    let allowed = false;
+    try {
+      await permissionCheck({ ctx, input, next: async () => true as any });
+      allowed = true;
+    } catch (e) {
+      if (e instanceof TRPCError && e.code === "UNAUTHORIZED") {
+        allowed = false;
+      } else {
+        throw e;
+      }
+    }
+
+    if (!allowed) {
+      const grant = ctx.shareGrant;
+      const grantCoversThread =
+        !!grant &&
+        grant.project_id === input.projectId &&
+        !!grant.thread_id &&
+        grant.thread_id === input.conversationId;
+      if (!grantCoversThread) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message:
+            "You do not have permission and no valid share grant was presented for this conversation",
+        });
+      }
+      ctx.publiclyShared = true;
+    }
+
+    ctx.permissionChecked = true;
+    return next();
+  };
+
 // ============================================================================
 // OPS PERMISSION
 // ============================================================================

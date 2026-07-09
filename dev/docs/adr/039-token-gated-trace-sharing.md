@@ -37,7 +37,9 @@ optional `maxViews` (null = unlimited, 1 = single view) and a `viewCount`. The
 one-share-per-resource unique constraint is dropped so a trace can carry several
 links with different audiences/expiries.
 
-**Token.** `share-lw-` prefix + 32-char nanoid (~190 bits). Stored in plaintext,
+**Token.** A bare 32-char nanoid (~190 bits) — deliberately unprefixed, unlike
+the `xx-lw-` credentials, because its only home is the `/share/<token>` URL
+where a prefix would stutter and buy nothing. Stored in plaintext,
 indexed and unique — consistent with the pre-existing behaviour (the old id was
 already a plaintext capability in the URL and DB), and required for backwards
 compat (see below) and for re-displaying a link in the management UI. Hashing at

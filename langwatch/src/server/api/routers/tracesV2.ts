@@ -1,7 +1,11 @@
 import { on } from "node:events";
 import { z } from "zod";
 import { resolveNonBilledCost } from "~/features/traces-v2/utils/costAttribution";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  publicProcedure,
+} from "~/server/api/trpc";
 import { getVisibilityCutoffMsForProject } from "~/server/api/utils";
 import { getApp } from "~/server/app-layer/app";
 import { ValidationError } from "~/server/app-layer/domain-error";
@@ -53,7 +57,11 @@ import {
   redactObject,
 } from "~/server/traces/mappers/redaction";
 import type { CategoryVisibility } from "~/server/traces/protections";
-import { checkProjectPermission } from "../rbac";
+import {
+  checkPermissionOrPubliclyShared,
+  checkPermissionOrSharedThread,
+  checkProjectPermission,
+} from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 import { withoutHiddenResourceAttrs } from "./tracesV2.resourceAttrs";
 import type {
@@ -825,14 +833,16 @@ export const tracesV2Router = createTRPCRouter({
    * query language so conversationIds with arbitrary characters work
    * unconditionally — builds a typed WHERE fragment server-side.
    */
-  conversationContext: protectedProcedure
+  conversationContext: publicProcedure
     .input(
       z.object({
         projectId: z.string(),
         conversationId: z.string().min(1),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .use(
+      checkPermissionOrSharedThread(checkProjectPermission("traces:view")),
+    )
     .query(async ({ input, ctx }) => {
       const app = getApp();
       const protections = await getUserProtectionsForProject(ctx, {
@@ -1010,7 +1020,7 @@ export const tracesV2Router = createTRPCRouter({
       });
     }),
 
-  header: protectedProcedure
+  header: publicProcedure
     .input(
       z.object({
         projectId: z.string(),
@@ -1025,7 +1035,12 @@ export const tracesV2Router = createTRPCRouter({
         occurredAtMs: z.number().int().optional(),
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .use(
+      checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
+        resourceType: "TRACE",
+        resourceParam: "traceId",
+      }),
+    )
     .query(async ({ input, ctx }): Promise<TraceHeader> => {
       const app = getApp();
       const protections = await getUserProtectionsForProject(ctx, {
@@ -1262,7 +1277,7 @@ export const tracesV2Router = createTRPCRouter({
       return rows.map(mapSpanSummaryToTreeNode);
     }),
 
-  spanTree: protectedProcedure
+  spanTree: publicProcedure
     .input(
       z.object({
         projectId: z.string(),
@@ -1270,7 +1285,12 @@ export const tracesV2Router = createTRPCRouter({
         ...spanReadHintShape,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .use(
+      checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
+        resourceType: "TRACE",
+        resourceParam: "traceId",
+      }),
+    )
     .query(async ({ input }): Promise<SpanTreeNode[]> => {
       const app = getApp();
       const rows = await app.traces.spans.getSpanSummaryByTraceId({
@@ -1287,7 +1307,7 @@ export const tracesV2Router = createTRPCRouter({
    * waterfall and span-list views so the primary `spanTree` query stays
    * cheap; UIs render badges + filter once this resolves.
    */
-  spanLangwatchSignals: protectedProcedure
+  spanLangwatchSignals: publicProcedure
     .input(
       z.object({
         projectId: z.string(),
@@ -1295,7 +1315,12 @@ export const tracesV2Router = createTRPCRouter({
         ...spanReadHintShape,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .use(
+      checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
+        resourceType: "TRACE",
+        resourceParam: "traceId",
+      }),
+    )
     .query(async ({ input }): Promise<SpanLangwatchSignals[]> => {
       const app = getApp();
       const rows = await app.traces.spans.getLangwatchSignalsByTraceId({
@@ -1311,7 +1336,7 @@ export const tracesV2Router = createTRPCRouter({
    * Trace markdown view to render per-span attributes and input/output.
    * Heavier than spanTree; fetch lazily.
    */
-  spansFull: protectedProcedure
+  spansFull: publicProcedure
     .input(
       z.object({
         projectId: z.string(),
@@ -1319,7 +1344,12 @@ export const tracesV2Router = createTRPCRouter({
         ...spanReadHintShape,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .use(
+      checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
+        resourceType: "TRACE",
+        resourceParam: "traceId",
+      }),
+    )
     .query(async ({ input, ctx }): Promise<SpanDetail[]> => {
       const app = getApp();
       const protections = await getUserProtectionsForProject(ctx, {
@@ -1355,7 +1385,7 @@ export const tracesV2Router = createTRPCRouter({
       });
     }),
 
-  spanDetail: protectedProcedure
+  spanDetail: publicProcedure
     .input(
       z.object({
         projectId: z.string(),
@@ -1364,7 +1394,12 @@ export const tracesV2Router = createTRPCRouter({
         ...spanReadHintShape,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .use(
+      checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
+        resourceType: "TRACE",
+        resourceParam: "traceId",
+      }),
+    )
     .query(async ({ input, ctx }): Promise<SpanDetail> => {
       const app = getApp();
       const protections = await getUserProtectionsForProject(ctx, {
@@ -1473,7 +1508,7 @@ export const tracesV2Router = createTRPCRouter({
    * the drawer's metadata section and as the "scope" chip on traces and
    * spans. Standard span mapping drops both, so this reads them raw.
    */
-  resourceInfo: protectedProcedure
+  resourceInfo: publicProcedure
     .input(
       z.object({
         projectId: z.string(),
@@ -1481,7 +1516,12 @@ export const tracesV2Router = createTRPCRouter({
         ...spanReadHintShape,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .use(
+      checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
+        resourceType: "TRACE",
+        resourceParam: "traceId",
+      }),
+    )
     .query(async ({ input }): Promise<TraceResourceInfoDto> => {
       const app = getApp();
       const rows = await app.traces.spans.getSpanResourcesByTraceId({
@@ -1518,7 +1558,7 @@ export const tracesV2Router = createTRPCRouter({
    * fires this separately (like evals), and it reads only the `Events.*`
    * columns rather than re-fetching the spans the tree already loads.
    */
-  traceEvents: protectedProcedure
+  traceEvents: publicProcedure
     .input(
       z.object({
         projectId: z.string(),
@@ -1526,7 +1566,12 @@ export const tracesV2Router = createTRPCRouter({
         ...spanReadHintShape,
       }),
     )
-    .use(checkProjectPermission("traces:view"))
+    .use(
+      checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
+        resourceType: "TRACE",
+        resourceParam: "traceId",
+      }),
+    )
     .query(async ({ input }): Promise<DerivedTraceEvent[]> => {
       const app = getApp();
       return app.traces.spans.getTraceEventsByTraceId({
