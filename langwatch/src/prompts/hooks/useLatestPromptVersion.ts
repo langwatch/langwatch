@@ -50,6 +50,11 @@ export const useLatestPromptVersion = ({
     },
     {
       enabled: !!configId && !!project?.id,
+      // Runs in every open tab's always-mounted label (for the outdated
+      // badge). A new version is created via a save, which invalidates this
+      // key, so we don't need per-focus refetches for every open tab.
+      staleTime: 30_000,
+      refetchOnWindowFocus: false,
     },
   );
 
