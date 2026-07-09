@@ -7,6 +7,7 @@ import {
 import { TRPCError } from "@trpc/server";
 import { env } from "~/env.mjs";
 import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
+import type { ShareGrantClaims } from "~/server/app-layer/share/shareGrant";
 import type { Session } from "~/server/auth";
 import { isAdmin } from "../../../ee/admin/isAdmin";
 
@@ -601,6 +602,7 @@ type PermissionMiddlewareParams<InputType> = {
     session: Session;
     permissionChecked: boolean;
     publiclyShared: boolean;
+    shareGrant?: ShareGrantClaims | null;
     organizationRole?: OrganizationUserRole | null;
     opsScope?: OpsScope;
   };
@@ -1470,6 +1472,19 @@ export const authorizeInResolver = ({
 
 type PublicResourceTypes = "TRACE" | "THREAD";
 
+/**
+ * Authorize a read either by the caller's own permission, or — for anonymous
+ * share viewers — by possession of a valid share grant covering exactly this
+ * resource. The grant is a signed, single-resource cookie minted by
+ * `share.resolve` after it validated the token, expiry, view cap and audience;
+ * it is read into `ctx.shareGrant` in `createTRPCContext`.
+ *
+ * This deliberately does NOT fall back to "a share row exists for this
+ * resource id": trace ids are caller-supplied and guessable, so keying
+ * authorization on their existence let anyone who learned a shared trace's id
+ * read it without the link. Authorization is by grant possession only. See
+ * ADR-039.
+ */
 export const checkPermissionOrPubliclyShared =
   <
     Key extends keyof InputType,
@@ -1502,21 +1517,16 @@ export const checkPermissionOrPubliclyShared =
     }
 
     if (!allowed) {
-      const sharedResource = await ctx.prisma.publicShare.findFirst({
-        where: {
-          projectId: input.projectId,
-          resourceType:
-            typeof resourceType === "function"
-              ? resourceType(input)
-              : resourceType,
-          resourceId: input[resourceParam],
-        },
-      });
-      if (!sharedResource) {
+      const grant = ctx.shareGrant;
+      const grantCoversResource =
+        !!grant &&
+        grant.project_id === input.projectId &&
+        grant.resource_id === input[resourceParam];
+      if (!grantCoversResource) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message:
-            "You do not have permission and this resource is not publicly shared",
+            "You do not have permission and no valid share grant was presented for this resource",
         });
       }
       ctx.publiclyShared = true;

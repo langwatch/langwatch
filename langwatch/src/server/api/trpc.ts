@@ -40,6 +40,11 @@ import { ZodError } from "zod";
 import { DomainError } from "~/server/app-layer/domain-error";
 import type { Session } from "~/server/auth";
 import { getServerAuthSession } from "~/server/auth";
+import {
+  SHARE_GRANT_COOKIE,
+  type ShareGrantClaims,
+  verifyShareGrant,
+} from "~/server/app-layer/share/shareGrant";
 import { prisma } from "~/server/db";
 import { AiCallFailedError } from "~/server/modelProviders/aiCallFailedError";
 import { ModelNotConfiguredError } from "~/server/modelProviders/modelNotConfiguredError";
@@ -65,6 +70,7 @@ interface CreateContextOptions {
   session: Session | null;
   permissionChecked?: boolean;
   publiclyShared?: boolean;
+  shareGrant?: ShareGrantClaims | null;
   organizationRole?: OrganizationUserRole | null;
   opsScope?: OpsScope;
 }
@@ -87,6 +93,7 @@ export const createInnerTRPCContext = (opts: CreateContextOptions) => {
     prisma,
     permissionChecked: opts.permissionChecked ?? false,
     publiclyShared: opts.publiclyShared ?? false,
+    shareGrant: opts.shareGrant ?? null,
     organizationRole: opts.organizationRole ?? undefined,
     opsScope: opts.opsScope,
   };
@@ -104,12 +111,20 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
   // Get the session via the BetterAuth-backed compat helper.
   const session = await getServerAuthSession({ req, res });
 
+  // A share viewer carries a signed, single-resource grant cookie minted by
+  // `share.resolve`. Reading it here lets the rbac middleware authorize
+  // anonymous reads on grant possession rather than on the (guessable)
+  // resource id. See ADR-039.
+  const grantCookie = req?.cookies?.[SHARE_GRANT_COOKIE];
+  const shareGrant = grantCookie ? verifyShareGrant(grantCookie) : null;
+
   return createInnerTRPCContext({
     req,
     res,
     session,
     permissionChecked: false,
     publiclyShared: false,
+    shareGrant,
   });
 };
 

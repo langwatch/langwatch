@@ -7,14 +7,12 @@ import {
   isDemoProject,
   type Permission,
 } from "../rbac";
+import type { ShareGrantClaims } from "~/server/app-layer/share/shareGrant";
 
 // Mock Prisma client
 const mockPrisma = {
   project: {
     findUnique: vi.fn(),
-  },
-  publicShare: {
-    findFirst: vi.fn(),
   },
   teamUserCustomRole: {
     findFirst: vi.fn(),
@@ -236,15 +234,37 @@ describe("Demo Project and Public Sharing Tests", () => {
       session: mockSession,
       permissionChecked: false,
       publiclyShared: false,
+      shareGrant: null as ShareGrantClaims | null,
     };
 
     const mockNext = vi.fn().mockResolvedValue("success");
 
+    function grantFor({
+      projectId = "project-123",
+      resourceId,
+      resourceType = "TRACE",
+    }: {
+      projectId?: string;
+      resourceId: string;
+      resourceType?: "TRACE" | "THREAD";
+    }): ShareGrantClaims {
+      return {
+        share_id: "share-123",
+        project_id: projectId,
+        resource_type: resourceType,
+        resource_id: resourceId,
+        thread_id: null,
+      };
+    }
+
     beforeEach(() => {
       vi.clearAllMocks();
+      mockCtx.shareGrant = null;
+      mockCtx.publiclyShared = false;
+      mockCtx.permissionChecked = false;
     });
 
-    it("should allow access when user has permission", async () => {
+    it("allows access when user has permission", async () => {
       mockPrisma.project.findUnique.mockResolvedValue({
         team: {
           id: "team-123",
@@ -272,19 +292,11 @@ describe("Demo Project and Public Sharing Tests", () => {
       expect(mockCtx.publiclyShared).toBe(false);
     });
 
-    it("should allow access when resource is publicly shared", async () => {
+    it("allows access when a share grant covers the resource", async () => {
       mockPrisma.project.findUnique.mockResolvedValue({
-        team: {
-          id: "team-123",
-          members: [],
-        },
+        team: { id: "team-123", members: [] },
       });
-
-      mockPrisma.publicShare.findFirst.mockResolvedValue({
-        id: "share-123",
-        resourceType: "TRACE",
-        resourceId: "trace-123",
-      });
+      mockCtx.shareGrant = grantFor({ resourceId: "trace-123" });
 
       const middleware = checkPermissionOrPubliclyShared(
         checkProjectPermission("workflows:view" as Permission),
@@ -302,15 +314,10 @@ describe("Demo Project and Public Sharing Tests", () => {
       expect(mockCtx.publiclyShared).toBe(true);
     });
 
-    it("should throw UNAUTHORIZED when no permission and not shared", async () => {
+    it("throws UNAUTHORIZED when there is neither permission nor a grant", async () => {
       mockPrisma.project.findUnique.mockResolvedValue({
-        team: {
-          id: "team-123",
-          members: [],
-        },
+        team: { id: "team-123", members: [] },
       });
-
-      mockPrisma.publicShare.findFirst.mockResolvedValue(null);
 
       const middleware = checkPermissionOrPubliclyShared(
         checkProjectPermission("workflows:view" as Permission),
@@ -326,26 +333,21 @@ describe("Demo Project and Public Sharing Tests", () => {
       ).rejects.toThrow();
     });
 
-    it("should handle different resource types", async () => {
-      const resourceTypes = ["TRACE", "THREAD"];
+    it("handles different resource types", async () => {
+      const resourceTypes = ["TRACE", "THREAD"] as const;
 
       for (const resourceType of resourceTypes) {
         mockPrisma.project.findUnique.mockResolvedValue({
-          team: {
-            id: "team-123",
-            members: [],
-          },
+          team: { id: "team-123", members: [] },
         });
-
-        mockPrisma.publicShare.findFirst.mockResolvedValue({
-          id: "share-123",
-          resourceType: resourceType as any,
+        mockCtx.shareGrant = grantFor({
           resourceId: "resource-123",
+          resourceType,
         });
 
         const middleware = checkPermissionOrPubliclyShared(
           checkProjectPermission("workflows:view" as Permission),
-          { resourceType: resourceType as any, resourceParam: "resourceId" },
+          { resourceType, resourceParam: "resourceId" },
         );
 
         const result = await middleware({
@@ -359,19 +361,11 @@ describe("Demo Project and Public Sharing Tests", () => {
       }
     });
 
-    it("should handle dynamic resource type function", async () => {
+    it("handles dynamic resource type function", async () => {
       mockPrisma.project.findUnique.mockResolvedValue({
-        team: {
-          id: "team-123",
-          members: [],
-        },
+        team: { id: "team-123", members: [] },
       });
-
-      mockPrisma.publicShare.findFirst.mockResolvedValue({
-        id: "share-123",
-        resourceType: "TRACE",
-        resourceId: "trace-123",
-      });
+      mockCtx.shareGrant = grantFor({ resourceId: "trace-123" });
 
       const middleware = checkPermissionOrPubliclyShared(
         checkProjectPermission("workflows:view" as Permission),
@@ -397,32 +391,6 @@ describe("Demo Project and Public Sharing Tests", () => {
 
     it.skip("should handle permission check errors gracefully", async () => {
       mockPrisma.project.findUnique.mockRejectedValue(
-        new Error("Database error"),
-      );
-
-      const middleware = checkPermissionOrPubliclyShared(
-        checkProjectPermission("workflows:view" as Permission),
-        { resourceType: "TRACE", resourceParam: "traceId" },
-      );
-
-      await expect(
-        middleware({
-          ctx: mockCtx,
-          input: { projectId: "project-123", traceId: "trace-123" },
-          next: mockNext,
-        }),
-      ).rejects.toThrow();
-    });
-
-    it("should handle public share lookup errors gracefully", async () => {
-      mockPrisma.project.findUnique.mockResolvedValue({
-        team: {
-          id: "team-123",
-          members: [],
-        },
-      });
-
-      mockPrisma.publicShare.findFirst.mockRejectedValue(
         new Error("Database error"),
       );
 
@@ -514,19 +482,42 @@ describe("Demo Project and Public Sharing Tests", () => {
       session: mockSession,
       permissionChecked: false,
       publiclyShared: false,
+      shareGrant: null as ShareGrantClaims | null,
     };
 
     const mockNext = vi.fn().mockResolvedValue("success");
 
-    it("should handle null public share result", async () => {
+    beforeEach(() => {
+      mockCtx.shareGrant = null;
+      mockCtx.publiclyShared = false;
       mockPrisma.project.findUnique.mockResolvedValue({
-        team: {
-          id: "team-123",
-          members: [],
-        },
+        team: { id: "team-123", members: [] },
       });
+    });
 
-      mockPrisma.publicShare.findFirst.mockResolvedValue(null);
+    it("denies when no grant is present", async () => {
+      const middleware = checkPermissionOrPubliclyShared(
+        checkProjectPermission("workflows:view" as Permission),
+        { resourceType: "TRACE", resourceParam: "traceId" },
+      );
+
+      await expect(
+        middleware({
+          ctx: mockCtx,
+          input: { projectId: "project-123", traceId: "trace-123" },
+          next: mockNext,
+        }),
+      ).rejects.toThrow();
+    });
+
+    it("denies when the grant does not cover the requested resource", async () => {
+      mockCtx.shareGrant = {
+        share_id: "share-123",
+        project_id: "project-123",
+        resource_type: "TRACE",
+        resource_id: "some-other-trace",
+        thread_id: null,
+      };
 
       const middleware = checkPermissionOrPubliclyShared(
         checkProjectPermission("workflows:view" as Permission),
@@ -542,59 +533,14 @@ describe("Demo Project and Public Sharing Tests", () => {
       ).rejects.toThrow();
     });
 
-    it("should handle undefined public share result", async () => {
-      mockPrisma.project.findUnique.mockResolvedValue({
-        team: {
-          id: "team-123",
-          members: [],
-        },
-      });
-
-      mockPrisma.publicShare.findFirst.mockResolvedValue(undefined);
-
-      const middleware = checkPermissionOrPubliclyShared(
-        checkProjectPermission("workflows:view" as Permission),
-        { resourceType: "TRACE", resourceParam: "traceId" },
-      );
-
-      await expect(
-        middleware({
-          ctx: mockCtx,
-          input: { projectId: "project-123", traceId: "trace-123" },
-          next: mockNext,
-        }),
-      ).rejects.toThrow();
-    });
-
-    it("should handle missing resource parameter in input", async () => {
-      mockPrisma.project.findUnique.mockResolvedValue({
-        team: {
-          id: "team-123",
-          members: [],
-        },
-      });
-
-      const middleware = checkPermissionOrPubliclyShared(
-        checkProjectPermission("workflows:view" as Permission),
-        { resourceType: "TRACE", resourceParam: "traceId" },
-      );
-
-      await expect(
-        middleware({
-          ctx: mockCtx,
-          input: { projectId: "project-123", traceId: "trace-123" } as any, // Missing traceId
-          next: mockNext,
-        }),
-      ).rejects.toThrow();
-    });
-
-    it("should handle invalid resource parameter type", async () => {
-      mockPrisma.project.findUnique.mockResolvedValue({
-        team: {
-          id: "team-123",
-          members: [],
-        },
-      });
+    it("denies an invalid resource parameter even with a grant", async () => {
+      mockCtx.shareGrant = {
+        share_id: "share-123",
+        project_id: "project-123",
+        resource_type: "TRACE",
+        resource_id: "trace-123",
+        thread_id: null,
+      };
 
       const middleware = checkPermissionOrPubliclyShared(
         checkProjectPermission("workflows:view" as Permission),
@@ -631,6 +577,13 @@ describe("Demo Project and Public Sharing Tests", () => {
         session: mockSession,
         permissionChecked: false,
         publiclyShared: false,
+        shareGrant: {
+          share_id: "share-123",
+          project_id: "regular-project-123",
+          resource_type: "TRACE",
+          resource_id: "trace-123",
+          thread_id: null,
+        } as ShareGrantClaims | null,
       };
 
       const mockNext = vi.fn().mockResolvedValue("success");
@@ -640,12 +593,6 @@ describe("Demo Project and Public Sharing Tests", () => {
           id: "team-123",
           members: [],
         },
-      });
-
-      mockPrisma.publicShare.findFirst.mockResolvedValue({
-        id: "share-123",
-        resourceType: "TRACE",
-        resourceId: "trace-123",
       });
 
       const middleware = checkPermissionOrPubliclyShared(

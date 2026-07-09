@@ -64,6 +64,7 @@ import { splitChipsForOverflow } from "../ChipBar";
 import { ExceptionsContent } from "../ExceptionsContent";
 import { ModeSwitch } from "../ModeSwitch";
 import { RawJsonDialog } from "../RawJsonDialog";
+import { ShareTraceDialog } from "./ShareTraceDialog";
 import { useTraceHeaderChipDefs } from "../TraceHeaderChips";
 import { EditableTraceName } from "./EditableTraceName";
 import { MetricPill } from "./MetricPill";
@@ -791,6 +792,7 @@ export const DrawerHeader = memo(function DrawerHeader({
   };
 
   const [rawOpen, setRawOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   // Local listener for the `\` shortcut. Lives here (rather than in
   // TraceDrawerShell) because the raw-JSON dialog's open state is also
@@ -1068,6 +1070,7 @@ export const DrawerHeader = memo(function DrawerHeader({
             dejaViewHref={dejaView.href ?? null}
             onOpenRawJson={() => setRawOpen(true)}
             onShowShortcuts={() => setShortcutsOpen(true)}
+            onShare={() => setShareOpen(true)}
             pinned={pinned}
             onTogglePinned={togglePinned}
           />
@@ -1317,6 +1320,13 @@ export const DrawerHeader = memo(function DrawerHeader({
         open={rawOpen}
         onClose={() => setRawOpen(false)}
         trace={trace}
+      />
+      <ShareTraceDialog
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        projectId={project?.id}
+        traceId={trace.traceId}
+        conversationId={trace.conversationId}
       />
     </VStack>
   );

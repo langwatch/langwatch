@@ -193,7 +193,7 @@ export const annotationRouter = createTRPCRouter({
       checkPermissionOrPubliclyShared(
         checkProjectPermission("annotations:view"),
         {
-          resourceType: PublicShareResourceTypes.TRACE,
+          resourceType: "TRACE",
           resourceParam: "traceId",
         },
       ),

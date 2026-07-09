@@ -47,7 +47,7 @@ export const projectRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
-      const publicShare = await prisma.publicShare.findUnique({
+      const publicShare = await prisma.shareLink.findUnique({
         where: { id: input.shareId, projectId: input.id },
       });
 

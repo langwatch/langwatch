@@ -1,32 +1,58 @@
-import type { PublicShare } from "@prisma/client";
+import type { ShareLink, ShareVisibility } from "@prisma/client";
 
 export type ShareResourceType = "TRACE" | "THREAD";
 
-export interface ShareWithProject extends PublicShare {
-  project: { traceSharingEnabled: boolean };
+export interface ShareWithProject extends ShareLink {
+  project: {
+    traceSharingEnabled: boolean;
+    team: { organizationId: string };
+  };
+}
+
+export interface CreateShareLinkParams {
+  token: string;
+  projectId: string;
+  resourceType: ShareResourceType;
+  resourceId: string;
+  threadId?: string | null;
+  visibility?: ShareVisibility;
+  expiresAt?: Date | null;
+  maxViews?: number | null;
+  userId?: string | null;
 }
 
 export interface ShareRepository {
+  /** Resolve a share by its secret token — the anonymous read path. Includes
+   *  the project context needed to gate on the sharing kill switch and audience. */
+  findByToken(token: string): Promise<ShareWithProject | null>;
+
   findById(id: string): Promise<ShareWithProject | null>;
 
-  findByResource(params: {
+  /** All links for a resource, newest first — backs the management list. */
+  listByResource(params: {
     projectId: string;
     resourceType: ShareResourceType;
     resourceId: string;
-  }): Promise<PublicShare | null>;
+  }): Promise<ShareLink[]>;
 
-  findByResourceType(params: {
-    resourceType: ShareResourceType;
-    resourceId: string;
-  }): Promise<PublicShare | null>;
-
-  create(params: {
+  /** Whether an unexpired link exists for the resource. Used by the pinning
+   *  service to keep a trace pinned while it is shared. Conservative: a
+   *  view-capped link that is exhausted still counts as active (harmless — it
+   *  only defers unpinning). */
+  hasActiveShareForResource(params: {
     projectId: string;
     resourceType: ShareResourceType;
     resourceId: string;
-    userId?: string | null;
-  }): Promise<PublicShare>;
+  }): Promise<boolean>;
 
+  create(params: CreateShareLinkParams): Promise<ShareLink>;
+
+  incrementViewCount(id: string): Promise<ShareLink>;
+
+  /** Revoke a single link, scoped to its project. */
+  deleteById(params: { id: string; projectId: string }): Promise<void>;
+
+  /** Revoke every link for a resource (thread unshare, kill switch). */
   deleteByResource(params: {
     projectId: string;
     resourceType: ShareResourceType;

@@ -77,7 +77,7 @@ model User {
   // Spec: specs/ai-gateway/governance/persona-home-content.feature
   lastHomePath             String?
   Annotation               Annotation[]
-  publicShares             PublicShare[]
+  shareLinks               ShareLink[]
   Workflow                 Workflow[]
   WorkflowVersion          WorkflowVersion[]
   annotationQueues         AnnotationQueueMembers[]
@@ -383,7 +383,7 @@ model Project {
   TriggerSent              TriggerSent[]
   ReactorOutbox            ReactorOutbox[]
   annotationScores         AnnotationScore[]
-  publicShares             PublicShare[]
+  shareLinks               ShareLink[]
   workflows                Workflow[]
   WorkflowVersion          WorkflowVersion[]
   AnnotationQueue          AnnotationQueue[]
@@ -1117,9 +1117,15 @@ model AnnotationScore {
   @@index([projectId])
 }
 
-enum PublicShareResourceTypes {
+enum ShareResourceType {
   TRACE
   THREAD
+}
+
+enum ShareVisibility {
+  PUBLIC
+  ORGANIZATION
+  PROJECT
 }
 
 model AnnotationQueue {
@@ -1186,19 +1192,32 @@ model AnnotationQueueItem {
   @@index([annotationQueueId, doneAt])
 }
 
-model PublicShare {
-  id           String                   @id @default(nanoid())
-  resourceType PublicShareResourceTypes
+model ShareLink {
+  id           String            @id @default(nanoid())
+  // Secret capability. `share-lw-` + high-entropy body for new links; legacy
+  // rows carry their old bare-nanoid id here (see migration backfill). The
+  // token — not the resource id — is what authorizes an anonymous read.
+  token        String            @unique
+  resourceType ShareResourceType
   resourceId   String
+  // Optional surrounding conversation to show alongside the trace.
+  threadId     String?
   projectId    String
-  project      Project                  @relation(fields: [projectId], references: [id])
+  project      Project           @relation(fields: [projectId], references: [id])
   userId       String?
-  user         User?                    @relation(fields: [userId], references: [id])
+  user         User?             @relation(fields: [userId], references: [id])
+
+  visibility ShareVisibility @default(PUBLIC)
+  // null = never expires.
+  expiresAt  DateTime?
+  // null = unlimited views; 1 = single view.
+  maxViews   Int?
+  viewCount  Int             @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
-  @@unique([projectId, resourceType, resourceId])
+  @@index([projectId, resourceType, resourceId])
   @@index([userId])
 }
 

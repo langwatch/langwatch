@@ -1,4 +1,3 @@
-import { PublicShareResourceTypes } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
@@ -19,7 +18,7 @@ export const spansRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
     .use(
       checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
-        resourceType: PublicShareResourceTypes.TRACE,
+        resourceType: "TRACE",
         resourceParam: "traceId",
       }),
     )

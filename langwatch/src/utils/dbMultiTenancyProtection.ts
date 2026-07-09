@@ -639,10 +639,15 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
     return;
   }
 
+  // ShareLink resolution: an anonymous viewer presents only a share token (or
+  // internal id) — the projectId is what the row teaches them, so it cannot be
+  // required in the where. The `token` lookup is the capability path; `id`
+  // covers internal admin/service lookups. See ADR-039.
   if (
     (action === "findFirst" || action === "findUnique") &&
-    model === "PublicShare" &&
-    (params.args?.where?.id ||
+    model === "ShareLink" &&
+    (params.args?.where?.token ||
+      params.args?.where?.id ||
       (params.args?.where?.resourceType && params.args?.where?.resourceId))
   ) {
     return;
@@ -657,7 +662,7 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
   // clause here is always shape
   //   { OR: [{ hashedSecret }, { previousHashedSecret, previousSecretValidUntil }] }
   // matching virtualKey.repository.ts:findByHashedSecret. Narrow
-  // exemption matches the PublicShare pattern above.
+  // exemption matches the ShareLink pattern above.
   if (
     action === "findFirst" &&
     model === "VirtualKey" &&

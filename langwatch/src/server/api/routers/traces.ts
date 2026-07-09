@@ -124,7 +124,7 @@ export const tracesRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
     .use(
       checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
-        resourceType: PublicShareResourceTypes.TRACE,
+        resourceType: "TRACE",
         resourceParam: "traceId",
       }),
     )
@@ -155,7 +155,7 @@ export const tracesRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
     .use(
       checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
-        resourceType: PublicShareResourceTypes.TRACE,
+        resourceType: "TRACE",
         resourceParam: "traceId",
       }),
     )
@@ -287,7 +287,7 @@ export const tracesRouter = createTRPCRouter({
     )
     .use(
       checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
-        resourceType: PublicShareResourceTypes.TRACE,
+        resourceType: "TRACE",
         resourceParam: "traceId",
       }),
     )
@@ -322,7 +322,25 @@ export const tracesRouter = createTRPCRouter({
         projectId,
         threadId,
         protections,
+<<<<<<< HEAD
       });
+=======
+      );
+
+      if (!ctx.publiclyShared) {
+        return tracesGrouped;
+      }
+
+      // A share grant scoped to the whole thread reveals the full conversation;
+      // a grant scoped to a single trace reveals only that trace within it.
+      const grant = ctx.shareGrant;
+      if (grant?.thread_id && grant.thread_id === threadId) {
+        return tracesGrouped;
+      }
+      return tracesGrouped.filter(
+        (trace) => trace.trace_id === grant?.resource_id,
+      );
+>>>>>>> dc9fd71e0 (feat(sharing): token-gated share links with audience + expiry (ADR-039))
     }),
 
   getTracesWithSpans: protectedProcedure

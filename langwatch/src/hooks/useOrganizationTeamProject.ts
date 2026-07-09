@@ -80,10 +80,10 @@ export const useOrganizationTeamProject = (
   const publicEnv = usePublicEnv();
 
   const isPublicRoute = publicRoutes.includes(router.route);
-  const shareId = typeof router.query.id === "string" ? router.query.id : "";
+  const shareToken = typeof router.query.id === "string" ? router.query.id : "";
   const publicShare = api.share.getShared.useQuery(
-    { id: shareId },
-    { enabled: !!shareId && !!isPublicRoute },
+    { token: shareToken },
+    { enabled: !!shareToken && !!isPublicRoute },
   );
   const publicShareProject = api.project.publicGetById.useQuery(
     {
