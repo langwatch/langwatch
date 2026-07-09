@@ -1,11 +1,11 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { Span } from "~/server/tracer/types";
-import { mapNormalizedSpansToSpans } from "~/server/traces/mappers/span.mapper";
 import type {
   NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import type { Span } from "~/server/tracer/types";
+import { mapNormalizedSpansToSpans } from "~/server/traces/mappers/span.mapper";
 
 export interface SpanStorageRepository {
   getSpansByTraceId(tenantId: string, traceId: string): Promise<Span[]>;
@@ -123,6 +123,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       droppedAttributesCount: 0,
       droppedEventsCount: 0,
       droppedLinksCount: 0,
+      cost: null,
+      nonBilledCost: null,
     }));
 
     return mapNormalizedSpansToSpans(normalizedSpans);

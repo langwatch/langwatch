@@ -2861,6 +2861,8 @@ export class ClickHouseTraceService {
       droppedAttributesCount: 0,
       droppedEventsCount: 0,
       droppedLinksCount: 0,
+      cost: null,
+      nonBilledCost: null,
     };
   }
 
@@ -2951,6 +2953,8 @@ export class ClickHouseTraceService {
       droppedAttributesCount: 0,
       droppedEventsCount: 0,
       droppedLinksCount: 0,
+      cost: null,
+      nonBilledCost: null,
     };
   }
 }

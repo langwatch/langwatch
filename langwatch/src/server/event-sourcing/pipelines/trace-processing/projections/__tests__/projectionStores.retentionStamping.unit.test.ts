@@ -71,6 +71,8 @@ describe("trace-pipeline projection stores retention stamping", () => {
     droppedAttributesCount: 0,
     droppedEventsCount: 0,
     droppedLinksCount: 0,
+    cost: null,
+    nonBilledCost: null,
   });
 
   describe("when the projection context carries no resolved policy", () => {

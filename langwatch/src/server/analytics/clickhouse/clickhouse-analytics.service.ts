@@ -7,26 +7,29 @@
 
 import type { ClickHouseClient } from "@clickhouse/client";
 import { getLangWatchTracer } from "langwatch";
-import { getClickHouseClientForProject, isClickHouseEnabled } from "../../clickhouse/clickhouseClient";
-import type { FilterField } from "../../filters/types";
-import type { TimeseriesInputType, SeriesInputType } from "../registry";
-import { currentVsPreviousDates } from "../../api/routers/analytics/common";
 import { createLogger } from "../../../utils/logger/server";
+import { currentVsPreviousDates } from "../../api/routers/analytics/common";
 import {
-  buildTimeseriesQuery,
+  getClickHouseClientForProject,
+  isClickHouseEnabled,
+} from "../../clickhouse/clickhouseClient";
+import type { FilterField } from "../../filters/types";
+import type { ElasticSearchEvent } from "../../tracer/types";
+import type { SeriesInputType, TimeseriesInputType } from "../registry";
+import type {
+  FeedbacksResult,
+  FilterDataResult,
+  TimeseriesBucket,
+  TimeseriesResult,
+  TopDocumentsResult,
+} from "../types";
+import {
   buildDataForFilterQuery,
-  buildTopDocumentsQuery,
   buildFeedbacksQuery,
+  buildTimeseriesQuery,
+  buildTopDocumentsQuery,
 } from "./aggregation-builder";
 import { buildMetricAlias } from "./metric-translator";
-import type {
-  TimeseriesResult,
-  TimeseriesBucket,
-  FilterDataResult,
-  TopDocumentsResult,
-  FeedbacksResult,
-} from "../types";
-import type { ElasticSearchEvent } from "../../tracer/types";
 
 /** Maximum number of timeseries buckets before auto-adjusting to daily granularity */
 const MAX_TIMESERIES_BUCKETS = 1000;
@@ -53,10 +56,10 @@ export const ANALYTICS_CLICKHOUSE_SETTINGS: Record<string, number> = {
 
 // Re-export types for backward compatibility
 export type {
-  TimeseriesResult,
-  FilterDataResult,
-  TopDocumentsResult,
   FeedbacksResult,
+  FilterDataResult,
+  TimeseriesResult,
+  TopDocumentsResult,
 };
 
 /**
@@ -73,7 +76,9 @@ export class ClickHouseAnalyticsService {
   /**
    * Resolve the ClickHouse client for a given project.
    */
-  private async resolveClient(projectId: string): Promise<ClickHouseClient | null> {
+  private async resolveClient(
+    projectId: string,
+  ): Promise<ClickHouseClient | null> {
     return getClickHouseClientForProject(projectId);
   }
 
@@ -85,12 +90,23 @@ export class ClickHouseAnalyticsService {
   }
 
   /**
-   * Execute timeseries query
+   * Execute timeseries query against the legacy `trace_summaries` table.
+   *
+   * ADR-034 Phase 3 routing (slim / rollup destinations) is owned by the
+   * app-layer analytics service at `~/server/app-layer/analytics/` — this
+   * legacy backend only ever hits `trace_summaries`. The new service uses
+   * its own repositories for the routed paths and a thin shim back into
+   * this builder for the trace_summaries fallback.
    */
   async getTimeseries(input: TimeseriesInputType): Promise<TimeseriesResult> {
     return this.tracer.withActiveSpan(
       "ClickHouseAnalyticsService.getTimeseries",
-      { attributes: { "tenant.id": input.projectId } },
+      {
+        attributes: {
+          "tenant.id": input.projectId,
+          "analytics.table": "trace_summaries",
+        },
+      },
       async (span) => {
         const clickHouseClient = await this.resolveClient(input.projectId);
         if (!clickHouseClient) {

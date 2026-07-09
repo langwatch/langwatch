@@ -47,6 +47,8 @@ function toAppLayer(
     droppedAttributesCount: span.droppedAttributesCount,
     droppedEventsCount: span.droppedEventsCount,
     droppedLinksCount: span.droppedLinksCount,
+    cost: span.cost,
+    nonBilledCost: span.nonBilledCost,
     retentionDays,
   };
 }
