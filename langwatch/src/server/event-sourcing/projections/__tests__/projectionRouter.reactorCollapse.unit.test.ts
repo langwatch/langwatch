@@ -5,6 +5,7 @@ vi.mock("~/server/metrics", async (importOriginal) => {
   return {
     ...actual,
     incrementEsReactorTotal: vi.fn(),
+    incrementEsReactorCollapsedTotal: vi.fn(),
     incrementEsFoldProjectionTotal: vi.fn(),
     observeEsFoldProjectionDuration: vi.fn(),
     incrementEsFoldRefoldTotal: vi.fn(),
@@ -197,6 +198,33 @@ describe("ProjectionRouter reactor dispatch over a coalesced batch", () => {
       const payloads = await dispatchBatch(reactor, batch());
 
       expect(payloads).toHaveLength(BATCH_SIZE);
+    });
+  });
+  describe("when one batch carries two distinct deduplication ids", () => {
+    it("dispatches each survivor in the occurredAt order of the event it carries", async () => {
+      // job A is seen at event-0 and again at event-4; job B only at event-1.
+      // A Map alone would order survivors by FIRST occurrence — [A(event-4),
+      // B(event-1)] — dispatching a later event before an earlier one.
+      const jobFor: Record<string, string> = {
+        "event-0": "A",
+        "event-1": "B",
+        "event-2": "A",
+        "event-3": "B",
+        "event-4": "A",
+      };
+      const reactor: ReactorDefinition<Event> = {
+        name: "two-lane",
+        options: {
+          // biome-ignore lint/style/noNonNullAssertion: every id is in the map.
+          makeJobId: ({ event }) => jobFor[event.id]!,
+        },
+        handle: vi.fn().mockResolvedValue(undefined),
+      };
+
+      const payloads = await dispatchBatch(reactor, batch());
+
+      // Survivors: B's last is event-3, A's last is event-4 → occurredAt order.
+      expect(payloads.map((p) => p.event.id)).toEqual(["event-3", "event-4"]);
     });
   });
 });

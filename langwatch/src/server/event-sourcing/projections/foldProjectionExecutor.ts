@@ -228,14 +228,14 @@ export class FoldProjectionExecutor {
     // history AND the projection still gains something by replaying it;
     // otherwise apply the batch on top (matches the single-event executor's
     // degraded behavior when no eventLoader exists).
-    const outOfOrder =
+    const isOutOfOrder =
       typeof earliestOccurredAt === "number" &&
       earliestOccurredAt > 0 &&
       typeof prevLastOccurred === "number" &&
       earliestOccurredAt < prevLastOccurred;
 
     let state = loadedState;
-    if (outOfOrder && canRefold(projection, context)) {
+    if (isOutOfOrder && canRefold(projection, context)) {
       // biome-ignore lint/style/noNonNullAssertion: canRefold returns false without an eventLoader.
       const allEvents = await projection.eventLoader!({
         tenantId: context.tenantId,

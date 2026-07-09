@@ -393,6 +393,25 @@ export const incrementEsFoldRefoldTotal = (
   outcome: "performed" | "declined" | "unavailable",
 ) => esFoldRefoldTotal.labels(projectionName, outcome).inc();
 
+register.removeSingleMetric("es_reactor_collapsed_total");
+const esReactorCollapsedTotal = new Counter({
+  name: "es_reactor_collapsed_total",
+  help: "Reactor dispatches skipped by collapsing a coalesced batch to one send per deduplication id",
+  labelNames: ["pipeline_name", "reactor_name"] as const,
+});
+
+/**
+ * Counts the sends a coalesced batch did NOT make. Each one would have
+ * serialized, gzipped and blobbed `{event, foldState}` only for the queue's
+ * dedup to discard it, so this is the direct measure of the churn the collapse
+ * removes (2026-07-09 incident).
+ */
+export const incrementEsReactorCollapsedTotal = (
+  pipelineName: string,
+  reactorName: string,
+  skipped: number,
+) => esReactorCollapsedTotal.labels(pipelineName, reactorName).inc(skipped);
+
 // --- Map projection metrics ---
 register.removeSingleMetric("es_map_projection_total");
 const esMapProjectionTotal = new Counter({

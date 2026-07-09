@@ -5,6 +5,7 @@ import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
 import {
   incrementEsFoldProjectionTotal,
   incrementEsMapProjectionTotal,
+  incrementEsReactorCollapsedTotal,
   incrementEsReactorTotal,
   observeEsFoldProjectionDuration,
   observeEsMapProjectionDuration,
@@ -430,7 +431,12 @@ export class ProjectionRouter<
             // Dispatch to map reactors after map execute succeeds
             const mapReactors = this.reactorsForMap.get(name);
             if (record !== null && mapReactors && mapReactors.length > 0) {
-              await this.dispatchToReactors(name, mapReactors, [event], record);
+              await this.dispatchToReactors({
+                foldName: name,
+                reactors: mapReactors,
+                events: [event],
+                foldState: record,
+              });
             }
           },
         },
@@ -703,7 +709,12 @@ export class ProjectionRouter<
             // Dispatch to map reactors after map execute succeeds
             const mapReactors = this.reactorsForMap.get(name);
             if (record !== null && mapReactors && mapReactors.length > 0) {
-              await this.dispatchToReactors(name, mapReactors, [event], record);
+              await this.dispatchToReactors({
+                foldName: name,
+                reactors: mapReactors,
+                events: [event],
+                foldState: record,
+              });
             }
           } catch (error) {
             handleError(error, categorizeError(error), this.logger, {
@@ -805,12 +816,12 @@ export class ProjectionRouter<
         // After fold succeeds, dispatch to reactors for this fold
         const reactors = this.reactorsForFold.get(projectionName);
         if (reactors && reactors.length > 0) {
-          await this.dispatchToReactors(
-            projectionName,
+          await this.dispatchToReactors({
+            foldName: projectionName,
             reactors,
-            [event],
+            events: [event],
             foldState,
-          );
+          });
         }
       },
     );
@@ -924,12 +935,12 @@ export class ProjectionRouter<
         // the same state. See ProjectionRouter.collapseByJobId.
         const reactors = this.reactorsForFold.get(projectionName);
         if (reactors && reactors.length > 0) {
-          await this.dispatchToReactors(
-            projectionName,
+          await this.dispatchToReactors({
+            foldName: projectionName,
             reactors,
-            toApply,
+            events: toApply,
             foldState,
-          );
+          });
         }
       },
     );
@@ -1005,23 +1016,42 @@ export class ProjectionRouter<
    * Reactors keyed per event (`…:${event.id}`) collapse to nothing and are
    * dispatched for every event, as are reactors with no job id at all.
    */
-  private collapseByJobId(
-    reactor: ReactorDefinition<EventType>,
-    events: EventType[],
-    foldState: unknown,
-  ): EventType[] {
+  private collapseByJobId({
+    reactor,
+    events,
+    foldState,
+  }: {
+    reactor: ReactorDefinition<EventType>;
+    events: EventType[];
+    foldState: unknown;
+  }): EventType[] {
     const makeJobId = reactor.options?.makeJobId;
     if (!makeJobId || events.length < 2) return events;
 
     try {
-      // A Map keeps the first insertion's position and the last insertion's
-      // value, so the result is in occurredAt order and each job id carries the
-      // last event that would have won the squash.
-      const lastPerJobId = new Map<string, EventType>();
-      for (const event of events) {
-        lastPerJobId.set(makeJobId({ event, foldState }), event);
-      }
-      return [...lastPerJobId.values()];
+      // Keep the LAST event per job id — the one the queue's dedup squash would
+      // have left behind (STAGE_LUA overwrites the stored value when
+      // `shouldReplace`, which every reactor here defaults to).
+      //
+      // A Map alone would order the survivors by each job id's FIRST
+      // occurrence while holding its last value, so a batch carrying two job
+      // ids could dispatch a later event before an earlier one. Re-sort by the
+      // surviving event's position so dispatch really is in occurredAt order —
+      // `events` arrives sorted, so the index IS that order.
+      const lastIndexPerJobId = new Map<string, number>();
+      events.forEach((event, index) => {
+        lastIndexPerJobId.set(makeJobId({ event, foldState }), index);
+      });
+      const survivors = [...lastIndexPerJobId.values()].sort((a, b) => a - b);
+      if (survivors.length === events.length) return events;
+
+      incrementEsReactorCollapsedTotal(
+        this.pipelineName,
+        reactor.name,
+        events.length - survivors.length,
+      );
+      // biome-ignore lint/style/noNonNullAssertion: every index came from `events`.
+      return survivors.map((index) => events[index]!);
     } catch (error) {
       // Fail open, like `shouldReact`: a throwing job-id function must never
       // drop a side effect. Worst case is the un-collapsed fan-out we had before.
@@ -1046,12 +1076,17 @@ export class ProjectionRouter<
    * keyed on the aggregate receives the last event it actually cared about
    * rather than the last event in the batch.
    */
-  private async dispatchToReactors(
-    foldName: string,
-    reactors: ReactorDefinition<EventType>[],
-    events: EventType[],
-    foldState: unknown,
-  ): Promise<void> {
+  private async dispatchToReactors({
+    foldName,
+    reactors,
+    events,
+    foldState,
+  }: {
+    foldName: string;
+    reactors: ReactorDefinition<EventType>[];
+    events: EventType[];
+    foldState: unknown;
+  }): Promise<void> {
     const errors: Error[] = [];
 
     for (const reactor of reactors) {
@@ -1068,7 +1103,11 @@ export class ProjectionRouter<
       }
       if (relevant.length === 0) continue;
 
-      for (const event of this.collapseByJobId(reactor, relevant, foldState)) {
+      for (const event of this.collapseByJobId({
+        reactor,
+        events: relevant,
+        foldState,
+      })) {
         await this.dispatchOneToReactor({
           foldName,
           reactor,
