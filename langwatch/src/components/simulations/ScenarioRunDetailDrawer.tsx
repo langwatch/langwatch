@@ -1,4 +1,5 @@
 import {
+  Accordion,
   Box,
   Button,
   Heading,
@@ -10,7 +11,6 @@ import {
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CopyButton } from "~/components/CopyButton";
-import { MetadataTag } from "~/components/MetadataTag";
 import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
 import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
@@ -26,11 +26,15 @@ import { useSimulationUpdateListener } from "~/hooks/useSimulationUpdateListener
 import { useTargetNameMap } from "~/hooks/useTargetNameMap";
 import { api } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
+import { formatCost, formatLatency } from "~/components/shared/formatters";
+import { Chip } from "~/features/traces-v2/components/TraceDrawer/Chip";
 import { TraceDetails } from "../traces/TraceDetails";
 import { Link } from "../ui/link";
 import { hasNoResults } from "./scenario-run-status.utils";
 import { getRunStatePollInterval } from "./run-state-polling";
 import { Drawer } from "../ui/drawer";
+import { CopyIdChip } from "./CopyIdChip";
+import { RunDetailSection } from "./RunDetailSection";
 import { ScenarioMessageRenderer } from "./ScenarioMessageRenderer";
 import { ScenarioRunActions } from "./ScenarioRunActions";
 import { ScenarioRunStatusIcon } from "./ScenarioRunStatusIcon";
@@ -191,12 +195,30 @@ export function ScenarioRunDetailDrawer({
   const copyableIds = useMemo(() => {
     if (!scenarioId || !batchRunId || !scenarioRunId) return undefined;
     return [
-      { label: "Scenario ID", value: scenarioId },
-      { label: "Batch Run ID", value: batchRunId },
-      { label: "Run ID", value: scenarioRunId },
-      ...(suiteId ? [{ label: "Run Plan ID", value: suiteId }] : []),
+      { label: "Scenario", value: scenarioId },
+      { label: "Batch", value: batchRunId },
+      { label: "Run", value: scenarioRunId },
+      ...(suiteId ? [{ label: "Run plan", value: suiteId }] : []),
     ];
   }, [scenarioId, batchRunId, scenarioRunId, suiteId]);
+
+  const criteria = useMemo(() => {
+    if (!scenarioState?.results) return null;
+    const met = scenarioState.results.metCriteria?.length ?? 0;
+    const unmet = scenarioState.results.unmetCriteria?.length ?? 0;
+    return { met, total: met + unmet };
+  }, [scenarioState?.results]);
+
+  const hasConversation =
+    (scenarioState?.messages ?? []).length > 0 ||
+    (streamingMessages ?? []).length > 0;
+  const conversationCount =
+    (scenarioState?.messages ?? []).length || (streamingMessages ?? []).length;
+
+  const [openSections, setOpenSections] = useState<string[]>([
+    "conversation",
+    "results",
+  ]);
 
   return (
     <>
@@ -260,11 +282,13 @@ export function ScenarioRunDetailDrawer({
                   paddingRight={12}
                   justify="space-between"
                 >
-                  <HStack gap={3}>
+                  <HStack gap={3} flex={1} minWidth={0}>
                     <ScenarioRunStatusIcon status={scenarioState.status} />
-                    <Heading size="md">{displayTitle}</Heading>
+                    <Heading size="md" lineClamp={2}>
+                      {displayTitle}
+                    </Heading>
                   </HStack>
-                  <HStack gap={2}>
+                  <HStack gap={2} flexShrink={0}>
                     <ScenarioRunActions
                       scenario={scenarioData}
                       isRunning={isRunning}
@@ -292,149 +316,113 @@ export function ScenarioRunDetailDrawer({
                   </HStack>
                 </HStack>
 
-                {/* Metrics summary — trace details style */}
-                {scenarioState.results && !hasNoResults(scenarioState.status) && (
-                  <HStack
-                    paddingX={4}
-                    borderBottomWidth={1}
-                    borderColor="border.emphasized"
-                    w="100%"
-                    align="stretch"
-                    gap={4}
-                  >
-                    <VStack
-                      borderRightWidth="1px"
-                      borderRightColor="border"
-                      alignItems="flex-start"
-                      paddingRight={4}
-                      paddingLeft={4}
-                      paddingY={3}
-                    >
-                      <b>Success Criteria</b>
-                      <Text color="fg">
-                        {scenarioState.results.metCriteria?.length ?? 0}/
-                        {(scenarioState.results.metCriteria?.length ?? 0) +
-                          (scenarioState.results.unmetCriteria?.length ?? 0)}
-                      </Text>
-                    </VStack>
-                    <VStack
-                      borderRightWidth="1px"
-                      borderRightColor="border"
-                      alignItems="flex-start"
-                      paddingRight={4}
-                      paddingY={3}
-                    >
-                      <b>Success Rate</b>
-                      <Text color="fg">
-                        {computeSuccessRate(
-                          scenarioState.results.metCriteria?.length ?? 0,
-                          scenarioState.results.unmetCriteria?.length ?? 0,
-                        )}%
-                      </Text>
-                    </VStack>
-                    {scenarioState.durationInMs && (
-                      <VStack
-                        borderRightWidth="1px"
-                        borderRightColor="border"
-                        alignItems="flex-start"
-                        paddingRight={4}
-                        paddingY={3}
-                      >
-                        <b>Duration</b>
-                        <Text color="fg">
-                          {(scenarioState.durationInMs / 1000).toFixed(2)}s
-                        </Text>
-                      </VStack>
-                    )}
-                    {timeAgo && (
-                      <VStack
-                        alignItems="flex-start"
-                        paddingRight={4}
-                        paddingY={3}
-                      >
-                        <b>Ran</b>
-                        <Text color="fg">{timeAgo}</Text>
-                      </VStack>
-                    )}
-                  </HStack>
-                )}
-
-                {/* Copyable IDs — MetadataTag chips (same as trace details) */}
-                {copyableIds && (
-                  <HStack
-                    w="100%"
-                    paddingX={6}
-                    paddingY={3}
-                    gap={3}
-                    flexWrap="wrap"
-                  >
-                    {copyableIds.map((id) => (
-                      <MetadataTag
-                        key={id.label}
-                        label={id.label}
-                        value={id.value}
-                        copyable
+                {/* Chip strip — metrics + copyable ids, one visual language
+                    with the Traces V2 drawer header */}
+                <HStack
+                  w="100%"
+                  paddingX={6}
+                  paddingBottom={3}
+                  gap={1.5}
+                  flexWrap="wrap"
+                >
+                  {criteria &&
+                    criteria.total > 0 &&
+                    !hasNoResults(scenarioState.status) && (
+                      <Chip
+                        label="Criteria"
+                        value={`${criteria.met}/${criteria.total}`}
+                        tone={criteria.met === criteria.total ? "green" : "red"}
+                        tooltip={`${computeSuccessRate(
+                          criteria.met,
+                          criteria.total - criteria.met,
+                        )}% of success criteria met`}
                       />
-                    ))}
-                  </HStack>
-                )}
+                    )}
+                  {scenarioState.durationInMs > 0 && (
+                    <Chip
+                      label="Duration"
+                      value={formatLatency(scenarioState.durationInMs)}
+                    />
+                  )}
+                  {scenarioState.totalCost != null && (
+                    <Chip
+                      label="Cost"
+                      value={formatCost(scenarioState.totalCost)}
+                    />
+                  )}
+                  {timeAgo && <Chip label="Ran" value={timeAgo} />}
+                  {copyableIds?.map((id) => (
+                    <CopyIdChip
+                      key={id.label}
+                      label={id.label}
+                      value={id.value}
+                    />
+                  ))}
+                </HStack>
               </VStack>
 
-              {/* Body — conversation on top, results on bottom */}
-              {/* Conversation — hidden when empty (e.g. stalled runs) */}
-              {((scenarioState.messages ?? []).length > 0 || (streamingMessages ?? []).length > 0) && (
-                <Box
-                  paddingX={6}
-                  paddingY={6}
-                  background="bg.muted"
-                >
-                  <Box borderRadius="md" overflow="hidden">
-                    <ScenarioMessageRenderer
-                      messages={scenarioState.messages ?? []}
-                      streamingMessages={streamingMessages}
-                      variant="drawer"
-                      projectId={project?.id ?? ""}
-                    />
-                  </Box>
-                </Box>
-              )}
-
-              {/* Results */}
-              <Box
-                flex={1}
-                width="full"
-                borderTop={((scenarioState.messages ?? []).length > 0 || (streamingMessages ?? []).length > 0) ? "1px" : undefined}
-                borderColor="border.muted"
-                position="relative"
-                className="group"
-                css={{
-                  "& > div:first-of-type": { borderRadius: 0, minHeight: "100%", height: "100%" },
-                }}
+              {/* Body — accordion sections, Traces V2 drawer language */}
+              <Accordion.Root
+                multiple
+                value={openSections}
+                onValueChange={(e) => setOpenSections(e.value)}
               >
-                <SimulationConsole
-                  results={scenarioState.results}
-                  scenarioName={scenarioState.name ?? undefined}
-                  status={scenarioState.status}
-                  durationInMs={scenarioState.durationInMs}
-                />
-                {scenarioState.results && (
-                  <Box
-                    position="absolute"
-                    top={2}
-                    right={2}
-                    opacity={0}
-                    _groupHover={{ opacity: 1 }}
-                    transition="opacity 0.2s"
+                {/* Conversation — hidden when empty (e.g. stalled runs) */}
+                {hasConversation && (
+                  <RunDetailSection
+                    value="conversation"
+                    title="Conversation"
+                    count={conversationCount}
+                    isFirst
                   >
-                    <CopyButton
-                      value={formatResultsForCopy(
-                        scenarioState.results,
-                      )}
-                      label="Results"
-                    />
-                  </Box>
+                    <Box
+                      background="bg.muted"
+                      borderRadius="lg"
+                      overflow="hidden"
+                      padding={4}
+                    >
+                      <ScenarioMessageRenderer
+                        messages={scenarioState.messages ?? []}
+                        streamingMessages={streamingMessages}
+                        variant="drawer"
+                        projectId={project?.id ?? ""}
+                      />
+                    </Box>
+                  </RunDetailSection>
                 )}
-              </Box>
+
+                <RunDetailSection
+                  value="results"
+                  title="Results"
+                  count={criteria?.total}
+                  isFirst={!hasConversation}
+                  contentPadding={false}
+                >
+                  <Box position="relative" className="group">
+                    <SimulationConsole
+                      results={scenarioState.results}
+                      scenarioName={scenarioState.name ?? undefined}
+                      status={scenarioState.status}
+                      durationInMs={scenarioState.durationInMs}
+                    />
+                    {scenarioState.results && (
+                      <Box
+                        position="absolute"
+                        top={2}
+                        right={2}
+                        opacity={0}
+                        _groupHover={{ opacity: 1 }}
+                        transition="opacity 0.2s"
+                      >
+                        <CopyButton
+                          value={formatResultsForCopy(scenarioState.results)}
+                          label="Results"
+                        />
+                      </Box>
+                    )}
+                  </Box>
+                </RunDetailSection>
+              </Accordion.Root>
               </Drawer.Body>
           )}
         </Drawer.Content>
