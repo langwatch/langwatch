@@ -170,7 +170,19 @@ export interface SimulationRunState extends Projection<SimulationRunStateData> {
  * less than what we've already seen) and would otherwise clobber Status back to
  * a non-terminal value while FinishedAt stays set — an unrecoverable zombie the
  * read-time stall path can no longer rescue (it only resolves runs with no
- * FinishedAt). Once FinishedAt is set, Status stays terminal.
+ * FinishedAt).
+ *
+ * Scope: this guards the non-terminal transition sites (started/snapshot/
+ * message) only. `handleSimulationRunFinished` deliberately does NOT route
+ * through it, so a `finished` event still sets Status unconditionally. Two
+ * consequences, both intentional-for-now and tracked on the PR:
+ *   - A later `finished` overwrites an earlier one, so a child that outlives a
+ *     reconciled parent can take an ERROR back to SUCCESS. That self-heal is
+ *     what protects a run the reconciler failed early by mistake.
+ *   - The ingest route's `finished` schema accepts any ScenarioRunStatus, so a
+ *     client POSTing `finished(status=IN_PROGRESS)` writes a non-terminal Status
+ *     alongside FinishedAt — the very zombie described above, through the one
+ *     door this guard does not cover.
  */
 function statusAfter({
   state,

@@ -635,9 +635,18 @@ export async function startScenarioProcessor(
   // had already started (PENDING/IN_PROGRESS) is invisible to it and spins in
   // the UI forever (#3195). This second sweep covers every non-terminal run
   // whose last activity predates any window a live worker could still hold it.
-  // Fire-and-forget so a large/slow sweep never blocks worker startup; the
-  // finish path both sweeps share is idempotent, so overlapping on a QUEUED
-  // orphan (and co-booting pods) collapses to a single terminal event.
+  // Fire-and-forget so a large/slow sweep never blocks worker startup.
+  //
+  // The two sweeps overlap on QUEUED orphans. Both reach the terminal state
+  // through the same FinishRunCommand, whose idempotency key is derived solely
+  // from (tenantId, scenarioRunId), so a duplicate finish never changes the
+  // resulting Status: whichever sweep lands first, the run ends ERROR. The one
+  // observable divergence is the Error string, which reads as whichever sweep's
+  // message was folded last.
+  //
+  // The two sweeps disagree on the QUEUED slice by design — that slice is owned
+  // by scenario-orphan-reconciler (#3365); this one exists for the started-but-
+  // abandoned slice (#3195). See the PR discussion for why they are not merged.
   void reconcileOrphanedRunsOnBoot({
     failureEmitter: deps.failureEmitter,
   }).catch((err: unknown) =>

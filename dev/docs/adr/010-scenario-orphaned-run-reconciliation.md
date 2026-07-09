@@ -70,7 +70,25 @@ the fold executor applies events in `occurredAt` order (and only re-folds when
 applies after the reconcile's `finished` event in logical time and would
 otherwise clobber `Status` back to `IN_PROGRESS` while `FinishedAt` stays set —
 an unrecoverable zombie the read-time stall path cannot rescue (it only resolves
-runs with no `FinishedAt`). With the guard, `Status` stays terminal.
+runs with no `FinishedAt`). With the guard, a late non-terminal event can no
+longer resurrect `Status`.
+
+The guard's scope is exactly those three sites. `handleSimulationRunFinished` is
+NOT routed through it and still assigns `Status` unconditionally, so two paths
+remain open, both deliberate for now:
+
+1. A later `finished` overwrites an earlier one (ERROR → SUCCESS when a child
+   outlives a parent this reconciler already failed). This is the self-heal that
+   limits the blast radius of a false-positive reconciliation, so closing it
+   trades one failure mode for another.
+2. The scenario-events ingest schema types the `finished` status as
+   `z.nativeEnum(ScenarioRunStatus)`, which admits `IN_PROGRESS`. A client
+   POSTing `finished(status=IN_PROGRESS)` writes a non-terminal `Status`
+   alongside `FinishedAt` — reproducing the zombie above through the one door
+   the guard does not cover.
+
+Both are recorded here rather than silently fixed because (1) is entangled with
+the reconciliation threshold's false-positive behaviour, which is under review.
 
 **Option B: Rely on event ordering alone.**
 Rejected. Client-supplied `occurredAt` can legitimately post-date the
