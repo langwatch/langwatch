@@ -6,22 +6,34 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-const { mockResolveOrganizationId, createMockLogger } = vi.hoisted(() => {
-  const createMockLogger = () => ({
-    info: vi.fn(),
-    debug: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    child: vi.fn(() => createMockLogger()),
+const { mockResolveOrganizationId, mockCaptureException, createMockLogger } =
+  vi.hoisted(() => {
+    const createMockLogger = () => ({
+      info: vi.fn(),
+      debug: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      child: vi.fn(() => createMockLogger()),
+    });
+    return {
+      mockResolveOrganizationId: vi.fn(),
+      mockCaptureException: vi.fn(),
+      createMockLogger,
+    };
   });
-  return { mockResolveOrganizationId: vi.fn(), createMockLogger };
-});
 
 vi.mock("~/server/organizations/resolveOrganizationId", () => ({
   resolveOrganizationId: mockResolveOrganizationId,
 }));
 vi.mock("~/utils/logger/server", () => ({
   createLogger: vi.fn(() => createMockLogger()),
+}));
+vi.mock("~/utils/posthogErrorCapture", () => ({
+  captureException: mockCaptureException,
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
+  withScope: vi.fn((cb: (scope: Record<string, unknown>) => void) => {
+    cb({ setTag: vi.fn(), setExtra: vi.fn() });
+  }),
 }));
 
 import { createStorageMeterDispatchReactor } from "../storageMeterDispatch.reactor";
@@ -77,6 +89,21 @@ describe("createStorageMeterDispatchReactor", () => {
       });
 
       await expect(reactor.handle(event, context)).resolves.toBeUndefined();
+    });
+
+    /** @scenario A persistent dispatch failure surfaces to Sentry, not just a log */
+    it("reports the error via captureException", async () => {
+      mockResolveOrganizationId.mockResolvedValue("org-1");
+      mockCaptureException.mockClear();
+      const reactor = createStorageMeterDispatchReactor({
+        getDispatch: () => vi.fn().mockRejectedValue(new Error("boom")),
+      });
+
+      await reactor.handle(event, context);
+
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "boom" }),
+      );
     });
   });
 });

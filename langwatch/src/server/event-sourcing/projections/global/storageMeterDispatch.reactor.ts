@@ -1,5 +1,10 @@
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 import { createLogger } from "~/utils/logger/server";
+import {
+  captureException,
+  toError,
+  withScope,
+} from "~/utils/posthogErrorCapture";
 import type { Event } from "../../domain/types";
 import type { ReactorDefinition } from "../../reactors/reactor.types";
 
@@ -43,10 +48,19 @@ export function createStorageMeterDispatchReactor(deps: {
       try {
         await deps.getDispatch()({ organizationId });
       } catch (error) {
+        // Measured rows are durable and the next event retries, so this never
+        // fails the queue job — but unlike a transient blip, a *persistent*
+        // outage here has no other signal (no breaker, no page): surface every
+        // occurrence to Sentry, mirroring reportStorageForHour.command.ts.
         logger.warn(
           { organizationId, error },
           "storage meter dispatch failed; measured rows are durable, will retry on the next event",
         );
+        await withScope(async (scope) => {
+          scope.setTag?.("handler", "storageMeterDispatch");
+          scope.setExtra?.("organizationId", organizationId);
+          captureException(toError(error));
+        });
       }
     },
   };
