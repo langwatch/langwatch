@@ -805,7 +805,6 @@ export function EvaluatorEditorBody({
             skipFields={
               isPairwise
                 ? [
-                    "prompt",
                     "swap_and_confirm",
                     "allow_tie",
                     "has_golden_answer",
@@ -813,7 +812,6 @@ export function EvaluatorEditorBody({
                   ]
                 : isSelectBest
                   ? [
-                      "prompt",
                       "randomize_order",
                       "allow_tie",
                       "has_golden_answer",
