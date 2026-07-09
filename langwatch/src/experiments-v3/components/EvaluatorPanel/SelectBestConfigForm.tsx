@@ -5,8 +5,9 @@ import {
   HStack,
   Text,
   VStack,
+  Wrap,
 } from "@chakra-ui/react";
-import { ChevronDown, Check } from "lucide-react";
+import { ChevronDown, Plus, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 
@@ -127,62 +128,65 @@ function VariantsMultiSelect({
   targets: TargetConfig[];
 }) {
   const selected = draft.variants ?? [];
-  const toggle = (id: string) => {
-    const next = selected.includes(id)
-      ? selected.filter((v) => v !== id)
-      : [...selected, id];
-    update({ variants: next });
-  };
+  const remaining = targets.filter((t) => !selected.includes(t.id));
+  const add = (id: string) => update({ variants: [...selected, id] });
+  const remove = (id: string) =>
+    update({ variants: selected.filter((v) => v !== id) });
 
   const insufficient = selected.length < 2;
 
   return (
     <Field.Root required flex="1">
-      <Field.Label fontSize="13px" color="fg.muted" marginBottom={1}>
+      <Field.Label fontSize="13px" color="fg.muted" marginBottom={2}>
         Variants (pick 2 or more)
       </Field.Label>
-      <Menu.Root closeOnSelect={false}>
-        <Menu.Trigger asChild>
-          <Button
-            variant="outline"
-            colorPalette="gray"
-            size="sm"
-            fontWeight="normal"
-            justifyContent="space-between"
-            width="full"
-            data-testid="select-best-variants"
-          >
-            <Text
-              fontSize="13px"
-              color={selected.length === 0 ? "fg.subtle" : "fg"}
-              truncate
+      <Wrap gap={2}>
+        {selected.map((id) => {
+          const target = targets.find((t) => t.id === id);
+          if (!target) return null;
+          return (
+            <VariantChip
+              key={id}
+              target={target}
+              onRemove={() => remove(id)}
+            />
+          );
+        })}
+        <Menu.Root>
+          <Menu.Trigger asChild>
+            <Button
+              variant="outline"
+              colorPalette="gray"
+              size="sm"
+              fontWeight="normal"
+              data-testid="select-best-add-variant"
+              disabled={remaining.length === 0}
             >
-              {selected.length === 0
-                ? "Select variants to compare…"
-                : `${selected.length} selected`}
-            </Text>
-            <ChevronDown size={14} color="var(--chakra-colors-fg-muted)" />
-          </Button>
-        </Menu.Trigger>
-        <Menu.Content portalled={true} maxHeight="240px" overflowY="auto">
-          {targets.length === 0 ? (
-            <Menu.Item value="__empty__" disabled>
-              <Text fontSize="13px" color="fg.subtle">
-                No targets available
+              <Plus size={14} />
+              <Text fontSize="13px">
+                {selected.length === 0 ? "Add a variant" : "Add another"}
               </Text>
-            </Menu.Item>
-          ) : (
-            targets.map((t) => (
-              <VariantMenuItem
-                key={t.id}
-                target={t}
-                checked={selected.includes(t.id)}
-                onToggle={() => toggle(t.id)}
-              />
-            ))
-          )}
-        </Menu.Content>
-      </Menu.Root>
+            </Button>
+          </Menu.Trigger>
+          <Menu.Content portalled={true} maxHeight="240px" overflowY="auto">
+            {remaining.length === 0 ? (
+              <Menu.Item value="__empty__" disabled>
+                <Text fontSize="13px" color="fg.subtle">
+                  All targets already added
+                </Text>
+              </Menu.Item>
+            ) : (
+              remaining.map((t) => (
+                <VariantMenuItem
+                  key={t.id}
+                  target={t}
+                  onAdd={() => add(t.id)}
+                />
+              ))
+            )}
+          </Menu.Content>
+        </Menu.Root>
+      </Wrap>
       {insufficient && (
         <Text
           fontSize="xs"
@@ -190,48 +194,75 @@ function VariantsMultiSelect({
           marginTop={2}
           data-testid="select-best-variants-insufficient"
         >
-          Pick at least 2 variants — a comparison needs candidates on both
-          sides.
+          Pick 2 or more variants.
         </Text>
       )}
-      <Text fontSize="xs" color="fg.muted" marginTop={2}>
-        The judge picks the best of these variants in one call per row.
-        Candidate order is shuffled deterministically per row to mitigate
-        position bias.
-      </Text>
     </Field.Root>
   );
 }
 
 /**
- * Individual menu item — split so `useTargetName` (which needs a stable
- * target) is called at a stable hook position even as the target list
- * grows / shrinks. Same pattern PairwiseConfigForm uses for its
- * TargetNameContributor helper.
+ * Menu item for a target the user can add. Split into its own component so
+ * `useTargetName` runs at a stable hook position (Rules of Hooks) even as
+ * the remaining-targets list shrinks with each pick. Same rationale as
+ * PairwiseConfigForm's TargetNameContributor.
  */
 function VariantMenuItem({
   target,
-  checked,
-  onToggle,
+  onAdd,
 }: {
   target: TargetConfig;
-  checked: boolean;
-  onToggle: () => void;
+  onAdd: () => void;
 }) {
   const name = useTargetName(target) ?? target.id;
   return (
     <Menu.Item
       value={target.id}
-      onClick={onToggle}
+      onClick={onAdd}
       data-testid={`select-best-variant-option-${target.id}`}
     >
-      <HStack gap={2} width="full" justify="space-between">
-        <Text fontSize="13px">{name}</Text>
-        {checked && (
-          <Check size={14} color="var(--chakra-colors-blue-solid)" />
-        )}
-      </HStack>
+      <Text fontSize="13px">{name}</Text>
     </Menu.Item>
+  );
+}
+
+/**
+ * Chip for an already-picked variant. Shows the target's human-readable
+ * name with an ✕ affordance to remove.
+ */
+function VariantChip({
+  target,
+  onRemove,
+}: {
+  target: TargetConfig;
+  onRemove: () => void;
+}) {
+  const name = useTargetName(target) ?? target.id;
+  return (
+    <HStack
+      gap={1}
+      paddingLeft={2}
+      paddingRight={1}
+      paddingY={1}
+      borderRadius="md"
+      bg="purple.subtle"
+      color="purple.fg"
+      data-testid={`select-best-variant-chip-${target.id}`}
+    >
+      <Text fontSize="13px">{name}</Text>
+      <Button
+        variant="ghost"
+        size="xs"
+        minWidth="auto"
+        padding={0}
+        height="18px"
+        onClick={onRemove}
+        aria-label={`Remove ${name}`}
+        data-testid={`select-best-variant-chip-${target.id}-remove`}
+      >
+        <X size={12} />
+      </Button>
+    </HStack>
   );
 }
 

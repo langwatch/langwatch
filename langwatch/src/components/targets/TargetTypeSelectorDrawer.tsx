@@ -112,34 +112,30 @@ export function TargetTypeSelectorDrawer(props: TargetTypeSelectorDrawerProps) {
     // Forward pairwiseContext from handleAddTarget so the creation form shows
     // Variant A / Variant B / Golden field immediately (matching edit-mode UX).
     if (type === "pairwise") {
-      openDrawer(
-        "evaluatorEditor",
-        {
-          evaluatorType: "langevals/pairwise_compare",
-          category: "llm_judge",
-          pairwiseContext: (complexProps.pairwiseContext ??
-            props.pairwiseContext) as TargetTypeSelectorDrawerProps["pairwiseContext"],
-          saveButtonText: "Add Comparison",
-        },
-        { replace: true },
-      );
+      // NOT `replace: true` — we want the back button in the evaluator
+      // editor to return to this Add-to-Evaluation picker instead of
+      // dead-ending. A `replace` here drops navigation history and the
+      // editor's Drawer.Header hides its arrow (canGoBack=false).
+      openDrawer("evaluatorEditor", {
+        evaluatorType: "langevals/pairwise_compare",
+        category: "llm_judge",
+        pairwiseContext: (complexProps.pairwiseContext ??
+          props.pairwiseContext) as TargetTypeSelectorDrawerProps["pairwiseContext"],
+        saveButtonText: "Add Comparison",
+      });
       return;
     }
 
     // N-way (#5101) sibling of pairwise above — same "skip category picker,
     // jump into the config form" shortcut but for langevals/select_best_compare.
     if (type === "nway") {
-      openDrawer(
-        "evaluatorEditor",
-        {
-          evaluatorType: "langevals/select_best_compare",
-          category: "llm_judge",
-          selectBestContext: (complexProps.selectBestContext ??
-            props.selectBestContext) as TargetTypeSelectorDrawerProps["selectBestContext"],
-          saveButtonText: "Add Comparison",
-        },
-        { replace: true },
-      );
+      openDrawer("evaluatorEditor", {
+        evaluatorType: "langevals/select_best_compare",
+        category: "llm_judge",
+        selectBestContext: (complexProps.selectBestContext ??
+          props.selectBestContext) as TargetTypeSelectorDrawerProps["selectBestContext"],
+        saveButtonText: "Add Comparison",
+      });
       return;
     }
 

@@ -110,7 +110,7 @@ describe("SelectBestConfigForm", () => {
       const onChange = vi.fn();
       renderForm({ value: baseConfig({ variants: [] }), onChange });
 
-      await user.click(screen.getByTestId("select-best-variants"));
+      await user.click(screen.getByTestId("select-best-add-variant"));
       await user.click(screen.getByTestId("select-best-variant-option-t1"));
 
       expect(onChange).toHaveBeenCalledWith(
@@ -118,13 +118,14 @@ describe("SelectBestConfigForm", () => {
       );
     });
 
-    it("removes a previously-picked variant when clicked again", async () => {
+    it("removes a previously-picked variant when its chip's ✕ is clicked", async () => {
       const user = userEvent.setup();
       const onChange = vi.fn();
       renderForm({ value: baseConfig({ variants: ["t1", "t2"] }), onChange });
 
-      await user.click(screen.getByTestId("select-best-variants"));
-      await user.click(screen.getByTestId("select-best-variant-option-t1"));
+      await user.click(
+        screen.getByTestId("select-best-variant-chip-t1-remove"),
+      );
 
       expect(onChange).toHaveBeenCalledWith(
         expect.objectContaining({ variants: ["t2"] }),
