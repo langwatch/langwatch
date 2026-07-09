@@ -1,8 +1,9 @@
-# ADR-038: Outbox heartbeat primitive
+# ADR-039: Outbox heartbeat primitive
 
 - **Status:** Accepted
-- **Date:** 2026-06-20
+- **Date:** 2026-07-07
 - **Related:** ADR-030 (transactional outbox), ADR-034 (event-sourced analytics materialization — the consumer that motivated this primitive)
+- **Behavioural contract:** [specs/triggers/event-sourced-graph-triggers.feature](../../../specs/triggers/event-sourced-graph-triggers.feature)
 
 ## Context
 

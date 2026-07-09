@@ -23,6 +23,8 @@ Document **important technical and architectural decisions** — context, trade-
 | [027](./027-typed-dispatcherror-contract.md) | Typed `DispatchError` contract for dispatch endpoints | Accepted |
 | [036](./036-liquid-templates-for-trigger-notifications.md) | Liquid templates for user-customizable trigger notifications | Accepted |
 | [037](./037-automation-operator-surfaces.md) | Automation operator surfaces — authoring drawer & dispatch-health view | Accepted |
+| [038](./038-intent-forked-onboarding-governance-vs-llmops.md) | Onboarding forks on a first-class Organization intent | Accepted |
+| [039](./039-outbox-heartbeat.md) | Outbox heartbeat primitive | Accepted |
 | [030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) | Transactional outbox for stake-sensitive reactor dispatch | Accepted |
 
 ## When to Write an ADR
