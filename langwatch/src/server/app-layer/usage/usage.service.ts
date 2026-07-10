@@ -302,14 +302,17 @@ export class UsageService {
     organizationId: string,
     resolvedPlan?: PlanInfo,
   ): Promise<MeterDecision> {
-    const pricingModel =
-      (await this.organizationRepository?.getPricingModel(organizationId)) ??
-      null;
+    // ADR-039: seat-event billing derives from the active subscription plan,
+    // never from the pricingModel display cache (which can drift).
+    const isSeatEvent =
+      (await this.organizationRepository?.hasActiveSeatEventSubscription(
+        organizationId,
+      )) ?? false;
     const plan = resolvedPlan ?? (await this.planResolver(organizationId));
     const hasValidLicenseOverride = plan.planSource === "license";
 
     const decision = resolveUsageMeter({
-      pricingModel,
+      isSeatEvent,
       licenseUsageUnit: plan.usageUnit,
       hasValidLicenseOverride,
       isFree: plan.free,

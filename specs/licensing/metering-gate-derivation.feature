@@ -8,28 +8,28 @@ Feature: Stripe metering gate derives from the active plan
   I want the metering population and meter unit derived from the resolved plan
   So that a paying seat-billed organization is always metered regardless of stored column drift
 
-  @integration @unimplemented
+  @integration
   Scenario: Organization with an active seat subscription and a stale TIERED column is metered
     Given an organization with pricingModel "TIERED"
     And the organization has an ACTIVE "GROWTH_SEAT_EUR_MONTHLY" subscription
     When the billing reporting pipeline selects organizations to meter
     Then the organization is included in the metering population
 
-  @integration @unimplemented
+  @integration
   Scenario: Organization without a seat subscription is not metered even if the column says SEAT_EVENT
     Given an organization with pricingModel "SEAT_EVENT"
     And the organization has no ACTIVE seat-event subscription
     When the billing reporting pipeline selects organizations to meter
     Then the organization is not included in the metering population
 
-  @unit @unimplemented
+  @unit
   Scenario: Meter unit comes from the resolved billing profile, not the pricingModel column
     Given an organization whose resolved plan reports meter unit "events"
     And the organization's pricingModel column says "TIERED"
     When the meter decision is resolved for the organization
     Then the decision uses meter unit "events"
 
-  @integration @unimplemented
+  @integration
   Scenario: Metering population is unchanged for organizations without column drift
     Given an organization with pricingModel "SEAT_EVENT" and an ACTIVE seat-event subscription
     And an organization with pricingModel "TIERED" and no subscription

@@ -123,7 +123,7 @@ export class ReportUsageForMonthCommand
       if (!org) {
         logger.warn(
           { organizationId },
-          "organization not found or not SEAT_EVENT, skipping",
+          "organization not found or has no active seat-event subscription, skipping",
         );
         return [];
       }

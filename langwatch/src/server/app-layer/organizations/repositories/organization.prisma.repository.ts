@@ -1,6 +1,5 @@
 import {
   OrganizationUserRole,
-  PricingModel,
   RoleBindingScopeType,
   TeamUserRole,
   type Currency,
@@ -203,8 +202,20 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   async getOrganizationForBilling(
     organizationId: string,
   ): Promise<OrganizationForBilling | null> {
+    // ADR-039: the metering population derives from the active seat-event
+    // subscription, never from the pricingModel column — column drift must
+    // not exclude a paying org from usage billing (nor a stale SEAT_EVENT
+    // column include an org that stopped paying for seats).
     return this.prisma.organization.findFirst({
-      where: { id: organizationId, pricingModel: PricingModel.SEAT_EVENT },
+      where: {
+        id: organizationId,
+        subscriptions: {
+          some: {
+            status: "ACTIVE",
+            plan: { in: [...GROWTH_SEAT_PLAN_TYPES] },
+          },
+        },
+      },
       select: {
         id: true,
         stripeCustomerId: true,
