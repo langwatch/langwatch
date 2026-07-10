@@ -32,7 +32,6 @@ const evaluatorCategoryMap: Record<
   "langevals/llm_boolean": "llm_judge",
   "langevals/llm_score": "llm_judge",
   "langevals/llm_category": "llm_judge",
-  "langevals/pairwise_compare": "llm_judge",
   "langevals/select_best_compare": "llm_judge",
 
   // RAG
@@ -66,6 +65,10 @@ const evaluatorCategoryMap: Record<
   // Ignored — custom templates, legacy, or internal
   "langevals/basic": "ignored",
   "langevals/similarity": "ignored",
+  // Superseded by select_best_compare ("Comparison"), which handles two
+  // candidates as well as N. Kept resolvable so experiments and monitors
+  // created before the merge keep running; never offered for a new evaluator.
+  "langevals/pairwise_compare": "ignored",
   "legacy/ragas_answer_correctness": "ignored",
   "legacy/ragas_answer_relevancy": "ignored",
   "legacy/ragas_context_precision": "ignored",

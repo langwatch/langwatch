@@ -1,16 +1,17 @@
 /**
- * PairwiseWinRateChart - Win-rate bar chart per pairwise evaluator (#5100
- * dogfood follow-up).
+ * WinRateChart - Win-rate bar chart per comparison evaluator (#5100 dogfood
+ * follow-up, generalized to N candidates in #5101).
  *
- * Replaces the generic "avg score" chart auto-generated for pairwise
+ * Replaces the generic "avg score" chart auto-generated for comparison
  * evaluators, which was misleading because it plotted a `0/1` chip score
  * with empty bars for the non-scored prompt targets participating in the
  * comparison. Users read the empty bars as prompts "scoring zero" — a
- * confusing signal that has nothing to do with the pairwise verdict.
+ * confusing signal that has nothing to do with the comparison verdict.
  *
- * Renders three bars per pairwise evaluator (`Variant A` / `Variant B` /
- * `Tie`) using resolved variant names on the x-axis. The tally is the
- * actual pairwise story: which candidate won more rows overall.
+ * Renders one bar per variant plus a Tie bar, using resolved variant names on
+ * the x-axis. The tally is the actual comparison story: which candidate won
+ * more rows overall. This is where the per-variant breakdown lives — the
+ * workbench column header only names the overall winner.
  *
  * Renders as a plain Box (not a Card) so `ComparisonCharts` can drop it
  * inline alongside its own Total Cost / Avg Latency chart cards without a
@@ -30,16 +31,26 @@ import {
   YAxis,
 } from "recharts";
 
-import type { BatchPairwiseColumn } from "./types";
+import type { BatchComparisonColumn } from "./types";
 
-const BAR_COLORS = {
-  a: "#22C55E",
-  b: "#8B5CF6",
-  tie: "#94A3B8",
-};
+/**
+ * Cycled per variant, in order. Deliberately excludes red: a losing variant
+ * isn't a failure, so no bar should read as one. Ties get their own gray.
+ */
+const VARIANT_COLORS = [
+  "#22C55E",
+  "#8B5CF6",
+  "#0EA5E9",
+  "#F59E0B",
+  "#EC4899",
+  "#14B8A6",
+  "#6366F1",
+  "#84CC16",
+];
+const TIE_COLOR = "#94A3B8";
 
-export type PairwiseWinRateChartProps = {
-  column: BatchPairwiseColumn;
+export type WinRateChartProps = {
+  column: BatchComparisonColumn;
   /** Matched to the sibling cost/latency charts in ComparisonCharts. */
   chartHeight: number;
 };
@@ -49,28 +60,30 @@ export type PairwiseWinRateChartProps = {
 // charts trim at ~10 chars, so we match that.
 const trimAxisLabel = (s: string) => (s.length > 10 ? `${s.slice(0, 9)}…` : s);
 
-export function PairwiseWinRateChart({
-  column,
-  chartHeight,
-}: PairwiseWinRateChartProps) {
+export function WinRateChart({ column, chartHeight }: WinRateChartProps) {
   const verdicts = Object.values(column.verdictsByRow);
-  const counts: Record<"A" | "B" | "tie", number> = { A: 0, B: 0, tie: 0 };
-  for (const v of verdicts) counts[v.label] += 1;
+
+  const winsByVariantId = new Map<string, number>();
+  let ties = 0;
+  for (const verdict of verdicts) {
+    if (verdict.winnerId === null) {
+      ties += 1;
+      continue;
+    }
+    winsByVariantId.set(
+      verdict.winnerId,
+      (winsByVariantId.get(verdict.winnerId) ?? 0) + 1,
+    );
+  }
 
   const chartData = [
-    {
-      key: "a",
-      name: trimAxisLabel(column.variantAName),
-      wins: counts.A,
-      color: BAR_COLORS.a,
-    },
-    {
-      key: "b",
-      name: trimAxisLabel(column.variantBName),
-      wins: counts.B,
-      color: BAR_COLORS.b,
-    },
-    { key: "tie", name: "Tie", wins: counts.tie, color: BAR_COLORS.tie },
+    ...column.variants.map((variant, index) => ({
+      key: variant.id ?? `variant-${index}`,
+      name: trimAxisLabel(variant.name),
+      wins: variant.id ? (winsByVariantId.get(variant.id) ?? 0) : 0,
+      color: VARIANT_COLORS[index % VARIANT_COLORS.length]!,
+    })),
+    { key: "tie", name: "Tie", wins: ties, color: TIE_COLOR },
   ];
 
   const yMax = Math.max(1, ...chartData.map((d) => d.wins));
@@ -86,7 +99,7 @@ export function PairwiseWinRateChart({
       borderRadius="md"
       padding={3}
       paddingBottom={1}
-      data-testid={`chart-pairwise-${column.evaluatorId}`}
+      data-testid={`chart-comparison-${column.evaluatorId}`}
     >
       <Text
         fontSize="xs"

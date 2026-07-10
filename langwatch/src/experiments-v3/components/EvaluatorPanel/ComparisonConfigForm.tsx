@@ -40,20 +40,22 @@ const GOLDEN_FREE_JUDGE_PROMPT =
   'Pick the best of N candidate replies to the task — there is no reference\nanswer, so compare them on their own merits.\n\nTask:  {input}\n\nCandidates:\n{candidates}\n\nLook across the candidates and decide which one is the best reply.\nBriefly explain WHY it\'s better than the others, then pick the winning\nslot label. Use "tie" only when no candidate is clearly better.\n';
 
 /**
- * Configuration form for the langevals/select_best_compare evaluator
- * (#5101). Sibling of PairwiseConfigForm, kept intentionally separate
- * so the two evaluator paths (Pairwise Compare vs N-way Compare) never
- * couple in the UI layer either. Three configurable sections:
+ * Configuration form for the langevals/select_best_compare evaluator — the one
+ * Comparison flow, whether it compares two candidates or ten (#5100, #5101).
+ * Four configurable sections:
  *
  *   1. Variants   — multiselect of ≥2 TargetConfig ids whose per-row
  *                   outputs are the candidates the judge picks between
  *   2. Golden     — dataset column whose value is the reference answer
- *   3. Metrics    — cost / duration toggles mirrored into `settings.include_metrics`
+ *   3. Shuffle    — candidate-order randomization, mirrored into
+ *                   `settings.randomize_order`
+ *   4. Metrics    — cost / duration toggles mirrored into `settings.include_metrics`
  *
- * A single N-way judge call per row picks a winner; candidate order is
- * shuffled deterministically per row (seeded by rowIndex) to mitigate
- * position bias — mirrors the Python evaluator's `randomize_order`
- * setting, exposed here as a checkbox in the settings section above.
+ * A single judge call per row picks a winner; candidate order is shuffled
+ * deterministically per row (seeded by rowIndex) to mitigate position bias.
+ *
+ * This form also renders for experiments saved with the legacy two-slot
+ * `pairwise` config, which `toComparisonConfig` folds into `variants` on load.
  */
 
 export type DatasetColumn = { id: string; name: string };
@@ -106,6 +108,8 @@ export function ComparisonConfigForm({
         update={update}
         datasetColumns={datasetColumns}
       />
+
+      <RandomizeOrderSection draft={draft} update={update} />
 
       <MetricsSection draft={draft} update={update} />
     </VStack>
@@ -434,11 +438,74 @@ function GoldenAnswerSection({
 }
 
 /**
+ * "Shuffle candidate order" toggle.
+ *
+ * LLM judges favour whichever candidate they read first. The judge counters
+ * this by shuffling the candidates before every call, deterministically seeded
+ * on the row index — so a row presents the same order every time it runs, and
+ * re-running an experiment doesn't reshuffle the verdicts underneath the user.
+ *
+ * On by default. Turning it off is for reproducing a run against a fixed
+ * candidate order, not something a normal comparison wants.
+ *
+ * Source of truth is `settings.randomize_order` (what the Python judge reads);
+ * `comparison.randomizeOrder` is mirrored on every write for the code paths
+ * that only see `evaluator.comparison`. Same dual-representation pattern as
+ * GoldenAnswerSection and MetricsSection.
+ */
+function RandomizeOrderSection({
+  draft,
+  update,
+}: {
+  draft: ComparisonEvaluatorConfig;
+  update: (patch: Partial<ComparisonEvaluatorConfig>) => void;
+}) {
+  const formContext = useFormContext<{
+    settings?: { randomize_order?: boolean };
+  }>();
+  const watched = useWatch({
+    control: formContext?.control,
+    name: "settings.randomize_order",
+  }) as boolean | undefined;
+  const randomizeOrder = (watched ?? draft.randomizeOrder) !== false;
+
+  const setRandomizeOrder = (on: boolean) => {
+    formContext?.setValue("settings.randomize_order", on, {
+      shouldDirty: true,
+      shouldTouch: true,
+    });
+    update({ randomizeOrder: on });
+  };
+
+  return (
+    <Box paddingTop={2}>
+      <HStack justify="space-between" align="start">
+        <VStack align="start" gap={0}>
+          <Text fontSize="13px" fontWeight="medium">
+            Shuffle candidate order
+          </Text>
+          <Text fontSize="xs" color="fg.muted" maxWidth="480px">
+            Judges tend to favour whichever candidate they read first. Shuffling
+            each row&apos;s candidates cancels that out. The same row always gets
+            the same order, so re-running gives you comparable verdicts.
+          </Text>
+        </VStack>
+        <Switch
+          checked={randomizeOrder}
+          onCheckedChange={({ checked }) => setRandomizeOrder(checked)}
+          data-testid="comparison-randomize-order"
+        />
+      </HStack>
+    </Box>
+  );
+}
+
+/**
  * Inline metric toggles. Source of truth is `settings.include_metrics`
  * (what the Python judge reads); the legacy `comparison.includeMetrics`
  * mirror is kept in sync on every write so any orchestrator path reading
  * from it doesn't drift. Same dual-representation pattern
- * PairwiseConfigForm uses.
+ * GoldenAnswerSection uses.
  */
 function MetricsSection({
   draft,

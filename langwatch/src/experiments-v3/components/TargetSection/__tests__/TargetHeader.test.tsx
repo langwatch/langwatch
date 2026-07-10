@@ -36,11 +36,18 @@ vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
 }));
 
 // Mock name hooks to avoid tRPC queries. Wrapped in vi.fn() so individual
-// tests (e.g. the pairwise same-name-variant scoreboard tests) can override
-// the implementation for just their own targets.
-vi.mock("../../../hooks/useTargetName", () => ({
-  useTargetName: vi.fn((target: { id: string }) => target.id),
-}));
+// tests (e.g. the same-name-variant scoreboard tests) can override the
+// implementation for just their own targets. `useTargetNames` delegates to
+// `useTargetName` so one override covers both the column title and the
+// comparison scoreboard's batched lookup.
+vi.mock("../../../hooks/useTargetName", () => {
+  const useTargetName = vi.fn((target: { id: string }) => target.id);
+  return {
+    useTargetName,
+    useTargetNames: (targets: ({ id: string } | undefined)[]) =>
+      targets.map((target) => (target ? useTargetName(target) : "")),
+  };
+});
 vi.mock("../../../hooks/useEvaluatorName", () => ({
   useEvaluatorName: () => "Exact Match",
   useEvaluatorNames: () => new Map(),

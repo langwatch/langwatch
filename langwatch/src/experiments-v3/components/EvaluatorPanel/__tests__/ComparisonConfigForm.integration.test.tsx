@@ -16,9 +16,15 @@ import { ComparisonConfigForm } from "../ComparisonConfigForm";
 // tRPC — the full tRPC context is out of scope for a component
 // integration test. Mock the hook to return the target's id so the
 // dropdown still renders with a stable label.
-vi.mock("../../../hooks/useTargetName", () => ({
-  useTargetName: (target: { id: string }) => target.id,
-}));
+vi.mock("../../../hooks/useTargetName", () => {
+  const useTargetName = (target: { id: string }) => target.id;
+  return {
+    useTargetName,
+    // Batched variant lookup used by the comparison scoreboard.
+    useTargetNames: (targets: ({ id: string } | undefined)[]) =>
+      targets.map((target) => (target ? useTargetName(target) : "")),
+  };
+});
 
 // Same rationale as PairwiseConfigForm's integration test: the metrics
 // section reads its "source of truth" via useFormContext + useWatch

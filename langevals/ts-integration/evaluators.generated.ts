@@ -892,7 +892,7 @@ export const evaluatorsSchema = z.object({
           "Judge prompt template. Placeholders: {input}, {golden}, {candidates} (a pre-rendered bulleted list with slot labels and optional per-candidate metrics).",
         )
         .default(
-          'Pick the best of N candidate outputs against a known-good reference (golden answer).\n\nTask:           {input}\nGolden answer:  {golden}\n\nCandidates:\n{candidates}\n\nReason step-by-step about how closely each candidate matches the\ngolden answer in correctness, completeness, and style. Then pick\nthe best candidate by its slot label, or "tie" if no clear winner.\nPrefer cheaper/faster only when quality is comparable.\n',
+          'Pick the best of N candidate replies to the task.\n\nTask:       {input}\nReference:  {golden}\n\nCandidates:\n{candidates}\n\nLook across the candidates and decide which one is the best reply.\nBriefly explain WHY it\'s better than the others, then pick the winning\nslot label. Use "tie" only when no candidate is clearly better.\n',
         ),
       randomize_order: z
         .boolean()
@@ -2373,7 +2373,7 @@ and monitors created before the merge keep running.
         description:
           "Judge prompt template. Placeholders: {input}, {golden}, {candidates} (a pre-rendered bulleted list with slot labels and optional per-candidate metrics).",
         default:
-          'Pick the best of N candidate outputs against a known-good reference (golden answer).\n\nTask:           {input}\nGolden answer:  {golden}\n\nCandidates:\n{candidates}\n\nReason step-by-step about how closely each candidate matches the\ngolden answer in correctness, completeness, and style. Then pick\nthe best candidate by its slot label, or "tie" if no clear winner.\nPrefer cheaper/faster only when quality is comparable.\n',
+          'Pick the best of N candidate replies to the task.\n\nTask:       {input}\nReference:  {golden}\n\nCandidates:\n{candidates}\n\nLook across the candidates and decide which one is the best reply.\nBriefly explain WHY it\'s better than the others, then pick the winning\nslot label. Use "tie" only when no candidate is clearly better.\n',
       },
       randomize_order: {
         description:

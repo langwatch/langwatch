@@ -76,10 +76,31 @@ Feature: Comparison evaluator (pairwise or multi-candidate preference judging)
     Then no verdict is produced for that row
     And the row reports which variant it was waiting on
 
-  Scenario: Column scoreboard reflects the per-variant tally
+  # The header names the overall outcome and nothing more — an exact count
+  # ("variant_1 wins 14") is a number without a denominator, and dogfood found
+  # it read as noise. The per-variant breakdown belongs on the results page,
+  # where there is room to chart it.
+  Scenario: Column header names the overall winner
     Given 30 rows have been evaluated where variant_1 wins 14, variant_2 wins 10, variant_3 wins 4, and 2 ties
     When I view the Comparison column header
-    Then I see the win tally broken down per variant, including ties
+    Then I see that "variant_1" wins
+    And hovering it reveals the win tally broken down per variant, including ties
+
+  Scenario: Column header reports a tie when no variant leads
+    Given 4 rows have been evaluated where variant_1 wins 2 and variant_2 wins 2
+    When I view the Comparison column header
+    Then I see "Tied"
+
+  Scenario: Results page charts the win rate per variant
+    Given 30 rows have been evaluated where variant_1 wins 14, variant_2 wins 10, variant_3 wins 4, and 2 ties
+    When I view the run on the results page
+    Then the win-rate chart has one bar per variant plus a bar for ties
+    And every variant's wins are counted, including the third
+
+  Scenario: A variant that never wins still appears
+    Given a Comparison evaluator ran with three variants and "variant_3" never won a row
+    When I view the run on the results page
+    Then "variant_3" is still shown, with zero wins
 
   # Customer feedback, 2026-07-08 call: reusing the same prompt as two
   # variants (e.g. re-testing gpt-4.1 vs gpt-5-mini) made them

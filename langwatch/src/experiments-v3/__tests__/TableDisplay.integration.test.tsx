@@ -28,13 +28,19 @@ vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
 }));
 
 // Mock name hooks to avoid tRPC queries
-vi.mock("../hooks/useTargetName", () => ({
-  useTargetName: (target: { id: string }) => {
+vi.mock("../hooks/useTargetName", () => {
+  const useTargetName = (target: { id: string }) => {
     if (target.id === "test-target") return "Test Prompt";
     if (target.id === "test-target-2") return "Test Prompt 2";
     return "My Prompt";
-  },
-}));
+  };
+  return {
+    useTargetName,
+    // Batched variant lookup used by the comparison scoreboard.
+    useTargetNames: (targets: ({ id: string } | undefined)[]) =>
+      targets.map((target) => (target ? useTargetName(target) : "")),
+  };
+});
 vi.mock("../hooks/useEvaluatorName", () => ({
   useEvaluatorName: () => "Exact Match",
   useEvaluatorNames: () => new Map(),
