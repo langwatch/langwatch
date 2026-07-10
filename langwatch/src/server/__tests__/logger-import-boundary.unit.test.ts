@@ -1,44 +1,70 @@
-import { existsSync, readdirSync, readFileSync } from "fs";
+import { readdirSync, readFileSync } from "fs";
 import { join, relative, resolve } from "path";
 import { describe, expect, it } from "vitest";
 
 /**
- * `~/utils/logger` is browser-safe. `~/utils/logger/server` uses AsyncLocalStorage
- * and must never reach a client bundle. Files under `src/server/` therefore import
- * the server logger — except the handful that are value-imported by client code.
+ * `~/utils/logger` is browser-safe. `~/utils/logger/server` pulls in
+ * `node:async_hooks` (AsyncLocalStorage) and must never reach a client bundle.
+ * Files under `src/server/` therefore import the server logger — except those
+ * that client code value-imports.
  *
- * `biome.json` enforces this via `noRestrictedImports`, but that guard only runs
- * when Biome's CLI version matches the config schema, and a stale exemption for a
- * deleted file rots silently. This test enforces the same invariant from the
- * filesystem, and treats `biome.json` as the single source of truth for exemptions
- * so the two cannot drift.
+ * `biome.json` states this as a `noRestrictedImports` rule, but lint cannot
+ * check that an exemption still points at a file that exists, and the pinned
+ * Biome CLI currently rejects its own config (schema 2.4.14 vs CLI 2.5.1), so
+ * `pnpm lint` never evaluates the rule locally. This test enforces the boundary
+ * from the filesystem instead, independent of any Biome version.
+ *
+ * EXEMPTED is deliberately hardcoded rather than read out of `biome.json`.
+ * A guard that derives its expectations from the config it guards can never
+ * disagree with that config: adding a browser-logger import AND a matching
+ * exemption would satisfy both. Stating the list here forces widening the
+ * boundary to be an explicit, reviewable edit to this file.
  */
 
 const LANGWATCH_ROOT = resolve(__dirname, "../../..");
 const SERVER_DIR = join(LANGWATCH_ROOT, "src/server");
-const SERVER_OVERRIDE_GLOB = "src/server/**/*.ts";
+const LOGGER_PATTERN_GROUP = "**/utils/logger";
 
-/** Matches a specifier ending exactly at `utils/logger` — `utils/logger/server` does not match. */
-const BROWSER_LOGGER_IMPORT = /from\s+["'][^"']*utils\/logger["']/;
+/**
+ * Client-reachable files that must stay on the browser-safe logger.
+ * `src/server/evaluations/preconditions.ts` is value-imported by the client
+ * component `src/components/checks/TryItOut.tsx`.
+ */
+const EXEMPTED = ["src/server/evaluations/preconditions.ts"];
 
-function readBiomeOverrides(): { includes?: string[] }[] {
-  const biome = JSON.parse(
-    readFileSync(join(LANGWATCH_ROOT, "biome.json"), "utf-8"),
-  ) as { overrides?: { includes?: string[] }[] };
-  return biome.overrides ?? [];
+/**
+ * Matches a specifier ending exactly at `utils/logger`, in `import ... from`,
+ * `export ... from`, bare `import "..."`, and dynamic `import("...")` forms.
+ * `utils/logger/server` does not match, and neither does `some-utils/logger`.
+ */
+const BROWSER_LOGGER_IMPORT =
+  /(?:from|import)\s*\(?\s*["'](?:[^"']*\/)?utils\/logger["']/;
+
+interface BiomeOverride {
+  includes?: string[];
+  linter?: {
+    rules?: {
+      style?: {
+        noRestrictedImports?: {
+          options?: { patterns?: { group?: string[] }[] };
+        };
+      };
+    };
+  };
 }
 
-/** The `!`-negated entries on the `src/server/**` override are the exempted files. */
-function exemptedPathsFromBiomeConfig(): string[] {
-  const serverOverride = readBiomeOverrides().find((override) =>
-    override.includes?.includes(SERVER_OVERRIDE_GLOB),
+function readServerOverride(): BiomeOverride | undefined {
+  const biome = JSON.parse(
+    readFileSync(join(LANGWATCH_ROOT, "biome.json"), "utf-8"),
+  ) as { overrides?: BiomeOverride[] };
+  return biome.overrides?.find((override) =>
+    override.includes?.some((pattern) => pattern.startsWith("src/server/")),
   );
-  if (!serverOverride) {
-    throw new Error(
-      `no biome override found covering ${SERVER_OVERRIDE_GLOB} — the logger guard is gone`,
-    );
-  }
-  return (serverOverride.includes ?? [])
+}
+
+function exemptionsDeclaredInBiomeConfig(): string[] {
+  const includes = readServerOverride()?.includes ?? [];
+  return includes
     .filter((pattern) => pattern.startsWith("!"))
     .map((pattern) => pattern.slice(1));
 }
@@ -59,30 +85,25 @@ function filesImportingBrowserLogger(): string[] {
 }
 
 describe("given the server logger import boundary", () => {
-  const exempted = exemptedPathsFromBiomeConfig();
-
   describe("when scanning every source file under src/server", () => {
-    it("finds the browser-safe logger imported only by exempted files", () => {
-      expect(filesImportingBrowserLogger()).toEqual([...exempted].sort());
+    it("finds the browser-safe logger imported only by the exempted files", () => {
+      expect(filesImportingBrowserLogger()).toEqual([...EXEMPTED].sort());
     });
   });
 
-  describe("when checking the exemptions declared in biome.json", () => {
-    it("points every exemption at a file that still exists", () => {
-      const missing = exempted.filter(
-        (path) => !existsSync(join(LANGWATCH_ROOT, path)),
+  describe("when reading the guard declared in biome.json", () => {
+    it("exempts exactly the files this test exempts", () => {
+      expect(exemptionsDeclaredInBiomeConfig().sort()).toEqual(
+        [...EXEMPTED].sort(),
       );
-      expect(missing).toEqual([]);
     });
 
-    it("keeps every exempted file on the browser-safe logger", () => {
-      const unnecessary = exempted.filter(
-        (path) =>
-          !BROWSER_LOGGER_IMPORT.test(
-            readFileSync(join(LANGWATCH_ROOT, path), "utf-8"),
-          ),
-      );
-      expect(unnecessary).toEqual([]);
+    it("still bans the browser-safe logger under src/server", () => {
+      const patterns =
+        readServerOverride()?.linter?.rules?.style?.noRestrictedImports?.options
+          ?.patterns ?? [];
+      const groups = patterns.flatMap((pattern) => pattern.group ?? []);
+      expect(groups).toContain(LOGGER_PATTERN_GROUP);
     });
   });
 });
