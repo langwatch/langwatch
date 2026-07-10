@@ -59,19 +59,12 @@ Feature: Scenario result grid view and full-width borderless run history
     When the viewport narrows
     Then cards reflow to fewer columns
 
-  # --- Run Rows Expanded by Default ---
-
-  @integration
-  Scenario: Run rows are expanded by default
-    Given a suite has run history
-    When I view the suite detail panel
-    Then all run rows are expanded showing their scenario results
-
-  @integration
-  Scenario: All runs panel rows are expanded by default
-    Given multiple suites have run history
-    When I view the all runs panel
-    Then all run rows are expanded showing their scenario results
+  # --- Run Row Expansion ---
+  # Run rows no longer all expand by default: only the most recent execution
+  # starts expanded, new arrivals auto-expand, and manual collapses stick.
+  # That behavior is specced and bound in
+  # specs/suites/simulations-performance.feature ("Only the most recent
+  # execution starts expanded" and siblings).
 
   # --- Card Content ---
 

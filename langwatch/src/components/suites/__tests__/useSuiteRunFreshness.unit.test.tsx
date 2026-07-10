@@ -30,6 +30,11 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 const settledRun = { status: ScenarioRunStatus.SUCCESS };
 const activeRun = { status: ScenarioRunStatus.IN_PROGRESS };
 
+interface FreshnessProps {
+  lastUpdatedAt: number | undefined;
+  scenarioSetId?: string;
+}
+
 function renderFreshness({
   lastUpdatedAt,
   runs = [settledRun],
@@ -43,7 +48,7 @@ function renderFreshness({
     data: lastUpdatedAt === undefined ? undefined : { lastUpdatedAt },
   });
   return renderHook(
-    (props: { lastUpdatedAt: number | undefined; scenarioSetId?: string }) => {
+    (props: FreshnessProps) => {
       mocks.useQuery.mockReturnValue({
         data:
           props.lastUpdatedAt === undefined
@@ -58,7 +63,7 @@ function renderFreshness({
         sseConnected,
       });
     },
-    { initialProps: { lastUpdatedAt } },
+    { initialProps: { lastUpdatedAt } as FreshnessProps },
   );
 }
 
