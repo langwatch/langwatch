@@ -36,7 +36,7 @@ describe("formatLoginCeremony", () => {
           ],
         });
         const toolLines = lines.filter(
-          (l) => l.startsWith("  $ langwatch") && !l.includes("langwatch open"),
+          (l) => l.startsWith("  $ langwatch") && !/langwatch open\b/.test(l),
         );
         expect(toolLines).toHaveLength(2);
         expect(toolLines[0]).toBe("  $ langwatch claude  # Claude Code");
@@ -48,7 +48,7 @@ describe("formatLoginCeremony", () => {
       it("falls back to every built-in wrapper (all six tools)", () => {
         const lines = formatLoginCeremony(baseInput);
         const toolLines = lines.filter(
-          (l) => l.startsWith("  $ langwatch") && !l.includes("langwatch open"),
+          (l) => l.startsWith("  $ langwatch") && !/langwatch open\b/.test(l),
         );
         expect(toolLines).toHaveLength(6);
         for (const slug of [
@@ -66,7 +66,7 @@ describe("formatLoginCeremony", () => {
       it("falls back when an empty tools array is supplied", () => {
         const lines = formatLoginCeremony({ ...baseInput, tools: [] });
         const toolLines = lines.filter(
-          (l) => l.startsWith("  $ langwatch") && !l.includes("langwatch open"),
+          (l) => l.startsWith("  $ langwatch") && !/langwatch open\b/.test(l),
         );
         expect(toolLines).toHaveLength(6);
       });
