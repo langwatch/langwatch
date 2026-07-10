@@ -63,7 +63,7 @@ vi.mock("~/utils/isLangwatchStaff", () => ({
 
 // Stub the heavy chat surface. It reflects the isOpen prop it receives and
 // exposes a button to open Langy, so the test can drive + observe open state.
-vi.mock("../LangySidebar", () => ({
+vi.mock("../components/LangyPanel", () => ({
   LangyDrawer: ({
     isOpen,
     onOpenChange,

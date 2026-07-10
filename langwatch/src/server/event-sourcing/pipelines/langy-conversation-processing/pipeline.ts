@@ -44,6 +44,15 @@ export interface LangyConversationProcessingPipelineDeps {
     LangyConversationProcessingEvent,
     LangyConversationStateData
   >;
+  /**
+   * Optional freshness-broadcast reactor. Emits a lightweight per-conversation
+   * SSE signal on every fold advance so the panel can cancel + invalidate its
+   * slim tRPC caches (ADR-046). Omitted (no-Redis dev) → no broadcast.
+   */
+  langyConversationUpdateBroadcastReactor?: ReactorDefinition<
+    LangyConversationProcessingEvent,
+    LangyConversationStateData
+  >;
 }
 
 /**
@@ -107,6 +116,15 @@ export function createLangyConversationProcessingPipeline(
       "langyConversationState",
       "reconcileAgentTurn",
       deps.reconcileAgentTurnReactor,
+    );
+  }
+  // Freshness broadcast: bound to the conversation-state fold so it fires
+  // whenever the spine advances. Optional so no-Redis dev omits it cleanly.
+  if (deps.langyConversationUpdateBroadcastReactor) {
+    builder = builder.withReactor(
+      "langyConversationState",
+      "langyConversationUpdateBroadcast",
+      deps.langyConversationUpdateBroadcastReactor,
     );
   }
 

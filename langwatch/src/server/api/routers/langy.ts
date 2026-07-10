@@ -1,0 +1,229 @@
+import { on } from "node:events";
+import { z } from "zod";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { getApp } from "~/server/app-layer/app";
+import type {
+  ConversationDetail,
+  ConversationListItem,
+} from "~/server/app-layer/langy/langy-conversation.service";
+import { trackServerEvent } from "~/server/posthog";
+import { checkProjectPermission } from "../rbac";
+import {
+  langyConversationDetailSchema,
+  langyConversationListItemSchema,
+  langyMessageSchema,
+  langyMessageRoleSchema,
+  langyConversationStatusSchema,
+  type LangyConversationDetailDto,
+  type LangyConversationListItemDto,
+  type LangyMessageDto,
+} from "./langy.schemas";
+
+/**
+ * Read-side tRPC router for Langy conversations (ADR-046 frontend).
+ *
+ * Mirrors `tracesV2` exactly: a SLIM `list` reading only the conversation
+ * spine (`langy_conversations` fold projection, no content), a separate
+ * on-demand `messages` read for the heavy history (`langy_messages` map
+ * projection), a `newCount` the panel polls only when the freshness SSE is
+ * disconnected, and a single `onConversationUpdate` subscription that pushes a
+ * lightweight per-conversation signal (never row data). All commands
+ * (send/rename/share/delete) still flow through the Hono chat + REST surface;
+ * this router is read + real-time only.
+ *
+ * Permission mirrors the Hono read gate (`evaluations:view`).
+ */
+
+const LANGY_READ_PERMISSION = "evaluations:view" as const;
+
+function toListItemDto(item: ConversationListItem): LangyConversationListItemDto {
+  return {
+    id: item.id,
+    title: item.title,
+    isShared: item.isShared,
+    isOwn: item.isOwn,
+    messageCount: item.messageCount,
+    lastActivityAtMs: item.lastActivityAt.getTime(),
+  };
+}
+
+function toDetailDto(detail: ConversationDetail): LangyConversationDetailDto {
+  return {
+    ...toListItemDto(detail),
+    // The fold status is a free string column; narrow to the known set and
+    // fall back to "active" for any unexpected value rather than throwing.
+    status: langyConversationStatusSchema.catch("active").parse(detail.status),
+  };
+}
+
+export const langyRouter = createTRPCRouter({
+  /**
+   * Slim recent-conversations list. Reads only the spine columns; message
+   * content is never fetched here. The client pairs this with
+   * `keepPreviousData` + `staleTime` so a freshness refetch never blanks the
+   * list.
+   */
+  list: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        limit: z.number().int().min(1).max(100).default(50),
+      }),
+    )
+    .use(checkProjectPermission(LANGY_READ_PERMISSION))
+    .query(
+      async ({
+        input,
+        ctx,
+      }): Promise<{ items: LangyConversationListItemDto[] }> => {
+        const items = await getApp().langy.conversations.getAll({
+          projectId: input.projectId,
+          userId: ctx.session.user.id,
+          limit: input.limit,
+        });
+        return { items: items.map(toListItemDto) };
+      },
+    ),
+
+  /**
+   * Single-conversation spine (status + counts), for the open conversation.
+   * Returns null when the conversation is not visible to the user.
+   */
+  detail: protectedProcedure
+    .input(z.object({ projectId: z.string(), conversationId: z.string() }))
+    .use(checkProjectPermission(LANGY_READ_PERMISSION))
+    .query(
+      async ({
+        input,
+        ctx,
+      }): Promise<LangyConversationDetailDto | null> => {
+        const detail = await getApp().langy.conversations.getById({
+          id: input.conversationId,
+          projectId: input.projectId,
+          userId: ctx.session.user.id,
+        });
+        return detail ? toDetailDto(detail) : null;
+      },
+    ),
+
+  /**
+   * Heavy on-demand message history for a single conversation. Split from
+   * `list` so opening a conversation never re-fetches the slim list, and the
+   * list never carries content.
+   */
+  messages: protectedProcedure
+    .input(z.object({ projectId: z.string(), conversationId: z.string() }))
+    .use(checkProjectPermission(LANGY_READ_PERMISSION))
+    .query(async ({ input }): Promise<{ messages: LangyMessageDto[] }> => {
+      const rows = await getApp().langy.messages.getAllByConversation({
+        conversationId: input.conversationId,
+        projectId: input.projectId,
+      });
+      const messages = rows.map<LangyMessageDto>((row) => ({
+        id: row.id,
+        role: langyMessageRoleSchema.catch("assistant").parse(row.role),
+        parts: Array.isArray(row.parts)
+          ? (row.parts as LangyMessageDto["parts"])
+          : [],
+        createdAtMs: row.createdAt.getTime(),
+      }));
+      return { messages };
+    }),
+
+  /**
+   * Count of conversations touched since a timestamp — the "N new" pill. The
+   * client only polls this when the freshness SSE is disconnected (adaptive
+   * backoff), mirroring `tracesV2.newCount`. Derived from the already-bounded
+   * slim list to avoid a second ClickHouse read path.
+   */
+  newCount: protectedProcedure
+    .input(z.object({ projectId: z.string(), since: z.number() }))
+    .use(checkProjectPermission(LANGY_READ_PERMISSION))
+    .query(async ({ input, ctx }): Promise<{ count: number }> => {
+      const items = await getApp().langy.conversations.getAll({
+        projectId: input.projectId,
+        userId: ctx.session.user.id,
+        limit: 100,
+      });
+      const count = items.filter(
+        (item) => item.lastActivityAt.getTime() > input.since,
+      ).length;
+      return { count };
+    }),
+
+  /**
+   * In-agent feedback capture ("How's Langy doing?" / thumbs).
+   *
+   * Two destinations, by design:
+   *  - Aggregate product analytics -> PostHog via the backend (never
+   *    client-side capture), so it lands in the same pipeline as the rest of
+   *    the product.
+   *  - The feedback itself (thumbs / frustration) is ALSO meant to flow back
+   *    into LangWatch as a feedback event tied to the conversation's trace id,
+   *    so we dogfood Langy in our own account. That routing is seamed on
+   *    `traceId` below — recording the LangWatch `thumbs_up_down` trace event
+   *    against `traceId` (via the events ingestion path) is the follow-up; the
+   *    id contract is captured here so the client already sends it.
+   *
+   * `shareConversationConsent` records that a (possibly frustrated) user
+   * granted permission to inspect the full conversation for debugging — the
+   * consent flag only; acting on it is a separate, gated flow.
+   */
+  recordFeedback: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        conversationId: z.string().optional(),
+        messageId: z.string().optional(),
+        /** Trace id of the conversation turn, for LangWatch feedback events. */
+        traceId: z.string().optional(),
+        rating: z.enum(["up", "down"]),
+        sentiment: z.enum(["frustrated", "delighted", "neutral"]).optional(),
+        comment: z.string().max(2000).optional(),
+        shareConversationConsent: z.boolean().optional(),
+      }),
+    )
+    .use(checkProjectPermission(LANGY_READ_PERMISSION))
+    .mutation(async ({ input, ctx }): Promise<void> => {
+      trackServerEvent({
+        userId: ctx.session.user.id,
+        event: "langy_feedback",
+        projectId: input.projectId,
+        properties: {
+          conversationId: input.conversationId,
+          messageId: input.messageId,
+          traceId: input.traceId,
+          rating: input.rating,
+          sentiment: input.sentiment,
+          comment: input.comment,
+          shareConversationConsent: input.shareConversationConsent ?? false,
+        },
+      });
+    }),
+
+  /**
+   * SSE subscription pushing `langy_conversation_updated` signals to active
+   * browsers when a conversation's fold projection advances. The client
+   * listens, cancels + invalidates its TanStack cache, and refetches the slim
+   * projection — landing fresh data without a data push. Mirrors
+   * `traces.onTraceUpdate` / `tracesV2.onDiscoverUpdate` so `useSSESubscription`
+   * handles it unchanged.
+   */
+  onConversationUpdate: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission(LANGY_READ_PERMISSION))
+    .subscription(async function* (opts) {
+      const { projectId } = opts.input;
+      const emitter = getApp().broadcast.getTenantEmitter(projectId);
+      try {
+        for await (const eventArgs of on(emitter, "langy_conversation_updated", {
+          // @ts-expect-error - signal is not typed on the events overload
+          signal: opts.signal,
+        })) {
+          yield eventArgs[0];
+        }
+      } finally {
+        getApp().broadcast.cleanupTenantEmitter(projectId);
+      }
+    }),
+});

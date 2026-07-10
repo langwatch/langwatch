@@ -23,7 +23,7 @@ import { useState } from "react";
 import { Menu } from "~/components/ui/menu";
 import { TriggerAnchor } from "~/components/ui/TriggerAnchor";
 import { Tooltip } from "~/components/ui/tooltip";
-import type { LangyConversationSummary } from "./useLangyConversations";
+import type { LangyConversationSummary } from "../data/useLangyConversations";
 
 export function RecentChatsMenu({
   conversations,

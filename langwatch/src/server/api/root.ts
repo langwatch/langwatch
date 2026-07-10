@@ -39,6 +39,7 @@ import { homeRouter } from "./routers/home";
 import { httpProxyRouter } from "./routers/httpProxy";
 import { integrationsChecksRouter } from "./routers/integrationsChecks";
 import { langyEgressRouter } from "./routers/langyEgress";
+import { langyRouter } from "./routers/langy";
 import { langyGithubRouter } from "./routers/langyGithub";
 import { licenseRouter } from "./routers/license";
 import { licenseEnforcementRouter } from "./routers/licenseEnforcement";
@@ -161,6 +162,7 @@ const coreRouters = {
   gatewayUsage: gatewayUsageRouter,
   langyGithub: langyGithubRouter,
   langyEgress: langyEgressRouter,
+  langy: langyRouter,
 };
 
 const eeRouters = {

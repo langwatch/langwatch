@@ -93,6 +93,7 @@ import type { SimulationRunStateRepository } from "./pipelines/simulation-proces
 import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
 import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
 import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
+import { createLangyConversationUpdateBroadcastReactor } from "./pipelines/langy-conversation-processing/reactors/langyConversationUpdateBroadcast.reactor";
 import type { LangyConversationStateData } from "./pipelines/langy-conversation-processing/projections/langyConversationState.foldProjection";
 import type { ClickHouseLangyMessageRecord } from "./pipelines/langy-conversation-processing/projections/langyMessageStorage.mapProjection";
 import type { LangyConversationStateRepository } from "./pipelines/langy-conversation-processing/repositories/langyConversationState.repository";
@@ -365,12 +366,22 @@ export class PipelineRegistry {
       conversations: { failTurn: (args) => failTurn.fn(args) },
     });
 
+    // Freshness signal: broadcast a per-conversation SSE signal on every fold
+    // advance so the panel invalidates its slim tRPC caches (ADR-046). Bridge
+    // needs Redis for worker->web pub/sub; the reactor self-disables without it.
+    const langyConversationUpdateBroadcastReactor =
+      createLangyConversationUpdateBroadcastReactor({
+        broadcast: this.deps.broadcast,
+        hasRedis: !!this.deps.eventSourcing.redisConnection,
+      });
+
     const pipeline = this.deps.eventSourcing.register(
       createLangyConversationProcessingPipeline({
         langyConversationStateFoldStore,
         langyMessageAppendStore: this.deps.repositories.langyMessageStorage,
         spawnAgentReactor: spawnAgentHandle.reactor,
         reconcileAgentTurnReactor,
+        langyConversationUpdateBroadcastReactor,
       }),
     );
 

@@ -55,7 +55,7 @@ vi.mock("~/server/modelProviders/iconsMap", () => ({
   modelProviderIcons: { openai: <svg data-testid="provider-icon" /> },
 }));
 
-import { Composer } from "../Composer";
+import { Composer } from "../components/Composer";
 
 function renderComposer() {
   return render(
