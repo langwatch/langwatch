@@ -25,8 +25,8 @@ describe("DraggableTabsBrowser", () => {
       return render(
         <ChakraProvider value={defaultSystem}>
           <DraggableTabsBrowser.Root onTabMove={vi.fn()}>
-            <DraggableTabsBrowser.Group
-              groupId="window-1"
+            <DraggableTabsBrowser.Window
+              windowId="window-1"
               activeTabId="tab-1"
               onTabChange={vi.fn()}
             >
@@ -48,7 +48,7 @@ describe("DraggableTabsBrowser", () => {
               <DraggableTabsBrowser.Content value="tab-2">
                 <div data-testid="tab-2-content">Tab 2 content</div>
               </DraggableTabsBrowser.Content>
-            </DraggableTabsBrowser.Group>
+            </DraggableTabsBrowser.Window>
           </DraggableTabsBrowser.Root>
         </ChakraProvider>,
       );

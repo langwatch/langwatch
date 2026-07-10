@@ -34,16 +34,16 @@ import { TabIdProvider } from "./TabContext";
 interface DraggableTabsContextValue {
   onTabMove: (params: {
     tabId: string;
-    from: { groupId: string; index: number };
-    to: { groupId: string; index: number };
+    from: { windowId: string; index: number };
+    to: { windowId: string; index: number };
   }) => void;
   activeDrag: {
-    groupId: string;
+    windowId: string;
     tabId: string;
     label?: React.ReactNode;
   } | null;
   setActiveDrag: (
-    drag: { groupId: string; tabId: string; label?: React.ReactNode } | null,
+    drag: { windowId: string; tabId: string; label?: React.ReactNode } | null,
   ) => void;
 }
 
@@ -64,28 +64,28 @@ export function useDraggableTabsContext() {
   return context;
 }
 
-// Context for managing group state
+// Context for managing window (split-pane) state
 /**
- * TabGroupContextValue interface
- * Single Responsibility: Provides group-level tab state and callbacks.
+ * TabWindowContextValue interface
+ * Single Responsibility: Provides window-level tab state and callbacks.
  */
-interface TabGroupContextValue {
-  groupId: string;
+interface TabWindowContextValue {
+  windowId: string;
   activeTabId?: string;
-  onTabChange?: (groupId: string, tabId: string) => void;
+  onTabChange?: (windowId: string, tabId: string) => void;
 }
 
-const TabGroupContext = React.createContext<TabGroupContextValue | null>(null);
+const TabWindowContext = React.createContext<TabWindowContextValue | null>(null);
 
 /**
- * useTabGroupContext
- * Single Responsibility: Provides access to group context; throws if used outside Group.
+ * useTabWindowContext
+ * Single Responsibility: Provides access to window context; throws if used outside Window.
  */
-function useTabGroupContext() {
-  const context = React.useContext(TabGroupContext);
+function useTabWindowContext() {
+  const context = React.useContext(TabWindowContext);
   if (!context) {
     throw new Error(
-      "Tab components must be used within DraggableTabsBrowser.Group",
+      "Tab components must be used within DraggableTabsBrowser.Window",
     );
   }
   return context;
@@ -94,21 +94,21 @@ function useTabGroupContext() {
 /**
  * DraggableTabsBrowser Root Component
  *
- * Single Responsibility: Provides drag-and-drop context and orchestrates tab movement between groups
+ * Single Responsibility: Provides drag-and-drop context and orchestrates tab movement between windows
  */
 interface DraggableTabsBrowserProps {
   children: React.ReactNode;
   onTabMove: (params: {
     tabId: string;
-    from: { groupId: string; index: number };
-    to: { groupId: string; index: number };
+    from: { windowId: string; index: number };
+    to: { windowId: string; index: number };
   }) => void;
 }
 
 /**
  * DraggableTabsBrowserRoot component
- * Single Responsibility: Orchestrates drag-and-drop for tabs across groups
- * @param children - Child group components
+ * Single Responsibility: Orchestrates drag-and-drop for tabs across windows
+ * @param children - Child window components
  * @param onTabMove - Callback fired when a tab is moved
  */
 function DraggableTabsBrowserRoot({
@@ -116,7 +116,7 @@ function DraggableTabsBrowserRoot({
   onTabMove,
 }: DraggableTabsBrowserProps) {
   const [activeDrag, setActiveDrag] = React.useState<{
-    groupId: string;
+    windowId: string;
     tabId: string;
     label?: React.ReactNode;
   } | null>(null);
@@ -134,8 +134,8 @@ function DraggableTabsBrowserRoot({
    * Single Responsibility: Sets active drag state when drag begins.
    */
   function handleDragStart(event: any) {
-    const { groupId, tabId, label } = event.active.data.current;
-    setActiveDrag({ groupId, tabId, label });
+    const { windowId, tabId, label } = event.active.data.current;
+    setActiveDrag({ windowId, tabId, label });
   }
 
   /**
@@ -155,12 +155,12 @@ function DraggableTabsBrowserRoot({
     const activeIndex = activeData.sortable?.index;
     const overIndex = overData.sortable?.index;
 
-    // Only move if group or tab positions differ
-    // if (activeData.groupId !== overData.groupId || activeIndex !== overIndex) {
+    // Only move if window or tab positions differ
+    // if (activeData.windowId !== overData.windowId || activeIndex !== overIndex) {
     onTabMove({
       tabId: activeData.tabId,
-      from: { groupId: activeData.groupId, index: activeIndex },
-      to: { groupId: overData.groupId, index: overIndex },
+      from: { windowId: activeData.windowId, index: activeIndex },
+      to: { windowId: overData.windowId, index: overIndex },
     });
     // }
   }
@@ -198,7 +198,7 @@ function DraggableTabsBrowserRoot({
 function DragOverlayContent({
   activeDrag,
 }: {
-  activeDrag: { groupId: string; tabId: string; label?: React.ReactNode };
+  activeDrag: { windowId: string; tabId: string; label?: React.ReactNode };
 }) {
   return (
     <div
@@ -217,49 +217,49 @@ function DragOverlayContent({
 }
 
 /**
- * DraggableTabsBrowser Group Component
+ * DraggableTabsBrowser Window Component
  *
- * Single Responsibility: Manages a group of tabs with shared state and drop zone
+ * Single Responsibility: Manages one split-pane window of tabs with shared state and drop zone
  */
-interface DraggableTabsGroupProps
+interface DraggableTabsWindowProps
   extends Omit<TabsRootProps, "onClick" | "defaultValue"> {
-  groupId: string;
+  windowId: string;
   activeTabId?: string;
-  onTabChange?: (groupId: string, tabId: string) => void;
-  onClick?: (groupId: string, tabId: string) => void;
+  onTabChange?: (windowId: string, tabId: string) => void;
+  onClick?: (windowId: string, tabId: string) => void;
 }
 
 /**
- * DraggableTabsGroup component
- * Single Responsibility: Manages a group of tabs with active state and tab change handler.
+ * DraggableTabsWindow component
+ * Single Responsibility: Manages one window of tabs with active state and tab change handler.
  * @param children - Tab bar and content components
- * @param groupId - Unique identifier for this tab group
+ * @param windowId - Unique identifier for this split-pane window
  * @param activeTabId - Currently active tab ID
  * @param onTabChange - Callback fired when active tab changes
- * @param onClick - Callback fired when group is clicked
+ * @param onClick - Callback fired when the window is clicked
  * @param props - Additional stack props
  */
-function DraggableTabsGroup({
+function DraggableTabsWindow({
   children,
-  groupId,
+  windowId,
   activeTabId,
   onTabChange,
   onClick,
   ...props
-}: DraggableTabsGroupProps) {
-  const groupContextValue: TabGroupContextValue = {
-    groupId,
+}: DraggableTabsWindowProps) {
+  const windowContextValue: TabWindowContextValue = {
+    windowId,
     activeTabId,
     onTabChange,
   };
 
   return (
-    <TabGroupContext.Provider value={groupContextValue}>
+    <TabWindowContext.Provider value={windowContextValue}>
       <VStack height="full" gap={0} align="stretch" width="full">
         <Tabs.Root
           value={activeTabId}
-          onValueChange={(change) => onTabChange?.(groupId, change.value)}
-          onClick={() => onClick?.(groupId, activeTabId ?? "")}
+          onValueChange={(change) => onTabChange?.(windowId, change.value)}
+          onClick={() => onClick?.(windowId, activeTabId ?? "")}
           width="full"
           height="full"
           display="flex"
@@ -272,7 +272,7 @@ function DraggableTabsGroup({
           {children}
         </Tabs.Root>
       </VStack>
-    </TabGroupContext.Provider>
+    </TabWindowContext.Provider>
   );
 }
 
@@ -360,7 +360,7 @@ function DraggableBrowserTabTrigger({
  * @param rest - Additional box props
  */
 function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
-  const { groupId } = useTabGroupContext();
+  const { windowId } = useTabWindowContext();
 
   const {
     attributes,
@@ -373,7 +373,7 @@ function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
   } = useSortable({
     id,
     data: {
-      groupId,
+      windowId,
       tabId: id,
       label: (
         <TabIdProvider tabId={id}>
@@ -405,25 +405,25 @@ const DraggableTabsContent = Tabs.Content;
 
 /**
  * Compound component for draggable browser-like tabs.
- * Provides drag-and-drop functionality for tabs across multiple groups.
+ * Provides drag-and-drop functionality for tabs across multiple windows.
  *
  * @example
  * ```tsx
  * <DraggableTabsBrowser.Root onTabMove={handleMove}>
- *   <DraggableTabsBrowser.Group groupId="g1" activeTabId="tab1">
+ *   <DraggableTabsBrowser.Window windowId="g1" activeTabId="tab1">
  *     <DraggableTabsBrowser.TabBar tabIds={["tab1", "tab2"]}>
  *       <DraggableTabsBrowser.Tab id="tab1">
  *         <DraggableTabsBrowser.Trigger value="tab1">Tab 1</DraggableTabsBrowser.Trigger>
  *       </DraggableTabsBrowser.Tab>
  *     </DraggableTabsBrowser.TabBar>
  *     <DraggableTabsBrowser.Content value="tab1">Content</DraggableTabsBrowser.Content>
- *   </DraggableTabsBrowser.Group>
+ *   </DraggableTabsBrowser.Window>
  * </DraggableTabsBrowser.Root>
  * ```
  */
 export const DraggableTabsBrowser = {
   Root: DraggableTabsBrowserRoot,
-  Group: DraggableTabsGroup,
+  Window: DraggableTabsWindow,
   TabBar: DraggableTabsTabBar,
   Trigger: DraggableBrowserTabTrigger,
   Tab: DraggableTab,

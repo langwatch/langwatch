@@ -46,22 +46,22 @@ export function PromptPlaygroundBrowser() {
    */
   function handleTabMove(params: {
     tabId: string;
-    from: { groupId: string; index: number };
-    to: { groupId: string; index: number };
+    from: { windowId: string; index: number };
+    to: { windowId: string; index: number };
   }) {
     moveTab({
       tabId: params.tabId,
-      windowId: params.to.groupId,
+      windowId: params.to.windowId,
       index: params.to.index,
     });
   }
 
   /**
    * handleTabChange
-   * Single Responsibility: Sets the active tab within a window group.
+   * Single Responsibility: Sets the active tab within a window.
    */
-  function handleTabChange(groupId: string, tabId: string) {
-    setActiveTab({ windowId: groupId, tabId });
+  function handleTabChange(windowId: string, tabId: string) {
+    setActiveTab({ windowId, tabId });
   }
 
   /**
@@ -75,9 +75,9 @@ export function PromptPlaygroundBrowser() {
   return (
     <DraggableTabsBrowser.Root onTabMove={handleTabMove}>
       {windows.map((tabbedWindow) => (
-        <DraggableTabsBrowser.Group
+        <DraggableTabsBrowser.Window
           key={tabbedWindow.id}
-          groupId={tabbedWindow.id}
+          windowId={tabbedWindow.id}
           activeTabId={tabbedWindow.activeTabId ?? undefined}
           onTabChange={handleTabChange}
           onClick={() => setActiveWindow({ windowId: tabbedWindow.id })}
@@ -167,7 +167,7 @@ export function PromptPlaygroundBrowser() {
               </DraggableTabsBrowser.Content>
             </TabIdProvider>
           ))}
-        </DraggableTabsBrowser.Group>
+        </DraggableTabsBrowser.Window>
       ))}
     </DraggableTabsBrowser.Root>
   );
