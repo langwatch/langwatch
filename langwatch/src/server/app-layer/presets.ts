@@ -400,6 +400,7 @@ export function initializeDefaultApp(options?: {
               getLicenseHandler().getActivePlan(organizationId),
           },
         }),
+        { isSaaS: true },
       )
     : PlanProviderService.create({
         getActivePlan: async ({ organizationId }) => {
@@ -409,7 +410,7 @@ export function initializeDefaultApp(options?: {
             planSource: plan.free ? ("free" as const) : ("license" as const),
           };
         },
-      });
+      }, { isSaaS: false });
 
   let subscription: SubscriptionService | undefined;
   let usageReportingService: StripeUsageReportingService | undefined;
@@ -964,9 +965,10 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       null,
       SimulationRunService.create(null),
     ),
-    planProvider: PlanProviderService.create({
-      getActivePlan: async () => FREE_PLAN,
-    }),
+    planProvider: PlanProviderService.create(
+      { getActivePlan: async () => FREE_PLAN },
+      { isSaaS: false },
+    ),
     subscription: undefined,
     notifications: NotificationService.createNull(),
     nurturing: undefined,

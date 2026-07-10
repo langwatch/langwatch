@@ -11,13 +11,13 @@ Feature: Billing profile resolution in the composite plan provider
 
   # --- Active subscription predicate ---
 
-  @unit @unimplemented
+  @unit
   Scenario: A PENDING subscription does not win plan resolution
     Given an organization whose only subscription has status "PENDING"
     When the active plan is resolved
     Then the plan resolves as if no subscription exists
 
-  @unit @unimplemented
+  @unit
   Scenario: A FAILED subscription does not win plan resolution
     Given an organization whose only subscription has status "FAILED"
     When the active plan is resolved
@@ -25,37 +25,37 @@ Feature: Billing profile resolution in the composite plan provider
 
   # --- memberPolicy mapping (Decision 4) ---
 
-  @unit @unimplemented
+  @unit
   Scenario: Seat-event subscription resolves member policy purchase_seat
     Given an organization whose winning plan source is an ACTIVE "GROWTH_SEAT_USD_MONTHLY" subscription
     When the active plan is resolved
     Then the billing profile member policy is "purchase_seat"
 
-  @unit @unimplemented
+  @unit
   Scenario: ENTERPRISE license resolves member policy hard_cap
     Given a SaaS organization whose winning plan source is a valid ENTERPRISE license
     When the active plan is resolved
     Then the billing profile member policy is "hard_cap"
 
-  @unit @unimplemented
+  @unit
   Scenario: Non-ENTERPRISE license on SaaS resolves member policy upgrade
     Given a SaaS organization whose winning plan source is a valid GROWTH license
     When the active plan is resolved
     Then the billing profile member policy is "upgrade"
 
-  @unit @unimplemented
+  @unit
   Scenario: Any license on self-hosted resolves member policy hard_cap
     Given a self-hosted deployment whose organization has a valid GROWTH license
     When the active plan is resolved
     Then the billing profile member policy is "hard_cap"
 
-  @unit @unimplemented
+  @unit
   Scenario: Legacy tiered paid subscription resolves member policy upgrade
     Given an organization whose winning plan source is an ACTIVE "LAUNCH" subscription
     When the active plan is resolved
     Then the billing profile member policy is "upgrade"
 
-  @unit @unimplemented
+  @unit
   Scenario: Free organization resolves member policy upgrade
     Given an organization with no subscription and no license
     When the active plan is resolved
@@ -63,13 +63,13 @@ Feature: Billing profile resolution in the composite plan provider
 
   # --- Capabilities (Decision 6) ---
 
-  @unit @unimplemented
+  @unit
   Scenario: Enterprise plan resolves with enterprise capabilities enabled
     Given an organization whose winning plan is ENTERPRISE
     When the active plan is resolved
     Then the plan capabilities include rbac, scim, and sso as enabled
 
-  @unit @unimplemented
+  @unit
   Scenario: Growth plan resolves with enterprise capabilities disabled
     Given an organization whose winning plan source is an ACTIVE "GROWTH_SEAT_EUR_MONTHLY" subscription
     When the active plan is resolved
@@ -121,7 +121,7 @@ Feature: Billing profile resolution in the composite plan provider
 
   # --- OSS parity (Invariant I5) ---
 
-  @unit @unimplemented
+  @unit
   Scenario: Self-hosted resolution behavior is unchanged
     Given a self-hosted deployment with a valid ENTERPRISE license
     When the active plan is resolved

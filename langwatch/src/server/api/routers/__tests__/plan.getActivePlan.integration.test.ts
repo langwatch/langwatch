@@ -81,7 +81,7 @@ describe.skipIf(isTestcontainersOnly)("plan.getActivePlan integration", () => {
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
-      }),
+      }, { isSaaS: true }),
     });
 
     const ctx = createInnerTRPCContext({

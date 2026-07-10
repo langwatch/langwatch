@@ -53,7 +53,7 @@ describe("user.persona-home customization integration", () => {
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
         getActivePlan: async (): Promise<PlanInfo> => FREE_PLAN,
-      }),
+      }, { isSaaS: true }),
     });
 
     await prisma.organization.create({

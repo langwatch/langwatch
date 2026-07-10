@@ -94,7 +94,7 @@ describe.skipIf(isTestcontainersOnly)(
       globalForApp.__langwatch_app = createTestApp({
         planProvider: PlanProviderService.create({
           getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
-        }),
+        }, { isSaaS: true }),
         usageLimits: {
           notifyResourceLimitReached: mockNotifyResourceLimitReached,
           checkAndSendWarning: vi.fn().mockResolvedValue(undefined),
@@ -319,7 +319,7 @@ describe.skipIf(isTestcontainersOnly)(
             maxProjects: 10,
             overrideAddingLimitations: false,
           }) as PlanProvider["getActivePlan"],
-        }),
+        }, { isSaaS: true }),
         usageLimits: {
           notifyResourceLimitReached: vi.fn().mockResolvedValue(undefined),
           checkAndSendWarning: vi.fn().mockResolvedValue(undefined),

@@ -41,7 +41,7 @@ describe("Feature: REST API resource limit enforcement parity", () => {
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan as PlanProvider["getActivePlan"],
-      }),
+      }, { isSaaS: true }),
       usageLimits: {
         notifyPlanLimitReached: vi.fn().mockResolvedValue(undefined),
         checkAndSendWarning: vi.fn().mockResolvedValue(undefined),

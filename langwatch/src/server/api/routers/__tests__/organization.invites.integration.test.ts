@@ -196,7 +196,7 @@ describe("Organization Invites Integration", () => {
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan,
-      }),
+      }, { isSaaS: true }),
     });
 
     // Create admin caller
@@ -232,7 +232,7 @@ describe("Organization Invites Integration", () => {
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan,
-      }),
+      }, { isSaaS: true }),
     });
   });
 

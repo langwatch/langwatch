@@ -87,7 +87,7 @@ describe("GET /api/auth/cli/governance/*", () => {
       planProvider: PlanProviderService.create({
         getActivePlan: async ({ organizationId }) =>
           organizationId === ORG_C ? freePlan : enterprisePlan,
-      }),
+      }, { isSaaS: true }),
     });
 
     await prisma.organization.create({

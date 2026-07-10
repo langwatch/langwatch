@@ -64,7 +64,7 @@ describe("Limits Router Integration", () => {
     globalForApp.__langwatch_app = createTestApp({
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan,
-      }),
+      }, { isSaaS: true }),
     });
 
     const organization = await prisma.organization.upsert({
@@ -135,7 +135,7 @@ describe("Limits Router Integration", () => {
       globalForApp.__langwatch_app = createTestApp({
         planProvider: PlanProviderService.create({
           getActivePlan: mockGetActivePlan,
-        }),
+        }, { isSaaS: true }),
       });
     });
 

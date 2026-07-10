@@ -21,7 +21,7 @@ describe("PlanProviderService", () => {
       const source: PlanProvider = {
         getActivePlan: vi.fn().mockResolvedValue(STUB_PLAN),
       };
-      const service = PlanProviderService.create(source);
+      const service = PlanProviderService.create(source, { isSaaS: true });
 
       const user: PlanProviderUser = {
         id: "user_1",
@@ -33,7 +33,7 @@ describe("PlanProviderService", () => {
         user,
       });
 
-      expect(result).toBe(STUB_PLAN);
+      expect(result).toMatchObject(STUB_PLAN);
       expect(source.getActivePlan).toHaveBeenCalledWith({
         organizationId: "org_1",
         user,
@@ -44,7 +44,7 @@ describe("PlanProviderService", () => {
       const source: PlanProvider = {
         getActivePlan: vi.fn().mockResolvedValue(STUB_PLAN),
       };
-      const service = PlanProviderService.create(source);
+      const service = PlanProviderService.create(source, { isSaaS: true });
 
       const user: PlanProviderUser = {
         id: "user_1",
@@ -63,13 +63,13 @@ describe("PlanProviderService", () => {
       const source: PlanProvider = {
         getActivePlan: vi.fn().mockResolvedValue(FREE_PLAN),
       };
-      const service = PlanProviderService.create(source);
+      const service = PlanProviderService.create(source, { isSaaS: true });
 
       const result = await service.getActivePlan({
         organizationId: "org_1",
       });
 
-      expect(result).toBe(FREE_PLAN);
+      expect(result).toMatchObject(FREE_PLAN);
       expect(source.getActivePlan).toHaveBeenCalledWith({
         organizationId: "org_1",
       });
@@ -82,7 +82,7 @@ describe("PlanProviderService", () => {
       const source: PlanProvider = {
         getActivePlan: vi.fn().mockRejectedValue(error),
       };
-      const service = PlanProviderService.create(source);
+      const service = PlanProviderService.create(source, { isSaaS: true });
 
       await expect(
         service.getActivePlan({ organizationId: "org_1" })
@@ -97,7 +97,7 @@ describe("PlanProviderService", () => {
       const service = PlanProviderService.create({
         getActivePlan: ({ organizationId, user }) =>
           saasGetActivePlan(organizationId, user),
-      });
+      }, { isSaaS: true });
 
       const user: PlanProviderUser = { id: "u1", email: "a@b.com" };
       const result = await service.getActivePlan({
@@ -105,7 +105,7 @@ describe("PlanProviderService", () => {
         user,
       });
 
-      expect(result).toBe(STUB_PLAN);
+      expect(result).toMatchObject(STUB_PLAN);
       expect(saasGetActivePlan).toHaveBeenCalledWith("org_1", user);
     });
 
@@ -115,14 +115,14 @@ describe("PlanProviderService", () => {
       const service = PlanProviderService.create({
         getActivePlan: ({ organizationId }) =>
           licenseGetActivePlan(organizationId),
-      });
+      }, { isSaaS: true });
 
       const result = await service.getActivePlan({
         organizationId: "org_1",
         user: { id: "u1" },
       });
 
-      expect(result).toBe(FREE_PLAN);
+      expect(result).toMatchObject(FREE_PLAN);
       expect(licenseGetActivePlan).toHaveBeenCalledWith("org_1");
     });
   });

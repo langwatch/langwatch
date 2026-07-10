@@ -53,7 +53,7 @@ beforeAll(async () => {
   globalForApp.__langwatch_app = createTestApp({
     planProvider: PlanProviderService.create({
       getActivePlan: async () => enterprisePlan,
-    }),
+    }, { isSaaS: true }),
   });
 
   const organization = await prisma.organization.create({
