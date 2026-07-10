@@ -41,6 +41,9 @@ import type {
 
 const COPILOT_ATTR_PREFIX = "github.copilot.";
 
+/** Copilot CLI's instrumentation scope name (verified, copilot 1.0.69). */
+export const COPILOT_SCOPE = "@github/copilot";
+
 /** Copilot's gen_ai.operation.name values → langwatch span types. */
 const OPERATION_TO_SPAN_TYPE: Record<string, string> = {
   invoke_agent: "agent",
@@ -61,9 +64,15 @@ export class CopilotExtractor implements CanonicalAttributesExtractor {
       attrs.get(ATTR_KEYS.GEN_AI_OPERATION_NAME);
     // Gate everything on copilot provenance so a non-copilot GenAI span
     // (e.g. a user's own SDK emitting invoke_agent) is left untouched.
-    const hasCopilotAttrs =
-      attrs.has("enduser.pseudo.id") || attrs.hasByPrefix(COPILOT_ATTR_PREFIX);
-    if (!hasCopilotAttrs) return;
+    // `enduser.pseudo.id` is deliberately NOT a trigger — it's standard
+    // OTel semconv any tenant SDK may emit; consuming it here would
+    // rename a foreign tenant's attribute. Provenance = copilot's
+    // instrumentation scope (`@github/copilot`, verified on the 1.0.69
+    // wire) or a github.copilot.* attribute.
+    const scopeName = ctx.span.instrumentationScope?.name ?? "";
+    const hasCopilotProvenance =
+      scopeName === COPILOT_SCOPE || attrs.hasByPrefix(COPILOT_ATTR_PREFIX);
+    if (!hasCopilotProvenance) return;
 
     if (typeof operation === "string" && OPERATION_TO_SPAN_TYPE[operation]) {
       inferSpanTypeIfAbsent(

@@ -356,23 +356,31 @@ export async function resolveWrapperMode(
     setOpencodeOpenTelemetryFlag();
   }
 
-  // Persist mode + (when freshly minted) the ingest key so the next
-  // invocation skips re-deriving the mode and reuses the cached key
-  // instead of minting again.
-  const next: GovernanceConfig = {
-    ...cfg,
-    tool_mode: { ...(cfg.tool_mode ?? {}), [tool]: "ingestion" },
-  };
+  // Persist (when freshly minted) the ingest key so the next invocation
+  // reuses the cached key instead of minting again. The tool_mode PIN is
+  // written only on the legacy state-only derivation (no forcedMode):
+  // when the path-selection UX upstream forced the mode, IT owns
+  // persistence — the interactive prompt saves an explicit answer, and
+  // silent defaults (non-TTY, prompt abort, copilot ingestion-first)
+  // deliberately do NOT persist so the user is asked again next run.
+  // Pinning here unconditionally turned one aborted prompt / CI run
+  // into a permanent silent pin that suppressed the prompt forever.
+  const next: GovernanceConfig = { ...cfg };
+  if (forcedMode === undefined) {
+    next.tool_mode = { ...(cfg.tool_mode ?? {}), [tool]: "ingestion" };
+  }
   if (minted) {
     next.default_personal_ingest_keys = {
       ...(cfg.default_personal_ingest_keys ?? {}),
       [sourceType]: { secret: token, prefix },
     };
   }
-  try {
-    saveConfig(next);
-  } catch {
-    // Best-effort cache - failure to persist doesn't block this run.
+  if (forcedMode === undefined || minted) {
+    try {
+      saveConfig(next);
+    } catch {
+      // Best-effort cache - failure to persist doesn't block this run.
+    }
   }
 
   return {

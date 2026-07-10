@@ -63,7 +63,11 @@ const TOOLS = ["claude", "codex", "cursor", "gemini", "opencode"] as const;
  * remove the function from the shell session (never from the rc file)
  * or the same calls get captured twice.
  */
-export const SHELL_FUNCTION_TOOLS = ["gemini", "opencode", "copilot"];
+export const SHELL_FUNCTION_TOOLS: readonly string[] = [
+  "gemini",
+  "opencode",
+  "copilot",
+] as const;
 
 const BLOCK_BEGIN = "# >>> langwatch begin >>>";
 const BLOCK_END = "# <<< langwatch end <<<";

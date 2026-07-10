@@ -27,7 +27,11 @@ import {
   SHELL_FUNCTION_TOOLS,
 } from "./shell-rc";
 import { copilotPrespawnWarnings } from "./copilot-prespawn";
-import { copilotSeatBypassSuffix, resolveWrapperMode } from "./wrapper-mode";
+import {
+  copilotSeatBypassSuffix,
+  resolveWrapperMode,
+  telemetryEnvVarNames,
+} from "./wrapper-mode";
 import { createCodexIOStreamer } from "./codex-rollout-otlp";
 import { parseToolModeFlag, resolveWrapperPath } from "./wrapper-path-choice";
 
@@ -145,12 +149,19 @@ export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
       // seat — which is why copilot defaults to the ingestion path
       // (wrapper-path-choice.ts) and only lands here on explicit choice
       // or policy force.
+      // clears: a user who hand-exported the Path B telemetry block
+      // (COPILOT_OTEL_ENABLED + OTLP endpoint/headers + capture flag)
+      // would otherwise double-trace in gateway mode — the rc-function
+      // unset in buildShellReapply only covers the persisted-function
+      // vector, not bare global exports. Derived from the same builder
+      // that installs the Path B block so the two can never drift.
       return {
         vars: {
           COPILOT_PROVIDER_TYPE: "openai",
           COPILOT_PROVIDER_BASE_URL: `${gw}/v1`,
           COPILOT_PROVIDER_API_KEY: auth,
         },
+        clears: telemetryEnvVarNames("copilot"),
       };
     case "opencode":
       // opencode 1.x is multi-provider; under the hood it uses the
@@ -406,15 +417,18 @@ function shouldAutoLogin(): boolean {
  * INSIDE `$SHELL -i -c` after the rc has been sourced, so the wrapper's
  * mode vars win over anything the rc exported.
  *
- * Gateway runs additionally `unset -f` the tool for scoped-function
- * tools (gemini / opencode / copilot): a previously persisted Path-B rc
- * function re-injects the OTel exporter env AT INVOCATION TIME — after
- * these exports — so without removing it the gateway would capture the
- * calls server-side AND the tool would emit OTel for the same calls
- * (double trace, double cost). `unset -f` removes only the function;
- * user aliases survive, which is the whole reason for the interactive
- * shell. Ingestion runs keep the function — it sets the same telemetry
- * env this run wants anyway, and the rc file itself is never touched.
+ * For scoped-function tools (gemini / opencode / copilot) the prefix
+ * additionally `unset -f`s the tool in EVERY mode: a previously
+ * persisted Path-B rc function re-applies its frozen env AT INVOCATION
+ * TIME — after these exports — so leaving it in place lets stale state
+ * win over this run's resolution. Concretely: on gateway runs the
+ * function re-injects OTel exporter env on top of gateway capture
+ * (double trace, double cost); on ingestion runs it overrides a
+ * freshly-minted token with a stale one (silent 401s) and re-enables
+ * content capture the user explicitly opted out of. `unset -f` removes
+ * only the function FROM THIS SHELL SESSION — user aliases survive
+ * (the whole reason for the interactive shell) and the rc file is
+ * never touched, so bare `<tool>` runs keep capturing.
  */
 export function buildShellReapply(args: {
   tool: string;
@@ -424,7 +438,7 @@ export function buildShellReapply(args: {
 }): string {
   const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
   const parts: string[] = [];
-  if (args.mode === "gateway" && SHELL_FUNCTION_TOOLS.includes(args.tool)) {
+  if (SHELL_FUNCTION_TOOLS.includes(args.tool)) {
     parts.push(`unset -f ${args.tool} 2>/dev/null`);
   }
   parts.push(...args.clears.map((k) => `unset ${k}`));

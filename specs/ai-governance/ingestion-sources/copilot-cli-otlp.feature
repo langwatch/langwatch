@@ -54,7 +54,7 @@ Feature: Copilot CLI OTLP spans canonicalize on the unified substrate
 
     @unit
     Scenario: Captured content payloads are lifted as span input and output
-      Given a copilot span whose events carry captured prompt and response content
+      Given a copilot span whose attributes carry captured prompt and response content
       When the canonicalisation chain runs
       Then the canonical span's input and output carry the captured content
 

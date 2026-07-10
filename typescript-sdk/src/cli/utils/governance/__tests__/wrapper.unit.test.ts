@@ -166,6 +166,20 @@ describe("envForTool", () => {
     expect(env.OTEL_EXPORTER_OTLP_ENDPOINT).toBeUndefined();
   });
 
+  it("copilot → gateway clears every Path B telemetry var inherited from the shell", () => {
+    // A hand-exported OTel block (pre-persist manual setup) would
+    // double-trace in gateway mode; the clears list is derived from the
+    // same builder that installs the Path B block so they cannot drift.
+    const clears = envForTool(cfg, "copilot").clears ?? [];
+    expect(clears).toContain("COPILOT_OTEL_ENABLED");
+    expect(clears).toContain("COPILOT_OTEL_EXPORTER_TYPE");
+    expect(clears).toContain("OTEL_EXPORTER_OTLP_ENDPOINT");
+    expect(clears).toContain("OTEL_EXPORTER_OTLP_HEADERS");
+    expect(clears).toContain(
+      "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT",
+    );
+  });
+
   it("unknown tool → empty env", () => {
     const env = envForTool(cfg, "nonsense").vars;
     expect(env).toEqual({});
@@ -259,14 +273,34 @@ describe("buildShellReapply", () => {
 
   describe("when the tool runs in ingestion mode", () => {
     /** @scenario Ingestion runs leave the persisted function in place */
-    it("does not unset the function (it sets the same telemetry env this run wants)", () => {
+    it("neutralizes the stale function for this run without touching the rc file", () => {
+      // The persisted function froze an OLD run's env (stale token,
+      // possibly capture-on when the user has since opted out) and its
+      // env-prefix would win over this run's exports at invocation time.
+      // Unset it in the session; the rc block itself stays for bare runs.
       const reapply = buildShellReapply({
         tool: "copilot",
         mode: "ingestion",
         clears: [],
         vars: { COPILOT_OTEL_ENABLED: "true" },
       });
-      expect(reapply).not.toContain("unset -f");
+      expect(reapply).toContain("unset -f copilot");
+      // buildShellReapply produces a shell prefix only — it never writes
+      // or removes rc content (no file I/O in this module path).
+      expect(reapply).not.toContain(">>");
+    });
+
+    it("lets this run's freshly-resolved env win over a stale persisted function", () => {
+      const reapply = buildShellReapply({
+        tool: "copilot",
+        mode: "ingestion",
+        clears: [],
+        vars: { OTEL_EXPORTER_OTLP_HEADERS: "Authorization=Bearer fresh" },
+      });
+      // unset -f comes FIRST, exports after — the fresh token wins.
+      expect(
+        reapply.indexOf("unset -f copilot"),
+      ).toBeLessThan(reapply.indexOf("export OTEL_EXPORTER_OTLP_HEADERS"));
     });
   });
 

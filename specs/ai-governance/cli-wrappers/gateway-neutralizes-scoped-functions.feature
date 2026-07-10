@@ -60,4 +60,5 @@ Feature: Gateway runs neutralize persisted Path B shell functions so no call is 
     Scenario: Ingestion runs leave the persisted function in place
       Given tool_mode.copilot is saved as "ingestion"
       When the user runs `langwatch copilot`
-      Then the persisted `copilot` shell function is not removed from the rc file
+      Then the stale persisted function is neutralized for this run only
+      And the rc file keeps the persisted `copilot` function for bare runs

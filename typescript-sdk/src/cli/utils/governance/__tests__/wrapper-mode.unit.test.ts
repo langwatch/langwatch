@@ -545,6 +545,50 @@ describe("resolveWrapperMode", () => {
     });
   });
 
+  describe("when the mode was forced by the path-selection UX (silent default)", () => {
+    // Regression: resolveWrapperMode used to pin tool_mode="ingestion"
+    // unconditionally — one aborted prompt / CI run silently pinned
+    // copilot forever and the path prompt never appeared again. When a
+    // forcedMode is passed, persistence belongs to the upstream UX
+    // (explicit prompt answers persist there; silent defaults don't).
+    it("does not pin tool_mode when a forcedMode was passed", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+      (cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+        token: "sk-lw-copilot-tok",
+        prefix: "sk-lw-copi",
+        endpoint: "http://app.example.com/api/otel",
+      });
+
+      const cfg = baseCfg();
+      await resolveWrapperMode(cfg, "copilot", {}, [], "ingestion");
+
+      const saved = (configMod.saveConfig as ReturnType<typeof vi.fn>).mock
+        .calls;
+      for (const call of saved) {
+        const persisted = call[0] as GovernanceConfig;
+        expect(persisted.tool_mode?.copilot).toBeUndefined();
+      }
+    });
+
+    it("still caches the freshly minted ingest key", async () => {
+      const { resolveWrapperMode } = await import("../wrapper-mode.js");
+      (cliApi.mintIngestionKey as ReturnType<typeof vi.fn>).mockResolvedValue({
+        token: "sk-lw-copilot-tok2",
+        prefix: "sk-lw-copi",
+        endpoint: "http://app.example.com/api/otel",
+      });
+
+      const cfg = baseCfg();
+      await resolveWrapperMode(cfg, "copilot", {}, [], "ingestion");
+
+      const persisted = (configMod.saveConfig as ReturnType<typeof vi.fn>).mock
+        .calls[(configMod.saveConfig as ReturnType<typeof vi.fn>).mock.calls.length - 1]?.[0] as GovernanceConfig;
+      expect(
+        persisted.default_personal_ingest_keys?.copilot_cli?.secret,
+      ).toBe("sk-lw-copilot-tok2");
+    });
+  });
+
   describe("copilotSeatBypassSuffix()", () => {
     // runWrapped's ingestion-mint-failure fallback appends this suffix to
     // its stderr message (wrapper.ts); asserting the helper here keeps the

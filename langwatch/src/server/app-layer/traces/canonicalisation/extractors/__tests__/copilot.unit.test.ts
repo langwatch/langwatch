@@ -52,6 +52,17 @@ describe("CopilotExtractor", () => {
       expect(ctx.out["langwatch.user.id"]).toBe("a1b2c3hash");
     });
 
+    it("recognizes provenance from the @github/copilot instrumentation scope alone", () => {
+      const ctx = createExtractorContext(
+        { "enduser.pseudo.id": "hash", "gen_ai.operation.name": "chat" },
+        { instrumentationScope: { name: "@github/copilot", version: null } },
+      );
+
+      new CopilotExtractor().apply(ctx);
+
+      expect(ctx.out["langwatch.user.id"]).toBe("hash");
+    });
+
     /** @scenario A copilot tool-execution span canonicalizes as a tool span */
     it("infers the tool span type from gen_ai.operation.name=execute_tool", () => {
       const ctx = createExtractorContext({
@@ -67,7 +78,7 @@ describe("CopilotExtractor", () => {
     it("infers the agent span type from invoke_agent", () => {
       const ctx = createExtractorContext({
         "gen_ai.operation.name": "invoke_agent",
-        "enduser.pseudo.id": "hash",
+        "github.copilot.turn_id": "t1",
       });
 
       new CopilotExtractor().apply(ctx);
@@ -78,7 +89,7 @@ describe("CopilotExtractor", () => {
     it("respects a span type set by an earlier extractor", () => {
       const ctx = createExtractorContext({
         "gen_ai.operation.name": "chat",
-        "enduser.pseudo.id": "hash",
+        "github.copilot.turn_id": "t1",
       });
       ctx.out["langwatch.span.type"] = "llm";
 
@@ -99,6 +110,18 @@ describe("CopilotExtractor", () => {
       new CopilotExtractor().apply(ctx);
 
       expect(ctx.out).toEqual({});
+    });
+
+    it("never consumes a foreign tenant's enduser.pseudo.id (standard semconv, not a copilot marker)", () => {
+      const ctx = createExtractorContext({
+        "enduser.pseudo.id": "someone-elses-user-hash",
+        "gen_ai.operation.name": "chat",
+      });
+
+      new CopilotExtractor().apply(ctx);
+
+      expect(ctx.out).toEqual({});
+      expect(ctx.bag.attrs.has("enduser.pseudo.id")).toBe(true);
     });
   });
 
@@ -137,10 +160,19 @@ describe("CopilotExtractor", () => {
       });
 
       // Standard core — GenAI's work, zero copilot-specific code.
+      // appliedRules pins the delegation: without GenAIExtractor in the
+      // chain these attrs would still merge via remaining(), so the
+      // value assertions alone would be unfalsifiable.
+      expect(
+        result.appliedRules.some((r) => r.startsWith("genai:")),
+      ).toBe(true);
       expect(result.attributes["gen_ai.request.model"]).toBe("gpt-5");
       expect(result.attributes["gen_ai.usage.input_tokens"]).toBe(1200);
       expect(result.attributes["gen_ai.usage.output_tokens"]).toBe(350);
       // Extras — Copilot's work.
+      expect(
+        result.appliedRules.some((r) => r.startsWith("copilot:")),
+      ).toBe(true);
       expect(result.attributes["metadata.copilot_premium_requests"]).toBe("1");
       expect(result.attributes["langwatch.user.id"]).toBe("hash");
     });
