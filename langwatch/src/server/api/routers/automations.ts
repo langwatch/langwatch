@@ -1,5 +1,5 @@
 import { generate as ksuid } from "@langwatch/ksuid";
-import { AlertType, type Prisma, TriggerAction } from "@prisma/client";
+import { AlertType, type Prisma, TriggerAction, TriggerKind } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import {
@@ -709,6 +709,7 @@ export const automationRouter = createTRPCRouter({
         data = {
           name: built.name,
           action: built.action,
+          triggerKind: TriggerKind.ALERT,
           alertType: built.alertType,
           filters: built.filters,
           customGraphId: built.customGraphId,
@@ -722,6 +723,7 @@ export const automationRouter = createTRPCRouter({
         data = {
           name: input.name,
           action: input.action,
+          triggerKind: TriggerKind.AUTOMATION,
           alertType: input.alertType ?? null,
           filters: JSON.stringify(input.filters),
           customGraphId: input.customGraphId ?? null,

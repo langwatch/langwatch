@@ -212,6 +212,7 @@ describe("automationRouter", () => {
           // Name is prefixed to match the dashboard "Add Alert" path so the
           // same trigger appears identically through both creators.
           expect(createArgs.data.name).toBe("p95 latency");
+          expect(createArgs.data.triggerKind).toBe("ALERT");
         });
       });
 
@@ -323,6 +324,7 @@ describe("automationRouter", () => {
         });
         expect(updateArgs.data.filters).toEqual({});
         expect(updateArgs.data.name).toBe("p95 latency");
+        expect(updateArgs.data.triggerKind).toBe("ALERT");
         expect(updateArgs.data.alertType).toBe("WARNING");
         expect(updateArgs.data.customGraphId).toBe("graph_1");
       });

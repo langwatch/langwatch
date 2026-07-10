@@ -740,6 +740,16 @@ enum TriggerAction {
   SEND_SLACK_MESSAGE
 }
 
+// The three automation kinds, distinguished by WHAT FIRES them (ADR-042):
+// AUTOMATION = an event (a trace matches filters); ALERT = a condition (a
+// custom-graph metric crosses a threshold); REPORT = a schedule (a calendar
+// cron). Backfilled from the legacy `customGraphId != null` heuristic.
+enum TriggerKind {
+  AUTOMATION
+  ALERT
+  REPORT
+}
+
 enum AlertType {
   CRITICAL
   WARNING
@@ -752,6 +762,9 @@ model Trigger {
   projectId     String
   project       Project       @relation(fields: [projectId], references: [id])
   action        TriggerAction
+  // ADR-042: the automation kind. Backfilled AUTOMATION/ALERT from
+  // customGraphId; REPORT is set by the scheduled-report upsert path.
+  triggerKind   TriggerKind   @default(AUTOMATION)
   actionParams  Json
   filters       Json
   lastRunAt     Float         @default(0)
