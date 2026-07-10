@@ -74,6 +74,15 @@ const EMPTY_COMPARISON_CONFIG: ComparisonEvaluatorConfig = {
   randomizeOrder: true,
 };
 
+/**
+ * A legacy pairwise evaluator opens in the same form as a current one: its
+ * config is normalized to the comparison shape on load, so the only thing its
+ * evaluatorType still selects is which judge endpoint runs it.
+ */
+const isComparisonEvaluatorType = (evaluatorType: string | undefined): boolean =>
+  evaluatorType === COMPARISON_EVALUATOR_TYPE ||
+  evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
+
 export type EvaluatorMappingsConfig = {
   level?: "trace" | "thread";
   availableSources?: AvailableSource[];
@@ -159,6 +168,8 @@ export type EvaluatorEditorController = {
         datasetColumns: { id: string; name: string }[];
       }
     | undefined;
+  /** The live comparison draft, mirrored from ComparisonConfigForm. */
+  comparison: ComparisonEvaluatorConfig;
   onComparisonChange:
     | ((config: ComparisonEvaluatorConfig) => void)
     | undefined;
@@ -219,6 +230,25 @@ export function useEvaluatorEditorController(
         }
       | undefined
   )?.onComparisonChange;
+
+  // ComparisonConfigForm keeps its own draft and only pushes changes outward,
+  // so the editor has to mirror it here — otherwise the footer can't know
+  // whether enough variants are picked to enable Save.
+  const [comparison, setComparison] = useState<ComparisonEvaluatorConfig>(
+    comparisonContext?.initialComparison ?? EMPTY_COMPARISON_CONFIG,
+  );
+  const initialComparison = comparisonContext?.initialComparison;
+  useEffect(() => {
+    setComparison(initialComparison ?? EMPTY_COMPARISON_CONFIG);
+  }, [initialComparison]);
+
+  const handleComparisonChange = useCallback(
+    (next: ComparisonEvaluatorConfig) => {
+      setComparison(next);
+      onComparisonChange?.(next);
+    },
+    [onComparisonChange],
+  );
 
   const saveButtonText =
     props.saveButtonText ?? (complexProps.saveButtonText as string | undefined);
@@ -495,7 +525,14 @@ export function useEvaluatorEditorController(
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
   const name = form.watch("name");
-  const isValid = !!name && name.trim().length > 0;
+
+  // A comparison with fewer than two variants judges nothing — the
+  // orchestrator skips it outright ("fewer than 2 variants configured"). Gate
+  // Save and Apply on it rather than letting the user create a column that
+  // silently never runs.
+  const hasEnoughVariants =
+    !isComparisonEvaluatorType(evaluatorType) || comparison.variants.length >= 2;
+  const isValid = !!name && name.trim().length > 0 && hasEnoughVariants;
 
   const handleSave = useCallback(() => {
     if (!project?.id || !isValid) return;
@@ -659,7 +696,8 @@ export function useEvaluatorEditorController(
     mappingsConfig,
     onMappingChange,
     comparisonContext,
-    onComparisonChange,
+    comparison,
+    onComparisonChange: onComparisonChange ? handleComparisonChange : undefined,
     onLocalConfigChange,
     title,
     handleSave,
@@ -694,6 +732,7 @@ export function EvaluatorEditorBody({
     mappingsConfig,
     onMappingChange,
     comparisonContext,
+    comparison,
     onComparisonChange,
   } = controller;
 
@@ -704,12 +743,7 @@ export function EvaluatorEditorBody({
   // Callback presence (`onComparisonChange`) is still checked at the render
   // site below so persistence works when wiring is present, but it no longer
   // decides which layout to draw.
-  // A legacy pairwise evaluator opens in the same form as a current one: its
-  // config is normalized to the comparison shape on load, so the only thing
-  // its evaluatorType still selects is which judge endpoint runs it.
-  const isComparison =
-    evaluatorType === COMPARISON_EVALUATOR_TYPE ||
-    evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
+  const isComparison = isComparisonEvaluatorType(evaluatorType);
 
   if (evaluatorId && isLoadingEvaluator) {
     return (
@@ -814,9 +848,7 @@ export function EvaluatorEditorBody({
         {isComparison && comparisonContext && onComparisonChange && (
           <Box paddingTop={4}>
             <ComparisonConfigForm
-              value={
-                comparisonContext.initialComparison ?? EMPTY_COMPARISON_CONFIG
-              }
+              value={comparison}
               onChange={onComparisonChange}
               targets={comparisonContext.targets}
               datasetColumns={comparisonContext.datasetColumns}

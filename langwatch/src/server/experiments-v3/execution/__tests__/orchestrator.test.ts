@@ -492,6 +492,85 @@ describe("orchestrator", () => {
       });
     });
 
+    // A variant column can carry its own grading evaluators. Those scores are
+    // appended to the candidate's text so the judge can weigh them, rather than
+    // re-deriving quality it has already been told.
+    describe("given a variant column has its own evaluator scores", () => {
+      const scoredState = () => {
+        const state = createTestState(2, 0);
+        state.targets.push({
+          id: "comparison-target",
+          type: "evaluator",
+          targetEvaluatorId: "db-select-best-evaluator",
+          inputs: [],
+          outputs: [{ identifier: "label", type: "str" }],
+          mappings: {},
+          comparison: {
+            variants: ["target-1", "target-2"],
+            hasGoldenAnswer: true,
+            goldenField: "expected",
+            includeMetrics: [],
+            randomizeOrder: true,
+          },
+        });
+        return state;
+      };
+
+      const plainOutputs = new Map([
+        ["0:target-1", { output: "answer from A", cost: 0, duration: 1 }],
+        ["0:target-2", { output: "answer from B", cost: 0, duration: 1 }],
+      ]);
+
+      it("appends each score to that candidate's output", () => {
+        const { cells } = generateComparisonCells(
+          scoredState(),
+          createTestDataset(1),
+          plainOutputs,
+          new Map([
+            [
+              "0:target-1",
+              [
+                { name: "Faithfulness", score: 0.91 },
+                { name: "Toxicity", passed: true },
+              ],
+            ],
+          ]),
+        );
+
+        const output = cells[0]?.comparison?.candidates[0]?.output as string;
+        expect(output).toContain("answer from A");
+        expect(output).toContain("--- Existing evaluator scores ---");
+        expect(output).toContain("- Faithfulness: score=0.91");
+        expect(output).toContain("- Toxicity: passed=true");
+      });
+
+      it("leaves a candidate with no scores untouched", () => {
+        const { cells } = generateComparisonCells(
+          scoredState(),
+          createTestDataset(1),
+          plainOutputs,
+          new Map([["0:target-1", [{ name: "Faithfulness", score: 0.91 }]]]),
+        );
+
+        expect(cells[0]?.comparison?.candidates[1]?.output).toBe(
+          "answer from B",
+        );
+      });
+
+      // The scores map is optional — nothing appends when it is absent.
+      it("judges the bare outputs when no scores were collected", () => {
+        const { cells } = generateComparisonCells(
+          scoredState(),
+          createTestDataset(1),
+          plainOutputs,
+        );
+
+        expect(cells[0]?.comparison?.candidates[0]?.output).toBe(
+          "answer from A",
+        );
+      });
+    });
+
     it("uses the prompt handle as candidate id when loadedPrompts has it", () => {
       const state = createTestState(2, 0);
       // Mark the variants as prompt-typed so variantIdentifierFor can look

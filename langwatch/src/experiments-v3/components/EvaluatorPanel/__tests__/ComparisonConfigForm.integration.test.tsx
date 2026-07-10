@@ -95,29 +95,21 @@ describe("ComparisonConfigForm", () => {
     cleanup();
   });
 
+  // The too-few-variants case is enforced by disabling Save and Apply in the
+  // drawer footer (EvaluatorEditorShared's isValid), not by an inline warning
+  // the user can scroll past. The label carries the requirement.
   describe("given fewer than 2 variants selected", () => {
-    it("shows an insufficient-variants warning", () => {
-      renderForm({ value: baseConfig({ variants: [] }) });
-      expect(
-        screen.getByTestId("comparison-variants-insufficient"),
-      ).toBeInTheDocument();
-    });
+    it.each([[[] as string[]], [["t1"]]])(
+      "states the requirement in the label rather than warning inline (%j)",
+      (variants) => {
+        renderForm({ value: baseConfig({ variants }) });
 
-    it("still shows the warning when exactly 1 variant is selected", () => {
-      renderForm({ value: baseConfig({ variants: ["t1"] }) });
-      expect(
-        screen.getByTestId("comparison-variants-insufficient"),
-      ).toBeInTheDocument();
-    });
-  });
-
-  describe("given 2 or more variants selected", () => {
-    it("hides the insufficient-variants warning", () => {
-      renderForm({ value: baseConfig({ variants: ["t1", "t2"] }) });
-      expect(
-        screen.queryByTestId("comparison-variants-insufficient"),
-      ).not.toBeInTheDocument();
-    });
+        expect(screen.getByText(/pick 2 or more/i)).toBeInTheDocument();
+        expect(
+          screen.queryByTestId("comparison-variants-insufficient"),
+        ).not.toBeInTheDocument();
+      },
+    );
   });
 
   describe("when the user picks a variant", () => {
@@ -347,6 +339,11 @@ describe("ComparisonConfigForm", () => {
   describe("the settings explanations", () => {
     const infoTooltips = [
       {
+        name: "variants",
+        testId: "comparison-variants-info",
+        opensWith: /those scores are passed to the judge/i,
+      },
+      {
         name: "has golden answer",
         testId: "comparison-has-golden-answer-info",
         opensWith: /compare each candidate against a reference answer/i,
@@ -378,9 +375,21 @@ describe("ComparisonConfigForm", () => {
     });
 
     describe.each(infoTooltips)(
-      "when the $name (i) is clicked",
+      "when the $name (i) is hovered",
       ({ testId, opensWith }) => {
         it("reveals the explanation", async () => {
+          const user = userEvent.setup();
+          renderForm({ value: baseConfig({ hasGoldenAnswer: true }) });
+
+          await user.hover(screen.getByTestId(testId));
+
+          await waitFor(() =>
+            expect(screen.getByText(opensWith)).toBeVisible(),
+          );
+        });
+
+        // Touch and keyboard users never hover.
+        it("reveals the explanation on click too", async () => {
           const user = userEvent.setup();
           renderForm({ value: baseConfig({ hasGoldenAnswer: true }) });
 

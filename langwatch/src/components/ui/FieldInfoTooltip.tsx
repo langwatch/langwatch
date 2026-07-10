@@ -1,5 +1,6 @@
 import { HStack, IconButton, Text, VStack } from "@chakra-ui/react";
 import { ExternalLink, Info } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Link } from "~/components/ui/link";
 import { Popover } from "~/components/ui/popover";
@@ -42,11 +43,16 @@ function resolveDocHref(href: string): string {
  * `dev/docs/best_practices/copywriting.md` — descriptions stay short, the
  * long form goes behind the (i).
  *
- * Uses Popover (click-triggered) rather than a hover Tooltip so the
- * doc link inside the popover is clickable without racing the close
- * animation. Matches enterprise-UX defaults (same pattern as e.g.
- * Stripe Dashboard and Cloudflare rule editors).
+ * Opens on hover, and stays open while the pointer is anywhere over the (i) or
+ * the popover itself — a plain hover Tooltip would close the moment the pointer
+ * left the icon, so the doc link inside could never be clicked. Leaving is
+ * given a short grace period to cover the gap the pointer crosses between the
+ * two. Click and keyboard focus still open it, for touch and for tabbing.
  */
+
+/** Grace period before a hover-out closes, so crossing the gap doesn't. */
+const HOVER_CLOSE_DELAY_MS = 150;
+
 export function FieldInfoTooltip({
   description,
   docHref,
@@ -55,8 +61,36 @@ export function FieldInfoTooltip({
 }: FieldInfoTooltipProps) {
   const resolvedHref = docHref ? resolveDocHref(docHref) : undefined;
   const isExternal = resolvedHref ? /^https?:\/\//i.test(resolvedHref) : false;
+
+  const [open, setOpen] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+
+  const cancelClose = useCallback(() => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = undefined;
+  }, []);
+
+  const openNow = useCallback(() => {
+    cancelClose();
+    setOpen(true);
+  }, [cancelClose]);
+
+  const closeSoon = useCallback(() => {
+    cancelClose();
+    closeTimer.current = setTimeout(() => setOpen(false), HOVER_CLOSE_DELAY_MS);
+  }, [cancelClose]);
+
+  // A pending close would fire after unmount and set state on a dead component.
+  useEffect(() => cancelClose, [cancelClose]);
+
   return (
-    <Popover.Root positioning={{ placement: "right-start" }}>
+    <Popover.Root
+      open={open}
+      onOpenChange={(details) => setOpen(details.open)}
+      positioning={{ placement: "right-start" }}
+    >
       <Popover.Trigger asChild>
         <IconButton
           aria-label="More info"
@@ -68,11 +102,19 @@ export function FieldInfoTooltip({
           minWidth="auto"
           height="auto"
           padding={0}
+          onMouseEnter={openNow}
+          onMouseLeave={closeSoon}
+          onFocus={openNow}
+          onBlur={closeSoon}
         >
           <Info size={14} />
         </IconButton>
       </Popover.Trigger>
-      <Popover.Content maxWidth="sm">
+      <Popover.Content
+        maxWidth="sm"
+        onMouseEnter={cancelClose}
+        onMouseLeave={closeSoon}
+      >
         <Popover.Arrow>
           <Popover.ArrowTip />
         </Popover.Arrow>

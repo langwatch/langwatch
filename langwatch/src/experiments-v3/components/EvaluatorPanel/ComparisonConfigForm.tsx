@@ -160,13 +160,18 @@ function VariantsMultiSelect({
     });
   };
 
-  const insufficient = selected.length < 2;
+  // Fewer than 2 variants is not warned about here — it disables Save and
+  // Apply in the drawer footer. The label already states the requirement.
   const columns = balancedColumns(selected.length);
 
   return (
     <Field.Root required flex="1">
       <Field.Label fontSize="13px" color="fg.muted" marginBottom={2}>
         Variants (pick 2 or more)
+        <FieldInfoTooltip
+          testId="comparison-variants-info"
+          description="The columns whose outputs are compared. If a column is already scored by its own evaluators, those scores are passed to the judge along with the output, so it can take them into account."
+        />
       </Field.Label>
 
       <SimpleGrid
@@ -224,16 +229,6 @@ function VariantsMultiSelect({
         </Menu.Content>
       </Menu.Root>
 
-      {insufficient && (
-        <Text
-          fontSize="xs"
-          color="orange.solid"
-          marginTop={2}
-          data-testid="comparison-variants-insufficient"
-        >
-          Pick 2 or more variants.
-        </Text>
-      )}
     </Field.Root>
   );
 }
