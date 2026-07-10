@@ -8,6 +8,7 @@ package otelsetup
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 	"sync"
@@ -18,6 +19,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
+	sdklog "go.opentelemetry.io/otel/sdk/log"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
@@ -146,11 +149,33 @@ type Options struct {
 	// and a stalled collector wedges the request thread. Gated on the
 	// NLPGO_SPAN_SYNC env var in deps.go.
 	SyncExport bool
+
+	// DebugCollectorEndpoint is an OPTIONAL second OTLP/HTTP endpoint
+	// (base URL, no signal path) for a developer's local observability
+	// stack. When non-empty it is ADDITIVE: an extra BatchSpanProcessor
+	// dual-exports every span here (on both the MultiTenant and the
+	// single-tenant paths) WITHOUT disturbing the primary product/ops
+	// pipeline, and net-new OTLP logs + metrics pipelines are installed.
+	// Empty (the default) leaves behavior byte-for-byte unchanged.
+	DebugCollectorEndpoint string
+	// DebugCollectorHeaders carries optional auth headers for the debug
+	// collector exporters.
+	DebugCollectorHeaders map[string]string
 }
 
 // Provider holds the configured OTel SDK providers.
 type Provider struct {
 	tp *sdktrace.TracerProvider
+	lp *sdklog.LoggerProvider
+	mp *sdkmetric.MeterProvider
+}
+
+// LoggerProvider returns the OTLP log provider, or nil when the debug
+// collector is disabled. Consumers (clog) use it to tee zap output into
+// the collector; deps.go relies on Shutdown to flush it, so callers do
+// not own its lifecycle.
+func (p *Provider) LoggerProvider() *sdklog.LoggerProvider {
+	return p.lp
 }
 
 // buildResourceAttrs assembles the standard service.* + node.id
@@ -169,6 +194,32 @@ func buildResourceAttrs(serviceName, serviceVersion, environment, nodeID string)
 		attrs = append(attrs, attribute.String("node.id", nodeID))
 	}
 	return attrs
+}
+
+// buildResource assembles the OTel resource shared by the trace, log,
+// and metric pipelines so service.name / service.version /
+// deployment.environment.name / node.id stay identical across every
+// signal. Merge failure (schema-URL mismatch) is impossible here — all
+// attrs use the same semconv schema — so the error is discarded, matching
+// the existing trace-path call sites.
+func buildResource(serviceName, serviceVersion, environment, nodeID string) *resource.Resource {
+	attrs := buildResourceAttrs(serviceName, serviceVersion, environment, nodeID)
+	res, _ := resource.Merge(
+		resource.Default(),
+		resource.NewWithAttributes(semconv.SchemaURL, attrs...),
+	)
+	return res
+}
+
+// withSignalPath appends the OTLP per-signal path (e.g. "/v1/traces")
+// to a base collector endpoint if it is not already present. Mirrors the
+// primary-endpoint logic in pkg/config/otel.go, but per-signal so the one
+// debug-collector base URL fans out to /v1/traces, /v1/logs, /v1/metrics.
+func withSignalPath(endpoint, signalPath string) string {
+	if endpoint == "" || strings.HasSuffix(endpoint, signalPath) {
+		return endpoint
+	}
+	return strings.TrimRight(endpoint, "/") + signalPath
 }
 
 // New creates the telemetry provider. If TraceEndpoint is empty, a noop
@@ -196,81 +247,14 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 	)
 	otelapi.SetTextMapPropagator(prop)
 
-	if opts.OTLPEndpoint == "" {
+	// Nothing to install: no primary product/ops endpoint and no debug
+	// collector. Returns the noop provider — behavior for everyone who
+	// hasn't opted into the local observability stack is unchanged.
+	if opts.OTLPEndpoint == "" && opts.DebugCollectorEndpoint == "" {
 		return &Provider{}, nil
 	}
 
-	if opts.MultiTenant {
-		// nlpgo path: a TenantRouter is the only span processor.
-		// Per-tenant otlptracehttp exporters are constructed lazily
-		// inside it, each with its own `X-Auth-Token` header sourced
-		// from the Studio event's `workflow.api_key`. Static
-		// OTLPHeaders are intentionally NOT applied here — they would
-		// be wrong for every tenant after the first.
-		attrs := buildResourceAttrs(serviceName, serviceVersion, environment, opts.NodeID)
-		res, _ := resource.Merge(
-			resource.Default(),
-			resource.NewWithAttributes(semconv.SchemaURL, attrs...),
-		)
-		var rootSampler sdktrace.Sampler
-		if opts.SampleRatio > 0 && opts.SampleRatio < 1.0 {
-			rootSampler = sdktrace.TraceIDRatioBased(opts.SampleRatio)
-		} else {
-			rootSampler = sdktrace.AlwaysSample()
-		}
-		router := NewTenantRouter(opts.OTLPEndpoint)
-		if opts.SyncExport {
-			router.newProcessor = newSyncTenantProcessor
-		}
-		tp := sdktrace.NewTracerProvider(
-			sdktrace.WithResource(res),
-			sdktrace.WithSpanProcessor(NewBaggageAttributeProcessor(AutoStampedBaggageKeys...)),
-			sdktrace.WithSpanProcessor(router),
-			sdktrace.WithSampler(sdktrace.ParentBased(rootSampler)),
-			sdktrace.WithIDGenerator(NewIDGenerator()),
-		)
-		otelapi.SetTracerProvider(tp)
-		return &Provider{tp: tp}, nil
-	}
-
-	exporterOpts := []otlptracehttp.Option{
-		otlptracehttp.WithEndpointURL(opts.OTLPEndpoint),
-	}
-	if len(opts.OTLPHeaders) > 0 {
-		exporterOpts = append(exporterOpts, otlptracehttp.WithHeaders(opts.OTLPHeaders))
-	}
-	exp, err := otlptracehttp.New(ctx, exporterOpts...)
-	if err != nil {
-		return nil, err
-	}
-
-	// Suppress startup-race auth/transport noise from the OTLP exporter —
-	// the default handler emits WARN for every batch, which floods logs
-	// for ~5s until the control-plane mints auth. The filter auto-disables
-	// once the healthyExporter wrapper sees a successful export, or after
-	// the 30s grace window elapses (whichever comes first).
-	startupFilter := newStartupErrorHandler(
-		slogErrorHandler{},
-		30*time.Second,
-	)
-	otelapi.SetErrorHandler(startupFilter)
-	wrappedExp := healthyExporterWrap(exp, startupFilter.markHealthy)
-
-	attrs := buildResourceAttrs(serviceName, serviceVersion, environment, opts.NodeID)
-
-	res, _ := resource.Merge(
-		resource.Default(),
-		resource.NewWithAttributes(semconv.SchemaURL, attrs...),
-	)
-
-	batchTimeout := opts.BatchTimeout
-	if batchTimeout == 0 {
-		batchTimeout = 5 * time.Second
-	}
-	queueSize := opts.MaxQueueSize
-	if queueSize == 0 {
-		queueSize = 8192
-	}
+	res := buildResource(serviceName, serviceVersion, environment, opts.NodeID)
 
 	var rootSampler sdktrace.Sampler
 	if opts.SampleRatio > 0 && opts.SampleRatio < 1.0 {
@@ -279,27 +263,135 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 		rootSampler = sdktrace.AlwaysSample()
 	}
 
-	tp := sdktrace.NewTracerProvider(
+	tpOpts := []sdktrace.TracerProviderOption{
 		sdktrace.WithResource(res),
 		sdktrace.WithSpanProcessor(NewBaggageAttributeProcessor(AutoStampedBaggageKeys...)),
-		sdktrace.WithBatcher(wrappedExp,
-			sdktrace.WithBatchTimeout(batchTimeout),
-			sdktrace.WithMaxQueueSize(queueSize),
-		),
 		sdktrace.WithSampler(sdktrace.ParentBased(rootSampler)),
 		sdktrace.WithIDGenerator(NewIDGenerator()),
-	)
-	otelapi.SetTracerProvider(tp)
+	}
 
-	return &Provider{tp: tp}, nil
+	// Primary product/ops span pipeline — unchanged from before the
+	// debug-collector feature. The baggage processor above still runs
+	// first (registration order), so it stamps attributes before either
+	// the primary or the debug exporter sees the span.
+	if opts.OTLPEndpoint != "" {
+		if opts.MultiTenant {
+			// nlpgo path: a TenantRouter routes each span to a per-tenant
+			// otlptracehttp exporter constructed lazily with its own
+			// `X-Auth-Token` sourced from the Studio event's
+			// `workflow.api_key`. Static OTLPHeaders are intentionally NOT
+			// applied here — they would be wrong for every tenant after
+			// the first.
+			router := NewTenantRouter(opts.OTLPEndpoint)
+			if opts.SyncExport {
+				router.newProcessor = newSyncTenantProcessor
+			}
+			tpOpts = append(tpOpts, sdktrace.WithSpanProcessor(router))
+		} else {
+			// aigateway path: a single static-headers batch exporter.
+			exporterOpts := []otlptracehttp.Option{
+				otlptracehttp.WithEndpointURL(opts.OTLPEndpoint),
+			}
+			if len(opts.OTLPHeaders) > 0 {
+				exporterOpts = append(exporterOpts, otlptracehttp.WithHeaders(opts.OTLPHeaders))
+			}
+			exp, err := otlptracehttp.New(ctx, exporterOpts...)
+			if err != nil {
+				return nil, err
+			}
+
+			// Suppress startup-race auth/transport noise from the OTLP
+			// exporter — the default handler emits WARN for every batch,
+			// which floods logs for ~5s until the control-plane mints auth.
+			// The filter auto-disables once the healthyExporter wrapper sees
+			// a successful export, or after the 30s grace window elapses.
+			startupFilter := newStartupErrorHandler(
+				slogErrorHandler{},
+				30*time.Second,
+			)
+			otelapi.SetErrorHandler(startupFilter)
+			wrappedExp := healthyExporterWrap(exp, startupFilter.markHealthy)
+
+			batchTimeout := opts.BatchTimeout
+			if batchTimeout == 0 {
+				batchTimeout = 5 * time.Second
+			}
+			queueSize := opts.MaxQueueSize
+			if queueSize == 0 {
+				queueSize = 8192
+			}
+			tpOpts = append(tpOpts,
+				sdktrace.WithBatcher(wrappedExp,
+					sdktrace.WithBatchTimeout(batchTimeout),
+					sdktrace.WithMaxQueueSize(queueSize),
+				),
+			)
+		}
+	}
+
+	// Additive debug-collector span exporter — dual export. Every span
+	// (on both paths) is also batched to the developer's local collector.
+	// This never diverts spans from the primary pipeline above.
+	if opts.DebugCollectorEndpoint != "" {
+		debugProc, err := newDebugSpanProcessor(ctx, opts.DebugCollectorEndpoint, opts.DebugCollectorHeaders)
+		if err != nil {
+			return nil, err
+		}
+		tpOpts = append(tpOpts, sdktrace.WithSpanProcessor(debugProc))
+	}
+
+	tp := sdktrace.NewTracerProvider(tpOpts...)
+	otelapi.SetTracerProvider(tp)
+	provider := &Provider{tp: tp}
+
+	// Net-new OTLP logs + metrics to the debug collector. Gated on the
+	// same endpoint, so nothing here runs unless a developer opted in.
+	if opts.DebugCollectorEndpoint != "" {
+		lp, err := newLoggerProvider(ctx, opts.DebugCollectorEndpoint, opts.DebugCollectorHeaders, res)
+		if err != nil {
+			return nil, err
+		}
+		provider.lp = lp
+
+		mp, err := newMeterProvider(ctx, opts.DebugCollectorEndpoint, opts.DebugCollectorHeaders, res)
+		if err != nil {
+			return nil, err
+		}
+		otelapi.SetMeterProvider(mp)
+		// Runtime metrics (GC, goroutines, mem) are the first cut — a
+		// start failure must not sink service init, so warn and carry on.
+		if err := startRuntimeMetrics(mp); err != nil {
+			slog.Warn("otel runtime metrics start failed", "err", err)
+		}
+		provider.mp = mp
+	}
+
+	return provider, nil
 }
 
-// Shutdown flushes pending telemetry. Safe to call on a noop provider.
+// Shutdown flushes pending telemetry across every configured signal
+// (traces, and — when the debug collector is enabled — logs + metrics).
+// Safe to call on a noop provider. Registered as the "otel" lifecycle
+// closer in each service's serve.go, so no extra closers are needed for
+// the log/metric providers.
 func (p *Provider) Shutdown(ctx context.Context) error {
+	var errs []error
 	if p.tp != nil {
-		return p.tp.Shutdown(ctx)
+		if err := p.tp.Shutdown(ctx); err != nil {
+			errs = append(errs, err)
+		}
 	}
-	return nil
+	if p.lp != nil {
+		if err := p.lp.Shutdown(ctx); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if p.mp != nil {
+		if err := p.mp.Shutdown(ctx); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // ForceFlush exports any pending spans synchronously. Safe to call on
@@ -318,10 +410,26 @@ func (p *Provider) Shutdown(ctx context.Context) error {
 // negligible vs the alternative of losing observability for the
 // requests that triggered the failure path.
 func (p *Provider) ForceFlush(ctx context.Context) error {
+	var errs []error
 	if p.tp != nil {
-		return p.tp.ForceFlush(ctx)
+		if err := p.tp.ForceFlush(ctx); err != nil {
+			errs = append(errs, err)
+		}
 	}
-	return nil
+	// The log + metric providers are only set when the debug collector is
+	// enabled; flushing them mirrors the per-request span flush so a
+	// Lambda freeze can't strand debug logs/metrics either.
+	if p.lp != nil {
+		if err := p.lp.ForceFlush(ctx); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if p.mp != nil {
+		if err := p.mp.ForceFlush(ctx); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // healthyExporter wraps a SpanExporter, invoking `onHealthy` the first

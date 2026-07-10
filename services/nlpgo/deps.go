@@ -46,12 +46,15 @@ func configureNLPGoOTel(ctx context.Context, cfg Config, nodeID string) (*otelse
 	// batching is what keeps the request hot path independent of
 	// collector RTT.
 	syncExport := strings.TrimSpace(os.Getenv("NLPGO_SPAN_SYNC")) == "1"
+	debugEndpoint, debugHeaders := cfg.OTel.DebugCollector()
 	return otelsetup.New(ctx, otelsetup.Options{
-		NodeID:       nodeID,
-		OTLPEndpoint: endpoint,
-		SampleRatio:  cfg.OTel.SampleRatio,
-		MultiTenant:  true,
-		SyncExport:   syncExport,
+		NodeID:                 nodeID,
+		OTLPEndpoint:           endpoint,
+		SampleRatio:            cfg.OTel.SampleRatio,
+		MultiTenant:            true,
+		SyncExport:             syncExport,
+		DebugCollectorEndpoint: debugEndpoint,
+		DebugCollectorHeaders:  debugHeaders,
 	})
 }
 
@@ -75,6 +78,12 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	otelProvider, err := configureNLPGoOTel(ctx, cfg, nodeID)
 	if err != nil {
 		return ctx, nil, fmt.Errorf("otel init: %w", err)
+	}
+	// When the debug collector is enabled, tee stdout logs into it too.
+	// No-op (returns the same logger) otherwise.
+	if lp := otelProvider.LoggerProvider(); lp != nil {
+		logger = clog.WithCollector(logger, lp)
+		ctx = clog.Set(ctx, logger)
 	}
 
 	probes := health.New(contexts.MustGetServiceInfo(ctx).Environment)

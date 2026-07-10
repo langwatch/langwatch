@@ -5,11 +5,17 @@ import (
 	"fmt"
 
 	prettyconsole "github.com/thessem/zap-prettyconsole"
+	"go.opentelemetry.io/contrib/bridges/otelzap"
+	sdklog "go.opentelemetry.io/otel/sdk/log"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
 	"github.com/langwatch/langwatch/pkg/contexts"
 )
+
+// otelScopeName is the instrumentation scope stamped on log records the
+// otelzap bridge ships to the collector.
+const otelScopeName = "github.com/langwatch/langwatch/pkg/clog"
 
 type contextKey struct{}
 
@@ -54,6 +60,26 @@ func New(ctx context.Context, cfg Config) *zap.Logger {
 		)
 	}
 	return logger
+}
+
+// WithCollector tees an existing zap logger so its records ALSO ship to
+// the OTLP debug collector via the official otelzap bridge, while the
+// original console/pretty/json core keeps writing to stdout unchanged
+// (zapcore.NewTee). Returns the logger untouched when lp is nil (the
+// debug collector is disabled), so callers can wire it unconditionally.
+//
+// Wrapping the built logger — rather than constructing the tee inside
+// New — keeps New's signature stable for every existing caller and lets
+// deps.go apply the tee only after the LoggerProvider exists (the
+// provider is built after the logger during service bootstrap).
+func WithCollector(logger *zap.Logger, lp *sdklog.LoggerProvider) *zap.Logger {
+	if lp == nil {
+		return logger
+	}
+	otelCore := otelzap.NewCore(otelScopeName, otelzap.WithLoggerProvider(lp))
+	return logger.WithOptions(zap.WrapCore(func(existing zapcore.Core) zapcore.Core {
+		return zapcore.NewTee(existing, otelCore)
+	}))
 }
 
 // Config controls logging setup.

@@ -1,3 +1,4 @@
+import { metrics } from "@opentelemetry/api";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 import {
   CompositePropagator,
@@ -5,10 +6,20 @@ import {
   W3CTraceContextPropagator,
 } from "@opentelemetry/core";
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-proto";
+import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-proto";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
+import { HostMetrics } from "@opentelemetry/host-metrics";
 import { awsEksDetector } from "@opentelemetry/resource-detector-aws";
-import { detectResources } from "@opentelemetry/resources";
+import {
+  detectResources,
+  envDetector,
+  resourceFromAttributes,
+} from "@opentelemetry/resources";
 import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
+import {
+  MeterProvider,
+  PeriodicExportingMetricReader,
+} from "@opentelemetry/sdk-metrics";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-node";
 import { setupObservability } from "langwatch/observability/node";
 
@@ -52,8 +63,11 @@ if (
       "service.name": "langwatch-backend",
       "deployment.environment": process.env.ENVIRONMENT,
     },
+    // envDetector merges OTEL_RESOURCE_ATTRIBUTES (e.g. langwatch.worktree=<name>,
+    // set by `make observability-connect`) so telemetry from each worktree is
+    // filterable in Grafana.
     resource: detectResources({
-      detectors: [awsEksDetector],
+      detectors: [awsEksDetector, envDetector],
     }),
     advanced: {},
     spanProcessors: spanProcessors,
@@ -108,4 +122,37 @@ if (
       }),
     ],
   });
+}
+
+// Metrics are a separate global MeterProvider (setupObservability only wires
+// traces + logs). Gated on OTEL_METRICS_ENABLED so it stays off by default and
+// only pushes to a collector that's actually configured. Emits Node/host
+// runtime metrics (CPU, memory, event loop, GC) — enough to correlate with the
+// traces + logs when debugging local dev in Grafana.
+if (explicitEndpoint && process.env.OTEL_METRICS_ENABLED) {
+  const metricAttrs: Record<string, string> = {
+    "service.name": process.env.OTEL_SERVICE_NAME ?? "langwatch-backend",
+  };
+  if (process.env.ENVIRONMENT) {
+    metricAttrs["deployment.environment"] = process.env.ENVIRONMENT;
+  }
+
+  const meterProvider = new MeterProvider({
+    // Merge OTEL_RESOURCE_ATTRIBUTES (e.g. langwatch.worktree) into the metric
+    // resource too, so metrics carry the same worktree label as traces/logs.
+    resource: resourceFromAttributes(metricAttrs).merge(
+      detectResources({ detectors: [envDetector] }),
+    ),
+    readers: [
+      new PeriodicExportingMetricReader({
+        exporter: new OTLPMetricExporter({
+          url: `${explicitEndpoint}/v1/metrics`,
+        }),
+        exportIntervalMillis: 15_000,
+      }),
+    ],
+  });
+  metrics.setGlobalMeterProvider(meterProvider);
+
+  new HostMetrics({ meterProvider, name: "langwatch-backend" }).start();
 }
