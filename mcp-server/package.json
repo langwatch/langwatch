@@ -47,7 +47,7 @@
     "@langwatch/scenario": "^0.4.6",
     "@types/debug": "^4.1.13",
     "@types/express": "^5.0.6",
-    "@types/node": "^25.6.0",
+    "@types/node": "^26.1.0",
     "@types/yargs": "^17.0.33",
     "@typescript/native-preview": "7.0.0-dev.20260628.1",
     "ai": "^6.0.161",
