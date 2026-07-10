@@ -21,24 +21,41 @@ vi.mock("~/server/modelProviders/modelDefaults.read", () => ({
   getResolvedDefaultForFeature: vi.fn().mockResolvedValue(null),
 }));
 
-// The dedicated Langy API key has its own unit suite; here it is a
+// The per-session Langy key mint has its own unit suite; here it is a
 // collaborator. The default mock returns a real token so the credential
-// service can hand the worker a least-privilege key. The "no token"
-// path now throws — covered by an explicit test below. Hoisted so the
-// vi.mock factory can reference them without TDZ errors.
-const { getLangyApiKeyToken, provisionLangyApiKey } = vi.hoisted(() => ({
-  getLangyApiKeyToken: vi.fn().mockResolvedValue("sk-lw-test-langy-token"),
-  provisionLangyApiKey: vi.fn().mockResolvedValue(undefined),
-}));
+// service can hand the worker a caller-scoped key. The "empty held subset"
+// path throws LangySessionKeyScopeError — covered by an explicit test below.
+// Hoisted so the vi.mock factory can reference them without TDZ errors; the
+// error class lives in the hoisted block so `instanceof` checks in the service
+// resolve against the same constructor the mock throws.
+const { mintLangySessionApiKey, LangySessionKeyScopeError } = vi.hoisted(() => {
+  class LangySessionKeyScopeError extends Error {
+    constructor(message: string) {
+      super(message);
+      this.name = "LangySessionKeyScopeError";
+    }
+  }
+  return {
+    mintLangySessionApiKey: vi
+      .fn()
+      .mockResolvedValue("sk-lw-test-langy-token"),
+    LangySessionKeyScopeError,
+  };
+});
 vi.mock("../langyApiKey", () => ({
-  provisionLangyApiKey,
-  getLangyApiKeyToken,
+  mintLangySessionApiKey,
+  LangySessionKeyScopeError,
 }));
 
 import {
   LangyCredentialResolutionError,
   LangyCredentialService,
 } from "../LangyCredentialService";
+
+// Every getOrProvision call now takes the requesting user's session (the mint
+// needs it to compute the held-permission subset). Fixed to user "u1" so the
+// VK path's `actorUserId: "u1"` assertions still hold.
+const SESSION = { user: { id: "u1" }, expires: "1" } as any;
 
 function makePrisma(overrides: any = {}) {
   return {
@@ -63,10 +80,8 @@ beforeEach(() => {
     secret: "lw_vk_live_provisioned",
     virtualKey: { id: "vk-1" },
   });
-  getLangyApiKeyToken.mockReset();
-  getLangyApiKeyToken.mockResolvedValue("sk-lw-test-langy-token");
-  provisionLangyApiKey.mockReset();
-  provisionLangyApiKey.mockResolvedValue(undefined);
+  mintLangySessionApiKey.mockReset();
+  mintLangySessionApiKey.mockResolvedValue("sk-lw-test-langy-token");
   process.env.LANGWATCH_API_URL = "https://api.langwatch.test";
   process.env.LW_GATEWAY_BASE_URL = "http://gateway.test:5563/v1";
   // Clear LW_GATEWAY_PUBLIC_URL so it doesn't leak in from the developer's
@@ -93,7 +108,7 @@ describe("LangyCredentialService", () => {
 
         const creds = await svc.getOrProvision({
           projectId: "p1",
-          actorUserId: "u1",
+          session: SESSION,
         });
 
         expect(creds.llmVirtualKey).toBe("lw_vk_live_stored");
@@ -121,7 +136,7 @@ describe("LangyCredentialService", () => {
 
         const creds = await svc.getOrProvision({
           projectId: "p1",
-          actorUserId: "u1",
+          session: SESSION,
         });
 
         expect(creds.gatewayBaseUrl).toBe("http://langwatch-gateway:80/v1");
@@ -141,7 +156,7 @@ describe("LangyCredentialService", () => {
 
         const creds = await svc.getOrProvision({
           projectId: "p1",
-          actorUserId: "u1",
+          session: SESSION,
         });
 
         expect(creds.gatewayBaseUrl).toBe("http://langwatch-gateway:80/v1");
@@ -157,7 +172,7 @@ describe("LangyCredentialService", () => {
 
         const creds = await svc.getOrProvision({
           projectId: "p1",
-          actorUserId: "u1",
+          session: SESSION,
         });
 
         expect(creds.llmVirtualKey).toBe("lw_vk_live_provisioned");
@@ -193,30 +208,53 @@ describe("LangyCredentialService", () => {
         const svc = new LangyCredentialService(prisma);
 
         await expect(
-          svc.getOrProvision({ projectId: "missing", actorUserId: "u1" }),
+          svc.getOrProvision({ projectId: "missing", session: SESSION }),
         ).rejects.toThrow(LangyCredentialResolutionError);
       });
     });
   });
 
-  describe("given Langy API key provisioning yields no token", () => {
-    // Reachable when resolveAttributionUserId returns null (e.g. an org
-    // with no active members). Falling back to project.apiKey here would
-    // hand the worker a key that bypasses LANGY_REQUIRED_PERMISSIONS — the
-    // whole RBAC gate. Fail-closed: throw so the route returns 409 and the
-    // user gets a clear actionable error instead of silent over-privilege.
-    describe("when getLangyApiKeyToken returns null", () => {
-      it("throws LangyCredentialResolutionError and does not fall back to project.apiKey", async () => {
-        getLangyApiKeyToken.mockResolvedValue(null);
+  describe("given the caller holds none of Langy's permissions in the project", () => {
+    // The mint computes the held subset and throws LangySessionKeyScopeError
+    // when it's empty. Falling back to a broader key here would hand the worker
+    // more power than the human has. Fail-closed: wrap as
+    // LangyCredentialResolutionError so the route returns 409 with the mint's
+    // user-safe message, instead of silent over-privilege.
+    describe("when mintLangySessionApiKey throws LangySessionKeyScopeError", () => {
+      it("wraps it as LangyCredentialResolutionError surfacing the user-safe message", async () => {
+        mintLangySessionApiKey.mockRejectedValue(
+          new LangySessionKeyScopeError(
+            "You do not hold any of the permissions Langy needs in this project.",
+          ),
+        );
         const prisma = makePrisma();
         const svc = new LangyCredentialService(prisma);
 
         await expect(
-          svc.getOrProvision({ projectId: "p1", actorUserId: "u1" }),
+          svc.getOrProvision({ projectId: "p1", session: SESSION }),
         ).rejects.toThrowError(
           expect.objectContaining({
             name: "LangyCredentialResolutionError",
-            message: expect.stringMatching(/no user could be attributed/),
+            message: expect.stringMatching(/permissions Langy needs/),
+          }),
+        );
+      });
+    });
+
+    describe("when mintLangySessionApiKey throws an unexpected error", () => {
+      it("wraps it as a generic LangyCredentialResolutionError (no internals leaked)", async () => {
+        mintLangySessionApiKey.mockRejectedValue(
+          new Error("boom: internal ceiling check exploded"),
+        );
+        const prisma = makePrisma();
+        const svc = new LangyCredentialService(prisma);
+
+        await expect(
+          svc.getOrProvision({ projectId: "p1", session: SESSION }),
+        ).rejects.toThrowError(
+          expect.objectContaining({
+            name: "LangyCredentialResolutionError",
+            message: expect.stringMatching(/Failed to mint a Langy session key/),
           }),
         );
       });
@@ -231,7 +269,7 @@ describe("LangyCredentialService", () => {
         const svc = new LangyCredentialService(prisma);
 
         await expect(
-          svc.getOrProvision({ projectId: "p1", actorUserId: "u1" }),
+          svc.getOrProvision({ projectId: "p1", session: SESSION }),
         ).rejects.toThrow(/LW_GATEWAY_BASE_URL/);
         expect(vkCreate).not.toHaveBeenCalled();
       });
@@ -262,7 +300,7 @@ describe("LangyCredentialService", () => {
 
         const creds = await svc.getOrProvision({
           projectId: "p1",
-          actorUserId: "u1",
+          session: SESSION,
         });
 
         expect(creds.llmVirtualKey).toBe("lw_vk_live_winner");

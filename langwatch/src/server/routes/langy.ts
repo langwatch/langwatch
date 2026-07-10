@@ -22,11 +22,7 @@ import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
 import type { Context } from "hono";
 import { z } from "zod";
 import { env } from "~/env.mjs";
-import {
-  hasProjectPermission,
-  type Permission,
-  Resources,
-} from "~/server/api/rbac";
+import { hasProjectPermission } from "~/server/api/rbac";
 import { createServiceApp, handlerManagedAuth } from "~/server/api/security";
 import { auditLog } from "~/server/auditLog";
 import { getServerAuthSession } from "~/server/auth";
@@ -61,33 +57,6 @@ import { createLogger } from "~/utils/logger/server";
 import type { NextRequestShim } from "./types";
 
 const logger = createLogger("langwatch:api:langy");
-
-// The Langy worker carries a service API key with WRITE on every resource
-// listed here (see LANGY_PERMISSION_SELECTIONS in services/langy/langyApiKey.ts).
-// A user reaching /langy/chat must hold an UPDATE-capable role on EACH of
-// these in the project they're chatting against — otherwise Langy becomes a
-// privilege-escalation surface where a viewer asks "Langy" to create a
-// dataset / trigger / prompt they can't create directly.
-//
-// `:update` is the minimum because the hierarchy (rbac.ts:hasPermissionWith
-// Hierarchy) treats `:manage` as a superset; this lets editors AND admins
-// through but locks out view-only custom roles.
-//
-// Follow-up tracked: PR #4913 ships this admin-only gate as the "smallest
-// validating slice"; the correct long-term fix is a caller-scoped API key
-// minted per chat session so each tool authorises against the calling user's
-// own permissions, not a service key.
-const LANGY_REQUIRED_PERMISSIONS: Permission[] = [
-  `${Resources.TRACES}:update`,
-  `${Resources.EVALUATIONS}:update`,
-  `${Resources.DATASETS}:update`,
-  `${Resources.SCENARIOS}:update`,
-  `${Resources.ANNOTATIONS}:update`,
-  `${Resources.ANALYTICS}:update`,
-  `${Resources.PROMPTS}:update`,
-  `${Resources.TRIGGERS}:update`,
-  `${Resources.WORKFLOWS}:update`,
-];
 
 // Runtime validation for the untrusted /langy/chat body. Zod-only with infer
 // (no parallel TS interface) per the repo's validation convention.
@@ -256,25 +225,24 @@ langyRoute().post("/langy/chat", async (c) => {
     return c.json({ error: "Agent not configured" }, { status: 503 });
   }
 
-  // Authorise against every capability the Langy service key carries, not
-  // just evaluations:view. The previous gate let a read-only user reach a
-  // worker that holds an admin-equivalent service key; this loop closes the
-  // privilege escalation. Each failing permission is checked sequentially —
-  // chat is not hot-path traffic, and the first deny short-circuits.
-  for (const required of LANGY_REQUIRED_PERMISSIONS) {
-    const ok = await hasProjectPermission(
-      { prisma, session },
-      projectId,
-      required,
+  // Coarse gate: the caller must be able to read this project at all. This is
+  // defense-in-depth, NOT the fine-grained authorisation. The real
+  // least-privilege enforcement is the per-session API key minted in
+  // getOrProvision, scoped to exactly the permissions THIS user holds (ADR-043).
+  // So we deliberately DON'T require write on every resource here — a user who
+  // can edit prompts but not create triggers still gets Langy; their session key
+  // simply can't create triggers. A user who holds none of Langy's permissions
+  // is refused when the mint yields an empty set (surfaced as a 409 below).
+  const canUseLangy = await hasProjectPermission(
+    { prisma, session },
+    projectId,
+    "evaluations:view",
+  );
+  if (!canUseLangy) {
+    return c.json(
+      { error: "You do not have permission to use Langy for this project." },
+      { status: 403 },
     );
-    if (!ok) {
-      return c.json(
-        {
-          error: "You do not have permission to use Langy for this project.",
-        },
-        { status: 403 },
-      );
-    }
   }
 
   const rl = await checkLangyMessageRateLimit({
@@ -366,7 +334,7 @@ langyRoute().post("/langy/chat", async (c) => {
   try {
     credentials = await credentialService.getOrProvision({
       projectId,
-      actorUserId: session.user.id,
+      session,
     });
   } catch (error) {
     if (error instanceof LangyCredentialResolutionError) {
