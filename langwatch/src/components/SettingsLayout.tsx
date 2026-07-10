@@ -1,5 +1,12 @@
-import { Box, Container, HStack, Text, VStack } from "@chakra-ui/react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import {
+  Box,
+  Collapsible,
+  Container,
+  HStack,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { ChevronDown } from "lucide-react";
 import { type PropsWithChildren, useEffect, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
@@ -28,34 +35,48 @@ function NavSection({
   }, [isActive]);
 
   return (
-    <VStack align="start" width="full" gap={0}>
-      <HStack
-        width="full"
-        px={4}
-        py={1}
-        cursor="pointer"
-        color="fg.muted"
-        _hover={{ color: "fg" }}
-        onClick={() => setOpen((v) => !v)}
-      >
-        <Text
-          fontSize="xs"
-          fontWeight="semibold"
-          textTransform="uppercase"
-          letterSpacing="wider"
-        >
-          {label}
-        </Text>
-        <Box ml="auto">
-          {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        </Box>
-      </HStack>
-      {open && (
-        <VStack align="start" width="full" gap={1} pl={2}>
-          {children}
-        </VStack>
-      )}
-    </VStack>
+    <Collapsible.Root
+      open={open}
+      onOpenChange={(e) => setOpen(e.open)}
+      width="full"
+    >
+      <VStack align="start" width="full" gap={0}>
+        <Collapsible.Trigger asChild>
+          <Box as="button" width="full" cursor="pointer">
+            <HStack
+              width="full"
+              px={4}
+              py={1}
+              color={isActive ? "fg" : "fg.muted"}
+              _hover={{ color: "fg" }}
+            >
+              <Text
+                fontSize="xs"
+                fontWeight="semibold"
+                textTransform="uppercase"
+                letterSpacing="wider"
+              >
+                {label}
+              </Text>
+              <Box
+                ml="auto"
+                transform={open ? "rotate(0deg)" : "rotate(-90deg)"}
+                transition="transform 0.15s ease-in-out"
+              >
+                <ChevronDown size={12} />
+              </Box>
+            </HStack>
+          </Box>
+        </Collapsible.Trigger>
+        {/* Collapsible.Content animates height open/closed; the manual
+            `{open && …}` it replaced snapped with no transition. */}
+        <Collapsible.Content style={{ width: "100%" }}>
+          <VStack align="start" width="full" gap={1} pl={2} pt={1}>
+            {children}
+          </VStack>
+        </Collapsible.Content>
+      </VStack>
+    </Collapsible.Root>
   );
 }
 
@@ -188,7 +209,7 @@ export default function SettingsLayout({
             </MenuLink>
             {!isLiteMember && project?.slug && (
               <MenuLink href={`/${project.slug}/automations`}>
-                Automations
+                Alerts &amp; Automations
               </MenuLink>
             )}
             {!isLiteMember && (

@@ -1,10 +1,10 @@
 import {
+  Badge,
   Box,
   Button,
   Container,
   Heading,
   HStack,
-  Spacer,
   Table,
   Text,
   VStack,
@@ -148,41 +148,104 @@ function FiringStatus({ firing }: { firing: boolean }) {
   );
 }
 
-/** Section header: icon + title + count + one-line inline docs + add CTA. */
+/**
+ * Section header for one automation kind. An accent-coloured icon chip gives
+ * each kind its own identity so the three sections stop reading as one block;
+ * the one-line summary is the scannable copy and the full explanation lives in
+ * the `(?)` tooltip (per `copywriting.md`). `accent` is a Chakra colorPalette
+ * token, shared with the section's chip, count badge and CTA.
+ */
 function SectionHeader({
   icon,
+  accent,
   title,
   count,
-  description,
+  summary,
+  details,
   addLabel,
   onAdd,
 }: {
   icon: React.ReactNode;
+  accent: string;
   title: string;
   count: number;
-  description: string;
+  summary: string;
+  details: string;
   addLabel: string;
   onAdd: () => void;
 }) {
   return (
-    <HStack width="full" align="start" gap={4}>
-      <VStack align="start" gap={1}>
-        <HStack gap={2}>
-          <Box color="fg.muted">{icon}</Box>
+    <HStack width="full" align="center" gap={3}>
+      <Box
+        colorPalette={accent}
+        bg="colorPalette.subtle"
+        color="colorPalette.fg"
+        borderRadius="lg"
+        padding={2}
+        display="flex"
+        flexShrink={0}
+      >
+        {icon}
+      </Box>
+      <VStack align="start" gap={0.5} flex={1} minWidth={0}>
+        <HStack gap={2} align="center">
           <Heading size="md">{title}</Heading>
-          <Text textStyle="sm" color="fg.muted">
+          <Badge colorPalette={accent} variant="subtle" borderRadius="full">
             {count}
-          </Text>
+          </Badge>
+          <Tooltip content={details}>
+            <Box color="fg.muted" display="inline-flex" cursor="help">
+              <HelpCircle size={13} />
+            </Box>
+          </Tooltip>
         </HStack>
         <Text textStyle="sm" color="fg.muted">
-          {description}
+          {summary}
         </Text>
       </VStack>
-      <Spacer />
-      <Button size="sm" variant="outline" onClick={onAdd}>
+      <Button
+        size="sm"
+        variant="outline"
+        colorPalette={accent}
+        onClick={onAdd}
+        flexShrink={0}
+      >
         <Plus size={14} /> {addLabel}
       </Button>
     </HStack>
+  );
+}
+
+/** Bordered table frame that scrolls horizontally instead of squishing
+ *  columns on narrow viewports. */
+function TableShell({ children }: { children: React.ReactNode }) {
+  return (
+    <Box
+      border="1px solid"
+      borderColor="border"
+      borderRadius="lg"
+      overflow="hidden"
+    >
+      <Box overflowX="auto">{children}</Box>
+    </Box>
+  );
+}
+
+/** Muted one-liner shown in place of a table when a section is empty and has
+ *  no dedicated use-case strip. */
+function EmptyHint({ children }: { children: React.ReactNode }) {
+  return (
+    <Box
+      border="1px dashed"
+      borderColor="border"
+      borderRadius="lg"
+      padding={6}
+      textAlign="center"
+    >
+      <Text textStyle="sm" color="fg.muted">
+        {children}
+      </Text>
+    </Box>
   );
 }
 
@@ -240,17 +303,41 @@ function Automations() {
     { enabled: !!project?.id && hasDatasetTriggers },
   );
 
-  // Alert rows resolve their stored series key into the series' display
-  // name from the graph's JSON. Only fetched when alerts exist; on failure
-  // the cell falls back to the raw key.
+  const reportsUseGraph = useMemo(
+    () =>
+      reports.some(
+        (r) =>
+          (r.actionParams as { source?: { kind?: string } } | null)?.source
+            ?.kind === "customGraph",
+      ),
+    [reports],
+  );
+
+  // Alert rows resolve their stored series key into the series' display name
+  // from the graph's JSON; report rows that send a custom graph also need the
+  // graph's name. Only fetched when either is present; on failure the cell
+  // falls back to the raw key / a generic label.
   const graphsQuery = api.graphs.getAll.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project?.id && alerts.length > 0, retry: false },
+    {
+      enabled: !!project?.id && (alerts.length > 0 || reportsUseGraph),
+      retry: false,
+    },
   );
   const graphJsonById = useMemo(
     () =>
       new Map<string, unknown>(
         (graphsQuery.data ?? []).map((g) => [g.id, g.graph as unknown]),
+      ),
+    [graphsQuery.data],
+  );
+  const graphNameById = useMemo(
+    () =>
+      new Map<string, string>(
+        (graphsQuery.data ?? []).map((g) => [
+          g.id,
+          (g as { name?: string }).name ?? "graph",
+        ]),
       ),
     [graphsQuery.data],
   );
@@ -503,12 +590,12 @@ function Automations() {
   return (
     <SettingsLayout>
       <Container maxWidth="1280px" padding={4}>
-        <VStack align="stretch" gap={8}>
+        <VStack align="stretch" gap={10}>
           <VStack align="start" gap={1}>
-            <Heading>Alerts &amp; automations</Heading>
+            <Heading>Alerts &amp; Automations</Heading>
             <Text textStyle="sm" color="fg.muted">
-              Get notified when a metric crosses a threshold, or act on
-              traces as they arrive.
+              Alerts watch a metric, reports go out on a schedule, and
+              automations act on traces as they arrive.
             </Text>
           </VStack>
 
@@ -518,13 +605,15 @@ function Automations() {
             </Text>
           ) : (
             <>
-              {/* Alerts: react to a custom graph's metric */}
-              <VStack align="stretch" gap={3}>
+              {/* Alerts — fire when a graph's metric crosses a threshold */}
+              <VStack align="stretch" gap={4}>
                 <SectionHeader
                   icon={<TrendingUp size={18} />}
+                  accent="orange"
                   title="Alerts"
                   count={alerts.length}
-                  description="An alert watches a metric on one of your analytics graphs and notifies you when it crosses a threshold, and again when it recovers."
+                  summary="Get told when a metric crosses a threshold — and again when it recovers."
+                  details="An alert watches one series on an analytics graph. When the value crosses your threshold it notifies your channel; when it returns to normal it sends a recovery notice."
                   addLabel="New alert"
                   onAdd={() =>
                     openDrawer("automation", { initialSource: "customGraph" })
@@ -536,18 +625,16 @@ function Automations() {
                     onOpen={(prefill) => openDrawer("automation", prefill)}
                   />
                 ) : (
-                  <Box
-                    border="1px solid"
-                    borderColor="border"
-                    borderRadius="lg"
-                    overflow="hidden"
-                  >
+                  <TableShell>
                     <Table.Root variant="line" width="full">
                       <Table.Header>
                         <Table.Row>
                           <Table.ColumnHeader>Name</Table.ColumnHeader>
-                          <Table.ColumnHeader>Destination</Table.ColumnHeader>
-                          <Table.ColumnHeader>Conditions</Table.ColumnHeader>
+                          <Table.ColumnHeader>Watches</Table.ColumnHeader>
+                          <Table.ColumnHeader whiteSpace="nowrap">
+                            Fires when
+                          </Table.ColumnHeader>
+                          <Table.ColumnHeader>Notifies</Table.ColumnHeader>
                           <Table.ColumnHeader whiteSpace="nowrap">
                             <MetricHeader
                               label="Last fired"
@@ -556,18 +643,12 @@ function Automations() {
                           </Table.ColumnHeader>
                           <Table.ColumnHeader whiteSpace="nowrap">
                             <MetricHeader
-                              label="Fires (30d)"
-                              help="Times this alert fired in the last 30 days."
-                            />
-                          </Table.ColumnHeader>
-                          <Table.ColumnHeader>
-                            <MetricHeader
                               label="Status"
                               help="Firing while the metric is past its threshold, back to OK when it recovers."
                             />
                           </Table.ColumnHeader>
                           <Table.ColumnHeader>Active</Table.ColumnHeader>
-                          <Table.ColumnHeader>Actions</Table.ColumnHeader>
+                          <Table.ColumnHeader />
                         </Table.Row>
                       </Table.Header>
                       <Table.Body>
@@ -577,29 +658,29 @@ function Automations() {
                           const stats = statsByTriggerId.get(trigger.id);
                           return (
                             <Table.Row {...sharedRowProps(trigger)}>
-                              <Table.Cell>{trigger.name}</Table.Cell>
-                              <Table.Cell>
-                                {actionItems(trigger.action, actionParams)}
+                              <Table.Cell fontWeight="medium">
+                                {trigger.name}
                               </Table.Cell>
-                              <Table.Cell maxWidth="500px">
-                                <GraphAlertConditions
+                              <Table.Cell maxWidth="260px">
+                                <AlertSubjectCell
                                   graphName={trigger.customGraph?.name ?? null}
                                   graph={graphJsonById.get(
                                     trigger.customGraphId ?? "",
                                   )}
-                                  actionParams={actionParams}
+                                  seriesName={actionParams.seriesName}
                                 />
+                              </Table.Cell>
+                              <Table.Cell whiteSpace="nowrap">
+                                <AlertRuleCell actionParams={actionParams} />
+                              </Table.Cell>
+                              <Table.Cell>
+                                {actionItems(trigger.action, actionParams)}
                               </Table.Cell>
                               <Table.Cell whiteSpace="nowrap">
                                 <LastFiredCell
                                   trigger={trigger}
                                   stats={stats}
                                 />
-                              </Table.Cell>
-                              <Table.Cell>
-                                <Text as="span" color="fg.muted">
-                                  {stats?.recentFireCount ?? 0}
-                                </Text>
                               </Table.Cell>
                               <Table.Cell whiteSpace="nowrap">
                                 <FiringStatus
@@ -613,80 +694,109 @@ function Automations() {
                         })}
                       </Table.Body>
                     </Table.Root>
-                  </Box>
+                  </TableShell>
                 )}
               </VStack>
 
-              {/* Reports: send a digest on a schedule */}
-              <VStack align="stretch" gap={3}>
+              {/* Reports — send something on a recurring schedule */}
+              <VStack align="stretch" gap={4}>
                 <SectionHeader
                   icon={<Calendar size={18} />}
+                  accent="purple"
                   title="Reports"
                   count={reports.length}
-                  description="A report sends a dashboard, a graph, or a table of traces (e.g. the top errors) on a schedule — a recurring Slack or email digest."
+                  summary="Send a dashboard, a graph, or a table of traces on a recurring schedule."
+                  details="A report bundles a dashboard, a single graph, or a top-N trace table into a Slack or email digest on the schedule you set. Upcoming send times are visible in Ops → Scheduler."
                   addLabel="New report"
                   onAdd={() =>
                     openDrawer("automation", { initialSource: "report" })
                   }
                 />
                 {reports.length === 0 ? (
-                  <Text textStyle="sm" color="fg.muted">
-                    No scheduled reports yet. Create one to get a recurring
-                    digest in Slack or email — timing is visible in Ops →
-                    Scheduler.
-                  </Text>
+                  <EmptyHint>
+                    No scheduled reports yet — create one for a recurring Slack
+                    or email digest.
+                  </EmptyHint>
                 ) : (
-                  <Box
-                    border="1px solid"
-                    borderColor="border"
-                    borderRadius="lg"
-                    overflow="hidden"
-                  >
+                  <TableShell>
                     <Table.Root variant="line" width="full">
                       <Table.Header>
                         <Table.Row>
                           <Table.ColumnHeader>Name</Table.ColumnHeader>
-                          <Table.ColumnHeader>Destination</Table.ColumnHeader>
-                          <Table.ColumnHeader>Schedule</Table.ColumnHeader>
+                          <Table.ColumnHeader>Sends</Table.ColumnHeader>
+                          <Table.ColumnHeader whiteSpace="nowrap">
+                            Schedule
+                          </Table.ColumnHeader>
+                          <Table.ColumnHeader>Delivery</Table.ColumnHeader>
+                          <Table.ColumnHeader>Active</Table.ColumnHeader>
+                          <Table.ColumnHeader />
                         </Table.Row>
                       </Table.Header>
                       <Table.Body>
-                        {reports.map((trigger) => (
-                          <Table.Row
-                            key={trigger.id}
-                            cursor="pointer"
-                            onClick={() =>
-                              openDrawer("automation", {
-                                automationId: trigger.id,
-                              })
+                        {reports.map((trigger) => {
+                          const actionParams =
+                            trigger.actionParams as TriggerActionParams;
+                          const schedule = (
+                            actionParams as {
+                              schedule?: { cron?: string; timezone?: string };
                             }
-                          >
-                            <Table.Cell>{trigger.name}</Table.Cell>
-                            <Table.Cell>
-                              {trigger.action === "SEND_SLACK_MESSAGE"
-                                ? "Slack"
-                                : "Email"}
-                            </Table.Cell>
-                            <Table.Cell>
-                              <Text textStyle="xs" color="fg.muted">
-                                On schedule — see Ops → Scheduler
-                              </Text>
-                            </Table.Cell>
-                          </Table.Row>
-                        ))}
+                          ).schedule;
+                          return (
+                            <Table.Row
+                              key={trigger.id}
+                              data-trigger-id={trigger.id}
+                              cursor="pointer"
+                              _hover={{ bg: "bg.muted" }}
+                              onClick={() =>
+                                openDrawer("automation", {
+                                  automationId: trigger.id,
+                                })
+                              }
+                            >
+                              <Table.Cell fontWeight="medium">
+                                {trigger.name}
+                              </Table.Cell>
+                              <Table.Cell>
+                                <ReportSubjectCell
+                                  actionParams={actionParams}
+                                  graphNameById={graphNameById}
+                                />
+                              </Table.Cell>
+                              <Table.Cell whiteSpace="nowrap">
+                                <Text textStyle="sm">
+                                  {schedule?.cron
+                                    ? describeSchedule(
+                                        schedule.cron,
+                                        schedule.timezone ?? "UTC",
+                                      )
+                                    : "—"}
+                                </Text>
+                              </Table.Cell>
+                              <Table.Cell>
+                                {trigger.action === "SEND_SLACK_MESSAGE"
+                                  ? "Slack"
+                                  : "Email"}
+                              </Table.Cell>
+                              {activeCell(trigger)}
+                              <Table.Cell>{rowActionsMenu(trigger)}</Table.Cell>
+                            </Table.Row>
+                          );
+                        })}
                       </Table.Body>
                     </Table.Root>
-                  </Box>
+                  </TableShell>
                 )}
               </VStack>
 
-              {/* Automations: react to incoming traces */}
-              <VStack align="stretch" gap={3}>
+              {/* Automations — act on each incoming trace that matches */}
+              <VStack align="stretch" gap={4}>
                 <SectionHeader
                   icon={<Zap size={18} />}
+                  accent="blue"
                   title="Automations"
                   count={traceAutomations.length}
-                  description="An automation acts on every incoming trace that matches your filters: send a Slack message or email, add rows to a dataset, or queue traces for annotation."
+                  summary="Act on every incoming trace that matches your filters."
+                  details="An automation runs on each trace matching your filters: post to Slack or email, add rows to a dataset, or queue traces for annotation."
                   addLabel="New automation"
                   onAdd={() => openDrawer("automation", {})}
                 />
@@ -696,19 +806,13 @@ function Automations() {
                     onOpen={(prefill) => openDrawer("automation", prefill)}
                   />
                 ) : (
-                  <Box
-                    border="1px solid"
-                    borderColor="border"
-                    borderRadius="lg"
-                    overflow="hidden"
-                  >
+                  <TableShell>
                     <Table.Root variant="line" width="full">
                       <Table.Header>
                         <Table.Row>
                           <Table.ColumnHeader>Name</Table.ColumnHeader>
-                          <Table.ColumnHeader>Action</Table.ColumnHeader>
-                          <Table.ColumnHeader>Destination</Table.ColumnHeader>
-                          <Table.ColumnHeader>Conditions</Table.ColumnHeader>
+                          <Table.ColumnHeader>Acts on</Table.ColumnHeader>
+                          <Table.ColumnHeader>Then</Table.ColumnHeader>
                           <Table.ColumnHeader whiteSpace="nowrap">
                             <MetricHeader
                               label="Last fired"
@@ -722,7 +826,7 @@ function Automations() {
                             />
                           </Table.ColumnHeader>
                           <Table.ColumnHeader>Active</Table.ColumnHeader>
-                          <Table.ColumnHeader>Actions</Table.ColumnHeader>
+                          <Table.ColumnHeader />
                         </Table.Row>
                       </Table.Header>
                       <Table.Body>
@@ -732,15 +836,11 @@ function Automations() {
                           const stats = statsByTriggerId.get(trigger.id);
                           return (
                             <Table.Row {...sharedRowProps(trigger)}>
-                              <Table.Cell>{trigger.name}</Table.Cell>
-                              <Table.Cell>
-                                {triggerActionName(trigger.action)}
+                              <Table.Cell fontWeight="medium">
+                                {trigger.name}
                               </Table.Cell>
-                              <Table.Cell>
-                                {actionItems(trigger.action, actionParams)}
-                              </Table.Cell>
-                              <Table.Cell maxWidth="500px">
-                                <VStack gap={2}>
+                              <Table.Cell maxWidth="360px">
+                                <VStack gap={2} align="stretch">
                                   {applyChecks(
                                     trigger.checks?.filter(
                                       (check): check is Monitor => !!check,
@@ -754,6 +854,16 @@ function Automations() {
                                       hasBorder={true}
                                     />
                                   ) : null}
+                                </VStack>
+                              </Table.Cell>
+                              <Table.Cell>
+                                <VStack align="start" gap={0}>
+                                  <Text textStyle="sm" fontWeight="medium">
+                                    {triggerActionName(trigger.action)}
+                                  </Text>
+                                  <Box textStyle="xs" color="fg.muted">
+                                    {actionItems(trigger.action, actionParams)}
+                                  </Box>
                                 </VStack>
                               </Table.Cell>
                               <Table.Cell whiteSpace="nowrap">
@@ -774,7 +884,7 @@ function Automations() {
                         })}
                       </Table.Body>
                     </Table.Root>
-                  </Box>
+                  </TableShell>
                 )}
               </VStack>
             </>
@@ -785,40 +895,26 @@ function Automations() {
   );
 }
 
-interface GraphAlertConditionsProps {
-  graphName: string | null;
-  /** The joined custom graph's JSON, used to resolve the stored series key
-   *  into its display name. Undefined when the graph was deleted. */
-  graph?: unknown;
-  actionParams: TriggerActionParams;
-}
-
-/**
- * Compact rendering of an alert row's conditions cell: shows the graph it
- * watches plus the threshold rule that fires it. Mirrors the dashboard
- * "Configure Alert" copy verbatim (`greater than`, `over 5 minutes`) so the
- * experience reads the same across both creation paths.
- */
-function GraphAlertConditions({
+/** Alert "Watches" cell — the graph + series the alert is about (the subject
+ *  facet). The stored series key resolves to its display name from the graph
+ *  JSON; falls back to the raw key, or "Graph deleted" when the graph is gone. */
+function AlertSubjectCell({
   graphName,
   graph,
-  actionParams,
-}: GraphAlertConditionsProps) {
-  const operator = actionParams.operator
-    ? OPERATOR_LABELS[actionParams.operator]
-    : null;
-  const window = actionParams.timePeriod
-    ? TIME_PERIOD_LABELS[actionParams.timePeriod]
-    : null;
-  const seriesLabel = actionParams.seriesName
-    ? (resolveSeriesLabel(graph, actionParams.seriesName) ??
-      actionParams.seriesName)
+  seriesName,
+}: {
+  graphName: string | null;
+  graph?: unknown;
+  seriesName?: string;
+}) {
+  const seriesLabel = seriesName
+    ? (resolveSeriesLabel(graph, seriesName) ?? seriesName)
     : null;
   return (
-    <VStack align="start" gap={1}>
+    <VStack align="start" gap={0}>
       {graphName ? (
-        <Text textStyle="sm" fontWeight="medium">
-          Graph: {graphName}
+        <Text textStyle="sm" fontWeight="medium" lineClamp={1}>
+          {graphName}
         </Text>
       ) : (
         <Text textStyle="sm" color="fg.muted">
@@ -826,17 +922,118 @@ function GraphAlertConditions({
         </Text>
       )}
       {seriesLabel ? (
-        <Text textStyle="sm" color="fg.muted">
+        <Text textStyle="xs" color="fg.muted" lineClamp={1}>
           {seriesLabel}
-          {operator ? ` ${operator}` : ""}
-          {actionParams.threshold !== undefined
-            ? ` ${actionParams.threshold}`
-            : ""}
-          {window ? ` over ${window}` : ""}
         </Text>
       ) : null}
     </VStack>
   );
+}
+
+/** Alert "Fires when" cell — the threshold rule (the cadence facet). Mirrors
+ *  the dashboard "Configure Alert" copy (`greater than`, `over 5 minutes`) so
+ *  both creation paths read the same. */
+function AlertRuleCell({ actionParams }: { actionParams: TriggerActionParams }) {
+  const operator = actionParams.operator
+    ? OPERATOR_LABELS[actionParams.operator]
+    : null;
+  const window = actionParams.timePeriod
+    ? TIME_PERIOD_LABELS[actionParams.timePeriod]
+    : null;
+  if (!operator && actionParams.threshold === undefined) {
+    return (
+      <Text textStyle="sm" color="fg.muted">
+        —
+      </Text>
+    );
+  }
+  return (
+    <Text textStyle="sm">
+      {operator ? `${operator} ` : ""}
+      {actionParams.threshold !== undefined ? actionParams.threshold : ""}
+      {window ? ` · over ${window}` : ""}
+    </Text>
+  );
+}
+
+/** Report "Sends" cell — what the report is about (the subject facet): a
+ *  dashboard, a named custom graph, or a top-N trace table. */
+function ReportSubjectCell({
+  actionParams,
+  graphNameById,
+}: {
+  actionParams: TriggerActionParams;
+  graphNameById: Map<string, string>;
+}) {
+  const source = (
+    actionParams as {
+      source?: { kind?: string; topN?: number; customGraphId?: string };
+    }
+  ).source;
+  if (source?.kind === "customGraph") {
+    const name = source.customGraphId
+      ? graphNameById.get(source.customGraphId)
+      : undefined;
+    return (
+      <VStack align="start" gap={0}>
+        <Text textStyle="sm" fontWeight="medium">
+          Custom graph
+        </Text>
+        <Text textStyle="xs" color="fg.muted" lineClamp={1}>
+          {name ?? "graph"}
+        </Text>
+      </VStack>
+    );
+  }
+  if (source?.kind === "dashboard") {
+    return (
+      <Text textStyle="sm" fontWeight="medium">
+        Analytics dashboard
+      </Text>
+    );
+  }
+  return (
+    <VStack align="start" gap={0}>
+      <Text textStyle="sm" fontWeight="medium">
+        Top {source?.topN ?? 5} traces
+      </Text>
+      <Text textStyle="xs" color="fg.muted">
+        matching your filters
+      </Text>
+    </VStack>
+  );
+}
+
+/** Weekday names for `describeSchedule`, in cron `dow` order (0 = Sunday). */
+const WEEKDAYS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+
+/** Humanises the cron shapes the report drawer emits (weekly / daily /
+ *  monthly). Anything else falls back to the raw expression — a shape lookup
+ *  for the presets we generate, not a general cron parser. */
+function describeSchedule(cron: string, timezone: string): string {
+  const parts = cron.trim().split(/\s+/);
+  if (parts.length !== 5) return `${cron} (${timezone})`;
+  const [min, hour, dom, , dow] = parts;
+  const at = `${String(hour).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+  if (dom === "*" && dow !== "*") {
+    const day = WEEKDAYS[Number(dow) % 7] ?? `day ${dow}`;
+    return `Weekly · ${day} ${at} ${timezone}`;
+  }
+  if (dom === "*" && dow === "*") {
+    return `Daily · ${at} ${timezone}`;
+  }
+  if (dom !== "*" && dow === "*") {
+    return `Monthly · day ${dom} ${at} ${timezone}`;
+  }
+  return `${cron} (${timezone})`;
 }
 
 export default withPermissionGuard("triggers:view", {
