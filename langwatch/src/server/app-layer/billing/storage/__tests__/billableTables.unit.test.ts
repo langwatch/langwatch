@@ -3,8 +3,8 @@ import * as path from "path";
 import { describe, expect, it } from "vitest";
 
 import {
-  RETENTION_TABLE_CATEGORY_MAP,
   RETENTION_MANAGED_TABLES,
+  RETENTION_TABLE_CATEGORY_MAP,
 } from "~/server/data-retention/retentionPolicy.schema";
 import {
   BILLABLE_STORAGE_TABLES,
@@ -33,9 +33,10 @@ function tablesWithSizeBytesColumn(): Set<string> {
     // ALTER TABLE / CREATE TABLE header. Statements are separated by ";".
     for (const statement of sql.split(";")) {
       if (!statement.includes("_size_bytes")) continue;
-      const header = /(?:ALTER|CREATE)\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:\S+\.)?`?(\w+)`?/i.exec(
-        statement,
-      );
+      const header =
+        /(?:ALTER|CREATE)\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:\S+\.)?`?(\w+)`?/i.exec(
+          statement,
+        );
       if (header?.[1]) tables.add(header[1]);
     }
   }

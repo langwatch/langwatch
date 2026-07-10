@@ -19,5 +19,8 @@ export function foldBoundaryEvents({
   initialBytes: bigint;
   events: readonly { deltaBytes: bigint }[];
 }): bigint {
-  return events.reduce((gauge, event) => gauge + event.deltaBytes, initialBytes);
+  return events.reduce(
+    (gauge, event) => gauge + event.deltaBytes,
+    initialBytes,
+  );
 }

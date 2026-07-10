@@ -90,7 +90,7 @@ Feature: Storage billing boundary calendar and gauge fold
     When an exit event of 3 GiB is folded
     Then the gauge reads 7 GiB
 
-  @integration @unimplemented
+  @integration
   Scenario: Folding the full event log reproduces the gauge row
     Given an organization with a mix of entry, exit, and correction events
     When all events are folded from scratch

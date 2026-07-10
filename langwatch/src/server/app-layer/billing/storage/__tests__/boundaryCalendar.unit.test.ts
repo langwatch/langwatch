@@ -55,8 +55,9 @@ describe("computeBoundaryCalendar()", () => {
 
     it("anchors each crossing to its ingest day-slice", () => {
       expect(crossings.map((c) => c.sliceDate.getTime())).toEqual(
-        Array.from({ length: 7 }, (_, day) =>
-          partitionStart.getTime() + day * DAY_MS,
+        Array.from(
+          { length: 7 },
+          (_, day) => partitionStart.getTime() + day * DAY_MS,
         ),
       );
     });
