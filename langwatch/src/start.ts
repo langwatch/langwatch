@@ -117,8 +117,13 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   // web process instead of a separate `pnpm run start:workers` process. Opt-in
   // via WORKERS_IN_PROCESS=1 (see scripts/start.sh + `pnpm dev:single`). Never
   // honoured in production — prod runs web and worker as separate deployments.
+  //
+  // Gate on NODE_ENV === "development" exactly (not `dev`, which is
+  // `!== "production"`) so this matches scripts/start.sh's lane-skip predicate.
+  // If they disagreed, an exotic NODE_ENV (e.g. "staging") would spawn BOTH the
+  // standalone workers lane AND the in-process stack — duplicate consumers.
   const inProcessWorkers =
-    dev &&
+    process.env.NODE_ENV === "development" &&
     (process.env.WORKERS_IN_PROCESS === "1" ||
       process.env.WORKERS_IN_PROCESS === "true");
 
@@ -250,7 +255,10 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
           res.end("Unauthorized");
           return;
         }
-        if (pathname === "/metrics") {
+        if (pathname === "/metrics" || inProcessWorkers) {
+          // /metrics, or /workers/metrics in single-process mode: the workers
+          // share this process's prom-client registry (no separate listener),
+          // so both paths serve the same registry.
           res.setHeader("Content-Type", register.contentType);
           res.end(await register.metrics());
         } else {
@@ -356,25 +364,10 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
     );
   });
 
-  // In-process worker stack (dev opt-in via WORKERS_IN_PROCESS=1). Booted after
-  // the server is listening so the UI comes up even if the workers are slow to
-  // start; a boot failure is logged and the web server keeps running (only the
-  // background jobs won't run).
+  // Assigned by the in-process worker boot below. Declared here so the
+  // shutdown handler can drain it, and so the boot can run *after* the signal
+  // handlers are installed (a SIGTERM during worker boot still drains cleanly).
   let workerHandle: WorkerHandle | undefined;
-  if (inProcessWorkers) {
-    logger.info("WORKERS_IN_PROCESS=1 — hosting the worker stack in-process");
-    try {
-      // startMetricsServer: false — in one process the worker prom registry is
-      // this process's registry, already served at /metrics; no second listener.
-      workerHandle = await startWorkers({ startMetricsServer: false });
-      logger.info("in-process workers ready");
-    } catch (error) {
-      logger.error(
-        { error },
-        "in-process workers failed to start — web server continues, background jobs will not run",
-      );
-    }
-  }
 
   // Graceful shutdown
   const shutdown = async (signal: string) => {
@@ -425,6 +418,26 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
       "unhandled rejection detected"
     );
   });
+
+  // In-process worker stack (dev opt-in via WORKERS_IN_PROCESS=1). Booted last —
+  // after the server is listening AND the shutdown handlers are installed — so
+  // the UI comes up even if the workers are slow to start, and a SIGTERM during
+  // the boot await still drains via the handler above. A boot failure is logged
+  // and the web server keeps running (only the background jobs won't run).
+  if (inProcessWorkers) {
+    logger.info("WORKERS_IN_PROCESS=1 — hosting the worker stack in-process");
+    try {
+      // startMetricsServer: false — in one process the worker prom registry is
+      // this process's registry, already served at /metrics; no second listener.
+      workerHandle = await startWorkers({ startMetricsServer: false });
+      logger.info("in-process workers ready");
+    } catch (error) {
+      logger.error(
+        { error },
+        "in-process workers failed to start — web server continues, background jobs will not run",
+      );
+    }
+  }
 };
 
 // Exported for the langwatch#5219 regression test, which drives the

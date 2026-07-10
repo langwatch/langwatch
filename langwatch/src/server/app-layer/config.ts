@@ -18,6 +18,22 @@ export function roleRunsWorkers(role: ProcessRole | undefined): boolean {
   return role === "worker" || role === "all";
 }
 
+/**
+ * Whether a reactor with the given `runIn` role filter should run under the
+ * current process role. A reactor with no filter runs everywhere. The `"all"`
+ * role (dev single-process mode) plays every role, so it satisfies any filter —
+ * without this, reactors declared `runIn: ["worker"]` would be excluded in
+ * in-process mode and the worker stack would boot but do no reactor work.
+ */
+export function roleSatisfiesRunIn(
+  runIn: ProcessRole[] | undefined,
+  role: ProcessRole | undefined,
+): boolean {
+  if (!runIn || !role) return true;
+  if (role === "all") return true;
+  return runIn.includes(role);
+}
+
 export interface AppConfig {
   nodeEnv: string;
 
