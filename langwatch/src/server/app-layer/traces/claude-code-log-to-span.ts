@@ -192,7 +192,9 @@ export const CLAUDE_TRUNCATED_LOGS_ATTR = "langwatch.claude_code.truncated_logs"
 /**
  * Root-span attribute carrying how many of a turn's marked log records were
  * dropped when the conversion was bounded (>= 1 whenever
- * {@link CLAUDE_TRUNCATED_LOGS_ATTR} is set).
+ * {@link CLAUDE_TRUNCATED_LOGS_ATTR} is set). The exact count when the reactor's
+ * uncapped count query succeeds; a lower bound (>= 1) when that query fails and
+ * the reactor falls back to `fetched - cap` (only the `cap + 1` fetch is known).
  */
 export const CLAUDE_DROPPED_LOG_COUNT_ATTR =
   "langwatch.claude_code.dropped_log_count";
