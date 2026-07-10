@@ -423,20 +423,29 @@ Feature: Externalize event byte content to stored_objects
   # zero conversation turns in the simulations UI.
 
   @integration
-  Scenario: MESSAGE_SNAPSHOT with an AI-SDK image part is accepted (201) and the image is externalized
-    Given a MESSAGE_SNAPSHOT whose message content is [text, {type:"image", image:"data:image/webp;base64,..."}]
-    When the event is POSTed to /api/scenario-events
-    Then the request is accepted with 201 rather than 400 from schema validation
-    And the inline image bytes are externalized to a stored_objects row with media type image/webp
-    And the image part is rewritten to reference /api/files/<projectId>/<id>
+  Scenario: A simulated user message with an image attachment is accepted and the image is stored for the run conversation
+    Given a scenario run whose user turn attaches an inline image, as documented on the multimodal-images page
+    When the SDK reports the conversation snapshot
+    Then the snapshot is accepted instead of being rejected by validation
+    And the image bytes are stored out-of-band
+    And the conversation references the stored image so the run can display it
 
   @integration
-  Scenario: MESSAGE_SNAPSHOT with an OpenAI file part is accepted (201) and the file is externalized preserving the filename
-    Given a MESSAGE_SNAPSHOT whose message content is [text, {type:"file", file:{filename:"document.pdf", file_data:"data:application/pdf;base64,..."}}]
-    When the event is POSTed to /api/scenario-events
-    Then the request is accepted with 201 rather than 400 from schema validation
-    And the inline file bytes are externalized to a stored_objects row with media type application/pdf
-    And the part is rewritten to a binary reference carrying url and filename and no inline data
+  Scenario: A simulated user message with a document attachment is accepted and keeps its filename
+    Given a scenario run whose user turn attaches an inline PDF document, as documented on the multimodal-files page
+    When the SDK reports the conversation snapshot
+    Then the snapshot is accepted instead of being rejected by validation
+    And the document bytes are stored out-of-band
+    And the stored attachment keeps its original filename
+    And no inline bytes remain in the message
+
+  @unit
+  Scenario: Documented image and file attachment shapes validate on the wire
+    Given message content carrying an AI-SDK image part with inline image data
+    And message content carrying an OpenAI file part with inline document data
+    When the wire validator parses the snapshots
+    Then both parse successfully
+    And the inline payloads survive validation intact for the extractor
 
   @unit
   Scenario: AI-SDK file parts with a document mediaType validate on the wire
@@ -452,6 +461,13 @@ Feature: Externalize event byte content to stored_objects
     Then the parse succeeds
     And no stored_objects row is created
     And the part passes through unchanged
+
+  @unit
+  Scenario: Raw-base64 audio file payloads resolve a playable audio type from the filename
+    Given an OpenAI file part whose file_data is raw base64 with filename "recording.wav"
+    When the extractor processes the part
+    Then the payload routes through the input_audio externalization path
+    And the stored object carries an audio media type so playback works
 
   @unit
   Scenario: Post-extraction image and file rewrites still validate on the wire
@@ -753,3 +769,17 @@ Feature: Externalize event byte content to stored_objects
   # AC37 "Azure Blob support — DEFERRED in this PR"                          -> Scenario: Stored-objects writes do not mint azure-blob URIs in this PR
   # AC38 "Project-delete cascade removes rows AND bytes"                     -> Scenario: When a project is deleted, deleteOwnedBy removes both the stored_objects rows and the underlying bytes
   # AC39 "MediaPart playback contract (onLoadedData / non-zero duration)"    -> Scenario: MediaPart audio playback reports a non-zero duration once the browser has decoded the media
+  # AC40 "S3 client supports every production credential mode"               -> Scenario: S3 client uses explicit credentials when env keys are present
+  #                                                                          -> Scenario: S3 client forwards sessionToken when set so SSO/STS credentials work
+  #                                                                          -> Scenario: S3 client omits credentials so the SDK default provider chain handles IRSA and instance profiles
+  #                                                                          -> Scenario: S3 client honors S3_REGION env for real AWS deployments instead of the R2/MinIO 'auto' default
+  #                                                                          -> Scenario: S3 client defaults region to 'auto' for R2 and MinIO compatibility
+  #                                                                          -> Scenario: S3 client falls back to default chain when credentials are partial — prevents misleading 'empty string credentials' bug
+  # AC41 "Documented image/file attachment shapes accepted and externalized" -> Scenario: A simulated user message with an image attachment is accepted and the image is stored for the run conversation
+  #                                                                          -> Scenario: A simulated user message with a document attachment is accepted and keeps its filename
+  #                                                                          -> Scenario: Documented image and file attachment shapes validate on the wire
+  #                                                                          -> Scenario: AI-SDK file parts with a document mediaType validate on the wire
+  #                                                                          -> Scenario: AI-SDK image parts with http(s) URLs validate and pass through unchanged
+  #                                                                          -> Scenario: Raw-base64 audio file payloads resolve a playable audio type from the filename
+  #                                                                          -> Scenario: Post-extraction image and file rewrites still validate on the wire
+  #                                                                          -> Scenario: OpenAI file parts carrying only a provider file_id pass through unchanged

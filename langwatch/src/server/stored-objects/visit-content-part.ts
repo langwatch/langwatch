@@ -522,8 +522,10 @@ function openAiFilePayloadToBinaryPart(
 
 /**
  * Mime type for a raw-base64 OpenAI `file_data` payload, inferred from the
- * filename extension. Covers the document types the /api/files read path
- * serves faithfully; everything else downgrades to a generic download.
+ * filename extension. Audio extensions must resolve to `audio/*` so the part
+ * routes through the `input_audio` externalization path and stays playable;
+ * image extensions keep the /api/files readback faithful. Everything else
+ * downgrades to a generic download.
  */
 function mimeTypeFromFilename(filename: string | undefined): string {
   const ext = filename?.split(".").pop()?.toLowerCase();
@@ -538,6 +540,23 @@ function mimeTypeFromFilename(filename: string | undefined): string {
       return "application/json";
     case "md":
       return "text/markdown";
+    case "wav":
+      return "audio/wav";
+    case "mp3":
+      return "audio/mpeg";
+    case "flac":
+      return "audio/flac";
+    case "ogg":
+      return "audio/ogg";
+    case "png":
+      return "image/png";
+    case "jpg":
+    case "jpeg":
+      return "image/jpeg";
+    case "webp":
+      return "image/webp";
+    case "gif":
+      return "image/gif";
     default:
       return "application/octet-stream";
   }

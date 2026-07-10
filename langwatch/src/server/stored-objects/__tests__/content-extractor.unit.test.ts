@@ -857,7 +857,7 @@ describe("extractInlineMediaFromEvent", () => {
   });
 
   describe("when an event has an AI-SDK image part with a base64 data URI (typescript scenario SDK shape)", () => {
-    /** @scenario "MESSAGE_SNAPSHOT with an AI-SDK image part is accepted (201) and the image is externalized" */
+    /** @scenario "A simulated user message with an image attachment is accepted and the image is stored for the run conversation" */
     it("extracts the bytes and rewrites image to /api/files/<projectId>/<id>", async () => {
       const base64Payload = makeBase64Payload("WEBP_BYTES");
       const storedId = "stored-image-id";
@@ -926,7 +926,7 @@ describe("extractInlineMediaFromEvent", () => {
   });
 
   describe("when an event has an OpenAI file part with a data URI file_data (multimodal-files docs shape)", () => {
-    /** @scenario "MESSAGE_SNAPSHOT with an OpenAI file part is accepted (201) and the file is externalized preserving the filename" */
+    /** @scenario "A simulated user message with a document attachment is accepted and keeps its filename" */
     it("extracts the bytes and rewrites the part to a binary reference preserving the filename", async () => {
       const base64Payload = makeBase64Payload("%PDF-1.4 fake pdf bytes");
       const storedId = "stored-openai-file-id";
@@ -1045,6 +1045,54 @@ describe("extractInlineMediaFromEvent", () => {
       expect(rewrittenEvent).toBe(event);
       expect(refs).toHaveLength(0);
       expect(service.storeFromBytes).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when an event has an OpenAI file part with raw base64 audio file_data", () => {
+    /** @scenario "Raw-base64 audio file payloads resolve a playable audio type from the filename" */
+    it("infers the audio mime type from the filename and routes through input_audio so the rewrite stays playable", async () => {
+      const base64Payload = makeBase64Payload("RAW_WAV_BYTES");
+      const storedId = "stored-raw-audio-id";
+
+      const service = makeService({
+        storeFromBytes: vi.fn().mockResolvedValue({
+          id: storedId,
+          mediaType: "audio/wav",
+          isDuplicate: false,
+        }),
+      });
+
+      const event = makeEventWithContent([
+        {
+          type: "file",
+          file: { filename: "recording.wav", file_data: base64Payload },
+        },
+      ]);
+
+      const { rewrittenEvent, refs } = await extractInlineMediaFromEvent({
+        ...BASE_PARAMS,
+        event,
+        service,
+      });
+
+      expect(service.storeFromBytes).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mediaType: "audio/wav",
+          bytes: Buffer.from("RAW_WAV_BYTES"),
+        }),
+      );
+
+      const content = (rewrittenEvent as { message: { content: unknown[] } })
+        .message.content;
+      expect(content[0]).toEqual({
+        type: "input_audio",
+        input_audio: {
+          data: undefined,
+          url: `/api/files/proj-1/${storedId}`,
+          mimeType: "audio/wav",
+        },
+      });
+      expect(refs).toHaveLength(1);
     });
   });
 
