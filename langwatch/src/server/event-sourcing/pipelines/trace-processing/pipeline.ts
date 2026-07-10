@@ -26,6 +26,14 @@ import {
 import { LogRecordStorageMapProjection } from "./projections/logRecordStorage.mapProjection";
 import { MetricRecordStorageMapProjection } from "./projections/metricRecordStorage.mapProjection";
 import { SpanStorageMapProjection } from "./projections/spanStorage.mapProjection";
+import {
+  type TraceAnalyticsData,
+  TraceAnalyticsFoldProjection,
+} from "./projections/traceAnalytics.foldProjection";
+import {
+  TraceAnalyticsRollupMapProjection,
+  type TraceAnalyticsRollupRow,
+} from "./projections/traceAnalyticsRollup.mapProjection";
 import { TraceSummaryFoldProjection } from "./projections/traceSummary.foldProjection";
 import type { RecordSpanCommandData } from "./schemas/commands";
 import type { TraceProcessingEvent } from "./schemas/events";
@@ -36,9 +44,13 @@ import { TraceRequestUtils } from "./utils/traceRequest.utils";
 
 export interface TraceProcessingPipelineDeps {
   spanAppendStore: AppendStore<NormalizedSpan>;
+  /** ADR-034 Phase 1: per-span rollup writer (app-side, replaces the MV). */
+  traceAnalyticsRollupAppendStore: AppendStore<TraceAnalyticsRollupRow>;
   logRecordAppendStore: AppendStore<NormalizedLogRecord>;
   metricRecordAppendStore: AppendStore<NormalizedMetricRecord>;
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
+  /** ADR-034 Phase 2: slim per-trace fold writer (silent dual-tap, no read path). */
+  traceAnalyticsStore: FoldProjectionStore<TraceAnalyticsData>;
   originGateReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   evaluationTriggerReactor: ReactorDefinition<
     TraceProcessingEvent,
@@ -77,6 +89,17 @@ export interface TraceProcessingPipelineDeps {
    *  the framework adapter no-ops on process roles without an outbox
    *  runtime, so unconditional registration is safe. */
   alertTriggerNotifyOutboxReactor: OutboxReactorDefinition<
+    TraceProcessingEvent,
+    TraceSummaryData
+  >;
+  /**
+   * ADR-034 Phase 5: real-time path for custom-graph threshold alerts.
+   * Attached on `traceAnalytics` (the slim fold) so it fires on every
+   * slim-fold update; debounced per (triggerId, projectId) inside the
+   * reactor's `decide`. Flag-gated per project — disabled = empty
+   * decide; cron handles the project's graph triggers as today.
+   */
+  graphTriggerEvaluationOutboxReactor: OutboxReactorDefinition<
     TraceProcessingEvent,
     TraceSummaryData
   >;
@@ -137,10 +160,22 @@ export function createTraceProcessingPipeline(
         store: deps.traceSummaryStore,
       }),
     )
+    .withFoldProjection(
+      "traceAnalytics",
+      new TraceAnalyticsFoldProjection({
+        store: deps.traceAnalyticsStore,
+      }),
+    )
     .withMapProjection(
       "spanStorage",
       new SpanStorageMapProjection({
         store: deps.spanAppendStore,
+      }),
+    )
+    .withMapProjection(
+      "traceAnalyticsRollup",
+      new TraceAnalyticsRollupMapProjection({
+        store: deps.traceAnalyticsRollupAppendStore,
       }),
     )
     .withMapProjection(
@@ -187,6 +222,11 @@ export function createTraceProcessingPipeline(
       "traceSummary",
       "alertTriggerNotifyOutbox",
       deps.alertTriggerNotifyOutboxReactor,
+    )
+    .withOutbox(
+      "traceAnalytics",
+      "graphTriggerEvaluation",
+      deps.graphTriggerEvaluationOutboxReactor,
     )
     .withReactor(
       "spanStorage",

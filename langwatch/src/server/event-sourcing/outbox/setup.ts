@@ -1,9 +1,12 @@
 import type { PrismaClient } from "@prisma/client";
 import { Cluster, type Redis } from "ioredis";
 import { env } from "~/env.mjs";
+import { handleSendEmail } from "~/pages/api/cron/triggers/actions/sendEmail";
+import { handleSendSlackMessage } from "~/pages/api/cron/triggers/actions/sendSlackMessage";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
 import { getProtectionsForProject } from "~/server/api/utils";
+import { getAnalyticsService } from "~/server/app-layer/analytics";
 import type { EvaluationRunService } from "~/server/app-layer/evaluations/evaluation-run.service";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import type { TraceSummaryRepository } from "~/server/app-layer/traces/repositories/trace-summary.repository";
@@ -11,6 +14,11 @@ import type { SpanStorageService } from "~/server/app-layer/traces/span-storage.
 import { TraceReadDerivationService } from "~/server/app-layer/traces/trace-read-derivation.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { EmailSuppressionService } from "~/server/app-layer/triggers/emailSuppression.service";
+import {
+  evaluateGraphTrigger,
+  type GraphTriggerEvaluationDeps,
+} from "~/server/app-layer/triggers/graph-trigger-evaluation.service";
+import { PrismaGraphTriggerSentRepository } from "~/server/app-layer/triggers/repositories/trigger.prisma.repository";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
 import { TraceService } from "~/server/traces/trace.service";
 import { TraceSummaryStore } from "../pipelines/trace-processing/projections/traceSummary.store";
@@ -24,6 +32,8 @@ import {
 } from "./emailHourlyCap";
 import {
   type CadenceStagePayload,
+  type GraphEvalStagePayload,
+  graphEvalDedupId,
   type SettleStagePayload,
   settleDedupId,
 } from "./payload";
@@ -71,6 +81,18 @@ export interface OutboxRuntime {
   enqueueSettle(
     payload: SettleStagePayload,
     options: { ttlMs: number },
+  ): Promise<void>;
+  /**
+   * Producer entry point for custom-graph threshold evaluations
+   * (ADR-034 Phase 5). Same queue, single-stage payload. `makeDedupId`
+   * is the caller-supplied dedup key — `graphEvalDedupId(...)` for
+   * reactor-sourced enqueues, with a `:hb` suffix for heartbeat-sourced
+   * enqueues so the two sources collapse SEPARATELY (real-time fires
+   * even when a heartbeat is pending, and vice versa).
+   */
+  enqueueGraphEval(
+    payload: GraphEvalStagePayload,
+    options: { ttlMs: number; makeDedupId: string },
   ): Promise<void>;
 }
 
@@ -141,6 +163,47 @@ export function buildOutboxRuntime({
     return promise;
   };
 
+  // ADR-034 Phase 5: shared evaluator deps for graphEval-stage payloads.
+  // Constructed lazily once (no per-tick allocation). Notifier reuses the
+  // EXISTING cron handlers byte-for-byte (`handleSendEmail` /
+  // `handleSendSlackMessage`) — the spec requires `sendTriggerEmail` /
+  // `sendSlackWebhook` to be UNCHANGED. The TriggerSent repo mirrors the
+  // cron's dedup pattern exactly (find/create/update with the same WHERE
+  // clauses for `customGraphId != null` graph alerts).
+  const graphTriggerSentRepo = new PrismaGraphTriggerSentRepository(prisma);
+  const graphTriggerEvalDeps: GraphTriggerEvaluationDeps = {
+    loadTrigger: async ({ triggerId, projectId }) =>
+      prisma.trigger.findUnique({ where: { id: triggerId, projectId } }),
+    loadCustomGraph: async ({ customGraphId, projectId }) =>
+      prisma.customGraph.findUnique({
+        where: { id: customGraphId, projectId },
+      }),
+    loadProject: async (projectId) =>
+      prisma.project.findUnique({ where: { id: projectId } }),
+    getTimeseries: async (input) =>
+      getAnalyticsService().getTimeseries(input),
+    triggerSent: graphTriggerSentRepo,
+    updateLastRunAt: async ({ triggerId, projectId }) =>
+      triggers.updateLastRunAt(triggerId, projectId),
+    notifier: {
+      sendEmail: async (params) =>
+        handleSendEmail({
+          trigger: params.trigger,
+          projects: params.projects,
+          triggerData: params.triggerData,
+          projectSlug: params.projectSlug,
+        }),
+      sendSlack: async (params) =>
+        handleSendSlackMessage({
+          trigger: params.trigger,
+          projects: params.projects,
+          triggerData: params.triggerData,
+          projectSlug: params.projectSlug,
+        }),
+    },
+    now: () => new Date(),
+  };
+
   const dispatcher = createOutboxDispatcher({
     triggers,
     projects,
@@ -181,6 +244,14 @@ export function buildOutboxRuntime({
       }),
     filterSuppressedEmails: ({ projectId, triggerId, emails }) =>
       emailSuppressions.filterSuppressed({ projectId, triggerId, emails }),
+    evaluateGraphTrigger: async (params) => {
+      await evaluateGraphTrigger({
+        deps: graphTriggerEvalDeps,
+        triggerId: params.triggerId,
+        projectId: params.projectId,
+        reason: params.reason,
+      });
+    },
     traceById: async (projectId, traceId) => {
       const protections = await getProtectionsDeduped(projectId);
       return traceService.getById(projectId, traceId, protections);
@@ -232,6 +303,29 @@ export function buildOutboxRuntime({
               triggerId: payload.triggerId,
               traceId: payload.traceId,
             }),
+          ttlMs,
+        },
+      });
+    },
+    async enqueueGraphEval(payload, { ttlMs, makeDedupId }) {
+      // Avoid the unused-import warning on `graphEvalDedupId` here even
+      // though the caller is what produces the dedupKey — we expose the
+      // helper at the payload layer for any future caller that wants
+      // the canonical shape without going through `OutboxEnqueueRequest`.
+      void graphEvalDedupId;
+      if (!queueHolder.current) {
+        throw new Error(
+          "Outbox runtime queue not attached — enqueueGraphEval called before attachQueue",
+        );
+      }
+      // Debounce Mode collapses repeat `(triggerId, projectId)` sends
+      // within the TTL. The handler is idempotent under repeated calls
+      // — `TriggerSent` is the at-most-once gate — so collapsing is the
+      // right behaviour. The 5s TTL the reactor passes here is the
+      // per-event debounce window the Phase 5 spec locks.
+      await queueHolder.current.send(payload, {
+        deduplication: {
+          makeId: () => makeDedupId,
           ttlMs,
         },
       });

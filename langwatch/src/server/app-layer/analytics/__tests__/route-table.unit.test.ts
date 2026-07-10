@@ -232,15 +232,40 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
   });
 
   describe("given an evaluation metric", () => {
-    it("falls back to trace_summaries (eval reads need evaluation_runs join)", () => {
+    it("routes to evaluation_analytics_rollup (ADR-034 Phase 6 — eval fast-path)", () => {
       const table = pickAnalyticsTable({
-        series: [
-          series("evaluations.evaluation_score", "avg", {
-            key: "evaluator-x",
-          }),
-        ],
+        series: [series("evaluations.evaluation_score", "avg")],
       });
-      expect(table).toBe("trace_summaries");
+      expect(table).toBe("evaluation_analytics_rollup");
+    });
+
+    describe("when the series names a specific evaluator", () => {
+      // An eval `key` is an evaluator ID. Neither fast-path table carries an
+      // EvaluatorId column (00040 / 00041 hoist EvaluatorType, a slug), so
+      // serving a keyed series from either would silently aggregate across
+      // every evaluator in the project. Only `evaluation_runs` can express
+      // the predicate.
+      it("falls back to evaluation_runs rather than blending evaluators on the rollup", () => {
+        const table = pickAnalyticsTable({
+          series: [
+            series("evaluations.evaluation_score", "avg", {
+              key: "evaluator-x",
+            }),
+          ],
+        });
+        expect(table).toBe("evaluation_runs");
+      });
+
+      it("falls back to evaluation_runs for a percentile that would otherwise hit slim", () => {
+        const table = pickAnalyticsTable({
+          series: [
+            series("evaluations.evaluation_score", "p95", {
+              key: "evaluator-x",
+            }),
+          ],
+        });
+        expect(table).toBe("evaluation_runs");
+      });
     });
   });
 
@@ -373,18 +398,26 @@ describe("pickAnalyticsTable (ADR-034 Phase 3 read router)", () => {
     // key that slim cannot, the router is forced to serve that shape from the
     // rollup's per-span attribution with no safer table to fall to — which is
     // exactly how `metadata.model` ended up on the rollup.
-    it("every rollup group-by key is also a slim group-by key", () => {
-      for (const key of __testOnly__.ROLLUP_GROUP_BY_KEYS) {
-        expect(__testOnly__.SLIM_GROUP_BY_KEYS.has(key)).toBe(true);
+    it("every trace-rollup group-by key is also a trace-slim group-by key", () => {
+      for (const key of __testOnly__.ROLLUP_TRACE_GROUP_BY_KEYS) {
+        expect(__testOnly__.SLIM_TRACE_GROUP_BY_KEYS.has(key)).toBe(true);
       }
     });
 
-    it("keeps the rollup ungrouped — its Model/SpanType sort keys are not read contracts", () => {
-      expect(__testOnly__.ROLLUP_GROUP_BY_KEYS.size).toBe(0);
+    it("every eval-rollup group-by key is also an eval-slim group-by key", () => {
+      for (const key of __testOnly__.ROLLUP_EVAL_GROUP_BY_KEYS) {
+        expect(__testOnly__.SLIM_EVAL_GROUP_BY_KEYS.has(key)).toBe(true);
+      }
+    });
+
+    it("keeps the trace rollup ungrouped — its Model/SpanType sort keys are not read contracts", () => {
+      expect(__testOnly__.ROLLUP_TRACE_GROUP_BY_KEYS.size).toBe(0);
     });
 
     it("serves metadata.model from slim, matching legacy's arrayJoin(Models)", () => {
-      expect(__testOnly__.SLIM_GROUP_BY_KEYS.has("metadata.model")).toBe(true);
+      expect(__testOnly__.SLIM_TRACE_GROUP_BY_KEYS.has("metadata.model")).toBe(
+        true,
+      );
     });
   });
 

@@ -59,6 +59,12 @@ function makeDeps(overrides?: {
   const runTraceSummariesTimeseries = vi.fn().mockResolvedValue(shimResult);
   const runRollupTimeseries = vi.fn().mockResolvedValue(rollupResult);
   const runSlimTimeseries = vi.fn().mockResolvedValue(slimResult);
+  // Phase 6 — eval analytics deps. Not exercised by the existing tests
+  // (which use trace metrics), but the AnalyticsService constructor now
+  // requires them.
+  const runEvalRollupTimeseries = vi.fn().mockResolvedValue(rollupResult);
+  const runEvalSlimTimeseries = vi.fn().mockResolvedValue(slimResult);
+  const runEvaluationRunsTimeseries = vi.fn().mockResolvedValue(shimResult);
   const getFeedbacks = vi.fn().mockResolvedValue({
     events: [{ event_id: "event-1", event_type: "thumbs_up_down" }],
   });
@@ -72,6 +78,9 @@ function makeDeps(overrides?: {
       rollupRepository: { runRollupTimeseries },
       slimRepository: { runSlimTimeseries },
       legacyShim: { runTraceSummariesTimeseries },
+      evalRollupRepository: { runRollupTimeseries: runEvalRollupTimeseries },
+      evalSlimRepository: { runSlimTimeseries: runEvalSlimTimeseries },
+      evalLegacyShim: { runEvaluationRunsTimeseries },
       legacyBackend: {
         getTimeseries: vi.fn(),
         getDataForFilter: vi.fn(),
@@ -84,6 +93,9 @@ function makeDeps(overrides?: {
       runTraceSummariesTimeseries,
       runRollupTimeseries,
       runSlimTimeseries,
+      runEvalRollupTimeseries,
+      runEvalSlimTimeseries,
+      runEvaluationRunsTimeseries,
       getFeedbacks,
       getTopUsedDocuments,
     },

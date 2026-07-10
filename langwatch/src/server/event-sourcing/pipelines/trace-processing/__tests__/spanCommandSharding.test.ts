@@ -59,6 +59,8 @@ function buildTraceDeps(
     logRecordAppendStore: store,
     metricRecordAppendStore: store,
     traceSummaryStore: store,
+    traceAnalyticsStore: store,
+    traceAnalyticsRollupAppendStore: store,
     originGateReactor: reactorStub("originGate"),
     evaluationTriggerReactor: reactorStub("evaluationTrigger"),
     customEvaluationSyncReactor: reactorStub("customEvaluationSync"),
@@ -69,6 +71,9 @@ function buildTraceDeps(
     alertTriggerReactor: outboxReactorStub("alertTrigger"),
     alertTriggerNotifyOutboxReactor: outboxReactorStub(
       "alertTriggerNotifyOutbox",
+    ),
+    graphTriggerEvaluationOutboxReactor: outboxReactorStub(
+      "graphTriggerEvaluation",
     ),
     spanStorageBroadcastReactor: reactorStub("spanStorageBroadcast"),
     claudeCodeSpanSyncReactor: reactorStub("claudeCodeSpanSync"),

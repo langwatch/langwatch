@@ -145,6 +145,27 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     envVar: "CLICKHOUSE_COLD_STORAGE_TRACE_ANALYTICS_ROLLUP_TTL_DAYS",
     hardcodedDefault: 49,
   },
+  // ADR-034 Phase 6: slim per-evaluation analytics table. Same TTL anchor +
+  // cadence as evaluation_runs so the slim row ages identically.
+  {
+    table: "evaluation_analytics",
+    ttlColumn: "OccurredAt",
+    retentionTTLColumn: "OccurredAt",
+    envVar: "CLICKHOUSE_COLD_STORAGE_EVALUATION_ANALYTICS_TTL_DAYS",
+    hardcodedDefault: 49,
+  },
+  // ADR-034 Phase 6: per-evaluation rollup. Anchor on BucketStart (its sort +
+  // partition leaf). BucketStart is DateTime64(3), so the ttlColumnExpression
+  // wraps in toDateTime — CH rejects DateTime64 directly in TTL arithmetic.
+  {
+    table: "evaluation_analytics_rollup",
+    ttlColumn: "BucketStart",
+    ttlColumnExpression: "toDateTime(BucketStart)",
+    retentionTTLColumn: "BucketStart",
+    retentionTTLColumnExpression: "toDateTime(BucketStart)",
+    envVar: "CLICKHOUSE_COLD_STORAGE_EVALUATION_ANALYTICS_ROLLUP_TTL_DAYS",
+    hardcodedDefault: 49,
+  },
 ] as const;
 
 function parseNonNegativeInt(value: string, label: string): number {

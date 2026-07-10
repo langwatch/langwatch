@@ -79,6 +79,7 @@ function makeOutboxStub(): OutboxRuntime {
     auditAdapter: {} as any,
     attachQueue: vi.fn(),
     enqueueSettle: vi.fn().mockResolvedValue(undefined),
+    enqueueGraphEval: vi.fn().mockResolvedValue(undefined),
   };
 }
 
