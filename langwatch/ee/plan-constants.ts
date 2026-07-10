@@ -3,7 +3,7 @@ import type { LicensePlanLimits } from "./licensing/types";
 
 /**
  * Single source of truth for plan definitions (ADR-039 Decision 7 /
- * Invariant I7, resolves Stripe-assessment hazard H11).
+ * Invariant I7).
  *
  * SaaS subscription plans (`ee/billing/planLimits.ts`) and self-hosted
  * license generation templates (`ee/licensing/planTemplates.ts`) previously
