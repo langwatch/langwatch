@@ -608,6 +608,9 @@ export function AutomationDrawer({
       setNotificationCadence: (value) =>
         dispatch({ type: "SET_CADENCE", value: value as NotificationCadence }),
       hasEvaluationFilter,
+      // Providers seed editor defaults from this so the template shown in
+      // the editor matches the one dispatch renders for the draft's kind.
+      sourceKind: isGraphAlert ? "graphAlert" : "trace",
     }),
     [
       projectId,
@@ -705,6 +708,10 @@ export function AutomationDrawer({
         projectId={projectId}
         prefilledGraphId={prefilledGraphId}
         prefilledSeriesName={prefilledSeriesName}
+        // A saved graph alert can't become a trace automation mid-edit —
+        // lock the source cards visibly instead of letting the switch look
+        // available.
+        sourceLocked={!!automationId && isGraphAlert}
         onSave={({ source, filters, customGraphId, graphAlert, alertType }) => {
           dispatch({ type: "SET_SOURCE", value: source });
           if (source === "trace") {

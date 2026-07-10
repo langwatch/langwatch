@@ -13,12 +13,16 @@ import { useState } from "react";
 import {
   type DraftCadence,
   pickDefaultSlackBlockKitTemplateId,
+  type SlackBlockKitTemplateKind,
   type SlackBlockKitTemplateOption,
-  templateOptionsForCadence,
+  templateOptionsFor,
 } from "./registry";
 
 interface Props {
   cadence: DraftCadence;
+  /** Trace automations and graph alerts render against different variable
+   *  sets, so the picker only offers layouts built for the draft's kind. */
+  kind: SlackBlockKitTemplateKind;
   hasEvaluationFilter: boolean;
   /** The current value of slice.template — used to highlight which preset
    *  (if any) matches it. Custom edits highlight nothing. */
@@ -32,29 +36,34 @@ interface Props {
 
 export function SlackBlockKitTemplatePicker({
   cadence,
+  kind,
   hasEvaluationFilter,
   currentSource,
   onSelect,
   onSelectOtherCadence,
 }: Props) {
-  const options = templateOptionsForCadence(cadence);
+  const options = templateOptionsFor({ cadence, kind });
   const otherCadence: DraftCadence =
     cadence === "digest" ? "immediate" : "digest";
-  const otherOptions = templateOptionsForCadence(otherCadence).filter(
-    (opt) => opt.cadenceFit !== "both",
-  );
+  const otherOptions = templateOptionsFor({
+    cadence: otherCadence,
+    kind,
+  }).filter((opt) => opt.cadenceFit !== "both");
   const [otherOpen, setOtherOpen] = useState(false);
   const defaultId = pickDefaultSlackBlockKitTemplateId({
     cadence,
     hasEvaluationFilter,
+    kind,
   });
 
   return (
     <Stack gap={2} align="stretch">
       <Text textStyle="xs" color="fg.muted">
-        {cadence === "digest"
-          ? "Your cadence bundles every trace matched in the window into one digest message. Pick a starting layout — the thumbnail shows structure, not the final look."
-          : "Each matching trace sends its own message. Pick a starting layout — the thumbnail shows structure, not the final look."}
+        {kind === "graphAlert"
+          ? "Each time the alert fires it sends one message. Pick a starting layout — the thumbnail shows structure, not the final look."
+          : cadence === "digest"
+            ? "Your cadence bundles every trace matched in the window into one digest message. Pick a starting layout — the thumbnail shows structure, not the final look."
+            : "Each matching trace sends its own message. Pick a starting layout — the thumbnail shows structure, not the final look."}
       </Text>
       <SimpleGrid
         columns={{ base: 2, md: Math.min(options.length, 3) }}

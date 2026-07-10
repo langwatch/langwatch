@@ -117,6 +117,10 @@ export interface ConfigFormCtx<TPreview = unknown> {
   /** True when the draft has any evaluations.* filter set — used by the
    *  Slack picker to surface the eval-failure template. */
   hasEvaluationFilter: boolean;
+  /** What the draft triggers on — trace data or a custom-graph alert.
+   *  Notify providers seed their template defaults from this so the editor
+   *  shows the same template dispatch will render. */
+  sourceKind: "trace" | "graphAlert";
 }
 
 /** Mirrors `editors/liquidMonaco#VariableInfo`. Defined here too so the

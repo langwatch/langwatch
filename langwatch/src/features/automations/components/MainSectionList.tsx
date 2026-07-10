@@ -1,4 +1,5 @@
-import { Text, VStack } from "@chakra-ui/react";
+import { Badge, Text, VStack } from "@chakra-ui/react";
+import { ListFilter, TrendingUp } from "lucide-react";
 import { CLIENT_PROVIDERS } from "~/automations/providers/client";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useGraphAlertLabels } from "../logic/useGraphAlertLabels";
@@ -75,6 +76,23 @@ export function MainSectionList({
 
       <SectionRow
         title="When"
+        badge={
+          // Trace automations and graph alerts behave differently end to
+          // end (filters vs threshold, template variables, cadence), so
+          // the kind is stamped on the row rather than buried in the
+          // summary sentence.
+          draft.source === "customGraph" ? (
+            <Badge size="sm" variant="surface" colorPalette="purple" gap={1}>
+              <TrendingUp size={12} />
+              Graph alert
+            </Badge>
+          ) : (
+            <Badge size="sm" variant="surface" gap={1}>
+              <ListFilter size={12} />
+              Trace data
+            </Badge>
+          )
+        }
         summary={
           conditionsSet
             ? conditionsSummary

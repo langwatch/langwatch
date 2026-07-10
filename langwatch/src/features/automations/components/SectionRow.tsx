@@ -1,5 +1,6 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { Check, ChevronRight } from "lucide-react";
+import type { ReactNode } from "react";
 
 /**
  * A single clickable row on the main drawer summarising one section of
@@ -13,12 +14,16 @@ export function SectionRow({
   summary,
   complete,
   disabled = false,
+  badge,
   onClick,
 }: {
   title: string;
   summary: string;
   complete: boolean;
   disabled?: boolean;
+  /** Optional chip rendered next to the title — e.g. the When row's
+   *  trigger-kind badge. */
+  badge?: ReactNode;
   onClick: () => void;
 }) {
   return (
@@ -54,6 +59,7 @@ export function SectionRow({
         <VStack align="start" gap={0} flex="1" minWidth="0">
           <HStack gap={2}>
             <Text fontWeight="semibold">{title}</Text>
+            {badge}
             {complete ? (
               <Box as="span" color="colorPalette.solid" display="inline-flex">
                 <Check size={14} color="currentColor" />

@@ -17,6 +17,8 @@ import {
   LiquidEditor,
 } from "~/features/automations/editors/templateAuthoring";
 import {
+  DEFAULT_ALERT_EMAIL_BODY_TEMPLATE,
+  DEFAULT_ALERT_EMAIL_SUBJECT_TEMPLATE,
   DEFAULT_EMAIL_BODY_TEMPLATE,
   DEFAULT_EMAIL_SUBJECT_TEMPLATE,
 } from "~/shared/templating/defaults";
@@ -155,11 +157,19 @@ function EmailConfigForm({
     onChange({ ...slice, members: slice.members.filter((m) => m !== email) });
   };
 
+  // Graph-alert drafts dispatch with the alert defaults, so the editor
+  // must seed the same templates — otherwise the shown template and the
+  // rendered email disagree.
+  const isGraphAlert = ctx.sourceKind === "graphAlert";
   const subjectValue = slice.subject.usingDefault
-    ? DEFAULT_EMAIL_SUBJECT_TEMPLATE
+    ? isGraphAlert
+      ? DEFAULT_ALERT_EMAIL_SUBJECT_TEMPLATE
+      : DEFAULT_EMAIL_SUBJECT_TEMPLATE
     : slice.subject.value;
   const bodyValue = slice.body.usingDefault
-    ? DEFAULT_EMAIL_BODY_TEMPLATE
+    ? isGraphAlert
+      ? DEFAULT_ALERT_EMAIL_BODY_TEMPLATE
+      : DEFAULT_EMAIL_BODY_TEMPLATE
     : slice.body.value;
 
   const emailPreview = ctx.preview;

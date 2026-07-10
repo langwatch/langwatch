@@ -2,7 +2,10 @@ import { AlertType, TriggerAction } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import { renderLiquid } from "~/shared/templating/engine";
 import { EXAMPLE_MATCHES } from "~/shared/templating/exampleContext";
-import { buildTemplateContext } from "~/shared/templating/templateContext";
+import {
+  buildExampleGraphAlertTemplateContext,
+  buildTemplateContext,
+} from "~/shared/templating/templateContext";
 import {
   ACTION_PROVIDERS,
   CLIENT_PROVIDERS,
@@ -95,8 +98,13 @@ describe("provider registry parity", () => {
         },
       }),
     } as const;
+    const graphAlertContext = buildExampleGraphAlertTemplateContext({
+      baseHost: "https://app.langwatch.ai",
+      project: { name: "Acme", slug: "acme" },
+      trigger: { name: "High latency", alertType: "WARNING" },
+    });
 
-    describe("when each template renders against the example context for its cadence", () => {
+    describe("when each template renders against the example context for its kind and cadence", () => {
       it.each(
         SLACK_BLOCK_KIT_TEMPLATES.map((t) => [t.id, t] as const),
       )("%s produces a non-empty Block Kit blocks array", async (_id, template) => {
@@ -105,12 +113,13 @@ describe("provider registry parity", () => {
             ? (["immediate", "digest"] as const)
             : ([template.cadenceFit] as const);
         for (const cadence of cadences) {
+          const context =
+            template.kind === "graphAlert"
+              ? graphAlertContext
+              : contextsByCadence[cadence];
           const { output } = await renderLiquid({
             template: template.source,
-            context: contextsByCadence[cadence] as unknown as Record<
-              string,
-              unknown
-            >,
+            context: context as unknown as Record<string, unknown>,
           });
           const blocks: unknown = JSON.parse(output);
           expect(Array.isArray(blocks)).toBe(true);

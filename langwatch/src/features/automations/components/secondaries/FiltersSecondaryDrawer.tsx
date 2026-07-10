@@ -84,6 +84,7 @@ export function FiltersSecondaryDrawer({
   projectId,
   prefilledGraphId,
   prefilledSeriesName,
+  sourceLocked = false,
   onSave,
   onCancel,
 }: {
@@ -100,6 +101,10 @@ export function FiltersSecondaryDrawer({
   /** Companion to `prefilledGraphId` — the series the chart card asked us
    *  to monitor. Locked alongside the graph field. */
   prefilledSeriesName?: string;
+  /** The draft's source can't change anymore (e.g. editing a saved graph
+   *  alert). The unselected source card renders with an explicit locked
+   *  treatment instead of silently ignoring clicks. */
+  sourceLocked?: boolean;
   onSave: (result: FiltersDrawerResult) => void;
   onCancel: () => void;
 }) {
@@ -238,6 +243,7 @@ export function FiltersSecondaryDrawer({
     !!localCustomGraphId &&
     !localGraphAlert.seriesName;
   const isPrefilled = !!prefilledGraphId;
+  const sourceIsLocked = isPrefilled || sourceLocked;
 
   return (
     <SecondaryDrawerShell
@@ -269,13 +275,17 @@ export function FiltersSecondaryDrawer({
             active={localSource === "trace"}
             title="Trace data"
             description="Match on incoming traces using filter fields."
-            onClick={() => !isPrefilled && setLocalSource("trace")}
+            locked={sourceIsLocked && localSource !== "trace"}
+            lockedTooltip="This automation watches a graph. Create a new automation to trigger on trace data."
+            onClick={() => !sourceIsLocked && setLocalSource("trace")}
           />
           <SourceCard
             active={localSource === "customGraph"}
             title="Custom graph"
             description="Fire when a custom graph metric crosses a threshold."
-            onClick={() => !isPrefilled && setLocalSource("customGraph")}
+            locked={sourceIsLocked && localSource !== "customGraph"}
+            lockedTooltip="This automation watches trace data. Create a new automation to trigger on a graph."
+            onClick={() => !sourceIsLocked && setLocalSource("customGraph")}
           />
         </HStack>
       </Box>

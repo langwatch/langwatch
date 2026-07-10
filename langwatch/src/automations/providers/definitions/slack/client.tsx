@@ -19,6 +19,8 @@ import {
   LiquidEditor,
 } from "~/features/automations/editors/templateAuthoring";
 import {
+  DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE,
+  DEFAULT_ALERT_SLACK_TEMPLATE,
   DEFAULT_SLACK_BLOCK_KIT_TEMPLATE,
   DEFAULT_SLACK_TEMPLATE,
 } from "~/shared/templating/defaults";
@@ -111,9 +113,17 @@ function SlackConfigForm({
   ctx,
 }: ConfigFormProps<SlackSlice, SlackPreview>) {
   const isBlockKit = slice.templateType === "block_kit";
+  // Graph-alert drafts dispatch with the alert defaults, so the editor
+  // must seed the same template — otherwise the shown template and the
+  // rendered message disagree.
+  const isGraphAlert = ctx.sourceKind === "graphAlert";
   const templateDefault = isBlockKit
-    ? DEFAULT_SLACK_BLOCK_KIT_TEMPLATE
-    : DEFAULT_SLACK_TEMPLATE;
+    ? isGraphAlert
+      ? DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE
+      : DEFAULT_SLACK_BLOCK_KIT_TEMPLATE
+    : isGraphAlert
+      ? DEFAULT_ALERT_SLACK_TEMPLATE
+      : DEFAULT_SLACK_TEMPLATE;
   const templateValue = slice.template.usingDefault
     ? templateDefault
     : slice.template.value;
@@ -123,19 +133,22 @@ function SlackConfigForm({
     [ctx.variables, ctx.cadenceMode],
   );
 
-  // If the cadence switches away from the one the picked preset was built
-  // for (immediate template on a digest dispatch or vice versa), the source
-  // would render empty/first-match-only bodies. Reset to the framework
-  // default so the editor shows a template that fits the new cadence.
+  // If the cadence or trigger kind switches away from what the picked
+  // preset was built for (immediate template on a digest dispatch, trace
+  // template on a graph alert, or vice versa), the source would render
+  // empty/first-match-only bodies. Reset to the framework default so the
+  // editor shows a template that fits the new draft.
   useEffect(() => {
     if (slice.template.usingDefault) return;
     const preset = findTemplateOptionBySource(slice.template.value);
     if (!preset) return;
-    if (preset.cadenceFit === "both" || preset.cadenceFit === ctx.cadenceMode)
-      return;
+    const cadenceMismatch =
+      preset.cadenceFit !== "both" && preset.cadenceFit !== ctx.cadenceMode;
+    const kindMismatch = preset.kind !== ctx.sourceKind;
+    if (!cadenceMismatch && !kindMismatch) return;
     onChange({ ...slice, template: EMPTY_FIELD });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ctx.cadenceMode]);
+  }, [ctx.cadenceMode, ctx.sourceKind]);
 
   return (
     <VStack align="stretch" gap={4}>
@@ -181,6 +194,7 @@ function SlackConfigForm({
       {isBlockKit ? (
         <SlackBlockKitTemplatePicker
           cadence={ctx.cadenceMode}
+          kind={ctx.sourceKind}
           hasEvaluationFilter={ctx.hasEvaluationFilter}
           currentSource={templateValue}
           onSelect={(option) =>
