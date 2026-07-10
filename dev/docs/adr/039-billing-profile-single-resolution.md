@@ -31,7 +31,7 @@ Hard constraints (locked):
 3. **OSS/self-hosted unaffected** — non-SaaS builds keep license-only resolution; no Stripe imports leak into OSS paths.
 4. **No Stripe migration** — existing subscriptions/prices/items unchanged; only our interpretation layer changes.
 
-Prior art: `specs/licensing/dual-pricing-model.feature` (PricingModel = HOW, PlanTypes = WHAT — revised by this ADR), `specs/licensing/enforcement-members.feature`, ADR-019 (layering), and the internal billing assessment.
+Prior art: `specs/licensing/dual-pricing-model.feature` (PricingModel = HOW, PlanTypes = WHAT — revised by this ADR), `specs/licensing/enforcement-members.feature`, and ADR-019 (layering).
 
 ## Decision
 

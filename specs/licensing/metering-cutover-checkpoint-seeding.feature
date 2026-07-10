@@ -3,6 +3,12 @@ Feature: Metering cutover bills forward only
   # metering turns on mid-month, only post-cutover events may be reported.
   # The reporting checkpoint defaults to 0, which would report the entire
   # month-to-date on first run — cutover seeds it.
+  #
+  # Implementation mapping: BillingCheckpointService.seedIfAbsent
+  # (src/server/app-layer/billing/billingCheckpoint.service.ts) seeds
+  # lastReportedTotal; ReportUsageForMonthCommand reports
+  # targetTotal - lastReportedTotal; the cutover entry point is
+  # scripts/seed-billing-checkpoints.ts.
 
   As the billing operations team
   I want newly-metered organizations reported only from the cutover moment
