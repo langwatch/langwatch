@@ -45,6 +45,7 @@ function makeService({
       findAllByOrganization: vi.fn(async () => []),
       sumNonExitByPartition: vi.fn(async () => prior),
       sumLiveNetGroups: vi.fn(async () => []),
+      countEventsAfter: vi.fn(async () => 0),
     },
     listProjectIds: async () => ["project_1"],
   });
