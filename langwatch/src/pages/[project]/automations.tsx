@@ -11,6 +11,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Monitor, TriggerAction } from "@prisma/client";
+import { useMemo } from "react";
 import {
   Bell,
   Edit2,
@@ -28,6 +29,7 @@ import {
   OPERATOR_LABELS,
   TIME_PERIOD_LABELS,
 } from "~/features/automations/logic/draftReducer";
+import { resolveSeriesLabel } from "~/features/automations/logic/seriesOptions";
 import { useDrawer } from "~/hooks/useDrawer";
 import type {
   GraphAlertOperator,
@@ -61,6 +63,22 @@ function Automations() {
   const getDatasets = api.dataset.getAll.useQuery({
     projectId: project?.id ?? "",
   });
+
+  // Graph-alert rows resolve their stored series key into the series'
+  // display name from the graph's JSON. Only fetched when the list actually
+  // contains graph alerts; on failure the cell falls back to the raw key.
+  const hasGraphAlerts = (triggers.data ?? []).some((t) => !!t.customGraphId);
+  const graphsQuery = api.graphs.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id && hasGraphAlerts, retry: false },
+  );
+  const graphJsonById = useMemo(
+    () =>
+      new Map<string, unknown>(
+        (graphsQuery.data ?? []).map((g) => [g.id, g.graph as unknown]),
+      ),
+    [graphsQuery.data],
+  );
 
   const toggleTrigger = api.automation.toggleTrigger.useMutation();
   const deleteTriggerMutation = api.automation.deleteById.useMutation();
@@ -328,6 +346,9 @@ function Automations() {
                             {isGraphAlert ? (
                               <GraphAlertConditions
                                 graphName={trigger.customGraph?.name ?? null}
+                                graph={graphJsonById.get(
+                                  trigger.customGraphId ?? "",
+                                )}
                                 actionParams={actionParams}
                               />
                             ) : (
@@ -437,6 +458,9 @@ function Automations() {
 
 interface GraphAlertConditionsProps {
   graphName: string | null;
+  /** The joined custom graph's JSON, used to resolve the stored series key
+   *  into its display name. Undefined when the graph was deleted. */
+  graph?: unknown;
   actionParams: {
     seriesName?: string;
     operator?: GraphAlertOperator;
@@ -454,6 +478,7 @@ interface GraphAlertConditionsProps {
  */
 function GraphAlertConditions({
   graphName,
+  graph,
   actionParams,
 }: GraphAlertConditionsProps) {
   const operator = actionParams.operator
@@ -462,14 +487,24 @@ function GraphAlertConditions({
   const window = actionParams.timePeriod
     ? TIME_PERIOD_LABELS[actionParams.timePeriod]
     : null;
+  const seriesLabel = actionParams.seriesName
+    ? (resolveSeriesLabel(graph, actionParams.seriesName) ??
+      actionParams.seriesName)
+    : null;
   return (
     <VStack align="start" gap={1}>
-      <Text fontSize="sm" fontWeight="500">
-        Graph: {graphName ?? "(missing)"}
-      </Text>
-      {actionParams.seriesName ? (
-        <Text fontSize="sm" color="fg.muted">
-          {actionParams.seriesName}
+      {graphName ? (
+        <Text textStyle="sm" fontWeight="medium">
+          Graph: {graphName}
+        </Text>
+      ) : (
+        <Text textStyle="sm" color="fg.muted">
+          Graph deleted
+        </Text>
+      )}
+      {seriesLabel ? (
+        <Text textStyle="sm" color="fg.muted">
+          {seriesLabel}
           {operator ? ` ${operator}` : ""}
           {actionParams.threshold !== undefined
             ? ` ${actionParams.threshold}`

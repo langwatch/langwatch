@@ -1,5 +1,5 @@
 import { Box, Button, Heading, HStack, Spacer, Text } from "@chakra-ui/react";
-import type { TriggerAction } from "@prisma/client";
+import { AlertType, type TriggerAction } from "@prisma/client";
 import { Mail } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -30,6 +30,7 @@ import {
   sanitizeTriggerFilters,
   type TriggerFilterValue,
 } from "~/server/filters/types";
+import { ALERT_TRIGGER_DEFAULTS } from "~/shared/templating/defaults";
 import {
   EXAMPLE_MATCHES,
   TEMPLATE_VARIABLES,
@@ -37,7 +38,9 @@ import {
 import { renderTriggerEmail } from "~/shared/templating/renderEmail";
 import { renderTriggerSlack } from "~/shared/templating/renderSlack";
 import {
+  buildExampleGraphAlertTemplateContext,
   buildTemplateContext,
+  type GraphAlertTemplateContext,
   type TemplateContext,
 } from "~/shared/templating/templateContext";
 import { api } from "~/utils/api";
@@ -55,7 +58,9 @@ import {
   notifyChannel,
   templatesFromDraft,
 } from "./logic/draftReducer";
+import { ALERT_TEMPLATE_VARIABLES } from "./editors/alertVariables";
 import { explainDomainError, readDomainError } from "./logic/errorExplainer";
+import { useGraphAlertLabels } from "./logic/useGraphAlertLabels";
 import { useAutomationStore } from "./state/automationStore";
 import {
   useCadenceConfirmed,
@@ -106,10 +111,9 @@ export function AutomationDrawer({
    *  drawer can surface a one-line landing banner. Any other value (or
    *  undefined) renders the drawer normally. */
   source?: string;
-  /** When set, the drawer opens in graph-alert mode with the graph + series
-   *  fields pre-filled and locked. Used by the dashboard "Add alert" entry
-   *  point (Phase 5.2). Phase 5.1 ships the seam; the dashboard does not
-   *  yet pass this. */
+  /** When set, the drawer opens in graph-alert mode with the graph
+   *  pre-filled and locked. Used by the dashboard "Add alert" entry
+   *  point (Phase 5.2). */
   prefilledGraphId?: string;
   prefilledSeriesName?: string;
 }) {
@@ -173,6 +177,9 @@ export function AutomationDrawer({
         value: { ...currentGraphAlert, seriesName: prefilledSeriesName },
       });
     }
+    // Seed a severity so the prefilled create can save without a detour
+    // through the When secondary — the author can still change it there.
+    dispatch({ type: "SET_ALERT_TYPE", value: AlertType.WARNING });
     prefilledFromGraph.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -321,17 +328,63 @@ export function AutomationDrawer({
   const channel = notifyChannel(draft);
   const [preview, setPreview] = useState<NotifyPreview | undefined>(undefined);
   const previewToken = useRef(0);
-  const previewContext = useMemo<TemplateContext>(
-    () => ({
+  const isGraphAlert = draft.source === "customGraph";
+  // Resolve the selected graph's name + the monitored series' human label
+  // so the alert preview / test-fire / conditions summary read like the
+  // real fire will, not like placeholders.
+  const { graphName, seriesLabel } = useGraphAlertLabels({
+    projectId,
+    enabled: isGraphAlert,
+    customGraphId: draft.customGraphId,
+    seriesName: draft.graphAlert.seriesName,
+  });
+  const previewContext = useMemo<
+    TemplateContext | GraphAlertTemplateContext
+  >(() => {
+    if (isGraphAlert) {
+      // Alert-shaped example context + the draft's actual rule, so the
+      // preview shows what a real fire renders — not the trace shape.
+      return buildExampleGraphAlertTemplateContext({
+        baseHost:
+          typeof window !== "undefined"
+            ? window.location.origin
+            : "https://app.langwatch.ai",
+        project: {
+          name: project?.name ?? "Project",
+          slug: project?.slug ?? "project",
+        },
+        trigger: {
+          name: draft.name || "Example alert",
+          alertType: draft.alertType,
+        },
+        graph: graphName ? { name: graphName } : undefined,
+        metricLabel: seriesLabel ?? undefined,
+        condition: {
+          operator: draft.graphAlert.operator,
+          threshold: draft.graphAlert.threshold,
+          timePeriodMinutes: draft.graphAlert.timePeriod,
+        },
+      });
+    }
+    return {
       ...exampleContext,
       trigger: {
         ...exampleContext.trigger,
         name: draft.name || "Your automation",
         alertType: draft.alertType,
       },
-    }),
-    [exampleContext, draft.name, draft.alertType],
-  );
+    };
+  }, [
+    exampleContext,
+    isGraphAlert,
+    graphName,
+    seriesLabel,
+    project?.name,
+    project?.slug,
+    draft.name,
+    draft.alertType,
+    draft.graphAlert,
+  ]);
 
   useEffect(() => {
     if (!channel || section !== "configuration") {
@@ -347,6 +400,7 @@ export function AutomationDrawer({
             subjectTemplate: templates.emailSubjectTemplate,
             bodyTemplate: templates.emailBodyTemplate,
             context: previewContext,
+            defaults: isGraphAlert ? ALERT_TRIGGER_DEFAULTS : undefined,
           });
           if (token === previewToken.current) {
             setPreview({
@@ -368,6 +422,7 @@ export function AutomationDrawer({
                   : null,
             template: templates.slackTemplate,
             context: previewContext,
+            defaults: isGraphAlert ? ALERT_TRIGGER_DEFAULTS : undefined,
           });
           if (token === previewToken.current) {
             setPreview({
@@ -385,7 +440,7 @@ export function AutomationDrawer({
         if (token === previewToken.current) setPreview(undefined);
       }
     })();
-  }, [channel, section, draft.action, draft.slices, previewContext]);
+  }, [channel, section, draft.action, draft.slices, previewContext, isGraphAlert]);
 
   const testFire = api.automation.testFireTemplate.useMutation();
   const upsert = api.automation.upsert.useMutation();
@@ -408,6 +463,17 @@ export function AutomationDrawer({
         },
         draft: templatesFromDraft(draft),
         webhook: target.webhook,
+        // Alert drafts test-fire with the alert-shaped example context so
+        // the message in the inbox matches what a real fire sends.
+        graphAlert: isGraphAlert
+          ? {
+              graphName: graphName ?? undefined,
+              metricLabel: seriesLabel ?? undefined,
+              operator: draft.graphAlert.operator,
+              threshold: draft.graphAlert.threshold,
+              timePeriodMinutes: draft.graphAlert.timePeriod,
+            }
+          : null,
       },
       {
         onSuccess: (r) => {
@@ -449,7 +515,16 @@ export function AutomationDrawer({
         },
       },
     );
-  }, [channel, draft, projectId, testFire, pushAttempt]);
+  }, [
+    channel,
+    draft,
+    projectId,
+    testFire,
+    pushAttempt,
+    isGraphAlert,
+    graphName,
+    seriesLabel,
+  ]);
 
   const onSave = useCallback(() => {
     if (!canSave || !draft.action) return;
@@ -521,7 +596,9 @@ export function AutomationDrawer({
       projectId,
       organizationId: organization?.id,
       teamSlug: team?.slug,
-      variables: TEMPLATE_VARIABLES,
+      // Alert templates render against the alert context — autocomplete,
+      // hover, and the unknown-variable check follow the same list.
+      variables: isGraphAlert ? ALERT_TEMPLATE_VARIABLES : TEMPLATE_VARIABLES,
       example: exampleContext,
       preview,
       // Synchronous render — there is never a loading state to show.
@@ -542,6 +619,7 @@ export function AutomationDrawer({
       draft.notificationCadence,
       dispatch,
       hasEvaluationFilter,
+      isGraphAlert,
     ],
   );
 
@@ -575,7 +653,13 @@ export function AutomationDrawer({
           <Drawer.Header>
             <Drawer.CloseTrigger />
             <Heading size="md">
-              {automationId ? "Edit automation" : "Add automation"}
+              {isGraphAlert || prefilledGraphId
+                ? automationId
+                  ? "Edit alert"
+                  : "New alert"
+                : automationId
+                  ? "Edit automation"
+                  : "Add automation"}
             </Heading>
           </Drawer.Header>
           <Drawer.Body>

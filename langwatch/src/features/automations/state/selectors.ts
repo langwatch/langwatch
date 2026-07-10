@@ -29,8 +29,8 @@ export const useConditionsSet = () =>
   useAutomationStore((s) => conditionsAreSet(s.draft));
 export const useConfigComplete = () =>
   useAutomationStore((s) => configIsComplete(s.draft));
-export const useSummariseConditions = () =>
-  useAutomationStore((s) => summariseConditions(s.draft));
+export const useSummariseConditions = (seriesLabel?: string | null) =>
+  useAutomationStore((s) => summariseConditions(s.draft, { seriesLabel }));
 export const useConfigurationSummary = () =>
   useAutomationStore((s) => configurationSummary(s.draft));
 export const useCadenceSummary = () =>

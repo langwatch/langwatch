@@ -77,6 +77,26 @@ Feature: Event-sourced custom-graph threshold alerts
     Then the notification subject renders the operator's template
     And the alert-default template is not used
 
+  Scenario: graph alert templates receive the graph's data, not trace data
+    Given the project is on the event-sourced path
+    When the alert fires
+    Then the template context carries the metric's recent numeric history
+    And a prebuilt trend sparkline of that history
+    And the metric's value over the preceding window
+    And no trace matches are present in the context
+
+  Scenario: graph alert notification links to the incident window
+    Given the project is on the event-sourced path
+    When the alert fires
+    Then the notification's dashboard link opens the graph at the window the breach was evaluated over
+    And not at the time the reader clicks the link
+
+  Scenario: previewing or test-firing a graph alert renders the alert shape
+    Given the operator is authoring a graph alert in the automations drawer
+    When they preview the templates or send a test notification
+    Then the rendered output uses the alert-default templates and an example alert context
+    And not the trace-iteration example used for trace-based automations
+
   Rule: eval-metric graph triggers fire on the same event-sourced path
 
     The Phase 6 extension wires eval-metric custom-graph triggers

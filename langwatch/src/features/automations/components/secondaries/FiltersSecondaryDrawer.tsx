@@ -10,7 +10,6 @@ import {
 import type { Monaco } from "@monaco-editor/react";
 import { AlertType } from "@prisma/client";
 import { useEffect, useMemo, useState } from "react";
-import { deriveSeriesIdentifier } from "~/components/analytics/seriesIdentifier";
 import { FieldsFilters } from "~/components/filters/FieldsFilters";
 import { Switch } from "~/components/ui/switch";
 import type { FilterParam } from "~/hooks/useFilterParams";
@@ -44,6 +43,10 @@ import {
   OPERATOR_LABELS,
   TIME_PERIOD_LABELS,
 } from "../../logic/draftReducer";
+import {
+  deriveSeriesOptionsFromGraph,
+  type GraphSeriesOption,
+} from "../../logic/seriesOptions";
 import { SourceCard } from "../SourceCard";
 import { SecondaryDrawerShell } from "./SecondaryDrawerShell";
 
@@ -62,39 +65,6 @@ export interface FiltersDrawerResult {
   customGraphId: string | null;
   graphAlert: GraphAlertDraft;
   alertType: AlertType | null;
-}
-
-interface GraphSeriesOption {
-  key: string;
-  label: string;
-}
-
-/**
- * Builds the series-key + label list a custom graph's JSON exposes for
- * alert authoring. Matches the format the dispatcher reads ("`{index}/{key
- * | metric}/{aggregation}`") so the saved `seriesName` lines up with what
- * the chart data is keyed by at evaluation time.
- *
- * Defensive: a hand-edited / malformed `graph` JSON falls back to an empty
- * list so the picker still renders without crashing — the user just sees
- * "Pick a graph with a configured series" copy below.
- */
-function deriveSeriesOptionsFromGraph(graph: unknown): GraphSeriesOption[] {
-  if (!graph || typeof graph !== "object") return [];
-  const candidate = (graph as { series?: unknown }).series;
-  if (!Array.isArray(candidate)) return [];
-  return candidate
-    .map((entry, index): GraphSeriesOption | null => {
-      const seriesKey = deriveSeriesIdentifier(graph, index);
-      if (!seriesKey) return null;
-      const s = (entry ?? {}) as Record<string, unknown>;
-      const tail = seriesKey.split("/").slice(1).join(" / ");
-      const label =
-        (typeof s.name === "string" && s.name.length > 0 ? s.name : null) ??
-        `Series ${index + 1}: ${tail}`;
-      return { key: seriesKey, label };
-    })
-    .filter((o): o is GraphSeriesOption => o !== null);
 }
 
 /**
@@ -140,6 +110,11 @@ export function FiltersSecondaryDrawer({
   );
   const [localGraphAlert, setLocalGraphAlert] =
     useState<GraphAlertDraft>(graphAlert);
+  // The threshold is held as text while editing so intermediate states
+  // ("-", "1e", empty) don't get coerced mid-keystroke; it parses on Done.
+  const [thresholdText, setThresholdText] = useState(
+    String(graphAlert.threshold),
+  );
   const [localAlertType, setLocalAlertType] = useState<AlertType>(
     alertType ?? AlertType.WARNING,
   );
@@ -154,6 +129,7 @@ export function FiltersSecondaryDrawer({
       setLocal(filters);
       setLocalCustomGraphId(customGraphId);
       setLocalGraphAlert(graphAlert);
+      setThresholdText(String(graphAlert.threshold));
       setLocalAlertType(alertType ?? AlertType.WARNING);
       setCode(JSON.stringify(filters, null, 2));
       setCodeError(null);
@@ -205,13 +181,19 @@ export function FiltersSecondaryDrawer({
     setCodeMode(toCode);
   };
 
+  const parsedThreshold =
+    thresholdText.trim() === "" ? NaN : Number(thresholdText);
+  const thresholdInvalid =
+    localSource === "customGraph" && !Number.isFinite(parsedThreshold);
+
   const apply = () => {
     if (localSource === "customGraph") {
+      if (thresholdInvalid) return;
       onSave({
         source: "customGraph",
         filters: {},
         customGraphId: localCustomGraphId,
-        graphAlert: localGraphAlert,
+        graphAlert: { ...localGraphAlert, threshold: parsedThreshold },
         alertType: localAlertType,
       });
       return;
@@ -263,7 +245,7 @@ export function FiltersSecondaryDrawer({
       title="When"
       onClose={onCancel}
       onDone={apply}
-      doneDisabled={customGraphMissing || seriesMissing}
+      doneDisabled={customGraphMissing || seriesMissing || thresholdInvalid}
       headerRight={
         localSource === "trace" ? (
           <>
@@ -299,7 +281,11 @@ export function FiltersSecondaryDrawer({
       </Box>
       {localSource === "customGraph" ? (
         <VStack align="stretch" gap={4}>
-          <Field.Root invalid={customGraphMissing}>
+          {/* `disabled` lives on Field.Root — the field context is what
+              actually stamps the native attribute on the select, so the
+              control is genuinely inert (keyboard + AT included), not just
+              styled as disabled. */}
+          <Field.Root invalid={customGraphMissing} disabled={isPrefilled}>
             <Field.Label>Custom graph</Field.Label>
             <NativeSelect.Root disabled={isPrefilled}>
               <NativeSelect.Field
@@ -332,12 +318,16 @@ export function FiltersSecondaryDrawer({
             ) : null}
           </Field.Root>
 
-          <Field.Root invalid={seriesMissing}>
+          {/* Deliberately NOT locked when prefilled — the entry point's
+              series is a starting default, not a cage; the author can
+              point the alert at any series on the locked graph. */}
+          <Field.Root
+            invalid={seriesMissing}
+            disabled={!localCustomGraphId || seriesOptions.length === 0}
+          >
             <Field.Label>Series</Field.Label>
             <NativeSelect.Root
-              disabled={
-                isPrefilled || !localCustomGraphId || seriesOptions.length === 0
-              }
+              disabled={!localCustomGraphId || seriesOptions.length === 0}
             >
               <NativeSelect.Field
                 value={localGraphAlert.seriesName}
@@ -387,18 +377,8 @@ export function FiltersSecondaryDrawer({
               <Input
                 type="number"
                 step="any"
-                value={
-                  Number.isFinite(localGraphAlert.threshold)
-                    ? localGraphAlert.threshold
-                    : 0
-                }
-                onChange={(e) => {
-                  const next = Number(e.target.value);
-                  setLocalGraphAlert((prev) => ({
-                    ...prev,
-                    threshold: Number.isFinite(next) ? next : 0,
-                  }));
-                }}
+                value={thresholdText}
+                onChange={(e) => setThresholdText(e.target.value)}
               />
             </Field.Root>
           </HStack>
@@ -446,8 +426,11 @@ export function FiltersSecondaryDrawer({
           </HStack>
 
           <Text textStyle="xs" color="fg.muted">
-            Fires when {OPERATOR_LABELS[localGraphAlert.operator]}{" "}
-            {localGraphAlert.threshold} over{" "}
+            Fires when{" "}
+            {seriesOptions.find((s) => s.key === localGraphAlert.seriesName)
+              ?.label ?? "the selected series"}{" "}
+            is {OPERATOR_LABELS[localGraphAlert.operator]}{" "}
+            {Number.isFinite(parsedThreshold) ? parsedThreshold : "…"} over{" "}
             {TIME_PERIOD_LABELS[localGraphAlert.timePeriod]}. Pick the
             notification channel below under Type.
           </Text>

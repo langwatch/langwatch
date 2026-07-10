@@ -151,8 +151,20 @@ export function reducer(
     case "SET_SOURCE":
       // Switching source clears the conditions tied to the other source so
       // we never persist stale filters next to a customGraphId or vice versa.
+      // Graph alerts only support notify actions (email / Slack) — a
+      // previously picked persist action would be rejected at save time, so
+      // switching to customGraph resets it and the user re-picks.
       return action.value === "customGraph"
-        ? { ...state, source: "customGraph", filters: {} }
+        ? {
+            ...state,
+            source: "customGraph",
+            filters: {},
+            action:
+              state.action === "SEND_EMAIL" ||
+              state.action === "SEND_SLACK_MESSAGE"
+                ? state.action
+                : null,
+          }
         : { ...state, source: "trace", customGraphId: null };
     case "SET_CUSTOM_GRAPH_ID":
       return { ...state, customGraphId: action.value };
@@ -224,11 +236,14 @@ export function conditionsAreSet(draft: AutomationDraft): boolean {
   if (draft.source === "customGraph") {
     // A graph alert isn't a condition until the threshold rule is filled
     // in. Without the rule there's nothing to fire on; without the series
-    // the dispatcher has no metric to evaluate.
+    // the dispatcher has no metric to evaluate. The severity is part of the
+    // rule too — the router rejects graph alerts without one, so gating it
+    // here keeps Save honest instead of surfacing a server 400.
     return (
       draft.customGraphId !== null &&
       draft.graphAlert.seriesName.length > 0 &&
-      Number.isFinite(draft.graphAlert.threshold)
+      Number.isFinite(draft.graphAlert.threshold) &&
+      draft.alertType !== null
     );
   }
   return filtersAreSet(draft.filters);
@@ -240,13 +255,22 @@ export function configIsComplete(draft: AutomationDraft): boolean {
   return provider.client.isComplete(draft.slices[draft.action]);
 }
 
-export function summariseConditions(draft: AutomationDraft): string {
+export function summariseConditions(
+  draft: AutomationDraft,
+  opts?: {
+    /** Human label of the monitored series, when the caller has the graph
+     *  loaded. Falls back to the raw series key so the summary never goes
+     *  blank while the graph is still loading. */
+    seriesLabel?: string | null;
+  },
+): string {
   if (draft.source === "customGraph") {
     if (!draft.customGraphId) return "Pick a graph";
     if (!draft.graphAlert.seriesName) return "Pick a series to monitor";
     const op = OPERATOR_LABELS[draft.graphAlert.operator];
     const window = TIME_PERIOD_LABELS[draft.graphAlert.timePeriod];
-    return `${draft.graphAlert.seriesName} ${op} ${draft.graphAlert.threshold} over ${window}`;
+    const series = opts?.seriesLabel ?? draft.graphAlert.seriesName;
+    return `${series} ${op} ${draft.graphAlert.threshold} over ${window}`;
   }
   const keys = Object.keys(draft.filters);
   if (keys.length === 0) return "No conditions yet";

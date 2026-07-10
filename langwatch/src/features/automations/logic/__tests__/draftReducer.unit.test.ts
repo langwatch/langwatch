@@ -83,6 +83,24 @@ describe("draftReducer", () => {
       expect(next.source).toBe("customGraph");
       expect(next.filters).toEqual({});
     });
+    it("keeps a notify action when switching to customGraph", () => {
+      const next = reducer(SAMPLE, {
+        type: "SET_SOURCE",
+        value: "customGraph",
+      });
+      expect(next.action).toBe(TriggerAction.SEND_EMAIL);
+    });
+    it("resets a persist action when switching to customGraph", () => {
+      const withDataset: AutomationDraft = {
+        ...SAMPLE,
+        action: TriggerAction.ADD_TO_DATASET,
+      };
+      const next = reducer(withDataset, {
+        type: "SET_SOURCE",
+        value: "customGraph",
+      });
+      expect(next.action).toBeNull();
+    });
     it("clears the customGraphId when switching back to trace", () => {
       const withGraph: AutomationDraft = {
         ...SAMPLE,
@@ -164,7 +182,24 @@ describe("conditionsAreSet", () => {
       expect(conditionsAreSet(a)).toBe(false);
     });
 
-    it("is true once graph + series + finite threshold are set", () => {
+    it("is false without an alert severity", () => {
+      const a: AutomationDraft = {
+        ...SAMPLE,
+        source: "customGraph",
+        filters: {},
+        customGraphId: "g_1",
+        alertType: null,
+        graphAlert: {
+          seriesName: "0/value/avg",
+          operator: "gt",
+          threshold: 250,
+          timePeriod: 60,
+        },
+      };
+      expect(conditionsAreSet(a)).toBe(false);
+    });
+
+    it("is true once graph + series + finite threshold + severity are set", () => {
       const a: AutomationDraft = {
         ...SAMPLE,
         source: "customGraph",
@@ -218,6 +253,23 @@ describe("summariseConditions for graph alerts", () => {
     expect(summariseConditions(draft)).toMatch(
       /0\/latency\/p95.*greater than.*250.*over 1 hour/i,
     );
+  });
+
+  it("prefers the resolved series label over the raw key", () => {
+    const draft: AutomationDraft = {
+      ...SAMPLE,
+      source: "customGraph",
+      customGraphId: "g_1",
+      graphAlert: {
+        seriesName: "0/latency/p95",
+        operator: "gt",
+        threshold: 250,
+        timePeriod: 60,
+      },
+    };
+    const summary = summariseConditions(draft, { seriesLabel: "p95 latency" });
+    expect(summary).toMatch(/p95 latency.*greater than.*250.*over 1 hour/i);
+    expect(summary).not.toContain("0/latency/p95");
   });
 
   it("prompts for a graph when none is picked", () => {

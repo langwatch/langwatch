@@ -13,14 +13,20 @@ const {
   mockTriggerUpdate,
   mockTriggerCreate,
   mockTriggerFindFirst,
+  mockTriggerFindMany,
+  mockMonitorFindMany,
   mockCustomGraphFindUnique,
+  mockCustomGraphFindMany,
   mockTriggersInvalidate,
 } = vi.hoisted(() => ({
   mockEnforceLicenseLimit: vi.fn().mockResolvedValue(undefined),
   mockTriggerUpdate: vi.fn(),
   mockTriggerCreate: vi.fn(),
   mockTriggerFindFirst: vi.fn(),
+  mockTriggerFindMany: vi.fn(),
+  mockMonitorFindMany: vi.fn(),
   mockCustomGraphFindUnique: vi.fn(),
+  mockCustomGraphFindMany: vi.fn(),
   mockTriggersInvalidate: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -66,9 +72,14 @@ function createTestCaller() {
         update: mockTriggerUpdate,
         create: mockTriggerCreate,
         findFirst: mockTriggerFindFirst,
+        findMany: mockTriggerFindMany,
+      },
+      monitor: {
+        findMany: mockMonitorFindMany,
       },
       customGraph: {
         findUnique: mockCustomGraphFindUnique,
+        findMany: mockCustomGraphFindMany,
       },
     },
     permissionChecked: false,
@@ -257,6 +268,58 @@ describe("automationRouter", () => {
       });
     });
 
+    describe("when the alert severity is missing", () => {
+      it("rejects with BAD_REQUEST before the tenancy lookup", async () => {
+        await expect(
+          caller.upsert({
+            ...baseGraphAlertInput,
+            alertType: null,
+          } as any),
+        ).rejects.toMatchObject({
+          code: "BAD_REQUEST",
+          message: "Graph alerts require an alert severity.",
+        });
+
+        // The severity guard runs before the customGraph tenancy lookup,
+        // so the DB is never touched for an invalid payload.
+        expect(mockCustomGraphFindUnique).not.toHaveBeenCalled();
+        expect(mockTriggerCreate).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when editing an existing graph alert (triggerId set)", () => {
+      it("routes the update through the SSOT builder shape", async () => {
+        mockCustomGraphFindUnique.mockResolvedValueOnce({ id: "graph_1" });
+        mockTriggerUpdate.mockResolvedValueOnce({ id: "trigger-1" });
+
+        await caller.upsert({
+          ...baseGraphAlertInput,
+          triggerId: "trigger-1",
+        } as any);
+
+        expect(mockTriggerCreate).not.toHaveBeenCalled();
+        expect(mockTriggerUpdate).toHaveBeenCalledTimes(1);
+        const updateArgs = mockTriggerUpdate.mock.calls[0]![0];
+        expect(updateArgs.where).toEqual({
+          id: "trigger-1",
+          projectId: "proj_123",
+        });
+        // Same builder-shaped row as the create path: threshold rule merged
+        // into actionParams, filters forced to {}, name "Alert: "-prefixed.
+        expect(updateArgs.data.actionParams).toMatchObject({
+          slackWebhook: "https://hooks.slack.com/services/abc",
+          threshold: 250,
+          operator: "gt",
+          timePeriod: 60,
+          seriesName: "0/latency/p95",
+        });
+        expect(updateArgs.data.filters).toEqual({});
+        expect(updateArgs.data.name).toBe("Alert: p95 latency");
+        expect(updateArgs.data.alertType).toBe("WARNING");
+        expect(updateArgs.data.customGraphId).toBe("graph_1");
+      });
+    });
+
     describe("when the graphAlert rule is missing", () => {
       it("rejects the upsert", async () => {
         await expect(
@@ -293,6 +356,63 @@ describe("automationRouter", () => {
             },
           } as any),
         ).rejects.toBeDefined();
+      });
+    });
+  });
+
+  describe("getTriggers", () => {
+    describe("when some triggers point at custom graphs", () => {
+      it("enriches only the graph-alert row with its customGraph", async () => {
+        mockTriggerFindMany.mockResolvedValueOnce([
+          {
+            id: "trigger_graph",
+            customGraphId: "graph-1",
+            filters: "{}",
+          },
+          {
+            id: "trigger_plain",
+            customGraphId: null,
+            filters: "{}",
+          },
+        ]);
+        mockMonitorFindMany.mockResolvedValueOnce([]);
+        mockCustomGraphFindMany.mockResolvedValueOnce([
+          { id: "graph-1", name: "p95 latency" },
+        ]);
+
+        const result = await caller.getTriggers({ projectId: "proj_123" });
+
+        // Multitenancy: the graph lookup is scoped to the calling project.
+        expect(mockCustomGraphFindMany).toHaveBeenCalledWith({
+          where: { id: { in: ["graph-1"] }, projectId: "proj_123" },
+          select: { id: true, name: true },
+        });
+        const graphRow = result.find((t) => t.id === "trigger_graph");
+        const plainRow = result.find((t) => t.id === "trigger_plain");
+        expect(graphRow?.customGraph).toEqual({
+          id: "graph-1",
+          name: "p95 latency",
+        });
+        expect(plainRow?.customGraph).toBeNull();
+      });
+    });
+
+    describe("when a trigger points at a graph that no longer exists", () => {
+      it("returns customGraph null instead of crashing", async () => {
+        mockTriggerFindMany.mockResolvedValueOnce([
+          {
+            id: "trigger_dangling",
+            customGraphId: "graph-gone",
+            filters: "{}",
+          },
+        ]);
+        mockMonitorFindMany.mockResolvedValueOnce([]);
+        mockCustomGraphFindMany.mockResolvedValueOnce([]);
+
+        const result = await caller.getTriggers({ projectId: "proj_123" });
+
+        expect(result).toHaveLength(1);
+        expect(result[0]?.customGraph).toBeNull();
       });
     });
   });

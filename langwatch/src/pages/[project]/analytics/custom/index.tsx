@@ -393,25 +393,46 @@ function AnalyticsCustomGraphContent({
                      * "Add alert" (create) paths open the automations
                      * drawer pre-filled with this graph + its first series,
                      * mirroring the dashboard chart card flow from Phase
-                     * 5.2. The legacy `customGraphAlert` drawer is kept
-                     * registered as an unreachable fallback per the side-
-                     * by-side rollout in ADR-034. `deriveSeriesIdentifier`
-                     * emits the canonical "{index}/{key|metric}/
-                     * {aggregation}" form the automations secondary drawer
-                     * matches against (Series.name is a free-form label
-                     * and would not pre-select).
+                     * 5.2. `deriveSeriesIdentifier` emits the canonical
+                     * "{index}/{key|metric}/{aggregation}" form the
+                     * automations secondary drawer matches against
+                     * (Series.name is a free-form label and would not
+                     * pre-select). Alerts only exist for saved graphs —
+                     * `customId` is unset until the first save, so the
+                     * entry point hides rather than opening a drawer that
+                     * can't reference the graph.
                      */}
-                    {form.watch("alert.enabled") ? (
-                      <Tooltip
-                        content="Alert configured"
-                        positioning={{ placement: "top" }}
-                      >
-                        <Box
-                          padding={1}
-                          cursor="pointer"
+                    {customId ? (
+                      form.watch("alert.enabled") ? (
+                        <Tooltip
+                          content="Alert configured"
+                          positioning={{ placement: "top" }}
+                        >
+                          <Box
+                            padding={1}
+                            cursor="pointer"
+                            onClick={() =>
+                              openDrawer("automation", {
+                                automationId:
+                                  form.getValues("alert.triggerId"),
+                                prefilledGraphId: customId,
+                                prefilledSeriesName: deriveSeriesIdentifier(
+                                  graph,
+                                  0,
+                                ),
+                              })
+                            }
+                          >
+                            <Bell width={16} />
+                          </Box>
+                        </Tooltip>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          colorPalette="gray"
+                          size="sm"
                           onClick={() =>
                             openDrawer("automation", {
-                              automationId: form.getValues("alert.triggerId"),
                               prefilledGraphId: customId,
                               prefilledSeriesName: deriveSeriesIdentifier(
                                 graph,
@@ -421,27 +442,10 @@ function AnalyticsCustomGraphContent({
                           }
                         >
                           <Bell width={16} />
-                        </Box>
-                      </Tooltip>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        colorPalette="gray"
-                        size="sm"
-                        onClick={() =>
-                          openDrawer("automation", {
-                            prefilledGraphId: customId,
-                            prefilledSeriesName: deriveSeriesIdentifier(
-                              graph,
-                              0,
-                            ),
-                          })
-                        }
-                      >
-                        <Bell width={16} />
-                        Add alert
-                      </Button>
-                    )}
+                          Add alert
+                        </Button>
+                      )
+                    ) : null}
                     <Menu.Root>
                       <Menu.Trigger asChild>
                         <Button variant="ghost" paddingX={0}>

@@ -1,5 +1,7 @@
 import { Text, VStack } from "@chakra-ui/react";
 import { CLIENT_PROVIDERS } from "~/automations/providers/client";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useGraphAlertLabels } from "../logic/useGraphAlertLabels";
 import { useAutomationStore } from "../state/automationStore";
 import {
   useCadenceConfirmed,
@@ -35,9 +37,18 @@ export function MainSectionList({
   testFireLoading: boolean;
 }) {
   const draft = useDraft();
+  const { project } = useOrganizationTeamProject();
+  // Graph alerts summarise with the series' human label, not the raw
+  // `{index}/{key}/{aggregation}` key the draft stores.
+  const { seriesLabel } = useGraphAlertLabels({
+    projectId: project?.id ?? "",
+    enabled: draft.source === "customGraph",
+    customGraphId: draft.customGraphId,
+    seriesName: draft.graphAlert.seriesName,
+  });
   const conditionsSet = useConditionsSet();
   const configComplete = useConfigComplete();
-  const conditionsSummary = useSummariseConditions();
+  const conditionsSummary = useSummariseConditions(seriesLabel);
   const configSummary = useConfigurationSummary();
   const cadenceSummary = useCadenceSummary();
   const cadenceConfirmed = useCadenceConfirmed();
