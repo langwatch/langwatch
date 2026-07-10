@@ -97,7 +97,9 @@ export class ClickHouseOrphanedRunFinder implements OrphanedRunFinder {
     // scope to, so this intentionally omits the per-tenant `WHERE TenantId =`
     // filter clickhouse-queries.md mandates for tenant-scoped reads. TenantId is
     // SELECTed (not filtered), and each terminal write downstream is scoped to
-    // its own run's tenant. Precedent: other system-level cross-tenant sweeps.
+    // its own run's tenant. This is the "boot-time system sweeps" carve-out in
+    // dev/docs/best_practices/clickhouse-queries.md; do NOT "fix" the missing
+    // filter — an integration test pins the cross-tenant behaviour.
     const result = await this.client.query({
       query: `
         SELECT
