@@ -78,13 +78,13 @@ Feature: Storage billing boundary calendar and gauge fold
 
   # Fold
 
-  @unit @unimplemented
+  @unit
   Scenario: Entry events increase the gauge by their bytes
     Given an organization gauge of 10 GiB
     When an entry event of 2 GiB is folded
     Then the gauge reads 12 GiB
 
-  @unit @unimplemented
+  @unit
   Scenario: Exit events decrease the gauge by their bytes
     Given an organization gauge of 10 GiB
     When an exit event of 3 GiB is folded
