@@ -39,6 +39,8 @@ import { z } from "zod";
 
 import { modelProviders as supportedModelProviders } from "~/server/modelProviders/registry";
 
+import type { PlatformToolSlug } from "./platformToolPolicy.service";
+
 export const SUPPORTED_TILE_TYPES = [
   "coding_assistant",
   "model_provider",
@@ -77,10 +79,7 @@ export type AssistantKind = (typeof SUPPORTED_ASSISTANT_KINDS)[number];
  * the login `toolPolicies` map from tile config.
  */
 export const ASSISTANT_KIND_TO_TOOL_SLUG: Partial<
-  Record<
-    AssistantKind,
-    "claude" | "codex" | "gemini" | "opencode" | "cursor" | "copilot"
-  >
+  Record<AssistantKind, PlatformToolSlug>
 > = {
   claude_code: "claude",
   codex: "codex",
@@ -472,7 +471,7 @@ export class AiToolEntryService {
   }): Promise<
     Partial<
       Record<
-        "claude" | "codex" | "gemini" | "opencode" | "cursor" | "copilot",
+        PlatformToolSlug,
         { allowVk: boolean; allowOtelDirect: boolean }
       >
     >
@@ -491,7 +490,7 @@ export class AiToolEntryService {
 
     const overrides: Partial<
       Record<
-        "claude" | "codex" | "gemini" | "opencode" | "cursor" | "copilot",
+        PlatformToolSlug,
         { allowVk: boolean; allowOtelDirect: boolean }
       >
     > = {};

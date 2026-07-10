@@ -87,8 +87,10 @@ describe("CopilotExtractor", () => {
     });
 
     it("respects a span type set by an earlier extractor", () => {
+      // Preset ("llm") differs from what the operation would infer
+      // ("tool") so a broken always-overwrite guard flips the result.
       const ctx = createExtractorContext({
-        "gen_ai.operation.name": "chat",
+        "gen_ai.operation.name": "execute_tool",
         "github.copilot.turn_id": "t1",
       });
       ctx.out["langwatch.span.type"] = "llm";

@@ -41,6 +41,9 @@ import { parseToolModeFlag, resolveWrapperPath } from "./wrapper-path-choice";
  */
 const CODEX_IO_POLL_MS = 2_500;
 
+/** Single-quote a string for safe interpolation into a `sh -c` command. */
+const shellQuote = (s: string): string => `'${s.replace(/'/g, "'\\''")}'`;
+
 export interface ToolEnv {
   /** Env-var name → value pairs to inject into the child process. */
   vars: Record<string, string>;
@@ -436,14 +439,13 @@ export function buildShellReapply(args: {
   clears: string[];
   vars: Record<string, string>;
 }): string {
-  const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
   const parts: string[] = [];
   if (SHELL_FUNCTION_TOOLS.includes(args.tool)) {
     parts.push(`unset -f ${args.tool} 2>/dev/null`);
   }
   parts.push(...args.clears.map((k) => `unset ${k}`));
   parts.push(
-    ...Object.entries(args.vars).map(([k, v]) => `export ${k}=${q(v)}`),
+    ...Object.entries(args.vars).map(([k, v]) => `export ${k}=${shellQuote(v)}`),
   );
   return parts.join("; ");
 }
@@ -733,7 +735,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 
   let child;
   if (aliasShell) {
-    const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
+
     const reapply = buildShellReapply({
       tool,
       mode: modeResult.mode,
@@ -744,7 +746,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
     // missing tool surfaces our actionable message rather than a bare
     // `command not found`. `command -v` honors the aliases/functions/PATH the
     // spawn below would use. The direct-spawn branch relies on ENOENT instead.
-    const guard = `command -v -- ${q(tool)} >/dev/null 2>&1 || { printf '%s\\n' ${q(notFoundMessage)} >&2; exit 127; }`;
+    const guard = `command -v -- ${shellQuote(tool)} >/dev/null 2>&1 || { printf '%s\\n' ${shellQuote(notFoundMessage)} >&2; exit 127; }`;
     const command = `${reapply ? `${reapply}; ` : ""}${guard}; ${tool} "$@"`;
     child = spawn(aliasShell, ["-i", "-c", command, tool, ...finalArgs], {
       stdio: "inherit",

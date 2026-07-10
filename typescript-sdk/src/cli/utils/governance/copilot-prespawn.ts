@@ -121,7 +121,7 @@ export function detectManagedOtelPin(
 export function parseCopilotVersion(raw: string | null): string | null {
   if (!raw) return null;
   const match = /(\d+)\.(\d+)\.(\d+)/.exec(raw);
-  return match ? match[0]! : null;
+  return match ? match[0] : null;
 }
 
 /** Simple semver-triple comparison: negative when a < b. */
