@@ -691,7 +691,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
    * fastq worker function: poison guard, then the real job processing.
    *
    * The guard records a claim strike BEFORE any decode/parse work and clears
-   * it on every code path where the process survives (the finally below —
+   * it on every code path where the process survives (the finally below -
    * success, retry, exhausted-park, drop-to-replay, graceful drain all pass
    * through it). A job that seizes the event loop never reaches the finally:
    * the liveness probe kills the process, the strike stays behind, and after
@@ -761,7 +761,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       }
       if (err instanceof PayloadTooLargeError) {
         // Over the decode cap: parsing it would seize the event loop. Park the
-        // group with the value intact for inspection — do NOT drop to replay
+        // group with the value intact for inspection - do NOT drop to replay
         // (replay would re-materialize the same value) and do NOT parse.
         await this.parkPoisonGroup({
           groupId,
@@ -1393,7 +1393,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
   /**
    * Claim-side poison park (specs/event-sourcing/poison-group-park-guard.feature):
    * re-stage the SAME staged value (no decode, no re-encode, hold token
-   * unchanged — the transient-decode rationale applies) and move the group to
+   * unchanged - the transient-decode rationale applies) and move the group to
    * the blocked set with a stored error. The value stays inspectable via the
    * ops peek path; operators recover with the existing unblock/drain surface.
    */

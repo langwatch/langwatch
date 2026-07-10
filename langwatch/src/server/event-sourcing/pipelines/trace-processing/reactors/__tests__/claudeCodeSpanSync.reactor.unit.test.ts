@@ -378,7 +378,7 @@ describe("createClaudeCodeSpanSyncReactor", () => {
         );
         // Only the capped model records became model spans: 6 kept rows minus
         // the user_prompt = 5 model records, which pair into 2 complete calls
-        // (anchor #1 present) — never all 4.
+        // (anchor #1 present) - never all 4.
         const modelSpans = recorded
           .map((r) => r.span)
           .filter((s) => spanType(s) === "llm");

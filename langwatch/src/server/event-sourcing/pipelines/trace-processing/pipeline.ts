@@ -139,7 +139,7 @@ export interface TraceProcessingPipelineDeps {
    * the historic per-trace group key; `> 1` spreads one Claude Code turn's log
    * records across `traceId:<shard>` groups so a turn that streams thousands of
    * log records drains in parallel instead of FIFO'ing behind one worker. The
-   * trace-summary fold and the claude-span-sync reactor are unaffected — both
+   * trace-summary fold and the claude-span-sync reactor are unaffected - both
    * run on their own aggregate-keyed queue. See logCommandGroupKey.ts.
    */
   logCommandShardCount?: number;
@@ -331,7 +331,7 @@ export function createTraceProcessingPipeline(
   // that spreads a trace's recordLog commands across `traceId:<shard>`
   // GroupQueue groups so one Claude Code turn that streams thousands of log
   // records drains in parallel instead of FIFO'ing behind one worker. When
-  // disabled (the default), install NO getGroupKey — the command falls back to
+  // disabled (the default), install NO getGroupKey - the command falls back to
   // getAggregateId, byte-identical to the historic per-trace key. The count is
   // clamped defensively so a caller constructing the pipeline directly can't
   // explode the number of groups. The command handler reads no trace state and

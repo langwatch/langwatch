@@ -103,7 +103,7 @@ describe.skipIf(!hasTestcontainers)(
           await queue.waitUntilReady();
 
           // Strikes left behind by prior claims whose process died before the
-          // clear could run — the crash-loop signature this guard detects.
+          // clear could run - the crash-loop signature this guard detects.
           await redis.set(
             strikesKey(name, "poisoned"),
             String(DEFAULT_CLAIM_STRIKE_THRESHOLD),
@@ -203,7 +203,7 @@ describe.skipIf(!hasTestcontainers)(
           );
 
           // The failure path survives the process, so the claim strike is
-          // cleared — retries are accounted by the retry budget, not by the
+          // cleared - retries are accounted by the retry budget, not by the
           // poison guard.
           await vi.waitFor(
             async () => {
@@ -225,7 +225,7 @@ describe.skipIf(!hasTestcontainers)(
           await queue.waitUntilReady();
 
           // Stage a legacy bare-JSON value over the cap directly through the
-          // staging scripts — exactly the shape of values written before the
+          // staging scripts - exactly the shape of values written before the
           // encode-side cap existed.
           const scripts = new GroupStagingScripts(redis, name);
           const oversized = JSON.stringify({

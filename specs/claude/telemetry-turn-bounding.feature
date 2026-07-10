@@ -13,8 +13,8 @@ Feature: Claude Code telemetry turn bounding
   # observed on one group), and the span-sync reactor re-reads the whole turn's
   # logs on every debounce. The converter's "a turn's log set is small and
   # bounded" assumption was the latent flaw. Trace ids must NOT be split further
-  # — tool outputs are recovered from the next model call's request body within
-  # the same trace's record set — so the bounding happens in the ingest lane and
+  # - tool outputs are recovered from the next model call's request body within
+  # the same trace's record set - so the bounding happens in the ingest lane and
   # the reactor, never in the trace identity. Mirrors the existing span-command
   # sharding (specs/event-sourcing/span-command-sharding.feature).
   #
@@ -49,7 +49,7 @@ Feature: Claude Code telemetry turn bounding
 
   # Sharding only changes the recordLog GroupQueue lane, never the record set the
   # span-sync reactor folds (it re-reads by the whole traceId) nor the converter,
-  # so the produced spans are identical by construction — the command handler
+  # so the produced spans are identical by construction - the command handler
   # reads no per-trace state. A dedicated end-to-end test that ingests the same
   # turn through sharded and unsharded lanes and diffs the two span trees is a
   # tracked gap.

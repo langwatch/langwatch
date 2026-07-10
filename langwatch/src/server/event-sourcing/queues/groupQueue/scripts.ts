@@ -1492,7 +1492,7 @@ export const CLAIM_STRIKE_TTL_SECONDS = 60 * 60;
  *
  * Semantics (mirrors readTenantCap):
  *   - env unset / empty / non-numeric / negative → DEFAULT_CLAIM_STRIKE_THRESHOLD
- *   - env = "0" → 0 (explicit kill switch — guard disabled)
+ *   - env = "0" → 0 (explicit kill switch - guard disabled)
  *   - env = positive integer → that integer
  */
 export function readClaimStrikeThreshold(): number {
@@ -2060,7 +2060,7 @@ export class GroupStagingScripts {
   /**
    * Poison-guard claim strike (specs/event-sourcing/poison-group-park-guard.feature).
    * Recorded when a worker claims a group's job, cleared on every code path
-   * where the process survives — so only groups whose jobs kill the process
+   * where the process survives - so only groups whose jobs kill the process
    * (event-loop seizure → liveness kill) accumulate a count. The TTL keeps an
    * old strike from parking a healthy group long after an unrelated death.
    *
