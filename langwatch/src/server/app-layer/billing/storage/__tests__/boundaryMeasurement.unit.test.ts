@@ -45,6 +45,8 @@ function makeService({
       findAllByOrganization: vi.fn(async () => []),
       sumNonExitByPartition: vi.fn(async () => prior),
       sumLiveNetGroups: vi.fn(async () => []),
+      countEventsAfter: vi.fn(async () => 0),
+      snapshotFoldState: vi.fn(async () => ({ events: [], gaugeBytes: 0n })),
     },
     listProjectIds: async () => ["project_1"],
   });
