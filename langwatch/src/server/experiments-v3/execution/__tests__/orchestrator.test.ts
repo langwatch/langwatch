@@ -569,6 +569,98 @@ describe("orchestrator", () => {
           "answer from A",
         );
       });
+
+      // The output is narrowed to its field BEFORE the scores are appended, so
+      // the judge reads the answer and its scores, not the whole blob.
+      describe("when the variant's output is structured", () => {
+        const structuredState = () => {
+          const state = scoredState();
+          const comparisonTarget = state.targets.at(-1)!;
+          comparisonTarget.comparison!.variantOutputPaths = {
+            "target-1": ["answer"],
+          };
+          return state;
+        };
+
+        const structured = new Map([
+          [
+            "0:target-1",
+            {
+              output: { answer: "from A", confidence: 0.9 },
+              cost: 0,
+              duration: 1,
+            },
+          ],
+          ["0:target-2", { output: "answer from B", cost: 0, duration: 1 }],
+        ]);
+
+        const scores = new Map([
+          ["0:target-1", [{ name: "Faithfulness", score: 0.91 }]],
+        ]);
+
+        it("appends the scores to the picked field, not the whole object", () => {
+          const { cells } = generateComparisonCells(
+            structuredState(),
+            createTestDataset(1),
+            structured,
+            scores,
+          );
+
+          expect(cells[0]?.comparison?.candidates[0]?.output).toBe(
+            "from A\n\n--- Existing evaluator scores ---\n- Faithfulness: score=0.91",
+          );
+        });
+
+        it("appends the scores to the serialized object when no field is picked", () => {
+          const { cells } = generateComparisonCells(
+            scoredState(),
+            createTestDataset(1),
+            structured,
+            scores,
+          );
+
+          const output = cells[0]?.comparison?.candidates[0]?.output as string;
+          expect(output).toContain('{"answer":"from A","confidence":0.9}');
+          expect(output).toContain("- Faithfulness: score=0.91");
+        });
+
+        // The scores used to be appended even when the variant produced no
+        // output, leaving a candidate that was a score block and nothing else.
+        // langevals only drops EMPTY candidates, so that one survived and the
+        // judge scored a variant that had said nothing against ones that had.
+        it("keeps an empty output empty rather than sending scores alone", () => {
+          const { cells } = generateComparisonCells(
+            scoredState(),
+            createTestDataset(1),
+            new Map([
+              ["0:target-1", { output: "", cost: 0, duration: 1 }],
+              ["0:target-2", { output: "answer from B", cost: 0, duration: 1 }],
+            ]),
+            scores,
+          );
+
+          expect(cells[0]?.comparison?.candidates[0]?.output).toBe("");
+        });
+
+        // An unserializable output (circular refs, BigInt) has no text to carry
+        // the scores, so it empties out and the row is skipped.
+        it("empties an unserializable output", () => {
+          const circular: Record<string, unknown> = { answer: "from A" };
+          circular.self = circular;
+
+          const { cells } = generateComparisonCells(
+            scoredState(),
+            createTestDataset(1),
+            new Map([
+              ["0:target-1", { output: circular, cost: 0, duration: 1 }],
+              ["0:target-2", { output: "answer from B", cost: 0, duration: 1 }],
+            ]),
+            scores,
+          );
+
+          expect(cells[0]?.comparison?.candidates[0]?.output).toBe("");
+        });
+      });
     });
 
     it("uses the prompt handle as candidate id when loadedPrompts has it", () => {

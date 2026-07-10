@@ -43,11 +43,15 @@ function resolveDocHref(href: string): string {
  * `dev/docs/best_practices/copywriting.md` — descriptions stay short, the
  * long form goes behind the (i).
  *
- * Opens on hover, and stays open while the pointer is anywhere over the (i) or
- * the popover itself — a plain hover Tooltip would close the moment the pointer
- * left the icon, so the doc link inside could never be clicked. Leaving is
- * given a short grace period to cover the gap the pointer crosses between the
- * two. Click and keyboard focus still open it, for touch and for tabbing.
+ * Opens while the pointer is over the (i), and closes when it leaves. It also
+ * stays open while the pointer is over the popover itself, so the doc link
+ * inside stays clickable — a plain hover Tooltip closes the moment the pointer
+ * leaves the icon, putting the link out of reach. Crossing the gap between the
+ * two gets a short grace period. Click still opens it, for touch.
+ *
+ * `autoFocus` is off: Chakra focuses the popover body when it opens, which
+ * blurs the trigger. With an onBlur that closes, that produced a visible
+ * open/close flicker on every hover.
  */
 
 /** Grace period before a hover-out closes, so crossing the gap doesn't. */
@@ -66,6 +70,7 @@ export function FieldInfoTooltip({
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
   );
+  const pointerOverTrigger = useRef(false);
 
   const cancelClose = useCallback(() => {
     if (closeTimer.current) clearTimeout(closeTimer.current);
@@ -88,8 +93,16 @@ export function FieldInfoTooltip({
   return (
     <Popover.Root
       open={open}
-      onOpenChange={(details) => setOpen(details.open)}
-      positioning={{ placement: "right-start" }}
+      // The trigger toggles on click, which on a mouse means hovering the (i)
+      // opens it and then clicking it shuts it again. Refuse a close while the
+      // pointer is still on the icon; Escape and clicking away still close,
+      // since the pointer has left by then.
+      onOpenChange={(details) => {
+        if (!details.open && pointerOverTrigger.current) return;
+        setOpen(details.open);
+      }}
+      autoFocus={false}
+      positioning={{ placement: "right-start", gutter: 8 }}
     >
       <Popover.Trigger asChild>
         <IconButton
@@ -102,10 +115,14 @@ export function FieldInfoTooltip({
           minWidth="auto"
           height="auto"
           padding={0}
-          onMouseEnter={openNow}
-          onMouseLeave={closeSoon}
-          onFocus={openNow}
-          onBlur={closeSoon}
+          onMouseEnter={() => {
+            pointerOverTrigger.current = true;
+            openNow();
+          }}
+          onMouseLeave={() => {
+            pointerOverTrigger.current = false;
+            closeSoon();
+          }}
         >
           <Info size={14} />
         </IconButton>

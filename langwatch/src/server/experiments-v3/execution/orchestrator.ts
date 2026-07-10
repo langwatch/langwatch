@@ -342,10 +342,9 @@ export const generateComparisonCells = (
   /**
    * Structured-output narrowing: when the comparison config carries an output
    * path for this variant, dig into the candidate's output and return just
-   * that field. Otherwise the judge sees the whole JSON blob (or a raw
-   * `[object Object]` in the score-appended path) instead of the single text
-   * the user actually wants compared. An empty or missing path is a no-op, so
-   * single-field configs keep working.
+   * that field. Otherwise the judge sees the whole JSON blob instead of the
+   * single text the user actually wants compared. An empty or missing path is
+   * a no-op, so single-field configs keep working.
    */
   const pickOutputPath = (output: unknown, path?: string[]): unknown => {
     if (!path || path.length === 0) return output;
@@ -373,21 +372,19 @@ export const generateComparisonCells = (
   };
 
   /**
-   * Append a variant's existing evaluator scores to its candidate text so the
-   * judge can factor them into the verdict. Skips silently when there are no
-   * scores, when the output can't be serialized, or when the scores map isn't
-   * provided.
+   * A variant's existing evaluator scores, rendered as a block to append to its
+   * candidate text so the judge can factor them into the verdict. Empty when
+   * there are no scores, or when none of them carry a value.
+   *
+   * This appends to text the caller has already produced, rather than
+   * serializing the output a second time itself — `toCandidateText` is the one
+   * place that turns an output into judge-readable text, structured or not.
    */
-  const withEvaluatorScores = (
-    output: unknown,
-    rowIndex: number,
-    variantId: string,
-  ): unknown => {
-    if (!completedTargetEvaluatorScores) return output;
-    const scores = completedTargetEvaluatorScores.get(
+  const evaluatorScoresBlock = (rowIndex: number, variantId: string): string => {
+    const scores = completedTargetEvaluatorScores?.get(
       `${rowIndex}:${variantId}`,
     );
-    if (!scores || scores.length === 0) return output;
+    if (!scores?.length) return "";
     const lines = scores
       .map((s) => {
         const parts: string[] = [];
@@ -398,20 +395,8 @@ export const generateComparisonCells = (
         return `- ${s.name}: ${parts.join(", ")}`;
       })
       .filter((l): l is string => l !== null);
-    if (lines.length === 0) return output;
-    const block = `\n\n--- Existing evaluator scores ---\n${lines.join("\n")}`;
-    if (typeof output === "string") return output + block;
-    // For non-string outputs, try to serialize. If JSON.stringify throws
-    // (circular refs / BigInt) we skip the score block entirely and return
-    // the raw output unchanged — appending the block to "[object Object]"
-    // would just confuse the judge without giving it usable context.
-    try {
-      const serialized = JSON.stringify(output);
-      if (serialized === undefined) return output;
-      return serialized + block;
-    } catch {
-      return output;
-    }
+    if (lines.length === 0) return "";
+    return `\n\n--- Existing evaluator scores ---\n${lines.join("\n")}`;
   };
 
   /**
@@ -504,21 +489,23 @@ export const generateComparisonCells = (
       .map(variantIdentifierFor);
     if (missing.length > 0) return { missing };
 
-    const candidates = cfg.variants.map((variantId, i) => ({
-      id: variantIdentifierFor(resolvedVariants[i]!),
-      output: toCandidateText(
-        withEvaluatorScores(
-          pickOutputPath(
-            outputs[i]!.output,
-            cfg.variantOutputPaths?.[variantId],
-          ),
-          rowIndex,
-          variantId,
-        ),
-      ),
-      cost: outputs[i]!.cost,
-      duration: outputs[i]!.duration,
-    }));
+    const candidates = cfg.variants.map((variantId, i) => {
+      // Narrow to the chosen field first, serialize it, then append the
+      // scores. An empty candidate stays empty: langevals drops it and skips
+      // the row, which is the honest outcome. Appending the block regardless
+      // produced a candidate that was nothing but scores — no output at all —
+      // which langevals would not drop, so the judge scored a variant that had
+      // said nothing against ones that had.
+      const text = toCandidateText(
+        pickOutputPath(outputs[i]!.output, cfg.variantOutputPaths?.[variantId]),
+      );
+      return {
+        id: variantIdentifierFor(resolvedVariants[i]!),
+        output: text ? text + evaluatorScoresBlock(rowIndex, variantId) : text,
+        cost: outputs[i]!.cost,
+        duration: outputs[i]!.duration,
+      };
+    });
 
     return { candidates: { candidates } };
   };
