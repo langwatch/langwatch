@@ -35,13 +35,13 @@ Feature: Storage billing boundary measurement engine
     When the sweep runs
     Then the other two organizations are measured and sampled normally
 
-  @integration @unimplemented
+  @integration
   Scenario: Missed hours are filled by one ordered catch-up replay
     Given an organization with 6 hours of unsampled gauge history
     When the sweep runs
     Then all 6 hourly rows are produced in order from a single replay
 
-  @integration @unimplemented
+  @integration
   Scenario: A caught-up hour records its true historical value, never the current one
     Given the gauge changed between a missed hour and now
     When the missed hour is caught up
@@ -97,13 +97,13 @@ Feature: Storage billing boundary measurement engine
 
   # Sampling
 
-  @unit @unimplemented
+  @unit
   Scenario: The sampled hourly value is never negative
     Given an organization gauge that folded to a negative value due to a defect
     When the hour is sampled
     Then the hourly row records zero megabytes
 
-  @integration @unimplemented
+  @integration
   Scenario: A gauge negative beyond tolerance raises a drift alarm without blocking sampling
     Given an organization gauge far below zero
     When the hour is sampled
