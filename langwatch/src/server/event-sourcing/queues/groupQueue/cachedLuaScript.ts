@@ -36,7 +36,7 @@ export class CachedLuaScript {
     try {
       return await redis.evalsha(this.sha, numKeys, ...keysAndArgs);
     } catch (err) {
-      if (err instanceof Error && err.message.includes("NOSCRIPT")) {
+      if (err instanceof Error && err.message.startsWith("NOSCRIPT")) {
         return await redis.eval(this.source, numKeys, ...keysAndArgs);
       }
       throw err;
