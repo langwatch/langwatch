@@ -56,8 +56,15 @@ export function createLangyConversationUpdateBroadcastReactor(
         // Enrich the signal with the operational spine the fold already holds
         // (zero extra reads) so the client applies it in place instead of
         // paying a ClickHouse round-trip. Content-derived fields (title,
-        // messages) are deliberately excluded — the broadcast is tenant-wide
-        // but the conversation is private to its owner (see schema doc).
+        // messages) are deliberately excluded.
+        //
+        // The broadcast fans out on the tenant-wide (project) channel, so we
+        // also carry the owner identity (`ownerUserId`) and `isShared` flag.
+        // The `onConversationUpdate` subscription uses these to drop every
+        // signal the subscriber is not allowed to see — a conversation is
+        // private to its owner unless shared with the project — mirroring the
+        // read routes' `(UserId = userId OR IsShared)` visibility gate. The
+        // client's signal schema strips these server-only fields on parse.
         const payload = JSON.stringify({
           event: "langy_conversation_updated",
           conversationId,
@@ -65,6 +72,8 @@ export function createLangyConversationUpdateBroadcastReactor(
           messageCount: foldState?.MessageCount,
           lastActivityAtMs: foldState?.LastActivityAt ?? null,
           isRunning: foldState?.Status === "running",
+          ownerUserId: foldState?.UserId,
+          isShared: foldState?.IsShared ?? false,
         });
 
         await deps.broadcast.broadcastToTenant(
