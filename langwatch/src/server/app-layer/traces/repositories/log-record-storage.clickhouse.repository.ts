@@ -84,6 +84,55 @@ export class LogRecordStorageClickHouseRepository
     }
   }
 
+  /**
+   * Shared partition time-window + timeFilter SQL for the marked-claude-code
+   * queries, so getMarkedClaudeCodeLogsByTrace and countMarkedClaudeCodeLogsByTrace
+   * scan byte-identical windows. Both must stay in lockstep: the count exists to
+   * report the TRUE marked count that the get would return uncapped, so any
+   * divergence in the window would make the cap-overflow signal wrong.
+   *
+   * `stored_log_records` is `PARTITION BY toYearWeek(TimeUnixMs)` and tiered to
+   * S3 after the hot window. Filtering only on TenantId + TraceId can't prune
+   * partitions, so without a time predicate the read walks every weekly
+   * partition (incl. cold S3): a burst of S3 GETs on every claude-code log
+   * re-fold. Two windows:
+   *   * with a turn-time hint → ±2d around it (generous headroom for clock
+   *     skew / long-running turns)
+   *   * without a hint → `now − 7×CC_RETENTION` ... `now + 2d`. The upper
+   *     bound mirrors the hint path's clock-skew headroom so a fast client
+   *     clock that writes a slightly-future TimeUnixMs (it's client-supplied)
+   *     doesn't silently drop the row. Lower bound is safe because CC logs
+   *     older than CLAUDE_CODE_LOG_RETENTION_DAYS have already been deleted
+   *     by TTL anyway.
+   *
+   * `timeFilter` qualifies the bound with the table name: the outer SELECT of
+   * the get aliases `toUnixTimestamp64Milli(TimeUnixMs) AS TimeUnixMs`, and
+   * ClickHouse would otherwise resolve a bare `TimeUnixMs` in WHERE to that
+   * ms-integer alias instead of the DateTime64 column, making the partition
+   * bound nonsensical.
+   */
+  private buildMarkedClaudeCodeWindow(occurredAtMs?: number): {
+    timeFilter: string;
+    fromMs: number;
+    toMs: number;
+  } {
+    const partitionWindowMs = 2 * 24 * 60 * 60 * 1000;
+    const ccRetentionMs = CLAUDE_CODE_LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    const fallbackLookbackMs = ccRetentionMs * 7;
+    const hasWindow = typeof occurredAtMs === "number" && occurredAtMs > 0;
+    const now = Date.now();
+    const fromMs = hasWindow
+      ? occurredAtMs - partitionWindowMs
+      : now - fallbackLookbackMs;
+    const toMs = hasWindow
+      ? occurredAtMs + partitionWindowMs
+      : now + partitionWindowMs;
+    const timeFilter =
+      `AND ${TABLE_NAME}.TimeUnixMs >= fromUnixTimestamp64Milli({fromMs:Int64}) ` +
+      `AND ${TABLE_NAME}.TimeUnixMs <= fromUnixTimestamp64Milli({toMs:Int64})`;
+    return { timeFilter, fromMs, toMs };
+  }
+
   async getMarkedClaudeCodeLogsByTrace(
     tenantId: string,
     traceId: string,
@@ -97,37 +146,8 @@ export class LogRecordStorageClickHouseRepository
 
     const client = await this.resolveClient(tenantId);
 
-    // `stored_log_records` is `PARTITION BY toYearWeek(TimeUnixMs)` and tiered to
-    // S3 after the hot window. Filtering only on TenantId + TraceId can't prune
-    // partitions, so without a time predicate the read walks every weekly
-    // partition (incl. cold S3) — a burst of S3 GETs on every claude-code log
-    // re-fold. Two windows:
-    //   * with a turn-time hint → ±2d around it (generous headroom for clock
-    //     skew / long-running turns)
-    //   * without a hint → `now − 7×CC_RETENTION` ... `now + 2d`. The upper
-    //     bound mirrors the hint path's clock-skew headroom so a fast client
-    //     clock that writes a slightly-future TimeUnixMs (it's client-supplied)
-    //     doesn't silently drop the row. Lower bound is safe because CC logs
-    //     older than CLAUDE_CODE_LOG_RETENTION_DAYS have already been deleted
-    //     by TTL anyway.
-    const partitionWindowMs = 2 * 24 * 60 * 60 * 1000;
-    const ccRetentionMs = CLAUDE_CODE_LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000;
-    const fallbackLookbackMs = ccRetentionMs * 7;
-    const hasWindow = typeof occurredAtMs === "number" && occurredAtMs > 0;
-    const now = Date.now();
-    const fromMs = hasWindow
-      ? occurredAtMs - partitionWindowMs
-      : now - fallbackLookbackMs;
-    const toMs = hasWindow
-      ? occurredAtMs + partitionWindowMs
-      : now + partitionWindowMs;
-    // Qualify the bound with the table name: the outer SELECT aliases
-    // `toUnixTimestamp64Milli(TimeUnixMs) AS TimeUnixMs`, and ClickHouse would
-    // otherwise resolve a bare `TimeUnixMs` in WHERE to that ms-integer alias
-    // instead of the DateTime64 column, making the partition bound nonsensical.
-    const timeFilter =
-      `AND ${TABLE_NAME}.TimeUnixMs >= fromUnixTimestamp64Milli({fromMs:Int64}) ` +
-      `AND ${TABLE_NAME}.TimeUnixMs <= fromUnixTimestamp64Milli({toMs:Int64})`;
+    const { timeFilter, fromMs, toMs } =
+      this.buildMarkedClaudeCodeWindow(occurredAtMs);
 
     // Dedup to the latest version of each distinct stored log (the table is a
     // ReplacingMergeTree(UpdatedAt) keyed on TenantId,TraceId,SpanId,ProjectionId);
@@ -227,21 +247,10 @@ export class LogRecordStorageClickHouseRepository
     // partition time-window, IN-tuple dedup + outer kind-attribute filter) so the
     // count matches the set that method would return uncapped - only without the
     // per-turn LIMIT, so the reactor can learn a pathological turn's TRUE marked
-    // count instead of the cap+1 lower bound. Keep both queries' WHERE identical.
-    const partitionWindowMs = 2 * 24 * 60 * 60 * 1000;
-    const ccRetentionMs = CLAUDE_CODE_LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000;
-    const fallbackLookbackMs = ccRetentionMs * 7;
-    const hasWindow = typeof occurredAtMs === "number" && occurredAtMs > 0;
-    const now = Date.now();
-    const fromMs = hasWindow
-      ? occurredAtMs - partitionWindowMs
-      : now - fallbackLookbackMs;
-    const toMs = hasWindow
-      ? occurredAtMs + partitionWindowMs
-      : now + partitionWindowMs;
-    const timeFilter =
-      `AND ${TABLE_NAME}.TimeUnixMs >= fromUnixTimestamp64Milli({fromMs:Int64}) ` +
-      `AND ${TABLE_NAME}.TimeUnixMs <= fromUnixTimestamp64Milli({toMs:Int64})`;
+    // count instead of the cap+1 lower bound. The shared window helper keeps both
+    // queries' WHERE identical.
+    const { timeFilter, fromMs, toMs } =
+      this.buildMarkedClaudeCodeWindow(occurredAtMs);
 
     const result = await client.query({
       query: `

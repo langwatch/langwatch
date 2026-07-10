@@ -877,6 +877,26 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
             });
             return;
           }
+          if (err instanceof PayloadTooLargeError) {
+            // An oversized drained sibling can't be parsed (it would seize the
+            // event loop) and re-dispatch would only re-drain it. Mirror the
+            // dispatched-job oversized path: park the group so it stops running
+            // this batch until an operator intervenes. Re-stage the drained
+            // siblings first (same restage the transient path uses) so the
+            // other work, including the oversized value itself, is preserved
+            // in staging for inspection, not lost to replay. The dispatched
+            // job's value carries the park so the group moves to the blocked set.
+            await this.restageDrainedSiblings(groupId, drainedSiblings);
+            await this.parkPoisonGroup({
+              groupId,
+              stagedJobId,
+              jobDataJson,
+              originalScore,
+              reason: "oversized_payload",
+              errorMessage: `Poison guard: a coalesced sibling of this group is oversized (${err.message}). The batch was parked unparsed.`,
+            });
+            return;
+          }
           throw err;
         }
       }
@@ -1260,6 +1280,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       // and re-stage every sibling together, rather than silently dropping
       // hundreds of siblings on a brief S3 blip (2026-06-24 review).
       if (err instanceof TransientBlobStoreError) {
+        throw err;
+      }
+      // An oversized sibling must NOT drop to replay either: replay would
+      // re-materialize the same over-cap value and parsing it would seize the
+      // event loop. Rethrow so the caller parks the group (reason
+      // oversized_payload) with the value intact for inspection, exactly as the
+      // dispatched job's own decode does, instead of silently dropping it.
+      if (err instanceof PayloadTooLargeError) {
         throw err;
       }
       this.logger.error(

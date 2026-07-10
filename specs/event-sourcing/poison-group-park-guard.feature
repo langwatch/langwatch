@@ -69,6 +69,20 @@ Feature: GroupQueue poison-group park guard
     And the stored group error names the observed size and the cap
     And the worker's event loop remains responsive throughout
 
+  Scenario: an oversized coalesced sibling parks the group without losing the batch
+    Given a group whose dispatched job is small but a coalesced sibling exceeds the decode-side cap
+    When a worker claims the group and drains the sibling to fold it into the batch
+    Then the group is moved to the blocked set without JSON-parsing the oversized sibling
+    And the stored group error explains the batch was parked unparsed
+    And the batch's other work is re-staged for operator inspection or replay instead of being dropped
+
+  Scenario: the poison guard is disabled by setting the strike threshold to 0
+    Given the strike-threshold kill switch is set to 0
+    And a group has accumulated claim strikes at or above the former poison threshold
+    When a worker claims the group
+    Then the group is dispatched and processed instead of being parked
+    And no claim strike is recorded or enforced for the group
+
   Scenario: a compressed staged value that would decompress past the cap is parked
     Given a staged envelope whose gzip body would inflate beyond the decode-side cap
     When a worker claims the group

@@ -1,3 +1,4 @@
+import type { Redis } from "ioredis";
 import {
   afterAll,
   afterEach,
@@ -8,20 +9,19 @@ import {
   it,
   vi,
 } from "vitest";
-import type { Redis } from "ioredis";
+import { QueueRedisRepository } from "../../../../app-layer/ops/repositories/queue.redis.repository";
 import {
+  getTestRedisConnection,
   startTestContainers,
   stopTestContainers,
-  getTestRedisConnection,
 } from "../../../__tests__/integration/testContainers";
-import { QueueRedisRepository } from "../../../../app-layer/ops/repositories/queue.redis.repository";
-import { GroupQueueProcessor } from "../groupQueue";
+import type { EventSourcedQueueDefinition } from "../../queue.types";
 import { MAX_BLOB_BYTES } from "../blobConstants";
+import { GroupQueueProcessor } from "../groupQueue";
 import {
   DEFAULT_CLAIM_STRIKE_THRESHOLD,
   GroupStagingScripts,
 } from "../scripts";
-import type { EventSourcedQueueDefinition } from "../../queue.types";
 
 // Skip when running without testcontainers (unit-only test runs)
 const hasTestcontainers = !!(
@@ -156,6 +156,54 @@ describe.skipIf(!hasTestcontainers)(
       });
     });
 
+    describe("given the strike-threshold kill switch is set to 0", () => {
+      describe("when a group at the former threshold is claimed", () => {
+        /** @scenario the poison guard is disabled by setting the strike threshold to 0 */
+        it("dispatches the group instead of parking it", async () => {
+          const previous = process.env.LANGWATCH_GQ_POISON_STRIKE_THRESHOLD;
+          process.env.LANGWATCH_GQ_POISON_STRIKE_THRESHOLD = "0";
+          try {
+            const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
+            processed.mockResolvedValue(undefined);
+            const { queue, name } = createQueue(processed);
+            await queue.waitUntilReady();
+
+            // Strikes at (and above) the old default threshold that WOULD park
+            // the group if the guard were enabled.
+            await redis.set(
+              strikesKey(name, "poisoned"),
+              String(DEFAULT_CLAIM_STRIKE_THRESHOLD + 5),
+            );
+
+            await queue.send({ id: "job-1", groupId: "poisoned", value: "x" });
+
+            // With the guard off, the group is claimed and processed normally.
+            await vi.waitFor(
+              () => {
+                expect(processed).toHaveBeenCalledTimes(1);
+              },
+              { timeout: 5000, interval: 50 },
+            );
+            expect(processed.mock.calls[0]![0].groupId).toBe("poisoned");
+            // The group is never parked into the blocked set.
+            expect(await blockedMembers(name)).not.toContain("poisoned");
+            // Strikes are not enforced: recordClaimStrike is skipped entirely
+            // when the threshold is 0, so the pre-seeded count is left untouched
+            // (never incremented past it, never cleared to a fresh value).
+            expect(await redis.get(strikesKey(name, "poisoned"))).toBe(
+              String(DEFAULT_CLAIM_STRIKE_THRESHOLD + 5),
+            );
+          } finally {
+            if (previous === undefined) {
+              delete process.env.LANGWATCH_GQ_POISON_STRIKE_THRESHOLD;
+            } else {
+              process.env.LANGWATCH_GQ_POISON_STRIKE_THRESHOLD = previous;
+            }
+          }
+        });
+      });
+    });
+
     describe("given a healthy group", () => {
       describe("when its job completes", () => {
         /** @scenario claim strikes are cleared when processing survives */
@@ -255,6 +303,81 @@ describe.skipIf(!hasTestcontainers)(
           const error = await storedError(name, "fat");
           expect(error).toContain("Poison guard");
           expect(error).toContain("parked unparsed");
+        });
+      });
+    });
+
+    describe("given a coalesced batch whose drained sibling is over the decode cap", () => {
+      describe("when a worker claims the group and drains the sibling", () => {
+        /** @scenario an oversized coalesced sibling parks the group without losing the batch */
+        it("parks the group and re-stages the batch's other work", async () => {
+          const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
+          processed.mockResolvedValue(undefined);
+          const processBatch = vi.fn<(ps: TestPayload[]) => Promise<void>>();
+          processBatch.mockResolvedValue(undefined);
+          const { queue, name } = createQueue(processed, {
+            processBatch: async (ps) => {
+              await processBatch(ps as TestPayload[]);
+            },
+            coalesceMaxBatch: () => 50,
+          });
+          await queue.waitUntilReady();
+
+          // Stage BOTH jobs atomically as legacy bare-JSON so the small one is
+          // the dispatched job (earliest score) and decodes fine, while the
+          // oversized one is drained as a coalesce sibling and blows the decode
+          // cap. Both due now; the small one sorts first.
+          const scripts = new GroupStagingScripts(redis, name);
+          const now = Date.now();
+          const small = JSON.stringify({
+            id: "job-small",
+            groupId: "fat",
+            value: "ok",
+          });
+          const oversized = JSON.stringify({
+            id: "job-big",
+            groupId: "fat",
+            value: "x".repeat(MAX_BLOB_BYTES + 1024),
+          });
+          await scripts.stageBatch([
+            {
+              stagedJobId: "job-small",
+              groupId: "fat",
+              dispatchAfterMs: now - 1000,
+              dedupId: "",
+              dedupTtlMs: 0,
+              jobDataJson: small,
+            },
+            {
+              stagedJobId: "job-big",
+              groupId: "fat",
+              dispatchAfterMs: now - 500,
+              dedupId: "",
+              dedupTtlMs: 0,
+              jobDataJson: oversized,
+            },
+          ]);
+
+          await vi.waitFor(
+            async () => {
+              expect(await blockedMembers(name)).toContain("fat");
+            },
+            { timeout: 10000, interval: 100 },
+          );
+
+          // The batch was parked before any handler ran (the oversized sibling
+          // is never JSON-parsed, so neither process nor processBatch fires).
+          expect(processed).not.toHaveBeenCalled();
+          expect(processBatch).not.toHaveBeenCalled();
+          const error = await storedError(name, "fat");
+          expect(error).toContain("Poison guard");
+          expect(error).toContain("parked unparsed");
+          // The batch's other work is not lost: the group still holds staged
+          // jobs (the re-staged siblings + the parked dispatched value), ready
+          // for operator inspection or replay on unblock, not dropped.
+          expect(
+            await redis.zcard(`${name}:gq:group:fat:jobs`),
+          ).toBeGreaterThan(0);
         });
       });
     });

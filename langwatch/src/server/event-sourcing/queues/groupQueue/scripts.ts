@@ -1572,6 +1572,34 @@ export interface DrainedJob {
 export const DEFAULT_TENANT_CAP = 50;
 
 /**
+ * Parse a non-negative integer env var with a fallback.
+ *
+ * Shared by the operator knobs whose kill-switch/fallback semantics are
+ * identical: `0` is an explicit, meaningful value (kept), while unset / empty /
+ * non-numeric / negative all collapse to `fallback`. Read at call time (not at
+ * import) so tests can mutate process.env without re-importing the frozen env
+ * module.
+ *
+ * Semantics:
+ *   - env unset / empty / non-numeric / negative → fallback
+ *   - env = "0" → 0 (explicit kill switch)
+ *   - env = positive integer → that integer
+ */
+function readNonNegativeIntEnv({
+  name,
+  fallback,
+}: {
+  name: string;
+  fallback: number;
+}): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return fallback;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 0) return fallback;
+  return n;
+}
+
+/**
  * Read the tenant soft-cap from the environment.
  * Post-2026-05-11 incident follow-up; see DISPATCH_LUA comment for design.
  * Symbol is captured in env-create.mjs for schema discoverability; we
@@ -1584,11 +1612,10 @@ export const DEFAULT_TENANT_CAP = 50;
  *   - env = positive integer → that integer
  */
 export function readTenantCap(): number {
-  const raw = process.env.LANGWATCH_DISPATCH_TENANT_CAP;
-  if (raw === undefined || raw === "") return DEFAULT_TENANT_CAP;
-  const n = Number.parseInt(raw, 10);
-  if (!Number.isFinite(n) || n < 0) return DEFAULT_TENANT_CAP;
-  return n;
+  return readNonNegativeIntEnv({
+    name: "LANGWATCH_DISPATCH_TENANT_CAP",
+    fallback: DEFAULT_TENANT_CAP,
+  });
 }
 
 /**
@@ -1618,11 +1645,10 @@ export const CLAIM_STRIKE_TTL_SECONDS = 60 * 60;
  *   - env = positive integer → that integer
  */
 export function readClaimStrikeThreshold(): number {
-  const raw = process.env.LANGWATCH_GQ_POISON_STRIKE_THRESHOLD;
-  if (raw === undefined || raw === "") return DEFAULT_CLAIM_STRIKE_THRESHOLD;
-  const n = Number.parseInt(raw, 10);
-  if (!Number.isFinite(n) || n < 0) return DEFAULT_CLAIM_STRIKE_THRESHOLD;
-  return n;
+  return readNonNegativeIntEnv({
+    name: "LANGWATCH_GQ_POISON_STRIKE_THRESHOLD",
+    fallback: DEFAULT_CLAIM_STRIKE_THRESHOLD,
+  });
 }
 
 /**
@@ -2249,7 +2275,7 @@ export class GroupStagingScripts {
     const errorKey = `${this.keyPrefix}group:${groupId}:error`;
     const result = await this.redis.hgetall(errorKey);
 
-    if (!result || !result.message) {
+    if (!result?.message) {
       return null;
     }
 

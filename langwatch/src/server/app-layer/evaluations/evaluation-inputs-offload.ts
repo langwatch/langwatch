@@ -146,6 +146,89 @@ function buildPreview(serialized: string): {
 }
 
 /**
+ * Preview-only marker for inputs over the hard ceiling: no durable object is
+ * written (a multi-GB PUT is itself a hazard), only the preview survives. Warns
+ * (attributing the bound to the tenant and evaluation) since the full content
+ * is dropped here - accepted because it protects the platform and is observable.
+ */
+function buildCeilingMarker({
+  sizeBytes,
+  preview,
+  truncatedPreview,
+  projectId,
+  evaluationId,
+}: {
+  sizeBytes: number;
+  preview: string;
+  truncatedPreview: boolean;
+  projectId: string;
+  evaluationId: string;
+}): Record<string, unknown> {
+  logger.warn(
+    {
+      projectId,
+      evaluationId,
+      sizeBytes,
+      hardCeilingBytes: EVAL_INPUTS_HARD_CEILING_BYTES,
+    },
+    "Evaluation inputs exceed the hard ceiling; storing preview-only marker without offloading full content",
+  );
+  return {
+    [STORED_OBJECT_MARKER_KEY]: {
+      id: "",
+      sizeBytes,
+      sha256: null,
+      preview,
+      truncatedPreview,
+      ceilingExceeded: true,
+    },
+  } satisfies StoredObjectInputsMarker;
+}
+
+/**
+ * Writes the serialized inputs to the stored-objects service and returns the
+ * marker referencing them. The serialized payload is encoded to UTF-8 exactly
+ * once; that single buffer feeds both the store PUT and the SHA-256, so a
+ * GB-scale payload is not re-encoded twice.
+ */
+async function storeOversizedInputs({
+  serialized,
+  sizeBytes,
+  preview,
+  truncatedPreview,
+  projectId,
+  evaluationId,
+  storedObjects,
+}: {
+  serialized: string;
+  sizeBytes: number;
+  preview: string;
+  truncatedPreview: boolean;
+  projectId: string;
+  evaluationId: string;
+  storedObjects: StoredObjectsService;
+}): Promise<Record<string, unknown>> {
+  const bytes = Buffer.from(serialized, "utf8");
+  const stored = await storedObjects.storeFromBytes({
+    projectId,
+    purpose: EVAL_INPUTS_STORED_OBJECT_PURPOSE,
+    ownerKind: EVAL_INPUTS_OWNER_KIND,
+    ownerId: evaluationId,
+    mediaType: EVAL_INPUTS_MEDIA_TYPE,
+    bytes,
+  });
+  return {
+    [STORED_OBJECT_MARKER_KEY]: {
+      id: stored.id,
+      sizeBytes,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+      preview,
+      truncatedPreview,
+    },
+  } satisfies StoredObjectInputsMarker;
+}
+
+/**
  * Offloads inputs to object storage when their serialized size exceeds the
  * inline threshold; otherwise returns them unchanged.
  *
@@ -186,51 +269,33 @@ export async function offloadInputsIfOversized({
   const { preview, truncatedPreview } = buildPreview(serialized);
 
   // Over the hard ceiling: do not move the full payload to storage; keep a
-  // preview-only marker and warn. The content is not recoverable here.
+  // preview-only marker (buildCeilingMarker warns). The content is not
+  // recoverable here. The marker is a plain JSON object the caller stores
+  // opaquely (resolveInputsMarker re-narrows it via the type guard).
   if (sizeBytes > EVAL_INPUTS_HARD_CEILING_BYTES) {
-    logger.warn(
-      {
+    return {
+      inputs: buildCeilingMarker({
+        sizeBytes,
+        preview,
+        truncatedPreview,
         projectId,
         evaluationId,
-        sizeBytes,
-        hardCeilingBytes: EVAL_INPUTS_HARD_CEILING_BYTES,
-      },
-      "Evaluation inputs exceed the hard ceiling; storing preview-only marker without offloading full content",
-    );
-    return {
-      inputs: {
-        [STORED_OBJECT_MARKER_KEY]: {
-          id: "",
-          sizeBytes,
-          sha256: null,
-          preview,
-          truncatedPreview,
-          ceilingExceeded: true,
-        },
-      },
+      }),
       offloaded: false,
     };
   }
 
   try {
-    const stored = await storedObjects.storeFromBytes({
-      projectId,
-      purpose: EVAL_INPUTS_STORED_OBJECT_PURPOSE,
-      ownerKind: EVAL_INPUTS_OWNER_KIND,
-      ownerId: evaluationId,
-      mediaType: EVAL_INPUTS_MEDIA_TYPE,
-      bytes: Buffer.from(serialized, "utf8"),
-    });
     return {
-      inputs: {
-        [STORED_OBJECT_MARKER_KEY]: {
-          id: stored.id,
-          sizeBytes,
-          sha256: createHash("sha256").update(serialized, "utf8").digest("hex"),
-          preview,
-          truncatedPreview,
-        },
-      },
+      inputs: await storeOversizedInputs({
+        serialized,
+        sizeBytes,
+        preview,
+        truncatedPreview,
+        projectId,
+        evaluationId,
+        storedObjects,
+      }),
       offloaded: true,
     };
   } catch (error) {
@@ -290,7 +355,11 @@ export async function resolveInputsMarker({
       EVAL_INPUTS_HARD_CEILING_BYTES,
     );
     const parsed: unknown = JSON.parse(buffer.toString("utf8"));
-    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      !Array.isArray(parsed)
+    ) {
       return parsed as Record<string, unknown>;
     }
     return inputs;
