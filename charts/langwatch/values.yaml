@@ -228,15 +228,15 @@ app:
   ## @extra app.http HTTP configuration for base/public URLs.
   ## @param app.http.baseHost [string, default: http://localhost:5560] Internal base URL.
   ## @param app.http.publicUrl [string, default: http://localhost:5560] Public URL for users.
-  ## @param app.http.langwatchEndpoint [string, default: ""] Endpoint the app ships its OWN telemetry to (LANGWATCH_ENDPOINT). Empty self-references the app over localhost on app.service.port. Set to route the app's self-traces to an external collector.
+  ## @param app.http.langwatchEndpoint [string, default: ""] Internal platform-API URL (LANGWATCH_ENDPOINT) that in-pod scenario/simulation runners call back to. Empty self-references the app over localhost on app.service.port — correct because on the app pod the app is local (unlike workers/nlp, which reach it via service DNS). Override only if in-pod runners must reach the app through a different URL.
   http:
     # Base host URL for internal communication
     baseHost: "http://localhost:5560"
     # Public URL that users will access the application from
     publicUrl: "http://localhost:5560"
-    # Where the app ships its own telemetry (LANGWATCH_ENDPOINT). Empty =
-    # self-reference over localhost so chart-default installs boot without
-    # tripping the post-#3541 required-env validation.
+    # Internal platform-API URL (LANGWATCH_ENDPOINT) that in-pod scenario/
+    # simulation runners call back to. Empty = self-reference over localhost so
+    # chart-default installs boot past the post-#3541 required-env validation.
     langwatchEndpoint: ""
 
   # Feature flags to enable/disable specific functionality
