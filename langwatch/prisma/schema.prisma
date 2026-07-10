@@ -1964,9 +1964,13 @@ model StorageBillingCheckpoint {
 // dedup only squashes re-enqueues while a job is staged; this cursor is the
 // guarantee and survives redeploys, which a process-local guard cannot.
 model StorageSweepCursor {
-  id                  String   @id // singleton row
+  id                  String    @id // singleton row
   lastSweptSealedHour DateTime
-  updatedAt           DateTime @updatedAt
+  // Entry-transit measurement is day-grained (boundary calendar); this cursor
+  // makes it run once per UTC day instead of every hourly sweep. Missed days
+  // self-heal: entry deltas are cumulative-minus-prior.
+  lastEntrySweptDay   DateTime?
+  updatedAt           DateTime  @updatedAt
 }
 
 // ============================================================================

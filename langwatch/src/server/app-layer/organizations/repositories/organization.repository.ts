@@ -254,6 +254,13 @@ export interface OrganizationRepository {
   getOrganizationForBilling(
     organizationId: string,
   ): Promise<OrganizationForBilling | null>;
+  /**
+   * Every SaaS-billable organization id (SEAT_EVENT pricing, a Stripe
+   * customer, and an active growth subscription) — the population the
+   * ADR-039 storage sweep iterates. Same billable definition as
+   * getOrganizationForBilling, as an enumeration.
+   */
+  listBillableOrganizationIds(): Promise<string[]>;
 
   // --- New methods for router delegation ---
 

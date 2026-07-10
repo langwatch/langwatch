@@ -181,6 +181,21 @@ export const FEATURE_FLAGS = [
     description:
       "Opens the Langy in-product assistant. Default off: only LangWatch staff (isLangwatchStaff() — @langwatch.ai email) get Langy out of the box. To open it for a specific project/org/user, flip the flag on via a PostHog rule, an operator-store row via /ops/feature-flags, or RELEASE_LANGY_ENABLED=true for a blanket on. Staff always bypass the flag so a global kill switch still leaves us able to debug.",
   },
+  // ADR-039 storage billing (phase 2). Master gate for the boundary
+  // measurement engine: OFF → the sweep runs zero ClickHouse queries, writes
+  // zero boundary events, and produces zero hourly rows — fully inert.
+  // `_size_bytes` aggregation has caused two prod OOM outages, so an operator
+  // must be able to kill metering without a deploy. Deliberately a FRESH
+  // identifier (not the closed ADR-027 stack's release_storage_billing_metering)
+  // so a residual PostHog rule from the predecessor can never un-dark this
+  // engine — see ADR-039 Open questions.
+  {
+    key: "release_storage_boundary_metering",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Gates the ADR-039 storage boundary-measurement engine: sweep, entry/exit boundary events, gauge fold, and hourly sampling. OFF (default) makes storage metering fully inert (no ClickHouse, no Postgres rows). Per-organization. Stripe reporting is a separate later gate.",
+  },
 ] as const satisfies readonly FeatureFlagDefinition[];
 
 export const FEATURE_FLAG_FAMILIES = [

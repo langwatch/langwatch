@@ -221,6 +221,23 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     });
   }
 
+  async listBillableOrganizationIds(): Promise<string[]> {
+    const orgs = await this.prisma.organization.findMany({
+      where: {
+        pricingModel: PricingModel.SEAT_EVENT,
+        stripeCustomerId: { not: null },
+        subscriptions: {
+          some: {
+            status: "ACTIVE",
+            plan: { in: [...GROWTH_SEAT_PLAN_TYPES] },
+          },
+        },
+      },
+      select: { id: true },
+    });
+    return orgs.map((org) => org.id);
+  }
+
   async createAndAssign(
     input: CreateAndAssignInput,
   ): Promise<CreateAndAssignResult> {
