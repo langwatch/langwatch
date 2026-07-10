@@ -43,7 +43,7 @@ function renderFreshness({
     data: lastUpdatedAt === undefined ? undefined : { lastUpdatedAt },
   });
   return renderHook(
-    (props: { lastUpdatedAt: number | undefined }) => {
+    (props: { lastUpdatedAt: number | undefined; scenarioSetId?: string }) => {
       mocks.useQuery.mockReturnValue({
         data:
           props.lastUpdatedAt === undefined
@@ -51,6 +51,7 @@ function renderFreshness({
             : { lastUpdatedAt: props.lastUpdatedAt },
       });
       return useSuiteRunFreshness({
+        scenarioSetId: props.scenarioSetId,
         startDateMs: 1000,
         runs,
         enabled: true,
@@ -87,6 +88,21 @@ describe("useSuiteRunFreshness()", () => {
       const { rerender } = renderFreshness({ lastUpdatedAt: 500 });
       rerender({ lastUpdatedAt: 500 });
       expect(mocks.invalidate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the probe scope changes to one with an older lastUpdatedAt", () => {
+    it("re-baselines and does not invalidate on the first observation", () => {
+      const { rerender } = renderFreshness({ lastUpdatedAt: 500 });
+      rerender({ lastUpdatedAt: 300, scenarioSetId: "set-b" });
+      expect(mocks.invalidate).not.toHaveBeenCalled();
+    });
+
+    it("invalidates when freshness advances within the new scope", () => {
+      const { rerender } = renderFreshness({ lastUpdatedAt: 500 });
+      rerender({ lastUpdatedAt: 300, scenarioSetId: "set-b" });
+      rerender({ lastUpdatedAt: 400, scenarioSetId: "set-b" });
+      expect(mocks.invalidate).toHaveBeenCalledTimes(1);
     });
   });
 
