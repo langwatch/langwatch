@@ -120,7 +120,7 @@ describe("reconcileOrphanedRuns", () => {
     });
   });
 
-  describe("when no threshold is supplied", () => {
+  describe("given no threshold is supplied", () => {
     it("defaults the finder to the read-path stall threshold", async () => {
       const finder = finderReturning([]);
       const emitter = spyEmitter();

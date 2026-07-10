@@ -9,6 +9,7 @@ import { ClickHouseOrphanedRunFinder } from "../orphaned-run-reconciliation.clic
 import { STALL_THRESHOLD_MS } from "../stall-detection";
 
 const tenantId = `test-orphan-${nanoid()}`;
+const otherTenantId = `test-orphan-other-${nanoid()}`;
 const NOW = Date.now();
 const minutesAgo = (m: number) => new Date(NOW - m * 60_000);
 
@@ -82,10 +83,12 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (ch) {
-    await ch.exec({
-      query: `ALTER TABLE simulation_runs DELETE WHERE TenantId = {tenantId:String}`,
-      query_params: { tenantId },
-    });
+    for (const t of [tenantId, otherTenantId]) {
+      await ch.exec({
+        query: `ALTER TABLE simulation_runs DELETE WHERE TenantId = {tenantId:String}`,
+        query_params: { tenantId: t },
+      });
+    }
   }
   await stopTestContainers();
 });
@@ -169,6 +172,34 @@ describe("ClickHouseOrphanedRunFinder.findOrphanedRuns (integration)", () => {
       expect(result.map((r) => r.scenarioRunId)).not.toContain(
         "queued-behind-backlog",
       );
+    });
+  });
+
+  // The sweep runs at boot with no tenant context, so it deliberately omits the
+  // `WHERE TenantId = ...` filter every other simulation_runs query carries.
+  // Nothing else pins that: a well-meaning "you forgot the tenant filter" fix
+  // would silently reduce the sweep to one arbitrary tenant, and every other
+  // test here uses a single tenant and would stay green.
+  describe("given stale started runs belonging to different tenants", () => {
+    it("surfaces every tenant's orphan, each attributed to its own tenant", async () => {
+      await insertRows(ch, [
+        makeRow({ ScenarioRunId: "orphan-tenant-a" }),
+        makeRow({
+          ScenarioRunId: "orphan-tenant-b",
+          TenantId: otherTenantId,
+        }),
+      ]);
+
+      const result = await finder.findOrphanedRuns({
+        now: NOW,
+        thresholdMs: STALL_THRESHOLD_MS,
+      });
+
+      const a = result.find((r) => r.scenarioRunId === "orphan-tenant-a");
+      const b = result.find((r) => r.scenarioRunId === "orphan-tenant-b");
+
+      expect(a?.tenantId).toBe(tenantId);
+      expect(b?.tenantId).toBe(otherTenantId);
     });
   });
 

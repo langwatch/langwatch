@@ -121,26 +121,30 @@ export async function reconcileOrphanedRuns({
     "Reconciling orphaned scenario runs on worker boot",
   );
 
-  const results = await Promise.allSettled(
-    orphans.map((run) =>
-      failureEmitter.ensureFailureEventsEmitted({
+  // Sequential on purpose. Fanning the whole sweep out at once would fire up to
+  // ORPHAN_SWEEP_LIMIT concurrent event-store writes on every worker boot, and
+  // a deploy co-boots every pod — multiplying that burst across the fleet
+  // exactly when the system is least healthy. Nothing here is latency-critical:
+  // this is fire-and-forget background repair. Each run is isolated in its own
+  // try/catch so one bad run cannot abort the sweep.
+  let reconciled = 0;
+  let failed = 0;
+
+  for (const run of orphans) {
+    try {
+      await failureEmitter.ensureFailureEventsEmitted({
         projectId: run.tenantId,
         scenarioId: run.scenarioId,
         setId: run.scenarioSetId,
         batchRunId: run.batchRunId,
         scenarioRunId: run.scenarioRunId,
         error: ORPHAN_ERROR_MESSAGE,
-      }),
-    ),
-  );
-
-  const failed = results.filter((r) => r.status === "rejected").length;
-  const reconciled = results.length - failed;
-
-  for (const [i, result] of results.entries()) {
-    if (result.status === "rejected") {
+      });
+      reconciled++;
+    } catch (err) {
+      failed++;
       logger.error(
-        { scenarioRunId: orphans[i]?.scenarioRunId, err: result.reason },
+        { scenarioRunId: run.scenarioRunId, err },
         "Failed to reconcile orphaned scenario run",
       );
     }

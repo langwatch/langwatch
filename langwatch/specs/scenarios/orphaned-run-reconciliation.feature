@@ -105,3 +105,20 @@ Feature: Orphaned scenario run reconciliation on worker boot
     When the run state is folded
     Then the run is recorded with a terminal status
     And the run does not become invisible to reconciliation
+
+  @unit
+  Scenario: A run re-entering the queue cannot revive a finished run
+    Given a run that already reached a terminal state
+    When a later event announces the run as queued for execution
+    Then the run keeps its terminal state
+
+  # ---------------------------------------------------------------------------
+  # The sweep spans every tenant
+  # ---------------------------------------------------------------------------
+
+  @integration
+  Scenario: Orphans are recovered for every tenant, not just one
+    Given stale started runs belonging to two different tenants
+    When the orphaned-run query runs
+    Then both runs are surfaced
+    And each run is attributed to the tenant that owns it

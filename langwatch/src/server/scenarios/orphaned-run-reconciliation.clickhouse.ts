@@ -15,6 +15,7 @@ import {
   type OrphanFailureEmitter,
   reconcileOrphanedRuns,
 } from "./orphaned-run-reconciliation";
+import { ScenarioRunStatus } from "./scenario-event.enums";
 
 const logger = createLogger("langwatch:scenarios:orphan-reconciliation");
 
@@ -58,7 +59,7 @@ const ORPHAN_SWEEP_LIMIT = 1000;
  *
  * @see ./scenario-orphan-reconciler.ts
  */
-const ORPHANABLE_STATUS = "IN_PROGRESS" as const;
+const ORPHANABLE_STATUS = ScenarioRunStatus.IN_PROGRESS;
 
 /**
  * Finds the latest version of every IN_PROGRESS run whose last activity is
@@ -108,6 +109,10 @@ export class ClickHouseOrphanedRunFinder implements OrphanedRunFinder {
           Status AS status
         FROM ${TABLE_NAME}
         WHERE ${partitionFilter}
+          -- The table's full dedup key is (TenantId, ScenarioSetId, BatchRunId,
+          -- ScenarioRunId), but ScenarioRunId is a globally-unique KSUID, so
+          -- grouping by (TenantId, ScenarioRunId) still collapses every version
+          -- of a run. Same shortcut the sibling QUEUED sweep takes.
           AND (TenantId, ScenarioRunId, UpdatedAt) IN (
             SELECT TenantId, ScenarioRunId, max(UpdatedAt)
             FROM ${TABLE_NAME}

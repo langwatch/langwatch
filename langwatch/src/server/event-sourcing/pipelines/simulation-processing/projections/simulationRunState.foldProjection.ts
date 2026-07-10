@@ -174,12 +174,16 @@ export interface SimulationRunState extends Projection<SimulationRunStateData> {
  *
  * Once FinishedAt is set, Status stays terminal. Three things hold that line
  * together, and all three are load-bearing:
- *   1. this guard, at the non-terminal transition sites (started/snapshot/
- *      message);
+ *   1. this guard, at EVERY non-terminal Status writer — queued, started,
+ *      snapshot, and textMessageStart. Miss one and the invariant is gone: a
+ *      `queued` event folded after `finished` used to resurrect Status=QUEUED
+ *      with FinishedAt still set. If you add a handler that writes a
+ *      non-terminal Status, it goes through here too;
  *   2. `handleSimulationRunFinished` returning early once FinishedAt is set, so
  *      a run finishes exactly once;
  *   3. that same handler refusing a non-terminal explicit status, since the
- *      ingest schema types it as the full ScenarioRunStatus enum.
+ *      finished event's `status` is only typed `z.string().optional()` on the
+ *      internal event schema — any string can reach the fold.
  */
 function statusAfter({
   state,
@@ -286,7 +290,7 @@ export class SimulationRunStateFoldProjection
       BatchRunId: event.data.batchRunId,
       ScenarioSetId: event.data.scenarioSetId,
       Name: event.data.name ?? null,
-      Status: "QUEUED",
+      Status: statusAfter({ state, candidate: "QUEUED" }),
       Description: event.data.description ?? null,
       Metadata: event.data.metadata ? JSON.stringify(event.data.metadata) : null,
       QueuedAt: event.occurredAt,

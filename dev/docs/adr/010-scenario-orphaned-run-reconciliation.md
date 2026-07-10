@@ -79,12 +79,21 @@ The original bug.
 ### Decision 3: Finalized-status fold guard (`statusAfter`)
 
 **Option A: Guard `Status` transitions in the fold projection once `FinishedAt` is set — chosen.**
-`simulationRunState.foldProjection.ts` lines 162–183 introduce `statusAfter`:
+`simulationRunState.foldProjection.ts` introduces `statusAfter`:
 once `FinishedAt` is set, any subsequent non-terminal status candidate is
-dropped and the terminal `Status` is preserved. This is applied at the three
-non-terminal transition sites: `handleSimulationRunStarted` (line 281),
-`handleSimulationRunMessageSnapshot` (line 348), and
-`handleSimulationRunTextMessageStart` (line 386).
+dropped and the terminal `Status` is preserved. It is applied at **every**
+non-terminal `Status` writer: `handleSimulationRunQueued`,
+`handleSimulationRunStarted`, `handleSimulationRunMessageSnapshot`, and
+`handleSimulationRunTextMessageStart`.
+
+Review caught that `handleSimulationRunQueued` was initially left out, and a
+`queued` event *is* in the fold set — so one arriving after `finished` resurrected
+`Status = QUEUED` with `FinishedAt` still set, reproducing the exact zombie this
+guard exists to prevent. The guard is only as good as its least-covered writer:
+any future handler that writes a non-terminal `Status` must route through it.
+(At the `textMessageStart` site the status candidate already preserves a terminal
+status on its own, so the guard there is defence in depth rather than
+load-bearing — its regression test pins the outcome, not the guard.)
 
 The guard defends against the following: a child process that outlived its dead
 parent (reparented) and later POSTs a real `started`/`snapshot` with a
@@ -111,17 +120,19 @@ executing the fold rather than reading it, and both are closed here:
    Decision 0 restricts the sweep to runs no live worker can hold, and it
    silently discarded the reconciled state downstream reactors had already acted
    on.
-2. **A `finished` event could carry a non-terminal status.** The scenario-events
-   ingest schema types it as `z.nativeEnum(ScenarioRunStatus)`, which admits
-   `IN_PROGRESS`, and the handler wrote it straight through alongside
-   `FinishedAt` — a run the reconciler skips (`FinishedAt IS NULL`) and read-time
-   stall detection skips (it only resolves unfinished runs). Nothing could
-   recover it. A non-terminal explicit status is now rejected in favour of the
-   verdict-derived one.
+2. **A `finished` event could carry a non-terminal status.** The internal event
+   schema types the field as `z.string().optional()` (`schemas/events.ts`), so
+   *any* string reaches the fold; even the stricter ingest-route schema
+   (`z.nativeEnum(ScenarioRunStatus)`) still admits non-terminal members like
+   `IN_PROGRESS`, `QUEUED` and `RUNNING`. The handler wrote it straight through
+   alongside `FinishedAt` — a run the reconciler skips (`FinishedAt IS NULL`) and
+   read-time stall detection skips (it only resolves unfinished runs). Nothing
+   could recover it. A non-terminal explicit status is now rejected in favour of
+   the verdict-derived one.
 
 So the invariant *"once `FinishedAt` is set, `Status` is terminal and stays
-terminal"* is held by three things together: this guard at the non-terminal
-transition sites, the finish-once early return, and the terminal-status check.
+terminal"* is held by three things together: this guard at **every** non-terminal
+`Status` writer, the finish-once early return, and the terminal-status check.
 Each is covered by a regression test in
 `simulationRunState.foldProjection.unit.test.ts`.
 
