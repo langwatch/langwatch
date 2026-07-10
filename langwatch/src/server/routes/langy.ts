@@ -66,7 +66,7 @@ const logger = createLogger("langwatch:api:langy");
  * UI, or an AI agent can act on — a safe `error` message, the serialisable
  * `code` (`kind`) to render a tailored experience by, and the renderable
  * `meta`. Internal detail (telemetry, reasons, stack, query internals) stays in
- * server logs, never on the wire (ADR-043).
+ * server logs, never on the wire (ADR-046).
  */
 function handledErrorBody(error: DomainError) {
   return { error: error.message, code: error.kind, meta: error.meta };
@@ -129,7 +129,7 @@ const chatRequestSchema = z.object({
     .max(200)
     .optional(),
 });
-// Persistence is now event-sourced (ADR-043): the user turn is a `SendMessage`
+// Persistence is now event-sourced (ADR-046): the user turn is a `SendMessage`
 // command and the assistant's final answer is a `ReconcileAgentTurn` command
 // (emitting `turn_finalized`). The conversation row and the langy_messages rows
 // are both projections of those events, so the old persistMessage + bumpActivity

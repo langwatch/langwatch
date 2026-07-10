@@ -206,9 +206,9 @@ export interface PipelineRepositories {
   /** ADR-034 Phase 6: slim per-evaluation analytics repository. */
   evaluationAnalytics: EvaluationAnalyticsRepository;
   experimentRunItemStorage: AppendStore<ClickHouseExperimentRunResultRecord>;
-  /** ADR-043: Langy conversation spine fold (replaces the Postgres spine). */
+  /** ADR-046: Langy conversation spine fold (replaces the Postgres spine). */
   langyConversationState: LangyConversationStateRepository;
-  /** ADR-043: Langy per-message append sink (existing langy_messages table). */
+  /** ADR-046: Langy per-message append sink (existing langy_messages table). */
   langyMessageStorage: AppendStore<ClickHouseLangyMessageRecord>;
 }
 
@@ -313,7 +313,7 @@ export class PipelineRegistry {
   }
 
   /**
-   * ADR-043: Langy conversation pipeline. Aggregate `langy_conversation`
+   * ADR-046: Langy conversation pipeline. Aggregate `langy_conversation`
    * (aggregateId = conversationId, TenantId = projectId). A fold projection
    * writes the conversation spine to `langy_conversations`; a map projection
    * writes per-message rows to `langy_messages`. No reactor in PR2 — the

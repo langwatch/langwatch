@@ -25,6 +25,7 @@ Document **important technical and architectural decisions** — context, trade-
 | [037](./037-automation-operator-surfaces.md) | Automation operator surfaces — authoring drawer & dispatch-health view | Accepted |
 | [038](./038-intent-forked-onboarding-governance-vs-llmops.md) | Onboarding forks on a first-class Organization intent | Accepted |
 | [039](./039-outbox-heartbeat.md) | Outbox heartbeat primitive | Accepted |
+| [046](./046-event-sourced-langy-conversations.md) | Event-sourced Langy conversations | Draft |
 | [030](./030-transactional-outbox-for-stake-sensitive-dispatch.md) | Transactional outbox for stake-sensitive reactor dispatch | Accepted |
 
 ## When to Write an ADR

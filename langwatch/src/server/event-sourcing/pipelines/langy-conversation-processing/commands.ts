@@ -125,7 +125,7 @@ export const ArchiveConversationCommand = defineCommand({
 
 /**
  * UpdateConversationMetadata → conversation_metadata_updated (rename/share).
- * Beyond the prescribed vocabulary — see ADR-043 open question 1.
+ * Beyond the prescribed vocabulary — see ADR-046 open question 1.
  */
 export const UpdateConversationMetadataCommand = defineCommand({
   commandType: LANGY_CONVERSATION_COMMAND_TYPES.UPDATE_METADATA,

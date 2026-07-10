@@ -1,7 +1,7 @@
 import { DomainError, NotFoundError } from "~/server/app-layer/domain-error";
 
 /**
- * Langy conversation domain errors (ADR-043).
+ * Langy conversation domain errors (ADR-046).
  *
  * These use the platform `DomainError` framework so they carry a serialisable
  * `kind` discriminant, renderable `meta`, an `httpStatus`, and OTel telemetry.

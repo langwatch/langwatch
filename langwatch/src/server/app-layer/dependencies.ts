@@ -87,7 +87,7 @@ export interface AppDependencies {
   suiteRuns: {
     runs: SuiteRunService;
   };
-  /** ADR-043: Langy conversations as an event-sourced projection. */
+  /** ADR-046: Langy conversations as an event-sourced projection. */
   langy: {
     conversations: LangyConversationService;
     messages: LangyMessageService;

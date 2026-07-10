@@ -36,7 +36,7 @@ export type ConversationDetail = ConversationListItem & {
   status: string;
 };
 
-/** How many months of conversations the list scan spans (ADR-043 open Q2). */
+/** How many months of conversations the list scan spans (ADR-046 open Q2). */
 const LIST_WINDOW_MONTHS = 12;
 
 const TABLE_NAME = "langy_conversations" as const;
@@ -86,7 +86,7 @@ const LATEST_ARCHIVED_MS = `argMax(if(ArchivedAt IS NULL, 0, toUnixTimestamp64Mi
 
 /**
  * Read-only repository over the `langy_conversations` ClickHouse fold table
- * (ADR-043). Replaces the Postgres `LangyConversation` spine reads.
+ * (ADR-046). Replaces the Postgres `LangyConversation` spine reads.
  *
  * Every query filters TenantId first and dedups the ReplacingMergeTree with
  * `argMax(..., UpdatedAt)` — never FINAL. Only the columns a given read needs
@@ -232,7 +232,7 @@ function newMessageId(): string {
 }
 
 /**
- * Langy conversation service (ADR-043). Reads come from the fold projection;
+ * Langy conversation service (ADR-046). Reads come from the fold projection;
  * writes are dispatched as event-sourcing commands. There is no Postgres spine
  * and no direct ClickHouse write — the conversation row is a projection.
  */
