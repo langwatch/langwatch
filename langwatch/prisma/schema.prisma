@@ -2935,7 +2935,7 @@ model ReactorOutbox {
 // Langy assistant
 // ============================================================================
 // The Langy conversation SPINE moved off Postgres onto the event-sourcing
-// framework (ADR-043). The conversation is now a projection of an event stream:
+// framework (ADR-046). The conversation is now a projection of an event stream:
 // its spine lives in the ClickHouse `langy_conversations` fold table and its
 // messages in `langy_messages`. The old `LangyConversation` Postgres model was
 // deleted; see migration `..._drop_langy_conversation`.

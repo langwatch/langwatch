@@ -1,4 +1,4 @@
-# ADR-043: Event-sourced Langy conversations
+# ADR-046: Event-sourced Langy conversations
 
 **Date:** 2026-07-10
 

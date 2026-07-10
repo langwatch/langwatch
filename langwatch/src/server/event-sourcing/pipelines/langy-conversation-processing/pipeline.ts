@@ -26,7 +26,7 @@ export interface LangyConversationProcessingPipelineDeps {
 }
 
 /**
- * Creates the langy-conversation-processing pipeline definition (ADR-043).
+ * Creates the langy-conversation-processing pipeline definition (ADR-046).
  *
  * Aggregate: `langy_conversation` (aggregateId = conversationId,
  * TenantId = projectId). A Langy conversation is a projection of its event

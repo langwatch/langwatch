@@ -4,7 +4,7 @@ Feature: Langy conversations are an event-sourced projection
   So that the conversation row and its messages can never drift, retries are
   idempotent, and turns are ordered per conversation
 
-  # Behavioural contract for ADR-043 (PR2 of the Langy event-sourcing stack).
+  # Behavioural contract for ADR-046 (PR2 of the Langy event-sourcing stack).
   # The conversation aggregate is `langy_conversation`; aggregateId is the
   # conversationId and TenantId is the projectId. Writes are commands that emit
   # past-tense events; the conversation row (langy_conversations fold) and the
@@ -123,7 +123,7 @@ Feature: Langy conversations are an event-sourced projection
     And the delete reports not-found or not-owned
 
   # ============================================================================
-  # Rename and share (metadata) — beyond the prescribed vocabulary (see ADR-043)
+  # Rename and share (metadata) — beyond the prescribed vocabulary (see ADR-046)
   # ============================================================================
 
   @review

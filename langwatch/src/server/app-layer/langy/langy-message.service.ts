@@ -38,7 +38,7 @@ export function extractTextFromParts(parts: unknown): string {
 const TABLE_NAME = "langy_messages" as const;
 
 /**
- * Read-only repository over the `langy_messages` ClickHouse table (ADR-043).
+ * Read-only repository over the `langy_messages` ClickHouse table (ADR-046).
  *
  * Writes are no longer done here — a Langy message row is now produced by the
  * `langyMessageStorage` MAP PROJECTION when a `message_sent` / `turn_finalized`
