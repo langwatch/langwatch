@@ -84,6 +84,25 @@ describe("PrismaStorageBoundaryEventRepository", () => {
         occurredAt: day(12),
         causeId: "change_1",
       });
+      // A second change reverts 91 back to 63 — its own cause id, so
+      // nothing collapses into change_1's events (the 63→91→63 trap).
+      await events.append({
+        ...base,
+        sliceDate: day(2),
+        retentionDays: 91,
+        edge: "REVERSAL",
+        deltaBytes: -15n * GIB,
+        occurredAt: day(14),
+        causeId: "change_2",
+      });
+      await events.append({
+        ...base,
+        sliceDate: day(2),
+        edge: "ENTRY",
+        deltaBytes: 15n * GIB,
+        occurredAt: day(14),
+        causeId: "change_2",
+      });
     });
 
     describe("when all events are folded from scratch", () => {
@@ -99,15 +118,15 @@ describe("PrismaStorageBoundaryEventRepository", () => {
         expect(gaugeRow?.billableBytes).toEqual(foldedFromScratch);
       });
 
-      it("holds 15 GiB after entries, replay no-op, exit, and re-booked retention", () => {
-        return gauge
-          .findByOrganization({ organizationId })
-          .then((row) => expect(row?.billableBytes).toEqual(15n * GIB));
+      /** @scenario Corrections from different causes are distinct events */
+      it("reconverges to 15 GiB after the 63→91→63 round-trip, matching a fresh 63d computation", async () => {
+        const row = await gauge.findByOrganization({ organizationId });
+        expect(row?.billableBytes).toEqual(15n * GIB);
       });
 
       it("stored the replayed entry exactly once", async () => {
         const log = await events.findAllByOrganization({ organizationId });
-        expect(log).toHaveLength(5);
+        expect(log).toHaveLength(7);
       });
     });
 

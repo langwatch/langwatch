@@ -1925,6 +1925,10 @@ model StorageBoundaryEvent {
 model StorageBillableGauge {
   organizationId String   @id
   billableBytes  BigInt
+  // occurredAt of the most-recently-APPLIED event — NOT a monotonic
+  // high-water mark: seeding and catch-up append historical events in
+  // arbitrary order, so this can move backwards. Do not build "resample if
+  // newer" logic on it; hour sampling cursors on StorageSweepCursor instead.
   lastEventAt    DateTime
   updatedAt      DateTime @updatedAt
 }

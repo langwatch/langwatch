@@ -1,8 +1,4 @@
-import {
-  RETENTION_TABLE_CATEGORY_MAP,
-  type RetentionCategory,
-  type RetentionManagedTable,
-} from "~/server/data-retention/retentionPolicy.schema";
+import type { RetentionManagedTable } from "~/server/data-retention/retentionPolicy.schema";
 
 /**
  * The tables whose stored bytes are billable (ADR-039). Explicit by decision,
@@ -44,9 +40,3 @@ export const EXCLUDED_RETENTION_TABLES = [
   "trace_analytics_rollup",
   "evaluation_runs",
 ] as const satisfies readonly RetentionManagedTable[];
-
-export const billableCategoryOf = ({
-  table,
-}: {
-  table: BillableStorageTable;
-}): RetentionCategory => RETENTION_TABLE_CATEGORY_MAP[table];

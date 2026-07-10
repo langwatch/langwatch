@@ -63,6 +63,24 @@ describe("buildDedupKey()", () => {
     });
   });
 
+  describe("when an identity field would break the key encoding", () => {
+    it("throws if a field contains the ':' delimiter", () => {
+      expect(() =>
+        buildDedupKey({ ...slice, edge: "ENTRY", projectId: "a:b" }),
+      ).toThrow(/must not contain ":"/);
+    });
+
+    it("throws if sliceDate is not UTC midnight", () => {
+      expect(() =>
+        buildDedupKey({
+          ...slice,
+          edge: "ENTRY",
+          sliceDate: new Date(Date.UTC(2026, 5, 21, 13)),
+        }),
+      ).toThrow(/UTC midnight/);
+    });
+  });
+
   describe("when a correction is emitted without its cause", () => {
     it("throws for REVERSAL", () => {
       expect(() => buildDedupKey({ ...slice, edge: "REVERSAL" })).toThrow(

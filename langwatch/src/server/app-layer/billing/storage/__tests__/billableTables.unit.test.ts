@@ -20,6 +20,11 @@ const CLICKHOUSE_MIGRATIONS_DIR = path.join(
  * Tables that carry a `_size_bytes` column according to the ClickHouse DDL —
  * the source of truth the billable set must be verified against (ADR-039:
  * a billable table without the column would error or silently bill 0).
+ *
+ * Name-matching caveat: the parser keys on the BASE table name in the
+ * ALTER/CREATE TABLE header of the statement adding the column. If a size
+ * column is ever added on a `_local`/`_distributed` variant instead of the
+ * base name, extend the parser rather than the billable set.
  */
 function tablesWithSizeBytesColumn(): Set<string> {
   const tables = new Set<string>();

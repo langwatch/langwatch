@@ -76,6 +76,24 @@ export function buildDedupKey({
         `their cause collapse into each other on replay (ADR-039 Decision 6)`,
     );
   }
+  // The key joins fields with ":" — a delimiter inside a field would let two
+  // distinct identities collide (or one identity split). Project/cause ids
+  // are cuid/nanoid today, but the key's uniqueness must not silently depend
+  // on that staying true.
+  if (projectId.includes(":") || causeId?.includes(":")) {
+    throw new Error(
+      `Boundary event identity fields must not contain ":" ` +
+        `(projectId=${projectId}, causeId=${causeId ?? ""})`,
+    );
+  }
+  // sliceDate is keyed by its UTC day; a non-midnight instant means the
+  // caller is off the boundary calendar and two logical slices near a day
+  // boundary could collapse into one key.
+  if (sliceDate.getTime() % (24 * 60 * 60 * 1000) !== 0) {
+    throw new Error(
+      `Boundary event sliceDate must be UTC midnight, got ${sliceDate.toISOString()}`,
+    );
+  }
 
   const sliceDay = sliceDate.toISOString().slice(0, 10);
   const base = [

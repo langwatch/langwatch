@@ -47,12 +47,17 @@ export class PrismaStorageBoundaryEventRepository
       ]);
       return { applied: true };
     } catch (error) {
-      // Unique violation on dedupKey = a replay of an already-applied event.
+      // Unique violation ON dedupKey = a replay of an already-applied event.
       // The transaction rolled back as a whole: neither the event nor the
-      // gauge increment landed, so replays are exact no-ops.
+      // gauge increment landed, so replays are exact no-ops. The constraint
+      // check is deliberately narrow — swallowing a P2002 from any OTHER
+      // unique index added later would silently drop a real event's gauge
+      // increment: permanent under-billing, the exact drift class this
+      // design exists to prevent.
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
+        error.code === "P2002" &&
+        (error.meta?.target as string[] | undefined)?.includes("dedupKey")
       ) {
         return { applied: false };
       }
