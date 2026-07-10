@@ -201,9 +201,16 @@ describe("<SubscriptionPage/>", () => {
       it("shows legacy paid plan name as current plan title", async () => {
         mockGetActivePlan.mockReturnValue({
           data: createMockPlan({
+            planSource: "subscription",
             type: "ACCELERATE",
             name: "Accelerate",
             free: false,
+            billing: {
+              meterUnit: "traces",
+              memberPolicy: "upgrade",
+              showUsageLimits: true,
+              isLegacyTiered: true,
+            },
             maxMembers: 5,
             maxMembersLite: 9999,
             maxMessagesPerMonth: 20000,
@@ -223,9 +230,16 @@ describe("<SubscriptionPage/>", () => {
       it("hides the update seats block on legacy paid plan with planned users", async () => {
         mockGetActivePlan.mockReturnValue({
           data: createMockPlan({
+            planSource: "subscription",
             type: "ACCELERATE",
             name: "Accelerate",
             free: false,
+            billing: {
+              meterUnit: "traces",
+              memberPolicy: "upgrade",
+              showUsageLimits: true,
+              isLegacyTiered: true,
+            },
             maxMembers: 5,
             maxMembersLite: 9999,
             maxMessagesPerMonth: 20000,
@@ -263,9 +277,16 @@ describe("<SubscriptionPage/>", () => {
       });
       mockGetActivePlan.mockReturnValue({
         data: createMockPlan({
+          planSource: "subscription",
           type: "ACCELERATE",
           name: "Accelerate",
           free: false,
+          billing: {
+            meterUnit: "traces",
+            memberPolicy: "upgrade",
+            showUsageLimits: true,
+            isLegacyTiered: true,
+          },
           maxMembers: 5,
           maxMembersLite: 9999,
           maxMessagesPerMonth: 20000,
