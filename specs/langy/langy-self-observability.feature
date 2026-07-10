@@ -4,7 +4,7 @@ Feature: Langy is observable to the team that builds it
   I want Langy's own activity and its workers' network egress in an internal project
   So that I can see how Langy behaves in the wild and spot suspicious worker behaviour
 
-  # Design: dev/docs/adr/043-langy-event-driven-turns.md (parts 4 and 5)
+  # Design: dev/docs/adr/044-langy-event-driven-turns.md (parts 4 and 5)
   # Blocked on PR1 (langy-agent manager telemetry + adapters/egress seam).
   #
   # Mirrors the AI gateway's dual-export (services/aigateway/adapters/

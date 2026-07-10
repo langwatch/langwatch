@@ -4,7 +4,7 @@ Feature: Langy turns are event-driven, survive deploys, and resume on refresh
   I want my turn to keep running when I refresh or when a deploy happens
   So that I never lose an answer to a dropped connection or a stalled worker
 
-  # Design: dev/docs/adr/043-langy-event-driven-turns.md
+  # Design: dev/docs/adr/044-langy-event-driven-turns.md
   # Blocked on PR1 (langy-agent telemetry + adapters/workerpool + adapters/egress)
   # and PR2 (langy_conversation aggregate: agent_turn_started, status_reported,
   # progress_reported, turn_finalized, agent_turn_failed; StartAgentTurn,

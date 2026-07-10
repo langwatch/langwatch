@@ -1,6 +1,6 @@
 # Langy PR3 — event-driven worker + streaming + self-observability — implementation plan
 
-> **ADR:** `dev/docs/adr/043-langy-event-driven-turns.md`
+> **ADR:** `dev/docs/adr/044-langy-event-driven-turns.md`
 > **Specs:** `specs/langy/langy-event-driven-turns.feature`,
 > `specs/langy/langy-self-observability.feature`
 > **Branch:** `design/langy-pr3` (this PR ships docs only)

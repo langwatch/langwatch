@@ -1,4 +1,4 @@
-# ADR-043: Event-driven Langy turns — worker spawn, liveness reconcile, stream persistence split, self-observability
+# ADR-044: Event-driven Langy turns — worker spawn, liveness reconcile, stream persistence split, self-observability
 
 **Date:** 2026-07-10
 
