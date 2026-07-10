@@ -74,6 +74,8 @@ See `dev/docs/adr/004-docker-dev-environment.md` for architecture decisions.
 
 **Running the app outside Docker (the default for TS work):** just run `pnpm dev` from `langwatch/` (or `PORT=5570 pnpm dev` for a second instance). You never need to hunt processes by hand. If the ports are already held, `check-ports.sh` refuses to start and prints two ready-to-paste options: a free-port-slot command (`PORT=5570 pnpm dev`), and a one-liner that kills only the node processes holding those exact ports by process group (Docker and everything else are left alone). Paste whichever fits. Do not reinvent process-tree walking, `pkill -f`, or pgid hunting; the script already does it correctly and port-scoped.
 
+**Two processes vs one (workers).** By default `pnpm dev` runs the app and the background workers as two Node processes (a separate `workers` lane under `concurrently`), matching prod's separate app/worker deployments. To run them as a **single process** locally, use `pnpm dev:single` (or `WORKERS_IN_PROCESS=1 pnpm dev`): the app boots with the `"all"` process role and hosts the worker stack in-process via `startWorkers()`. This is dev-only — `NODE_ENV=production` ignores the flag. See `dev/docs/adr/004-docker-dev-environment.md` (Amendment: In-process workers) and `specs/setup/in-process-workers-dev.feature`. Whether a role runs the worker stack is `roleRunsWorkers(role)` (`src/server/app-layer/config.ts`) — use it, never compare `processRole === "worker"` directly.
+
 ### AI Gateway (Go, services/aigateway/)
 
 The gateway is a separate Go service (not in `compose.dev.yml`) that terminates

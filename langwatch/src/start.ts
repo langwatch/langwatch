@@ -72,13 +72,17 @@ import { register } from "prom-client";
 import { createMcpHandler } from "./mcp/handler";
 import { createApiRouter } from "./server/api-router";
 import { getApp } from "./server/app-layer/app";
-import { initializeWebApp } from "./server/app-layer/presets";
+import {
+  initializeInProcessApp,
+  initializeWebApp,
+} from "./server/app-layer/presets";
 import { buildStorageConnectSrc } from "./server/buildStorageConnectSrc";
 import { getWorkerMetricsPort, isMetricsAuthorized } from "./server/metrics";
 import { shutdownPostHog } from "./server/posthog";
 import { verifyRedisReady } from "./server/redis";
 import { serveStaticOrFallback } from "./server/static-handler";
 import { setupTRPCWebSocket } from "./server/websockets/trpc-ws";
+import { startWorkers, type WorkerHandle } from "./server/workers/startWorkers";
 import { createLogger } from "./utils/logger/server";
 
 const logger = createLogger("langwatch:start");
@@ -109,9 +113,24 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   const dev = process.env.NODE_ENV !== "production";
   const hostname = "0.0.0.0";
 
+  // Dev-only single-process mode: host the background worker stack inside this
+  // web process instead of a separate `pnpm run start:workers` process. Opt-in
+  // via WORKERS_IN_PROCESS=1 (see scripts/start.sh + `pnpm dev:single`). Never
+  // honoured in production — prod runs web and worker as separate deployments.
+  const inProcessWorkers =
+    dev &&
+    (process.env.WORKERS_IN_PROCESS === "1" ||
+      process.env.WORKERS_IN_PROCESS === "true");
+
   // Initialize the app-layer (services, repositories, event sourcing, etc.)
-  // This was previously done by Next.js instrumentation hook.
-  initializeWebApp();
+  // This was previously done by Next.js instrumentation hook. In-process mode
+  // boots with the "all" role so the outbox consumer / drainer / heartbeat
+  // scheduler wire up exactly as on a dedicated worker.
+  if (inProcessWorkers) {
+    initializeInProcessApp();
+  } else {
+    initializeWebApp();
+  }
 
   // Fail fast if Redis is unreachable — better-auth uses it as secondary
   // session store, and without it every request ends in a "Redirecting to
@@ -337,6 +356,26 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
     );
   });
 
+  // In-process worker stack (dev opt-in via WORKERS_IN_PROCESS=1). Booted after
+  // the server is listening so the UI comes up even if the workers are slow to
+  // start; a boot failure is logged and the web server keeps running (only the
+  // background jobs won't run).
+  let workerHandle: WorkerHandle | undefined;
+  if (inProcessWorkers) {
+    logger.info("WORKERS_IN_PROCESS=1 — hosting the worker stack in-process");
+    try {
+      // startMetricsServer: false — in one process the worker prom registry is
+      // this process's registry, already served at /metrics; no second listener.
+      workerHandle = await startWorkers({ startMetricsServer: false });
+      logger.info("in-process workers ready");
+    } catch (error) {
+      logger.error(
+        { error },
+        "in-process workers failed to start — web server continues, background jobs will not run",
+      );
+    }
+  }
+
   // Graceful shutdown
   const shutdown = async (signal: string) => {
     logger.info({ signal }, "Received signal, shutting down...");
@@ -357,6 +396,13 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
     server.close();
     if ("closeAllConnections" in server) server.closeAllConnections();
     mcpHandler.closeAllSessions();
+    // Drain in-process workers (if any) before closing the shared App below,
+    // so jobs stop accepting/draining before ClickHouse / Redis / Prisma go away.
+    try {
+      await workerHandle?.shutdown();
+    } catch (error) {
+      logger.error({ error }, "error shutting down in-process workers");
+    }
     try {
       await Promise.all([getApp().close(), shutdownPostHog()]);
     } catch (error) {

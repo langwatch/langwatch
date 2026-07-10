@@ -49,7 +49,11 @@ else
   PORTS_TO_CHECK+=("$PORT")          ; PORT_LABELS+=("api server")
 fi
 
-if [ "$START_WORKERS_VAL" = "true" ] || [ "$START_WORKERS_VAL" = "1" ]; then
+# In-process mode (WORKERS_IN_PROCESS=1) runs the workers inside the app and
+# serves their metrics via the app's /metrics — no separate worker-metrics
+# listener, so don't reserve that port.
+if { [ "$START_WORKERS_VAL" = "true" ] || [ "$START_WORKERS_VAL" = "1" ]; } &&
+   [ "$WORKERS_IN_PROCESS" != "true" ] && [ "$WORKERS_IN_PROCESS" != "1" ]; then
   PORTS_TO_CHECK+=("$WORKER_METRICS_PORT") ; PORT_LABELS+=("worker metrics")
 fi
 

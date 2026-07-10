@@ -91,6 +91,7 @@ import {
   type AppConfig,
   createAppConfigFromEnv,
   type ProcessRole,
+  roleRunsWorkers,
 } from "./config";
 import type {
   AppDependencies,
@@ -202,6 +203,17 @@ export function initializeWebApp(): App {
 
 export function initializeWorkerApp(): App {
   return initializeDefaultApp({ processRole: "worker" });
+}
+
+/**
+ * Dev-only single-process mode: the web server also hosts the worker stack
+ * in-process (opt-in via WORKERS_IN_PROCESS=1). Boots the App with the "all"
+ * role so the outbox consumer, drainer, and heartbeat scheduler wire up
+ * exactly as they do on a dedicated worker. Prod never calls this — it runs
+ * web and worker as separate deployments.
+ */
+export function initializeInProcessApp(): App {
+  return initializeDefaultApp({ processRole: "all" });
 }
 
 export function initializeDefaultApp(options?: {
@@ -597,7 +609,7 @@ export function initializeDefaultApp(options?: {
   // its `.withOutbox` reactors can enqueue settle payloads. Web processes
   // don't build this (no settle traffic; no consumer to drain).
   const outbox =
-    config.processRole === "worker"
+    roleRunsWorkers(config.processRole)
       ? buildOutboxRuntime({
           prisma,
           redis: redis ?? null,
@@ -637,7 +649,7 @@ export function initializeDefaultApp(options?: {
   // Redis client are present — the lock is the leader-election primitive
   // so a missing Redis means no scheduler.
   const outboxHeartbeatScheduler =
-    config.processRole === "worker" && outbox && redis
+    roleRunsWorkers(config.processRole) && outbox && redis
       ? new OutboxHeartbeatScheduler({
           registry: outboxHeartbeatRegistry,
           redis,

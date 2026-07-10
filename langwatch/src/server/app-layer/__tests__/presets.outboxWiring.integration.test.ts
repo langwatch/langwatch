@@ -95,6 +95,23 @@ describe("presets outbox wiring", () => {
     });
   });
 
+  describe("when the app is initialized as all (in-process dev mode)", () => {
+    it("wires the outbox exactly like a worker (no drop-warnings)", async () => {
+      await resetApp();
+      vi.clearAllMocks();
+
+      const app = bootTolerant("all");
+
+      // The dev single-process role hosts the worker stack in the web process,
+      // so its outbox reactors must register WITH a runtime — same as "worker",
+      // never on the drop path.
+      expect(outboxDropWarnings()).toBe(0);
+      if (app?.eventSourcing) {
+        expect(app.eventSourcing.isOutboxWired).toBe(true);
+      }
+    });
+  });
+
   describe("when the app is initialized as web", () => {
     it("has no outbox runtime, so its outbox reactors register on the drop path", async () => {
       await resetApp();

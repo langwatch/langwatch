@@ -1,7 +1,22 @@
 import { createEnvConfig } from "../../env-create.mjs";
 import { parseRedisDbIndex } from "../redis-db-index";
 
-export type ProcessRole = "web" | "worker" | "migration";
+export type ProcessRole = "web" | "worker" | "migration" | "all";
+
+/**
+ * Roles that run the background worker stack: the event-sourcing consumers,
+ * the outbox drainer, the heartbeat scheduler, and the BullMQ / GroupQueue
+ * workers booted in `startWorkers()`.
+ *
+ * - `"worker"` — the dedicated worker deployment (prod + the default dev
+ *   second process).
+ * - `"all"` — the dev-only single-process mode where the web server also
+ *   hosts the workers in-process (WORKERS_IN_PROCESS=1). Never used in prod,
+ *   which always runs web and worker as separate deployments.
+ */
+export function roleRunsWorkers(role: ProcessRole | undefined): boolean {
+  return role === "worker" || role === "all";
+}
 
 export interface AppConfig {
   nodeEnv: string;
@@ -26,8 +41,10 @@ export interface AppConfig {
   // Process role — controls which event-sourcing consumers run.
   // "web": dispatch commands only (no BullMQ workers)
   // "worker": full consumers
+  // "all": web server + full consumers in one process (dev-only, WORKERS_IN_PROCESS=1)
   // "migration": direct processCommand() calls, reactors excluded
-  // undefined: backward-compatible "all" mode
+  // undefined: dispatch-only (web-like) — no consumers
+  // Use `roleRunsWorkers(role)` rather than comparing to "worker" directly.
   processRole?: ProcessRole;
 
   // Customer.io nurturing
