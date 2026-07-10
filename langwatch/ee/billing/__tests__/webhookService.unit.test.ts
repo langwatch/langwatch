@@ -35,7 +35,10 @@ import {
   RETENTION_CATEGORIES,
 } from "../../../src/server/data-retention/retentionPolicy.schema";
 import { SubscriptionStatus } from "../planTypes";
-import { EEWebhookService } from "../services/webhookService";
+import {
+  EEWebhookService,
+  licenseConflictAlertCooldown,
+} from "../services/webhookService";
 
 const createMockSubscriptionRepository = () => ({
   findLastNonCancelled: vi.fn(),
@@ -173,9 +176,10 @@ describe("webhookService", () => {
   let mockStripeInstance: ReturnType<typeof createMockStripe>;
   let service: EEWebhookService;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+    await licenseConflictAlertCooldown.delete("org_123");
     subRepo = createMockSubscriptionRepository();
     orgRepo = createMockOrganizationRepository();
     itemCalculator = createMockItemCalculator();
@@ -460,6 +464,38 @@ describe("webhookService", () => {
             licensePlanType: "ENTERPRISE",
           }),
         );
+      });
+
+      it("does not re-alert for the same org within the cooldown window", async () => {
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        subRepo.activate.mockResolvedValue(
+          makeSubscriptionWithOrg({
+            status: SubscriptionStatus.ACTIVE,
+            organization: {
+              name: "Acme",
+              license: makeLicenseKey({ isTrial: false }),
+            },
+          }),
+        );
+
+        const first = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+        await vi.advanceTimersByTimeAsync(2000);
+        await first;
+
+        subRepo.findByStripeId.mockResolvedValue(
+          makeSubscription({ status: SubscriptionStatus.PENDING }),
+        );
+        const second = service.handleInvoicePaymentSucceeded({
+          subscriptionId: "sub_stripe_1",
+        });
+        await vi.advanceTimersByTimeAsync(2000);
+        await second;
+
+        expect(mockSendSlackLicenseConflictAlert).toHaveBeenCalledTimes(1);
       });
 
       it("treats a pre-flag license (no isTrial field) as non-trial", async () => {
