@@ -188,8 +188,10 @@ describe.skipIf(!hasTestcontainers)("BoundaryMeasurementService", () => {
         /Partition[\s\S]*?in \(-Inf, (\d+)\][\s\S]*?in \[(\d+), \+Inf\)/.exec(
           plan,
         );
-      expect(partitionStage, `no partition pruning stage in plan:\n${plan}`)
-        .not.toBeNull();
+      expect(
+        partitionStage,
+        `no partition pruning stage in plan:\n${plan}`,
+      ).not.toBeNull();
       const [, upperWeek, lowerWeek] = partitionStage!;
       expect(upperWeek).toEqual(lowerWeek);
     });

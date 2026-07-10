@@ -152,14 +152,20 @@ export class BoundaryMeasurementService {
       partitionKey,
     });
     const priorByGroup = new Map(
-      prior.map((row) => [`${row.category}:${row.retentionDays}`, row.totalBytes]),
+      prior.map((row) => [
+        `${row.category}:${row.retentionDays}`,
+        row.totalBytes,
+      ]),
     );
 
     for (const group of measured) {
       // Retention at or under the billable window never bills: those rows die
       // before day 35 (any still-visible ones are past their entitlement).
       // Retention 0 (indefinite) IS billable.
-      if (group.retentionDays !== 0 && group.retentionDays <= BILLABLE_AFTER_DAYS)
+      if (
+        group.retentionDays !== 0 &&
+        group.retentionDays <= BILLABLE_AFTER_DAYS
+      )
         continue;
 
       const key = `${group.category}:${group.retentionDays}`;

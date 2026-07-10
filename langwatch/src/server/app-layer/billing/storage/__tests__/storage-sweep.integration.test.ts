@@ -3,18 +3,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { prisma } from "~/server/db";
 import { PrismaStorageSweepCursorRepository } from "../repositories/storage-sweep-cursor.prisma.repository";
-import { StorageSweepService, type StorageSweepDeps } from "../storageSweep.service";
+import {
+  type StorageSweepDeps,
+  StorageSweepService,
+} from "../storageSweep.service";
 
 const HOUR_MS = 60 * 60 * 1000;
 
-// Each test gets its own fresh sweep hour so the singleton cursor row (shared
-// across tests and runs) never makes a claim collide: the base doubles the
-// wall clock (far future, monotonically increasing across suite runs) and
-// each test jumps a full day within the run.
+// The sweep cursor is a platform singleton row. Each test deletes it and
+// sweeps at its own fixed instant, so claims are deterministic regardless of
+// what earlier tests or earlier suite runs left behind (fileParallelism is
+// off for integration tests, so nothing races the reset).
 let hourCounter = 0;
-const runBase = Math.floor((Date.now() * 2) / HOUR_MS) * HOUR_MS;
+const runBase = Date.UTC(2031, 0, 1);
 function nextSweepInstant(): Date {
-  hourCounter += 24; // jump a day each time so entry-day claims are fresh too
+  hourCounter += 24; // a fresh day per test so entry-day claims are fresh too
   return new Date(runBase + hourCounter * HOUR_MS + 25 * 60 * 1000);
 }
 
@@ -63,8 +66,9 @@ function makeSweep({
 
 let sweepInstant: Date;
 
-beforeEach(() => {
+beforeEach(async () => {
   sweepInstant = nextSweepInstant();
+  await prisma.storageSweepCursor.deleteMany({ where: { id: "storage-sweep" } });
 });
 
 describe("StorageSweepService", () => {

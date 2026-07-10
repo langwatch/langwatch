@@ -264,9 +264,7 @@ export interface OrganizationRepository {
 
   // --- New methods for router delegation ---
 
-  createAndAssign(
-    input: CreateAndAssignInput,
-  ): Promise<CreateAndAssignResult>;
+  createAndAssign(input: CreateAndAssignInput): Promise<CreateAndAssignResult>;
 
   getAllForUser(params: {
     userId: string;
@@ -305,6 +303,10 @@ export interface OrganizationRepository {
 export class NullOrganizationRepository implements OrganizationRepository {
   async getOrganizationIdByTeamId(_teamId: string): Promise<string | null> {
     return null;
+  }
+
+  async listBillableOrganizationIds(): Promise<string[]> {
+    return [];
   }
 
   async getUserOrgRole(_params: {

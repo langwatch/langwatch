@@ -12,6 +12,7 @@ import {
 } from "~/server/clickhouse/clickhouseClient";
 import { closeClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as globalPrisma } from "~/server/db";
+import { featureFlagService } from "~/server/featureFlag";
 import { getFeatureFlagStore } from "~/server/featureFlag/featureFlagStore.postgres";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetRepository } from "~/server/gateway/budget.repository";
@@ -22,6 +23,11 @@ import { createS3Client } from "~/server/storage";
 import { buildTraceBlobResolutionDeps } from "~/server/traces/trace-blob-resolution.deps";
 import { liveTriggerNotifier } from "~/server/triggers/triggerNotifier";
 import { createLogger } from "~/utils/logger/server";
+import {
+  captureException,
+  toError,
+  withScope,
+} from "~/utils/posthogErrorCapture";
 import { getSaaSPlanProvider } from "../../../ee/billing";
 import { NotificationService } from "../../../ee/billing/notifications/notification.service";
 import { NotificationRepository } from "../../../ee/billing/notifications/repositories/notification.repository";
@@ -77,6 +83,14 @@ import { TraceUsageService } from "../traces/trace-usage.service";
 import { runEvaluationWorkflow } from "../workflows/runWorkflow";
 import { App, getApp, globalForApp, initializeApp } from "./app";
 import { PrismaBillingCheckpointService } from "./billing/billingCheckpoint.service";
+import { BoundaryExitService } from "./billing/storage/boundaryExit.service";
+import { BoundaryMeasurementService } from "./billing/storage/boundaryMeasurement.service";
+import { GaugeSamplingService } from "./billing/storage/gaugeSampling.service";
+import { PrismaStorageBoundaryEventRepository } from "./billing/storage/repositories/storage-boundary-event.prisma.repository";
+import { PrismaStorageSweepCursorRepository } from "./billing/storage/repositories/storage-sweep-cursor.prisma.repository";
+import { PrismaStorageUsageHourlyRepository } from "./billing/storage/repositories/storage-usage-hourly.prisma.repository";
+import { StorageCorrectionService } from "./billing/storage/storageCorrection.service";
+import { StorageSweepService } from "./billing/storage/storageSweep.service";
 import { BroadcastService } from "./broadcast/broadcast.service";
 import { createClickHouseClientFromConfig } from "./clients/clickhouse.factory";
 import { NullLangevalsClient } from "./clients/langevals/langevals.client";
@@ -587,6 +601,67 @@ export function initializeDefaultApp(options?: {
   // construction. Passing `outbox` anywhere else (e.g. only to the registry)
   // leaves every outbox reactor on the silent drop path — the trigger dispatch
   // regression fixed here. See presets.outboxWiring.integration.test.ts.
+  // ADR-039 phase 2: the storage boundary-measurement engine. Built from
+  // repos + services that all exist before EventSourcing, so the sweep can be
+  // handed to the reactor directly (no forward reference needed). Flag-gated
+  // per org (release_storage_boundary_metering, default OFF = fully dark) and
+  // scoped to SaaS-billable orgs inside the sweep itself.
+  const storageBoundaryEvents = new PrismaStorageBoundaryEventRepository(
+    prisma,
+  );
+  const storageCorrections = new StorageCorrectionService({
+    events: storageBoundaryEvents,
+  });
+  const storageSweep = new StorageSweepService({
+    cursor: new PrismaStorageSweepCursorRepository(prisma),
+    listBillableOrganizationIds: () =>
+      organizations.listBillableOrganizationIds(),
+    isMeteringEnabled: (organizationId) =>
+      featureFlagService.isEnabled("release_storage_boundary_metering", {
+        distinctId: organizationId,
+        defaultValue: false,
+      }),
+    measurement: new BoundaryMeasurementService({
+      resolveClickHouseClient: clickhouseEnabled
+        ? resolveClickHouseClient
+        : null,
+      events: storageBoundaryEvents,
+      listProjectIds: async ({ organizationId }) => {
+        // Archived projects included: archived data still occupies storage.
+        const orgProjects = await prisma.project.findMany({
+          where: { team: { organizationId } },
+          select: { id: true },
+        });
+        return orgProjects.map((project) => project.id);
+      },
+    }),
+    exits: new BoundaryExitService({ events: storageBoundaryEvents }),
+    sampling: new GaugeSamplingService({
+      events: storageBoundaryEvents,
+      usageHourly: new PrismaStorageUsageHourlyRepository(prisma),
+      onDriftAlarm: ({ organizationId, sealedHour, gaugeBytes }) => {
+        void withScope(async (scope) => {
+          scope.setTag?.("handler", "storageGaugeDrift");
+          scope.setExtra?.("organizationId", organizationId);
+          scope.setExtra?.("sealedHour", sealedHour.toISOString());
+          scope.setExtra?.("gaugeBytes", gaugeBytes.toString());
+          captureException(
+            new Error(
+              "storage gauge folded below the negative-drift tolerance",
+            ),
+          );
+        });
+      },
+    }),
+    onOrgFailure: ({ organizationId, error }) => {
+      void withScope(async (scope) => {
+        scope.setTag?.("handler", "storageSweepOrg");
+        scope.setExtra?.("organizationId", organizationId);
+        captureException(toError(error));
+      });
+    },
+  });
+
   const es = new EventSourcing({
     clickhouse: clickhouseEnabled ? resolveClickHouseClient : void 0,
     redis,
@@ -595,6 +670,9 @@ export function initializeDefaultApp(options?: {
     processRole: config.processRole,
     retentionPolicyResolver: retentionPolicyCache,
     outbox,
+    getStorageSweep: config.isSaas
+      ? () => () => storageSweep.sweep()
+      : undefined,
   });
 
   const registry = new PipelineRegistry({
@@ -805,6 +883,7 @@ export function initializeDefaultApp(options?: {
     usageLimits,
     retentionPolicyCache,
     dataRetention,
+    storageBilling: { corrections: storageCorrections },
     share,
     commands,
     ops,

@@ -74,21 +74,21 @@ Feature: Storage billing boundary measurement engine
 
   # Corrections
 
-  @integration @unimplemented
+  @integration
   Scenario: Deleting a project lowers the bill the same hour
     Given a project whose data contributes 5 GiB to the organization gauge
     When the project is deleted
     Then negative events for the affected partitions are recorded before deletion
     And the next hourly sample reflects the 5 GiB drop
 
-  @integration @unimplemented
+  @integration
   Scenario: A privacy erasure request lowers the bill before the data is erased
     Given an erasure request covering billable data
     When the erasure is executed
     Then the affected partitions are measured and negative events recorded before deletion
     And the gauge decreases by the erased amount
 
-  @integration @unimplemented
+  @integration
   Scenario: A retention policy change re-books affected data under the new retention
     Given an organization gauge built under 63-day retention
     When retention changes to 91 days

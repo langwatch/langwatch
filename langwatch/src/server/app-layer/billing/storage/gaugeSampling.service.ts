@@ -111,7 +111,11 @@ export class GaugeSamplingService {
       }
 
       const megabytes =
-        gauge <= 0n ? 0 : Number((gauge + BigInt(BYTES_PER_MIB) - 1n) / BigInt(BYTES_PER_MIB));
+        gauge <= 0n
+          ? 0
+          : Number(
+              (gauge + BigInt(BYTES_PER_MIB) - 1n) / BigInt(BYTES_PER_MIB),
+            );
       rows.push({ sealedHour: new Date(hourMs), megabytes });
     }
 

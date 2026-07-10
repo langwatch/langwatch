@@ -1,6 +1,6 @@
 import type { RetentionCategory } from "~/server/data-retention/retentionPolicy.schema";
-import { MS_PER_DAY } from "./sealedHour";
 import type { StorageBoundaryEventRepository } from "./repositories/storage-boundary-event.repository";
+import { MS_PER_DAY } from "./sealedHour";
 
 /**
  * The exit edge (ADR-039 Decision 3): when a slice-group's retention

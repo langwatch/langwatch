@@ -63,9 +63,7 @@ describe("GaugeSamplingService", () => {
   describe("when the org has never been sampled", () => {
     it("starts forward-only at the latest sealed hour", async () => {
       const { service, recorded } = makeService({
-        events: [
-          { occurredAt: new Date(0), deltaBytes: 5n * 1024n * 1024n },
-        ],
+        events: [{ occurredAt: new Date(0), deltaBytes: 5n * 1024n * 1024n }],
       });
       await service.sampleHoursForOrg({ organizationId: "org_1", at });
 
