@@ -50,7 +50,6 @@ vi.mock("~/server/topicClustering/topicClusteringQueue", () => ({
   scheduleTopicClusteringNextPage: vi.fn(),
 }));
 
-vi.mock("fetch-h2", () => ({ fetch: vi.fn() }));
 
 import { storeResults } from "../topicClustering";
 
