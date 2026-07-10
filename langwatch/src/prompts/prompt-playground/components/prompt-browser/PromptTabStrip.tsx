@@ -5,6 +5,7 @@ import { PromptTabSwitcher } from "./switcher/PromptTabSwitcher";
 import { PromptBrowserTab } from "./tab/PromptBrowserTab";
 import { DraggableTabsBrowser } from "./ui/DraggableTabsBrowser";
 import { TabIdProvider } from "./ui/TabContext";
+import { useIsOverflowing } from "./useIsOverflowing";
 
 interface PromptTabStripProps {
   tabs: Tab[];
@@ -30,6 +31,7 @@ export function PromptTabStrip({
   onSelectTab,
 }: PromptTabStripProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const isStripOverflowing = useIsOverflowing(scrollerRef, tabs.length);
 
   return (
     <>
@@ -40,6 +42,10 @@ export function PromptTabStrip({
         height="full"
         paddingY={2}
         paddingX={2}
+        // Tabs shrink to share this row before it ever scrolls, so `flex` lets
+        // the strip claim the width the toolbar is not using.
+        flex="1 1 0"
+        minWidth={0}
       >
         {tabs.map((tab) => (
           <TabIdProvider key={tab.id} tabId={tab.id}>
@@ -56,6 +62,7 @@ export function PromptTabStrip({
         activeTabId={activeTabId}
         onSelect={onSelectTab}
         scrollerRef={scrollerRef}
+        isStripOverflowing={isStripOverflowing}
       />
     </>
   );

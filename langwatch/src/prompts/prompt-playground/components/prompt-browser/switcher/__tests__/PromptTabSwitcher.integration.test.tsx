@@ -56,6 +56,9 @@ function renderSwitcher(
         activeTabId={props.activeTabId ?? "summarizer"}
         onSelect={onSelect}
         scrollerRef={scrollerRef}
+        // The switcher only exists once the strip has run out of room, so that
+        // is the default here; the fits-in-the-strip case opts out explicitly.
+        isStripOverflowing={props.isStripOverflowing ?? true}
       />
     </ChakraProvider>,
   );
@@ -84,7 +87,7 @@ afterEach(() => {
 
 describe("PromptTabSwitcher", () => {
   describe("given several prompts are open", () => {
-    /** @scenario The switcher appears once a second prompt is open */
+    /** @scenario The switcher appears once the tabs no longer fit */
     it("reports how many prompts are open", () => {
       renderSwitcher({ tabIds: ["summarizer", "classifier"] });
 
@@ -104,6 +107,7 @@ describe("PromptTabSwitcher", () => {
             activeTabId="summarizer"
             onSelect={vi.fn()}
             scrollerRef={React.createRef<HTMLDivElement | null>()}
+            isStripOverflowing
           />
         </ChakraProvider>,
       );
@@ -124,6 +128,7 @@ describe("PromptTabSwitcher", () => {
             activeTabId="summarizer"
             onSelect={vi.fn()}
             scrollerRef={React.createRef<HTMLDivElement | null>()}
+            isStripOverflowing
           />
         </ChakraProvider>,
       );
@@ -134,6 +139,18 @@ describe("PromptTabSwitcher", () => {
       expect(
         within(menu).queryByRole("menuitem", { name: /classifier/ }),
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given every open tab still fits in the strip", () => {
+    /** @scenario The switcher stays hidden while every tab still fits */
+    it("hides the switcher, because it would list only what is on screen", () => {
+      renderSwitcher({
+        tabIds: ["summarizer", "classifier"],
+        isStripOverflowing: false,
+      });
+
+      expect(screen.queryByRole("button")).not.toBeInTheDocument();
     });
   });
 
@@ -161,7 +178,7 @@ describe("PromptTabSwitcher", () => {
       const scrollIntoView = vi.fn();
       const scroller = document.createElement("div");
       const offscreenTab = document.createElement("div");
-      offscreenTab.setAttribute("data-tab-id", "eval-judge");
+      offscreenTab.setAttribute("data-tab-strip-id", "eval-judge");
       offscreenTab.scrollIntoView = scrollIntoView;
       scroller.appendChild(offscreenTab);
 
@@ -286,6 +303,7 @@ describe("PromptTabSwitcher", () => {
             activeTabId="summarizer"
             onSelect={vi.fn()}
             scrollerRef={React.createRef<HTMLDivElement | null>()}
+            isStripOverflowing
           />
         </ChakraProvider>,
       );
@@ -355,12 +373,14 @@ describe("PromptTabSwitcher", () => {
             activeTabId="summarizer"
             onSelect={vi.fn()}
             scrollerRef={React.createRef<HTMLDivElement | null>()}
+            isStripOverflowing
           />
           <PromptTabSwitcher
             tabIds={["eval-judge"]}
             activeTabId="eval-judge"
             onSelect={vi.fn()}
             scrollerRef={React.createRef<HTMLDivElement | null>()}
+            isStripOverflowing
           />
         </ChakraProvider>,
       );
@@ -378,6 +398,7 @@ describe("PromptTabSwitcher", () => {
             activeTabId="eval-judge"
             onSelect={vi.fn()}
             scrollerRef={React.createRef<HTMLDivElement | null>()}
+            isStripOverflowing
           />
         </ChakraProvider>,
       );

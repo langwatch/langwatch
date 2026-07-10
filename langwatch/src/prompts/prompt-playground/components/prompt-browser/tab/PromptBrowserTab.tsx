@@ -31,22 +31,33 @@ function PromptBrowserTabView({
   const meta = tab.data.meta;
 
   return (
-    <HStack gap={2} height="full" {...rest}>
-      <HStack>
-        <Text textOverflow="ellipsis" whiteSpace="nowrap" overflow="hidden">
+    // `minWidth={0}` on every flex ancestor of the title, or the title's
+    // intrinsic width wins and the tab refuses to shrink. Ellipsis only
+    // engages once the chain down to the Text can actually be squeezed.
+    <HStack gap={2} height="full" width="full" minWidth={0} {...rest}>
+      <HStack gap={2} minWidth={0} flex="1 1 0">
+        <Text
+          textOverflow="ellipsis"
+          whiteSpace="nowrap"
+          overflow="hidden"
+          minWidth={0}
+          title={meta.title ?? "New Prompt"}
+        >
           {meta.title ?? "New Prompt"}
         </Text>
         {hasUnsavedChanges && (
-          <Box>
+          <Box flexShrink={0}>
             <Circle size="10px" bg="orange.solid" />
           </Box>
         )}
         {showVersionBadge && meta.versionNumber != null && (
-          <VersionBadge
-            version={meta.versionNumber}
-            latestVersion={latestVersion}
-            onUpgrade={isOutdated ? handleUpgrade : undefined}
-          />
+          <Box flexShrink={0}>
+            <VersionBadge
+              version={meta.versionNumber}
+              latestVersion={latestVersion}
+              onUpgrade={isOutdated ? handleUpgrade : undefined}
+            />
+          </Box>
         )}
       </HStack>
       <Box
@@ -54,6 +65,7 @@ function PromptBrowserTabView({
         borderRadius="3px"
         transition="all 0.1s ease-in-out"
         opacity={dimmed ? 0.25 : 1}
+        flexShrink={0}
         _hover={{ opacity: 1 }}
         onPointerDown={(e) => {
           e.stopPropagation();

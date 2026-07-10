@@ -1,4 +1,4 @@
-import { HStack, Spacer } from "@chakra-ui/react";
+import { HStack } from "@chakra-ui/react";
 import { LuColumns2 } from "react-icons/lu";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -102,7 +102,6 @@ export function PromptPlaygroundBrowser() {
                 setActiveTab({ windowId: tabbedWindow.id, tabId })
               }
             />
-            <Spacer />
             {tabbedWindow.id === activeWindowId && (
               <>
                 <HStack

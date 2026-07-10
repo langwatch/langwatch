@@ -17,6 +17,8 @@ interface PromptTabSwitcherProps {
   onSelect: (tabId: string) => void;
   /** The pane's horizontally scrolling tab strip, used to reveal a chosen tab. */
   scrollerRef: React.RefObject<HTMLDivElement | null>;
+  /** Whether the strip has run out of room even with its tabs at their floor. */
+  isStripOverflowing: boolean;
 }
 
 /**
@@ -25,17 +27,21 @@ interface PromptTabSwitcherProps {
  * Single Responsibility: List every prompt open in this pane and let the user
  * jump to one, including the tabs that have scrolled out of the strip.
  *
+ * Shown only once the strip actually overflows. Tabs shrink to share the strip
+ * before that point, so while they all fit the switcher would be a dropdown
+ * listing things already on screen.
+ *
  * The strip keeps scrolling and keeps every tab mounted — nothing is hidden —
  * so drag-to-reorder continues to work on tabs the switcher also lists.
- * A single open prompt needs no switcher, so none is rendered.
  */
 export function PromptTabSwitcher({
   tabIds,
   activeTabId,
   onSelect,
   scrollerRef,
+  isStripOverflowing,
 }: PromptTabSwitcherProps) {
-  if (tabIds.length <= 1) return null;
+  if (!isStripOverflowing || tabIds.length <= 1) return null;
 
   /**
    * Reveal the chosen tab in the strip. Looked up by attribute rather than a
@@ -45,8 +51,8 @@ export function PromptTabSwitcher({
     const scroller = scrollerRef.current;
     if (!scroller) return;
     const tab = Array.from(
-      scroller.querySelectorAll<HTMLElement>("[data-tab-id]"),
-    ).find((el) => el.getAttribute("data-tab-id") === tabId);
+      scroller.querySelectorAll<HTMLElement>("[data-tab-strip-id]"),
+    ).find((el) => el.getAttribute("data-tab-strip-id") === tabId);
     tab?.scrollIntoView({
       behavior: "smooth",
       inline: "nearest",

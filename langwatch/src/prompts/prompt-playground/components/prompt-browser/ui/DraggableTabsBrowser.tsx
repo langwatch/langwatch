@@ -328,6 +328,15 @@ interface DraggableTabTriggerProps extends BoxProps {
 }
 
 /**
+ * A tab never shrinks below this. Past it the strip scrolls instead, and the
+ * tab switcher appears to reach what scrolled away. Wide enough to keep a few
+ * characters of the title alongside the close button.
+ */
+export const TAB_MIN_WIDTH = "88px";
+/** A lone tab does not stretch across an empty strip. */
+export const TAB_MAX_WIDTH = "180px";
+
+/**
  * DraggableBrowserTabTrigger component
  * Single Responsibility: Renders a single tab trigger with browser-like styling.
  * @param value - Tab identifier
@@ -343,7 +352,11 @@ function DraggableBrowserTabTrigger({
   return (
     <Tabs.Trigger
       value={value}
-      minWidth="fit-content"
+      // `min-width: 0` defeats the flex default of `auto`, which would size the
+      // trigger to its content and stop the tab from ever shrinking.
+      minWidth={0}
+      width="full"
+      overflow="hidden"
       cursor="pointer"
       transition="all 0.15s ease-in-out"
     >
@@ -388,8 +401,17 @@ function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
       {...rest}
       ref={setNodeRef}
       // Lets the tab switcher find this tab in the strip to scroll it into view.
-      data-tab-id={id}
-      flex={1}
+      // Not `data-tab-id`: that already marks a tab's chat textarea
+      // (SyncedChatInput), which PromptPlaygroundChat queries to focus.
+      data-tab-strip-id={id}
+      // Tabs share the strip rather than each claiming its natural width, so
+      // more of them stay visible as the count grows: they shrink from
+      // TAB_MAX_WIDTH down to TAB_MIN_WIDTH, and only then does the strip
+      // scroll. They are never hidden — a hidden element has a zero-size rect,
+      // which would corrupt @dnd-kit's drop-index math for these sortables.
+      flex="1 1 0"
+      minWidth={TAB_MIN_WIDTH}
+      maxWidth={TAB_MAX_WIDTH}
       alignItems="stretch"
       cursor={isDragging ? "grabbing" : "grab"}
       transform={CSS.Transform.toString(transform)}
