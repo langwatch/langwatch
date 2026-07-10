@@ -179,16 +179,17 @@ describe("organization member role denial resolution", () => {
   describe("when a seat-billed org at its cap changes a member's role", () => {
     /** @scenario Lite-to-full role change denial carries the resolution */
     it("carries resolution purchase_seat in the denial cause", async () => {
+      // Full plan shape: PlanProviderService derives the billing profile from
+      // planSource + type (a hand-written billing block would be overwritten
+      // by the stamp), so this exercises the real purchase_seat derivation.
       mockGetActivePlan.mockResolvedValue({
+        planSource: "subscription",
+        type: "GROWTH_SEAT_USD_MONTHLY",
+        name: "Growth",
+        free: false,
         maxMembers: 100,
         maxMembersLite: 0,
         overrideAddingLimitations: false,
-        billing: {
-          meterUnit: "events",
-          memberPolicy: "purchase_seat",
-          showUsageLimits: false,
-          isLegacyTiered: false,
-        },
       });
 
       const caller = createCaller();
