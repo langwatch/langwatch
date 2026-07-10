@@ -524,7 +524,7 @@ export class EvaluationRunClickHouseRepository
     version: string,
     retentionDays = PLATFORM_DEFAULT_RETENTION_DAYS,
   ): ClickHouseEvaluationRunWriteRecord {
-    // Belt-and-braces write caps (ADR-039): unconditional, flag-independent,
+    // Belt-and-braces write caps (ADR-040): unconditional, flag-independent,
     // last line of defence that keeps the part merge-safe even if the offload
     // path is off, failed open, or a different writer inserted a fat payload.
     // With offload on, `Inputs` is already a small marker object so these are

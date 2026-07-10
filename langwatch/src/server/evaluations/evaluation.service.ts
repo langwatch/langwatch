@@ -10,7 +10,7 @@ import { mapClickHouseEvaluationToTraceEvaluation } from "./evaluation-run.mappe
 import type { TraceEvaluation } from "./evaluation-run.types";
 
 /**
- * Resolves an offloaded-inputs marker (ADR-039) back to the full inputs at the
+ * Resolves an offloaded-inputs marker (ADR-040) back to the full inputs at the
  * read boundary. The production default builds a per-project stored-objects
  * service and streams the durable object; a plain (non-marker) object passes
  * through unchanged. Injected so tests can supply a stub without standing up
@@ -270,7 +270,7 @@ export class EvaluationService {
             parsed && typeof parsed === "object" && !Array.isArray(parsed)
               ? (parsed as Record<string, unknown>)
               : null;
-          // ADR-039: when inputs were offloaded, `parsed` is a stored-object
+          // ADR-040: when inputs were offloaded, `parsed` is a stored-object
           // marker. Resolve it to the full inputs here - the natural lazy seam
           // the UI already fetches through - so the caller cannot tell whether
           // the inputs were inline or offloaded. Non-markers pass through.

@@ -249,7 +249,7 @@ export class StoredObjectsRepository {
 
   /**
    * Sums `size_bytes` of the live rows owned by a project, optionally scoped to
-   * one `purpose`, as the storage-accounting byte ledger (ADR-039).
+   * one `purpose`, as the storage-accounting byte ledger (ADR-040).
    *
    * Dedup uses the IN-tuple `(project_id, id, max(inserted_at))` pattern so
    * only the latest version of each content-addressed row is counted - never

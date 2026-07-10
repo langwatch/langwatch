@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  *
- * Unit tests for the unconditional write-time column caps (ADR-039) that keep
+ * Unit tests for the unconditional write-time column caps (ADR-040) that keep
  * `evaluation_runs` parts merge-safe regardless of the offload feature flag.
  */
 import { describe, expect, it } from "vitest";
