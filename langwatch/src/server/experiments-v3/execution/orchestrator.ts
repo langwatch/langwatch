@@ -414,6 +414,32 @@ export const generateComparisonCells = (
     }
   };
 
+  /**
+   * Coerce a candidate's output to the string the judge reads.
+   *
+   * langevals types `CandidateInput.output` as `str` and pydantic will not
+   * coerce a dict, a list, or a number — the whole evaluation 422s. A target
+   * emitting a structured output therefore has to arrive here already
+   * flattened. `variantOutputPaths` is the precise way to do that (pick the
+   * `.answer` field), but a user who never opened the field picker still has
+   * an object in hand, and failing their run is the worse answer: the judge
+   * can reason about JSON perfectly well.
+   *
+   * `null` / `undefined` become the empty string, which the judge skips as an
+   * empty candidate rather than judging the text "null".
+   */
+  const toCandidateText = (output: unknown): string => {
+    if (typeof output === "string") return output;
+    if (output === null || output === undefined) return "";
+    try {
+      return JSON.stringify(output) ?? "";
+    } catch {
+      // Circular refs / BigInt. Nothing useful to send; treat as empty so the
+      // row is skipped with "fewer than 2 candidates" instead of 422ing.
+      return "";
+    }
+  };
+
   // Pick the most human-readable identifier we can derive from a TargetConfig.
   // langevals echoes each `candidate.id` back to us as the verdict `label`,
   // and that label is what every programmatic consumer (REST, SDK, MCP) reads
@@ -480,13 +506,15 @@ export const generateComparisonCells = (
 
     const candidates = cfg.variants.map((variantId, i) => ({
       id: variantIdentifierFor(resolvedVariants[i]!),
-      output: withEvaluatorScores(
-        pickOutputPath(
-          outputs[i]!.output,
-          cfg.variantOutputPaths?.[variantId],
+      output: toCandidateText(
+        withEvaluatorScores(
+          pickOutputPath(
+            outputs[i]!.output,
+            cfg.variantOutputPaths?.[variantId],
+          ),
+          rowIndex,
+          variantId,
         ),
-        rowIndex,
-        variantId,
       ),
       cost: outputs[i]!.cost,
       duration: outputs[i]!.duration,

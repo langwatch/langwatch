@@ -3,19 +3,26 @@ import {
   Button,
   Field,
   HStack,
+  SimpleGrid,
   Text,
   VStack,
-  Wrap,
 } from "@chakra-ui/react";
 import { ChevronDown, Plus, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 
 import { FieldInfoTooltip } from "~/components/ui/FieldInfoTooltip";
 import { Menu } from "~/components/ui/menu";
 import { Switch } from "~/components/ui/switch";
+import {
+  type AvailableSource,
+  type FieldMapping as UIFieldMapping,
+  VariableMappingInput,
+} from "~/components/variables";
+import type { Field as DSLField } from "~/optimization_studio/types/dsl";
 
-import { useTargetName } from "../../hooks/useTargetName";
+import { useTargetName, useTargetNames } from "../../hooks/useTargetName";
+import { balancedColumns } from "../../utils/balancedColumns";
 import type {
   ComparisonEvaluatorConfig,
   TargetConfig,
@@ -134,64 +141,106 @@ function VariantsMultiSelect({
 }) {
   const selected = draft.variants ?? [];
   const remaining = targets.filter((t) => !selected.includes(t.id));
+  const outputPaths = draft.variantOutputPaths ?? {};
+
   const add = (id: string) => update({ variants: [...selected, id] });
-  const remove = (id: string) =>
-    update({ variants: selected.filter((v) => v !== id) });
+
+  const remove = (id: string) => {
+    const { [id]: _dropped, ...keptPaths } = outputPaths;
+    update({
+      variants: selected.filter((v) => v !== id),
+      variantOutputPaths: Object.keys(keptPaths).length ? keptPaths : undefined,
+    });
+  };
+
+  // The mapping widget can retarget a slot as well as re-field it, so a
+  // change may rewrite both the variant id (in place, preserving order) and
+  // its output path. A cleared mapping is a no-op: dropping the variant on a
+  // stray clear would delete a column the user only meant to re-point.
+  const setMapping = (index: number, mapping: UIFieldMapping | undefined) => {
+    if (!mapping || mapping.type !== "source") return;
+    const previousId = selected[index];
+    const nextVariants = [...selected];
+    nextVariants[index] = mapping.sourceId;
+
+    const nextPaths = { ...outputPaths };
+    if (previousId) delete nextPaths[previousId];
+    if (mapping.path.length > 0) nextPaths[mapping.sourceId] = mapping.path;
+
+    update({
+      variants: nextVariants,
+      variantOutputPaths: Object.keys(nextPaths).length ? nextPaths : undefined,
+    });
+  };
 
   const insufficient = selected.length < 2;
+  const columns = balancedColumns(selected.length);
 
   return (
     <Field.Root required flex="1">
       <Field.Label fontSize="13px" color="fg.muted" marginBottom={2}>
         Variants (pick 2 or more)
       </Field.Label>
-      <Wrap gap={2}>
-        {selected.map((id) => {
+
+      <SimpleGrid
+        columns={columns}
+        gap={3}
+        width="100%"
+        data-testid="comparison-variants-grid"
+        data-columns={columns}
+      >
+        {selected.map((id, index) => {
           const target = targets.find((t) => t.id === id);
           if (!target) return null;
           return (
-            <VariantChip
+            <VariantCard
               key={id}
               target={target}
+              // Retargeting is allowed, so a slot's own target must stay in
+              // its source list — otherwise the widget renders its current
+              // value as an unknown source and blanks the pill.
+              sources={[target, ...remaining]}
+              path={outputPaths[id]}
+              onMappingChange={(mapping) => setMapping(index, mapping)}
               onRemove={() => remove(id)}
             />
           );
         })}
-        <Menu.Root>
-          <Menu.Trigger asChild>
-            <Button
-              variant="outline"
-              colorPalette="gray"
-              size="sm"
-              fontWeight="normal"
-              data-testid="comparison-add-variant"
-              disabled={remaining.length === 0}
-            >
-              <Plus size={14} />
-              <Text fontSize="13px">
-                {selected.length === 0 ? "Add a variant" : "Add another"}
+      </SimpleGrid>
+
+      <Menu.Root>
+        <Menu.Trigger asChild>
+          <Button
+            variant="outline"
+            colorPalette="gray"
+            size="sm"
+            fontWeight="normal"
+            marginTop={selected.length > 0 ? 3 : 0}
+            alignSelf="start"
+            data-testid="comparison-add-variant"
+            disabled={remaining.length === 0}
+          >
+            <Plus size={14} />
+            <Text fontSize="13px">
+              {selected.length === 0 ? "Add a variant" : "Add another"}
+            </Text>
+          </Button>
+        </Menu.Trigger>
+        <Menu.Content portalled={true} maxHeight="240px" overflowY="auto">
+          {remaining.length === 0 ? (
+            <Menu.Item value="__empty__" disabled>
+              <Text fontSize="13px" color="fg.subtle">
+                All targets already added
               </Text>
-            </Button>
-          </Menu.Trigger>
-          <Menu.Content portalled={true} maxHeight="240px" overflowY="auto">
-            {remaining.length === 0 ? (
-              <Menu.Item value="__empty__" disabled>
-                <Text fontSize="13px" color="fg.subtle">
-                  All targets already added
-                </Text>
-              </Menu.Item>
-            ) : (
-              remaining.map((t) => (
-                <VariantMenuItem
-                  key={t.id}
-                  target={t}
-                  onAdd={() => add(t.id)}
-                />
-              ))
-            )}
-          </Menu.Content>
-        </Menu.Root>
-      </Wrap>
+            </Menu.Item>
+          ) : (
+            remaining.map((t) => (
+              <VariantMenuItem key={t.id} target={t} onAdd={() => add(t.id)} />
+            ))
+          )}
+        </Menu.Content>
+      </Menu.Root>
+
       {insufficient && (
         <Text
           fontSize="xs"
@@ -205,6 +254,97 @@ function VariantsMultiSelect({
     </Field.Root>
   );
 }
+
+/**
+ * One cell of the variants grid: which column, and which of its output
+ * fields feeds the judge.
+ *
+ * The field picker is `VariableMappingInput` — the same widget the rest of
+ * the app maps variables with, restored here from PairwiseConfigForm, which
+ * had it before the two forms merged. Without it a variant emitting a
+ * structured output has no way to say "judge the `.answer` field", and the
+ * whole object reaches the judge, where `CandidateInput.output: str` rejects
+ * it. Whole-output selection stays representable as an empty path, so
+ * single-field targets and previously saved configs keep working untouched.
+ */
+function VariantCard({
+  target,
+  sources,
+  path,
+  onMappingChange,
+  onRemove,
+}: {
+  target: TargetConfig;
+  sources: TargetConfig[];
+  path: string[] | undefined;
+  onMappingChange: (mapping: UIFieldMapping | undefined) => void;
+  onRemove: () => void;
+}) {
+  // Resolved in one batched lookup rather than a useTargetName per source,
+  // which would be a hook inside a .map() over a list that changes length.
+  const sourceNames = useTargetNames(sources);
+  const name = sourceNames[0] || target.id;
+  const availableSources = useMemo(
+    () => sources.map((source, i) => targetToSource(source, sourceNames[i])),
+    [sources, sourceNames],
+  );
+
+  return (
+    <VStack
+      align="stretch"
+      gap={1.5}
+      padding={2.5}
+      borderWidth="1px"
+      borderColor="border"
+      borderRadius="md"
+      bg="bg.subtle"
+      data-testid={`comparison-variant-card-${target.id}`}
+    >
+      <HStack justify="space-between" gap={1}>
+        <Text fontSize="13px" fontWeight="medium" lineClamp={1} title={name}>
+          {name}
+        </Text>
+        <Button
+          variant="ghost"
+          size="xs"
+          minWidth="auto"
+          padding={0}
+          height="18px"
+          onClick={onRemove}
+          aria-label={`Remove ${name}`}
+          data-testid={`comparison-variant-chip-${target.id}-remove`}
+        >
+          <X size={12} />
+        </Button>
+      </HStack>
+      <VariableMappingInput
+        mapping={{ type: "source", sourceId: target.id, path: path ?? [] }}
+        onMappingChange={onMappingChange}
+        availableSources={availableSources}
+        placeholder="Select an output field"
+        inputTestId={`comparison-variant-output-${target.id}`}
+      />
+    </VStack>
+  );
+}
+
+/**
+ * Shape a target as a mapping source. "signature" matches the source type
+ * the evaluator mappings drawer uses, so the widget renders the same icon
+ * and the same `<target>.<field>` pill it does everywhere else.
+ */
+const targetToSource = (
+  target: TargetConfig,
+  displayName: string | undefined,
+): AvailableSource => ({
+  id: target.id,
+  name: displayName || target.id,
+  type: "signature",
+  fields: (target.outputs ?? []).map((output) => ({
+    name: output.identifier,
+    type: output.type as DSLField["type"],
+  })),
+});
 
 /**
  * Menu item for a target the user can add. Split into its own component so
@@ -228,46 +368,6 @@ function VariantMenuItem({
     >
       <Text fontSize="13px">{name}</Text>
     </Menu.Item>
-  );
-}
-
-/**
- * Chip for an already-picked variant. Shows the target's human-readable
- * name with an ✕ affordance to remove.
- */
-function VariantChip({
-  target,
-  onRemove,
-}: {
-  target: TargetConfig;
-  onRemove: () => void;
-}) {
-  const name = useTargetName(target) ?? target.id;
-  return (
-    <HStack
-      gap={1}
-      paddingLeft={2}
-      paddingRight={1}
-      paddingY={1}
-      borderRadius="md"
-      bg="purple.subtle"
-      color="purple.fg"
-      data-testid={`comparison-variant-chip-${target.id}`}
-    >
-      <Text fontSize="13px">{name}</Text>
-      <Button
-        variant="ghost"
-        size="xs"
-        minWidth="auto"
-        padding={0}
-        height="18px"
-        onClick={onRemove}
-        aria-label={`Remove ${name}`}
-        data-testid={`comparison-variant-chip-${target.id}-remove`}
-      >
-        <X size={12} />
-      </Button>
-    </HStack>
   );
 }
 

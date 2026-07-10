@@ -21,9 +21,17 @@ Feature: Comparison evaluator (pairwise or multi-candidate preference judging)
 
   Scenario: Comparison is offered as a single card
     When I open Add to Evaluation
-    Then I see one "Comparison" card described as "Pairwise or multi-candidate preference judging"
+    Then I see one "Comparison" card
     And I do not see a separate "Pairwise Compare" card
     And I do not see a separate "N-way Compare" card
+
+  # A comparison is defined by which of THIS experiment's columns it compares.
+  # Created anywhere else there is nothing to compare, so the only door into
+  # it is the one that can show the columns.
+  Scenario: Comparison is only created where its columns are visible
+    When I open the evaluator catalog and choose "LLM as Judge"
+    Then I do not see a "Comparison" card
+    But adding a Comparison from Add to Evaluation opens the form with the variant picker
 
   Scenario: Compare two variants
     When I add a Comparison evaluator
@@ -145,6 +153,23 @@ Feature: Comparison evaluator (pairwise or multi-candidate preference judging)
     Given "variant_1" produces a structured output with fields "answer" and "confidence"
     When I select "answer" as the output field to compare for "variant_1"
     Then only that field's value is presented to the judge as that candidate's output
+
+  Scenario: A structured output with no field selected still judges
+    Given "variant_1" produces a structured output with fields "answer" and "confidence"
+    And I have not chosen an output field for "variant_1"
+    When I run the comparison
+    Then the whole output is presented to the judge as text
+    And the run does not fail
+
+  # The variants used to reflow ragged: twelve of them landed as 4/4/3/1 and
+  # the lone trailing card read as a mistake.
+  Scenario: Variants are laid out in even rows
+    When I pick 12 variants
+    Then they are laid out 4 to a row
+    When I pick 9 variants
+    Then they are laid out 3 to a row
+    When I pick 7 variants
+    Then they are laid out 4 to a row, then 3
 
   # Back-compat. Experiments created before the merge stored a two-slot
   # `pairwise` config (variantA / variantB) and, on older runs, verdict

@@ -156,6 +156,70 @@ describe("ComparisonConfigForm", () => {
     });
   });
 
+  // Restored from PairwiseConfigForm, which had a per-variant output picker
+  // before the forms merged. Without it a variant emitting a structured
+  // output cannot be narrowed to a field.
+  describe("the per-variant output picker", () => {
+    it("renders one for every picked variant", () => {
+      renderForm({ value: baseConfig({ variants: ["t1", "t2"] }) });
+
+      expect(
+        screen.getByTestId("comparison-variant-output-t1"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId("comparison-variant-output-t2"),
+      ).toBeInTheDocument();
+    });
+
+    describe("when a variant is removed", () => {
+      it("drops its saved output path along with it", async () => {
+        const user = userEvent.setup();
+        const onChange = vi.fn();
+        renderForm({
+          value: baseConfig({
+            variants: ["t1", "t2"],
+            variantOutputPaths: { t1: ["answer"], t2: ["answer"] },
+          }),
+          onChange,
+        });
+
+        await user.click(
+          screen.getByTestId("comparison-variant-chip-t1-remove"),
+        );
+
+        expect(onChange).toHaveBeenCalledWith(
+          expect.objectContaining({
+            variants: ["t2"],
+            variantOutputPaths: { t2: ["answer"] },
+          }),
+        );
+      });
+    });
+  });
+
+  // A Wrap reflowed ragged; twelve variants used to land as 4/4/3/1.
+  describe("the variants grid", () => {
+    describe.each([
+      { variants: 2, columns: 2 },
+      { variants: 5, columns: 3 },
+      { variants: 7, columns: 4 },
+      { variants: 12, columns: 4 },
+    ])("given $variants variants", ({ variants, columns }) => {
+      it(`lays them out ${columns} to a row`, () => {
+        const ids = Array.from({ length: variants }, (_, i) => `t${i}`);
+        renderForm({
+          value: baseConfig({ variants: ids }),
+          targets: ids.map(target),
+        });
+
+        expect(screen.getByTestId("comparison-variants-grid")).toHaveAttribute(
+          "data-columns",
+          String(columns),
+        );
+      });
+    });
+  });
+
   describe("the include-metrics section", () => {
     it("renders the two toggles", () => {
       renderForm();

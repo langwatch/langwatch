@@ -385,15 +385,111 @@ describe("orchestrator", () => {
       expect(cells).toHaveLength(1);
       expect(cells[0]?.targetId).toBe("pairwise-target");
       expect(cells[0]?.skipTarget).toBe(true);
-      expect(cells[0]?.comparison?.candidates[0]?.output).toEqual({
-        output: "answer from A",
-      });
-      expect(cells[0]?.comparison?.candidates[1]?.output).toEqual({
-        output: "answer from B",
-      });
+      // Serialized, not the raw dict: langevals types CandidateInput.output
+      // as `str` and pydantic refuses to coerce an object, so passing the
+      // dict through 422s the whole evaluation.
+      expect(cells[0]?.comparison?.candidates[0]?.output).toBe(
+        '{"output":"answer from A"}',
+      );
+      expect(cells[0]?.comparison?.candidates[1]?.output).toBe(
+        '{"output":"answer from B"}',
+      );
       expect(cells[0]?.evaluatorConfigs[0]?.comparison?.goldenField).toBe(
         "expected",
       );
+    });
+
+    // langevals types CandidateInput.output as `str`. Pydantic will not coerce
+    // a dict / list / number, so anything non-string reaching the judge 422s
+    // the run. A target emitting a structured output must therefore be either
+    // narrowed to a field by variantOutputPaths, or serialized.
+    describe("given a variant whose output is structured", () => {
+      const structuredState = (
+        variantOutputPaths?: Record<string, string[]>,
+      ) => {
+        const state = createTestState(2, 0);
+        state.targets.push({
+          id: "comparison-target",
+          type: "evaluator",
+          targetEvaluatorId: "db-select-best-evaluator",
+          inputs: [],
+          outputs: [{ identifier: "label", type: "str" }],
+          mappings: {},
+          comparison: {
+            variants: ["target-1", "target-2"],
+            hasGoldenAnswer: true,
+            goldenField: "expected",
+            includeMetrics: [],
+            randomizeOrder: true,
+            ...(variantOutputPaths && { variantOutputPaths }),
+          },
+        });
+        return state;
+      };
+
+      const structuredOutputs = new Map([
+        [
+          "0:target-1",
+          { output: { answer: "from A", confidence: 0.9 }, cost: 0, duration: 1 },
+        ],
+        [
+          "0:target-2",
+          { output: { answer: "from B", confidence: 0.4 }, cost: 0, duration: 1 },
+        ],
+      ]);
+
+      describe("when an output path narrows it to a field", () => {
+        it("sends that field's value as the candidate text", () => {
+          const { cells } = generateComparisonCells(
+            structuredState({
+              "target-1": ["answer"],
+              "target-2": ["answer"],
+            }),
+            createTestDataset(1),
+            structuredOutputs,
+          );
+
+          expect(cells[0]?.comparison?.candidates[0]?.output).toBe("from A");
+          expect(cells[0]?.comparison?.candidates[1]?.output).toBe("from B");
+        });
+      });
+
+      describe("when no output path was picked", () => {
+        it("serializes the whole object rather than failing the run", () => {
+          const { cells } = generateComparisonCells(
+            structuredState(),
+            createTestDataset(1),
+            structuredOutputs,
+          );
+
+          const [first, second] = cells[0]?.comparison?.candidates ?? [];
+          expect(typeof first?.output).toBe("string");
+          expect(typeof second?.output).toBe("string");
+          expect(JSON.parse(first!.output as string)).toEqual({
+            answer: "from A",
+            confidence: 0.9,
+          });
+        });
+      });
+
+      // A null output still counts as "the target ran", so the cell is built.
+      // The candidate must be empty rather than the four characters "null":
+      // langevals drops empty candidates and skips the row for having fewer
+      // than two, which is the honest outcome. Judging the word "null" is not.
+      describe("when the output is null", () => {
+        it("empties the candidate instead of judging the text 'null'", () => {
+          const { cells } = generateComparisonCells(
+            structuredState(),
+            createTestDataset(1),
+            new Map([
+              ["0:target-1", { output: null, cost: 0, duration: 1 }],
+              ["0:target-2", { output: { answer: "B" }, cost: 0, duration: 1 }],
+            ]) as never,
+          );
+
+          expect(cells[0]?.comparison?.candidates[0]?.output).toBe("");
+        });
+      });
     });
 
     it("uses the prompt handle as candidate id when loadedPrompts has it", () => {
