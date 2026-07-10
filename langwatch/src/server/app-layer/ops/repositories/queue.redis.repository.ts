@@ -39,6 +39,7 @@ local jobsKey    = KEYS[3]
 local readyKey   = KEYS[4]
 local signalKey  = KEYS[5]
 local errorKey   = KEYS[6]
+local strikesKey = KEYS[7]
 local groupId    = ARGV[1]
 local nowMs      = tonumber(ARGV[2])
 
@@ -47,6 +48,10 @@ local wasBlocked = redis.call("SREM", blockedKey, groupId)
 if wasBlocked > 0 then
   redis.call("DEL", activeKey)
   redis.call("DEL", errorKey)
+  -- Unblocking is an operator's "try again": reset the poison guard's claim
+  -- strikes so the group gets a fresh run instead of re-parking on the next
+  -- claim (specs/event-sourcing/poison-group-park-guard.feature).
+  redis.call("DEL", strikesKey)
 
   local pendingCount = redis.call("ZCARD", jobsKey)
   if pendingCount > 0 then
@@ -701,13 +706,14 @@ export class QueueRedisRepository implements QueueRepository {
     const prefix = `${params.queueName}:gq:`;
     const result = await this.redis.eval(
       UNBLOCK_LUA,
-      6,
+      7,
       `${prefix}blocked`,
       `${prefix}group:${params.groupId}:active`,
       `${prefix}group:${params.groupId}:jobs`,
       `${prefix}ready`,
       `${prefix}signal`,
       `${prefix}group:${params.groupId}:error`,
+      `${prefix}group:${params.groupId}:strikes`,
       params.groupId,
       String(Date.now()),
     );
@@ -737,13 +743,14 @@ export class QueueRedisRepository implements QueueRepository {
       for (const groupId of members) {
         pipeline.eval(
           UNBLOCK_LUA,
-          6,
+          7,
           `${prefix}blocked`,
           `${prefix}group:${groupId}:active`,
           `${prefix}group:${groupId}:jobs`,
           `${prefix}ready`,
           `${prefix}signal`,
           `${prefix}group:${groupId}:error`,
+          `${prefix}group:${groupId}:strikes`,
           groupId,
           String(Date.now()),
         );
@@ -1229,13 +1236,14 @@ export class QueueRedisRepository implements QueueRepository {
     for (const groupId of groupsToUnblock) {
       unblockPipeline.eval(
         UNBLOCK_LUA,
-        6,
+        7,
         `${prefix}blocked`,
         `${prefix}group:${groupId}:active`,
         `${prefix}group:${groupId}:jobs`,
         `${prefix}ready`,
         `${prefix}signal`,
         `${prefix}group:${groupId}:error`,
+        `${prefix}group:${groupId}:strikes`,
         groupId,
         String(Date.now()),
       );

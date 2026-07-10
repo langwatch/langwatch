@@ -42,6 +42,45 @@ function writeCompression(): CompressionCodec {
 }
 
 /**
+ * Decompression with the over-limit error converted to a park signal. bodyCodec
+ * already caps both codecs' output at the encode ceiling (ADR-030 §1) so a
+ * tampered or corrupt blob (e.g. a tenant zip-bombing their own BYOC object)
+ * can't OOM the worker; zlib reports the over-limit result as
+ * ERR_BUFFER_TOO_LARGE (or an "output length" RangeError depending on version).
+ * Both mean the same thing here: the staged value would materialize past the
+ * decode ceiling, so throw {@link PayloadTooLargeError} and let the caller park
+ * the group for inspection instead of dropping the job to replay (which would
+ * re-materialize the same value).
+ */
+async function boundedDecompress(data: Buffer): Promise<Buffer> {
+  try {
+    return await decompress(data);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (
+      code === "ERR_BUFFER_TOO_LARGE" ||
+      (err instanceof RangeError && /output length/i.test(err.message))
+    ) {
+      throw new PayloadTooLargeError(MAX_BLOB_BYTES + 1);
+    }
+    throw err;
+  }
+}
+
+/**
+ * Decode-side twin of {@link assertPayloadWithinCap}: values staged before the
+ * encode cap existed (or via the bare-JSON path when envelope writes are off)
+ * must not reach JSON.parse unbounded — a synchronous parse of a runaway value
+ * seizes the worker event loop, which the liveness probe converts into a
+ * process-wide crash loop.
+ */
+function assertDecodeWithinCap(byteLength: number): void {
+  if (byteLength > MAX_BLOB_BYTES) {
+    throw new PayloadTooLargeError(byteLength);
+  }
+}
+
+/**
  * Versioned envelope for staged job values: `GQ<v>|<headerLen>|<headerJson><body>`.
  *
  * The header carries only what dispatch-time Lua and the ops dashboard need
@@ -424,6 +463,7 @@ export async function decodeJobEnvelope({
   parsed?: { header: EnvelopeHeader; body: string };
 }): Promise<Record<string, unknown>> {
   if (!isEnvelope(value)) {
+    assertDecodeWithinCap(Buffer.byteLength(value, "utf8"));
     return JSON.parse(value) as Record<string, unknown>;
   }
 
@@ -448,7 +488,7 @@ export async function decodeJobEnvelope({
         "Job envelope tiered blob is missing (deleted or expired)",
       );
     }
-    const parsedBody = decodePayload(await decompress(data));
+    const parsedBody = decodePayload(await boundedDecompress(data));
     return mergeMachinery(parsedBody, header);
   }
 
@@ -471,12 +511,18 @@ export async function decodeJobEnvelope({
         `Job envelope blob ${header.r} is missing (deleted or expired)`,
       );
     }
-    return decodePayload(await decompress(data));
+    return decodePayload(await boundedDecompress(data));
   }
 
+  // Raw inline bodies never went through the bounded decompressor, so cap them
+  // before the synchronous parse; compressed bodies are bounded by
+  // boundedDecompress itself.
+  if (header.e !== "gz") {
+    assertDecodeWithinCap(Buffer.byteLength(body, "utf8"));
+  }
   const parsedBody =
     header.e === "gz"
-      ? decodePayload(await decompress(Buffer.from(body, "base64")))
+      ? decodePayload(await boundedDecompress(Buffer.from(body, "base64")))
       : (JSON.parse(body) as Record<string, unknown>);
   // GQ2 inline lifted machinery into header.m too; GQ1 (v=1) never did.
   return header.v === 2 ? mergeMachinery(parsedBody, header) : parsedBody;
