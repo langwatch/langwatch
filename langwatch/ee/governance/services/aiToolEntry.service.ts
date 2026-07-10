@@ -353,6 +353,18 @@ export const STARTER_PACK_TILES: ReadonlyArray<{
     },
   },
   {
+    type: "coding_assistant",
+    slug: "github-copilot",
+    displayName: "GitHub Copilot CLI",
+    iconAsset: "preset:github_copilot",
+    config: {
+      assistantKind: "github_copilot",
+      setupCommand: "langwatch copilot",
+      setupDocsUrl:
+        "https://docs.langwatch.ai/ai-governance/personal-portal/end-user",
+    },
+  },
+  {
     type: "model_provider",
     slug: "openai",
     displayName: "OpenAI",
