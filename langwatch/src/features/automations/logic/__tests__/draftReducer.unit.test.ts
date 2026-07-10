@@ -12,6 +12,8 @@ import {
   filtersAreSet,
   INITIAL_DRAFT,
   INITIAL_GRAPH_ALERT_DRAFT,
+  INITIAL_REPORT_DRAFT,
+  reportInputFromDraft,
   isNotifyAction,
   notifyChannel,
   reducer,
@@ -425,6 +427,86 @@ describe("buildTestFirePayload sends the graph-alert discriminator", () => {
         threshold: 10,
         timePeriodMinutes: 30,
       });
+    });
+  });
+});
+
+
+describe("report source", () => {
+  describe("SET_SOURCE report", () => {
+    it("switches to report, clears trace filters + graph id, keeps a notify action", () => {
+      const withGraph: AutomationDraft = {
+        ...SAMPLE,
+        source: "customGraph",
+        customGraphId: "g_1",
+        action: TriggerAction.SEND_EMAIL,
+      };
+      const next = reducer(withGraph, { type: "SET_SOURCE", value: "report" });
+      expect(next.source).toBe("report");
+      expect(next.filters).toEqual({});
+      expect(next.customGraphId).toBeNull();
+      expect(next.action).toBe(TriggerAction.SEND_EMAIL);
+    });
+    it("drops a persist action when switching to report", () => {
+      const next = reducer(
+        { ...SAMPLE, action: TriggerAction.ADD_TO_DATASET },
+        { type: "SET_SOURCE", value: "report" },
+      );
+      expect(next.action).toBeNull();
+    });
+  });
+
+  describe("SET_REPORT", () => {
+    it("replaces the report draft", () => {
+      const next = reducer(SAMPLE, {
+        type: "SET_REPORT",
+        value: { ...INITIAL_REPORT_DRAFT, topN: 10, cron: "0 7 * * *" },
+      });
+      expect(next.report.topN).toBe(10);
+      expect(next.report.cron).toBe("0 7 * * *");
+    });
+  });
+
+  describe("conditionsAreSet for reports", () => {
+    it("is true for a trace-query report with a schedule", () => {
+      const d: AutomationDraft = {
+        ...SAMPLE,
+        source: "report",
+        report: { ...INITIAL_REPORT_DRAFT },
+      };
+      expect(conditionsAreSet(d)).toBe(true);
+    });
+    it("is false for a customGraph report without a graph id", () => {
+      const d: AutomationDraft = {
+        ...SAMPLE,
+        source: "report",
+        report: { ...INITIAL_REPORT_DRAFT, sourceKind: "customGraph", customGraphId: null },
+      };
+      expect(conditionsAreSet(d)).toBe(false);
+    });
+    it("is false without a schedule", () => {
+      const d: AutomationDraft = {
+        ...SAMPLE,
+        source: "report",
+        report: { ...INITIAL_REPORT_DRAFT, cron: "  " },
+      };
+      expect(conditionsAreSet(d)).toBe(false);
+    });
+  });
+
+  describe("reportInputFromDraft", () => {
+    it("maps a trace-query report to the discriminated input", () => {
+      const out = reportInputFromDraft({ ...INITIAL_REPORT_DRAFT, topN: 7 });
+      expect(out.source).toEqual({ kind: "traceQuery", filters: {}, topN: 7 });
+      expect(out.schedule).toEqual({ cron: "0 9 * * 1", timezone: "UTC" });
+    });
+    it("maps a custom-graph report", () => {
+      const out = reportInputFromDraft({
+        ...INITIAL_REPORT_DRAFT,
+        sourceKind: "customGraph",
+        customGraphId: "g_9",
+      });
+      expect(out.source).toEqual({ kind: "customGraph", customGraphId: "g_9" });
     });
   });
 });

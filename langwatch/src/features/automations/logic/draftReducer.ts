@@ -31,7 +31,30 @@ import type { FilterField } from "~/server/filters/types";
  * provider; the reducer doesn't change.
  */
 
-export type ConditionSource = "trace" | "customGraph";
+export type ConditionSource = "trace" | "customGraph" | "report";
+
+/** The content + schedule a scheduled REPORT captures (ADR-042). Mirrors the
+ *  `reportActionParams` the router persists: a source discriminated by kind
+ *  plus a cron+timezone schedule. Flat here for simple form binding. */
+export type ReportSourceKind = "traceQuery" | "customGraph" | "dashboard";
+
+export interface ReportDraft {
+  sourceKind: ReportSourceKind;
+  customGraphId: string | null;
+  dashboardId: string | null;
+  topN: number;
+  cron: string;
+  timezone: string;
+}
+
+export const INITIAL_REPORT_DRAFT: ReportDraft = {
+  sourceKind: "traceQuery",
+  customGraphId: null,
+  dashboardId: null,
+  topN: 5,
+  cron: "0 9 * * 1",
+  timezone: "UTC",
+};
 
 /** The threshold rule a custom-graph alert fires on. Mirrors the fields the
  *  dashboard `AlertDrawer` collects and the dispatcher reads off the
@@ -67,6 +90,9 @@ export interface AutomationDraft {
    *  back and forth doesn't wipe the user's threshold while they're
    *  experimenting. */
   graphAlert: GraphAlertDraft;
+  /** Report content + schedule. Only meaningful when `source === "report"`;
+   *  carried around so type-switching doesn't wipe it. */
+  report: ReportDraft;
   /** Per-trigger digest cadence (ADR-026). Ignored at storage and dispatch
    *  time for persist actions, so the draft value can sit dormant while the
    *  user is type-switching. */
@@ -93,6 +119,7 @@ export type DraftAction =
   | { type: "SET_CUSTOM_GRAPH_ID"; value: string | null }
   | { type: "SET_FILTERS"; value: Partial<Record<FilterField, FilterParam>> }
   | { type: "SET_GRAPH_ALERT"; value: GraphAlertDraft }
+  | { type: "SET_REPORT"; value: ReportDraft }
   | { type: "SET_CADENCE"; value: NotificationCadence }
   | { type: "SET_TRACE_DEBOUNCE_MS"; value: number }
   | { type: "CONFIRM_CADENCE" }
@@ -122,6 +149,7 @@ export const INITIAL_DRAFT: AutomationDraft = {
   filters: {},
   customGraphId: null,
   graphAlert: INITIAL_GRAPH_ALERT_DRAFT,
+  report: INITIAL_REPORT_DRAFT,
   // Matches the app-layer create-default for notify triggers (ADR-026).
   // Persist actions ignore this at the router boundary, so leaving it set
   // here while the user is picking an action is safe.
@@ -154,24 +182,41 @@ export function reducer(
       // Graph alerts only support notify actions (email / Slack) — a
       // previously picked persist action would be rejected at save time, so
       // switching to customGraph resets it and the user re-picks.
-      return action.value === "customGraph"
-        ? {
-            ...state,
-            source: "customGraph",
-            filters: {},
-            action:
-              state.action === "SEND_EMAIL" ||
-              state.action === "SEND_SLACK_MESSAGE"
-                ? state.action
-                : null,
-          }
-        : { ...state, source: "trace", customGraphId: null };
+      if (action.value === "customGraph") {
+        return {
+          ...state,
+          source: "customGraph",
+          filters: {},
+          action:
+            state.action === "SEND_EMAIL" ||
+            state.action === "SEND_SLACK_MESSAGE"
+              ? state.action
+              : null,
+        };
+      }
+      if (action.value === "report") {
+        // Reports send a rendered notification on a schedule — notify only.
+        return {
+          ...state,
+          source: "report",
+          filters: {},
+          customGraphId: null,
+          action:
+            state.action === "SEND_EMAIL" ||
+            state.action === "SEND_SLACK_MESSAGE"
+              ? state.action
+              : null,
+        };
+      }
+      return { ...state, source: "trace", customGraphId: null };
     case "SET_CUSTOM_GRAPH_ID":
       return { ...state, customGraphId: action.value };
     case "SET_FILTERS":
       return { ...state, filters: action.value };
     case "SET_GRAPH_ALERT":
       return { ...state, graphAlert: action.value };
+    case "SET_REPORT":
+      return { ...state, report: action.value };
     case "SET_CADENCE":
       return {
         ...state,
@@ -290,6 +335,14 @@ export function conditionsAreSet(draft: AutomationDraft): boolean {
       draft.alertType !== null
     );
   }
+  if (draft.source === "report") {
+    const r = draft.report;
+    const sourceOk =
+      r.sourceKind === "traceQuery" ||
+      (r.sourceKind === "customGraph" && r.customGraphId !== null) ||
+      (r.sourceKind === "dashboard" && r.dashboardId !== null);
+    return sourceOk && r.cron.trim().length > 0;
+  }
   return filtersAreSet(draft.filters);
 }
 
@@ -321,6 +374,20 @@ export function summariseConditions(
     const window = TIME_PERIOD_LABELS[draft.graphAlert.timePeriod];
     const series = opts?.seriesLabel ?? draft.graphAlert.seriesName;
     return `${series} ${op} ${draft.graphAlert.threshold} over ${window}`;
+  }
+  if (draft.source === "report") {
+    const r = draft.report;
+    const src =
+      r.sourceKind === "traceQuery"
+        ? `Top ${r.topN} traces`
+        : r.sourceKind === "customGraph"
+          ? r.customGraphId
+            ? "Custom graph"
+            : "Pick a graph"
+          : r.dashboardId
+            ? "Dashboard"
+            : "Pick a dashboard";
+    return `${src} · schedule ${r.cron} (${r.timezone})`;
   }
   const keys = Object.keys(draft.filters);
   if (keys.length === 0) return "No conditions yet";
@@ -394,4 +461,39 @@ export function cadenceSummary(draft: AutomationDraft): string {
   const seconds = Math.round(draft.traceDebounceMs / 1000);
   const settle = `${seconds}s settle window`;
   return `${cadence} · ${settle}`;
+}
+
+
+/**
+ * Map the flat `ReportDraft` to the `report` upsert input (source discriminated
+ * union + schedule) the automations router validates.
+ */
+export function reportInputFromDraft(report: ReportDraft): {
+  source:
+    | { kind: "traceQuery"; filters: Record<string, unknown>; topN: number }
+    | { kind: "customGraph"; customGraphId: string }
+    | { kind: "dashboard"; dashboardId: string };
+  schedule: { cron: string; timezone: string };
+  compareToPrevious: boolean;
+} {
+  const schedule = { cron: report.cron, timezone: report.timezone };
+  if (report.sourceKind === "customGraph") {
+    return {
+      source: { kind: "customGraph", customGraphId: report.customGraphId ?? "" },
+      schedule,
+      compareToPrevious: false,
+    };
+  }
+  if (report.sourceKind === "dashboard") {
+    return {
+      source: { kind: "dashboard", dashboardId: report.dashboardId ?? "" },
+      schedule,
+      compareToPrevious: false,
+    };
+  }
+  return {
+    source: { kind: "traceQuery", filters: {}, topN: report.topN },
+    schedule,
+    compareToPrevious: false,
+  };
 }
