@@ -18,7 +18,7 @@ Feature: Persist the OTLP telemetry exports so `<tool>` captures automatically
     - `codex` → `~/.codex/config.toml`'s `[otel.trace_exporter.otlp-http]`
       block, which takes an inline `headers` field, so the ingest token
       lives beside the endpoint in one 0600 file.
-  Tools with no config-file env target (`gemini`, `opencode`) instead get a
+  Tools with no config-file env target (`gemini`, `opencode`, `copilot`) instead get a
   shell function installed in the rc that sets the telemetry env ONLY for that
   tool's invocations, since their OTEL vars use generic names a global
   `export` would otherwise leak into every shell child. `cursor` is
@@ -164,6 +164,15 @@ Feature: Persist the OTLP telemetry exports so `<tool>` captures automatically
         | tool     |
         | gemini   |
         | opencode |
+        | copilot  |
+
+    @unit @unimplemented
+    Scenario: The copilot wrapper function carries the tool-specific telemetry vars
+      Given `langwatch copilot` resolves to ingestion mode
+      When the user types "y" at the persistence prompt
+      Then the scoped `copilot()` function sets COPILOT_OTEL_ENABLED alongside
+        the OTEL_EXPORTER_OTLP_* env
+      And a plain `copilot` run exports telemetry to LangWatch
 
     Scenario: Each tool's scoped wrapper lands under its own marker pair
       Given ~/.zshrc already carries a scoped `gemini` wrapper from a prior run

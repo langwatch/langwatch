@@ -87,6 +87,7 @@ Feature: `langwatch logout` clears credentials AND the telemetry wiring
         | tool     |
         | gemini   |
         | opencode |
+        | copilot  |
 
     Scenario: the global gateway shell-rc block is removed
       Given ~/.zshrc carries the `# >>> langwatch begin >>>` gateway block
