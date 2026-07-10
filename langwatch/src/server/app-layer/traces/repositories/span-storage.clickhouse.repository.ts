@@ -1698,13 +1698,27 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         // Keyed pagination over (StartTimeMs, SpanId): the tuple compare uses
         // the same millisecond expression the rows are ordered (and returned)
         // by, so page boundaries are exact even though StartTime itself has
-        // sub-ms precision. The cursor predicate stays OUT of the dedup
-        // subquery on purpose — dedup must pick the latest version per span
-        // across the whole trace; if the winning version sorts before the
-        // cursor, the span belongs to an earlier page and is correctly
+        // sub-ms precision.
+        //
+        // The coarse `StartTime >=` bound restates the tuple predicate on the
+        // raw partition key: `toYearWeek(StartTime)` partition pruning can't
+        // see through `toUnixTimestamp64Milli(...)`, so without it every page
+        // re-scans the partitions pagination already moved past — exactly the
+        // long-running multi-week traces that need paging, and the only
+        // pruning at all when no occurredAtMs hint was threaded. It goes into
+        // the dedup subquery too (else the inner scan stays unpruned), same
+        // trade the `since` readers make: a span's versions share its
+        // StartTime, so bounding the version scan by it is safe. The exact
+        // tuple predicate stays OUT of the dedup subquery — dedup must pick
+        // the latest version per span; if the winning version sorts before
+        // the cursor, the span belongs to an earlier page and is correctly
         // excluded by the outer filter rather than re-emitted stale.
+        const cursorCoarseBound = cursor
+          ? `AND StartTime >= fromUnixTimestamp64Milli({cursorStartTimeMs:Int64})`
+          : "";
         const cursorFilter = cursor
-          ? `AND (toUnixTimestamp64Milli(StartTime), SpanId) > ({cursorStartTimeMs:Int64}, {cursorSpanId:String})`
+          ? `${cursorCoarseBound}
+              AND (toUnixTimestamp64Milli(StartTime), SpanId) > ({cursorStartTimeMs:Int64}, {cursorSpanId:String})`
           : "";
         const result = await client.query({
           query: `
@@ -1714,7 +1728,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
               AND TraceId = {traceId:String}
               ${partition.sqlAnd}
               ${cursorFilter}
-              AND ${dedupInTuple(partition.sqlAndInner)}
+              AND ${dedupInTuple(`${partition.sqlAndInner} ${cursorCoarseBound}`)}
             ORDER BY StartTimeMs ASC, SpanId ASC
             LIMIT {limit:UInt32}
           `,
