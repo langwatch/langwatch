@@ -128,6 +128,7 @@ import { ShareService } from "./share/share.service";
 import { SimulationRunService } from "./simulations/simulation-run.service";
 import { createCompositePlanProvider } from "./subscription/composite-plan-provider";
 import { PlanProviderService } from "./subscription/plan-provider";
+import { createPricingModelSelfHeal } from "./subscription/pricing-model-heal";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import { SuiteRunService } from "./suites/suite-run.service";
 import { NullTopicRepository } from "./topics/null-topic.repository";
@@ -388,6 +389,17 @@ export function initializeDefaultApp(options?: {
     simulationReads,
   );
 
+  const pricingModelSelfHeal = createPricingModelSelfHeal({
+    hasActiveSeatEventSubscription: (organizationId) =>
+      orgRepo.hasActiveSeatEventSubscription(organizationId),
+    getPricingModel: (organizationId) =>
+      orgRepo.getPricingModel(organizationId),
+    setPricingModel: ({ organizationId, pricingModel }) =>
+      orgRepo.setPricingModel({ organizationId, pricingModel }),
+    invalidateMeterDecision: (organizationId) =>
+      usage.invalidateMeterDecision(organizationId),
+  });
+
   const planProvider = config.isSaas
     ? PlanProviderService.create(
         createCompositePlanProvider({
@@ -400,7 +412,7 @@ export function initializeDefaultApp(options?: {
               getLicenseHandler().getActivePlan(organizationId),
           },
         }),
-        { isSaaS: true },
+        { isSaaS: true, selfHeal: pricingModelSelfHeal },
       )
     : PlanProviderService.create({
         getActivePlan: async ({ organizationId }) => {

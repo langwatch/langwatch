@@ -60,6 +60,23 @@ export class OrganizationRepository {
   }
 
   /**
+   * Converges the pricingModel display cache (ADR-039 Decision 3). Only the
+   * self-heal writes through this — decisions never read the column.
+   */
+  async setPricingModel({
+    organizationId,
+    pricingModel,
+  }: {
+    organizationId: string;
+    pricingModel: PricingModel;
+  }): Promise<void> {
+    await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: { pricingModel },
+    });
+  }
+
+  /**
    * Gets the Stripe customer ID for an organization
    */
   async getStripeCustomerId(organizationId: string): Promise<string | null> {

@@ -286,6 +286,15 @@ export class UsageService {
     });
   }
 
+  /**
+   * Drops the cached meter decision for an organization so the next check
+   * recomputes it from the resolved plan. Called by the pricingModel
+   * self-heal (ADR-039 Decision 3) when billing state converges.
+   */
+  async invalidateMeterDecision(organizationId: string): Promise<void> {
+    await this.decisionCache.delete(organizationId);
+  }
+
   private async getCachedMeterDecision(
     organizationId: string,
     plan?: PlanInfo,

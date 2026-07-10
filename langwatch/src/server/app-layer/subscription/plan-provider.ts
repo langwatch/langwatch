@@ -1,5 +1,6 @@
 import type { PlanInfo } from "../../../../ee/licensing/planInfo";
 import { deriveBillingProfile, deriveCapabilities } from "./billing-profile";
+import type { PricingModelSelfHeal } from "./pricing-model-heal";
 
 export type PlanResolver = (organizationId: string) => Promise<PlanInfo>;
 
@@ -21,13 +22,14 @@ export class PlanProviderService implements PlanProvider {
   private constructor(
     private readonly provider: PlanProvider,
     private readonly isSaaS: boolean,
+    private readonly selfHeal?: PricingModelSelfHeal,
   ) {}
 
   static create(
     provider: PlanProvider,
-    { isSaaS }: { isSaaS: boolean },
+    { isSaaS, selfHeal }: { isSaaS: boolean; selfHeal?: PricingModelSelfHeal },
   ): PlanProviderService {
-    return new PlanProviderService(provider, isSaaS);
+    return new PlanProviderService(provider, isSaaS, selfHeal);
   }
 
   /**
@@ -42,6 +44,12 @@ export class PlanProviderService implements PlanProvider {
     user?: PlanProviderUser;
   }): Promise<PlanInfo> {
     const plan = await this.provider.getActivePlan(params);
+
+    // Lazy pricingModel convergence (ADR-039 Decision 3). Fire-and-forget:
+    // the heal guards, logs, and swallows internally — never blocks or
+    // fails plan resolution.
+    void this.selfHeal?.({ organizationId: params.organizationId });
+
     return {
       ...plan,
       billing: deriveBillingProfile({ plan, isSaaS: this.isSaaS }),

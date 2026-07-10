@@ -77,19 +77,19 @@ Feature: Billing profile resolution in the composite plan provider
 
   # --- Self-heal (Decision 3) ---
 
-  @integration @unimplemented
+  @unit
   Scenario: Resolving a drifted organization heals the pricingModel column
     Given an organization with pricingModel "TIERED" and an ACTIVE seat-event subscription
     When the active plan is resolved
     Then the organization's pricingModel is updated to "SEAT_EVENT"
 
-  @integration @unimplemented
+  @unit
   Scenario: The self-heal fires at most once per guard window
     Given an organization whose pricingModel was healed within the guard window
     When the active plan is resolved again
     Then no additional pricingModel update is issued
 
-  @integration @unimplemented
+  @unit
   Scenario: A heal invalidates the organization's meter decision cache
     Given an organization with a cached meter decision based on the stale column
     When the resolver heals the organization's pricingModel
