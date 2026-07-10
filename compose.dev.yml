@@ -442,7 +442,8 @@ services:
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
       GF_NEWS_NEWS_FEED_ENABLED: "false"
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      # otel-lgtm ships curl, not wget.
+      test: ["CMD", "curl", "-sf", "http://localhost:3000/api/health"]
       interval: 10s
       timeout: 5s
       retries: 18
