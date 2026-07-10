@@ -24,6 +24,7 @@ import {
   type GraphAlertActionParams,
   graphAlertActionParamsSchema,
 } from "~/server/app-layer/triggers/graph-alert.builder";
+import { TriggerFireHistoryService } from "~/server/app-layer/triggers/trigger-fire-history.service";
 import {
   type DraftProject,
   validateTemplateDraft,
@@ -66,14 +67,20 @@ const traceDebounceMsSchema = z
 function resolveCadenceForCreate(
   action: TriggerAction,
   requested: NotificationCadence | undefined,
+  isGraphAlert = false,
 ): NotificationCadence {
   if (!NOTIFY_TRIGGER_ACTIONS.has(action)) return "immediate";
+  // Graph alerts are incident-based (fire on breach, silent while open,
+  // resolve on recovery) — there is nothing to digest, so cadence pins to
+  // immediate at the storage boundary just like persist actions.
+  if (isGraphAlert) return "immediate";
   return requested ?? "5min_digest";
 }
 
 function resolveCadenceForUpdate(
   action: TriggerAction,
   requested: NotificationCadence | undefined,
+  isGraphAlert = false,
 ): NotificationCadence | undefined {
   // Persist actions always pin to `immediate`. Returning `undefined`
   // here when the client omits the field would skip the column update
@@ -82,6 +89,7 @@ function resolveCadenceForUpdate(
   // the row but the dispatch path no longer reads it). Force the
   // boundary invariant on every update.
   if (!NOTIFY_TRIGGER_ACTIONS.has(action)) return "immediate";
+  if (isGraphAlert) return "immediate";
   return requested;
 }
 
@@ -381,6 +389,32 @@ export const automationRouter = createTRPCRouter({
       });
 
       return enhancedTriggers;
+    }),
+  getTriggerStats: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("triggers:view"))
+    .query(async ({ ctx, input }) => {
+      const fireHistory = TriggerFireHistoryService.create(ctx.prisma);
+      return fireHistory.getAllFireStatsForProject({
+        projectId: input.projectId,
+      });
+    }),
+  getRecentFires: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        triggerId: z.string(),
+        limit: z.number().int().min(1).max(20).default(20),
+      }),
+    )
+    .use(checkProjectPermission("triggers:view"))
+    .query(async ({ ctx, input }) => {
+      const fireHistory = TriggerFireHistoryService.create(ctx.prisma);
+      return fireHistory.getAllRecentFiresForTrigger({
+        projectId: input.projectId,
+        triggerId: input.triggerId,
+        limit: input.limit,
+      });
     }),
   toggleTrigger: protectedProcedure
     .input(
@@ -704,6 +738,7 @@ export const automationRouter = createTRPCRouter({
         const cadenceUpdate = resolveCadenceForUpdate(
           input.action,
           input.notificationCadence,
+          isGraphAlert,
         );
         trigger = await ctx.prisma.trigger.update({
           where: { id: input.triggerId, projectId: input.projectId },
@@ -746,6 +781,7 @@ export const automationRouter = createTRPCRouter({
               notificationCadence: resolveCadenceForCreate(
                 input.action,
                 input.notificationCadence,
+                isGraphAlert,
               ),
               traceDebounceMs:
                 input.traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,
@@ -760,6 +796,7 @@ export const automationRouter = createTRPCRouter({
               notificationCadence: resolveCadenceForCreate(
                 input.action,
                 input.notificationCadence,
+                isGraphAlert,
               ),
               traceDebounceMs:
                 input.traceDebounceMs ?? DEFAULT_TRACE_DEBOUNCE_MS,

@@ -30,7 +30,7 @@ describe("buildGraphAlertTriggerData", () => {
 
         expect(data).toEqual({
           id: "trigger-abc",
-          name: "Alert: p95 latency",
+          name: "p95 latency",
           projectId: "project-1",
           action: TriggerAction.SEND_SLACK_MESSAGE,
           actionParams: {
@@ -47,7 +47,7 @@ describe("buildGraphAlertTriggerData", () => {
         });
       });
 
-      it("does not double-prefix a name already prefixed with Alert:", () => {
+      it("strips a legacy Alert: prefix instead of storing it", () => {
         const data = buildGraphAlertTriggerData({
           id: "trigger-abc",
           name: "Alert: p95 latency",
@@ -64,10 +64,10 @@ describe("buildGraphAlertTriggerData", () => {
           },
         });
 
-        expect(data.name).toBe("Alert: p95 latency");
+        expect(data.name).toBe("p95 latency");
       });
 
-      it("strips lower-case 'alert:' prefix before applying canonical form (builder5015-009)", () => {
+      it("strips lower-case 'alert:' prefix too (builder5015-009)", () => {
         const data = buildGraphAlertTriggerData({
           id: "trigger-abc",
           name: "alert: cost spike",
@@ -83,7 +83,7 @@ describe("buildGraphAlertTriggerData", () => {
             members: ["a@b.co"],
           },
         });
-        expect(data.name).toBe("Alert: cost spike");
+        expect(data.name).toBe("cost spike");
       });
     });
   });

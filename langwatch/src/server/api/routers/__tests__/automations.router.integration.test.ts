@@ -18,6 +18,8 @@ const {
   mockCustomGraphFindUnique,
   mockCustomGraphFindMany,
   mockTriggersInvalidate,
+  mockTriggerSentGroupBy,
+  mockTriggerSentFindMany,
 } = vi.hoisted(() => ({
   mockEnforceLicenseLimit: vi.fn().mockResolvedValue(undefined),
   mockTriggerUpdate: vi.fn(),
@@ -28,6 +30,8 @@ const {
   mockCustomGraphFindUnique: vi.fn(),
   mockCustomGraphFindMany: vi.fn(),
   mockTriggersInvalidate: vi.fn().mockResolvedValue(undefined),
+  mockTriggerSentGroupBy: vi.fn(),
+  mockTriggerSentFindMany: vi.fn(),
 }));
 
 vi.mock("~/server/license-enforcement", async (importOriginal) => {
@@ -80,6 +84,10 @@ function createTestCaller() {
       customGraph: {
         findUnique: mockCustomGraphFindUnique,
         findMany: mockCustomGraphFindMany,
+      },
+      triggerSent: {
+        groupBy: mockTriggerSentGroupBy,
+        findMany: mockTriggerSentFindMany,
       },
     },
     permissionChecked: false,
@@ -203,7 +211,7 @@ describe("automationRouter", () => {
           });
           // Name is prefixed to match the dashboard "Add Alert" path so the
           // same trigger appears identically through both creators.
-          expect(createArgs.data.name).toBe("Alert: p95 latency");
+          expect(createArgs.data.name).toBe("p95 latency");
         });
       });
 
@@ -314,7 +322,7 @@ describe("automationRouter", () => {
           seriesName: "0/latency/p95",
         });
         expect(updateArgs.data.filters).toEqual({});
-        expect(updateArgs.data.name).toBe("Alert: p95 latency");
+        expect(updateArgs.data.name).toBe("p95 latency");
         expect(updateArgs.data.alertType).toBe("WARNING");
         expect(updateArgs.data.customGraphId).toBe("graph_1");
       });
@@ -413,6 +421,128 @@ describe("automationRouter", () => {
 
         expect(result).toHaveLength(1);
         expect(result[0]?.customGraph).toBeNull();
+      });
+    });
+  });
+
+  describe("getTriggerStats", () => {
+    describe("when a project has fire history", () => {
+      beforeEach(() => {
+        mockTriggerSentGroupBy.mockImplementation(
+          ({ _max }: { _max?: unknown }) =>
+            Promise.resolve(
+              _max
+                ? [
+                    {
+                      triggerId: "trigger_1",
+                      _max: { createdAt: new Date("2026-07-09T10:00:00Z") },
+                    },
+                  ]
+                : [{ triggerId: "trigger_1", _count: { _all: 4 } }],
+            ),
+        );
+        mockTriggerSentFindMany.mockResolvedValue([
+          { triggerId: "trigger_1" },
+        ]);
+      });
+
+      it("scopes every fire-history read to the calling project", async () => {
+        await caller.getTriggerStats({ projectId: "proj_123" });
+
+        for (const call of mockTriggerSentGroupBy.mock.calls) {
+          expect(call[0].where).toMatchObject({ projectId: "proj_123" });
+        }
+        expect(mockTriggerSentFindMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({ projectId: "proj_123" }),
+          }),
+        );
+      });
+
+      it("returns the per-trigger rollup with the open-incident flag", async () => {
+        const result = await caller.getTriggerStats({
+          projectId: "proj_123",
+        });
+
+        expect(result).toEqual([
+          {
+            triggerId: "trigger_1",
+            lastFiredAt: new Date("2026-07-09T10:00:00Z"),
+            recentFireCount: 4,
+            currentlyFiring: true,
+          },
+        ]);
+      });
+
+      it("only counts unresolved graph-alert rows as firing", async () => {
+        await caller.getTriggerStats({ projectId: "proj_123" });
+
+        expect(mockTriggerSentFindMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              customGraphId: { not: null },
+              resolvedAt: null,
+            }),
+          }),
+        );
+      });
+    });
+  });
+
+  describe("getRecentFires", () => {
+    describe("when listing a trigger's fire history", () => {
+      beforeEach(() => {
+        mockTriggerSentFindMany.mockResolvedValue([
+          {
+            id: "sent_1",
+            triggerId: "trigger_1",
+            customGraphId: null,
+            createdAt: new Date("2026-07-09T10:00:00Z"),
+            resolvedAt: null,
+          },
+        ]);
+      });
+
+      it("scopes the read to the calling project and trigger", async () => {
+        await caller.getRecentFires({
+          projectId: "proj_123",
+          triggerId: "trigger_1",
+        });
+
+        expect(mockTriggerSentFindMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { projectId: "proj_123", triggerId: "trigger_1" },
+            take: 20,
+          }),
+        );
+      });
+
+      it("selects fire metadata only, never trace references or content", async () => {
+        const result = await caller.getRecentFires({
+          projectId: "proj_123",
+          triggerId: "trigger_1",
+        });
+
+        const selectArg =
+          mockTriggerSentFindMany.mock.calls[0]![0].select ?? {};
+        expect(Object.keys(selectArg).sort()).toEqual([
+          "createdAt",
+          "customGraphId",
+          "id",
+          "resolvedAt",
+          "triggerId",
+        ]);
+        expect(result[0]).not.toHaveProperty("traceId");
+      });
+
+      it("caps the page size at 20 rows", async () => {
+        await expect(
+          caller.getRecentFires({
+            projectId: "proj_123",
+            triggerId: "trigger_1",
+            limit: 100,
+          }),
+        ).rejects.toMatchObject({ code: "BAD_REQUEST" });
       });
     });
   });

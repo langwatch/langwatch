@@ -25,7 +25,7 @@ export type GraphAlertOperator = (typeof GRAPH_ALERT_OPERATORS)[number];
  *  The dispatcher accepts any positive integer, but the UI is constrained
  *  to this set so the validator can reject typos / hostile input on the
  *  wire. */
-export const GRAPH_ALERT_TIME_PERIODS = [5, 15, 30, 60, 1440] as const;
+export const GRAPH_ALERT_TIME_PERIODS = [1, 5, 15, 30, 60, 1440] as const;
 export type GraphAlertTimePeriod = (typeof GRAPH_ALERT_TIME_PERIODS)[number];
 
 export const graphAlertOperatorSchema = z.enum(GRAPH_ALERT_OPERATORS);
@@ -81,9 +81,10 @@ export interface GraphAlertTriggerData {
 
 /**
  * Shape the `Trigger` row inserted/updated for a graph-threshold alert.
- * Prefixes the user-facing name with `Alert:` to keep parity with the
- * legacy dashboard path — case-insensitive prefix detection so
- * `Alert: cost spike` and `alert: cost spike` don't produce a double-prefix.
+ * Stores the user's name as typed — the legacy dashboard path baked an
+ * `Alert:` prefix into the row, which then leaked back into the edit form
+ * and doubled up with the list's Type column. Legacy prefixes are stripped
+ * (case-insensitive) so pre-existing rows clean up on their next save.
  */
 export function buildGraphAlertTriggerData({
   id,
@@ -94,10 +95,10 @@ export function buildGraphAlertTriggerData({
   customGraphId,
   actionParams,
 }: BuildGraphAlertTriggerDataInput): GraphAlertTriggerData {
-  const trimmed = name.replace(/^\s*alert:\s*/i, "");
+  const trimmed = name.replace(/^\s*alert:\s*/i, "").trim();
   return {
     id,
-    name: `Alert: ${trimmed}`,
+    name: trimmed,
     projectId,
     action,
     actionParams: { ...actionParams } as Prisma.InputJsonValue,

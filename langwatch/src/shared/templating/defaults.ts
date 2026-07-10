@@ -90,7 +90,7 @@ export const DEFAULT_ALERT_EMAIL_BODY_TEMPLATE = `# [Alert] {{ trigger.name }}
 {% if reason == "heartbeat-absence" %}
 No qualifying data was seen in the window.
 {% endif %}
-Current value: **{{ currentValue }}**{% if previousValue != nil %} (was {{ previousValue }}){% endif %} — threshold: {{ condition.operator }} {{ condition.threshold }}.
+Current value: **{{ currentValue }}**{% if previousValue != nil %} (was {{ previousValue }}){% endif %} — threshold: {{ condition.operatorLabel }} {{ condition.threshold }}.
 {% if sparkline != "" %}
 Trend: \`{{ sparkline }}\`
 {% endif %}
@@ -99,7 +99,7 @@ Trend: \`{{ sparkline }}\`
 export const DEFAULT_ALERT_SLACK_TEMPLATE = `:rotating_light: *{{ trigger.name | mrkdwn_escape }}*{% if trigger.alertType %} _({{ trigger.alertType }})_{% endif %}
 *{{ metric.label | mrkdwn_escape }}* {{ condition.operatorLabel }} *{{ condition.threshold }}* over the {{ condition.timePeriodLabel }}.{% if reason == "heartbeat-absence" %}
 No qualifying data was seen in the window.{% endif %}
-Current value: *{{ currentValue }}*{% if previousValue != nil %} (was {{ previousValue }}){% endif %} — threshold: {{ condition.operator }} {{ condition.threshold }}.{% if sparkline != "" %}
+Current value: *{{ currentValue }}*{% if previousValue != nil %} (was {{ previousValue }}){% endif %} — threshold: {{ condition.operatorLabel }} {{ condition.threshold }}.{% if sparkline != "" %}
 Trend: \`{{ sparkline }}\`{% endif %}
 <{{ graph.url }}|Open dashboard>`;
 
@@ -125,7 +125,7 @@ export const DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE = `[
     "type": "section",
     "text": { "type": "mrkdwn", "text": {{ _metric_line | json }} }
   },
-  {%- capture _value_line -%}Current value: *{{ currentValue }}*{% if previousValue != nil %} (was {{ previousValue }}){% endif %} — threshold: {{ condition.operator }} {{ condition.threshold }}.{%- endcapture -%}
+  {%- capture _value_line -%}Current value: *{{ currentValue }}*{% if previousValue != nil %} (was {{ previousValue }}){% endif %} — threshold: {{ condition.operatorLabel }} {{ condition.threshold }}.{%- endcapture -%}
   {
     "type": "section",
     "text": { "type": "mrkdwn", "text": {{ _value_line | json }} }
@@ -149,7 +149,7 @@ export const DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE = `[
   {
     "type": "divider"
   },
-  {%- capture _footer_text -%}<{{ trigger.editUrl }}|Edit automation>{%- endcapture -%}
+  {%- capture _footer_text -%}<{{ trigger.editUrl }}|Edit alert>{%- endcapture -%}
   {
     "type": "context",
     "elements": [

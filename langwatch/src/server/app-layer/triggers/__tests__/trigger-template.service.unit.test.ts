@@ -4,6 +4,8 @@ import {
   TEST_FIRE_EMAIL_SUBJECT_PREFIX,
   TEST_FIRE_NOTICE,
 } from "~/shared/templating/banner";
+import { DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE } from "~/shared/templating/defaults";
+import graphAlertDetailedSource from "~/automations/providers/definitions/slack/templates/graph_alert_detailed.liquid?raw";
 import { TemplateValidationError, TestFireUnavailableError } from "../errors";
 import {
   type DraftIdentity,
@@ -97,6 +99,102 @@ describe("validateTemplateDraft", () => {
 });
 
 describe("testFireTrigger", () => {
+  describe("given a graph-alert draft rendering a gallery Block Kit template", () => {
+    it("renders the alert example context — metric, condition, dashboard URL all populated", async () => {
+      const { notifier, sentSlack } = makeNotifier();
+      const service = makeService(notifier);
+
+      const result = await service.testFire({
+        channel: "slack",
+        trigger: TRIGGER,
+        project: PROJECT,
+        draft: {
+          slackTemplateType: "block_kit",
+          slackTemplate: DEFAULT_ALERT_SLACK_BLOCK_KIT_TEMPLATE,
+        },
+        recipients: [],
+        webhook: "https://hooks.slack.com/services/abc",
+        graphAlert: {
+          graphName: "Traces count",
+          metricLabel: "Traces count",
+          operator: "gt",
+          threshold: 10,
+          timePeriodMinutes: 30,
+        },
+      });
+
+      expect(result.missingVariables).toEqual([]);
+      expect(result.errors).toEqual([]);
+      const payload = JSON.stringify(sentSlack[0]?.payload);
+      expect(payload).toContain("Traces count");
+      expect(payload).toContain("is greater than");
+      expect(payload).toContain("last 30 minutes");
+      expect(payload).toContain("/acme/analytics/custom/example-graph");
+    });
+
+    // Regression for the field-5015 garbled test-fire: the exact gallery
+    // template the user selected ("Alert — detailed") must render populated
+    // fields + a real dashboard URL. The empty-field symptom happens when
+    // the alert template is rendered against the TRACE context — a null
+    // `graphAlert` — so we assert the dashboard link resolves and the
+    // skeleton labels never appear alone.
+    it("renders the real 'graph_alert_detailed' gallery source with a resolved dashboard URL", async () => {
+      const { notifier, sentSlack } = makeNotifier();
+      const service = makeService(notifier);
+
+      const result = await service.testFire({
+        channel: "slack",
+        trigger: TRIGGER,
+        project: PROJECT,
+        draft: {
+          slackTemplateType: "block_kit",
+          slackTemplate: graphAlertDetailedSource,
+        },
+        recipients: [],
+        webhook: "https://hooks.slack.com/services/abc",
+        graphAlert: {
+          graphName: "Traces count",
+          metricLabel: "Traces count",
+          operator: "gt",
+          threshold: 10,
+          timePeriodMinutes: 30,
+        },
+      });
+
+      expect(result.errors).toEqual([]);
+      const payload = JSON.stringify(sentSlack[0]?.payload);
+      // A populated dashboard link — the empty `<|Open dashboard>` symptom
+      // is precisely a missing graph.url from a trace context.
+      expect(payload).toContain("/acme/analytics/custom/example-graph|");
+      expect(payload).toContain("Traces count");
+      expect(payload).toContain("is greater than");
+      // The value line carries the example currentValue, not a blank.
+      expect(payload).toContain("12");
+    });
+  });
+
+  describe("given a graph-alert draft with null templates (framework defaults)", () => {
+    it("falls back to the ALERT defaults, not the trace defaults", async () => {
+      const { notifier, sentSlack } = makeNotifier();
+      const service = makeService(notifier);
+
+      const result = await service.testFire({
+        channel: "slack",
+        trigger: TRIGGER,
+        project: PROJECT,
+        draft: {},
+        recipients: [],
+        webhook: "https://hooks.slack.com/services/abc",
+        graphAlert: { metricLabel: "Traces count" },
+      });
+
+      expect(result.usedDefault).toBe(true);
+      const payload = JSON.stringify(sentSlack[0]?.payload);
+      expect(payload).toContain("Traces count");
+      expect(payload).not.toContain("matching trace");
+    });
+  });
+
   describe("testFire", () => {
     describe("when the channel is email and recipients are configured", () => {
       it("sends a banner-marked email to the recipients", async () => {
