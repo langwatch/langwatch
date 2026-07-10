@@ -110,7 +110,11 @@ import type { TraceAnalyticsData } from "./pipelines/trace-processing/projection
 import { TraceAnalyticsStore } from "./pipelines/trace-processing/projections/traceAnalytics.store";
 import { TraceAnalyticsRollupAppendStore } from "./pipelines/trace-processing/projections/traceAnalyticsRollup.store";
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
-import { resolveClaudeTurnLogCap } from "~/server/app-layer/traces/claude-code-log-to-span";
+import {
+  resolveClaudeTurnLogCap,
+  resolveClaudeTurnMaxBatches,
+} from "~/server/app-layer/traces/claude-code-log-to-span";
+import { createRedisClaudeTurnConversionStateStore } from "~/server/app-layer/traces/claude-code-turn-conversion.state-store.redis";
 import { createClaudeCodeSpanSyncReactor } from "./pipelines/trace-processing/reactors/claudeCodeSpanSync.reactor";
 import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
 import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
@@ -483,12 +487,19 @@ export class PipelineRegistry {
     });
 
     const claudeCodeSpanSyncReactor = createClaudeCodeSpanSyncReactor({
-      getMarkedClaudeCodeLogs: (tenantId, traceId, occurredAtMs, limit) =>
+      getMarkedClaudeCodeLogs: (
+        tenantId,
+        traceId,
+        occurredAtMs,
+        limit,
+        afterKey,
+      ) =>
         this.deps.repositories.logRecordStorage.getMarkedClaudeCodeLogsByTrace(
           tenantId,
           traceId,
           occurredAtMs,
           limit,
+          afterKey,
         ),
       countMarkedClaudeCodeLogs: (tenantId, traceId, occurredAtMs) =>
         this.deps.repositories.logRecordStorage.countMarkedClaudeCodeLogsByTrace(
@@ -496,12 +507,22 @@ export class PipelineRegistry {
           traceId,
           occurredAtMs,
         ),
-      // Per-turn conversion cap (env LANGWATCH_CLAUDE_TURN_LOG_CAP, default
-      // CLAUDE_TURN_LOG_CAP). Bounds how many of a pathological turn's marked
-      // logs the span-sync reactor folds in one pass so a runaway turn can't
-      // seize the worker; the root span is marked truncated when the cap bites.
+      // Persisted incremental conversion state so each pass converts only the
+      // records after the last cursor. Redis-backed; degrades to re-convert from
+      // zero when no Redis (still correct via the idempotent full redraw).
+      stateStore: createRedisClaudeTurnConversionStateStore(this.deps.redis),
+      // Records converted per batch (env LANGWATCH_CLAUDE_TURN_LOG_CAP, default
+      // CLAUDE_TURN_LOG_CAP). The reactor pages the turn in batches of this size,
+      // converging a turn of ANY size across passes.
       turnLogCap: resolveClaudeTurnLogCap(
         process.env.LANGWATCH_CLAUDE_TURN_LOG_CAP,
+      ),
+      // Max batches one job converts before yielding (env
+      // LANGWATCH_CLAUDE_TURN_MAX_BATCHES, default MAX_CONVERSION_BATCHES_PER_JOB)
+      // so one pathological turn can't seize the worker; the rest converges on
+      // the next event's debounced job.
+      maxBatches: resolveClaudeTurnMaxBatches(
+        process.env.LANGWATCH_CLAUDE_TURN_MAX_BATCHES,
       ),
       recordSpan: recordSpanDispatch.fn,
     });

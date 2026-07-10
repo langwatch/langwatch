@@ -80,8 +80,17 @@ import {
   buildInputMessagesFromRequestBody,
   collectToolResultsFromRequestBody,
   extractAssistantOutputFromResponseBody,
+  extractAssistantTextFromResponseBody,
   isConversationalQuerySource,
 } from "./canonicalisation/extractors/claudeCode";
+import {
+  type ClaudeTurnConversionState,
+  type ClaudeTurnCursor,
+  type ClaudeTurnRootState,
+  carriedToRecord,
+  emptyClaudeTurnConversionState,
+  recordToCarried,
+} from "./claude-code-turn-conversion.state";
 
 export const CLAUDE_CODE_EVENT_SCOPE = "com.anthropic.claude_code.events";
 
@@ -182,6 +191,30 @@ export const CLAUDE_TURN_LOG_CAP = 2000;
 export const MAX_CLAUDE_TURN_LOG_CAP = 20000;
 
 /**
+ * Max conversion batches one span-sync job runs before yielding. The reactor
+ * pages a turn's marked logs in batches of {@link CLAUDE_TURN_LOG_CAP} records,
+ * converging a turn of ANY size across passes; this ceiling bounds how much ONE
+ * job does so a single pathological turn can never seize the worker. At the
+ * defaults one job converts up to `cap × maxBatches` = 50,000 records; a turn
+ * larger than that finishes on the next event's debounced job (every record
+ * still fires a job, so the last record's job converges the turn). While a job
+ * exits still behind, the root span carries the truncation marker, cleared once
+ * a later pass catches up.
+ */
+export const MAX_CONVERSION_BATCHES_PER_JOB = 25;
+
+/** Upper bound on the operator-supplied max-batches override. */
+export const MAX_CLAUDE_TURN_MAX_BATCHES = 500;
+
+/**
+ * TTL (seconds) for the per-turn conversion state in Redis (48h). Outlasts the
+ * longest single turn plus late-arriving export batches; refreshed on every
+ * write so an active turn's state never expires mid-conversion. Well under the
+ * platform default so an abandoned turn's state is reclaimed.
+ */
+export const CLAUDE_TURN_CONVERSION_STATE_TTL_SECONDS = 48 * 60 * 60;
+
+/**
  * Root-span attribute set to `true` when a turn's log set exceeded
  * {@link CLAUDE_TURN_LOG_CAP} and the conversion was bounded, so the truncation
  * is observable in the trace. Named under the existing `langwatch.claude_code.*`
@@ -209,6 +242,19 @@ export function resolveClaudeTurnLogCap(raw: string | undefined): number {
   const parsed = Number(raw);
   if (!Number.isInteger(parsed) || parsed < 1) return CLAUDE_TURN_LOG_CAP;
   return Math.min(parsed, MAX_CLAUDE_TURN_LOG_CAP);
+}
+
+/**
+ * Resolve the operator-configured max conversion batches per job from an env
+ * value, clamped to `[1, MAX_CLAUDE_TURN_MAX_BATCHES]`. Absent, non-numeric, or
+ * below-one values fall back to {@link MAX_CONVERSION_BATCHES_PER_JOB}.
+ */
+export function resolveClaudeTurnMaxBatches(raw: string | undefined): number {
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    return MAX_CONVERSION_BATCHES_PER_JOB;
+  }
+  return Math.min(parsed, MAX_CLAUDE_TURN_MAX_BATCHES);
 }
 
 /**
@@ -301,6 +347,26 @@ const bySequence = (
   return sa - sb;
 };
 
+/**
+ * The resource + scope of the first record that carries either, so a span
+ * rebuilt from carried records (which drop resource/scope to stay compact) takes
+ * the batch's turn-uniform resource/scope.
+ */
+function firstResourceScope(records: ClaudeCodeLogRecordInput[]): {
+  resource: OtlpResource | null;
+  instrumentationScope: OtlpInstrumentationScope | null;
+} {
+  for (const record of records) {
+    if (record.resource || record.instrumentationScope) {
+      return {
+        resource: record.resource,
+        instrumentationScope: record.instrumentationScope,
+      };
+    }
+  }
+  return { resource: null, instrumentationScope: null };
+}
+
 function groupByTrace(
   records: ClaudeCodeLogRecordInput[],
 ): Map<string, ClaudeCodeLogRecordInput[]> {
@@ -339,7 +405,19 @@ export function convertClaudeCodeTurnToSpans(
 ): SynthesizedClaudeSpan[] {
   const out: SynthesizedClaudeSpan[] = [];
   for (const traceRecords of groupByTrace(records).values()) {
-    out.push(...buildTurnSpans(traceRecords, promptTextById, truncation));
+    // Whole-turn conversion is incremental-with-empty-state over one batch, so a
+    // single conversion core serves both paths (no duplicated join logic). The
+    // seed promptTextById is merged into the empty state's map.
+    const seed = emptyClaudeTurnConversionState();
+    for (const [id, text] of promptTextById) seed.promptTextById[id] = text;
+    out.push(
+      ...convertTurnBatch({
+        traceId: traceRecords[0]!.traceId,
+        records: traceRecords,
+        state: seed,
+        truncation,
+      }).spans,
+    );
   }
   return out;
 }
@@ -349,39 +427,188 @@ export interface ClaudeTurnTruncation {
   droppedLogCount: number;
 }
 
-function buildTurnSpans(
-  records: ClaudeCodeLogRecordInput[],
-  promptTextById: ReadonlyMap<string, string>,
-  truncation: ClaudeTurnTruncation,
-): SynthesizedClaudeSpan[] {
-  const traceId = records[0]?.traceId;
-  if (!traceId) return [];
+/**
+ * Incremental entry point: convert ONE batch of a turn's claude logs against the
+ * carried conversion `state`, returning the batch's spans plus the `nextState`
+ * to persist for the following batch. The whole-turn function above is exactly
+ * this over the empty state with the whole turn as one batch, so both paths run
+ * the same {@link convertTurnBatch} core.
+ *
+ * Cross-batch joins are completed by re-emitting the carried records (an anchor
+ * still missing a body/response, an orphan body/response, a tool event whose
+ * output has not yet been recovered) alongside the new batch: the deterministic
+ * span ids + completeness nudge make the later, more complete emission win the
+ * stored_spans ReplacingMergeTree dedup, so the turn converges regardless of how
+ * the records were partitioned into batches.
+ */
+export function convertClaudeCodeTurnToSpansIncremental({
+  traceId,
+  records,
+  state,
+  truncation = { droppedLogCount: 0 },
+}: {
+  traceId: string;
+  records: ClaudeCodeLogRecordInput[];
+  state: ClaudeTurnConversionState;
+  truncation?: ClaudeTurnTruncation;
+}): { spans: SynthesizedClaudeSpan[]; nextState: ClaudeTurnConversionState } {
+  return convertTurnBatch({ traceId, records, state, truncation });
+}
 
+/**
+ * The single conversion core. Merges the carried records with this batch, runs
+ * the model + tool joins over the combined set, re-parents every produced span
+ * under the deterministic root, re-emits the root from accumulated state + this
+ * batch, and computes the next state (advanced cursor, updated root
+ * accumulators, refreshed prompt map, and the records still awaiting a join
+ * partner as the next carry set).
+ */
+function convertTurnBatch({
+  traceId,
+  records,
+  state,
+  truncation,
+}: {
+  traceId: string;
+  records: ClaudeCodeLogRecordInput[];
+  state: ClaudeTurnConversionState;
+  truncation: ClaudeTurnTruncation;
+}): { spans: SynthesizedClaudeSpan[]; nextState: ClaudeTurnConversionState } {
   // Deterministic per-turn root id so every re-fold parents children identically.
   const rootSpanId = createHash("sha256")
     .update(`${traceId}:claude_root`)
     .digest("hex")
     .slice(0, 16);
 
-  const children = [
-    ...buildModelSpansForTrace(records, promptTextById),
-    ...buildToolSpansForTrace(records),
-  ];
-  for (const child of children) {
-    child.span.parentSpanId = rootSpanId;
+  // Prompt map: carried entries plus any user_prompt in this batch. A later
+  // model call whose request body claude truncated inline reads its input here.
+  const promptTextById = new Map<string, string>(
+    Object.entries(state.promptTextById),
+  );
+  for (const record of records) {
+    if (record.eventName !== "user_prompt") continue;
+    const promptId = asNonEmpty(record.attrs["prompt.id"]);
+    const promptText = asNonEmpty(record.attrs.prompt);
+    if (promptId && promptText) promptTextById.set(promptId, promptText);
   }
 
-  if (children.length === 0) return [];
+  // Combine the carried records (projected back to full shape) with this batch.
+  // The carried set is what makes a cross-batch join complete on a later pass.
+  // Carried records drop resource/scope to stay compact; backfill them from this
+  // batch (turn-uniform: same session + service), so a re-emitted carried span
+  // carries the same resource/scope the batch that OWNS the record emitted.
+  const batchResourceScope = firstResourceScope(records);
+  const carried = state.carryRecords.map((c) => {
+    const record = carriedToRecord(c, traceId);
+    record.resource = batchResourceScope.resource;
+    record.instrumentationScope = batchResourceScope.instrumentationScope;
+    return record;
+  });
+  const combined = [...carried, ...records];
 
-  const root = buildRootSpan({
-    records,
+  const model = buildModelSpansForTrace(combined, promptTextById);
+  const tool = buildToolSpansForTrace(combined);
+  const children = [...model.spans, ...tool.spans];
+  for (const child of children) child.span.parentSpanId = rootSpanId;
+
+  // The next carry set: records whose span could still change on a later batch.
+  // Deduped by identity so a record carried twice (still unresolved) stays once.
+  const nextCarry = dedupeCarry([...model.unresolved, ...tool.unresolved]);
+
+  // Progress counters advance by this batch's OWN new terminal records (an
+  // api_request anchor, a tool_result), never by carried re-emissions, so the
+  // count is the distinct total at convergence (each record lands in exactly one
+  // batch), the monotonic, partition-invariant driver for the root nudge.
+  const newAnchors = records.filter(
+    (r) => r.eventName === "api_request",
+  ).length;
+  const newToolResults = records.filter(
+    (r) => r.eventName === "tool_result",
+  ).length;
+
+  const nextRoot = accumulateRoot({
+    prev: state.root,
+    batch: records,
+    combined,
+    children,
+    newAnchors,
+    newToolResults,
+    promptTextById,
+  });
+
+  const cursor = advanceCursor(state.cursor, records);
+
+  const nextState: ClaudeTurnConversionState = {
+    cursor,
+    carryRecords: nextCarry.map(recordToCarried),
+    promptTextById: Object.fromEntries(promptTextById),
+    root: nextRoot,
+  };
+
+  // The turn has real content once any model/tool call has ever been converted.
+  const turnHasContent =
+    nextRoot.modelCallCount + nextRoot.toolCallCount > 0;
+
+  if (children.length === 0 && !turnHasContent) {
+    // Nothing convertible yet (e.g. only a user_prompt so far): no root without
+    // content, but the accumulated state still advances so a later batch that
+    // brings the first model/tool call can build the root from it.
+    return { spans: [], nextState };
+  }
+
+  // Emit the root whenever the turn has content, even if THIS batch produced no
+  // new child spans (a catch-up pass completing tool outputs, or a truncation
+  // re-stamp over an empty batch): the children dispatched on prior passes
+  // persist in stored_spans, and the root re-emits idempotently under its stable
+  // id with the accumulated envelope + the current truncation flag.
+  const root = buildRootSpanFromState({
     traceId,
     rootSpanId,
     children,
-    promptTextById,
+    root: nextRoot,
+    combined,
     truncation,
   });
-  return [root, ...children];
+  return { spans: [root, ...children], nextState };
+}
+
+/** Advance the cursor to the batch's last record in (time, sequence) order. */
+function advanceCursor(
+  prev: ClaudeTurnCursor,
+  batch: ClaudeCodeLogRecordInput[],
+): ClaudeTurnCursor {
+  let cursor = prev;
+  for (const record of batch) {
+    const sequence = asNumber(record.attrs["event.sequence"]) ?? 0;
+    if (
+      record.timeUnixMs > cursor.timeUnixMs ||
+      (record.timeUnixMs === cursor.timeUnixMs && sequence > cursor.sequence)
+    ) {
+      cursor = { timeUnixMs: record.timeUnixMs, sequence };
+    }
+  }
+  return cursor;
+}
+
+/** Dedupe carried records by (eventName, ordering, key attrs) identity. */
+function dedupeCarry(
+  records: ClaudeCodeLogRecordInput[],
+): ClaudeCodeLogRecordInput[] {
+  const seen = new Set<string>();
+  const out: ClaudeCodeLogRecordInput[] = [];
+  for (const record of records) {
+    const key = [
+      record.eventName,
+      record.timeUnixMs,
+      record.attrs["event.sequence"] ?? "",
+      record.attrs.request_id ?? "",
+      record.attrs.tool_use_id ?? "",
+    ].join("|");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(record);
+  }
+  return out;
 }
 
 /**
@@ -395,15 +622,25 @@ export function convertClaudeCodeLogsToSpans(
 ): SynthesizedClaudeSpan[] {
   const out: SynthesizedClaudeSpan[] = [];
   for (const traceRecords of groupByTrace(records).values()) {
-    out.push(...buildModelSpansForTrace(traceRecords, promptTextById));
+    out.push(...buildModelSpansForTrace(traceRecords, promptTextById).spans);
   }
   return out;
 }
 
+/**
+ * The model spans for a set of records, plus the records whose span is not yet
+ * complete and must be re-fed on a later batch: an anchor still missing its
+ * request body or response (its span improves once the missing half lands) and
+ * an orphan body / response with no anchor yet (it is never emitted alone but
+ * pairs with its anchor when that anchor arrives).
+ */
 function buildModelSpansForTrace(
   records: ClaudeCodeLogRecordInput[],
   promptTextById: ReadonlyMap<string, string>,
-): SynthesizedClaudeSpan[] {
+): {
+  spans: SynthesizedClaudeSpan[];
+  unresolved: ClaudeCodeLogRecordInput[];
+} {
   const anchors = records
     .filter((r) => r.eventName === "api_request")
     .sort(bySequence);
@@ -417,6 +654,7 @@ function buildModelSpansForTrace(
   const usedBodies = new Set<number>();
   const usedResponses = new Set<number>();
   const spans: SynthesizedClaudeSpan[] = [];
+  const unresolved: ClaudeCodeLogRecordInput[] = [];
 
   for (const anchor of anchors) {
     // OUTPUT join: exact request_id match (consume-once). The response and the
@@ -449,12 +687,29 @@ function buildModelSpansForTrace(
     if (bodyIdx >= 0) usedBodies.add(bodyIdx);
 
     spans.push(buildModelSpan(anchor, body, response, promptTextById));
+
+    // The anchor's span still improves if a part is missing this pass: carry the
+    // anchor (and the parts it DID pair with) so the completeness-nudged re-emit
+    // once the missing half lands wins the stored_spans max(StartTime) dedup.
+    if (!body || !response) {
+      unresolved.push(anchor);
+      if (body) unresolved.push(body);
+      if (response) unresolved.push(response);
+    }
   }
 
   // A request/response body with no anchor in the set is NOT emitted on its own
-  // — it pairs with its anchor once that anchor is in the folded turn. This is
-  // what removes the cross-batch orphan-body duplicate by construction.
-  return spans;
+  //, it pairs with its anchor once that anchor is in the folded turn. Carry
+  // every still-unpaired body/response so a future batch's anchor completes it;
+  // this is what removes the cross-batch orphan-body duplicate by construction.
+  bodies.forEach((body, i) => {
+    if (!usedBodies.has(i)) unresolved.push(body);
+  });
+  responses.forEach((response, i) => {
+    if (!usedResponses.has(i)) unresolved.push(response);
+  });
+
+  return { spans, unresolved };
 }
 
 function baseAttrs(record: ClaudeCodeLogRecordInput): OtlpKeyValue[] {
@@ -728,99 +983,189 @@ const CLAUDE_ROOT_HANDLED_ATTRS = new Set<string>([
 const SPAN_NAME_MAX = 80;
 
 /**
- * The turn ROOT span: the user_prompt becomes one parentless span per turn that
- * carries the turn input, with the model + tool spans hanging under it. A single
- * root replaces the old flat fan of parentless model spans, so the trace has a
- * real shape and the input/output gates in the fold work off one root. Its
- * timing envelopes its children (and the user_prompt event). The SpanId is a
- * stable hash of the trace, so every re-fold produces the same root.
+ * Fold this batch's records into the root accumulators. The root agent span is
+ * re-emitted every pass from this accumulated state + the current children's
+ * time envelope, so a turn spread across batches grows one convergent root
+ * rather than a flapping partial one. Accumulators only ever move forward
+ * (earliest start, first-seen input/session, latest genuine assistant reply,
+ * incrementing counts), so re-running a batch is idempotent.
  */
-function buildRootSpan({
-  records,
-  traceId,
-  rootSpanId,
+function accumulateRoot({
+  prev,
+  batch,
+  combined,
   children,
+  newAnchors,
+  newToolResults,
   promptTextById,
-  truncation,
 }: {
-  records: ClaudeCodeLogRecordInput[];
-  traceId: string;
-  rootSpanId: string;
+  prev: ClaudeTurnRootState;
+  batch: ClaudeCodeLogRecordInput[];
+  combined: ClaudeCodeLogRecordInput[];
   children: SynthesizedClaudeSpan[];
+  newAnchors: number;
+  newToolResults: number;
   promptTextById: ReadonlyMap<string, string>;
-  truncation: ClaudeTurnTruncation;
-}): SynthesizedClaudeSpan {
-  const userPrompt = records.find((r) => r.eventName === "user_prompt") ?? null;
-  const promptText =
+}): ClaudeTurnRootState {
+  const userPrompt = batch.find((r) => r.eventName === "user_prompt") ?? null;
+
+  // The turn envelope: earliest record start and latest child end, accumulated
+  // across batches so a later batch bringing an earlier-ending span never shrinks
+  // the root's end (which re-deriving per batch would).
+  let startMs = prev.startMs;
+  for (const record of batch) startMs = Math.min(startMs, record.timeUnixMs);
+  let endMs = prev.endMs;
+  for (const child of children) {
+    endMs = Math.max(endMs, nanoToMs(child.span.endTimeUnixNano));
+    startMs = Math.min(startMs, nanoToMs(child.span.startTimeUnixNano));
+  }
+
+  const input =
+    prev.input ??
     asNonEmpty(userPrompt?.attrs.prompt) ??
     asNonEmpty([...promptTextById.values()][0]);
 
   const sessionId =
+    prev.sessionId ??
     asNonEmpty(userPrompt?.attrs["session.id"]) ??
-    asNonEmpty(records.find((r) => r.attrs["session.id"])?.attrs["session.id"]);
+    asNonEmpty(batch.find((r) => r.attrs["session.id"])?.attrs["session.id"]);
 
-  const attrs: OtlpKeyValue[] = [strAttr(ATTR_KEYS.SPAN_TYPE, "agent")];
-  if (sessionId) {
-    attrs.push(strAttr(ATTR_KEYS.GEN_AI_CONVERSATION_ID, sessionId));
-    attrs.push(strAttr(ATTR_KEYS.LANGWATCH_THREAD_ID, sessionId));
+  // Provenance is set once from the first user_prompt seen (the turn has one).
+  let provenance = prev.provenance;
+  if (Object.keys(provenance).length === 0 && userPrompt) {
+    provenance = {};
+    for (const [key, value] of Object.entries(userPrompt.attrs)) {
+      if (CLAUDE_ROOT_HANDLED_ATTRS.has(key)) continue;
+      const clean = asNonEmpty(value);
+      if (clean) provenance[key] = clean;
+    }
   }
-  // Mark the turn as truncated when the caller bounded the conversion, so the
-  // drop is observable at read instead of silently missing spans.
+
+  // The latest genuine conversational assistant reply text, for observability on
+  // the root. Utility calls (title, autosuggest) are excluded exactly as the
+  // trace headline gate does. Read from this batch's responses in wire order.
+  let lastAssistantResponse = prev.lastAssistantResponse;
+  const responses = combined
+    .filter((r) => r.eventName === "api_response_body")
+    .sort(bySequence);
+  for (const response of responses) {
+    if (!isConversationalQuerySource(asNonEmpty(response.attrs.query_source))) {
+      continue;
+    }
+    const text = extractAssistantTextFromResponseBody(response.attrs.body);
+    if (text) lastAssistantResponse = text;
+  }
+
+  return {
+    startMs,
+    endMs,
+    input: input ?? null,
+    lastAssistantResponse: lastAssistantResponse ?? null,
+    sessionId: sessionId ?? null,
+    provenance,
+    modelCallCount: prev.modelCallCount + newAnchors,
+    toolCallCount: prev.toolCallCount + newToolResults,
+  };
+}
+
+/**
+ * The turn ROOT span rendered from the accumulated root state + this pass's
+ * children. A single parentless span per turn carries the turn input, with the
+ * model + tool spans hanging under it, so the trace has a real shape and the
+ * fold's input/output gates work off one root. Its timing envelopes its children
+ * and the accumulated start. The SpanId is a stable hash of the trace, so every
+ * re-fold produces the same root (idempotent upsert).
+ */
+function buildRootSpanFromState({
+  traceId,
+  rootSpanId,
+  children,
+  root,
+  combined,
+  truncation,
+}: {
+  traceId: string;
+  rootSpanId: string;
+  children: SynthesizedClaudeSpan[];
+  root: ClaudeTurnRootState;
+  combined: ClaudeCodeLogRecordInput[];
+  truncation: ClaudeTurnTruncation;
+}): SynthesizedClaudeSpan {
+  const attrs: OtlpKeyValue[] = [strAttr(ATTR_KEYS.SPAN_TYPE, "agent")];
+  if (root.sessionId) {
+    attrs.push(strAttr(ATTR_KEYS.GEN_AI_CONVERSATION_ID, root.sessionId));
+    attrs.push(strAttr(ATTR_KEYS.LANGWATCH_THREAD_ID, root.sessionId));
+  }
+  // Mark the turn as truncated when this pass is still behind (more records
+  // remain than the batch converted). When a later pass catches up the caller
+  // passes droppedLogCount 0 and this block is skipped, so the attribute is
+  // omitted on the catch-up re-emission and the UI-visible value flips.
   if (truncation.droppedLogCount > 0) {
     attrs.push(boolAttr(CLAUDE_TRUNCATED_LOGS_ATTR, true));
     attrs.push(intAttr(CLAUDE_DROPPED_LOG_COUNT_ATTR, truncation.droppedLogCount));
   }
-  if (promptText) {
+  if (root.input) {
     attrs.push(
       strAttr(
         ATTR_KEYS.LANGWATCH_INPUT,
-        capPayloadString(promptText, undefined, "claude_input"),
+        capPayloadString(root.input, undefined, "claude_input"),
       ),
     );
   }
   // user_prompt provenance (command_name, command_source, prompt_length, …).
-  if (userPrompt) {
-    for (const [key, value] of Object.entries(userPrompt.attrs)) {
-      if (CLAUDE_ROOT_HANDLED_ATTRS.has(key)) continue;
-      const clean = asNonEmpty(value);
-      if (clean) attrs.push(strAttr(`claude_code.${key}`, clean));
-    }
+  for (const [key, value] of Object.entries(root.provenance)) {
+    attrs.push(strAttr(`claude_code.${key}`, value));
   }
 
-  // Envelope the children (and the user_prompt event) in time.
-  let startMs = Number.POSITIVE_INFINITY;
-  let endMs = Number.NEGATIVE_INFINITY;
+  // The root envelope comes from the ACCUMULATED root state (min start, max end
+  // across every batch), so a later batch that brings an earlier-ending span
+  // never shrinks it and every partition converges to the same envelope.
+  let startMs = Number.isFinite(root.startMs) ? root.startMs : 0;
+  let endMs = Number.isFinite(root.endMs) ? root.endMs : startMs;
   for (const child of children) {
     startMs = Math.min(startMs, nanoToMs(child.span.startTimeUnixNano));
     endMs = Math.max(endMs, nanoToMs(child.span.endTimeUnixNano));
   }
-  if (userPrompt) {
-    startMs = Math.min(startMs, userPrompt.timeUnixMs);
-    endMs = Math.max(endMs, userPrompt.timeUnixMs);
-  }
-  if (!Number.isFinite(startMs)) startMs = userPrompt?.timeUnixMs ?? 0;
-  if (!Number.isFinite(endMs)) endMs = startMs;
 
-  const name = rootSpanName(promptText);
-  const resource = userPrompt?.resource ?? children[0]?.resource ?? null;
+  const name = rootSpanName(root.input);
+  // Resource + scope from the first record that carries them, else the first
+  // child's. Carried records drop resource/scope to stay small, so a root built
+  // in a pass whose combined set is all carried takes them from a child instead.
+  const provenanceSource =
+    combined.find((r) => r.resource || r.instrumentationScope) ?? null;
+  const resource = provenanceSource?.resource ?? children[0]?.resource ?? null;
   const instrumentationScope =
-    userPrompt?.instrumentationScope ??
+    provenanceSource?.instrumentationScope ??
     children[0]?.instrumentationScope ??
     null;
 
-  return {
-    span: makeSpan({
-      traceId,
-      spanId: rootSpanId,
-      name,
-      startMs,
-      endMs,
-      attributes: attrs,
-      kind: "SPAN_KIND_SERVER",
-    }),
-    resource,
-    instrumentationScope,
-  };
+  const span = makeSpan({
+    traceId,
+    spanId: rootSpanId,
+    name,
+    startMs,
+    endMs,
+    attributes: attrs,
+    kind: "SPAN_KIND_SERVER",
+  });
+  // Convergence nudge (idempotency, load-bearing). The root's emitted StartTime
+  // gains a MONOTONIC per-converted-call offset, in NANOSECONDS, so it is
+  // invisible in the millisecond waterfall, so a later root re-emission that has
+  // enveloped MORE of the turn has a strictly greater StartTime and wins the
+  // stored_spans max(StartTime) read dedup + RMT merge over an earlier, less
+  // complete root. The driver (model + tool spans converted so far) only ever
+  // increases and converges to the SAME fixpoint for the whole-turn single pass
+  // and any batch partition, so they all land the same root. Two roots at the
+  // same call count carry identical attributes (a later tool OUTPUT lives on the
+  // CHILD span, not the root), so a tie between them is harmless. Without this,
+  // the accumulated min-start would make a later, fuller root tie or lose an
+  // earlier partial one.
+  const progress = root.modelCallCount + root.toolCallCount;
+  span.startTimeUnixNano = (
+    BigInt(String(span.startTimeUnixNano)) + BigInt(progress)
+  ).toString();
+
+  return { span, resource, instrumentationScope };
 }
 
 /** A short, readable root name from the user's prompt (first line, capped). */
@@ -867,14 +1212,24 @@ export function convertClaudeCodeToolLogsToSpans(
 ): SynthesizedClaudeSpan[] {
   const out: SynthesizedClaudeSpan[] = [];
   for (const traceRecords of groupByTrace(records).values()) {
-    out.push(...buildToolSpansForTrace(traceRecords));
+    out.push(...buildToolSpansForTrace(traceRecords).spans);
   }
   return out;
 }
 
+/**
+ * The tool spans for a set of records, plus the tool records still awaiting a
+ * cross-batch join: a `tool_decision` whose terminal `tool_result` has not
+ * landed, and a `tool_result` whose OUTPUT has not been recovered yet (its
+ * output rides on a LATER model call's request body, which may be in a future
+ * batch).
+ */
 function buildToolSpansForTrace(
   records: ClaudeCodeLogRecordInput[],
-): SynthesizedClaudeSpan[] {
+): {
+  spans: SynthesizedClaudeSpan[];
+  unresolved: ClaudeCodeLogRecordInput[];
+} {
   // Recover tool outputs from every model request body in the turn: a later
   // call feeds each tool's result back as a tool_result block keyed by
   // tool_use_id. Merge across bodies (first occurrence wins).
@@ -917,16 +1272,25 @@ function buildToolSpansForTrace(
   }
 
   const spans: SynthesizedClaudeSpan[] = [];
+  const unresolved: ClaudeCodeLogRecordInput[] = [];
   for (const [toolUseId, { decision, result }] of byToolUseId) {
-    const span = buildToolSpan(
-      toolUseId,
-      decision,
-      result,
-      toolOutputsByUseId.get(toolUseId) ?? null,
-    );
-    if (span) spans.push(span);
+    const output = toolOutputsByUseId.get(toolUseId) ?? null;
+    const span = buildToolSpan(toolUseId, decision, result, output);
+    if (span) {
+      spans.push(span);
+      // The result span still improves if its output has not been recovered:
+      // carry the result (and decision) so a future batch's model request body
+      // that echoes this tool_result completes the span with its output.
+      if (!output) {
+        unresolved.push(result!);
+        if (decision) unresolved.push(decision);
+      }
+    } else {
+      // A decision with no terminal result yet: carry it until the result lands.
+      if (decision) unresolved.push(decision);
+    }
   }
-  return spans;
+  return { spans, unresolved };
 }
 
 function buildToolSpan(

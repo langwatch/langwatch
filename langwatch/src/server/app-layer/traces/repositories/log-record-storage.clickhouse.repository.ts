@@ -89,6 +89,7 @@ export class LogRecordStorageClickHouseRepository
     traceId: string,
     occurredAtMs?: number,
     limit?: number,
+    afterKey?: { timeUnixMs: number; sequence: number },
   ): Promise<StoredLogRecordRow[]> {
     EventUtils.validateTenantId(
       { tenantId },
@@ -148,10 +149,24 @@ export class LogRecordStorageClickHouseRepository
     const orderBy =
       "ORDER BY TimeUnixMs ASC, toInt64OrZero(Attributes['event.sequence']) ASC";
     // Bound the read when the caller caps the conversion (Claude turn log cap):
-    // the reactor requests cap+1 so it can detect overflow, and the LIMIT keeps
-    // a pathological turn from materializing every marked row.
+    // the reactor requests one batch of `cap` records per pass, and the LIMIT
+    // keeps a pathological turn from materializing every marked row.
     const hasLimit = typeof limit === "number" && limit > 0;
     const limitClause = hasLimit ? "LIMIT {limit:UInt64}" : "";
+
+    // Incremental paging: fetch only records strictly after the last converted
+    // record's `(TimeUnixMs, event.sequence)` order key, mirroring the ORDER BY
+    // so a lexicographic tuple compare pages the turn one batch at a time. The
+    // column is qualified with the table name because the outer SELECT aliases
+    // `toUnixTimestamp64Milli(TimeUnixMs) AS TimeUnixMs`; a bare TimeUnixMs in
+    // WHERE would bind to that ms-integer alias, not the DateTime64 column. The
+    // sequence side reuses the same toInt64OrZero the ORDER BY uses so a
+    // non-numeric / missing sequence compares identically on both sides.
+    const hasAfterKey = afterKey !== undefined;
+    const afterKeyClause = hasAfterKey
+      ? `AND (${TABLE_NAME}.TimeUnixMs, toInt64OrZero(${TABLE_NAME}.Attributes['event.sequence'])) ` +
+        `> (fromUnixTimestamp64Milli({afterMs:Int64}), {afterSeq:Int64})`
+      : "";
 
     const result = await client.query({
       query: `
@@ -167,6 +182,7 @@ export class LogRecordStorageClickHouseRepository
         WHERE TenantId = {tenantId:String}
           AND TraceId = {traceId:String}
           ${timeFilter}
+          ${afterKeyClause}
           AND (TenantId, TraceId, SpanId, ProjectionId, UpdatedAt) IN (
             SELECT TenantId, TraceId, SpanId, ProjectionId, max(UpdatedAt)
             FROM ${TABLE_NAME}
@@ -186,6 +202,9 @@ export class LogRecordStorageClickHouseRepository
         fromMs,
         toMs,
         ...(hasLimit ? { limit } : {}),
+        ...(hasAfterKey
+          ? { afterMs: afterKey.timeUnixMs, afterSeq: afterKey.sequence }
+          : {}),
       },
       format: "JSONEachRow",
     });
