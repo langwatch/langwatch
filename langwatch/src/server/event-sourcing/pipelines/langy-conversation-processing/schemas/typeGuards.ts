@@ -1,0 +1,88 @@
+import { LANGY_CONVERSATION_EVENT_TYPES } from "./constants";
+import type {
+  LangyAgentRespondedEvent,
+  LangyAgentTurnCompletedEvent,
+  LangyAgentTurnFailedEvent,
+  LangyAgentTurnStartedEvent,
+  LangyConversationArchivedEvent,
+  LangyConversationMetadataUpdatedEvent,
+  LangyConversationProcessingEvent,
+  LangyMessageSentEvent,
+  LangyProgressReportedEvent,
+  LangyStatusReportedEvent,
+  LangyToolCallCompletedEvent,
+  LangyToolCallStartedEvent,
+  LangyTurnFinalizedEvent,
+} from "./events";
+
+export function isLangyMessageSentEvent(
+  event: LangyConversationProcessingEvent,
+): event is LangyMessageSentEvent {
+  return event.type === LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_SENT;
+}
+
+export function isLangyAgentTurnStartedEvent(
+  event: LangyConversationProcessingEvent,
+): event is LangyAgentTurnStartedEvent {
+  return event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_STARTED;
+}
+
+export function isLangyToolCallStartedEvent(
+  event: LangyConversationProcessingEvent,
+): event is LangyToolCallStartedEvent {
+  return event.type === LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_STARTED;
+}
+
+export function isLangyToolCallCompletedEvent(
+  event: LangyConversationProcessingEvent,
+): event is LangyToolCallCompletedEvent {
+  return event.type === LANGY_CONVERSATION_EVENT_TYPES.TOOL_CALL_COMPLETED;
+}
+
+export function isLangyAgentRespondedEvent(
+  event: LangyConversationProcessingEvent,
+): event is LangyAgentRespondedEvent {
+  return event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED;
+}
+
+export function isLangyAgentTurnCompletedEvent(
+  event: LangyConversationProcessingEvent,
+): event is LangyAgentTurnCompletedEvent {
+  return event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_COMPLETED;
+}
+
+export function isLangyAgentTurnFailedEvent(
+  event: LangyConversationProcessingEvent,
+): event is LangyAgentTurnFailedEvent {
+  return event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_FAILED;
+}
+
+export function isLangyStatusReportedEvent(
+  event: LangyConversationProcessingEvent,
+): event is LangyStatusReportedEvent {
+  return event.type === LANGY_CONVERSATION_EVENT_TYPES.STATUS_REPORTED;
+}
+
+export function isLangyProgressReportedEvent(
+  event: LangyConversationProcessingEvent,
+): event is LangyProgressReportedEvent {
+  return event.type === LANGY_CONVERSATION_EVENT_TYPES.PROGRESS_REPORTED;
+}
+
+export function isLangyTurnFinalizedEvent(
+  event: LangyConversationProcessingEvent,
+): event is LangyTurnFinalizedEvent {
+  return event.type === LANGY_CONVERSATION_EVENT_TYPES.TURN_FINALIZED;
+}
+
+export function isLangyConversationArchivedEvent(
+  event: LangyConversationProcessingEvent,
+): event is LangyConversationArchivedEvent {
+  return event.type === LANGY_CONVERSATION_EVENT_TYPES.ARCHIVED;
+}
+
+export function isLangyConversationMetadataUpdatedEvent(
+  event: LangyConversationProcessingEvent,
+): event is LangyConversationMetadataUpdatedEvent {
+  return event.type === LANGY_CONVERSATION_EVENT_TYPES.METADATA_UPDATED;
+}

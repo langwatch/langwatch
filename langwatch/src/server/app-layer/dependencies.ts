@@ -25,6 +25,8 @@ import type { PresenceService } from "./presence/presence.service";
 import type { ProjectService } from "./projects/project.service";
 import type { ShareService } from "./share/share.service";
 import type { SimulationRunService } from "./simulations/simulation-run.service";
+import type { LangyConversationService } from "./langy/langy-conversation.service";
+import type { LangyMessageService } from "./langy/langy-message.service";
 import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import type { SuiteRunService } from "./suites/suite-run.service";
@@ -84,6 +86,11 @@ export interface AppDependencies {
   };
   suiteRuns: {
     runs: SuiteRunService;
+  };
+  /** ADR-043: Langy conversations as an event-sourced projection. */
+  langy: {
+    conversations: LangyConversationService;
+    messages: LangyMessageService;
   };
   experiments: ExperimentService;
   triggers: TriggerService;

@@ -271,8 +271,9 @@ const featureFlagIsEnabled = vi.fn();
 const getOrProvision = vi.fn();
 const getModelsAllowed = vi.fn();
 const ensureConversation = vi.fn();
-const touchConversation = vi.fn();
-const appendMessage = vi.fn();
+const recordUserMessage = vi.fn();
+const startTurn = vi.fn();
+const finalizeTurn = vi.fn();
 
 vi.mock("~/server/api/rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/server/api/rbac")>();
@@ -316,28 +317,29 @@ vi.mock("~/server/services/langy/LangyCredentialService", () => ({
     }),
   },
 }));
-vi.mock("~/server/services/langy/LangyConversationService", () => ({
+vi.mock("~/server/app-layer/langy/langy-conversation.service", () => ({
   LangyConversationNotOwnedError: class extends Error {},
-  LangyConversationService: {
-    create: () => ({
-      ensureConversation: (...args: unknown[]) => ensureConversation(...args),
-      bumpActivity: (...args: unknown[]) => touchConversation(...args),
-    }),
-  },
 }));
-vi.mock("~/server/services/langy/LangyMessageService", async () => {
+vi.mock("~/server/app-layer/langy/langy-message.service", async () => {
   const actual = await vi.importActual<
-    typeof import("~/server/services/langy/LangyMessageService")
-  >("~/server/services/langy/LangyMessageService");
-  return {
-    ...actual,
-    LangyMessageService: {
-      create: () => ({
-        append: (...args: unknown[]) => appendMessage(...args),
-      }),
-    },
-  };
+    typeof import("~/server/app-layer/langy/langy-message.service")
+  >("~/server/app-layer/langy/langy-message.service");
+  return { ...actual };
 });
+// The route reaches the event-sourced conversation writers via getApp().langy.
+vi.mock("~/server/app-layer/app", () => ({
+  getApp: () => ({
+    langy: {
+      conversations: {
+        ensureConversation: (...args: unknown[]) => ensureConversation(...args),
+        recordUserMessage: (...args: unknown[]) => recordUserMessage(...args),
+        startTurn: (...args: unknown[]) => startTurn(...args),
+        finalizeTurn: (...args: unknown[]) => finalizeTurn(...args),
+      },
+      messages: {},
+    },
+  }),
+}));
 // `~/server/auth` is already mocked above (getServerAuthSession). The chat
 // route reads the SAME mock; re-point its resolved value per test below.
 
@@ -406,11 +408,11 @@ describe("Feature: Langy chat opens PRs as the requesting user", () => {
   }
 
   function persistedAssistantText(): string {
-    const assistant = appendMessage.mock.calls
-      .map((c) => c[0] as { role: string; parts: { text?: string }[] })
-      .find((a) => a.role === "assistant");
-    expect(assistant).toBeDefined();
-    return assistant!.parts.map((p) => p.text ?? "").join("");
+    const finalized = finalizeTurn.mock.calls
+      .map((c) => c[0] as { parts: { text?: string }[] })
+      .find((a) => Array.isArray(a.parts));
+    expect(finalized).toBeDefined();
+    return finalized!.parts.map((p) => p.text ?? "").join("");
   }
 
   beforeEach(() => {
@@ -436,8 +438,9 @@ describe("Feature: Langy chat opens PRs as the requesting user", () => {
     });
     releaseLangyGithubPrPermit.mockResolvedValue(undefined);
     ensureConversation.mockResolvedValue({ id: "conv-1" });
-    appendMessage.mockResolvedValue({ id: "msg-1" });
-    touchConversation.mockResolvedValue(undefined);
+    recordUserMessage.mockResolvedValue({ messageId: "msg-1" });
+    startTurn.mockResolvedValue({ turnId: "turn-1" });
+    finalizeTurn.mockResolvedValue({ messageId: "msg-2" });
 
     // Connected user: credentials carry a github token + login (this is what
     // the resolver returns once getGithubTokenForUser succeeds).

@@ -51,4 +51,6 @@ export const KSUID_RESOURCES = {
   GROUP: "group",
   ROLE_BINDING: "rolebinding",
   API_KEY_ROLE: "apikeyrole",
+  LANGY_CONVERSATION: "langyconv",
+  LANGY_MESSAGE: "langymsg",
 } as const;

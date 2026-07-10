@@ -2,12 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import {
   type LangyMessageRepository,
   LangyMessageService,
-} from "../LangyMessageService";
+} from "../langy-message.service";
 
 function makeRepo(overrides?: Partial<LangyMessageRepository>) {
   const repo = {
     findAllByConversation: vi.fn(),
-    create: vi.fn(),
     ...overrides,
   } as unknown as LangyMessageRepository;
   return repo;

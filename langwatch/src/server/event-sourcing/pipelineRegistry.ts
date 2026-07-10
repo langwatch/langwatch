@@ -92,6 +92,11 @@ import { createTraceMetricsSyncReactor } from "./pipelines/simulation-processing
 import type { SimulationRunStateRepository } from "./pipelines/simulation-processing/repositories/simulationRunState.repository";
 import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
 import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
+import { createLangyConversationProcessingPipeline } from "./pipelines/langy-conversation-processing/pipeline";
+import type { LangyConversationStateData } from "./pipelines/langy-conversation-processing/projections/langyConversationState.foldProjection";
+import type { ClickHouseLangyMessageRecord } from "./pipelines/langy-conversation-processing/projections/langyMessageStorage.mapProjection";
+import type { LangyConversationStateRepository } from "./pipelines/langy-conversation-processing/repositories/langyConversationState.repository";
+import { LANGY_CONVERSATION_PROJECTION_VERSIONS } from "./pipelines/langy-conversation-processing/schemas/constants";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
@@ -201,6 +206,10 @@ export interface PipelineRepositories {
   /** ADR-034 Phase 6: slim per-evaluation analytics repository. */
   evaluationAnalytics: EvaluationAnalyticsRepository;
   experimentRunItemStorage: AppendStore<ClickHouseExperimentRunResultRecord>;
+  /** ADR-043: Langy conversation spine fold (replaces the Postgres spine). */
+  langyConversationState: LangyConversationStateRepository;
+  /** ADR-043: Langy per-message append sink (existing langy_messages table). */
+  langyMessageStorage: AppendStore<ClickHouseLangyMessageRecord>;
 }
 
 export interface PipelineRegistryDeps {
@@ -285,6 +294,7 @@ export class PipelineRegistry {
     const experimentRunPipeline = this.registerExperimentRunPipeline({
       wireExperimentDeps,
     });
+    const langyConversationPipeline = this.registerLangyConversationPipeline();
     const billingPipeline = this.registerBillingReportingPipeline();
 
     logger.info("All pipelines registered");
@@ -295,10 +305,36 @@ export class PipelineRegistry {
       experimentRuns: mapCommands(experimentRunPipeline.commands),
       simulations: mapCommands(simulationPipeline.commands),
       suiteRuns: mapCommands(suiteRunPipeline.commands),
+      langy: mapCommands(langyConversationPipeline.commands),
       billing: mapCommands(billingPipeline.commands),
       /** Late-bind the execution pool for scenario execution reactor. */
       scenarioExecutionHandle,
     };
+  }
+
+  /**
+   * ADR-043: Langy conversation pipeline. Aggregate `langy_conversation`
+   * (aggregateId = conversationId, TenantId = projectId). A fold projection
+   * writes the conversation spine to `langy_conversations`; a map projection
+   * writes per-message rows to `langy_messages`. No reactor in PR2 — the
+   * streaming worker + reconcile reactor land in PR3.
+   */
+  private registerLangyConversationPipeline() {
+    const langyConversationStateFoldStore =
+      this.cached<LangyConversationStateData>(
+        new RepositoryFoldStore<LangyConversationStateData>(
+          this.deps.repositories.langyConversationState,
+          LANGY_CONVERSATION_PROJECTION_VERSIONS.CONVERSATION_STATE,
+        ),
+        "langy_conversations",
+      );
+
+    return this.deps.eventSourcing.register(
+      createLangyConversationProcessingPipeline({
+        langyConversationStateFoldStore,
+        langyMessageAppendStore: this.deps.repositories.langyMessageStorage,
+      }),
+    );
   }
 
   private registerEvaluationPipeline({
