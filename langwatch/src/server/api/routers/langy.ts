@@ -6,6 +6,7 @@ import type {
   ConversationDetail,
   ConversationListItem,
 } from "~/server/app-layer/langy/langy-conversation.service";
+import { isLangyConversationUpdateVisibleToUser } from "~/server/app-layer/langy/langyConversationUpdateVisibility";
 import { trackServerEvent } from "~/server/posthog";
 import { checkProjectPermission } from "../rbac";
 import {
@@ -214,13 +215,28 @@ export const langyRouter = createTRPCRouter({
     .use(checkProjectPermission(LANGY_READ_PERMISSION))
     .subscription(async function* (opts) {
       const { projectId } = opts.input;
+      const userId = opts.ctx.session.user.id;
       const emitter = getApp().broadcast.getTenantEmitter(projectId);
       try {
         for await (const eventArgs of on(emitter, "langy_conversation_updated", {
           // @ts-expect-error - signal is not typed on the events overload
           signal: opts.signal,
         })) {
-          yield eventArgs[0];
+          const data = eventArgs[0] as { event?: unknown; timestamp?: number };
+          // User-scope gate: the broadcast is tenant-wide, so drop every signal
+          // for a conversation this user cannot access (not owner, not shared),
+          // mirroring the read routes' `(UserId = userId OR IsShared)` rule. A
+          // non-owner must never even learn that another user's private
+          // conversation is active. Fail-closed on any malformed payload.
+          if (
+            !isLangyConversationUpdateVisibleToUser({
+              eventPayload: data.event,
+              userId,
+            })
+          ) {
+            continue;
+          }
+          yield data;
         }
       } finally {
         getApp().broadcast.cleanupTenantEmitter(projectId);
