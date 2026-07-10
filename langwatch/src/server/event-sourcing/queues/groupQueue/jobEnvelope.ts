@@ -16,10 +16,45 @@ const gunzipAsync = promisify(gunzip);
 /**
  * Cap decompression output at the same ceiling encode enforces (ADR-030 §1), so
  * a tampered or corrupt blob (e.g. a tenant zip-bombing their own BYOC object)
- * can't OOM the worker. zlib throws past the limit; decode lets that propagate to
- * the missing-blob fail-safe (complete the slot, recover via replay).
+ * can't OOM the worker. zlib throws past the limit; {@link boundedGunzip}
+ * converts that into {@link PayloadTooLargeError} so the caller parks the group
+ * for inspection instead of dropping the job to replay.
  */
 const DECODE_GUNZIP_OPTS = { maxOutputLength: MAX_BLOB_BYTES };
+
+/**
+ * Gunzip bounded at {@link MAX_BLOB_BYTES}. zlib reports an over-limit output
+ * as ERR_BUFFER_TOO_LARGE (or an "output length" RangeError depending on
+ * version); both mean the same thing here: the staged value would materialize
+ * past the decode ceiling.
+ */
+async function boundedGunzip(data: Buffer): Promise<Buffer> {
+  try {
+    return await gunzipAsync(data, DECODE_GUNZIP_OPTS);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (
+      code === "ERR_BUFFER_TOO_LARGE" ||
+      (err instanceof RangeError && /output length/i.test(err.message))
+    ) {
+      throw new PayloadTooLargeError(MAX_BLOB_BYTES + 1);
+    }
+    throw err;
+  }
+}
+
+/**
+ * Decode-side twin of {@link assertPayloadWithinCap}: values staged before the
+ * encode cap existed (or via the bare-JSON path when envelope writes are off)
+ * must not reach JSON.parse unbounded — a synchronous parse of a runaway value
+ * seizes the worker event loop, which the liveness probe converts into a
+ * process-wide crash loop.
+ */
+function assertDecodeWithinCap(byteLength: number): void {
+  if (byteLength > MAX_BLOB_BYTES) {
+    throw new PayloadTooLargeError(byteLength);
+  }
+}
 
 /**
  * Versioned envelope for staged job values: `GQ<v>|<headerLen>|<headerJson><body>`.
@@ -380,6 +415,7 @@ export async function decodeJobEnvelope({
   parsed?: { header: EnvelopeHeader; body: string };
 }): Promise<Record<string, unknown>> {
   if (!isEnvelope(value)) {
+    assertDecodeWithinCap(Buffer.byteLength(value, "utf8"));
     return JSON.parse(value) as Record<string, unknown>;
   }
 
@@ -405,7 +441,7 @@ export async function decodeJobEnvelope({
       );
     }
     const parsedBody = JSON.parse(
-      (await gunzipAsync(data, DECODE_GUNZIP_OPTS)).toString("utf8"),
+      (await boundedGunzip(data)).toString("utf8"),
     ) as Record<string, unknown>;
     return mergeMachinery(parsedBody, header);
   }
@@ -430,16 +466,15 @@ export async function decodeJobEnvelope({
       );
     }
     return JSON.parse(
-      (await gunzipAsync(data, DECODE_GUNZIP_OPTS)).toString("utf8"),
+      (await boundedGunzip(data)).toString("utf8"),
     ) as Record<string, unknown>;
   }
 
   const json =
     header.e === "gz"
-      ? (
-          await gunzipAsync(Buffer.from(body, "base64"), DECODE_GUNZIP_OPTS)
-        ).toString("utf8")
+      ? (await boundedGunzip(Buffer.from(body, "base64"))).toString("utf8")
       : body;
+  assertDecodeWithinCap(Buffer.byteLength(json, "utf8"));
   const parsedBody = JSON.parse(json) as Record<string, unknown>;
   // GQ2 inline lifted machinery into header.m too; GQ1 (v=1) never did.
   return header.v === 2 ? mergeMachinery(parsedBody, header) : parsedBody;
