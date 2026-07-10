@@ -54,6 +54,11 @@ function fakeRedis() {
     smembers(key: string) {
       return Array.from(sets.get(key) ?? new Set<string>());
     },
+    hdel(key: string, ...fields: string[]) {
+      const h = hashes.get(key);
+      if (!h) return;
+      for (const f of fields) h.delete(f);
+    },
   };
 
   return {
@@ -70,6 +75,10 @@ function fakeRedis() {
         },
         sadd(key: string, member: string) {
           queued.push(() => ops.sadd(key, member));
+          return pipe;
+        },
+        hdel(key: string, ...fields: string[]) {
+          queued.push(() => ops.hdel(key, ...fields));
           return pipe;
         },
         async exec() {
@@ -90,6 +99,9 @@ function fakeRedis() {
     },
     async smembers(key: string) {
       return ops.smembers(key);
+    },
+    async hdel(key: string, ...fields: string[]) {
+      return ops.hdel(key, ...fields);
     },
     async get(key: string) {
       return strings.get(key) ?? null;
@@ -287,6 +299,51 @@ describe("TenantRateTracker", () => {
     // they must be dropped and the silent minutes zero-padded.
     const series = await tracker.perMinuteSeries("proj_acme", 180);
     expect(series).toEqual([0, 0, 9]);
+  });
+
+  it("perMinuteSeries trims minute fields that have aged past the retention window", async () => {
+    const redis = fakeRedis();
+    const tracker = new TenantRateTracker(redis, () => now);
+    const key = "obs:tenant_rate:proj_acme";
+
+    // A field far older than the 8-day retention window — the shape a hash
+    // takes when it grew unbounded before trimming existed. HGETALL would
+    // otherwise fetch every one of these on each cold baseline read.
+    await tracker.record("proj_acme", 5);
+    const staleMinute = String(Math.floor(now / 60_000));
+    now += 30 * 24 * 60 * 60 * 1000; // 30 days later
+    await tracker.record("proj_acme", 9);
+    const freshMinute = String(Math.floor(now / 60_000));
+
+    // Precondition: write-time trim only drops the single field aging out this
+    // tick, so the 30-day-old orphan is still present before the read.
+    expect(await redis.hgetall(key)).toHaveProperty(staleMinute);
+
+    const series = await tracker.perMinuteSeries("proj_acme", 180);
+    expect(series).toEqual([0, 0, 9]);
+
+    // The read trimmed everything past the window; only in-window data remains.
+    const remaining = await redis.hgetall(key);
+    expect(remaining).not.toHaveProperty(staleMinute);
+    expect(remaining).toHaveProperty(freshMinute);
+  });
+
+  it("record trims the field that has just aged out of the retention window", async () => {
+    const redis = fakeRedis();
+    const tracker = new TenantRateTracker(redis, () => now);
+    const key = "obs:tenant_rate:proj_acme";
+
+    await tracker.record("proj_acme", 4);
+    const firstMinute = String(Math.floor(now / 60_000));
+    expect(await redis.hgetall(key)).toHaveProperty(firstMinute);
+
+    // Advance exactly the 8-day retention window and write again: the write
+    // HDELs the field now exactly one full window old, so a continuously-active
+    // tenant's hash can never grow past the window.
+    now += 8 * 24 * 60 * 60 * 1000;
+    await tracker.record("proj_acme", 1);
+
+    expect(await redis.hgetall(key)).not.toHaveProperty(firstMinute);
   });
 
   it("setCachedBaseline honours a caller-provided TTL", async () => {
