@@ -22,7 +22,11 @@ import { checkBudget, renderBudgetExceeded } from "./budget";
 import { getCliBootstrap, GovernanceCliError } from "./cli-api";
 import { runDeviceFlowLogin } from "./login-flow";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
-import { maybeOfferIngestionShellRcPersist } from "./shell-rc";
+import {
+  maybeOfferIngestionShellRcPersist,
+  SHELL_FUNCTION_TOOLS,
+} from "./shell-rc";
+import { copilotPrespawnWarnings } from "./copilot-prespawn";
 import { copilotSeatBypassSuffix, resolveWrapperMode } from "./wrapper-mode";
 import { createCodexIOStreamer } from "./codex-rollout-otlp";
 import { parseToolModeFlag, resolveWrapperPath } from "./wrapper-path-choice";
@@ -398,6 +402,39 @@ function shouldAutoLogin(): boolean {
 }
 
 /**
+ * The env re-application prefix for the interactive-shell spawn. Runs
+ * INSIDE `$SHELL -i -c` after the rc has been sourced, so the wrapper's
+ * mode vars win over anything the rc exported.
+ *
+ * Gateway runs additionally `unset -f` the tool for scoped-function
+ * tools (gemini / opencode / copilot): a previously persisted Path-B rc
+ * function re-injects the OTel exporter env AT INVOCATION TIME — after
+ * these exports — so without removing it the gateway would capture the
+ * calls server-side AND the tool would emit OTel for the same calls
+ * (double trace, double cost). `unset -f` removes only the function;
+ * user aliases survive, which is the whole reason for the interactive
+ * shell. Ingestion runs keep the function — it sets the same telemetry
+ * env this run wants anyway, and the rc file itself is never touched.
+ */
+export function buildShellReapply(args: {
+  tool: string;
+  mode: "gateway" | "ingestion";
+  clears: string[];
+  vars: Record<string, string>;
+}): string {
+  const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
+  const parts: string[] = [];
+  if (args.mode === "gateway" && SHELL_FUNCTION_TOOLS.includes(args.tool)) {
+    parts.push(`unset -f ${args.tool} 2>/dev/null`);
+  }
+  parts.push(...args.clears.map((k) => `unset ${k}`));
+  parts.push(
+    ...Object.entries(args.vars).map(([k, v]) => `export ${k}=${q(v)}`),
+  );
+  return parts.join("; ");
+}
+
+/**
  * Run the named tool routed through the gateway. Inherits stdio so
  * the user gets the same interactive UX they'd have invoking the
  * tool directly. Exits the parent process with the child's exit
@@ -530,6 +567,16 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
     process.stderr.write(`${modeResult.notice}\n`);
   }
 
+  // Copilot-only pre-spawn warnings (enterprise managed-settings OTel
+  // pin + version gate). Deliberately OUTSIDE the gateway-only preflight
+  // below — copilot defaults to ingestion, and both conditions make
+  // capture silently incomplete on either path (ADR-039 D8/D9).
+  if (tool === "copilot") {
+    for (const warning of copilotPrespawnWarnings()) {
+      process.stderr.write(`${warning}\n`);
+    }
+  }
+
   if (modeResult.mode === "gateway") {
     const probe = await preflightWrapper(cfg, tool);
     if (!probe.ok) {
@@ -619,7 +666,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
   // live; the wrapper's env (mode vars + clears) is re-applied *after* that
   // so a user's rc can't clobber the gateway / OTLP wiring. Args ride
   // positional params ("$@") and are never re-quoted. `tool` is whitelisted
-  // (claude/codex/cursor/gemini/opencode) so the command string is safe.
+  // (claude/codex/copilot/cursor/gemini/opencode) so the command string is safe.
   const shellName = (process.env.SHELL ?? "").split("/").pop() ?? "";
   const aliasShell =
     process.platform !== "win32" && (shellName === "zsh" || shellName === "bash")
@@ -673,10 +720,12 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
   let child;
   if (aliasShell) {
     const q = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
-    const reapply = [
-      ...(modeResult.clears ?? []).map((k) => `unset ${k}`),
-      ...Object.entries(modeResult.vars).map(([k, v]) => `export ${k}=${q(v)}`),
-    ].join("; ");
+    const reapply = buildShellReapply({
+      tool,
+      mode: modeResult.mode,
+      clears: modeResult.clears ?? [],
+      vars: modeResult.vars,
+    });
     // Resolve the tool inside the same login shell before handing over so a
     // missing tool surfaces our actionable message rather than a bare
     // `command not found`. `command -v` honors the aliases/functions/PATH the

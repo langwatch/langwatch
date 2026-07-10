@@ -43,6 +43,7 @@ import {
   rcHasLangwatchBlock,
   rcPath,
   removeBlockFromRc,
+  SHELL_FUNCTION_TOOLS,
   toolMarkers,
 } from "./shell-rc";
 import { telemetryEnvVarNames } from "./wrapper-mode";
@@ -58,8 +59,6 @@ export interface TelemetryTarget {
 
 const SHELLS: DetectedShell[] = ["zsh", "bash", "fish"];
 
-/** Tools whose Path B telemetry rides on a scoped shell function. */
-const SHELL_FUNCTION_TOOLS = ["gemini", "opencode"];
 
 /** Render an absolute path with the home dir collapsed to `~`. */
 function tildify(p: string): string {

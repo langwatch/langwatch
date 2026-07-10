@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  buildShellReapply,
   envForTool,
   preflightWrapper,
   shouldForgetGatewayPin,
@@ -201,6 +202,86 @@ describe("envForTool", () => {
     const trailing: GovernanceConfig = { ...cfg, gateway_url: "http://gw.example.com/" };
     const env = envForTool(trailing, "claude").vars;
     expect(env.ANTHROPIC_BASE_URL).toBe("http://gw.example.com");
+  });
+});
+
+describe("buildShellReapply", () => {
+  // Gateway spawns go through `$SHELL -i -c`, which sources the rc. A
+  // previously persisted Path-B function (`copilot() { OTEL… command
+  // copilot }`) re-injects the exporter env AT INVOCATION — after these
+  // exports — so without `unset -f` the gateway captures server-side AND
+  // the tool emits OTel for the same calls.
+  describe("when a scoped-function tool runs in gateway mode", () => {
+    /** @scenario A gateway copilot run with a persisted rc function emits no OTLP */
+    it("prepends unset -f for copilot so the rc function cannot re-inject OTel", () => {
+      const reapply = buildShellReapply({
+        tool: "copilot",
+        mode: "gateway",
+        clears: [],
+        vars: { COPILOT_PROVIDER_TYPE: "openai" },
+      });
+      expect(reapply.startsWith("unset -f copilot 2>/dev/null; ")).toBe(true);
+    });
+
+    /** @scenario A gateway opencode run with a persisted rc function emits no OTLP */
+    it("prepends unset -f for opencode (pre-existing double-trace hole, fixed generically)", () => {
+      const reapply = buildShellReapply({
+        tool: "opencode",
+        mode: "gateway",
+        clears: [],
+        vars: {},
+      });
+      expect(reapply).toContain("unset -f opencode");
+    });
+
+    /** @scenario A gateway gemini run with a persisted rc function emits no OTLP */
+    it("prepends unset -f for gemini", () => {
+      const reapply = buildShellReapply({
+        tool: "gemini",
+        mode: "gateway",
+        clears: [],
+        vars: {},
+      });
+      expect(reapply).toContain("unset -f gemini");
+    });
+
+    /** @scenario Gateway runs still honor the user's alias for the tool */
+    it("removes only the function, never aliases (no unalias in the prefix)", () => {
+      const reapply = buildShellReapply({
+        tool: "copilot",
+        mode: "gateway",
+        clears: [],
+        vars: {},
+      });
+      expect(reapply).not.toContain("unalias");
+    });
+  });
+
+  describe("when the tool runs in ingestion mode", () => {
+    /** @scenario Ingestion runs leave the persisted function in place */
+    it("does not unset the function (it sets the same telemetry env this run wants)", () => {
+      const reapply = buildShellReapply({
+        tool: "copilot",
+        mode: "ingestion",
+        clears: [],
+        vars: { COPILOT_OTEL_ENABLED: "true" },
+      });
+      expect(reapply).not.toContain("unset -f");
+    });
+  });
+
+  describe("when the tool has no scoped shell function (claude)", () => {
+    it("emits only clears + exports", () => {
+      const reapply = buildShellReapply({
+        tool: "claude",
+        mode: "gateway",
+        clears: ["ANTHROPIC_API_KEY"],
+        vars: { ANTHROPIC_BASE_URL: "http://gw" },
+      });
+      expect(reapply).toBe(
+        "unset ANTHROPIC_API_KEY; export ANTHROPIC_BASE_URL='http://gw'",
+      );
+    });
   });
 });
 
