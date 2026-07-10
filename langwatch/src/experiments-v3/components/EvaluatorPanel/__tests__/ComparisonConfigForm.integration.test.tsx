@@ -8,8 +8,8 @@ import type { ReactNode } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { SelectBestEvaluatorConfig, TargetConfig } from "../../../types";
-import { SelectBestConfigForm } from "../SelectBestConfigForm";
+import type { ComparisonEvaluatorConfig, TargetConfig } from "../../../types";
+import { ComparisonConfigForm } from "../ComparisonConfigForm";
 
 // The variant multiselect's menu items resolve display names via
 // useTargetName, which reaches through useOrganizationTeamProject to
@@ -36,8 +36,8 @@ const FormWrapper = ({ children }: { children: ReactNode }) => {
 };
 
 const baseConfig = (
-  overrides: Partial<SelectBestEvaluatorConfig> = {},
-): SelectBestEvaluatorConfig => ({
+  overrides: Partial<ComparisonEvaluatorConfig> = {},
+): ComparisonEvaluatorConfig => ({
   variants: [],
   hasGoldenAnswer: true,
   goldenField: "",
@@ -56,12 +56,12 @@ const target = (id: string): TargetConfig => ({
 });
 
 const renderForm = (
-  props: Partial<React.ComponentProps<typeof SelectBestConfigForm>> = {},
+  props: Partial<React.ComponentProps<typeof ComparisonConfigForm>> = {},
 ) => {
   const value = props.value ?? baseConfig();
   return render(
     <FormWrapper>
-      <SelectBestConfigForm
+      <ComparisonConfigForm
         value={value}
         onChange={vi.fn()}
         targets={props.targets ?? [target("t1"), target("t2"), target("t3")]}
@@ -74,7 +74,7 @@ const renderForm = (
   );
 };
 
-describe("SelectBestConfigForm", () => {
+describe("ComparisonConfigForm", () => {
   afterEach(() => {
     cleanup();
   });
@@ -83,14 +83,14 @@ describe("SelectBestConfigForm", () => {
     it("shows an insufficient-variants warning", () => {
       renderForm({ value: baseConfig({ variants: [] }) });
       expect(
-        screen.getByTestId("select-best-variants-insufficient"),
+        screen.getByTestId("comparison-variants-insufficient"),
       ).toBeInTheDocument();
     });
 
     it("still shows the warning when exactly 1 variant is selected", () => {
       renderForm({ value: baseConfig({ variants: ["t1"] }) });
       expect(
-        screen.getByTestId("select-best-variants-insufficient"),
+        screen.getByTestId("comparison-variants-insufficient"),
       ).toBeInTheDocument();
     });
   });
@@ -99,7 +99,7 @@ describe("SelectBestConfigForm", () => {
     it("hides the insufficient-variants warning", () => {
       renderForm({ value: baseConfig({ variants: ["t1", "t2"] }) });
       expect(
-        screen.queryByTestId("select-best-variants-insufficient"),
+        screen.queryByTestId("comparison-variants-insufficient"),
       ).not.toBeInTheDocument();
     });
   });
@@ -110,8 +110,8 @@ describe("SelectBestConfigForm", () => {
       const onChange = vi.fn();
       renderForm({ value: baseConfig({ variants: [] }), onChange });
 
-      await user.click(screen.getByTestId("select-best-add-variant"));
-      await user.click(screen.getByTestId("select-best-variant-option-t1"));
+      await user.click(screen.getByTestId("comparison-add-variant"));
+      await user.click(screen.getByTestId("comparison-variant-option-t1"));
 
       expect(onChange).toHaveBeenCalledWith(
         expect.objectContaining({ variants: ["t1"] }),
@@ -124,7 +124,7 @@ describe("SelectBestConfigForm", () => {
       renderForm({ value: baseConfig({ variants: ["t1", "t2"] }), onChange });
 
       await user.click(
-        screen.getByTestId("select-best-variant-chip-t1-remove"),
+        screen.getByTestId("comparison-variant-chip-t1-remove"),
       );
 
       expect(onChange).toHaveBeenCalledWith(
@@ -139,9 +139,9 @@ describe("SelectBestConfigForm", () => {
       const onChange = vi.fn();
       renderForm({ onChange });
 
-      await user.click(screen.getByTestId("select-best-golden-field"));
+      await user.click(screen.getByTestId("comparison-golden-field"));
       await user.click(
-        screen.getByTestId("select-best-golden-field-option-expected_output"),
+        screen.getByTestId("comparison-golden-field-option-expected_output"),
       );
 
       expect(onChange).toHaveBeenCalledWith(
@@ -153,9 +153,9 @@ describe("SelectBestConfigForm", () => {
   describe("the include-metrics section", () => {
     it("renders the two toggles", () => {
       renderForm();
-      expect(screen.getByTestId("select-best-include-cost")).toBeInTheDocument();
+      expect(screen.getByTestId("comparison-include-cost")).toBeInTheDocument();
       expect(
-        screen.getByTestId("select-best-include-duration"),
+        screen.getByTestId("comparison-include-duration"),
       ).toBeInTheDocument();
     });
   });

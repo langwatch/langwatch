@@ -22,7 +22,9 @@ import type {
 } from "~/components/variables";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import type { EvaluatorConfig, TargetConfig } from "../types";
+import { isComparisonEvaluator } from "../types";
 import { createEvaluatorEditorCallbacks } from "../utils/evaluatorEditorCallbacks";
+import { toComparisonConfig } from "../utils/normalizeComparison";
 import {
   convertFromUIMapping,
   convertToUIMapping,
@@ -140,13 +142,15 @@ export const useOpenEvaluatorEditor = () => {
         return;
       }
 
-      // Pairwise compare evaluators (#5100): bypass the per-row mapping form
-      // and render a target+golden picker instead. The four required input
-      // fields (candidate_a_*/candidate_b_*) have no per-row source — they
-      // come from two OTHER targets' outputs, picked once via the form.
-      // The orchestrator's Phase-2 cell generator reads evaluator.pairwise
-      // to assemble those inputs at run time.
-      if (evaluator.evaluatorType === "langevals/pairwise_compare") {
+      // Comparison evaluators: bypass the per-row mapping form and render a
+      // variants+golden picker instead. The required `candidates` input has no
+      // per-row source — it comes from OTHER targets' outputs, picked once via
+      // the form. The orchestrator's `generateComparisonCells` reads
+      // `evaluator.comparison` at run time to assemble the per-row candidates.
+      //
+      // A legacy pairwise evaluator lands here too: its config was normalized
+      // to `comparison` at load, so it opens in the same form.
+      if (isComparisonEvaluator(evaluator)) {
         const activeDataset = datasets.find((d) => d.id === activeDatasetId);
         setFlowCallbacks(
           "evaluatorEditor",
@@ -154,8 +158,8 @@ export const useOpenEvaluatorEditor = () => {
             onLocalConfigChange: (localEvaluatorConfig) => {
               updateEvaluator(evaluator.id, { localEvaluatorConfig });
             },
-            onPairwiseChange: (pairwise) => {
-              updateEvaluator(evaluator.id, { pairwise });
+            onComparisonChange: (comparison) => {
+              updateEvaluator(evaluator.id, { comparison });
             },
           }),
         );
@@ -164,47 +168,12 @@ export const useOpenEvaluatorEditor = () => {
           evaluatorType: evaluator.evaluatorType,
           initialLocalConfig: evaluator.localEvaluatorConfig,
           // Non-serializable extras consumed by the drawer body.
-          pairwiseContext: {
-            initialPairwise: evaluator.pairwise,
+          comparisonContext: {
+            initialComparison: toComparisonConfig(evaluator),
             // Pass full TargetConfig so the picker's `useTargetName` hook
             // can resolve human-readable handles (it needs `type`,
             // `promptId`, `dbAgentId`, `targetEvaluatorId` — stripping to
             // `{id}` would force the dropdown to show raw `target_NNNN` ids).
-            targets,
-            datasetColumns:
-              activeDataset?.columns.map((c) => ({
-                id: c.id,
-                name: c.name,
-              })) ?? [],
-          },
-        });
-        return;
-      }
-
-      // N-way select-best evaluator (#5101): sibling of the pairwise
-      // branch above. Kept fully separate so the two evaluator paths
-      // never couple. The orchestrator's `generateSelectBestCells`
-      // reads `evaluator.selectBest` at run time to assemble the
-      // per-row candidates list from the picked variants' outputs.
-      if (evaluator.evaluatorType === "langevals/select_best_compare") {
-        const activeDataset = datasets.find((d) => d.id === activeDatasetId);
-        setFlowCallbacks(
-          "evaluatorEditor",
-          createEvaluatorEditorCallbacks({
-            onLocalConfigChange: (localEvaluatorConfig) => {
-              updateEvaluator(evaluator.id, { localEvaluatorConfig });
-            },
-            onSelectBestChange: (selectBest) => {
-              updateEvaluator(evaluator.id, { selectBest });
-            },
-          }),
-        );
-        openDrawer("evaluatorEditor", {
-          evaluatorId: evaluator.dbEvaluatorId,
-          evaluatorType: evaluator.evaluatorType,
-          initialLocalConfig: evaluator.localEvaluatorConfig,
-          selectBestContext: {
-            initialSelectBest: evaluator.selectBest,
             targets,
             datasetColumns:
               activeDataset?.columns.map((c) => ({

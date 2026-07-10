@@ -10,9 +10,8 @@
 
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
 import type {
+  ComparisonEvaluatorConfig,
   LocalEvaluatorConfig,
-  PairwiseEvaluatorConfig,
-  SelectBestEvaluatorConfig,
 } from "../types";
 
 /**
@@ -53,19 +52,12 @@ export type CreateEvaluatorEditorCallbacksParams = {
     mapping: UIFieldMapping | undefined,
   ) => void;
   /**
-   * Pairwise evaluator config sink (#5100). When present, the drawer
-   * renders PairwiseConfigForm instead of the generic per-row field
-   * mappings — pairwise evaluators don't have per-row sources for
-   * candidate_a_* / candidate_b_*, those come from two OTHER target
-   * outputs that the user picks via this form.
+   * Comparison evaluator config sink. When present, the drawer renders
+   * ComparisonConfigForm instead of the generic per-row field mappings — a
+   * comparison has no per-row source for `candidates`, they come from the
+   * OTHER target columns the user picks in this form.
    */
-  onPairwiseChange?: (config: PairwiseEvaluatorConfig) => void;
-  /**
-   * N-way (select-best) evaluator config sink (#5101). Sibling of
-   * `onPairwiseChange` — when present, the drawer renders
-   * SelectBestConfigForm instead of the generic mappings section.
-   */
-  onSelectBestChange?: (config: SelectBestEvaluatorConfig) => void;
+  onComparisonChange?: (config: ComparisonEvaluatorConfig) => void;
   onSave?: (evaluator: {
     id: string;
     name: string;
@@ -85,8 +77,7 @@ export type EvaluatorEditorCallbacksForTarget = {
     identifier: string,
     mapping: UIFieldMapping | undefined,
   ) => void;
-  onPairwiseChange?: (config: PairwiseEvaluatorConfig) => void;
-  onSelectBestChange?: (config: SelectBestEvaluatorConfig) => void;
+  onComparisonChange?: (config: ComparisonEvaluatorConfig) => void;
   onSave?: (evaluator: {
     id: string;
     name: string;
@@ -131,8 +122,7 @@ export const createEvaluatorEditorCallbacks = ({
   targetId,
   updateTarget,
   onMappingChange,
-  onPairwiseChange,
-  onSelectBestChange,
+  onComparisonChange,
   onSave,
 }: CreateEvaluatorEditorCallbacksParams): EvaluatorEditorCallbacksForTarget => {
   const callbacks: EvaluatorEditorCallbacksForTarget = {};
@@ -144,8 +134,7 @@ export const createEvaluatorEditorCallbacks = ({
     };
   }
   if (onMappingChange) callbacks.onMappingChange = onMappingChange;
-  if (onPairwiseChange) callbacks.onPairwiseChange = onPairwiseChange;
-  if (onSelectBestChange) callbacks.onSelectBestChange = onSelectBestChange;
+  if (onComparisonChange) callbacks.onComparisonChange = onComparisonChange;
   if (onSave) callbacks.onSave = onSave;
   return callbacks;
 };

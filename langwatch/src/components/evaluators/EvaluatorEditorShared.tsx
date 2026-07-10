@@ -25,13 +25,16 @@ import type {
   AvailableSource,
   FieldMapping as UIFieldMapping,
 } from "~/components/variables";
-import { PairwiseConfigForm } from "~/experiments-v3/components/EvaluatorPanel/PairwiseConfigForm";
-import { SelectBestConfigForm } from "~/experiments-v3/components/EvaluatorPanel/SelectBestConfigForm";
+
+import { ComparisonConfigForm } from "~/experiments-v3/components/EvaluatorPanel/ComparisonConfigForm";
 import type {
+  ComparisonEvaluatorConfig,
   LocalEvaluatorConfig,
-  PairwiseEvaluatorConfig,
-  SelectBestEvaluatorConfig,
   TargetConfig,
+} from "~/experiments-v3/types";
+import {
+  COMPARISON_EVALUATOR_TYPE,
+  LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "~/experiments-v3/types";
 import {
   getComplexProps,
@@ -55,26 +58,15 @@ import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import type { EvaluatorCategoryId } from "./EvaluatorCategorySelectorDrawer";
 import { EvaluatorMappingsSection } from "./EvaluatorMappingsSection";
 
-// Stable reference for the "no pairwise config yet" default (new pairwise
+// Stable reference for the "no comparison config yet" default (new comparison
 // evaluator, before the user has picked anything). Must be a module-level
-// constant, not an inline literal in JSX — PairwiseConfigForm re-syncs its
+// constant, not an inline literal in JSX — ComparisonConfigForm re-syncs its
 // local draft from this `value` prop whenever the *reference* changes
 // (`useEffect(() => setDraft(value), [value])`), and onChange only writes
 // to a ref (not back into this prop), so a fresh `{...}` literal on every
-// EvaluatorEditorBody re-render silently wiped Variant A/B/Golden field
+// EvaluatorEditorBody re-render silently wiped the variants / Golden field
 // mid-selection any time an unrelated field in the drawer re-rendered it.
-const EMPTY_PAIRWISE_CONFIG: PairwiseEvaluatorConfig = {
-  variantA: "",
-  variantB: "",
-  hasGoldenAnswer: true,
-  goldenField: "",
-  includeMetrics: [],
-};
-
-// Same "stable default for new N-way config" pattern — see the pairwise
-// comment above. Kept module-level so a fresh `{...}` literal each render
-// doesn't wipe SelectBestConfigForm's in-progress draft.
-const EMPTY_SELECT_BEST_CONFIG: SelectBestEvaluatorConfig = {
+const EMPTY_COMPARISON_CONFIG: ComparisonEvaluatorConfig = {
   variants: [],
   hasGoldenAnswer: true,
   goldenField: "",
@@ -112,23 +104,12 @@ export type EvaluatorEditorDrawerProps = {
   ) => void;
   initialLocalConfig?: LocalEvaluatorConfig;
   /**
-   * Pairwise compare drawer context (#5100). Non-serializable; flows
-   * through complexProps. When present, the drawer renders
-   * PairwiseConfigForm in place of the per-row mappings section.
+   * Comparison drawer context. Non-serializable; flows through complexProps.
+   * When present, the drawer renders ComparisonConfigForm in place of the
+   * per-row mappings section.
    */
-  pairwiseContext?: {
-    initialPairwise?: PairwiseEvaluatorConfig;
-    targets: { id: string }[];
-    datasetColumns: { id: string; name: string }[];
-  };
-  /**
-   * N-way (select-best) drawer context (#5101). Non-serializable; flows
-   * through complexProps. Sibling of pairwiseContext — kept separate so
-   * the two evaluator paths stay independent. When present, the drawer
-   * renders SelectBestConfigForm in place of the per-row mappings section.
-   */
-  selectBestContext?: {
-    initialSelectBest?: SelectBestEvaluatorConfig;
+  comparisonContext?: {
+    initialComparison?: ComparisonEvaluatorConfig;
     targets: { id: string }[];
     datasetColumns: { id: string; name: string }[];
   };
@@ -170,25 +151,16 @@ export type EvaluatorEditorController = {
   onMappingChange:
     | ((identifier: string, mapping: UIFieldMapping | undefined) => void)
     | undefined;
-  /** Pairwise compare drawer context (#5100). Set only for pairwise evaluator types. */
-  pairwiseContext:
+  /** Comparison drawer context. Set only for comparison evaluator types. */
+  comparisonContext:
     | {
-        initialPairwise?: PairwiseEvaluatorConfig;
+        initialComparison?: ComparisonEvaluatorConfig;
         targets: TargetConfig[];
         datasetColumns: { id: string; name: string }[];
       }
     | undefined;
-  onPairwiseChange: ((config: PairwiseEvaluatorConfig) => void) | undefined;
-  /** N-way (select-best) drawer context (#5101). Set only for select-best evaluator types. */
-  selectBestContext:
-    | {
-        initialSelectBest?: SelectBestEvaluatorConfig;
-        targets: TargetConfig[];
-        datasetColumns: { id: string; name: string }[];
-      }
-    | undefined;
-  onSelectBestChange:
-    | ((config: SelectBestEvaluatorConfig) => void)
+  onComparisonChange:
+    | ((config: ComparisonEvaluatorConfig) => void)
     | undefined;
   onLocalConfigChange:
     | ((config: LocalEvaluatorConfig | undefined) => void)
@@ -231,38 +203,22 @@ export function useEvaluatorEditorController(
     props.mappingsConfig ??
     (complexProps.mappingsConfig as EvaluatorMappingsConfig | undefined);
   const onMappingChange = flowCallbacks?.onMappingChange;
-  // Pairwise compare (#5100): when this context is set, the drawer renders
-  // PairwiseConfigForm instead of the per-row mappings section.
-  const pairwiseContext = complexProps.pairwiseContext as
+  // Comparison: when this context is set, the drawer renders
+  // ComparisonConfigForm instead of the per-row mappings section.
+  const comparisonContext = complexProps.comparisonContext as
     | {
-        initialPairwise?: PairwiseEvaluatorConfig;
+        initialComparison?: ComparisonEvaluatorConfig;
         targets: TargetConfig[];
         datasetColumns: { id: string; name: string }[];
       }
     | undefined;
-  const onPairwiseChange = (
+  const onComparisonChange = (
     flowCallbacks as
       | {
-          onPairwiseChange?: (config: PairwiseEvaluatorConfig) => void;
+          onComparisonChange?: (config: ComparisonEvaluatorConfig) => void;
         }
       | undefined
-  )?.onPairwiseChange;
-  // N-way select-best (#5101): sibling of pairwiseContext above, entirely
-  // separate wiring so the two evaluator paths don't couple.
-  const selectBestContext = complexProps.selectBestContext as
-    | {
-        initialSelectBest?: SelectBestEvaluatorConfig;
-        targets: TargetConfig[];
-        datasetColumns: { id: string; name: string }[];
-      }
-    | undefined;
-  const onSelectBestChange = (
-    flowCallbacks as
-      | {
-          onSelectBestChange?: (config: SelectBestEvaluatorConfig) => void;
-        }
-      | undefined
-  )?.onSelectBestChange;
+  )?.onComparisonChange;
 
   const saveButtonText =
     props.saveButtonText ?? (complexProps.saveButtonText as string | undefined);
@@ -702,10 +658,8 @@ export function useEvaluatorEditorController(
     saveButtonText,
     mappingsConfig,
     onMappingChange,
-    pairwiseContext,
-    onPairwiseChange,
-    selectBestContext,
-    onSelectBestChange,
+    comparisonContext,
+    onComparisonChange,
     onLocalConfigChange,
     title,
     handleSave,
@@ -739,22 +693,23 @@ export function EvaluatorEditorBody({
     projectSlug,
     mappingsConfig,
     onMappingChange,
-    pairwiseContext,
-    onPairwiseChange,
-    selectBestContext,
-    onSelectBestChange,
+    comparisonContext,
+    onComparisonChange,
   } = controller;
 
-  // Pairwise (#5100): if the caller passed pairwise context, ignore the
-  // generic mappings UI entirely and render the targets+golden picker.
-  // Derive from evaluatorType alone so the inline UI shows the right
-  // fields even when the drawer navigation transitions between drawer
-  // types wipe flowCallbacks/complexProps mid-flight. Callback presence
-  // (`onPairwiseChange` / `onSelectBestChange`) is still checked at the
-  // render sites below so persistence works when wiring is present, but
-  // it no longer decides which layout to draw.
-  const isPairwise = evaluatorType === "langevals/pairwise_compare";
-  const isSelectBest = evaluatorType === "langevals/select_best_compare";
+  // Comparison: if the caller passed comparison context, ignore the generic
+  // mappings UI entirely and render the variants+golden picker. Derive from
+  // evaluatorType alone so the inline UI shows the right fields even when
+  // drawer navigation transitions wipe flowCallbacks/complexProps mid-flight.
+  // Callback presence (`onComparisonChange`) is still checked at the render
+  // site below so persistence works when wiring is present, but it no longer
+  // decides which layout to draw.
+  // A legacy pairwise evaluator opens in the same form as a current one: its
+  // config is normalized to the comparison shape on load, so the only thing
+  // its evaluatorType still selects is which judge endpoint runs it.
+  const isComparison =
+    evaluatorType === COMPARISON_EVALUATOR_TYPE ||
+    evaluatorType === LEGACY_PAIRWISE_EVALUATOR_TYPE;
 
   if (evaluatorId && isLoadingEvaluator) {
     return (
@@ -796,31 +751,26 @@ export function EvaluatorEditorBody({
             prefix="settings"
             errors={form.formState.errors.settings}
             variant="default"
-            // For the Pairwise / N-way shortcuts (#5100 / #5101) keep
-            // ONLY the Model picker from the schema-driven form. Every
-            // other field is either duplicated by the inline
-            // PairwiseConfigForm / SelectBestConfigForm (has_golden_answer,
-            // include_metrics) or configurable defaults the user rarely
+            // For the Comparison shortcut, keep ONLY the Model picker from
+            // the schema-driven form. Every other field is either duplicated
+            // by the inline ComparisonConfigForm (has_golden_answer,
+            // include_metrics) or a configurable default the user rarely
             // needs during the "which columns am I comparing" flow
             // (prompt / swap_and_confirm / allow_tie / randomize_order).
             // They remain fully editable via the full evaluator editor
             // (click the column chip on the workbench after creation).
             skipFields={
-              isPairwise
+              isComparison
                 ? [
+                    // The comparison form owns these; `swap_and_confirm` only
+                    // exists on the legacy pairwise judge and is not offered.
                     "swap_and_confirm",
+                    "randomize_order",
                     "allow_tie",
                     "has_golden_answer",
                     "include_metrics",
                   ]
-                : isSelectBest
-                  ? [
-                      "randomize_order",
-                      "allow_tie",
-                      "has_golden_answer",
-                      "include_metrics",
-                    ]
-                  : undefined
+                : undefined
             }
           />
         )}
@@ -853,8 +803,7 @@ export function EvaluatorEditorBody({
         )}
 
         {!hasSettings &&
-          !isPairwise &&
-          !isSelectBest &&
+          !isComparison &&
           (!mappingsConfig || !onMappingChange) &&
           !isWorkflowEvaluator && (
             <Text fontSize="sm" color="fg.muted">
@@ -862,34 +811,20 @@ export function EvaluatorEditorBody({
             </Text>
           )}
 
-        {isPairwise && pairwiseContext && onPairwiseChange && (
+        {isComparison && comparisonContext && onComparisonChange && (
           <Box paddingTop={4}>
-            <PairwiseConfigForm
-              value={pairwiseContext.initialPairwise ?? EMPTY_PAIRWISE_CONFIG}
-              onChange={onPairwiseChange}
-              targets={pairwiseContext.targets}
-              datasetColumns={pairwiseContext.datasetColumns}
-            />
-          </Box>
-        )}
-
-        {isSelectBest && selectBestContext && onSelectBestChange && (
-          <Box paddingTop={4}>
-            <SelectBestConfigForm
+            <ComparisonConfigForm
               value={
-                selectBestContext.initialSelectBest ?? EMPTY_SELECT_BEST_CONFIG
+                comparisonContext.initialComparison ?? EMPTY_COMPARISON_CONFIG
               }
-              onChange={onSelectBestChange}
-              targets={selectBestContext.targets}
-              datasetColumns={selectBestContext.datasetColumns}
+              onChange={onComparisonChange}
+              targets={comparisonContext.targets}
+              datasetColumns={comparisonContext.datasetColumns}
             />
           </Box>
         )}
 
-        {!isPairwise &&
-          !isSelectBest &&
-          mappingsConfig &&
-          onMappingChange && (
+        {!isComparison && mappingsConfig && onMappingChange && (
             <Box paddingTop={4}>
               <EvaluatorMappingsSection
                 evaluatorDef={effectiveEvaluatorDef}

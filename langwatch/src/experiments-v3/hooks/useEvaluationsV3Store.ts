@@ -15,14 +15,19 @@ import {
   type EvaluatorConfig,
   type FieldMapping,
   type OverlayType,
+  isComparisonEvaluator,
   type TargetConfig,
 } from "../types";
 import {
-  derivePairwiseTargetMappings,
+  deriveComparisonTargetMappings,
   inferAllEvaluatorMappings,
   inferAllTargetMappings,
   propagateMappingsToNewDataset,
 } from "../utils/mappingInference";
+import {
+  normalizeEvaluators,
+  normalizeTargets,
+} from "../utils/normalizeComparison";
 
 // ============================================================================
 // Helper Functions
@@ -691,24 +696,26 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     });
   },
 
-  updateTargetPairwise: (targetId, pairwise) => {
+  updateTargetComparison: (targetId, comparison) => {
     set((state) => {
       const existingTarget = state.targets.find((r) => r.id === targetId);
-      // Strictly additive: silently skip for non-pairwise targets so we never
-      // perturb the prompt / agent / non-pairwise-evaluator code paths.
-      if (!existingTarget || existingTarget.pairwise === undefined) {
+      // Silently skip non-comparison targets so we never perturb the prompt /
+      // agent / plain-evaluator code paths.
+      if (!existingTarget || !isComparisonEvaluator(existingTarget)) {
         return state;
       }
 
       // Derive the per-row field mappings the orchestrator expects from the
-      // high-level pairwise picks — this is what lets the PairwiseConfigForm
-      // be a clean 3-field UI while keeping the orchestrator unchanged.
-      // Keys we own — must be stripped from prior mappings BEFORE spreading
-      // derived on top. Otherwise clearing a variant (or goldenField) just
-      // leaves the previously-derived candidate_*_id / golden mapping in
-      // place, and the orchestrator dispatches against a dead variant id
-      // or stale golden column.
-      const PAIRWISE_DERIVED_KEYS = [
+      // high-level picks — this is what lets ComparisonConfigForm be a clean
+      // variants + golden UI while keeping the orchestrator unchanged.
+      //
+      // Keys we own must be stripped from prior mappings BEFORE spreading the
+      // derived ones on top. Otherwise clearing the golden field just leaves
+      // the previously-derived mapping in place and the orchestrator
+      // dispatches against a stale column. `candidate_*` are legacy pairwise
+      // keys: a target being edited may still carry them from before the
+      // merge, and they must not survive into the comparison payload.
+      const DERIVED_KEYS = [
         "candidate_a_id",
         "candidate_a_output",
         "candidate_b_id",
@@ -721,9 +728,9 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         Record<string, FieldMapping>
       > = {};
       for (const dataset of state.datasets) {
-        const derived = derivePairwiseTargetMappings(pairwise, dataset);
+        const derived = deriveComparisonTargetMappings(comparison, dataset);
         const existing = { ...(existingTarget.mappings[dataset.id] ?? {}) };
-        for (const key of PAIRWISE_DERIVED_KEYS) delete existing[key];
+        for (const key of DERIVED_KEYS) delete existing[key];
         newDatasetMappings[dataset.id] = {
           ...existing,
           ...derived,
@@ -733,7 +740,8 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       return {
         targets: state.targets.map((t) =>
           t.id === targetId
-            ? { ...t, pairwise, mappings: newDatasetMappings }
+            ? // Drop the legacy shape as we write the canonical one.
+              { ...t, pairwise: undefined, comparison, mappings: newDatasetMappings }
             : t,
         ),
       };
@@ -1306,13 +1314,20 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
           (state.datasets as typeof current.datasets) ?? current.datasets,
         activeDatasetId:
           (state.activeDatasetId as string) ?? current.activeDatasetId,
-        evaluators:
-          (state.evaluators as typeof current.evaluators) ?? current.evaluators,
+        // Experiments saved before pairwise and N-way were merged carry a
+        // two-slot `pairwise` config. This is the load boundary where it is
+        // folded into the canonical `comparison` shape — everything
+        // downstream, including what gets saved back, sees only `comparison`.
+        evaluators: normalizeEvaluators(
+          (state.evaluators as typeof current.evaluators) ??
+            current.evaluators,
+        ),
         // Support loading old state format (agents) and new format (targets)
-        targets:
+        targets: normalizeTargets(
           (state.targets as typeof current.targets) ??
-          (state.agents as typeof current.targets) ??
-          current.targets,
+            (state.agents as typeof current.targets) ??
+            current.targets,
+        ),
         // Load persisted results if available
         results: loadedResults ?? current.results,
         // Load UI settings

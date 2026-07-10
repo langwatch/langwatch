@@ -16,7 +16,7 @@ import { Switch } from "~/components/ui/switch";
 
 import { useTargetName } from "../../hooks/useTargetName";
 import type {
-  SelectBestEvaluatorConfig,
+  ComparisonEvaluatorConfig,
   TargetConfig,
 } from "../../types";
 
@@ -58,25 +58,25 @@ const GOLDEN_FREE_JUDGE_PROMPT =
 
 export type DatasetColumn = { id: string; name: string };
 
-export type SelectBestConfigFormProps = {
-  value: SelectBestEvaluatorConfig;
-  onChange: (next: SelectBestEvaluatorConfig) => void;
+export type ComparisonConfigFormProps = {
+  value: ComparisonEvaluatorConfig;
+  onChange: (next: ComparisonEvaluatorConfig) => void;
   /** All targets the user has configured (excluding evaluator-as-target). */
   targets: TargetConfig[];
   /** Active dataset columns the user can pick the golden field from. */
   datasetColumns: DatasetColumn[];
 };
 
-export function SelectBestConfigForm({
+export function ComparisonConfigForm({
   value,
   onChange,
   targets,
   datasetColumns,
-}: SelectBestConfigFormProps) {
+}: ComparisonConfigFormProps) {
   // Same local-draft + ref pattern PairwiseConfigForm uses so back-to-back
   // picks against a stale `value` prop don't stomp each other. Parent-
   // pushed value changes still resync `draft`.
-  const [draft, setDraft] = useState<SelectBestEvaluatorConfig>(value);
+  const [draft, setDraft] = useState<ComparisonEvaluatorConfig>(value);
   useEffect(() => {
     setDraft(value);
   }, [value]);
@@ -86,7 +86,7 @@ export function SelectBestConfigForm({
     draftRef.current = draft;
   }, [draft]);
 
-  const update = (patch: Partial<SelectBestEvaluatorConfig>) => {
+  const update = (patch: Partial<ComparisonEvaluatorConfig>) => {
     const next = { ...draftRef.current, ...patch };
     draftRef.current = next;
     setDraft(next);
@@ -123,8 +123,8 @@ function VariantsMultiSelect({
   update,
   targets,
 }: {
-  draft: SelectBestEvaluatorConfig;
-  update: (patch: Partial<SelectBestEvaluatorConfig>) => void;
+  draft: ComparisonEvaluatorConfig;
+  update: (patch: Partial<ComparisonEvaluatorConfig>) => void;
   targets: TargetConfig[];
 }) {
   const selected = draft.variants ?? [];
@@ -159,7 +159,7 @@ function VariantsMultiSelect({
               colorPalette="gray"
               size="sm"
               fontWeight="normal"
-              data-testid="select-best-add-variant"
+              data-testid="comparison-add-variant"
               disabled={remaining.length === 0}
             >
               <Plus size={14} />
@@ -192,7 +192,7 @@ function VariantsMultiSelect({
           fontSize="xs"
           color="orange.solid"
           marginTop={2}
-          data-testid="select-best-variants-insufficient"
+          data-testid="comparison-variants-insufficient"
         >
           Pick 2 or more variants.
         </Text>
@@ -219,7 +219,7 @@ function VariantMenuItem({
     <Menu.Item
       value={target.id}
       onClick={onAdd}
-      data-testid={`select-best-variant-option-${target.id}`}
+      data-testid={`comparison-variant-option-${target.id}`}
     >
       <Text fontSize="13px">{name}</Text>
     </Menu.Item>
@@ -247,7 +247,7 @@ function VariantChip({
       borderRadius="md"
       bg="purple.subtle"
       color="purple.fg"
-      data-testid={`select-best-variant-chip-${target.id}`}
+      data-testid={`comparison-variant-chip-${target.id}`}
     >
       <Text fontSize="13px">{name}</Text>
       <Button
@@ -258,7 +258,7 @@ function VariantChip({
         height="18px"
         onClick={onRemove}
         aria-label={`Remove ${name}`}
-        data-testid={`select-best-variant-chip-${target.id}-remove`}
+        data-testid={`comparison-variant-chip-${target.id}-remove`}
       >
         <X size={12} />
       </Button>
@@ -270,9 +270,9 @@ function VariantChip({
  * "Has golden answer" toggle plus the Golden field picker it gates.
  * Parity with PairwiseConfigForm's #5378 opt-out: source of truth is the
  * parent form's `settings.has_golden_answer` (the field the judge reads);
- * `selectBest.hasGoldenAnswer` is mirrored on every write so the
+ * `comparison.hasGoldenAnswer` is mirrored on every write so the
  * orchestrator's cell-generation guard and the missing-mappings validator
- * — which only see `evaluator.selectBest`, not the evaluator's Python
+ * — which only see `evaluator.comparison`, not the evaluator's Python
  * settings — can read it too. Same dual-representation pattern as
  * MetricsSection/include_metrics below.
  */
@@ -281,8 +281,8 @@ function GoldenAnswerSection({
   update,
   datasetColumns,
 }: {
-  draft: SelectBestEvaluatorConfig;
-  update: (patch: Partial<SelectBestEvaluatorConfig>) => void;
+  draft: ComparisonEvaluatorConfig;
+  update: (patch: Partial<ComparisonEvaluatorConfig>) => void;
   datasetColumns: DatasetColumn[];
 }) {
   const formContext = useFormContext<{
@@ -358,7 +358,7 @@ function GoldenAnswerSection({
         <Switch
           checked={hasGoldenAnswer}
           onCheckedChange={({ checked }) => setHasGoldenAnswer(checked)}
-          data-testid="select-best-has-golden-answer"
+          data-testid="comparison-has-golden-answer"
         />
       </HStack>
 
@@ -377,7 +377,7 @@ function GoldenAnswerSection({
                   fontWeight="normal"
                   justifyContent="space-between"
                   width="full"
-                  data-testid="select-best-golden-field"
+                  data-testid="comparison-golden-field"
                 >
                   <Text
                     fontSize="13px"
@@ -409,7 +409,7 @@ function GoldenAnswerSection({
                       key={c.id}
                       value={c.name}
                       onClick={() => update({ goldenField: c.name })}
-                      data-testid={`select-best-golden-field-option-${c.name}`}
+                      data-testid={`comparison-golden-field-option-${c.name}`}
                     >
                       <Text fontSize="13px">{c.name}</Text>
                     </Menu.Item>
@@ -435,7 +435,7 @@ function GoldenAnswerSection({
 
 /**
  * Inline metric toggles. Source of truth is `settings.include_metrics`
- * (what the Python judge reads); the legacy `selectBest.includeMetrics`
+ * (what the Python judge reads); the legacy `comparison.includeMetrics`
  * mirror is kept in sync on every write so any orchestrator path reading
  * from it doesn't drift. Same dual-representation pattern
  * PairwiseConfigForm uses.
@@ -444,8 +444,8 @@ function MetricsSection({
   draft,
   update,
 }: {
-  draft: SelectBestEvaluatorConfig;
-  update: (patch: Partial<SelectBestEvaluatorConfig>) => void;
+  draft: ComparisonEvaluatorConfig;
+  update: (patch: Partial<ComparisonEvaluatorConfig>) => void;
 }) {
   const formContext = useFormContext<{
     settings?: { include_metrics?: Metric[] };
@@ -488,7 +488,7 @@ function MetricsSection({
           <Switch
             checked={current.includes("cost")}
             onCheckedChange={({ checked }) => toggle("cost", checked)}
-            data-testid="select-best-include-cost"
+            data-testid="comparison-include-cost"
           />
         </HStack>
         <HStack justify="space-between">
@@ -496,7 +496,7 @@ function MetricsSection({
           <Switch
             checked={current.includes("duration")}
             onCheckedChange={({ checked }) => toggle("duration", checked)}
-            data-testid="select-best-include-duration"
+            data-testid="comparison-include-duration"
           />
         </HStack>
       </VStack>
