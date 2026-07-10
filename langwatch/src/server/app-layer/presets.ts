@@ -673,16 +673,19 @@ export function initializeDefaultApp(options?: {
   }
   outboxHeartbeatScheduler?.start();
 
-  // ADR-042 Phase 1: the generic calendar scheduler. POSTGRES-ONLY — no Redis,
-  // no cron infra. A worker-only in-process loop that sleeps until the soonest
-  // due `ScheduledJob`, atomically claims each due row (a conditional nextRunAt
+  // ADR-042 Phase 1: the generic calendar scheduler. No cron infra. A
+  // worker-only in-process loop that sleeps until the soonest due
+  // `ScheduledJob`, atomically claims each due row (a conditional nextRunAt
   // update — the DB-level exactly-once guarantee), and fires it into a handler
   // registered on `schedulerRegistry`. There is no leader-lock: because the
   // claim guarantees exactly-once, every worker runs the loop and races the
-  // claim, sharing firing load across the fleet. Constructed on the worker role
-  // (Redis is irrelevant here). Kept dormant this phase — no consumers register
-  // yet (the report handler lands in a later phase), so the loop runs and
-  // log-and-skips any orphan targetType.
+  // claim, sharing firing load across the fleet. Postgres is the sole
+  // correctness/locking layer; `redis` is passed only for the BEST-EFFORT
+  // cross-pod wake (a job created on one pod fires everywhere now instead of
+  // within one poll backstop) — a missing/flaky Redis just falls back to the
+  // poll, never affecting correctness. Kept dormant this phase — no consumers
+  // register yet (the report handler lands in a later phase), so the loop runs
+  // and log-and-skips any orphan targetType.
   const scheduler =
     config.processRole === "worker"
       ? new SchedulerService({
@@ -690,6 +693,7 @@ export function initializeDefaultApp(options?: {
           registry: schedulerRegistry,
           processRole: config.processRole,
           logger: createLogger("langwatch:app-layer:scheduler"),
+          redis,
         })
       : undefined;
   scheduler?.start();

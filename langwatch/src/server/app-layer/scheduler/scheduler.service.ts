@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import type { Cluster, Redis } from "ioredis";
 import type { ProcessRole } from "../config";
 import type { Logger } from "~/utils/logger/server";
 import { captureException, toError } from "~/utils/posthogErrorCapture";
@@ -8,6 +9,15 @@ import type {
   ScheduledJobRecord,
   ScheduledJobRepository,
 } from "./scheduler.types";
+
+/**
+ * Best-effort cross-pod wake (ADR-042, user decision 2026-07-10). Postgres is
+ * the sole correctness/locking layer; Redis pub/sub is a pure optimization so a
+ * job created on one pod fires on every pod's loop *now* instead of within one
+ * poll backstop. Fire-and-forget: a dropped publish or a down Redis costs only
+ * latency (the poll still fires the job), never correctness.
+ */
+const WAKE_CHANNEL = "scheduler:wake";
 
 /**
  * Safety-net backstop for the intelligent sleep: even when the next job is far
@@ -36,6 +46,14 @@ export interface SchedulerServiceDeps {
   logger: Logger;
   /** Intelligent-sleep backstop (default 60s). */
   maxSleepMs?: number;
+  /**
+   * Optional Redis for the best-effort cross-pod wake. When present, the loop
+   * subscribes to `scheduler:wake` and re-scans immediately on any published
+   * signal; producers call `SchedulerService.publishWake(redis)` on job
+   * create/edit. Omit it and the scheduler is 100% Postgres — correctness is
+   * identical, only cross-pod reaction latency changes (poll backstop).
+   */
+  redis?: Redis | Cluster | null;
 }
 
 /**
@@ -57,11 +75,13 @@ export interface SchedulerServiceDeps {
  * wire into shared bootstrap without role gating (mirrors
  * `OutboxHeartbeatScheduler`).
  *
- * Cross-pod early-wake (a job created on a web pod firing before the backstop
- * elapses) is a documented future refinement — a Postgres LISTEN/NOTIFY signal
- * would keep it Redis-free. Today `wake()` interrupts THIS process's sleep
- * (instant reaction when web+worker share a process), and cross-process
- * reaction is bounded by `maxSleepMs`.
+ * Cross-pod early-wake is BEST-EFFORT via Redis pub/sub (optional `redis` dep):
+ * a producer calls `SchedulerService.publishWake(redis)` after creating/editing
+ * a job, every pod's loop subscribes to `scheduler:wake` and re-scans on the
+ * signal. This is a pure latency optimization layered on the Postgres core — a
+ * dropped signal or absent Redis just means the job waits for the poll backstop
+ * (`maxSleepMs`), never a correctness change. Without `redis`, the scheduler is
+ * 100% Postgres and `wake()` only interrupts THIS process's sleep.
  */
 export class SchedulerService {
   private readonly repo: ScheduledJobRepository;
@@ -69,6 +89,7 @@ export class SchedulerService {
   private readonly processRole: ProcessRole | undefined;
   private readonly logger: Logger;
   private readonly maxSleepMs: number;
+  private readonly redis: Redis | Cluster | null;
   private readonly workerId = randomUUID();
 
   /** Reset on every `start()` so a stop/start cycle gets a fresh signal. */
@@ -77,6 +98,8 @@ export class SchedulerService {
   private started = false;
   /** Resolver for the current interruptible sleep; `wake()` pokes it. */
   private wakeCurrentSleep: (() => void) | null = null;
+  /** Dedicated subscriber connection for the cross-pod wake (null = poll-only). */
+  private subscriber: Redis | Cluster | null = null;
 
   constructor(deps: SchedulerServiceDeps) {
     this.repo = deps.repo;
@@ -84,6 +107,20 @@ export class SchedulerService {
     this.processRole = deps.processRole;
     this.logger = deps.logger;
     this.maxSleepMs = deps.maxSleepMs ?? DEFAULT_MAX_SLEEP_MS;
+    this.redis = deps.redis ?? null;
+  }
+
+  /**
+   * Best-effort cross-pod wake producer: signal every pod's scheduler loop to
+   * re-scan now. Call after creating/editing a `ScheduledJob` (e.g. a report
+   * upsert). Fire-and-forget — a publish failure is swallowed because the poll
+   * backstop still fires the job.
+   */
+  static publishWake(redis: Redis | Cluster | null | undefined): void {
+    if (!redis) return;
+    void redis.publish(WAKE_CHANNEL, "1").catch(() => {
+      // swallow — the poll backstop covers a missed wake (best-effort)
+    });
   }
 
   /**
@@ -111,8 +148,53 @@ export class SchedulerService {
     if (this.abortController.signal.aborted) {
       this.abortController = new AbortController();
     }
+    this.subscribeToWake();
     this.loopPromise = this.runLoop();
-    this.logger.info({ workerId: this.workerId }, "SchedulerService started");
+    this.logger.info(
+      { workerId: this.workerId, crossPodWake: this.redis != null },
+      "SchedulerService started",
+    );
+  }
+
+  /**
+   * Best-effort cross-pod wake consumer. A dedicated subscriber connection
+   * (subscriber mode blocks a connection, so it must be its own) pokes the
+   * in-process sleep whenever any pod publishes. All failures are swallowed —
+   * the poll backstop is the correctness floor, so Redis can be absent or flaky
+   * without affecting exactly-once firing.
+   */
+  private subscribeToWake(): void {
+    if (!this.redis) return;
+    try {
+      const sub = this.redis.duplicate();
+      sub.on("message", (channel: string) => {
+        if (channel === WAKE_CHANNEL) this.wake();
+      });
+      sub.on("error", (err: Error) => {
+        this.logger.debug(
+          { workerId: this.workerId, error: err.message },
+          "SchedulerService: wake subscriber error (poll backstop still active)",
+        );
+      });
+      void sub.subscribe(WAKE_CHANNEL).catch((err: unknown) => {
+        this.logger.debug(
+          {
+            workerId: this.workerId,
+            error: err instanceof Error ? err.message : String(err),
+          },
+          "SchedulerService: wake subscribe failed (poll backstop still active)",
+        );
+      });
+      this.subscriber = sub;
+    } catch (err) {
+      this.logger.debug(
+        {
+          workerId: this.workerId,
+          error: err instanceof Error ? err.message : String(err),
+        },
+        "SchedulerService: could not set up wake subscriber (poll backstop still active)",
+      );
+    }
   }
 
   /**
@@ -125,6 +207,17 @@ export class SchedulerService {
     this.abortController.abort();
     // Unblock a sleeping loop right away.
     this.wakeCurrentSleep?.();
+
+    // Tear down the best-effort wake subscriber (its own connection).
+    if (this.subscriber) {
+      const sub = this.subscriber;
+      this.subscriber = null;
+      try {
+        sub.disconnect();
+      } catch {
+        // best-effort teardown
+      }
+    }
 
     if (this.loopPromise) {
       const settled = await Promise.race([
