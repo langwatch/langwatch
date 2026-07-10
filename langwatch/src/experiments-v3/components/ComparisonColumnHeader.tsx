@@ -1,8 +1,9 @@
-import { HStack, Icon, Spacer, Text } from "@chakra-ui/react";
+import { Button, HStack, Icon, Spacer, Text } from "@chakra-ui/react";
 import { Swords } from "lucide-react";
 import { useMemo } from "react";
 
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
+import { useOpenComparisonEditor } from "../hooks/useOpenEvaluatorEditor";
 import { useTargetNames } from "../hooks/useTargetName";
 import { computeComparisonAggregate } from "../utils/computeAggregates";
 import { toComparisonConfig } from "../utils/normalizeComparison";
@@ -15,6 +16,11 @@ import { ComparisonScoreboard } from "./TargetSection/ComparisonScoreboard";
  * Swords identifies a comparison; a Trophy is reserved for declaring a winner,
  * which happens per row in `ComparisonCell`. The overall outcome sits on the
  * right, matching where every other column puts its summary.
+ *
+ * The title opens the config form. Every other evaluator is edited by clicking
+ * its chip, but comparisons are filtered out of the chip lists (they grade no
+ * single target), so without this the column could be created and never
+ * changed.
  */
 export function ComparisonColumnHeader({
   evaluatorId,
@@ -62,12 +68,26 @@ export function ComparisonColumnHeader({
     [evaluator, results, rowCount],
   );
 
+  const openComparisonEditor = useOpenComparisonEditor();
+
   return (
     <HStack gap={1.5} width="full">
-      <Icon as={Swords} color="fg.muted" boxSize="14px" />
-      <Text fontSize="13px" fontWeight="medium">
-        {name}
-      </Text>
+      <Button
+        variant="ghost"
+        size="xs"
+        paddingX={1}
+        marginLeft={-1}
+        height="auto"
+        fontWeight="medium"
+        disabled={!evaluator}
+        onClick={() => evaluator && openComparisonEditor(evaluator)}
+        data-testid="comparison-column-header-edit"
+      >
+        <Icon as={Swords} color="fg.muted" boxSize="14px" />
+        <Text fontSize="13px" fontWeight="medium">
+          {name}
+        </Text>
+      </Button>
       <Spacer />
       {aggregate && (
         <ComparisonScoreboard

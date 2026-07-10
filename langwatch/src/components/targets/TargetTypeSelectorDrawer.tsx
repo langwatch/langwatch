@@ -89,22 +89,34 @@ export function TargetTypeSelectorDrawer(props: TargetTypeSelectorDrawerProps) {
   const isOpen = props.open !== false && props.open !== undefined;
 
   const handleSelectType = (type: TargetCardKey) => {
-    // Comparison is a UI shortcut: skip the category/type picker and jump
-    // straight into the comparison evaluator config. The save flow (set up by
-    // handleAddTarget) creates the column as an evaluator-target. Forward
-    // comparisonContext from handleAddTarget so the creation form shows the
-    // variant picker and Golden field immediately (matching edit-mode UX).
+    // A comparison is a saved evaluator, so it gets the same list-then-create
+    // flow as Prompt, Agent and Evaluator: pick one you already have, or make a
+    // new one. The list is EvaluatorListDrawer narrowed to comparison
+    // evaluators — same component, same cards, same empty state.
+    //
+    // The save flow (set up by handleAddTarget) creates the column as an
+    // evaluator-target either way. comparisonContext is forwarded from
+    // handleAddTarget so the creation form shows the variant picker and Golden
+    // field immediately, matching edit-mode UX.
     if (type === "comparison") {
-      // NOT `replace: true` — we want the back button in the evaluator
+      const comparisonContext = (complexProps.comparisonContext ??
+        props.comparisonContext) as TargetTypeSelectorDrawerProps["comparisonContext"];
+
+      // NOT `replace: true` — we want the back button in the list and the
       // editor to return to this Add-to-Evaluation picker instead of
       // dead-ending. A `replace` here drops navigation history and the
-      // editor's Drawer.Header hides its arrow (canGoBack=false).
-      openDrawer("evaluatorEditor", {
-        evaluatorType: COMPARISON_EVALUATOR_TYPE,
-        category: "llm_judge",
-        comparisonContext: (complexProps.comparisonContext ??
-          props.comparisonContext) as TargetTypeSelectorDrawerProps["comparisonContext"],
-        saveButtonText: "Add Comparison",
+      // header hides its arrow (canGoBack=false).
+      openDrawer("evaluatorList", {
+        filterEvaluatorType: COMPARISON_EVALUATOR_TYPE,
+        title: "Choose Comparison",
+        createLabel: "New Comparison",
+        onCreateNew: () =>
+          openDrawer("evaluatorEditor", {
+            evaluatorType: COMPARISON_EVALUATOR_TYPE,
+            category: "llm_judge",
+            comparisonContext,
+            saveButtonText: "Add Comparison",
+          }),
       });
       return;
     }

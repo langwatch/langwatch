@@ -61,7 +61,6 @@ import type {
 } from "../types";
 import {
   COMPARISON_EVALUATOR_TYPE,
-  isComparisonEvaluator,
   isGoldenFieldSatisfied,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "../types";
@@ -855,27 +854,23 @@ export function EvaluationsV3Table({
     setFlowCallbacks("evaluatorList", {
       onSelect: handleSelectEvaluatorAsTarget,
     });
-    // Build comparisonContext so TargetTypeSelectorDrawer can pass it to
-    // evaluatorEditor when "Comparison" is selected — this makes the creation
-    // form show the variant picker and Golden field immediately, matching the
-    // edit-mode experience (see #5195).
+    // Build comparisonContext so the Comparison flow can pass it to
+    // evaluatorEditor — this makes the creation form show the variant picker
+    // and Golden field immediately, matching the edit-mode experience (#5195).
     //
-    // If a comparison already exists in the workbench, pre-fill from IT so
-    // clicking "Comparison" opens the existing one for editing instead of
-    // dropping a fresh blank form and creating a second evaluator every time.
-    // Only the first is picked up — multiple comparisons per workbench aren't a
-    // supported pattern today.
+    // No initialComparison: "New Comparison" means a blank one. Reaching an
+    // existing comparison is the list's job now (TargetTypeSelectorDrawer opens
+    // EvaluatorListDrawer filtered to comparison evaluators), and editing the
+    // one already on the table is the column header's job. Pre-filling from the
+    // first comparison in the workbench used to make a second one impossible to
+    // create and quietly turned "add" into "edit".
     pendingComparisonRef.current = null;
     const state = useEvaluationsV3Store.getState();
     const variantOptions = state.targets.filter((t) => t.type !== "evaluator");
     const activeDs = state.datasets.find((d) => d.id === state.activeDatasetId);
     const datasetColumns =
       activeDs?.columns.map((c) => ({ id: c.id, name: c.name })) ?? [];
-    const existingComparison = state.evaluators.find(isComparisonEvaluator);
     const comparisonContext = {
-      initialComparison: existingComparison
-        ? toComparisonConfig(existingComparison)
-        : undefined,
       targets: variantOptions,
       datasetColumns,
     };

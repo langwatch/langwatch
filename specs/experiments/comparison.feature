@@ -33,6 +33,35 @@ Feature: Comparison evaluator (pairwise or multi-candidate preference judging)
     Then I do not see a "Comparison" card
     But adding a Comparison from Add to Evaluation opens the form with the variant picker
 
+  # A comparison is a saved evaluator, so it gets the same list-then-create flow
+  # as Prompt, Agent and Evaluator — the same list component, narrowed to
+  # comparison evaluators.
+  Scenario: Comparison offers the ones I already have
+    Given I have already saved a comparison evaluator
+    When I choose Comparison from Add to Evaluation
+    Then I see it listed, alongside a "New Comparison" button
+
+  Scenario: Selecting a saved comparison adds it as a column
+    Given I am looking at the list of saved comparisons
+    When I select one
+    Then it is added as a Comparison column
+    And its config form opens so I can pick the variants for this experiment
+
+  # Variants are target ids belonging to THIS experiment, so a saved comparison
+  # carries a judge and its settings, never the columns it compared elsewhere.
+  Scenario: New Comparison starts blank
+    Given a comparison already exists in this evaluation
+    When I choose Comparison and click "New Comparison"
+    Then the form opens with no variants selected
+    And creating it adds a second Comparison column
+
+  # Every other evaluator is edited by clicking its chip, but comparisons are
+  # filtered out of the chip lists — they grade no single target.
+  Scenario: The Comparison column header opens its config
+    Given a Comparison column exists
+    When I click the column's title
+    Then its config form opens, with the current variants selected
+
   # The Comparison card collects the variants before Create, so by the time the
   # column is added there is nothing left to configure. Re-opening the config
   # form on top of it reads as the drawer refusing to close.
