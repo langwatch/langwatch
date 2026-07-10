@@ -473,6 +473,43 @@ describe("jobEnvelope", () => {
         ).toEqual(big);
       });
 
+      it("registers the hold before the blob is written, for the blob the envelope references", async () => {
+        // Ordering is the correctness property: content-addressed blobs are
+        // shared across jobs, so a hold that lands after the write leaves a
+        // window where another job's release reclaims the blob. Hold-first
+        // means a racing reclaim either sees the hold or deletes bytes the
+        // write below restores.
+        const { tieredBlobs, redisBlobs } = makeTiered();
+        const order: string[] = [];
+        const acquired: { projectId?: string; hash?: string; token?: string } =
+          {};
+        const originalPut = redisBlobs.put.bind(redisBlobs);
+        redisBlobs.put = async (params) => {
+          order.push("write");
+          return originalPut(params);
+        };
+
+        const encoded = await encodeJobEnvelope({
+          jobData: big,
+          tieredBlobs,
+          projectId: PROJECT,
+          acquireHold: async ({ projectId, hash, token }) => {
+            order.push("hold");
+            acquired.projectId = projectId;
+            acquired.hash = hash;
+            acquired.token = token;
+          },
+        });
+
+        expect(order).toEqual(["hold", "write"]);
+        const hold = readEnvelopeHold(encoded)!;
+        expect(acquired).toEqual({
+          projectId: PROJECT,
+          hash: hold.ref.hash,
+          token: hold.token,
+        });
+      });
+
       it("exposes routing meta from the header without resolving the blob", async () => {
         const { tieredBlobs } = makeTiered();
         const encoded = await encodeJobEnvelope({

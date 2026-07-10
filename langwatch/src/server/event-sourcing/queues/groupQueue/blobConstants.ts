@@ -44,3 +44,14 @@ export const BLOB_HOLDER_TTL_SECONDS = BLOB_BACKSTOP_TTL_SECONDS + 24 * 60 * 60;
  * (ADR-030 §1).
  */
 export const MAX_BLOB_BYTES = 50 * 1024 * 1024;
+
+/**
+ * Grace period between an s3-tier reclaim decision (holder set emptied) and
+ * the out-of-band DeleteObject. Unlike the redis tier — whose UNLINK is atomic
+ * with the emptiness check inside the release Lua — the s3 delete is a
+ * separate network call, so a staging on another pod can re-hold the same
+ * content in the gap. The reclaimer waits this long and re-checks the holder
+ * set before deleting; a skipped delete degrades to the TTL / bucket-lifecycle
+ * backstop, never to a deleted live blob.
+ */
+export const S3_RECLAIM_GRACE_MS = 5_000;

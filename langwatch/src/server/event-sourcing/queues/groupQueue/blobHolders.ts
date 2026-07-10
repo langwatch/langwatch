@@ -118,6 +118,22 @@ export class BlobHolders {
       .exec();
   }
 
+  /**
+   * Whether ANY slot currently holds the blob. Used by the s3 reclaim grace
+   * re-check: the reclaim decision is made inside the release eval, but the s3
+   * DeleteObject is a separate call — if the content was re-held in the gap,
+   * the delete must be skipped.
+   */
+  async isHeld({
+    projectId,
+    hash,
+  }: {
+    projectId: TenantId;
+    hash: string;
+  }): Promise<boolean> {
+    return (await this.redis.exists(this.holderKey(projectId, hash))) === 1;
+  }
+
   /** Refreshes the holder set's TTL on access (dispatch), so it outlives the blob it guards. */
   async touch({
     projectId,

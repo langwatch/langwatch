@@ -1,6 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { Readable } from "node:stream";
 
+import { ObjectNotFoundError } from "~/server/stored-objects/errors";
+
 import type { JobBlobStore } from "../jobEnvelope";
 import type { ObjectStore } from "../tieredBlobStore";
 
@@ -43,8 +45,11 @@ export class InMemoryJobBlobStore implements JobBlobStore {
 
 /**
  * In-memory stand-in for the stored-objects StorageRegistry (the GQ2 s3 tier).
- * A miss throws a `NoSuchKey`-named error so the tier classifies it as gone;
- * deletes are recorded so out-of-band reclaim can be asserted.
+ * A miss throws the registry's real {@link ObjectNotFoundError} — faithful to
+ * what `S3Driver`/`LocalFilesystemDriver` actually throw, so a
+ * missing-vs-transient classification gap between the double and production
+ * can't hide behind the double. Deletes are recorded so out-of-band reclaim
+ * can be asserted.
  */
 export class InMemoryObjectStore implements ObjectStore {
   readonly store = new Map<string, Buffer>();
@@ -55,9 +60,7 @@ export class InMemoryObjectStore implements ObjectStore {
   async get(uri: string): Promise<Readable> {
     const bytes = this.store.get(uri);
     if (!bytes) {
-      const err = new Error(`no object at ${uri}`);
-      err.name = "NoSuchKey";
-      throw err;
+      throw new ObjectNotFoundError(uri);
     }
     return Readable.from(bytes);
   }

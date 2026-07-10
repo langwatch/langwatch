@@ -54,6 +54,9 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
         kind: "s3",
         bucket: "test-bucket",
       }),
+      // No reclaim grace by default so out-of-band delete assertions stay
+      // prompt; the grace behaviour has its own dedicated suite below.
+      s3ReclaimGraceMs: 0,
     });
   });
 
@@ -150,9 +153,12 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
         });
         const newHash = hashOf(newValue);
         const newHolderKey = `${queueName}:gq:blobholders:proj2/${newHash}`;
-        lifecycle.acquire(oldValue);
+        // Drop the hold proj2's own encode registered: the guard under test is
+        // about a foreign value arriving in proj1's group (mis-routed/forged),
+        // where no legitimate proj2 staging exists.
+        await redis.del(newHolderKey);
         const oldKey = holderKey(hashOf(oldValue));
-        await vi.waitFor(async () => expect(await redis.scard(oldKey)).toBe(1));
+        expect(await redis.scard(oldKey)).toBe(1); // encode-time hold
 
         lifecycle.transfer({ newValue, oldValue, groupId: TENANT_GROUP });
 
@@ -178,10 +184,9 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
         });
         const hash = hashOf(v1);
         expect(hashOf(v2)).toBe(hash); // same content → same blob
-        lifecycle.acquire(v1);
-        await vi.waitFor(async () =>
-          expect(await redis.scard(holderKey(hash))).toBe(1),
-        );
+        // Each encode registered its own hold up front, so both occupancies
+        // are already in the holder set before any transfer runs.
+        expect(await redis.scard(holderKey(hash))).toBe(2);
 
         lifecycle.transfer({
           newValue: v2,
@@ -213,9 +218,9 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
         });
 
         expect(hashOf(v2)).toBe(hashOf(v1));
-        lifecycle.acquire(v1);
         const key = holderKey(hashOf(v1));
-        await vi.waitFor(async () => expect(await redis.scard(key)).toBe(1));
+        // Both encode-time holds are registered before anything is staged.
+        expect(await redis.scard(key)).toBe(2);
 
         lifecycle.transfer({
           newValue: v2,
@@ -308,6 +313,143 @@ describe.skipIf(!hasTestcontainers)("EnvelopeBlobLifecycle", () => {
         await vi.waitFor(async () =>
           expect(await redis.scard(holderKey(hashOf(gq2Value)))).toBe(1),
         );
+      });
+    });
+  });
+
+  describe("given stagings sharing one content-addressed blob", () => {
+    describe("when a value is encoded", () => {
+      it("registers the occupancy's hold before encode returns", async () => {
+        const value = await lifecycle.encode({
+          jobData: REDIS_TIER_PAYLOAD,
+          groupId: TENANT_GROUP,
+        });
+
+        // No acquire() call: by the time the value exists (and could be
+        // staged), the hold must already be in the holder set — a hold that
+        // only lands after staging leaves a window where a sibling's release
+        // reclaims the shared blob.
+        const hold = readEnvelopeHold(value)!;
+        expect(await redis.smembers(holderKey(hold.ref.hash))).toContain(
+          hold.token,
+        );
+      });
+    });
+
+    describe("when one staging retires before a concurrent one dispatches", () => {
+      it("keeps the shared s3 blob alive for the remaining staging", async () => {
+        const shared = { bulk: incompressible(768 * 1024) }; // > 256 KiB gzipped → s3
+        const first = await lifecycle.encode({
+          jobData: shared,
+          groupId: TENANT_GROUP,
+        });
+        const second = await lifecycle.encode({
+          jobData: shared,
+          groupId: TENANT_GROUP,
+        });
+        expect(readEnvelopeHold(second)!.ref.tier).toBe("s3");
+        // Ensure the FIRST staging's hold has landed (post-stage refresh), so
+        // its release below actually removes a member — the interleave where a
+        // hold-after-staging design empties the set and reclaims the blob out
+        // from under the second staging.
+        lifecycle.acquire(first);
+        await vi.waitFor(async () =>
+          expect(await redis.scard(holderKey(hashOf(first)))).toBeGreaterThan(
+            0,
+          ),
+        );
+
+        // The first staging completes and releases its hold while the second
+        // is still awaiting dispatch.
+        lifecycle.release({ values: [first], groupId: TENANT_GROUP });
+        // Wait past the point an unguarded release would have deleted it.
+        await new Promise((resolve) => setTimeout(resolve, 150));
+
+        expect(objectStore.deleted).toHaveLength(0);
+        expect(
+          await lifecycle.decode({ value: second, groupId: TENANT_GROUP }),
+        ).toEqual(shared);
+      });
+
+      it("keeps the shared redis blob alive for the remaining staging", async () => {
+        const first = await lifecycle.encode({
+          jobData: REDIS_TIER_PAYLOAD,
+          groupId: TENANT_GROUP,
+        });
+        const second = await lifecycle.encode({
+          jobData: REDIS_TIER_PAYLOAD,
+          groupId: TENANT_GROUP,
+        });
+        lifecycle.acquire(first);
+        await vi.waitFor(async () =>
+          expect(await redis.scard(holderKey(hashOf(first)))).toBeGreaterThan(
+            0,
+          ),
+        );
+
+        lifecycle.release({ values: [first], groupId: TENANT_GROUP });
+        await new Promise((resolve) => setTimeout(resolve, 150));
+
+        expect(await redis.exists(blobKey(hashOf(second)))).toBe(1);
+        expect(
+          await lifecycle.decode({ value: second, groupId: TENANT_GROUP }),
+        ).toEqual(REDIS_TIER_PAYLOAD);
+      });
+    });
+  });
+
+  describe("given an s3 reclaim decision with a grace window", () => {
+    const gracedLifecycle = (graceMs: number) =>
+      new EnvelopeBlobLifecycle({
+        redis,
+        queueName,
+        objectStoreFor: () => objectStore,
+        resolveStorageDestination: async () => ({
+          kind: "s3",
+          bucket: "test-bucket",
+        }),
+        s3ReclaimGraceMs: graceMs,
+      });
+
+    describe("when the same content is re-held before the delete executes", () => {
+      it("skips the delete so the new occupancy never references a deleted object", async () => {
+        const graced = gracedLifecycle(200);
+        const shared = { bulk: incompressible(768 * 1024) };
+        const first = await graced.encode({
+          jobData: shared,
+          groupId: TENANT_GROUP,
+        });
+
+        // Sole holder retires → reclaim decided; a new staging re-holds the
+        // same content inside the grace window.
+        graced.release({ values: [first], groupId: TENANT_GROUP });
+        const second = await graced.encode({
+          jobData: shared,
+          groupId: TENANT_GROUP,
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        expect(objectStore.deleted).toHaveLength(0);
+        expect(
+          await graced.decode({ value: second, groupId: TENANT_GROUP }),
+        ).toEqual(shared);
+      });
+    });
+
+    describe("when nothing re-holds the content within the grace", () => {
+      it("deletes the object once the grace elapses", async () => {
+        const graced = gracedLifecycle(100);
+        const value = await graced.encode({
+          jobData: { bulk: incompressible(768 * 1024) },
+          groupId: TENANT_GROUP,
+        });
+
+        graced.release({ values: [value], groupId: TENANT_GROUP });
+
+        await vi.waitFor(() => expect(objectStore.deleted).toHaveLength(1), {
+          timeout: 2000,
+          interval: 25,
+        });
       });
     });
   });

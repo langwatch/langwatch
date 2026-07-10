@@ -175,9 +175,52 @@ describe("TieredBlobStore", () => {
           "over the threshold so it lands in the s3 tier",
         );
         const ref = await store.put({ projectId: PROJECT, data });
-        objectStore.store.clear(); // the object vanished (NoSuchKey)
+        // The double throws the registry's real ObjectNotFoundError, the shape
+        // production reads actually see for a deleted object.
+        objectStore.store.clear();
 
         expect(await store.get(ref)).toBeNull();
+      });
+
+      it("classifies every not-found shape as missing, never transient", async () => {
+        // A miss can surface as the driver's translated error OR a raw
+        // SDK/errno shape (an ObjectStore that doesn't translate). Treating
+        // any of these as transient sends the job through the full retry
+        // ladder instead of the immediate missing-blob fail-safe.
+        const missingShapes: (() => Error)[] = [
+          () => Object.assign(new Error("miss"), { name: "NoSuchKey" }),
+          () => Object.assign(new Error("miss"), { name: "NotFound" }),
+          () => Object.assign(new Error("miss"), { code: "ENOENT" }),
+          () =>
+            Object.assign(new Error("miss"), {
+              $metadata: { httpStatusCode: 404 },
+            }),
+          () =>
+            Object.assign(new Error("Object not found: s3://b/k"), {
+              name: "ObjectNotFoundError",
+            }),
+        ];
+        for (const shape of missingShapes) {
+          const gone: ObjectStore = {
+            put: async () => {},
+            get: async () => {
+              throw shape();
+            },
+            delete: async () => {},
+          };
+          const store = new TieredBlobStore({
+            redisBlobs: new InMemoryJobBlobStore(),
+            objectStoreFor: () => gone,
+            resolveDestination: async () => ({
+              kind: "s3",
+              bucket: "test-bucket",
+            }),
+            s3ThresholdBytes: 8,
+          });
+          const ref: BlobRef = { tier: "s3", projectId: PROJECT, hash: "h" };
+
+          expect(await store.get(ref)).toBeNull();
+        }
       });
     });
   });

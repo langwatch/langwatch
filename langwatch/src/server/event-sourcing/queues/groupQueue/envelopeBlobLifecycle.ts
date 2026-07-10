@@ -7,6 +7,7 @@ import {
   redactStorageUrisInText,
 } from "../../../stored-objects/project-storage-destination";
 import { createTenantId, type TenantId } from "../../domain/tenantId";
+import { S3_RECLAIM_GRACE_MS } from "./blobConstants";
 import { BlobHolders } from "./blobHolders";
 import {
   decodeJobEnvelope,
@@ -20,7 +21,11 @@ import {
 import { gqBlobReclaimS3FailuresTotal } from "./metrics";
 import { hasRedisHashTag } from "./redisHashTag";
 import { RedisJobBlobStore } from "./redisJobBlobStore";
-import { type ObjectStore, TieredBlobStore } from "./tieredBlobStore";
+import {
+  type BlobRef,
+  type ObjectStore,
+  TieredBlobStore,
+} from "./tieredBlobStore";
 
 const logger = createLogger("langwatch:event-sourcing:envelope-blob-lifecycle");
 
@@ -36,6 +41,7 @@ export class EnvelopeBlobLifecycle {
   private readonly tieredBlobs?: TieredBlobStore;
   private readonly queueName: string;
   private readonly writesEnabled?: boolean;
+  private readonly s3ReclaimGraceMs: number;
 
   constructor({
     redis,
@@ -43,6 +49,7 @@ export class EnvelopeBlobLifecycle {
     objectStoreFor,
     resolveStorageDestination,
     writesEnabled,
+    s3ReclaimGraceMs,
   }: {
     redis: IORedis | Cluster;
     queueName: string;
@@ -58,9 +65,15 @@ export class EnvelopeBlobLifecycle {
      * env var (call-time read so tests can toggle without module reload).
      */
     writesEnabled?: boolean;
+    /**
+     * Grace between an s3 reclaim decision and its DeleteObject; see
+     * {@link S3_RECLAIM_GRACE_MS}. Injectable so tests don't wait wall-clock.
+     */
+    s3ReclaimGraceMs?: number;
   }) {
     this.queueName = queueName;
     this.writesEnabled = writesEnabled;
+    this.s3ReclaimGraceMs = s3ReclaimGraceMs ?? S3_RECLAIM_GRACE_MS;
     // The holder release/transfer evals touch two keys (holder + blob); in
     // cluster mode they must share a slot, which requires the queue name to
     // carry a hash tag. Fail fast rather than CROSSSLOT-leak silently at runtime
@@ -103,6 +116,12 @@ export class EnvelopeBlobLifecycle {
   /**
    * Encodes a job payload into a staged envelope, offloading a large body to the
    * content-addressed tiered store under the group's tenant namespace.
+   *
+   * The occupancy's hold on the shared blob is registered HERE, awaited, before
+   * the blob is written and before the returned value can be staged — so by the
+   * time any other job's release can observe this occupancy, its hold is
+   * already in the holder set. The fire-and-forget post-stage
+   * {@link EnvelopeBlobLifecycle.acquire} is only a TTL refresh on top of this.
    */
   async encode({
     jobData,
@@ -119,6 +138,8 @@ export class EnvelopeBlobLifecycle {
       writesEnabled: this.writesEnabled,
       queueName: this.queueName,
       logger,
+      acquireHold: ({ projectId, hash, token }) =>
+        this.blobHolders.acquire({ projectId, hash, slotId: token }),
     });
   }
 
@@ -182,9 +203,14 @@ export class EnvelopeBlobLifecycle {
   }
 
   /**
-   * Acquires this staged occupancy's hold on its GQ2 blob (no-op for GQ1,
-   * inline, and legacy values). Fire-and-forget: a missed acquire degrades to
-   * the blob's TTL backstop, never to a premature reclaim.
+   * Re-asserts this staged occupancy's hold on its GQ2 blob (no-op for GQ1,
+   * inline, and legacy values). The authoritative hold is registered inside
+   * {@link encode}, awaited, before the blob is written — content-addressed
+   * blobs are shared across jobs, so a hold that only exists after staging
+   * leaves a window where another job's release reclaims the blob out from
+   * under this one. This post-stage call is an idempotent SADD + TTL refresh
+   * for values that were encoded earlier (re-stages, drained-sibling
+   * re-stages), and safe to fire-and-forget.
    */
   acquire(value: string): void {
     const hold = readEnvelopeHold(value);
@@ -249,26 +275,8 @@ export class EnvelopeBlobLifecycle {
             slotId: hold.token,
           })
           .then((outcome) => {
-            if (outcome === "reclaim-s3" && this.tieredBlobs) {
-              return this.tieredBlobs.delete(hold.ref).catch((err: unknown) => {
-                // S3 reclaim failed — the holder is already gone, so no future
-                // release will retry this object. Warn AND counter so oncall
-                // sees a recurring failure before the bucket-lifecycle
-                // backstop kicks in (2026-06-24 review).
-                gqBlobReclaimS3FailuresTotal.inc({
-                  queue_name: this.queueName,
-                });
-                logger.warn(
-                  {
-                    projectId: hold.ref.projectId,
-                    blobHash: hold.ref.hash,
-                    err: redactStorageUrisInText(
-                      err instanceof Error ? err.message : String(err),
-                    ),
-                  },
-                  "S3 blob reclaim failed after holder drop — orphaned until bucket lifecycle sweeps",
-                );
-              });
+            if (outcome === "reclaim-s3") {
+              return this.reclaimS3(hold.ref, "holder drop");
             }
           })
           .catch((err: unknown) => {
@@ -369,20 +377,8 @@ export class EnvelopeBlobLifecycle {
         oldSlotId: oldHold.token,
       })
       .then((outcome) => {
-        if (outcome === "reclaim-s3" && this.tieredBlobs) {
-          return this.tieredBlobs.delete(oldHold.ref).catch((err: unknown) => {
-            gqBlobReclaimS3FailuresTotal.inc({ queue_name: this.queueName });
-            logger.warn(
-              {
-                projectId: oldHold.ref.projectId,
-                blobHash: oldHold.ref.hash,
-                err: redactStorageUrisInText(
-                  err instanceof Error ? err.message : String(err),
-                ),
-              },
-              "S3 blob reclaim failed after transfer — orphaned until bucket lifecycle sweeps",
-            );
-          });
+        if (outcome === "reclaim-s3") {
+          return this.reclaimS3(oldHold.ref, "transfer");
         }
       })
       .catch((err: unknown) => {
@@ -398,6 +394,55 @@ export class EnvelopeBlobLifecycle {
           "Blob holder transfer failed; relying on the TTL backstop",
         );
       });
+  }
+
+  /**
+   * Out-of-band s3 reclaim with a grace re-check. The release/transfer eval
+   * decided the holder set was empty, but the DeleteObject is a separate
+   * network call — a staging elsewhere can re-hold the same content in the gap
+   * (its hold is registered before its PUT, so a re-held blob is always
+   * rewritten). Wait out the grace, re-check the holder set, and skip the
+   * delete when the content is held again: a skipped orphan degrades to the
+   * TTL / bucket-lifecycle backstop, never to a deleted live blob.
+   */
+  private async reclaimS3(ref: BlobRef, edge: string): Promise<void> {
+    if (!this.tieredBlobs) return;
+    try {
+      if (this.s3ReclaimGraceMs > 0) {
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, this.s3ReclaimGraceMs);
+          // Never keep a worker process alive just to finish a best-effort
+          // delete; an abandoned reclaim is an orphan for the backstop.
+          timer.unref?.();
+        });
+      }
+      if (
+        await this.blobHolders.isHeld({
+          projectId: ref.projectId,
+          hash: ref.hash,
+        })
+      ) {
+        return;
+      }
+      await this.tieredBlobs.delete(ref);
+    } catch (err: unknown) {
+      // S3 reclaim failed — the holder is already gone, so no future release
+      // will retry this object. Warn AND counter so oncall sees a recurring
+      // failure before the bucket-lifecycle backstop kicks in (2026-06-24
+      // review).
+      gqBlobReclaimS3FailuresTotal.inc({ queue_name: this.queueName });
+      logger.warn(
+        {
+          projectId: ref.projectId,
+          blobHash: ref.hash,
+          edge,
+          err: redactStorageUrisInText(
+            err instanceof Error ? err.message : String(err),
+          ),
+        },
+        "S3 blob reclaim failed after holder drop — orphaned until bucket lifecycle sweeps",
+      );
+    }
   }
 
   /**

@@ -8,7 +8,11 @@ import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
 
 import { MAX_BLOB_BYTES } from "./blobConstants";
 import { gqEnvelopeGQ2DowngradeTotal, gqPayloadTooLargeTotal } from "./metrics";
-import type { BlobRef, TieredBlobStore } from "./tieredBlobStore";
+import {
+  type BlobRef,
+  contentHash,
+  type TieredBlobStore,
+} from "./tieredBlobStore";
 
 const gzipAsync = promisify(gzip);
 const gunzipAsync = promisify(gunzip);
@@ -255,6 +259,7 @@ export async function encodeJobEnvelope({
   writesEnabled,
   queueName,
   logger,
+  acquireHold,
 }: {
   jobData: Record<string, unknown>;
   blobs?: JobBlobStore;
@@ -272,6 +277,20 @@ export async function encodeJobEnvelope({
   queueName?: string;
   /** Optional logger for tenant-attributed warn on cap / downgrade. */
   logger?: Logger;
+  /**
+   * Registers this occupancy's hold on the content-addressed blob BEFORE the
+   * blob is written. Ordering is the correctness property: content-addressed
+   * blobs are shared across every job carrying identical bytes, so another
+   * job's terminal release can reclaim the blob at any moment the holder set
+   * doesn't yet list us. Registering first means a concurrent
+   * release-and-reclaim either sees our hold (and keeps the blob) or deletes
+   * a copy our own subsequent PUT rewrites (ADR-029 AC3.9).
+   */
+  acquireHold?: (params: {
+    projectId: TenantId;
+    hash: string;
+    token: string;
+  }) => Promise<void>;
 }): Promise<string> {
   const json = JSON.stringify(jobData);
   const enabled = writesEnabled ?? envelopeWritesEnabled();
@@ -304,6 +323,22 @@ export async function encodeJobEnvelope({
     const payloadJson = JSON.stringify(payload);
     const payloadBytes = Buffer.byteLength(payloadJson);
     if (payloadBytes > INLINE_CEILING_BYTES) {
+      // Per-stage hold token: the holder-set member identifying this staged
+      // occupancy. Lives in the (inline) header, never in the content-addressed
+      // body, so it doesn't perturb the blob hash that collapses the fan-out.
+      const token = randomUUID();
+      // The hash the tiered store will key by (it hashes the same raw payload
+      // json, so the two derivations can't diverge). Known before the write so
+      // the hold can be registered first.
+      const hash = contentHash(payloadJson);
+      // Hold BEFORE write (awaited): once the hold is in the holder set, no
+      // concurrent release can reclaim this content; and any reclaim that won
+      // the race before our hold landed deleted bytes the PUT below rewrites.
+      // A crash between these two steps leaves a hold guarding nothing — the
+      // holder-set TTL backstop clears it (ADR-030 §3).
+      if (acquireHold) {
+        await acquireHold({ projectId, hash, token });
+      }
       const ref = await tieredBlobs.put({
         projectId,
         data: await gzipAsync(payloadJson),
@@ -315,10 +350,7 @@ export async function encodeJobEnvelope({
       });
       header.e = ref.tier;
       header.ref = ref;
-      // Per-stage hold token: the holder-set member identifying this staged
-      // occupancy. Lives in the (inline) header, never in the content-addressed
-      // body, so it doesn't perturb the blob hash that collapses the fan-out.
-      header.h = randomUUID();
+      header.h = token;
       return finalize(ENVELOPE_PREFIX_V2, header, "");
     }
     return finalize(

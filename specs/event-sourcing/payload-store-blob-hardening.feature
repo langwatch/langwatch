@@ -105,6 +105,36 @@ Feature: GroupQueue blob-handling hardening
     Then the blob survives until the last referencing job retires
     And no still-staged job is left pointing at a reclaimed blob
 
+  @integration @track3
+  # A hold that only lands after staging leaves a window where a fast sibling's
+  # completion sees an "empty" holder set and reclaims a blob a concurrent
+  # staging still needs. Hold-first closes it: a racing reclaim either sees the
+  # hold, or deletes bytes the staging's own idempotent write restores.
+  Scenario: A staging's hold on its shared blob exists before the blob is written
+    When a job whose payload offloads to a shared content-addressed blob is encoded
+    Then its hold is registered in the holder set before the blob write
+    And before the job becomes dispatchable
+
+  @integration @track3
+  Scenario: A fan-out sibling completing early never reclaims a blob a concurrent staging references
+    Given two stagings encoding the same content-addressed payload
+    When the first retires before the second is dispatched
+    Then the shared blob survives the first staging's release
+    And the second staging decodes its payload intact
+
+  @integration @track3
+  # The redis-tier reclaim is atomic inside the release eval; the s3 delete is a
+  # separate network call, so the reclaim decision can be stale by the time the
+  # delete executes. The reclaimer re-checks after a grace window and skips the
+  # delete when the content is held again — a skipped orphan degrades to the
+  # TTL / bucket-lifecycle backstop, never to a deleted live blob.
+  Scenario: An s3 reclaim is skipped when the content is re-held before the delete executes
+    Given an s3-tier blob whose last holder released
+    And a new staging re-holds the same content before the reclaim delete runs
+    When the grace window elapses and the reclaimer re-checks the holder set
+    Then the delete is skipped
+    And the new staging decodes its payload intact
+
   # ===========================================================================
   # Track 4 — atomic hold transfer (no reclaim gap)
   # ===========================================================================
@@ -181,6 +211,9 @@ Feature: GroupQueue blob-handling hardening
   #   AC3.1 holder TTL ≥ blob TTL     -> The holder-set TTL is never shorter than the blob TTL
   #   AC3.2 dispatch refreshes both   -> Dispatch refreshes the holder set as well as the blob
   #   AC3.3 no premature reclaim      -> A long-lived fan-out does not prematurely reclaim a referenced blob
+  #   AC3.4 hold-before-write         -> A staging's hold on its shared blob exists before the blob is written
+  #   AC3.5 sibling-safe release      -> A fan-out sibling completing early never reclaims a blob ...
+  #   AC3.6 s3 reclaim grace re-check -> An s3 reclaim is skipped when the content is re-held ...
   # Track 4 — atomic transfer
   #   AC4.1 atomic retry transfer     -> A retry transfers the hold ... in a single atomic step
   #   AC4.2 no reclaim on partial     -> A partial failure during the transfer cannot reclaim a referenced blob
@@ -192,6 +225,6 @@ Feature: GroupQueue blob-handling hardening
   # Track 6 — cluster-slot guard
   #   AC6.1 reject hash-tag-less name -> A queue name without a Redis hash tag is rejected at construction
   #
-  # Count: 16 behavioral ACs -> 16 scenarios. Streaming (the original AC1.2) was
+  # Count: 19 behavioral ACs -> 19 scenarios. Streaming (the original AC1.2) was
   # dropped in implementation — the cap is the memory bound (ADR-030 §1).
   # ===========================================================================

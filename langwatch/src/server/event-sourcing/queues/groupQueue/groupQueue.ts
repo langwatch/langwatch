@@ -415,13 +415,16 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>>
       shouldSurviveDispatch,
     });
 
-    // Acquire this occupancy's hold BEFORE releasing any payload a dedup squash
-    // displaced, so a squash re-staging identical content never drops the shared
-    // blob to zero holders. Both are no-ops for inline/legacy values.
+    // This occupancy's hold was registered inside encode(), awaited, BEFORE the
+    // blob write and before the stage above — so no concurrent release could
+    // reclaim the shared blob while this value was in flight (ADR-029 AC3.9).
+    // What remains here is squash bookkeeping and a TTL refresh; both are
+    // no-ops for inline/legacy values.
     if (orphanedValue) {
       // Atomic hold transfer: a dedup squash moves the hold from the displaced
       // value to the new one in one eval, so a partial failure can't reclaim a
-      // live blob (ADR-030 §4).
+      // live blob (ADR-030 §4). The new value's encode-time hold makes the SADD
+      // half idempotent.
       this.blobLifecycle.transfer({
         newValue: jobDataJson,
         oldValue: orphanedValue,

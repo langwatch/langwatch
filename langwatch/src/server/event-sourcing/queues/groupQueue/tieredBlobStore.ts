@@ -5,6 +5,7 @@ import type { Logger } from "pino";
 
 import { COMMAND_INLINE_THRESHOLD } from "~/server/app-layer/traces/lean-for-projection";
 import type { TenantId } from "~/server/event-sourcing/domain/tenantId";
+import { ObjectNotFoundError } from "~/server/stored-objects/errors";
 import type { ProjectStorageDestination } from "~/server/stored-objects/project-storage-destination";
 import { mintFileUri, mintS3Uri } from "~/server/stored-objects/uri";
 
@@ -113,15 +114,26 @@ async function streamToBuffer(
   return Buffer.concat(chunks);
 }
 
-/** Whether an object-store error means the object is absent (vs a transient failure). */
+/**
+ * Whether an object-store error means the object is absent (vs a transient
+ * failure). Covers BOTH shapes a miss can arrive in: the stored-objects
+ * drivers' own {@link ObjectNotFoundError} (what `StorageRegistry.get`
+ * actually throws — `S3Driver`/`LocalFilesystemDriver` translate their SDK
+ * miss into it), and the raw SDK/errno shapes for any `ObjectStore`
+ * implementation that doesn't translate. Missing either shape misclassifies a
+ * gone-forever blob as transient, sending the job into a full retry ladder
+ * instead of the immediate missing-blob fail-safe.
+ */
 function isObjectMissingError(err: unknown): boolean {
   if (err == null || typeof err !== "object") return false;
+  if (err instanceof ObjectNotFoundError) return true;
   const e = err as {
     name?: string;
     code?: string;
     $metadata?: { httpStatusCode?: number };
   };
   return (
+    e.name === "ObjectNotFoundError" ||
     e.name === "NoSuchKey" ||
     e.name === "NotFound" ||
     e.code === "ENOENT" ||
