@@ -84,7 +84,7 @@ function buildStoredObjects(): StoredObjectsService {
 }
 
 /** Builds an inputs object whose JSON serialization is at least `bytes` long. */
-function inputsOfSize(bytes: number): Record<string, unknown> {
+function inputsOfSize(bytes: number): { blob: string } {
   const overhead = JSON.stringify({ blob: "" }).length;
   return { blob: "x".repeat(Math.max(0, bytes - overhead)) };
 }
