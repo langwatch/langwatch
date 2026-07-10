@@ -7,7 +7,7 @@ Status: Accepted (locked 2026-07-10)
 
 ## Context
 
-A paying Growth customer was hard-blocked at "Team Members: 6/6" and ops was paged. Root cause: the org carried `pricingModel = TIERED` while holding an active `GROWTH_SEAT_*` subscription — `migrateToSeatEvent` was skipped by webhook ordering (`customer.subscription.updated` activated the sub before `invoice.payment_succeeded`, whose `previousStatus !== ACTIVE` gate then never fired; sibling of hazard C3 in the Stripe assessment). The red-team pass found the same drift had a second, worse effect: `getOrganizationForBilling` filters `WHERE pricingModel = SEAT_EVENT` (`organization.prisma.repository.ts:207`), so drifted orgs were also **excluded from Stripe event metering** — silently under-billed the whole time.
+A paying Growth customer was hard-blocked at "Team Members: 6/6" and ops was paged. Root cause: the org carried `pricingModel = TIERED` while holding an active `GROWTH_SEAT_*` subscription — `migrateToSeatEvent` was skipped by webhook ordering (`customer.subscription.updated` activated the sub before `invoice.payment_succeeded`, whose `previousStatus !== ACTIVE` gate then never fired; sibling of hazard C3 in the Stripe assessment). The red-team pass found the same drift had a second, worse effect: `getOrganizationForBilling` filters `WHERE pricingModel = SEAT_EVENT` (`organization.prisma.repository.ts:207`), so drifted orgs were also **excluded from the usage-metering population**.
 
 Every surface that asked "how does this org pay?" read a different signal:
 
@@ -65,10 +65,10 @@ Prior art: `specs/licensing/dual-pricing-model.feature` (PricingModel = HOW, Pla
    A single shared module feeds both SaaS `PLAN_LIMITS` and license-generation `planTemplates` (kills hazard H11 drift). Safe for issued licenses — red-team confirmed: `verifySignature` re-serializes the payload that was signed at generation time (`validation.ts:47`); templates matter only at generation. The unified module preserves generation-side legacy fields (`evaluationsCredit`) for payload-schema stability.
 
 8. **`isTrial` is added to new license payloads; webhooks clear only trials.**
-   `clearTrialLicenseIfPresent` checks the flag; a non-trial license coexisting with an activating subscription raises an ops alert instead of silent deletion. Existing licenses without the flag are treated as **non-trial** (never auto-deleted — deleting a paid license is the worse failure). Pre-flag trial licenses in the wild (especially long-dated ENTERPRISE evals, which outrank subscriptions) are handled by a one-time audit: query prod for orgs with `license IS NOT NULL`, classify with sales, revoke or re-issue with `isTrial` (see Rollout / Open questions). Rejects: keeping the unconditional wipe (destroys enterprise licenses).
+   `clearTrialLicenseIfPresent` checks the flag; a non-trial license coexisting with an activating subscription raises an ops alert instead of silent deletion. Existing licenses without the flag are treated as **non-trial** (never auto-deleted — deleting a paid license is the worse failure). Pre-flag trial licenses in the wild are reconciled by a one-time review of stored licenses (internal cutover runbook) — re-issue with `isTrial` or revoke. Rejects: keeping the unconditional wipe (destroys enterprise licenses).
 
 9. **Ops alerts split by resolution.**
-   `purchase_seat` shown → info-level breadcrumb (self-serve friction funnel, no page). `hard_cap` / `upgrade` denial → real alert (sales signal). Rejects: single undifferentiated alert (the ambiguity that triggered this investigation), alerting only on hard blocks (loses seat-purchase friction data).
+   `purchase_seat` shown → info-level breadcrumb (self-serve friction funnel, no page). `hard_cap` / `upgrade` denial → real ops alert. Rejects: single undifferentiated alert (the ambiguity that triggered this investigation), alerting only on hard blocks (loses seat-purchase friction data).
 
 10. **The five member-block paths and the seat flow consume only derived fields.**
     `useInviteActions`' three-condition gate (`activePlanSource === "subscription" && pricingModel === "SEAT_EVENT" && api.subscription`) collapses to `limitInfo.resolution === "purchase_seat"`. All 9 FE sites reading `organization.pricingModel` switch to `useActivePlan().billing.*`. `seatSyncService` dead code is deleted (self-heal in Decision 3 replaces its intent). Server sites (`EESubscriptionService.updateSubscriptionItems`, `previewProration`, `usage-meter-policy`, `usage.service`) read the resolver's output.
@@ -86,12 +86,12 @@ Prior art: `specs/licensing/dual-pricing-model.feature` (PricingModel = HOW, Pla
 
 1. **Move the metering gate**: `getOrganizationForBilling` + `resolveMeterDecision` read the resolver, not the column. Ship + verify metering population is unchanged for non-drifted orgs.
 2. **Resolver ships** with derivation, capabilities, `resolution`, self-heal (write-once guard), alert split. Precedence flip dark behind the flag.
-3. **Audit** — two lists reviewed by ops/CS before any data change: (a) drifted orgs (TIERED + active seat sub) whose event metering will turn ON — **billing starts forward from cutover, no retroactive catch-up**, enforced by **checkpoint seeding**: at cutover, each newly-metered org's `lastReportedTotal` checkpoint is seeded to its current month-to-date billable-events total, so the first `reportUsageForMonth` run bills only post-cutover events (the checkpoint otherwise defaults to 0 and would bill the entire month-to-date — `reportUsageForMonth.command.ts:202,265`); CS gets the list for heads-up; (b) orgs with `license IS NOT NULL` — classify trials with sales, re-issue with `isTrial` or revoke.
+3. **Checkpoint seeding** (before any data change): each org whose metering turns on mid-cycle gets its `lastReportedTotal` checkpoint seeded to its current month-to-date total, so the first `reportUsageForMonth` run reports only post-cutover events — the checkpoint otherwise defaults to 0 and would report the entire month-to-date (`reportUsageForMonth.command.ts:202,265`). The operational cutover procedure (review steps, affected-population handling, license reconciliation) lives in the internal ops runbook, not in this ADR.
 4. **Backfill** `pricingModel` (now display-only, per step 1 — the update no longer changes billing behavior by itself; metering for drifted orgs starts at step 1's deploy).
-5. **Flip the precedence flag** after the license audit confirms no org resolves unexpectedly.
+5. **Flip the precedence flag** after the license reconciliation (internal runbook) confirms no org resolves unexpectedly.
 6. Consumer migration (~40 sites) and `seatSyncService` deletion ride steps 2–5 in the same PR series.
 
-WHY this order: backfilling the column before step 1 would activate the *old* metering gate on the drifted cohort as a side effect of a "display" update — the red-team's adversarial scenario (40 surprise metered-usage invoices, finance escalation).
+WHY this order: backfilling the column before step 1 would activate the *old* metering gate on the drifted cohort as a side effect of a "display" update — otherwise the first metering run reports retroactively (Invariant I8 violation).
 
 ## Constants
 
@@ -159,7 +159,7 @@ WHERE o."pricingModel" <> 'SEAT_EVENT'
 - Server-side auto seat purchase — charges without explicit consent.
 - Auto-cancelling the orphaned subscription under an ENTERPRISE license — money-mutating code on a derived signal (C1–C3 hazard class).
 - Keeping drifted orgs permanently un-metered — revenue leak becomes policy; two org classes forever.
-- Retroactive catch-up billing for drifted orgs — surprise charges for usage customers were told was included.
+- Retroactive catch-up metering for drifted orgs — violates Invariant I8.
 - Fixing only the invite path — four other paths keep the incident alive.
 - Deferring capabilities / plan-constants unification — leaves the same disease in neighboring organs (user chose in-scope).
 - New `BillingProfileService` — a second authority recreates the two-sources problem one layer up.
@@ -171,7 +171,7 @@ WHERE o."pricingModel" <> 'SEAT_EVENT'
 
 **Positive:** the incident class is impossible by construction; enterprise licenses can't be destroyed by a webhook; the silent under-metering of drifted orgs is found and fixed; one place to read when debugging "why is this org billed/gated like this"; ops can distinguish self-serve friction from stuck customers; H11 drift killed.
 
-**Negative:** ~40 call sites churn across an ordered PR series (mitigated: mechanical, each site becomes simpler); precedence change is a behavior change for GROWTH/PRO-licensed SaaS orgs that also hold an active subscription — they flip from license-limits to subscription-limits (audited in rollout step 3, kill-switch via flag); drifted orgs start being metered (correct per contract, but CS-visible — heads-up list required); the orphaned-sub-under-ENTERPRISE-license leak persists until a human acts on the alert (explicitly accepted, Decision 11); **while the precedence flag is off (rollout steps 2–5), license+subscription orgs keep license-wins resolution — their metering mismatch and seat-flow dead-end persist until the flag flips; step 2 fully fixes only the no-license drift class (the original incident)**; the resolver gains responsibility (mitigated: it was already the choke point for planSource).
+**Negative:** ~40 call sites churn across an ordered PR series (mitigated: mechanical, each site becomes simpler); precedence change is a behavior change for GROWTH/PRO-licensed SaaS orgs that also hold an active subscription — they flip from license-limits to subscription-limits (reviewed at cutover per the internal runbook, kill-switch via flag); metering for previously-excluded organizations begins at cutover; the orphaned-sub-under-ENTERPRISE-license leak persists until a human acts on the alert (explicitly accepted, Decision 11); **while the precedence flag is off (rollout steps 2–5), license+subscription orgs keep license-wins resolution — their metering mismatch and seat-flow dead-end persist until the flag flips; step 2 fully fixes only the no-license drift class (the original incident)**; the resolver gains responsibility (mitigated: it was already the choke point for planSource).
 
 **Neutral:** `dual-pricing-model.feature` needs revision (PricingModel demoted from "HOW billing works" to cache); backoffice keeps editing the column but edits no longer affect behavior (H8 remains for subscription-row edits — out of scope).
 
@@ -182,10 +182,11 @@ WHERE o."pricingModel" <> 'SEAT_EVENT'
 - Backoffice subscription edits bypassing invariants (assessment H8) — out of scope here; tracked in the Stripe assessment.
 - Whether `resolution` should extend to non-member limit types (projects, workflows) — decide at implementation; the enum is designed to extend.
 - Exact `capabilities` key set — finalized from the 12 `assertEnterprisePlan` call sites during implementation.
-- Count and classification of pre-flag licenses in prod (rollout step 3b) — needs the license audit query; owner: Sergio + sales.
+- Reconciliation of pre-flag licenses (rollout step 3b) — procedure in the internal ops runbook; owner: Sergio.
 
 ## Revisions
 
+- v4 (2026-07-10): Redaction pass — operational/business cutover detail (affected-population review, customer communication, license reconciliation procedure) moved out of this public ADR into the internal ops runbook; engineering invariants unchanged.
 - v1 (2026-07-09): Initial draft. Round 1 locked: full-consolidation scope, money+access blast radius, 4 hard constraints. Round 2 locked: precedence rank (after worked ACME example — user initially leaned subscription-always-wins), derive-from-plan authority with cache column, memberPolicy mapping, capabilities in scope. Round 3 locked: typed resolution on all 5 paths, lazy heal + backfill, plan-constants unification in scope (user overrode defer recommendation), alerts split by resolution.
 - v3 (2026-07-10): Adversarial consistency review vs conversation locks (all 16 locks verified present). Finding 1 reopened the memberPolicy fork: `hard_cap` for all licenses was a self-serve regression — non-ENT-license SaaS orgs can buy a subscription that outranks their license; user locked SaaS→`upgrade` / self-hosted→`hard_cap` / ENTERPRISE→`hard_cap` (Decision 4). Finding 2: I8 had no mechanism — `reportUsageForMonth` checkpoint defaults to 0 and would bill the full month-to-date; fixed via checkpoint seeding at cutover (Rollout 3a, I8). Finding 3: flag-off window consequence stated explicitly (Consequences).
 - v2 (2026-07-09): Red-team pass (devils-advocate) folded in. Blocker 1 — `pricingModel` was NOT cosmetic: it gates Stripe event metering (`getOrganizationForBilling`); drifted orgs were silently un-metered. Added ordered Rollout section (metering gate moves before backfill), I8 (no retroactive billing), user locked bill-forward cutover. Blocker 2 — orphaned paying sub under an ENTERPRISE license: user locked let-it-run + alert-only (Decision 11). Also from red-team: active-subscription predicate pinned to `status='ACTIVE'` (Decision 1), pre-flag trial-license audit (Decision 8 + rollout 3b), public API documented as sixth advisory path (Decision 5, I3), self-heal write-once guard + meter-cache invalidation (Decision 3), plan-constants unification confirmed safe (Decision 7). New user locks: precedence flip behind feature flag (Decision 12), pending-invite seats surfaced not changed (Decision 13).

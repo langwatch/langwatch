@@ -10,7 +10,8 @@
  * metered and is owed its delta).
  *
  * MUST run BEFORE scripts/backfill-pricing-model.ts and before flipping any
- * metering for the cohort. Review the printed org list with ops/CS first.
+ * metering for the cohort. Review the printed list before running (see the
+ * internal cutover runbook).
  *
  * Run with:
  *   DATABASE_URL=... npx tsx scripts/seed-billing-checkpoints.ts --dry-run
