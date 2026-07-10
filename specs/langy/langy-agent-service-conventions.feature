@@ -5,7 +5,7 @@ Feature: The langy-agent manager follows the house service conventions
   So that it is observable, has consistent errors and health, and its
      ADR-033 worker-isolation guarantees survive the re-home
 
-  # Part of ADR-043 (Langy Foundations, PR1 of 4). The manager was a flat
+  # Part of ADR-047 (Langy Foundations, PR1 of 4). The manager was a flat
   # `langyagent` package with hand-rolled config, sentinel errors, a plain
   # net/http mux, and zero OpenTelemetry. This feature is the observable
   # contract after it is re-homed onto the pkg/ toolkit (herr, config, clog,
@@ -56,7 +56,7 @@ Feature: The langy-agent manager follows the house service conventions
     Then the stream carries an at-capacity error event
 
   # ===========================================================================
-  # Telemetry (the load-bearing seam PR3 depends on)
+  # Telemetry (the load-bearing seam PR4 depends on)
   # ===========================================================================
 
   Scenario: The manager emits operational telemetry

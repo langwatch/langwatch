@@ -5,7 +5,7 @@ Feature: Per-session caller-scoped Langy key
   session key exposes only my access and only for a short window
 
   # Replaces the shared, admin-equivalent "Langy" service key at chat time.
-  # See "ADR-043: Langy Foundations". The eager project-create provisioning of
+  # See "ADR-047: Langy Foundations". The eager project-create provisioning of
   # the dedicated project key is unchanged and covered by
   # langy-api-key-provisioning.feature; this spec governs the CHAT-TIME key.
 

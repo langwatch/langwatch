@@ -256,7 +256,7 @@ langyRoute().post("/langy/chat", async (c) => {
   // Coarse gate: the caller must be able to read this project at all. This is
   // defense-in-depth, NOT the fine-grained authorisation. The real
   // least-privilege enforcement is the per-session API key minted in
-  // getOrProvision, scoped to exactly the permissions THIS user holds (ADR-043).
+  // getOrProvision, scoped to exactly the permissions THIS user holds (ADR-047).
   // So we deliberately DON'T require write on every resource here — a user who
   // can edit prompts but not create triggers still gets Langy; their session key
   // simply can't create triggers. A user who holds none of Langy's permissions

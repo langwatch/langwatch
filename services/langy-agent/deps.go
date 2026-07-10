@@ -29,7 +29,7 @@ type Deps struct {
 // telemetry — distinct from the per-worker opencode plugin telemetry, which
 // exports into each customer's project). The provider is a no-op until
 // OTEL_OTLP_ENDPOINT is configured; the spans + metric call sites exist
-// regardless (ADR-043 telemetry seam).
+// regardless (ADR-047 telemetry seam).
 func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	logger := clog.New(ctx, cfg.Log)
 	ctx = clog.Set(ctx, logger)

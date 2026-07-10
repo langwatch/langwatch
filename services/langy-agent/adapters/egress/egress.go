@@ -1,5 +1,5 @@
 // Package egress is a thin seam for per-worker egress monitoring. It exists so
-// that PR3 (egress monitoring) can slot real behaviour behind the Guard
+// that PR4 (egress monitoring) can slot real behaviour behind the Guard
 // interface without restructuring the worker pool. This PR ships ONLY the
 // interface and a pass-through implementation — no monitoring logic lands here.
 //
@@ -13,7 +13,7 @@ package egress
 import "context"
 
 // WorkerContext is the minimal per-worker identity the guard needs. Kept small
-// on purpose — PR3 widens it if it needs more, without touching the pool.
+// on purpose — PR4 widens it if it needs more, without touching the pool.
 type WorkerContext struct {
 	// ConversationID is the per-conversation worker key.
 	ConversationID string
@@ -30,7 +30,7 @@ type Guard interface {
 }
 
 // PassThrough is the default Guard: it does nothing and changes no behaviour.
-// PR3 replaces it with a real implementation.
+// PR4 replaces it with a real implementation.
 type PassThrough struct{}
 
 // NewPassThrough returns the no-op guard.

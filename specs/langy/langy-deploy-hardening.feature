@@ -8,7 +8,7 @@ Feature: Langy deploy hardening — sandboxed-runtime guard and e2e security par
   # Cross-references:
   #   ADR-033 — Langy worker network isolation under gVisor: the sandboxed
   #             runtime requirement and the per-worker UID isolation model.
-  #   ADR-043 — Langy Foundations: the hardening batch this spec belongs to
+  #   ADR-047 — Langy Foundations: the hardening batch this spec belongs to
   #             (authored alongside these changes).
   #
   # Why this matters. The langy-agent pod runs many opencode workers, each
