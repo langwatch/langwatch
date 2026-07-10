@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useState, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useState,
+  type RefObject,
+} from "react";
 
 /**
  * useIsOverflowing
@@ -25,7 +31,10 @@ export function useIsOverflowing(
     setIsOverflowing(el.scrollWidth - el.clientWidth > 1);
   }, [ref]);
 
-  useEffect(() => {
+  // Before paint, not after. A strip restored from the persisted store opens
+  // with every tab already in it, and measuring in a plain effect would draw
+  // one frame of un-crowded tabs before correcting itself.
+  useLayoutEffect(() => {
     measure();
   }, [measure, watch]);
 

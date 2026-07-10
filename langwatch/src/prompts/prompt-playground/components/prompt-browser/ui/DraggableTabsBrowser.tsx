@@ -64,23 +64,13 @@ export function useDraggableTabsContext() {
   return context;
 }
 
-// Context for managing window (split-pane) state
-/**
- * TabWindowContextValue interface
- * Single Responsibility: Provides window-level tab state and callbacks.
- */
 interface TabWindowContextValue {
   windowId: string;
   activeTabId?: string;
-  onTabChange?: (windowId: string, tabId: string) => void;
 }
 
 const TabWindowContext = React.createContext<TabWindowContextValue | null>(null);
 
-/**
- * useTabWindowContext
- * Single Responsibility: Provides access to window context; throws if used outside Window.
- */
 function useTabWindowContext() {
   const context = React.useContext(TabWindowContext);
   if (!context) {
@@ -225,32 +215,22 @@ interface DraggableTabsWindowProps
   extends Omit<TabsRootProps, "onClick" | "defaultValue"> {
   windowId: string;
   activeTabId?: string;
-  onTabChange?: (windowId: string, tabId: string) => void;
-  onClick?: (windowId: string, tabId: string) => void;
+  onTabChange?: (params: { windowId: string; tabId: string }) => void;
+  /** Named apart from the DOM's `onClick`, which it shadows and does not match. */
+  onWindowClick?: (params: { windowId: string; tabId: string }) => void;
 }
 
-/**
- * DraggableTabsWindow component
- * Single Responsibility: Manages one window of tabs with active state and tab change handler.
- * @param children - Tab bar and content components
- * @param windowId - Unique identifier for this split-pane window
- * @param activeTabId - Currently active tab ID
- * @param onTabChange - Callback fired when active tab changes
- * @param onClick - Callback fired when the window is clicked
- * @param props - Additional stack props
- */
 function DraggableTabsWindow({
   children,
   windowId,
   activeTabId,
   onTabChange,
-  onClick,
+  onWindowClick,
   ...props
 }: DraggableTabsWindowProps) {
   const windowContextValue: TabWindowContextValue = {
     windowId,
     activeTabId,
-    onTabChange,
   };
 
   return (
@@ -258,8 +238,12 @@ function DraggableTabsWindow({
       <VStack height="full" gap={0} align="stretch" width="full">
         <Tabs.Root
           value={activeTabId}
-          onValueChange={(change) => onTabChange?.(windowId, change.value)}
-          onClick={() => onClick?.(windowId, activeTabId ?? "")}
+          onValueChange={(change) =>
+            onTabChange?.({ windowId, tabId: change.value })
+          }
+          onClick={() =>
+            onWindowClick?.({ windowId, tabId: activeTabId ?? "" })
+          }
           width="full"
           height="full"
           display="flex"

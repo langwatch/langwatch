@@ -172,194 +172,196 @@ describe("PromptTabSwitcher", () => {
     });
   });
 
-  describe("when a prompt is chosen from the switcher", () => {
-    /** @scenario Choosing a prompt that has scrolled out of view */
-    it("activates the prompt and scrolls its tab into view", async () => {
-      const scrollIntoView = vi.fn();
-      const scroller = document.createElement("div");
-      const offscreenTab = document.createElement("div");
-      offscreenTab.setAttribute("data-tab-strip-id", "eval-judge");
-      offscreenTab.scrollIntoView = scrollIntoView;
-      scroller.appendChild(offscreenTab);
+  describe("given more prompts are open than fit across the strip", () => {
+    describe("when a prompt is chosen from the switcher", () => {
+      /** @scenario Choosing a prompt that has scrolled out of view */
+      it("activates the prompt and scrolls its tab into view", async () => {
+        const scrollIntoView = vi.fn();
+        const scroller = document.createElement("div");
+        const offscreenTab = document.createElement("div");
+        offscreenTab.setAttribute("data-tab-strip-id", "eval-judge");
+        offscreenTab.scrollIntoView = scrollIntoView;
+        scroller.appendChild(offscreenTab);
 
-      const scrollerRef = { current: scroller };
-      const { onSelect } = renderSwitcher({
-        tabIds: ["summarizer", "classifier", "eval-judge"],
-        activeTabId: "summarizer",
-        scrollerRef,
+        const scrollerRef = { current: scroller };
+        const { onSelect } = renderSwitcher({
+          tabIds: ["summarizer", "classifier", "eval-judge"],
+          activeTabId: "summarizer",
+          scrollerRef,
+        });
+
+        const menu = await openSwitcher(3);
+        await userEvent.click(rowFor(menu, "eval-judge"));
+
+        expect(onSelect).toHaveBeenCalledWith("eval-judge");
+        expect(scrollIntoView).toHaveBeenCalled();
       });
 
-      const menu = await openSwitcher(3);
-      await userEvent.click(rowFor(menu, "eval-judge"));
+      /** @scenario Choosing the already-active prompt changes nothing */
+      it("does not re-activate the prompt that is already active", async () => {
+        const { onSelect } = renderSwitcher({
+          tabIds: ["summarizer", "classifier"],
+          activeTabId: "summarizer",
+        });
 
-      expect(onSelect).toHaveBeenCalledWith("eval-judge");
-      expect(scrollIntoView).toHaveBeenCalled();
+        const menu = await openSwitcher(2);
+        await userEvent.click(rowFor(menu, "summarizer"));
+
+        expect(onSelect).not.toHaveBeenCalled();
+      });
     });
 
-    /** @scenario Choosing the already-active prompt changes nothing */
-    it("does not re-activate the prompt that is already active", async () => {
-      const { onSelect } = renderSwitcher({
-        tabIds: ["summarizer", "classifier"],
-        activeTabId: "summarizer",
+    describe("when the switcher is open", () => {
+      /** @scenario The switcher marks which prompt is active */
+      it("marks the active prompt's row", async () => {
+        renderSwitcher({
+          tabIds: ["summarizer", "classifier"],
+          activeTabId: "summarizer",
+        });
+
+        const menu = await openSwitcher(2);
+
+        expect(rowFor(menu, "summarizer")).toHaveAttribute(
+          "aria-current",
+          "true",
+        );
+        expect(rowFor(menu, "classifier")).not.toHaveAttribute("aria-current");
       });
 
-      const menu = await openSwitcher(2);
-      await userEvent.click(rowFor(menu, "summarizer"));
+      /** @scenario A row shows the prompt's title */
+      it("shows a row per open prompt, titled by the prompt", async () => {
+        givenTabs({
+          summarizer: { title: "summarizer" },
+          classifier: { title: "classifier" },
+        });
+        renderSwitcher({ tabIds: ["summarizer", "classifier"] });
 
-      expect(onSelect).not.toHaveBeenCalled();
-    });
-  });
+        const menu = await openSwitcher(2);
 
-  describe("when the switcher is open", () => {
-    /** @scenario The switcher marks which prompt is active */
-    it("marks the active prompt's row", async () => {
-      renderSwitcher({
-        tabIds: ["summarizer", "classifier"],
-        activeTabId: "summarizer",
+        expect(rowFor(menu, "summarizer")).toBeInTheDocument();
+        expect(rowFor(menu, "classifier")).toBeInTheDocument();
       });
 
-      const menu = await openSwitcher(2);
+      /** @scenario A prompt that has never been saved shows a placeholder title */
+      it("falls back to a placeholder title for an unsaved prompt", async () => {
+        givenTabs({
+          "tab-new": { title: "New Prompt" },
+          classifier: { title: "classifier" },
+        });
+        renderSwitcher({
+          tabIds: ["tab-new", "classifier"],
+          activeTabId: "tab-new",
+        });
 
-      expect(rowFor(menu, "summarizer")).toHaveAttribute(
-        "aria-current",
-        "true",
-      );
-      expect(rowFor(menu, "classifier")).not.toHaveAttribute("aria-current");
-    });
+        const menu = await openSwitcher(2);
 
-    /** @scenario A row shows the prompt's title */
-    it("shows a row per open prompt, titled by the prompt", async () => {
-      givenTabs({
-        summarizer: { title: "summarizer" },
-        classifier: { title: "classifier" },
-      });
-      renderSwitcher({ tabIds: ["summarizer", "classifier"] });
-
-      const menu = await openSwitcher(2);
-
-      expect(rowFor(menu, "summarizer")).toBeInTheDocument();
-      expect(rowFor(menu, "classifier")).toBeInTheDocument();
-    });
-
-    /** @scenario A prompt that has never been saved shows a placeholder title */
-    it("falls back to a placeholder title for an unsaved prompt", async () => {
-      givenTabs({
-        "tab-new": { title: "New Prompt" },
-        classifier: { title: "classifier" },
-      });
-      renderSwitcher({
-        tabIds: ["tab-new", "classifier"],
-        activeTabId: "tab-new",
+        expect(rowFor(menu, "New Prompt")).toBeInTheDocument();
       });
 
-      const menu = await openSwitcher(2);
+      /** @scenario A row marks a prompt with unsaved changes */
+      it("marks only the rows whose prompt has unsaved changes", async () => {
+        givenTabs({
+          summarizer: { title: "summarizer", hasUnsavedChanges: true },
+          classifier: { title: "classifier", hasUnsavedChanges: false },
+        });
+        renderSwitcher({ tabIds: ["summarizer", "classifier"] });
 
-      expect(rowFor(menu, "New Prompt")).toBeInTheDocument();
-    });
+        const menu = await openSwitcher(2);
 
-    /** @scenario A row marks a prompt with unsaved changes */
-    it("marks only the rows whose prompt has unsaved changes", async () => {
-      givenTabs({
-        summarizer: { title: "summarizer", hasUnsavedChanges: true },
-        classifier: { title: "classifier", hasUnsavedChanges: false },
-      });
-      renderSwitcher({ tabIds: ["summarizer", "classifier"] });
-
-      const menu = await openSwitcher(2);
-
-      expect(
-        within(rowFor(menu, "summarizer")).getByTestId("unsaved-indicator"),
-      ).toBeInTheDocument();
-      expect(
-        within(rowFor(menu, "classifier")).queryByTestId("unsaved-indicator"),
-      ).not.toBeInTheDocument();
-    });
-
-    /** @scenario Saving clears the unsaved marker from the row */
-    it("drops the unsaved marker once the prompt is saved", async () => {
-      givenTabs({
-        summarizer: { title: "summarizer", hasUnsavedChanges: true },
-        classifier: { title: "classifier" },
-      });
-      const { rerender } = renderSwitcher({
-        tabIds: ["summarizer", "classifier"],
+        expect(
+          within(rowFor(menu, "summarizer")).getByTestId("unsaved-indicator"),
+        ).toBeInTheDocument();
+        expect(
+          within(rowFor(menu, "classifier")).queryByTestId("unsaved-indicator"),
+        ).not.toBeInTheDocument();
       });
 
-      expect(
-        within(rowFor(await openSwitcher(2), "summarizer")).getByTestId(
-          "unsaved-indicator",
-        ),
-      ).toBeInTheDocument();
+      /** @scenario Saving clears the unsaved marker from the row */
+      it("drops the unsaved marker once the prompt is saved", async () => {
+        givenTabs({
+          summarizer: { title: "summarizer", hasUnsavedChanges: true },
+          classifier: { title: "classifier" },
+        });
+        const { rerender } = renderSwitcher({
+          tabIds: ["summarizer", "classifier"],
+        });
 
-      // The save lands: the hook now reports a clean prompt.
-      givenTabs({
-        summarizer: { title: "summarizer", hasUnsavedChanges: false },
-        classifier: { title: "classifier" },
+        expect(
+          within(rowFor(await openSwitcher(2), "summarizer")).getByTestId(
+            "unsaved-indicator",
+          ),
+        ).toBeInTheDocument();
+
+        // The save lands: the hook now reports a clean prompt.
+        givenTabs({
+          summarizer: { title: "summarizer", hasUnsavedChanges: false },
+          classifier: { title: "classifier" },
+        });
+        rerender(
+          <ChakraProvider value={defaultSystem}>
+            <PromptTabSwitcher
+              tabIds={["summarizer", "classifier"]}
+              activeTabId="summarizer"
+              onSelect={vi.fn()}
+              scrollerRef={React.createRef<HTMLDivElement | null>()}
+              isStripOverflowing
+            />
+          </ChakraProvider>,
+        );
+
+        expect(
+          within(rowFor(screen.getByRole("menu"), "summarizer")).queryByTestId(
+            "unsaved-indicator",
+          ),
+        ).not.toBeInTheDocument();
       });
-      rerender(
-        <ChakraProvider value={defaultSystem}>
-          <PromptTabSwitcher
-            tabIds={["summarizer", "classifier"]}
-            activeTabId="summarizer"
-            onSelect={vi.fn()}
-            scrollerRef={React.createRef<HTMLDivElement | null>()}
-            isStripOverflowing
-          />
-        </ChakraProvider>,
-      );
 
-      expect(
-        within(rowFor(screen.getByRole("menu"), "summarizer")).queryByTestId(
-          "unsaved-indicator",
-        ),
-      ).not.toBeInTheDocument();
-    });
+      /** @scenario A row shows the version only when the prompt is behind */
+      it("shows the version number only on a prompt that is behind", async () => {
+        givenTabs({
+          summarizer: {
+            title: "summarizer",
+            versionNumber: 2,
+            latestVersion: 5,
+            isOutdated: true,
+            showVersionBadge: true,
+          },
+          classifier: {
+            title: "classifier",
+            versionNumber: 5,
+            latestVersion: 5,
+            showVersionBadge: false,
+          },
+        });
+        renderSwitcher({ tabIds: ["summarizer", "classifier"] });
 
-    /** @scenario A row shows the version only when the prompt is behind */
-    it("shows the version number only on a prompt that is behind", async () => {
-      givenTabs({
-        summarizer: {
-          title: "summarizer",
-          versionNumber: 2,
-          latestVersion: 5,
-          isOutdated: true,
-          showVersionBadge: true,
-        },
-        classifier: {
-          title: "classifier",
-          versionNumber: 5,
-          latestVersion: 5,
-          showVersionBadge: false,
-        },
+        const menu = await openSwitcher(2);
+
+        expect(
+          within(rowFor(menu, "summarizer")).getByText("v2"),
+        ).toBeInTheDocument();
+        expect(
+          within(rowFor(menu, "classifier")).queryByText(/^v\d+$/),
+        ).not.toBeInTheDocument();
       });
-      renderSwitcher({ tabIds: ["summarizer", "classifier"] });
 
-      const menu = await openSwitcher(2);
+      /** @scenario A row does not offer to close or upgrade the prompt */
+      it("offers navigation only, with no close or upgrade control", async () => {
+        givenTabs({
+          summarizer: {
+            title: "summarizer",
+            versionNumber: 2,
+            latestVersion: 5,
+            isOutdated: true,
+            showVersionBadge: true,
+          },
+        });
+        renderSwitcher({ tabIds: ["summarizer", "classifier"] });
 
-      expect(
-        within(rowFor(menu, "summarizer")).getByText("v2"),
-      ).toBeInTheDocument();
-      expect(
-        within(rowFor(menu, "classifier")).queryByText(/^v\d+$/),
-      ).not.toBeInTheDocument();
-    });
+        const row = rowFor(await openSwitcher(2), "summarizer");
 
-    /** @scenario A row does not offer to close or upgrade the prompt */
-    it("offers navigation only, with no close or upgrade control", async () => {
-      givenTabs({
-        summarizer: {
-          title: "summarizer",
-          versionNumber: 2,
-          latestVersion: 5,
-          isOutdated: true,
-          showVersionBadge: true,
-        },
+        expect(within(row).queryByRole("button")).not.toBeInTheDocument();
       });
-      renderSwitcher({ tabIds: ["summarizer", "classifier"] });
-
-      const row = rowFor(await openSwitcher(2), "summarizer");
-
-      expect(within(row).queryByRole("button")).not.toBeInTheDocument();
     });
   });
 

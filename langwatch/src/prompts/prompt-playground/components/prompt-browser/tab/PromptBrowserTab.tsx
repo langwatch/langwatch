@@ -24,11 +24,13 @@ type PromptBrowserTabControllerProps = ReturnType<
  */
 function PromptBrowserTabView({
   tab,
+  title,
   hasUnsavedChanges,
   dimmed,
   isActive,
   isCrowded,
   handleClose,
+  versionNumber,
   latestVersion,
   isOutdated,
   handleUpgrade,
@@ -41,7 +43,7 @@ function PromptBrowserTabView({
   const [isHovered, setIsHovered] = useState(false);
 
   if (!tab) return null;
-  const meta = tab.data.meta;
+  const name = getDisplayHandle(title);
 
   // At the floor a tab has room for the name or the close button, not both.
   // The name is what tells two tabs apart, so it wins until the pointer
@@ -72,19 +74,19 @@ function PromptBrowserTabView({
           whiteSpace="nowrap"
           overflow="hidden"
           minWidth={0}
-          title={meta.title ?? "New Prompt"}
+          title={title}
         >
-          {getDisplayHandle(meta.title)}
+          {name}
         </Text>
         {hasUnsavedChanges && (
           <Box flexShrink={0}>
             <Circle size="10px" bg="orange.solid" />
           </Box>
         )}
-        {showVersionBadge && meta.versionNumber != null && (
+        {showVersionBadge && versionNumber != null && (
           <Box flexShrink={0}>
             <VersionBadge
-              version={meta.versionNumber}
+              version={versionNumber}
               latestVersion={latestVersion}
               onUpgrade={isOutdated ? handleUpgrade : undefined}
             />
@@ -94,7 +96,7 @@ function PromptBrowserTabView({
       {showsCloseButton && (
         <Box
           role="button"
-          aria-label={`Close ${getDisplayHandle(meta.title)}`}
+          aria-label={`Close ${name}`}
           borderRadius="3px"
           transition="all 0.1s ease-in-out"
           opacity={dimmed ? 0.25 : 1}

@@ -40,10 +40,6 @@ export function PromptPlaygroundBrowser() {
     }),
   );
 
-  /**
-   * handleTabMove
-   * Single Responsibility: Moves a tab to a new position/window when dragged.
-   */
   function handleTabMove(params: {
     tabId: string;
     from: { windowId: string; index: number };
@@ -56,18 +52,16 @@ export function PromptPlaygroundBrowser() {
     });
   }
 
-  /**
-   * handleTabChange
-   * Single Responsibility: Sets the active tab within a window.
-   */
-  function handleTabChange(windowId: string, tabId: string) {
+  function handleTabChange({
+    windowId,
+    tabId,
+  }: {
+    windowId: string;
+    tabId: string;
+  }) {
     setActiveTab({ windowId, tabId });
   }
 
-  /**
-   * handleSplit
-   * Single Responsibility: Splits the current tab into a new window pane.
-   */
   function handleSplit(tabId: string) {
     splitTab({ tabId });
   }
@@ -80,7 +74,7 @@ export function PromptPlaygroundBrowser() {
           windowId={tabbedWindow.id}
           activeTabId={tabbedWindow.activeTabId ?? undefined}
           onTabChange={handleTabChange}
-          onClick={() => setActiveWindow({ windowId: tabbedWindow.id })}
+          onWindowClick={() => setActiveWindow({ windowId: tabbedWindow.id })}
           maxWidth={
             windows.length > 1
               ? `calc((100vw - 340px) / ${windows.length})`
@@ -99,7 +93,7 @@ export function PromptPlaygroundBrowser() {
               activeTabId={tabbedWindow.activeTabId ?? undefined}
               isActiveWindow={tabbedWindow.id === activeWindowId}
               onSelectTab={(tabId) =>
-                setActiveTab({ windowId: tabbedWindow.id, tabId })
+                handleTabChange({ windowId: tabbedWindow.id, tabId })
               }
             />
             {tabbedWindow.id === activeWindowId && (

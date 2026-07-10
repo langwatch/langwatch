@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { usePrompts } from "~/prompts/hooks/usePrompts";
 import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompts/utils/llmPromptConfigUtils";
 import { useDraggableTabsBrowserStore } from "../../../prompt-playground-store/DraggableTabsBrowserStore";
+import { useTabById } from "../../../prompt-playground-store/useTabById";
 import { useTabId } from "../ui/TabContext";
 import { usePromptTabSummary } from "./usePromptTabSummary";
 
@@ -15,12 +16,16 @@ export function usePromptBrowserTabController() {
 
   // What the tab displays is derived once, in the hook the tab switcher's rows
   // also read, so the two renderings of a tab cannot disagree.
-  const { hasUnsavedChanges, latestVersion, isOutdated, showVersionBadge } =
-    usePromptTabSummary(tabId);
+  const {
+    title,
+    hasUnsavedChanges,
+    versionNumber,
+    latestVersion,
+    isOutdated,
+    showVersionBadge,
+  } = usePromptTabSummary(tabId);
 
-  const tab = useDraggableTabsBrowserStore((state) =>
-    state.windows.flatMap((w) => w.tabs).find((t) => t.id === tabId),
-  );
+  const tab = useTabById(tabId);
   const removeTab = useDraggableTabsBrowserStore((state) => state.removeTab);
   const updateTabData = useDraggableTabsBrowserStore(
     (state) => state.updateTabData,
@@ -82,8 +87,10 @@ export function usePromptBrowserTabController() {
 
   return {
     tab,
+    title,
     hasUnsavedChanges,
     handleClose,
+    versionNumber,
     latestVersion,
     isOutdated,
     handleUpgrade,

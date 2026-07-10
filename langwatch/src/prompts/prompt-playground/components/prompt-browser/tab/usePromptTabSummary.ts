@@ -2,6 +2,7 @@ import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { NEW_PROMPT_TITLE } from "~/prompts/utils/promptHandle";
 import { useHasUnsavedChanges } from "../../../hooks/useHasUnsavedChanges";
 import { useDraggableTabsBrowserStore } from "../../../prompt-playground-store/DraggableTabsBrowserStore";
+import { useTabById } from "../../../prompt-playground-store/useTabById";
 import { shouldShowVersionBadge } from "./shouldShowVersionBadge";
 
 /** What a prompt tab displays about itself, wherever it is displayed. */
@@ -31,9 +32,7 @@ export interface PromptTabSummary {
  * switcher render the same facts from the same source, and cannot drift.
  */
 export function usePromptTabSummary(tabId: string): PromptTabSummary {
-  const tab = useDraggableTabsBrowserStore((state) =>
-    state.windows.flatMap((w) => w.tabs).find((t) => t.id === tabId),
-  );
+  const tab = useTabById(tabId);
   const hasUnsavedChanges = useHasUnsavedChanges(tabId);
 
   const configId = tab?.data.form.currentValues?.configId;

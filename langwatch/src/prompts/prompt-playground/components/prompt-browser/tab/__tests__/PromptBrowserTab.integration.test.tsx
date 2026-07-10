@@ -25,8 +25,10 @@ const controllerOf = vi.mocked(usePromptBrowserTabController);
 function givenTabTitled(title: string) {
   controllerOf.mockReturnValue({
     tab: { id: "tab-1", data: { meta: { title } } },
+    title,
     hasUnsavedChanges: false,
     handleClose: vi.fn(),
+    versionNumber: 1,
     latestVersion: 1,
     isOutdated: false,
     handleUpgrade: vi.fn(),
