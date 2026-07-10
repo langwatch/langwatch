@@ -46,8 +46,11 @@ if [ -f "$ENV_FILE" ]; then
   set_env_var OTEL_EXPORTER_OTLP_ENDPOINT      "$OTLP_ENDPOINT" "$ENV_FILE"
   set_env_var OTEL_EXPORTER_OTLP_HEADERS       ""              "$ENV_FILE"
   set_env_var PINO_OTEL_ENABLED                "true"          "$ENV_FILE"
-  set_env_var PINO_OTEL_LEVEL                   "debug"         "$ENV_FILE"
   set_env_var OTEL_METRICS_ENABLED             "true"          "$ENV_FILE"
+  # Unified log levels — read by BOTH the TS app and the Go services: keep the
+  # console quiet (warnings/errors only) while info+debug flow to the stack.
+  set_env_var LOG_CONSOLE_LEVEL                "warn"          "$ENV_FILE"
+  set_env_var LOG_OTEL_LEVEL                   "debug"         "$ENV_FILE"
   set_env_var OTEL_DEBUG_COLLECTOR_ENDPOINT    "$OTLP_ENDPOINT" "$ENV_FILE"
   set_env_var OTEL_DEBUG_COLLECTOR_HEADERS     ""              "$ENV_FILE"
 

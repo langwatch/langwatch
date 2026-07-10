@@ -53,6 +53,22 @@ Go log lines carry standard correlation fields (matching the TS app's
 The shared keys + helpers live in `pkg/clog/fields.go`
 (`WithIdentity` / `WithSpanContext` / `WithObserved`).
 
+## Quiet console, full detail in Grafana
+
+Log levels are **unified across the TS app and the Go services** — one set of env
+vars configures both:
+
+| Var                 | Local value | Effect                                        |
+| ------------------- | ----------- | --------------------------------------------- |
+| `LOG_CONSOLE_LEVEL` | `warn`      | console (terminal) shows only warnings/errors |
+| `LOG_OTEL_LEVEL`    | `debug`     | info + debug flow to the collector → Loki      |
+
+`make observability-connect` sets these. So your terminal stays readable while
+the full firehose is queryable in Grafana. On the Go side this is a split-core
+tee (`pkg/clog` `WithCollector`); on the TS side it's pino's console vs OTel
+transport levels — both keyed off the same variables (`PINO_*` remain as
+fallbacks).
+
 ## The stack
 
 The `otel-lgtm` service lives in `compose.dev.yml` under the optional

@@ -63,7 +63,7 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	// When the debug collector is enabled, tee stdout logs into it too,
 	// before the adapters below capture `logger`. No-op otherwise.
 	if lp := otelProvider.LoggerProvider(); lp != nil {
-		logger = clog.WithCollector(logger, lp)
+		logger = clog.WithCollector(ctx, cfg.Log, logger, lp)
 		ctx = clog.Set(ctx, logger)
 	}
 

@@ -421,7 +421,11 @@ services:
   # worktree exports to the SAME collector — that's what makes the
   # langwatch.worktree tag useful. Data is ephemeral: a down discards it.
   otel-lgtm:
-    image: grafana/otel-lgtm:0.28.0
+    # Pinned to 0.11.7 (Grafana 12.1 + Prometheus 3.5 + Tempo 2.8): 0.28.0's
+    # bundled Prometheus 3.11 / Tempo 2.10 segfault on startup on Apple Silicon
+    # (arm64), taking metrics + traces down while logs/Loki stay up. 0.11.7 runs
+    # all three cleanly and keeps Grafana >= v12 so gcx works. Verify before bumping.
+    image: grafana/otel-lgtm:0.11.7
     container_name: langwatch-otel-lgtm
     profiles: [observability]
     ports:
