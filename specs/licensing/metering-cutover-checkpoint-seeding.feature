@@ -1,12 +1,12 @@
 Feature: Metering cutover bills forward only
-  # ADR-039 rollout step 3 / Invariant I8. Organizations whose event metering
-  # turns on mid-month (the drifted cohort) must never be billed for events
-  # that occurred before the cutover. The reporting checkpoint defaults to 0,
-  # which would bill the entire month-to-date on first run — cutover seeds it.
+  # ADR-039 rollout step 3 / Invariant I8. When an organization's event
+  # metering turns on mid-month, only post-cutover events may be reported.
+  # The reporting checkpoint defaults to 0, which would report the entire
+  # month-to-date on first run — cutover seeds it.
 
   As the billing operations team
-  I want newly-metered organizations billed only from the cutover moment
-  So that no customer receives retroactive charges for previously un-metered usage
+  I want newly-metered organizations reported only from the cutover moment
+  So that mid-cycle metering enablement never reports retroactively
 
   @integration
   Scenario: A seeded checkpoint bills only post-cutover events
