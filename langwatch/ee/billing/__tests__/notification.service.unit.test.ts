@@ -33,16 +33,14 @@ vi.mock("../../../src/utils/logger/server", () => ({
 
 vi.mock("../../../src/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 import { sendUsageLimitEmail } from "../../../src/server/mailer/usageLimitEmail";
 import { captureException } from "../../../src/utils/posthogErrorCapture";
 import { NotificationService } from "../notifications/notification.service";
 
-const mockSendUsageLimitEmail = sendUsageLimitEmail as ReturnType<
-  typeof vi.fn
->;
+const mockSendUsageLimitEmail = sendUsageLimitEmail as ReturnType<typeof vi.fn>;
 
 describe("NotificationService", () => {
   let service: NotificationService;
@@ -115,9 +113,9 @@ describe("NotificationService", () => {
           new Error("SMTP failure"),
         );
 
-        await expect(
-          service.sendUsageLimitEmail(emailParams),
-        ).rejects.toThrow("SMTP failure");
+        await expect(service.sendUsageLimitEmail(emailParams)).rejects.toThrow(
+          "SMTP failure",
+        );
       });
     });
   });
@@ -471,7 +469,11 @@ describe("NotificationService", () => {
       it("returns without sending", async () => {
         const mockFetch = vi.fn();
         const localService = NotificationService.create({
-          config: { ...config, hubspotPortalId: undefined, hubspotReachedLimitFormId: undefined },
+          config: {
+            ...config,
+            hubspotPortalId: undefined,
+            hubspotReachedLimitFormId: undefined,
+          },
           fetchFn: mockFetch,
         });
 
@@ -733,9 +735,7 @@ describe("NotificationService", () => {
 
     describe("when HubSpot request fails", () => {
       it("catches the error and captures exception", async () => {
-        const mockFetch = vi
-          .fn()
-          .mockRejectedValue(new Error("Network error"));
+        const mockFetch = vi.fn().mockRejectedValue(new Error("Network error"));
         const localService = NotificationService.create({
           config: {
             ...config,

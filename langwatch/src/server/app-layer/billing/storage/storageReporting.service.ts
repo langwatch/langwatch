@@ -22,6 +22,14 @@ export const REPORT_MAX_HOURS_PER_RUN = 200;
 /** Consecutive Stripe failures before the breaker alarm fires. */
 export const MAX_CONSECUTIVE_REPORT_FAILURES = 5;
 
+/**
+ * Safety margin under the ceiling: a row passing the gate at sweep start
+ * must still be inside Stripe's server-side cutoff after up to 200 awaited
+ * sends — a row this close to the edge is settled+alerted instead of
+ * gambled at the API.
+ */
+export const BACKDATE_SAFETY_MARGIN_HOURS = 24;
+
 export interface StorageReportingDeps {
   usageHourly: StorageUsageHourlyRepository;
   checkpoints: StorageBillingCheckpointRepository;
@@ -32,9 +40,14 @@ export interface StorageReportingDeps {
     subscriptions: { id: string }[];
   } | null>;
   /**
-   * Sends one additive meter event. MUST treat Stripe's
-   * `resource_already_exists` as success (the deterministic identifier is
-   * the idempotency key); throws on transient failure.
+   * Sends one additive meter event, CLASSIFIED:
+   * - "sent": delivered.
+   * - "duplicate": Stripe already has this identifier
+   *   (resource_already_exists) — success, the idempotency key did its job.
+   * - "permanent-reject": Stripe will never accept this event (invalid
+   *   request other than duplicate, auth) — retrying forever would wedge
+   *   the org's queue behind a poison row.
+   * Throws ONLY on genuinely transient failures (network, 5xx, rate limit).
    */
   sendMeterEvent: (params: {
     stripeCustomerId: string;
@@ -43,11 +56,11 @@ export interface StorageReportingDeps {
     identifier: string;
     /** Unix seconds. */
     timestamp: number;
-  }) => Promise<void>;
-  /** Alert sink: backdate-ceiling skips and breaker trips. */
+  }) => Promise<{ outcome: "sent" | "duplicate" | "permanent-reject" }>;
+  /** Alert sink: backdate skips, permanent rejects, and breaker trips. */
   onReportingAlert: (params: {
     organizationId: string;
-    kind: "backdate-ceiling" | "circuit-breaker";
+    kind: "backdate-ceiling" | "permanent-reject" | "circuit-breaker";
     detail: Record<string, string>;
   }) => void;
 }
@@ -76,6 +89,10 @@ export class StorageReportingService {
   }): Promise<void> {
     if (!(await this.deps.isBillingEnabled(organizationId))) return;
 
+    // Known gap (deliberate, tracked in the ADR's open questions): an org
+    // that cancels leaves its final unreported hours behind this gate —
+    // they never reach Stripe and never alarm. Departing customers' last
+    // partial period is under-billed until a subscription-end flush exists.
     const org = await this.deps.getBillableOrg(organizationId);
     if (!org?.stripeCustomerId || org.subscriptions.length === 0) return;
 
@@ -86,7 +103,9 @@ export class StorageReportingService {
     if (rows.length === 0) return;
 
     const earliestReportableMs =
-      at.getTime() - STRIPE_BACKDATE_CEILING_HOURS * MS_PER_HOUR;
+      at.getTime() -
+      (STRIPE_BACKDATE_CEILING_HOURS - BACKDATE_SAFETY_MARGIN_HOURS) *
+        MS_PER_HOUR;
 
     for (const row of rows) {
       // Zero usage: settle the cursor, never call Stripe.
@@ -130,7 +149,7 @@ export class StorageReportingService {
 
       const billingMonth = row.sealedHour.toISOString().slice(0, 7);
       try {
-        await this.deps.sendMeterEvent({
+        const { outcome } = await this.deps.sendMeterEvent({
           stripeCustomerId: org.stripeCustomerId,
           organizationId,
           value: row.megabytes,
@@ -140,6 +159,28 @@ export class StorageReportingService {
           }),
           timestamp: Math.floor(row.sealedHour.getTime() / 1000),
         });
+        if (outcome === "permanent-reject") {
+          // Stripe will NEVER accept this event: settle it (a poison row
+          // must not block every newer hour forever) and alert — this is
+          // usage that needs the meterEventAdjustments runbook.
+          logger.error(
+            {
+              organizationId,
+              sealedHour: row.sealedHour,
+              megabytes: row.megabytes,
+            },
+            "ALARM: Stripe permanently rejected a storage meter event — " +
+              "settled WITHOUT reporting; recover via meterEventAdjustments",
+          );
+          this.deps.onReportingAlert({
+            organizationId,
+            kind: "permanent-reject",
+            detail: {
+              sealedHour: row.sealedHour.toISOString(),
+              megabytes: String(row.megabytes),
+            },
+          });
+        }
         await this.deps.usageHourly.markReported({
           organizationId,
           sealedHour: row.sealedHour,

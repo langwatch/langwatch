@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { NurturingService } from "./nurturing.service";
 
 /**
@@ -21,7 +21,7 @@ vi.mock("../../../src/utils/logger/server", () => ({
 }));
 vi.mock("../../../src/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 describe("NurturingService app wiring", () => {
@@ -39,15 +39,18 @@ describe("NurturingService app wiring", () => {
     });
 
     it("makes HTTP requests when methods are called", async () => {
-      const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(
-        new Response(null, { status: 200 }),
-      );
+      const fetchFn = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(new Response(null, { status: 200 }));
       const service = NurturingService.create({
         config: { customerIoApiKey: "test-key", customerIoRegion: "us" },
         fetchFn,
       });
 
-      await service.identifyUser({ userId: "user-1", traits: { email: "a@b.com" } });
+      await service.identifyUser({
+        userId: "user-1",
+        traits: { email: "a@b.com" },
+      });
 
       expect(fetchFn).toHaveBeenCalledTimes(1);
     });
@@ -71,15 +74,18 @@ describe("NurturingService app wiring", () => {
   describe("when the app config has no customerIoRegion", () => {
     /** @scenario 'Region defaults to EU when CUSTOMER_IO_REGION is not set' */
     it("defaults to the EU regional endpoint", async () => {
-      const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(
-        new Response(null, { status: 200 }),
-      );
+      const fetchFn = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(new Response(null, { status: 200 }));
       const service = NurturingService.create({
         config: { customerIoApiKey: "key", customerIoRegion: undefined },
         fetchFn,
       });
 
-      await service.identifyUser({ userId: "user-1", traits: { email: "a@b.com" } });
+      await service.identifyUser({
+        userId: "user-1",
+        traits: { email: "a@b.com" },
+      });
 
       const [url] = fetchFn.mock.calls[0]!;
       expect(url).toContain("cdp-eu.customer.io");
@@ -97,15 +103,18 @@ describe("NurturingService app wiring", () => {
 
   describe("when region is set to 'eu'", () => {
     it("routes requests to the EU endpoint", async () => {
-      const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(
-        new Response(null, { status: 200 }),
-      );
+      const fetchFn = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(new Response(null, { status: 200 }));
       const service = NurturingService.create({
         config: { customerIoApiKey: "key", customerIoRegion: "eu" },
         fetchFn,
       });
 
-      await service.identifyUser({ userId: "user-1", traits: { email: "a@b.com" } });
+      await service.identifyUser({
+        userId: "user-1",
+        traits: { email: "a@b.com" },
+      });
 
       const [url] = fetchFn.mock.calls[0]!;
       expect(url).toContain("cdp-eu.customer.io");

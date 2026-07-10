@@ -2,10 +2,13 @@ import {
   IncomingWebhook,
   type IncomingWebhookSendArguments,
 } from "@slack/webhook";
+import type { AppConfig } from "../../../src/server/app-layer/config";
 import { sendUsageLimitEmail } from "../../../src/server/mailer/usageLimitEmail";
 import { createLogger } from "../../../src/utils/logger/server";
-import { captureException, toError } from "../../../src/utils/posthogErrorCapture";
-import type { AppConfig } from "../../../src/server/app-layer/config";
+import {
+  captureException,
+  toError,
+} from "../../../src/utils/posthogErrorCapture";
 import type {
   LicensePurchaseNotificationPayload,
   PlanLimitNotificationContext,
@@ -288,8 +291,7 @@ export class NotificationService {
           timeout: EXTERNAL_SERVICE_TIMEOUT_MS,
         }));
     this.fetchFn =
-      options?.fetchFn ??
-      ((...args) => fetch(...args)) as typeof fetch;
+      options?.fetchFn ?? (((...args) => fetch(...args)) as typeof fetch);
   }
 
   /**
@@ -443,7 +445,9 @@ export class NotificationService {
   /**
    * Sends a Slack notification for a new signup.
    */
-  async sendSlackSignupEvent(payload: SignupNotificationPayload): Promise<void> {
+  async sendSlackSignupEvent(
+    payload: SignupNotificationPayload,
+  ): Promise<void> {
     const details = [
       payload.phoneNumber,
       payload.utmCampaign ? `Campaign: ${payload.utmCampaign}` : null,
@@ -519,24 +523,57 @@ export class NotificationService {
 
     const nameParts = (payload.userName ?? "").split(" ").filter(Boolean);
     const firstName = nameParts[0] ?? "";
-    const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1]! : "";
+    const lastName =
+      nameParts.length > 1 ? nameParts[nameParts.length - 1]! : "";
 
     const signUpData = payload.signUpData;
 
     const formData = {
       submittedAt: Date.now(),
       fields: [
-        { objectTypeId: "0-1", name: "company", value: payload.organizationName ?? "" },
+        {
+          objectTypeId: "0-1",
+          name: "company",
+          value: payload.organizationName ?? "",
+        },
         { objectTypeId: "0-1", name: "firstname", value: firstName },
         { objectTypeId: "0-1", name: "lastname", value: lastName },
         { objectTypeId: "0-1", name: "email", value: payload.userEmail ?? "" },
-        { objectTypeId: "0-1", name: "mobilephone", value: payload.phoneNumber ?? "" },
-        { objectTypeId: "0-1", name: "Features_usage_multiple", value: signUpData?.featureUsage ?? "Other" },
-        { objectTypeId: "0-1", name: "user_role", value: signUpData?.yourRole ?? "Other" },
-        { objectTypeId: "0-1", name: "product_usage", value: signUpData?.usage ?? "" },
-        { objectTypeId: "0-1", name: "product_solution", value: signUpData?.solution ?? "" },
-        { objectTypeId: "0-1", name: "organization_size", value: signUpData?.companySize ?? "1" },
-        { objectTypeId: "0-1", name: "utm_campaign", value: signUpData?.utmCampaign ?? payload.utmCampaign ?? "" },
+        {
+          objectTypeId: "0-1",
+          name: "mobilephone",
+          value: payload.phoneNumber ?? "",
+        },
+        {
+          objectTypeId: "0-1",
+          name: "Features_usage_multiple",
+          value: signUpData?.featureUsage ?? "Other",
+        },
+        {
+          objectTypeId: "0-1",
+          name: "user_role",
+          value: signUpData?.yourRole ?? "Other",
+        },
+        {
+          objectTypeId: "0-1",
+          name: "product_usage",
+          value: signUpData?.usage ?? "",
+        },
+        {
+          objectTypeId: "0-1",
+          name: "product_solution",
+          value: signUpData?.solution ?? "",
+        },
+        {
+          objectTypeId: "0-1",
+          name: "organization_size",
+          value: signUpData?.companySize ?? "1",
+        },
+        {
+          objectTypeId: "0-1",
+          name: "utm_campaign",
+          value: signUpData?.utmCampaign ?? payload.utmCampaign ?? "",
+        },
       ],
       context: {
         pageUri: "app.langwatch.ai",
@@ -639,10 +676,7 @@ export class NotificationService {
         );
       }
     } catch (error) {
-      logger.error(
-        { error },
-        "Failed to send HubSpot plan-limit notification",
-      );
+      logger.error({ error }, "Failed to send HubSpot plan-limit notification");
       captureException(toError(error));
     } finally {
       clearTimeout(timeoutId);

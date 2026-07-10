@@ -37,7 +37,11 @@ import { handleLicensePurchase } from "../../../ee/billing/services/licensePurch
 import { createSeatEventSubscriptionFns } from "../../../ee/billing/services/seatEventSubscription";
 import { EESubscriptionService } from "../../../ee/billing/services/subscription.service";
 import * as subscriptionItemCalculator from "../../../ee/billing/services/subscriptionItemCalculator";
-import { StripeUsageReportingService } from "../../../ee/billing/services/usageReportingService";
+import {
+  isStripeAuthenticationError,
+  isStripeInvalidRequestError,
+  StripeUsageReportingService,
+} from "../../../ee/billing/services/usageReportingService";
 import {
   EEWebhookService,
   type WebhookService,
@@ -210,6 +214,28 @@ export function initializeWebApp(): App {
 
 export function initializeWorkerApp(): App {
   return initializeDefaultApp({ processRole: "worker" });
+}
+
+/**
+ * Per-process 5-minute memo over a per-org PRODUCT flag check. The storage
+ * sweep evaluates its gates for every billable org every sealed hour; an
+ * uncached check would be a PostHog /flags N+1 (~200 orgs x 24/day) for
+ * values that change on rollout timescales.
+ */
+function memoizeOrgFlag(
+  key: "release_storage_boundary_metering" | "release_storage_boundary_billing",
+): (organizationId: string) => Promise<boolean> {
+  const memo = new Map<string, { value: boolean; expiresAt: number }>();
+  return async (organizationId: string) => {
+    const cached = memo.get(organizationId);
+    if (cached && cached.expiresAt > Date.now()) return cached.value;
+    const value = await featureFlagService.isEnabled(key, {
+      distinctId: organizationId,
+      defaultValue: false,
+    });
+    memo.set(organizationId, { value, expiresAt: Date.now() + 300_000 });
+    return value;
+  };
 }
 
 export function initializeDefaultApp(options?: {
@@ -675,11 +701,7 @@ export function initializeDefaultApp(options?: {
     ? new StorageReportingService({
         usageHourly: new PrismaStorageUsageHourlyRepository(prisma),
         checkpoints: new PrismaStorageBillingCheckpointRepository(prisma),
-        isBillingEnabled: (organizationId) =>
-          featureFlagService.isEnabled("release_storage_boundary_billing", {
-            distinctId: organizationId,
-            defaultValue: false,
-          }),
+        isBillingEnabled: memoizeOrgFlag("release_storage_boundary_billing"),
         getBillableOrg: (organizationId) =>
           organizations.getOrganizationForBilling(organizationId),
         sendMeterEvent: async ({
@@ -698,18 +720,27 @@ export function initializeDefaultApp(options?: {
               identifier,
               timestamp,
             });
+            return { outcome: "sent" as const };
           } catch (error) {
             // The deterministic identifier is the idempotency key: Stripe
             // already recorded this (org, hour) — a resend after a lost
             // confirmation is success, not failure.
             if (
-              error instanceof Error &&
-              "code" in error &&
-              (error as { code?: string }).code === "resource_already_exists"
+              isStripeInvalidRequestError(error) &&
+              error.code === "resource_already_exists"
             ) {
-              return;
+              return { outcome: "duplicate" as const };
             }
-            throw error;
+            // Any other invalid-request / auth error is PERMANENT: Stripe
+            // will never accept this event, so retrying would wedge the
+            // org's oldest-first queue behind a poison row forever.
+            if (
+              isStripeInvalidRequestError(error) ||
+              isStripeAuthenticationError(error)
+            ) {
+              return { outcome: "permanent-reject" as const };
+            }
+            throw error; // transient: network / 5xx / rate limit
           }
         },
         onReportingAlert: ({ organizationId, kind, detail }) => {
@@ -731,19 +762,7 @@ export function initializeDefaultApp(options?: {
     // Memoized per process (5 min): the sweep checks every billable org each
     // sealed hour, and an uncached PRODUCT-scope check would hit PostHog
     // ~200x/hour while the engine is dark.
-    isMeteringEnabled: (() => {
-      const memo = new Map<string, { value: boolean; expiresAt: number }>();
-      return async (organizationId: string) => {
-        const cached = memo.get(organizationId);
-        if (cached && cached.expiresAt > Date.now()) return cached.value;
-        const value = await featureFlagService.isEnabled(
-          "release_storage_boundary_metering",
-          { distinctId: organizationId, defaultValue: false },
-        );
-        memo.set(organizationId, { value, expiresAt: Date.now() + 300_000 });
-        return value;
-      };
-    })(),
+    isMeteringEnabled: memoizeOrgFlag("release_storage_boundary_metering"),
     measurement: storageBoundaryMeasurement,
     exits: new BoundaryExitService({ events: storageBoundaryEvents }),
     audits: storageAudits,

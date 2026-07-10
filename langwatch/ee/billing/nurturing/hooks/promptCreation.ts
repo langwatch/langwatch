@@ -1,7 +1,10 @@
 import type { PrismaClient } from "@prisma/client";
 import { getApp } from "../../../../src/server/app-layer/app";
 import { createLogger } from "../../../../src/utils/logger/server";
-import { captureException, toError } from "../../../../src/utils/posthogErrorCapture";
+import {
+  captureException,
+  toError,
+} from "../../../../src/utils/posthogErrorCapture";
 
 const logger = createLogger("ee:nurturing:prompt-creation");
 

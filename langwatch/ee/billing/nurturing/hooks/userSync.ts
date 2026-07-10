@@ -1,7 +1,7 @@
 import { getApp } from "../../../../src/server/app-layer/app";
 import { prisma } from "../../../../src/server/db";
 import { captureException } from "../../../../src/utils/posthogErrorCapture";
-import type { CioPersonTraits, CioOrgTraits } from "../types";
+import type { CioOrgTraits, CioPersonTraits } from "../types";
 
 /**
  * Tracks which users have had a full CIO profile sync this process lifetime.

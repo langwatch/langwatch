@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireSignupNurturingCalls } from "./signupIdentification";
 
 // Suppress logger output
@@ -12,7 +12,7 @@ vi.mock("../../../../src/utils/logger/server", () => ({
 }));
 vi.mock("../../../../src/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 const mockNurturing = {
@@ -127,7 +127,9 @@ describe("Signup identification hook", () => {
 
       const args = mockNurturing.identifyUser.mock.calls[0]![0];
       expect(args.traits.createdAt).toBeDefined();
-      expect(new Date(args.traits.createdAt).toISOString()).toBe(args.traits.createdAt);
+      expect(new Date(args.traits.createdAt).toISOString()).toBe(
+        args.traits.createdAt,
+      );
     });
 
     /** @scenario 'New signup associates user with organization via group call' */

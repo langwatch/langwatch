@@ -20,14 +20,17 @@ function makeReporter({
   billingEnabled = true,
   failSends = 0,
   alreadyExists = false,
+  permanentReject = false,
 }: {
   billingEnabled?: boolean;
   failSends?: number;
   alreadyExists?: boolean;
+  permanentReject?: boolean;
 } = {}) {
   const sent: { identifier: string; value: number; timestamp: number }[] = [];
   const alerts: { kind: string }[] = [];
   let remainingFailures = failSends;
+  let rejectNext = permanentReject;
   const service = new StorageReportingService({
     usageHourly,
     checkpoints,
@@ -41,13 +44,17 @@ function makeReporter({
         remainingFailures -= 1;
         throw new Error("stripe transient error");
       }
+      if (rejectNext) {
+        rejectNext = false;
+        return { outcome: "permanent-reject" as const };
+      }
       // Stripe-side dedup: a resend with a known identifier records nothing
-      // new — the sender treats it as success, exactly like the real client
-      // treats resource_already_exists.
+      // new — like the real client mapping resource_already_exists.
       if (alreadyExists && sent.some((s) => s.identifier === identifier)) {
-        return;
+        return { outcome: "duplicate" as const };
       }
       sent.push({ identifier, value, timestamp });
+      return { outcome: "sent" as const };
     }),
     onReportingAlert: ({ kind }) => alerts.push({ kind }),
   });
@@ -190,6 +197,27 @@ describe("StorageReportingService", () => {
         where: { organizationId },
       });
       expect(row?.reportedAt).not.toBeNull();
+    });
+  });
+
+  describe("when Stripe permanently rejects the oldest hour", () => {
+    it("settles the poison row with an alert and reports the next hour", async () => {
+      const organizationId = await orgWithHours("poison", [
+        { hoursAgo: 3, megabytes: 100 },
+        { hoursAgo: 2, megabytes: 200 },
+      ]);
+      const { service, sent, alerts } = makeReporter({ permanentReject: true });
+
+      await service.reportForOrg({ organizationId, at });
+
+      // The rejected hour is settled (never retried, never wedging the
+      // queue) and the newer hour reported normally in the same run.
+      expect(alerts).toEqual([{ kind: "permanent-reject" }]);
+      expect(sent.map((s) => s.value)).toEqual([200]);
+      const unreported = await prisma.storageUsageHourly.findMany({
+        where: { organizationId, reportedAt: null },
+      });
+      expect(unreported).toEqual([]);
     });
   });
 

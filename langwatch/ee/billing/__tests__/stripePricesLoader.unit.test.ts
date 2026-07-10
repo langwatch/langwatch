@@ -14,7 +14,9 @@ describe("stripeCatalog", () => {
       const parsed = parseStripePricesFile(stripeCatalogData);
 
       expect(parsed.schemaVersion).toBe(1);
-      expect(Object.keys(parsed.mapping)).toHaveLength(STRIPE_PRICE_NAMES.length);
+      expect(Object.keys(parsed.mapping)).toHaveLength(
+        STRIPE_PRICE_NAMES.length,
+      );
       expect(Object.keys(parsed.prices).length).toBeGreaterThan(0);
     });
 

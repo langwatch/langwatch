@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   fireActivityTrackingNurturing,
-  resetActivityTrackingCache,
   getActivityTrackingCacheSize,
+  resetActivityTrackingCache,
 } from "./activityTracking";
 
 // Suppress logger output
@@ -16,7 +16,7 @@ vi.mock("../../../../src/utils/logger/server", () => ({
 }));
 vi.mock("../../../../src/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
-  toError: vi.fn((e) => e instanceof Error ? e : new Error(String(e))),
+  toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
 const mockNurturing = {

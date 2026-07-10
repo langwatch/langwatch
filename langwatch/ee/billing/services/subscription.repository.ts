@@ -1,8 +1,8 @@
-import {
-  type PrismaClient,
-  type Subscription,
-  SubscriptionStatus as PrismaSubscriptionStatus,
+import type {
+  PrismaClient,
   PlanTypes as PrismaPlanTypes,
+  SubscriptionStatus as PrismaSubscriptionStatus,
+  Subscription,
 } from "@prisma/client";
 import type {
   CancelledSubscription,
@@ -56,10 +56,7 @@ export class PrismaSubscriptionRepository implements SubscriptionRepository {
     });
   }
 
-  async updatePlan(input: {
-    id: string;
-    plan: string;
-  }): Promise<Subscription> {
+  async updatePlan(input: { id: string; plan: string }): Promise<Subscription> {
     return await this.prisma.subscription.update({
       where: { id: input.id },
       data: { plan: input.plan as PrismaPlanTypes },
@@ -125,9 +122,7 @@ export class PrismaSubscriptionRepository implements SubscriptionRepository {
       data: {
         status: SubscriptionStatus.CANCELLED as PrismaSubscriptionStatus,
         endDate: new Date(),
-        ...Object.fromEntries(
-          NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null]),
-        ),
+        ...Object.fromEntries(NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null])),
       },
     });
   }
