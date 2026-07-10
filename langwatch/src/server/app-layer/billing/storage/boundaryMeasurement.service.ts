@@ -168,19 +168,112 @@ export class BoundaryMeasurementService {
     }
   }
 
+  /**
+   * Seeding / re-seed path (ADR-039 Decision 6): the SAME bounded query and
+   * cumulative-minus-prior delta as live measurement — the full-backlog
+   * query shape is never run, not even once — but emitted as SEED events
+   * keyed by the seed run's cause id. The cause key keeps a corrective
+   * re-seed from colliding with already-recorded events on the same slice
+   * (dedup is identity-level; idempotency here is VALUE-level: a re-run
+   * measures delta 0 and emits nothing). Groups already past their
+   * entitlement are skipped — they would enter and exit in the same breath.
+   */
+  async seedPartition({
+    organizationId,
+    projectId,
+    partitionStart,
+    at,
+    causeId,
+  }: {
+    organizationId: string;
+    projectId: string;
+    partitionStart: Date;
+    at: Date;
+    causeId: string;
+  }): Promise<{ appended: number }> {
+    if (!this.deps.resolveClickHouseClient) return { appended: 0 };
+    const cutoff = floorToDay(
+      new Date(at.getTime() - BILLABLE_AFTER_DAYS * MS_PER_DAY),
+    );
+    const sliceDate = new Date(cutoff.getTime() - MS_PER_DAY);
+    return await this.measurePartition({
+      organizationId,
+      projectId,
+      partitionStart,
+      cutoff,
+      sliceDate,
+      edge: "SEED",
+      causeId,
+      entitlementAt: at,
+    });
+  }
+
+  /**
+   * Reference-audit read (ADR-039 Decision 7): re-measure one partition's
+   * billable bytes — same bounded query, same whole-day cutoff and
+   * entitlement filter as seeding — WITHOUT emitting anything. The caller
+   * compares the result against the recorded live nets.
+   */
+  async measureReferenceBytes({
+    projectId,
+    partitionStart,
+    at,
+  }: {
+    projectId: string;
+    partitionStart: Date;
+    at: Date;
+  }): Promise<bigint> {
+    if (!this.deps.resolveClickHouseClient) return 0n;
+    const cutoff = floorToDay(
+      new Date(at.getTime() - BILLABLE_AFTER_DAYS * MS_PER_DAY),
+    );
+    const partitionEnd = new Date(partitionStart.getTime() + 7 * MS_PER_DAY);
+    const partitionLastDay = new Date(partitionEnd.getTime() - MS_PER_DAY);
+    const measured = await this.measureBillableBytes({
+      projectId,
+      partitionStart,
+      partitionEnd,
+      cutoff,
+    });
+
+    let total = 0n;
+    for (const group of measured) {
+      if (
+        group.retentionDays !== 0 &&
+        group.retentionDays <= BILLABLE_AFTER_DAYS
+      )
+        continue;
+      if (
+        group.retentionDays !== 0 &&
+        partitionLastDay.getTime() + group.retentionDays * MS_PER_DAY <=
+          at.getTime()
+      )
+        continue;
+      total += group.bytes;
+    }
+    return total;
+  }
+
   private async measurePartition({
     organizationId,
     projectId,
     partitionStart,
     cutoff,
     sliceDate,
+    edge = "ENTRY",
+    causeId,
+    entitlementAt,
   }: {
     organizationId: string;
     projectId: string;
     partitionStart: Date;
     cutoff: Date;
     sliceDate: Date;
-  }): Promise<void> {
+    edge?: "ENTRY" | "SEED";
+    causeId?: string;
+    /** When set, groups whose exit is already due are skipped (seeding). */
+    entitlementAt?: Date;
+  }): Promise<{ appended: number }> {
     const partitionKey = partitionKeyFor(partitionStart);
     const partitionEnd = new Date(partitionStart.getTime() + 7 * MS_PER_DAY);
     // Attribute the delta to the newest completed slice, clamped into this
@@ -210,6 +303,7 @@ export class BoundaryMeasurementService {
       ]),
     );
 
+    let appended = 0;
     for (const group of measured) {
       // Retention at or under the billable window never bills: those rows die
       // before day 35 (any still-visible ones are past their entitlement).
@@ -217,6 +311,17 @@ export class BoundaryMeasurementService {
       if (
         group.retentionDays !== 0 &&
         group.retentionDays <= BILLABLE_AFTER_DAYS
+      )
+        continue;
+
+      // Seeding only: rows physically present but already past their
+      // retention entitlement (TTL lag) must not enter the gauge — they
+      // would exit on the very next sweep anyway.
+      if (
+        entitlementAt &&
+        group.retentionDays !== 0 &&
+        attributedSlice.getTime() + group.retentionDays * MS_PER_DAY <=
+          entitlementAt.getTime()
       )
         continue;
 
@@ -232,13 +337,16 @@ export class BoundaryMeasurementService {
         partitionKey,
         sliceDate: attributedSlice,
         retentionDays: group.retentionDays,
-        edge: "ENTRY",
+        edge,
         deltaBytes,
         occurredAt: new Date(
           attributedSlice.getTime() + BILLABLE_AFTER_DAYS * MS_PER_DAY,
         ),
+        ...(causeId ? { causeId } : {}),
       });
+      appended += 1;
     }
+    return { appended };
   }
 
   /**

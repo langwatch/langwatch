@@ -29,6 +29,21 @@ export interface StorageSweepDeps {
       at: Date;
     }) => Promise<void>;
   };
+  /**
+   * The two-layer daily audit (phase 3): runs under the day claim, after
+   * the org's measurement/exits/sampling, so it checks today's settled
+   * state. Optional — absent in non-SaaS presets.
+   */
+  audits?: {
+    runFoldAudit: (params: {
+      organizationId: string;
+      at: Date;
+    }) => Promise<{ clean: boolean }>;
+    runReferenceAudit: (params: {
+      organizationId: string;
+      at: Date;
+    }) => Promise<{ clean: boolean; partitionsChecked: number }>;
+  };
   /** Per-org failure sink (alarmed, never rethrown — no poison org). */
   onOrgFailure: (params: { organizationId: string; error: unknown }) => void;
   /** Injectable wall clock for deterministic tests. */
@@ -82,6 +97,10 @@ export class StorageSweepService {
           await this.deps.exits.emitExitsDue({ organizationId, at });
         }
         await this.deps.sampling.sampleHoursForOrg({ organizationId, at });
+        if (entryDay.claimed && this.deps.audits) {
+          await this.deps.audits.runFoldAudit({ organizationId, at });
+          await this.deps.audits.runReferenceAudit({ organizationId, at });
+        }
       } catch (error) {
         logger.error(
           { organizationId, error },
