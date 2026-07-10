@@ -28,7 +28,42 @@ export interface ReportDispatchDeps {
     triggerId: string;
     emails: string[];
   }) => Promise<string[]>;
+  /**
+   * Query the top-N matching traces over the report's schedule window and
+   * return them as prerendered row lines (e.g. `"<traceId> — <input snippet>"`)
+   * capped for length and safe to `mrkdwn_escape`. Injected by the composition
+   * root so this module stays free of the trace-list service and its ClickHouse
+   * plumbing. Only called for `traceQuery` report sources.
+   */
+  listTraceRows(params: {
+    projectId: string;
+    filters: Record<string, unknown>;
+    from: number;
+    to: number;
+    limit: number;
+  }): Promise<string[]>;
   baseHost: string;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEK_MS = 7 * DAY_MS;
+
+/**
+ * Derive a report's trailing look-back window from its cron cadence — the span
+ * a fire should summarise ("since the last fire"). Deliberately a shape lookup
+ * on the standard 5-field cron, not a full parser:
+ *  - a weekday-pinned cron (`m h * * N`) → trailing 7 days;
+ *  - a plain daily cron    (`m h * * *`) → trailing 1 day;
+ *  - anything else (malformed / day-of-month pinned) → 7 days.
+ */
+export function reportWindowMs(cron: string): number {
+  const fields = cron.trim().split(/\s+/);
+  if (fields.length < 5) return WEEK_MS;
+  const dayOfMonth = fields[2];
+  const dayOfWeek = fields[4];
+  if (dayOfWeek !== "*") return WEEK_MS; // e.g. "0 9 * * 1" — weekly
+  if (dayOfMonth === "*") return DAY_MS; // e.g. "0 7 * * *" — daily
+  return WEEK_MS; // day-of-month pinned / anything else — default
 }
 
 /** Human summary of what a report renders (context `report.sourceLabel`). */
@@ -106,6 +141,24 @@ export async function dispatchScheduledReport({
     members?: string[];
     slackWebhook?: string;
   };
+
+  // Trace-query reports render REAL rows: the top-N matching traces over the
+  // window `[slot - windowMs, slot]`, where windowMs tracks the cron cadence.
+  // customGraph/dashboard sources stay rows-free (charts are a later phase) —
+  // they still ship the summary + deep link.
+  let rows: string[] = [];
+  if (report.source.kind === "traceQuery") {
+    const to = fire.slot.getTime();
+    const from = to - reportWindowMs(report.schedule.cron);
+    rows = await deps.listTraceRows({
+      projectId: fire.projectId,
+      filters: report.source.filters,
+      from,
+      to,
+      limit: report.source.topN,
+    });
+  }
+
   const context = buildReportTemplateContext({
     trigger: { id: trigger.id, name: trigger.name },
     report: {
@@ -116,7 +169,7 @@ export async function dispatchScheduledReport({
       ),
     },
     viewUrl: viewUrl(report.source, deps.baseHost, project.slug),
-    rows: [],
+    rows,
     occurredAt: fire.slot,
     project: { id: project.id, name: project.name, slug: project.slug },
     baseHost: deps.baseHost,

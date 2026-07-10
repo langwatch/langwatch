@@ -8,6 +8,7 @@ import { renderLiquid } from "./engine";
 import { errorMessage, renderWithFallback } from "./renderWithFallback";
 import type {
   GraphAlertTemplateContext,
+  ReportTemplateContext,
   TemplateContext,
 } from "./templateContext";
 
@@ -99,7 +100,7 @@ export async function renderTriggerSlack({
 }: {
   templateType: SlackTemplateType | null;
   template: string | null;
-  context: TemplateContext | GraphAlertTemplateContext;
+  context: TemplateContext | GraphAlertTemplateContext | ReportTemplateContext;
   /** Per-context default overrides (ADR-034 Phase 8.1). When omitted,
    *  the trace defaults apply — same behaviour as before. */
   defaults?: SlackRenderDefaults;

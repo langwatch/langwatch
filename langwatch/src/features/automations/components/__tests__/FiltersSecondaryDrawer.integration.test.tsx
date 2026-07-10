@@ -10,7 +10,10 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { INITIAL_GRAPH_ALERT_DRAFT } from "../../logic/draftReducer";
+import {
+  INITIAL_GRAPH_ALERT_DRAFT,
+  INITIAL_REPORT_DRAFT,
+} from "../../logic/draftReducer";
 import { FiltersSecondaryDrawer } from "../secondaries/FiltersSecondaryDrawer";
 
 vi.mock("~/utils/api", () => ({
@@ -74,6 +77,7 @@ const renderDrawer = (
       filters={{}}
       customGraphId="graph-1"
       graphAlert={INITIAL_GRAPH_ALERT_DRAFT}
+      report={INITIAL_REPORT_DRAFT}
       alertType={null}
       projectId="project-1"
       onSave={vi.fn()}

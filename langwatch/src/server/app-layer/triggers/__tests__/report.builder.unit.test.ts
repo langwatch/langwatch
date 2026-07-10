@@ -76,7 +76,9 @@ describe("extractReportFromTriggerRow", () => {
       const out = extractReportFromTriggerRow(row);
       expect(out?.source.kind).toBe("traceQuery");
       expect(out?.schedule.cron).toBe("0 9 * * 1");
-      expect((out as { members: string[] }).members).toEqual(["a@b.co"]);
+      expect((out as unknown as { members: string[] }).members).toEqual([
+        "a@b.co",
+      ]);
     });
   });
 

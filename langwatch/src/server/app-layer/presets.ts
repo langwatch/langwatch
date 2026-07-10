@@ -46,10 +46,14 @@ import { DataRetentionPolicyRepository } from "../data-retention/policy/dataRete
 import { DataRetentionPolicyService } from "../data-retention/policy/dataRetentionPolicy.service";
 import { RetentionPolicyCache } from "../data-retention/retentionPolicyCache";
 import { RetroactiveUpdateService } from "../data-retention/retroactive/retroactiveUpdate.service";
-import { PrismaScheduledJobRepository } from "./scheduler/scheduled-job.repository";
+import {
+  NullScheduledJobRepository,
+  PrismaScheduledJobRepository,
+} from "./scheduler/scheduled-job.repository";
 import { schedulerRegistry } from "./scheduler/scheduler.registry";
 import { SchedulerService } from "./scheduler/scheduler.service";
 import { dispatchScheduledReport } from "./reports/report-dispatch";
+import { formatTraceReportRow } from "./reports/trace-report-row";
 import { REPORT_SCHEDULER_TARGET_TYPE } from "./triggers/report.builder";
 import { sendRenderedTriggerEmail } from "~/server/mailer/triggerEmail";
 import { sendRenderedSlackMessage } from "~/server/triggers/sendSlackWebhook";
@@ -730,6 +734,27 @@ export function initializeDefaultApp(options?: {
                 triggerId,
                 emails,
               }),
+            // Render the top-N traces in the report window as compact row
+            // lines via the shared TraceListService. `filters` are carried on
+            // the contract but not yet applied to the SQL: the only
+            // filters-object → SQL builder (`generateClickHouseFilterConditions`)
+            // emits `ts.`-aliased conditions for a JOIN context, which are
+            // invalid against getList's unaliased `trace_summaries` bare-column
+            // `filterWhere` (and unsafe to alias-strip because of its correlated
+            // EXISTS subqueries). Until a bare-column object→filterWhere
+            // converter lands, rows are window-scoped real traces (newest
+            // first), not filter-scoped.
+            listTraceRows: async ({ projectId, from, to, limit }) => {
+              const page = await traceList.getList({
+                tenantId: projectId,
+                timeRange: { from, to },
+                sort: { columnId: "time", direction: "desc" },
+                page: 1,
+                pageSize: limit,
+                visibilityCutoffMs: null,
+              });
+              return page.items.map(formatTraceReportRow);
+            },
             baseHost: config.baseHost ?? env.BASE_HOST,
           },
           fire,
@@ -1134,7 +1159,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     usageLimits: UsageLimitService.createNull(),
     ops: {
       queues: new QueueService(new NullQueueRepository()),
-      scheduler: new SchedulerOpsService(new PrismaScheduledJobRepository(prisma)),
+      scheduler: new SchedulerOpsService(new NullScheduledJobRepository()),
       eventExplorer: new EventExplorerService(
         new NullEventExplorerRepository(),
       ),

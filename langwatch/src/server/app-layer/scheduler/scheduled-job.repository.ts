@@ -187,3 +187,26 @@ export class PrismaScheduledJobRepository implements ScheduledJobRepository {
     `;
   }
 }
+
+/**
+ * No-op `ScheduledJob` repository for the null preset (web boot / tests) where
+ * no scheduler runs and there is no `prisma` in scope. Reads return empty,
+ * writes are no-ops, and `claim` never wins — nothing fires. Mirrors the
+ * sibling `Null*` ops repositories so the null preset never touches Postgres.
+ */
+export class NullScheduledJobRepository implements ScheduledJobRepository {
+  async findDue(): Promise<ScheduledJobRecord[]> {
+    return [];
+  }
+  async earliestActiveNextRunAt(): Promise<Date | null> {
+    return null;
+  }
+  async claim(): Promise<boolean> {
+    return false;
+  }
+  async upsertForTarget(): Promise<void> {}
+  async deactivateForTarget(): Promise<void> {}
+  async listForOps(): Promise<ScheduledJobRecord[]> {
+    return [];
+  }
+}

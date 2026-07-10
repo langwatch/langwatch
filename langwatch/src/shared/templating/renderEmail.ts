@@ -11,6 +11,7 @@ import { markdownToEmailHtml } from "./markdown";
 import { renderWithFallback } from "./renderWithFallback";
 import type {
   GraphAlertTemplateContext,
+  ReportTemplateContext,
   TemplateContext,
 } from "./templateContext";
 
@@ -55,7 +56,7 @@ export async function renderTriggerEmail({
 }: {
   subjectTemplate: string | null;
   bodyTemplate: string | null;
-  context: TemplateContext | GraphAlertTemplateContext;
+  context: TemplateContext | GraphAlertTemplateContext | ReportTemplateContext;
   defaults?: { emailSubject: string; emailBody: string };
   testFire?: boolean;
 }): Promise<RenderedEmail> {
